@@ -10,6 +10,9 @@ import { ColaImpresion } from '../ColaImpresion';
 import { PanelInstalarPrograma } from '../PanelInstalarPrograma';
 import { TarjetaEquipo } from './TarjetaEquipo';
 import { TarjetaCompacta } from './TarjetaCompacta';
+import { PanelVistaPrevia, type PcPrevia } from './PanelVistaPrevia';
+import { configDe } from './logicaEquipo';
+import { tamanoEfectivo } from '@caprichos/compartido';
 import { esNueva, ordenarEquipos } from './logicaEquipo';
 import { contadorEquipos, equiposDelListado } from './logicaListado';
 import { VistaPieza } from '../mapa/VistaPiezaEjemplo';
@@ -48,6 +51,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
   const [guardando, setGuardando] = useState(false);
   const [instalar, setInstalar] = useState(false);
   const [abierta, setAbierta] = useState<string | null>(null);
+  const [previa, setPrevia] = useState<{ pcId: string | null; n: number }>({ pcId: null, n: 0 });
 
   const cargar = useCallback(async () => {
     try {
@@ -99,6 +103,16 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
   const nuevas = detalles.filter((d) => esNueva(d));
   const listado = useMemo(() => equiposDelListado(equiposOrdenados), [equiposOrdenados]);
   const areasSimples = useMemo(() => mapa?.areas.map((a) => ({ id: a.id, nombre: a.nombre })) ?? [], [mapa]);
+  const tamanosLocal = estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO };
+  const pcsPrevia = useMemo<PcPrevia[]>(
+    () =>
+      listado.items.map(({ equipo }) => {
+        const cfg = configDe(equipo);
+        return { id: equipo.deviceKeyId, nombre: equipo.nombre, bebida: tamanoEfectivo(cfg.tamanoBebida, tamanosLocal.bebida), general: tamanoEfectivo(cfg.tamanoGeneral, tamanosLocal.general) };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [listado],
+  );
   const equipoAbierto = listado.items.find((i) => i.equipo.deviceKeyId === abierta) ?? null;
 
   if (cargando && !mapa) return <Cargando mensaje="Consultando tus computadoras de impresión..." />;
@@ -162,11 +176,17 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
         {listado.items.length === 0 && <p className="if-vacio">Todavía no hay ninguna computadora. Pulsa «Agregar computadora».</p>}
         <div className="ic-grilla" data-testid="lista-pcs">
           {listado.items.map(({ equipo, duplicadoDe }) => (
-            <TarjetaCompacta key={equipo.deviceKeyId} equipo={equipo} areas={areasSimples} duplicadoDe={duplicadoDe} alAbrir={() => setAbierta(equipo.deviceKeyId)} />
+            <div key={equipo.deviceKeyId} className="ic-envoltura">
+              <TarjetaCompacta equipo={equipo} areas={areasSimples} duplicadoDe={duplicadoDe} alAbrir={() => setAbierta(equipo.deviceKeyId)} />
+              <button type="button" className="ic-ver" data-testid={`ver-ejemplos-${equipo.deviceKeyId}`} aria-label={`Ver ejemplos de lo que imprime ${equipo.nombre}`} onClick={() => setPrevia((p) => ({ pcId: equipo.deviceKeyId, n: p.n + 1 }))}>
+                👁 Ver ejemplos
+              </button>
+            </div>
           ))}
         </div>
         {listado.ocultas > 0 && <p className="if-sub" data-testid="pcs-ocultas">{listado.ocultas === 1 ? 'Hay 1 computadora antigua guardada' : `Hay ${listado.ocultas} computadoras antiguas guardadas`} (repetidas o reemplazadas): no se muestran aquí y nada se borró. Están en la Vista avanzada.</p>}
       </section>
+      <PanelVistaPrevia pcs={pcsPrevia} pcId={previa.pcId} abrir={previa.n} />
       {equipoAbierto && (
         <TarjetaEquipo
           key={equipoAbierto.equipo.deviceKeyId}
@@ -174,7 +194,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
           areas={areasSimples}
           categorias={mapa?.categorias ?? []}
           configsOtras={listado.items.filter((o) => o.equipo.deviceKeyId !== abierta).map((o) => o.equipo.config).filter((c): c is NonNullable<typeof c> => !!c)}
-          tamanosLocal={estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO }}
+          tamanosLocal={tamanosLocal}
           puedeEditar={puedeEditar}
           pendientes={equipoAbierto.equipo.pendientes}
           duplicadoDe={equipoAbierto.duplicadoDe}
