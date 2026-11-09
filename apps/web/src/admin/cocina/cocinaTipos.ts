@@ -42,7 +42,7 @@ export interface LineaComanda {
   combo?: string | null;
   combo_nombre?: string | null;
   /** pocoPedida: esta opción elegida es la menos pedida de su grupo (últimos 30 días) y el producto tiene el check. */
-  opciones?: Array<string | { id?: string; nombre: string; grupo?: string; pocoPedida?: boolean }>;
+  opciones?: Array<string | { id?: string; nombre: string; grupo?: string; pocoPedida?: boolean; motivoResaltado?: 'MANUAL' | 'MENOS_PEDIDA' }>;
   personas?: string[];
   nota?: string | null;
   area?: string;

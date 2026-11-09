@@ -507,6 +507,8 @@ model Opcion {
   precio_extra  Decimal       @default(0) @db.Decimal(12, 2)
   activo              Boolean              @default(true)
   agotado_hasta       DateTime?            @db.Timestamptz
+  /// «Resaltar siempre en cocina»: marca manual de la opción (vale en todos los productos que usan su grupo)
+  resaltar_siempre    Boolean              @default(false)
   grupo               GrupoOpciones        @relation(fields: [grupo_id], references: [id])
   valor               ListaValor           @relation(fields: [valor_id], references: [id])
   pedidoLineaOpciones PedidoLineaOpcion[]

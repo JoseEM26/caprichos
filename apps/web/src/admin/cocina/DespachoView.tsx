@@ -1,5 +1,5 @@
 import { RejillaComandas } from './RejillaComandas';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
@@ -7,7 +7,7 @@ import { despacharCompleto, devolverComanda, listarDespacho } from './cocinaApi'
 import { estaSilenciado, reproducirCampanaCocina, setSilenciado } from './audioAlerta';
 import { TiempoEspera } from './TiempoEspera';
 import { detalleLinea, textoSabores } from './cocinaTipos';
-import type { AreaDespacho, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
+import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
@@ -36,6 +36,23 @@ export const MODALIDAD: Record<string, { texto: string; icono: string; fondo: st
 };
 
 export { detalleLinea };
+
+/** Detalle de la línea («Grande · Stevia») con las opciones resaltadas (manual o menos pedida) en negrita ámbar y ⭐ de texto. */
+function detalleConResaltado(l: LineaComanda) {
+  const resaltadas = new Set(
+    (l.opciones || []).filter((o) => typeof o === 'object' && o?.pocoPedida === true).map((o) => (o as { nombre: string }).nombre),
+  );
+  return detalleLinea(l).map((t, i) => (
+    <Fragment key={i}>
+      {i > 0 && ' · '}
+      {resaltadas.has(t) ? (
+        <span data-testid="opcion-resaltada" style={{ fontWeight: 800, color: '#0B2C3E', background: '#FFE08A', border: '2px solid #D99E39', borderRadius: 6, padding: '0 5px' }}>
+          ⭐ {t}
+        </span>
+      ) : t}
+    </Fragment>
+  ));
+}
 
 /** Quién o dónde: mesa, cliente o ambos. */
 function destino(p: PedidoDespacho): string {
@@ -117,7 +134,7 @@ function Areas({
                         {textoSabores(l)}
                       </div>
                     )}
-                    {detalleLinea(l).length > 0 && <div data-testid="linea-detalle" style={{ fontSize: '14px', fontWeight: 600, color: SUAVE }}>{detalleLinea(l).join(' · ')}</div>}
+                    {detalleLinea(l).length > 0 && <div data-testid="linea-detalle" style={{ fontSize: '14px', fontWeight: 600, color: SUAVE }}>{detalleConResaltado(l)}</div>}
                     {l.nota && (
                       <div data-testid="linea-nota" style={{ fontSize: '14px', fontWeight: 800, background: AVISO_FONDO, color: NAVY, border: `1px solid ${AVISO_BORDE}`, display: 'inline-block', padding: '1px 8px', marginTop: '2px', borderRadius: '6px' }}>Nota: {l.nota}</div>
                     )}

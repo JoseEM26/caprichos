@@ -138,3 +138,7 @@
   .eo-vivo-panel { display: flex; margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .eo-orden-fila { transition: none; } }
+
+/* Interruptor «Resaltar siempre en cocina» de cada opción: objetivo táctil de 44 px */
+.eo-resaltar { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--cp-navy); cursor: pointer; }
+.eo-resaltar input { width: 24px; height: 24px; accent-color: #D99E39; }

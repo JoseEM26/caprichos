@@ -71,23 +71,29 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
   opciones.forEach((o, i) => {
     const texto = normalizarOpcion(o);
     const destacada = typeof o === 'object' && o !== null && o.pocoPedida === true;
+    const manual = destacada && typeof o === 'object' && o.motivoResaltado === 'MANUAL';
     partes.push(
       destacada ? (
         <span
           key={`op-${i}`}
-          data-testid="opcion-poco-pedida"
-          title="Poco pedida: la opción que menos se eligió en su grupo (últimos 30 días)"
+          data-testid={manual ? 'opcion-resaltada-manual' : 'opcion-poco-pedida'}
+          data-resaltada="true"
+          title={
+            manual
+              ? 'Resaltada siempre: marcada a mano en el producto para que cocina la vea'
+              : 'Poco pedida: la opción que menos se eligió en su grupo (últimos 30 días)'
+          }
           style={{
             fontWeight: 800,
-            color: 'var(--cp-navy)',
-            background: 'var(--cp-cream)',
-            border: '1.5px solid var(--cp-rust, #B2500F)',
+            color: '#0B2C3E',
+            background: '#FFE08A',
+            border: '2px solid #D99E39',
             borderRadius: '6px',
             padding: '0 5px',
           }}
         >
           {texto}
-          <span style={sinVista}> (poco pedida)</span>
+          {manual ? <span style={{ fontSize: '0.75em' }}> ⭐ SIEMPRE</span> : <span style={sinVista}> (poco pedida)</span>}
         </span>
       ) : (
         <span key={`op-${i}`}>{texto}</span>

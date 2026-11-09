@@ -23,7 +23,7 @@ import {
   extraerOpciones,
   obtenerInicioDiaLima,
 } from './cocina.util';
-import { opcionesMenosPedidasPorProducto } from './opcion-menos-pedida';
+import { motivoResaltado, resaltadoDeLineas, type Resaltado } from './opcion-menos-pedida';
 import { asignarNumeroDia } from './numero-dia';
 
 export interface DescuentoPedidoHook {
@@ -57,14 +57,14 @@ export function distribucionSabores(l: { sabores?: Array<{ sabor_nombre: string;
 
 /**
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
- * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
+ * `resaltado`: opciones resaltadas (manual «siempre» o automática «menos pedida»); cada opción elegida lleva
+ * `pocoPedida` y, si va resaltada, `motivoResaltado`.
  */
-export function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<string>> = new Map()) {
+export function lineasDeArea(lineas: any[], areaId: bigint, resaltado?: Resaltado) {
   return lineas
     .filter((l) => (l.area_id ?? l.producto?.categoria?.area_id) === areaId)
     .map((l) => {
       const comboNombre = extraerNombreCombo(l);
-      const menosPedidas = l.producto_id ? marcadas.get(String(l.producto_id)) : undefined;
       return {
         id: l.id.toString(),
         nombre: l.nombre,
@@ -76,10 +76,10 @@ export function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string
         sabores: (l.sabores ?? []).map((s: any) => ({ nombre: s.sabor_nombre, cantidad: s.cantidad })),
         combo: comboNombre,
         combo_nombre: comboNombre,
-        opciones: extraerOpciones(l).map((o) => ({
-          ...o,
-          pocoPedida: Boolean(o.id && menosPedidas?.has(o.id)),
-        })),
+        opciones: extraerOpciones(l).map((o) => {
+          const motivo = motivoResaltado(resaltado, l.producto_id ? String(l.producto_id) : null, o.id);
+          return { ...o, pocoPedida: motivo !== null, ...(motivo ? { motivoResaltado: motivo } : {}) };
+        }),
         personas: l.nombres_persona ?? [],
         nota: l.nota ?? null,
       };
@@ -360,20 +360,6 @@ export class ComandasService {
   }
 
   /**
-   * Opciones «menos pedida» de los productos dados (ids repetidos o nulos se ignoran).
-   * Si el cálculo falla, la cocina sigue funcionando sin resaltado.
-   */
-  private async opcionesMenosPedida(productoIds: Array<string | null>): Promise<Map<string, Set<string>>> {
-    const ids = productoIds.filter((id): id is string => !!id);
-    if (ids.length === 0) return new Map();
-    try {
-      return await opcionesMenosPedidasPorProducto(this.prisma, ids);
-    } catch {
-      return new Map();
-    }
-  }
-
-  /**
    * GET /admin/cocina/ajustes
    * Ajustes de la pantalla de cocina que lee el personal. Hoy: si despejar pide confirmación (por defecto, sí).
    */
@@ -462,10 +448,8 @@ export class ComandasService {
       ],
     });
 
-    // Opciones «menos pedida» de los productos de estos pedidos (caché de 10 min, una consulta por producto)
-    const marcadas = await this.opcionesMenosPedida(
-      comandas.flatMap((c) => c.pedido.lineas.map((l) => (l.producto_id ? l.producto_id.toString() : null))),
-    );
+    // Opciones resaltadas: manual (de la opción) y «menos pedida» (caché de 10 min por producto)
+    const marcadas = await resaltadoDeLineas(this.prisma, comandas.flatMap((c) => c.pedido.lineas));
 
     const lista = comandas.map((c) => {
       const p = c.pedido;

@@ -531,6 +531,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           id: o.id.toString(),
           nombre: o.valor?.nombre || '',
           precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+          resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
         })),
@@ -620,6 +621,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           id: o.id.toString(),
           nombre: o.valor?.nombre || '',
           precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+          resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
         })),
@@ -2180,6 +2182,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           valorId: o.valor_id.toString(),
           nombre: o.valor?.nombre || '',
           precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+          resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
         })),
@@ -2318,8 +2321,8 @@ export class CatalogoService implements OnApplicationBootstrap {
     }
     const opcion = await this.prisma.opcion.upsert({
       where: { grupo_id_valor_id: { grupo_id: gId, valor_id: valor.id } },
-      update: { activo: true, precio_extra: precioExtra },
-      create: { grupo_id: gId, valor_id: valor.id, precio_extra: precioExtra, activo: true },
+      update: { activo: true, precio_extra: precioExtra, ...(dto.resaltarSiempre !== undefined ? { resaltar_siempre: dto.resaltarSiempre } : {}) },
+      create: { grupo_id: gId, valor_id: valor.id, precio_extra: precioExtra, activo: true, resaltar_siempre: dto.resaltarSiempre ?? false },
     });
 
     await this.auditoria.registrar({
@@ -2329,7 +2332,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       resultado: 'OK',
       entidad: 'opcion',
       entidadId: opcion.id,
-      despues: { grupoId: gId.toString(), nombre: valor.nombre, precioExtra },
+      despues: { grupoId: gId.toString(), nombre: valor.nombre, precioExtra, resaltarSiempre: opcion.resaltar_siempre },
       partyId: usuario?.partyId,
       ip,
     });
@@ -2339,6 +2342,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       valorId: valor.id.toString(),
       nombre: valor.nombre,
       precioExtra: Number(Number(opcion.precio_extra).toFixed(2)),
+      resaltarSiempre: opcion.resaltar_siempre,
       activo: opcion.activo,
       disponible: estaDisponible(opcion.agotado_hasta),
     };
@@ -2393,6 +2397,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       data: {
         precio_extra: dto.precioExtra !== undefined ? dto.precioExtra : undefined,
         activo: dto.activo !== undefined ? dto.activo : undefined,
+        resaltar_siempre: dto.resaltarSiempre !== undefined ? dto.resaltarSiempre : undefined,
       },
     });
 
@@ -2403,11 +2408,12 @@ export class CatalogoService implements OnApplicationBootstrap {
       resultado: 'OK',
       entidad: 'opcion',
       entidadId: oId,
-      antes: { nombre: actual.valor?.nombre, precioExtra: Number(actual.precio_extra), activo: actual.activo },
+      antes: { nombre: actual.valor?.nombre, precioExtra: Number(actual.precio_extra), activo: actual.activo, resaltarSiempre: actual.resaltar_siempre },
       despues: {
         nombre: nuevoNombre || actual.valor?.nombre,
         precioExtra: Number(updated.precio_extra),
         activo: updated.activo,
+        resaltarSiempre: updated.resaltar_siempre,
       },
       partyId: usuario?.partyId,
       ip,
@@ -2418,6 +2424,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       valorId: updated.valor_id.toString(),
       nombre: nuevoNombre || actual.valor?.nombre || '',
       precioExtra: Number(Number(updated.precio_extra).toFixed(2)),
+      resaltarSiempre: updated.resaltar_siempre,
       activo: updated.activo,
       disponible: estaDisponible(updated.agotado_hasta),
     };

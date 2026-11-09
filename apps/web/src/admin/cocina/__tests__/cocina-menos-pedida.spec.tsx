@@ -137,3 +137,21 @@ describe('Pantalla de cocina: despejar según Confirmar al despejar', () => {
     expect(despejar).not.toHaveBeenCalled();
   });
 });
+
+describe('Resaltado manual «Resaltar siempre»', () => {
+  it('ComandaTarjeta pinta la opción manual con texto «SIEMPRE», navy sobre ámbar', () => {
+    const c: Comanda = {
+      ...base,
+      lineas: [{ id: '1', nombre: 'Frappé', cantidad: 1, opciones: [
+        { id: '1', nombre: 'Entera', pocoPedida: false },
+        { id: '2', nombre: 'Sin lactosa', pocoPedida: true, motivoResaltado: 'MANUAL' },
+      ] }],
+    };
+    render(<ComandaTarjeta comanda={c} soloLectura />);
+    const el = screen.getByTestId('opcion-resaltada-manual');
+    expect(el.textContent).toContain('Sin lactosa');
+    expect(el.textContent).toContain('SIEMPRE');
+    expect(el).toHaveStyle({ backgroundColor: '#FFE08A', color: '#0B2C3E' });
+    expect(screen.queryByTestId('opcion-poco-pedida')).toBeNull();
+  });
+});

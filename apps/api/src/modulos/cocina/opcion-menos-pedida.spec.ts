@@ -1,12 +1,15 @@
+import { construirEtiquetasBebida, construirTicketComandaSalon } from '../impresion/constructor-etiquetas';
 import {
   invalidarOpcionesMenosPedida,
+  motivoResaltado,
+  resaltadoDeLineas,
   marcadasDeGrupos,
   opcionesMenosPedidas,
   opcionesMenosPedidasPorProducto,
   TTL_MENOS_PEDIDA_MS,
   VENTANA_DIAS_MENOS_PEDIDA,
 } from './opcion-menos-pedida';
-import { ComandasService } from './comandas.service';
+import { ComandasService, lineasDeArea } from './comandas.service';
 import { confirmarDespejarActivo } from './cocina.util';
 
 jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
@@ -49,8 +52,9 @@ describe('opcionesMenosPedidas (cálculo puro)', () => {
     expect(opcionesMenosPedidas(['201', '202', '203'], conteos)).toEqual(['202']);
   });
 
-  it('siempre hay una resaltada aunque no haya ventas (todo en 0)', () => {
-    expect(opcionesMenosPedidas(['201', '202', '203'], new Map())).toEqual(['201', '202', '203']);
+  it('empate TOTAL (todo en 0, o todas con el mismo conteo): no hay «menos pedida», no se resalta nada', () => {
+    expect(opcionesMenosPedidas(['201', '202', '203'], new Map())).toEqual([]);
+    expect(opcionesMenosPedidas(['201', '202'], new Map([['201', 3], ['202', 3]]))).toEqual([]);
   });
 
   it('empate en el mínimo: se resaltan TODAS las empatadas, no solo una', () => {
@@ -255,5 +259,77 @@ describe('parámetro cocina_confirmar_despejar', () => {
     const prisma: any = { parametro: { findUnique: jest.fn().mockResolvedValue(null) } };
     const service = new ComandasService(prisma, { registrar: jest.fn() } as any);
     await expect(service.obtenerAjustes()).resolves.toEqual({ confirmarDespejar: true });
+  });
+});
+
+describe('resaltado manual («Resaltar siempre») y motivo', () => {
+  const lineas = [
+    { producto_id: 7n, opcionesElegidas: [{ opcion_id: 201n }, { opcion_id: 203n }] },
+  ];
+
+  it('manual marca aunque el check automático del producto esté apagado (no mira producto ni 30 días)', async () => {
+    invalidarOpcionesMenosPedida();
+    const prisma = {
+      ...prismaFalso({ flag: false }),
+      opcion: { findMany: jest.fn().mockResolvedValue([{ id: 203n }]) },
+    };
+    const r = await resaltadoDeLineas(prisma, lineas);
+    expect(motivoResaltado(r, '7', '203')).toBe('MANUAL');
+    expect(motivoResaltado(r, '7', '201')).toBeNull();
+    expect(prisma.pedidoLineaOpcion.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('automático marca la menos pedida; manual + automático no duplica y gana MANUAL', async () => {
+    invalidarOpcionesMenosPedida();
+    const prisma = {
+      ...prismaFalso({ flag: true, conteos: [{ opcion_id: 201n, n: 5 }, { opcion_id: 202n, n: 4 }, { opcion_id: 203n, n: 1 }] }),
+      opcion: { findMany: jest.fn().mockResolvedValue([{ id: 203n }]) },
+    };
+    const r = await resaltadoDeLineas(prisma, lineas);
+    expect(motivoResaltado(r, '7', '203')).toBe('MANUAL');
+    expect(motivoResaltado(r, '7', '201')).toBeNull();
+    const auto = { automaticas: new Map([['7', new Set(['201'])]]), manuales: new Set<string>() };
+    expect(motivoResaltado(auto, '7', '201')).toBe('MENOS_PEDIDA');
+  });
+
+  it('empate total en el producto con check encendido: nada se resalta', async () => {
+    invalidarOpcionesMenosPedida();
+    const prisma = {
+      ...prismaFalso({ flag: true, conteos: [] }),
+      opcion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const r = await resaltadoDeLineas(prisma, lineas);
+    expect(r.manuales.size).toBe(0);
+    expect(r.automaticas.get('7')?.size).toBe(0);
+  });
+
+  it('lineasDeArea trae pocoPedida y motivoResaltado MANUAL (cocina por área y Despacho usan esta función)', () => {
+    const l = {
+      id: 1n, nombre: 'Frappé', cantidad: 1, producto_id: 7n, area_id: 1n,
+      opcionesElegidas: [
+        { opcion_id: 201n, grupo_nombre: 'Leche', opcion_nombre: 'Entera' },
+        { opcion_id: 203n, grupo_nombre: 'Leche', opcion_nombre: 'Sin lactosa' },
+      ],
+    };
+    const out = lineasDeArea([l], 1n, { automaticas: new Map(), manuales: new Set(['203']) });
+    expect(out[0].opciones[0]).toMatchObject({ nombre: 'Entera', pocoPedida: false });
+    expect(out[0].opciones[0]).not.toHaveProperty('motivoResaltado');
+    expect(out[0].opciones[1]).toMatchObject({ nombre: 'Sin lactosa', pocoPedida: true, motivoResaltado: 'MANUAL' });
+  });
+
+  it('ticket y stickers imprimen la opción resaltada entre asteriscos', () => {
+    const pedido = {
+      id: 1n, codigo: 'CP-1', modalidad: 'LLEVAR', creado_en: new Date(), cliente_nombre: 'Ana',
+      lineas: [{
+        id: 1n, nombre: 'Frappé', cantidad: 1, area_id: 1n, tamano: null, area: { nombre: 'BARRA' },
+        producto: { categoria: { nombre: 'FRAPPES' } },
+        opcionesElegidas: [
+          { opcion_id: 201n, opcion_nombre: 'Entera', grupo_nombre: 'Leche', resaltada: false },
+          { opcion_id: 203n, opcion_nombre: 'Sin lactosa', grupo_nombre: 'Leche', resaltada: true },
+        ],
+      }],
+    };
+    expect(construirEtiquetasBebida(pedido)[0].opciones).toEqual(['Entera', '*Sin lactosa*']);
+    expect(construirTicketComandaSalon(pedido).lineas[0].opciones).toEqual(['Entera', '*Sin lactosa*']);
   });
 });

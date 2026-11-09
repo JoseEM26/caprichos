@@ -30,7 +30,11 @@ export const CRITERIO_BEBIDA_CATEGORIAS = [
   'BEBIDA',
 ];
 
-const nombreOpcion = (o: any): string => o.opcion_nombre || o.nombre || '';
+/** Nombre de la opción para imprimir; la resaltada (`resaltada`) va entre asteriscos: `*SIN LACTOSA*` (monocromo). */
+const nombreOpcion = (o: any): string => {
+  const n = o.opcion_nombre || o.nombre || '';
+  return n && o.resaltada === true ? `*${n}*` : n;
+};
 const grupoOpcion = (o: any): string => String(o.grupo_nombre || o.grupo || '');
 
 /** Opciones de la línea para la etiqueta: el reparto por sabor («2 Fresa · 3 Oreo · 1 Manjar») primero, si lo hay. */
@@ -207,7 +211,7 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
   for (const [areaNombre, lList] of areaMap.entries()) {
     const lineasArea: EtiquetaAreaLinea[] = lList.map((l) => {
       const opciones = opcionesConSabores(l, (l.opcionesElegidas || l.opciones || [])
-        .map((o: any) => o.opcion_nombre || o.nombre || '')
+        .map(nombreOpcion)
         .filter(Boolean));
       // Pieza de combo con parte opcional: el sticker no imprime la nota, así que «SIN …» y «EXTRA +n» van como opción
       if (l.linea_combo_id != null) {
@@ -285,7 +289,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
     }
     if (!esLineaBebida(linea)) return;
     const opciones = (linea.opcionesElegidas || linea.opciones || [])
-      .map((o: any) => o.opcion_nombre || o.nombre || '')
+      .map(nombreOpcion)
       .filter(Boolean);
 
     const contiene =
@@ -336,7 +340,7 @@ function lineaDeComanda(l: any, todas: any[]): LineaComandaDatos {
     cantidad: Number(l.cantidad) || 1,
     nombre: l.nombre,
     tamano: l.tamano || null,
-    opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean)),
+    opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map(nombreOpcion).filter(Boolean)),
     nota: l.nota || null,
     detalles: detalleLinea({ ...entrada, partes: [] }).detalles,
     ...(hijas.length > 0 ? { partes: hijas.map((h) => lineaDeComanda(h, todas)) } : {}),
