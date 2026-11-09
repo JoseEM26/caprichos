@@ -668,6 +668,16 @@ export function PedidosAdminView() {
   // Paginación fina: «1–12 de 18» con flechas
   const totalPaginas = Math.max(1, Math.ceil(cuentas.length / pedidosPorPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
+  // Al cambiar de página se vuelve al inicio de la lista (si no, en celular queda a media pantalla)
+  const listaRef = useRef<HTMLDivElement>(null);
+  const primeraPagina = useRef(true);
+  useEffect(() => {
+    if (primeraPagina.current) {
+      primeraPagina.current = false;
+      return;
+    }
+    listaRef.current?.scrollIntoView?.({ block: 'start' });
+  }, [paginaValida]);
   const pedidosPaginados = useMemo(() => {
     const inicio = (paginaValida - 1) * pedidosPorPagina;
     return cuentas.slice(inicio, inicio + pedidosPorPagina);
@@ -1034,7 +1044,7 @@ export function PedidosAdminView() {
         </section>
 
         {/* TARJETAS */}
-        <div className="cj2-lista">
+        <div className="cj2-lista" ref={listaRef}>
           {pedidosPaginados.length === 0 ? (
             <div className="cj2-vacio">
               {pedidos.length > 0 ? (
@@ -1121,6 +1131,7 @@ export function PedidosAdminView() {
               onClick={() => setPaginaActual((p) => Math.max(1, Math.min(p, totalPaginas) - 1))}
             >
               <Flecha />
+              <span className="cj2-pag-txt">Anterior</span>
             </button>
             {totalPaginas >= 5 ? (
               <label className="cj2-pag-ir">
@@ -1137,7 +1148,7 @@ export function PedidosAdminView() {
                 <span>/ {totalPaginas}</span>
               </label>
             ) : (
-              <span className="cj2-pag-n">{paginaValida}/{totalPaginas}</span>
+              <span className="cj2-pag-n">Página {paginaValida} de {totalPaginas}</span>
             )}
             <button
               type="button"
@@ -1146,6 +1157,7 @@ export function PedidosAdminView() {
               disabled={paginaValida >= totalPaginas}
               onClick={() => setPaginaActual((p) => Math.min(totalPaginas, Math.min(p, totalPaginas) + 1))}
             >
+              <span className="cj2-pag-txt">Siguiente</span>
               <Flecha der />
             </button>
             {totalPaginas >= 5 && (

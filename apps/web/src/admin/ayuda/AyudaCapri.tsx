@@ -146,7 +146,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
             className="ayuda-fab"
             onClick={alAbrir}
             {...arr.props}
-            aria-label="Abrir la ayuda de Capri. Mantén presionado para mover"
+            aria-label="Abrir la ayuda de Capri. Arrástrala para moverla"
             aria-expanded={false}
           >
             <span className="tip">¿Necesitas ayuda? Pregúntame cómo se hace.</span>
@@ -174,7 +174,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
             className="ayuda-fab-mini"
             onClick={alAbrir}
             {...arr.props}
-            aria-label="Abrir la ayuda de Capri. Mantén presionado para mover"
+            aria-label="Abrir la ayuda de Capri. Arrástrala para moverla"
             title="Ayuda de Capri"
           >
             <MascotaCapri estado="reposo" tamano={44} forzarFallback2D />
