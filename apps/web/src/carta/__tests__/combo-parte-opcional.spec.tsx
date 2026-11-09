@@ -77,6 +77,17 @@ describe('Carta: parte opcional del combo (papas)', () => {
     expect(l.comboElecciones).toContainEqual({ parteId: '101', productoId: '6', cantidad: 2 });
   });
 
+  it('se entiende cuál es el extra: ayuda «Toca +», «Suma S/ 6.00 al combo» y el resumen del pie', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo()} />);
+    // con lo incluido (1 papa) el cliente ve que ya está dentro del precio y cómo pedir más
+    expect(screen.getByTestId('ayuda-extra-101')).toHaveTextContent(/Ya incluye 1\. Toca \+ si quieres más: cada una suma S\/ 6\.00/);
+    expect(screen.queryByTestId('suma-extra-101')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar uno: PAPAS NATIVAS' }));
+    expect(screen.queryByTestId('ayuda-extra-101')).toBeNull();
+    expect(screen.getByTestId('suma-extra-101')).toHaveTextContent('Suma S/ 6.00 al combo');
+    expect(screen.getByTestId('resumen-combo')).toHaveTextContent(/\+1 PAPAS NATIVAS extra \(S\/ 6\.00\)/);
+  });
+
   it('no marcada por defecto: arranca en 0 y sin «Incluida»', () => {
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo({ incluidaPorDefecto: false })} />);
     expect(screen.getByTestId('parte-opcional-101')).toHaveTextContent('Sin papas nativas');

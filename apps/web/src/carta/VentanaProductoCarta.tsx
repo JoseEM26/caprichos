@@ -234,6 +234,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             ? (bebidas[parte.parteId] ?? []).slice(0, parte.cantidad * cantidad).filter(Boolean).map((c) => etiquetaBebida(parte, c)).join(' + ')
             : resumenReparto(parte, elegido[parte.parteId] ?? {}, undefined, ' + '),
         ),
+        // Extras de partes opcionales (papas): «+1 Papas nativas extra (S/ 6.00)»
+        ...partesOpc.flatMap((o) => {
+          const extras = Math.max(0, llevadasOpcional(o, opcionales) - o.incluidas);
+          return extras > 0 ? [`+${extras} ${o.nombre} extra (S/ ${(extras * o.precioExtra).toFixed(2)})`] : [];
+        }),
       ]
         .filter(Boolean)
         .join(' · ')

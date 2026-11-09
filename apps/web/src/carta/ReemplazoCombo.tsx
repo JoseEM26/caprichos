@@ -484,6 +484,16 @@ export function ParteOpcionalTarjeta({ parte, valor, onCambio, deshabilitar = fa
         {parte.precioExtra > 0 && parte.max > parte.incluidas && (
           <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>+ S/ {parte.precioExtra.toFixed(2)} por cada extra{extras > 0 ? ` (extra S/ ${(extras * parte.precioExtra).toFixed(2)})` : ''}</div>
         )}
+        {parte.precioExtra > 0 && parte.max > parte.incluidas && valor > 0 && extras === 0 && (
+          <div data-testid={`ayuda-extra-${parte.parteId}`} style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)' }}>
+            Ya incluye {parte.incluidas}. Toca + si quieres más: cada una suma S/ {parte.precioExtra.toFixed(2)}.
+          </div>
+        )}
+        {extras > 0 && (
+          <div data-testid={`suma-extra-${parte.parteId}`} style={{ fontSize: 12, fontWeight: 800, color: 'var(--cp-rust)' }}>
+            Suma S/ {(extras * parte.precioExtra).toFixed(2)} al combo
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {boton('−', 'Quitar uno', valor <= parte.min, valor - 1)}
