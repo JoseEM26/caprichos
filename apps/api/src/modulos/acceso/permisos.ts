@@ -77,6 +77,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'reportar' },
   // Chat de WhatsApp de un pedido propio (solo texto, solo mientras el pedido siga vigente)
   { modulo: 'repartos', accion: 'chat' },
+  // Ver en el mapa dónde está cada repartidor en ruta, en vivo: solo ADMIN, SUPERVISOR y CAJERO (ni mozo, ni cocina, ni otros repartidores)
+  { modulo: 'repartos', accion: 'ver_ubicacion' },
   { modulo: 'repartos', accion: 'liquidar' },
   // Cambio de ubicación de un delivery: Caja aprueba/cambia; el repartidor propone
   { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
@@ -269,6 +271,7 @@ export const MATRIZ: Record<string, string[]> = {
     'mesas/liberar',
     'repartos/ver',
     'repartos/seguir',
+    'repartos/ver_ubicacion',
     'repartos/liquidar',
     'vouchers/subir',
     'vouchers/ver',
