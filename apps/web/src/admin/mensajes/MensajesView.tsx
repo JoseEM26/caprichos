@@ -43,6 +43,7 @@ import { CuadroEscribir } from './CuadroEscribir';
 import { ModalRechazoCambio } from './ModalRechazoCambio';
 import { eventosDelChat } from './EventoSistema';
 import { esUsuarioWhatsApp, telefonoDeUrl } from './utilidadesChat';
+import { useAtrasCierraPanel, esVistaMovil } from '../../comun/useAtrasCierraPanel';
 import './mensajes.css';
 
 export { obtenerEstiloEspera, SIN_RESPUESTA_MIN_VISIBLE } from './utilidadesChat';
@@ -109,6 +110,19 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   // Vista móvil: chat abierto
   const [chatAbiertoMovil, setChatAbiertoMovil] = useState(false);
+  // «Atrás» del celular cierra el chat y vuelve a la lista (no sale de Mensajes); ?chat= reabre tras recargar
+  const chatDeUrl = React.useRef<string>(new URLSearchParams(window.location.search).get('chat') || '');
+  const [esMovil, setEsMovil] = useState(esVistaMovil);
+  useEffect(() => {
+    const onResize = () => setEsMovil(esVistaMovil());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  useAtrasCierraPanel(chatAbiertoMovil, () => setChatAbiertoMovil(false), {
+    activo: esMovil,
+    param: chatSeleccionadoId ? ['chat', chatSeleccionadoId] : undefined,
+    limpiar: ['telefono'],
+  });
 
   // Pantalla completa y zoom
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
@@ -218,9 +232,12 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         ? res.chats.find((c) => c.telefono.replace(/\D/g, '').endsWith(pendiente))
         : undefined;
       if (pendiente) telefonoPendiente.current = '';
+      const delEnlace = chatDeUrl.current ? res.chats.find((c) => c.id === chatDeUrl.current) : undefined;
+      chatDeUrl.current = '';
 
-      if (delCliente) {
-        setChatSeleccionadoId(delCliente.id);
+      if (delCliente || delEnlace) {
+        setChatSeleccionadoId((delCliente ?? delEnlace)!.id);
+        if (esVistaMovil()) setChatAbiertoMovil(true);
       } else if (res.chats.length > 0) {
         setChatSeleccionadoId((prev) => {
           if (mantenerSeleccion && prev && res.chats.some((c) => c.id === prev)) {
