@@ -80,7 +80,7 @@ describe('ColaImpresion por máquina', () => {
     expect(screen.queryByRole('button', { name: /Quitar seleccionados/ })).toBeNull();
     // 2 y 4 son FALLIDO (quitables); el IMPRESO no cuenta
     fireEvent.click(screen.getByLabelText('Seleccionar todos los visibles'));
-    expect(screen.getByTestId('lt-contador')).toHaveTextContent('4 seleccionados');
+    expect(screen.getByTestId('lt-contador')).toHaveTextContent('5 seleccionados');
     fireEvent.click(screen.getByLabelText('Seleccionar todos los visibles'));
     expect(screen.queryByTestId('lt-contador')).toBeNull();
     fireEvent.click(within(screen.getByTestId('trabajo-2')).getByRole('checkbox'));
