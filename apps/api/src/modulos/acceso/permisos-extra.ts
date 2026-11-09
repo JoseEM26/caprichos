@@ -38,7 +38,7 @@ export const NOMBRES_ACCION: Record<string, string> = {
   cobrar_ahora: 'Cobrar al momento', enviar: 'Enviar mensajes', tomar: 'Tomar', cerrar: 'Cerrar', abrir: 'Abrir', movimientos: 'Movimientos',
   desactivar: 'Desactivar', reactivar: 'Reactivar', restablecer: 'Restablecer claves', pagar: 'Pagar', reimprimir: 'Reimprimir', emitir: 'Emitir',
   agotar: 'Marcar agotado', ocultar: 'Ocultar', publicar: 'Publicar', liquidar: 'Liquidar', apertura: 'Apertura del día', cierre: 'Cierre',
-  traslados: 'Traslados', cambiar_estado: 'Cambiar estado', ajustar: 'Ajustar', responder: 'Responder',
+  traslados: 'Traslados', imprimir_precuenta: 'Imprimir precuenta', cambiar_estado: 'Cambiar estado', ajustar: 'Ajustar', responder: 'Responder',
 };
 
 export const nombreAccion = (a: string): string => NOMBRES_ACCION[a] ?? a.replace(/_/g, ' ');

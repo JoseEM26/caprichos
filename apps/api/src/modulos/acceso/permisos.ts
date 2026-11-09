@@ -57,6 +57,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Editar productos y datos de un pedido aún sin cobrar (Caja): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'editar' },
   { modulo: 'pedidos', accion: 'corregir_cliente' },
+  // Imprimir la precuenta de una mesa (ticket sin cobrar) desde cualquier equipo, tablet incluida: ADMIN, SUPERVISOR, CAJERO y MOZO
+  { modulo: 'pedidos', accion: 'imprimir_precuenta' },
   // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'extra' },
   { modulo: 'zonas', accion: 'ver' },
@@ -239,6 +241,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/validar_cambio_cobro',
     'pedidos/editar',
     'pedidos/corregir_cliente',
+    'pedidos/imprimir_precuenta',
     'pedidos/extra',
     'cortesias/dar',
     'cortesias/ver',
@@ -304,6 +307,7 @@ export const MATRIZ: Record<string, string[]> = {
     'whatsapp_salientes/reenviar',
     'whatsapp_salientes/descartar',
     'pedidos/crear',
+    'pedidos/imprimir_precuenta', // precuenta de sus mesas desde la tablet: encola el ticket, no cobra
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante

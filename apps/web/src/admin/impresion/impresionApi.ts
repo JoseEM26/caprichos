@@ -395,6 +395,11 @@ export const impresionApi = {
     return api.post(`/admin/pedidos/${pedidoId}/reimprimir`, body);
   },
 
+  /** Precuenta de un pedido sin cobrar: encola el ticket «PRE-CUENTA - SIN PAGAR» en la ticketera de pago (también para el mozo). */
+  imprimirPrecuenta: async (pedidoId: string | number): Promise<ResultadoReimpresionPedido> => {
+    return api.post(`/admin/pedidos/${pedidoId}/precuenta/imprimir`, {});
+  },
+
   obtenerEtiquetasPedido: async (pedidoId: string): Promise<EstadoEtiquetasPedido> => {
     return api.get<EstadoEtiquetasPedido>(`/admin/pedidos/${pedidoId}/etiquetas-estado`);
   },

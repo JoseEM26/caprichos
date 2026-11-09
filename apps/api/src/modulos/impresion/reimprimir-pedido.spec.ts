@@ -2,6 +2,7 @@ jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn(), JwtModule: {} }));
 import { HttpException } from '@nestjs/common';
 import { CONFIG_EQUIPO_NUEVO } from './ruteo-impresion';
 import { PedidosAdminController } from '../pedidos-admin/pedidos-admin.controller';
+import { MATRIZ } from '../acceso/permisos';
 import { CLAVE_PERMISO } from '../acceso/permiso.decorator';
 import { ImpresionService } from './impresion.service';
 
@@ -169,5 +170,51 @@ describe('reimprimirPedido (reimpresión rápida desde Caja)', () => {
     ctrl.impresionService = impresion;
     await ctrl.reimprimirPedido('9', { tipo: 'todo' }, { usuario: { partyId: '1' }, ip: '2.2.2.2' });
     expect(impresion.reimprimirPedido).toHaveBeenCalledWith('9', { tipo: 'todo' }, { partyId: '1' }, '2.2.2.2');
+  });
+
+  describe('imprimirPrecuenta (mozo / tablet)', () => {
+    it('mesa sin cobro: encola la PRE-CUENTA en la PC con «Ticket de pago»', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad: 'MESA', estado: 'ABIERTO', mesa_nombre: 'Mesa 3' }));
+      const r: any = await service.imprimirPrecuenta(9, false, { partyId: '3' } as any);
+      expect(creados()).toHaveLength(1);
+      expect(creados()[0]).toMatchObject({ tipo: 'TICKET_PAGO', destino_equipo_id: 1n, estado: 'PENDIENTE' });
+      expect(creados()[0].payload.marca).toMatch(/PRE-CUENTA/);
+      expect(r.porMaquina[0]).toMatchObject({ equipo: 'Caja', conectado: true });
+    });
+
+    it('PC sin conexión: queda pendiente y lo dice; sin PC con Ticket de pago: no encola y da el motivo', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad: 'MESA', estado: 'ABIERTO' }));
+      equipos = [{ ...CAJA, conectado: false }];
+      const r: any = await service.imprimirPrecuenta(9, false);
+      expect(creados()).toHaveLength(1);
+      expect(r.porMaquina[0].conectado).toBe(false);
+      prisma.printJob.create.mockClear();
+      equipos = [{ ...CAJA, config: cfg({ ticketera: true, ticketPago: false }) }];
+      const r2: any = await service.imprimirPrecuenta(9, false);
+      expect(prisma.printJob.create).not.toHaveBeenCalled();
+      expect(r2.omitidos[0].motivo).toMatch(/Mapa de impresión/);
+    });
+
+    it('no duplica si ya está en cola', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad: 'MESA', estado: 'ABIERTO' }));
+      prisma.printJob.findMany.mockResolvedValue([{ tipo: 'TICKET_PAGO', payload: {} }]);
+      const r: any = await service.imprimirPrecuenta(9, false);
+      expect(prisma.printJob.create).not.toHaveBeenCalled();
+      expect(r.yaEnCola).toHaveLength(1);
+    });
+
+    it('pedido cobrado o anulado no tiene precuenta (400)', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ cobros: [{ anulado_en: null }] }));
+      await expect(service.imprimirPrecuenta(9, false)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_YA_COBRADO' } });
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ estado: 'ANULADO' }));
+      await expect(service.imprimirPrecuenta(9, false)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_VIGENTE' } });
+    });
+
+    it('el endpoint pide su permiso propio, que tienen MOZO y CAJERO y no COCINA', async () => {
+      expect(Reflect.getMetadata(CLAVE_PERMISO, PedidosAdminController.prototype.imprimirPrecuenta)).toEqual({ modulo: 'pedidos', accion: 'imprimir_precuenta' });
+      for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('pedidos/imprimir_precuenta');
+      for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('pedidos/imprimir_precuenta');
+      expect(MATRIZ.MOZO).not.toContain('pedidos/cambiar_estado');
+    });
   });
 });

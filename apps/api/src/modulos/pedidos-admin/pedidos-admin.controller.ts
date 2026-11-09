@@ -226,6 +226,19 @@ export class PedidosAdminController {
     return this.impresionService.reimprimirPedido(id, dto, req?.usuario, req?.ip);
   }
 
+  /**
+   * Precuenta de una mesa/pedido sin cobrar: encola SOLO el ticket «PRE-CUENTA - SIN PAGAR» en la ticketera con «Ticket de pago».
+   * Lo piden también el mozo y la tablet, que no tienen `cambiar_estado`; por eso permiso propio y tipo fijo.
+   */
+  @Post(':id/precuenta/imprimir')
+  @Permiso('pedidos', 'imprimir_precuenta')
+  async imprimirPrecuenta(@Param('id') id: string, @Body() dto: { vista_previa?: boolean } = {}, @Req() req?: any) {
+    if (!this.impresionService) {
+      return { ok: false, mensaje: 'Módulo de impresión no configurado' };
+    }
+    return this.impresionService.imprimirPrecuenta(id, Boolean(dto?.vista_previa), req?.usuario, req?.ip);
+  }
+
   /** Estado de impresión de cada etiqueta del pedido (cola, impresa, fallida, vencida). */
   @Get(':id/etiquetas-estado')
   @Permiso('pedidos', 'ver')
