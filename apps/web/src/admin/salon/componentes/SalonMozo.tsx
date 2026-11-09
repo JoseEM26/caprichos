@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Cargando } from '../../../comun/Cargando';
 import { useEventos } from '../../../comun/socket';
 import { salonApi } from '../api';
-import type { MesaSalon, PisoPlano, PisoSalon } from '../tipos';
+import type { MesaSalon, MiPedido, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
 import { ModalNuevoPedidoMesa } from './ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './ModalPrecuenta';
@@ -10,6 +10,8 @@ import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { ListaEsperaMesa, useListaEspera } from './ListaEsperaMesa';
 import { nombreMesaSalon, useCambioDeMesa, useSumarMesas } from './CambioDeMesa';
 import { useSesion } from '../../../comun/sesion';
+import { MesasOcupadas, progresoDeMesa } from './MesasOcupadas';
+import type { ProgresoPiezas } from '../progresoMesa';
 
 export interface SalonMozoProps {
   /** Permiso mesas/liberar: la vista previa ofrece «Forzar liberación» */
@@ -38,6 +40,7 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   // Mesa ocupada tocada con lista de espera: ver su cuenta o darle la mesa a alguien de la lista
   const [decidirOcupadaId, setDecidirOcupadaId] = useState<string | null>(null);
   const [ofrecidaId, setOfrecidaId] = useState<string | null>(null);
+  const [extras, setExtras] = useState<MiPedido[]>([]);
   const espera = useListaEspera();
 
   const cargar = useCallback(async () => {
@@ -45,6 +48,11 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
       const res = await salonApi.obtenerMesas();
       setPisos(res.pisos || []);
       setError(false);
+      // Pedidos extra de las mesas (mismo refresco por sockets); si falla, solo se pierde el desglose
+      salonApi
+        .misPedidos('hoy')
+        .then((r) => setExtras((r?.pedidos ?? []).filter((p) => p.pedidoOrigenId)))
+        .catch(() => undefined);
     } catch {
       setError(true);
     } finally {
@@ -100,6 +108,9 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   }));
   const columnas = planoActual?.cuadriculaAncho ?? pisoActual?.cuadriculaAncho ?? 20;
   const filas = planoActual?.cuadriculaAlto ?? pisoActual?.cuadriculaAlto ?? 12;
+
+  const progresoMesas: Record<string, ProgresoPiezas> = {};
+  for (const m of mesas) if (m.estado === 'OCUPADA' && m.pedido) progresoMesas[m.id] = progresoDeMesa(m, extras);
 
   const buscarMesa = (id: string | null) => mesas.find((m) => m.id === id) ?? null;
   const cuenta = buscarMesa(cuentaId);
@@ -233,6 +244,13 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
             mesasSalon={mesas}
             onSeleccionarMesaSalon={tocarMesa}
             alMantenerMesaSalon={(m) => setVistaId(m.id)}
+            progresoMesas={progresoMesas}
+          />
+          <MesasOcupadas
+            mesas={mesas}
+            extras={extras}
+            alAbrirCuenta={(m) => setCuentaId(m.id)}
+            alAgregarExtra={tiene('pedidos/extra') ? (m) => setExtraMesa(m) : undefined}
           />
         </>
       )}
