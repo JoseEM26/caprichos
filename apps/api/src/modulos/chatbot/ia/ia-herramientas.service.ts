@@ -11,6 +11,19 @@ import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
 import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
 
+/** Reglas reales de pago y entrega (las que aplica el sistema): la IA no puede afirmar otras. */
+export const POLITICAS_DE_PAGO = {
+  delivery: 'En delivery se puede pagar en efectivo al recibir (el cliente indica con cuánto paga para el vuelto) o con tarjeta en el POS del repartidor. También puede pagar por adelantado con Yape, Plin o transferencia.',
+  local: 'En el local se paga al recibir o en Caja: efectivo, tarjeta, Yape, Plin o transferencia.',
+  digital: 'Yape, Plin y transferencia requieren enviar la captura (voucher) por el chat; Caja la valida. Sin captura legible no cuenta como pagado.',
+  pagoDividido: 'Un pedido puede pagarse dividido (por ejemplo parte por Yape y el resto en efectivo al recibir): eso es el plan de pago del pedido.',
+  saldoPendiente: 'Si el pedido tiene saldo por cobrar, se cobra con el medio que quede en el plan (efectivo o tarjeta al recibir). Agregar o corregir el delivery en el total y cambiar el plan de pago lo hace una persona del equipo.',
+  limitesDeLaIa: 'La IA no registra pagos, no confirma vouchers, no cambia montos, no promete reembolsos. Todo cambio del pedido es una solicitud que revisa una persona.',
+};
+
+/** Medios que se cobran al recibir (sin voucher). */
+const MEDIOS_AL_RECIBIR = ['EFECTIVO', 'TARJETA'];
+
 /**
  * Servicio de herramientas de SOLO LECTURA (function calling) para OpenAI.
  * Garantía de arquitectura: NINGUNA función modifica la base de datos ni aprueba pagos/pedidos.
@@ -109,9 +122,18 @@ export class IaHerramientasService {
       {
         type: 'function',
         function: {
+          name: 'politicasDePago',
+          description:
+            'Reglas REALES de pago y entrega de Caprichos (efectivo al recibir en delivery, tarjeta, pago dividido, voucher). Úsala antes de afirmar cualquier regla de pago; no afirmes nada que no esté aquí.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'estadoDePedido',
           description:
-            'Consulta el estado de un pedido del cliente actual. Con el código (ej: CP-0110) busca ese pedido; sin código devuelve su último pedido. Solo consulta pedidos que pertenezcan estrictamente al número del cliente.',
+            'Consulta un pedido del cliente actual: estado, total, delivery (incluido o no), pagado, saldo por cobrar, plan de pago y vouchers. Úsala SIEMPRE ante dudas de pago, saldo o delivery. Con el código (ej: CP-0110) busca ese pedido; sin código devuelve su último pedido. Solo consulta pedidos que pertenezcan estrictamente al número del cliente.',
           parameters: {
             type: 'object',
             properties: {
@@ -133,6 +155,11 @@ export class IaHerramientasService {
             type: 'object',
             properties: {
               motivo: { type: 'string', description: 'Motivo breve (ej: "reclamo por pedido frío").' },
+              solicitud: {
+                type: 'string',
+                description:
+                  'Lo que el cliente pide que una persona haga, con cifras SOLO de las herramientas (ej: "pagar el saldo de S/ 5 en efectivo al recibir; agregar delivery al total"). Tú no lo ejecutas.',
+              },
             },
             required: ['motivo'],
           },
@@ -187,6 +214,9 @@ export class IaHerramientasService {
         case 'mediosDePago':
           return { resultado: await this.mediosDePago() };
 
+        case 'politicasDePago':
+          return { resultado: POLITICAS_DE_PAGO };
+
         case 'estadoDePedido':
           return {
             resultado: await this.estadoDePedido(
@@ -200,6 +230,7 @@ export class IaHerramientasService {
             resultado: {
               derivado: true,
               motivo: String(args.motivo || 'Solicitud del cliente').slice(0, 200),
+              solicitud: args.solicitud ? String(args.solicitud).slice(0, 300) : undefined,
               instruccion: 'Dile al cliente con calidez que una persona del equipo lo atenderá. No prometas tiempos.',
             },
             necesitaDerivar: true,
@@ -500,11 +531,11 @@ export class IaHerramientasService {
 
     const codigoNorm = (codigo || '').trim().toUpperCase();
     const pedido = codigoNorm
-      ? await this.prisma.pedido.findUnique({ where: { codigo: codigoNorm }, include: { lineas: true } })
+      ? await this.prisma.pedido.findUnique({ where: { codigo: codigoNorm }, include: { lineas: true, planPago: true, cobros: true, zona: true, vouchers: true } })
       : await this.prisma.pedido.findFirst({
           where: { cliente_telefono: { endsWith: telBusqueda.slice(-9) } },
           orderBy: { creado_en: 'desc' },
-          include: { lineas: true },
+          include: { lineas: true, planPago: true, cobros: true, zona: true, vouchers: true },
         });
 
     if (!pedido) {
@@ -532,12 +563,46 @@ export class IaHerramientasService {
       (linea: any) => `${linea.cantidad}x ${linea.nombre || 'Producto'}`,
     );
 
+    const p: any = pedido;
+    const totalCobrable = Math.round((Number(p.total) + Number(p.propina ?? 0)) * 100) / 100;
+    const cobrado = (p.cobros || []).filter((c: any) => !c.anulado_en).reduce((a: number, c: any) => a + Number(c.total), 0);
+    const plan = (p.planPago || []).map((f: any) => ({ medio: f.medio, monto: Number(f.monto) }));
+    const vouchers = (p.vouchers || []).filter((v: any) => !v.reemplazado_en && !v.retirado);
+    const esDelivery = String(p.modalidad || '').toUpperCase() === 'DELIVERY';
+    const envio = p.envio != null ? Number(p.envio) : null;
+    const saldo = p.pago_estado === 'PAGADO' ? 0 : Math.max(0, Math.round((totalCobrable - cobrado) * 100) / 100);
+    const alRecibir = plan.filter((f: any) => MEDIOS_AL_RECIBIR.includes(f.medio)).reduce((a: number, f: any) => a + f.monto, 0);
+    const delivery = esDelivery
+      ? {
+          envioIncluidoEnTotal: envio != null && envio > 0,
+          envioCobrado: envio,
+          tarifaDeLaZona: p.zona?.tarifa != null ? Number(p.zona.tarifa) : null,
+          nota:
+            envio != null && envio > 0
+              ? 'El envío ya está sumado al total.'
+              : 'El total NO muestra costo de envío (puede faltar sumarlo o ser envío gratis). No afirmes una tarifa que no esté aquí; una persona lo confirma.',
+        }
+      : undefined;
+
     return {
       encontrado: true,
       codigo: pedido.codigo,
       estado: pedido.estado,
       modalidad: pedido.modalidad,
       total: Number(pedido.total),
+      totalACobrar: totalCobrable,
+      pago: {
+        estado: p.pago_estado ?? null,
+        medioElegido: p.pago_metodo ?? p.pago_preferido ?? null,
+        pagaCon: p.paga_con != null ? Number(p.paga_con) : null,
+        planDePago: plan,
+        pagadoRegistradoPorCaja: cobrado,
+        saldoPorCobrar: saldo,
+        montoPorCobrarAlRecibirSegunPlan: alRecibir,
+        vouchersEnRevision: vouchers.filter((v: any) => !v.revisado_en).length,
+        aviso: 'Pagado y saldo salen de lo que Caja registró; un voucher en revisión aún no cuenta como pagado.',
+      },
+      delivery,
       creado_en: pedido.creado_en.toISOString(),
       productos,
       tiempoEstimadoMin:
@@ -546,6 +611,24 @@ export class IaHerramientasService {
           : null,
       mensaje: `Pedido ${pedido.codigo} en estado ${pedido.estado}.`,
     };
+  }
+
+  /**
+   * Resumen de una línea del pedido más reciente del cliente, para la nota interna del asesor. Solo lectura; nunca lanza.
+   */
+  async resumenPedidoParaAsesor(telefonoCliente?: string | null): Promise<string | null> {
+    try {
+      const r: any = await this.estadoDePedido('', telefonoCliente);
+      if (!r?.encontrado) return null;
+      const partes = [`${r.codigo} (${r.estado}, ${r.modalidad})`, `total S/ ${r.totalACobrable ?? r.total}`];
+      if (r.pago) partes.push(`pagado por Caja S/ ${r.pago.pagadoRegistradoPorCaja}`, `saldo S/ ${r.pago.saldoPorCobrar}`);
+      if (r.pago?.planDePago?.length) partes.push(`plan: ${r.pago.planDePago.map((f: any) => `${f.medio} ${f.monto}`).join(' + ')}`);
+      if (r.delivery) partes.push(r.delivery.envioIncluidoEnTotal ? `envío S/ ${r.delivery.envioCobrado} incluido` : 'envío NO sumado al total');
+      if (r.pago?.vouchersEnRevision) partes.push(`${r.pago.vouchersEnRevision} voucher(s) sin revisar`);
+      return partes.join(' · ');
+    } catch {
+      return null;
+    }
   }
 
   /**

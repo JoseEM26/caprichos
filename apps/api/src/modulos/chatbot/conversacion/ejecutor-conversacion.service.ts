@@ -63,6 +63,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
+import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, notaResumenAsesor } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
   motivoSalidaValidarPago,
@@ -2396,6 +2397,13 @@ export class EjecutorConversacionService {
             esDerivacion = resIa.necesitaDerivar || !resIa.exito;
             motivoDeriv = resIa.motivoDerivacion || 'CONSULTA_IA_DERIVADA';
 
+            // Cliente atascado (frustrado, repite o pago/delivery sin avanzar): útil + derivar, sin esperar a que lo pida
+            const atascado = detectarCasoAtascado(accion.pregunta, historial);
+            if (atascado.atascado && !esDerivacion) {
+              esDerivacion = true;
+              motivoDeriv = atascado.motivo!;
+            }
+
             if (!esDerivacion) {
               const { productoConcreto, productosMultiples } = this.identificarProductosConsulta(
                 accion.pregunta,
@@ -2461,11 +2469,22 @@ export class EjecutorConversacionService {
         }
 
         if (esDerivacion) {
+          if (!MENCIONA_PERSONA.test(textoRespuesta)) {
+            textoRespuesta = `${textoRespuesta}\n\n${TEXTOS_ESCALADO.derivado(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre)}`.trim();
+          }
+          // «Necesita asesor»: queda urgente (arriba en Por atender) con la marca que usa el vigilante de espera.
+          // Si ya estaba escalado y nadie contestó, no se repite aviso ni nota.
+          const marcaPrevia = conversacion.urgente ? (flujoPersistir as any)?.escalado_ia : null;
+          const flujoEscalado = marcaPrevia
+            ? flujoPersistir
+            : { ...flujoPersistir, escalado_ia: { en: new Date().toISOString(), esperaEnviada: false } };
           await this.prisma.conversacion.update({
             where: { id: conversacion.id },
             data: {
               duenio: 'PERSONA',
-              urgente: Boolean(conversacion.urgente),
+              urgente: true,
+              motivo_derivacion: String(motivoDeriv).slice(0, 250),
+              flujo: flujoEscalado as any,
               estado:
                 !conversacion.estado || conversacion.estado === 'ATENDIDA'
                   ? 'ABIERTA'
@@ -2476,23 +2495,41 @@ export class EjecutorConversacionService {
             },
           });
 
-          const tituloNotif = `Atención en WhatsApp: duda de cliente (${nombreMostrar})`;
-          const mensajeNotif = `Consulta del cliente: "${accion.pregunta.slice(0, 100)}". Requiere atención de un asesor (${motivoDeriv}).`;
+          if (!marcaPrevia) {
+            const tituloNotif = `Necesita asesor en WhatsApp: ${nombreMostrar}`;
+            const mensajeNotif = `Consulta del cliente: "${accion.pregunta.slice(0, 100)}". Requiere atención de un asesor (${motivoDeriv}).`;
 
-          const notif = await this.prisma.notificacion.create({
-            data: {
-              tipo: 'ATENCION_WHATSAPP',
-              rol_destino: null,
+            const notif = await this.prisma.notificacion.create({
+              data: {
+                tipo: 'ATENCION_WHATSAPP',
+                rol_destino: null,
+                titulo: tituloNotif,
+                mensaje: mensajeNotif,
+                enlace: '/admin/mensajes',
+              },
+            });
+
+            this.eventos?.emitirAdmin('notificaciones:nueva', {
+              id: notif.id.toString(),
               titulo: tituloNotif,
-              mensaje: mensajeNotif,
-              enlace: '/admin/mensajes',
-            },
-          });
+            });
 
-          this.eventos?.emitirAdmin('notificaciones:nueva', {
-            id: notif.id.toString(),
-            titulo: tituloNotif,
-          });
+            // Nota interna para el asesor: qué pidió, pedido relacionado y qué ya respondió la IA
+            const pedidoResumen = await this.chatbotIaService?.resumenPedidoParaAsesor?.(telefonoCliente)?.catch(() => null);
+            await this.prisma.mensajeChat.create({
+              data: {
+                conversacion_id: conversacion.id,
+                direccion: 'SALE',
+                autor: 'BOT',
+                tipo: 'SISTEMA',
+                contenido: {
+                  texto: notaResumenAsesor({ motivo: motivoDeriv, pedidoCliente: accion.pregunta, ultimaRespuestaBot: textoRespuesta, pedido: pedidoResumen }),
+                  nota_asesor: true,
+                } as any,
+              },
+            });
+          }
+          this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
         }
 
         let metaId: string | null = null;

@@ -70,6 +70,11 @@ export class ChatbotIaService {
     }
   }
 
+  /** Resumen de una línea del pedido más reciente del cliente (para la nota del asesor); solo lectura. */
+  resumenPedidoParaAsesor(telefono?: string | null): Promise<string | null> {
+    return this.herramientasService.resumenPedidoParaAsesor?.(telefono) ?? Promise.resolve(null);
+  }
+
   /**
    * Indica si la clave de API de OpenAI está configurada.
    */
@@ -271,7 +276,8 @@ export class ChatbotIaService {
               necesitaDerivar = true;
             }
             if (nombreFuncion === 'pasarAPersona') {
-              motivoPasarAPersona = String(resultadoHerramienta.resultado?.motivo || 'IA_PASA_A_PERSONA');
+              const r = resultadoHerramienta.resultado;
+              motivoPasarAPersona = String(r?.motivo || 'IA_PASA_A_PERSONA') + (r?.solicitud ? ` | Solicitud: ${r.solicitud}` : '');
             }
 
             const prods =
