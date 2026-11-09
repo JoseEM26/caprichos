@@ -1816,6 +1816,29 @@ export class ImpresionService {
     return resultado;
   }
 
+  /**
+   * Precuenta de un pedido SIN cobrar (botón «Imprimir precuenta» del mozo y de la tablet): encola el ticket de pago
+   * con la marca «PRE-CUENTA - SIN PAGAR» por el mismo ruteo de PC que la reimpresión (PC con «Ticket de pago»).
+   * No exige que quien pide sea una PC vinculada. Un pedido cobrado o anulado no tiene precuenta: eso lo reimprime Caja.
+   */
+  async imprimirPrecuenta(pedidoIdInput: string | number, vistaPrevia: boolean, usuario?: UsuarioAutenticado, ip?: string) {
+    let id: bigint;
+    try {
+      id = BigInt(pedidoIdInput);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+    }
+    const p: any = await this.prisma.pedido.findUnique({ where: { id }, select: { estado: true, cobros: { select: { anulado_en: true } } } });
+    if (!p) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (ESTADOS_NO_VIGENTES.includes(p.estado)) {
+      throw new BadRequestException({ codigo: 'PEDIDO_NO_VIGENTE', mensaje: 'El pedido está anulado: no tiene precuenta' });
+    }
+    if ((p.cobros ?? []).some((c: any) => !c.anulado_en)) {
+      throw new BadRequestException({ codigo: 'PEDIDO_YA_COBRADO', mensaje: 'El pedido ya está cobrado: la precuenta no aplica. Pide el ticket a Caja.' });
+    }
+    return this.reimprimirPedido(pedidoIdInput, { tipo: 'ticket_pago', vista_previa: vistaPrevia }, usuario, ip);
+  }
+
   /** Etiquetas (general, por área y por vaso) del pedido tal como están hoy, con su clave estable y su contenido. */
   private async etiquetasActualesDePedido(pedidoId: bigint) {
     const pedido: any = await this.prisma.pedido.findUnique({

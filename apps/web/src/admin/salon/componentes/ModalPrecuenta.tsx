@@ -4,6 +4,7 @@ import '../salon.css';
 import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
+import { impresionApi, type ResultadoReimpresionPedido } from '../../impresion/impresionApi';
 import { vouchersApi, type EnvioCajaExtra } from '../../vouchers/vouchersApi';
 import type { PlanPagoItem } from '../../pedidos/planPago';
 import {
@@ -133,6 +134,19 @@ const soles = (n: number | string | null | undefined) => `S/ ${Number(n || 0).to
 const horaAhora = () =>
   new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
 
+/** Qué le decimos al mozo tras pedir la precuenta: a qué ticketera fue, si quedó en cola o por qué no salió. */
+function textoResultadoPrecuenta(r: ResultadoReimpresionPedido): { tono: 'ok' | 'mal'; texto: string } {
+  const m = r.porMaquina[0];
+  if (r.cantidad > 0 && m) {
+    return m.conectado
+      ? { tono: 'ok', texto: `Precuenta enviada a la ticketera de ${m.equipo}.` }
+      : { tono: 'mal', texto: `La ticketera de ${m.equipo} está sin conexión: el ticket queda en cola y saldrá al conectarse.` };
+  }
+  if (r.yaEnCola.length) return { tono: 'ok', texto: 'La precuenta ya está en cola: saldrá en la ticketera.' };
+  const motivo = r.omitidos[0]?.motivo;
+  return { tono: 'mal', texto: `No se envió la precuenta${motivo ? `: ${motivo}` : ''}.` };
+}
+
 export function ModalPrecuenta({
   abierto,
   alCerrar,
@@ -158,6 +172,7 @@ export function ModalPrecuenta({
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
+  const [avisoImpresion, setAvisoImpresion] = useState<{ tono: 'ok' | 'mal'; texto: string } | null>(null);
 
   // Envío del cobro a Caja: el mozo reparte el pago (uno o varios medios) y, si hay parte digital, puede subir el voucher
   const [filas, setFilas] = useState<FilaPlan[]>(() => filasIniciales(plan, total, pagoMetodo));
@@ -235,12 +250,23 @@ export function ModalPrecuenta({
   const desgloseEnvio = planEnvio.map((f) => `${nombreMedio(f.medio)} S/ ${f.monto.toFixed(2)}`).join(' · ');
 
   const handleConfirmarImpresion = async () => {
+    if (imprimiendo) return;
+    setImprimiendo(true);
+    setAvisoImpresion(null);
     try {
-      setImprimiendo(true);
       if (alImprimir) {
         await alImprimir();
+        setCopiasLocales((c) => c + 1);
+      } else if (pedidoId !== undefined) {
+        // Encola el ticket en la ticketera de pago: sirve desde la tablet, que no tiene impresora propia
+        const r = await impresionApi.imprimirPrecuenta(pedidoId);
+        setAvisoImpresion(textoResultadoPrecuenta(r));
+        if (r.cantidad > 0) setCopiasLocales((c) => c + 1);
+      } else {
+        window.print();
       }
-      setCopiasLocales((c) => c + 1);
+    } catch (e) {
+      setAvisoImpresion({ tono: 'mal', texto: e instanceof Error && e.message ? e.message : 'No se pudo enviar la precuenta' });
     } finally {
       setImprimiendo(false);
       setConfirmarImprimir(false);
@@ -495,8 +521,21 @@ export function ModalPrecuenta({
           </div>
 
           <footer className="pc-pie">
-            <button type="button" onClick={() => setConfirmarImprimir(true)} className="pc-btn pc-btn-primario">
-              Imprimir precuenta
+            {avisoImpresion && (
+              <div role={avisoImpresion.tono === 'ok' ? 'status' : 'alert'} className={avisoImpresion.tono === 'ok' ? 'pc-aviso' : 'pc-error'} style={{ gridColumn: '1 / -1' }}>
+                {avisoImpresion.texto}
+                {avisoImpresion.tono === 'mal' && (
+                  <>
+                    {' '}
+                    <button type="button" className="pc-btn pc-btn-secundario" onClick={() => window.print()}>
+                      Imprimir desde este equipo
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            <button type="button" disabled={imprimiendo} onClick={() => setConfirmarImprimir(true)} className="pc-btn pc-btn-primario">
+              {imprimiendo ? 'Enviando…' : avisoImpresion?.tono === 'mal' ? 'Reintentar' : 'Imprimir precuenta'}
             </button>
             {alCambiarMesa && (
               <button type="button" onClick={alCambiarMesa} className="pc-btn pc-btn-secundario">
@@ -513,7 +552,7 @@ export function ModalPrecuenta({
       <Confirmar
         abierto={confirmarImprimir}
         titulo="¿Imprimir precuenta?"
-        mensaje={`¿Imprimir la precuenta de ${mesa}? Sale en la ticketera de salón. No es un comprobante.`}
+        mensaje={`¿Imprimir la precuenta de ${mesa}? Sale en la ticketera de Caja. No es un comprobante.`}
         textoConfirmar="Sí, imprimir"
         textoNo="No, cancelar"
         cargando={imprimiendo}
