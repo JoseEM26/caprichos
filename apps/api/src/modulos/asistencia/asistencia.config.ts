@@ -1,9 +1,11 @@
 // Parámetros de asistencia (clave parametro «asistencia.config»). Valores por defecto del dueño:
-// radio 10 m, tolerancia 10 min, retención 90 días.
+// radio 10 m, tolerancia 5 min, retención 90 días, tardanza pagada al 50 %.
 
 export interface ConfigAsistencia {
   radioM: number;
   toleranciaMin: number;
+  /** Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). */
+  pagoTardanzaPct: number;
   retencionDias: number;
   precisionMaxM: number;
   localLat: number | null;
@@ -12,7 +14,8 @@ export interface ConfigAsistencia {
 
 export const CONFIG_ASISTENCIA_DEFECTO: ConfigAsistencia = {
   radioM: 10,
-  toleranciaMin: 10,
+  toleranciaMin: 5,
+  pagoTardanzaPct: 50,
   retencionDias: 90,
   precisionMaxM: 25,
   localLat: null,
@@ -34,6 +37,7 @@ export function leerConfigAsistencia(valor: unknown): ConfigAsistencia {
   return {
     radioM: numeroEn(v.radioM, CONFIG_ASISTENCIA_DEFECTO.radioM, 3, 100),
     toleranciaMin: numeroEn(v.toleranciaMin, CONFIG_ASISTENCIA_DEFECTO.toleranciaMin, 0, 60),
+    pagoTardanzaPct: numeroEn(v.pagoTardanzaPct, CONFIG_ASISTENCIA_DEFECTO.pagoTardanzaPct, 0, 100),
     retencionDias: numeroEn(v.retencionDias, CONFIG_ASISTENCIA_DEFECTO.retencionDias, 7, 3650),
     precisionMaxM: numeroEn(v.precisionMaxM, CONFIG_ASISTENCIA_DEFECTO.precisionMaxM, 5, 100),
     localLat: coord(v.localLat, -90, 90),

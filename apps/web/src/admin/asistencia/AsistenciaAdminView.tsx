@@ -18,6 +18,7 @@ import {
   listarMarcas,
   obtenerConfigAsistencia,
   reiniciarCelular,
+  revisarMarca,
   reporteHoy,
   reporteMes,
   TipoMarca,
@@ -28,12 +29,13 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
+import { PlanillaTab } from './PlanillaTab';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
 import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import './asistencia.css';
 
-type Pestana = 'hoy' | 'mes' | 'marcas' | 'config' | 'pantalla';
+type Pestana = 'hoy' | 'mes' | 'marcas' | 'planilla' | 'config' | 'pantalla';
 type Avisar = (m: string | null) => void;
 
 const ahoraLima = () => {
@@ -61,7 +63,7 @@ function Chip({ estado }: { estado: string }) {
 
 const SIN_UBICACION = 'Aún no configuras la ubicación del local: nadie podrá marcar';
 
-const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'config', 'pantalla'];
+const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'planilla', 'config', 'pantalla'];
 
 export function AsistenciaAdminView() {
   // Enlace directo (lo usa Capri): /admin/asistencia?pestana=config abre esa pestaña
@@ -87,6 +89,7 @@ export function AsistenciaAdminView() {
     ['hoy', 'Hoy'],
     ['mes', 'Mensual'],
     ['marcas', 'Marcas y selfies'],
+    ['planilla', 'Planilla'],
     ['config', 'Configuración'],
     ['pantalla', 'Pantalla del QR'],
   ];
@@ -115,6 +118,7 @@ export function AsistenciaAdminView() {
       {pestana === 'hoy' && <HoyTab onError={setError} onOk={setMensaje} />}
       {pestana === 'mes' && <MesTab onError={setError} />}
       {pestana === 'marcas' && <MarcasTab onError={setError} onOk={setMensaje} />}
+      {pestana === 'planilla' && <PlanillaTab onError={setError} onOk={setMensaje} />}
       {pestana === 'config' && <ConfigTab cfg={cfg} setCfg={setCfg} onError={setError} onOk={setMensaje} />}
       {pestana === 'pantalla' && <EnlacePantalla onError={setError} onOk={setMensaje} />}
     </div>
@@ -305,6 +309,7 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
   const [marcas, setMarcas] = useState<MarcaAdmin[]>([]);
   const [foto, setFoto] = useState<{ id: number; url: string } | null>(null);
   const [form, setForm] = useState({ partyId: '', jornada: '', tipo: 'SALIDA' as TipoMarca, momento: '', motivo: '' });
+  const [revisando, setRevisando] = useState<{ marca: MarcaAdmin; accion: 'aprobar' | 'anular'; motivo: string } | null>(null);
 
   const cargar = async () => {
     try {
@@ -321,6 +326,18 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
       setFoto({ id, url: await obtenerBlobAutenticado(`/admin/asistencia/marcas/${id}/selfie`) });
     } catch (e) {
       onError(mensajeDe(e, 'La foto ya no está disponible.'));
+    }
+  };
+
+  const confirmarRevision = async () => {
+    if (!revisando) return;
+    try {
+      await revisarMarca(revisando.marca.id, revisando.accion, revisando.motivo.trim());
+      onOk(revisando.accion === 'aprobar' ? 'Marca aprobada: desde ahora cuenta en la planilla.' : 'Marca anulada: ya no cuenta. El registro se conserva.');
+      setRevisando(null);
+      await cargar();
+    } catch (e) {
+      onError(mensajeDe(e, 'No se pudo registrar la revisión.'));
     }
   };
 
@@ -370,6 +387,23 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
         </fieldset>
       </Tarjeta>
 
+      {revisando && (
+        <Tarjeta
+          titulo={`${revisando.accion === 'aprobar' ? 'Aprobar' : 'Anular'} la marca de ${revisando.marca.nombre}`}
+          subtitulo={`${ETIQUETA_TIPO[revisando.marca.tipo]} · ${new Date(revisando.marca.momento).toLocaleString('es-PE', { timeZone: 'America/Lima' })}`}
+        >
+          <label className="as-campo">Motivo
+            <textarea placeholder="Motivo (mínimo 10 caracteres)" value={revisando.motivo} onChange={(e) => setRevisando({ ...revisando, motivo: e.target.value })} />
+          </label>
+          <div className="as-acciones">
+            <Boton type="button" variante="secundario" onClick={() => setRevisando(null)}>Cancelar</Boton>
+            <Boton type="button" onClick={() => void confirmarRevision()} disabled={revisando.motivo.trim().length < 10}>
+              {revisando.accion === 'aprobar' ? 'Aprobar marca' : 'Anular marca'}
+            </Boton>
+          </div>
+        </Tarjeta>
+      )}
+
       {foto && (
         <Tarjeta titulo={`Selfie de la marca ${foto.id}`} accion={<Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setFoto(null)}>Cerrar foto</Boton>}>
           <img src={foto.url} alt={`Selfie de la marca ${foto.id}`} className="as-selfie" />
@@ -391,14 +425,23 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
                   <td data-label="Hora" className="as-num">{new Date(m.momento).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</td>
                   <td data-label="Estado">
                     <span>
-                      {m.estado === 'A_REVISAR' ? <Insignia variante="acento" title={m.alertas ?? ''}>A revisar</Insignia> : <Insignia variante="exito">Válida</Insignia>}
+                      {m.estado === 'A_REVISAR' ? <Insignia variante="acento" title={m.alertas ?? ''}>A revisar</Insignia>
+                        : m.estado === 'ANULADA' ? <Insignia variante="peligro">Anulada</Insignia>
+                        : m.estado === 'APROBADA' ? <Insignia variante="exito">Aprobada</Insignia>
+                        : <Insignia variante="exito">Válida</Insignia>}
+                      {m.alertas && m.estado === 'A_REVISAR' && <small className="as-nota">{m.alertas}</small>}
                       {m.motivo && <small className="as-nota">{m.motivo}</small>}
+                      {m.revisadoMotivo && <small className="as-nota">Revisión: {m.revisadoMotivo}</small>}
                     </span>
                   </td>
                   <td data-label="Distancia" className="as-num">{m.distanciaM ?? '—'} m</td>
                   <td data-label="Precisión" className="as-num">{m.precisionM ?? '—'} m</td>
-                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : 'Celular'}</td>
-                  <td data-label="">{m.tieneSelfie && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void verFoto(m.id)}>Ver selfie</Boton>}</td>
+                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : m.origen === 'WEB' ? 'Usuario y contraseña' : 'Celular'}</td>
+                  <td data-label="">
+                    {m.tieneSelfie && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void verFoto(m.id)}>Ver selfie</Boton>}
+                    {m.estado === 'A_REVISAR' && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setRevisando({ marca: m, accion: 'aprobar', motivo: '' })}>Aprobar</Boton>}
+                    {m.estado !== 'ANULADA' && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setRevisando({ marca: m, accion: 'anular', motivo: '' })}>Anular</Boton>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -517,7 +560,8 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
         <Tarjeta titulo="Marcas" subtitulo="Cuándo se acepta una marca.">
           <div style={{ display: 'grid', gap: 12 }}>
             {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
-            {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza.')}
+            {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza. Hoy: 5.')}
+            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). Hoy: 50.')}
             {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}
           </div>
         </Tarjeta>

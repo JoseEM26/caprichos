@@ -10,6 +10,8 @@ import {
   miHistorial,
   miHoy as cargarMiHoy,
   miPropinas,
+  miResumen as cargarMiResumen,
+  MiResumen,
 } from './asistenciaApi';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
@@ -66,6 +68,7 @@ export function MiAsistenciaView() {
   const [hoy, setHoy] = useState<MiHoy | null>(null);
   const [historial, setHistorial] = useState<any[]>([]);
   const [propinas, setPropinas] = useState<MiPropina[]>([]);
+  const [resumen, setResumen] = useState<MiResumen | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<TipoMarca | null>(null);
@@ -92,6 +95,7 @@ export function MiAsistenciaView() {
       setHistorial(hist);
       // Mis propinas: solo mi parte de los repartos aprobados o pagados. Si falla, no se muestra.
       setPropinas(await miPropinas().catch(() => []));
+      setResumen(await cargarMiResumen().catch(() => null));
       setError(null);
     } catch (e) {
       setError(mensajeDe(e, 'No pudimos cargar tu asistencia.'));
@@ -385,6 +389,19 @@ export function MiAsistenciaView() {
       )}
       {error && (
         <div role="alert" className="ma-resultado ma-resultado--error"><strong>No se pudo marcar</strong><span>{error}</span></div>
+      )}
+
+      {resumen && (
+        <section aria-label="Mi período" className="ma-lista">
+          <h3 className="as-sub">Mi {resumen.modalidad === 'SEMANAL' ? 'semana' : 'mes'} ({resumen.periodo.desde} a {resumen.periodo.hasta})</h3>
+          <div className="ma-card">
+            <div>Horas programadas: <strong>{resumen.programadasH} h</strong></div>
+            <div>Horas trabajadas: <strong>{resumen.trabajadasH} h</strong></div>
+            <div>Tardanzas: <strong>{resumen.tardanzas}</strong>{resumen.tardanzaMin > 0 ? ` (${resumen.tardanzaMin} min)` : ''}</div>
+            {resumen.faltas > 0 && <div>Faltas: <strong>{resumen.faltas}</strong></div>}
+            {resumen.jornadasPorRevisar > 0 && <div>Jornadas por revisar con el administrador: <strong>{resumen.jornadasPorRevisar}</strong></div>}
+          </div>
+        </section>
       )}
 
       {propinas.length > 0 && (

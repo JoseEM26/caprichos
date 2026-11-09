@@ -62,7 +62,18 @@ Ver tambien: [[mi-asistencia]]
 ## Como se hace: Preparar la pantalla del QR
 1. Pulsa Pantalla del QR para generar, regenerar o desactivar el enlace de la tablet del local. Los pasos completos estan en [[asistencia-pantalla]].
 
+## Como se hace: Pagar la planilla (pestana Planilla)
+1. Pon el sueldo de cada persona en Usuarios, pestana Horario: semanal o mensual; el otro se calcula (semanal = mensual x 12 / 52).
+2. En la pestana Planilla elige un dia del periodo (semana de lunes a domingo o mes, segun la modalidad de cada persona) y abre a la persona.
+3. Valor hora = sueldo del periodo / horas programadas (sin break ni descansos). Se paga lo trabajado dentro de su turno; la tardanza (pasada la tolerancia, 5 min) se paga al 50 % (configurable en Configuracion); salir antes no se paga; el break no se paga. Las horas extra solo suman si las apruebas en Jornadas y extras.
+4. En Consumos marca los que se cobran en este pago; los demas pasan al siguiente periodo. En Adelantos y descuentos registra adelantos o descuentos por producto danado (se anulan con motivo, no se borran).
+5. Marcar pagado congela el periodo. No mueve la caja. Para cambiarlo, Reabrir periodo con motivo.
+
+## Como se hace: Aprobar o anular una marca
+En Marcas y selfies, las marcas hechas con usuario y contrasena (pagina publica /asistencia/marcar) quedan A revisar. Aprobar las hace contar; Anular las deja sin efecto. Ambas piden motivo y la marca se conserva. Solo cuentan las marcas validas o aprobadas.
+
 ## Errores y dudas
+- "Hay N jornada(s) incompletas o por revisar": corrige o aprueba las marcas de esos dias antes de pagar.
 - "Aun no configuras la ubicacion del local: nadie podra marcar": falta el punto del local; ve a Configuracion y guardalo.
 - "No pudimos cargar el dia / el mes / las marcas": revisa la conexion y recarga.
 - "La foto ya no esta disponible": paso el plazo de retencion y la selfie se borro; la marca sigue ahi.

@@ -70,6 +70,7 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export class ConfigurarAsistenciaDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(3) @Max(100) radioM?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(60) toleranciaMin?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) pagoTardanzaPct?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(7) @Max(3650) retencionDias?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(5) @Max(100) precisionMaxM?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) localLat?: number;
@@ -113,4 +114,18 @@ export class ListarMarcasDto {
 
 export class MiHistorialDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(62) dias?: number;
+}
+
+/** Marca sin celular: usuario (documento) y contraseña de Caprichos. `tipo` vacío = la siguiente marca lógica. */
+export class MarcarWebDto {
+  @IsString() @MinLength(3) @MaxLength(20) usuario!: string;
+  @IsString() @MinLength(1) @MaxLength(200) contrasena!: string;
+  @IsOptional() @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' }) tipo?: TipoMarca;
+}
+
+export class RevisarMarcaDto {
+  @IsString()
+  @MinLength(10, { message: 'El motivo debe tener al menos 10 caracteres' })
+  @MaxLength(300)
+  motivo!: string;
 }

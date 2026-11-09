@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, Param, Post, Put, Query, Req, Re
 import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, ListarMarcasDto, ReporteMesDto } from './dto/asistencia.dto';
+import { ConfigurarAsistenciaDto, CorregirMarcaDto, ListarMarcasDto, ReporteMesDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import { AsistenciaService } from './asistencia.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -77,6 +77,20 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   corregir(@Body() dto: CorregirMarcaDto, @Req() req: any) {
     return this.asistencia.corregir(dto, req.usuario, ipDe(req));
+  }
+
+  /** Aprobar una marca pendiente (la de usuario y contraseña, o con alertas de GPS): desde ahí cuenta. */
+  @Post('marcas/:id/aprobar')
+  @Permiso('asistencia', 'administrar')
+  aprobar(@Param('id') id: string, @Body() dto: RevisarMarcaDto, @Req() req: any) {
+    return this.asistencia.revisarMarca(Number(id), 'APROBAR', dto, req.usuario, ipDe(req));
+  }
+
+  /** Anular una marca (no cuenta; la fila y el motivo se conservan). */
+  @Post('marcas/:id/anular')
+  @Permiso('asistencia', 'administrar')
+  anular(@Param('id') id: string, @Body() dto: RevisarMarcaDto, @Req() req: any) {
+    return this.asistencia.revisarMarca(Number(id), 'ANULAR', dto, req.usuario, ipDe(req));
   }
 
   @Post('dispositivos/:partyId/reiniciar')

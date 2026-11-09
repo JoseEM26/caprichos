@@ -3,6 +3,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { MarcarDto, MiHistorialDto } from './dto/asistencia.dto';
 import { AsistenciaService } from './asistencia.service';
+import { PlanillaService } from './planilla.service';
 
 const ipDe = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -13,7 +14,10 @@ const ipDe = (req: any): string | undefined => {
 @Controller('admin/asistencia')
 @UseGuards(AccesoGuard)
 export class AsistenciaController {
-  constructor(private readonly asistencia: AsistenciaService) {}
+  constructor(
+    private readonly asistencia: AsistenciaService,
+    private readonly planilla: PlanillaService,
+  ) {}
 
   @Get('mi/hoy')
   @Permiso('asistencia', 'marcar')
@@ -25,6 +29,13 @@ export class AsistenciaController {
   @Permiso('asistencia', 'marcar')
   miHistorial(@Req() req: any, @Query() q: MiHistorialDto) {
     return this.asistencia.miHistorial(req.usuario.partyId, q.dias ?? 14);
+  }
+
+  /** Horas y tardanzas de mi período. Nunca lleva dinero. */
+  @Get('mi/resumen')
+  @Permiso('asistencia', 'marcar')
+  miResumen(@Req() req: any) {
+    return this.planilla.miResumen(req.usuario.partyId);
   }
 
   @Post('marcar')

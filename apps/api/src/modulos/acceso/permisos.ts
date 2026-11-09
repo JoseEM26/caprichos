@@ -220,6 +220,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'asistencia', accion: 'marcar' },
   { modulo: 'asistencia', accion: 'administrar' },
   { modulo: 'asistencia', accion: 'pantalla' },
+  // Planilla del personal (sueldos, pagos, adelantos, descuentos): solo ADMIN
+  { modulo: 'planilla', accion: 'ver' },
+  { modulo: 'planilla', accion: 'administrar' },
   // Mascota Capri (mas-api)
   { modulo: 'mascota', accion: 'ver' },
   { modulo: 'mascota', accion: 'editar' },
@@ -409,7 +412,9 @@ export const MATRIZ: Record<string, string[]> = {
   ],
 };
 
-// Marcar asistencia desde el celular: todo el personal que puede tener horario (no el ADMIN, que ya lo tiene todo)
+// Marcar asistencia: obligatoria para todo el personal salvo el ADMIN (el servicio también lo rechaza, aunque su matriz lo
+// incluya porque ADMIN recibe todos los permisos). El SUPERVISOR se arma más abajo desde CAJERO y MOZO y ya la hereda.
+// No existe un rol CONTADOR en el sistema: si se crea, agregarlo aquí.
 for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
   MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
 }

@@ -20,6 +20,7 @@ import {
   mensajeDocumento,
 } from "./roles";
 import { EditorHorario } from "./EditorHorario";
+import { SeccionSueldo } from "./SeccionSueldo";
 import { EditorReemplazos } from "./EditorReemplazos";
 import {
   horarioDesdeServidor,
@@ -766,6 +767,9 @@ export function EditarUsuarioModal({
         alCambiar={setHorario}
         deshabilitado={guardando}
       />
+      {esAdmin && (rol || usuario.rol) !== "ADMIN" && (
+        <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} />
+      )}
       {msgHorario && (
         <div
           role="status"
