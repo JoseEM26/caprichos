@@ -14,6 +14,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { esSoloMozo } from '../acceso/roles-usuario';
 import {
   AREA_BEBIDAS,
   EstadoAdminImpresion,
@@ -1850,6 +1851,26 @@ await this.anotarResaltadas(pedido);
       throw new BadRequestException({ codigo: 'PEDIDO_YA_COBRADO', mensaje: 'El pedido ya está cobrado: la precuenta no aplica. Pide el ticket a Caja.' });
     }
     return this.reimprimirPedido(pedidoIdInput, { tipo: 'ticket_pago', vista_previa: vistaPrevia }, usuario, ip);
+  }
+
+  /**
+   * Copia del ticket de pago de un pedido (cobrado o no) para quien no tiene `cambiar_estado`. ADMIN, SUPERVISOR y
+   * CAJERO: cualquier pedido; quien es solo mozo: únicamente los que él tomó. Pasa por `reimprimirPedido`
+   * (límite por minuto, copia marcada y auditoría).
+   */
+  async reimprimirTicketPagoPropio(pedidoIdInput: string | number, usuario?: UsuarioAutenticado, ip?: string) {
+    let id: bigint;
+    try {
+      id = BigInt(pedidoIdInput);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+    }
+    const p: any = await this.prisma.pedido.findUnique({ where: { id }, select: { party_id: true } });
+    if (!p) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (usuario && esSoloMozo(usuario) && !(p.party_id != null && BigInt(p.party_id) === BigInt(usuario.partyId))) {
+      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Este pedido no es tuyo: no puedes reimprimir su ticket' });
+    }
+    return this.reimprimirPedido(pedidoIdInput, { tipo: 'ticket_pago' }, usuario, ip);
   }
 
   /** Etiquetas (general, por área y por vaso) del pedido tal como están hoy, con su clave estable y su contenido. */

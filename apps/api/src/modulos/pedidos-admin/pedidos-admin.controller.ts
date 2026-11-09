@@ -108,7 +108,7 @@ export class PedidosAdminController {
   @Get('mis-pedidos')
   @Permiso('pedidos', 'crear')
   async misPedidos(@Query() query: MisPedidosQueryDto, @Req() req: any) {
-    return this.pedidosEstadoService.misPedidos(req.usuario, query.rango ?? 'hoy');
+    return this.pedidosEstadoService.misPedidos(req.usuario, query.rango ?? 'hoy', query);
   }
 
   /** Historial de vouchers del pedido (vigentes y reemplazados). Declarada antes de GET ':id'. */
@@ -237,6 +237,16 @@ export class PedidosAdminController {
       return { ok: false, mensaje: 'Módulo de impresión no configurado' };
     }
     return this.impresionService.reimprimirPedido(id, dto, req?.usuario, req?.ip);
+  }
+
+  /** Copia del ticket de pago: Caja, Supervisor y Admin cualquier pedido; el mozo, solo los que él tomó. */
+  @Post(':id/ticket/reimprimir')
+  @Permiso('pedidos', 'reimprimir_ticket')
+  async reimprimirTicketPago(@Param('id') id: string, @Req() req?: any) {
+    if (!this.impresionService) {
+      return { ok: false, mensaje: 'Módulo de impresión no configurado' };
+    }
+    return this.impresionService.reimprimirTicketPagoPropio(id, req?.usuario, req?.ip);
   }
 
   /**

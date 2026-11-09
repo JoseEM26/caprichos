@@ -59,6 +59,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'corregir_cliente' },
   // Imprimir la precuenta de una mesa (ticket sin cobrar) desde cualquier equipo, tablet incluida: ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'imprimir_precuenta' },
+  // Reimprimir la copia del ticket de pago: ADMIN, SUPERVISOR y CAJERO cualquier pedido; MOZO solo los que él tomó (lo valida el servicio)
+  { modulo: 'pedidos', accion: 'reimprimir_ticket' },
   // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'extra' },
   { modulo: 'zonas', accion: 'ver' },
@@ -251,6 +253,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/editar',
     'pedidos/corregir_cliente',
     'pedidos/imprimir_precuenta',
+    'pedidos/reimprimir_ticket',
     'pedidos/extra',
     'cortesias/dar',
     'cortesias/ver',
@@ -321,6 +324,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/crear',
     'pedidos/anular', // cualquier pedido (decisión del dueño 09/11)
     'pedidos/imprimir_precuenta', // precuenta de sus mesas desde la tablet: encola el ticket, no cobra
+    'pedidos/reimprimir_ticket', // copia del ticket de pago, solo de SUS pedidos (lo valida el servicio)
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
