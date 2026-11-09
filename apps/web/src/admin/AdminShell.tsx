@@ -8,7 +8,6 @@ import { GRUPOS_MODULOS, MODULOS } from './modulos';
 import { TITULOS_VISTA } from './titulos';
 import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
-import { marcarTodasNotificacionesLeidas } from './notificaciones/notificacionesApi';
 import { CampanaNotificaciones } from './notificaciones/CampanaNotificaciones';
 import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import { AvisosEmergentes, useTituloContador } from './notificaciones/AvisosNotificaciones';
@@ -156,12 +155,8 @@ export function AdminShell() {
 
   /** Marca todas como leídas para este usuario; el resto de usuarios no se entera */
   const marcarTodasLeidas = async () => {
-    try {
-      await marcarTodasNotificacionesLeidas();
-    } catch {
-      // sin conexión o sin permiso: se quedan como están
-    }
-    await resumen.refrescar();
+    // sin conexión o sin permiso: el hook vuelve a lo que diga el servidor
+    await resumen.marcarTodas();
   };
 
   // Lo no leído (urgente primero) es lo que suena, cuenta en la campanita y en el título

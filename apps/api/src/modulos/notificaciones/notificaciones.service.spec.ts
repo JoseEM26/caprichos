@@ -106,6 +106,14 @@ describe('NotificacionesService', () => {
           const r = lecturas.filter((l) => cumple(l, where));
           return Promise.resolve(r.map((l) => ({ clave: l.clave, leida_en: l.leida_en })));
         }),
+        deleteMany: jest.fn().mockImplementation(({ where }: any) => {
+          lecturas = lecturas.filter((l) => !(l.party_id === where.party_id && where.clave.in.includes(l.clave)));
+          return Promise.resolve({});
+        }),
+        createMany: jest.fn().mockImplementation(({ data }: any) => {
+          lecturas.push(...data.map((d: any) => ({ ...d })));
+          return Promise.resolve({ count: data.length });
+        }),
         upsert: jest.fn().mockImplementation(({ where, create, update }: any) => {
           const k = where.party_id_clave;
           const existente = lecturas.find((l) => l.party_id === k.party_id && l.clave === k.clave);
@@ -252,6 +260,43 @@ describe('NotificacionesService', () => {
     const b = await service.resumen(CAJERO_B);
     expect(b.notificaciones.some((n) => !n.leida)).toBe(true);
     expect(prisma.notificacion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('marcar todas alcanza también las guardadas que el resumen no muestra (más de 100), solo para ese usuario', async () => {
+    for (let i = 0; i < 150; i++) {
+      notifs.push({ id: BigInt(100 + i), tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: `P${i}`, mensaje: '', enlace: null, leida_en: null, en: hace(100 + i) });
+    }
+    const r = await service.marcarTodasLeidas(CAJERO_A);
+    expect(r.marcadas).toBeGreaterThan(150);
+    const h = await service.historial({ estado: 'nuevas', limite: 50 }, CAJERO_A);
+    expect(h.total).toBe(0);
+    expect(h.metricas.sinLeerHistorial).toBe(0);
+    const hb = await service.historial({ estado: 'nuevas', limite: 50 }, CAJERO_B);
+    expect(hb.total).toBeGreaterThan(150);
+    expect(lecturas.every((l) => l.party_id === CAJERO_A.partyId)).toBe(true);
+  });
+
+  it('el historial se pagina por cursor: 10 por defecto, máximo 50, sin repetir aunque entren avisos nuevos', async () => {
+    for (let i = 0; i < 25; i++) {
+      notifs.push({ id: BigInt(200 + i), tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: `P${i}`, mensaje: '', enlace: null, leida_en: null, en: hace(200 + i) });
+    }
+    const p1 = await service.historial({}, ADMIN);
+    expect(p1.items).toHaveLength(10);
+    expect(p1.total).toBe(30);
+    expect(p1.hayMas).toBe(true);
+    expect(p1.metricas.sinLeerHistorial).toBeGreaterThan(0);
+    // entra un aviso nuevo arriba: la segunda página no lo repite ni salta ninguno
+    notifs.push({ id: 999n, tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: 'Nuevo', mensaje: '', enlace: null, leida_en: null, en: hace(0) });
+    const p2 = await service.historial({ cursor: p1.siguienteCursor! }, ADMIN);
+    expect(p2.items).toHaveLength(10);
+    expect(p2.pendientes).toEqual([]);
+    const ids = [...p1.items, ...p2.items].map((i) => i.id);
+    expect(new Set(ids).size).toBe(20);
+    const p3 = await service.historial({ cursor: p2.siguienteCursor! }, ADMIN);
+    expect(p3.items).toHaveLength(10);
+    expect(p3.hayMas).toBe(false);
+    expect((await service.historial({ limite: 500 }, ADMIN)).items).toHaveLength(31);
+    expect((await service.historial({ limite: 2 }, ADMIN)).items).toHaveLength(2);
   });
 
   it('un cajero solo ve caja y sus avisos de rol', async () => {

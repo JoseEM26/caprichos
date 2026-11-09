@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
@@ -13,7 +13,10 @@ import {
   NotificacionPendiente,
   RespuestaHistorialNotificaciones,
 } from './notificacionesTipos';
+import { CentinelaMas } from './CentinelaMas';
 import { NuevoMensajeModal } from './NuevoMensajeModal';
+
+const POR_PAGINA = 10;
 
 const TIPOS_DISPONIBLES = [
   'Todos',
@@ -67,8 +70,18 @@ export function NotificacionesView() {
   const [confirmarMarcarTodas, setConfirmarMarcarTodas] = useState(false);
   const [pendienteLeida, setPendienteLeida] = useState<NotificacionPendiente | null>(null);
 
-  // Cargar datos del historial y pendientes
-  const cargar = useCallback(async () => {
+  // Paginación al bajar: `data.items` crece de 10 en 10
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [errorMas, setErrorMas] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const pidiendoMas = useRef(false); // evita pedidos duplicados aunque el centinela dispare dos veces
+  const itemsRef = useRef<NotificacionHistorialItem[]>([]);
+  const filtrosRef = useRef<FiltrosHistorial>({});
+
+  // Primera página (y refresco en vivo). `reiniciar` descarta lo ya cargado (cambio de filtros); sin él, los avisos
+  // nuevos entran arriba y lo que ya se bajó se conserva debajo, sin repetir.
+  const cargar = useCallback(async (reiniciar = true) => {
     try {
       const filtros: FiltrosHistorial = {
         q: busqueda,
@@ -77,17 +90,51 @@ export function NotificacionesView() {
         desde: desde || undefined,
         hasta: hasta || undefined,
       };
-      const res = await listarHistorialNotificaciones(filtros);
-      setData(res);
+      filtrosRef.current = filtros;
+      const res = await listarHistorialNotificaciones({ ...filtros, limite: POR_PAGINA });
+      if (filtrosRef.current !== filtros) return; // llegó tarde: ya hay otros filtros
+      const previos = itemsRef.current;
+      const ultima = res.items[res.items.length - 1];
+      const ids = new Set(res.items.map((i) => i.id));
+      const cola = reiniciar || !ultima ? [] : previos.filter((i) => !ids.has(i.id) && i.creadoEn <= ultima.creadoEn);
+      const items = [...res.items, ...cola];
+      itemsRef.current = items;
+      setHayMas(cola.length > 0 ? true : !!res.hayMas);
+      setErrorMas(false);
+      setErrorCarga(false);
+      setData({ ...res, items });
     } catch {
-      // Ignorar error transitorio
+      setErrorCarga(true);
     } finally {
       setCargando(false);
     }
   }, [busqueda, tipoSeleccionado, estadoSeleccionado, desde, hasta]);
 
+  const cargarMas = useCallback(async () => {
+    const ultima = itemsRef.current[itemsRef.current.length - 1];
+    if (pidiendoMas.current || !ultima) return;
+    pidiendoMas.current = true;
+    setCargandoMas(true);
+    setErrorMas(false);
+    const filtros = filtrosRef.current;
+    try {
+      const res = await listarHistorialNotificaciones({ ...filtros, limite: POR_PAGINA, cursor: ultima.id });
+      if (filtrosRef.current !== filtros) return;
+      const ids = new Set(itemsRef.current.map((i) => i.id));
+      const items = [...itemsRef.current, ...res.items.filter((i) => !ids.has(i.id))];
+      itemsRef.current = items;
+      setHayMas(!!res.hayMas);
+      setData((d) => (d ? { ...d, items } : d));
+    } catch {
+      setErrorMas(true);
+    } finally {
+      pidiendoMas.current = false;
+      setCargandoMas(false);
+    }
+  }, []);
+
   useEffect(() => {
-    cargar();
+    void cargar(true);
   }, [cargar]);
 
   // Manejar presets de fecha
@@ -125,14 +172,16 @@ export function NotificacionesView() {
   };
 
   // Socket en vivo
-  useEventos('notificaciones:nueva', () => cargar());
-  useEventos('notificaciones:actualizada', () => cargar());
+  useEventos('notificaciones:nueva', () => void cargar(false));
+  useEventos('notificaciones:actualizada', () => void cargar(false));
 
   // Acciones individuales
   const handleToggleLeida = async (item: NotificacionHistorialItem) => {
     try {
       await marcarNotificacion(`n:${item.id}`, !item.leida);
-      await cargar();
+      const leida = !item.leida;
+      itemsRef.current = itemsRef.current.map((i) => (i.id === item.id ? { ...i, leida, leidaEn: leida ? new Date().toISOString() : null } : i));
+      await cargar(false);
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
@@ -140,7 +189,7 @@ export function NotificacionesView() {
     if (!pendienteLeida) return;
     try {
       await marcarNotificacion(pendienteLeida.clave);
-      await cargar();
+      await cargar(false);
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
     setPendienteLeida(null);
   };
@@ -149,7 +198,19 @@ export function NotificacionesView() {
     try {
       await marcarTodasNotificacionesLeidas();
       setConfirmarMarcarTodas(false);
-      await cargar();
+      // contador en 0 al instante; después se confirma con el servidor (primera página otra vez)
+      setData((d) =>
+        d
+          ? {
+              ...d,
+              items: d.items.map((i) => (i.leida ? i : { ...i, leida: true })),
+              pendientes: [],
+              metricas: { ...d.metricas, sinLeerHistorial: 0, pendientesAhora: 0, urgentesAhora: 0 },
+              conteosPorEstado: { todas: d.conteosPorEstado.todas, nuevas: 0, leidas: d.conteosPorEstado.todas },
+            }
+          : d,
+      );
+      await cargar(true);
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
 
@@ -249,7 +310,7 @@ export function NotificacionesView() {
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
             Sin leer en el historial
           </div>
-          <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '24px' }}>
+          <div role="status" aria-live="polite" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '24px' }}>
             {data?.metricas.sinLeerHistorial ?? 0}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
@@ -687,6 +748,13 @@ export function NotificacionesView() {
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--cp-soft)' }}>
             Cargando historial...
           </div>
+        ) : errorCarga && !data ? (
+          <div role="alert" style={{ padding: '24px', textAlign: 'center', color: 'var(--cp-soft)', fontSize: '13px' }}>
+            No se pudo cargar el historial.{' '}
+            <button type="button" onClick={() => void cargar(true)} style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700 }}>
+              Reintentar
+            </button>
+          </div>
         ) : gruposPorDia.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--cp-soft)', fontSize: '13px' }}>
             No se encontraron avisos que coincidan con los filtros aplicados.
@@ -786,6 +854,9 @@ export function NotificacionesView() {
               ))}
             </div>
           ))
+        )}
+        {!cargando && gruposPorDia.length > 0 && (
+          <CentinelaMas hayMas={hayMas} cargando={cargandoMas} error={errorMas} onCargar={() => void cargarMas()} />
         )}
       </div>
 

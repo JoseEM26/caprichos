@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../comun/api';
 import { useEventos } from '../comun/socket';
-import { marcarNotificacion } from './notificaciones/notificacionesApi';
+import { marcarNotificacion, marcarTodasNotificacionesLeidas } from './notificaciones/notificacionesApi';
 import { ordenarNotificaciones } from './notificaciones/notificacionesTipos';
 import type { AjustesNotificaciones, NotificacionPendiente } from './notificaciones/notificacionesTipos';
 
@@ -22,6 +22,8 @@ export interface ResumenNotificacionesVivo extends ResumenNotificaciones {
   refrescar: () => Promise<void>;
   /** Marca leído o no leído para este usuario; cambia al instante y luego confirma con el servidor */
   marcar: (clave: string, leida: boolean) => Promise<boolean>;
+  /** Marca todo como leído en el servidor (solo para este usuario); la campanita queda en 0 al instante */
+  marcarTodas: () => Promise<boolean>;
 }
 
 const VACIO: ResumenNotificaciones = { conteos: {}, notificaciones: [] };
@@ -77,5 +79,24 @@ export function useNotificaciones(): ResumenNotificacionesVivo {
     [cargar],
   );
 
-  return useMemo(() => ({ ...resumen, cargado, refrescar: cargar, marcar }), [resumen, cargado, cargar, marcar]);
+  const marcarTodas = useCallback(async (): Promise<boolean> => {
+    const ahoraIso = new Date().toISOString();
+    setResumen((r) => ({
+      ...r,
+      notificaciones: ordenarNotificaciones(r.notificaciones.map((n) => (n.leida ? n : { ...n, leida: true, leidaEn: ahoraIso }))),
+    }));
+    try {
+      await marcarTodasNotificacionesLeidas();
+      await cargar();
+      return true;
+    } catch {
+      await cargar(); // vuelve a lo que diga el servidor
+      return false;
+    }
+  }, [cargar]);
+
+  return useMemo(
+    () => ({ ...resumen, cargado, refrescar: cargar, marcar, marcarTodas }),
+    [resumen, cargado, cargar, marcar, marcarTodas],
+  );
 }
