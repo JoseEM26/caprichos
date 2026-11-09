@@ -63,6 +63,25 @@ export async function sincronizarRuta(db: any, partyId: bigint, ahora: Date = ne
   return ruta.id;
 }
 
+/**
+ * Tras anular un pedido que tenía repartidor: cierra la ruta si ya no quedan LISTO/EN_CAMINO y avisa a Repartos/Caja.
+ * Nunca lanza: un fallo se registra y la anulación sigue (la ruta se corrige al recargar «Mis pedidos»).
+ */
+export async function cerrarRutaTrasAnular(
+  db: any,
+  repartidorPartyId: bigint | null | undefined,
+  eventos?: { emitirAdmin(evento: string, datos: unknown): void },
+  log?: { error(m: string): void },
+): Promise<void> {
+  if (repartidorPartyId == null) return;
+  try {
+    await sincronizarRuta(db, BigInt(repartidorPartyId));
+    eventos?.emitirAdmin('reparto:rutas', {});
+  } catch (e) {
+    log?.error(`Anulado, pero no se pudo sincronizar la ruta del repartidor ${repartidorPartyId}: ${String(e)}`);
+  }
+}
+
 /** Estado final de un pedido de la ruta, o null si todavía está pendiente con su repartidor. */
 export function estadoFinalEnRuta(
   p: { estado: string; anulado_en?: Date | null; repartidor_party_id?: bigint | null },

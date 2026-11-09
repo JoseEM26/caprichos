@@ -2536,6 +2536,96 @@ export class RepartosService {
   }
 
   /**
+   * POST /admin/repartos/ruta/cerrar: cierre manual de la ruta EN_CURSO, sin orden y sin exigir que todo esté entregado.
+   * Solo bloquea si queda algún pedido EN_CAMINO sin resolver (409 RUTA_CON_PENDIENTES con la lista). Los ANULADOS y
+   * RECHAZADOS no cuentan; los LISTO que aún no salieron vuelven a «disponibles». El repartidor cierra la suya;
+   * Caja/Admin la de `repartidorId`. La liquidación solo suma lo ENTREGADO (ver pedidosRepartoDelDia).
+   */
+  async cerrarRuta(repartidorId: string | undefined, usuario: UsuarioAutenticado, ip?: string) {
+    let partyId: bigint;
+    if (usuario.rol === 'REPARTIDOR') {
+      partyId = BigInt(usuario.partyId);
+    } else {
+      this.exigirCajaOAdmin(usuario);
+      if (!repartidorId) throw new BadRequestException({ codigo: 'REPARTIDOR_REQUERIDO', mensaje: 'Elige el repartidor de la ruta' });
+      partyId = this.parsearId(repartidorId);
+    }
+    const ruta = await this.prisma.rutaReparto.findFirst({
+      where: { repartidor_party_id: partyId, estado: 'EN_CURSO' },
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
+    if (!ruta) throw new ConflictException({ codigo: 'SIN_RUTA', mensaje: 'No hay una ruta en curso para cerrar' });
+
+    const enCamino = await this.prisma.pedido.findMany({
+      where: { ruta_reparto_id: ruta.id, repartidor_party_id: partyId, estado: 'EN_CAMINO' },
+      select: { id: true, codigo: true },
+      orderBy: { id: 'asc' },
+    });
+    if (enCamino.length > 0) {
+      throw new ConflictException({
+        codigo: 'RUTA_CON_PENDIENTES',
+        mensaje: `Te falta resolver: ${enCamino.map((p) => `${p.codigo} (en camino)`).join(', ')}`,
+        pedidos: enCamino.map((p) => ({ id: String(p.id), codigo: p.codigo, estado: 'EN_CAMINO' })),
+      });
+    }
+
+    // Los que aún no salieron (LISTO) dejan la ruta y vuelven a disponibles
+    const ahora = new Date();
+    const liberados = await this.prisma.pedido.findMany({
+      where: { ruta_reparto_id: ruta.id, repartidor_party_id: partyId, estado: 'LISTO' },
+      select: { id: true },
+    });
+    if (liberados.length > 0) {
+      const ids = liberados.map((p) => p.id);
+      await this.prisma.pedido.updateMany({
+        where: { id: { in: ids } },
+        data: { repartidor_party_id: null, tomado_en: null, ruta_reparto_id: null },
+      });
+      await this.prisma.mensajeReparto.deleteMany({ where: { pedido_id: { in: ids }, numero: ETAPAS_AVISO.ASIGNADO.numero } });
+    }
+    const cerrada = await sincronizarRuta(this.prisma, partyId, ahora);
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'CERRAR_RUTA', resultado: 'OK', entidad: 'ruta_reparto',
+      entidadId: ruta.id, despues: { liberados: liberados.length }, partyId: BigInt(usuario.partyId), ip,
+    });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { ok: true, rutaId: String(ruta.id), cerrada: cerrada != null, liberados: liberados.length };
+  }
+
+  /**
+   * POST /admin/repartos/:id/devolver-local: el repartidor devuelve al local un pedido suyo que ya salió (EN_CAMINO).
+   * Vuelve a LISTO sin repartidor y queda en su ruta como no entregado; si era el último pendiente la ruta se cierra.
+   */
+  async devolverAlLocal(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+      throw new ForbiddenException({ codigo: 'NO_ASIGNADO', mensaje: 'Este pedido no está asignado a tu usuario' });
+    }
+    if (pedido.estado !== 'EN_CAMINO') {
+      throw new ConflictException({ codigo: 'TRANSICION_INVALIDA', mensaje: 'Solo se devuelve al local un pedido que ya salió' });
+    }
+    const ahora = new Date();
+    await this.prisma.pedido.update({
+      where: { id: pedidoId },
+      data: { repartidor_party_id: null, tomado_en: null, salio_en: null, llego_en: null, estado: 'LISTO' },
+    });
+    await this.prisma.pedidoEstadoHistorial.create({
+      data: { pedido_id: pedidoId, estado_anterior: 'EN_CAMINO', estado_nuevo: 'LISTO', motivo: 'Devuelto al local por el repartidor al cerrar la ruta', por_party_id: partyId, en: ahora },
+    });
+    await sincronizarRuta(this.prisma, partyId, ahora);
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'DEVOLVER_AL_LOCAL', resultado: 'OK', entidad: 'pedido', entidadId: pedidoId, partyId, ip,
+    });
+    this.eventosGateway?.emitirAdmin('pedido:estado', { id: Number(pedido.id), codigo: pedido.codigo, estado: 'LISTO', repartidor_party_id: null });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { ok: true, pedidoId: String(pedidoId), estado: 'LISTO' };
+  }
+
+  /**
    * POST /admin/repartos/:id/reasignar (repartos/liquidar - Caja/Admin)
    * Reasigna un pedido a otro repartidor activo que tenga cupo disponible.
    */

@@ -463,6 +463,13 @@ export const repartosApi = {
   llegue: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/llegue`),
 
+  /** Cierra la ruta en curso sin orden; con EN_CAMINO sin resolver responde 409 RUTA_CON_PENDIENTES (detalles.pedidos). */
+  cerrarRuta: (repartidorId?: string) =>
+    api.post<{ ok: boolean; rutaId: string; cerrada: boolean; liberados: number }>('/admin/repartos/ruta/cerrar', repartidorId ? { repartidorId } : {}),
+
+  /** El repartidor devuelve al local un pedido suyo que ya salió. */
+  devolverAlLocal: (id: string) => api.post<{ ok: boolean }>(`/admin/repartos/${id}/devolver-local`),
+
   entregar: (id: string) =>
     api.post<PedidoReparto & { por_rendir_efectivo?: number; efectivo_a_rendir?: number }>(
       `/admin/repartos/${id}/entregar`,

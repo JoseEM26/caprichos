@@ -29,6 +29,7 @@ import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ArchivosService } from '../archivos/archivos.service';
 import { StockService } from '../stock/stock.service';
 import { PuntosService } from '../clientes/puntos.service';
+import { cerrarRutaTrasAnular } from '../repartos/rutas-reparto';
 import sharp from 'sharp';
 import {
   PosChat,
@@ -1361,6 +1362,7 @@ export class MensajesService {
         codigo: pedidoActual.codigo,
         estado: 'ANULADO',
       });
+      await cerrarRutaTrasAnular(this.prisma, pedidoActual.repartidor_party_id, this.eventos, this.logger);
 
       await this.auditar(usuario, 'APLICAR_CANCELACION_PEDIDO', c.id, {
         pedido: pedidoActual.codigo,
