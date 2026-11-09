@@ -312,6 +312,7 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
   MOZO: [
+    'pedidos/ver', // ficha del pedido para el detalle de Mis pedidos (ya puede corregir el cliente de cualquier pedido vigente)
     'pedidos/ajustar_pago', // solo sus pedidos (lo valida el servicio)
     // Chat de WhatsApp (Mensajes): lo atienden MOZO y CAJERO (antes el rol CALLCENTER, eliminado)
     'mensajes/ver',
