@@ -27,4 +27,15 @@ describe('DescargaAgenteController', () => {
   it('404 con sistema desconocido', () => {
     expect(() => ctrl.descargar('mac', res())).toThrow(NotFoundException);
   });
+
+  it('expone la ultima version publicada y no rompe si no hay archivo', () => {
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dv-')), 'version-agente.json');
+    process.env.AGENTE_VERSION_RUTA = f;
+    expect(ctrl.version()).toEqual({ publicada: null });
+    fs.writeFileSync(f, JSON.stringify({ version: '0.1.57', commit: 'ab12cd3', fecha: '2026-11-09T10:00:00Z' }));
+    expect(ctrl.version()).toEqual({ publicada: { version: '0.1.57', commit: 'ab12cd3', fecha: '2026-11-09T10:00:00Z' } });
+    fs.writeFileSync(f, 'basura');
+    expect(ctrl.version()).toEqual({ publicada: null });
+    delete process.env.AGENTE_VERSION_RUTA;
+  });
 });

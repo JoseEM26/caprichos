@@ -1,5 +1,6 @@
 import type { EquipoEstadoImpresion } from '@caprichos/compartido';
 import { configDe, haceCuanto } from './logicaEquipo';
+import { InsigniaVersion, type VersionPublicada } from '../versionPrograma';
 import { resumenConfig } from './logicaListado';
 
 /**
@@ -11,11 +12,13 @@ export function TarjetaCompacta({
   areas,
   duplicadoDe,
   alAbrir,
+  ultimaVersion,
 }: {
   equipo: EquipoEstadoImpresion;
   areas: { id: string; nombre: string }[];
   duplicadoDe?: { nombre: string } | null;
   alAbrir: () => void;
+  ultimaVersion?: VersionPublicada | null;
 }) {
   const cfg = configDe(equipo);
   const chips = resumenConfig(cfg, areas);
@@ -39,7 +42,7 @@ export function TarjetaCompacta({
       </span>
       <span className="ic-fila ic-meta">
         <span title={equipo.ipPublica ? `IP pública: ${equipo.ipPublica}` : undefined}>{ip ? `IP ${ip}` : 'Sin IP'}</span>
-        {equipo.version && <span>v{equipo.version}</span>}
+        <InsigniaVersion instalada={equipo.version} ultima={ultimaVersion} enlace={false} />
         {equipo.hostname && <span className="ic-host">{equipo.hostname}</span>}
         {equipo.pendientes > 0 && <span className="ic-pend">{equipo.pendientes} en espera</span>}
       </span>

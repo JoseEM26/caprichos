@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { crearReenlace } from './revinculacion';
-import { obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
+import { LINEA_VERSION, obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
 import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
 import { candidatasDeLinux, candidatasDeWindows, idGuardado } from './candidatas';
@@ -536,7 +536,12 @@ async function comandoControl(c: string | undefined): Promise<number | undefined
 
 export async function main(): Promise<void> {
   let comando = process.argv[2]?.trim().toLowerCase();
+  if (comando === '--version' || comando === '-v' || comando === 'version') {
+    console.log(LINEA_VERSION);
+    process.exit(0);
+  }
   const segundoPlano = comando === '--segundo-plano';
+  if (!segundoPlano) console.log(LINEA_VERSION);
   const primerPlano = comando === '--primer-plano';
   if (segundoPlano) {
     modo.segundoPlano = true;

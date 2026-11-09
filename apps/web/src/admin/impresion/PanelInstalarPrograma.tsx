@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { textoFecha, type VersionPublicada } from './versionPrograma';
 import { useSesion } from '../../comun/sesion';
 import { impresionApi } from './impresionApi';
 import './cola-impresion.css';
@@ -41,6 +42,10 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
   const [nombrePc, setNombrePc] = useState('');
   const [descargando, setDescargando] = useState(false);
   const origen = window.location.origin;
+  const [ultima, setUltima] = useState<VersionPublicada | null>(null);
+  useEffect(() => {
+    Promise.resolve().then(() => impresionApi.ultimaVersionPrograma()).then((r) => setUltima(r?.publicada ?? null)).catch(() => {});
+  }, []);
 
   const descargarVinculado = async () => {
     setError('');
@@ -87,6 +92,11 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
         <p className="cola-ayuda">
           Se instala una vez en la PC donde están conectadas la etiquetera y la ticketera. El navegador no puede ver impresoras USB; este programa sí.
         </p>
+        {ultima && (
+          <p className="cola-ayuda" data-testid="ultima-version">
+            Última: v{ultima.version}{textoFecha(ultima.fecha) ? `, publicada el ${textoFecha(ultima.fecha)}` : ''}
+          </p>
+        )}
         <div role="tablist" style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
           {(['windows', 'linux'] as const).map((s) => (
             <button key={s} type="button" role="tab" aria-selected={sistema === s} className="cola-btn"

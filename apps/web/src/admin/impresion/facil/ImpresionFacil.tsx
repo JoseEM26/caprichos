@@ -10,6 +10,7 @@ import { ColaImpresion } from '../ColaImpresion';
 import { PanelInstalarPrograma } from '../PanelInstalarPrograma';
 import { TarjetaEquipo } from './TarjetaEquipo';
 import { TarjetaCompacta } from './TarjetaCompacta';
+import type { VersionPublicada } from '../versionPrograma';
 import { PanelVistaPrevia, type PcPrevia } from './PanelVistaPrevia';
 import { configDe } from './logicaEquipo';
 import { tamanoEfectivo } from '@caprichos/compartido';
@@ -50,6 +51,11 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [instalar, setInstalar] = useState(false);
+  const [ultimaVersion, setUltimaVersion] = useState<VersionPublicada | null>(null);
+  useEffect(() => {
+    // Sin archivo publicado o sin red: simplemente no hay insignia
+    Promise.resolve().then(() => impresionApi.ultimaVersionPrograma()).then((r) => setUltimaVersion(r?.publicada ?? null)).catch(() => {});
+  }, []);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [previa, setPrevia] = useState<{ pcId: string | null; n: number }>({ pcId: null, n: 0 });
 
@@ -177,7 +183,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
         <div className="ic-grilla" data-testid="lista-pcs">
           {listado.items.map(({ equipo, duplicadoDe }) => (
             <div key={equipo.deviceKeyId} className="ic-envoltura">
-              <TarjetaCompacta equipo={equipo} areas={areasSimples} duplicadoDe={duplicadoDe} alAbrir={() => setAbierta(equipo.deviceKeyId)} />
+              <TarjetaCompacta equipo={equipo} areas={areasSimples} duplicadoDe={duplicadoDe} alAbrir={() => setAbierta(equipo.deviceKeyId)} ultimaVersion={ultimaVersion} />
               <button type="button" className="ic-ver" data-testid={`ver-ejemplos-${equipo.deviceKeyId}`} aria-label={`Ver ejemplos de lo que imprime ${equipo.nombre}`} onClick={() => setPrevia((p) => ({ pcId: equipo.deviceKeyId, n: p.n + 1 }))}>
                 👁 Ver ejemplos
               </button>
@@ -198,6 +204,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
           puedeEditar={puedeEditar}
           pendientes={equipoAbierto.equipo.pendientes}
           duplicadoDe={equipoAbierto.duplicadoDe}
+          ultimaVersion={ultimaVersion}
           alRecargar={() => void cargar()}
           alAviso={(tipo, texto) => setAviso({ tipo, texto })}
           alCancelar={() => setAbierta(null)}

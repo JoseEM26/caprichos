@@ -38,7 +38,7 @@ describe('TarjetaEquipo', () => {
     const datos = screen.getByTestId('datos-10');
     expect(datos).toHaveTextContent('192.168.1.20');
     expect(datos).toHaveTextContent('200.1.1.1');
-    expect(datos).toHaveTextContent('versión 0.1.0');
+    expect(datos).toHaveTextContent('Programa v0.1.0');
     expect(datos).toHaveTextContent('POS-80C · USB001 · POS-80C · Normal');
     expect(screen.queryByTestId('nueva-10')).toBeNull();
   });

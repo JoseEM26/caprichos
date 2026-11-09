@@ -10,7 +10,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   exe:
@@ -30,21 +30,48 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @caprichos/compartido build
+      # Versión de compilación: 0.1.<número de ejecución> + commit corto (se ve con --version y en la web)
+      - name: Versión del programa
+        run: |
+          echo "AGENTE_VERSION=0.1.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "AGENTE_COMMIT=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
       - run: pnpm --filter @caprichos/agente-local empaquetar:win
       - run: pnpm --filter @caprichos/agente-local empaquetar:linux
+      - name: Archivo version-agente.json
+        run: |
+          printf '{"version":"%s","commit":"%s","fecha":"%s"}\n' "$AGENTE_VERSION" "$AGENTE_COMMIT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > apps/agente-local/dist-exe/version-agente.json
+          cat apps/agente-local/dist-exe/version-agente.json
       # Humo: el binario Linux (mismo código que el .exe) debe imprimir su salida y terminar; si queda mudo, falla el pipeline
       - name: Prueba de humo del programa
         run: |
           out=$(AGENTE_CONFIG=/tmp/humo-config.json timeout 20 apps/agente-local/dist-exe/agente-impresion-linux impresoras </dev/null 2>&1)
           echo "$out"
           echo "$out" | grep -qi "impresora" || { echo "El programa no mostró salida"; exit 1; }
+          v=$(apps/agente-local/dist-exe/agente-impresion-linux --version)
+          echo "$v"
+          echo "$v" | grep -q "v${AGENTE_VERSION} (${AGENTE_COMMIT})" || { echo "La versión del binario no coincide"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: agente-impresion
           path: |
             apps/agente-local/dist-exe/agente-impresion-windows.exe
             apps/agente-local/dist-exe/agente-impresion-linux
+            apps/agente-local/dist-exe/version-agente.json
           retention-days: 30
+
+      # Release aparte de las versiones del sistema (v0.4.x): solo al subir a main
+      - name: Release de GitHub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "agente-v${AGENTE_VERSION}" \
+            apps/agente-local/dist-exe/agente-impresion-windows.exe \
+            apps/agente-local/dist-exe/agente-impresion-linux \
+            apps/agente-local/dist-exe/version-agente.json \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Programa de impresión v${AGENTE_VERSION}" \
+            --notes "Programa de impresión Caprichos v${AGENTE_VERSION}, commit ${AGENTE_COMMIT}, compilado el $(date -u +%Y-%m-%d)."
 
       # Publica el .exe donde la API lo sirve (/api/agente-impresion/descargar/{windows,linux}).
       - name: Subir al servidor
@@ -62,4 +89,5 @@ jobs:
           scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             apps/agente-local/dist-exe/agente-impresion-windows.exe \
             apps/agente-local/dist-exe/agente-impresion-linux \
+            apps/agente-local/dist-exe/version-agente.json \
             "${SSH_USER:-deploy}@${SSH_HOST}:caprichos-descargas/"

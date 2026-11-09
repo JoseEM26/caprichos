@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { rutaArchivoConfiguracion } from './config';
+import { LINEA_VERSION, rutaArchivoConfiguracion } from './config';
 
 /**
  * Ciclo de vida como proceso de segundo plano: instancia única (archivo de bloqueo con el pid),
@@ -89,7 +89,7 @@ export function describirEstado(dir = dirDatos(), vivo: VivoFn = procesoVivo): s
   const pid = pidEnMarcha(dir, vivo);
   const e = leerEstado(dir);
   if (!pid) return 'El programa de impresión NO está corriendo. Ábrelo de nuevo (doble clic) o reinicia la PC.';
-  const l = [`El programa de impresión está corriendo en segundo plano (pid ${pid}).`];
+  const l = [LINEA_VERSION, `El programa de impresión está corriendo en segundo plano (pid ${pid}).`];
   if (e?.necesitaVincular) l.push('ATENCIÓN: este equipo necesita vincularse de nuevo (la llave ya no vale). Descarga el programa otra vez desde Caprichos › Configuración › Impresión.');
   l.push(e?.ultimaConexionOk ? `Última conexión con Caprichos: ${e.ultimaConexionOk}` : 'Aún no se conectó con Caprichos desde que arrancó.');
   if (e?.ultimoError && !e.necesitaVincular) l.push(`Último problema: ${e.ultimoError}`);

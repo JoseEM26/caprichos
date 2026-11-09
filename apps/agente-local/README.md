@@ -4,6 +4,17 @@ Agente de fondo en Node.js que corre en la **PC de Caja** de la cafetería Capri
 
 ---
 
+## 0. Versión y release del programa
+
+- **Esquema:** `0.1.<N>`, donde `N` es el número de ejecución del workflow `agente-windows.yml` (`github.run_number`), más el commit corto. Ejemplo: `Programa de impresión Caprichos v0.1.57 (ab12cd3)`.
+- **Cómo se inyecta:** `scripts/bundle.mjs` (esbuild `--define`) toma `AGENTE_VERSION` y `AGENTE_COMMIT` del entorno; sin ellas (tests, `tsc`, `pnpm start`) vale `0.1.0-dev` / `dev`. La versión del `package.json` no se usa.
+- **Ver la versión instalada en una PC:** `agente-impresion-windows.exe --version` (también `-v` o `version`); `--estado` y el arranque la incluyen en su primera línea. En la web: Configuración › Impresión › Fácil, cada PC muestra «Programa v0.1.N (commit)» con la insignia «Actualizado» o «Hay una versión nueva».
+- **Última publicada:** el workflow sube `version-agente.json` (`{version, commit, fecha}`) junto al `.exe` a `~/caprichos-descargas/`; la API lo expone en `GET /api/agente-impresion/version` (variable `AGENTE_VERSION_RUTA` para cambiar el archivo). Sin archivo, la web no muestra insignia.
+- **Release de GitHub:** en cada push a `main` el workflow crea el pre-release `agente-v0.1.N` con los dos binarios y `version-agente.json` (separado de los `v0.4.x` del sistema).
+- Una PC con un `.exe` anterior a este esquema reporta `0.1.0` y se considera antigua: hay que instalar UNA vez el `.exe` nuevo para que desde entonces se vea la versión.
+
+---
+
 ## 1. Arquitectura y Funcionamiento
 
 - **Consumo desacoplado:** Las demás terminales (cocina, mozos, carta web) no buscan impresoras locales ni dependen de la red física. Solamente encolan trabajos en la API del servidor (`print_job`).
