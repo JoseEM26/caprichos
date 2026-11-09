@@ -37,6 +37,7 @@ import {
 } from './repartosApi';
 import { DosPantallas, PantallaTiempos, CobroDetallado, type PantallaDetalle } from './DetalleDosPantallas';
 import { BotonCambiarFormaPago, useCambioCobro } from './CambioCobroRepartidor';
+import { CompartirUbicacion } from './CompartirUbicacion';
 import { clasificarEspera, ConfigReparto, CONFIG_REPARTO_DEFECTO, COORDENADAS_TIENDA_DEFECTO } from './calculoRuta';
 
 type VistaRepartidor = 'pedidos' | 'mios';
@@ -741,6 +742,7 @@ function HechosHoy({ hechos }: { hechos: PedidoReparto[] }) {
 /* Vista principal                                                   */
 /* ---------------------------------------------------------------- */
 
+
 export function RepartidorView() {
   const { salir } = useSesion();
   const navigate = useNavigate();
@@ -1346,6 +1348,9 @@ export function RepartidorView() {
         {/* Chip de ruta y avisos flotando arriba, sin tapar el mapa entero */}
         <div style={{ position: 'absolute', top: 8, left: 8, right: 8, zIndex: 800, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'none' }}>
           {chipRuta}
+          <div style={{ pointerEvents: 'auto' }}>
+            <CompartirUbicacion hayEnCamino={datosMios.pedidos.some((p) => p.estado === 'EN_CAMINO')} />
+          </div>
           <div style={{ pointerEvents: 'auto' }}>
             <BannerAvisosRepartidor pedidos={datosMios.pedidos} avisos={datosMios.avisos} />
           </div>

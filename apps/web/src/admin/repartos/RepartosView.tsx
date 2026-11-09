@@ -20,10 +20,11 @@ import { repartosApi, PedidoReparto, PedidoSeguimiento, PanelRepartidores as Dat
 import { PanelRepartidores } from './PanelRepartidores';
 import { RepartidorView } from './RepartidorView';
 import { RutasAdmin } from './RutasAdmin';
+import { RepartidoresEnVivo } from './RepartidoresEnVivo';
 import { DespachoAdmin } from './DespachoAdmin';
 import { ContadoresDeliveryChips, useContadoresDelivery } from './ContadoresDelivery';
 
-type Vista = 'despacho' | 'panel' | 'todos' | 'mapa' | 'rutas';
+type Vista = 'despacho' | 'panel' | 'todos' | 'mapa' | 'rutas' | 'envivo';
 
 const PESTANAS: Array<{ clave: Vista; texto: string }> = [
   { clave: 'despacho', texto: 'Despacho' },
@@ -31,6 +32,7 @@ const PESTANAS: Array<{ clave: Vista; texto: string }> = [
   { clave: 'todos', texto: 'Todos los pedidos' },
   { clave: 'mapa', texto: 'Mapa' },
   { clave: 'rutas', texto: 'Rutas' },
+  { clave: 'envivo', texto: '🛵 En vivo' },
 ];
 
 /**
@@ -47,9 +49,11 @@ function SeguimientoRepartosView() {
   const puedeTomar = esAdmin && tiene('repartos/tomar');
   const puedeSoltar = (esAdmin || usuario?.rol === 'CAJERO') && tiene('repartos/liquidar');
   const puedeLiquidar = tiene('repartos/liquidar');
+  // Ubicación en vivo de los repartidores: solo ADMIN, SUPERVISOR y CAJERO
+  const puedeVerUbicacion = tiene('repartos/ver_ubicacion');
 
   const vistaUrl = searchParams.get('vista');
-  const vista: Vista = vistaUrl === 'todos' || vistaUrl === 'lista' || vistaUrl === 'mios' ? 'todos' : vistaUrl === 'mapa' ? 'mapa' : vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'panel' ? 'panel' : 'despacho';
+  const vista: Vista = vistaUrl === 'envivo' && puedeVerUbicacion ? 'envivo' : vistaUrl === 'todos' || vistaUrl === 'lista' || vistaUrl === 'mios' ? 'todos' : vistaUrl === 'mapa' ? 'mapa' : vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'panel' ? 'panel' : 'despacho';
 
   const [config, setConfig] = useState<ConfigReparto>(CONFIG_REPARTO_DEFECTO);
   const [zonasGeo, setZonasGeo] = useState<ZonaGeoItem[]>(ZONAS_GEO_DEFECTO);
@@ -173,7 +177,7 @@ function SeguimientoRepartosView() {
         aria-label="Vistas del seguimiento de repartos"
         style={{ display: 'flex', gap: 4, flexWrap: 'wrap', padding: 2, alignSelf: 'flex-start', border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: 'var(--cp-cream, #FFFDF8)' }}
       >
-        {PESTANAS.map((t) => (
+        {PESTANAS.filter((t) => t.clave !== 'envivo' || puedeVerUbicacion).map((t) => (
           <button
             key={t.clave}
             type="button"
@@ -209,6 +213,12 @@ function SeguimientoRepartosView() {
 
       {vista === 'rutas' ? (
         <RutasAdmin />
+      ) : vista === 'envivo' ? (
+        <RepartidoresEnVivo
+          esperados={(panel?.repartidores ?? [])
+            .filter((r) => r.pedidos.some((p: any) => p.etapa === 'EN_CAMINO' || p.etapa === 'LLEGADO'))
+            .map((r) => ({ id: String(r.party_id), nombre: r.nombre }))}
+        />
       ) : cargando ? (
         <div style={{ padding: '60px 0' }}>
           <Cargando mensaje="Cargando pedidos de reparto..." />
@@ -251,7 +261,7 @@ function SeguimientoRepartosView() {
         </>
       )}
 
-      {vista !== 'rutas' && hoja}
+      {vista !== 'rutas' && vista !== 'envivo' && hoja}
 
       {soltando && (
         <ModalSoltarPedido

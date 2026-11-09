@@ -12,6 +12,8 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { RepartosService } from './repartos.service';
+import { UbicacionRepartidorService } from './ubicacion-repartidor.service';
+import { UbicacionRepartidorDto } from './dto/ubicacion-repartidor.dto';
 import { RepartosChatService } from './repartos-chat.service';
 import { TextoDto } from '../mensajes/dto/mensajes.dto';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
@@ -38,7 +40,25 @@ export class RepartosController {
   constructor(
     private readonly repartosService: RepartosService,
     private readonly repartosChat: RepartosChatService,
+    private readonly ubicaciones: UbicacionRepartidorService,
   ) {}
+
+  /** El repartidor con pedidos en camino manda su posición; solo el local la ve. */
+  @Post('ubicacion')
+  @Permiso('repartos', 'entregar')
+  async enviarUbicacion(@Body() dto: UbicacionRepartidorDto, @Req() req: any) {
+    return this.ubicaciones.registrar(dto, req.usuario);
+  }
+
+  /** Posiciones vigentes (<15 min): el personal las ve todas; el repartidor, solo la suya. */
+  @Get('ubicaciones')
+  @Permiso([
+    { modulo: 'repartos', accion: 'ver_ubicacion' },
+    { modulo: 'repartos', accion: 'entregar' },
+  ])
+  async verUbicaciones(@Req() req: any) {
+    return this.ubicaciones.listar(req.usuario);
+  }
 
   @Get('config')
   @Permiso(VER_O_SEGUIR)

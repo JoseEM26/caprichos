@@ -14,6 +14,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RepartosController } from './repartos.controller';
 import { RepartosService } from './repartos.service';
 import { RepartosChatService } from './repartos-chat.service';
+import { UbicacionRepartidorService } from './ubicacion-repartidor.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -61,6 +62,7 @@ describe('RepartosController', () => {
       providers: [
         { provide: RepartosService, useValue: serviceMock },
         { provide: RepartosChatService, useValue: {} },
+        { provide: UbicacionRepartidorService, useValue: {} },
         { provide: PrismaService, useValue: {} },
         { provide: AuditoriaService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => 'secreto' } },

@@ -761,6 +761,19 @@ model ContadorDiario {
   @@map("contador_diario")
 }
 
+// Última posición del repartidor en ruta: una fila por repartidor, sin historial; solo la ve el personal y vence a los 15 min
+model UbicacionRepartidor {
+  repartidor_party_id BigInt   @id
+  lat                 Float
+  lng                 Float
+  precision           Float?
+  rumbo               Float?
+  velocidad           Float?
+  actualizado_en      DateTime @default(now()) @db.Timestamptz
+
+  @@map("ubicacion_repartidor")
+}
+
 // Una salida del repartidor con sus pedidos: se cierra sola cuando todos llegan a un estado final
 model RutaReparto {
   id                  BigInt    @id @default(autoincrement())
