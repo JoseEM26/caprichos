@@ -122,16 +122,16 @@ describe('Todo el día', () => {
   it('el resumen cuenta lo que muestra la lista y cada contador filtra por su estado', async () => {
     montar(dia);
     const resumen = await screen.findByTestId('resumen-dia');
-    expect(resumen.textContent).toContain('Total del día: 5 pedidos');
-    expect(within(resumen).getByRole('button', { name: /Activos/ }).textContent).toContain('2');
-    expect(within(resumen).getByRole('button', { name: /Entregados/ }).textContent).toContain('1');
-    expect(within(resumen).getByRole('button', { name: /Anulados/ }).textContent).toContain('1');
-    expect(within(resumen).getByRole('button', { name: /Rechazados/ }).textContent).toContain('1');
-    expect(within(resumen).getByRole('button', { name: /Por cobrar/ }).textContent).toContain('1');
-    fireEvent.click(within(resumen).getByRole('button', { name: /Anulados/ }));
+    expect(resumen.textContent).toContain('5 pedidos');
+    expect(within(resumen).getByRole('button', { name: /activo/ }).textContent).toContain('2');
+    expect(within(resumen).getByRole('button', { name: /entregado/ }).textContent).toContain('1');
+    expect(within(resumen).getByRole('button', { name: /anulado/ }).textContent).toContain('1');
+    expect(within(resumen).getByRole('button', { name: /rechazado/ }).textContent).toContain('1');
+    expect(within(resumen).getByRole('button', { name: /por cobrar/ }).textContent).toContain('1');
+    fireEvent.click(within(resumen).getByRole('button', { name: /anulado/ }));
     expect(screen.getByText('CP-003')).toBeTruthy();
     expect(screen.queryByText('CP-001')).toBeNull();
-    fireEvent.click(within(resumen).getByRole('button', { name: /Por cobrar/ }));
+    fireEvent.click(within(resumen).getByRole('button', { name: /por cobrar/ }));
     expect(screen.getByText('CP-005')).toBeTruthy();
     expect(screen.queryByText('CP-003')).toBeNull();
   });
@@ -151,9 +151,9 @@ describe('Todo el día', () => {
     const muchos = Array.from({ length: 120 }, (_, i) => ped(i + 1));
     montar(muchos, { resumen: [{ estado: 'ENTREGADO', pago_estado: 'PAGADO', n: 118, total: 2360 }, { estado: 'ANULADO', pago_estado: 'PAGADO', n: 2, total: 40 }] });
     const resumen = await screen.findByTestId('resumen-dia');
-    expect(resumen.textContent).toContain('Total del día: 120 pedidos');
-    expect(within(resumen).getByRole('button', { name: /Entregados/ }).textContent).toContain('118');
-    expect(resumen.textContent).toContain('S/ 2360.00');
+    expect(resumen.textContent).toContain('120 pedidos');
+    expect(within(resumen).getByRole('button', { name: /entregado/ }).textContent).toContain('118');
+    expect(resumen.textContent).toContain('S/ 2,360.00');
   });
 
   it('?vista=todo abre mostrando todos los estados', async () => {
