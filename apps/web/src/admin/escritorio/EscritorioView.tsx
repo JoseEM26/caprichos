@@ -4,6 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { useNotificaciones } from '../useNotificaciones';
 import { EscritorioSupervisorView } from './EscritorioSupervisorView';
+import { TarjetaCumpleanos } from './TarjetaCumpleanos';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 
 interface ResumenApi {
@@ -298,6 +299,8 @@ function EscritorioGeneral() {
           ? `Hola, ${nombreUsuario}. Este es tu escritorio de Administrador.`
           : `Hola, ${nombreUsuario}. Este es tu escritorio de ${rolEtiqueta}: solo muestra lo que corresponde a tu rol.`}
       </div>
+
+      <TarjetaCumpleanos />
 
       {/* Aviso de stock bajo para roles con permiso de compras */}
       {notifStockBajo && (

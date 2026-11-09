@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { useNotificaciones } from '../useNotificaciones';
+import { TarjetaCumpleanos } from './TarjetaCumpleanos';
 
 /** Lo que ve el supervisor: solo conteos, horarios y estados. El servidor no manda montos. */
 export interface EscritorioOperativo {
@@ -113,6 +114,8 @@ export function EscritorioSupervisorView() {
       <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
         Hola, {nombre}. Este es tu escritorio de Supervisor: lo que pasa en el local ahora.
       </div>
+
+      <TarjetaCumpleanos />
 
       {error && (
         <div role="alert" style={{ fontSize: 13, color: 'var(--cp-red, #b3261e)' }}>

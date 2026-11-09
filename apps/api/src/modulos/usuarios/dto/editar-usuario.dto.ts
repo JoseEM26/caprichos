@@ -42,6 +42,11 @@ export class EditarUsuarioDto {
   @MaxLength(80, { message: 'El país de nacimiento es demasiado largo' })
   paisNacimiento?: string;
 
+  /** Cumpleaños: DD/MM o AAAA-MM-DD (solo se guarda día y mes). Vacío lo quita. Solo ADMIN. */
+  @IsOptional()
+  @IsString()
+  cumpleanos?: string;
+
   /** Vacío quita el correo. */
   @IsOptional()
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'El correo no tiene un formato válido' })

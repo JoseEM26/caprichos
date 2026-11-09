@@ -11,6 +11,8 @@ export interface UsuarioItem {
   /** Principal primero, luego los extra. */
   roles?: string[];
   paisNacimiento?: string | null;
+  /** DD/MM (solo día y mes). */
+  cumpleanos?: string | null;
   /** Recibe los avisos del sistema por correo. */
   avisosCorreo?: boolean;
   /** Disponible 24/7 (recibe avisos si nadie con casilla está de turno). */

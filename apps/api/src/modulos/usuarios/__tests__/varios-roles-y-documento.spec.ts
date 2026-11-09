@@ -152,6 +152,16 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
     expect(tx.person.create.mock.calls[0][0].data.pais_nacimiento).toBe('Venezuela');
   });
 
+  it('alta con fecha de nacimiento: guarda solo día y mes; una fecha irreal o futura da 400', async () => {
+    await service.crear({ nombres: 'Ana', apellidos: 'Ruiz', dni: '12345678', rol: 'CAJERO', fechaNacimiento: '1990-03-04' } as any, admin);
+    const data = tx.person.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ cumple_dia: 4, cumple_mes: 3 });
+    expect(data).not.toHaveProperty('fecha_nacimiento');
+    for (const f of ['1990-02-31', '2999-01-01']) {
+      await expect(service.crear({ nombres: 'A', apellidos: 'B', dni: '12345678', rol: 'CAJERO', fechaNacimiento: f } as any, admin)).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
+
   it('rechaza ADMIN combinado con otro rol (400 ROLES_INVALIDOS) y un DNI de 7 dígitos (400)', async () => {
     await expect(
       service.crear({ nombres: 'A', apellidos: 'B', dni: '12345678', rol: 'ADMIN', otrosRoles: ['CAJERO'] } as any, admin),

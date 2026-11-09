@@ -59,6 +59,29 @@ describe('Editar usuario: controles de administración', () => {
     expect(screen.queryByRole('button', { name: 'Cambiar contraseña' })).not.toBeInTheDocument();
   });
 
+  it('cumpleaños: solo ADMIN lo ve; una fecha irreal da error y no llama al servidor; válida se envía como día/mes', async () => {
+    abrir();
+    const campo = await screen.findByLabelText('Cumpleaños, día/mes (opcional)');
+    expect(screen.getByText(/Solo la ven Administración y Supervisión/)).toBeInTheDocument();
+    fireEvent.change(campo, { target: { value: '31/02' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Escribe día y mes reales, por ejemplo 14/03')).toBeInTheDocument();
+    expect(api.patch).not.toHaveBeenCalled();
+    vi.mocked(api.patch).mockResolvedValue({ ...PERSONA, reingresar: false });
+    fireEvent.change(campo, { target: { value: '14/03' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, guardar' }));
+    await waitFor(() => expect(api.patch).toHaveBeenCalled());
+    expect(vi.mocked(api.patch).mock.calls[0][1]).toMatchObject({ cumpleanos: '14/03' });
+  });
+
+  it('cumpleaños: otros roles no ven el campo', async () => {
+    sesion.rol = 'CAJERO';
+    abrir();
+    await screen.findByLabelText('Nombres');
+    expect(screen.queryByLabelText('Cumpleaños, día/mes (opcional)')).not.toBeInTheDocument();
+  });
+
   it('cambiar el DNI sin escribir la contraseña del administrador muestra error y no llama al servidor', async () => {
     abrir();
     fireEvent.change(await screen.findByLabelText('Nuevo DNI (deja vacío para no cambiarlo)'), {

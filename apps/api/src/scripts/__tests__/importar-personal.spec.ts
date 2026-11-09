@@ -37,6 +37,13 @@ describe('importar-personal (consola)', () => {
     expect(filas[3].fila).toEqual(expect.objectContaining({ activo: false }));
   });
 
+  it('fecha_nacimiento acepta dd/mm/aaaa y aaaa-mm-dd', () => {
+    const csv = ['nombres,apellidos,documento,fecha_nacimiento,rol_principal', 'A,B,11111111,04/03/1990,MOZO', 'C,D,22222222,1991-12-25,MOZO'].join('\n');
+    const { filas } = filasDesdeCsv(csv);
+    expect(filas[0].fila).toEqual(expect.objectContaining({ fechaNacimiento: '1990-03-04' }));
+    expect(filas[1].fila).toEqual(expect.objectContaining({ fechaNacimiento: '1991-12-25' }));
+  });
+
   it('una cabecera sin columnas obligatorias aborta', () => {
     expect(filasDesdeCsv('nombres,apellidos\nAna,Ruiz').error).toMatch(/documento, rol_principal/);
   });
