@@ -1103,8 +1103,12 @@
 .msg-panel-sec h3 { margin: 0 0 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #2C4C5D; }
 .msg-panel-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .msg-limpiar { align-self: flex-end; min-height: 44px; padding: 0 8px; }
-/* Pestañas: en dos filas (wrap) en vez de scroll oculto; nunca quedan cortadas ni inalcanzables con mouse */
-.msg-tabs { flex: none; flex-wrap: wrap; gap: 4px; padding: 4px 10px; overflow: visible; }
+/* Pestañas: UNA fila (ahorra alto) con scroll lateral VISIBLE y fino; la rueda del mouse también la mueve (ver ListaChats) */
+.msg-tabs { flex: none; flex-wrap: nowrap; gap: 4px; padding: 4px 10px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: #B2500F #EFE6D9; }
+.msg-tabs::-webkit-scrollbar { height: 8px; display: block; }
+.msg-tabs::-webkit-scrollbar-track { background: #EFE6D9; border-radius: 999px; }
+.msg-tabs::-webkit-scrollbar-thumb { background: #B2500F; border-radius: 999px; }
+.msg-tabs > * { flex: none; white-space: nowrap; }
 .msg-tab-principal { min-height: 36px; padding: 0 9px; display: inline-flex; align-items: center; gap: 4px; background: #FFFFFF; color: #2C4C5D; border-color: #E3D6C6; }
 @media (pointer: coarse) { .msg-tab-principal { min-height: 44px; } }
 .msg-tab-principal b { margin: 0; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #EFE6D9; color: #0B2C3E; font-size: 12px; text-align: center; box-sizing: border-box; }

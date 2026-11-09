@@ -77,6 +77,19 @@ export function ListaChats({
   const [panelAbierto, setPanelAbierto] = React.useState(false);
   const cabRef = React.useRef<HTMLDivElement>(null);
   const botonFiltrosRef = React.useRef<HTMLButtonElement>(null);
+  const pestanasRef = React.useRef<HTMLDivElement>(null);
+  // Con mouse la rueda solo mueve en vertical: sobre las pestañas la convertimos en desplazamiento lateral (solo si hay desborde)
+  React.useEffect(() => {
+    const el = pestanasRef.current;
+    if (!el) return;
+    const alRodar = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', alRodar, { passive: false });
+    return () => el.removeEventListener('wheel', alRodar);
+  }, []);
   const hayDias = Boolean(dias && onDia);
   const diaActivo = hayDias && dia !== 'hoy';
   const posActivo = Boolean(onPos) && pos !== null;
@@ -229,7 +242,7 @@ export function ListaChats({
         )}
       </div>
 
-      <div className="msg-tabs" role="group" aria-label="Filtrar chats" data-testid="pestanas">
+      <div ref={pestanasRef} className="msg-tabs" role="group" aria-label="Filtrar chats" data-testid="pestanas">
         {[
           { id: 'todos', label: 'Todos', count: conteos.todos },
           { id: 'atender', label: 'Por atender', count: conteos.atender },
