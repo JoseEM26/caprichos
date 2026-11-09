@@ -38,6 +38,13 @@ export class AsistenciaController {
     return this.planilla.miResumen(req.usuario.partyId);
   }
 
+  /** Lo que llevo ganado por día y acumulado del período actual (solo lo mío). */
+  @Get('mi/ganado')
+  @Permiso('asistencia', 'marcar')
+  miGanado(@Req() req: any) {
+    return this.planilla.miGanado(req.usuario.partyId);
+  }
+
   @Post('marcar')
   @Permiso('asistencia', 'marcar')
   marcar(@Body() dto: MarcarDto, @Req() req: any) {

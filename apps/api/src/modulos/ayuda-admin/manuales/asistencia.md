@@ -72,6 +72,12 @@ Ver tambien: [[mi-asistencia]]
 ## Como se hace: Aprobar o anular una marca
 En Marcas y selfies, las marcas hechas con usuario y contrasena (pagina publica /asistencia/marcar) quedan A revisar. Aprobar las hace contar; Anular las deja sin efecto. Ambas piden motivo y la marca se conserva. Solo cuentan las marcas validas o aprobadas.
 
+## Como se hace: Feriados y pago doble
+En la pestana Feriados (solo Administrador) estan precargados los feriados nacionales de Peru de 2026 y 2027; revisalos cada ano porque el Estado puede mover o agregar dias. Puedes agregar uno (fecha, nombre y recargo), cambiar el recargo o Desactivarlo; nunca se borran y cada cambio queda en la auditoria. Las horas trabajadas en un feriado activo se pagan a valor hora x recargo (normal x2); la tardanza ese dia se descuenta al 50% del valor hora ya recargado. Las horas programadas del periodo no cambian, y un periodo ya pagado no se recalcula. En el detalle de planilla la jornada muestra la etiqueta "Feriado x2".
+
+## Que ve el trabajador
+En [[mi-asistencia]], la tarjeta "Lo que llevo ganado" muestra por dia las horas y lo ganado, el acumulado del periodo y si es Estimado (puede cambiar hasta que el Administrador cierre el periodo) o Pagado (con el neto recibido). Solo ve lo suyo.
+
 ## Errores y dudas
 - "Hay N jornada(s) incompletas o por revisar": corrige o aprueba las marcas de esos dias antes de pagar.
 - "Aun no configuras la ubicacion del local: nadie podra marcar": falta el punto del local; ve a Configuracion y guardalo.

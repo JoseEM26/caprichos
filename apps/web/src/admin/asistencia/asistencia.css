@@ -110,3 +110,8 @@
 .pa-instalar__btn { font: inherit; font-size: 13px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--cp-line); background: #fff; color: var(--cp-navy); cursor: pointer; opacity: .85; }
 .pa-instalar__ayuda { margin: 0; font-size: 12px; background: #fff; border: 1px solid var(--cp-line); border-radius: 10px; padding: 6px 10px; }
 .ma-enlace { background: none; border: 0; padding: 0; color: var(--cp-navy); text-decoration: underline; font: inherit; cursor: pointer; }
+.ma-ganado-total { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.ma-ganado-total strong { font-family: var(--fuente-titulos); font-size: 24px; font-weight: 800; }
+.ma-ganado-dia { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--cp-line); font-size: 14px; }
+.ma-ganado-dia small { color: var(--cp-soft); font-size: 12px; display: block; }
+.as-form-fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }

@@ -8,10 +8,11 @@ const ADMIN: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: fals
 const LUIS = 7n;
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const AHORA = new Date('2026-12-05T15:00:00Z');
+const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[] } = {}) {
   const consumos: Fila[] = [
     { id: 1n, party_id: LUIS, fecha: d('2026-11-10'), pedido_id: 100n, monto: 40, pagado_en: null, pedido: { codigo: 'P-100' } },
     { id: 2n, party_id: LUIS, fecha: d('2026-11-20'), pedido_id: 101n, monto: 25.5, pagado_en: null, pedido: { codigo: 'P-101' } },
@@ -40,6 +41,7 @@ function montar(opts: { estadoDia?: string } = {}) {
     },
     person: { findUnique: async () => ({ nombres: 'Luis', apellidos: 'Pérez' }), findMany: async () => [{ party_id: LUIS, nombres: 'Luis', apellidos: 'Pérez' }] },
     planillaExtraAprobada: { findMany: async () => [] },
+    feriado: { findMany: async () => opts.feriados ?? [] },
     planillaAjuste: {
       findMany: async () => ajustes,
       findUnique: async ({ where }: any) => ajustes.find((a) => a.id === where.id) ?? null,
@@ -139,6 +141,31 @@ describe('PlanillaService', () => {
     const { svc, periodos } = montar({ estadoDia: 'INCOMPLETO' });
     await expect(svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'JORNADAS_PENDIENTES' } });
     expect(periodos).toHaveLength(0);
+  });
+
+  it('feriado activo: 5 h del 02/11 se pagan ×2 (+100), el valor hora no cambia y Mi ganado lo marca', async () => {
+    const { svc } = montar({ feriados: [{ fecha: d('2026-11-02'), nombre: 'Día de prueba', recargo: 2 }] });
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.resultado.valorHora).toBe(20);
+    expect(r.resultado.ganado).toBe(700);
+    expect(r.dias.find((x: any) => x.jornada === '2026-11-02')).toMatchObject({ feriado: 'Día de prueba', recargo: 2, ganado: 200 });
+    const g: any = await svc.miGanado(LUIS, NOV);
+    expect(g).toMatchObject({ conSueldo: true, estado: 'ESTIMADO', acumulado: 700, neto: null });
+    expect(g.dias.find((x: any) => x.jornada === '2026-11-02')).toEqual({ jornada: '2026-11-02', trabajadaH: 5, ganado: 200, feriado: 'Día de prueba', recargo: 2 });
+    expect(JSON.stringify(g)).not.toMatch(/consumo|ajuste|descuento|adelanto/i);
+  });
+
+  it('Mi ganado pagado devuelve el neto congelado y un feriado nuevo no recalcula', async () => {
+    const m = montar();
+    await m.svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA);
+    const g: any = await m.svc.miGanado(LUIS, NOV);
+    expect(g).toMatchObject({ estado: 'PAGADO', acumulado: 600, neto: 534.5 });
+  });
+
+  it('Mi ganado sin sueldo no es error', async () => {
+    const m = montar();
+    (m.svc as any).prisma.sueldoPersonal.findUnique = async () => null;
+    expect(await m.svc.miGanado(LUIS, NOV)).toEqual({ conSueldo: false });
   });
 
   it('Mi resumen no lleva dinero', async () => {

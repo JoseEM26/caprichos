@@ -30,12 +30,13 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { PlanillaTab } from './PlanillaTab';
+import { FeriadosTab } from './FeriadosTab';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
 import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import './asistencia.css';
 
-type Pestana = 'hoy' | 'mes' | 'marcas' | 'planilla' | 'config' | 'pantalla';
+type Pestana = 'hoy' | 'mes' | 'marcas' | 'planilla' | 'feriados' | 'config' | 'pantalla';
 type Avisar = (m: string | null) => void;
 
 const ahoraLima = () => {
@@ -63,7 +64,7 @@ function Chip({ estado }: { estado: string }) {
 
 const SIN_UBICACION = 'Aún no configuras la ubicación del local: nadie podrá marcar';
 
-const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'planilla', 'config', 'pantalla'];
+const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'planilla', 'feriados', 'config', 'pantalla'];
 
 export function AsistenciaAdminView() {
   // Enlace directo (lo usa Capri): /admin/asistencia?pestana=config abre esa pestaña
@@ -90,6 +91,7 @@ export function AsistenciaAdminView() {
     ['mes', 'Mensual'],
     ['marcas', 'Marcas y selfies'],
     ['planilla', 'Planilla'],
+    ['feriados', 'Feriados'],
     ['config', 'Configuración'],
     ['pantalla', 'Pantalla del QR'],
   ];
@@ -119,6 +121,7 @@ export function AsistenciaAdminView() {
       {pestana === 'mes' && <MesTab onError={setError} />}
       {pestana === 'marcas' && <MarcasTab onError={setError} onOk={setMensaje} />}
       {pestana === 'planilla' && <PlanillaTab onError={setError} onOk={setMensaje} />}
+      {pestana === 'feriados' && <FeriadosTab onError={setError} onOk={setMensaje} />}
       {pestana === 'config' && <ConfigTab cfg={cfg} setCfg={setCfg} onError={setError} onOk={setMensaje} />}
       {pestana === 'pantalla' && <EnlacePantalla onError={setError} onOk={setMensaje} />}
     </div>

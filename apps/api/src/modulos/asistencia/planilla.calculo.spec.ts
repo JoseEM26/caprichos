@@ -5,6 +5,7 @@ import {
   periodoDe,
   sueldoEquivalente,
   DiaPlanilla,
+  pagoDia,
 } from './planilla.calculo';
 
 const dia = (over: Partial<DiaPlanilla> = {}): DiaPlanilla => ({
@@ -117,5 +118,33 @@ describe('calcularPlanilla', () => {
   it('sin horas programadas no hay valor hora ni pago', () => {
     const r = calcularPlanilla({ ...base, sueldoPeriodo: 1000, dias: [] });
     expect(r.ganado).toBe(0);
+  });
+});
+
+describe('feriados (recargo del valor hora)', () => {
+  // 10 días de 8 h = 80 h programadas; sueldo S/1600 → valor hora S/20
+  const dias = (rec?: number) => [
+    dia({ jornada: '2026-11-01', programadaMin: 480, trabajadaMin: 480, recargo: rec }),
+    ...Array.from({ length: 9 }, (_, i) => dia({ jornada: `2026-11-${String(i + 2).padStart(2, '0')}`, programadaMin: 480, trabajadaMin: 480 })),
+  ];
+  it('8 h en feriado ×2 con valor hora S/20 pagan S/320; el valor hora no cambia', () => {
+    const sin = calcularPlanilla({ ...base, sueldoPeriodo: 1600, dias: dias() });
+    const con = calcularPlanilla({ ...base, sueldoPeriodo: 1600, dias: dias(2) });
+    expect(sin.valorHora).toBe(20);
+    expect(con.valorHora).toBe(20);
+    expect(con.programadaMin).toBe(sin.programadaMin);
+    expect(pagoDia(dias(2)[0], 20, 50, false)).toBe(320);
+    expect(con.ganado).toBe(sin.ganado + 160);
+  });
+  it('sin recargo todo queda igual que antes', () => {
+    expect(calcularPlanilla({ ...base, sueldoPeriodo: 1600, dias: dias() }).ganado).toBe(1600);
+  });
+  it('tardanza en feriado: 50% del valor hora ya recargado', () => {
+    const d = dia({ programadaMin: 480, trabajadaMin: 420, tardanzaMin: 60, recargo: 2 });
+    expect(pagoDia(d, 20, 50, false)).toBe(7 * 40 + 1 * 40 * 0.5);
+    expect(calcularPlanilla({ ...base, sueldoPeriodo: 160, dias: [d] }).pagoTardanza).toBe(20);
+  });
+  it('la hora extra aprobada no lleva recargo', () => {
+    expect(pagoDia(dia({ extraMin: 60, recargo: 2 }), 20, 50, true)).toBe(20);
   });
 });

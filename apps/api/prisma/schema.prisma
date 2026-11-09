@@ -2989,3 +2989,17 @@ model PlanillaPeriodo {
   @@index([party_id, desde])
   @@map("planilla_periodo")
 }
+
+// Feriados (migración 20270201300000_feriados). Las horas trabajadas en un feriado activo se pagan a valor hora × recargo.
+model Feriado {
+  id              BigInt   @id @default(autoincrement())
+  fecha           DateTime @unique @db.Date
+  nombre          String   @db.VarChar(120)
+  recargo         Decimal  @default(2) @db.Decimal(4, 2)
+  activo          Boolean  @default(true)
+  creado_en       DateTime @default(now()) @db.Timestamptz
+  actualizado_en  DateTime @default(now()) @db.Timestamptz
+  actualizado_por BigInt?
+
+  @@map("feriado")
+}

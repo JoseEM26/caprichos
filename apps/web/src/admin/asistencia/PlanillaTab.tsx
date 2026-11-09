@@ -168,7 +168,7 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         <tbody>
           {d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0).map((x) => (
             <tr key={x.jornada}>
-              <td data-label="Jornada" className="as-num">{x.jornada}</td>
+              <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">Feriado ×{x.recargo}</Insignia></> : null}</td>
               <td data-label="Estado">{ETIQUETA_ESTADO[x.estado] ?? x.estado}</td>
               <td data-label="Prog. (h)" className="as-num">{horas(x.programadaMin)}</td>
               <td data-label="Trab. (h)" className="as-num">{horas(x.trabajadaMin)}</td>

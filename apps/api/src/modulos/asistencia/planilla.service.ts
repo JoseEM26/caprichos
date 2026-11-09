@@ -9,6 +9,7 @@ import {
   Modalidad,
   calcularDiaPlanilla,
   calcularPlanilla,
+  pagoDia,
   periodoDe,
   redondear2,
   sueldoEquivalente,
@@ -137,8 +138,7 @@ export class PlanillaService {
     ahora: Date,
   ) {
     const { dias, cfg } = await this.asistencia.diasDePersona(id, periodo.desde, periodo.hasta, ahora);
-    const diasCalc = dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin));
-    const [extras, ajustes, consumosBd, persona] = await Promise.all([
+    const [extras, ajustes, consumosBd, persona, feriadosBd] = await Promise.all([
       this.prisma.planillaExtraAprobada.findMany({ where: { party_id: id, jornada: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       this.prisma.planillaAjuste.findMany({
         where: { party_id: id, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } },
@@ -151,7 +151,15 @@ export class PlanillaService {
         orderBy: { fecha: 'asc' },
       }),
       this.prisma.person.findUnique({ where: { party_id: id } }),
+      this.prisma.feriado.findMany({ where: { activo: true, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
     ]);
+    // Feriado activo: las horas trabajadas de esa jornada se pagan a valor hora × recargo (ver pagoDia en planilla.calculo).
+    const feriados = new Map(feriadosBd.map((f) => [isoDe(f.fecha), { nombre: f.nombre, recargo: Number(f.recargo) }]));
+    const diasCalc = dias.map((d) => {
+      const c = calcularDiaPlanilla(d, cfg.toleranciaMin);
+      const f = feriados.get(c.jornada);
+      return f && f.recargo !== 1 ? { ...c, recargo: f.recargo } : c;
+    });
     const vigentes = ajustes.filter((a) => !a.anulado_en);
     const consumos = consumosBd.map((c) => ({
       id: c.id.toString(),
@@ -186,6 +194,8 @@ export class PlanillaService {
         ...d,
         programadaH: horas(d.programadaMin),
         trabajadaH: horas(d.trabajadaMin),
+        feriado: feriados.get(d.jornada)?.nombre ?? null,
+        ganado: redondear2(pagoDia(d, resultado.valorHora, cfg.pagoTardanzaPct, porDia.has(d.jornada))),
         extraAprobada: porDia.has(d.jornada),
         extraAprobadaPor: porDia.has(d.jornada) ? Number(porDia.get(d.jornada)!.aprobado_por) : null,
         extraAprobadaEn: porDia.has(d.jornada) ? porDia.get(d.jornada)!.aprobado_en.toISOString() : null,
@@ -376,6 +386,33 @@ export class PlanillaService {
       tardanzaMin: suma((d) => d.tardanzaMin),
       faltas: calc.filter((d) => d.estado === 'FALTA').length,
       jornadasPorRevisar: calc.filter((d) => ESTADOS_PENDIENTES.includes(d.estado)).length,
+    };
+  }
+
+  /**
+   * Lo que llevo ganado, por día y acumulado, del período actual de MI sueldo. Reutiliza `detalle` (misma fórmula
+   * que la planilla del admin; pagado = cifras congeladas). Solo expone horas, ganado bruto y neto propio: nunca
+   * consumos ni ajustes de otros ni el detalle de consumos.
+   */
+  async miGanado(partyId: bigint, ahora = new Date()) {
+    const s = await this.prisma.sueldoPersonal.findUnique({ where: { party_id: partyId } });
+    if (!s) return { conSueldo: false };
+    const hoy = jornadaDe(ahora).jornada;
+    const d = await this.detalle(Number(partyId), hoy, [], ahora);
+    return {
+      conSueldo: true,
+      modalidad: d.sueldo.modalidad as Modalidad,
+      periodo: d.periodo,
+      estado: d.estado === 'PAGADO' ? 'PAGADO' : 'ESTIMADO',
+      dias: (d.dias as any[]).map((x) => ({
+        jornada: x.jornada,
+        trabajadaH: x.trabajadaH,
+        ganado: x.ganado ?? 0,
+        feriado: x.feriado ?? null,
+        recargo: x.recargo ?? 1,
+      })),
+      acumulado: d.resultado.ganado,
+      neto: d.estado === 'PAGADO' ? d.resultado.neto : null,
     };
   }
 

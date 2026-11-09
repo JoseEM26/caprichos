@@ -34,6 +34,10 @@ export interface DiaPlanillaApi {
   extraMin: number;
   extraAprobada: boolean;
   extraAprobadaEn: string | null;
+  /** Nombre del feriado activo de esa jornada (sus horas se pagan con recargo). */
+  feriado?: string | null;
+  recargo?: number;
+  ganado?: number;
 }
 
 export interface ConsumoPlanillaApi {
@@ -107,3 +111,19 @@ export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/pla
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
 export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[]) => api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds });
 export const reabrirPlanilla = (periodoId: number, motivo: string) => api.post(`/admin/planilla/periodos/${periodoId}/reabrir`, { motivo });
+
+export interface Feriado { id: number; fecha: string; nombre: string; recargo: number; activo: boolean }
+export const listarFeriados = (anio?: number) => api.get<Feriado[]>(`/admin/feriados${anio ? `?anio=${anio}` : ''}`);
+export const crearFeriado = (d: { fecha: string; nombre: string; recargo: number }) => api.post<Feriado>('/admin/feriados', d);
+export const editarFeriado = (id: number, d: Partial<Pick<Feriado, 'nombre' | 'recargo' | 'activo'>>) => api.patch<Feriado>(`/admin/feriados/${id}`, d);
+
+export interface MiGanado {
+  conSueldo: boolean;
+  modalidad?: Modalidad;
+  periodo?: { desde: string; hasta: string };
+  estado?: 'ESTIMADO' | 'PAGADO';
+  dias?: Array<{ jornada: string; trabajadaH: number; ganado: number; feriado: string | null; recargo: number }>;
+  acumulado?: number;
+  neto?: number | null;
+}
+export const miGanado = () => api.get<MiGanado>('/admin/asistencia/mi/ganado');

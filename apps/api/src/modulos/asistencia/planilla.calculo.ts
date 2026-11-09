@@ -56,7 +56,19 @@ export interface DiaPlanilla {
   salidaAnticipadaMin: number;
   /** Minutos fuera del turno (antes de entrar o después de salir) pasada la tolerancia. */
   extraMin: number;
+  /** Feriado activo ese día: multiplicador del valor hora para las horas trabajadas y la tardanza (vacío = 1). */
+  recargo?: number;
 }
+
+/**
+ * Pago de una jornada a un valor hora dado: (trabajadas + tardanza × pct%) × valor hora × recargo del feriado.
+ * La tardanza en feriado se paga al pct% del valor hora YA recargado. La hora extra aprobada no lleva recargo.
+ * Única fuente de la fórmula: la usan el total de la planilla y el «ganado por día» de Mi asistencia.
+ */
+export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.trabajadaMin / 60) * vh * (d.recargo ?? 1);
+export const pagoTardanzaDia = (d: DiaPlanilla, vh: number, pct: number): number => (d.tardanzaMin / 60) * vh * (d.recargo ?? 1) * (pct / 100);
+export const pagoDia = (d: DiaPlanilla, vh: number, pct: number, extraAprobada: boolean): number =>
+  pagoTrabajadoDia(d, vh) + pagoTardanzaDia(d, vh, pct) + (extraAprobada ? (d.extraMin / 60) * vh : 0);
 
 /** Jornada de una persona: minutos programados, trabajados válidos, tardanza, salida anticipada y extra. */
 export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPlanilla {
@@ -159,8 +171,9 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
   const extraAprobadaMin = e.dias.filter((d) => e.extrasAprobadas.has(d.jornada)).reduce((a, d) => a + d.extraMin, 0);
 
   const vh = programadaMin > 0 ? e.sueldoPeriodo / (programadaMin / 60) : 0;
-  const pagoTrabajado = redondear2((trabajadaMin / 60) * vh);
-  const pagoTardanza = redondear2((tardanzaMin / 60) * vh * (e.pctTardanza / 100));
+  // Las horas del período para el valor hora NO cambian por feriado; solo el pago de esas horas lleva recargo.
+  const pagoTrabajado = redondear2(e.dias.reduce((a, d) => a + pagoTrabajadoDia(d, vh), 0));
+  const pagoTardanza = redondear2(e.dias.reduce((a, d) => a + pagoTardanzaDia(d, vh, e.pctTardanza), 0));
   const pagoExtra = redondear2((extraAprobadaMin / 60) * vh);
   const ganado = redondear2(pagoTrabajado + pagoTardanza + pagoExtra);
 
