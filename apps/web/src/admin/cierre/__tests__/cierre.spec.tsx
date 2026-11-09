@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ArqueoCiegoForm } from '../ArqueoCiegoForm';
 import { HistorialCierres } from '../HistorialCierres';
 import { CierreView } from '../CierreView';
+import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -10,6 +11,7 @@ import * as sesionModulo from '../../../comun/sesion';
 describe('Ola F5: Caja y Cierres', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reiniciarBorradores();
 
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '2', nombres: 'Cajera Carmen', rol: 'CAJERO' },
@@ -190,7 +192,7 @@ describe('Ola F5: Caja y Cierres', () => {
     });
   });
 
-  it('muestra el resumen esperado solo cuando el rol es ADMIN en CierreView', async () => {
+  it('muestra el resumen esperado al cajero y al ADMIN en CierreView', async () => {
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 10, estado: 'ABIERTA', apertura: 50 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
@@ -217,11 +219,11 @@ describe('Ola F5: Caja y Cierres', () => {
       },
     });
 
-    // Caso A: Cajero no ve el resumen esperado
+    // Caso A: el cajero TAMBIÉN ve el resumen esperado (el conteo a ciegas ya no se usa)
     const { rerender } = render(<CierreView />);
-    expect(screen.queryByTestId('seccion-esperado-admin')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('seccion-esperado-admin')).toBeInTheDocument();
 
-    // Caso B: Admin ve el resumen esperado
+    // Caso B: el admin lo ve igual
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '1', nombres: 'Admin Kevin', rol: 'ADMIN' },
       permisos: ['caja/ver', 'caja/cerrar'],
@@ -327,7 +329,6 @@ describe('Ola F5: Caja y Cierres', () => {
 
     expect(await screen.findByText(/La caja del 22\/10\/2026 sigue abierta/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('seccion-esperado-admin')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerrar caja y cuadrar' })).toBeInTheDocument();
   });
 
@@ -348,30 +349,36 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.queryByText('Caja cerrada. Se abre en cero cada mañana.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abrir caja' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerrar caja y cuadrar' })).toBeInTheDocument();
-    expect(esperado).not.toHaveBeenCalled();
+    // El cajero también pide el esperado (sin código): el conteo a ciegas ya no se usa
+    expect(esperado).toHaveBeenCalled();
   });
 
-  it('el cajero cuenta con el arqueo del servidor y no pide el esperado', async () => {
+  it('el cajero cuenta y ve la diferencia en vivo: ya no hay arqueo a ciegas ni intentos', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
     vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
     vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
-    const esperado = vi.spyOn(cierreApi, 'obtenerEsperado');
-    const arqueo = vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
+    vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 7,
+      fecha: `${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })}T00:00:00.000Z`,
+      apertura: 0,
+      efectivoEsperado: 250,
+      medios: { efectivo: 250, yape: 0, plin: 0, transferencia: 0, tarjeta: 0 },
+      desglose: { ventasEfectivo: 250, ingresos: 0, egresos: 0 },
+      cobrados: [],
+      movimientos: [],
+    } as any);
+    const arqueo = vi.spyOn(cierreApi, 'realizarArqueo');
 
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
+    expect(await screen.findByTestId('cc-deberia')).toHaveTextContent('S/ 250.00');
     fireEvent.change(screen.getByLabelText('Cantidad de billetes de S/ 100'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
 
-    await waitFor(() =>
-      expect(arqueo).toHaveBeenCalledWith({ conteo: { '100': 3 }, medios: { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 } }),
-    );
-    expect(await screen.findByText(/No cuadra\. Cuenta de nuevo/)).toBeInTheDocument();
+    expect(screen.getByTestId('cc-diferencia')).toHaveTextContent('Sobra +S/ 50.00');
+    expect(arqueo).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/Código de la supervisora/i)).not.toBeInTheDocument();
-    expect(esperado).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Sist\./)).not.toBeInTheDocument();
   });
 
   it('al cajero no se le ofrece la pestaña de historial (el servidor responde 403)', async () => {
@@ -385,24 +392,32 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.queryByRole('tab', { name: 'Historial de cierres' })).not.toBeInTheDocument();
   });
 
-  it('si no cuadra, el cajero sigue a ciegas: no hay campo de código ni detalle del cuadre', async () => {
+  it('si no cuadra, el cajero puede cerrar igual: sin código y con nota opcional (antes: a ciegas, nota obligatoria)', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
     vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
     vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
     vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockResolvedValue([]);
-    vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 7,
+      fecha: `${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })}T00:00:00.000Z`,
+      apertura: 0,
+      efectivoEsperado: 100,
+      medios: { efectivo: 100, yape: 0, plin: 0, transferencia: 0, tarjeta: 0 },
+      desglose: { ventasEfectivo: 100, ingresos: 0, egresos: 0 },
+      cobrados: [],
+      movimientos: [],
+    } as any);
+    const cerrar = vi.spyOn(cierreApi, 'cerrarCaja').mockResolvedValue({ cajaId: 7, resultado: 'NO_CUADRA', diferenciaTotal: -50 } as any);
 
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
+    fireEvent.change(await screen.findByLabelText('Cantidad de billetes de S/ 50'), { target: { value: '1' } });
 
-    expect(await screen.findByText(/No cuadra\. Cuenta de nuevo/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Código de la supervisora/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Verificar' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('detalle-cuadre')).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/Nota explicativa/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Cerrar caja con diferencia de −S\/ 50\.00/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, cerrar caja' }));
+    await waitFor(() => expect(cerrar).toHaveBeenCalledWith(expect.objectContaining({ conteo: { '50': 1 }, nota: undefined })));
   });
 
   it('la fecha de la caja no cambia de día al mostrarla en Lima', async () => {

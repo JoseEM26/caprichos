@@ -458,8 +458,9 @@ describe('CierreService', () => {
 
       const resCerrar = await service.cerrar(dtoCerrar, mockUsuarioCajero);
 
-      // El cajero no recibe el esperado ni la diferencia (DT-61)
-      expect(resCerrar.medios).toBeUndefined();
+      // Quien cierra ve el esperado y la diferencia (el conteo a ciegas ya no se usa)
+      expect(resCerrar.medios).toBeDefined();
+      expect(resCerrar.diferenciaTotal).toBe(-5);
       const medioYape = prismaMock.cierreMedio.create.mock.calls.map((c: any) => c[0].data).find((d: any) => d.medio === 'YAPE');
       expect(medioYape).toMatchObject({ sistema: 200, visto: 210 });
 
@@ -736,11 +737,10 @@ describe('CierreService', () => {
   // 8. Montos esperados del sistema (solo ADMIN)
   // -------------------------------------------------------------------------
   describe('8. montos esperados en vivo', () => {
-    it('el cajero no ve el esperado (cierre ciego); el ADMIN y el SUPERVISOR lo ven directo', async () => {
-      await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toMatchObject({
-        status: HttpStatus.FORBIDDEN,
-        response: { codigo: 'ESPERADO_RESERVADO' },
-      });
+    it('el cajero, el SUPERVISOR y el ADMIN ven el esperado sin código (el conteo a ciegas ya no se usa)', async () => {
+      const caj = await service.obtenerEsperado(mockUsuarioCajero);
+      expect(caj.cajaId).toBe(10);
+      expect(caj.efectivoEsperado).toBe(355);
       const sup = await service.obtenerEsperado(mockUsuarioSupervisor);
       expect(sup.cajaId).toBe(10);
 
@@ -763,9 +763,17 @@ describe('CierreService', () => {
             egresos: 15.0,
             liquidadoRepartidores: 0,
             propinas: { total: 0, efectivo: 0, digital: 0 },
+            // Desglose llano: 50 + 300 + 0 + 20 − 15 = 355 (el vuelto de 10 ya está descontado en el cobro)
+            apertura: 50,
+            cobrosEfectivo: 300,
+            vueltos: 10,
+            esperado: 355,
+            porMedio: { efectivo: 355, yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
           },
         }),
       );
+      const d = esperado.desglose;
+      expect(d.apertura + d.cobrosEfectivo + d.liquidadoRepartidores + d.ingresos - d.egresos).toBe(d.esperado);
     });
   });
 
@@ -808,10 +816,11 @@ describe('CierreService', () => {
       expect(esperado.movimientos.map((m) => m.motivo)).toEqual(['Sencillo inicial extra', 'Compra de hielo']);
     });
 
-    it('el cajero no recibe cobros ni movimientos (cierre ciego, DT-61)', async () => {
-      await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toThrow(HttpException);
-      expect(prismaMock.cobro.findMany).not.toHaveBeenCalled();
-      expect(prismaMock.movimientoCaja.findMany).not.toHaveBeenCalled();
+    it('el cajero también recibe cobros y movimientos de la caja abierta (sin código)', async () => {
+      const esperado = await service.obtenerEsperado(mockUsuarioCajero);
+      expect(esperado.cajaId).toBe(7);
+      expect(esperado.cobrados).toHaveLength(4);
+      expect(esperado.movimientos).toHaveLength(2);
     });
   });
 
@@ -850,38 +859,51 @@ describe('CierreService', () => {
       }
     });
 
-    it('exige nota explicativa cuando el cierre no cuadra (NOTA_REQUERIDA)', async () => {
-      const dtoSinNota: CerrarCajaDto = {
-        conteo: { '200': 1 },
-        medios: { yape: 200 },
-        nota: '  ',
-      };
-
-      await expect(
-        service.cerrar(dtoSinNota, mockUsuarioCajero),
-      ).rejects.toThrow(HttpException);
-
-      try {
-        await service.cerrar(dtoSinNota, mockUsuarioCajero);
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.BAD_REQUEST);
-        expect(e.getResponse().codigo).toBe('NOTA_REQUERIDA');
-      }
+    it('cierra con FALTA aunque no haya nota: guarda NO_CUADRA, la diferencia por medio y no pide aprobación', async () => {
+      const res = await service.cerrar({ conteo: { '200': 1 }, medios: { yape: 200 }, nota: '  ' }, mockUsuarioCajero);
+      expect(res.resultado).toBe('NO_CUADRA');
+      const creada = prismaMock.cierreCaja.create.mock.calls[0][0].data;
+      expect(creada.resultado).toBe('NO_CUADRA');
+      expect(creada.nota).toBeNull();
+      expect(creada.aprobado_por).toBeUndefined();
+      const ef = res.medios!.find((m: any) => m.medio === 'EFECTIVO');
+      expect(ef).toMatchObject({ sistema: 355, visto: 200, diferencia: -155 });
+      expect(res.diferenciaTotal).toBe(-155);
     });
 
-    it('exige arqueo previo si no se proporciona conteo ni medios al cerrar (ARQUEO_REQUERIDO)', async () => {
+    it('cierra con SOBRA, guarda la nota y la diferencia total suma todos los medios', async () => {
+      const res = await service.cerrar(
+        { conteo: { '200': 1, '100': 1, '50': 1, '5': 1, '2': 1 }, medios: { yape: 210 }, nota: 'Me dieron de más' },
+        mockUsuarioCajero,
+      );
+      expect(res.resultado).toBe('NO_CUADRA');
+      expect(res.nota).toBe('Me dieron de más');
+      // efectivo 357 vs 355 = +2; yape 210 vs 200 = +10
+      expect(res.diferenciaTotal).toBe(12);
+      expect(prismaMock.cierreCaja.create.mock.calls[0][0].data.nota).toBe('Me dieron de más');
+    });
+
+    it('cierra CUADRA con el efectivo como total directo (sin billetes) y lo guarda en el conteo', async () => {
+      const res = await service.cerrar({ efectivoTotal: 355, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } }, mockUsuarioCajero);
+      expect(res.resultado).toBe('CUADRA');
+      expect(res.diferenciaTotal).toBe(0);
+      expect(prismaMock.cierreCaja.create.mock.calls[0][0].data.conteo).toEqual({ total_directo: 355 });
+    });
+
+    it('sin conteo ni total ya no exige arqueo previo: el efectivo cuenta cero y cierra con diferencia', async () => {
       prismaMock.conteoCierre.findMany.mockResolvedValue([]);
+      const res = await service.cerrar({}, mockUsuarioCajero);
+      expect(res.resultado).toBe('NO_CUADRA');
+      expect(res.diferenciaTotal).toBe(-355);
+    });
 
-      await expect(
-        service.cerrar({}, mockUsuarioCajero),
-      ).rejects.toThrow(HttpException);
-
-      try {
-        await service.cerrar({}, mockUsuarioCajero);
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.BAD_REQUEST);
-        expect(e.getResponse().codigo).toBe('ARQUEO_REQUERIDO');
-      }
+    it('el arqueo previo que NO cuadró no cuenta intentos ni exige nada para cerrar', async () => {
+      prismaMock.conteoCierre.findMany.mockResolvedValue([
+        { intento: 3, resultado: 'NO_CUADRA' },
+        { intento: 2, resultado: 'NO_CUADRA' },
+        { intento: 1, resultado: 'NO_CUADRA' },
+      ]);
+      await expect(service.cerrar({ efectivoTotal: 355 }, mockUsuarioCajero)).resolves.toMatchObject({ resultado: 'CUADRA' });
     });
   });
 
@@ -1125,17 +1147,16 @@ describe('CierreService', () => {
       expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
     });
 
-    it('cierre con un medio distinto del sistema y sin ajuste se rechaza (AJUSTE_REQUERIDO)', async () => {
+    it('cierre con un medio distinto del sistema y sin ajuste YA NO se rechaza: queda como diferencia (AJUSTE_REQUERIDO retirado)', async () => {
       const dto: CerrarCajaDto = {
         conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
         medios: { yape: 210, plin: 0, transferencia: 50, tarjeta: 100 },
         nota: 'Yape distinto',
       };
-      await expect(service.cerrar(dto, mockUsuarioAdmin, undefined)).rejects.toMatchObject({
-        response: { codigo: 'AJUSTE_REQUERIDO' },
-        status: HttpStatus.CONFLICT,
-      });
-      expect(prismaMock.cierreCaja.create).not.toHaveBeenCalled();
+      const res = await service.cerrar(dto, mockUsuarioAdmin, undefined);
+      expect(res.resultado).toBe('NO_CUADRA');
+      const medioYape = prismaMock.cierreMedio.create.mock.calls.map((c: any) => c[0].data).find((d: any) => d.medio === 'YAPE');
+      expect(medioYape).toMatchObject({ sistema: 200, visto: 210 });
     });
 
     it('cierre con el monto corregido sí pasa: el medio queda visto con el valor ajustado y el resultado sigue NO_CUADRA', async () => {
@@ -1281,16 +1302,16 @@ describe('CierreService', () => {
       expect(resultado).toEqual({ resultado: 'CUADRA', intento: 1 });
     });
 
-    it('el cierre no acepta el Yape sin devolución (AJUSTE_REQUERIDO): el sistema ya lo descuenta', async () => {
+    it('el cierre con Yape sin descontar la devolución cierra y deja la diferencia (+50): el sistema ya la descuenta', async () => {
       prismaMock.devolucionPedido.findMany.mockResolvedValue([
         devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
       ]);
-      await expect(
-        service.cerrar(
-          { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
-          mockUsuarioCajero,
-        ),
-      ).rejects.toMatchObject({ response: { codigo: 'AJUSTE_REQUERIDO' } });
+      const res = await service.cerrar(
+        { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
+        mockUsuarioCajero,
+      );
+      expect(res.resultado).toBe('NO_CUADRA');
+      expect(res.medios!.find((m: any) => m.medio === 'YAPE')).toMatchObject({ sistema: 150, visto: 200, diferencia: 50 });
     });
   });
 });

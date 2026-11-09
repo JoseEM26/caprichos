@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConfirmarAsync } from '../../comun/useConfirmarAsync';
 import { useSesion } from '../../comun/sesion';
-import { useEsAdminOSupervisor } from '../../comun/useEsAdminOSupervisor';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
 import {
   cierreApi,
-  calcularTotalEfectivo,
   AjusteMedio,
   ClaveDigital,
   DevolucionTurno,
@@ -16,9 +14,9 @@ import {
   PendienteCobro,
   RepartidorPorLiquidar,
 } from './cierreApi';
-import { DialogoCorregirMedio, ETIQUETA_MEDIO, ListaCorrecciones } from './CorreccionesMedios';
-import { VerificarMovimientos } from './VerificarMovimientos';
-import { PendientesCobroCierre, AvisoBloqueoCierre, FocoPendientes, GrupoFoco } from './PendientesCobroCierre';
+import { DialogoCorregirMedio, ETIQUETA_MEDIO } from './CorreccionesMedios';
+import { CuadreCaja, type CierrePayload } from './CuadreCaja';
+import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -30,8 +28,6 @@ type TabCierre = 'turno' | 'historial';
 // Monto en soles: solo dígitos y un punto, máximo dos decimales (sin negativos ni letras)
 const limpiarMonto = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1');
 
-// Monto con signo para el desglose digital: las devoluciones salen en negativo
-const solesConSigno = (n: number) => (n < 0 ? `-S/ ${(-n).toFixed(2)}` : `S/ ${n.toFixed(2)}`);
 
 // Hoy en Lima como AAAA-MM-DD, para comparar con la fecha de la caja
 const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -41,8 +37,6 @@ export function CierreView() {
   const { confirmar, dialogo } = useConfirmarAsync();
   const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || tieneRolUsuario(usuario, 'CAJERO');
   const esAdmin = usuario?.rol === 'ADMIN';
-  // ADMIN y SUPERVISOR ven el esperado y la diferencia; el cajero cierra a ciegas (DT-61)
-  const veDetalle = useEsAdminOSupervisor();
 
   const [tabActiva, setTabActiva] = useState<TabCierre>('turno');
 
@@ -61,8 +55,6 @@ export function CierreView() {
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
   const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
   const [errorPendientes, setErrorPendientes] = useState(false);
-  // Enfoque pedido desde un aviso del cierre hacia el panel de pendientes
-  const [foco, setFoco] = useState<FocoPendientes | null>(null);
   const [pedidosCobrados, setPedidosCobrados] = useState<CobroTurno[]>([]);
   // Fecha (AAAA-MM-DD) de la caja que se cierra: la abierta, sea de hoy o de un día anterior
   const [fechaTurno, setFechaTurno] = useState(hoyLima());
@@ -88,32 +80,13 @@ export function CierreView() {
   const [montoAbrir, setMontoAbrir] = useState('0.00');
   const [errorAbrir, setErrorAbrir] = useState('');
 
-  // Estados modal cierre y arqueo
-  const [faseCierre, setFaseCierre] = useState<'verificar' | 'arqueo'>('verificar');
-  const [conteoBilletes, setConteoBilletes] = useState<Record<string, string>>({
-    '200': '',
-    '100': '',
-    '50': '',
-    '20': '',
-    '10': '',
-  });
-  const [conteoMonedas, setConteoMonedas] = useState<Record<string, string>>({
-    '5': '',
-    '2': '',
-    '1': '',
-    '0.5': '',
-    '0.2': '',
-    '0.1': '',
-  });
+  // Panel «Cuadre de caja» (una pantalla; reemplaza al modal por pasos)
   // Medios digitales: los calcula el sistema (vouchers aprobados). El cajero no los teclea;
   // solo los corrige por excepción, con motivo y autorización (ver DialogoCorregirMedio).
   const [digitales, setDigitales] = useState<DigitalesCaja | null>(null);
   const [ajustesMedio, setAjustesMedio] = useState<AjusteMedio[]>([]);
   const [devolucionesTurno, setDevolucionesTurno] = useState<DevolucionTurno[]>([]);
   const [correccion, setCorreccion] = useState<{ medio: MedioAjustable; clave: ClaveDigital } | null>(null);
-  const [obsCierre, setObsCierre] = useState('');
-  const [revisadoCuadra, setRevisadoCuadra] = useState<boolean | null>(null);
-  const [arqueosNoCuadra, setArqueosNoCuadra] = useState(0);
   const [msgCierreError, setMsgCierreError] = useState('');
   const [cerrandoCaja, setCerrandoCaja] = useState(false);
 
@@ -156,10 +129,10 @@ export function CierreView() {
         // En mock mode puede fallar
       }
 
-      // 2. Esperado: lo piden el administrador y el supervisor. El cajero cuenta a ciegas (DT-61).
+      // 2. Esperado: lo ve quien cierra la caja (el conteo a ciegas ya no se usa).
       // Con él llegan también los cobros y movimientos de la MISMA caja abierta (sea de hoy o no).
       let turnoDeCaja = false;
-      if (veDetalle) {
+      {
         try {
           const esp = await cierreApi.obtenerEsperado();
           if (esp) {
@@ -220,7 +193,7 @@ export function CierreView() {
     } finally {
       setCargando(false);
     }
-  }, [veDetalle, cargarDigitales]);
+  }, [cargarDigitales]);
 
   useEffect(() => {
     cargarTurno();
@@ -241,6 +214,10 @@ export function CierreView() {
     return pedidosCobrados.reduce((acc, p) => acc + p.total, 0);
   }, [esperado, pedidosCobrados, ventasEfectivo, propinasDigital]);
 
+  // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
+  // Cuenta los pedidos que tienen un pago en ese medio (un pedido mixto cuenta en cada medio)
+  const pedidosPorMedio = (medio: string) => pedidosCobrados.filter((p) => p.medios.includes(medio)).length;
+
   const movimientosVigentes = useMemo(() => movimientos.filter((m) => !m.anulado_en), [movimientos]);
 
   const ingresosExtra = useMemo(() => {
@@ -258,54 +235,9 @@ export function CierreView() {
     return aperturaMonto + ventasEfectivo + propinasEfectivo + ingresosExtra - egresosGasto;
   }, [esperado, aperturaMonto, ventasEfectivo, propinasEfectivo, ingresosExtra, egresosGasto]);
 
-  const montoDigital = (clave: ClaveDigital) => digitales?.medios[clave]?.monto ?? 0;
-
-  // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
-  // Cuenta los pedidos que tienen un pago en ese medio (un pedido mixto cuenta en cada medio)
-  const pedidosPorMedio = (medio: string) => pedidosCobrados.filter((p) => p.medios.includes(medio)).length;
-
-  // Total contado en conteo
-  const totalEfectivoContado = useMemo(() => {
-    const todos: Record<string, string> = { ...conteoBilletes, ...conteoMonedas };
-    return calcularTotalEfectivo(todos);
-  }, [conteoBilletes, conteoMonedas]);
-
-  // Cada medio contado frente a lo que el sistema espera (el mismo criterio del servidor: 0,005)
-  const filasCuadre = esperado
-    ? [
-        { medio: 'Efectivo', sistema: efectivoEsperado, contado: totalEfectivoContado },
-        { medio: 'Yape', sistema: esperado.medios?.yape ?? 0, contado: montoDigital('yape') },
-        { medio: 'Plin', sistema: esperado.medios?.plin ?? 0, contado: montoDigital('plin') },
-        { medio: 'Transferencia', sistema: esperado.medios?.transferencia ?? 0, contado: montoDigital('transferencia') },
-        { medio: 'Tarjeta', sistema: esperado.medios?.tarjeta ?? 0, contado: montoDigital('tarjeta') },
-      ].map((f) => ({ ...f, dif: Math.round((f.contado - f.sistema) * 100) / 100 }))
-    : [];
-  const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
-  // La nota explicativa es obligatoria si no cuadra: el admin y el supervisor ven la diferencia; el cajero, si el arqueo
-  // no cuadra o ya van 3 arqueos que no cuadraron
-  const necesitaNota = veDetalle ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3;
-
-  const armarConteo = () => {
-    const conteo: Record<string, number> = {};
-    for (const [k, v] of Object.entries({ ...conteoBilletes, ...conteoMonedas })) {
-      const n = parseInt(v || '0', 10);
-      if (n > 0) conteo[k] = n;
-    }
-    return conteo;
-  };
-
-  // Los digitales van como los vale hoy el sistema (con su corrección, si la hay); el servidor los vuelve a comprobar
-  const armarMedios = () => ({
-    yape: montoDigital('yape'),
-    plin: montoDigital('plin'),
-    transferencia: montoDigital('transferencia'),
-    tarjeta: montoDigital('tarjeta'),
-  });
-
-  // Tras corregir un monto, el cuadre anterior ya no vale: hay que revisar otra vez
+  // Tras corregir un monto, el panel recalcula la diferencia con el sistema nuevo
   const alCorregirMedio = async (ajuste: AjusteMedio) => {
     setCorreccion(null);
-    setRevisadoCuadra(null);
     setMsgCierreError('');
     setCjMsg(`Corrección guardada: ${ETIQUETA_MEDIO[ajuste.medio] ?? ajuste.medio} ahora vale s/ ${ajuste.montoNuevo.toFixed(2)}.`);
     await cargarDigitales();
@@ -314,17 +246,8 @@ export function CierreView() {
   const errorDeServidor = (err: unknown, respaldo: string) => (err instanceof ErrorApi ? err.message : respaldo);
 
   const abrirCierre = () => {
-    setFaseCierre('verificar');
-    setRevisadoCuadra(null);
     setMsgCierreError('');
     setAbrirModalCierre(true);
-  };
-
-  // Lleva al panel de pendientes (abre el cierre si hace falta) y abre el grupo pedido
-  const enfocarPendientes = (grupo: GrupoFoco) => {
-    setFaseCierre('verificar');
-    if (!abrirModalCierre) abrirCierre();
-    setFoco({ grupo, n: Date.now() });
   };
 
   // Acciones
@@ -439,72 +362,27 @@ export function CierreView() {
     }
   };
 
-  // Cajero: el arqueo lo compara el servidor (todos los medios, mismo criterio) y guarda el intento
-  const handleRevisarCuadre = async () => {
-    if (guardando) return;
+  // Cierra la caja con lo que trae el panel. Nunca se bloquea por diferencia; sí por pendientes (el servidor lo vuelve a validar).
+  const handleCerrarCaja = async (p: CierrePayload): Promise<boolean> => {
+    if (guardando || cerrandoCaja) return false;
     setMsgCierreError('');
-    setGuardando(true);
-    try {
-      const res = await cierreApi.realizarArqueo({ conteo: armarConteo(), medios: armarMedios() });
-      setRevisadoCuadra(res.resultado === 'CUADRA');
-      setArqueosNoCuadra(res.resultado === 'NO_CUADRA' ? arqueosNoCuadra + 1 : arqueosNoCuadra);
-    } catch (err: any) {
-      setMsgCierreError(errorDeServidor(err, 'No se pudo revisar el arqueo.'));
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const handleConfirmarCierre = async () => {
-    if (guardando || cerrandoCaja) return;
-    setMsgCierreError('');
-    if (pedidosAbiertos.length > 0) {
-      setMsgCierreError('Hay pedidos sin cobrar o por confirmar. Resuélvelos antes de cerrar.');
-      return;
-    }
-    if (repartidores.some((r) => r.pendiente > 0)) {
-      setMsgCierreError('Hay efectivo de repartidores sin liquidar. Liquídalo antes de cerrar.');
-      return;
-    }
-    if (!veDetalle && revisadoCuadra === null) {
-      setMsgCierreError('Toca «Revisar» para saber si cuadra antes de cerrar.');
-      return;
-    }
-    if (necesitaNota) {
-      if (obsCierre.trim().length < 3) {
-        setMsgCierreError('Escribe una nota de al menos 3 caracteres para cerrar con diferencias.');
-        return;
-      }
-    }
-
-    // El cajero no ve la diferencia (cierre ciego): la pregunta es neutra
-    let titulo = '¿Cerrar la caja?';
-    if (veDetalle) {
-      const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
-      const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
-      titulo = `¿Cerrar la caja ${txtDif}?`;
-    }
-    const conf = await confirmar({
-      titulo,
-      mensaje: `Se guarda el cierre en el historial, que no se puede borrar ni editar. Mañana la caja se abre en cero.`,
-    });
-    if (!conf) return;
-
     setCerrandoCaja(true);
     try {
-      await cierreApi.cerrarCaja({
-        conteo: armarConteo(),
-        medios: armarMedios(),
-        nota: obsCierre.trim() || undefined,
-      });
-
+      const res = await cierreApi.cerrarCaja(p);
       setAbrirModalCierre(false);
-      setCjMsg('Caja cerrada. El cierre quedó registrado en el historial inmutable.');
-      setTabActiva('historial');
-      setArqueosNoCuadra(0);
+      const dif = res.diferenciaTotal ?? 0;
+      const txt = dif > 0 ? `+S/ ${dif.toFixed(2)}` : `−S/ ${Math.abs(dif).toFixed(2)}`;
+      setCjMsg(
+        Math.abs(dif) < 0.005
+          ? 'Caja cerrada. El cierre quedó registrado en el historial inmutable.'
+          : `Caja cerrada con una diferencia de ${txt}. Quedó registrada en el historial inmutable.`,
+      );
+      if (esAdmin) setTabActiva('historial');
       cargarTurno();
+      return true;
     } catch (err: any) {
       setMsgCierreError(errorDeServidor(err, 'Error al cerrar la caja.'));
+      return false;
     } finally {
       setCerrandoCaja(false);
     }
@@ -520,6 +398,68 @@ export function CierreView() {
 
   if (cargando) {
     return <Cargando mensaje="Cargando caja y cierres..." />;
+  }
+
+  // Si el esperado no cargó no se deja la pantalla muerta: se dice y se puede reintentar
+  if (abrirModalCierre && !esperado) {
+    return (
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <EstadoError mensaje="No se pudo cargar lo que debería haber en caja. Revisa tu conexión e inténtalo otra vez." />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="cc-btn cc-sec" style={{ minHeight: 44 }} onClick={() => cargarTurno()}>Reintentar</button>
+          <button type="button" className="cc-btn cc-sec" style={{ minHeight: 44 }} onClick={() => setAbrirModalCierre(false)}>Volver</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Cerrar caja: una sola pantalla «Cuadre de caja» (resumen, conteo, medios digitales y cierre)
+  if (abrirModalCierre && esperado) {
+    return (
+      <div>
+        {dialogo}
+        {cjMsg && (
+          <div role="status" style={{ margin: '8px 12px', padding: '10px 14px', borderRadius: 10, background: '#E8F3EC', color: '#1D5430', border: '1px solid #2F7A45', fontWeight: 700, fontSize: 14 }}>
+            {cjMsg}
+          </div>
+        )}
+        <CuadreCaja
+          esperado={esperado}
+          fecha={fechaTurno}
+          diaAnterior={fechaTurno < hoyLima()}
+          cajero={cajeroNombre}
+          pendientesCount={pedidosAbiertos.length}
+          pendientesPanel={
+            <PendientesCobroCierre
+              pendientes={pedidosAbiertos}
+              setPendientes={setPedidosAbiertos}
+              alCambiarTurno={cargarTurno}
+              errorLista={errorPendientes}
+              alReintentar={cargarTurno}
+              fechaCaja={fechaTurno}
+            />
+          }
+          repartidores={repartidores}
+          onRecibirRepartidor={handleRecibirEfectivoRider}
+          ajustesMedio={ajustesMedio}
+          devoluciones={devolucionesTurno}
+          onCorregir={(medio, clave) => setCorreccion({ medio, clave })}
+          cerrando={cerrandoCaja}
+          error={msgCierreError}
+          onCerrar={handleCerrarCaja}
+          onVolver={() => setAbrirModalCierre(false)}
+        />
+        {correccion && digitales && (
+          <DialogoCorregirMedio
+            medio={correccion.medio}
+            montoSistema={digitales.medios[correccion.clave].sistema}
+            montoActual={digitales.medios[correccion.clave].monto}
+            alCerrar={() => setCorreccion(null)}
+            alGuardado={alCorregirMedio}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -733,25 +673,8 @@ export function CierreView() {
 
           {cajaAbierta && (
             <>
-              {/* Notificación de cierre ciego si no es ADMIN */}
-              {!esAdmin && (
-                <div
-                  style={{
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1.5px dashed var(--cp-soft, #2C4C5D)',
-                    borderRadius: 14,
-                    padding: '12px 16px',
-                    fontSize: 13,
-                    lineHeight: '18px',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                  }}
-                >
-                  Cierre ciego (acta 03): los totales por medio de pago y el efectivo esperado solo los ven el administrador y el supervisor. Al cerrar, cuenta y anota lo que hay; el sistema te dirá si cuadra.
-                </div>
-              )}
-
-              {/* Bloques visibles SOLO para Administrador */}
-              {esAdmin && (
+              {/* Esperado del turno: lo ve quien cierra la caja */}
+              {esperado && (
                 <div data-testid="seccion-esperado-admin" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {/* Ventas del turno por medio de pago */}
                   <div
@@ -1467,386 +1390,14 @@ export function CierreView() {
         </>
       )}
 
-      {/* MODAL 3: CERRAR CAJA Y CUADRAR (Paso 1: Verificar -> Paso 2: Conteo y Arqueo) */}
-      {abrirModalCierre && (
-        <>
-          <div className="vm-fondo" onClick={() => setAbrirModalCierre(false)} />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="vm-titulo"
-            className={`vm-modal${faseCierre === 'verificar' ? ' vm-ancho' : ''}`}
-          >
-            <div className="vm-enc">
-              <h2 id="vm-titulo" className="vm-titulo">
-                {faseCierre === 'verificar' ? 'Verificar movimientos del turno' : 'Cerrar caja y cuadrar'}
-              </h2>
-              <button type="button" className="vm-x" onClick={() => setAbrirModalCierre(false)} aria-label="Cerrar">
-                ×
-              </button>
-            </div>
-
-            {/* FASE 1: VERIFICAR MOVIMIENTOS */}
-            {faseCierre === 'verificar' && (
-              <VerificarMovimientos
-                devoluciones={devolucionesTurno}
-                fecha={fechaTurno}
-                diaAnterior={fechaTurno < hoyLima()}
-                cajero={cajeroNombre}
-                resumen={
-                  esperado
-                    ? {
-                        apertura: aperturaMonto,
-                        ventasEfectivo,
-                        yape: esperado.medios?.yape ?? 0,
-                        plin: esperado.medios?.plin ?? 0,
-                        transferencia: esperado.medios?.transferencia ?? 0,
-                        tarjeta: esperado.medios?.tarjeta ?? 0,
-                        propinasEfectivo,
-                        propinasDigital,
-                        efectivoEsperado,
-                      }
-                    : null
-                }
-                totalCobrado={ventasTotales}
-                ingresos={ingresosExtra}
-                egresos={egresosGasto}
-                pedidosCobrados={pedidosCobrados}
-                movimientos={movimientos}
-                pendientesCount={pedidosAbiertos.length}
-                pendientes={
-                  <PendientesCobroCierre
-                    pendientes={pedidosAbiertos}
-                    setPendientes={setPedidosAbiertos}
-                    alCambiarTurno={cargarTurno}
-                    errorLista={errorPendientes}
-                    alReintentar={cargarTurno}
-                    foco={foco}
-                    fechaCaja={fechaTurno}
-                  />
-                }
-                onContinuar={() => setFaseCierre('arqueo')}
-                onVolver={() => setAbrirModalCierre(false)}
-              />
-            )}
-
-            {/* FASE 2: CONTEO DE EFECTIVO Y ARQUEO CIEGO */}
-            {faseCierre === 'arqueo' && (
-              <div className="vm-cuerpo">
-                {/* 1. Billetes y Monedas */}
-                <div
-                  style={{
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1px solid var(--cp-line, #E3D6C6)',
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>1. Billetes y monedas</div>
-                    <div style={{ fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
-                      Total contado: s/ {totalEfectivoContado.toFixed(2)}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    {/* Billetes */}
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)', marginBottom: 4 }}>
-                        BILLETES
-                      </div>
-                      {['200', '100', '50', '20', '10'].map((d) => (
-                        <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <span style={{ width: 44, fontSize: 12, fontWeight: 700 }}>S/ {d}</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            aria-label={`Cantidad de billetes de S/ ${d}`}
-                            placeholder="0"
-                            value={conteoBilletes[d]}
-                            onChange={(e) => setConteoBilletes({ ...conteoBilletes, [d]: e.target.value.replace(/\D/g, '') })}
-                            style={{
-                              width: 60,
-                              minHeight: 36,
-                              borderRadius: 8,
-                              border: '1px solid var(--cp-line, #E3D6C6)',
-                              padding: '0 6px',
-                              textAlign: 'center',
-                            }}
-                          />
-                          <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', width: 50, textAlign: 'right' }}>
-                            = {(parseInt(conteoBilletes[d] || '0', 10) * Number(d)).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Monedas */}
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)', marginBottom: 4 }}>
-                        MONEDAS
-                      </div>
-                      {['5', '2', '1', '0.5', '0.2', '0.1'].map((d) => (
-                        <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <span style={{ width: 44, fontSize: 12, fontWeight: 700 }}>S/ {Number(d).toFixed(2)}</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            aria-label={`Cantidad de monedas de S/ ${Number(d).toFixed(2)}`}
-                            placeholder="0"
-                            value={conteoMonedas[d]}
-                            onChange={(e) => setConteoMonedas({ ...conteoMonedas, [d]: e.target.value.replace(/\D/g, '') })}
-                            style={{
-                              width: 60,
-                              minHeight: 36,
-                              borderRadius: 8,
-                              border: '1px solid var(--cp-line, #E3D6C6)',
-                              padding: '0 6px',
-                              textAlign: 'center',
-                            }}
-                          />
-                          <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', width: 50, textAlign: 'right' }}>
-                            = {(parseInt(conteoMonedas[d] || '0', 10) * Number(d)).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Medios digitales: los calcula el sistema; corregir es excepción (motivo y autorización) */}
-                <div
-                  style={{
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: '1px solid var(--cp-line, #E3D6C6)',
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ fontWeight: 800, fontSize: 14 }}>2. Medios digitales (calculados por el sistema)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-                    {(
-                      [
-                        { clave: 'yape', medio: 'YAPE', etiqueta: 'Yape' },
-                        { clave: 'plin', medio: 'PLIN', etiqueta: 'Plin' },
-                        { clave: 'transferencia', medio: 'TRANSFERENCIA', etiqueta: 'Transferencia' },
-                        { clave: 'tarjeta', medio: 'TARJETA', etiqueta: 'Tarjeta' },
-                      ] as const
-                    ).map(({ clave, medio, etiqueta }) => {
-                      const info = digitales?.medios[clave];
-                      return (
-                        <div key={clave} data-testid={`digital-${clave}`} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-                            <label htmlFor={`digital-${clave}-monto`} style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
-                              {etiqueta}
-                            </label>
-                            {info?.corregido && (
-                              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cp-rust, #B2500F)' }}>Corregido</span>
-                            )}
-                          </div>
-                          <input
-                            id={`digital-${clave}-monto`}
-                            type="text"
-                            readOnly
-                            aria-label={`Monto en ${clave}`}
-                            value={(info?.monto ?? 0).toFixed(2)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              minHeight: 38,
-                              borderRadius: 8,
-                              border: '1px solid var(--cp-line, #E3D6C6)',
-                              padding: '0 8px',
-                              fontSize: 13,
-                              background: 'var(--cp-sand, #EDE1D1)',
-                            }}
-                          />
-                          <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
-                            Calculado por el sistema (vouchers aprobados)
-                          </div>
-                          {info && (
-                            <div data-testid={`desglose-${clave}`} style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              <span>Cobrado: {solesConSigno(info.cobrado)}</span>
-                              <span>Devoluciones: {solesConSigno(info.devuelto)}</span>
-                              <span style={{ fontWeight: 800 }}>Esperado: {solesConSigno(info.sistema)}</span>
-                            </div>
-                          )}
-                          <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
-                            {info ? `${info.cobros} ${info.cobros === 1 ? 'cobro' : 'cobros'}` : 'Sin datos'}
-                          </div>
-                          <button
-                            type="button"
-                            aria-label={`Corregir ${etiqueta}`}
-                            disabled={!info}
-                            onClick={() => setCorreccion({ medio, clave })}
-                            style={{ minHeight: 30, borderRadius: 8, border: '1px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
-                          >
-                            Corregir
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {ajustesMedio.length > 0 && <ListaCorrecciones ajustes={ajustesMedio} />}
-                </div>
-
-                {/* Botón Revisar si cuadra: solo para el cajero (ADMIN y SUPERVISOR no lo necesitan) */}
-                {!veDetalle && (
-                  <div>
-                    <button
-                      type="button"
-                      disabled={guardando}
-                      onClick={handleRevisarCuadre}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 16px',
-                        borderRadius: 12,
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        background: 'transparent',
-                        color: 'var(--cp-navy, #0B2C3E)',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        width: '100%',
-                      }}
-                    >
-                      Revisar si cuadra
-                    </button>
-                    {revisadoCuadra === true && (
-                      <div style={{ marginTop: 6, color: 'var(--cp-green, #2F7A45)', fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
-                        ¡Cuadra! Todo en orden.
-                      </div>
-                    )}
-                    {revisadoCuadra === false && (
-                      <div style={{ marginTop: 8, border: '1px solid var(--cp-rust, #B2500F)', background: '#FFF0ED', borderRadius: 10, padding: 10 }}>
-                        <div style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
-                          No cuadra. Cuenta de nuevo; si sigue igual, escribe la nota explicativa para cerrar.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Detalle de comparación: solo el administrador y el supervisor (el cajero cierra a ciegas) */}
-                {veDetalle && filasCuadre.length > 0 && (
-                  <div
-                    data-testid="detalle-cuadre"
-                    style={{
-                      background: 'var(--cp-white, #FFFFFF)',
-                      border: '1px solid var(--cp-line, #E3D6C6)',
-                      borderRadius: 12,
-                      padding: 12,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                    }}
-                  >
-                    <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
-                      Resultado del cuadre
-                    </div>
-                    {filasCuadre.map((f) => (
-                      <div
-                        key={f.medio}
-                        style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, borderTop: '1px solid var(--cp-sand, #EDE1D1)', paddingTop: 4 }}
-                      >
-                        <b>{f.medio}</b>
-                        <span>Sist. s/ {f.sistema.toFixed(2)}</span>
-                        <span>Cont. s/ {f.contado.toFixed(2)}</span>
-                        <b style={{ color: Math.abs(f.dif) < 0.005 ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)' }}>
-                          {Math.abs(f.dif) < 0.005 ? 'Cuadra' : `${f.dif > 0 ? '+' : '−'} s/ ${Math.abs(f.dif).toFixed(2)}`}
-                        </b>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Observaciones */}
-                <div>
-                  <label htmlFor="cl-o" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                    {necesitaNota ? 'Nota explicativa (obligatoria, mínimo 3 caracteres)' : 'Observaciones (opcional)'}
-                  </label>
-                  <textarea
-                    id="cl-o"
-                    rows={2}
-                    value={obsCierre}
-                    onChange={(e) => setObsCierre(e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--cp-line, #E3D6C6)',
-                      padding: '8px 12px',
-                      fontSize: 14,
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-
-                {msgCierreError && (
-                  <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                    {msgCierreError}
-                  </div>
-                )}
-
-                {msgCierreError && pedidosAbiertos.length > 0 && (
-                  <AvisoBloqueoCierre pedidos={pedidosAbiertos} alVerGrupo={enfocarPendientes} />
-                )}
-
-                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                  <button
-                    type="button"
-                    disabled={cerrandoCaja || guardando}
-                    onClick={handleConfirmarCierre}
-                    style={{
-                      flex: 1,
-                      minHeight: 48,
-                      border: 0,
-                      borderRadius: 12,
-                      background: 'var(--cp-orange, #E67929)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: 15,
-                      cursor: cerrandoCaja || guardando ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {cerrandoCaja ? 'Cerrando...' : 'Cerrar caja'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAbrirModalCierre(false)}
-                    style={{
-                      flex: 1,
-                      minHeight: 48,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: 12,
-                      background: 'transparent',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          {correccion && digitales && (
-            <DialogoCorregirMedio
-              medio={correccion.medio}
-              montoSistema={digitales.medios[correccion.clave].sistema}
-              montoActual={digitales.medios[correccion.clave].monto}
-              alCerrar={() => setCorreccion(null)}
-              alGuardado={alCorregirMedio}
-            />
-          )}
-        </>
+      {correccion && digitales && (
+        <DialogoCorregirMedio
+          medio={correccion.medio}
+          montoSistema={digitales.medios[correccion.clave].sistema}
+          montoActual={digitales.medios[correccion.clave].monto}
+          alCerrar={() => setCorreccion(null)}
+          alGuardado={alCorregirMedio}
+        />
       )}
     </div>
   );

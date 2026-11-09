@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CierreView } from '../CierreView';
+import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -25,6 +26,7 @@ function usarSesion(rol: string) {
 describe('cierre: el SUPERVISOR cierra sin ningún código', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reiniciarBorradores();
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({
       abierta: true,
@@ -48,7 +50,7 @@ describe('cierre: el SUPERVISOR cierra sin ningún código', () => {
 
   async function llegarAlConteo() {
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Ya revisé: continuar al conteo' }));
+    await screen.findByTestId('cuadre-caja');
   }
 
   it('no muestra ningún campo de código al contar y cerrar', async () => {
@@ -56,22 +58,23 @@ describe('cierre: el SUPERVISOR cierra sin ningún código', () => {
     render(<CierreView />);
     await llegarAlConteo();
 
-    expect(await screen.findByRole('button', { name: 'Cerrar caja' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Cerrar caja/ })).toBeEnabled();
     expect(screen.queryByLabelText(/Código de la supervisora/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Código del supervisor/i)).not.toBeInTheDocument();
   });
 
-  it('confirma el cierre con descuadre solo con la nota', async () => {
+  it('cierra con descuadre: la nota es opcional y se confirma con Sí/No', async () => {
     usarSesion('SUPERVISOR');
     render(<CierreView />);
     await llegarAlConteo();
 
     fireEvent.change(await screen.findByLabelText('Cantidad de billetes de S/ 100'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText(/Nota explicativa/i), { target: { value: 'Faltante de turno' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar caja' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Sí, continuar/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Cerrar caja con diferencia/ }));
+    const dialogo = await screen.findByRole('dialog');
+    // Sin escribir nota: igual se puede cerrar
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sí, cerrar caja' }));
 
     await waitFor(() => expect(cierreApi.cerrarCaja).toHaveBeenCalledTimes(1));
-    expect(cierreApi.cerrarCaja).toHaveBeenCalledWith(expect.objectContaining({ conteo: expect.any(Object), nota: 'Faltante de turno' }));
+    expect(cierreApi.cerrarCaja).toHaveBeenCalledWith(expect.objectContaining({ conteo: { '100': 1 }, nota: undefined }));
   });
 });

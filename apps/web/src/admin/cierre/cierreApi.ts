@@ -51,6 +51,8 @@ export interface ArqueoRespuesta {
 
 export interface CerrarCajaDto {
   conteo?: Record<string, number>;
+  /** Efectivo contado como un solo total, sin desglosar por billetes y monedas */
+  efectivoTotal?: number;
   medios?: MediosVistos;
   nota?: string;
 }
@@ -68,6 +70,8 @@ export interface CierreCajaRespuesta {
   resultado: 'CUADRA' | 'NO_CUADRA';
   aprobadoPor: number | null;
   nota: string | null;
+  /** Suma de las diferencias de todos los medios (visto − sistema) */
+  diferenciaTotal?: number;
   medios?: CierreMedioDetalle[];
 }
 
@@ -93,6 +97,16 @@ export interface MontosEsperados {
     propinas?: { total: number; efectivo: number; digital: number };
     ingresos: number;
     egresos: number;
+    /** Efectivo que los repartidores ya entregaron a la caja */
+    liquidadoRepartidores?: number;
+    /** Desglose llano del efectivo: apertura + cobrosEfectivo + repartidores + ingresos − egresos = esperado */
+    apertura?: number;
+    /** Cobros en efectivo con propinas, ya netos de vuelto */
+    cobrosEfectivo?: number;
+    /** Vueltos entregados (informativo: cobrosEfectivo ya los descuenta) */
+    vueltos?: number;
+    esperado?: number;
+    porMedio?: { efectivo: number; yape: number; plin: number; transferencia: number; tarjeta: number };
   };
 }
 

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import * as sesionModulo from '../../../comun/sesion';
 import { pedidosApi } from '../../pedidos/pedidosApi';
+import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi } from '../cierreApi';
 import { CierreView } from '../CierreView';
 import { VerificarMovimientos, soles } from '../VerificarMovimientos';
@@ -22,6 +23,7 @@ const base = {
 const resumen = { apertura: 100, ventasEfectivo: 0, yape: 150, plin: 0, transferencia: 0, tarjeta: 0, efectivoEsperado: 94.5 };
 
 describe('Verificar movimientos del turno', () => {
+  beforeEach(() => reiniciarBorradores());
   it('formatea montos con 2 decimales', () => {
     expect(soles(5)).toBe('S/ 5.00');
     expect(soles(undefined)).toBe('S/ 0.00');
@@ -90,7 +92,7 @@ describe('Verificar movimientos del turno', () => {
     expect(within(lista).getByText('S/ 230.00')).toBeInTheDocument();
   });
 
-  it('el modal del cierre usa la clase ancha y titulo accesible', async () => {
+  it('cerrar caja abre el panel «Cuadre de caja» en una sola pantalla, sin modal de verificación (antes: modal por pasos)', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '2', nombres: 'Carmen', rol: 'CAJERO' }, permisos: [], tiene: vi.fn().mockReturnValue(true),
     } as any);
@@ -98,12 +100,14 @@ describe('Verificar movimientos del turno', () => {
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
     vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
     vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 7, fecha: `${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })}T00:00:00.000Z`, apertura: 0, efectivoEsperado: 0,
+      medios: { efectivo: 0, yape: 0, plin: 0, transferencia: 0, tarjeta: 0 }, desglose: { ventasEfectivo: 0, ingresos: 0, egresos: 0 }, cobrados: [], movimientos: [],
+    } as any);
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    const dlg = screen.getByRole('dialog', { name: 'Verificar movimientos del turno' });
-    expect(dlg).toHaveClass('vm-ancho');
-    fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
-    expect(screen.getByRole('dialog', { name: 'Cerrar caja y cuadrar' })).not.toHaveClass('vm-ancho');
+    expect(await screen.findByRole('heading', { name: 'Cuadre de caja' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('admin con la caja abierta de ayer y una de hoy: todo el turno sale de la de ayer, sin mezclar', async () => {
@@ -133,21 +137,11 @@ describe('Verificar movimientos del turno', () => {
 
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    const dlg = screen.getByRole('dialog', { name: 'Verificar movimientos del turno' });
+    const panel = await screen.findByTestId('cuadre-caja');
 
-    expect(within(dlg).getByText(ayer, { selector: 'b' })).toBeInTheDocument();
-    expect(within(dlg).getByRole('alert')).toHaveTextContent(
-      `Esta caja es del ${d}/${m}/${a} y sigue abierta. Ciérrala antes de trabajar con la de hoy.`,
-    );
-    expect(within(dlg).getByText('Caja abierta (día anterior)')).toBeInTheDocument();
-
-    // Lista, total y conteo por medio son los mismos cobros de la caja de ayer
-    const lista = within(dlg).getByRole('table', { name: 'Pedidos cobrados en el turno' });
-    expect(within(lista).getByText('CP-005')).toBeInTheDocument();
-    const tablaMedios = within(dlg).getByRole('table', { name: 'Cobros por medio de pago' });
-    const filaYape = within(tablaMedios).getByText('Yape').closest('[role="row"]') as HTMLElement;
-    expect(within(filaYape).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Yape', '1', 'S/ 56.00']);
-    expect(within(dlg).queryByText('Sin pedidos cobrados aún.')).not.toBeInTheDocument();
+    // La caja que se cierra es la de ayer: fecha, aviso de día anterior y montos de ESA caja
+    expect(within(panel).getByText(new RegExp(`Caja del ${d}/${m}/${a} \\(día anterior sin cerrar\\)`))).toBeInTheDocument();
+    expect(within(panel).getByTestId('digital-yape')).toHaveTextContent('Sistema S/ 56.00');
   });
 });
 
