@@ -4,6 +4,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { MarcarDto, MiHistorialDto } from './dto/asistencia.dto';
 import { AsistenciaService } from './asistencia.service';
 import { PlanillaService } from './planilla.service';
+import { VacacionesService } from './vacaciones.service';
 
 const ipDe = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -17,6 +18,7 @@ export class AsistenciaController {
   constructor(
     private readonly asistencia: AsistenciaService,
     private readonly planilla: PlanillaService,
+    private readonly vacaciones: VacacionesService,
   ) {}
 
   @Get('mi/hoy')
@@ -43,6 +45,13 @@ export class AsistenciaController {
   @Permiso('asistencia', 'marcar')
   miGanado(@Req() req: any) {
     return this.planilla.miGanado(req.usuario.partyId);
+  }
+
+  /** Mi saldo de vacaciones (solo lectura; sin dinero). */
+  @Get('mi/vacaciones')
+  @Permiso('asistencia', 'marcar')
+  miVacaciones(@Req() req: any) {
+    return this.vacaciones.miVacaciones(req.usuario.partyId);
   }
 
   @Post('marcar')

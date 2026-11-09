@@ -21,6 +21,7 @@ import {
 } from "./roles";
 import { EditorHorario } from "./EditorHorario";
 import { SeccionSueldo } from "./SeccionSueldo";
+import { PanelVinculo } from "../asistencia/VinculoVacaciones";
 import { EditorReemplazos } from "./EditorReemplazos";
 import {
   horarioDesdeServidor,
@@ -768,7 +769,10 @@ export function EditarUsuarioModal({
         deshabilitado={guardando}
       />
       {esAdmin && (rol || usuario.rol) !== "ADMIN" && (
-        <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} />
+        <>
+          <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} />
+          <PanelVinculo partyId={Number(usuario.partyId)} deshabilitado={guardando} />
+        </>
       )}
       {msgHorario && (
         <div

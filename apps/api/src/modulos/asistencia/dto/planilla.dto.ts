@@ -42,3 +42,27 @@ export class ExtraDto {
   @Matches(FECHA) jornada!: string;
   @IsBoolean() aprobada!: boolean;
 }
+
+export class VinculoDto {
+  @IsIn(['PLANILLA', 'CONTRATO_TEMPORAL']) tipo!: 'PLANILLA' | 'CONTRATO_TEMPORAL';
+  @Matches(FECHA) fechaIngreso!: string;
+  /** Solo contrato temporal. */
+  @IsOptional() @Matches(FECHA) fechaFin?: string | null;
+  /** Solo planilla: 30 o 15 días al año (por defecto 30). */
+  @IsOptional() @Type(() => Number) @IsIn([30, 15]) regimenVacaciones?: 30 | 15;
+  @IsOptional() @IsString() @MaxLength(500) notas?: string;
+}
+
+export class VacacionMovimientoDto {
+  @Type(() => Number) @IsInt() @Min(1) partyId!: number;
+  @IsIn(['TOMADAS', 'PAGADAS', 'AJUSTE']) tipo!: 'TOMADAS' | 'PAGADAS' | 'AJUSTE';
+  /** TOMADAS: inicio del rango. PAGADAS y AJUSTE: la fecha del movimiento (en PAGADAS fija el período de planilla). */
+  @Matches(FECHA) desde!: string;
+  /** Solo TOMADAS (fin del rango, inclusive). */
+  @IsOptional() @Matches(FECHA) hasta?: string;
+  /** PAGADAS (positivo) y AJUSTE (con signo). En TOMADAS se calcula con su horario. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-365) @Max(365) dias?: number;
+  /** Solo PAGADAS. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0.01) @Max(1_000_000) monto?: number;
+  @IsOptional() @IsString() @MaxLength(300) motivo?: string;
+}

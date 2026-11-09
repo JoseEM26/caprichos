@@ -12,7 +12,8 @@ export interface FilaPlanilla {
   partyId: number;
   nombre: string;
   sueldo: SueldoPersona | null;
-  periodo?: { desde: string; hasta: string };
+  vinculo?: { tipo: 'PLANILLA' | 'CONTRATO_TEMPORAL'; fechaIngreso: string; fechaFin: string | null } | null;
+  periodo?:{ desde: string; hasta: string };
   estado?: 'ABIERTO' | 'PAGADO';
   programadasH?: number;
   trabajadasH?: number;
@@ -80,6 +81,8 @@ export interface DetallePlanilla {
     pagoTrabajado: number;
     pagoTardanza: number;
     pagoExtra: number;
+    /** Vacaciones pagadas en dinero dentro del período. */
+    pagoVacaciones?: number;
     ganado: number;
     consumosCobrados: number;
     consumosPendientes: number;

@@ -19,6 +19,7 @@ export const ETIQUETA_ESTADO: Record<string, string> = {
   INCOMPLETO: 'Incompleto',
   A_REVISAR: 'A revisar',
   SIN_EVALUAR: 'En curso',
+  VACACIONES: 'Vacaciones',
 };
 
 export interface QrPantalla {

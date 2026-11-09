@@ -14,6 +14,7 @@ import {
   MiResumen,
 } from './asistenciaApi';
 import { TarjetaGanado } from './TarjetaGanado';
+import { MiVacaciones } from './MiVacaciones';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
@@ -406,6 +407,7 @@ export function MiAsistenciaView() {
       )}
 
       <TarjetaGanado />
+      <MiVacaciones />
 
       {propinas.length > 0 && (
         <section aria-label="Mis propinas" className="ma-lista">
