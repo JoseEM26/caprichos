@@ -911,26 +911,24 @@ describe('PedidosEstadoService', () => {
         expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
       });
 
-      it('digital sin código de operación -> 400 CODIGO_OPERACION_REQUERIDO, no registra', async () => {
-        await expect(
-          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth),
-        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO', faltan: ['YAPE'] } });
-        await expect(
-          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '   ' }] }, cajeroAuth),
-        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO' } });
-        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-        expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+      // Antes: 400 CODIGO_OPERACION_REQUERIDO. Ahora el código del pago digital es opcional (instrucción del dueño).
+      it('digital sin código de operación ni foto: se registra igual (código opcional)', async () => {
+        const res = await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth);
+        expect(res.pago_estado).toBe('PAGADO');
+        await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '   ' }] }, cajeroAuth);
+        await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE' }] }, cajeroAuth);
+        expect(prismaMock.pedido.update).toHaveBeenCalled();
+        const despues = auditoriaMock.registrar.mock.calls[0][0].despues;
+        expect(despues.codigos_operacion).toEqual([]);
       });
 
-      it('plan mixto efectivo + Yape: pide solo el código de Yape', async () => {
+      it('plan mixto efectivo + Yape: el código de Yape es opcional y se guarda si viene', async () => {
         prismaMock.pedido.findUnique.mockResolvedValue({
           ...pedidoSinPagar,
           planPago: [{ medio: 'EFECTIVO', monto: 10 }, { medio: 'YAPE', monto: 25 }],
         });
 
-        await expect(
-          service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth),
-        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO', faltan: ['YAPE'] } });
+        await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
 
         const res = await service.registrarPago(
           10n,

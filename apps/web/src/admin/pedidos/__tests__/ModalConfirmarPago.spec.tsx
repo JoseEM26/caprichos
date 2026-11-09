@@ -205,7 +205,7 @@ describe('ModalConfirmarPago', () => {
   });
 
   describe('código de operación', () => {
-    it('llega prellenado con la lectura de la IA, con la etiqueta y sin «(opcional)»', async () => {
+    it('llega prellenado con la lectura de la IA y editable (etiqueta «opcional»)', async () => {
       vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('CONFIABLE', '21', '98765')]);
       abrir(pedidoCarta());
       irAlPaso3();
@@ -213,23 +213,35 @@ describe('ModalConfirmarPago', () => {
       const campo = await screen.findByTestId('input-codigo-operacion-YAPE');
       await waitFor(() => expect((campo as HTMLInputElement).value).toBe('98765'));
       expect(screen.getByTestId('codigo-leido-YAPE').textContent).toMatch(/Leído del voucher por la IA/);
-      expect(screen.queryByText(/opcional/)).toBeNull();
+      expect(screen.getAllByText('Código de operación (opcional)').length).toBeGreaterThan(0);
     });
 
-    it('sin lectura de la IA el campo va vacío, bloquea Confirmar y pide escribirlo', async () => {
+    // Antes bloqueaba Confirmar y pedía escribirlo; ahora el código es opcional (ⓘ informativo, sin error).
+    it('sin lectura de la IA el campo va vacío, no bloquea Confirmar y confirma sin código', async () => {
       vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('CONFIABLE', '21', null)]);
       abrir(pedidoCarta());
       irAlPaso3();
 
       expect((await screen.findByTestId('input-codigo-operacion-YAPE') as HTMLInputElement).value).toBe('');
-      expect(screen.getByText('Escribe el código de operación que ves en el voucher')).toBeDefined();
+      expect(screen.getByTestId('info-sin-codigo-YAPE').textContent).toMatch(/Sin código de operación/);
+      expect(screen.queryByRole('alert')).toBeNull();
       const boton = screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement;
-      expect(boton.disabled).toBe(true);
+      expect(boton.disabled).toBe(false);
       fireEvent.click(boton);
-      expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
+      await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
+      expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'YAPE', 'PAGADO', undefined, undefined);
+    });
 
-      escribirCodigo('YAPE', '555111');
-      expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
+    it('Yape sin captura y sin código: confirma sin error y muestra «Sin captura» neutro', async () => {
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([]);
+      abrir(pedidoCarta());
+      irAlPaso3();
+      expect((await screen.findByTestId('info-sin-captura')).textContent).toMatch(/Sin captura/);
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
+      await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
+      expect(screen.queryByRole('alert')).toBeNull();
     });
 
     it('si Caja corrige lo leído, queda la nota «Corregido manualmente» y se envía lo corregido', async () => {

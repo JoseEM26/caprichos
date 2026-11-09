@@ -15,7 +15,7 @@ export interface CapturasPlanDigitalProps {
 
 /**
  * Una captura por cada medio digital del plan (pago dividido). Cada fila dice si la captura ya está
- * subida o falta, y ofrece subirla para ese medio. El servidor exige lo mismo (VOUCHER_REQUERIDO.faltan).
+ * subida o falta, y ofrece subirla para ese medio. Todas son opcionales: sin ellas el pago queda «sin captura».
  */
 export function CapturasPlanDigital({ pedidoId, planPago, alCambiar }: CapturasPlanDigitalProps) {
   const [vouchers, setVouchers] = useState<VoucherPagoItem[] | null>(null);

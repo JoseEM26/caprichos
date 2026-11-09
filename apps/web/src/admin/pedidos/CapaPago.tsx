@@ -116,7 +116,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
                         color: !digital ? 'var(--cp-soft, #2C4C5D)' : falta ? 'var(--cp-rust, #B2500F)' : '#1F5C33',
                       }}
                     >
-                      {!digital ? 'Sin captura' : vouchers === null ? 'Captura requerida' : falta ? 'Falta captura' : 'Captura subida'}
+                      {!digital ? 'Sin captura' : vouchers === null ? 'Cargando captura' : falta ? 'Falta captura' : 'Captura subida'}
                     </span>
                     <strong style={{ fontSize: 17 }}>{soles(Number(f.monto || 0))}</strong>
                   </span>

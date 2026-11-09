@@ -1281,20 +1281,12 @@ export class PedidosEstadoService {
       permiteExcepcion: true,
     });
 
-    // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
-    // La excepción «confirmar sin comprobante» (con motivo) no tiene voucher del que sacar el código
-    const codigosRequeridos = dto.sinVoucher || sinVoucherAutorizado?.sinCaptura ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
+    // Código de operación por medio digital (plan mixto: uno por parte): OPCIONAL, nunca bloquea el pago.
+    // Solo se guardan y auditan los que vienen escritos; sin código el pago queda «sin código» y se puede agregar después.
     const codigosEntregados = new Map(
-      (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
+      (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo ?? '').trim()]),
     );
-    const sinCodigo = codigosRequeridos.filter((m) => !codigosEntregados.get(m));
-    if (sinCodigo.length > 0) {
-      throw new BadRequestException({
-        codigo: 'CODIGO_OPERACION_REQUERIDO',
-        faltan: sinCodigo,
-        mensaje: `Escribe el código de operación que ves en el voucher (${sinCodigo.join(', ')})`,
-      });
-    }
+    const codigosRequeridos = mediosQueExigenCodigo(metodoUpper, pedido.planPago).filter((m) => !!codigosEntregados.get(m));
 
     const ahora = new Date();
     // Pago dividido con parte en efectivo o tarjeta: validar la parte digital no cobra el resto. El pedido queda
