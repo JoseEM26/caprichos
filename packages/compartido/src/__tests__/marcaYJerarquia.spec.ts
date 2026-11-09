@@ -33,11 +33,42 @@ describe('marca en los 3 stickers', () => {
     expect(hayMarca(maquetarArea(area()))).toBe(true);
   });
 
-  it('con espacio (100 x 100 y area) lleva tambien el logo; en 76 x 38 solo la palabra', () => {
+  it('con espacio lleva tambien el logo (100 x 100, area, y el vaso de 76 x 38 y 60 x 40); en 50 x 30 solo la palabra', () => {
     expect(logos(maquetarGeneral(general()))).toBe(1);
     expect(logos(maquetarBebida(bebida(), { anchoMm: 100, altoMm: 100 }))).toBe(1);
     expect(logos(maquetarArea(area()))).toBe(1);
-    expect(logos(maquetarBebida(bebida()))).toBe(0);
+    expect(logos(maquetarBebida(bebida()))).toBe(1);
+    expect(logos(maquetarBebida(bebida(), { anchoMm: 60, altoMm: 40 }))).toBe(1);
+    expect(logos(maquetarBebida(bebida(), { anchoMm: 50, altoMm: 30 }))).toBe(0);
+  });
+
+  it('vaso: logo y CAPRICHOS enteros en la banda, sin solapar nada, con nombre corto y largo', () => {
+    for (const t of [{ anchoMm: 76, altoMm: 38 }, { anchoMm: 60, altoMm: 40 }, { anchoMm: 100, altoMm: 100 }, { anchoMm: 50, altoMm: 30 }]) {
+      for (const persona of ['Maria', 'Alejandro Rafael Ramos Nardini']) {
+        const m = maquetarBebida(bebida({ persona }), t);
+        const marca = textos(m).find((p) => p.texto === 'CAPRICHOS')!;
+        expect(marca, `${t.anchoMm}x${t.altoMm}`).toBeDefined();
+        const caja = (p: Texto) => ({ x1: p.x, y1: p.y, x2: p.x + p.texto.length * FUENTES_TSPL[p.fuente].ancho * p.xm, y2: p.y + altoTexto(p) });
+        const logo = m.primitivas.find((p) => p.t === 'logo') as Extract<Primitiva, { t: 'logo' }> | undefined;
+        if (logo) {
+          const l = { x1: logo.x, y1: logo.y, x2: logo.x + logo.lado, y2: logo.y + logo.lado };
+          expect(marca.x).toBeGreaterThanOrEqual(l.x2);
+          for (const p of textos(m)) {
+            const c = caja(p);
+            expect(c.x1 >= l.x2 || c.x2 <= l.x1 || c.y1 >= l.y2 || c.y2 <= l.y1, `logo vs "${p.texto}"`).toBe(true);
+          }
+          expect(l.y2).toBeLessThanOrEqual(m.H);
+        }
+        // ningun texto se sale del sticker ni se pisa con el nombre del cliente
+        const nombre = textos(m).filter((p) => !p.invertido && persona.toUpperCase().includes(p.texto) && p.texto.length > 3);
+        for (const p of textos(m)) {
+          const c = caja(p);
+          expect(c.x2).toBeLessThanOrEqual(m.W);
+          expect(c.y2).toBeLessThanOrEqual(m.H);
+        }
+        for (const n of nombre) expect(caja(n).y1).toBeGreaterThanOrEqual(caja(marca).y2);
+      }
+    }
   });
 });
 

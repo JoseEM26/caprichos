@@ -62,7 +62,7 @@ describe('Impresión en 3 pasos', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('muestra «Cómo funciona» y los tres pasos numerados', async () => {
+  it('muestra «Cómo funciona», las computadoras, las reglas generales aparte y lo último impreso (sin «Probar todas»)', async () => {
     vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
     montar();
     expect(await screen.findByText('Cómo funciona')).toBeInTheDocument();
@@ -70,19 +70,54 @@ describe('Impresión en 3 pasos', () => {
     for (const id of ['paso-1', 'paso-2', 'paso-3']) expect(screen.getByTestId(id)).toBeInTheDocument();
     expect(within(screen.getByTestId('paso-1')).getByText('Tus computadoras')).toBeInTheDocument();
     expect(within(screen.getByTestId('paso-2')).getByText('Reglas generales del local')).toBeInTheDocument();
-    expect(within(screen.getByTestId('paso-3')).getByText('Probar')).toBeInTheDocument();
+    expect(screen.queryByTestId('probar-todo')).toBeNull();
+    expect(screen.queryByText(/Imprimir una prueba en cada impresora/)).toBeNull();
     expect(screen.queryByTestId('aviso-armado')).toBeNull();
   });
 
-  it('lista las PC vinculadas, con la nueva arriba de todo, su insignia y un aviso en la pantalla', async () => {
+  it('las reglas generales son un card aparte y plegado por defecto', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    montar();
+    const det = (await screen.findByTestId('reglas-plegado')) as HTMLDetailsElement;
+    expect(det.open).toBe(false);
+    expect(det.closest('[data-testid="paso-2"]')).not.toBeNull();
+    expect(det.closest('[data-testid="paso-1"]')).toBeNull();
+  });
+
+  it('una tarjeta compacta por PC (la nueva arriba), contador y clic abre la ventana de configuración', async () => {
     vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
     equiposEstado = [equipo('10', 'PC Caja'), equipo('12', 'PC recién vinculada', { config: CFG_NUEVA, ultimoLatido: null, conectado: false })];
     montar();
-    const tarjetas = await screen.findAllByRole('article');
-    expect(tarjetas.map((t) => t.getAttribute('aria-label'))).toEqual(['PC recién vinculada', 'PC Caja']);
-    expect(screen.getByTestId('nueva-12')).toHaveTextContent('Nueva · falta configurar');
-    expect(screen.queryByTestId('nueva-10')).toBeNull();
+    const lista = await screen.findByTestId('lista-pcs');
+    const tarjetas = within(lista).getAllByRole('button');
+    expect(tarjetas.map((t) => t.getAttribute('data-testid'))).toEqual(['card-12', 'card-10']);
+    expect(screen.getByTestId('contador-pcs')).toHaveTextContent('2 computadoras · 1 conectada');
+    expect(screen.getByTestId('card-12')).toHaveTextContent('Nueva · falta configurar');
+    expect(screen.getByTestId('card-10')).toHaveTextContent('Ticket de pago');
     expect(screen.getByTestId('aviso-nuevas')).toHaveTextContent('recién vinculada');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByTestId('card-10'));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveAttribute('aria-modal', 'true');
+    expect(within(dialogo).getByTestId('nombre-10')).toHaveValue('PC Caja');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('deduplica: una PC archivada/antigua no sale y la repetida lleva insignia «Posible duplicado»', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    equiposEstado = [
+      equipo('10', 'CAJA', { conectado: false, antigua: true, ultimoLatido: new Date(Date.now() - 5 * 3600000).toISOString() }),
+      equipo('11', 'Programa del local', { hostname: 'CAPRICHOS-CAJA' }),
+      equipo('12', 'Otra', { hostname: 'CAPRICHOS-CAJA', conectado: false, ultimoLatido: new Date(Date.now() - 3600000).toISOString() }),
+    ];
+    montar();
+    await screen.findByTestId('lista-pcs');
+    expect(screen.queryByTestId('card-10')).toBeNull();
+    expect(screen.getByTestId('pcs-ocultas')).toHaveTextContent('1 computadora antigua');
+    expect(screen.getByTestId('dup-12')).toHaveTextContent('Posible duplicado de Programa del local');
+    expect(screen.queryByTestId('dup-11')).toBeNull();
+    expect(screen.getByTestId('contador-pcs')).toHaveTextContent('2 computadoras · 1 conectada');
   });
 
   it('avisa cuando hay papeles que ninguna PC imprime', async () => {

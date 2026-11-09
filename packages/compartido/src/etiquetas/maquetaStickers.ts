@@ -85,10 +85,10 @@ function lineas(L: Lienzo, y: number, r: { n: Nivel; lineas: string[] }, centrad
   return y;
 }
 
-/** Marca de la tienda en la banda superior. Con espacio suficiente (sticker de 60 mm o mas por lado) lleva tambien el logo. */
+/** Marca de la tienda en la banda superior. Con espacio suficiente (sticker de 37,5 mm o mas por el lado corto: el vaso de 76 x 38 ya lo lleva) lleva tambien el logo. */
 const MARCA = 'CAPRICHOS';
 const LOGO_DOTS = 64;
-const conLogo = (L: Lienzo) => Math.min(L.W, L.H) >= 480;
+const conLogo = (L: Lienzo) => Math.min(L.W, L.H) >= 300;
 
 /**
  * Banda negra superior con texto blanco: a la izquierda la marca (logo + CAPRICHOS) y a la derecha `derIdeal`.

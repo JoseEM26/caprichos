@@ -209,10 +209,94 @@ describe('tamaño del sticker por PC con vista previa', () => {
     fireEvent.click(screen.getByTestId('tamano-bebida-60x40'));
     fireEvent.click(screen.getByTestId('tamano-bebida-probar'));
     await waitFor(() => expect(prueba).toHaveBeenCalledWith('10', 'bebida', { anchoMm: 60, altoMm: 40 }));
-    expect(await screen.findByText('Sticker de prueba enviado a esta PC.')).toBeInTheDocument();
+    expect(await screen.findByText(/Prueba enviada a la impresora/)).toBeInTheDocument();
     // sin tamaño propio manda sin medida: el servidor usa el que tenga o el del local
     fireEvent.click(screen.getByTestId('tamano-general-probar'));
     await waitFor(() => expect(prueba).toHaveBeenLastCalledWith('10', 'general', null));
+  });
+});
+
+describe('ventana de configuración (modal) y pestaña Probar', () => {
+  beforeEach(() => vi.restoreAllMocks());
+  const completa = () => equipo({ config: { ...CFG, ticketera: true, ticketPago: true, comandaSalon: true, etiquetera: true, stickerAreas: ['2'], stickerBebidaAreas: ['1'], stickerGeneral: true } });
+  const abrir = (e: any = completa()) => {
+    const alCancelar = vi.fn();
+    const r = render(<TarjetaEquipo equipo={e} areas={AREAS} tamanosLocal={LOCAL} puedeEditar alRecargar={vi.fn()} alAviso={vi.fn()} alCancelar={alCancelar} />);
+    return { ...r, alCancelar };
+  };
+
+  it('es un diálogo modal con 4 pestañas y pie con Guardar, Usar lo general y Cancelar', () => {
+    abrir();
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['General', 'Ticketera', 'Etiquetera', 'Probar']);
+    for (const id of ['guardar-10', 'general-10', 'cancelar-10']) expect(screen.getByTestId(id)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tab-probar-10'));
+    expect(screen.getByTestId('tab-probar-10')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('Esc o Cancelar sin cambios cierran; con cambios avisa antes de descartar', async () => {
+    const { alCancelar } = abrir();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(alCancelar).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId('sw-ticketera-10'));
+    expect(screen.getByTestId('sucio-10')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('cancelar-10'));
+    expect(alCancelar).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Hay cambios sin guardar', { selector: 'h2, h3, h4, strong, div' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+    expect(alCancelar).toHaveBeenCalledTimes(2);
+  });
+
+  it('Probar solo ofrece lo que esa PC tiene activo y encola UNA prueba solo para esa PC', async () => {
+    const ticket = vi.spyOn(impresionApi, 'pruebaImpresion').mockResolvedValue({ ok: true, trabajoId: '5', mensaje: 'ok' });
+    const etiqueta = vi.spyOn(impresionApi, 'pruebaEtiquetaEquipo').mockResolvedValue({ ok: true, trabajoId: '6', mensaje: 'ok' });
+    abrir();
+    fireEvent.click(screen.getByTestId('probar-bebida'));
+    await waitFor(() => expect(etiqueta).toHaveBeenCalledWith('10', 'bebida', null));
+    fireEvent.click(screen.getByTestId('probar-general'));
+    await waitFor(() => expect(etiqueta).toHaveBeenLastCalledWith('10', 'general', null));
+    fireEvent.click(screen.getByTestId('probar-ETIQUETERA'));
+    await waitFor(() => expect(ticket).toHaveBeenCalledWith('ETIQUETERA', undefined, '10'));
+    expect(etiqueta).toHaveBeenCalledTimes(2);
+  });
+
+  it('una PC sin nada activo no ofrece botones de prueba', () => {
+    abrir(equipo());
+    expect(screen.queryByTestId('probar-TICKETERA')).toBeNull();
+    expect(screen.queryByTestId('probar-bebida')).toBeNull();
+    expect(screen.getByTestId('probar-10')).toHaveTextContent('nada activo que probar');
+  });
+
+  it('«Mostrar cómo se visualiza» dibuja la maqueta REAL (CAPRICHOS, logo y bloque PAGO) con un nombre al azar', () => {
+    abrir(equipo({ config: { ...CFG, etiquetera: true, stickerBebidaAreas: ['1'], stickerGeneral: true, tamanoGeneral: { anchoMm: 100, altoMm: 100 } } }));
+    fireEvent.click(screen.getByTestId('ver-previa-general'));
+    const vp = screen.getByTestId('vp-general');
+    const svg = within(vp).getByRole('img');
+    expect(svg.textContent).toContain('CAPRICHOS');
+    expect(svg.querySelector('[data-logo]')).not.toBeNull();
+    expect(svg.textContent).toMatch(/PAGO|VUELTO|COBRAR/i);
+    const nombre = within(vp).getByTestId('vp-nombre-general').textContent;
+    expect(nombre).toMatch(/Ejemplo con «/);
+    fireEvent.click(within(vp).getByTestId('vp-otro-general'));
+    expect(within(vp).getByTestId('vp-nombre-general').textContent).not.toBe(nombre);
+    fireEvent.click(screen.getByTestId('ver-previa-bebida'));
+    const vaso = within(screen.getByTestId('vp-bebida')).getByRole('img');
+    expect(vaso.textContent).toContain('CAPRICHOS');
+    expect(vaso.getAttribute('data-maqueta')).toBe('608x304');
+    expect(vaso.querySelector('[data-logo]')).not.toBeNull();
+  });
+
+  it('PC duplicada: ofrece Fusionar (con confirmación) y «No es la misma»', async () => {
+    const fus = vi.spyOn(impresionApi, 'fusionarEquipo').mockResolvedValue({ ok: true });
+    const no = vi.spyOn(impresionApi, 'noEsLaMisma').mockResolvedValue({ ok: true });
+    render(<TarjetaEquipo equipo={completa()} areas={AREAS} tamanosLocal={LOCAL} puedeEditar alRecargar={vi.fn()} alAviso={vi.fn()} alCancelar={vi.fn()} duplicadoDe={{ deviceKeyId: '99', nombre: 'CAJA' }} />);
+    expect(screen.getByTestId('duplicado-10')).toHaveTextContent('Posible duplicado de «CAJA»');
+    fireEvent.click(screen.getByTestId('fusionar-10'));
+    expect(fus).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, fusionar' }));
+    await waitFor(() => expect(fus).toHaveBeenCalledWith('10', '99'));
+    fireEvent.click(screen.getByTestId('no-misma-10'));
+    await waitFor(() => expect(no).toHaveBeenCalledWith('10', '99'));
   });
 });
 
