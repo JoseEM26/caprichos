@@ -518,7 +518,8 @@
 
 .cj2-mod-txt {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word; /* parte por espacios; una palabra sola (DELIVERY) no se corta */
+  word-break: normal;
 }
 
 .cj2-mod-det {
@@ -750,7 +751,7 @@
   .cj2-fab {
     position: fixed;
     right: 16px;
-    bottom: 76px; /* por encima de la paginación */
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px)); /* por encima de la paginación fija (~52 px) y de la barra inferior */
     z-index: 30;
     width: 60px;
     height: 60px;
@@ -1212,6 +1213,12 @@
 
 /* ---- Celular y tablet angosta: paginación pegada al fondo, compacta, botones de 44 px ---- */
 .cj2-pag-txt { display: none; }
+/* Tablet vertical (700–979): las pastillas ocupan su fila y la búsqueda no queda minúscula */
+@media (min-width: 700px) and (max-width: 979px) {
+  .cj2-fila { flex-wrap: wrap; }
+  .cj2-pastillas { flex: 1 1 100%; order: 1; }
+  .cj2-busqueda { flex: 1 1 200px; order: 3; }
+}
 @media (max-width: 899px) {
   .cj2-pag {
     position: sticky;
