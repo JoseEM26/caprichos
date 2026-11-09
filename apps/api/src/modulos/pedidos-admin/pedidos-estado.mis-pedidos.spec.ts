@@ -96,6 +96,8 @@ describe('PedidosEstadoService.misPedidos', () => {
       propina: 0,
       modalidad: 'MESA',
       mesaNombre: 'Mesa 3',
+      pedidoOrigenId: null,
+      pedidoOrigenCodigo: null,
       clienteNombre: 'Mesa 3',
       ubicacionEditadaEn: null,
       total: 5,

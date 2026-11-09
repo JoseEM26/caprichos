@@ -17,6 +17,7 @@ import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
+import { agruparCuentas } from '../pedidos/agruparCuentas';
 import './mis-pedidos.css';
 import './mis-pedidos-voucher.css';
 
@@ -207,128 +208,13 @@ export function MisPedidosView() {
     if (filtro === 'faltaVoucher') return faltanVoucher(p);
     return p.estado === 'ENTREGADO';
   });
+  // Cuenta = pedido original + sus extras (pedidoOrigenId): una sola tarjeta; el resumen sigue contando cada pedido
+  const cuentas = agruparCuentas(visibles, pedidos, (p) => p.pedidoOrigenId ?? p.id);
   const resumen = datos?.resumen ?? RESUMEN_VACIO;
   const valor = (n: number) => (datos ? String(n) : '—');
 
-  return (
-    <div className="mp" aria-busy={cargando}>
-      <div role="tablist" aria-label="Vista de mis pedidos" className="mpv-pestanas">
-        <button
-          type="button"
-          role="tab"
-          id="mp-tab-salon"
-          aria-selected={pestana === 'salon'}
-          aria-controls="mp-panel"
-          className="mpv-pestana"
-          onClick={() => setPestana('salon')}
-        >
-          Salón
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="mp-tab-lista"
-          aria-selected={pestana === 'lista'}
-          aria-controls="mp-panel"
-          className="mpv-pestana"
-          onClick={() => setPestana('lista')}
-        >
-          Lista
-        </button>
-      </div>
-
-      <button type="button" className="mp-nuevo" onClick={() => setModalAbierto(true)}>
-        Nuevo pedido
-      </button>
-
-      {pestana === 'salon' && (
-        <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-salon">
-          <SalonMozo puedeForzar={tiene('mesas/liberar')} puedeDespachar={tiene('cocina/despachar')} />
-        </div>
-      )}
-
-      {pestana === 'lista' && (
-      <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-lista" style={{ display: 'contents' }}>
-      <div className="mpv-buscar">
-        <input
-          type="search"
-          className="mpv-buscar-caja"
-          placeholder="Buscar por nombre, código o mesa"
-          aria-label="Buscar pedidos por nombre, código o mesa"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        {buscando && <span className="mpv-buscar-cuenta">{visibles.length === 1 ? '1 resultado' : `${visibles.length} resultados`}</span>}
-      </div>
-
-      <section className="mp-resumen" aria-label="Resumen del rango elegido">
-        <div className="mp-stat">
-          <span className="mp-stat-valor">{valor(resumen.cantidad)}</span>
-          <span className="mp-stat-etiq">Pedidos</span>
-        </div>
-        <div className="mp-stat">
-          <span className="mp-stat-valor">{datos ? soles(resumen.total) : '—'}</span>
-          <span className="mp-stat-etiq">Total vendido</span>
-        </div>
-        <div className="mp-stat">
-          <span className="mp-stat-valor">{valor(resumen.enCurso)}</span>
-          <span className="mp-stat-etiq">En curso</span>
-        </div>
-        <div className="mp-stat">
-          <span className="mp-stat-valor">{valor(resumen.entregados)}</span>
-          <span className="mp-stat-etiq">Entregados</span>
-        </div>
-      </section>
-
-      <BarraFiltros>
-        <FiltroCombo
-          etiqueta="Periodo"
-          valor={rango}
-          valorPorDefecto="hoy"
-          opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
-          alCambiar={(v) => setRango(v as RangoMisPedidos)}
-        />
-        <FiltroCombo
-          etiqueta="Estado"
-          valor={filtro}
-          opciones={FILTROS.map((f) =>
-            f.valor === 'faltaVoucher'
-              ? { valor: f.valor, etiqueta: f.etiqueta, cantidad: cuantosFaltan }
-              : { valor: f.valor, etiqueta: f.etiqueta },
-          )}
-          alCambiar={(v) => setFiltro(v as FiltroEstado)}
-        />
-      </BarraFiltros>
-
-      {error && (
-        <EstadoError
-          mensaje="No pudimos cargar tus pedidos. Revisa la conexión e inténtalo de nuevo."
-          alReintentar={() => void cargar()}
-        />
-      )}
-
-      {!datos && !error && <Cargando mensaje="Cargando tus pedidos" />}
-
-      {datos && pedidos.length === 0 && (
-        <EstadoVacio titulo="Aún no tomaste pedidos en este rango" descripcion="Toca Nuevo pedido para registrar el primero." />
-      )}
-
-      {datos && pedidos.length > 0 && visibles.length === 0 && buscando && (
-        <div className="mpv-vacio">
-          <p className="mpv-vacio-texto">Ningún pedido coincide con tu búsqueda</p>
-          <button type="button" className="mpv-boton" onClick={() => setBusqueda('')}>
-            Limpiar
-          </button>
-        </div>
-      )}
-
-      {datos && pedidos.length > 0 && visibles.length === 0 && !buscando && (
-        <EstadoVacio titulo="No hay pedidos con este estado" descripcion="Prueba con Todos para ver el resto." />
-      )}
-
-      {visibles.length > 0 && (
-        <ul className="mp-lista">
-          {visibles.map((p) => {
+  // Una tarjeta de pedido. `rol` solo viene dentro de una cuenta (original + extras); `Cont` es li (suelta) o div (dentro de la cuenta)
+  const tarjeta = (p: MiPedido, Cont: 'li' | 'div', rol?: 'original' | 'extra', incluido = true) => {
             const abierto = expandido === p.id;
             const est = ESTADO_VISTO[p.estado] ?? { texto: p.estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
             const idDetalle = `mp-detalle-${p.id}`;
@@ -336,10 +222,12 @@ export function MisPedidosView() {
             const recortar = p.lineas.length > LINEAS_SIN_RECORTE && !itemsAbiertos.has(p.id);
             const lineasVisibles = recortar ? p.lineas.slice(0, LINEAS_VISIBLES) : p.lineas;
             return (
-              <li key={p.id} className={faltanVoucher(p) ? 'mp-card mpv-card--falta' : 'mp-card'}>
+              <Cont key={p.id} className={faltanVoucher(p) ? 'mp-card mpv-card--falta' : 'mp-card'}>
                 <div className="mp-card-cabeza">
                   <span className="mp-card-fila">
                     <strong className="mp-codigo">{p.codigo}</strong>
+                    {rol && <span className={`mp-rol mp-rol--${rol}`} data-testid={rol === 'extra' ? 'insignia-extra' : 'rotulo-original'}>{rol === 'extra' ? 'EXTRA' : 'PEDIDO ORIGINAL'}</span>}
+                    {rol && !incluido && <span className="mp-fuera" data-testid="fuera-filtro">no incluido en este filtro</span>}
                     {p.ubicacionEditadaEn && <InsigniaDireccionEditada />}
                     {p.clienteNombre && (
                       <span className="mpv-cliente" title={p.clienteNombre}>
@@ -484,6 +372,147 @@ export function MisPedidosView() {
                     )}
                   </div>
                 )}
+              </Cont>
+            );
+  };
+
+  return (
+    <div className="mp" aria-busy={cargando}>
+      <div role="tablist" aria-label="Vista de mis pedidos" className="mpv-pestanas">
+        <button
+          type="button"
+          role="tab"
+          id="mp-tab-salon"
+          aria-selected={pestana === 'salon'}
+          aria-controls="mp-panel"
+          className="mpv-pestana"
+          onClick={() => setPestana('salon')}
+        >
+          Salón
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="mp-tab-lista"
+          aria-selected={pestana === 'lista'}
+          aria-controls="mp-panel"
+          className="mpv-pestana"
+          onClick={() => setPestana('lista')}
+        >
+          Lista
+        </button>
+      </div>
+
+      <button type="button" className="mp-nuevo" onClick={() => setModalAbierto(true)}>
+        Nuevo pedido
+      </button>
+
+      {pestana === 'salon' && (
+        <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-salon">
+          <SalonMozo puedeForzar={tiene('mesas/liberar')} puedeDespachar={tiene('cocina/despachar')} />
+        </div>
+      )}
+
+      {pestana === 'lista' && (
+      <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-lista" style={{ display: 'contents' }}>
+      <div className="mpv-buscar">
+        <input
+          type="search"
+          className="mpv-buscar-caja"
+          placeholder="Buscar por nombre, código o mesa"
+          aria-label="Buscar pedidos por nombre, código o mesa"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        {buscando && <span className="mpv-buscar-cuenta">{cuentas.length === 1 ? '1 resultado' : `${cuentas.length} resultados`}</span>}
+      </div>
+
+      <section className="mp-resumen" aria-label="Resumen del rango elegido">
+        <div className="mp-stat">
+          <span className="mp-stat-valor">{valor(resumen.cantidad)}</span>
+          <span className="mp-stat-etiq">Pedidos</span>
+        </div>
+        <div className="mp-stat">
+          <span className="mp-stat-valor">{datos ? soles(resumen.total) : '—'}</span>
+          <span className="mp-stat-etiq">Total vendido</span>
+        </div>
+        <div className="mp-stat">
+          <span className="mp-stat-valor">{valor(resumen.enCurso)}</span>
+          <span className="mp-stat-etiq">En curso</span>
+        </div>
+        <div className="mp-stat">
+          <span className="mp-stat-valor">{valor(resumen.entregados)}</span>
+          <span className="mp-stat-etiq">Entregados</span>
+        </div>
+      </section>
+
+      <BarraFiltros>
+        <FiltroCombo
+          etiqueta="Periodo"
+          valor={rango}
+          valorPorDefecto="hoy"
+          opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
+          alCambiar={(v) => setRango(v as RangoMisPedidos)}
+        />
+        <FiltroCombo
+          etiqueta="Estado"
+          valor={filtro}
+          opciones={FILTROS.map((f) =>
+            f.valor === 'faltaVoucher'
+              ? { valor: f.valor, etiqueta: f.etiqueta, cantidad: cuantosFaltan }
+              : { valor: f.valor, etiqueta: f.etiqueta },
+          )}
+          alCambiar={(v) => setFiltro(v as FiltroEstado)}
+        />
+      </BarraFiltros>
+
+      {error && (
+        <EstadoError
+          mensaje="No pudimos cargar tus pedidos. Revisa la conexión e inténtalo de nuevo."
+          alReintentar={() => void cargar()}
+        />
+      )}
+
+      {!datos && !error && <Cargando mensaje="Cargando tus pedidos" />}
+
+      {datos && pedidos.length === 0 && (
+        <EstadoVacio titulo="Aún no tomaste pedidos en este rango" descripcion="Toca Nuevo pedido para registrar el primero." />
+      )}
+
+      {datos && pedidos.length > 0 && visibles.length === 0 && buscando && (
+        <div className="mpv-vacio">
+          <p className="mpv-vacio-texto">Ningún pedido coincide con tu búsqueda</p>
+          <button type="button" className="mpv-boton" onClick={() => setBusqueda('')}>
+            Limpiar
+          </button>
+        </div>
+      )}
+
+      {datos && pedidos.length > 0 && visibles.length === 0 && !buscando && (
+        <EstadoVacio titulo="No hay pedidos con este estado" descripcion="Prueba con Todos para ver el resto." />
+      )}
+
+      {cuentas.length > 0 && (
+        <ul className="mp-lista">
+          {cuentas.map((c) => {
+            if (c.miembros.length === 1) return tarjeta(c.miembros[0], 'li');
+            const raiz = c.miembros.find((m) => m.id === c.raizId) ?? c.miembros[0];
+            const vigentes = c.miembros.filter((m) => m.estado !== 'ANULADO' && m.estado !== 'RECHAZADO');
+            const totalCuenta = vigentes.reduce((a, m) => a + m.total, 0);
+            const porCobrar = vigentes.filter((m) => m.pagoEstado !== 'PAGADO').reduce((a, m) => a + m.total, 0);
+            return (
+              <li key={`cuenta-${c.raizId}`} className="mp-cuenta" data-testid="tarjeta-cuenta">
+                <div className="mp-cuenta-cab">
+                  <strong className="mp-cuenta-nombre">{raiz.clienteNombre || lugar(raiz)}</strong>
+                  <span>{lugar(raiz)} · {horaLima(raiz.creadoEn)} · {c.miembros.length} pedidos en la cuenta</span>
+                </div>
+                <div className="mp-cuenta-lista">
+                  {c.miembros.map((m) => tarjeta(m, 'div', m.id === c.raizId ? 'original' : 'extra', c.coincide.has(m.id)))}
+                </div>
+                <div className="mp-cuenta-pie" data-testid="total-cuenta">
+                  <span>Total de la cuenta: <strong>{soles(totalCuenta)}</strong></span>
+                  <span className={porCobrar > 0 ? 'mp-cuenta-pend' : 'mp-cuenta-ok'}>{porCobrar > 0 ? `Por cobrar ${soles(porCobrar)}` : 'Todo cobrado'}</span>
+                </div>
               </li>
             );
           })}

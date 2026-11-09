@@ -309,6 +309,8 @@ export interface RespuestaListarPedidos {
   pagina: number;
   limite: number;
   items: Pedido[];
+  /** Miembros de una cuenta (original o extras) que la página no trajo: solo para armar la tarjeta; no cuentan en total ni resumen */
+  relacionados?: Pedido[];
   /** Solo con resumen=1: una fila por estado y estado de pago */
   resumen?: { estado: string; pago_estado: string | null; n: number; total: number }[];
 }

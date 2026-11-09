@@ -1081,3 +1081,131 @@
   .cj2-info { width: 32px; min-width: 32px; margin: -6px -4px; }
   .cj2-cab .cj2-btn--ico { min-width: 40px; padding: 0; }
 }
+
+/* ---- Tarjeta «cuenta»: pedido original + sus extras en una sola tarjeta ---- */
+.cj2-cuenta-cab {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 12px 15px 8px;
+  font: inherit;
+  color: var(--cp-navy, #0B2C3E);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.cj2-cuenta-cab:focus-visible,
+.cj2-cta-abrir:focus-visible,
+.cj2-cta-vermas:focus-visible,
+.cj2-cta-mas summary:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+.cj2-cta-cuenta { font-size: 13px; font-weight: 800; color: #2C4C5D; }
+.cj2-cta-secciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 8px;
+  /* la tarjeta no crece sin límite: pasado este alto, la lista de pedidos se desplaza por dentro */
+  max-height: 460px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cj2-cta-sec {
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  background: #FFFFFF;
+  overflow: hidden;
+  flex: none;
+}
+.cj2-cta-sec--sel { border-color: #E67929; box-shadow: 0 0 0 3px rgba(230, 121, 41, 0.25); }
+.cj2-cta-sec--fuera { background: #FBF4EC; border-style: dashed; }
+.cj2-cta-sec--fuera .cj2-cta-prods { opacity: 0.85; }
+.cj2-cta-abrir {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 10px 12px 6px;
+  font: inherit;
+  color: #0B2C3E;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.cj2-cta-linea { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; font-variant-numeric: tabular-nums; }
+.cj2-cta-cod { font-family: Montserrat, sans-serif; font-weight: 900; font-size: 14px; color: #0B2C3E; overflow-wrap: anywhere; }
+.cj2-cta-rol { font-size: 11.5px; font-weight: 900; letter-spacing: 0.05em; border-radius: 6px; padding: 2px 7px; }
+.cj2-cta-rol--orig { background: #E4EDF2; color: #0B2C3E; }
+.cj2-cta-rol--extra { background: #0B2C3E; color: #FBF4EC; }
+.cj2-cta-monto { margin-left: auto; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 16px; color: #0B2C3E; white-space: nowrap; }
+.cj2-cta-fuera { font-size: 12px; font-weight: 800; color: #2C4C5D; align-self: center; }
+.cj2-cta-prods { display: flex; flex-direction: column; gap: 3px; font-size: 14.5px; font-weight: 600; color: #0B2C3E; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.cj2-cta-prods .cj2-prod { display: flex; flex-direction: column; gap: 1px; }
+.cj2-cta-acciones { display: flex; align-items: stretch; gap: 6px; padding: 0 10px 10px; }
+.cj2-cta-accion { min-height: 44px; font-size: 13.5px; flex: 1 1 auto; }
+.cj2-cta-mas { position: relative; flex: none; margin-left: auto; }
+.cj2-cta-mas summary {
+  list-style: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: #0B2C3E;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.cj2-cta-mas summary::-webkit-details-marker { display: none; }
+.cj2-cta-menu {
+  position: absolute;
+  right: 0;
+  bottom: 50px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #FFFFFF;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(11, 44, 62, 0.18);
+  min-width: 200px;
+}
+.cj2-cta-menu .cj2-reimprimir { position: static; width: 100%; }
+.cj2-cta-vermas {
+  min-height: 44px;
+  border: 1.5px solid var(--cp-line, #E3D6C6);
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: #2C4C5D;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cj2-cta-pie {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 10px 15px 12px;
+  border-top: 1.5px solid var(--cp-line, #E3D6C6);
+  background: #FBF4EC;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0B2C3E;
+  font-variant-numeric: tabular-nums;
+}
+.cj2-cta-pend { color: #B2500F; font-weight: 900; }
+.cj2-cta-ok { color: #2F7A45; font-weight: 900; }
