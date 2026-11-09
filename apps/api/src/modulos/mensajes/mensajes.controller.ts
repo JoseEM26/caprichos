@@ -74,8 +74,8 @@ export class MensajesController {
 
   @Post('conversaciones/:id/reabrir-plantilla')
   @Permiso('mensajes', 'enviar')
-  reabrirPlantilla(@Param('id') id: string, @Req() req: any) {
-    return this.mensajes.reabrirConPlantilla(id, req.usuario, ipDe(req));
+  reabrirPlantilla(@Param('id') id: string, @Body() cuerpo: { forzar?: boolean } | undefined, @Req() req: any) {
+    return this.mensajes.reabrirConPlantilla(id, req.usuario, ipDe(req), cuerpo?.forzar === true);
   }
 
   @Post('conversaciones/:id/mensajes/:mensajeId/reintentar')

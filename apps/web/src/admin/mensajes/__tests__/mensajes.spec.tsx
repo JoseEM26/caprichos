@@ -317,11 +317,7 @@ describe('MensajesView (/admin/mensajes)', () => {
     render(<MensajesView />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada.',
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('porque-ventana').textContent).toMatch(/nunca te ha escrito por WhatsApp|último mensaje suyo/);
       expect(screen.getByRole('button', { name: 'Reabrir con plantilla' })).toBeInTheDocument();
     });
 
@@ -337,6 +333,33 @@ describe('MensajesView (/admin/mensajes)', () => {
     await waitFor(() => {
       expect(spyReabrir).toHaveBeenCalledWith('1');
     });
+  });
+
+  it('10b. Con la ventana cerrada explica el porqué con la fecha del último mensaje del cliente', async () => {
+    const msgs = [{ id: '1', autor: 'CLIENTE', saliente: false, texto: 'Hola', hora: '14:20', fecha: '2026-11-09T19:20:00.000Z' }];
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue({ ...detalleMock, ventanaAbierta: false, mensajes: msgs } as any);
+    render(<MensajesView />);
+    await waitFor(() => expect(screen.getByTestId('porque-ventana').textContent).toMatch(/no te escribió en las últimas 24 h \(último mensaje suyo: 9 nov 2026, 14:20\)/));
+    expect(screen.getByTestId('porque-ventana').textContent).toMatch(/Cuando responda, podrás escribirle libremente/);
+  });
+
+  it('10c. Tras enviar la plantilla: botón bloqueado «Plantilla enviada · esperando respuesta» y desbloqueo con confirmación', async () => {
+    const msgs = [
+      { id: '1', autor: 'CLIENTE', saliente: false, texto: 'Hola', hora: '14:20', fecha: '2026-11-07T19:20:00.000Z' },
+      { id: '2', autor: 'PERSONA', saliente: true, plantilla: true, estado: 'ENTREGADO', texto: '[Plantilla]', hora: '17:10', fecha: '2026-11-09T22:10:00.000Z' },
+    ];
+    vi.spyOn(api, 'obtenerDetalleConversacion').mockResolvedValue({ ...detalleMock, ventanaAbierta: false, mensajes: msgs } as any);
+    const spyReabrir = vi.spyOn(api, 'reabrirConversacionPlantilla').mockResolvedValue({ ok: true, id: 'x' });
+    render(<MensajesView />);
+    const bloqueado = await screen.findByTestId('plantilla-enviada');
+    expect(bloqueado).toBeDisabled();
+    expect(bloqueado.textContent).toBe('Plantilla enviada 17:10 (entregada) · esperando respuesta del cliente');
+    expect(screen.queryByRole('button', { name: 'Reabrir con plantilla' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar otra plantilla de todos modos' }));
+    await waitFor(() => expect(screen.getByText(/Meta puede cobrarla de nuevo/)).toBeInTheDocument());
+    expect(spyReabrir).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar otra' }));
+    await waitFor(() => expect(spyReabrir).toHaveBeenCalledWith('1', true));
   });
 
   it('11. Cuando el envío libre falla por ventana cerrada (409), ofrece diálogo para reabrir con plantilla', async () => {

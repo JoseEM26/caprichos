@@ -25,6 +25,8 @@ export interface MensajeItem {
   /** Fecha y hora exactas (ISO) del mensaje, para los separadores de día y el title de la burbuja. */
   fecha?: string;
   estado?: string;
+  /** Mensaje de plantilla aprobada (p. ej. la de reapertura). */
+  plantilla?: boolean;
   /** Solo ADMIN: código de clasificación interno (p. ej. PLANTILLA_FORMATO_VARIABLE). */
   errorCodigo?: string | null;
   /** Solo ADMIN: texto original de Meta, sin el código. */
