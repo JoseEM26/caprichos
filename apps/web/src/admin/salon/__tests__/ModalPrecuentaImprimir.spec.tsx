@@ -8,7 +8,7 @@ vi.mock('../../vouchers/vouchersApi', () => ({ vouchersApi: { listarPedido: vi.f
 
 const res = (p: any = {}) => ({ ok: true, cantidad: 1, porMaquina: [{ equipo: 'CAJA', conectado: true }], omitidos: [], yaEnCola: [], ...p });
 const abrir = () =>
-  render(<ModalPrecuenta abierto alCerrar={vi.fn()} mesa="Mesa 3" total={10} subtotal={10} pedidoId={9} lineas={[{ cantidad: 1, nombre: 'Café', precio: 10 }]} />);
+  render(<ModalPrecuenta abierto alCerrar={vi.fn()} mesa="Mesa 3" total={10} subtotal={10} pedidoId={9} lineas={[{ cantidad: 1, nombre: 'Café', detalle: '', precio: 10 }]} />);
 const imprimir = async () => {
   fireEvent.click(screen.getByRole('button', { name: /Imprimir precuenta/ }));
   fireEvent.click(screen.getByRole('button', { name: /Sí, imprimir/ }));
