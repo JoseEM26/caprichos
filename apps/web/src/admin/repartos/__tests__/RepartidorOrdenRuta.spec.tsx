@@ -65,19 +65,19 @@ describe('RepartidorView: orden de entrega', () => {
     return screen.findByTestId('detalle-pedido');
   };
 
-  it('el pedido 1 queda resaltado como Siguiente en el mapa', async () => {
+  it('el pedido 1 queda resaltado como Sugerido en el mapa', async () => {
     render(<MemoryRouter><RepartosView /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Mis pedidos' }));
     expect(await screen.findByTestId('marcador-1')).toHaveAttribute('data-siguiente', 'true');
-    expect(screen.getByTestId('marcador-1')).toHaveTextContent('Siguiente');
+    expect(screen.getByTestId('marcador-1')).toHaveTextContent('Sugerido');
     expect(screen.getByTestId('marcador-2')).not.toHaveAttribute('data-siguiente');
   });
 
-  it('el que no toca tiene el botón deshabilitado con motivo y no ofrece Saltar', async () => {
+  it('sin orden obligatorio: el pedido 2 tiene el botón habilitado, sin motivo de bloqueo, y ofrece Saltar', async () => {
     await abrirPedido('2');
-    expect(screen.getByTestId('btn-salir-2')).toBeDisabled();
-    expect(screen.getByTestId('motivo-bloqueo-2')).toHaveTextContent('Siguiente: CP-1');
-    expect(screen.queryByTestId('btn-saltar-2')).toBeNull();
+    expect(screen.getByTestId('btn-salir-2')).toBeEnabled();
+    expect(screen.queryByTestId('motivo-bloqueo-2')).toBeNull();
+    expect(screen.getByTestId('btn-saltar-2')).toBeInTheDocument();
   });
 
   it('el que toca tiene el botón habilitado y Empezar por este reordena en la API', async () => {

@@ -1383,8 +1383,6 @@ export class RepartosService {
       }
     }
 
-    await this.verificarTurno(pedido);
-
     if (pedido.estado !== 'LISTO') {
       throw new BadRequestException({
         codigo: 'ESTADO_INVALIDO',
@@ -1476,8 +1474,6 @@ export class RepartosService {
         });
       }
     }
-
-    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
@@ -1574,8 +1570,6 @@ export class RepartosService {
         });
       }
     }
-
-    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
@@ -2855,26 +2849,6 @@ export class RepartosService {
   }
 
   /**
-   * Orden obligatorio: si el pedido tiene orden_ruta, solo puede avanzar el de menor orden entre los
-   * pendientes (LISTO o EN_CAMINO) del mismo repartidor. Sin orden_ruta (flujo viejo) no se bloquea.
-   */
-  private async verificarTurno(pedido: { id: bigint; orden_ruta?: number | null; repartidor_party_id?: bigint | null }) {
-    if (pedido.orden_ruta == null || pedido.repartidor_party_id == null) return;
-    const toca = await this.prisma.pedido.findFirst({
-      where: {
-        repartidor_party_id: pedido.repartidor_party_id,
-        orden_ruta: { not: null },
-        estado: { in: ['LISTO', 'EN_CAMINO'] },
-      },
-      orderBy: { orden_ruta: 'asc' },
-      select: { id: true, codigo: true },
-    });
-    if (toca && toca.id !== pedido.id) {
-      throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: toca.codigo, mensaje: `Primero entrega ${toca.codigo}` });
-    }
-  }
-
-  /**
    * Mayor numero_ruta usado en la ruta en curso del repartidor (entregados y fallidos incluidos), sin contar
    * `excluir`. Sin ruta en curso: 0. Los números de una ruta no se reutilizan hasta cerrarla.
    */
@@ -2975,9 +2949,6 @@ export class RepartosService {
       const lista: any[] = await this.pendientesConOrden(tx, partyId);
       const pedido = lista.find((p) => p.id === pedidoId);
       if (!pedido) throw new ConflictException({ codigo: 'NO_EN_RUTA', mensaje: 'Ese pedido no está en tu ruta' });
-      if (lista[0].id !== pedidoId) {
-        throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: lista[0].codigo, mensaje: `Primero entrega ${lista[0].codigo}` });
-      }
       if (lista.length < 2) {
         throw new ConflictException({ codigo: 'SIN_OTROS', mensaje: 'No hay otro pedido en tu ruta al que pasar el turno' });
       }
@@ -2993,7 +2964,7 @@ export class RepartosService {
         data: { pedido_id: pedidoId, estado_anterior: pedido.estado, estado_nuevo: pedido.estado, motivo, por_party_id: partyId, en: new Date() },
       });
       // numero_ruta no cambia: el saltado conserva su número y le toca el siguiente pendiente
-      return { nuevoOrden: ultimo, numeroRuta: pedido.numero_ruta ?? null, siguienteNumeroRuta: lista[1].numero_ruta ?? null };
+      return { nuevoOrden: ultimo, numeroRuta: pedido.numero_ruta ?? null, siguienteNumeroRuta: (lista.find((p) => p.id !== pedidoId)?.numero_ruta as number | undefined) ?? null };
     });
     await this.auditoria.registrar({
       categoria: 'CAMBIO', modulo: 'repartos', accion: 'SALTAR', resultado: 'OK',

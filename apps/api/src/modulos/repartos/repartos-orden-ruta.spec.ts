@@ -4,7 +4,8 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({
   },
 }));
 
-import { BadRequestException, ConflictException } from '@nestjs/common';
+
+import { BadRequestException } from '@nestjs/common';
 import { RepartosService } from './repartos.service';
 import { RutaService } from './ruta.service';
 
@@ -39,15 +40,17 @@ function montar(pedidos: any[], saltosPrevios = 0) {
   return { service: new RepartosService(prisma, auditoria, new RutaService()), auditoria, tx, pedidos };
 }
 
-describe('orden de entrega obligatorio', () => {
-  it('salir, llegue y entregar responden 409 ORDEN_RUTA si no es el que toca', async () => {
-    const { service } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1, 'EN_CAMINO')]);
-    for (const accion of ['salir', 'llegue', 'entregar'] as const) {
-      await expect((service as any)[accion]('2', rep)).rejects.toMatchObject({
-        response: { codigo: 'ORDEN_RUTA', mensaje: 'Primero entrega CP-1' },
-      });
-    }
-    await expect(service.salir('2', rep)).rejects.toBeInstanceOf(ConflictException);
+describe('orden de entrega: solo informativo (sin orden obligatorio)', () => {
+  // Antes (v0.4.91): salir/llegue/entregar del #2 respondian 409 ORDEN_RUTA «Primero entrega CP-1».
+  it('salir y llegue de cualquier pedido funcionan aunque otro de la ruta vaya antes', async () => {
+    const { service } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1, 'EN_CAMINO'), ped(3n, 3, -12.2)]);
+    await expect(service.salir('3', rep)).resolves.toMatchObject({ id: '3' });
+    await expect(service.llegue('2', rep)).resolves.toBeDefined();
+  });
+
+  it('un anulado de la ruta no bloquea: el 3 sale sin haber entregado el 1 ni el 2', async () => {
+    const { service } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1, 'ANULADO'), ped(3n, 3, -12.2)]);
+    await expect(service.salir('3', rep)).resolves.toMatchObject({ id: '3' });
   });
 
   it('un pedido sin orden_ruta (flujo viejo) no se bloquea por el orden', async () => {
@@ -85,7 +88,7 @@ describe('orden de entrega obligatorio', () => {
     await expect(service.empezarPor('2', rep)).rejects.toMatchObject({ response: { codigo: 'RUTA_EN_CURSO' } });
   });
 
-  it('saltar pasa el pedido al final, deja historial con motivo y audita quién y por qué', async () => {
+  it('saltar (atajo opcional, desde cualquier pedido) pasa el pedido al final, deja historial con motivo y audita quién y por qué', async () => {
     const { service, pedidos, tx, auditoria } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1), ped(3n, 3, -12.2)]);
     const r = await service.saltar('1', { motivo: 'NO_CONTESTA' }, rep, '1.2.3.4');
     expect(r.ordenRuta).toBe(4);
@@ -98,9 +101,9 @@ describe('orden de entrega obligatorio', () => {
     );
   });
 
-  it('saltar exige que sea el que toca, el detalle en Otro y respeta el tope de 2 saltos', async () => {
+  it('saltar desde cualquier pedido, exige el detalle en Otro y respeta el tope de 2 saltos', async () => {
     const { service } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1)]);
-    await expect(service.saltar('2', { motivo: 'TRAFICO' }, rep)).rejects.toMatchObject({ response: { codigo: 'ORDEN_RUTA' } });
+    await expect(service.saltar('2', { motivo: 'TRAFICO' }, rep)).resolves.toMatchObject({ id: '2' });
     await expect(service.saltar('1', { motivo: 'OTRO' }, rep)).rejects.toBeInstanceOf(BadRequestException);
     const { service: s2 } = montar([ped(1n, 1, -12.0), ped(2n, 2, -12.1)], 2);
     await expect(s2.saltar('1', { motivo: 'TRAFICO' }, rep)).rejects.toMatchObject({ response: { codigo: 'TOPE_SALTOS' } });

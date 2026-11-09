@@ -272,7 +272,7 @@ function Marcador({
         <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{punto.cliente}</strong>
         <span style={{ fontSize: 10, fontWeight: 700 }}>{punto.codigo}</span>
         {!punto.disponible && punto.estadoTexto && <span style={{ fontSize: 10 }}>{punto.estadoTexto}</span>}
-        {punto.siguiente && <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cp-orange)' }}>Siguiente</span>}
+        {punto.siguiente && <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cp-orange)' }}>Sugerido</span>}
       </span>
     </button>
   );

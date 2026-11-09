@@ -448,7 +448,6 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
   const telefono = mio?.cliente_telefono ?? resumen.telefono;
   const fila: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 14 };
   const conOrden = !!mio && mio.ordenRuta != null && !!orden?.siguiente;
-  const noLeToca = conOrden && orden!.siguiente!.id !== mio!.id;
   const botonOrden: CSSProperties = { ...botonBase, width: '100%', minHeight: 48, background: 'var(--cp-white)', color: 'var(--cp-navy)', border: '1.5px solid var(--cp-navy)', fontSize: 14 };
 
   const filasCliente = (
@@ -592,14 +591,13 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
             etapa={etapaDe(mio)}
             grande
             onAccion={alEtapa}
-            bloqueadoPor={noLeToca ? `Siguiente: ${orden!.siguiente!.codigo}` : undefined}
           />
           {conOrden && !orden!.enCurso && orden!.pendientes > 1 && alEmpezarPor && mio.estado === 'LISTO' && (
             <button type="button" data-testid={`btn-empezar-por-${mio.id}`} onClick={() => alEmpezarPor(mio)} style={botonOrden}>
               Empezar por este
             </button>
           )}
-          {conOrden && !noLeToca && orden!.pendientes > 1 && alSaltar && (
+          {conOrden && orden!.pendientes > 1 && alSaltar && (
             <button type="button" data-testid={`btn-saltar-${mio.id}`} onClick={() => alSaltar(mio)} style={botonOrden}>
               Saltar este pedido
             </button>
