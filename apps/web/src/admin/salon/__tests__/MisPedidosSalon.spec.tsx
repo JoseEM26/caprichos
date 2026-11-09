@@ -116,7 +116,7 @@ describe('Mis pedidos: pestaña Salón (croquis)', () => {
     expect(celda.textContent).toContain('Mesa 1 · José');
   });
 
-  it('mantener 2 s una mesa ocupada abre la vista previa con lo que pidió', async () => {
+  it('mantener 1 s una mesa ocupada abre la vista previa con lo que pidió', async () => {
     render(<MisPedidosView />);
     const celda = await screen.findByTestId('elemento-plano-5');
 

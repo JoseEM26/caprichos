@@ -90,7 +90,7 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
     expect(salonApi.obtenerMesas).toHaveBeenCalled();
   });
 
-  it('sin permiso mesas/liberar, mantener 2 s abre la vista previa pero sin Liberar mesa', async () => {
+  it('sin permiso mesas/liberar, mantener 1 s abre la vista previa pero sin Liberar mesa', async () => {
     vi.useFakeTimers();
     vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [pisoCon(mesaOcupada)] } as any);
     render(
@@ -127,7 +127,7 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
     fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 
-    // Mantener 2 s abre la vista previa; forzar sale de ahí
+    // Mantener 1 s abre la vista previa; forzar sale de ahí
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
     fireEvent.click(within(vista).getByRole('button', { name: 'Liberar mesa' }));
     const modal = await screen.findByRole('dialog', { name: /Liberar Mesa 1/ });

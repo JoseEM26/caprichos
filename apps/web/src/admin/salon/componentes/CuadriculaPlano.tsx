@@ -19,7 +19,7 @@ export interface CuadriculaPlanoProps {
   modoSalon?: boolean;
   /** Elegir destino de un cambio de mesa: las mesas libres se resaltan */
   modoDestino?: boolean;
-  // Mantener presionada una mesa ocupada (2 s) llama a esto (vista previa de la mesa)
+  // Mantener presionada una mesa ocupada (1 s) llama a esto (vista previa de la mesa)
   alMantenerMesaSalon?: (mesa: MesaSalon) => void;
   /** Mesas con anillo naranja y la etiqueta «Esta mesa» (detalle de un pedido). No cambia su color ni su selección. */
   mesasResaltadasIds?: string[];
@@ -128,7 +128,7 @@ export function CuadriculaPlano({
   mesasResaltadasIds = [],
 }: CuadriculaPlanoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa), 2000);
+  const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa), 1000);
 
   // Estado para arrastre suave con puntero táctil o ratón
   const [arrastre, setArrastre] = useState<{
@@ -420,7 +420,7 @@ export function CuadriculaPlano({
 
           const resaltada = mesasResaltadasIds.includes(elem.id);
           const tieneReserva = esMesa && mesaSalon?.reserva;
-          // Mantener 2 s una mesa ocupada abre su vista previa (la decide quien usa el croquis)
+          // Mantener 1 s una mesa ocupada abre su vista previa (la decide quien usa el croquis)
           const mantenible =
             modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA' && !!alMantenerMesaSalon;
           const pulsa = mantenible && mesaSalon ? mantener.manejadores(mesaSalon) : null;

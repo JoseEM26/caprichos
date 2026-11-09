@@ -63,7 +63,7 @@ export function PlanoView() {
   const [mesaParaCuenta, setMesaParaCuenta] = useState<MesaSalon | null>(null);
   // Mesa ocupada mantenida presionada 2 s -> vista previa (ahí viven cuenta, cambio de mesa y forzar liberación)
   const [vistaPreviaId, setVistaPreviaId] = useState<string | null>(null);
-  const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setVistaPreviaId(String(mesa.id)), 2000);
+  const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setVistaPreviaId(String(mesa.id)), 1000);
   const cambio = useCambioDeMesa(() => void cargarDatos());
   const sumar = useSumarMesas(() => void cargarDatos());
   // Mesas del mismo pedido que esta (la vista previa y «Quitar mesa» las necesitan)

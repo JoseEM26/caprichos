@@ -81,7 +81,7 @@ describe('ModalForzarLiberarMesa', () => {
   });
 });
 
-describe('Plano de mesas: mantener 2 s una mesa ocupada', () => {
+describe('Plano de mesas: mantener 1 s una mesa ocupada', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -97,7 +97,7 @@ describe('Plano de mesas: mantener 2 s una mesa ocupada', () => {
     fireEvent.pointerDown(el, { button: 0, clientX: 10, clientY: 10 });
   };
 
-  it('mantener 2 s una mesa ocupada llama a alMantenerMesaSalon (antes de 2 s, no)', () => {
+  it('mantener 1 s una mesa ocupada llama a alMantenerMesaSalon (antes de 1 s, no)', () => {
     const alMantener = vi.fn();
     render(
       <CuadriculaPlano
@@ -111,9 +111,9 @@ describe('Plano de mesas: mantener 2 s una mesa ocupada', () => {
       />,
     );
     pulsar(screen.getByTestId('elemento-plano-5'));
-    act(() => vi.advanceTimersByTime(1500));
+    act(() => vi.advanceTimersByTime(800));
     expect(alMantener).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(700));
+    act(() => vi.advanceTimersByTime(400));
     expect(alMantener).toHaveBeenCalledTimes(1);
     expect(alMantener.mock.calls[0][0].id).toBe('5');
   });

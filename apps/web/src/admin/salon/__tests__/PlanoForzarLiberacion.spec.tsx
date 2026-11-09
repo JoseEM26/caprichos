@@ -52,7 +52,7 @@ async function montarConMesaOcupada(permisos: string[]) {
   return screen.findByTestId('elemento-plano-5');
 }
 
-describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', () => {
+describe('Plano del local: mantener 1 s una mesa ocupada abre la vista previa', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (salonApi.obtenerPlano as any).mockResolvedValue(pisos);
@@ -63,14 +63,14 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     vi.useRealTimers();
   });
 
-  it('con mesas/liberar, mantener 2 s la mesa ocupada abre la vista previa con su pedido y Liberar mesa', async () => {
+  it('con mesas/liberar, mantener 1 s la mesa ocupada abre la vista previa con su pedido y Liberar mesa', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
     fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
-    act(() => vi.advanceTimersByTime(1500));
+    act(() => vi.advanceTimersByTime(800));
     expect(screen.queryByRole('dialog', { name: /Vista previa de/ })).toBeNull();
-    act(() => vi.advanceTimersByTime(700));
+    act(() => vi.advanceTimersByTime(400));
     fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 

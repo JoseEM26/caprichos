@@ -22,7 +22,7 @@ const PISOS_VACIOS: PisoSalon[] = [];
 
 /**
  * Pestaña «Salón» de «Mis pedidos»: el croquis del local en vivo.
- * Tocar una libre abre Nuevo pedido con esa mesa; una ocupada, su cuenta; mantener 2 s, la vista previa.
+ * Tocar una libre abre Nuevo pedido con esa mesa; una ocupada, su cuenta; mantener 1 s, la vista previa.
  */
 export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProps) {
   const [pisos, setPisos] = useState<PisoSalon[]>(PISOS_VACIOS);
@@ -220,7 +220,7 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
       {!cargando && pisoActual && (
         <>
           <p className="smz-ayuda">
-            Toca una mesa libre para tomar pedido. Toca una ocupada para ver su cuenta. Mantenla 2 segundos para ver
+            Toca una mesa libre para tomar pedido. Toca una ocupada para ver su cuenta. Mantenla 1 segundo para ver
             qué pidió.
           </p>
           <CuadriculaPlano
