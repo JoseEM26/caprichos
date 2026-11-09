@@ -13,6 +13,8 @@ export async function listarHistorialNotificaciones(
   if (filtros.estado && filtros.estado !== 'todas') params.set('estado', filtros.estado);
   if (filtros.desde) params.set('desde', filtros.desde);
   if (filtros.hasta) params.set('hasta', filtros.hasta);
+  if (filtros.limite) params.set('limite', String(filtros.limite));
+  if (filtros.cursor) params.set('cursor', filtros.cursor);
   const qs = params.toString();
   return api.get<RespuestaHistorialNotificaciones>(`/admin/notificaciones/historial${qs ? `?${qs}` : ''}`);
 }

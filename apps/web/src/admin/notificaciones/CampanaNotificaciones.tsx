@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icono } from '../../comun/Icono';
 import type { NotificacionAdmin } from '../useNotificaciones';
+import { CentinelaMas } from './CentinelaMas';
 import { COLOR_PRIORIDAD, TEXTO_PRIORIDAD, rutaDeAviso } from './AvisosNotificaciones';
 import './parpadeo-reservas.css';
 
@@ -15,6 +16,8 @@ interface CampanaNotificacionesProps {
   marcarTodasActivo?: boolean;
   onActivarSonido: () => void;
 }
+
+const POR_TANDA = 10;
 
 const esperaTexto = (desde: string | null): string => {
   if (!desde) return '';
@@ -41,10 +44,16 @@ export function CampanaNotificaciones({
   const location = useLocation();
   const [abierta, setAbierta] = useState(false);
   const [marcandoTodas, setMarcandoTodas] = useState(false);
+  // La lista se pinta de 10 en 10 al bajar: con cientos de avisos no se dibujan todos de golpe
+  const [mostrando, setMostrando] = useState(POR_TANDA);
 
   useEffect(() => {
     setAbierta(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!abierta) setMostrando(POR_TANDA);
+  }, [abierta]);
 
   const noLeidas = notificaciones.filter((n) => !n.leida);
   const total = noLeidas.length;
@@ -79,8 +88,11 @@ export function CampanaNotificaciones({
         style={{ position: 'relative', flex: 'none', width: 44, height: 44, padding: 0, border: '1.5px solid var(--cp-navy)', borderRadius: 22, background: 'var(--cp-white)', color: 'var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <Icono nombre="notificaciones" tamano={22} />
+        <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+          {total === 0 ? 'Sin notificaciones pendientes' : `${total} sin leer`}
+        </span>
         {total > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, boxSizing: 'border-box', borderRadius: 10, background: COLOR_PRIORIDAD[mayorPrioridad], color: 'var(--cp-white)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+          <span aria-hidden="true" style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, boxSizing: 'border-box', borderRadius: 10, background: COLOR_PRIORIDAD[mayorPrioridad], color: 'var(--cp-white)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
             {total}
           </span>
         )}
@@ -122,7 +134,7 @@ export function CampanaNotificaciones({
 
             {total === 0 && <div style={{ padding: '18px 16px', textAlign: 'center', fontSize: 14, color: 'var(--cp-soft)' }}>Todo al día. No hay nada pendiente.</div>}
 
-            {notificaciones.map((n) => (
+            {notificaciones.slice(0, mostrando).map((n) => (
               <div
                 key={n.clave}
                 className={n.id === 'reservas' && !n.leida ? 'cp-parpadea-fila' : undefined}
@@ -161,6 +173,14 @@ export function CampanaNotificaciones({
                 </div>
               </div>
             ))}
+
+            {notificaciones.length > POR_TANDA && (
+              <CentinelaMas
+                hayMas={mostrando < notificaciones.length}
+                cargando={false}
+                onCargar={() => setMostrando((m) => m + POR_TANDA)}
+              />
+            )}
 
             <button
               type="button"

@@ -89,6 +89,11 @@ export interface RespuestaHistorialNotificaciones {
     leidas: number;
   };
   items: NotificacionHistorialItem[];
+  /** Total que cumple los filtros (no solo los de esta página) */
+  total?: number;
+  hayMas?: boolean;
+  /** Id de la última fila de esta página: se pasa como `cursor` para pedir la siguiente */
+  siguienteCursor?: string | null;
 }
 
 export interface FiltrosHistorial {
@@ -97,4 +102,6 @@ export interface FiltrosHistorial {
   estado?: 'todas' | 'nuevas' | 'leidas';
   desde?: string;
   hasta?: string;
+  limite?: number;
+  cursor?: string;
 }

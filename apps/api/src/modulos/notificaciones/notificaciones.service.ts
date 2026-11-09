@@ -165,6 +165,8 @@ const HORAS_LEIDAS_VISIBLES = 24;
 const MAX_LEIDAS_VISIBLES = 30;
 const MAX_GUARDADAS_NO_LEIDAS = 100;
 const MAX_GUARDADAS_LEIDAS = 100;
+const LIMITE_PAGINA = 10;
+const MAX_LIMITE_PAGINA = 50;
 const CLAVE_VALIDA = /^(n:\d+|c:[a-z-]+:[0-9a-f]{12})$/;
 
 /** Clave de un aviso calculado: cambia con sus ids (o cantidad), así un aviso leído vuelve si cambia. */
@@ -532,7 +534,7 @@ export class NotificacionesService {
    * Listado del historial de notificaciones con métricas y conteos dinámicos (mockup Notificaciones).
    */
   async historial(
-    filtro: { tipo?: string; estado?: 'todas' | 'nuevas' | 'leidas'; desde?: string; hasta?: string; q?: string },
+    filtro: { tipo?: string; estado?: 'todas' | 'nuevas' | 'leidas'; desde?: string; hasta?: string; q?: string; limite?: number; cursor?: string },
     usuario: UsuarioAutenticado,
   ) {
     // 1. Obtener todas las notificaciones visibles para el usuario o su rol
@@ -581,9 +583,11 @@ export class NotificacionesService {
     const sinLeerHistorial = filas.filter((f) => !f.leida).length;
     const delDiaDeHoy = filas.filter((f) => f.iso === hoyIso).length;
 
-    // Resumen de pendientes en vivo para la sección superior (solo las no leídas)
-    const res = await this.resumen(usuario);
-    const pendientes = res.notificaciones.filter((n) => !n.leida);
+    // Resumen de pendientes en vivo para la sección superior (solo las no leídas).
+    // Las páginas siguientes (con cursor) no lo recalculan: solo traen más filas.
+    const siguiente = !!filtro.cursor;
+    const res = siguiente ? null : await this.resumen(usuario);
+    const pendientes = res ? res.notificaciones.filter((n) => !n.leida) : [];
     const pendientesAhora = pendientes.length;
     const urgentesAhora = pendientes.filter((p) => p.prioridad === 'ALTA').length;
 
@@ -623,8 +627,18 @@ export class NotificacionesService {
       return true;
     });
 
+    // Paginación por cursor (id de la última recibida): no se repite nada aunque entren avisos nuevos arriba
+    const limite = Math.min(Math.max(Math.trunc(filtro.limite ?? LIMITE_PAGINA), 1), MAX_LIMITE_PAGINA);
+    let inicio = 0;
+    if (filtro.cursor) {
+      const pos = items.findIndex((f) => f.id === filtro.cursor);
+      inicio = pos >= 0 ? pos + 1 : 0;
+    }
+    const pagina = items.slice(inicio, inicio + limite);
+    const hayMas = inicio + limite < items.length;
+
     return {
-      ajustes: res.ajustes,
+      ajustes: res ? res.ajustes : await this.ajustes(),
       metricas: {
         pendientesAhora,
         urgentesAhora,
@@ -636,7 +650,10 @@ export class NotificacionesService {
       pendientes,
       conteosPorTipo,
       conteosPorEstado,
-      items,
+      items: pagina,
+      total: items.length,
+      hayMas,
+      siguienteCursor: hayMas ? pagina[pagina.length - 1].id : null,
     };
   }
 
@@ -692,21 +709,32 @@ export class NotificacionesService {
       }
       claves = ids.map((i) => `n:${i}`);
     } else {
+      // Calculadas pendientes + TODAS las guardadas sin leer que ve este usuario (el resumen solo muestra las últimas 100)
       const res = await this.resumen(usuario);
-      claves = res.notificaciones.filter((n) => !n.leida).map((n) => n.clave);
+      const calculadas = res.notificaciones.filter((n) => !n.leida && n.clave.startsWith('c:')).map((n) => n.clave);
+      const puede = await this.permisosDe(usuario);
+      const lecturas = await this.lecturasGuardadas(usuario.partyId);
+      const leidos = [...lecturas].filter(([, en]) => en !== null).map(([id]) => BigInt(id));
+      const explicitas = [...lecturas].filter(([, en]) => en === null).map(([id]) => BigInt(id));
+      const pendientes = await this.prisma.notificacion.findMany({
+        where: aRol(usuario, {
+          AND: [{ id: { notIn: leidos } }, { OR: [{ leida_en: null }, { id: { in: explicitas } }] }, visibilidadPorTipo(puede)],
+        }),
+        select: { id: true },
+      });
+      claves = [...calculadas, ...pendientes.map((n) => `n:${n.id}`)];
     }
 
     const ahora = new Date();
     if (claves.length) {
-      await this.prisma.$transaction(
-        claves.map((clave) =>
-          this.prisma.notificacionLectura.upsert({
-            where: { party_id_clave: { party_id: usuario.partyId, clave } },
-            create: { party_id: usuario.partyId, clave, leida_en: ahora },
-            update: { leida_en: ahora },
-          }),
-        ),
-      );
+      // Solo filas de ESTE usuario: se reemplazan en bloque (una sola ida a la base, aunque sean cientos)
+      await this.prisma.$transaction([
+        this.prisma.notificacionLectura.deleteMany({ where: { party_id: usuario.partyId, clave: { in: claves } } }),
+        this.prisma.notificacionLectura.createMany({
+          data: claves.map((clave) => ({ party_id: usuario.partyId, clave, leida_en: ahora })),
+          skipDuplicates: true,
+        }),
+      ]);
     }
 
     this.eventos?.emitirAdmin('notificaciones:actualizada', { todas: true });

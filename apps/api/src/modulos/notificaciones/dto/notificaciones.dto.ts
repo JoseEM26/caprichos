@@ -1,4 +1,5 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class FiltroHistorialDto {
   @IsOptional()
@@ -20,6 +21,20 @@ export class FiltroHistorialDto {
   @IsOptional()
   @IsString()
   hasta?: string;
+
+  /** Cuántas devolver (por defecto 10, máximo 50) */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limite?: number;
+
+  /** Id de la última notificación ya recibida: devuelve las que van después (más antiguas) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  cursor?: string;
 }
 
 export class MarcarLeidaDto {
