@@ -8,6 +8,7 @@ import { PagoPlanService, PlanPagoItem, efectivoDelPedido, mediosDigitalesDelPed
 import { VouchersService } from '../vouchers/vouchers.service';
 import { totalCobrable } from '../propinas/propinas.util';
 import { nombresDePartes } from './devolucion-pedido.util';
+import { AjustarPagoService } from './ajustar-pago.service';
 
 export const ACCIONES_RESOLVER = ['APROBAR', 'RECHAZAR', 'AUTORIZAR_SIN_VALIDAR'] as const;
 export type AccionResolver = (typeof ACCIONES_RESOLVER)[number];
@@ -60,6 +61,7 @@ export class CambioCobroService {
     private readonly auditoria: AuditoriaService,
     private readonly vouchers: VouchersService,
     private readonly pagoPlan: PagoPlanService,
+    private readonly ajustar: AjustarPagoService,
     @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
 
@@ -68,26 +70,6 @@ export class CambioCobroService {
       throw new BadRequestException({ codigo, mensaje: 'El identificador no es válido' });
     }
     return BigInt(String(valor));
-  }
-
-  /** Pedido del repartidor autenticado (dueño) y en camino; cualquier otro es 403/409. */
-  private async pedidoDelRepartidor(idRaw: string, usuario: UsuarioAutenticado) {
-    const id = this.parseId(idRaw);
-    const pedido = await this.prisma.pedido.findUnique({ where: { id }, include: { planPago: { orderBy: { orden: 'asc' } } } });
-    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
-    if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== BigInt(usuario.partyId)) {
-      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Este pedido no está asignado a ti' });
-    }
-    if (pedido.modalidad !== 'DELIVERY' || pedido.estado !== 'EN_CAMINO') {
-      throw new ConflictException({
-        codigo: 'ESTADO_INVALIDO',
-        mensaje: 'Solo puedes cambiar la forma de pago de un pedido que va en camino o ya llegó',
-      });
-    }
-    if (pedido.pago_estado === 'PAGADO') {
-      throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Este pedido ya está pagado: no hay cobro que cambiar' });
-    }
-    return pedido;
   }
 
   private parsearPlan(planRaw: unknown): PlanPagoItem[] {
@@ -105,7 +87,11 @@ export class CambioCobroService {
     return valor as PlanPagoItem[];
   }
 
-  /** El repartidor solicita el cambio. Sube la captura de cada medio digital junto con la solicitud. */
+  /**
+   * El repartidor cambia la forma de pago de su pedido y SE APLICA DE INMEDIATO (sin aprobación de Caja): la validación
+   * y el cambio de Cobro/plan los hace AjustarPagoService. Aquí solo se suben las capturas opcionales de los medios
+   * digitales y se deja la fila APROBADA (historial inmutable que Caja ve como aviso, sin acción pendiente).
+   */
   async solicitar(
     idRaw: string,
     body: { plan?: unknown; pagaCon?: unknown },
@@ -113,48 +99,21 @@ export class CambioCobroService {
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
-    const pedido = await this.pedidoDelRepartidor(idRaw, usuario);
+    const id = this.parseId(idRaw);
     const partyId = BigInt(usuario.partyId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id }, include: { planPago: { orderBy: { orden: 'asc' } } } });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== partyId) {
+      throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Este pedido no está asignado a ti' });
+    }
     const total = totalCobrable(pedido);
-
     const plan = this.pagoPlan.validar(this.parsearPlan(body.plan), total);
     if (!plan) throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'Elige la nueva forma de pago' });
     const planNuevo: PlanPagoItem[] = plan.map((f) => ({ medio: f.medio, monto: f.monto }));
-    const planOriginal = planActualDelPedido(pedido);
-    if (mismoPlan(planNuevo, planOriginal)) {
-      throw new BadRequestException({ codigo: 'SIN_CAMBIO', mensaje: 'La forma de pago elegida es la misma que ya tiene el pedido' });
-    }
 
-    // La captura de cada medio digital es opcional: se sube si el cliente ya la tiene; si no, se pide después
-    const digitales = mediosDigitalesDelPedido(planNuevo, null, total);
-
-    const montoEfectivo = efectivoDelPedido(planNuevo, null, total);
-    let pagaCon: number | null = null;
-    if (montoEfectivo > 0 && body.pagaCon != null && String(body.pagaCon).trim() !== '') {
-      pagaCon = redondear(Number(body.pagaCon));
-      if (!Number.isFinite(pagaCon) || pagaCon < montoEfectivo) {
-        throw new BadRequestException({
-          codigo: 'PAGA_CON_INVALIDO',
-          mensaje: `Con cuánto paga debe ser al menos el efectivo a cobrar (S/ ${montoEfectivo.toFixed(2)})`,
-        });
-      }
-    }
-
-    const previa = await this.prisma.solicitudCambioCobro.findFirst({ where: { pedido_id: pedido.id, estado: 'PENDIENTE' } });
-    if (previa) {
-      throw new ConflictException({ codigo: 'CAMBIO_COBRO_PENDIENTE', mensaje: 'Ya hay una solicitud pendiente: espera a que Caja la valide' });
-    }
-
-    // Subir las capturas (se leen con la IA y cuentan contra el plan NUEVO). Una ilegible no cuenta: se retira y se pide otra.
+    // Una captura por medio digital, opcional: se lee con la IA contra el plan NUEVO; una ilegible se retira
     const voucherIds: bigint[] = [];
-    const retirar = async (ids: bigint[], motivo: string) => {
-      if (ids.length === 0) return;
-      await this.prisma.voucherPago.updateMany({
-        where: { id: { in: ids } },
-        data: { retirado: true, reemplazado_en: new Date(), motivo_cambio: motivo },
-      });
-    };
-    for (const d of digitales) {
+    for (const d of mediosDigitalesDelPedido(planNuevo, null, total)) {
       if (!capturas[d.medio]?.buffer) continue;
       const r: any = await this.vouchers.subirYProcesar(
         capturas[d.medio],
@@ -163,64 +122,43 @@ export class CambioCobroService {
           medio: d.medio as 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
           origen: 'REPARTIDOR',
           planEsperado: planNuevo,
-          motivoCambio: 'Cambio de forma de pago en la puerta (solicitud del repartidor)',
+          motivoCambio: 'Cambio de forma de pago en la puerta (hecho por el repartidor)',
         },
         usuario,
         ip,
       );
-      const vid = BigInt(r.id);
-      voucherIds.push(vid);
-      // Una captura ilegible no cuenta: se retira y la solicitud sigue sin ella (la captura es opcional)
       if (r.legible === false) {
-        await retirar([vid], 'Captura ilegible en cambio de cobro');
-        voucherIds.pop();
-      }
+        await this.prisma.voucherPago.updateMany({
+          where: { id: BigInt(r.id) },
+          data: { retirado: true, reemplazado_en: new Date(), motivo_cambio: 'Captura ilegible en cambio de cobro' },
+        });
+      } else voucherIds.push(BigInt(r.id));
     }
 
-    let fila;
-    try {
-      fila = await this.prisma.solicitudCambioCobro.create({
-        data: {
-          pedido_id: pedido.id,
-          solicitado_por_party_id: partyId,
-          estado: 'PENDIENTE',
-          plan_original: planOriginal as unknown as Prisma.InputJsonValue,
-          plan_solicitado: planNuevo as unknown as Prisma.InputJsonValue,
-          paga_con: pagaCon,
-          voucher_ids: voucherIds,
-        },
-      });
-    } catch (e) {
-      await retirar(voucherIds, 'Solicitud de cambio de cobro no registrada');
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException({ codigo: 'CAMBIO_COBRO_PENDIENTE', mensaje: 'Ya hay una solicitud pendiente: espera a que Caja la valide' });
-      }
-      throw e;
-    }
+    const r = await this.ajustar.ajustar(idRaw, { plan: planNuevo, pagaCon: body.pagaCon }, usuario, ip, 'REPARTIDOR');
 
-    const nombre = (await nombresDePartes(this.prisma, [partyId])).get(String(partyId)) ?? 'el repartidor';
-    await this.prisma.pedidoEstadoHistorial.create({
+    // Solicitudes PENDIENTES antiguas del pedido (de antes de este cambio): se cierran, el cambio nuevo manda
+    await this.prisma.solicitudCambioCobro.updateMany({
+      where: { pedido_id: id, estado: 'PENDIENTE' },
+      data: { estado: 'RECHAZADA', resuelto_por_party_id: partyId, resuelto_en: new Date(), motivo: 'Reemplazada por un cambio aplicado de inmediato' },
+    });
+    const pagaCon = body.pagaCon != null && String(body.pagaCon).trim() !== '' ? redondear(Number(body.pagaCon)) : null;
+    const fila = await this.prisma.solicitudCambioCobro.create({
       data: {
-        pedido_id: pedido.id,
-        estado_anterior: pedido.estado,
-        estado_nuevo: pedido.estado,
-        motivo: `Cambio de pago solicitado: ${this.texto(planOriginal)} → ${this.texto(planNuevo)}`,
-        por_party_id: partyId,
+        pedido_id: id,
+        solicitado_por_party_id: partyId,
+        estado: 'APROBADA',
+        plan_original: r.antes as unknown as Prisma.InputJsonValue,
+        plan_solicitado: planNuevo as unknown as Prisma.InputJsonValue,
+        paga_con: pagaCon,
+        voucher_ids: voucherIds,
+        resuelto_por_party_id: partyId,
+        resuelto_en: new Date(),
+        motivo: 'Aplicado de inmediato por el repartidor',
       },
     });
-    await this.avisarCaja(pedido.codigo, nombre, fila.id, pedido.id, partyId);
-    await this.auditoria.registrar({
-      categoria: 'CAMBIO',
-      modulo: 'repartos',
-      accion: 'SOLICITAR_CAMBIO_COBRO',
-      resultado: 'OK',
-      entidad: 'pedido',
-      entidadId: pedido.id,
-      antes: { plan: this.texto(planOriginal) },
-      despues: { solicitudId: String(fila.id), plan: this.texto(planNuevo), pagaCon, vouchers: voucherIds.map(String) },
-      partyId,
-      ip,
-    });
+    const nombre = r.modificadoPor ?? 'el repartidor';
+    await this.avisarCaja(pedido.codigo, nombre, r.antes, planNuevo);
     return this.salida(fila, new Map([[String(partyId), nombre]]));
   }
 
@@ -395,29 +333,17 @@ export class CambioCobroService {
     };
   }
 
-  private async avisarCaja(codigo: string, nombre: string, solicitudId: bigint, pedidoId: bigint, repartidor: bigint) {
-    const titulo = `Cambio de pago solicitado por ${nombre}`;
+  /** Aviso informativo para Caja (sin acción pendiente): el repartidor ya cambió el pago. */
+  private async avisarCaja(codigo: string, nombre: string, antes: PlanPagoItem[], ahora: PlanPagoItem[]) {
+    const titulo = `Cambio de pago hecho por ${nombre}`;
     try {
       const notif = await this.prisma.notificacion.create({
-        data: {
-          tipo: 'CAMBIO_COBRO_SOLICITADO',
-          rol_destino: 'CAJERO',
-          titulo,
-          mensaje: `Pedido ${codigo}: valida la captura y aprueba o rechaza el cambio`,
-          enlace: '/admin/caja',
-        },
+        data: { tipo: 'CAMBIO_COBRO_APLICADO', rol_destino: 'CAJERO', titulo, mensaje: `Pedido ${codigo}: ${this.texto(antes)} → ${this.texto(ahora)}`, enlace: '/admin/caja' },
       });
       this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
     } catch (err) {
       this.logger.error(`Aviso de cambio de cobro no registrado: ${(err as Error).message}`);
     }
-    this.eventosGateway?.emitirAdmin('cambio-cobro:solicitud', {
-      pedidoId: String(pedidoId),
-      codigo,
-      solicitudId: String(solicitudId),
-      estado: 'PENDIENTE',
-      repartidorPartyId: String(repartidor),
-    });
   }
 
   private async avisarRepartidor(codigo: string, pedidoId: bigint, repartidor: bigint, solicitudId: bigint, accion: AccionResolver, motivo: string) {

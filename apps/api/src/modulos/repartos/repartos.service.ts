@@ -1591,18 +1591,6 @@ export class RepartosService {
       });
     }
 
-    // Cambio de forma de pago pendiente: Caja debe validarlo (o autorizar la entrega sin validar) antes de entregar
-    const cambioPendiente = await this.prisma.solicitudCambioCobro.findFirst({
-      where: { pedido_id: pedidoId, estado: 'PENDIENTE' },
-      select: { id: true },
-    });
-    if (cambioPendiente) {
-      throw new ConflictException({
-        codigo: 'CAMBIO_COBRO_PENDIENTE',
-        mensaje: 'Esperando que Caja valide el pago…',
-      });
-    }
-
     const ahora = new Date();
 
     const porRendirEfectivo =

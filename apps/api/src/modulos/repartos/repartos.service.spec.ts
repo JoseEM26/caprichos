@@ -325,21 +325,19 @@ describe('RepartosService', () => {
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('POST :id/entregar con un cambio de cobro pendiente: 409 «Esperando que Caja valide el pago», no se entrega', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue({
+    // ANTES: una solicitud PENDIENTE daba 409 «Esperando que Caja valide el pago». Ahora el cambio se aplica
+    // de inmediato y una pendiente antigua ya no bloquea la entrega.
+    it('POST :id/entregar ya no espera a Caja: una solicitud pendiente antigua no bloquea', async () => {
+      const base = {
         id: 35n, codigo: 'CP-0107', modalidad: 'DELIVERY', estado: 'EN_CAMINO', repartidor_party_id: 101n,
         pago_estado: 'PENDIENTE', pago_metodo: 'EFECTIVO', total: new Prisma.Decimal(40), creado_en: new Date(), zona: null,
-      });
+      };
       prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue({ id: 3n }) };
-
-      await expect(service.entregar('35', repartidor1)).rejects.toMatchObject({
-        status: 409,
-        response: { codigo: 'CAMBIO_COBRO_PENDIENTE', mensaje: 'Esperando que Caja valide el pago…' },
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-      expect(prismaMock.solicitudCambioCobro.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { pedido_id: 35n, estado: 'PENDIENTE' } }),
-      );
+      prismaMock.pedido.findUnique.mockResolvedValue(base);
+      prismaMock.pedido.update.mockResolvedValue({ ...base, estado: 'ENTREGADO' });
+      const r = await service.entregar('35', repartidor1);
+      expect(r.estado).toBe('ENTREGADO');
+      expect(prismaMock.solicitudCambioCobro.findFirst).not.toHaveBeenCalled();
     });
 
     it('POST :id/entregar con el cambio aprobado: el efectivo por rendir sale del plan nuevo', async () => {

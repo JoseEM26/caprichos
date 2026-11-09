@@ -17,6 +17,7 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { PedidosEstadoService } from './pedidos-estado.service';
+import { AjustarPagoService } from './ajustar-pago.service';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
@@ -51,6 +52,7 @@ export class PedidosAdminController {
     @Optional() private readonly vouchersService?: VouchersService,
     @Optional() private readonly pedidoComprobante?: PedidoComprobanteService,
     @Optional() private readonly devolucionPedido?: DevolucionPedidoService,
+    @Optional() private readonly ajustarPagoService?: AjustarPagoService,
   ) {}
 
   @Post()
@@ -194,6 +196,17 @@ export class PedidosAdminController {
   async corregirDatosCliente(@Param('id') id: string, @Body() dto: CorregirClienteDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.corregirCliente.corregir(id, dto, req.usuario, ip);
+  }
+
+  /**
+   * Cambiar o agregar medios de pago del pedido, en cualquier estado salvo anulado y sin código de supervisor
+   * ni aprobación. Repartidor: solo los asignados a él; mozo: solo los suyos (se valida en el servicio).
+   */
+  @Post(':id/pago/ajustar')
+  @Permiso('pedidos', 'ajustar_pago')
+  async ajustarPago(@Param('id') id: string, @Body() dto: { plan?: unknown; pagaCon?: unknown; motivo?: unknown }, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.ajustarPagoService?.ajustar(id, dto ?? {}, req.usuario, ip);
   }
 
   @Post(':id/ubicacion')

@@ -20,6 +20,7 @@ import { UbicacionWhatsappPedidoService } from './ubicacion-whatsapp-pedido.serv
 import { UBICACION_PEDIDO_PUERTO } from '../chatbot/puerto/ubicacion-pedido.puerto';
 import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
 import { CambioCobroService } from './cambio-cobro.service';
+import { AjustarPagoService } from './ajustar-pago.service';
 import { CambioCobroController } from './cambio-cobro.controller';
 import { CajaModule } from '../caja/caja.module';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
@@ -44,6 +45,7 @@ import { PedidoExtraController } from './pedido-extra.controller';
     CambioUbicacionService,
     PropuestaUbicacionService,
     CambioCobroService,
+    AjustarPagoService,
     EditarPedidoService,
     PedidoExtraService,
     // Sin estado ni dependencias; PedidosModule no lo exporta

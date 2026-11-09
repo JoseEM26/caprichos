@@ -7,6 +7,7 @@ import { deliverySinUbicacion } from './ubicacionDelivery';
 import { canalLabel, ChipCobroMozo } from './PedidosAdminView';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
+import { BotonCambiarPago } from './CambiarPago';
 import { EtiquetaCajaCerrada } from './BannerCajaCerrada';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import type { AccionCaja } from './accionesCaja';
@@ -68,6 +69,8 @@ export interface TarjetaPedidoCajaProps {
   resaltado: boolean;
   cajaCerradaEspera: boolean;
   cambioCobroPendiente: boolean;
+  /** Acción discreta «Cambiar método de pago» (permiso pedidos/ajustar_pago) */
+  puedeCambiarPago?: boolean;
   alSeleccionar: (id: Pedido['id']) => void;
   /** Botón grande del pie (confirmar pago, preparar, listo…); null en los cerrados */
   accion?: AccionCaja | null;
@@ -83,7 +86,7 @@ export interface TarjetaPedidoCajaProps {
  * y un botón grande con la acción siguiente. El botón de abrir el detalle y el de acción son hermanos (no se anidan).
  */
 export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
-  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, alSeleccionar, accion, alAccion, alComerLocal, ahora,
+  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, puedeCambiarPago, alSeleccionar, accion, alAccion, alComerLocal, ahora,
 }: TarjetaPedidoCajaProps) {
   const visual = estadoVisual(o);
   const pago = chipPago(o);
@@ -168,6 +171,11 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
         </span>
       </button>
       <ReimprimirPedido pedido={o} variante="tarjeta" />
+      {puedeCambiarPago && (
+        <div style={{ padding: '0 10px 6px' }}>
+          <BotonCambiarPago permitido pedido={o} variante="tarjeta" />
+        </div>
+      )}
       {accion ? (
         <div className="cj2-accion-caja">
           <button

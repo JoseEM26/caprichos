@@ -87,6 +87,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Cambio de forma de pago en la puerta: el repartidor solicita; Caja, Admin y Supervisor validan
   { modulo: 'repartos', accion: 'solicitar_cambio_cobro' },
   { modulo: 'pedidos', accion: 'validar_cambio_cobro' },
+  // Cambiar o agregar medios de pago del pedido en cualquier estado (sin código ni aprobación): Caja, Admin, Supervisor, Mozo (sus pedidos) y Repartidor (los asignados)
+  { modulo: 'pedidos', accion: 'ajustar_pago' },
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
@@ -239,6 +241,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/anular', // anular pedidos: solo CAJERO y ADMIN (decisión del dueño); nadie más
     'pedidos/cambiar_ubicacion',
     'pedidos/validar_cambio_cobro',
+    'pedidos/ajustar_pago',
     'pedidos/editar',
     'pedidos/corregir_cliente',
     'pedidos/imprimir_precuenta',
@@ -298,6 +301,7 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
   MOZO: [
+    'pedidos/ajustar_pago', // solo sus pedidos (lo valida el servicio)
     // Chat de WhatsApp (Mensajes): lo atienden MOZO y CAJERO (antes el rol CALLCENTER, eliminado)
     'mensajes/ver',
     'mensajes/tomar',
@@ -364,6 +368,7 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/chat',
     'repartos/proponer_ubicacion',
     'repartos/solicitar_cambio_cobro',
+    'pedidos/ajustar_pago', // solo los pedidos asignados a él (lo valida el servicio)
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
@@ -382,6 +387,7 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/chat',
     'repartos/proponer_ubicacion',
     'repartos/solicitar_cambio_cobro',
+    'pedidos/ajustar_pago', // solo los asignados a él
     'notificaciones/ver',
     'notificaciones/marcar',
   ],
