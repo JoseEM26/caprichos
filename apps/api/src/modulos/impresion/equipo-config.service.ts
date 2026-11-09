@@ -143,7 +143,7 @@ export class EquipoConfigService {
   async guardar(idInput: string | number, cambio: Record<string, unknown>, usuario?: UsuarioAutenticado, ip?: string) {
     const e = await this.equipo(idInput);
     const [actual, areas] = await Promise.all([this.configDe(e.id), this.areasActivas()]);
-    const cats = cambio.stickerBebidaCategorias !== undefined ? await this.prisma.categoria.findMany({ select: { id: true } }) : null;
+    const cats = (cambio.stickerBebidaCategorias !== undefined || cambio.stickerBebidaCategoriasPorModalidad !== undefined) ? await this.prisma.categoria.findMany({ select: { id: true } }) : null;
     const nueva = aplicarCambio(actual, cambio, new Set(areas.map((a) => a.id.toString())), cats ? new Set(cats.map((c) => c.id.toString())) : undefined);
     await this.persistir(e, actual, nueva, cambio, usuario, ip, 'CAMBIAR_CONFIG_EQUIPO_IMPRESION');
     return { ok: true, config: nueva };
@@ -227,14 +227,15 @@ export class EquipoConfigService {
       const areas = areasParaRuteo(j.tipo, j.area_id, ctx.areaBebidasId, (j.payload as any)?.areaId);
       const actual = j.destino_equipo_id !== null ? ctx.equipos.find((e) => e.id === j.destino_equipo_id) : undefined;
       const cat = (j.payload as any)?.categoriaId ?? null;
-      if (actual && equipoAcepta(actual.config, j.tipo, areas, cat)) continue;
+      const mod = (j.payload as any)?.modalidadFiltro ?? null;
+      if (actual && equipoAcepta(actual.config, j.tipo, areas, cat, mod)) continue;
       // Un vaso cuya categoría se desmarcó en todas las PC que lo tomaban: no se imprime (ni queda pendiente)
-      if (j.tipo === 'ETIQUETA_BEBIDA' && vasoDescartadoPorCategoria(areas, cat, ctx)) {
+      if (j.tipo === 'ETIQUETA_BEBIDA' && vasoDescartadoPorCategoria(areas, cat, ctx, mod)) {
         await this.prisma.printJob.update({ where: { id: j.id }, data: { estado: 'DESCARTADO', error: 'Descartada: la categoría ya no lleva sticker de vaso' } });
         n += 1;
         continue;
       }
-      const nuevo = destinoDeTrabajo(j.tipo, areas, ctx, cat);
+      const nuevo = destinoDeTrabajo(j.tipo, areas, ctx, cat, mod);
       if ((nuevo?.id ?? null) === j.destino_equipo_id) continue;
       await this.prisma.printJob.update({
         where: { id: j.id },

@@ -69,3 +69,15 @@
 .ie-vasos-res { font-weight: 700; margin: 8px 0 0; }
 .ie-vasos-aviso { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: #FFF1D6; color: #5A3A00; font-weight: 700; }
 .ie-vasos-info { margin: 6px 0 0; font-size: 14px; color: var(--cp-soft, #2C4C5D); }
+
+.ie-vasos-misma { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 8px; font-weight: 700; cursor: pointer; }
+.ie-vasos-misma input { width: 24px; height: 24px; accent-color: var(--cp-navy, #0B2C3E); flex: none; }
+.ie-matriz { display: grid; grid-template-columns: minmax(80px, 1.4fr) repeat(3, minmax(64px, 1fr)); gap: 6px; align-items: center; margin-top: 8px; }
+.ie-matriz-col { font-weight: 800; font-size: 13px; text-align: center; line-height: 1.15; }
+.ie-matriz-fila { font-weight: 700; overflow-wrap: anywhere; }
+.ie-celda { min-height: 44px; min-width: 44px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: #fff; color: var(--cp-navy, #0B2C3E); font: inherit; font-weight: 900; font-size: 18px; cursor: pointer; }
+.ie-celda[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: #fff; }
+.ie-celda:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+.ie-matriz-atajos { display: flex; flex-direction: column; gap: 4px; }
+.ie-matriz-atajos .ie-atajo { padding: 0 6px; font-size: 13px; }
+.ie-vasos-lista { padding-left: 18px; }

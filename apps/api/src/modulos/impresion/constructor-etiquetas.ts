@@ -1,5 +1,6 @@
 import { representacionDe } from '../comprobantes/facturacion/representacion';
 import {
+  modalidadDeFiltroBebida,
   EtiquetaGeneralDatos,
   EtiquetaGeneralProducto,
   EtiquetaAreaDatos,
@@ -308,6 +309,8 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
         hora,
         ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
         ...(linea.producto?.categoria_id ? { categoriaId: String(linea.producto.categoria_id) } : {}),
+        // Tipo de pedido vigente: el filtro del vaso por PC lo usa para elegir su lista de categorías
+        ...(modalidadDeFiltroBebida(pedido.modalidad) ? { modalidadFiltro: modalidadDeFiltroBebida(pedido.modalidad) as string } : {}),
       });
     }
   });
