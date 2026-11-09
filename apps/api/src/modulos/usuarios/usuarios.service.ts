@@ -13,6 +13,7 @@ import * as argon2 from 'argon2';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { FilaImportarPersonalDto } from './dto/fila-importar-personal.dto';
+import { exigirCumpleanos, formatearCumpleanos } from '../clientes/cumpleanos.util';
 import {
   aTexto,
   diaAnterior,
@@ -191,6 +192,7 @@ export class UsuariosService {
             motivo: r.motivo,
           })),
         paisNacimiento: u.party?.persona?.pais_nacimiento ?? null,
+        cumpleanos: u.party?.persona?.cumple_dia ? formatearCumpleanos(u.party.persona.cumple_dia, u.party.persona.cumple_mes) : null,
         avisosCorreo: Boolean(u.avisos_correo),
         horario24_7: Boolean(u.party?.persona?.horario_24_7),
         correo: u.party?.persona?.correo ?? null,
@@ -349,12 +351,8 @@ export class UsuariosService {
         // Horario 24/7: por defecto, el ADMIN
         const horario247 = dto.horario24_7 ?? dto.rol === 'ADMIN';
         const pais = dto.paisNacimiento?.trim() || null;
-        const cumple = dto.fechaNacimiento
-          ? {
-              cumple_mes: Number(dto.fechaNacimiento.slice(5, 7)),
-              cumple_dia: Number(dto.fechaNacimiento.slice(8, 10)),
-            }
-          : null;
+        const cumpleVal = dto.fechaNacimiento ? exigirCumpleanos(dto.fechaNacimiento) : null;
+        const cumple = cumpleVal ? { cumple_mes: cumpleVal.mes, cumple_dia: cumpleVal.dia } : null;
 
         const personaPrevia = reutilizarId ? await tx.person.findUnique({ where: { party_id: party.id } }) : null;
         const person = personaPrevia
@@ -924,6 +922,14 @@ export class UsuariosService {
     const correoNuevo = dto.correo !== undefined ? dto.correo.trim().toLowerCase() || null : correoAnterior;
     const correoCambia = dto.correo !== undefined && correoNuevo !== correoAnterior;
     const paisNuevo = dto.paisNacimiento !== undefined ? dto.paisNacimiento.trim() || null : undefined;
+    let cumpleNuevo: { cumple_dia: number | null; cumple_mes: number | null } | undefined;
+    if (dto.cumpleanos !== undefined) {
+      this.exigirAdmin(usuarioActual);
+      cumpleNuevo = dto.cumpleanos.trim() === '' ? { cumple_dia: null, cumple_mes: null } : (() => {
+        const c = exigirCumpleanos(dto.cumpleanos);
+        return { cumple_dia: c.dia, cumple_mes: c.mes };
+      })();
+    }
 
     // Avisos por correo: con la casilla encendida hace falta correo (si se toca correo o casilla)
     const avisosNuevo = dto.avisosCorreo ?? usuario.avisos_correo;
@@ -969,7 +975,7 @@ export class UsuariosService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia || paisNuevo !== undefined) {
+        if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia || paisNuevo !== undefined || cumpleNuevo !== undefined) {
           await tx.person.update({
             where: { party_id: usuario.party_id },
             data: {
@@ -977,6 +983,7 @@ export class UsuariosService {
               ...(dto.apellidos !== undefined ? { apellidos: dto.apellidos.trim() } : {}),
               ...(correoCambia ? { correo: correoNuevo } : {}),
               ...(paisNuevo !== undefined ? { pais_nacimiento: paisNuevo } : {}),
+              ...(cumpleNuevo ?? {}),
             },
           });
         }
@@ -1049,7 +1056,7 @@ export class UsuariosService {
       entidad: 'user_account',
       entidadId: usuario.id,
       antes,
-      despues: { ...despues, correoCambiado: correoCambia, dniCambiado: dniCambia },
+      despues: { ...despues, correoCambiado: correoCambia, dniCambiado: dniCambia, ...(cumpleNuevo ? { cumpleanosCambiado: true } : {}) },
       partyId: usuarioActual?.partyId,
       ip,
     });

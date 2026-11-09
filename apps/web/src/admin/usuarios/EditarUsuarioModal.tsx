@@ -78,6 +78,15 @@ const permanentesDe = (u: UsuarioItem): string[] => {
   return (u.roles ?? []).filter((r) => r !== u.rol && !temporales.includes(r));
 };
 
+/** DD/MM con día y mes reales (febrero admite 29). */
+export function cumpleanosValido(v: string): boolean {
+  const m = v.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return false;
+  const dia = Number(m[1]);
+  const mes = Number(m[2]);
+  return mes >= 1 && mes <= 12 && dia >= 1 && dia <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mes - 1];
+}
+
 export function EditarUsuarioModal({
   usuario,
   abierto,
@@ -101,6 +110,7 @@ export function EditarUsuarioModal({
   const [claveAdminDni, setClaveAdminDni] = useState("");
   const [otrosRoles, setOtrosRoles] = useState<string[]>([]);
   const [paisNacimiento, setPaisNacimiento] = useState("");
+  const [cumpleanos, setCumpleanos] = useState("");
   const [correoNuevo, setCorreoNuevo] = useState("");
   const [quitarCorreo, setQuitarCorreo] = useState(false);
   const [avisosCorreo, setAvisosCorreo] = useState(false);
@@ -218,6 +228,7 @@ export function EditarUsuarioModal({
       setTemporales(usuario.rolesTemporales ?? []);
       setMsgRoles("");
       setPaisNacimiento(usuario.paisNacimiento ?? "");
+      setCumpleanos(usuario.cumpleanos ?? "");
       setErrores({});
       setErrorServidor(null);
       setDniNuevo("");
@@ -237,6 +248,7 @@ export function EditarUsuarioModal({
     !iguales(otrosRoles, permanentesDe(usuario)) ||
     !iguales(areasCocina, areasOriginales) ||
     paisNacimiento.trim() !== (usuario.paisNacimiento ?? "") ||
+    cumpleanos.trim() !== (usuario.cumpleanos ?? "") ||
     avisosCorreo !== Boolean(usuario.avisosCorreo) ||
     horario247 !== Boolean(usuario.horario24_7) ||
     dniNuevo.trim() !== "" ||
@@ -270,6 +282,9 @@ export function EditarUsuarioModal({
     if (combinacion) nuevosErrores.otrosRoles = combinacion;
 
     if (esAdmin) {
+      if (cumpleanos.trim() && !cumpleanosValido(cumpleanos.trim())) {
+        nuevosErrores.cumpleanos = "Escribe día y mes reales, por ejemplo 14/03";
+      }
       if (dniNuevo.trim() && !documentoValido(tipoDocNuevo, dniNuevo.trim())) {
         nuevosErrores.dni = mensajeDocumento(tipoDocNuevo);
       } else if (dniNuevo.trim() && !claveAdminDni) {
@@ -296,7 +311,7 @@ export function EditarUsuarioModal({
     if (Object.keys(malos).length > 0) {
       // Lleva a la pestaña donde está el primer problema
       setSeccion(
-        ["nombres", "apellidos", "dni", "claveAdmin", "correo"].some(
+        ["nombres", "apellidos", "dni", "claveAdmin", "correo", "cumpleanos"].some(
           (k) => malos[k],
         )
           ? "datos"
@@ -338,6 +353,8 @@ export function EditarUsuarioModal({
         }
         if (paisNacimiento.trim() !== (usuario.paisNacimiento ?? ""))
           cuerpo.paisNacimiento = paisNacimiento.trim();
+        if (cumpleanos.trim() !== (usuario.cumpleanos ?? ""))
+          cuerpo.cumpleanos = cumpleanos.trim();
         if (avisosCorreo !== Boolean(usuario.avisosCorreo))
           cuerpo.avisosCorreo = avisosCorreo;
         if (horario247 !== Boolean(usuario.horario24_7))
@@ -494,6 +511,21 @@ export function EditarUsuarioModal({
             type="text"
             value={paisNacimiento}
             onChange={(e) => setPaisNacimiento(e.target.value)}
+            disabled={guardando}
+          />
+          <Campo
+            id="editar-cumpleanos"
+            etiqueta="Cumpleaños, día/mes (opcional)"
+            type="text"
+            placeholder="14/03"
+            maxLength={5}
+            value={cumpleanos}
+            onChange={(e) => {
+              setCumpleanos(e.target.value);
+              if (errores.cumpleanos) setErrores((prev) => ({ ...prev, cumpleanos: "" }));
+            }}
+            error={errores.cumpleanos}
+            ayuda="Solo la ven Administración y Supervisión; se usa para el aviso de cumpleaños"
             disabled={guardando}
           />
         </>

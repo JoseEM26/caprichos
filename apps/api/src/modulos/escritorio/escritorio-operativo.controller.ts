@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { EscritorioOperativoService } from './escritorio-operativo.service';
@@ -13,5 +13,12 @@ export class EscritorioOperativoController {
   @Permiso('escritorio', 'operativo')
   obtener() {
     return this.escritorio.obtener();
+  }
+
+  /** Cumpleaños más cercanos del personal activo: solo ADMIN y SUPERVISOR. */
+  @Get('cumpleanos')
+  @Permiso('escritorio', 'cumpleanos')
+  cumpleanos(@Query('dias') dias?: string) {
+    return this.escritorio.cumpleanos(dias ? Number(dias) : undefined);
   }
 }

@@ -109,6 +109,12 @@ function mapearRolEliminado(rol: string): string {
 }
 
 /** Convierte el CSV en filas para el servicio. Error de cabecera = el archivo no se puede usar. */
+/** dd/mm/aaaa (o d/m/aaaa) pasa a aaaa-mm-dd; lo demás queda igual y lo valida el DTO. */
+function aIso(v: string): string {
+  const m = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : v;
+}
+
 export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string } {
   const [cabecera, ...datos] = parsearCsv(texto);
   if (!cabecera) return { filas: [], error: 'El archivo está vacío.' };
@@ -146,7 +152,7 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
         otrosRoles: extras.filter((x, k) => x !== rolPrincipal && extras.indexOf(x) === k),
         activo: activoTexto !== 'no',
         ...opt('celular', r.celular),
-        ...opt('fechaNacimiento', r.fecha_nacimiento),
+        ...opt('fechaNacimiento', aIso(r.fecha_nacimiento)),
         ...opt('fechaIngreso', r.fecha_ingreso),
         ...opt('fechaReingreso', r.fecha_reingreso),
         ...opt('paisNacimiento', r.pais_nacimiento),
