@@ -75,9 +75,29 @@ export function esSoloMozo(usuario: { rol: string; roles?: string[] }): boolean 
   return roles.includes('MOZO') && !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r));
 }
 
-/** Solo CAJERO y ADMIN anulan pedidos completos; con varios roles basta uno de ellos. */
-export function puedeAnularPedidos(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+/** Volver atrás un pedido entregado (reabrir) sigue siendo solo de CAJERO y ADMIN; con varios roles basta uno. */
+export function puedeVolverAtrasPedidos(usuario: { rol: string; roles?: string[] } | undefined): boolean {
   return rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'CAJERO');
+}
+
+/** Roles que anulan cualquier pedido que ven (el REPARTIDOR queda acotado a los suyos antes, en el servicio). */
+const ROLES_ANULAN_CUALQUIER_PEDIDO = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'];
+
+/**
+ * Alcance de anular un pedido completo: todos los roles con acceso a pedidos. Un mozo que solo es mozo anula únicamente
+ * sus pedidos (party_id = su cuenta); ALMACEN y cuentas sin rol operativo no anulan.
+ * ponytail: si el dueño quiere que el mozo anule cualquiera, basta añadir 'MOZO' a ROLES_ANULAN_CUALQUIER_PEDIDO.
+ */
+export function puedeAnularPedido(
+  usuario: { rol: string; roles?: string[]; partyId?: bigint | string | number } | undefined,
+  pedido: { party_id?: bigint | string | number | null },
+): boolean {
+  const roles = rolesDelUsuario(usuario);
+  if (roles.some((r) => ROLES_ANULAN_CUALQUIER_PEDIDO.includes(r))) return true;
+  if (usuario && esSoloMozo(usuario)) {
+    return pedido.party_id != null && usuario.partyId != null && BigInt(pedido.party_id) === BigInt(usuario.partyId);
+  }
+  return false;
 }
 
 /** Rol con el que se aplican las reglas por rol: MOZO si es solo mozo; si no, el de alcance amplio que tenga (o el principal). */

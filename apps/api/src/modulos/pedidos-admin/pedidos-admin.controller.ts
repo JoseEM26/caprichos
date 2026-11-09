@@ -128,7 +128,7 @@ export class PedidosAdminController {
   }
 
   @Post(':id/estado')
-  // Anular (estado ANULADO) solo lo permite el servicio a CAJERO y ADMIN (ANULAR_SOLO_CAJA_ADMIN)
+  // Anular (estado ANULADO): el servicio aplica el alcance por rol (ANULAR_SIN_ALCANCE)
   @Permiso([
     { modulo: 'pedidos', accion: 'cambiar_estado' },
     { modulo: 'pedidos', accion: 'anular' },
@@ -138,7 +138,7 @@ export class PedidosAdminController {
     return this.pedidosEstadoService.cambiarEstado(id, dto, req.usuario, ip);
   }
 
-  /** «Volver atrás» de un pedido entregado por error (solo Caja y Administrador: mismo permiso que anular). */
+  /** «Volver atrás» de un pedido entregado por error (solo Caja y Administrador: lo valida el servicio con puedeVolverAtrasPedidos). */
   @Post(':id/reabrir')
   @Permiso('pedidos', 'anular')
   async reabrir(@Param('id') id: string, @Body() dto: ReabrirPedidoDto, @Req() req: any) {

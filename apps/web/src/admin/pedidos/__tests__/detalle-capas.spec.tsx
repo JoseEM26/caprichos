@@ -22,7 +22,7 @@ vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 let permisos: string[] = [];
 beforeEach(() => {
   vi.restoreAllMocks();
-  permisos = [];
+  permisos = ['pedidos/anular'];
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ tiene: (p: string) => permisos.includes(p) } as any);
   vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([]);
   vi.mocked(obtenerBlobAutenticado).mockResolvedValue('blob:captura');

@@ -1,4 +1,5 @@
 import { MATRIZ, PERMISOS, ROLES, ROLES_ELIMINADOS } from './permisos';
+import { puedeAnularPedido } from './roles-usuario';
 
 describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo ADMIN y SUPERVISOR', () => {
   const roles = ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'REPARTIDOR'];
@@ -45,10 +46,10 @@ describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
   });
 });
 
-describe('anular pedidos: solo CAJERO y ADMIN (decisión del dueño)', () => {
-  it('ADMIN y CAJERO tienen pedidos/anular; ningún otro rol lo tiene', () => {
+describe('anular pedidos: todos los roles de pedidos (orden del dueño 08/11)', () => {
+  it('todos los roles de personal con acceso a pedidos tienen pedidos/anular; ALMACEN no', () => {
     for (const [rol, claves] of Object.entries(MATRIZ)) {
-      expect(claves.includes('pedidos/anular')).toBe(rol === 'ADMIN' || rol === 'CAJERO');
+      expect(claves.includes('pedidos/anular')).toBe(rol !== 'ALMACEN');
     }
   });
 
@@ -83,8 +84,8 @@ describe('matriz de permisos de COCINA (coc-api)', () => {
     );
   });
 
-  it('no anula pedidos (solo Caja o Administrador); no tiene caja, compras, usuarios, configuracion, clientes ni repartos', () => {
-    expect(cocina).not.toContain('pedidos/anular');
+  it('anula pedidos (orden del dueño 08/11); no tiene caja, compras, usuarios, configuracion, clientes ni repartos', () => {
+    expect(cocina).toContain('pedidos/anular');
     const prohibidos = ['caja/', 'compras/', 'usuarios/', 'configuracion/', 'clientes/', 'repartos/'];
     for (const prefijo of prohibidos) {
       expect(cocina.filter((p) => p.startsWith(prefijo))).toEqual([]);
@@ -182,5 +183,20 @@ describe('creditos/cobrar_ahora: cobrar al trabajador en el momento', () => {
         expect(claves).not.toContain('creditos/ver');
       }
     }
+  });
+});
+
+describe('puedeAnularPedido (alcance por rol)', () => {
+  const pedido = { party_id: 7n };
+  it.each(['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'])('%s anula', (rol) => {
+    expect(puedeAnularPedido({ rol, partyId: 1n }, pedido)).toBe(true);
+  });
+  it('mozo solo mozo: propio sí, ajeno no; con rol amplio anula cualquiera', () => {
+    expect(puedeAnularPedido({ rol: 'MOZO', partyId: 7n }, pedido)).toBe(true);
+    expect(puedeAnularPedido({ rol: 'MOZO', partyId: 8n }, pedido)).toBe(false);
+    expect(puedeAnularPedido({ rol: 'MOZO', roles: ['MOZO', 'CAJERO'], partyId: 8n }, pedido)).toBe(true);
+  });
+  it('ALMACEN no anula', () => {
+    expect(puedeAnularPedido({ rol: 'ALMACEN', partyId: 7n }, pedido)).toBe(false);
   });
 });

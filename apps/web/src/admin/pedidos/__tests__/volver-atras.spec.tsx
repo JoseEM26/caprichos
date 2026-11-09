@@ -7,7 +7,7 @@ import { Pedido, pedidosApi } from '../pedidosApi';
 let permisos: string[] = ['pedidos/anular'];
 vi.mock('../../../comun/sesion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../comun/sesion')>()),
-  useSesion: () => ({ tiene: (p: string) => permisos.includes(p), usuario: null }),
+  useSesion: () => ({ tiene: (p: string) => permisos.includes(p), usuario: { rol: 'CAJERO', partyId: '1' } }),
 }));
 vi.mock('../../creditos/creditosApi', () => ({
   listarPersonalActivo: vi.fn().mockResolvedValue([]),

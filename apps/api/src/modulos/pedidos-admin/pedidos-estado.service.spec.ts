@@ -567,9 +567,11 @@ describe('PedidosEstadoService', () => {
     });
   });
 
-  describe('solo Caja o Administrador anulan pedidos', () => {
+  describe('anular pedidos: todos los roles de pedidos, cada uno en su alcance (orden del dueño 08/11)', () => {
     const motivo = 'El cliente se fue de la mesa';
+    // Pedido del mozo 7, asignado al repartidor 7 (los ids se reutilizan para probar cada alcance)
     const enCola = { id: 10n, codigo: 'CP-M010', modalidad: 'SALON', estado: 'COLA', canal: 'MOZO', party_id: 7n, pago_estado: 'PENDIENTE', repartidor_party_id: 7n };
+    const usuario = (partyId: bigint, rol: string, roles?: string[]) => ({ partyId, rol, roles, debeCambiar: false }) as UsuarioAutenticado;
 
     beforeEach(() => {
       prismaMock.rolPermiso.findFirst.mockResolvedValue({ id: 1n });
@@ -578,27 +580,51 @@ describe('PedidosEstadoService', () => {
     });
 
     it.each([
-      ['COCINA', undefined],
-      ['MOZO', undefined],
+      ['ADMIN', undefined],
+      ['CAJERO', undefined],
       ['SUPERVISOR', undefined],
-      ['REPARTIDOR', undefined],
-      ['ALMACEN', undefined],
-      ['COCINA', ['COCINA', 'MOZO']],
-    ])('%s %j recibe 403 ANULAR_SOLO_CAJA_ADMIN, aunque tenga el permiso en la base', async (rol, roles) => {
-      await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, { partyId: 7n, rol, roles, debeCambiar: false } as UsuarioAutenticado),
-      ).rejects.toMatchObject({ response: { codigo: 'ANULAR_SOLO_CAJA_ADMIN' } });
+      ['COCINA', undefined],
+      ['APOYO_DELIVERY', undefined],
+      ['MOZO', undefined], // 7 es el mozo dueño del pedido
+      ['REPARTIDOR', undefined], // 7 es el repartidor asignado
+      ['MOZO', ['MOZO', 'CAJERO']],
+    ])('%s %j anula con motivo, sin código de supervisor', async (rol, roles) => {
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(7n, rol, roles as string[] | undefined));
+      expect(res.estado).toBe('ANULADO');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ANULAR', motivo, partyId: 7n }));
+    });
+
+    it('un mozo que solo es mozo no anula el pedido de otro mozo (403 ANULAR_SIN_ALCANCE)', async () => {
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(8n, 'MOZO'))).rejects.toMatchObject({
+        response: { codigo: 'ANULAR_SIN_ALCANCE', mensaje: 'Solo puedes anular tus propios pedidos' },
+      });
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it.each([
-      ['ADMIN', undefined],
-      ['CAJERO', undefined],
-      ['CAJERO', ['CAJERO', 'MOZO']],
-      ['MOZO', ['MOZO', 'CAJERO']],
-    ])('%s %j anula con motivo', async (rol, roles) => {
-      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, { partyId: 2n, rol, roles, debeCambiar: false } as UsuarioAutenticado);
-      expect(res.estado).toBe('ANULADO');
+    it('un repartidor no anula un pedido que no tiene asignado (403 NO_ASIGNADO)', async () => {
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(8n, 'REPARTIDOR'))).rejects.toMatchObject({
+        response: { codigo: 'NO_ASIGNADO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('ALMACEN (sin acceso a pedidos) recibe 403 ANULAR_SIN_ALCANCE aunque tenga el permiso en la base', async () => {
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(7n, 'ALMACEN'))).rejects.toMatchObject({
+        response: { codigo: 'ANULAR_SIN_ALCANCE' },
+      });
+    });
+
+    it('un pedido ya anulado no se vuelve a anular', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(7n, 'COCINA'))).rejects.toMatchObject({
+        response: { codigo: 'TRANSICION_INVALIDA' },
+      });
+    });
+
+    it('el motivo sigue siendo obligatorio (mínimo 5 caracteres)', async () => {
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'no' }, usuario(7n, 'COCINA'))).rejects.toMatchObject({
+        response: { codigo: 'MOTIVO_REQUERIDO' },
+      });
     });
   });
 
