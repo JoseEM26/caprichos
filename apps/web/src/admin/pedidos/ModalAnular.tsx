@@ -3,7 +3,6 @@ import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
-import { useAnulaConAlcanceLimitado } from '../../comun/useAnulaConAlcanceLimitado';
 import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
@@ -19,7 +18,7 @@ export interface ModalAnularProps {
   pedidoId: string | number;
   codigoPedido: string;
   esCobro?: boolean;
-  /** Desde la comanda de cocina: se anula el pedido completo (todas las áreas), no solo el área que se ve. */
+  /** Ya no cambia nada: todo pedido se anula completo (se deja para no romper a quien lo pasa). */
   completo?: boolean;
   cobroId?: string | number;
   /** Detalle del pedido para el encabezado (cliente, modalidad, estado, total, líneas). Opcional. */
@@ -43,7 +42,6 @@ export function ModalAnular({
   pedidoId,
   codigoPedido,
   esCobro = false,
-  completo = false,
   cobroId,
   pedido,
   alCerrar,
@@ -53,9 +51,8 @@ export function ModalAnular({
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
-  // COCINA y MOZO anulan el pedido completo con el alcance de su rol; anular un cobro es aparte
-  const alcanceLimitado = useAnulaConAlcanceLimitado() && !esCobro;
-  const pedidoCompleto = (completo || alcanceLimitado) && !esCobro;
+  // Todos los roles anulan el pedido completo con la misma advertencia; anular un cobro es aparte
+  const pedidoCompleto = !esCobro;
 
   const validarCampos = (): boolean => {
     setErrorMensaje('');
@@ -189,7 +186,7 @@ export function ModalAnular({
               : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres.`}
             {pedidoCompleto && (
               <div style={{ marginTop: 6, fontWeight: 700 }}>
-                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.{alcanceLimitado && ' Queda registrado a tu nombre.'}
+                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Se devuelve el stock; si ya estaba cobrado, su cobro también se anula y sale de la caja, y se reversan sus puntos y cupones. Queda registrado a tu nombre.
               </div>
             )}
             {tieneCobro && !esCobro && (

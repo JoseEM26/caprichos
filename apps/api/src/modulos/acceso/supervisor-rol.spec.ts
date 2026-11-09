@@ -23,7 +23,7 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
   it('es exactamente la unión de CAJERO y MOZO, más su escritorio operativo', () => {
     // Excepción: almacen/apertura (conteo de apertura de productos) es de CAJERO pero no del supervisor
     // Sin dinero: tampoco cambia la ubicación de un delivery (pedidos/cambiar_ubicacion, aunque CAJERO lo tenga)
-    const esperado = uniones('CAJERO', 'MOZO').filter((p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'pedidos/anular' && p !== 'creditos/cobrar_ahora');
+    const esperado = uniones('CAJERO', 'MOZO').filter((p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora');
     expect([...supervisor].sort()).toEqual([...esperado, 'escritorio/operativo', 'iniciativas/cambiar_estado'].sort());
   });
 

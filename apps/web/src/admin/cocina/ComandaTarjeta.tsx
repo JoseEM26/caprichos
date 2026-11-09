@@ -24,6 +24,8 @@ export interface ComandaTarjetaProps {
   alDespacharTodo?: (comanda: Comanda) => void;
   /** La última unidad acaba de despejar el área: la tarjeta queda en verde con «Deshacer» un rato. */
   alDeshacerSalida?: () => void;
+  /** Con permiso pedidos/anular: anula el pedido completo (todas las áreas). */
+  alAnular?: (comanda: Comanda) => void;
 }
 
 /** Color por minutos con los umbrales por defecto (la tarjeta usa los del servidor). */
@@ -532,6 +534,7 @@ export function ComandaTarjeta({
   puedeDespachar = false,
   alDespacharLinea,
   alDespacharTodo,
+  alAnular,
   alDeshacerSalida,
 }: ComandaTarjetaProps) {
   // Última línea que se completó: se puede deshacer unos segundos (vuelve a su cantidad anterior)
@@ -832,6 +835,15 @@ export function ComandaTarjeta({
         </button>
       )}
 
+      {alAnular && (
+        <button
+          type="button"
+          onClick={() => alAnular(comanda)}
+          style={{ minHeight: '40px', border: '1.5px solid var(--cp-rust)', borderRadius: '12px', background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
+        >
+          Anular pedido
+        </button>
+      )}
     </div>
   );
 }

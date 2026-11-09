@@ -23,7 +23,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import { puedeAnularPedidos, rolesDelUsuario } from '../acceso/roles-usuario';
+import { esSoloMozo, puedeAnularPedido, rolesDelUsuario } from '../acceso/roles-usuario';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { esPedidoLocalSinCaptura, exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
@@ -933,12 +933,12 @@ export class PedidosEstadoService {
 
     const roles = rolesDelUsuario(usuarioActual);
 
-    // 1. Manejo de Anulación (DT-61): solo Caja o Administrador (decisión del dueño), también por API directa
+    // 1. Manejo de Anulación (DT-61): todos los roles de pedidos, cada uno en su alcance (mozo: sus pedidos; repartidor: los asignados)
     if (nuevoEstado === 'ANULADO') {
-      if (!puedeAnularPedidos(usuarioActual)) {
+      if (!puedeAnularPedido(usuarioActual, pedido)) {
         throw new ForbiddenException({
-          codigo: 'ANULAR_SOLO_CAJA_ADMIN',
-          mensaje: 'Solo Caja o Administrador pueden anular pedidos',
+          codigo: 'ANULAR_SIN_ALCANCE',
+          mensaje: esSoloMozo(usuarioActual) ? 'Solo puedes anular tus propios pedidos' : 'Tu rol no puede anular pedidos',
         });
       }
 

@@ -34,7 +34,7 @@ export class SincronizadorPermisosService implements OnModuleInit {
     await this.prisma.rolPermiso.deleteMany({ where: { permiso: { OR: retirados } } });
     await this.prisma.permiso.deleteMany({ where: { OR: retirados } });
 
-    // Anular pedidos es solo de Caja y Administrador: se quita el vínculo viejo a COCINA, MOZO, SUPERVISOR y demás
+    // Anular pedidos: se quita el vínculo a roles fuera de ROLES_ANULAN_PEDIDOS (p. ej. ALMACEN)
     await this.prisma.rolPermiso.deleteMany({
       where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: [...ROLES_ANULAN_PEDIDOS] } },
     });

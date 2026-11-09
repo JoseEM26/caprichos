@@ -24,8 +24,8 @@ export const ROLES: readonly DefinicionRol[] = [
 /** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
 export const ROLES_ELIMINADOS: readonly string[] = ['CALLCENTER'];
 
-/** Únicos roles que anulan pedidos completos; el sincronizador quita pedidos/anular a cualquier otro rol. */
-export const ROLES_ANULAN_PEDIDOS: readonly string[] = ['ADMIN', 'CAJERO'];
+/** Roles que anulan pedidos (todos los de personal con acceso a pedidos; ALMACEN no); el sincronizador quita pedidos/anular a cualquier otro rol. */
+export const ROLES_ANULAN_PEDIDOS: readonly string[] = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY'];
 
 /** Permisos retirados (modulo/accion): el sincronizador los borra de la base y de todos los roles. */
 export const PERMISOS_RETIRADOS: readonly string[] = ['supervisor/ver_codigo', 'supervisor/gestionar_codigo'];
@@ -238,7 +238,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/ver',
     'pedidos/crear',
     'pedidos/cambiar_estado',
-    'pedidos/anular', // anular pedidos: solo CAJERO y ADMIN (decisión del dueño); nadie más
+    'pedidos/anular', // anular pedidos: todos los roles de pedidos, cada uno en su alcance (orden del dueño 08/11)
     'pedidos/cambiar_ubicacion',
     'pedidos/validar_cambio_cobro',
     'pedidos/ajustar_pago',
@@ -278,6 +278,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
+    'pedidos/anular',
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',
@@ -311,6 +312,7 @@ export const MATRIZ: Record<string, string[]> = {
     'whatsapp_salientes/reenviar',
     'whatsapp_salientes/descartar',
     'pedidos/crear',
+    'pedidos/anular', // solo los suyos (alcance en el servicio)
     'pedidos/imprimir_precuenta', // precuenta de sus mesas desde la tablet: encola el ticket, no cobra
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
@@ -361,6 +363,7 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
   REPARTIDOR: [
+    'pedidos/anular', // solo los asignados a él (NO_ASIGNADO en el servicio)
     'repartos/ver',
     'repartos/tomar',
     'repartos/entregar',
@@ -379,6 +382,7 @@ export const MATRIZ: Record<string, string[]> = {
   // el efectivo de los repartidores (cierre) y reasigna; es dinero y queda en Caja y ADMIN.
   // No se combina con ADMIN (ya lo tiene todo) pero sí con cualquier otro rol, a diferencia de REPARTIDOR.
   APOYO_DELIVERY: [
+    'pedidos/anular',
     'repartos/ver',
     'repartos/seguir',
     'repartos/tomar',
@@ -407,7 +411,6 @@ MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
-  // Tampoco anula pedidos: solo CAJERO y ADMIN (decisión del dueño, a confirmar)
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'pedidos/anular' && p !== 'creditos/cobrar_ahora',
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',
 );
 

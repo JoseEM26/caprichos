@@ -3,7 +3,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { puedeAnularPedidos } from '../acceso/roles-usuario';
+import { puedeVolverAtrasPedidos } from '../acceso/roles-usuario';
 import { obtenerFechaHoraLima } from '../cocina/cocina.util';
 
 const ESTADOS_DESTINO = ['LISTO', 'EN_CAMINO'];
@@ -23,7 +23,7 @@ export class ReabrirPedidoService {
   ) {}
 
   async reabrir(idRaw: string, motivoRaw: string | undefined, usuario: UsuarioAutenticado, ip?: string) {
-    if (!puedeAnularPedidos(usuario)) {
+    if (!puedeVolverAtrasPedidos(usuario)) {
       throw new ForbiddenException({ codigo: 'SIN_PERMISO', mensaje: 'Solo Caja o Administrador pueden volver atrás un pedido' });
     }
     if (!/^\d+$/.test(String(idRaw))) {

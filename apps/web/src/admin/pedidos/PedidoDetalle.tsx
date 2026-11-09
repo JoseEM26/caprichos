@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { useSesion } from '../../comun/sesion';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 import { LineaPedido, Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
@@ -97,7 +98,7 @@ function BotonIcono({ n, texto, etiqueta, alClic, peligro, deshabilitado, titulo
 }
 
 export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgregarExtra, alAbrirPedido, editandoPor, cajaAbierta }: PedidoDetalleProps) {
-  const { tiene } = useSesion();
+  const { tiene, usuario } = useSesion();
   const [lineaCortesia, setLineaCortesia] = useState<LineaPedido | null>(null);
   const [capa, setCapa] = useState<Capa>('productos');
   const [abrirImpresion, setAbrirImpresion] = useState(false);
@@ -189,7 +190,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   // Delivery sin punto o sin zona: no se confirma, cobra ni pasa a cocina hasta ubicarlo (el servidor lo rechaza igual)
   const sinUbicar = deliverySinUbicacion(pedido) && !['ANULADO', 'RECHAZADO', 'ENTREGADO'].includes(String(pedido.estado || '').toUpperCase());
   // Volver atrás: solo Caja y Administrador, un pedido entregado; deshabilitado con el motivo si ya no aplica (el servidor lo valida igual)
-  const puedeVolverAtras = est === 'ENTREGADO' && tiene('pedidos/anular');
+  const puedeVolverAtras = est === 'ENTREGADO' && tiene('pedidos/anular') && (tieneRolUsuario(usuario, 'ADMIN') || tieneRolUsuario(usuario, 'CAJERO'));
   const motivoNoVolverAtras =
     cajaAbierta === false
       ? 'Ya cerró la caja del día'
@@ -569,7 +570,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               {esMesa && <BotonIcono n="precuenta" texto="Precuenta" etiqueta="Sacar precuenta (el cajero cobra)" alClic={() => setAbrirPrecuenta(true)} />}
               <BotonIcono n="imprimir" texto="Imprimir" etiqueta="Imprimir etiquetas y ticket" alClic={() => setAbrirImpresion(true)} />
               <ReimprimirPedido pedido={pedido} variante="detalle" />
-              {est !== 'ANULADO' && (
+              {est !== 'ANULADO' && (esPorConfirmar || tiene('pedidos/anular')) && (
                 <BotonIcono
                   n="anular"
                   peligro

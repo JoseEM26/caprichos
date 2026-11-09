@@ -81,11 +81,11 @@ describe('SincronizadorPermisosService', () => {
     expect(PERMISOS.some((p) => p.modulo === 'supervisor')).toBe(false);
   });
 
-  it('quita pedidos/anular a todo rol que no sea ADMIN ni CAJERO', async () => {
+  it('quita pedidos/anular a todo rol fuera de los de pedidos (p. ej. ALMACEN)', async () => {
     const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
     await servicio.sincronizar();
     expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({
-      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: ['ADMIN', 'CAJERO'] } },
+      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY'] } },
     });
   });
 

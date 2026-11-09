@@ -11,6 +11,7 @@ import { ModalVoucherPedido } from './ModalVoucherPedido';
 import { HistorialVoucher } from './HistorialVoucher';
 import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from '../vouchers/vouchersApi';
+import { ModalAnular } from '../pedidos/ModalAnular';
 import { ProgresoPedido } from './ProgresoPedido';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
@@ -134,6 +135,7 @@ export function MisPedidosView() {
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
   const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
+  const [anularDe, setAnularDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
   const [itemsAbiertos, setItemsAbiertos] = useState<Set<string>>(() => new Set());
@@ -434,6 +436,12 @@ export function MisPedidosView() {
                         Agregar extra
                       </button>
                     )}
+                    {/* Mis pedidos lista solo los del mozo: puede anular los suyos (el servidor lo valida igual) */}
+                    {tiene('pedidos/anular') && p.estado !== 'ANULADO' && p.estado !== 'RECHAZADO' && p.estado !== 'ENTREGADO' && (
+                      <button type="button" className="mpv-boton" onClick={() => setAnularDe(p)}>
+                        Anular pedido
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -497,6 +505,18 @@ export function MisPedidosView() {
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
+        />
+      )}
+
+      {anularDe && (
+        <ModalAnular
+          pedidoId={anularDe.id}
+          codigoPedido={anularDe.codigo}
+          alCerrar={() => setAnularDe(null)}
+          alAnularExitoso={() => {
+            setAnularDe(null);
+            void cargar();
+          }}
         />
       )}
 
