@@ -22,6 +22,8 @@
 .ic-chips { display: flex; flex-wrap: wrap; gap: 4px; padding-right: 74px; }
 .ic-chip { font-size: 12px; line-height: 16px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--cp-line, #E3D6C6); color: var(--cp-navy, #0B2C3E); }
 .ic-chip--aviso { background: #FFF1D6; border-color: #D99E39; color: #5A3A00; }
+.ic-chip--ok { background: #E3F4E3; border-color: #5BA55B; color: #1F4D1F; }
+.ic-meta a.ic-chip { text-decoration: none; }
 .ic-chip--gris { color: var(--cp-soft, #2C4C5D); font-weight: 600; }
 .ic-ir { position: absolute; right: 12px; bottom: 10px; font-size: 12px; font-weight: 800; text-decoration: underline; }
 @media (max-width: 480px) { .ic-chips { padding-right: 0; } .ic-ir { display: none; } }

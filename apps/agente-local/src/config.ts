@@ -41,7 +41,15 @@ export interface ConfiguracionAgente {
   version: string;
 }
 
-export const VERSION_AGENTE = '0.1.0';
+// Inyectadas por esbuild --define al empaquetar (scripts empaquetar:*); sin eso (tests, tsc) valen el valor de desarrollo.
+declare const __AGENTE_VERSION__: string | undefined;
+declare const __AGENTE_COMMIT__: string | undefined;
+export const VERSION_NUMERO = typeof __AGENTE_VERSION__ === 'string' ? __AGENTE_VERSION__ : '0.1.0-dev';
+export const COMMIT_AGENTE = typeof __AGENTE_COMMIT__ === 'string' ? __AGENTE_COMMIT__ : 'dev';
+/** Lo que viaja en el latido y se ve en la web: «0.1.57 (ab12cd3)». */
+export const VERSION_AGENTE = COMMIT_AGENTE === 'dev' ? VERSION_NUMERO : `${VERSION_NUMERO} (${COMMIT_AGENTE})`;
+/** Línea de presentación del programa. */
+export const LINEA_VERSION = `Programa de impresión Caprichos v${VERSION_NUMERO} (${COMMIT_AGENTE})`;
 
 export function rutaArchivoConfiguracion(env: NodeJS.ProcessEnv = process.env): string {
   if (env.AGENTE_CONFIG) return env.AGENTE_CONFIG;

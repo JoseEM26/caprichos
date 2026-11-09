@@ -253,6 +253,11 @@ export const impresionApi = {
     return api.post('/admin/impresion/codigo-vinculo', {});
   },
 
+  /** Última versión publicada del programa (pública); `publicada` null si el servidor no tiene el archivo. */
+  ultimaVersionPrograma: (): Promise<{ publicada: { version: string; commit?: string | null; fecha?: string | null } | null }> => {
+    return api.get('/agente-impresion/version');
+  },
+
   /** Crea el equipo y descarga el ZIP con el programa ya vinculado (lleva una llave secreta); solo ADMIN. */
   descargarProgramaVinculado: async (nombre?: string): Promise<Blob> => {
     const token = getTokenAcceso();

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, Post, Res } from '@nestjs/common';
 import * as fs from 'fs';
+import * as path from 'path';
 import { VincularAgenteDto } from './dto/latido.dto';
 import { ImpresionService } from './impresion.service';
 
@@ -17,10 +18,27 @@ export const PROGRAMAS: Record<string, { ruta: () => string; nombre: string; eti
   },
 };
 
+/** version-agente.json lo sube el pipeline junto al programa: {version, commit, fecha}. */
+export function rutaVersionPrograma(): string {
+  return process.env.AGENTE_VERSION_RUTA || path.join(path.dirname(PROGRAMAS.windows.ruta()), 'version-agente.json');
+}
+
 /** Rutas públicas del programa del local: descarga del instalador y canje del código de vinculación. */
 @Controller(['agente-impresion', 'api/agente-impresion'])
 export class DescargaAgenteController {
   constructor(private readonly impresionService: ImpresionService) {}
+
+  /** Última versión publicada del programa; sin archivo, `{ publicada: null }` (la web no muestra insignia). */
+  @Get('version')
+  version() {
+    try {
+      const j = JSON.parse(fs.readFileSync(rutaVersionPrograma(), 'utf-8'));
+      if (typeof j?.version !== 'string') return { publicada: null };
+      return { publicada: { version: j.version, commit: j.commit ?? null, fecha: j.fecha ?? null } };
+    } catch {
+      return { publicada: null };
+    }
+  }
 
   @Get('descargar/:sistema')
   descargar(@Param('sistema') sistema: string, @Res() res: any) {

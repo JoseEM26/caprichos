@@ -13,6 +13,7 @@ import { Confirmar } from '../../../comun/Confirmar';
 import { EtiquetaBebida, EtiquetaGeneral } from '../../pedidos/EtiquetaPrevia';
 import { TITULO_PREVIA, VistaPreviaSticker, type TipoPrevia } from './VistaPreviaSticker';
 import { MUESTRA_BEBIDA, MUESTRA_GENERAL } from '../mapa/VistaPiezaEjemplo';
+import { InsigniaVersion, type VersionPublicada } from '../versionPrograma';
 import { impresionApi, type CambioConfigEquipo } from '../impresionApi';
 import './tarjeta-equipo.css';
 import { alternarArea, configDe, haceCuanto, mismaConfig } from './logicaEquipo';
@@ -56,6 +57,8 @@ interface Props {
   alCancelar?: () => void;
   /** Otra PC con la que se confunde (para fusionar o decir que no lo es). */
   duplicadoDe?: { deviceKeyId: string; nombre: string } | null;
+  /** Última versión publicada del programa (para la insignia). */
+  ultimaVersion?: VersionPublicada | null;
 }
 
 type Pestana = 'general' | 'ticketera' | 'etiquetera' | 'probar';
@@ -286,7 +289,7 @@ export function EditorTamano({
  * Una PC con el programa de impresión: su estado, su red y, sobre todo, QUÉ HACE (cada PC manda).
  * Todo se gestiona desde aquí sin estar en el local; si la PC está sin conexión, lo guardado se aplica al reconectar.
  */
-export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [], tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso, alCancelar, duplicadoDe = null }: Props) {
+export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [], tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso, alCancelar, duplicadoDe = null, ultimaVersion }: Props) {
   const servidor = configDe(equipo);
   const nueva = !servidor.configurado;
   const seleccionServidor = {
@@ -557,7 +560,7 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
           <dl className="ie-datos" data-testid={`datos-${equipo.deviceKeyId}`}>
             <div><dt>IP en el local</dt><dd>{equipo.ipLocal?.length ? equipo.ipLocal.join(', ') : '—'}</dd></div>
             <div><dt>IP pública</dt><dd>{equipo.ipPublica ?? '—'}</dd></div>
-            <div><dt>Programa</dt><dd>{equipo.version ? `versión ${equipo.version}` : '—'}</dd></div>
+            <div><dt>Programa</dt><dd><InsigniaVersion instalada={equipo.version} ultima={ultimaVersion} /></dd></div>
             <div><dt>Computadora</dt><dd>{[equipo.hostname, equipo.sistema].filter(Boolean).join(' · ') || '—'}</dd></div>
             <div className="ie-datos-ancho">
               <dt>Impresoras que ve</dt>
