@@ -191,9 +191,9 @@ describe('puedeAnularPedido (alcance por rol)', () => {
   it.each(['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'])('%s anula', (rol) => {
     expect(puedeAnularPedido({ rol, partyId: 1n }, pedido)).toBe(true);
   });
-  it('mozo solo mozo: propio sí, ajeno no; con rol amplio anula cualquiera', () => {
+  it('mozo anula cualquier pedido, propio o ajeno (decisión del dueño 09/11); con rol amplio también', () => {
     expect(puedeAnularPedido({ rol: 'MOZO', partyId: 7n }, pedido)).toBe(true);
-    expect(puedeAnularPedido({ rol: 'MOZO', partyId: 8n }, pedido)).toBe(false);
+    expect(puedeAnularPedido({ rol: 'MOZO', partyId: 8n }, pedido)).toBe(true);
     expect(puedeAnularPedido({ rol: 'MOZO', roles: ['MOZO', 'CAJERO'], partyId: 8n }, pedido)).toBe(true);
   });
   it('ALMACEN no anula', () => {

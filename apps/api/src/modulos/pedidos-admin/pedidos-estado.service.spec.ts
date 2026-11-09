@@ -585,7 +585,7 @@ describe('PedidosEstadoService', () => {
       ['SUPERVISOR', undefined],
       ['COCINA', undefined],
       ['APOYO_DELIVERY', undefined],
-      ['MOZO', undefined], // 7 es el mozo dueño del pedido
+      ['MOZO', undefined], // 7 es el mozo dueño del pedido (cualquier mozo anula)
       ['REPARTIDOR', undefined], // 7 es el repartidor asignado
       ['MOZO', ['MOZO', 'CAJERO']],
     ])('%s %j anula con motivo, sin código de supervisor', async (rol, roles) => {
@@ -594,11 +594,10 @@ describe('PedidosEstadoService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ANULAR', motivo, partyId: 7n }));
     });
 
-    it('un mozo que solo es mozo no anula el pedido de otro mozo (403 ANULAR_SIN_ALCANCE)', async () => {
-      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(8n, 'MOZO'))).rejects.toMatchObject({
-        response: { codigo: 'ANULAR_SIN_ALCANCE', mensaje: 'Solo puedes anular tus propios pedidos' },
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    it('un mozo que solo es mozo SÍ anula el pedido de otro mozo (decisión del dueño 09/11: cualquier pedido)', async () => {
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, usuario(8n, 'MOZO'));
+      expect(res.estado).toBe('ANULADO');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ANULAR', motivo, partyId: 8n }));
     });
 
     it('un repartidor no anula un pedido que no tiene asignado (403 NO_ASIGNADO)', async () => {

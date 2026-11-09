@@ -81,12 +81,11 @@ export function puedeVolverAtrasPedidos(usuario: { rol: string; roles?: string[]
 }
 
 /** Roles que anulan cualquier pedido que ven (el REPARTIDOR queda acotado a los suyos antes, en el servicio). */
-const ROLES_ANULAN_CUALQUIER_PEDIDO = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'];
+const ROLES_ANULAN_CUALQUIER_PEDIDO = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'MOZO', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'];
 
 /**
- * Alcance de anular un pedido completo: todos los roles con acceso a pedidos. Un mozo que solo es mozo anula únicamente
- * sus pedidos (party_id = su cuenta); ALMACEN y cuentas sin rol operativo no anulan.
- * ponytail: si el dueño quiere que el mozo anule cualquiera, basta añadir 'MOZO' a ROLES_ANULAN_CUALQUIER_PEDIDO.
+ * Alcance de anular un pedido completo: todos los roles con acceso a pedidos, incluido el MOZO (decisión del dueño el
+ * 09/11: el mozo anula cualquier pedido, no solo los suyos); ALMACEN y cuentas sin rol operativo no anulan.
  */
 export function puedeAnularPedido(
   usuario: { rol: string; roles?: string[]; partyId?: bigint | string | number } | undefined,

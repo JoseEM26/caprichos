@@ -966,7 +966,7 @@ export class PedidosEstadoService {
       if (!puedeAnularPedido(usuarioActual, pedido)) {
         throw new ForbiddenException({
           codigo: 'ANULAR_SIN_ALCANCE',
-          mensaje: esSoloMozo(usuarioActual) ? 'Solo puedes anular tus propios pedidos' : 'Tu rol no puede anular pedidos',
+          mensaje: esSoloMozo(usuarioActual) ? 'Tu rol no puede anular pedidos' : 'Tu rol no puede anular pedidos',
         });
       }
 
