@@ -1,5 +1,5 @@
 import { api, getTokenAcceso } from '../../comun/api';
-import type { ConfigEquipoImpresion, TamanoEtiquetaPc } from '@caprichos/compartido';
+import type { BebidaCategoriasPorModalidad, ConfigEquipoImpresion, TamanoEtiquetaPc } from '@caprichos/compartido';
 import { EstadoAdminImpresion, EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export interface TrabajoImpresionAdmin {
@@ -202,7 +202,9 @@ export interface MapaImpresionDatos {
 }
 
 /** Cambio parcial de la configuración de una PC; null en un tamaño = hereda el del local. */
-export type CambioConfigEquipo = Partial<Omit<ConfigEquipoImpresion, 'configurado'>> & {
+export type CambioConfigEquipo = Partial<Omit<ConfigEquipoImpresion, 'configurado' | 'stickerBebidaCategoriasPorModalidad'>> & {
+  /** Regla del vaso por tipo de pedido; null = limpiar (igual que la general). */
+  stickerBebidaCategoriasPorModalidad?: BebidaCategoriasPorModalidad | null;
   nombre?: string;
   impresoras?: Partial<Record<RolImpresora, string | null>>;
 };

@@ -4,6 +4,9 @@ import {
   ReglasImpresion,
   RolImpresora,
   esAreaBebidas,
+  BebidaCategoriasPorModalidad,
+  MODALIDADES_BEBIDA,
+  ModalidadBebida,
   tamanoPcValido,
 } from '@caprichos/compartido';
 import { CONFIG_EQUIPO_NUEVO } from './ruteo-impresion';
@@ -11,6 +14,16 @@ import { CONFIG_EQUIPO_NUEVO } from './ruteo-impresion';
 export interface AreaSimple {
   id: bigint;
   nombre: string;
+}
+
+function leerPorModalidad(v: unknown): BebidaCategoriasPorModalidad | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r: BebidaCategoriasPorModalidad = {};
+  for (const m of MODALIDADES_BEBIDA) {
+    const x = (v as any)[m];
+    if (Array.isArray(x)) r[m] = x.map(String);
+  }
+  return Object.keys(r).length ? r : undefined;
 }
 
 /** Fila de equipo_impresion_config → configuración (lo que falte o venga mal queda apagado). */
@@ -29,6 +42,7 @@ export function filaAConfig(f: any | null | undefined): ConfigEquipoImpresion {
     stickerBebidaAreas: ids(f.sticker_bebida_areas),
     // Sin migración: la lista de categorías vive en el JSON `tamanos` (ausente = todas)
     stickerBebidaCategorias: Array.isArray(t.bebidaCategorias) ? t.bebidaCategorias.map(String) : null,
+    stickerBebidaCategoriasPorModalidad: leerPorModalidad(t.bebidaCategoriasPorModalidad),
     tamanoGeneral: tamanoPcValido(t.general),
     tamanoBebida: tamanoPcValido(t.bebida),
     pausado: !!f.pausado,
@@ -49,7 +63,7 @@ export function configAFila(c: ConfigEquipoImpresion) {
     sticker_general: c.stickerGeneral,
     sticker_areas: c.stickerAreas as any,
     sticker_bebida_areas: c.stickerBebidaAreas as any,
-    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null, bebidaCategorias: c.stickerBebidaCategorias ?? null } as any,
+    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null, bebidaCategorias: c.stickerBebidaCategorias ?? null, bebidaCategoriasPorModalidad: c.stickerBebidaCategoriasPorModalidad ?? null } as any,
   };
 }
 
@@ -84,6 +98,26 @@ export function aplicarCambio(
       r.stickerBebidaCategorias = [...new Set(v as string[])];
     } else {
       throw new BadRequestException({ codigo: 'CATEGORIA_INVALIDA', mensaje: 'Hay una categoría de bebida que no existe' });
+    }
+  }
+  if (cambio.stickerBebidaCategoriasPorModalidad !== undefined) {
+    const v = cambio.stickerBebidaCategoriasPorModalidad;
+    if (v === null) r.stickerBebidaCategoriasPorModalidad = undefined;
+    else if (typeof v !== 'object' || Array.isArray(v)) {
+      throw new BadRequestException({ codigo: 'VALOR_INVALIDO', mensaje: 'La regla por tipo de pedido no es válida' });
+    } else {
+      const out: BebidaCategoriasPorModalidad = {};
+      for (const [m, lista] of Object.entries(v as Record<string, unknown>)) {
+        if (!(MODALIDADES_BEBIDA as readonly string[]).includes(m)) {
+          throw new BadRequestException({ codigo: 'MODALIDAD_INVALIDA', mensaje: 'Hay un tipo de pedido que no existe' });
+        }
+        if (lista === null || lista === undefined) continue; // = la regla general
+        if (!Array.isArray(lista) || !lista.every((x) => typeof x === 'string' && (!categoriasValidas || categoriasValidas.has(x)))) {
+          throw new BadRequestException({ codigo: 'CATEGORIA_INVALIDA', mensaje: 'Hay una categoría de bebida que no existe' });
+        }
+        out[m as ModalidadBebida] = [...new Set(lista as string[])];
+      }
+      r.stickerBebidaCategoriasPorModalidad = Object.keys(out).length ? out : undefined;
     }
   }
   for (const k of ['tamanoGeneral', 'tamanoBebida'] as const) {

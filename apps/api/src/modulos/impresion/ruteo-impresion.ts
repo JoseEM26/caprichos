@@ -1,4 +1,6 @@
 import {
+  categoriasBebidaEfectivas,
+  modalidadDeFiltroBebida,
   ConfigEquipoImpresion,
   MODALIDADES_SALON,
   ReglasImpresion,
@@ -47,7 +49,7 @@ export const CONFIG_EQUIPO_NUEVO: ConfigEquipoImpresion = {
  * (y el área) activados. `areaIds` son las áreas candidatas del trabajo (la del sticker o comanda; en vasos, la de la
  * línea y la de Bebidas).
  */
-export function equipoAcepta(cfg: ConfigEquipoImpresion, tipo: string, areaIds: Array<string | null>, categoriaId: string | null = null): boolean {
+export function equipoAcepta(cfg: ConfigEquipoImpresion, tipo: string, areaIds: Array<string | null>, categoriaId: string | null = null, modalidad: string | null = null): boolean {
   if (!cfg.configurado || cfg.pausado) return false;
   const area = areaIds[0] ?? null;
   switch (tipo) {
@@ -67,11 +69,18 @@ export function equipoAcepta(cfg: ConfigEquipoImpresion, tipo: string, areaIds: 
         cfg.etiquetera &&
         areaIds.some((a) => a !== null && cfg.stickerBebidaAreas.includes(a)) &&
         // Lista de categorías: solo las marcadas. Sin lista (o vaso sin categoría conocida) sale como siempre.
-        (cfg.stickerBebidaCategorias === null || categoriaId === null || cfg.stickerBebidaCategorias.includes(categoriaId))
+        // La lista efectiva depende del tipo de pedido (su regla, si no la general)
+        categoriaPermitida(cfg, categoriaId, modalidad)
       );
     default:
       return false;
   }
+}
+
+/** ¿La categoría del vaso está permitida en esta PC para ese tipo de pedido? Sin lista o sin categoría conocida: sí. */
+export function categoriaPermitida(cfg: ConfigEquipoImpresion, categoriaId: string | null, modalidad: string | null): boolean {
+  const lista = categoriasBebidaEfectivas(cfg.stickerBebidaCategorias, cfg.stickerBebidaCategoriasPorModalidad, modalidadDeFiltroBebida(modalidad));
+  return lista === null || categoriaId === null || lista.includes(categoriaId);
 }
 
 /** Áreas candidatas para decidir el destino: el sticker de vaso mira su línea y Bebidas. */
@@ -90,9 +99,10 @@ export function destinoDeTrabajo(
   areaIds: Array<string | null>,
   ctx: ContextoRuteo,
   categoriaId: string | null = null,
+  modalidad: string | null = null,
 ): EquipoRuteo | null {
   const candidatos = ctx.equipos
-    .filter((e) => equipoAcepta(e.config, tipo, areaIds, categoriaId))
+    .filter((e) => equipoAcepta(e.config, tipo, areaIds, categoriaId, modalidad))
     .sort((a, b) => Number(b.conectado) - Number(a.conectado) || (a.id < b.id ? -1 : 1));
   return candidatos[0] ?? null;
 }
@@ -137,7 +147,8 @@ export function aplicaSegunReglas(tipo: string, modalidad: string, reglas: Regla
  * Un vaso que ninguna PC imprime SOLO por su categoría (alguna PC lo tomaría sin el filtro): no se encola, no queda
  * pendiente ni es error. Si ninguna PC cubre ni su área, sigue esperando en cola con aviso como siempre.
  */
-export function vasoDescartadoPorCategoria(areaIds: Array<string | null>, categoriaId: string | null, ctx: ContextoRuteo): boolean {
+export function vasoDescartadoPorCategoria(areaIds: Array<string | null>, categoriaId: string | null, ctx: ContextoRuteo, modalidad: string | null = null): boolean {
   if (categoriaId === null) return false;
-  return destinoDeTrabajo('ETIQUETA_BEBIDA', areaIds, ctx, categoriaId) === null && destinoDeTrabajo('ETIQUETA_BEBIDA', areaIds, ctx) !== null;
+  // Sin categoría ni tipo de pedido = sin ningún filtro (la PC cubre el área)
+  return destinoDeTrabajo('ETIQUETA_BEBIDA', areaIds, ctx, categoriaId, modalidad) === null && destinoDeTrabajo('ETIQUETA_BEBIDA', areaIds, ctx) !== null;
 }

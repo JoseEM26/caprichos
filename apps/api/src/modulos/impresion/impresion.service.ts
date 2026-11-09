@@ -2258,13 +2258,13 @@ export class ImpresionService {
   private vasoOmitido(tipo: string, areaId: bigint | string | null, payload: any, ctx: ContextoRuteo): boolean {
     return (
       tipo === 'ETIQUETA_BEBIDA' &&
-      vasoDescartadoPorCategoria(areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), payload?.categoriaId ?? null, ctx)
+      vasoDescartadoPorCategoria(areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), payload?.categoriaId ?? null, ctx, payload?.modalidadFiltro ?? null)
     );
   }
 
   /** A qué PC va el trabajo según la configuración de cada una (null/null = nadie lo imprime todavía: espera con aviso). */
   private destinoJob(tipo: string, areaId: bigint | string | null, payload: any, ctx: ContextoRuteo) {
-    const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), ctx, payload?.categoriaId ?? null);
+    const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), ctx, payload?.categoriaId ?? null, payload?.modalidadFiltro ?? null);
     return { destino_equipo_id: d?.id ?? null, destino_area_id: d?.areaId ?? null };
   }
 

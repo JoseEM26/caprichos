@@ -82,6 +82,39 @@ export interface ConfigEquipoParaAgente {
  * Configuración de impresión de UNA computadora (cada PC manda). Una PC nueva llega con todo apagado y
  * `configurado = false`: no imprime nada hasta que el dueño guarda por primera vez.
  */
+export type ModalidadBebida = 'COMER_LOCAL' | 'LLEVAR' | 'RECOGER' | 'DELIVERY';
+export const MODALIDADES_BEBIDA: readonly ModalidadBebida[] = ['COMER_LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'];
+export type BebidaCategoriasPorModalidad = Partial<Record<ModalidadBebida, string[] | null>>;
+
+/** Modalidad del pedido → tipo de pedido del filtro de vasos (MESA y LOCAL = en el local); null si no se conoce. */
+export function modalidadDeFiltroBebida(m: unknown): ModalidadBebida | null {
+  switch (String(m ?? '').toUpperCase()) {
+    case 'MESA':
+    case 'LOCAL':
+    case 'COMER_LOCAL':
+      return 'COMER_LOCAL';
+    case 'LLEVAR':
+      return 'LLEVAR';
+    case 'RECOGER':
+      return 'RECOGER';
+    case 'DELIVERY':
+      return 'DELIVERY';
+    default:
+      return null;
+  }
+}
+
+/** Lista efectiva de categorías para una modalidad: la suya, si no la general (null = todas). */
+export function categoriasBebidaEfectivas(
+  general: string[] | null,
+  porModalidad: BebidaCategoriasPorModalidad | undefined,
+  modalidad: ModalidadBebida | null,
+): string[] | null {
+  if (!modalidad || !porModalidad) return general;
+  const propia = porModalidad[modalidad] ?? (modalidad === 'RECOGER' ? porModalidad.LLEVAR : undefined);
+  return propia === undefined || propia === null ? general : propia;
+}
+
 export interface ConfigEquipoImpresion {
   ticketera: boolean;
   etiquetera: boolean;
@@ -99,6 +132,11 @@ export interface ConfigEquipoImpresion {
   stickerBebidaAreas: string[];
   /** Ids de las categorías de bebida cuyo vaso sale aquí; null = todas (como siempre). */
   stickerBebidaCategorias: string[] | null;
+  /**
+   * Regla por tipo de pedido (ids de categoría que SÍ imprimen en ese tipo). Clave ausente o null = la regla general
+   * (`stickerBebidaCategorias`); [] = ninguna. RECOGER usa la de LLEVAR si no tiene la suya.
+   */
+  stickerBebidaCategoriasPorModalidad?: BebidaCategoriasPorModalidad;
   /** Tamaño propio del sticker general en esta PC; null = el general del local. */
   tamanoGeneral: TamanoEtiquetaPc | null;
   /** Tamaño propio del sticker de bebida en esta PC; null = el general del local. */

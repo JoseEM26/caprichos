@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   PRESETS_TAMANO_ETIQUETA,
   esAreaBebidas,
@@ -15,7 +15,22 @@ import { MUESTRA_BEBIDA, MUESTRA_GENERAL } from '../mapa/VistaPiezaEjemplo';
 import { impresionApi, type CambioConfigEquipo } from '../impresionApi';
 import './tarjeta-equipo.css';
 import { alternarArea, configDe, haceCuanto, mismaConfig } from './logicaEquipo';
-import { alternarCategoria, categoriasSinPc, categoriasVisibles, resumenVasos, soloFrias, type CategoriaSimple } from './logicaVasos';
+import {
+  alternarCategoria,
+  alternarCategoriaTipo,
+  categoriasSinPcPorTipo,
+  categoriasVisibles,
+  marcadasDeTipo,
+  mismaReglaParaTodos,
+  resumenTipo,
+  resumenVasos,
+  soloFrias,
+  soloFriasTipo,
+  todasTipo,
+  TIPOS_VASO,
+  type CategoriaSimple,
+} from './logicaVasos';
+import type { BebidaCategoriasPorModalidad } from '@caprichos/compartido';
 
 export interface AreaSimple {
   id: string;
@@ -74,13 +89,16 @@ function Chips({ titulo, areas, marcadas, alAlternar, deshabilitado, id }: { tit
 }
 
 /** «¿De qué bebidas? (opcional)»: casillas por categoría para que el sticker de vaso no se gaste en lo que no lo necesita (ej. las calientes). */
-function VasosCategorias({ id, cfg, categorias, configsOtras, deshabilitado, alCambiar }: { id: string; cfg: ConfigEquipoImpresion; categorias: CategoriaSimple[]; configsOtras: ConfigEquipoImpresion[]; deshabilitado?: boolean; alCambiar: (v: string[] | null) => void }) {
+function VasosCategorias({ id, cfg, categorias, configsOtras, deshabilitado, alCambiar, alCambiarPorTipo }: { id: string; cfg: ConfigEquipoImpresion; categorias: CategoriaSimple[]; configsOtras: ConfigEquipoImpresion[]; deshabilitado?: boolean; alCambiar: (v: string[] | null) => void; alCambiarPorTipo: (v: BebidaCategoriasPorModalidad | null) => void }) {
+  // La matriz está abierta si hay reglas por tipo, o si la persona la abrió con el conmutador (aunque aún no difiera de la general)
+  const [matriz, setMatriz] = useState(!mismaReglaParaTodos(cfg));
   const visibles = categoriasVisibles(categorias, cfg.stickerBebidaAreas);
   if (visibles.length === 0) return null;
   const { si, no } = resumenVasos(cfg, visibles);
-  const sinPc = categoriasSinPc(categorias, [...configsOtras, cfg]);
+  const sinPc = categoriasSinPcPorTipo(categorias, [...configsOtras, cfg]);
+  const misma = !matriz;
   return (
-    <details className="ie-vasos" data-testid={`vasos-${id}`} open={cfg.stickerBebidaCategorias != null}>
+    <details className="ie-vasos" data-testid={`vasos-${id}`} open={cfg.stickerBebidaCategorias != null || matriz}>
       <summary>¿De qué bebidas? (opcional)</summary>
       <p className="if-sub">Quita las que no necesitan sticker de vaso, por ejemplo las calientes, para no gastar etiquetas. La comanda y lo demás no cambian.</p>
       <div className="ie-chips-lista" role="group" aria-label="Categorías de bebida con sticker">
@@ -98,12 +116,61 @@ function VasosCategorias({ id, cfg, categorias, configsOtras, deshabilitado, alC
         <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-frias-${id}`} onClick={() => alCambiar(soloFrias(visibles))}>Solo frías</button>
         <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-todas-${id}`} onClick={() => alCambiar(null)}>Todas</button>
       </div>
+      <label className="ie-vasos-misma">
+        <input type="checkbox" checked={misma} disabled={deshabilitado} data-testid={`vasos-misma-${id}`} onChange={(e) => { setMatriz(!e.target.checked); if (e.target.checked) alCambiarPorTipo(null); }} />
+        <span>Usar la misma regla para todos los tipos de pedido</span>
+      </label>
+      {!misma && (
+        <div data-testid={`vasos-matriz-${id}`}>
+          <p className="if-sub">Ej.: no imprimir calientes en el local, pero sí en delivery. Marca, en cada tipo de pedido, las bebidas que sí llevan sticker.</p>
+          <div className="ie-matriz" role="group" aria-label="Bebidas con sticker según el tipo de pedido">
+            <span />
+            {TIPOS_VASO.map((t) => (
+              <span key={t.id} className="ie-matriz-col">
+                <span aria-hidden="true">{t.icono}</span> {t.corto}
+              </span>
+            ))}
+            {visibles.map((c) => (
+              <Fragment key={c.id}>
+                <span className="ie-matriz-fila">{c.nombre}</span>
+                {TIPOS_VASO.map((t) => {
+                  const on = marcadasDeTipo(cfg, visibles, t.id).includes(c.id);
+                  return (
+                    <button key={t.id} type="button" className="ie-celda" aria-pressed={on} aria-label={`${c.nombre} ${t.frase}`} disabled={deshabilitado} data-testid={`vaso-mod-${id}-${t.id}-${c.id}`} onClick={() => alCambiarPorTipo(alternarCategoriaTipo(cfg, visibles, t.id, c.id))}>
+                      {on ? '✓' : ''}
+                    </button>
+                  );
+                })}
+              </Fragment>
+            ))}
+            <span />
+            {TIPOS_VASO.map((t) => (
+              <span key={t.id} className="ie-matriz-atajos">
+                <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-mod-frias-${id}-${t.id}`} aria-label={`Solo frías ${t.frase}`} onClick={() => alCambiarPorTipo(soloFriasTipo(cfg, visibles, t.id))}>Solo frías</button>
+                <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-mod-todas-${id}-${t.id}`} aria-label={`Todas ${t.frase}`} onClick={() => alCambiarPorTipo(todasTipo(cfg, visibles, t.id))}>Todas</button>
+              </span>
+            ))}
+          </div>
+          <ul className="ie-vasos-res ie-vasos-lista" data-testid={`vasos-resumen-tipos-${id}`}>
+            {TIPOS_VASO.map((t) => (
+              <li key={t.id}>{resumenTipo(cfg, visibles, t.id)}</li>
+            ))}
+          </ul>
+          {TIPOS_VASO.filter((t) => marcadasDeTipo(cfg, visibles, t.id).length === 0).map((t) => (
+            <p key={t.id} role="alert" className="ie-vasos-aviso" data-testid={`vasos-aviso-${id}-${t.id}`}>Ojo: «{t.corto}» se quedó sin ninguna categoría marcada. No saldrá ningún sticker de vaso {t.frase}.</p>
+          ))}
+        </div>
+      )}
       <p className="ie-vasos-res" data-testid={`vasos-resumen-${id}`}>
         Se imprimirán stickers de: {si.length ? si.join(', ') : 'ninguna'}
         {no.length > 0 && ` · No: ${no.join(', ')}`}
       </p>
       {si.length === 0 && <p role="alert" className="ie-vasos-aviso" data-testid={`vasos-aviso-${id}`}>Ojo: no marcaste ninguna. Esta PC no imprimirá ningún sticker de vaso.</p>}
-      {sinPc.length > 0 && <p className="ie-vasos-info" data-testid={`vasos-sinpc-${id}`}>{sinPc.join(', ')}: ninguna PC imprime su sticker (es solo un aviso, no bloquea nada).</p>}
+      {sinPc.length > 0 && (
+        <p className="ie-vasos-info" data-testid={`vasos-sinpc-${id}`}>
+          {sinPc.map((x) => `${x.nombre}: ninguna PC imprime su sticker${x.tipos.length < TIPOS_VASO.length ? ` ${x.tipos.map((t) => TIPOS_VASO.find((y) => y.id === t)!.frase).join(' ni ')}` : ''}`).join('. ')} (es solo un aviso, no bloquea nada).
+        </p>
+      )}
     </details>
   );
 }
@@ -249,7 +316,7 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
     setGuardando(true);
     try {
       const { configurado: _c, ...cfg } = borrador;
-      const cuerpo: CambioConfigEquipo = { ...cfg, nombre: nombre.trim() || equipo.nombre, ...extra };
+      const cuerpo: CambioConfigEquipo = { ...cfg, stickerBebidaCategoriasPorModalidad: cfg.stickerBebidaCategoriasPorModalidad ?? null, nombre: nombre.trim() || equipo.nombre, ...extra };
       if (JSON.stringify(impresoras) !== JSON.stringify(seleccionServidor)) {
         cuerpo.impresoras = {
           TICKETERA: impresoras.TICKETERA || null,
@@ -411,7 +478,7 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
             <Chips id={`chips-sticker-area-${equipo.deviceKeyId}`} titulo="Sticker por área: elige las áreas" areas={areasSticker} marcadas={borrador.stickerAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerAreas: alternarArea(borrador.stickerAreas, id) })} />
             <Chips id={`chips-sticker-bebida-${equipo.deviceKeyId}`} titulo="Sticker de bebida (un vaso, un sticker): elige las áreas" areas={areas} marcadas={borrador.stickerBebidaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerBebidaAreas: alternarArea(borrador.stickerBebidaAreas, id) })} />
             {borrador.stickerBebidaAreas.length > 0 && (
-              <VasosCategorias id={equipo.deviceKeyId} cfg={borrador} categorias={categorias} configsOtras={configsOtras} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ stickerBebidaCategorias: v })} />
+              <VasosCategorias id={equipo.deviceKeyId} cfg={borrador} categorias={categorias} configsOtras={configsOtras} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ stickerBebidaCategorias: v })} alCambiarPorTipo={(v) => cambiar({ stickerBebidaCategoriasPorModalidad: v ?? undefined })} />
             )}
             <Interruptor id={`sw-general-${equipo.deviceKeyId}`} texto="Sticker general" ayuda="Un resumen del pedido (para llevar, recoger y delivery)" activo={borrador.stickerGeneral} deshabilitado={bloqueado} alCambiar={() => cambiar({ stickerGeneral: !borrador.stickerGeneral })} />
             {selector('ETIQUETERA')}
