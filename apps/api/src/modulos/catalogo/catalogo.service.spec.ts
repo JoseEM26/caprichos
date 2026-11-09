@@ -707,6 +707,22 @@ describe('CatalogoService', () => {
       await expect(service.editarOpcion(80, { precioExtra: -2 })).rejects.toThrow(BadRequestException);
     });
 
+    it('editarOpcion guarda resaltarSiempre, lo devuelve y lo audita (antes/después)', async () => {
+      prisma.opcion.findUnique.mockResolvedValue({
+        id: BigInt(80), valor_id: BigInt(70), precio_extra: 0, activo: true, resaltar_siempre: false,
+        valor: { id: BigInt(70), lista_id: BigInt(9), nombre: 'Sin lactosa' },
+      });
+      prisma.opcion.update.mockResolvedValue({ id: BigInt(80), valor_id: BigInt(70), precio_extra: 0, activo: true, resaltar_siempre: true, agotado_hasta: null });
+      const res = await service.editarOpcion(80, { resaltarSiempre: true });
+      expect(prisma.opcion.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ resaltar_siempre: true }) }));
+      expect(res.resaltarSiempre).toBe(true);
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({
+        accion: 'EDITAR_OPCION',
+        antes: expect.objectContaining({ resaltarSiempre: false }),
+        despues: expect.objectContaining({ resaltarSiempre: true }),
+      }));
+    });
+
     it('editarProducto con sincronizarGrupos desliga los grupos que no vienen', async () => {
       prisma.producto.findUnique.mockResolvedValue({ id: BigInt(1), nombre: 'A', precio: 5, oculto: false, categoria_id: BigInt(1), tamanos: [], grupos: [], sabores: [] });
       jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);

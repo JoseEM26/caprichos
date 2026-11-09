@@ -7,6 +7,7 @@ import { DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util
 import { ComandasService, lineasDeArea } from './comandas.service';
 import { estadoAreasDePedido } from './areas-pedido';
 import { obtenerInicioDiaLima } from './cocina.util';
+import { resaltadoDeLineas } from './opcion-menos-pedida';
 import { resumenPagoDespacho } from './resumen-pago-despacho';
 
 const FUERA = ['ANULADO', 'RECHAZADO'];
@@ -63,11 +64,12 @@ export class DespachoService {
       : [];
     const nombreDe = new Map(personas.map((x) => [x.party_id.toString(), [x.nombres, x.apellidos].filter(Boolean).join(' ')]));
 
+    const resaltado = await resaltadoDeLineas(this.prisma, pedidos.flatMap((p) => p.lineas));
     const lista = pedidos.map((p) => {
       const estado = estadoAreasDePedido(p.comandas, p.lineas);
       const areas = estado.areas.map(({ nLineas: _n, ...a }) => ({
         ...a,
-        lineas: lineasDeArea(p.lineas, BigInt(a.areaId)),
+        lineas: lineasDeArea(p.lineas, BigInt(a.areaId), resaltado),
       }));
       const mesa = (p as any).mesa ?? (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
       const delivery = p.modalidad === 'DELIVERY';

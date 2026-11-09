@@ -24,6 +24,8 @@ export function opcionesMenosPedidas(opcionesEnOrden: string[], conteos: Map<str
   if (opcionesEnOrden.length < 2) return [];
   const cuenta = opcionesEnOrden.map((id) => conteos.get(id) ?? 0);
   const minimo = Math.min(...cuenta);
+  // Empate total (0 y 0, 3 y 3…): no hay «menos pedida»; resaltar todas sería puro ruido
+  if (cuenta.every((c) => c === minimo)) return [];
   return opcionesEnOrden.filter((_, i) => cuenta[i] === minimo);
 }
 
@@ -120,4 +122,52 @@ export async function opcionesMenosPedidasPorProducto(
     resultado.set(id, marcadas);
   }
   return resultado;
+}
+
+/** Por qué una opción sale resaltada en cocina. */
+export type MotivoResaltado = 'MANUAL' | 'MENOS_PEDIDA';
+
+/** Qué se resalta en un conjunto de líneas: lo automático por producto y lo manual (marca de la opción). */
+export interface Resaltado {
+  automaticas: Map<string, Set<string>>;
+  manuales: Set<string>;
+}
+
+/** Motivo con que una opción elegida de una línea de ese producto sale resaltada; MANUAL gana y no se duplica. */
+export function motivoResaltado(
+  r: Resaltado | undefined,
+  productoId: string | null | undefined,
+  opcionId: string | null | undefined,
+): MotivoResaltado | null {
+  if (!r || !opcionId) return null;
+  if (r.manuales.has(opcionId)) return 'MANUAL';
+  if (productoId && r.automaticas.get(productoId)?.has(opcionId)) return 'MENOS_PEDIDA';
+  return null;
+}
+
+/**
+ * Resaltado de las líneas dadas (con `opcionesElegidas`). El manual (`opcion.resaltar_siempre`) se lee de la opción en
+ * cada llamada: no depende del check del producto, de los 30 días ni de la caché. Nunca lanza: si falla, sin resaltado.
+ */
+export async function resaltadoDeLineas(prisma: PrismaService, lineas: any[]): Promise<Resaltado> {
+  const vacio: Resaltado = { automaticas: new Map(), manuales: new Set() };
+  try {
+    const productoIds = lineas.map((l) => (l.producto_id ? String(l.producto_id) : '')).filter(Boolean);
+    const opcionIds = [
+      ...new Set(
+        lineas.flatMap((l) => (l.opcionesElegidas ?? []).map((o: any) => o.opcion_id).filter((id: any) => id != null)),
+      ),
+    ].map((id: any) => BigInt(id));
+    const [automaticas, filas] = await Promise.all([
+      opcionesMenosPedidasPorProducto(prisma, productoIds).catch(() => new Map<string, Set<string>>()),
+      // Cada parte falla por separado: si no se puede leer la marca manual, la automática sigue funcionando
+      (async () =>
+        opcionIds.length
+          ? await prisma.opcion.findMany({ where: { id: { in: opcionIds }, resaltar_siempre: true }, select: { id: true } })
+          : [])().catch(() => [] as Array<{ id: bigint }>),
+    ]);
+    return { automaticas, manuales: new Set(filas.map((f) => String(f.id))) };
+  } catch {
+    return vacio;
+  }
 }

@@ -17,6 +17,8 @@ export interface OpcionItem {
   precioExtra: number;
   activo?: boolean;
   disponible?: boolean;
+  /** Marca manual «Resaltar siempre en cocina» (de la opción: vale en todos los productos que usan el grupo). */
+  resaltarSiempre?: boolean;
 }
 
 export interface RequisitoOpcionAdmin {
@@ -341,14 +343,14 @@ export const catalogoApi = {
 
   async crearOpcion(
     grupoId: string,
-    data: { nombre: string; precioExtra?: number },
+    data: { nombre: string; precioExtra?: number; resaltarSiempre?: boolean },
   ): Promise<OpcionItem> {
     return api.post<OpcionItem>(`/admin/catalogo/grupos/${grupoId}/opciones`, data);
   },
 
   async editarOpcion(
     id: string,
-    data: { nombre?: string; precioExtra?: number; activo?: boolean },
+    data: { nombre?: string; precioExtra?: number; activo?: boolean; resaltarSiempre?: boolean },
   ): Promise<OpcionItem> {
     return api.patch<OpcionItem>(`/admin/catalogo/opciones/${id}`, data);
   },

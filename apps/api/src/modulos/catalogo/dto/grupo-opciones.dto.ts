@@ -90,6 +90,11 @@ export class CrearOpcionDto {
   @IsNumber({}, { message: 'El precio extra debe ser un número' })
   @Min(0, { message: 'El precio extra debe ser mayor o igual a 0' })
   precioExtra?: number;
+
+  /** «Resaltar siempre en cocina»: la opción sale destacada en la comanda cada vez que alguien la elige. */
+  @IsOptional()
+  @IsBoolean({ message: 'Resaltar siempre debe ser verdadero o falso' })
+  resaltarSiempre?: boolean;
 }
 
 export class ActualizarOpcionDto {
@@ -105,4 +110,8 @@ export class ActualizarOpcionDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+  /** «Resaltar siempre en cocina»: la opción sale destacada en la comanda cada vez que alguien la elige. */
+  @IsOptional()
+  @IsBoolean({ message: 'Resaltar siempre debe ser verdadero o falso' })
+  resaltarSiempre?: boolean;
 }

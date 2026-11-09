@@ -3,7 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { catalogoApi, GrupoOpcionItem } from './catalogoApi';
 import { Ayuda } from './ayudaOpciones';
 
-interface OpcionDraft { id?: string; nombre: string; precioExtra: number; activo: boolean }
+interface OpcionDraft { id?: string; nombre: string; precioExtra: number; activo: boolean; resaltarSiempre: boolean }
 
 export function resumenGrupo(g: GrupoOpcionItem): string {
   const n = g.opciones.length;
@@ -22,7 +22,7 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
   const [minimo, setMinimo] = useState(g.minimo ?? 0);
   const [maximo, setMaximo] = useState(g.maximo ?? 1);
   const [ops, setOps] = useState<OpcionDraft[]>(
-    g.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, activo: o.activo !== false })),
+    g.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, activo: o.activo !== false, resaltarSiempre: o.resaltarSiempre === true })),
   );
   const [error, setError] = useState('');
   const [confirmar, setConfirmar] = useState(false);
@@ -58,9 +58,9 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
       await catalogoApi.actualizarGrupo(g.id, { nombre: nombre.trim(), obligatorio, minimo: min, maximo: max });
       for (const o of ops) {
         const orig = g.opciones.find((x) => x.id === o.id);
-        if (!o.id) await catalogoApi.crearOpcion(g.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra });
-        else if (orig && (orig.nombre !== o.nombre.trim() || orig.precioExtra !== o.precioExtra || (orig.activo !== false) !== o.activo)) {
-          await catalogoApi.editarOpcion(o.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, activo: o.activo });
+        if (!o.id) await catalogoApi.crearOpcion(g.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, ...(o.resaltarSiempre ? { resaltarSiempre: true } : {}) });
+        else if (orig && (orig.nombre !== o.nombre.trim() || orig.precioExtra !== o.precioExtra || (orig.activo !== false) !== o.activo || (orig.resaltarSiempre === true) !== o.resaltarSiempre)) {
+          await catalogoApi.editarOpcion(o.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, activo: o.activo, resaltarSiempre: o.resaltarSiempre });
         }
       }
       setError('');
@@ -134,11 +134,16 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
                   onClick={() => setOp(i, { activo: !o.activo })}>
                   {o.activo ? 'Activa' : 'Oculta'}
                 </button>
+                <label className="eo-resaltar" title="Aparece destacada en la comanda cada vez que alguien la elige: útil para Leche sin lactosa, Leche de almendra, Stevia… Vale en todos los productos que usan este grupo.">
+                  <input type="checkbox" checked={o.resaltarSiempre} onChange={(e) => setOp(i, { resaltarSiempre: e.target.checked })}
+                    aria-label={`⭐ Resaltar siempre en cocina: ${o.nombre || 'opción ' + (i + 1)}`} />
+                  <span>⭐ Resaltar siempre en cocina</span>
+                </label>
               </div>
             ))}
           </div>
           <div className="eo-acciones-fila">
-            <button type="button" className="eo-btn" onClick={() => setOps([...ops, { nombre: '', precioExtra: 0, activo: true }])}>
+            <button type="button" className="eo-btn" onClick={() => setOps([...ops, { nombre: '', precioExtra: 0, activo: true, resaltarSiempre: false }])}>
               + Agregar opción
             </button>
             <button type="button" className="eo-btn principal" disabled={guardando}

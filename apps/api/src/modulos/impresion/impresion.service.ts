@@ -1,3 +1,4 @@
+import { motivoResaltado, resaltadoDeLineas } from '../cocina/opcion-menos-pedida';
 import { CLAVES_FACTURACION, interpretarConfig } from '../comprobantes/facturacion/facturacion.config';
 import {
   BadRequestException,
@@ -1061,6 +1062,7 @@ export class ImpresionService {
         return;
       }
 
+await this.anotarResaltadas(pedido);
       const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
       await this.anotarCategorias(bebidas);
       const reglas = await leerReglasImpresion(this.prisma);
@@ -1532,6 +1534,7 @@ export class ImpresionService {
       });
     }
 
+await this.anotarResaltadas(pedido);
     // Lista de etiquetas pedidas, cada una con su clave estable dentro del pedido
     const seleccion: Array<{ tipo: string; clave: string; payload: any; areaId: bigint | null }> = [];
     if (quiereGeneral) {
@@ -1859,6 +1862,7 @@ export class ImpresionService {
       },
     });
     if (!pedido) return null;
+await this.anotarResaltadas(pedido);
     const lista: Array<{ tipo: string; clave: string; payload: any; areaId: bigint | null }> = [
       { tipo: 'ETIQUETA_GENERAL', clave: CLAVE_GENERAL, payload: construirEtiquetaGeneral(pedido), areaId: null },
     ];
@@ -2146,6 +2150,7 @@ export class ImpresionService {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
 
+await this.anotarResaltadas(pedido);
     const { areas, bebidas: todasBebidas } = construirTodasLasEtiquetas(pedido);
     await this.anotarCategorias(todasBebidas);
     const ctxRuteo = await this.contextoRuteo();
@@ -2236,6 +2241,20 @@ export class ImpresionService {
    * Pone la categoría (id) a cada vaso que no la trae (las bebidas de un combo): se busca por el nombre del producto.
    * Sin categoría conocida el vaso sale como siempre. Nunca lanza error.
    */
+  /**
+   * Marca `resaltada` en las opciones elegidas que cocina debe ver destacadas (manual «siempre» o automática «menos
+   * pedida»): el constructor de etiquetas y comandas las imprime entre asteriscos (`*SIN LACTOSA*`).
+   */
+  private async anotarResaltadas(pedido: any): Promise<void> {
+    const lineas: any[] = pedido?.lineas ?? [];
+    const r = await resaltadoDeLineas(this.prisma, lineas);
+    for (const l of lineas) {
+      for (const o of l.opcionesElegidas ?? []) {
+        o.resaltada = motivoResaltado(r, l.producto_id ? String(l.producto_id) : null, o.opcion_id != null ? String(o.opcion_id) : null) !== null;
+      }
+    }
+  }
+
   private async anotarCategorias(bebidas: any[]): Promise<void> {
     const faltan = bebidas.filter((b) => b && !b.categoriaId && b.bebidaNombre);
     if (!faltan.length) return;
