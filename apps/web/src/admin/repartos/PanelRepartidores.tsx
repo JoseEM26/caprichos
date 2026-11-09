@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { clasificarEspera, ConfigReparto } from './calculoRuta';
 import { nombreClienteVisible } from './textoVisible';
+import { ErrorApi } from '../../comun/api';
+import { repartosApi } from './repartosApi';
+import { PendientesCierreRuta, type PendienteCierre } from './PendientesCierreRuta';
 import type { PanelRepartidores as Panel, PedidoReparto, EtapaReparto } from './repartosApi';
 
 const ETAPA: Record<EtapaReparto, { texto: string; hora: (p: PedidoReparto) => string | null }> = {
@@ -95,6 +98,23 @@ export function PanelRepartidores({
   const { resumen } = panel;
   // Filtro opcional: un repartidor real (de la lista del servidor); «todos» muestra a todos
   const [filtro, setFiltro] = useState('todos');
+  // Cierre manual de la ruta de un repartidor (Caja/Admin): sin orden; solo estorban los EN_CAMINO sin resolver
+  const [cierre, setCierre] = useState<{ partyId: string; pendientes: PendienteCierre[] } | null>(null);
+  const [msgCierre, setMsgCierre] = useState<string | null>(null);
+  const cerrarRuta = async (partyId: string) => {
+    setMsgCierre(null);
+    try {
+      const r = await repartosApi.cerrarRuta(partyId);
+      setCierre(null);
+      setMsgCierre(r.cerrada ? 'Ruta cerrada' : 'Ruta actualizada');
+    } catch (err: any) {
+      if (err instanceof ErrorApi && err.codigo === 'RUTA_CON_PENDIENTES') {
+        setCierre({ partyId, pendientes: ((err.detalles as any)?.pedidos ?? []).map((p: any) => ({ id: String(p.id), codigo: p.codigo })) });
+      } else {
+        setMsgCierre(err?.message || 'No se pudo cerrar la ruta');
+      }
+    }
+  };
   const visibles = filtro === 'todos' ? panel.repartidores : panel.repartidores.filter((r) => r.party_id === filtro);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -102,6 +122,11 @@ export function PanelRepartidores({
         {resumen.repartidores_libres} repartidores libres · {resumen.repartidores_ocupados} ocupados ·{' '}
         {resumen.pedidos_sin_tomar} pedidos sin tomar
       </p>
+      {msgCierre && (
+        <p role="status" data-testid="msg-cierre-ruta" style={{ margin: 0, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+          {msgCierre}
+        </p>
+      )}
       <BarraFiltros role="group" aria-label="Filtrar por repartidor">
         <FiltroCombo
           etiqueta="Repartidor"
@@ -147,6 +172,24 @@ export function PanelRepartidores({
             {r.pedidos.map((p) => (
               <FilaPedido key={p.id} p={p} etapa={p.etapa} config={config} alAbrir={alAbrir} />
             ))}
+            {!r.libre && (
+              <button
+                type="button"
+                data-testid={`btn-cerrar-ruta-${r.party_id}`}
+                onClick={() => void cerrarRuta(r.party_id)}
+                style={{ minHeight: 44, borderRadius: 10, border: '1px solid var(--cp-navy, #0B2C3E)', background: 'var(--cp-white, #fff)', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Cerrar ruta
+              </button>
+            )}
+            {cierre?.partyId === r.party_id && (
+              <PendientesCierreRuta
+                pendientes={cierre.pendientes}
+                alVer={alAbrir}
+                alCerrar={() => void cerrarRuta(r.party_id)}
+                alDescartar={() => setCierre(null)}
+              />
+            )}
             {r.efectivo_por_rendir > 0 && (
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
                 Efectivo por rendir: S/ {r.efectivo_por_rendir.toFixed(2)}

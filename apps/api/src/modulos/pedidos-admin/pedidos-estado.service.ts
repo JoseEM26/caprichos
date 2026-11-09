@@ -7,6 +7,7 @@ import { totalCobrable } from '../propinas/propinas.util';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
+import { cerrarRutaTrasAnular } from '../repartos/rutas-reparto';
 import { FILTRO_CANCELADO_NO_RECIBIR, PAGOS_DEVOLVIBLES, nombresDePartes, salidaDevolucion } from './devolucion-pedido.util';
 import { StockService } from '../stock/stock.service';
 import { CobrosService } from '../caja/cobros.service';
@@ -1096,6 +1097,9 @@ export class PedidosEstadoService {
         codigo: pedido.codigo,
         estado: 'ANULADO',
       });
+
+      // si estaba en la ruta de un repartidor: la ruta se cierra sola si ya no le quedan pedidos pendientes
+      await cerrarRutaTrasAnular(this.prisma, pedido.repartidor_party_id, this.eventosGateway, this.logger);
 
       // un pedido anulado libera sus mesas
       try {

@@ -15,6 +15,8 @@ import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './M
 import { HojaInferior } from './HojaInferior';
 import { ChatPedidoReparto, chatVigente } from './ChatPedidoReparto';
 import { SaltarPedidoModal } from './SaltarPedidoModal';
+import { PilaAvisosAnulados, useAvisosAnulados } from './AvisosAnulados';
+import { PendientesCierreRuta, type PendienteCierre } from './PendientesCierreRuta';
 import { colorOpcion } from './OpcionesRutaSugerida';
 import { enlaceLlamar } from './textoVisible';
 import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
@@ -771,6 +773,7 @@ export function RepartidorView() {
   const [ejecutando, setEjecutando] = useState(false);
   const [pedidoParaFalla, setPedidoParaFalla] = useState<PedidoReparto | null>(null);
   const [chatPedido, setChatPedido] = useState<{ id: string; codigo: string } | null>(null);
+  const [pendientesCierre, setPendientesCierre] = useState<PendienteCierre[] | null>(null);
   const [pedidoParaSaltar, setPedidoParaSaltar] = useState<PedidoReparto | null>(null);
   const [saltando, setSaltando] = useState(false);
   const [opcionSugeridaId, setOpcionSugeridaId] = useState<string | null>(null);
@@ -837,7 +840,8 @@ export function RepartidorView() {
   const opcionSugerida = sugeridas.datos?.opciones.find((o) => o.id === opcionSugeridaId) ?? null;
 
   // En vivo: un pedido que cambia de estado aparece, pasa a gris o desaparece sin recargar
-  useEventos('pedido:estado', () => {
+  useEventos('pedido:estado', (d: any) => {
+    avisosAnulados.alEstado(d);
     cargarDatos();
     sugeridas.recargar();
   });
@@ -869,6 +873,27 @@ export function RepartidorView() {
     const clave = (p: PedidoReparto) => p.ordenRuta ?? (ordenMap.has(String(p.id)) ? ordenMap.get(String(p.id))! + 1 : 999);
     return [...datosMios.pedidos].sort((a, b) => clave(a) - clave(b));
   }, [datosMios]);
+
+  // Aviso en pantalla cuando anulan un pedido de mi ruta (el pedido sale de la lista al recargar)
+  const avisosAnulados = useAvisosAnulados(useMemo(() => pedidosActivos.map((p) => String(p.id)), [pedidosActivos]));
+
+  // Cierre manual: solo estorban los EN_CAMINO sin resolver; se listan para resolverlos uno a uno
+  const pendientesVisibles = pendientesCierre?.filter((x) => pedidosActivos.some((p) => String(p.id) === x.id && p.estado === 'EN_CAMINO')) ?? null;
+  const cerrarRuta = async () => {
+    try {
+      const r = await repartosApi.cerrarRuta();
+      setPendientesCierre(null);
+      setAviso({ tipo: 'ok', texto: r.cerrada ? 'Ruta cerrada' : 'Ruta actualizada' });
+    } catch (err: any) {
+      if (err instanceof ErrorApi && err.codigo === 'RUTA_CON_PENDIENTES') {
+        setPendientesCierre(((err.detalles as any)?.pedidos ?? []).map((p: any) => ({ id: String(p.id), codigo: p.codigo })));
+      } else {
+        setAviso({ tipo: 'error', texto: err?.message || 'No se pudo cerrar la ruta' });
+      }
+    }
+    await cargarDatos();
+  };
+  const pedidoPendiente = (id: string) => pedidosActivos.find((p) => String(p.id) === id);
 
   const cupo = Math.max(0, maxPedidos - pedidosActivos.length);
 
@@ -1238,6 +1263,16 @@ export function RepartidorView() {
               {' · '}Ruta en curso: {entregadosRuta} de {rutaActual.pedidos.length} {entregadosRuta === 1 ? 'entregado' : 'entregados'}
             </span>
           )}
+          {rutaActual && (
+            <button
+              type="button"
+              data-testid="btn-cerrar-ruta"
+              onClick={cerrarRuta}
+              style={{ ...botonBase, minHeight: 44, fontSize: 13, marginLeft: 8, background: 'rgba(255,255,255,.14)', color: 'var(--cp-cream)' }}
+            >
+              Cerrar ruta
+            </button>
+          )}
         </span>
       )}
     </div>
@@ -1314,6 +1349,20 @@ export function RepartidorView() {
           <div style={{ pointerEvents: 'auto' }}>
             <BannerAvisosRepartidor pedidos={datosMios.pedidos} avisos={datosMios.avisos} />
           </div>
+          <PilaAvisosAnulados avisos={avisosAnulados.avisos} alCerrar={avisosAnulados.cerrar} />
+          {pendientesVisibles && (
+            <PendientesCierreRuta
+              pendientes={pendientesVisibles}
+              alEntregado={(id) => { const p = pedidoPendiente(id); if (p) acciones.entregar(p); }}
+              alNoSePudo={(id) => { const p = pedidoPendiente(id); if (p) setPedidoParaFalla(p); }}
+              alDevolver={(id) => {
+                const p = pedidoPendiente(id);
+                if (p) pedirConfirmacion('¿Devolver al local?', `El pedido ${p.codigo} vuelve al local y queda como no entregado en tu ruta.`, async () => { await repartosApi.devolverAlLocal(id); });
+              }}
+              alCerrar={cerrarRuta}
+              alDescartar={() => setPendientesCierre(null)}
+            />
+          )}
           {aviso && avisoPantalla(aviso.texto, aviso.tipo, () => setAviso(null), 'aviso-pantalla')}
           {acciones.errorAccion && avisoPantalla(acciones.errorAccion, 'error', () => acciones.setErrorAccion(null), 'aviso-accion')}
         </div>

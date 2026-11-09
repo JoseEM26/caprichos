@@ -176,6 +176,23 @@ export class RepartosController {
     return this.repartosService.iniciarRuta(dto, req.usuario, ip);
   }
 
+  @Post('ruta/cerrar')
+  @Permiso([
+    { modulo: 'repartos', accion: 'entregar' },
+    { modulo: 'repartos', accion: 'liquidar' },
+  ])
+  async cerrarRuta(@Body() dto: { repartidorId?: string }, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.cerrarRuta(dto?.repartidorId, req.usuario, ip);
+  }
+
+  @Post(':id/devolver-local')
+  @Permiso('repartos', 'entregar')
+  async devolverAlLocal(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.devolverAlLocal(id, req.usuario, ip);
+  }
+
   @Post(':id/tomar')
   @Permiso('repartos', 'tomar')
   async tomarPedido(@Param('id') id: string, @Req() req: any) {
