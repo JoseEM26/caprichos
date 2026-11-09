@@ -94,9 +94,9 @@ function Areas({ progreso }: { progreso: ProgresoPiezas }) {
   );
 }
 
-function Fila({ fila, ultima }: { fila: FilaPedido; ultima: boolean }) {
-  // Abierta solo la última o la que aún tiene algo pendiente
-  const [abierta, setAbierta] = useState(ultima || (fila.progreso.total > 0 && fila.progreso.porcentaje < 100));
+function Fila({ fila, ultima, pocas }: { fila: FilaPedido; ultima: boolean; pocas: boolean }) {
+  // Con 1-2 pedidos queda abierta la última o la que tiene algo pendiente; con más, todas plegadas (una línea) para no estirar la mesa
+  const [abierta, setAbierta] = useState(pocas && (ultima || (fila.progreso.total > 0 && fila.progreso.porcentaje < 100)));
   const nombre = fila.esExtra ? `extra ${fila.codigo}` : `pedido ${fila.codigo}`;
   return (
     <li className="mo-fila">
@@ -143,35 +143,47 @@ export function MesasOcupadas({ mesas, extras, alAgregarExtra, alAbrirCuenta }: 
     <section className="mo" aria-label="Mesas ocupadas">
       <h3 className="mo-titulo">Mesas ocupadas</h3>
       <ul className="mo-lista">
-        {unicas.map((m) => {
-          const filas = filasDeMesa(m, extras);
-          const nExtras = filas.length - 1;
-          const prog = progresoDeMesa(m, extras);
-          return (
-            <li key={m.id} className="mo-tarjeta">
-              <div className="mo-cab">
-                <button type="button" className="mo-nombre" onClick={() => alAbrirCuenta(m)}>
-                  {nombreMesaSalon(m)}
-                  {m.pedido?.cliente ? ` · ${m.pedido.cliente}` : ''}
-                </button>
-                {nExtras > 0 && <span className="mo-chip">{nExtras} {nExtras === 1 ? 'extra' : 'extras'}</span>}
-              </div>
-              <BarraMini progreso={prog} nombre={nombreMesaSalon(m)} />
-              <Areas progreso={prog} />
-              <ul className="mo-filas">
-                {filas.map((f, i) => (
-                  <Fila key={f.id} fila={f} ultima={i === filas.length - 1} />
-                ))}
-              </ul>
-              {alAgregarExtra && (
-                <button type="button" className="mo-extra" onClick={() => alAgregarExtra(m)}>
-                  + Pedido extra
-                </button>
-              )}
-            </li>
-          );
-        })}
+        {unicas.map((m) => (
+          <TarjetaMesa key={m.id} mesa={m} extras={extras} alAgregarExtra={alAgregarExtra} alAbrirCuenta={alAbrirCuenta} />
+        ))}
       </ul>
     </section>
+  );
+}
+
+function TarjetaMesa({ mesa: m, extras, alAgregarExtra, alAbrirCuenta }: { mesa: MesaSalon } & Omit<MesasOcupadasProps, 'mesas'>) {
+  const filas = filasDeMesa(m, extras);
+  const nExtras = filas.length - 1;
+  const prog = progresoDeMesa(m, extras);
+  // Con 2 o más extras el grupo arranca plegado; el contador «N extras» lo abre y cierra completo
+  const [manual, setManual] = useState<boolean | null>(null);
+  const grupo = manual ?? nExtras < 2;
+  const idGrupo = `mo-grupo-${m.id}`;
+  return (
+    <li className="mo-tarjeta">
+      <div className="mo-cab">
+        <button type="button" className="mo-nombre" onClick={() => alAbrirCuenta(m)}>
+          {nombreMesaSalon(m)}
+          {m.pedido?.cliente ? ` · ${m.pedido.cliente}` : ''}
+        </button>
+        {nExtras > 0 && (
+          <button type="button" className="mo-chip" aria-expanded={grupo} aria-controls={idGrupo} onClick={() => setManual(!grupo)}>
+            {nExtras} {nExtras === 1 ? 'extra' : 'extras'} <span aria-hidden="true">{grupo ? '▲' : '▼'}</span>
+          </button>
+        )}
+      </div>
+      <BarraMini progreso={prog} nombre={nombreMesaSalon(m)} />
+      <Areas progreso={prog} />
+      <ul className="mo-filas" id={idGrupo} hidden={!grupo}>
+        {filas.map((f, i) => (
+          <Fila key={f.id} fila={f} ultima={i === filas.length - 1} pocas={filas.length <= 2} />
+        ))}
+      </ul>
+      {alAgregarExtra && (
+        <button type="button" className="mo-extra" onClick={() => alAgregarExtra(m)}>
+          + Pedido extra
+        </button>
+      )}
+    </li>
   );
 }

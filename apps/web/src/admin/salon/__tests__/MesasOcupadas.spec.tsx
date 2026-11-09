@@ -23,17 +23,28 @@ const extra = (id: string, listas: number): MiPedido =>
 
 describe('MesasOcupadas', () => {
   it('suma original y extras, muestra contador y deja abierto solo lo pendiente o último', () => {
-    render(<MesasOcupadas mesas={[mesa]} extras={[extra('51', 0), extra('52', 2)]} alAbrirCuenta={vi.fn()} />);
-    expect(screen.getByText('2 extras')).toBeTruthy();
+    render(<MesasOcupadas mesas={[mesa]} extras={[extra('51', 0)]} alAbrirCuenta={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /1 extra/ })).toBeTruthy();
     const barra = screen.getAllByRole('progressbar', { name: /Avance de Mesa/ })[0];
-    expect(barra.getAttribute('aria-valuenow')).toBe('67'); // 4 de 6 piezas
+    expect(barra.getAttribute('aria-valuenow')).toBe('50'); // 2 de 4 piezas
     const orig = screen.getByRole('button', { name: /Pedido CP-50/ });
     expect(orig.getAttribute('aria-expanded')).toBe('false'); // completo y no es el último
     expect(screen.getByRole('button', { name: /Extra CP-51/ }).getAttribute('aria-expanded')).toBe('true'); // pendiente
-    expect(screen.getByRole('button', { name: /Extra CP-52/ }).getAttribute('aria-expanded')).toBe('true'); // última
     fireEvent.click(orig);
     expect(orig.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getAllByText('Cocina 2/2').length).toBeGreaterThan(0);
+  });
+
+  it('con 3 extras el grupo arranca plegado y el contador lo abre y cierra completo', () => {
+    render(<MesasOcupadas mesas={[mesa]} extras={[extra('51', 0), extra('52', 0), extra('53', 2)]} alAbrirCuenta={vi.fn()} />);
+    const chip = screen.getByRole('button', { name: /3 extras/ });
+    expect(chip.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById(chip.getAttribute('aria-controls')!)!.hidden).toBe(true);
+    fireEvent.click(chip);
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: /Extra CP-51/ }).getAttribute('aria-expanded')).toBe('false'); // una línea cada una
+    fireEvent.click(chip);
+    expect(document.getElementById(chip.getAttribute('aria-controls')!)!.hidden).toBe(true);
   });
 
   it('«+ Pedido extra» solo con permiso y llama con la mesa', () => {

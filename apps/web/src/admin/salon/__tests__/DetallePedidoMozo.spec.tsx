@@ -53,7 +53,7 @@ describe('DetallePedidoMozo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar datos del cliente' }));
     await waitFor(() => expect(guardar).toHaveBeenCalledWith('11', { nombre: 'Ana María', telefono: '912345678' }));
     await waitFor(() => expect(p.alCambio).toHaveBeenCalled());
-    expect(await screen.findByRole('button', { name: 'Cambiar método de pago' })).toBeInTheDocument();
+    expect((await screen.findAllByRole('button', { name: 'Cambiar método de pago' })).length).toBeGreaterThan(0);
   });
 
   it('celular inválido bloquea el guardado', async () => {
@@ -105,5 +105,20 @@ describe('DetallePedidoMozo', () => {
     expect(screen.getByRole('tab', { name: /1 · Pedido/ })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(p.alCerrar).toHaveBeenCalled();
+  });
+
+  it('paso 2: el original y cada extra vigente tienen su propio botón «Cambiar método de pago»', async () => {
+    render(<DetallePedidoMozo {...props()} extras={[extra, { ...extra, id: '13', codigo: 'CP-M013' }, { ...extra, id: '14', codigo: 'CP-M014', estado: 'ANULADO' }]} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Cliente y pago/ }));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Cambiar método de pago' })).toHaveLength(3));
+    expect(screen.getAllByTestId('dpm-pago-extra')).toHaveLength(2);
+  });
+
+  it('sin permiso pedidos/ajustar_pago no hay botón de pago en ningún pedido', async () => {
+    permisos.delete('pedidos/ajustar_pago');
+    render(<DetallePedidoMozo {...props()} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Cliente y pago/ }));
+    await screen.findByText(/Pago del extra CP-M012/);
+    expect(screen.queryByRole('button', { name: 'Cambiar método de pago' })).toBeNull();
   });
 });

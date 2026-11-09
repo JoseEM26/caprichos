@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -60,7 +61,7 @@ describe('MisPedidosView', () => {
   it('muestra el resumen, las tarjetas y el botón Nuevo pedido', async () => {
     render(<MisPedidosView />);
 
-    expect(await screen.findByText('CP-M012')).toBeInTheDocument();
+    await abrirTodas('CP-M012');
     const resumen = screen.getByLabelText('Resumen del rango elegido');
     expect(within(resumen).getByText('S/ 32.50')).toBeInTheDocument();
     expect(within(resumen).getByText('Total vendido')).toBeInTheDocument();
@@ -75,7 +76,7 @@ describe('MisPedidosView', () => {
 
   it('el filtro por estado deja solo los entregados o los en curso', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
 
     fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
     fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));
@@ -101,7 +102,8 @@ describe('MisPedidosView', () => {
 
   it('la lista muestra tamaño, opciones, nota, subtotal y Listo sin abrir la tarjeta', async () => {
     render(<MisPedidosView />);
-    const tarjeta = (await screen.findByText('CP-M012')).closest('li')!;
+    await abrirTodas('CP-M012');
+    const tarjeta = screen.getByText('CP-M012').closest('li')!;
     const lista = within(tarjeta).getByRole('list', { name: 'Productos del pedido CP-M012' });
     const cafe = within(lista).getAllByRole('listitem')[0];
 
@@ -118,7 +120,8 @@ describe('MisPedidosView', () => {
 
   it('«Ver detalle» abre el modal por pasos con los productos y el pago', async () => {
     render(<MisPedidosView />);
-    const tarjeta = (await screen.findByText('CP-M012')).closest('li')!;
+    await abrirTodas('CP-M012');
+    const tarjeta = screen.getByText('CP-M012').closest('li')!;
     fireEvent.click(within(tarjeta).getByRole('button', { name: 'Ver detalle' }));
 
     const dialogo = await screen.findByRole('dialog', { name: 'Pedido CP-M012' });
@@ -142,7 +145,7 @@ describe('MisPedidosView', () => {
 
   it('cambiar el rango pide ese rango a la API', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
 
     fireEvent.click(screen.getByRole('button', { name: 'Periodo: Hoy' }));
     fireEvent.click(screen.getByRole('option', { name: 'Ayer' }));
@@ -171,7 +174,8 @@ describe('MisPedidosView', () => {
     it('con 7 productos muestra 5 y «Ver 2 más» expande y colapsa dentro de la tarjeta', async () => {
       vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [pedidoCon(7)], resumen: respuesta.resumen } as any);
       render(<MisPedidosView />);
-      const tarjeta = (await screen.findByText('CP-M030')).closest('li')!;
+      await abrirTodas('CP-M030');
+    const tarjeta = screen.getByText('CP-M030').closest('li')!;
       const lista = within(tarjeta).getByRole('list', { name: 'Productos del pedido CP-M030' });
       expect(within(lista).getAllByRole('listitem')).toHaveLength(5);
 
@@ -189,7 +193,8 @@ describe('MisPedidosView', () => {
     it('con 6 productos o menos se ven todos y no aparece el botón', async () => {
       vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [pedidoCon(6)], resumen: respuesta.resumen } as any);
       render(<MisPedidosView />);
-      const tarjeta = (await screen.findByText('CP-M030')).closest('li')!;
+      await abrirTodas('CP-M030');
+    const tarjeta = screen.getByText('CP-M030').closest('li')!;
       expect(within(tarjeta).getAllByRole('listitem')).toHaveLength(6);
       expect(within(tarjeta).queryByRole('button', { name: /Ver \d+ más|Ver menos/ })).not.toBeInTheDocument();
     });

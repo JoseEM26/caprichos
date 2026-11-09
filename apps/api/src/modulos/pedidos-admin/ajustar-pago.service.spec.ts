@@ -153,6 +153,13 @@ describe('AjustarPagoService (cambiar o agregar medios de pago, siempre y sin ap
     await expect(service.ajustar('7', { plan: yape }, mozo)).rejects.toMatchObject({ status: 403 });
   });
 
+  it('mozo y delivery: el que él tomó (canal MOZO) sí; el de la carta/bot (otro canal) o de otro compañero, 403 PEDIDO_AJENO', async () => {
+    pedidoActual = pedido({ canal: 'MOZO', party_id: 60n, repartidor_party_id: null, modalidad: 'DELIVERY' });
+    await expect(service.ajustar('7', { plan: yape }, mozo)).resolves.toMatchObject({ ok: true });
+    pedidoActual = pedido({ canal: 'WEB', party_id: 60n, repartidor_party_id: null, modalidad: 'DELIVERY' });
+    await expect(service.ajustar('7', { plan: yape }, mozo)).rejects.toMatchObject({ status: 403, response: { codigo: 'PEDIDO_AJENO' } });
+  });
+
   it('permisos: Caja, Admin, Supervisor, Mozo y Repartidor lo tienen; cocina y almacén no', () => {
     for (const rol of ['ADMIN', 'CAJERO', 'SUPERVISOR', 'MOZO', 'REPARTIDOR']) expect(MATRIZ[rol]).toContain('pedidos/ajustar_pago');
     for (const rol of ['COCINA', 'ALMACEN']) expect(MATRIZ[rol] ?? []).not.toContain('pedidos/ajustar_pago');

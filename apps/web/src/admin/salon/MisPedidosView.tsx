@@ -13,6 +13,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { ModalAnular } from '../pedidos/ModalAnular';
 import { ProgresoPedido } from './ProgresoPedido';
+import { juntarProgresos, progresoDePiezas } from './progresoMesa';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import { DetallePedidoMozo } from './DetallePedidoMozo';
@@ -173,6 +174,7 @@ export function MisPedidosView() {
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
   const [itemsAbiertos, setItemsAbiertos] = useState<Set<string>>(() => new Set());
+  const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
   const ultimaSolicitud = useRef(0);
 
   const alternarItems = (id: string) =>
@@ -271,6 +273,9 @@ export function MisPedidosView() {
   const detalle = detalleId ? pedidos.find((p) => p.id === detalleId) ?? null : null;
   // Cuenta = pedido original + sus extras (pedidoOrigenId): una sola tarjeta; el resumen sigue contando cada pedido
   const cuentas = agruparCuentas(visibles, pedidos, (p) => p.pedidoOrigenId ?? p.id);
+  // Abre sola la cuenta con algo pendiente solo si es una única; con varias, el mozo elige
+  const pendientes = cuentas.filter((c) => c.miembros.some((m) => ESTADOS_EN_CURSO.includes(m.estado)));
+  const unicaEnCurso = pendientes.length === 1 ? pendientes[0].raizId : null;
   const resumen = datos?.resumen ?? RESUMEN_VACIO;
   const valor = (n: number) => (datos ? String(n) : '—');
 
@@ -316,14 +321,23 @@ export function MisPedidosView() {
   };
 
   // Una tarjeta de pedido. `rol` solo viene dentro de una cuenta (original + extras); `Cont` es li (suelta) o div (dentro de la cuenta)
-  const tarjeta = (p: MiPedido, Cont: 'li' | 'div', rol?: 'original' | 'extra', incluido = true) => {
+  const tarjeta = (p: MiPedido, Cont: 'li' | 'div', rol?: 'original' | 'extra', incluido = true, sinCabeza = false) => {
             const est = ESTADO_VISTO[p.estado] ?? { texto: p.estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
             const idItems = `mp-items-${p.id}`;
             const recortar = p.lineas.length > LINEAS_SIN_RECORTE && !itemsAbiertos.has(p.id);
             const lineasVisibles = recortar ? p.lineas.slice(0, LINEAS_VISIBLES) : p.lineas;
             return (
               <Cont key={p.id} className={faltanVoucher(p) ? 'mp-card mpv-card--falta' : 'mp-card'}>
-                <div className="mp-card-cabeza">
+                {sinCabeza && (
+                  <div className="mp-card-cabeza">
+                    <span className="mp-card-fila">
+                      {p.ubicacionEditadaEn && <InsigniaDireccionEditada />}
+                      {faltanVoucher(p) && <span className="mpv-insignia-falta" title="El pago digital no necesita captura; puedes subirla después">ⓘ Sin captura</span>}
+                      {mozos.length > 0 && p.mozoNombre && <span>{p.mozoNombre}</span>}
+                    </span>
+                  </div>
+                )}
+                {!sinCabeza && <div className="mp-card-cabeza">
                   <span className="mp-card-fila">
                     <strong className="mp-codigo">{p.codigo}</strong>
                     {rol && <span className={`mp-rol mp-rol--${rol}`} data-testid={rol === 'extra' ? 'insignia-extra' : 'rotulo-original'}>{rol === 'extra' ? 'EXTRA' : 'PEDIDO ORIGINAL'}</span>}
@@ -351,7 +365,7 @@ export function MisPedidosView() {
                     </span>
                     <strong className="mp-total">{soles(p.total)}</strong>
                   </span>
-                </div>
+                </div>}
 
                 {/* Lista del pedido siempre visible: cantidad, producto, detalle, nota y subtotal */}
                 <ul className="mp-items" id={idItems} aria-label={`Productos del pedido ${p.codigo}`}>
@@ -559,24 +573,81 @@ export function MisPedidosView() {
       {cuentas.length > 0 && (
         <ul className="mp-lista">
           {cuentas.map((c) => {
-            if (c.miembros.length === 1) return tarjeta(c.miembros[0], 'li');
             const raiz = c.miembros.find((m) => m.id === c.raizId) ?? c.miembros[0];
             const vigentes = c.miembros.filter((m) => m.estado !== 'ANULADO' && m.estado !== 'RECHAZADO');
             const totalCuenta = vigentes.reduce((a, m) => a + m.total, 0);
             const porCobrar = vigentes.filter((m) => m.pagoEstado !== 'PAGADO').reduce((a, m) => a + m.total, 0);
+            const nExtras = c.miembros.length - 1;
+            const abierta = abiertas[c.raizId] ?? (unicaEnCurso === c.raizId);
+            const idCuerpo = `mp-acc-${c.raizId}`;
+            const enCurso = c.miembros.filter((m) => ESTADOS_EN_CURSO.includes(m.estado));
+            const estado = enCurso[0]?.estado ?? raiz.estado;
+            const est = ESTADO_VISTO[estado] ?? { texto: estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
+            const pct = juntarProgresos(vigentes.map((m) => progresoDePiezas(m.progreso, m.estado)));
+            const espera = Math.max(-1, ...enCurso.map((m) => m.esperaMinutos ?? -1));
             return (
-              <li key={`cuenta-${c.raizId}`} className="mp-cuenta" data-testid="tarjeta-cuenta">
-                <div className="mp-cuenta-cab">
-                  <strong className="mp-cuenta-nombre">{raiz.clienteNombre || lugar(raiz)}</strong>
-                  <span>{lugar(raiz)} · {horaLima(raiz.creadoEn)} · {c.miembros.length} pedidos en la cuenta</span>
-                </div>
-                <div className="mp-cuenta-lista">
-                  {c.miembros.map((m) => tarjeta(m, 'div', m.id === c.raizId ? 'original' : 'extra', c.coincide.has(m.id)))}
-                </div>
-                <div className="mp-cuenta-pie" data-testid="total-cuenta">
-                  <span>Total de la cuenta: <strong>{soles(totalCuenta)}</strong></span>
-                  <span className={porCobrar > 0 ? 'mp-cuenta-pend' : 'mp-cuenta-ok'}>{porCobrar > 0 ? `Por cobrar ${soles(porCobrar)}` : 'Todo cobrado'}</span>
-                </div>
+              <li key={`cuenta-${c.raizId}`} className={`mp-acc${c.miembros.some(faltanVoucher) ? ' mpv-card--falta' : ''}`} data-testid={nExtras > 0 ? 'tarjeta-cuenta' : undefined}>
+                <button
+                  type="button"
+                  className="mp-acc-cab"
+                  aria-expanded={abierta}
+                  aria-controls={idCuerpo}
+                  onClick={() => setAbiertas((a) => ({ ...a, [c.raizId]: !abierta }))}
+                >
+                  <span className="mp-acc-fila">
+                    <strong className={`mp-acc-nombre${raiz.clienteNombre ? ' mpv-cliente' : ''}`} title={raiz.clienteNombre || undefined}>{raiz.clienteNombre || lugar(raiz)}</strong>
+                    <span className="mp-estado" style={{ background: est.bg, color: est.fg }}>{est.texto}</span>
+                    {nExtras > 0 && <span className="mp-acc-extras">{nExtras} {nExtras === 1 ? 'extra' : 'extras'}</span>}
+                  </span>
+                  <span className="mp-acc-fila mp-acc-sub">
+                    <span>{raiz.clienteNombre ? `${lugar(raiz)} · ` : ''}{nExtras === 0 && <><span>{raiz.codigo}</span> · </>}{horaLima(raiz.creadoEn)}</span>
+                    {pct.total > 0 && <span>{pct.porcentaje >= 100 ? 'Todo listo' : `${pct.porcentaje}%`}</span>}
+                    {espera >= 0 && <span className={`mp-espera mp-espera--${nivelEspera(espera)}`} data-testid="espera-minutos" aria-label={`Espera de ${espera} minutos`}>⏱ {espera} min</span>}
+                    <strong className="mp-total">{soles(totalCuenta)}</strong>
+                  </span>
+                  <span className="mp-acc-chev" aria-hidden="true" />
+                </button>
+                {abierta && (
+                  <div className="mp-acc-cuerpo" id={idCuerpo}>
+                    {nExtras === 0 ? (
+                      tarjeta(raiz, 'div', undefined, true, true)
+                    ) : (
+                      <div className="mp-cuenta-lista">
+                        {c.miembros.map((m) => {
+                          const rol = m.id === c.raizId ? 'original' : 'extra';
+                          const e = ESTADO_VISTO[m.estado] ?? { texto: m.estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
+                          const pm = progresoDePiezas(m.progreso, m.estado);
+                          return (
+                            <div key={m.id} className="mp-sub">
+                              <div className="mp-sub-fila">
+                                <strong className="mp-codigo">{m.codigo}</strong>
+                                <span className={`mp-rol mp-rol--${rol}`} data-testid={rol === 'extra' ? 'insignia-extra' : 'rotulo-original'}>{rol === 'extra' ? 'EXTRA' : 'PEDIDO ORIGINAL'}</span>
+                                {!c.coincide.has(m.id) && <span className="mp-fuera" data-testid="fuera-filtro">no incluido en este filtro</span>}
+                                <span>{horaLima(m.creadoEn)}</span>
+                                <span className="mp-estado" style={{ background: e.bg, color: e.fg }}>{e.texto}</span>
+                                {pm.total > 0 && <span>{pm.porcentaje >= 100 ? 'Todo listo' : `${pm.porcentaje}%`}</span>}
+                                <strong className="mp-total">{soles(m.total)}</strong>
+                                <button type="button" className="mp-mas mp-sub-ver" aria-haspopup="dialog" aria-label={`Ver detalle de ${m.codigo}`} onClick={() => setDetalleId(m.id)}>
+                                  Ver detalle
+                                </button>
+                              </div>
+                              {bloqueVoucher(m, false)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {nExtras > 0 && (
+                      <div className="mp-cuenta-pie" data-testid="total-cuenta">
+                        <span>Total de la cuenta: <strong>{soles(totalCuenta)}</strong></span>
+                        <span className={porCobrar > 0 ? 'mp-cuenta-pend' : 'mp-cuenta-ok'}>{porCobrar > 0 ? `Por cobrar ${soles(porCobrar)}` : 'Todo cobrado'}</span>
+                      </div>
+                    )}
+                    {tiene('pedidos/extra') && !['ANULADO', 'RECHAZADO'].includes(raiz.estado) && (
+                      <button type="button" className="mp-acc-extra" onClick={() => setExtraDe(raiz)}>+ Pedido extra</button>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}

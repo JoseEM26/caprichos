@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -59,13 +60,13 @@ describe('MisPedidosView: buscador en cliente', () => {
 
   it('la caja de búsqueda tiene el placeholder pedido', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     expect(screen.getByPlaceholderText('Buscar por nombre, código o mesa')).toBeInTheDocument();
   });
 
   it('filtra por código sin importar mayúsculas ni el guion, y muestra el conteo', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
 
     fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, código o mesa'), { target: { value: 'cpw022' } });
 
@@ -75,7 +76,7 @@ describe('MisPedidosView: buscador en cliente', () => {
 
   it('filtra por nombre del cliente y por nombre de la mesa', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     const caja = screen.getByPlaceholderText('Buscar por nombre, código o mesa');
 
     fireEvent.change(caja, { target: { value: 'quispe' } });
@@ -87,7 +88,7 @@ describe('MisPedidosView: buscador en cliente', () => {
 
   it('sin coincidencias muestra el estado vacío con Limpiar, que devuelve la lista', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     const caja = screen.getByPlaceholderText('Buscar por nombre, código o mesa');
 
     fireEvent.change(caja, { target: { value: 'zzz' } });
@@ -101,7 +102,7 @@ describe('MisPedidosView: buscador en cliente', () => {
 
   it('se combina con el filtro de estado', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
 
     fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
     fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));

@@ -730,3 +730,23 @@
 .mp-fechas label { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; font-size: 12px; font-weight: 700; color: var(--cp-soft); }
 .mp-fechas input { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--cp-navy); }
 .mp-fechas input:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 1px; }
+
+/* ---- Lista compacta con acordeón: una fila de altura casi uniforme por cuenta ---- */
+.mp-acc { list-style: none; min-width: 0; background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 16px; overflow: hidden; }
+.mp-acc-cab { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 100%; min-height: 84px; padding: 10px 48px 10px 14px; box-sizing: border-box; background: transparent; border: 0; text-align: left; font: inherit; color: var(--cp-navy); cursor: pointer; }
+.mp-acc-cab:focus-visible { outline: 3px solid var(--cp-navy); outline-offset: -3px; }
+.mp-acc-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.mp-acc-sub { font-size: 13px; font-weight: 700; color: var(--cp-soft); font-variant-numeric: tabular-nums; }
+.mp-acc-nombre { font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mp-acc-extras { padding: 2px 10px; border-radius: 9999px; background: var(--cp-sand); font-size: 12px; font-weight: 800; }
+.mp-acc-chev { position: absolute; right: 0; top: 0; bottom: 0; width: 44px; }
+.mp-acc-chev::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translate(-50%, -70%) rotate(45deg); transition: transform 0.2s ease; }
+.mp-acc-cab[aria-expanded='true'] .mp-acc-chev::after { transform: translate(-50%, -30%) rotate(-135deg); }
+.mp-acc-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; animation: mp-acc-in 0.2s ease; }
+.mp-acc-cuerpo > .mp-card { box-shadow: none; }
+.mp-acc-extra { min-height: 44px; border: 1px solid var(--cp-line); border-radius: 10px; background: transparent; color: var(--cp-soft); font: inherit; font-weight: 800; cursor: pointer; }
+.mp-sub { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--cp-line); border-radius: 12px; background: var(--cp-cream); }
+.mp-sub-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mp-sub-ver { min-height: 44px; margin-left: auto; }
+@keyframes mp-acc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mp-acc-cuerpo { animation: none; } .mp-acc-chev::after { transition: none; } }

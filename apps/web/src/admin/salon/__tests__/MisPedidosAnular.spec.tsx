@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -46,7 +46,7 @@ describe('Mis pedidos: anular pedido propio', () => {
     render(<MisPedidosView />);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Ver detalle' }))[0]);
     fireEvent.click(await screen.findByRole('tab', { name: /Estado y acciones/ }));
-    await screen.findByRole('button', { name: '+ Pedido extra' });
+    await within(screen.getByRole('dialog')).findByRole('button', { name: '+ Pedido extra' });
     expect(screen.queryByRole('button', { name: 'Anular pedido' })).toBeNull();
   });
 });
