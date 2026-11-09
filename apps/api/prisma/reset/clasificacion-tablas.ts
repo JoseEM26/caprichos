@@ -82,6 +82,7 @@ export const CONSERVAR: string[] = [
   'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
   'propina_reparto', 'propina_reparto_detalle',
   'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo',
+  'vinculo_personal', 'vacacion_movimiento',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio', 'opcion_requiere',
   'compra', 'compra_linea', 'consumo_personal', 'contador_diario', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta', 'equipo_impresion_config',

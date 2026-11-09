@@ -2989,3 +2989,46 @@ model PlanillaPeriodo {
   @@index([party_id, desde])
   @@map("planilla_periodo")
 }
+
+// ---------------------------------------------------------------------------
+// Vínculo y vacaciones del personal (migración 20270201200000_vinculo_vacaciones).
+// vinculo_personal: historial por persona (una sola fila vigente: vigente_hasta NULL). Cambiar de tipo cierra la
+// vigente y abre otra. El contrato PDF vive en la tabla archivo (privado), nunca público.
+// vacacion_movimiento: TOMADAS | PAGADAS | AJUSTE; se anulan con motivo, no se borran.
+model VinculoPersonal {
+  id                  BigInt    @id @default(autoincrement())
+  party_id            BigInt
+  tipo                String    @db.VarChar(18) // PLANILLA | CONTRATO_TEMPORAL
+  fecha_ingreso       DateTime  @db.Date
+  fecha_fin           DateTime? @db.Date
+  regimen_vacaciones  Int? // 30 | 15 días al año (solo PLANILLA)
+  contrato_archivo_id BigInt?
+  notas               String?
+  vigente_desde       DateTime  @default(now()) @db.Timestamptz
+  vigente_hasta       DateTime? @db.Timestamptz
+  creado_por          BigInt?
+
+  @@index([party_id, vigente_desde])
+  @@map("vinculo_personal")
+}
+
+model VacacionMovimiento {
+  id             BigInt    @id @default(autoincrement())
+  party_id       BigInt
+  vinculo_id     BigInt
+  tipo           String    @db.VarChar(8) // TOMADAS | PAGADAS | AJUSTE
+  fecha_desde    DateTime  @db.Date
+  fecha_hasta    DateTime  @db.Date
+  /// TOMADAS y PAGADAS: días positivos que descuentan saldo. AJUSTE: con signo (+ suma, - resta).
+  dias           Decimal   @db.Decimal(6, 2)
+  monto          Decimal?  @db.Decimal(10, 2) // solo PAGADAS
+  motivo         String?
+  creado_por     BigInt
+  creado_en      DateTime  @default(now()) @db.Timestamptz
+  anulado_en     DateTime? @db.Timestamptz
+  anulado_por    BigInt?
+  anulado_motivo String?
+
+  @@index([party_id, fecha_desde])
+  @@map("vacacion_movimiento")
+}

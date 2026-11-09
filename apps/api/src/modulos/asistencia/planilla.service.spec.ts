@@ -18,6 +18,7 @@ function montar(opts: { estadoDia?: string } = {}) {
   ];
   const periodos: Fila[] = [];
   const ajustes: Fila[] = [];
+  const vacaciones: Fila[] = [];
   let id = 1n;
   // 10 jornadas de 5 h programadas = 50 h; trabaja 30 h (6 jornadas)
   const dias = Array.from({ length: 30 }, (_, i) => {
@@ -40,6 +41,8 @@ function montar(opts: { estadoDia?: string } = {}) {
     },
     person: { findUnique: async () => ({ nombres: 'Luis', apellidos: 'Pérez' }), findMany: async () => [{ party_id: LUIS, nombres: 'Luis', apellidos: 'Pérez' }] },
     planillaExtraAprobada: { findMany: async () => [] },
+    vinculoPersonal: { findMany: async () => [] },
+    vacacionMovimiento: { findMany: async () => vacaciones },
     planillaAjuste: {
       findMany: async () => ajustes,
       findUnique: async ({ where }: any) => ajustes.find((a) => a.id === where.id) ?? null,
@@ -66,7 +69,7 @@ function montar(opts: { estadoDia?: string } = {}) {
     diasDePersona: jest.fn(async () => ({ dias, cfg: { toleranciaMin: 5, pagoTardanzaPct: 50 } })),
   };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
-  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, auditoria, ajustes };
+  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, auditoria, ajustes, vacaciones };
 }
 
 describe('PlanillaService', () => {
@@ -78,6 +81,19 @@ describe('PlanillaService', () => {
     expect(r.resultado.consumosCobrados).toBe(65.5);
     expect(r.resultado.neto).toBe(534.5);
     expect(r.periodo).toEqual({ desde: '2026-11-01', hasta: '2026-11-30' });
+  });
+
+  it('vacación tomada paga la jornada programada normal (no es falta) y la pagada suma una línea', async () => {
+    const { svc, vacaciones } = montar();
+    // 11 al 12: eran faltas (índices 10 y 11 del mes... los días 7 al 10 son FALTA con turno)
+    vacaciones.push({ id: 1n, tipo: 'TOMADAS', fecha_desde: d('2026-11-07'), fecha_hasta: d('2026-11-08'), dias: 2, monto: null });
+    vacaciones.push({ id: 2n, tipo: 'PAGADAS', fecha_desde: d('2026-11-15'), fecha_hasta: d('2026-11-15'), dias: 1, monto: 50 });
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.vacaciones.diasTomados).toBe(2);
+    expect(r.dias.filter((x: any) => x.estado === 'VACACIONES')).toHaveLength(2);
+    // 1000 / 50 h = 20 por hora; 6 jornadas de 5 h + 2 de vacación = 40 h = 800, + 50 de vacaciones pagadas
+    expect(r.resultado.pagoVacaciones).toBe(50);
+    expect(r.resultado.ganado).toBe(850);
   });
 
   it('un consumo que pasa al siguiente período no se resta', async () => {

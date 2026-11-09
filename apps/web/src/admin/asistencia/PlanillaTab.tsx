@@ -6,6 +6,8 @@ import { Insignia } from '../../comun/Insignia';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
+import { PestanaVinculoVacaciones } from './VinculoVacaciones';
+import { ETIQUETA_VINCULO } from './vinculoApi';
 import {
   DetallePlanilla,
   FilaPlanilla,
@@ -54,12 +56,13 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas">
             <thead>
-              <tr><th>Persona</th><th>Modalidad</th><th>Sueldo semanal</th><th>Sueldo mensual</th><th>Período</th><th>Horas prog.</th><th>Horas trab.</th><th>Ganado</th><th>Consumos</th><th>Descuentos</th><th>Adelantos</th><th>Neto</th><th>Estado</th><th /></tr>
+              <tr><th>Persona</th><th>Vínculo</th><th>Modalidad</th><th>Sueldo semanal</th><th>Sueldo mensual</th><th>Período</th><th>Horas prog.</th><th>Horas trab.</th><th>Ganado</th><th>Consumos</th><th>Descuentos</th><th>Adelantos</th><th>Neto</th><th>Estado</th><th /></tr>
             </thead>
             <tbody>
               {filas.map((f) => (
                 <tr key={f.partyId}>
                   <td data-label="Persona" className="as-nombre">{f.nombre}</td>
+                  <td data-label="Vínculo">{f.vinculo ? ETIQUETA_VINCULO[f.vinculo.tipo] : '—'}</td>
                   <td data-label="Modalidad">{f.sueldo ? (f.sueldo.modalidad === 'SEMANAL' ? 'Semanal' : 'Mensual') : <Insignia variante="aviso">Sin sueldo</Insignia>}</td>
                   <td data-label="Sueldo semanal" className="as-num">{soles(f.sueldo?.semanal)}</td>
                   <td data-label="Sueldo mensual" className="as-num">{soles(f.sueldo?.mensual)}</td>
@@ -149,6 +152,7 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         <Dato t={`Tardanza (${r.tardanzaMin} min al ${d.pctTardanza} %)`} v={soles(r.pagoTardanza)} />
         <Dato t="Salidas anticipadas (no se pagan)" v={`${r.salidaAnticipadaMin} min`} />
         <Dato t={`Horas extra aprobadas (de ${horas(r.extraMin)} h)`} v={`${horas(r.extraAprobadaMin)} h → ${soles(r.pagoExtra)}`} />
+        {!!r.pagoVacaciones && <Dato t="Vacaciones pagadas (en dinero)" v={soles(r.pagoVacaciones)} />}
         <Dato t="Ganado" v={soles(r.ganado)} fuerte />
         <Dato t="Consumos cobrados" v={`− ${soles(r.consumosCobrados)}`} />
         <Dato t="Descuentos" v={`− ${soles(r.descuentos)}`} />
@@ -315,6 +319,7 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         { id: 'jornadas', etiqueta: 'Jornadas y extras', contenido: jornadas ?? <Cargando mensaje="Cargando" /> },
         { id: 'consumos', etiqueta: 'Consumos', insignia: d?.consumos.length || null, contenido: consumos ?? <Cargando mensaje="Cargando" /> },
         { id: 'ajustes', etiqueta: 'Adelantos y descuentos', insignia: d?.ajustes.filter((a) => !a.anulado).length || null, contenido: ajustes ?? <Cargando mensaje="Cargando" /> },
+        { id: 'vinculo', etiqueta: 'Vínculo y vacaciones', contenido: <PestanaVinculoVacaciones partyId={fila.partyId} alCambiar={() => void cargar()} />, persistente: false },
       ]}
     />
   );

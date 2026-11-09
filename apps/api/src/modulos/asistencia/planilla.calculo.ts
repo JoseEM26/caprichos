@@ -46,7 +46,7 @@ export interface DiaEntrada {
 
 export interface DiaPlanilla {
   jornada: string;
-  estado: EstadoJornada;
+  estado: EstadoJornada | 'VACACIONES';
   programadaMin: number;
   /** Minutos trabajados dentro del turno (sin break, sin extra, sin tardanza). */
   trabajadaMin: number;
@@ -128,9 +128,12 @@ export interface EntradaPlanilla {
   consumos: ConsumoPlanilla[];
   descuentos: number[];
   adelantos: number[];
+  /** Montos de vacaciones pagadas (liquidadas en dinero) del período: ingreso adicional con su línea. */
+  vacacionesPagadas?: number[];
 }
 
 export interface ResultadoPlanilla {
+  pagoVacaciones: number;
   programadaMin: number;
   trabajadaMin: number;
   tardanzaMin: number;
@@ -162,9 +165,10 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
   const pagoTrabajado = redondear2((trabajadaMin / 60) * vh);
   const pagoTardanza = redondear2((tardanzaMin / 60) * vh * (e.pctTardanza / 100));
   const pagoExtra = redondear2((extraAprobadaMin / 60) * vh);
-  const ganado = redondear2(pagoTrabajado + pagoTardanza + pagoExtra);
-
   const total = (xs: number[]) => redondear2(xs.reduce((a, x) => a + x, 0));
+  const pagoVacaciones = total(e.vacacionesPagadas ?? []);
+  const ganado = redondear2(pagoTrabajado + pagoTardanza + pagoExtra + pagoVacaciones);
+
   const consumosCobrados = total(e.consumos.filter((c) => c.cobrar).map((c) => c.monto));
   const consumosPendientes = total(e.consumos.filter((c) => !c.cobrar).map((c) => c.monto));
   const descuentos = total(e.descuentos);
@@ -180,6 +184,7 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
     pagoTrabajado,
     pagoTardanza,
     pagoExtra,
+    pagoVacaciones,
     ganado,
     consumosCobrados,
     consumosPendientes,

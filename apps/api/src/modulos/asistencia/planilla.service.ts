@@ -13,6 +13,7 @@ import {
   redondear2,
   sueldoEquivalente,
 } from './planilla.calculo';
+import { aplicarVacaciones, fechasDelRango } from './vacaciones.calculo';
 
 const fechaDb = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const isoDe = (d: Date) => d.toISOString().slice(0, 10);
@@ -76,15 +77,17 @@ export class PlanillaService {
     const ref = fecha ? fechaValida(fecha) : jornadaDe(ahora).jornada;
     const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true } });
     const ids = cuentas.map((c) => c.party_id);
-    const [sueldos, personas] = await Promise.all([
+    const [sueldos, personas, vinculos] = await Promise.all([
       this.prisma.sueldoPersonal.findMany({ where: { party_id: { in: ids } } }),
       this.prisma.person.findMany({ where: { party_id: { in: ids } } }),
+      this.prisma.vinculoPersonal.findMany({ where: { party_id: { in: ids }, vigente_hasta: null } }),
     ]);
+    const vinculoDe = new Map(vinculos.map((v) => [v.party_id, { tipo: v.tipo, fechaIngreso: isoDe(v.fecha_ingreso), fechaFin: v.fecha_fin ? isoDe(v.fecha_fin) : null }]));
     const nombre = new Map(personas.map((p) => [p.party_id, [p.nombres, p.apellidos].filter(Boolean).join(' ')]));
     const filas = [];
     for (const id of ids) {
       const s = sueldos.find((x) => x.party_id === id);
-      const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}` };
+      const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}`, vinculo: vinculoDe.get(id) ?? null };
       if (!s) {
         filas.push({ ...base, sueldo: null });
         continue;
@@ -129,6 +132,16 @@ export class PlanillaService {
     return { ...calc, sueldo, estado: 'ABIERTO', periodoId: null };
   }
 
+  private async vacacionesDelPeriodo(id: bigint, periodo: { desde: string; hasta: string }) {
+    const vacs = await this.prisma.vacacionMovimiento.findMany({
+      where: { party_id: id, anulado_en: null, tipo: { in: ['TOMADAS', 'PAGADAS'] }, fecha_desde: { lte: fechaDb(periodo.hasta) }, fecha_hasta: { gte: fechaDb(periodo.desde) } },
+      orderBy: { fecha_desde: 'asc' },
+    });
+    const fechasVac = new Set(vacs.filter((v) => v.tipo === 'TOMADAS').flatMap((v) => fechasDelRango(isoDe(v.fecha_desde), isoDe(v.fecha_hasta))));
+    const vacPagadas = vacs.filter((v) => v.tipo === 'PAGADAS' && isoDe(v.fecha_desde) >= periodo.desde && isoDe(v.fecha_desde) <= periodo.hasta);
+    return { fechasVac, vacPagadas };
+  }
+
   private async calcular(
     id: bigint,
     sueldo: { modalidad: Modalidad; semanal: number; mensual: number },
@@ -137,7 +150,9 @@ export class PlanillaService {
     ahora: Date,
   ) {
     const { dias, cfg } = await this.asistencia.diasDePersona(id, periodo.desde, periodo.hasta, ahora);
-    const diasCalc = dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin));
+    // Vacaciones del período (vínculo y vacaciones): tomadas = jornada programada pagada normal; pagadas = línea de ingreso
+    const { fechasVac, vacPagadas } = await this.vacacionesDelPeriodo(id, periodo);
+    const diasCalc = aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac);
     const [extras, ajustes, consumosBd, persona] = await Promise.all([
       this.prisma.planillaExtraAprobada.findMany({ where: { party_id: id, jornada: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       this.prisma.planillaAjuste.findMany({
@@ -171,6 +186,7 @@ export class PlanillaService {
       consumos,
       descuentos: vigentes.filter((a) => a.tipo === 'DESCUENTO').map((a) => Number(a.monto)),
       adelantos: vigentes.filter((a) => a.tipo === 'ADELANTO').map((a) => Number(a.monto)),
+      vacacionesPagadas: vacPagadas.map((v) => Number(v.monto ?? 0)),
     });
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
     return {
@@ -181,7 +197,11 @@ export class PlanillaService {
       pctTardanza: cfg.pagoTardanzaPct,
       resultado,
       resumen: { programadasH: horas(resultado.programadaMin), trabajadasH: horas(resultado.trabajadaMin) },
-      pendientes: diasCalc.filter((d) => ESTADOS_PENDIENTES.includes(d.estado)).length,
+      pendientes: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).length,
+      vacaciones: {
+        diasTomados: diasCalc.filter((d) => d.estado === 'VACACIONES').length,
+        pagadas: vacPagadas.map((v) => ({ id: Number(v.id), fecha: isoDe(v.fecha_desde), dias: Number(v.dias), monto: Number(v.monto ?? 0) })),
+      },
       dias: diasCalc.map((d) => ({
         ...d,
         programadaH: horas(d.programadaMin),
@@ -365,7 +385,8 @@ export class PlanillaService {
     const hoy = jornadaDe(ahora).jornada;
     const periodo = periodoDe(modalidad, hoy);
     const { dias, cfg } = await this.asistencia.diasDePersona(partyId, periodo.desde, periodo.hasta, ahora);
-    const calc = dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin));
+    const { fechasVac } = await this.vacacionesDelPeriodo(partyId, periodo);
+    const calc = aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac);
     const suma = (f: (d: (typeof calc)[number]) => number) => calc.reduce((a, d) => a + f(d), 0);
     return {
       modalidad,
@@ -375,7 +396,7 @@ export class PlanillaService {
       tardanzas: calc.filter((d) => d.tardanzaMin > 0).length,
       tardanzaMin: suma((d) => d.tardanzaMin),
       faltas: calc.filter((d) => d.estado === 'FALTA').length,
-      jornadasPorRevisar: calc.filter((d) => ESTADOS_PENDIENTES.includes(d.estado)).length,
+      jornadasPorRevisar: calc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).length,
     };
   }
 
