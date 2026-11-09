@@ -100,6 +100,8 @@ const estiloBotonTamano: React.CSSProperties = {
 // Referencia estable: un [] nuevo en cada render reiniciaría el formulario sin parar.
 const SIN_CATEGORIAS: never[] = [];
 
+import { PiezasBloqueadas } from './PiezasBloqueadas';
+
 export function ModalCombo({
   abierto,
   comboAEditar,
@@ -857,6 +859,7 @@ export function ModalCombo({
           ) },
           { id: 'partes', etiqueta: 'Partes y alternativas', ...marca('partes'), contenido: (
           <div data-testid="paso-2-combo" className="mo-tarjeta">
+            <PiezasBloqueadas oferta={comboAEditar} />
             <EditorPartesCombo partes={partes} onCambiar={(p) => { setPartes(p); setMensajeError(''); }} productos={productosDisponibles} categorias={categoriasEditor} mostrarErrores={verErrores} />
           </div>
           ) },

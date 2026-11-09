@@ -87,22 +87,23 @@ export function saborDisponible(s: SaborDisp): boolean {
 }
 
 /**
- * Disponible = ni oculto (desactivado) ni agotado; si controla stock, además con saldo: un producto por sabor
+ * Disponible = no agotado (a mano o por cronómetro); `oculto` NO cuenta: un producto que solo vive dentro de un combo
+ * puede estar desactivado en la carta. Si controla stock, además con saldo: un producto por sabor
  * necesita algún sabor con saldo, uno sin sabores necesita saldo > 0. Sin stock controlado, no cambia.
  */
 export function productoDisponible(p: ProductoDisp | undefined): boolean {
-  if (!p || p.oculto || !estaDisponible(p.agotadoHasta)) return false;
+  if (!p || !estaDisponible(p.agotadoHasta)) return false;
   if (!p.controlaStock) return true;
   if ((p.sabores ?? []).length > 0) return (p.sabores ?? []).some(saborDisponible);
   return (p.saldo ?? 0) > 0;
 }
 
 /**
- * Unidades que se pueden pedir de un producto ahora: Infinity si no controla stock (y está visible y no agotado),
+ * Unidades que se pueden pedir de un producto ahora: Infinity si no controla stock (y no está agotado; oculto no cuenta),
  * 0 si no está disponible; con sabores, la suma del saldo de sus sabores disponibles.
  */
 export function unidadesDisponibles(p: ProductoDisp | undefined): number {
-  if (!p || p.oculto || !estaDisponible(p.agotadoHasta)) return 0;
+  if (!p || !estaDisponible(p.agotadoHasta)) return 0;
   if (!p.controlaStock) return Infinity;
   if ((p.sabores ?? []).length > 0) {
     return (p.sabores ?? []).filter(saborDisponible).reduce((acc, s) => acc + Math.floor(s.saldo), 0);
@@ -143,11 +144,24 @@ export function esParteBebidas(parte: ParteDisp, productos: ProductoDisp[]): boo
  * ¿El producto es opción de la parte? FIJO: el principal; UNA_DE: su lista; A_ELECCION: sin los excluidos y, si hay productos
  * marcados, SOLO esos (la lista manda); sin productos marcados, los de sus categorías.
  */
-export function admiteProducto(parte: ParteDisp, p: Pick<ProductoDisp, 'id' | 'categoriaId'>): boolean {
+export function admiteProducto(parte: ParteDisp, p: Pick<ProductoDisp, 'id' | 'categoriaId'> & { oculto?: boolean }): boolean {
   if (parte.tipo === 'FIJO') return p.id === parte.productos[0];
   if (parte.tipo === 'UNA_DE') return parte.productos.includes(p.id);
   if ((parte.productosExcluidos ?? []).includes(p.id)) return false;
-  return parte.productos.length > 0 ? parte.productos.includes(p.id) : parte.categorias.includes(p.categoriaId);
+  if (parte.productos.length > 0) return parte.productos.includes(p.id);
+  // Elección por categoría: un producto oculto no se ofrece (solo vale oculto en piezas fijas o en la lista explícita)
+  return !p.oculto && parte.categorias.includes(p.categoriaId);
+}
+
+/** Por qué una pieza bloquea el combo (para el panel del dueño), o null si está disponible. */
+export function motivoProductoBloqueado(p: ProductoDisp): string | null {
+  if (!estaDisponible(p.agotadoHasta)) {
+    const h = new Date(p.agotadoHasta as Date | string);
+    const hora = isNaN(+h) ? '' : ` hasta ${h.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false })}`;
+    return `Agotado${hora}`;
+  }
+  if (!productoDisponible(p)) return (p.sabores ?? []).length > 0 ? 'Sin sabores con saldo' : 'Stock 0';
+  return null;
 }
 
 /** El producto tal como lo ve la parte: con sabores acotados, solo esos (vacío = todos). Sin sabores no cambia. */

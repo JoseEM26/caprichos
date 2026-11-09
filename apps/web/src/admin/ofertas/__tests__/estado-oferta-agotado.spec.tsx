@@ -50,3 +50,13 @@ describe('estado de una oferta: agotada sola o desactivada por ti', () => {
     expect(screen.queryByTestId('insignia-agotado-auto')).toBeNull();
   });
 });
+
+describe('piezas bloqueadas (solo panel)', () => {
+  it('la tarjeta lista cada pieza con su motivo y enlace a Productos', async () => {
+    montar([{ ...combo, disponible: false, motivoAgotado: 'Falta NUGGETS', piezasBloqueadas: [{ productoId: '5', nombre: 'NUGGETS', motivo: 'Agotado hasta 15:40' }, { productoId: '6', nombre: 'PAPAS', motivo: 'Stock 0' }] }]);
+    const aviso = await screen.findByTestId('piezas-bloqueadas');
+    expect(aviso.textContent).toContain('NUGGETS · Agotado hasta 15:40');
+    expect(aviso.textContent).toContain('PAPAS · Stock 0');
+    expect(aviso.querySelector('a')?.getAttribute('href')).toBe('/admin/productos');
+  });
+});

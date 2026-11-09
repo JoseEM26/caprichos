@@ -94,6 +94,38 @@ describe('Combo con bebidas por categoría (Bebida 1..N)', () => {
     expect(piezas[0].opcionesDetalle?.map((o) => o.nombre)).toEqual(['DONA']);
   });
 
+  it('motivo de agotado: el admin lo recibe con las piezas bloqueadas; la carta pública no', async () => {
+    const dona = productos.find((p) => p.id === 17n)!;
+    const galleta = productos.find((p) => p.id === 37n)!;
+    dona.agotado_hasta = new Date(Date.now() + 3600_000) as any;
+    galleta.agotado_hasta = new Date(Date.now() + 3600_000) as any;
+    try {
+      const [admin] = await service.listarOfertas('COMBO');
+      expect(admin.disponible).toBe(false);
+      expect(admin.motivoAgotado).toContain('complemento');
+      expect(admin.piezasBloqueadas?.map((x) => [x.nombre, x.motivo.startsWith('Agotado hasta')])).toEqual([['DONA', true], ['GALLETA', true]]);
+      const [publico] = await service.listarOfertas(undefined, false, 'CARTA', true);
+      expect(publico.disponible).toBe(false);
+      expect(publico.motivoAgotado).toBeUndefined();
+      expect(publico.piezasBloqueadas).toBeUndefined();
+    } finally {
+      dona.agotado_hasta = null as any;
+      galleta.agotado_hasta = null as any;
+    }
+  });
+
+  it('una pieza oculta que solo vive en el combo no lo agota', async () => {
+    const dona = productos.find((p) => p.id === 17n)!;
+    dona.oculto = true;
+    try {
+      const [o] = await service.listarOfertas('COMBO');
+      expect(o.disponible).toBe(true);
+      expect(o.piezasBloqueadas).toEqual([]);
+    } finally {
+      dona.oculto = false;
+    }
+  });
+
   const el = (parteId: string, productoId: string) => ({ parteId, productoId });
 
   it('acepta 2 bebidas de las categorías y las vuelve líneas hijas', async () => {

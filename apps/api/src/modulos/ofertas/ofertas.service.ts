@@ -43,6 +43,7 @@ import {
   esParteBebidas,
   parteArmable,
   productoDisponible,
+  motivoProductoBloqueado,
   productosDeParte,
   ProductoDisp,
   saborDisponible,
@@ -169,7 +170,7 @@ function detalleOpcion(id: string, productos: ProductoDisp[]): OpcionDetalleComb
     : undefined;
   const disponible = !!f && productoDisponible(f);
   // Bloqueada solo por saldo (no por ocultar ni agotar a mano): la carta dice «No hay stock»
-  const sinStock = !disponible && !!f && !f.oculto && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
+  const sinStock = !disponible && !!f && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
   return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}), ...(f?.fotoUrl ? { fotoUrl: f.fotoUrl } : {}), ...(f?.categoriaNombre ? { categoria: f.categoriaNombre } : {}) };
 }
 
@@ -235,6 +236,8 @@ export class OfertasService {
     // Carta web y local comparten esta lista: un combo solo para WhatsApp no aparece en ninguna de las dos
     if (paraCarta) items = items.filter((o) => o.tipo !== 'COMBO' || ofertaIncluyeCanal(o.canales, 'CARTA') || ofertaIncluyeCanal(o.canales, 'ADMIN'));
     items = await this.conDisponibilidad(items);
+    // La carta pública solo sabe si está agotado, no por qué: el motivo es del panel del dueño
+    if (paraCarta) for (const o of items) { delete o.motivoAgotado; delete o.piezasBloqueadas; }
     if (esBot) return items.filter((o) => !(o.tipo === 'COMBO' && o.disponible === false));
     // Panel de administración: cuándo y quién la desactivó por última vez (de la auditoría, sin tabla nueva)
     if (!canal && !paraCarta) await this.conUltimaDesactivacion(items);
@@ -2664,7 +2667,17 @@ export class OfertasService {
       const delCombo = productos.filter(
         (x) => c.combosParte!.some((p) => [...p.productos, ...(p.alternativas ?? []).map((a) => a.id)].includes(x.id) || p.categorias.includes(x.categoriaId)),
       );
-      c.sinStock = !r.disponible && delCombo.some((x) => x.controlaStock && !x.oculto && estaDisponible(x.agotadoHasta) && !productoDisponible(x));
+      c.sinStock = !r.disponible && delCombo.some((x) => x.controlaStock && estaDisponible(x.agotadoHasta) && !productoDisponible(x));
+      // Piezas que bloquean el combo y por qué (solo panel del dueño; la carta pública no lo recibe)
+      const bloq = new Map<string, { productoId: string; nombre: string; motivo: string }>();
+      for (const p of c.combosParte!) {
+        for (const id of [...p.productos, ...(p.alternativas ?? []).map((a) => a.id)]) {
+          const prod = productos.find((x) => x.id === id);
+          const motivo = prod ? motivoProductoBloqueado(prod) : null;
+          if (prod && motivo) bloq.set(id, { productoId: id, nombre: prod.nombre, motivo });
+        }
+      }
+      c.piezasBloqueadas = [...bloq.values()];
       // El producto anfitrión (Dúo) no se vende si un paso obligatorio se quedó sin opciones por stock (misma regla que la carta)
       if (c.alcanceProductoId && hostsBloqueados.has(c.alcanceProductoId)) {
         c.disponible = false;
@@ -2682,7 +2695,7 @@ export class OfertasService {
           p.alternativas = p.alternativas.map((a, j) => {
             const f = productos.find((x) => x.id === a.id);
             const disponible = rp.alternativas[j]?.disponible ?? false;
-            const sinStock = !disponible && !!f && !f.oculto && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
+            const sinStock = !disponible && !!f && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
             return { ...detalleOpcion(a.id, productos), nombre: f?.nombre ?? a.nombre, cantidad: a.cantidad, disponible, ...(sinStock ? { sinStock } : {}) };
           });
         }

@@ -1,6 +1,6 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
-import { calcularDisponibilidadCombo, esParteBebidas, ParteDisp, ProductoDisp, productoDisponible, SaborDisp, unidadesDisponibles } from './combo-disponibilidad.util';
+import { calcularDisponibilidadCombo, esParteBebidas, ParteDisp, ProductoDisp, motivoProductoBloqueado, productoDisponible, SaborDisp, unidadesDisponibles } from './combo-disponibilidad.util';
 
 const futuro = new Date(Date.now() + 3600_000);
 const prod = (id: string, extra: Partial<ProductoDisp> = {}): ProductoDisp => ({
@@ -31,17 +31,33 @@ describe('calcularDisponibilidadCombo', () => {
     expect(r.motivoAgotado).toBe('Falta P10');
   });
 
-  it('oculto cuenta como no disponible; agotado vencido sí está disponible', () => {
+  it('oculto dentro de un combo NO lo agota; agotado vencido también está disponible', () => {
     const r = calcularDisponibilidadCombo([fijo(['11'])], [
       prod('10', { oculto: true }), prod('11', { agotadoHasta: new Date(Date.now() - 1000) }),
     ]);
-    expect(r.partes[0].opcionesDisponibles).toEqual(['11']);
+    expect(r.disponible).toBe(true);
+    expect(r.partes[0].opcionesDisponibles).toEqual(['10']);
+  });
+
+  it('oculto pero agotado a mano o con stock 0 sí agota; motivos claros', () => {
+    expect(calcularDisponibilidadCombo([fijo()], [prod('10', { oculto: true, agotadoHasta: futuro })]).disponible).toBe(false);
+    expect(calcularDisponibilidadCombo([fijo()], [prod('10', { oculto: true, controlaStock: true, saldo: 0 })]).disponible).toBe(false);
+    expect(motivoProductoBloqueado(prod('10', { oculto: true, controlaStock: true, saldo: 0 }))).toBe('Stock 0');
+    expect(motivoProductoBloqueado(prod('10', { agotadoHasta: futuro }))).toMatch(/^Agotado hasta \d\d:\d\d$/);
+    expect(motivoProductoBloqueado(prod('10', { oculto: true }))).toBeNull();
+  });
+
+  it('oculto en elección por categoría no se ofrece; en lista explícita sí', () => {
+    const porCat: ParteDisp = { tipo: 'A_ELECCION', cantidad: 1, categorias: ['1'], productos: [], alternativas: [] };
+    expect(calcularDisponibilidadCombo([porCat], [prod('1', { oculto: true })]).disponible).toBe(false);
+    const lista: ParteDisp = { ...porCat, categorias: [], productos: ['1'] };
+    expect(calcularDisponibilidadCombo([lista], [prod('1', { oculto: true })]).disponible).toBe(true);
   });
 
   it('UNA_DE: basta un producto disponible', () => {
     const parte: ParteDisp = { tipo: 'UNA_DE', cantidad: 1, categorias: [], productos: ['1', '2'], alternativas: [] };
     expect(calcularDisponibilidadCombo([parte], [prod('1', { oculto: true }), prod('2')]).disponible).toBe(true);
-    expect(calcularDisponibilidadCombo([parte], [prod('1', { oculto: true }), prod('2', { agotadoHasta: futuro })]).disponible).toBe(false);
+    expect(calcularDisponibilidadCombo([parte], [prod('1', { agotadoHasta: futuro }), prod('2', { agotadoHasta: futuro })]).disponible).toBe(false);
   });
 
   it('A_ELECCION: mira los productos de sus categorías', () => {
