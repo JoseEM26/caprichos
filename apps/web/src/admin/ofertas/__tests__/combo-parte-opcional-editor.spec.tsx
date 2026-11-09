@@ -42,6 +42,17 @@ describe('Editor de partes: parte opcional', () => {
     expect(errorDePartes([fijo({ opcional: true, cantidadMax: 3, precioExtra: 6 })])).toBeNull();
   });
 
+  it('avisa si hay precio por extra pero el máximo es igual a lo incluido (no se podrían pedir extras)', () => {
+    const msg = errorDePartes([fijo({ opcional: true, cantidad: 1, cantidadMax: 1, precioExtra: 6 })]);
+    expect(msg).toMatch(/sube el máximo/);
+    expect(msg).toMatch(/por ejemplo a 2/);
+    // sin máximo explícito también cuenta como «igual a lo incluido»
+    expect(errorDePartes([fijo({ opcional: true, cantidad: 1, cantidadMax: null, precioExtra: 6 })])).toMatch(/sube el máximo/);
+    // sin precio de extra, o con lugar para extras, es válido
+    expect(errorDePartes([fijo({ opcional: true, cantidad: 1, cantidadMax: 1, precioExtra: null })])).toBeNull();
+    expect(errorDePartes([fijo({ opcional: true, cantidad: 1, cantidadMax: 2, precioExtra: 6 })])).toBeNull();
+  });
+
   it('guarda los campos solo si es opcional; el FIJO normal queda opcional:false', () => {
     const guardado = partesParaGuardar([fijo({ opcional: true, cantidadMax: 3, precioExtra: 6, incluidaPorDefecto: false }), fijo()], [], productos);
     expect(guardado[0]).toMatchObject({ opcional: true, cantidadMin: 0, cantidadMax: 3, incluidaPorDefecto: false, precioExtra: 6 });

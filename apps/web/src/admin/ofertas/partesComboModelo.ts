@@ -266,6 +266,8 @@ export function faltaEnBloque(partes: Parte[], b: Bloque, n: number): string | n
     if (piezaVaciaDeDatos(parte)) return `Te falta elegir el producto de la tarjeta ${n}.`;
     if ((parte.cantidadMax ?? parte.cantidad ?? 1) < (parte.cantidad || 1)) return `En la tarjeta ${n}, el máximo que puede llevar no puede ser menor que las incluidas en el precio.`;
     if (parte.precioExtra != null && !(Number(parte.precioExtra) >= 0)) return `En la tarjeta ${n}, el precio de cada extra no puede ser negativo.`;
+    // Con precio de extra pero sin lugar para extras: la carta no mostraría «+ S/ …» y el cliente no podría pedirlos
+    if (Number(parte.precioExtra) > 0 && (parte.cantidadMax ?? parte.cantidad ?? 1) <= (parte.cantidad || 1)) return `En la tarjeta ${n}, pusiste un precio por cada extra pero el máximo que puede llevar es igual a lo incluido: sube el máximo (por ejemplo a ${(parte.cantidad || 1) + 1}) para que pueda pedir extras.`;
     return null;
   }
   if (!piezaVaciaDeDatos(parte)) return null;
