@@ -1,0 +1,16 @@
+/* Vista previa de lo que se imprime. Tokens --cp-*, táctil 44 px, sin scroll horizontal de página. */
+.pv > details { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pv-resumen { display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-height: 44px; justify-content: center; }
+.pv-resumen h3 { display: inline; margin: 0; }
+.pv-pestanas, .pv-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.pv-campo { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.pv-campo select { min-height: 44px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: #fff; color: var(--cp-navy, #0B2C3E); font: inherit; padding: 0 10px; max-width: 100%; }
+.pv .ie-chip { min-height: 44px; }
+.pv .ie-chip[aria-selected="true"] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
+.pv .ie-vp-papel { max-width: 100%; min-width: 0; }
+.pv-papel { --pv-fs: clamp(9px, calc((100vw - 110px) / 29), 12px); box-sizing: content-box; padding: 12px 10px; background: #fff; color: #000; border: 1px solid #d8d8d8; flex: none; }
+.pv-qr { display: flex; justify-content: center; padding: 6px 0; }
+.pv-qr span { width: 6em; height: 6em; display: flex; align-items: center; justify-content: center; border: 3px solid #000; background: repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0 / 1em 1em; color: #fff; font-weight: 800; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+.ic-ver { min-height: 44px; margin-top: 6px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: var(--cp-navy, #0B2C3E); font: 800 14px inherit; cursor: pointer; align-self: flex-start; }
+.ic-ver:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+.ic-envoltura { display: flex; flex-direction: column; min-width: 0; }

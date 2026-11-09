@@ -90,7 +90,7 @@ describe('Impresión en 3 pasos', () => {
     montar();
     const lista = await screen.findByTestId('lista-pcs');
     const tarjetas = within(lista).getAllByRole('button');
-    expect(tarjetas.map((t) => t.getAttribute('data-testid'))).toEqual(['card-12', 'card-10']);
+    expect(tarjetas.map((t) => t.getAttribute('data-testid')).filter((t) => t?.startsWith('card-'))).toEqual(['card-12', 'card-10']);
     expect(screen.getByTestId('contador-pcs')).toHaveTextContent('2 computadoras · 1 conectada');
     expect(screen.getByTestId('card-12')).toHaveTextContent('Nueva · falta configurar');
     expect(screen.getByTestId('card-10')).toHaveTextContent('Ticket de pago');
@@ -102,6 +102,17 @@ describe('Impresión en 3 pasos', () => {
     expect(within(dialogo).getByTestId('nombre-10')).toHaveValue('PC Caja');
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('el panel «Vista previa» está abierto y «Ver ejemplos» de una PC lo abre con el tamaño de esa PC', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    equiposEstado = [equipo('10', 'PC Caja', { config: { ...CFG_OK, tamanoBebida: { anchoMm: 60, altoMm: 40 } } }), equipo('11', 'PC Bebidas')];
+    montar();
+    const panel = await screen.findByTestId('panel-previa');
+    expect(panel.querySelector('details')).toHaveAttribute('open');
+    fireEvent.click(screen.getByTestId('ver-ejemplos-10'));
+    expect((screen.getByTestId('pv-pc') as HTMLSelectElement).value).toBe('10');
+    expect(screen.getByTestId('pv-texto')).toHaveTextContent('60 × 40 mm (PC Caja)');
   });
 
   it('deduplica: una PC archivada/antigua no sale y la repetida lleva insignia «Posible duplicado»', async () => {
