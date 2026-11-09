@@ -13,6 +13,10 @@ export interface ConfirmarProps {
   cargando?: boolean;
   /** Deshabilita solo el botón de confirmar (p. ej. falta elegir mesa). */
   deshabilitarConfirmar?: boolean;
+  /** Foco inicial en «No» (acciones que no deben dispararse por un toque accidental). */
+  focoInicialNo?: boolean;
+  /** Error al confirmar: se ve en la ventana y el botón pasa a «Reintentar». */
+  error?: string | null;
   alConfirmar: () => void | Promise<void>;
   alCancelar: () => void;
   children?: React.ReactNode;
@@ -28,6 +32,8 @@ export function Confirmar({
   peligro = false,
   cargando = false,
   deshabilitarConfirmar = false,
+  focoInicialNo = false,
+  error = null,
   alConfirmar,
   alCancelar,
   children,
@@ -40,17 +46,17 @@ export function Confirmar({
   // ponytail: sin trampa de foco (Tab puede salir); basta para confirmaciones cortas.
   useEffect(() => {
     if (!abierto) return;
-    dialogoRef.current?.querySelector<HTMLButtonElement>('[data-confirmar-principal]')?.focus();
+    dialogoRef.current?.querySelector<HTMLButtonElement>(focoInicialNo ? '[data-confirmar-no]' : '[data-confirmar-principal]')?.focus();
     const alTeclear = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !cargando) alCancelarRef.current();
     };
     document.addEventListener('keydown', alTeclear);
     return () => document.removeEventListener('keydown', alTeclear);
-  }, [abierto, cargando]);
+  }, [abierto, cargando, focoInicialNo]);
 
   if (!abierto || typeof document === 'undefined') return null;
 
-  const textoBotonSi = textoConfirmar || textoSi;
+  const textoBotonSi = error ? 'Reintentar' : textoConfirmar || textoSi;
 
   // Portal a document.body: sale centrada en la ventana visible aunque se
   // abra desde un modal con scroll o con transform/filter en un ancestro.
@@ -118,6 +124,11 @@ export function Confirmar({
             </p>
           )}
           {children}
+          {error && (
+            <p role="alert" style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--cp-error, #b42318)' }}>
+              {error}
+            </p>
+          )}
         </div>
 
         <div
@@ -132,6 +143,7 @@ export function Confirmar({
           <Boton
             type="button"
             variante="secundario"
+            data-confirmar-no=""
             disabled={cargando}
             onClick={alCancelar}
           >
