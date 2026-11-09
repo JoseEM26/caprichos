@@ -7,6 +7,7 @@ import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
+import { ticketEjemplo } from './ticketCierreEjemplo';
 
 describe('Ola F5: Caja y Cierres', () => {
   beforeEach(() => {
@@ -144,6 +145,7 @@ describe('Ola F5: Caja y Cierres', () => {
         { medio: 'EFECTIVO', sistema: 355, visto: 351, diferencia: -4 },
         { medio: 'YAPE', sistema: 200, visto: 200, diferencia: 0 },
       ],
+      ticket: ticketEjemplo(),
     });
 
     // Caso A: Usuario CAJERO (no ADMIN)
@@ -161,6 +163,7 @@ describe('Ola F5: Caja y Cierres', () => {
     });
 
     // Para no ADMIN: el detalle por medio NO debe existir en el DOM
+    fireEvent.click(screen.getByRole('tab', { name: 'Medios de pago' }));
     expect(screen.queryByTestId('detalle-medios')).not.toBeInTheDocument();
     expect(screen.getByTestId('aviso-detalle-restringido')).toBeInTheDocument();
 
@@ -184,12 +187,12 @@ describe('Ola F5: Caja y Cierres', () => {
     // Ahora como ADMIN sí debe mostrarse el detalle por medio con diferencias
     await waitFor(() => {
       expect(screen.getByTestId('detalle-medios')).toBeInTheDocument();
-      expect(screen.getByText(/Detalle por medio de pago \(solo administrador\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/EFECTIVO/)).toBeInTheDocument();
-      expect(screen.getByText(/Sist\. S\/ 355\.00/)).toBeInTheDocument();
-      expect(screen.getByText(/Cont\. S\/ 351\.00/)).toBeInTheDocument();
-      expect(screen.getByText(/- S\/ 4\.00/)).toBeInTheDocument();
     });
+    const tabla = screen.getByTestId('detalle-medios');
+    expect(tabla).toHaveTextContent('EFECTIVO');
+    expect(tabla).toHaveTextContent('S/ 355.00');
+    expect(tabla).toHaveTextContent('S/ 351.00');
+    expect(tabla).toHaveTextContent('−S/ 4.00');
   });
 
   it('muestra el resumen esperado al cajero y al ADMIN en CierreView', async () => {

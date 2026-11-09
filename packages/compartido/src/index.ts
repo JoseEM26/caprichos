@@ -80,6 +80,8 @@ export type { LineaDetalleEntrada, DetalleLinea, DescuentoTicket } from './etiqu
 export { lineasTicketComandaSalon } from './etiquetas/ticketComanda.js';
 export type { LineaComanda } from './etiquetas/ticketComanda.js';
 export type { LineaTicket } from './etiquetas/ticketPago.js';
+export { lineasTicketCierre, desglosarConteo, DENOMINACIONES_CIERRE } from './etiquetas/ticketCierre.js';
+export type { TicketCierreDatos, RenglonDesglose } from './etiquetas/ticketCierre.js';
 export { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './etiquetas/logoBitmap.js';
 export {
   UMBRALES_AVISO_STOCK_DEFECTO,

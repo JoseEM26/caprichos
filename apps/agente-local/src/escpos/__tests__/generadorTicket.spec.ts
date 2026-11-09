@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { TicketPagoDatos } from '@caprichos/compartido';
-import { bloqueQrEscPos, generarTicketEscPos, generarComandaSalonEscPos } from '../generadorTicket';
+import { bloqueQrEscPos, generarTicketEscPos, generarComandaSalonEscPos, generarCierreEscPos } from '../generadorTicket';
 
 const CADENA = '20600000001|03|B002|1|1.80|11.80|2026-11-02|1|00000000|';
 const GS_K = Buffer.from([0x1d, 0x28, 0x6b]);
@@ -99,5 +99,21 @@ describe('simulación de pedido', () => {
     expect(generarTicketEscPos(base, 48).toString('latin1')).not.toContain('PRUEBA');
     const comanda: any = { codigo: 'PRUEBA', mesa: null, lineas: [], simulacion: true };
     expect(generarComandaSalonEscPos(comanda, 48).toString('latin1')).toContain('*** PRUEBA ***');
+  });
+});
+
+describe('generarCierreEscPos', () => {
+  it('imprime el cierre con su desglose y termina con corte', () => {
+    const t: any = {
+      local: { nombre: 'Caprichos' }, codigo: 'CZ-0012', fecha: '21/10/2026', cerradoEn: '21:30', abiertoPor: 'Ana', cerradoPor: 'Luis',
+      apertura: 100, resultado: 'CUADRA', diferencia: 0, aprobadoPor: null, nota: null,
+      efectivo: { desglose: [{ valor: 200, cantidad: 1, subtotal: 200 }], contado: 200, esperado: 200, diferencia: 0 },
+      intentos: [], medios: [{ medio: 'EFECTIVO', sistema: 200, visto: 200, diferencia: 0 }],
+      movimientos: [], correcciones: [], liquidaciones: [], anulaciones: [],
+    };
+    const txt = generarCierreEscPos(t, 48).toString('latin1');
+    expect(txt).toContain('CIERRE DE CAJA CZ-0012');
+    expect(txt).toContain('1 x S/ 200.00');
+    expect(txt.endsWith('\x1dV\x42\x00')).toBe(true);
   });
 });

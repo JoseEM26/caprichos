@@ -1,4 +1,5 @@
 import { api } from '../../comun/api';
+import type { TicketCierreDatos } from '@caprichos/compartido';
 import type { CobrarDto, CobroTurno, MovimientoCaja } from '../pedidos/pedidosApi';
 
 /** Pedido sin cobrar de cualquier día: bloquea el cierre hasta cobrarlo o anularlo (RN-CAP-079). */
@@ -225,6 +226,8 @@ export interface DetalleCierreCompleto {
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
   ajustesMedio?: AjusteMedio[];
+  /** Todo el detalle del cierre ya armado (el mismo que se imprime); falta en respuestas de un API viejo. */
+  ticket?: TicketCierreDatos;
 }
 
 export const DENOMINACIONES_LISTA: Array<{ valor: number; clave: string; tipo: 'billete' | 'moneda'; etiqueta: string }> = [
@@ -295,4 +298,8 @@ export const cierreApi = {
 
   obtenerCierrePorId: (id: string | number) =>
     api.get<DetalleCierreCompleto>(`/admin/cierre/${id}`),
+
+  /** Encola el ticket de cierre en la ticketera de Caja. */
+  imprimirCierre: (id: string | number) =>
+    api.post<{ ok: boolean; mensaje: string }>(`/admin/cierre/${id}/imprimir`, {}),
 };

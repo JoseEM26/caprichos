@@ -1,0 +1,39 @@
+/* Detalle del cierre: móvil primero, táctil 44 px, cabecera y pie fijos. */
+.dc-fondo { position: fixed; inset: 0; z-index: 60; background: rgba(11, 44, 62, 0.55); display: flex; align-items: flex-end; justify-content: center; }
+.dc-dialogo { background: var(--cp-cream, #FBF4EC); color: var(--cp-navy, #0B2C3E); width: 100%; max-height: 100dvh; height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; }
+@media (min-width: 640px) {
+  .dc-fondo { align-items: center; padding: 12px; }
+  .dc-dialogo { width: min(560px, 100%); height: auto; max-height: calc(100dvh - 24px); border-radius: 20px; box-shadow: 0 20px 50px rgba(11, 44, 62, 0.4); }
+}
+.dc-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--cp-line, #E3D6C6); flex: none; }
+.dc-cabecera h2 { margin: 0; font: 800 18px Montserrat, sans-serif; }
+.dc-x { width: 44px; height: 44px; border-radius: 22px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
+.dc-cuerpo { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.dc-pestanas { display: flex; gap: 6px; overflow-x: auto; flex: none; padding-bottom: 2px; }
+.dc-tab { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: inherit; font: 800 13px inherit; white-space: nowrap; cursor: pointer; }
+.dc-tab[aria-selected="true"] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
+.dc-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dc-lista { margin: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 12px; }
+.dc-fila { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--cp-sand, #EDE1D1); font-size: 14px; }
+.dc-fila:first-child { border-top: 0; }
+.dc-fila dt { color: var(--cp-soft, #2C4C5D); }
+.dc-fila dd { margin: 0; text-align: right; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.dc-tabla { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 12px; font-size: 13px; }
+.dc-tabla th, .dc-tabla td { padding: 8px 8px; text-align: right; border-top: 1px solid var(--cp-sand, #EDE1D1); }
+.dc-tabla th:first-child, .dc-tabla td:first-child { text-align: left; }
+.dc-tabla thead th { border-top: 0; color: var(--cp-soft, #2C4C5D); font-size: 12px; }
+.dc-bloque h4 { margin: 8px 0 4px; font-size: 14px; }
+.dc-items { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.dc-intento { background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 12px; padding: 0 10px 8px; margin-top: 6px; font-size: 13px; }
+.dc-intento summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.dc-aviso { margin: 0; padding: 10px 12px; background: #fff; border: 1px dashed var(--cp-line, #E3D6C6); border-radius: 12px; font-size: 13px; color: var(--cp-soft, #2C4C5D); }
+.dc-ok { color: var(--cp-green, #2F7A45); }
+.dc-mal { color: var(--cp-rust, #B2500F); }
+.dc-ticket { display: flex; justify-content: center; max-width: 100%; overflow-x: auto; }
+.dc-pie { flex: none; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--cp-line, #E3D6C6); background: var(--cp-cream, #FBF4EC); display: flex; flex-direction: column; gap: 6px; }
+.dc-pie p { margin: 0; font-size: 13px; font-weight: 700; }
+.dc-acciones { display: flex; gap: 8px; }
+.dc-btn { flex: 1; min-height: 44px; border: 1.5px solid var(--cp-navy, #0B2C3E); border-radius: 12px; background: transparent; color: var(--cp-navy, #0B2C3E); font: 800 14px inherit; cursor: pointer; }
+.dc-btn-fuerte { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
+.dc-btn[disabled] { opacity: 0.6; cursor: default; }
+.dc-tab:focus-visible, .dc-btn:focus-visible, .dc-x:focus-visible, .dc-intento summary:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }

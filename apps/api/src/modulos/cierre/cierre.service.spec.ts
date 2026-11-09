@@ -226,6 +226,7 @@ describe('CierreService', () => {
           persona: { nombres: 'Carlos', apellidos: 'Repartidor' },
         }),
       },
+      parametro: { findUnique: jest.fn().mockResolvedValue(null) },
       liquidacion: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 100n, ...data })),

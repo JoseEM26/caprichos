@@ -1,5 +1,5 @@
-import { lineasTicketPago, lineasTicketComandaSalon } from '@caprichos/compartido';
-import type { TicketPagoDatos, TicketComandaSalonDatos } from '@caprichos/compartido';
+import { lineasTicketPago, lineasTicketComandaSalon, lineasTicketCierre } from '@caprichos/compartido';
+import type { TicketPagoDatos, TicketComandaSalonDatos, TicketCierreDatos } from '@caprichos/compartido';
 import { aWindows1252 } from '../tspl/codepage1252';
 
 const ESC = '\x1b';
@@ -74,5 +74,20 @@ export function generarComandaSalonEscPos(c: TicketComandaSalonDatos, columnas: 
     partes.push(l.negrita ? `${ESC}E\x01${l.texto}\n${ESC}E\x00` : `${l.texto}\n`);
   }
   partes.push(`\n\n\n${GS}V\x42\x00`);
+  return aWindows1252(partes.join(''));
+}
+
+/** Ticket de cierre de caja en ESC/POS (texto, negrita y centrado; mismo corte que el ticket de pago). */
+export function generarCierreEscPos(t: TicketCierreDatos, columnas: number = 48): Buffer {
+  const partes: string[] = [`${ESC}@${ESC}t\x10`];
+  let centrado = false;
+  for (const l of lineasTicketCierre(t, columnas)) {
+    if (!!l.centrado !== centrado) {
+      centrado = !!l.centrado;
+      partes.push(`${ESC}a${centrado ? '\x01' : '\x00'}`);
+    }
+    partes.push(l.negrita ? `${ESC}E\x01${l.texto}\n${ESC}E\x00` : `${l.texto}\n`);
+  }
+  partes.push(`${ESC}a\x00\n\n\n${GS}V\x42\x00`);
   return aWindows1252(partes.join(''));
 }
