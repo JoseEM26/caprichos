@@ -858,6 +858,11 @@ export function RepartidorView() {
     cargarDatos();
   });
 
+  // Caja cambió el pago de un pedido mío: el efectivo a cobrar se actualiza en vivo
+  useEventos('pedido:pago', () => {
+    cargarDatos();
+  });
+
   const acciones = useAccionesReparto({ alActualizar: cargarDatos });
 
   // Mis pedidos en el orden de la ruta que dice el servidor

@@ -167,6 +167,8 @@ export interface Pedido {
   pago_estado?: string | null;
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
+  /** Último cambio de pago (Caja, mozo o repartidor): quién, cuándo y «Pago modificado: antes → ahora» */
+  ajustePago?: { por: string | null; en: string; texto: string } | null;
   /** Número del día en cocina (referencial); null si no llegó a cocina */
   numero_dia?: number | null;
   fecha_dia?: string | null;
@@ -475,6 +477,14 @@ export const pedidosApi = {
     dto: { nombre: string; telefono: string; direccion?: string; referencia?: string; motivo?: string },
   ): Promise<{ avisosPendientes: number; numeroDeCuenta: string | null }> {
     return api.patch(`/admin/pedidos/${id}/cliente`, dto);
+  },
+
+  /** Cambia o agrega medios de pago (siempre disponible, sin código de supervisor ni aprobación). */
+  async ajustarPago(
+    id: string | number,
+    dto: { plan: Array<{ medio: string; monto: number }>; pagaCon?: number | null; motivo?: string },
+  ): Promise<{ ok: boolean; mensaje: string; avisos: string[]; ajustePosteriorAlCierre: boolean }> {
+    return api.post(`/admin/pedidos/${id}/pago/ajustar`, dto);
   },
 
   async registrarPago(

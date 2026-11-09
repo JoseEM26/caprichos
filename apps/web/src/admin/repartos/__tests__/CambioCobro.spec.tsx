@@ -33,14 +33,14 @@ describe('Formulario «Cambiar forma de pago» del repartidor', () => {
     expect(screen.queryByTestId('btn-cambiar-pago')).toBeNull();
   });
 
-  it('con parte digital la captura es obligatoria: sin foto no se puede enviar', async () => {
+  // ANTES: la captura era obligatoria y el envío quedaba PENDIENTE de Caja; ahora es opcional y el cambio se aplica al instante
+  it('con parte digital la captura es opcional: se puede cambiar sin foto y con foto se envía', async () => {
     const solicitar = vi.spyOn(cambioCobroApi, 'solicitar').mockResolvedValue(solicitud());
     const { alEnviado } = montar();
     fireEvent.click(screen.getByTestId('btn-cambiar-pago'));
     // el formulario propone Yape por el total (el medio actual es efectivo)
-    expect(screen.getByTestId('captura-YAPE')).toHaveTextContent('obligatoria');
-    expect(screen.getByTestId('captura-YAPE')).toHaveTextContent('Falta la captura');
-    expect(screen.getByTestId('enviar-cambio-pago')).toBeDisabled();
+    expect(screen.getByTestId('captura-YAPE')).toHaveTextContent('opcional');
+    expect(screen.getByTestId('enviar-cambio-pago')).toBeEnabled();
 
     // se puede elegir de la galería o de la cámara
     const archivo = foto();
@@ -65,7 +65,7 @@ describe('Formulario «Cambiar forma de pago» del repartidor', () => {
     await waitFor(() => expect(solicitar).toHaveBeenCalledWith('7', expect.objectContaining({ plan: [{ medio: 'TARJETA', monto: 40 }], capturas: {} })));
   });
 
-  it('mixto: pide una captura por cada medio digital', () => {
+  it('mixto: una captura opcional por cada medio digital', () => {
     montar();
     fireEvent.click(screen.getByTestId('btn-cambiar-pago'));
     fireEvent.click(screen.getByText(/Agregar otro medio/));
@@ -74,7 +74,7 @@ describe('Formulario «Cambiar forma de pago» del repartidor', () => {
     fireEvent.change(screen.getByLabelText('Monto en Plin'), { target: { value: '10' } });
     expect(screen.getByTestId('captura-YAPE')).toHaveTextContent('S/ 30.00');
     expect(screen.getByTestId('captura-PLIN')).toHaveTextContent('S/ 10.00');
-    expect(screen.getByTestId('enviar-cambio-pago')).toBeDisabled();
+    expect(screen.getByTestId('enviar-cambio-pago')).toBeEnabled();
   });
 
   it('un error del servidor (captura ilegible) se muestra y no cierra el formulario', async () => {
@@ -91,6 +91,12 @@ describe('Formulario «Cambiar forma de pago» del repartidor', () => {
     montar({ solicitud: solicitud() });
     expect(screen.getByTestId('estado-cambio-cobro')).toHaveTextContent('Esperando que Caja valide el pago…');
     expect(screen.queryByTestId('btn-cambiar-pago')).toBeNull();
+  });
+
+  it('aplicada de inmediato: muestra «Cambio de pago aplicado» y deja volver a cambiar (sin aprobación de Caja)', () => {
+    montar({ solicitud: solicitud({ estado: 'APROBADA' }) });
+    expect(screen.getByTestId('estado-cambio-cobro')).toHaveTextContent('Cambio de pago aplicado');
+    expect(screen.getByTestId('btn-cambiar-pago')).toBeInTheDocument();
   });
 
   it('rechazada: avisa que cobre con el medio original y deja pedir de nuevo', () => {

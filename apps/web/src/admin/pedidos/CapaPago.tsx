@@ -15,6 +15,7 @@ import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { digitalesDelPlan, faltanCapturas, medioDigitalVoucher } from './mediosPago';
 import { nombreMedio } from './planPago';
+import { BotonCambiarPago, MarcaPagoModificado } from './CambiarPago';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -134,6 +135,14 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
               <strong>{medioTxt}</strong>
             </div>
           )}
+
+          {/* Cambiar o agregar medio de pago: siempre, para todo pedido no anulado (sin código ni aprobación) */}
+          {est === 'ANULADO' ? (
+            <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>Pedido anulado: no se puede cambiar el pago.</div>
+          ) : (
+            <BotonCambiarPago permitido={tiene('pedidos/ajustar_pago')} pedido={pedido} alExito={(m) => { alExito(m); alActualizar(); }} />
+          )}
+          <MarcaPagoModificado pedido={pedido} />
 
           {/* Comprobante */}
           <div className="dp-fila" style={{ fontSize: 14 }}>

@@ -65,7 +65,7 @@ export const cambioCobroApi = {
 
 export const TEXTO_ESTADO_CAMBIO: Record<EstadoCambioCobro, string> = {
   PENDIENTE: 'Esperando que Caja valide el pago…',
-  APROBADA: 'Caja aprobó el cambio de pago',
+  APROBADA: 'Cambio de pago aplicado',
   RECHAZADA: 'Caja rechazó el cambio: cobra con el medio original',
   AUTORIZADA_SIN_VALIDAR: 'Caja autorizó la entrega sin validar el pago',
 };

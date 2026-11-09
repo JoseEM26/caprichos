@@ -52,9 +52,9 @@ function CapturaMedio({ medio, monto, archivo, alElegir }: { medio: string; mont
   const elegido = (e: React.ChangeEvent<HTMLInputElement>) => alElegir(e.target.files?.[0]);
   const boton = { minHeight: 48, flex: 1, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' } as const;
   return (
-    <div data-testid={`captura-${medio}`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 10, background: 'var(--cp-white)', border: `1.5px solid ${archivo ? 'var(--cp-green)' : 'var(--cp-rust)'}` }}>
+    <div data-testid={`captura-${medio}`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 10, background: 'var(--cp-white)', border: `1.5px solid ${archivo ? 'var(--cp-green)' : 'var(--cp-line, #E3D6C6)'}` }}>
       <div style={{ fontSize: 13, fontWeight: 800 }}>
-        Captura de {nombreMedio(medio)} (S/ {monto.toFixed(2)}) <span style={{ color: 'var(--cp-rust)' }}>obligatoria</span>
+        Captura de {nombreMedio(medio)} (S/ {monto.toFixed(2)}) <span style={{ color: 'var(--cp-soft)' }}>opcional</span>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={boton} onClick={() => camara.current?.click()}>
@@ -66,14 +66,14 @@ function CapturaMedio({ medio, monto, archivo, alElegir }: { medio: string; mont
       </div>
       <input ref={camara} type="file" accept="image/*" capture="environment" aria-label={`Foto de ${nombreMedio(medio)}`} hidden onChange={elegido} />
       <input ref={galeria} type="file" accept="image/*" aria-label={`Galería de ${nombreMedio(medio)}`} hidden onChange={elegido} />
-      <div style={{ fontSize: 12, fontWeight: 700, color: archivo ? 'var(--cp-green)' : 'var(--cp-rust)' }}>{archivo ? `Lista: ${archivo.name}` : 'Falta la captura'}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: archivo ? 'var(--cp-green)' : 'var(--cp-soft)' }}>{archivo ? `Lista: ${archivo.name}` : 'Sin captura (puedes subirla después)'}</div>
     </div>
   );
 }
 
 /**
  * Botón «Cambiar forma de pago» de la pantalla Pedido: el cliente quiere pagar distinto al llegar. El repartidor elige
- * el medio nuevo (o mixto), sube la captura de cada parte digital y SOLICITA; Caja valida. Hasta entonces no puede entregar.
+ * el medio nuevo (o mixto), sube la captura de cada parte digital (opcional) y el cambio SE APLICA DE INMEDIATO, sin aprobación.
  */
 export function BotonCambiarFormaPago({
   pedidoId,
@@ -102,11 +102,10 @@ export function BotonCambiarFormaPago({
   const plan = useMemo(() => aPlan(filas), [filas]);
   const digitales = plan.filter((f) => MEDIOS_CON_CAPTURA.includes(f.medio));
   const falloPlan = errorPlan(totalCobrable, filas);
-  const faltanCapturas = digitales.some((d) => !capturas[d.medio]);
   const montoEf = montoEfectivoPlan(plan);
   const pagaConNum = Number(pagaCon);
   const pagaConMalo = montoEf > 0 && pagaCon !== '' && !(pagaConNum >= montoEf);
-  const puedeEnviar = !falloPlan && !faltanCapturas && !pagaConMalo && !ocupado;
+  const puedeEnviar = !falloPlan && !pagaConMalo && !ocupado;
 
   // Solo en camino o ya en la puerta; con una solicitud pendiente se ve su estado, no el botón
   if (estado !== 'EN_CAMINO') return null;
@@ -125,7 +124,7 @@ export function BotonCambiarFormaPago({
       setAbierto(false);
       setCapturas({});
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo enviar la solicitud.');
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar la forma de pago.');
     } finally {
       setOcupado(false);
     }
@@ -150,7 +149,7 @@ export function BotonCambiarFormaPago({
           >
             <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--cp-navy)' }}>Nueva forma de pago de {codigo}</div>
             <div style={{ fontSize: 13 }}>
-              Total a cobrar: <strong>S/ {totalCobrable.toFixed(2)}</strong>. El pago no cambia hasta que Caja valide: no podrás entregar mientras tanto.
+              Total a cobrar: <strong>S/ {totalCobrable.toFixed(2)}</strong>. El cambio se aplica al instante y Caja lo ve como aviso, sin aprobación.
             </div>
             <PlanPagoEditor total={totalCobrable} filas={filas} onChange={setFilas} pagaCon={pagaCon} onPagaCon={setPagaCon} />
             {digitales.map((d) => (
@@ -171,7 +170,7 @@ export function BotonCambiarFormaPago({
                 Cancelar
               </Boton>
               <Boton data-testid="enviar-cambio-pago" cargando={ocupado} deshabilitado={!puedeEnviar} onClick={enviar} style={{ flex: 1 }}>
-                Solicitar a Caja
+                Cambiar forma de pago
               </Boton>
             </div>
           </div>

@@ -1047,6 +1047,7 @@ export function PedidosAdminView() {
                   resaltado={pedidosResaltados.has(String(o.id))}
                   cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
                   cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
+                  puedeCambiarPago={tiene('pedidos/ajustar_pago')}
                   alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
                   accion={accionDe(o)}
                   alAccion={ejecutarAccion}

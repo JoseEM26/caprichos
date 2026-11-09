@@ -868,8 +868,18 @@ export class PedidosEstadoService {
       () => ({ eventos: [], cortesiaPorLinea: new Map<string, any>() }),
     );
     const { incidentes, ...pedidoSinIncidentes } = pedido;
+    // Marca «Pago modificado por <usuario> · hora»: el último cambio de pago del historial (AjustarPagoService)
+    const ultimoAjuste = [...((pedido.historial as any[]) ?? [])].reverse().find((h) => String(h.motivo ?? '').startsWith('Pago modificado'));
+    const ajustePago = ultimoAjuste
+      ? {
+          por: ultimoAjuste.por_party_id ? (await nombresDePartes(this.prisma, [ultimoAjuste.por_party_id]).catch(() => new Map<string, string>())).get(String(ultimoAjuste.por_party_id)) ?? null : null,
+          en: ultimoAjuste.en,
+          texto: String(ultimoAjuste.motivo),
+        }
+      : null;
     return {
       ...pedidoSinIncidentes,
+      ajustePago,
       lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
       eventos: eventosPedido,
       ...resumenExtras(pedido),

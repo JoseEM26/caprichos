@@ -1,5 +1,5 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
 import { CambioCobroService, mismoPlan, planActualDelPedido } from './cambio-cobro.service';
@@ -14,6 +14,7 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
   let auditoria: any;
   let gateway: any;
   let service: CambioCobroService;
+  let ajustar: any;
 
   const pedido = (extra: any = {}) => ({
     id: 7n, codigo: 'CP-W007', modalidad: 'DELIVERY', estado: 'EN_CAMINO', repartidor_party_id: 50n,
@@ -44,7 +45,7 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
       solicitudCambioCobro: {
         findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn().mockResolvedValue(solicitud()),
-        create: jest.fn().mockResolvedValue(solicitud()),
+        create: jest.fn().mockResolvedValue(solicitud({ estado: 'APROBADA' })),
         updateMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -57,7 +58,8 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
     vouchers = { subirYProcesar: jest.fn().mockResolvedValue({ id: '11', legible: true }) };
     auditoria = { registrar: jest.fn() };
     gateway = { emitirAdmin: jest.fn() };
-    service = new CambioCobroService(prisma, auditoria, vouchers, new PagoPlanService(), gateway);
+    ajustar = { ajustar: jest.fn().mockResolvedValue({ antes: [{ medio: 'EFECTIVO', monto: 40 }], modificadoPor: 'Luis Ruiz' }) };
+    service = new CambioCobroService(prisma, auditoria, vouchers, new PagoPlanService(), ajustar, gateway);
   });
 
   describe('solicitar', () => {
@@ -67,12 +69,8 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
       expect(prisma.solicitudCambioCobro.create).not.toHaveBeenCalled();
     });
 
-    it.each(['LISTO', 'ENTREGADO', 'ANULADO'])('solo en camino o llegó: en %s da 409', async (estado) => {
-      prisma.pedido.findUnique.mockResolvedValue(pedido({ estado }));
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).rejects.toMatchObject({ response: { codigo: 'ESTADO_INVALIDO' } });
-    });
-
-    it('con la captura queda PENDIENTE: guarda original, solicitado y voucher; no toca el pedido; avisa a Caja', async () => {
+    // ANTES: LISTO/ENTREGADO/ANULADO daban 409 ESTADO_INVALIDO; ahora el estado lo decide AjustarPagoService (solo ANULADO se rechaza allí)
+    it('se aplica de inmediato por AjustarPagoService (sin aprobar) y queda la fila APROBADA para Caja', async () => {
       const r = await service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor);
       expect(vouchers.subirYProcesar).toHaveBeenCalledWith(
         captura,
@@ -80,57 +78,42 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
         repartidor,
         undefined,
       );
+      expect(ajustar.ajustar).toHaveBeenCalledWith('7', { plan: [{ medio: 'YAPE', monto: 40 }], pagaCon: undefined }, repartidor, undefined, 'REPARTIDOR');
       expect(prisma.solicitudCambioCobro.create.mock.calls[0][0].data).toMatchObject({
-        estado: 'PENDIENTE', plan_original: [{ medio: 'EFECTIVO', monto: 40 }], plan_solicitado: [{ medio: 'YAPE', monto: 40 }], voucher_ids: [11n],
+        estado: 'APROBADA', plan_original: [{ medio: 'EFECTIVO', monto: 40 }], plan_solicitado: [{ medio: 'YAPE', monto: 40 }], voucher_ids: [11n], resuelto_por_party_id: 50n,
       });
-      expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'CAMBIO_COBRO_SOLICITADO', rol_destino: 'CAJERO' }) });
-      expect(gateway.emitirAdmin).toHaveBeenCalledWith('cambio-cobro:solicitud', expect.objectContaining({ estado: 'PENDIENTE', pedidoId: '7' }));
-      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'SOLICITAR_CAMBIO_COBRO', partyId: 50n }));
-      expect(r.estado).toBe('PENDIENTE');
-      expect(tx.pedido.update).not.toHaveBeenCalled();
+      expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'CAMBIO_COBRO_APLICADO', rol_destino: 'CAJERO' }) });
+      expect(r.estado).toBe('APROBADA');
     });
 
-    it('la captura de cada medio digital es opcional: «ya yapeó» sin foto queda PENDIENTE y solo sube la que haya', async () => {
+    it('las solicitudes PENDIENTES antiguas del pedido se cierran al aplicar el cambio nuevo', async () => {
+      await service.solicitar('7', { plan: plan([{ medio: 'TARJETA', monto: 40 }]) }, {}, repartidor);
+      expect(prisma.solicitudCambioCobro.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { pedido_id: 7n, estado: 'PENDIENTE' }, data: expect.objectContaining({ estado: 'RECHAZADA' }) }),
+      );
+    });
+
+    it('la captura de cada medio digital es opcional: solo sube la que haya', async () => {
       const mixto = plan([{ medio: 'EFECTIVO', monto: 10 }, { medio: 'YAPE', monto: 20 }, { medio: 'PLIN', monto: 10 }]);
-      await expect(service.solicitar('7', { plan: mixto }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
-      // Solo la de Yape se sube; la de Plin queda para después
+      await expect(service.solicitar('7', { plan: mixto }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'APROBADA' });
       expect(vouchers.subirYProcesar).toHaveBeenCalledTimes(1);
       expect(vouchers.subirYProcesar.mock.calls[0][1]).toMatchObject({ medio: 'YAPE' });
       vouchers.subirYProcesar.mockClear();
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, {}, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
+      await service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, {}, repartidor);
       expect(vouchers.subirYProcesar).not.toHaveBeenCalled();
       expect(prisma.solicitudCambioCobro.create.mock.calls.at(-1)[0].data.voucher_ids).toEqual([]);
     });
 
-    it('efectivo → tarjeta no pide captura; el plan debe cuadrar con el total', async () => {
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'TARJETA', monto: 40 }]) }, {}, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
+    it('el plan debe cuadrar con el total (no se llega a ajustar)', async () => {
       await expect(service.solicitar('7', { plan: plan([{ medio: 'TARJETA', monto: 30 }]) }, {}, repartidor)).rejects.toMatchObject({ response: { codigo: 'PLAN_PAGO_NO_CUADRA' } });
+      expect(ajustar.ajustar).not.toHaveBeenCalled();
     });
 
-    it('la misma forma de pago no es un cambio', async () => {
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'EFECTIVO', monto: 40 }]) }, {}, repartidor)).rejects.toMatchObject({ response: { codigo: 'SIN_CAMBIO' } });
-    });
-
-    it('una captura ilegible no cuenta: se retira y la solicitud sigue sin ella (la captura es opcional)', async () => {
+    it('una captura ilegible no cuenta: se retira y el cambio sigue sin ella', async () => {
       vouchers.subirYProcesar.mockResolvedValue({ id: '11', legible: false });
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
-      expect(prisma.voucherPago.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: { in: [11n] } }, data: { retirado: true } });
+      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'APROBADA' });
+      expect(prisma.voucherPago.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 11n }, data: { retirado: true } });
       expect(prisma.solicitudCambioCobro.create.mock.calls[0][0].data.voucher_ids).toEqual([]);
-    });
-
-    it('con una solicitud pendiente no se acepta otra (409), ni por la carrera del índice único', async () => {
-      prisma.solicitudCambioCobro.findFirst.mockResolvedValue(solicitud());
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'TARJETA', monto: 40 }]) }, {}, repartidor)).rejects.toMatchObject({ response: { codigo: 'CAMBIO_COBRO_PENDIENTE' } });
-      prisma.solicitudCambioCobro.findFirst.mockResolvedValue(null);
-      prisma.solicitudCambioCobro.create.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }));
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'TARJETA', monto: 40 }]) }, {}, repartidor)).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it('paga con menor al efectivo a cobrar es inválido', async () => {
-      const mixto = plan([{ medio: 'EFECTIVO', monto: 15 }, { medio: 'TARJETA', monto: 25 }]);
-      await expect(service.solicitar('7', { plan: mixto, pagaCon: 10 }, {}, repartidor)).rejects.toBeInstanceOf(BadRequestException);
-      await service.solicitar('7', { plan: mixto, pagaCon: 20 }, {}, repartidor);
-      expect(prisma.solicitudCambioCobro.create.mock.calls[0][0].data.paga_con).toBe(20);
     });
   });
 
