@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ElementoPlano, MesaSalon } from '../tipos';
 import { useMantenerPresionado } from '../useMantenerPresionado';
+import { RellenoMesa } from './RellenoMesa';
+import type { ProgresoPiezas } from '../progresoMesa';
 import '../salon.css';
 
 export interface CuadriculaPlanoProps {
@@ -23,6 +25,8 @@ export interface CuadriculaPlanoProps {
   alMantenerMesaSalon?: (mesa: MesaSalon) => void;
   /** Mesas con anillo naranja y la etiqueta «Esta mesa» (detalle de un pedido). No cambia su color ni su selección. */
   mesasResaltadasIds?: string[];
+  /** Avance de cocina por id de mesa ocupada: el agua que sube dentro de la mesa */
+  progresoMesas?: Record<string, ProgresoPiezas>;
 }
 
 export const ESTILOS_ELEMENTOS: Record<
@@ -126,6 +130,7 @@ export function CuadriculaPlano({
   modoDestino = false,
   alMantenerMesaSalon,
   mesasResaltadasIds = [],
+  progresoMesas,
 }: CuadriculaPlanoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa), 1000);
@@ -558,9 +563,14 @@ export function CuadriculaPlano({
                 </div>
               )}
 
+              {modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA' && progresoMesas?.[elem.id] && (
+                <RellenoMesa progreso={progresoMesas[elem.id]} nombre={etiquetaMesaOcupada(elem, mesaSalon)} />
+              )}
+
               {/* Texto principal del elemento */}
               <span
                 style={{
+                  position: 'relative',
                   lineHeight: '13px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',

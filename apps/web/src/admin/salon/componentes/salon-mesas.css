@@ -1,0 +1,208 @@
+/* Agua que sube dentro de la mesa del plano */
+.rm-agua {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.rm-nivel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--cp-navy) 28%, transparent);
+  transition: height 0.8s ease, background-color 0.4s ease;
+}
+.rm-agua--listo .rm-nivel {
+  background: #9ed9af;
+}
+.rm-texto {
+  position: relative;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 12px;
+  color: var(--cp-navy);
+}
+
+/* Lista de mesas ocupadas */
+.mo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.mo-titulo {
+  margin: 0;
+  font-size: 15px;
+  color: var(--cp-navy);
+}
+.mo-lista,
+.mo-filas,
+.mo-areas,
+.mo-lineas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mo-lista {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+.mo-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--cp-white);
+  border: 1.5px solid var(--cp-line);
+  border-radius: 12px;
+}
+.mo-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mo-nombre {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--cp-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  cursor: pointer;
+}
+.mo-chip {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  background: var(--cp-sand);
+  color: var(--cp-navy);
+  font-size: 12px;
+  font-weight: 800;
+}
+.mo-barra-caja {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mo-barra {
+  flex: 1;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--cp-sand);
+  overflow: hidden;
+}
+.mo-barra-nivel {
+  display: block;
+  height: 100%;
+  background: var(--cp-orange);
+  transition: width 0.8s ease, background-color 0.4s ease;
+}
+.mo-barra--listo .mo-barra-nivel {
+  background: var(--cp-ok);
+}
+.mo-pct {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--cp-navy);
+  white-space: nowrap;
+}
+.mo-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mo-area {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid var(--cp-line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-navy);
+}
+.mo-area--lista {
+  background: var(--cp-greenbg);
+  border-color: var(--cp-ok);
+}
+.mo-filas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.mo-fila {
+  border: 1px solid var(--cp-line);
+  border-radius: 10px;
+  background: var(--cp-cream);
+}
+.mo-fila-cab {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--cp-navy);
+  cursor: pointer;
+}
+.mo-fila-titulo {
+  font-weight: 800;
+  font-size: 14px;
+}
+.mo-fila-meta {
+  grid-column: 1;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mo-flecha {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  font-size: 11px;
+}
+.mo-fila-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+.mo-lineas {
+  font-size: 13px;
+  color: var(--cp-navy);
+}
+.mo-extra {
+  min-height: 44px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy);
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+  font-weight: 800;
+  cursor: pointer;
+}
+.mo-nombre:focus-visible,
+.mo-fila-cab:focus-visible,
+.mo-extra:focus-visible {
+  outline: 3px solid var(--cp-gold);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-nivel,
+  .mo-barra-nivel {
+    transition: none;
+  }
+}
