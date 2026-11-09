@@ -998,7 +998,11 @@
   position: absolute;
   bottom: 50px;
   left: 0;
-  z-index: 30;
+  /* por encima del fondo transparente (.msg-menu-fondo, z 40): si no, el toque cae en el fondo y cierra sin insertar */
+  z-index: 41;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  max-height: 70vh;
+  overflow-y: auto;
   width: 300px;
   max-width: 86vw;
   padding: 8px;
@@ -1012,6 +1016,7 @@
 .msg-emojis-cat { flex: 1; min-height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: 18px; cursor: pointer; }
 .msg-emojis-cat[aria-selected='true'] { background: #D9FDD3; }
 .msg-emojis-grilla { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 180px; overflow-y: auto; margin-top: 6px; }
+.msg-emoji, .msg-emojis-cat { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
 .msg-emoji { min-height: 34px; border: 0; background: transparent; font-size: 21px; border-radius: 6px; cursor: pointer; }
 .msg-emoji:hover, .msg-emoji:focus-visible { background: #EEF2F4; }
 .msg-emojis-vacio { grid-column: 1 / -1; padding: 12px 4px; color: #54656F; font-size: 13px; }

@@ -93,7 +93,12 @@ export function insertarEnCursor(
   inicio: number | null,
   fin: number | null,
 ): { texto: string; cursor: number } {
-  const a = inicio ?? texto.length;
-  const b = fin ?? a;
+  const sustituto = (i: number) => i > 0 && i < texto.length && /[\uDC00-\uDFFF]/.test(texto[i]) && /[\uD800-\uDBFF]/.test(texto[i - 1]);
+  let a = Math.min(Math.max(inicio ?? texto.length, 0), texto.length);
+  let b = Math.min(Math.max(fin ?? a, a), texto.length);
+  // nunca cortar un par sustituto por la mitad
+  if (sustituto(a)) a -= 1;
+  if (sustituto(b)) b += 1;
+  if (inicio === fin) b = a; // cursor sin selección: solo inserta, no borra
   return { texto: texto.slice(0, a) + emoji + texto.slice(b), cursor: a + emoji.length };
 }
