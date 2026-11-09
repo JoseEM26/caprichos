@@ -62,6 +62,9 @@ export interface ChatResumen {
   /** Minutos que el último mensaje del cliente lleva sin respuesta (sin persona que lo tomó); null si ya se respondió. */
   sinRespuestaMin?: number | null;
   bloqueoSpam?: BloqueoSpam | null;
+  /** Lista manual de números bloqueados / número del propio negocio: no se les envía nada. */
+  numeroBloqueado?: boolean;
+  numeroPropio?: boolean;
   pos?: PosChat;
   faltaProcesar?: boolean;
   /** Solo en «Atendidos»: cuándo (ISO) y quién lo archivó. */
@@ -138,6 +141,8 @@ export interface DetalleConversacion {
   altaDemanda: boolean;
   motivoDerivacion?: string | null;
   bloqueoSpam?: BloqueoSpam | null;
+  numeroBloqueado?: boolean;
+  numeroPropio?: boolean;
   voucher?: import('../vouchers/tipos').VoucherResumenChat | null;
 }
 

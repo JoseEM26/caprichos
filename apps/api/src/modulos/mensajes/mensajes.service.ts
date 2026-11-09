@@ -22,6 +22,7 @@ import { EditarNombreContactoDto } from './dto/mensajes.dto';
 import { MATRIZ } from '../acceso/permisos';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
 import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-cambios';
+import { NumerosWhatsappService } from '../chatbot/servicios/numeros-whatsapp.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
@@ -138,7 +139,17 @@ export class MensajesService {
     @Optional() private readonly archivos?: ArchivosService,
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly puntosService?: PuntosService,
+    @Optional() private readonly numeros?: NumerosWhatsappService,
   ) {}
+
+  /** Escribir a mano al número del negocio o a uno bloqueado no se permite: los bots se contestarían entre sí. */
+  private async exigirNumeroEnviable(c: { telefono: string }) {
+    const motivo = await this.numeros?.motivoOmision(c.telefono);
+    if (motivo === 'DESTINO_NUMERO_PROPIO') {
+      throw error(HttpStatus.BAD_REQUEST, 'NUMERO_PROPIO', 'Ese número es del propio negocio: no se le envía nada');
+    }
+    if (motivo === 'DESTINO_BLOQUEADO') throw error(HttpStatus.BAD_REQUEST, 'NUMERO_BLOQUEADO', 'Número bloqueado: no se le envía nada. Desbloquéalo para escribirle');
+  }
 
   /** Límite de 20 mensajes por minuto por usuario para evitar abusos (Redis). */
   private async verificarLimiteTasaUsuario(partyId: bigint): Promise<void> {
@@ -285,6 +296,7 @@ export class MensajesService {
     const quienes = await this.nombresDe(todas.map((c) => c.atendido_por));
     const porReprogramar = await this.celularesPorReprogramar();
     const hoy0 = inicioHoyLima();
+    const motivosNumero = new Map(await Promise.all(todas.map(async (c) => [c.telefono, await this.numeros?.motivoOmision(c.telefono)] as const)));
     const filas = todas.map((c) => {
       const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, c.mensajes));
       const ult = c.mensajes[0];
@@ -319,6 +331,8 @@ export class MensajesService {
             ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000))
             : null,
         bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
+        numeroBloqueado: motivosNumero.get(c.telefono) === 'DESTINO_BLOQUEADO',
+        numeroPropio: motivosNumero.get(c.telefono) === 'DESTINO_NUMERO_PROPIO',
         pos: posChat,
         faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m) => m.autor === 'CLIENTE' && m.en >= hoy0)),
         atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
@@ -562,6 +576,8 @@ export class MensajesService {
       motivoDerivacion:
         (c.motivo_derivacion !== MOTIVO_BLOQUEO_SPAM ? c.motivo_derivacion : null) || (c.flujo as any)?.motivoDerivacion || null,
       bloqueoSpam: (await this.bloqueosSpam([c]))?.get(c.telefono) ?? null,
+      numeroBloqueado: (await this.numeros?.motivoOmision(c.telefono)) === 'DESTINO_BLOQUEADO',
+      numeroPropio: (await this.numeros?.motivoOmision(c.telefono)) === 'DESTINO_NUMERO_PROPIO',
       solicitudReserva: solicitudReserva
         ? {
             id: solicitudReserva.id.toString(),
@@ -597,6 +613,7 @@ export class MensajesService {
       );
     }
 
+    await this.exigirNumeroEnviable(c);
     // Límite de 20 mensajes por minuto por usuario
     await this.verificarLimiteTasaUsuario(usuario.partyId);
 
@@ -663,6 +680,7 @@ export class MensajesService {
     if (!this.gateway.enviarImagen || !this.archivos) {
       throw error(HttpStatus.NOT_IMPLEMENTED, 'IMAGEN_NO_DISPONIBLE', 'Este canal no permite enviar fotos');
     }
+    await this.exigirNumeroEnviable(c);
     await this.verificarLimiteTasaUsuario(usuario.partyId);
     if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
       throw new HttpException(
@@ -707,6 +725,7 @@ export class MensajesService {
       );
     }
 
+    await this.exigirNumeroEnviable(c);
     await this.verificarLimiteTasaUsuario(usuario.partyId);
 
     const nombreCliente = c.nombre_contacto || (c.party as any)?.persona?.nombres || 'Cliente';
@@ -774,6 +793,7 @@ export class MensajesService {
       );
     }
 
+    await this.exigirNumeroEnviable(c);
     await this.verificarLimiteTasaUsuario(usuario.partyId);
 
     let nMensaje: bigint;

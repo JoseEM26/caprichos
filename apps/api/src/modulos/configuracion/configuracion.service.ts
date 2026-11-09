@@ -1,3 +1,4 @@
+import { listaCelulares } from '../chatbot/servicios/numeros-whatsapp.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -200,6 +201,8 @@ export const CLAVES_TEXTO = [
   // Verificación del celular al crear cuenta o recuperar contraseña (ver clientes/verificacion-whatsapp.util.ts)
   'verificacion_celular_modo',
   'verificacion_whatsapp_numero',
+  // Celulares del propio negocio (9 dígitos, separados por coma): el sistema NUNCA les escribe
+  'whatsapp_numeros_propios',
 ] as const;
 
 /** Alcances del sonido de avisos (valor guardado en `notif_sonido_alcance`). */
@@ -317,6 +320,17 @@ export class ConfiguracionService {
           });
         }
         valor = modo;
+      } else if (clave === 'whatsapp_numeros_propios') {
+        const bruto = typeof valor === 'string' ? valor : '';
+        const lista = listaCelulares(bruto);
+        const partes = bruto.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+        if (partes.length !== lista.length) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'Cada número debe ser un celular de 9 dígitos que empiece con 9 (con o sin +51), separados por coma',
+          });
+        }
+        valor = lista.join(', ');
       } else if (clave === 'verificacion_whatsapp_numero') {
         // Vacío = usar el WhatsApp de contacto del local. Si se escribe, debe ser un celular peruano válido.
         const bruto = typeof valor === 'string' ? valor.trim() : '';

@@ -1,4 +1,5 @@
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
+import { BotonBloquearNumero, InsigniaNumeroBloqueado } from './NumeroBloqueado';
 import { horaListaChat } from './fechasChat';
 import { InsigniaPos } from './InsigniaPos';
 import { DetalleConversacion } from './mensajesTipos';
@@ -8,6 +9,9 @@ import { ESTADOS_BG, ESTADOS_LABEL, esUsuarioWhatsApp, formatearNumeroReceptor, 
 export interface CabeceraChatProps {
   detalle: DetalleConversacion;
   puedeDesbloquear: boolean;
+  /** Permiso mensajes/bloquear_numeros (ADMIN y SUPERVISOR). */
+  puedeBloquearNumero?: boolean;
+  onNumeroCambiado?: () => void | Promise<void>;
   onVolver: () => void;
   onAbrirDetalles: () => void;
   onDesbloquear: () => void;
@@ -17,7 +21,7 @@ export interface CabeceraChatProps {
 }
 
 /** Cabecera de una línea: nombre, teléfono, 2-3 chips de estado y el menú «⋯» con lo secundario. */
-export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetalles, onDesbloquear, onAtendido, onVolverPorAtender, acciones }: CabeceraChatProps) {
+export function CabeceraChat({ detalle, puedeDesbloquear, puedeBloquearNumero, onNumeroCambiado, onVolver, onAbrirDetalles, onDesbloquear, onAtendido, onVolverPorAtender, acciones }: CabeceraChatProps) {
   const etiqueta = detalle.urgente ? `Urgente · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado];
   const textoDueno = detalle.dueno ? (detalle.esMio ? 'Lo atiendes tú' : `Lo atiende ${detalle.dueno}`) : 'Chat libre';
 
@@ -54,6 +58,15 @@ export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetal
           </span>
         )}
         <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
+        <InsigniaNumeroBloqueado bloqueado={detalle.numeroBloqueado} propio={detalle.numeroPropio} id={`detalle-${detalle.id}`} />
+        {puedeBloquearNumero && !detalle.numeroPropio && !esUsuarioWhatsApp(detalle) && (
+          <BotonBloquearNumero
+            telefono={detalle.telefono}
+            nombre={detalle.nombre}
+            bloqueado={Boolean(detalle.numeroBloqueado)}
+            alCambiar={() => onNumeroCambiado?.()}
+          />
+        )}
         {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
           <button
             type="button"

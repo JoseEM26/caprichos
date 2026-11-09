@@ -29,7 +29,8 @@ export interface ResultadoEnvioWhatsApp {
   exito: boolean;
   id?: string;
   waMessageId?: string;
-  estado: 'ENVIADO' | 'SIMULADO' | 'FALLIDO';
+  /** OMITIDO: el guardia de salida no lo mandó (número propio del negocio o bloqueado); nunca se reintenta. */
+  estado: 'ENVIADO' | 'SIMULADO' | 'FALLIDO' | 'OMITIDO';
   errorCodigo?: string;
   errorDetalle?: string;
   reintentos?: number;

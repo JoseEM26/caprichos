@@ -1,5 +1,6 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { TEXTO_OMISION, MotivoOmision } from './numeros-whatsapp.service';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
@@ -281,7 +282,7 @@ export class OutboxWhatsappService {
     return resumen;
   }
 
-  private async enviarFila(fila: FilaSaliente, token: string): Promise<'ENVIADO' | 'REINTENTO' | 'FALLIDO' | 'PERDIDO'> {
+  private async enviarFila(fila: FilaSaliente, token: string): Promise<'ENVIADO' | 'REINTENTO' | 'FALLIDO' | 'PERDIDO' | 'OMITIDO'> {
     const carga = (fila.carga ?? {}) as unknown as CargaSaliente;
     let resultado: ResultadoEnvioWhatsApp;
     try {
@@ -310,6 +311,24 @@ export class OutboxWhatsappService {
       await this.marcarReparto(fila, 'ENVIADO');
       await this.registrarEnChat(fila, carga, resultado);
       return 'ENVIADO';
+    }
+
+    if (resultado.estado === 'OMITIDO') {
+      // Guardia de salida: número propio o bloqueado. No es un fallo ni se reintenta: queda DESCARTADO con su motivo.
+      const motivo = TEXTO_OMISION[resultado.errorCodigo as MotivoOmision] ?? 'Omitido por el guardia de salida';
+      const r = await this.prisma.salienteWhatsapp.updateMany({
+        where: { id: fila.id, intento_token: token },
+        data: {
+          estado: 'DESCARTADO',
+          intentos,
+          ultimo_error: `[${resultado.errorCodigo}] ${motivo}`,
+          motivo_descarte: motivo,
+          descartado_en: new Date(),
+          descartado_por: 'Sistema',
+          intento_token: null,
+        },
+      });
+      return r.count === 0 ? 'PERDIDO' : 'OMITIDO';
     }
 
     const error = `[${resultado.errorCodigo ?? 'ERROR'}] ${resultado.errorDetalle ?? ''}`.trim();

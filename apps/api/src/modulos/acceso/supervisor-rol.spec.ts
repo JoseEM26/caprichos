@@ -24,7 +24,7 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
     // Excepción: almacen/apertura (conteo de apertura de productos) es de CAJERO pero no del supervisor
     // Sin dinero: tampoco cambia la ubicación de un delivery (pedidos/cambiar_ubicacion, aunque CAJERO lo tenga)
     const esperado = uniones('CAJERO', 'MOZO').filter((p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora');
-    expect([...supervisor].sort()).toEqual([...esperado, 'escritorio/operativo', 'iniciativas/cambiar_estado'].sort());
+    expect([...supervisor].sort()).toEqual([...esperado, 'escritorio/operativo', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros'].sort());
   });
 
   it('valida el cambio de forma de pago en la puerta (como Caja)', () => {

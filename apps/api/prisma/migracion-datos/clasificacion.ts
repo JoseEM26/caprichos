@@ -45,7 +45,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ]],
   ['clientes: cuentas, puntos, direcciones y consentimientos', [
     'customer_account', 'customer_detail', 'consent', 'contact_mechanism', 'cliente_direccion',
-    'movimiento_puntos', 'cupon_emitido', 'cupon_canje_compartido', 'cliente_whatsapp_consentimiento',
+    'movimiento_puntos', 'cupon_emitido', 'cupon_canje_compartido', 'cliente_whatsapp_consentimiento', 'numero_bloqueado',
     'data_request', 'encuesta', 'encuesta_posventa', 'ranking_mes', 'aviso_cliente_unico',
   ]],
   ['reservas y solicitudes operativas', [

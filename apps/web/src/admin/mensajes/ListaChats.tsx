@@ -1,5 +1,6 @@
 import React from 'react';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
+import { InsigniaNumeroBloqueado } from './NumeroBloqueado';
 import { horaListaChat } from './fechasChat';
 import { diaDeChat, encabezadoDia, FiltroDia, textoVacioDia } from './diasBandeja';
 import { MenuFilaChat } from './MenuFilaChat';
@@ -407,6 +408,7 @@ export function ListaChats({
                         </span>
                       )}
                       <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
+                      <InsigniaNumeroBloqueado bloqueado={c.numeroBloqueado} propio={c.numeroPropio} id={c.id} />
                       {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
                         <span
                           data-testid={`sin-respuesta-${c.id}`}
