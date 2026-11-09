@@ -833,7 +833,7 @@ export function AdminShell() {
               {titulo.titulo}
             </h1>
           )}
-          {!esRepartidorMovil && moduloActual?.clave !== 'mensajes' && (
+          {!esRepartidorMovil && moduloActual?.clave !== 'mensajes' && moduloActual?.clave !== 'caja' && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <h1 style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 26, lineHeight: '32px' }}>{titulo.titulo}</h1>

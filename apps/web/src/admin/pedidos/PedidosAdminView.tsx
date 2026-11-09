@@ -116,6 +116,10 @@ function grupoInicialDeUrl(): GrupoEstadoCaja {
   }
 }
 
+const CLAVE_RESUMEN = 'caprichos.caja.resumen';
+const SUBTITULO_CAJA = 'El cajero verifica cada pedido y lo acepta antes de que pase a cocina.';
+const soles = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 /** Pedidos por página del API (máximo permitido); «Cargar más» pide la siguiente. */
 const LIMITE_PAGINA = 100;
 
@@ -236,6 +240,26 @@ export function PedidosAdminView() {
 
   const [busqueda, setBusqueda] = useState<string>('');
   const [fcOpen, setFcOpen] = useState<boolean>(false);
+  const [infoAbierta, setInfoAbierta] = useState<boolean>(false);
+  // Resumen del día: visible compacto por defecto; si se pliega, se recuerda en este equipo
+  const [resumenAbierto, setResumenAbierto] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(CLAVE_RESUMEN) !== 'plegado';
+    } catch {
+      return true;
+    }
+  });
+  const alternarResumen = () => {
+    const nuevo = !resumenAbierto;
+    setResumenAbierto(nuevo);
+    try {
+      window.localStorage.setItem(CLAVE_RESUMEN, nuevo ? 'abierto' : 'plegado');
+    } catch {
+      // sin almacenamiento: solo vale en esta sesión
+    }
+  };
+  const panelRef = useRef<HTMLDivElement>(null);
+  const botonFiltrosRef = useRef<HTMLButtonElement>(null);
   const [masAbierto, setMasAbierto] = useState<boolean>(false);
   const [canalFiltro, setCanalFiltro] = useState<string>('all');
   const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
@@ -616,6 +640,18 @@ export function PedidosAdminView() {
     };
   }, [fcOpen, masAbierto]);
 
+  // Foco accesible: al abrir el panel entra el foco; al cerrarlo vuelve al botón «Filtros»
+  const panelYaAbierto = useRef(false);
+  useEffect(() => {
+    if (fcOpen) {
+      panelRef.current?.focus();
+      panelYaAbierto.current = true;
+    } else if (panelYaAbierto.current) {
+      panelYaAbierto.current = false;
+      botonFiltrosRef.current?.focus();
+    }
+  }, [fcOpen]);
+
   // Paginación fina: «1–12 de 18» con flechas
   const totalPaginas = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPorPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
@@ -673,11 +709,20 @@ export function PedidosAdminView() {
 
     {/* Cabecera compacta: caja cerrada e impresoras, atajos y acciones en una sola línea */}
     <div className="cj2-cab">
-      <div className="cj-estado" style={{ margin: 0 }}>
-        <BannerCajaCerrada compacto />
-        <FranjaImpresion />
+      <div className="cj2-titulo">
+        <h1>Pedidos y caja</h1>
+        <button
+          type="button"
+          className="cj2-info"
+          aria-label={SUBTITULO_CAJA}
+          title={SUBTITULO_CAJA}
+          aria-expanded={infoAbierta}
+          onClick={() => setInfoAbierta((a) => !a)}
+        >
+          <span aria-hidden="true">ⓘ</span>
+        </button>
+        <span className="cj2-sub" aria-hidden="true">{SUBTITULO_CAJA}</span>
       </div>
-      <span className="cj2-cab-vacio" />
 
       {!enNoEntregados && totalNoEntregados > 0 && (
         <button type="button" className="cj2-atajo cj2-atajo--rust" onClick={() => cambiarGrupoEstado('noent')}>
@@ -702,6 +747,12 @@ export function PedidosAdminView() {
           {pendientesAnteriores} de días anteriores
         </button>
       )}
+
+      <span className="cj2-cab-vacio" />
+      <div className="cj-estado" style={{ margin: 0 }}>
+        <BannerCajaCerrada compacto />
+        <FranjaImpresion />
+      </div>
 
       {puedeCortesia && (
         <button type="button" className="cj2-btn cj2-btn--cortesia-cab" onClick={() => setCortesiaSeparadaAbierta(true)}>
@@ -735,6 +786,10 @@ export function PedidosAdminView() {
       )}
     </div>
 
+    {infoAbierta && <p className="cj2-nota" role="note">{SUBTITULO_CAJA}</p>}
+
+    {/* Barra de control (fija arriba al desplazar): estados, buscador, atajo y Filtros; debajo, los filtros activos */}
+    <div className="cj2-control">
     {/* Los cuatro filtros visibles, buscador y panel de Filtros */}
     {!enNoEntregados && (
       <div className="cj2-fila" ref={filaFiltrosRef}>
@@ -758,23 +813,43 @@ export function PedidosAdminView() {
           Todo el día
           {vistaTodo && <span aria-hidden="true">✓</span>}
         </button>
-        <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
-          Buscar
-        </label>
-        <input
-          id="ord-q"
-          type="search"
-          className="cj2-buscar"
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setPaginaActual(1);
-          }}
-          placeholder="Buscar por código, cliente o celular"
-        />
+        <div className="cj2-busqueda">
+          <svg className="cj2-busqueda-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="M16 16l4.5 4.5" />
+          </svg>
+          <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
+            Buscar
+          </label>
+          <input
+            id="ord-q"
+            type="search"
+            className="cj2-buscar"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPaginaActual(1);
+            }}
+            placeholder="Buscar por código, cliente o celular"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              className="cj2-busqueda-x"
+              aria-label="Limpiar búsqueda"
+              onClick={() => {
+                setBusqueda('');
+                setPaginaActual(1);
+              }}
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          )}
+        </div>
         <button
           type="button"
-          className="cj2-btn"
+          ref={botonFiltrosRef}
+          className="cj2-btn cj2-btn--filtros"
           onClick={() => setFcOpen(!fcOpen)}
           aria-expanded={fcOpen}
           style={{ background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : undefined, color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : undefined }}
@@ -789,7 +864,7 @@ export function PedidosAdminView() {
         {fcOpen && (
           <>
             <div className="cj2-panel-fondo" onClick={() => setFcOpen(false)} />
-            <div className="cj2-panel" role="group" aria-label="Filtros">
+            <div className="cj2-panel" role="group" aria-label="Filtros" ref={panelRef} tabIndex={-1}>
               <div className="cj2-panel-cab">
                 <span>Filtros</span>
                 <button type="button" className="cj2-btn" onClick={() => setFcOpen(false)}>Listo</button>
@@ -888,6 +963,7 @@ export function PedidosAdminView() {
         {chips.length > 0 && <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>}
       </div>
     )}
+    </div>
 
     {enNoEntregados ? (
       <div className="cj-right cj2-noentregados">
@@ -907,25 +983,41 @@ export function PedidosAdminView() {
       <>
         {/* RESUMEN DEL DÍA: una fila; cada contador filtra por ese estado */}
         <section className="cj2-resumen" aria-label="Resumen del día" data-testid="resumen-dia">
-          <span className="cj2-resumen-t">
-            {rango.modo === 'hoy' ? 'Total del día' : 'Total'}: {resumen.total} {resumen.total === 1 ? 'pedido' : 'pedidos'}
+          <button type="button" className="cj2-res-plegar" aria-expanded={resumenAbierto} onClick={alternarResumen}>
+            <span aria-hidden="true">{resumenAbierto ? '▾' : '▸'} </span>Resumen
+          </button>
+          <span className="cj2-resumen-t" title={rango.modo === 'hoy' ? 'Total del día' : 'Total'}>
+            <strong>{resumen.total}</strong> {resumen.total === 1 ? 'pedido' : 'pedidos'}
           </span>
-          <button type="button" className="cj2-res" aria-pressed={grupoEstado === 'act' && !contador} onClick={() => elegirContador('activos')}>
-            Activos <strong>{resumen.activos}</strong>
-          </button>
-          <button type="button" className="cj2-res" aria-pressed={contador === 'entregados'} onClick={() => elegirContador('entregados')}>
-            Entregados <strong>{resumen.entregados}</strong>
-          </button>
-          <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'anulados'} onClick={() => elegirContador('anulados')}>
-            Anulados <strong>{resumen.anulados}</strong>
-          </button>
-          <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'rechazados'} onClick={() => elegirContador('rechazados')}>
-            Rechazados <strong>{resumen.rechazados}</strong>
-          </button>
-          <button type="button" className="cj2-res" aria-pressed={contador === 'porcobrar'} onClick={() => elegirContador('porcobrar')}>
-            Por cobrar <strong>{resumen.porCobrar}</strong>
-          </button>
-          <span className="cj2-ventas">Ventas (sin anulados ni rechazados): S/ {resumen.ventas.toFixed(2)}</span>
+          {resumenAbierto && (
+            <>
+              <button type="button" className="cj2-res" aria-pressed={grupoEstado === 'act' && !contador} onClick={() => elegirContador('activos')}>
+                <strong>{resumen.activos}</strong> {resumen.activos === 1 ? 'activo' : 'activos'}
+              </button>
+              <button type="button" className="cj2-res" aria-pressed={contador === 'entregados'} onClick={() => elegirContador('entregados')}>
+                <strong>{resumen.entregados}</strong> {resumen.entregados === 1 ? 'entregado' : 'entregados'}
+              </button>
+              <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'anulados'} onClick={() => elegirContador('anulados')}>
+                <strong>{resumen.anulados}</strong> {resumen.anulados === 1 ? 'anulado' : 'anulados'}
+              </button>
+              {(resumen.rechazados > 0 || contador === 'rechazados') && (
+                <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'rechazados'} onClick={() => elegirContador('rechazados')}>
+                  <strong>{resumen.rechazados}</strong> {resumen.rechazados === 1 ? 'rechazado' : 'rechazados'}
+                </button>
+              )}
+              <button type="button" className="cj2-res" aria-pressed={contador === 'porcobrar'} onClick={() => elegirContador('porcobrar')}>
+                <strong>{resumen.porCobrar}</strong> por cobrar
+              </button>
+            </>
+          )}
+          <span
+            className="cj2-ventas"
+            role="img"
+            title="Ventas (sin anulados ni rechazados)"
+            aria-label={`Ventas (sin anulados ni rechazados): S/ ${soles(resumen.ventas)}`}
+          >
+            S/ {soles(resumen.ventas)} <span aria-hidden="true" className="cj2-ventas-i">ⓘ</span>
+          </span>
         </section>
 
         {/* TARJETAS */}

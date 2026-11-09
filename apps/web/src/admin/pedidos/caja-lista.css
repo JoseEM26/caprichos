@@ -5,7 +5,7 @@
   flex-direction: column;
   gap: 10px;
   /* la lista ocupa la pantalla; solo se desplazan las tarjetas */
-  min-height: clamp(520px, calc(100vh - 196px), 900px);
+  min-height: clamp(520px, calc(100vh - 150px), 900px);
 }
 
 /* ---- Cabecera ---- */
@@ -345,7 +345,7 @@
 /* PC y monitores grandes: alto fijo = pantalla; solo las tarjetas se desplazan y el pie de paginación queda siempre a la vista */
 @media (min-width: 1100px) {
   .cj2 {
-    height: calc(100vh - 196px);
+    height: calc(100vh - 150px);
     min-height: 520px;
   }
 
@@ -891,4 +891,193 @@
   justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* =====================================================================
+   Encabezado compacto de Caja: barra superior, barra de control fija,
+   filtros activos en una línea y resumen en franja fina.
+   Alturas: celular y tablet 44 px (táctil); PC con puntero fino 36 px.
+   ===================================================================== */
+.cj2 { gap: 6px; --cj2-h: 44px; }
+@media (min-width: 700px) and (pointer: fine) { .cj2 { --cj2-h: 36px; } }
+
+/* 1) Barra superior: título a la izquierda, acciones a la derecha */
+.cj2-cab { flex-wrap: wrap; gap: 6px 8px; }
+.cj2-titulo { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
+.cj2-titulo h1 {
+  margin: 0;
+  font-family: var(--fuente-titulos, Montserrat, sans-serif);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 28px;
+  color: var(--cp-navy, #0B2C3E);
+  white-space: nowrap;
+}
+.cj2-info {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--cp-soft, #2C4C5D);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cj2-info:hover { background: var(--cp-sand, #EDE1D1); }
+.cj2-info:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 1px; }
+@media (pointer: coarse), (max-width: 699px) { .cj2-info { width: 44px; height: 44px; margin: -6px 0; } }
+.cj2-sub { display: none; font-size: 13px; color: var(--cp-soft, #2C4C5D); min-width: 0; }
+@media (min-width: 1280px) { .cj2-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 4px; } .cj2-info { display: none; } }
+.cj2-nota {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--cp-white, #FFFFFF);
+  border: 1px solid var(--cp-line, #E3D6C6);
+  font-size: 13px;
+  color: var(--cp-soft, #2C4C5D);
+}
+.cj2-cab .cj2-btn,
+.cj2-cab .cj2-atajo { min-height: var(--cj2-h); }
+.cj2-cab .cj2-btn--ico { min-width: var(--cj2-h); }
+.cj2-btn--cortesia-cab {
+  border-color: var(--cp-line, #E3D6C6);
+  background: transparent;
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+}
+.cj2-btn--nuevo { color: var(--cp-navy, #0B2C3E); }
+
+/* 2) Barra de control fija arriba al desplazar; fondo sólido y por debajo del chip de impresión y los modales */
+.cj2-control {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--cp-cream, #FBF4EC);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+  flex: none;
+}
+.cj2-fila { flex-wrap: wrap; gap: 6px 8px; }
+.cj2-fila > * { min-width: 0; }
+.cj2-pastillas { gap: 6px; flex: 1 1 100%; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+.cj2-pastilla {
+  min-height: var(--cj2-h);
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 13.5px;
+  border-width: 1.5px;
+}
+.cj2-pastilla[aria-pressed='true'] { box-shadow: inset 0 -3px 0 var(--cp-orange, #E67929); }
+.cj2-pastilla--todo { flex: 0 0 auto; border-color: var(--cp-line, #E3D6C6); }
+.cj2-pastilla--todo svg { width: 16px; height: 16px; }
+.cj2-pastilla--todo[aria-pressed='true'] { box-shadow: none; border-color: var(--cp-navy, #0B2C3E); }
+.cj2-cuenta { min-width: 20px; height: 20px; padding: 0 5px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cj2-busqueda { position: relative; flex: 1 1 160px; min-width: 0; display: flex; align-items: center; order: 3; }
+.cj2-busqueda-ico { position: absolute; left: 10px; color: var(--cp-soft, #2C4C5D); pointer-events: none; }
+.cj2-buscar { width: 100%; min-height: var(--cj2-h); padding: 0 38px 0 34px; font-size: 14px; flex: none; -webkit-appearance: none; appearance: none; }
+.cj2-buscar::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.cj2-busqueda-x {
+  position: absolute;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--cp-soft, #2C4C5D);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cj2-busqueda-x:hover { background: var(--cp-sand, #EDE1D1); }
+.cj2-busqueda-x:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 1px; }
+@media (pointer: coarse), (max-width: 699px) { .cj2-busqueda-x { width: 44px; height: 44px; } }
+.cj2-pastilla--todo { order: 4; }
+.cj2-btn--filtros { order: 5; min-height: var(--cj2-h); }
+.cj2-fila .cj2-btn { min-height: var(--cj2-h); font-size: 13.5px; padding: 0 12px; }
+
+/* PC y tablet horizontal: todo en UNA fila */
+@media (min-width: 700px) {
+  .cj2-fila { flex-wrap: nowrap; }
+  .cj2-pastillas { flex: 0 1 auto; order: 1; }
+  .cj2-pastilla--todo, .cj2-btn--filtros { flex: 0 0 auto; }
+}
+
+/* Filtros activos: una sola línea con scroll; no ocupa fila si no hay */
+.cj2-activos { flex-wrap: nowrap; overflow-x: auto; gap: 6px; scrollbar-width: none; padding-bottom: 1px; }
+.cj2-activos::-webkit-scrollbar { display: none; }
+.cj2-quitar { flex: 0 0 auto; white-space: nowrap; min-height: 32px; padding: 0 10px; font-size: 12.5px; }
+.cj2-limpiar { flex: 0 0 auto; white-space: nowrap; min-height: 32px; font-size: 13px; }
+@media (pointer: coarse), (max-width: 699px) { .cj2-quitar, .cj2-limpiar { min-height: 44px; } }
+
+/* 3) Resumen del día: franja fina de una línea */
+.cj2-resumen {
+  flex: none;
+  gap: 0;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--cp-navy, #0B2C3E);
+  border-top: 1px solid var(--cp-line, #E3D6C6);
+  border-bottom: 1px solid var(--cp-line, #E3D6C6);
+  -webkit-overflow-scrolling: touch;
+}
+.cj2-res-plegar {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--cp-soft, #2C4C5D);
+  font-weight: 800;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cj2-res-plegar:focus-visible, .cj2-res:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: -2px; }
+.cj2-resumen-t { font-size: 13px; font-weight: 700; padding-right: 10px; }
+.cj2-res {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--cp-line, #E3D6C6);
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cj2-res strong { font-weight: 800; }
+.cj2-res[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); border-radius: 8px; border-left-color: transparent; }
+.cj2-res--cerrado { color: var(--cp-rust, #B2500F); border-color: var(--cp-line, #E3D6C6); }
+.cj2-res--cerrado[aria-pressed='true'] { background: var(--cp-rust, #B2500F); color: #FFFFFF; }
+.cj2-ventas { margin-left: auto; padding-left: 12px; font-size: 13px; font-weight: 800; border-left: 1px solid var(--cp-line, #E3D6C6); cursor: help; }
+.cj2-ventas-i { color: var(--cp-soft, #2C4C5D); font-weight: 400; }
+@media (pointer: coarse), (max-width: 699px) {
+  .cj2-resumen { min-height: 44px; }
+  .cj2-res, .cj2-res-plegar { min-height: 44px; }
+}
+
+/* Celular: título más chico para que quepa con las acciones; franja de resumen más baja */
+@media (max-width: 699px) {
+  .cj2-titulo h1 { font-size: 19px; line-height: 24px; }
+  .cj2-info { width: 36px; min-width: 36px; height: 36px; margin: -6px -2px; }
+  .cj2-resumen { min-height: 40px; }
+  .cj2-res, .cj2-res-plegar { min-height: 40px; }
+  .cj2-quitar { min-height: 36px; }
+}
+@media (max-width: 420px) {
+  .cj2-cab { gap: 4px; }
+  .cj2-titulo h1 { font-size: 17px; }
+  .cj2-info { width: 32px; min-width: 32px; margin: -6px -4px; }
+  .cj2-cab .cj2-btn--ico { min-width: 40px; padding: 0; }
 }
