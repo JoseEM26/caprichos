@@ -46,6 +46,10 @@ interface Props {
   esMovilPreview?: boolean;
   /** Combo vinculado a este producto (para avisar si una parte fija se agotó y ofrecer reemplazos) */
   oferta?: OfertaItem | null;
+  /** Solo la vista previa del editor: antepone «1», «2»… a cada pregunta. */
+  numerarPreguntas?: boolean;
+  /** Solo la vista previa del editor: resalta (borde suave) la pregunta de este grupo. */
+  destacarGrupoId?: string | null;
 }
 
 const fmt = (n: number): string => `S/ ${n.toFixed(2)}`;
@@ -76,7 +80,7 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  * previa de la etiqueta del vaso, y los combos armados paso a paso. (La personalización unidad por
  * unidad, DT-62, es del pedido de caja y mozo: VentanaProducto.)
  */
-export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null }: Props) {
+export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null, numerarPreguntas = false, destacarGrupoId = null }: Props) {
   const { agregarLinea, inventario, lineas } = useCarrito();
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
@@ -453,9 +457,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     const f = filtrar(g, selX, clave);
     const obligatorio = g.minimo >= 1;
     return (
-      <div key={clave} data-grupo={g.id}>
+      <div key={clave} data-grupo={g.id} data-destacado={destacarGrupoId === g.id ? '1' : undefined}
+        style={destacarGrupoId === g.id ? { outline: '2px solid var(--cp-orange)', outlineOffset: 4, borderRadius: 10, transition: 'outline-color .3s' } : undefined}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-          <span style={{ ...titulo, fontWeight: 800, fontSize: 14, letterSpacing: '0.01em' }}>{g.nombre}</span>
+          <span style={{ ...titulo, fontWeight: 800, fontSize: 14, letterSpacing: '0.01em' }}>
+            {numerarPreguntas && <span data-testid="num-pregunta" style={{ display: 'inline-block', minWidth: 22, marginRight: 6, textAlign: 'center', background: 'var(--cp-orange)', color: 'var(--cp-navy)', borderRadius: 9999, fontSize: 12 }}>{gruposCarta.indexOf(g) + 1}</span>}
+            {g.nombre}
+          </span>
           <span style={{ fontSize: 11, fontWeight: 700, background: obligatorio ? 'var(--cp-navy)' : 'transparent', color: obligatorio ? 'var(--cp-cream)' : 'var(--cp-soft)', borderRadius: 9999, padding: '2px 10px', border: `1px solid ${obligatorio ? 'var(--cp-navy)' : 'var(--cp-soft)'}` }}>
             {etiquetaGrupo(g)}
           </span>

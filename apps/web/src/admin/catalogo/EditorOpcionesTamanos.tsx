@@ -23,6 +23,8 @@ import { EnlacesStockOpciones } from './EnlacesStockOpciones';
 import { GrupoCard, NuevoGrupo } from './GruposPregunta';
 import { Tip } from './ayudaOpciones';
 import { VistaCliente } from './VistaClienteOpciones';
+import { OrdenPreguntas } from './OrdenPreguntas';
+import { VistaPreviaEnVivo } from './VistaPreviaEnVivo';
 
 export type { EstadoOpciones, GrupoEstado, TamanoEstado } from './editorOpcionesTipos';
 
@@ -85,6 +87,9 @@ export function EditorOpcionesTamanos({
   const [buscarGrupo, setBuscarGrupo] = useState('');
   const [filtroGrupo, setFiltroGrupo] = useState<'aqui' | 'no' | 'todos'>('todos');
   const inicial = useRef(JSON.stringify(producto ? estadoDesdeProducto(producto) : ESTADO_VACIO));
+  const ordenInicial = useRef<string[]>((modo === 'borrador' ? valor ?? ESTADO_VACIO : producto ? estadoDesdeProducto(producto) : ESTADO_VACIO).grupos.map((g) => g.grupoId));
+  const [movidoId, setMovidoId] = useState<string | null>(null);
+  const [verVista, setVerVista] = useState(false);
   const [renombrando, setRenombrando] = useState<{ id: string; texto: string } | null>(null);
   const [confirmarRenombre, setConfirmarRenombre] = useState(false);
 
@@ -161,6 +166,26 @@ export function EditorOpcionesTamanos({
     }
   };
 
+  const moverGrupo = (desde: number, hasta: number) => {
+    const c = [...estado.grupos];
+    const [x] = c.splice(desde, 1);
+    c.splice(hasta, 0, x);
+    setEstado({ ...estado, grupos: c });
+    setMovidoId(x.grupoId);
+  };
+  useEffect(() => {
+    if (!movidoId) return;
+    const t = setTimeout(() => setMovidoId(null), 1600);
+    return () => clearTimeout(t);
+  }, [movidoId]);
+  // «Restablecer»: vuelve al orden con que se abrió el editor; las preguntas nuevas van al final
+  const segunInicial = (gs: GrupoEstado[]) => {
+    const rango = (id: string) => { const k = ordenInicial.current.indexOf(id); return k < 0 ? 1e6 : k; };
+    return [...gs].sort((x, y) => rango(x.grupoId) - rango(y.grupoId));
+  };
+  const restablecerOrden = () => { setEstado({ ...estado, grupos: segunInicial(estado.grupos) }); setMovidoId(null); };
+  const ordenCambiado = segunInicial(estado.grupos).some((g, i) => g.grupoId !== estado.grupos[i].grupoId);
+
   const toggleGrupo = (g: GrupoOpcionItem) => {
     const esta = estado.grupos.some((x) => x.grupoId === g.id);
     const grupos2: GrupoEstado[] = esta
@@ -180,6 +205,10 @@ export function EditorOpcionesTamanos({
     if (!producto) return;
     setGuardando(true);
     try {
+      // Solo cambió el orden de las mismas preguntas: se guarda con su endpoint (queda en la auditoría)
+      const ids = estado.grupos.map((g) => g.grupoId);
+      const mismas = ids.length === ordenInicial.current.length && ids.every((id) => ordenInicial.current.includes(id));
+      if (mismas && ids.some((id, i) => id !== ordenInicial.current[i])) await catalogoApi.ordenarGrupos(producto.id, ids);
       await catalogoApi.editarProducto(producto.id, {
         tamanos: estado.tamanos.map((t) => ({
           tamanoValorId: t.tamanoValorId,
@@ -198,6 +227,7 @@ export function EditorOpcionesTamanos({
       for (let i = 0; i < actuales.length; i++) {
         if (actuales[i].orden !== huecos[i]) await catalogoApi.actualizarValor(actuales[i].id, { orden: huecos[i] });
       }
+      ordenInicial.current = estado.grupos.map((g) => g.grupoId);
       alGuardar?.();
     } catch (e: any) {
       setError(e?.message || 'Error al guardar tamaños y opciones');
@@ -214,6 +244,20 @@ export function EditorOpcionesTamanos({
     .filter((g) => g.nombre.toLowerCase().includes(buscarGrupo.trim().toLowerCase()))
     .filter((g) => (filtroGrupo === 'todos' ? true : filtroGrupo === 'aqui' ? esAqui(g) : !esAqui(g)))
     .sort((a, b) => Number(esAqui(b)) - Number(esAqui(a)));
+
+  const borradorVivo: BorradorProducto = useMemo(() => ({
+    ...(producto ?? {}),
+    ...(borradorBase ?? {}),
+    tamanos: estado.tamanos.map((t) => ({ id: t.tamanoValorId, nombre: t.nombre, precio: t.precio, activo: t.activo })),
+    grupos: estado.grupos.map((x) => {
+      const g = grupos.find((k) => k.id === x.grupoId);
+      return {
+        id: x.grupoId, nombre: g?.nombre ?? x.nombre, minimo: g?.minimo ?? x.minimo, maximo: g?.maximo ?? x.maximo,
+        obligatorio: g?.obligatorio ?? x.requerido, opciones: g?.opciones, activo: g?.activo,
+      };
+    }),
+  }), [producto, borradorBase, estado.tamanos, estado.grupos, grupos]);
+  const preguntasOrden = estado.grupos.map((x) => ({ id: x.grupoId, nombre: grupos.find((g) => g.id === x.grupoId)?.nombre ?? x.nombre ?? `Grupo ${x.grupoId}` }));
 
   const sucio = modo === 'guardado' && JSON.stringify(estado) !== inicial.current;
   const cerrar = () => (sucio ? setConfirmarSalir(true) : alCancelar?.());
@@ -305,8 +349,24 @@ export function EditorOpcionesTamanos({
   const chip = (k: 'aqui' | 'no' | 'todos', texto: string) => (
     <button type="button" className="eo-chip eo-chip-filtro" aria-pressed={filtroGrupo === k} onClick={() => setFiltroGrupo(k)}>{texto}</button>
   );
+  const panelVivo = (
+    <aside className={`eo-vivo${verVista ? ' eo-vivo--abierto' : ''}`} aria-label="Cómo lo ve el cliente">
+      <button type="button" className="eo-btn eo-vivo-boton" aria-expanded={verVista} onClick={() => setVerVista((v) => !v)}>
+        👁 Cómo lo ve el cliente
+      </button>
+      <div className="eo-vivo-panel">
+        <div className="eo-micro">Vista previa en vivo: no envía nada ni toca el carrito.</div>
+        <VistaPreviaEnVivo borrador={borradorVivo} gruposGenerales={grupos} destacarGrupoId={movidoId} />
+      </div>
+    </aside>
+  );
   const pestanaPreguntas = (
-    <>
+    <div className="eo-preguntas-grid">
+    <div className="eo-preguntas-izq">
+      {estado.grupos.length > 0 && (
+        <OrdenPreguntas preguntas={preguntasOrden} movidoId={movidoId} alMover={moverGrupo}
+          alRestablecer={restablecerOrden} puedeRestablecer={ordenCambiado} deshabilitado={bloqueado} />
+      )}
       <div className="eo-barra">
         <input className="eo-input eo-buscar" type="search" aria-label="Buscar grupo" placeholder="Buscar grupo…" value={buscarGrupo}
           onChange={(e) => setBuscarGrupo(e.target.value)} />
@@ -337,7 +397,9 @@ export function EditorOpcionesTamanos({
         <GrupoCard key={`${g.id}-${g.opciones.length}-${g.nombre}-${g.maximo}-${g.minimo}-${g.obligatorio}`} g={g}
           enProducto={esAqui(g)} puedeEditar={puedeEditar} onToggle={() => toggleGrupo(g)} alCambiar={recargar} />
       ))}
-    </>
+    </div>
+    {panelVivo}
+    </div>
   );
 
   const opcionesStock = grupos
@@ -433,7 +495,7 @@ export function EditorOpcionesTamanos({
         pestanas={pestanas}
         alCerrar={cerrar}
         bloquearCierre={guardando}
-        ancho={1040}
+        ancho={1180}
         accionesEncabezado={botonAyuda}
         bajoPestanas={panelAyuda || undefined}
         pie={(

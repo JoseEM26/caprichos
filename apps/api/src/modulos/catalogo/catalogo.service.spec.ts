@@ -717,6 +717,49 @@ describe('CatalogoService', () => {
     });
   });
 
+  describe('Orden de las preguntas por producto', () => {
+    beforeEach(() => {
+      prisma.producto.findUnique.mockResolvedValue({ id: BigInt(1) });
+      prisma.productoGrupo.findMany.mockResolvedValue([{ grupo_id: BigInt(4) }, { grupo_id: BigInt(5) }, { grupo_id: BigInt(6) }]);
+      prisma.productoGrupo.update = jest.fn().mockResolvedValue({});
+      prisma.$transaction = jest.fn().mockResolvedValue([]);
+    });
+
+    it('guarda el orden nuevo en producto_grupo y audita antes/después', async () => {
+      const r = await service.ordenarGruposProducto(1, ['6', 4, '5'], { partyId: '9' } as any, '1.1.1.1');
+      expect(r.grupoIds).toEqual(['6', '4', '5']);
+      expect(prisma.productoGrupo.update).toHaveBeenCalledWith({
+        where: { producto_id_grupo_id: { producto_id: BigInt(1), grupo_id: BigInt(6) } }, data: { orden: 0 },
+      });
+      expect(prisma.productoGrupo.update).toHaveBeenCalledTimes(3);
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({
+        accion: 'ORDENAR_PREGUNTAS_PRODUCTO',
+        antes: { grupoIds: ['4', '5', '6'] },
+        despues: { grupoIds: ['6', '4', '5'] },
+      }));
+    });
+
+    it('rechaza ids ajenos, faltantes o repetidos y no escribe', async () => {
+      await expect(service.ordenarGruposProducto(1, ['4', '5', '99'])).rejects.toThrow(BadRequestException);
+      await expect(service.ordenarGruposProducto(1, ['4', '5'])).rejects.toThrow(BadRequestException);
+      await expect(service.ordenarGruposProducto(1, ['4', '4', '5'])).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditoria.registrar).not.toHaveBeenCalled();
+    });
+
+    it('producto inexistente -> 404', async () => {
+      prisma.producto.findUnique.mockResolvedValue(null);
+      await expect(service.ordenarGruposProducto(1, [])).rejects.toThrow(NotFoundException);
+    });
+
+    it('la carta y el producto piden los grupos por orden y luego id', async () => {
+      prisma.categoria.findMany.mockResolvedValue([]);
+      await service.obtenerCarta();
+      const inc = prisma.categoria.findMany.mock.calls[0][0].include.productos.include.grupos;
+      expect(inc.orderBy).toEqual([{ orden: 'asc' }, { id: 'asc' }]);
+    });
+  });
+
   describe('Editar sabores y «Controlar stock» de un producto', () => {
     const actual = { id: BigInt(1), nombre: 'A', precio: 5, oculto: false, categoria_id: BigInt(1), tamanos: [], grupos: [], sabores: [] };
     beforeEach(() => {
