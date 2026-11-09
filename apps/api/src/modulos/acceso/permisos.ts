@@ -173,6 +173,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'mensajes', accion: 'tomar' },
   { modulo: 'mensajes', accion: 'enviar' },
   { modulo: 'mensajes', accion: 'cerrar' },
+  // Bloquear números de WhatsApp (nada se les envía y se ignoran sus mensajes): solo ADMIN y SUPERVISOR
+  { modulo: 'mensajes', accion: 'bloquear_numeros' },
   // Cola de WhatsApp saliente (outbox): ver el estado, reenviar o descartar un fallido
   { modulo: 'whatsapp_salientes', accion: 'ver' },
   { modulo: 'whatsapp_salientes', accion: 'reenviar' },
@@ -408,7 +410,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 // Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
 MATRIZ.SUPERVISOR = [
-  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado']),
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',

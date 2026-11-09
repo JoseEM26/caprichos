@@ -2892,3 +2892,15 @@ model PropinaRepartoDetalle {
   @@id([reparto_id, party_id])
   @@map("propina_reparto_detalle")
 }
+
+/// Lista manual de celulares a los que NO se envía nada por WhatsApp y cuyos mensajes se ignoran (Mensajes > Bloquear número).
+model NumeroBloqueado {
+  id            BigInt   @id @default(autoincrement())
+  celular       String   @unique @db.VarChar(9)
+  motivo        String?  @db.VarChar(120)
+  bloqueado_por String?  @db.VarChar(120)
+  bloqueado_en  DateTime @default(now()) @db.Timestamptz
+  activo        Boolean  @default(true)
+
+  @@map("numero_bloqueado")
+}

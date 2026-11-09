@@ -222,7 +222,7 @@ export class Ventana24hService {
       }
     }
 
-    if (!resultadoPlantilla.exito) {
+    if (!resultadoPlantilla.exito && resultadoPlantilla.estado !== 'OMITIDO') {
       this.logger.warn(
         `Fallo al enviar plantilla '${definicion.nombre}' a ${telMask}: ${resultadoPlantilla.errorDetalle}`,
       );

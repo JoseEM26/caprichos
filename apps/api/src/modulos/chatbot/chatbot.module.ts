@@ -36,6 +36,8 @@ import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tar
 import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pago.service';
 import { ReanudacionBotService } from './servicios/reanudacion-bot.service';
 import { QuejasWhatsappService } from './servicios/quejas-whatsapp.service';
+import { NumerosBloqueadosController } from './controladores/numeros-bloqueados.controller';
+import { NumerosWhatsappService } from './servicios/numeros-whatsapp.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto';
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
 import { ColaWebhookService } from './servicios/cola-webhook.service';
@@ -60,9 +62,10 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     AccesoModule,
     DireccionesModule,
   ],
-  controllers: [WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
+  controllers: [NumerosBloqueadosController, WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
   providers: [
     { provide: CUENTA_CLIENTE_BOT_PUERTO, useExisting: ClientesService },
+    NumerosWhatsappService,
     WhatsAppMetaAdaptador,
     WhatsAppSimuladoAdaptador,
     WhatsAppMensajeriaProvider,
@@ -81,6 +84,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     ColaWebhookService,
   ],
   exports: [
+    NumerosWhatsappService,
     WHATSAPP_MENSAJERIA_PUERTO,
     WhatsAppMetaAdaptador,
     WhatsAppSimuladoAdaptador,

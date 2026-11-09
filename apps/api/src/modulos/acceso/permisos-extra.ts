@@ -35,7 +35,7 @@ export const NOMBRES_MODULO: Record<string, string> = {
 
 export const NOMBRES_ACCION: Record<string, string> = {
   ver: 'Ver', crear: 'Crear', editar: 'Editar', anular: 'Anular', exportar: 'Exportar', saldar: 'Saldar deudas', cobrar: 'Cobrar',
-  cobrar_ahora: 'Cobrar al momento', enviar: 'Enviar mensajes', tomar: 'Tomar', cerrar: 'Cerrar', abrir: 'Abrir', movimientos: 'Movimientos',
+  cobrar_ahora: 'Cobrar al momento', enviar: 'Enviar mensajes', tomar: 'Tomar', bloquear_numeros: 'Bloquear números de WhatsApp', cerrar: 'Cerrar', abrir: 'Abrir', movimientos: 'Movimientos',
   desactivar: 'Desactivar', reactivar: 'Reactivar', restablecer: 'Restablecer claves', pagar: 'Pagar', reimprimir: 'Reimprimir', emitir: 'Emitir',
   agotar: 'Marcar agotado', ocultar: 'Ocultar', publicar: 'Publicar', liquidar: 'Liquidar', apertura: 'Apertura del día', cierre: 'Cierre',
   traslados: 'Traslados', imprimir_precuenta: 'Imprimir precuenta', cambiar_estado: 'Cambiar estado', ajustar: 'Ajustar', responder: 'Responder',

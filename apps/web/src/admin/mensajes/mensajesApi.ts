@@ -24,6 +24,14 @@ export async function desbloquearSpam(id: string, motivo: string): Promise<{ ok:
   return api.post<{ ok: boolean }>(`/admin/mensajes/${id}/desbloquear-spam`, { motivo });
 }
 
+export async function bloquearNumero(celular: string, motivo?: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>('/admin/whatsapp/numeros-bloqueados', { celular, motivo: motivo || undefined });
+}
+
+export async function desbloquearNumero(celular: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>('/admin/whatsapp/numeros-bloqueados/desbloquear', { celular });
+}
+
 export async function obtenerDetalleConversacion(id: string): Promise<DetalleConversacion> {
   return api.get<DetalleConversacion>(`/admin/mensajes/conversaciones/${id}`);
 }

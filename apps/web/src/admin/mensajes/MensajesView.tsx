@@ -50,9 +50,11 @@ export { obtenerEstiloEspera, SIN_RESPUESTA_MIN_VISIBLE } from './utilidadesChat
 function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   let tieneVouchersVer = true;
   let puedeDesbloquear = false;
+  let puedeBloquearNumero = false;
   try {
     const sesion = useSesion();
     puedeDesbloquear = Boolean(sesion?.tiene?.('mensajes/enviar'));
+    puedeBloquearNumero = Boolean(sesion?.tiene?.('mensajes/bloquear_numeros'));
     tieneVouchersVer =
       Boolean(sesion?.tiene?.('vouchers/ver')) ||
       sesion?.usuario?.rol === 'ADMIN' ||
@@ -759,6 +761,11 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
               <CabeceraChat
                 detalle={detalle}
                 puedeDesbloquear={puedeDesbloquear}
+                puedeBloquearNumero={puedeBloquearNumero}
+                onNumeroCambiado={async () => {
+                  await cargarDetalle(detalle.id);
+                  await cargarLista(true);
+                }}
                 onVolver={() => setChatAbiertoMovil(false)}
                 onAbrirDetalles={() => setPanelAbierto(true)}
                 onDesbloquear={() => setModalDesbloqueo(true)}

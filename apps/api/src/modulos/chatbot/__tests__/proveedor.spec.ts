@@ -6,10 +6,18 @@ import { WhatsAppMetaAdaptador } from '../adaptadores/whatsapp-meta.adaptador';
 import { WhatsAppSimuladoAdaptador } from '../adaptadores/whatsapp-simulado.adaptador';
 
 describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
-  const mockMeta = { tipo: 'meta' } as unknown as WhatsAppMetaAdaptador;
-  const mockSimulado = { tipo: 'simulado' } as unknown as WhatsAppSimuladoAdaptador;
+  const mockMeta = { tipo: 'meta', enviarTexto: jest.fn().mockResolvedValue({ exito: true }) } as unknown as WhatsAppMetaAdaptador;
+  const mockSimulado = { tipo: 'simulado', enviarTexto: jest.fn().mockResolvedValue({ exito: true }) } as unknown as WhatsAppSimuladoAdaptador;
+  // El proveedor devuelve el adaptador elegido envuelto por el guardia de salida: se comprueba a quién llama
+  const numeros = { motivoOmision: jest.fn().mockResolvedValue(null), logOmitido: jest.fn() };
+  const elegido = async (adaptador: any) => {
+    (mockMeta as any).enviarTexto.mockClear();
+    (mockSimulado as any).enviarTexto.mockClear();
+    await adaptador.enviarTexto('51987654321', 'hola');
+    return (mockMeta as any).enviarTexto.mock.calls.length ? mockMeta : mockSimulado;
+  };
 
-  it('selecciona el adaptador Meta si existen WHATSAPP_TOKEN y WHATSAPP_PHONE_ID', () => {
+  it('selecciona el adaptador Meta si existen WHATSAPP_TOKEN y WHATSAPP_PHONE_ID', async () => {
     const configService = {
       get: jest.fn((key: string) => {
         if (key === 'WHATSAPP_TOKEN') return 'token-meta-123';
@@ -19,12 +27,12 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado);
+    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
 
-    expect(adaptador).toBe(mockMeta);
+    expect(await elegido(adaptador)).toBe(mockMeta);
   });
 
-  it('selecciona el adaptador Simulado por defecto si falta WHATSAPP_TOKEN', () => {
+  it('selecciona el adaptador Simulado por defecto si falta WHATSAPP_TOKEN', async () => {
     const configService = {
       get: jest.fn((key: string) => {
         if (key === 'WHATSAPP_TOKEN') return '';
@@ -34,20 +42,20 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado);
+    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
 
-    expect(adaptador).toBe(mockSimulado);
+    expect(await elegido(adaptador)).toBe(mockSimulado);
   });
 
-  it('selecciona el adaptador Simulado por defecto si faltan ambas variables', () => {
+  it('selecciona el adaptador Simulado por defecto si faltan ambas variables', async () => {
     const configService = {
       get: jest.fn(() => undefined),
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado);
+    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
 
-    expect(adaptador).toBe(mockSimulado);
+    expect(await elegido(adaptador)).toBe(mockSimulado);
   });
 
   it('WhatsAppSimuladoAdaptador simula enviarImagen correctamente y persiste mensaje', async () => {

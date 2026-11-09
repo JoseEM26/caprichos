@@ -1,3 +1,4 @@
+import { NumerosWhatsappService } from './numeros-whatsapp.service';
 import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
 import { interactivoDesdeContenido } from './interactivo.util';
 import {
@@ -109,6 +110,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly direcciones?: DireccionesService,
     @Optional() private readonly moduleRef?: ModuleRef,
+    @Optional() private readonly numeros?: NumerosWhatsappService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -1436,6 +1438,16 @@ export class WhatsappWebhookService {
     return { id, display: display || undefined };
   }
 
+  /** Remitente propio del negocio o bloqueado: se ignora en silencio (sin conversación, sin respuesta, sin contar spam ni guardar contenido). */
+  private async remitenteOmitido(msg: any, contacts: any[] = []): Promise<boolean> {
+    if (!this.numeros) return false;
+    const de = String(msg?.from || contacts?.[0]?.wa_id || '');
+    const motivo = await this.numeros.motivoOmision(de);
+    if (!motivo) return false;
+    this.numeros.logOmitido(motivo, de, 'webhook_entrante');
+    return true;
+  }
+
   async procesarPayload(payload: any) {
     if (!payload || payload.object !== 'whatsapp_business_account') {
       return { procesados: 0, estados: 0 };
@@ -1453,6 +1465,7 @@ export class WhatsappWebhookService {
 
         const receptor = this.receptorDe(val.metadata);
         if (receptor === 'OMITIR') continue;
+        if (receptor?.display) this.numeros?.aprenderNumeroVisible(receptor.display);
 
         // 1. Estados de entrega (sent, delivered, read, failed)
         if (Array.isArray(val.statuses)) {
@@ -1465,6 +1478,8 @@ export class WhatsappWebhookService {
         // 2. Mensajes entrantes
         if (Array.isArray(val.messages)) {
           for (const msg of val.messages) {
+            // Anti-bucle: ni el propio número del negocio (auto-mensajes, ecos) ni los bloqueados llegan al bot
+            if (change.field === 'smb_message_echoes' || (await this.remitenteOmitido(msg, val.contacts))) continue;
             const nuevo = await this.procesarMensajeEntrante(msg, val.contacts, receptor);
             if (nuevo) mensajesProcesados++;
           }

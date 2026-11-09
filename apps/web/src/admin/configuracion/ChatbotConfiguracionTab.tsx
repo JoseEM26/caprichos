@@ -6,6 +6,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { TarjetaProteccionSpam } from './TarjetaProteccionSpam';
+import { TarjetaNumerosBloqueados } from './TarjetaNumerosBloqueados';
 import { TarjetaConsumoWhatsapp } from './TarjetaConsumoWhatsapp';
 import { CampoConfig } from './CampoConfig';
 import { CampoAyuda } from './AyudaCampo';
@@ -1125,6 +1126,10 @@ function ChatbotConfiguracionVista({
 
       <CampoConfig id="chatbot-proteccion-spam">
         <TarjetaProteccionSpam esAdmin={puedeEditar} />
+      </CampoConfig>
+
+      <CampoConfig id="chatbot-numeros-bloqueados">
+        <TarjetaNumerosBloqueados esAdmin={puedeEditar} />
       </CampoConfig>
 
       {/* TARJETA 5: Privacidad Ley 29733 */}

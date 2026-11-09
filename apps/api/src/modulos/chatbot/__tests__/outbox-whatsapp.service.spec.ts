@@ -138,6 +138,18 @@ describe('OutboxWhatsappService (salientes de WhatsApp)', () => {
       expect(roles).toEqual(['CAJERO', 'ADMIN']);
     });
 
+    it('número propio o bloqueado (OMITIDO): queda DESCARTADO por el sistema, sin reintento, sin FALLIDO y sin aviso a Caja', async () => {
+      ventana.enviarMensajeNegocio.mockResolvedValueOnce({ exito: false, estado: 'OMITIDO', errorCodigo: 'DESTINO_NUMERO_PROPIO', errorDetalle: 'x' });
+      const r = await servicio.procesarLote();
+      expect(r).toMatchObject({ enviados: 0, reintentos: 0, fallidos: 0 });
+      expect(prisma.salienteWhatsapp.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ estado: 'DESCARTADO', motivo_descarte: 'Omitido: es el número del negocio', descartado_por: 'Sistema', intento_token: null }),
+        }),
+      );
+      expect(prisma.notificacion.create).not.toHaveBeenCalled();
+    });
+
     it('cliente en BAJA: FALLIDO pero sin aviso (es un resultado esperado)', async () => {
       ventana.enviarMensajeNegocio.mockResolvedValueOnce({ exito: false, estado: 'FALLIDO', errorCodigo: 'CLIENTE_BAJA', errorDetalle: 'BAJA' });
       await servicio.procesarLote();

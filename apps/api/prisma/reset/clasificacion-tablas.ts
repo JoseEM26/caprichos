@@ -78,7 +78,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
-  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
+  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento', 'numero_bloqueado',
   'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
   'propina_reparto', 'propina_reparto_detalle',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio', 'opcion_requiere',
