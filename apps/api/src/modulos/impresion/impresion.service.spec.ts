@@ -641,6 +641,23 @@ describe('ImpresionService', () => {
       expect(prismaMock.printJob.updateMany.mock.calls[1][0].data.error).toContain('Pedido ya entregado');
     });
 
+    it('quitarTrabajos: solo ids no impresos, dedup, audita y devuelve quitados', async () => {
+      prismaMock.printJob.updateMany.mockResolvedValue({ count: 2 });
+      const res = await service.quitarTrabajos({ ids: ['5', '6', '5', '999'] }, caja, '1.1.1.1');
+      const { where, data } = prismaMock.printJob.updateMany.mock.calls[0][0];
+      expect(where).toEqual({ id: { in: [5n, 6n, 999n] }, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } });
+      expect(data.estado).toBe('DESCARTADO');
+      expect(res).toEqual(expect.objectContaining({ ok: true, quitados: 2 }));
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'QUITAR_TRABAJOS' }));
+    });
+
+    it('quitarTrabajos: COCINA 403, ids inválidos 400 y nada se toca', async () => {
+      await expect(service.quitarTrabajos({ ids: ['1'] }, { rol: 'COCINA', partyId: 1n } as any)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.quitarTrabajos({ ids: ['abc'] }, caja)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.quitarTrabajos({ ids: [] }, caja)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prismaMock.printJob.updateMany).not.toHaveBeenCalled();
+    });
+
     it('el agente nunca toma un descartado: tomarTrabajos solo pide PENDIENTE', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);
       await service.tomarTrabajos(5, 1n);

@@ -28,3 +28,4 @@
 .lt-estado--fallo { color: #8A3A08; }
 .lt-estado--cola { color: #8A5A00; }
 .lt-enlace { align-self: flex-start; min-height: 44px; padding: 0 4px; background: none; border: none; color: var(--cp-navy, #0B2C3E); font-weight: 700; text-decoration: underline; cursor: pointer; font-size: 14px; }
+.lt-check--todos { width: auto; gap: 8px; margin: 0; }

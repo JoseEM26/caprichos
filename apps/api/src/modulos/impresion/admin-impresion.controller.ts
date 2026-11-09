@@ -23,6 +23,7 @@ import { ImpresionService } from './impresion.service';
 import {
   CrearLlaveDto,
   DescartarDto,
+  QuitarTrabajosDto,
   VaciarColaDto,
   ReimprimirDto,
   ReimprimirTrabajosDto,
@@ -93,6 +94,13 @@ export class AdminImpresionController {
   @Permiso('pedidos', 'cambiar_estado')
   async reimprimirTrabajo(@Param('id') id: string, @Req() req: any) {
     return this.impresionService.reimprimirTrabajos({ ids: [id] }, req.usuario, this.ip(req));
+  }
+
+  @Post('cola/quitar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async quitarTrabajos(@Body() dto: QuitarTrabajosDto, @Req() req: any) {
+    return this.impresionService.quitarTrabajos(dto, req.usuario, this.ip(req));
   }
 
   @Post('trabajos/:id/descartar')
