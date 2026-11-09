@@ -34,6 +34,14 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { SELECT_PRUEBA_INCIDENTE, construirPruebaEntrega } from '../repartos/prueba-entrega';
 import { INCLUIR_EXTRAS, resumenExtras } from './extras-pedido.util';
+
+/** Lo que trae cada pedido de la lista de Caja (también los «relacionados» de una cuenta). */
+const INCLUIR_LISTA = {
+  lineas: { include: { opcionesElegidas: true, sabores: true, area: true } },
+  zona: true,
+  cobros: { where: { anulado_en: null }, select: { id: true }, take: 1 },
+  ...INCLUIR_EXTRAS,
+};
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -295,22 +303,7 @@ export class PedidosEstadoService {
         skip,
         take: limite,
         orderBy: [{ creado_en: 'desc' }, { id: 'desc' }], // id desempata: la paginación no pierde ni repite pedidos del mismo instante
-        include: {
-          lineas: {
-            include: {
-              opcionesElegidas: true,
-              sabores: true,
-              area: true,
-            },
-          },
-          zona: true,
-          cobros: {
-            where: { anulado_en: null },
-            select: { id: true },
-            take: 1,
-          },
-          ...INCLUIR_EXTRAS,
-        },
+        include: INCLUIR_LISTA,
       }),
       this.obtenerUmbrales(),
       filtros.resumen === '1'
@@ -320,10 +313,36 @@ export class PedidosEstadoService {
 
     const ahora = new Date();
     const esAdmin = usuarioActual?.rol === 'ADMIN';
-    const cobrosMozo = await this.cobrosMozoDe(pedidos);
-    const ajustes = await ajustesPendientesUbicacion(this.prisma, pedidos.map((p) => p.id));
 
-    const items = pedidos.map((p) => {
+    // Cuenta = pedido original + sus extras (enlace pedido_origen_id). Si la página parte una cuenta, los miembros que
+    // quedaron fuera viajan aparte en `relacionados` (no cuentan en total/paginación ni en el resumen): la web los une a la tarjeta.
+    const idsPagina = pedidos.map((p) => p.id);
+    const enPagina = new Set(idsPagina.map(String));
+    // Solo las cuentas a las que les falta alguien: el original fuera de la página o algún extra del original fuera de ella
+    const raices = [
+      ...new Set(
+        pedidos
+          .filter((p) => p.pedido_origen_id != null || (p.extras?.length ?? 0) > 0)
+          .map((p) => p.pedido_origen_id ?? p.id)
+          .filter((raiz) => {
+            const r = pedidos.find((p) => p.id === raiz);
+            return !r || (r.extras ?? []).some((e) => !enPagina.has(String(e.id)));
+          }),
+      ),
+    ];
+    const relacionadosCrudos =
+      raices.length > 0 && usuarioActual?.rol !== 'REPARTIDOR'
+        ? await this.prisma.pedido.findMany({
+            where: { id: { notIn: idsPagina }, OR: [{ id: { in: raices } }, { pedido_origen_id: { in: raices } }] },
+            orderBy: { id: 'asc' },
+            include: INCLUIR_LISTA,
+          })
+        : [];
+    const todos = [...pedidos, ...relacionadosCrudos];
+    const cobrosMozo = await this.cobrosMozoDe(todos);
+    const ajustes = await ajustesPendientesUbicacion(this.prisma, todos.map((p) => p.id));
+
+    const mapear = (p: (typeof todos)[number]) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
         p.creado_en,
         ahora,
@@ -344,13 +363,16 @@ export class PedidosEstadoService {
         color,
         colorEspera,
       };
-    });
+    };
+    const items = pedidos.map(mapear);
+    const relacionados = relacionadosCrudos.map(mapear);
 
     return {
       total,
       pagina,
       limite,
       items,
+      relacionados,
       ...(grupos && {
         resumen: grupos.map((g) => ({
           estado: g.estado,
@@ -487,6 +509,9 @@ export class PedidosEstadoService {
         pasa_cocina_en: true,
         entregado_mesa_en: true,
         ubicacion_editada_en: true,
+        // «Pedido extra»: enlace al original (todos los extras cuelgan del pedido raíz); la web une la cuenta en una tarjeta
+        pedido_origen_id: true,
+        pedidoOrigen: { select: { codigo: true } },
         repartidor_party_id: true,
         despachado_en: true,
         eta_min: true,
@@ -544,6 +569,8 @@ export class PedidosEstadoService {
         estado: p.estado,
         modalidad: p.modalidad,
         mesaNombre: p.mesa_nombre,
+        pedidoOrigenId: p.pedido_origen_id != null ? String(p.pedido_origen_id) : null,
+        pedidoOrigenCodigo: p.pedidoOrigen?.codigo ?? null,
         // Último cambio de ubicación (la insignia «Dirección editada»); null si la dirección es la original
         ubicacionEditadaEn: p.ubicacion_editada_en ?? null,
         // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.

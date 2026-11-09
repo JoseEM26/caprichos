@@ -26,6 +26,8 @@ import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { ContadorDia, enContador, filasDePedidos, resumirDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
+import { TarjetaCuentaCaja } from './TarjetaCuentaCaja';
+import { agruparCuentas } from './agruparCuentas';
 import { VentanaDetalle } from './VentanaDetalle';
 import { useAccionesCaja } from './accionesCaja';
 import {
@@ -200,6 +202,8 @@ export function PedidosAdminView() {
   const [errorCarga, setErrorCarga] = useState<string>('');
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  // Originales/extras de una cuenta que la página cargada no trajo (solo para armar la tarjeta; no entran en contadores ni resumen)
+  const [relacionados, setRelacionados] = useState<Pedido[]>([]);
   // Día o rango que muestra la lista (por defecto hoy en Lima; no se recuerda entre visitas)
   const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
   // Paginación del servidor: páginas de 100 ya cargadas, cuántos pedidos tiene el filtro y el conteo agrupado
@@ -316,6 +320,7 @@ export function PedidosAdminView() {
         contarPendientesAnteriores(),
       ]);
       setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || [])));
+      setRelacionados(unirSinRepetir([], paginas.flatMap((r) => r.relacionados || [])));
       setTotalDia(paginas[0].total ?? 0);
       setResumenApi(paginas[0].resumen ?? null);
       if (pendientes !== null) setPendientesAnteriores(pendientes);
@@ -344,6 +349,7 @@ export function PedidosAdminView() {
       paginasRef.current = siguiente;
       setTotalDia(r.total ?? 0);
       setPedidos((prev) => unirSinRepetir(prev, r.items || []));
+      setRelacionados((prev) => unirSinRepetir(prev, r.relacionados || []));
     } catch (err: any) {
       setErrorMas(err?.message || 'No se pudieron cargar más pedidos');
     } finally {
@@ -545,6 +551,13 @@ export function PedidosAdminView() {
     [base, filtro, orden],
   );
 
+  // Tarjetas: cada «cuenta» (original + extras) es UNA tarjeta; un pedido sin extras es una tarjeta como siempre.
+  // La paginación y el «N de M» cuentan tarjetas; los contadores y el resumen siguen contando pedidos.
+  const cuentas = useMemo(
+    () => agruparCuentas(pedidosFiltrados, [...pedidos, ...relacionados], (p) => String(p.pedido_origen?.id ?? p.id)),
+    [pedidosFiltrados, pedidos, relacionados],
+  );
+
   // Atajos: lo que necesita atención no queda escondido
   const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
 
@@ -653,18 +666,18 @@ export function PedidosAdminView() {
   }, [fcOpen]);
 
   // Paginación fina: «1–12 de 18» con flechas
-  const totalPaginas = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPorPagina));
+  const totalPaginas = Math.max(1, Math.ceil(cuentas.length / pedidosPorPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
   const pedidosPaginados = useMemo(() => {
     const inicio = (paginaValida - 1) * pedidosPorPagina;
-    return pedidosFiltrados.slice(inicio, inicio + pedidosPorPagina);
-  }, [pedidosFiltrados, paginaValida, pedidosPorPagina]);
+    return cuentas.slice(inicio, inicio + pedidosPorPagina);
+  }, [cuentas, paginaValida, pedidosPorPagina]);
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
   useEffect(() => {
     setPaginaActual((p) => (p > totalPaginas ? totalPaginas : p));
   }, [totalPaginas]);
-  const desde = pedidosFiltrados.length === 0 ? 0 : (paginaValida - 1) * pedidosPorPagina + 1;
-  const hasta = Math.min(paginaValida * pedidosPorPagina, pedidosFiltrados.length);
+  const desde = cuentas.length === 0 ? 0 : (paginaValida - 1) * pedidosPorPagina + 1;
+  const hasta = Math.min(paginaValida * pedidosPorPagina, cuentas.length);
 
   const pedidoSeleccionado = useMemo(() => {
     return pedidos.find((p) => String(p.id) === pedidoSeleccionadoId) || (pedidoExterno && String(pedidoExterno.id) === pedidoSeleccionadoId ? pedidoExterno : null);
@@ -1039,21 +1052,40 @@ export function PedidosAdminView() {
             </div>
           ) : (
             <div className="cj2-cuadricula" data-columnas={columnas} style={{ ['--cj2-cols' as string]: columnas }}>
-              {pedidosPaginados.map((o) => (
-                <TarjetaPedidoCaja
-                  key={o.id}
-                  pedido={o}
-                  seleccionado={pedidoSeleccionadoId === String(o.id)}
-                  resaltado={pedidosResaltados.has(String(o.id))}
-                  cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
-                  cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
-                  puedeCambiarPago={tiene('pedidos/ajustar_pago')}
-                  alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
-                  accion={accionDe(o)}
-                  alAccion={ejecutarAccion}
-                  alComerLocal={() => void cargarDatos()}
-                />
-              ))}
+              {pedidosPaginados.map((cuenta) => {
+                if (cuenta.miembros.length > 1) {
+                  return (
+                    <TarjetaCuentaCaja
+                      key={`cuenta-${cuenta.raizId}`}
+                      cuenta={cuenta}
+                      seleccionadoId={pedidoSeleccionadoId}
+                      resaltados={pedidosResaltados}
+                      puedeCambiarPago={tiene('pedidos/ajustar_pago')}
+                      cajaCerradaEspera={(m) => esperaCajaCerrada(m, cajaAbierta)}
+                      alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
+                      accionDe={accionDe}
+                      alAccion={ejecutarAccion}
+                      alComerLocal={() => void cargarDatos()}
+                    />
+                  );
+                }
+                const o = cuenta.miembros[0];
+                return (
+                  <TarjetaPedidoCaja
+                    key={o.id}
+                    pedido={o}
+                    seleccionado={pedidoSeleccionadoId === String(o.id)}
+                    resaltado={pedidosResaltados.has(String(o.id))}
+                    cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
+                    cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
+                    puedeCambiarPago={tiene('pedidos/ajustar_pago')}
+                    alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
+                    accion={accionDe(o)}
+                    alAccion={ejecutarAccion}
+                    alComerLocal={() => void cargarDatos()}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -1073,7 +1105,7 @@ export function PedidosAdminView() {
         {/* PAGINACIÓN FINA */}
         <div className="cj2-pag">
           <span className="cj2-pag-rango" data-testid="rango-pagina">
-            {pedidosFiltrados.length === 0 ? '0 pedidos' : `${desde}–${hasta} de ${pedidosFiltrados.length}`}
+            {cuentas.length === 0 ? '0 pedidos' : `${desde}–${hasta} de ${cuentas.length}`}
           </span>
           <div className="cj2-pag-flechas">
             {totalPaginas >= 5 && (

@@ -229,6 +229,9 @@ export interface MiPedido {
   estado: string;
   modalidad: string;
   mesaNombre: string | null;
+  /** «Pedido extra»: id y código del pedido original al que se enlaza (null si es un pedido normal) */
+  pedidoOrigenId?: string | null;
+  pedidoOrigenCodigo?: string | null;
   /** Último cambio de ubicación (ISO): insignia «Dirección editada»; null si la dirección es la original */
   ubicacionEditadaEn?: string | null;
   /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
