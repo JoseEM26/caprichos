@@ -1103,9 +1103,10 @@
 .msg-panel-sec h3 { margin: 0 0 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #2C4C5D; }
 .msg-panel-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .msg-limpiar { align-self: flex-end; min-height: 44px; padding: 0 8px; }
-.msg-tabs { flex: none; flex-wrap: nowrap; gap: 6px; padding: 4px 10px 4px; overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.msg-tabs::-webkit-scrollbar { display: none; }
-.msg-tab-principal { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; color: #2C4C5D; border-color: #E3D6C6; }
+/* Pestañas: en dos filas (wrap) en vez de scroll oculto; nunca quedan cortadas ni inalcanzables con mouse */
+.msg-tabs { flex: none; flex-wrap: wrap; gap: 4px; padding: 4px 10px; overflow: visible; }
+.msg-tab-principal { min-height: 36px; padding: 0 9px; display: inline-flex; align-items: center; gap: 4px; background: #FFFFFF; color: #2C4C5D; border-color: #E3D6C6; }
+@media (pointer: coarse) { .msg-tab-principal { min-height: 44px; } }
 .msg-tab-principal b { margin: 0; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #EFE6D9; color: #0B2C3E; font-size: 12px; text-align: center; box-sizing: border-box; }
 .msg-tab-principal[aria-pressed='true'] { background: #0B2C3E; color: #FBF4EC; border-color: #0B2C3E; }
 .msg-tab-principal[aria-pressed='true'] b { background: #FBF4EC; color: #0B2C3E; }
@@ -1117,7 +1118,7 @@
 .msg-panel-chips .msg-tab { min-height: 44px; background: #FFFFFF; color: #2C4C5D; border-color: #E3D6C6; }
 .msg-panel-chips .msg-tab[aria-pressed='true'] { background: #0B2C3E; color: #FBF4EC; border-color: #0B2C3E; }
 .msg-panel-chips .msg-dia-fecha { min-height: 44px; }
-.msg-activos { flex: none; display: flex; gap: 6px; padding: 0 10px 4px; overflow-x: auto; scrollbar-width: none; }
+.msg-activos { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 4px; }
 .msg-chip-activo {
   flex: none; min-height: 32px; padding: 0 10px; border: 1px solid #B2500F; border-radius: 999px; background: #FBF4EC; color: #B2500F;
   font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
