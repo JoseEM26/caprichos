@@ -6,6 +6,7 @@ import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi, AjusteMedio, DigitalesCaja } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
+import { ticketEjemplo } from './ticketCierreEjemplo';
 
 function usarSesion(rol: 'ADMIN' | 'CAJERO') {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
@@ -219,11 +220,13 @@ describe('cierre: medios digitales calculados por el sistema', () => {
       conteo: {},
       medios: [],
       ajustesMedio: [ajuste],
+      ticket: ticketEjemplo({ correcciones: [{ medio: 'YAPE', anterior: 200, nuevo: 210, motivo: 'm', por: 'Ana', hora: '10:00' }] }),
     } as any);
 
     render(<HistorialCierres />);
     fireEvent.click(await screen.findByText(/21\/10\/2026/));
 
+    fireEvent.click(await screen.findByRole('tab', { name: 'Movimientos' }));
     expect(await screen.findByText('Correcciones de medios digitales')).toBeInTheDocument();
     expect(screen.getByText('Motivo: El voucher dice 210, no 200')).toBeInTheDocument();
     expect(screen.getByText(/aprobada por Rosa Supervisora/)).toBeInTheDocument();

@@ -7,7 +7,7 @@ import type { IClienteApiImpresion } from '../api/clienteApi';
 import type { IDispositivoImpresora } from '../impresora/dispositivo.interface';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 import { generarBytesTrabajo } from '../tspl/generadorTspl';
-import { generarTicketEscPos, generarComandaSalonEscPos } from '../escpos/generadorTicket';
+import { generarTicketEscPos, generarComandaSalonEscPos, generarCierreEscPos } from '../escpos/generadorTicket';
 import { generarPruebaEtiqueta, generarPruebaTicket } from '../pruebaImpresora';
 import { paraServidor } from '../candidatas';
 import type { CandidataLocal } from '../candidatas';
@@ -394,6 +394,8 @@ export class AgenteLocalServicio {
       const bytes =
         trabajo.tipo === 'TICKET_PAGO'
           ? generarTicketEscPos(trabajo.payload as any, this.config.ticketColumnas)
+          : trabajo.tipo === 'TICKET_CIERRE'
+          ? generarCierreEscPos(trabajo.payload as any, this.config.ticketColumnas)
           : trabajo.tipo === 'TICKET_COMANDA_SALON' || trabajo.tipo === 'TICKET_COMANDA_AREA'
             ? generarComandaSalonEscPos(trabajo.payload as any, this.config.ticketColumnas)
             : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);

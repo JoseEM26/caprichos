@@ -7,7 +7,7 @@ export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBI
 export type TipoTicketComanda = 'TICKET_COMANDA_SALON' | 'TICKET_COMANDA_AREA';
 
 /** Tipo de trabajo de impresión: etiquetas (etiquetera), ticket de pago o comanda de salón (ticketera de Caja). */
-export type TipoTrabajoImpresion = TipoEtiqueta | 'TICKET_PAGO' | TipoTicketComanda;
+export type TipoTrabajoImpresion = TipoEtiqueta | 'TICKET_PAGO' | 'TICKET_CIERRE' | TipoTicketComanda;
 
 /** Máquina que imprime el trabajo: la etiquetera (stickers) o la ticketera (voucher/ticket de pago). */
 export type RolImpresora = 'ETIQUETERA' | 'TICKETERA';
@@ -15,7 +15,7 @@ export type RolImpresora = 'ETIQUETERA' | 'TICKETERA';
 export const ROLES_IMPRESORA: RolImpresora[] = ['ETIQUETERA', 'TICKETERA'];
 
 export function rolDeTrabajo(tipo: string): RolImpresora {
-  return tipo === 'TICKET_PAGO' || tipo === 'TICKET_COMANDA_SALON' || tipo === 'TICKET_COMANDA_AREA' ? 'TICKETERA' : 'ETIQUETERA';
+  return tipo === 'TICKET_PAGO' || tipo === 'TICKET_CIERRE' || tipo === 'TICKET_COMANDA_SALON' || tipo === 'TICKET_COMANDA_AREA' ? 'TICKETERA' : 'ETIQUETERA';
 }
 
 /** Estado de una máquina reportado por el agente local en su latido. */

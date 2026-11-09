@@ -176,6 +176,14 @@ export class CierreController {
     return this.cierreService.liquidarRepartidor(dto, req.usuario, ip);
   }
 
+  /** Imprime el ticket de cierre de una caja cerrada en la ticketera de Caja (solo administrador). */
+  @Post(':id/imprimir')
+  @Permiso('caja', 'ver')
+  async imprimir(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cierreService.imprimirCierre(id, req.usuario, ip);
+  }
+
   /**
    * Consulta el detalle de un cierre por ID (mostrando diferencias por medio).
    */

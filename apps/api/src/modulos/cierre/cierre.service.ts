@@ -28,6 +28,8 @@ import {
   pedidosRepartoDelDia,
 } from '../caja/caja.calculo';
 import { ArqueoDto } from './dto/arqueo.dto';
+import { ImpresionService } from '../impresion/impresion.service';
+import { armarTicketCierre } from './ticket-cierre';
 import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
@@ -132,6 +134,7 @@ export class CierreService {
     private readonly eventosGateway: EventosGateway,
     private readonly cobrosService: CobrosService,
     @Optional() private readonly puntosService?: PuntosService,
+    @Optional() private readonly impresion?: ImpresionService,
   ) {}
 
   /** Nombre de la persona de cada party (quién cerró la caja): el historial muestra nombres, no IDs. */
@@ -873,9 +876,39 @@ export class CierreService {
       );
     }
 
-    const ajustes = await this.prisma.cierreAjusteMedio.findMany({
-      where: { caja_id: cierre.caja_id },
-      orderBy: { id: 'asc' },
+    const ajustes = await this.mapearAjustes(
+      await this.prisma.cierreAjusteMedio.findMany({ where: { caja_id: cierre.caja_id }, orderBy: { id: 'asc' } }),
+    );
+    const [conteos, movimientos, liquidaciones, cobrosAnulados, local] = await Promise.all([
+      this.prisma.conteoCierre.findMany({ where: { caja_id: cierre.caja_id }, orderBy: { intento: 'asc' } }),
+      this.prisma.movimientoCaja.findMany({ where: { caja_id: cierre.caja_id }, orderBy: { id: 'asc' } }),
+      this.prisma.liquidacion.findMany({ where: { caja_id: cierre.caja_id }, orderBy: { id: 'asc' } }),
+      this.prisma.cobro.findMany({
+        where: { caja_id: cierre.caja_id, anulado_en: { not: null } },
+        include: { pedido: { select: { codigo: true } } },
+        orderBy: { id: 'asc' },
+      }),
+      this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
+    ]);
+    const ids: bigint[] = [
+      cierre.caja.abierta_por,
+      ...(cierre.caja.cerrada_por ? [cierre.caja.cerrada_por] : []),
+      ...(cierre.aprobado_por ? [cierre.aprobado_por] : []),
+      ...conteos.map((c) => c.por),
+      ...liquidaciones.map((l) => l.repartidor_party_id),
+      ...cobrosAnulados.flatMap((c) => (c.anulado_por ? [c.anulado_por] : [])),
+    ];
+    const nombres = await this.nombresDePartes(ids);
+    const ticket = armarTicketCierre({
+      localNombre: ((local?.valor as any)?.nombre as string) || 'Caprichos',
+      caja: cierre.caja,
+      cierre,
+      conteos,
+      movimientos,
+      ajustes,
+      liquidaciones,
+      cobrosAnulados,
+      nombre: (id) => (id == null ? null : (nombres.get(String(id)) ?? null)),
     });
 
     return {
@@ -886,9 +919,7 @@ export class CierreService {
       aprobadoPor: cierre.aprobado_por ? Number(cierre.aprobado_por) : null,
       nota: cierre.nota,
       cerradaPor: cierre.caja.cerrada_por ? Number(cierre.caja.cerrada_por) : null,
-      cerradaPorNombre: cierre.caja.cerrada_por
-        ? ((await this.nombresDePartes([cierre.caja.cerrada_por])).get(String(cierre.caja.cerrada_por)) ?? null)
-        : null,
+      cerradaPorNombre: cierre.caja.cerrada_por ? (nombres.get(String(cierre.caja.cerrada_por)) ?? null) : null,
       cerradaEn: cierre.caja.cerrada_en,
       conteo: cierre.conteo,
       medios: cierre.medios.map((m) => ({
@@ -897,8 +928,19 @@ export class CierreService {
         visto: Number(m.visto),
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
-      ajustesMedio: await this.mapearAjustes(ajustes),
+      ajustesMedio: ajustes,
+      ticket,
     };
+  }
+
+  /** Encola el ticket de cierre de una caja ya cerrada en la ticketera de Caja. Solo administrador. */
+  async imprimirCierre(id: bigint | number | string, usuario: UsuarioAutenticado, ip?: string) {
+    exigirAdmin(usuario, 'Solo el administrador puede imprimir un cierre.');
+    if (!this.impresion) {
+      throw new HttpException({ codigo: 'IMPRESION_NO_DISPONIBLE', mensaje: 'La impresión no está disponible.' }, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    const detalle = await this.obtenerCierrePorId(id, usuario);
+    return this.impresion.encolarTicketCierre(BigInt(detalle.cajaId), detalle.ticket, usuario, ip);
   }
 
   /**

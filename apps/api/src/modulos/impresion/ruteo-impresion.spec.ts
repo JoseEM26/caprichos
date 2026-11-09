@@ -91,7 +91,7 @@ describe('destinoDeTrabajo por configuración de equipo', () => {
 
 describe('roles y tipos', () => {
   it('la ticketera toma pago y comandas; la etiquetera, los stickers', () => {
-    expect(tiposDeRoles(['TICKETERA'])).toEqual(['TICKET_PAGO', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA']);
+    expect(tiposDeRoles(['TICKETERA'])).toEqual(['TICKET_PAGO', 'TICKET_CIERRE', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA']);
     expect(tiposDeRoles(['ETIQUETERA'])).toEqual(['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
     expect(tiposDeRoles([])).toEqual([]);
   });

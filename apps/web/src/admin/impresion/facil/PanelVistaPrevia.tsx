@@ -27,7 +27,7 @@ const FUENTE_MONO = "'DejaVu Sans Mono','Liberation Mono',Menlo,Consolas,monospa
 const mm = (n: number) => String(n).replace('.', ',');
 
 /** Papel térmico: renglones monoespaciados al ancho del rollo (80 mm = 48 columnas, 58 mm = 32), tal como los arma el programa de la PC. */
-function PapelTermico({ lineas, columnas, zoom, etiqueta }: { lineas: { texto: string; centrado?: boolean; negrita?: boolean; qr?: string }[]; columnas: 48 | 32; zoom: number; etiqueta: string }) {
+export function PapelTermico({ lineas, columnas, zoom, etiqueta }: { lineas: { texto: string; centrado?: boolean; negrita?: boolean; qr?: string }[]; columnas: 48 | 32; zoom: number; etiqueta: string }) {
   return (
     <div
       role="img"

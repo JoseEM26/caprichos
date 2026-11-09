@@ -54,6 +54,7 @@ export function equipoAcepta(cfg: ConfigEquipoImpresion, tipo: string, areaIds: 
   const area = areaIds[0] ?? null;
   switch (tipo) {
     case 'TICKET_PAGO':
+    case 'TICKET_CIERRE':
       return cfg.ticketera && cfg.ticketPago;
     case 'TICKET_COMANDA_SALON':
       return cfg.ticketera && cfg.comandaSalon;
@@ -116,7 +117,7 @@ export function rolesDeConfig(cfg: ConfigEquipoImpresion): RolImpresora[] {
 export function tiposDeRoles(roles: RolImpresora[]): string[] {
   return [
     ...(roles.includes('ETIQUETERA') ? ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'] : []),
-    ...(roles.includes('TICKETERA') ? ['TICKET_PAGO', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA'] : []),
+    ...(roles.includes('TICKETERA') ? ['TICKET_PAGO', 'TICKET_CIERRE', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA'] : []),
   ];
 }
 

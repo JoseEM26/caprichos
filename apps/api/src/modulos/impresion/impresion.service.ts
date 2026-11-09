@@ -26,6 +26,7 @@ import {
   rolDeTrabajo,
   TipoTrabajoImpresion,
   TicketPagoDatos,
+  TicketCierreDatos,
 } from '@caprichos/compartido';
 import {
   CrearLlaveDto,
@@ -1682,6 +1683,50 @@ await this.anotarResaltadas(pedido);
     }
     this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'TICKET_PAGO' });
     return { ok: true, mensaje: 'Se encoló el ticket de pago para reimpresión', cantidad: 1, omitidas: 0, noAplican: 0, trabajoIds: [trabajo.id.toString()] };
+  }
+
+  /**
+   * Imprime el ticket de cierre de caja (ya armado) en la ticketera de Caja, con el mismo ruteo por PC que el ticket
+   * de pago. Mismo tope por minuto que las reimpresiones; no repite uno que ya espera en cola. Queda auditado.
+   */
+  async encolarTicketCierre(cajaId: bigint, ticket: TicketCierreDatos, usuario?: UsuarioAutenticado, ip?: string) {
+    const k = `cierre:${cajaId}`;
+    const ahora = Date.now();
+    const recientes = (this.reimpresionesRecientes.get(k) ?? []).filter((t) => ahora - t < 60_000);
+    if (recientes.length >= MAX_REIMPRESIONES_POR_MINUTO) {
+      throw new HttpException(
+        { codigo: 'MUCHAS_REIMPRESIONES', mensaje: `Ya imprimiste este cierre ${MAX_REIMPRESIONES_POR_MINUTO} veces en el último minuto. Espera un momento.` },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    this.reimpresionesRecientes.set(k, [...recientes, ahora]);
+    const payload = { ...ticket, tipo: 'TICKET_CIERRE' as const };
+    const yaEnCola = await this.prisma.printJob.count({
+      where: { pedido_id: null, tipo: 'TICKET_CIERRE', estado: { in: ESTADOS_EN_COLA }, payload: { path: ['codigo'], equals: ticket.codigo } },
+    });
+    if (yaEnCola > 0) return { ok: true, mensaje: 'El ticket de cierre ya está en cola de impresión', trabajoId: null };
+    const ctx = await this.contextoRuteo();
+    const destino = this.destinoJob('TICKET_CIERRE', null, payload, ctx);
+    if (destino.destino_equipo_id === null) {
+      throw new HttpException({ codigo: 'SIN_IMPRESORA_CAJA', mensaje: motivoSinPc(ctx) }, HttpStatus.CONFLICT);
+    }
+    const trabajo = await this.prisma.printJob.create({
+      data: { pedido_id: null, ...destino, tipo: 'TICKET_CIERRE', payload: payload as any, copia: false, estado: 'PENDIENTE' },
+    });
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'REIMPRIMIR_TICKET_CIERRE',
+        entidad: 'caja',
+        entidadId: cajaId,
+        partyId: usuario.partyId,
+        despues: { cierre: ticket.codigo, trabajoId: trabajo.id.toString() },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { tipo: 'TICKET_CIERRE' });
+    return { ok: true, mensaje: 'Se encoló el ticket de cierre', trabajoId: trabajo.id.toString() };
   }
 
   /** Reimpresiones pedidas por pedido en el último minuto (en memoria; ponytail: por instancia, suficiente con un solo API). */
