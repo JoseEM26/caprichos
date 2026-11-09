@@ -280,6 +280,14 @@ function coincideAlgunaPalabra(texto: string, lista: string[]): boolean {
   });
 }
 
+/**
+ * Frase larga y específica (4+ palabras, no un botón) con la IA encendida: la contesta la IA con los datos reales del
+ * pedido y las políticas, no la FAQ fija de pagos/delivery (que solo sirve para la palabra suelta: «yape», «pagos»).
+ */
+function preguntaEspecificaParaIa(entrada: EntradaNormalizada, contexto: ContextoConversacion): boolean {
+  return Boolean(contexto.chatbotIaActivo && !entrada.id && (entrada.texto || '').trim().split(/\s+/).length >= 4);
+}
+
 function construirListaCategorias(
   categorias: any[],
   pagina = 0,
@@ -1571,7 +1579,7 @@ export function transicionarEstado(
   }
 
   // f) Medios de pago
-  if (idInteractivo === 'faq_pagos' || coincideAlgunaPalabra(texto, ['pago', 'pagos', 'yape', 'plin', 'tarjeta', 'efectivo'])) {
+  if (idInteractivo === 'faq_pagos' || (!preguntaEspecificaParaIa(entrada, contexto) && coincideAlgunaPalabra(texto, ['pago', 'pagos', 'yape', 'plin', 'tarjeta', 'efectivo']))) {
     return {
       nuevoEstado: 'PREGUNTAS',
       acciones: [
@@ -1586,7 +1594,7 @@ export function transicionarEstado(
   }
 
   // g) Costo de delivery
-  if (idInteractivo === 'faq_delivery' || coincideAlgunaPalabra(texto, ['delivery', 'costo envio', 'envio gratis', 'zonas reparto'])) {
+  if (idInteractivo === 'faq_delivery' || (!preguntaEspecificaParaIa(entrada, contexto) && coincideAlgunaPalabra(texto, ['delivery', 'costo envio', 'envio gratis', 'zonas reparto']))) {
     return {
       nuevoEstado: 'PREGUNTAS',
       acciones: [
@@ -2099,7 +2107,9 @@ function transicionarSoloMenus(
   }
 
   // 10. Preguntas frecuentes concretas
-  const faq = claveFaqSoloMenus(id, texto);
+  let faq = claveFaqSoloMenus(id, texto);
+  // Una pregunta larga y específica de pago o delivery la contesta la IA con los datos reales, no la FAQ fija
+  if ((faq === 'pagos' || faq === 'delivery') && preguntaEspecificaParaIa(entrada, contexto)) faq = null;
   if (faq) {
     return respuesta([respuestaFaqSoloMenus(faq, contexto)]);
   }

@@ -23,6 +23,8 @@ import { BOTONES_AVISO_PEDIDO } from './avisos-internos.textos';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
 import { controlAlmacenActivo } from '../../stock/control-almacen';
+import { LocalService } from '../../local/local.service';
+import { MarcaEscalado, TEXTOS_ESCALADO } from '../conversacion/escalado-ia.util';
 
 export interface UmbralesAlertasEspera {
   alertaVoucherMin1: number;
@@ -58,6 +60,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
     private readonly avisosInternosService: AvisosInternosService,
     private readonly outbox: OutboxWhatsappService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly localService?: LocalService,
   ) {}
 
   onModuleInit() {
@@ -128,6 +131,82 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         alertaPedidoSinConfirmarMin: 5,
       };
     }
+  }
+
+  /**
+   * Casos que la IA derivó (flujo.escalado_ia) y siguen sin atender: pasado `escalado_ia_espera_min` (10 por defecto)
+   * sin respuesta de una persona, UN mensaje de espera al cliente y UNA re-notificación al equipo (panel + correo,
+   * nunca WhatsApp al equipo). Si una persona ya respondió, solo se cierra la marca. Devuelve los mensajes de espera enviados.
+   */
+  async vigilarEscaladosIa(ahora: Date): Promise<number> {
+    const p = await this.prisma.parametro.findUnique({ where: { clave: 'escalado_ia_espera_min' } }).catch(() => null);
+    const esperaMin = Number(p?.valor) > 0 ? Number(p?.valor) : 10;
+    const convs = await this.prisma.conversacion.findMany({
+      where: { urgente: true, tomado_por: null, duenio: 'PERSONA', ultima_actividad: { gte: new Date(ahora.getTime() - 24 * 3600 * 1000) } },
+    });
+    let enviados = 0;
+    for (const conv of convs) {
+      const flujo = (conv.flujo as any) || {};
+      const marca = flujo.escalado_ia as MarcaEscalado | undefined;
+      if (!marca || marca.esperaEnviada) continue;
+      const minutos = (ahora.getTime() - new Date(marca.en).getTime()) / 60000;
+      if (minutos < esperaMin) continue;
+
+      const marcar = () =>
+        this.prisma.conversacion.update({
+          where: { id: conv.id },
+          data: { flujo: { ...flujo, escalado_ia: { ...marca, esperaEnviada: true } } as any },
+        });
+
+      const personaRespondio = await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: conv.id, direccion: 'SALE', autor: 'PERSONA', en: { gt: new Date(marca.en) } },
+        select: { id: true },
+      });
+      if (personaRespondio) {
+        await marcar();
+        continue;
+      }
+
+      const clave = `idemp:escalado:espera:${conv.id}:${marca.en}`;
+      if (!(await this.adquirirIdempotencia(clave, 7 * 86400))) continue;
+      await marcar();
+
+      let abierta = true;
+      let abre: string | null | undefined;
+      try {
+        const e: any = await this.localService?.obtenerEstadoCarta(ahora);
+        if (e) {
+          abierta = e.abierta !== false;
+          abre = e.abre;
+        }
+      } catch {
+        /* sin dato de horario: se asume abierto */
+      }
+
+      const tel = normalizarTelefono(conv.telefono);
+      if (tel) {
+        // Una sola vez por caso; el outbox respeta tope por minuto, guardia de salida y contador de consumo
+        await this.outbox.encolar({
+          telefono: tel,
+          tipo: 'TEXTO',
+          clave,
+          origen: 'ESPERA',
+          pedidoId: null,
+          carga: { textoLibre: TEXTOS_ESCALADO.espera(abierta, abre), autor: 'BOT', etapa: 'ESPERA_ESCALADO_IA' },
+        });
+        this.outbox.despertar();
+        enviados++;
+      }
+      await this.avisosInternosService.enviarAvisoAdmin(
+        'Cliente de WhatsApp sin atender',
+        `${conv.nombre_contacto || 'Un cliente'} lleva ${Math.floor(minutos)} min esperando a un asesor (${conv.motivo_derivacion || 'derivado por la IA'}). Ábrelo en Mensajes, arriba en Por atender.`,
+        '/admin/mensajes',
+        undefined,
+        `${clave}:aviso`,
+        { correo: true, sinWhatsapp: true },
+      );
+    }
+    return enviados;
   }
 
   /**
@@ -286,6 +365,13 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
             }
           }
         }
+      }
+
+      // 1.b) Casos que la IA derivó a una persona y nadie ha respondido
+      try {
+        avisosEsperaClienteEnviados += await this.vigilarEscaladosIa(ahora);
+      } catch (err: any) {
+        this.logger.warn(`Error vigilando casos escalados por la IA: ${err.message}`);
       }
 
       // =========================================================================

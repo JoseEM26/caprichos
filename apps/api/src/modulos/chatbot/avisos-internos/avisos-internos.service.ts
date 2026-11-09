@@ -793,7 +793,7 @@ export class AvisosInternosService {
     enlace: string,
     botones?: BotonAccion[],
     claveIdempotencia?: string,
-    opciones?: { sinCampana?: boolean; correo?: boolean },
+    opciones?: { sinCampana?: boolean; correo?: boolean; sinWhatsapp?: boolean },
   ): Promise<ResultadoNotificacionEquipo> {
     // Alerta va SIEMPRE a la campana del panel (respaldo y registro), salvo que quien avisa ya la haya puesto
     if (!opciones?.sinCampana) {
@@ -809,7 +809,7 @@ export class AvisosInternosService {
       });
     }
 
-    const activo = await this.estanAvisosActivos();
+    const activo = opciones?.sinWhatsapp ? false : await this.estanAvisosActivos();
     if (!activo) {
       return {
         omitido: true,
