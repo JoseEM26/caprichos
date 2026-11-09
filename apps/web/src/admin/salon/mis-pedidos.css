@@ -720,3 +720,13 @@
 .mp-rol--original { background: #E4EDF2; color: #0B2C3E; }
 .mp-rol--extra { background: #0B2C3E; color: #FBF4EC; }
 .mp-fuera { font-size: 12px; font-weight: 800; color: #2C4C5D; }
+
+/* Espera por pedido: color por umbral (texto siempre legible) */
+.mp-espera { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 12px; font-size: 12px; font-weight: 800; }
+.mp-espera--baja { background: var(--cp-greenbg); color: var(--cp-green); }
+.mp-espera--media { background: var(--cp-gold); color: var(--cp-navy); }
+.mp-espera--alta { background: #FBEDE9; color: var(--cp-rust); }
+.mp-fechas { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-fechas label { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; font-size: 12px; font-weight: 700; color: var(--cp-soft); }
+.mp-fechas input { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--cp-navy); }
+.mp-fechas input:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 1px; }

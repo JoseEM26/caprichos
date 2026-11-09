@@ -1,0 +1,26 @@
+/* Modal «Ver detalle» de Mis pedidos (3 pasos). Celular primero. */
+.dpm-sec { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--cp-line); border-radius: 12px; background: #fff; min-width: 0; }
+.dpm-sec-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dpm-der { margin-left: auto; }
+.dpm-h { margin: 0; font-size: 15px; font-weight: 800; color: var(--cp-navy); }
+.dpm-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 12px; background: var(--cp-sand); color: var(--cp-navy); font-size: 12px; font-weight: 700; }
+.dpm-chip--extra { background: var(--cp-gold); }
+.dpm-area--lista { background: var(--cp-greenbg); color: var(--cp-green); }
+.dpm-area--preparando { background: var(--cp-gold); color: var(--cp-navy); }
+.dpm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dpm-barra { height: 8px; border-radius: 4px; background: var(--cp-sand); overflow: hidden; }
+.dpm-barra > span { display: block; height: 100%; background: var(--cp-green); }
+.dpm-lineas { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dpm-linea { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.dpm-cant { font-weight: 800; min-width: 28px; }
+.dpm-linea-txt { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dpm-det { display: block; font-size: 12px; color: var(--cp-soft); }
+.dpm-ayuda { margin: 0; font-size: 13px; color: var(--cp-soft); }
+.dpm-error { margin: 0; font-size: 13px; font-weight: 700; color: var(--cp-rust); }
+.dpm-ok { margin: 0; font-size: 13px; font-weight: 700; color: var(--cp-green); }
+.dpm-campo { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; }
+.dpm-campo input { min-height: 44px; border-radius: 10px; border: 1.5px solid var(--cp-line); padding: 0 12px; font: inherit; font-size: 16px; }
+.dpm-campo input:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 1px; }
+.dpm-acciones { display: flex; flex-direction: column; gap: 8px; }
+.dpm-tiempo { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+@media (min-width: 600px) { .dpm-acciones { flex-direction: row; flex-wrap: wrap; } }

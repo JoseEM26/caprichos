@@ -15,7 +15,8 @@ import { ModalAnular } from '../pedidos/ModalAnular';
 import { ProgresoPedido } from './ProgresoPedido';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
-import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
+import { DetallePedidoMozo } from './DetallePedidoMozo';
+import type { EstadoMisPedidos, FiltrosMisPedidos, MiPedido, OrdenMisPedidos, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { agruparCuentas } from '../pedidos/agruparCuentas';
 import './mis-pedidos.css';
@@ -33,19 +34,52 @@ function pestanaGuardada(): Pestana {
   }
 }
 
-const RANGOS: Array<{ valor: RangoMisPedidos; etiqueta: string }> = [
+type RangoElegido = RangoMisPedidos | 'rango';
+const RANGOS: Array<{ valor: RangoElegido; etiqueta: string }> = [
   { valor: 'hoy', etiqueta: 'Hoy' },
   { valor: 'ayer', etiqueta: 'Ayer' },
   { valor: '7dias', etiqueta: 'Últimos 7 días' },
+  { valor: '30dias', etiqueta: 'Últimos 30 días' },
+  { valor: 'todas', etiqueta: 'Todas' },
+  { valor: 'rango', etiqueta: 'Desde / hasta' },
 ];
 
-type FiltroEstado = 'todos' | 'enCurso' | 'entregados' | 'faltaVoucher';
+/** `faltaVoucher` solo filtra en la web; el resto de valores se manda a la API como `estado`. */
+type FiltroEstado = 'todos' | EstadoMisPedidos | 'faltaVoucher';
 const FILTROS: Array<{ valor: FiltroEstado; etiqueta: string }> = [
   { valor: 'todos', etiqueta: 'Todos' },
-  { valor: 'enCurso', etiqueta: 'En curso' },
-  { valor: 'entregados', etiqueta: 'Entregados' },
+  { valor: 'EN_CURSO', etiqueta: 'En curso' },
+  { valor: 'COLA', etiqueta: 'En cola' },
+  { valor: 'PREPARANDO', etiqueta: 'Preparando' },
+  { valor: 'LISTO', etiqueta: 'Listo' },
+  { valor: 'ENTREGADO', etiqueta: 'Entregados' },
+  { valor: 'ANULADO', etiqueta: 'Anulado' },
   { valor: 'faltaVoucher', etiqueta: 'Falta captura' },
 ];
+const ORDENES: Array<{ valor: OrdenMisPedidos; etiqueta: string }> = [
+  { valor: 'recientes', etiqueta: 'Más recientes' },
+  { valor: 'mas_espera', etiqueta: 'Más tiempo en espera' },
+];
+
+/** Filtros recordados en la URL (?rango=&mozo=&estado=&orden=&desde=&hasta=) para compartir o recargar. */
+function filtrosDeUrl() {
+  const q = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
+  const rango = q.get('rango');
+  const estado = q.get('estado');
+  const desde = q.get('desde') ?? '';
+  const hasta = q.get('hasta') ?? '';
+  return {
+    rango: (desde || hasta ? 'rango' : RANGOS.some((r) => r.valor === rango) && rango !== 'rango' ? rango : 'hoy') as RangoElegido,
+    estado: (FILTROS.some((f) => f.valor === estado) ? estado : 'todos') as FiltroEstado,
+    mozo: q.get('mozo') ?? 'todos',
+    orden: (q.get('orden') === 'mas_espera' ? 'mas_espera' : 'recientes') as OrdenMisPedidos,
+    desde,
+    hasta,
+  };
+}
+
+/** Color de la espera: menos de 10 min tranquilo, hasta 20 atención, más de 20 urgente. */
+const nivelEspera = (min: number) => (min >= 20 ? 'alta' : min >= 10 ? 'media' : 'baja');
 
 const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
 
@@ -69,12 +103,6 @@ const MODALIDAD: Record<string, string> = {
   LLEVAR: 'Para llevar',
   RECOGER: 'Para llevar',
   DELIVERY: 'Delivery',
-};
-
-const PAGO: Record<string, string> = {
-  PAGADO: 'Pagado',
-  PENDIENTE: 'Pago pendiente',
-  COORDINADO: 'Pago coordinado',
 };
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -122,13 +150,18 @@ function nombreMedioPlan(medio: string): string {
 
 export function MisPedidosView() {
   const { tiene } = useSesion();
-  const [rango, setRango] = useState<RangoMisPedidos>('hoy');
-  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
+  const [inicial] = useState(filtrosDeUrl);
+  const [rango, setRango] = useState<RangoElegido>(inicial.rango);
+  const [filtro, setFiltro] = useState<FiltroEstado>(inicial.estado);
+  const [mozo, setMozo] = useState(inicial.mozo);
+  const [orden, setOrden] = useState<OrdenMisPedidos>(inicial.orden);
+  const [desde, setDesde] = useState(inicial.desde);
+  const [hasta, setHasta] = useState(inicial.hasta);
   const [busqueda, setBusqueda] = useState('');
   const [datos, setDatos] = useState<RespuestaMisPedidos | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [detalleId, setDetalleId] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [quitarDe, setQuitarDe] = useState<{ voucherId: string; codigo: string } | null>(null);
   const [quitando, setQuitando] = useState(false);
@@ -164,7 +197,14 @@ export function MisPedidosView() {
     const id = ++ultimaSolicitud.current;
     setCargando(true);
     try {
-      const res = await salonApi.misPedidos(rango);
+      const filtros: FiltrosMisPedidos =
+        rango === 'rango'
+          ? { ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) }
+          : { rango };
+      if (mozo !== 'todos') filtros.mozo = mozo;
+      if (filtro !== 'todos' && filtro !== 'faltaVoucher') filtros.estado = filtro;
+      if (orden === 'mas_espera') filtros.orden = orden;
+      const res = await salonApi.misPedidos(filtros);
       if (id !== ultimaSolicitud.current) return;
       setDatos(res);
       setError(false);
@@ -173,7 +213,25 @@ export function MisPedidosView() {
     } finally {
       if (id === ultimaSolicitud.current) setCargando(false);
     }
-  }, [rango]);
+  }, [rango, desde, hasta, mozo, filtro, orden]);
+
+  // Los filtros quedan en la URL sin recargar ni ensuciar el historial
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const poner = (k: string, val: string, porDefecto: string) => (val && val !== porDefecto ? q.set(k, val) : q.delete(k));
+      poner('rango', rango === 'rango' ? '' : rango, 'hoy');
+      poner('desde', rango === 'rango' ? desde : '', '');
+      poner('hasta', rango === 'rango' ? hasta : '', '');
+      poner('estado', filtro, 'todos');
+      poner('mozo', mozo, 'todos');
+      poner('orden', orden, 'recientes');
+      const s = q.toString();
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`);
+    } catch {
+      // Sin acceso a la URL: los filtros valen solo para esta sesión
+    }
+  }, [rango, desde, hasta, filtro, mozo, orden]);
 
   useEffect(() => {
     void cargar();
@@ -204,20 +262,62 @@ export function MisPedidosView() {
   const visibles = pedidos.filter((p) => {
     if (!coincideBusqueda(p, busqueda)) return false;
     if (filtro === 'todos') return true;
-    if (filtro === 'enCurso') return ESTADOS_EN_CURSO.includes(p.estado);
+    if (filtro === 'EN_CURSO') return ESTADOS_EN_CURSO.includes(p.estado);
     if (filtro === 'faltaVoucher') return faltanVoucher(p);
-    return p.estado === 'ENTREGADO';
+    return p.estado === filtro;
   });
+  if (orden === 'mas_espera') visibles.sort((a, b) => (b.esperaMinutos ?? -1) - (a.esperaMinutos ?? -1));
+  const mozos = datos?.mozos ?? [];
+  const detalle = detalleId ? pedidos.find((p) => p.id === detalleId) ?? null : null;
   // Cuenta = pedido original + sus extras (pedidoOrigenId): una sola tarjeta; el resumen sigue contando cada pedido
   const cuentas = agruparCuentas(visibles, pedidos, (p) => p.pedidoOrigenId ?? p.id);
   const resumen = datos?.resumen ?? RESUMEN_VACIO;
   const valor = (n: number) => (datos ? String(n) : '—');
 
+  // Voucher por medio digital del plan. Dentro del modal de detalle, abrir otro modal cierra primero el detalle
+  const bloqueVoucher = (p: MiPedido, enModal: boolean) => {
+    if (!tieneParteDigital(p) || p.estado === 'ANULADO') return null;
+    const abrir = (f: () => void) => () => {
+      if (enModal) setDetalleId(null);
+      f();
+    };
+    return (
+      <div className="mpv-medios">
+        {mediosVoucher(p).map((m) => (
+          <div className="mpv-fila" key={m.medio}>
+            <span className={`mpv-badge ${m.subido ? 'mpv-badge--ok' : 'mpv-badge--falta'}`}>
+              {m.subido ? '' : 'ⓘ '}{nombreMedioPlan(m.medio)}: {m.subido ? 'captura subida' : 'sin captura'}
+            </span>
+            {m.subido && p.puedeCambiarVoucher && (
+              <button type="button" className="mpv-boton" onClick={abrir(() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto }))}>
+                Cambiar voucher
+              </button>
+            )}
+            {m.subido && p.puedeCambiarVoucher && m.voucherId && (
+              <button type="button" className="mpv-boton" onClick={abrir(() => setQuitarDe({ voucherId: m.voucherId as string, codigo: p.codigo }))}>
+                Quitar voucher
+              </button>
+            )}
+            {!m.subido && p.puedeSubirVoucher && (
+              <button type="button" className="mpv-boton" onClick={abrir(() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto }))}>
+                Subir captura (opcional)
+              </button>
+            )}
+          </div>
+        ))}
+        {mediosVoucher(p).some((m) => !m.subido) && p.puedeSubirVoucher && (
+          <p className="mpv-ayuda">La captura es opcional: puedes subirla después.</p>
+        )}
+        {mediosVoucher(p).some((m) => m.subido) && p.puedeCambiarVoucher === false && (
+          <p className="mpv-ayuda">Voucher bloqueado: Caja ya aprobó el pago de este pedido. Pide a Caja cualquier cambio.</p>
+        )}
+      </div>
+    );
+  };
+
   // Una tarjeta de pedido. `rol` solo viene dentro de una cuenta (original + extras); `Cont` es li (suelta) o div (dentro de la cuenta)
   const tarjeta = (p: MiPedido, Cont: 'li' | 'div', rol?: 'original' | 'extra', incluido = true) => {
-            const abierto = expandido === p.id;
             const est = ESTADO_VISTO[p.estado] ?? { texto: p.estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
-            const idDetalle = `mp-detalle-${p.id}`;
             const idItems = `mp-items-${p.id}`;
             const recortar = p.lineas.length > LINEAS_SIN_RECORTE && !itemsAbiertos.has(p.id);
             const lineasVisibles = recortar ? p.lineas.slice(0, LINEAS_VISIBLES) : p.lineas;
@@ -238,10 +338,16 @@ export function MisPedidosView() {
                     <span className="mp-estado" style={{ background: est.bg, color: est.fg }}>
                       {est.texto}
                     </span>
+                    {p.esperaMinutos != null && ESTADOS_EN_CURSO.includes(p.estado) && (
+                      <span className={`mp-espera mp-espera--${nivelEspera(p.esperaMinutos)}`} data-testid="espera-minutos" aria-label={`Espera de ${p.esperaMinutos} minutos`}>
+                        ⏱ {p.esperaMinutos} min
+                      </span>
+                    )}
                   </span>
                   <span className="mp-card-fila mp-card-sub">
                     <span>
                       {lugar(p)} · {horaLima(p.creadoEn)}
+                      {mozos.length > 0 && p.mozoNombre ? ` · ${p.mozoNombre}` : ''}
                     </span>
                     <strong className="mp-total">{soles(p.total)}</strong>
                   </span>
@@ -286,52 +392,11 @@ export function MisPedidosView() {
                   </button>
                 )}
 
-                {!abierto && <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="compacto" />}
+                <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="compacto" />
 
-                <button
-                  type="button"
-                  className="mp-mas"
-                  aria-expanded={abierto}
-                  aria-controls={idDetalle}
-                  onClick={() => setExpandido(abierto ? null : p.id)}
-                >
-                  {abierto ? 'Ocultar detalle' : 'Ver detalle'}
+                <button type="button" className="mp-mas" aria-haspopup="dialog" onClick={() => setDetalleId(p.id)}>
+                  Ver detalle
                 </button>
-
-                {abierto && (
-                  <div id={idDetalle} className="mp-detalle">
-                    <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="completo" />
-                    <dl>
-                      <dt>Estado</dt>
-                      <dd>{est.texto}</dd>
-                      <dt>Pago</dt>
-                      <dd>{PAGO[p.pagoEstado ?? ''] ?? (p.pagoEstado || 'Sin dato')}</dd>
-                      <dt>Total</dt>
-                      <dd>{soles(p.total)}</dd>
-                      {(p.propina ?? 0) > 0 && (
-                        <>
-                          <dt>Propina (aparte)</dt>
-                          <dd data-testid="mis-pedidos-propina">{soles(p.propina ?? 0)}</dd>
-                        </>
-                      )}
-                    </dl>
-                    {((p.historialVouchers ?? 0) >= 2 || (p.historialVouchers ?? 0) > (p.vouchers ?? 0)) && (
-                      <HistorialVoucher pedidoId={p.id} total={p.historialVouchers ?? 0} />
-                    )}
-                    {/* El servidor decide (suyo, en cocina, sin cobro ni voucher aprobado); aquí solo no se ofrece lo evidente */}
-                    {tiene('pedidos/extra') && p.estado !== 'ANULADO' && p.estado !== 'RECHAZADO' && (
-                      <button type="button" className="mpv-boton" onClick={() => setExtraDe(p)}>
-                        Agregar extra
-                      </button>
-                    )}
-                    {/* Mis pedidos lista solo los del mozo: puede anular los suyos (el servidor lo valida igual) */}
-                    {tiene('pedidos/anular') && p.estado !== 'ANULADO' && p.estado !== 'RECHAZADO' && p.estado !== 'ENTREGADO' && (
-                      <button type="button" className="mpv-boton" onClick={() => setAnularDe(p)}>
-                        Anular pedido
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 {p.plan && p.plan.length > 0 && (
                   <p className="mpv-ayuda">
@@ -339,39 +404,7 @@ export function MisPedidosView() {
                   </p>
                 )}
 
-                {tieneParteDigital(p) && p.estado !== 'ANULADO' && (
-                  <div className="mpv-medios">
-                    {/* Un voucher por medio digital del plan: cada uno subido o falta */}
-                    {mediosVoucher(p).map((m) => (
-                      <div className="mpv-fila" key={m.medio}>
-                        <span className={`mpv-badge ${m.subido ? 'mpv-badge--ok' : 'mpv-badge--falta'}`}>
-                          {m.subido ? '' : 'ⓘ '}{nombreMedioPlan(m.medio)}: {m.subido ? 'captura subida' : 'sin captura'}
-                        </span>
-                        {m.subido && p.puedeCambiarVoucher && (
-                          <button type="button" className="mpv-boton" onClick={() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto })}>
-                            Cambiar voucher
-                          </button>
-                        )}
-                        {m.subido && p.puedeCambiarVoucher && m.voucherId && (
-                          <button type="button" className="mpv-boton" onClick={() => setQuitarDe({ voucherId: m.voucherId as string, codigo: p.codigo })}>
-                            Quitar voucher
-                          </button>
-                        )}
-                        {!m.subido && p.puedeSubirVoucher && (
-                          <button type="button" className="mpv-boton" onClick={() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto })}>
-                            Subir captura (opcional)
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    {mediosVoucher(p).some((m) => !m.subido) && p.puedeSubirVoucher && (
-                      <p className="mpv-ayuda">La captura es opcional: puedes subirla después.</p>
-                    )}
-                    {mediosVoucher(p).some((m) => m.subido) && p.puedeCambiarVoucher === false && (
-                      <p className="mpv-ayuda">Voucher bloqueado: Caja ya aprobó el pago de este pedido. Pide a Caja cualquier cambio.</p>
-                    )}
-                  </div>
-                )}
+                {bloqueVoucher(p, false)}
               </Cont>
             );
   };
@@ -452,7 +485,7 @@ export function MisPedidosView() {
           valor={rango}
           valorPorDefecto="hoy"
           opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
-          alCambiar={(v) => setRango(v as RangoMisPedidos)}
+          alCambiar={(v) => setRango(v as RangoElegido)}
         />
         <FiltroCombo
           etiqueta="Estado"
@@ -464,7 +497,38 @@ export function MisPedidosView() {
           )}
           alCambiar={(v) => setFiltro(v as FiltroEstado)}
         />
+        <FiltroCombo
+          etiqueta="Orden"
+          valor={orden}
+          opciones={ORDENES}
+          alCambiar={(v) => setOrden(v as OrdenMisPedidos)}
+        />
+        {mozos.length > 0 && (
+          <FiltroCombo
+            etiqueta="Mozo"
+            valor={mozo}
+            valorPorDefecto="todos"
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos', cantidad: mozos.reduce((a, m) => a + m.pedidos, 0) },
+              ...mozos.map((m) => ({ valor: m.partyId, etiqueta: m.nombre, cantidad: m.pedidos })),
+            ]}
+            alCambiar={setMozo}
+          />
+        )}
       </BarraFiltros>
+
+      {rango === 'rango' && (
+        <div className="mp-fechas">
+          <label>
+            Desde
+            <input type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)} />
+          </label>
+          <label>
+            Hasta
+            <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} />
+          </label>
+        </div>
+      )}
 
       {error && (
         <EstadoError
@@ -534,6 +598,31 @@ export function MisPedidosView() {
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
+        />
+      )}
+
+      {detalle && (
+        <DetallePedidoMozo
+          pedido={detalle}
+          extras={pedidos.filter((x) => x.pedidoOrigenId === detalle.id)}
+          vouchers={
+            <>
+              {bloqueVoucher(detalle, true)}
+              {((detalle.historialVouchers ?? 0) >= 2 || (detalle.historialVouchers ?? 0) > (detalle.vouchers ?? 0)) && (
+                <HistorialVoucher pedidoId={detalle.id} total={detalle.historialVouchers ?? 0} />
+              )}
+            </>
+          }
+          alCerrar={() => setDetalleId(null)}
+          alCambio={() => void cargar()}
+          alExtra={() => {
+            setDetalleId(null);
+            setExtraDe(detalle);
+          }}
+          alAnular={() => {
+            setDetalleId(null);
+            setAnularDe(detalle);
+          }}
         />
       )}
 
