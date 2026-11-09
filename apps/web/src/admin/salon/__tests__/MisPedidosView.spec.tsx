@@ -70,7 +70,7 @@ describe('MisPedidosView', () => {
     expect(within(lista).getByText('2×')).toBeInTheDocument();
     expect(within(lista).getByText('Torta')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nuevo pedido' })).toBeInTheDocument();
-    expect(salonApi.misPedidos).toHaveBeenCalledWith('hoy');
+    expect(salonApi.misPedidos).toHaveBeenCalledWith({ rango: 'hoy' });
   });
 
   it('el filtro por estado deja solo los entregados o los en curso', async () => {
@@ -116,21 +116,17 @@ describe('MisPedidosView', () => {
     expect(within(torta).getByText('S/ 14.50')).toBeInTheDocument();
   });
 
-  it('al abrir el detalle solo aparecen pago, progreso e historial; los productos no se repiten', async () => {
+  it('«Ver detalle» abre el modal por pasos con los productos y el pago', async () => {
     render(<MisPedidosView />);
     const tarjeta = (await screen.findByText('CP-M012')).closest('li')!;
-    const boton = within(tarjeta).getByRole('button', { name: 'Ver detalle' });
-    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(within(tarjeta).getByRole('button', { name: 'Ver detalle' }));
 
-    fireEvent.click(boton);
-
-    expect(within(tarjeta).getByRole('button', { name: 'Ocultar detalle' })).toHaveAttribute('aria-expanded', 'true');
-    const detalle = document.getElementById(boton.getAttribute('aria-controls')!)!;
-    expect(within(detalle).getByText('Pagado')).toBeInTheDocument();
-    expect(within(detalle).queryByRole('list')).not.toBeInTheDocument();
-    expect(within(detalle).queryByText('Café')).not.toBeInTheDocument();
-    // Los productos siguen en la lista de la tarjeta, una sola vez
-    expect(within(tarjeta).getAllByRole('list', { name: 'Productos del pedido CP-M012' })).toHaveLength(1);
+    const dialogo = await screen.findByRole('dialog', { name: 'Pedido CP-M012' });
+    expect(within(dialogo).getByRole('list', { name: 'Productos de CP-M012' })).toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole('tab', { name: /Cliente y pago/ }));
+    expect(within(dialogo).getByText(/Pagado/)).toBeInTheDocument();
+    fireEvent.keyDown(dialogo, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Pedido CP-M012' })).toBeNull());
   });
 
   it('error con Reintentar que vuelve a pedir los datos', async () => {
@@ -151,7 +147,7 @@ describe('MisPedidosView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Periodo: Hoy' }));
     fireEvent.click(screen.getByRole('option', { name: 'Ayer' }));
 
-    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith('ayer'));
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: 'ayer' }));
   });
 
   describe('lista de productos recortada', () => {

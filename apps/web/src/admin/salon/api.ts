@@ -7,6 +7,7 @@ import {
   PisoPlano,
   PisoSalon,
   RangoMisPedidos,
+  FiltrosMisPedidos,
   Reserva,
   RespuestaEspera,
   RespuestaMisPedidos,
@@ -99,6 +100,17 @@ export interface ActualizarReservaPayload {
   mesas?: (string | number)[];
 }
 
+/** Cliente de GET /admin/pedidos/mis-pedidos con todos los filtros (los vacíos no se envían). */
+export const misPedidosApi = {
+  listar: (filtros: FiltrosMisPedidos | RangoMisPedidos = {}) => {
+    const f: FiltrosMisPedidos = typeof filtros === 'string' ? { rango: filtros } : filtros;
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v) q.set(k, String(v));
+    if (!q.has('rango') && !q.has('desde')) q.set('rango', 'hoy');
+    return api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?${q.toString()}`);
+  },
+};
+
 export const salonApi = {
   // =========================================================================
   // PLANO
@@ -132,8 +144,7 @@ export const salonApi = {
   // =========================================================================
   obtenerMesas: () => api.get<{ pisos: PisoSalon[] }>('/admin/salon/mesas'),
 
-  misPedidos: (rango: RangoMisPedidos) =>
-    api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?rango=${rango}`),
+  misPedidos: (filtros: FiltrosMisPedidos | RangoMisPedidos = {}) => misPedidosApi.listar(filtros),
 
   abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
     api.post('/admin/salon/pedidos', payload, {

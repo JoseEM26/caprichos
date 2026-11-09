@@ -163,7 +163,20 @@ export interface AvisoPedidoListo {
   recibidoEn: string;
 }
 
-export type RangoMisPedidos = 'hoy' | 'ayer' | '7dias';
+export type RangoMisPedidos = 'hoy' | 'ayer' | '7dias' | '30dias' | 'todas';
+export type EstadoMisPedidos = 'EN_CURSO' | 'COLA' | 'PREPARANDO' | 'LISTO' | 'ENTREGADO' | 'ANULADO';
+export type OrdenMisPedidos = 'recientes' | 'mas_espera';
+
+/** Filtros de GET /admin/pedidos/mis-pedidos. Todo opcional; `desde`/`hasta` (YYYY-MM-DD) mandan sobre `rango`. */
+export interface FiltrosMisPedidos {
+  rango?: RangoMisPedidos;
+  desde?: string;
+  hasta?: string;
+  /** Solo ADMIN/SUPERVISOR: partyId del mozo */
+  mozo?: string;
+  estado?: EstadoMisPedidos;
+  orden?: OrdenMisPedidos;
+}
 
 /** Progreso en cocina y entrega (mismo contrato que la API: progresoDelPedido). */
 export type EtapaProgreso =
@@ -205,6 +218,10 @@ export interface ProgresoPedido {
   etaMax?: number;
   /** Minutos para que esté listo lo que falta (solo mientras cocina trabaja). */
   estimadoMin?: number;
+  /** Contrato nuevo de mis-pedidos (opcional): unidades totales/listas y avance por área */
+  total?: number;
+  listas?: number;
+  porArea?: Array<{ area: string; total: number; listas: number }>;
 }
 
 /** Línea de un pedido del mozo. Los campos nuevos pueden faltar en respuestas anteriores. */
@@ -262,9 +279,22 @@ export interface MiPedido {
   lineas: MiPedidoLinea[];
   /** Cocina y entrega en vivo. Puede faltar en respuestas anteriores. */
   progreso?: ProgresoPedido;
+  /** Mozo que tomó el pedido (la API lo manda; puede faltar) */
+  mozoNombre?: string | null;
+  mozoPartyId?: string | null;
+  /** Minutos desde que entró a cocina sin estar listo/entregado */
+  esperaMinutos?: number | null;
+}
+
+export interface MozoFiltro {
+  partyId: string;
+  nombre: string;
+  pedidos: number;
 }
 
 export interface RespuestaMisPedidos {
+  /** Solo para ADMIN/SUPERVISOR */
+  mozos?: MozoFiltro[];
   pedidos: MiPedido[];
   resumen: { cantidad: number; total: number; enCurso: number; entregados: number };
 }

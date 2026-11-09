@@ -31,6 +31,7 @@ describe('Mis pedidos: anular pedido propio', () => {
   it('el pedido en curso ofrece «Anular pedido» y pide motivo y confirmación', async () => {
     render(<MisPedidosView />);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Ver detalle' }))[0]);
+    fireEvent.click(await screen.findByRole('tab', { name: /Estado y acciones/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Anular pedido' }));
     expect(screen.getByText(/pedido COMPLETO, con todas sus áreas/)).toBeInTheDocument();
     expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
@@ -44,7 +45,8 @@ describe('Mis pedidos: anular pedido propio', () => {
     permisos.delete('pedidos/anular');
     render(<MisPedidosView />);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Ver detalle' }))[0]);
-    await screen.findByRole('button', { name: 'Agregar extra' });
+    fireEvent.click(await screen.findByRole('tab', { name: /Estado y acciones/ }));
+    await screen.findByRole('button', { name: '+ Pedido extra' });
     expect(screen.queryByRole('button', { name: 'Anular pedido' })).toBeNull();
   });
 });
