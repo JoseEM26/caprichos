@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { MascotaCapri } from '../../mascota';
+import { useArrastrable } from '../../comun/useArrastrable';
 import { useAyuda } from './useAyuda';
 import { formatearTextoAyuda } from './formatearTextoAyuda';
 import './AyudaCapri.css';
@@ -62,6 +63,11 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
       /* sin almacenamiento */
     }
   };
+  const contenedorRef = useRef<HTMLDivElement>(null);
+  const arr = useArrastrable(contenedorRef, { clave: 'capri.posicion', dep: `${minimizada}-${abierto}` });
+  const alAbrir = () => {
+    if (arr.permitirClic()) abrir();
+  };
   const finMensajesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -118,7 +124,12 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
     <>
       {/* Botón flotante FAB (visible solo cuando el panel está cerrado) */}
       {!abierto && !minimizada && (
-        <div className="ayuda-fab-wrap">
+        <div
+          ref={contenedorRef}
+          className={`ayuda-fab-wrap${arr.movida ? ' ayuda-movida' : ''}${arr.moviendo ? ' ayuda-moviendo' : ''}`}
+          style={arr.estilo}
+        >
+          {arr.moviendo && <span className="ayuda-suelta" aria-hidden="true">Suelta donde quieras</span>}
           <button
             type="button"
             className="ayuda-min"
@@ -133,8 +144,9 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
           <button
             type="button"
             className="ayuda-fab"
-            onClick={abrir}
-            aria-label="Abrir la ayuda de Capri"
+            onClick={alAbrir}
+            {...arr.props}
+            aria-label="Abrir la ayuda de Capri. Mantén presionado para mover"
             aria-expanded={false}
           >
             <span className="tip">¿Necesitas ayuda? Pregúntame cómo se hace.</span>
@@ -151,12 +163,18 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
 
       {/* Capri minimizada: botón redondo pequeño y, aparte, el botón para agrandarla */}
       {!abierto && minimizada && (
-        <div className="ayuda-mini-wrap">
+        <div
+          ref={contenedorRef}
+          className={`ayuda-mini-wrap${arr.movida ? ' ayuda-movida' : ''}${arr.moviendo ? ' ayuda-moviendo' : ''}`}
+          style={arr.estilo}
+        >
+          {arr.moviendo && <span className="ayuda-suelta" aria-hidden="true">Suelta donde quieras</span>}
           <button
             type="button"
             className="ayuda-fab-mini"
-            onClick={abrir}
-            aria-label="Abrir la ayuda de Capri"
+            onClick={alAbrir}
+            {...arr.props}
+            aria-label="Abrir la ayuda de Capri. Mantén presionado para mover"
             title="Ayuda de Capri"
           >
             <MascotaCapri estado="reposo" tamano={44} forzarFallback2D />
@@ -175,6 +193,8 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
         </div>
       )}
 
+      <span className="ayuda-sr-only" role="status" aria-live="polite">{arr.anuncio}</span>
+
       {/* Fondo oscuro traslúcido en celular */}
       {abierto && esMovil && (
         <div
@@ -187,7 +207,7 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
       {/* Panel de Ayuda */}
       {abierto && (
         <section
-          className="ayuda-panel"
+          className={`ayuda-panel${arr.movida && arr.lado === 'izq' ? ' ayuda-panel--izq' : ''}`}
           role="dialog"
           aria-label="Ayuda de Capri"
           aria-modal={esMovil}
@@ -283,6 +303,21 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
               ))}
             </div>
           )}
+
+          <div className="ayuda-pie">
+            {arr.movida && (
+              <button type="button" onClick={arr.restaurar}>Volver a la esquina original</button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                cerrar();
+                cambiarMinimizada(true);
+              }}
+            >
+              Ocultar por ahora
+            </button>
+          </div>
 
           {/* Entrada de texto */}
           <form className="ayuda-in" onSubmit={manejarEnvio}>
