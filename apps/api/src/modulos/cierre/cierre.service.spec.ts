@@ -865,7 +865,8 @@ describe('CierreService', () => {
       const creada = prismaMock.cierreCaja.create.mock.calls[0][0].data;
       expect(creada.resultado).toBe('NO_CUADRA');
       expect(creada.nota).toBeNull();
-      expect(creada.aprobado_por).toBeUndefined();
+      // La BD (ck_cierre_caja_aprobacion) rechaza NO_CUADRA sin aprobado_por: se guarda quien cierra (era el error 500 del cierre con diferencia)
+      expect(creada.aprobado_por).toBe(mockUsuarioCajero.partyId);
       const ef = res.medios!.find((m: any) => m.medio === 'EFECTIVO');
       expect(ef).toMatchObject({ sistema: 355, visto: 200, diferencia: -155 });
       expect(res.diferenciaTotal).toBe(-155);

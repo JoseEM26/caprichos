@@ -624,6 +624,9 @@ export class CierreService {
           conteo: conteo as any,
           resultado,
           nota: dto.nota?.trim() || null,
+          // La BD exige quién respondió por un cierre NO_CUADRA (ck_cierre_caja_aprobacion): aquí es quien cierra,
+          // no una aprobación de supervisor (el cierre con diferencia ya no pide aprobación).
+          aprobado_por: resultado === 'NO_CUADRA' ? usuario.partyId : null,
         },
       });
 
