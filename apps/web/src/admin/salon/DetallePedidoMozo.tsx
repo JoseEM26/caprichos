@@ -114,16 +114,16 @@ export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alC
         <FormCliente pedido={pedido} completo={completo} sinFicha={sinFicha} editable={vigente && tiene('pedidos/corregir_cliente')} alGuardado={() => { cargarCompleto(); alCambio(); }} />
         <section className="dpm-sec" aria-label="Forma de pago">
           <h3 className="dpm-h">Forma de pago</h3>
-          <p className="dpm-ayuda">
-            {pedido.plan && pedido.plan.length > 0
-              ? pedido.plan.map((f) => `${f.medio} ${soles(f.monto)}`).join(' · ')
-              : pedido.pagoMetodo ?? 'Sin dato'} · Total {soles(pedido.total)} · {PAGO[pedido.pagoEstado ?? ''] ?? (pedido.pagoEstado || 'Sin dato')}
-          </p>
-          {completo && (
-            <BotonCambiarPago pedido={completo} permitido={tiene('pedidos/ajustar_pago')} alExito={() => { cargarCompleto(); alCambio(); }} />
-          )}
+          <PagoDe p={pedido} completo={completo} permitido={tiene('pedidos/ajustar_pago')} alExito={() => { cargarCompleto(); alCambio(); }} />
           {vouchers}
         </section>
+        {/* Cada extra tiene su propio plan de pago: también se cambia desde aquí */}
+        {extras.filter((e) => !['ANULADO', 'RECHAZADO'].includes(e.estado)).map((e) => (
+          <section key={e.id} className="dpm-sec" aria-label={`Forma de pago del extra ${e.codigo}`} data-testid="dpm-pago-extra">
+            <h3 className="dpm-h">Pago del extra {e.codigo}</h3>
+            <PagoExtra p={e} permitido={tiene('pedidos/ajustar_pago')} alCambio={alCambio} />
+          </section>
+        ))}
       </>
     ) },
     { id: 'estado', etiqueta: PASOS[2].etiqueta, contenido: (
@@ -153,6 +153,27 @@ export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alC
       }
     />
   );
+}
+
+/** Plan de pago de un pedido y su botón «Cambiar método de pago» (el servidor valida que el pedido sea del mozo). */
+function PagoDe({ p, completo, permitido, alExito }: { p: MiPedido; completo: Pedido | null; permitido: boolean; alExito: () => void }) {
+  return (
+    <>
+      <p className="dpm-ayuda">
+        {p.plan && p.plan.length > 0
+          ? p.plan.map((f) => `${f.medio} ${soles(f.monto)}`).join(' · ')
+          : p.pagoMetodo ?? 'Sin dato'} · Total {soles(p.total)} · {PAGO[p.pagoEstado ?? ''] ?? (p.pagoEstado || 'Sin dato')}
+      </p>
+      {completo && <BotonCambiarPago pedido={completo} permitido={permitido} alExito={alExito} />}
+    </>
+  );
+}
+
+function PagoExtra({ p, permitido, alCambio }: { p: MiPedido; permitido: boolean; alCambio: () => void }) {
+  const [completo, setCompleto] = useState<Pedido | null>(null);
+  const cargar = useCallback(() => { pedidosApi.obtenerPorId(p.id).then(setCompleto).catch(() => setCompleto(null)); }, [p.id]);
+  useEffect(() => { cargar(); }, [cargar]);
+  return <PagoDe p={p} completo={completo} permitido={permitido} alExito={() => { cargar(); alCambio(); }} />;
 }
 
 function FormCliente({ pedido, completo, sinFicha, editable, alGuardado }: {

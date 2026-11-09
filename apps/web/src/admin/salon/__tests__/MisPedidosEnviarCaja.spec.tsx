@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -59,7 +60,7 @@ describe('MisPedidosView: sin Enviar a Caja (la cuenta de mesa se cobra desde Me
 
   it('ningún pedido de mesa abierto muestra el botón Enviar a Caja', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
 
     expect(screen.queryByRole('button', { name: 'Enviar a Caja' })).toBeNull();
     for (const codigo of ['CP-M012', 'CP-M013', 'CP-M014', 'CP-M015', 'CP-D016']) {

@@ -200,7 +200,7 @@ export class PedidosAdminController {
 
   /**
    * Cambiar o agregar medios de pago del pedido, en cualquier estado salvo anulado y sin código de supervisor
-   * ni aprobación. Repartidor: solo los asignados a él; mozo: cualquier pedido.
+   * ni aprobación. Repartidor: solo los asignados a él; mozo: solo los que él tomó (canal MOZO).
    */
   @Post(':id/pago/ajustar')
   @Permiso('pedidos', 'ajustar_pago')

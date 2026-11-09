@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -72,7 +73,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
 
   it('el botón Subir captura (opcional) solo aparece en pagos digitales y no anulados', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
 
     const botones = screen.getAllByRole('button', { name: 'Subir captura (opcional)' });
     expect(botones).toHaveLength(1);
@@ -86,7 +87,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
 
   it('abre la ventana del voucher con el medio del pedido', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
 
     fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
@@ -97,7 +98,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
   it('tras subir una foto legible muestra el éxito y vuelve a leer la lista', async () => {
     vi.mocked(vouchersApi.subirVoucher).mockResolvedValue({ id: '7', legible: true } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
     fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');
@@ -117,7 +118,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
       mensaje: 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.',
     } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
     fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');
@@ -140,7 +141,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
       extraido: { monto: 10, operacion: '123456' },
     } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
+    await abrirTodas('CP-M012');
     fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');

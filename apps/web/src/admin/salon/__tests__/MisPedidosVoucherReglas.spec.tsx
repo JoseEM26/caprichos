@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -57,7 +58,7 @@ describe('MisPedidosView: reglas del voucher en la tarjeta', () => {
       resumen: { cantidad: 1, total: 27, enCurso: 1, entregados: 0 },
     } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     const card = tarjeta('CP-W021');
     expect(card.textContent).toContain('Plin: captura subida');
     expect(card.textContent).toContain('Voucher bloqueado: Caja ya aprobó el pago de este pedido. Pide a Caja cualquier cambio.');
@@ -90,7 +91,7 @@ describe('MisPedidosView: reglas del voucher en la tarjeta', () => {
       resumen: { cantidad: 1, total: 27, enCurso: 1, entregados: 0 },
     } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-W022');
+    await abrirTodas('CP-W022');
     const card = tarjeta('CP-W022');
     expect(card.textContent).toContain('Yape: captura subida');
     expect(card.textContent).toContain('Plin: sin captura');
@@ -128,7 +129,7 @@ describe('MisPedidosView: quitar voucher desde la tarjeta', () => {
       resumen: { cantidad: 1, total: 27, enCurso: 1, entregados: 0 },
     } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-W025');
+    await abrirTodas('CP-W025');
     const card = tarjeta('CP-W025');
     fireEvent.click(Array.from(card.querySelectorAll('button')).find((b) => b.textContent === 'Quitar voucher')!);
     fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar' }));
@@ -192,7 +193,7 @@ describe('MisPedidosView: nombre del cliente y filtro Falta captura', () => {
 
   it('muestra el nombre del cliente junto al código, en una sola línea con ellipsis', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     const nombre = screen.getByText('Ana López', { exact: false });
     expect(nombre.className).toContain('mpv-cliente');
     expect(nombre.getAttribute('title')).toBe('Ana López');
@@ -200,7 +201,7 @@ describe('MisPedidosView: nombre del cliente y filtro Falta captura', () => {
 
   it('la opción Falta captura del combo Estado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
     render(<MisPedidosView />);
-    await screen.findByText('CP-W021');
+    await abrirTodas('CP-W021');
     // El filtro Estado es un combo; la opción «Falta captura» lleva la cantidad
     fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
     expect(screen.getByRole('option', { name: /Falta captura/ })).toHaveTextContent('1');

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -55,7 +56,8 @@ describe('Mis pedidos: una tarjeta por cuenta (original + extras)', () => {
 
   it('original + 2 extras en UNA tarjeta con los 3 códigos y el total de la cuenta; el suelto sigue aparte', async () => {
     render(<MisPedidosView />);
-    const cuenta = await screen.findByTestId('tarjeta-cuenta');
+    await abrirTodas();
+    const cuenta = screen.getByTestId('tarjeta-cuenta');
     expect(screen.getAllByTestId('tarjeta-cuenta')).toHaveLength(1);
     for (const c of ['CP-W120', 'CP-W121', 'CP-W122']) expect(within(cuenta).getByText(c)).toBeTruthy();
     expect(within(cuenta).getByTestId('rotulo-original')).toHaveTextContent('PEDIDO ORIGINAL');
@@ -81,7 +83,30 @@ describe('Mis pedidos: una tarjeta por cuenta (original + extras)', () => {
   it('sin extras una tarjeta es la de siempre', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [respuesta.pedidos[3]], resumen: { cantidad: 1, total: 12, enCurso: 1, entregados: 0 } } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-W105');
+    await abrirTodas('CP-W105');
     expect(screen.queryByTestId('tarjeta-cuenta')).toBeNull();
+  });
+
+  it('acordeón: cerrada por defecto con varias cuentas pendientes, sin listar extras; abre y cierra con aria-expanded', async () => {
+    render(<MisPedidosView />);
+    await screen.findAllByRole('button', { name: /Ana/ });
+    const cabs = document.querySelectorAll<HTMLElement>('.mp-acc-cab');
+    expect(cabs).toHaveLength(2);
+    cabs.forEach((c) => expect(c.getAttribute('aria-expanded')).toBe('false'));
+    expect(screen.queryAllByTestId('insignia-extra')).toHaveLength(0);
+    expect(within(cabs[0]).getByText('2 extras')).toBeTruthy();
+    fireEvent.click(cabs[0]);
+    expect(cabs[0].getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById(cabs[0].getAttribute('aria-controls')!)).not.toBeNull();
+    expect(screen.getAllByTestId('insignia-extra')).toHaveLength(2);
+    fireEvent.click(cabs[0]);
+    expect(screen.queryAllByTestId('insignia-extra')).toHaveLength(0);
+  });
+
+  it('acordeón: si una sola cuenta tiene algo pendiente, arranca abierta', async () => {
+    vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [respuesta.pedidos[3]], resumen: { cantidad: 1, total: 12, enCurso: 1, entregados: 0 } } as any);
+    render(<MisPedidosView />);
+    await screen.findByText('CP-W105');
+    expect(document.querySelector('.mp-acc-cab')!.getAttribute('aria-expanded')).toBe('true');
   });
 });

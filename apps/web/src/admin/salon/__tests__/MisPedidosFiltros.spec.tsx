@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { abrirTodas } from './abrirTodas';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -33,14 +34,14 @@ describe('Mis pedidos: filtros', () => {
   it('sin lista de mozos (rol mozo) no hay selector «Mozo»', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-A');
+    await abrirTodas('CP-A');
     expect(screen.queryByRole('button', { name: /^Mozo:/ })).toBeNull();
   });
 
   it('admin/supervisor: selector Mozo con contadores; elegir uno lo manda a la API y a la URL', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue({ ...base, mozos: [{ partyId: '7', nombre: 'Rosa', pedidos: 2 }, { partyId: '8', nombre: 'Luis', pedidos: 1 }] } as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-A');
+    await abrirTodas('CP-A');
     fireEvent.click(screen.getByRole('button', { name: 'Mozo: Todos' }));
     expect(screen.getByRole('option', { name: /Rosa/ })).toHaveTextContent('2');
     fireEvent.click(screen.getByRole('option', { name: /Luis/ }));
@@ -51,7 +52,7 @@ describe('Mis pedidos: filtros', () => {
   it('estado, periodo y orden viajan a la API', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-A');
+    await abrirTodas('CP-A');
     elegir('Estado: Todos', 'Preparando');
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: 'hoy', estado: 'PREPARANDO' }));
     elegir('Periodo: Hoy', 'Últimos 30 días');
@@ -64,7 +65,7 @@ describe('Mis pedidos: filtros', () => {
   it('rango Desde/hasta pide por fechas', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-A');
+    await abrirTodas('CP-A');
     elegir('Periodo: Hoy', 'Desde / hasta');
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-15' } });
@@ -74,7 +75,7 @@ describe('Mis pedidos: filtros', () => {
   it('«Más tiempo en espera» ordena de mayor a menor y muestra los minutos con su nivel', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
-    await screen.findByText('CP-A');
+    await abrirTodas('CP-A');
     elegir(/^Orden:/, 'Más tiempo en espera');
     await waitFor(() => {
       const minutos = screen.getAllByTestId('espera-minutos').map((e) => e.textContent);
