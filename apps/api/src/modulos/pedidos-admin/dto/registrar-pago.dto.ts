@@ -8,9 +8,10 @@ export class CodigoOperacionDto {
   @IsNotEmpty({ message: 'El medio del código de operación es requerido' })
   medio!: string;
 
+  @IsOptional()
   @IsString({ message: 'El código de operación debe ser texto' })
   @MaxLength(64, { message: 'El código de operación es demasiado largo' })
-  codigo!: string;
+  codigo?: string;
 }
 
 export class RegistrarPagoDto {
@@ -35,7 +36,7 @@ export class RegistrarPagoDto {
   @IsBoolean()
   confirmaSinCaptura?: boolean;
 
-  /** Obligatorio por cada medio digital (Yape, Plin, transferencia, tarjeta) y ninguno en efectivo. */
+  /** Opcional: código de operación por medio digital (Yape, Plin, transferencia); puede venir vacío o faltar. */
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

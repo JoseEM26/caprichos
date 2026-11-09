@@ -53,10 +53,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   const comprobanteListo = multiples
     ? faltanCapturas.length === 0
     : voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
-  // Medios que piden código: digitales del plan y el medio elegido (el efectivo nunca)
-  // En la excepción «confirmar sin comprobante» no hay voucher del que sacar el código
-  const enExcepcion = (esDigital || multiples) && !comprobanteListo;
-  const codigosRequeridos = enExcepcion ? [] : mediosQueExigenCodigo(medio, pedido.planPago);
+  // Medios con código de operación (OPCIONAL): digitales del plan y el medio elegido (el efectivo nunca)
+  const codigosRequeridos = mediosQueExigenCodigo(medio, pedido.planPago);
   // Lectura de la IA del voucher vigente de ese medio (el más reciente que no sea ilegible)
   const codigoLeido = (m: string): string => {
     const candidatos = vouchersPedido
@@ -67,7 +65,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   };
   const valorCodigo = (m: string): string => codigos[m] ?? codigoLeido(m);
   const codigoCorregido = (m: string): boolean => codigos[m] !== undefined && codigoLeido(m) !== '' && codigos[m].trim() !== codigoLeido(m);
-  const codigosFaltan = codigosRequeridos.filter((m) => valorCodigo(m).trim() === '');
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
   // Sin punto Y zona (envío calculado) no hay confirmación: el servidor lo rechaza igual (DELIVERY_SIN_UBICACION)
   const sinUbicar = deliverySinUbicacion(pedido);
@@ -81,11 +78,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
     if (esDelivery && sinUbicar) {
       setPaso(1);
       setMsg(MENSAJE_DELIVERY_SIN_UBICACION);
-      return;
-    }
-    if (codigosFaltan.length > 0) {
-      setPaso(3);
-      setMsg('Escribe el código de operación que ves en el voucher.');
       return;
     }
     setMsg('');
@@ -104,8 +96,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
         medio.toUpperCase(),
         esDigital ? 'PAGADO' : 'COORDINADO',
         excepcionSinVoucher,
-        codigosRequeridos.length > 0
-          ? codigosRequeridos.map((m) => ({ medio: m, codigo: valorCodigo(m).trim() }))
+        // El código es opcional: solo viajan los escritos (o leídos por la IA)
+        codigosRequeridos.some((m) => valorCodigo(m).trim() !== '')
+          ? codigosRequeridos.filter((m) => valorCodigo(m).trim() !== '').map((m) => ({ medio: m, codigo: valorCodigo(m).trim() }))
           : undefined,
       );
       if (String(pedido.estado).toUpperCase() === 'NUEVO') {
@@ -372,7 +365,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
               </div>
             )}
 
-            {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
+            {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (todas opcionales) */}
             {multiples && (
               <div style={tarjeta}>
                 <div style={subtitulo}>Comprobantes de los pagos digitales (opcional)</div>
@@ -405,18 +398,18 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Medio de pago</dt>
                 <dd style={{ margin: 0, fontWeight: 700 }}>{medio}</dd>
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Comprobante</dt>
-                <dd style={{ margin: 0, fontWeight: 700, color: !(esDigital || multiples) || comprobanteListo ? 'var(--cp-green, #2F7A45)' : 'var(--cp-orange, #E67929)' }}>
+                <dd style={{ margin: 0, fontWeight: 700, color: !(esDigital || multiples) || comprobanteListo ? 'var(--cp-green, #2F7A45)' : 'var(--cp-soft, #2C4C5D)' }}>
                   {!(esDigital || multiples)
                     ? 'No hace falta (se cobra al entregar o recoger)'
                     : comprobanteListo
                       ? 'Listo'
-                      : 'Sin captura (opcional)'}
+                      : <span data-testid="info-sin-captura">ⓘ Sin captura (puedes agregarla después)</span>}
                 </dd>
               </dl>
             </div>
             {codigosRequeridos.length > 0 && (
               <div style={tarjeta} data-testid="codigos-operacion">
-                <div style={subtitulo}>Código de operación{codigosRequeridos.length > 1 ? 's' : ''}</div>
+                <div style={subtitulo}>Código de operación{codigosRequeridos.length > 1 ? 'es' : ''} (opcional)</div>
                 {codigosRequeridos.map((m) => {
                   const nombre = m.charAt(0) + m.slice(1).toLowerCase();
                   const valor = valorCodigo(m);
@@ -425,7 +418,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                   return (
                     <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <label htmlFor={`pc-r-${m}`} style={{ fontWeight: 700, fontSize: 13 }}>
-                        {codigosRequeridos.length > 1 ? `${nombre}: código de operación` : 'Código de operación'}
+                        {codigosRequeridos.length > 1 ? `${nombre}: código de operación (opcional)` : 'Código de operación (opcional)'}
                       </label>
                       <input
                         id={`pc-r-${m}`}
@@ -436,8 +429,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                         style={campo}
                       />
                       {faltaEste && (
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                          Escribe el código de operación que ves en el voucher
+                        <div data-testid={`info-sin-codigo-${m}`} style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                          ⓘ Sin código de operación. Puedes escribirlo o subirlo después.
                         </div>
                       )}
                       {!faltaEste && codigoCorregido(m) && (
@@ -498,9 +491,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
               <button
                 type="button"
                 onClick={handleConfirmar}
-                disabled={enviando || codigosFaltan.length > 0 || sinUbicar}
+                disabled={enviando || sinUbicar}
                 title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
-                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando || codigosFaltan.length > 0 || sinUbicar ? 'not-allowed' : 'pointer', opacity: codigosFaltan.length > 0 || sinUbicar ? 0.6 : 1 }}
+                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando || sinUbicar ? 'not-allowed' : 'pointer', opacity: sinUbicar ? 0.6 : 1 }}
               >
                 {enviando ? 'Confirmando...' : 'Confirmar y enviar a cocina'}
               </button>
