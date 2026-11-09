@@ -95,6 +95,9 @@ describe('PedidosEstadoService.misPedidos', () => {
       estado: 'EN_CAMINO',
       propina: 0,
       modalidad: 'MESA',
+      mozoPartyId: null,
+      mozoNombre: null,
+      esperaMinutos: 60,
       mesaNombre: 'Mesa 3',
       pedidoOrigenId: null,
       pedidoOrigenCodigo: null,
@@ -121,6 +124,10 @@ describe('PedidosEstadoService.misPedidos', () => {
         totalAreas: 0,
         porcentaje: 100,
         enCamino: true,
+        total: 2,
+        listas: 0,
+        porcentajeUnidades: 0,
+        porArea: [{ area: 'Otros', total: 2, listas: 0 }],
       },
     });
   });
@@ -157,6 +164,13 @@ describe('PedidosEstadoService.misPedidos', () => {
       // Con datos de preparación (defecto) el tiempo que falta: solo cuenta el texto, no el reloj
       estimadoMin: expect.any(Number),
       enCamino: false,
+      total: 2,
+      listas: 0,
+      porcentajeUnidades: 0,
+      porArea: [
+        { area: 'Bebidas', total: 1, listas: 0 },
+        { area: 'Salados', total: 1, listas: 0 },
+      ],
     });
     const json = JSON.stringify(res);
     expect(json).not.toContain('llego_en');

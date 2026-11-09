@@ -4,7 +4,8 @@ import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/
 import { PuntosService } from '../clientes/puntos.service';
 import { MEDIOS_DIGITALES_PLAN, mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { totalCobrable } from '../propinas/propinas.util';
-import { progresoDelPedido } from '../pedidos/progreso-pedido';
+import { Prisma } from '@prisma/client';
+import { progresoDelPedido, unidadesDeProgreso } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { cerrarRutaTrasAnular } from '../repartos/rutas-reparto';
@@ -44,7 +45,7 @@ const INCLUIR_LISTA = {
   ...INCLUIR_EXTRAS,
 };
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
-import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
+import { FiltrosMisPedidos, RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
@@ -481,18 +482,39 @@ export class PedidosEstadoService {
    * "Mis pedidos" del mozo (GET /admin/pedidos/mis-pedidos, pedidos/crear): solo los que él tomó
    * (canal MOZO y party_id propio) en el rango pedido, por día de Lima. El resumen no cuenta los anulados.
    */
-  async misPedidos(usuario: UsuarioAutenticado, rango: RangoMisPedidos = 'hoy') {
+  async misPedidos(usuario: UsuarioAutenticado, rango: RangoMisPedidos = 'hoy', filtros: FiltrosMisPedidos = {}) {
     const inicioHoy = obtenerInicioDiaLima();
     const DIA = 24 * 60 * 60 * 1000;
-    const creado_en =
-      rango === 'ayer'
-        ? { gte: new Date(inicioHoy.getTime() - DIA), lt: inicioHoy }
-        : rango === '7dias'
-          ? { gte: new Date(inicioHoy.getTime() - 6 * DIA) }
-          : { gte: inicioHoy };
+    // `desde`/`hasta` (YYYY-MM-DD, día Lima, inclusivos) mandan sobre `rango`; Lima es UTC-5 todo el año
+    const diaLima = (f: string) => new Date(`${f}T05:00:00.000Z`);
+    const conFechas = Boolean(
+      (filtros.desde && ES_FECHA_SOLA.test(filtros.desde)) || (filtros.hasta && ES_FECHA_SOLA.test(filtros.hasta)),
+    );
+    let creado_en: { gte?: Date; lt?: Date } | undefined;
+    if (conFechas) {
+      creado_en = {};
+      if (filtros.desde && ES_FECHA_SOLA.test(filtros.desde)) creado_en.gte = diaLima(filtros.desde);
+      if (filtros.hasta && ES_FECHA_SOLA.test(filtros.hasta)) creado_en.lt = new Date(diaLima(filtros.hasta).getTime() + DIA);
+    } else if (rango === 'todas') creado_en = undefined;
+    else if (rango === 'ayer') creado_en = { gte: new Date(inicioHoy.getTime() - DIA), lt: inicioHoy };
+    else if (rango === '7dias') creado_en = { gte: new Date(inicioHoy.getTime() - 6 * DIA) };
+    else if (rango === '30dias') creado_en = { gte: new Date(inicioHoy.getTime() - 29 * DIA) };
+    else creado_en = { gte: inicioHoy };
+
+    // ADMIN y SUPERVISOR ven los pedidos de todos los mozos; el resto (mozo, caja) solo los suyos y `mozo` se ignora
+    const veTodos = rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR');
+    const mozoFiltro = veTodos && filtros.mozo && /^\d+$/.test(filtros.mozo) ? BigInt(filtros.mozo) : null;
+    const estadoFiltro =
+      filtros.estado === 'EN_CURSO' ? { in: ESTADOS_EN_CURSO } : filtros.estado ? filtros.estado : undefined;
+    const where: Prisma.PedidoWhereInput = {
+      canal: 'MOZO',
+      ...(veTodos ? (mozoFiltro != null ? { party_id: mozoFiltro } : {}) : { party_id: BigInt(usuario.partyId) }),
+      ...(creado_en ? { creado_en } : {}),
+      ...(estadoFiltro ? { estado: estadoFiltro } : {}),
+    };
 
     const pedidos = await this.prisma.pedido.findMany({
-      where: { canal: 'MOZO', party_id: BigInt(usuario.partyId), creado_en },
+      where,
       orderBy: { creado_en: 'desc' },
       select: {
         id: true,
@@ -507,6 +529,7 @@ export class PedidosEstadoService {
         pago_coordinado_en: true,
         cliente_nombre: true,
         creado_en: true,
+        party_id: true,
         pasa_cocina_en: true,
         entregado_mesa_en: true,
         ubicacion_editada_en: true,
@@ -563,13 +586,50 @@ export class PedidosEstadoService {
       ahora,
     );
 
+    // Nombres de los mozos (una consulta) y, para ADMIN/SUPERVISOR, el desplegable de mozos del rango (sin anulados)
+    const conteoMozos = veTodos
+      ? await this.prisma.pedido.groupBy({
+          by: ['party_id'],
+          where: { canal: 'MOZO', estado: { not: 'ANULADO' }, party_id: { not: null }, ...(creado_en ? { creado_en } : {}) },
+          _count: { _all: true },
+        })
+      : [];
+    const idsMozo = [...new Set([...pedidos.map((p) => p.party_id), ...conteoMozos.map((c) => c.party_id)].filter((i): i is bigint => i != null))];
+    const personas = idsMozo.length
+      ? await this.prisma.person
+          .findMany({ where: { party_id: { in: idsMozo } }, select: { party_id: true, nombres: true, apellidos: true } })
+          .catch(() => [])
+      : [];
+    const nombreMozo = new Map(personas.map((x) => [String(x.party_id), [x.nombres, x.apellidos].filter(Boolean).join(' ')]));
+
+    const lista = pedidos.map((p) => {
+      const enEspera = !['LISTO', 'ENTREGADO', 'ANULADO'].includes(p.estado);
+      const desdeEspera = p.pasa_cocina_en ?? p.creado_en;
+      return {
+        p,
+        esperaMinutos: enEspera ? Math.max(0, Math.floor((ahora.getTime() - desdeEspera.getTime()) / 60000)) : null,
+      };
+    });
+    if (filtros.orden === 'mas_espera') {
+      // Más tiempo esperando primero; los que ya no esperan al final, por reciente (el orden base ya es reciente)
+      lista.sort((a, b) => (b.esperaMinutos ?? -1) - (a.esperaMinutos ?? -1));
+    }
+
     return {
-      pedidos: pedidos.map((p) => ({
+      mozos: veTodos
+        ? conteoMozos
+            .map((c) => ({ partyId: String(c.party_id), nombre: nombreMozo.get(String(c.party_id)) || `Mozo ${c.party_id}`, pedidos: c._count._all }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        : undefined,
+      pedidos: lista.map(({ p, esperaMinutos }) => ({
         id: String(p.id),
         codigo: p.codigo,
         estado: p.estado,
         modalidad: p.modalidad,
         mesaNombre: p.mesa_nombre,
+        mozoPartyId: p.party_id != null ? String(p.party_id) : null,
+        mozoNombre: p.party_id != null ? nombreMozo.get(String(p.party_id)) || null : null,
+        esperaMinutos,
         pedidoOrigenId: p.pedido_origen_id != null ? String(p.pedido_origen_id) : null,
         pedidoOrigenCodigo: p.pedidoOrigen?.codigo ?? null,
         // Último cambio de ubicación (la insignia «Dirección editada»); null si la dirección es la original
@@ -626,7 +686,7 @@ export class PedidosEstadoService {
           lista: l.listas >= l.cantidad,
         })),
         // Estado de cocina y entrega (misma función que el seguimiento de la carta)
-        progreso: progresoDelPedido(p, { cfg, ahora, preparacion }),
+        progreso: { ...progresoDelPedido(p, { cfg, ahora, preparacion }), ...unidadesDeProgreso(p) },
       })),
       resumen: {
         cantidad: validos.length,

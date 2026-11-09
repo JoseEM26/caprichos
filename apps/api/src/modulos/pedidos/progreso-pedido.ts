@@ -262,3 +262,31 @@ function areasDePedido(p: EntradaProgreso, todasListas: boolean): ProgresoPedido
     return areaProgreso(p, c.area_id, c.area.nombre, estado);
   });
 }
+
+/**
+ * Avance por unidades de las líneas (cantidad vs listas), total y por área de cocina. Se suma al `ProgresoPedido`
+ * en «Mis pedidos»; su `porcentajeUnidades` es independiente del `porcentaje` por etapa.
+ */
+export function unidadesDeProgreso(p: EntradaProgreso) {
+  const nombres = new Map((p.comandas ?? []).map((c) => [String(c.area_id), c.area.nombre]));
+  const porArea = new Map<string, { area: string; total: number; listas: number }>();
+  let total = 0;
+  let listas = 0;
+  for (const l of p.lineas ?? []) {
+    const lista = Math.min(l.listas ?? 0, l.cantidad);
+    const id = areaDeLinea(l);
+    const area = (id != null && nombres.get(String(id))) || 'Otros';
+    const a = porArea.get(area) ?? { area, total: 0, listas: 0 };
+    a.total += l.cantidad;
+    a.listas += lista;
+    porArea.set(area, a);
+    total += l.cantidad;
+    listas += lista;
+  }
+  return {
+    total,
+    listas,
+    porcentajeUnidades: total > 0 ? Math.round((listas / total) * 100) : 0,
+    porArea: [...porArea.values()],
+  };
+}
