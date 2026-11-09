@@ -690,6 +690,7 @@ export function ModalNuevoPedidoMesa({
 
   // Diálogo de confirmación
   const [confirmarEnviar, setConfirmarEnviar] = useState(false);
+  const [errorExtra, setErrorExtra] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   // Se activa al tocar el botón con datos incompletos: desde ahí cada falta se muestra junto a su campo
   const [intentoEnvio, setIntentoEnvio] = useState(false);
@@ -1201,6 +1202,8 @@ export function ModalNuevoPedidoMesa({
 
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
   const handleEnviarPedido = async () => {
+    if (enviando) return; // anti doble envío
+    setErrorExtra(null);
     if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
@@ -1351,6 +1354,11 @@ export function ModalNuevoPedidoMesa({
       await alRefrescarMesas?.();
       alCerrar();
     } catch (err: any) {
+      if (extra) {
+        // Extra: la ventana sigue abierta con el error y «Reintentar»; el carrito no se toca
+        setErrorExtra(err?.message || 'No se pudo agregar el extra.');
+        return;
+      }
       setConfirmarEnviar(false);
       if (err?.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
         // El pedido no se pierde: se actualizan los combos para elegir otro reemplazo
@@ -3587,25 +3595,54 @@ export function ModalNuevoPedidoMesa({
         />
       )}
 
-      {/* Diálogo Confirmar Enviar Pedido */}
+      {/* Diálogo Confirmar Enviar Pedido (el extra tiene su propio resumen) */}
       <Confirmar
         abierto={confirmarEnviar}
         titulo={
-          modalidad === 'local'
-            ? '¿Enviar pedido directo a cocina?'
-            : '¿Registrar este pedido?'
+          extra
+            ? '¿Agregar este extra?'
+            : modalidad === 'local'
+              ? '¿Enviar pedido directo a cocina?'
+              : '¿Registrar este pedido?'
         }
         mensaje={
-          modalidad === 'local'
+          extra
+            ? `Vas a agregar al pedido ${extra.codigo} (${[extra.modalidad === 'MESA' ? extra.mesa_nombre || 'Mesa' : extra.modalidad === 'DELIVERY' ? 'Delivery' : 'Para llevar', extra.cliente_nombre].filter(Boolean).join(' · ')}). Cocina lo recibirá como EXTRA y suma a la cuenta del pedido.`
+            : modalidad === 'local'
             ? `Se enviarán los productos ${enEspera ? 'a la lista de espera de mesa (se asigna la mesa cuando se libere una)' : `para la mesa ${textoMesas}`}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
             : `Se registrará el pedido (${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'}) a nombre de ${cliNombre || (clientePideId && clienteEncontrado ? clienteEncontrado.nombre : 'Cliente')} por S/ ${total.toFixed(2)}.`
         }
-        textoConfirmar={modalidad === 'local' ? 'Sí, enviar comanda' : 'Sí, registrar'}
-        textoNo="No, revisar"
+        textoConfirmar={extra ? 'Sí, agregar' : modalidad === 'local' ? 'Sí, enviar comanda' : 'Sí, registrar'}
+        textoNo={extra ? 'No, volver' : 'No, revisar'}
+        focoInicialNo={Boolean(extra)}
+        error={extra ? errorExtra : null}
         cargando={enviando}
         alConfirmar={handleEnviarPedido}
-        alCancelar={() => setConfirmarEnviar(false)}
-      />
+        alCancelar={() => {
+          setConfirmarEnviar(false);
+          setErrorExtra(null);
+        }}
+      >
+        {extra && (
+          <ul data-testid="extra-resumen" style={{ margin: '4px 0 0', paddingLeft: '18px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+            {lineas.map((l) => (
+              <li key={l.id}>
+                {l.cantidad}× {l.nombre}
+                {l.tamanoNombre ? ` (${l.tamanoNombre})` : ''}
+                {l.opciones.length ? ` · ${l.opciones.map((o) => o.nombre).join(', ')}` : ''}
+                {l.nota ? ` · «${l.nota}»` : ''}
+              </li>
+            ))}
+            <li style={{ listStyle: 'none', marginLeft: '-18px', fontWeight: 800, marginTop: '6px' }}>
+              Total del extra: S/ {total.toFixed(2)} · Paga con{' '}
+              {planAhora.length
+                ? planAhora.map((f) => `${f.medio.charAt(0) + f.medio.slice(1).toLowerCase()} S/ ${f.monto.toFixed(2)}`).join(' + ')
+                : 'Efectivo'}
+              {pagaConValido() !== undefined ? ` (paga con S/ ${pagaConValido()!.toFixed(2)})` : ''}
+            </li>
+          </ul>
+        )}
+      </Confirmar>
 
       {/* Aviso de capacidad: las mesas no alcanzan para las personas (el local decide) */}
       <Confirmar

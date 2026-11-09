@@ -33,6 +33,8 @@ const carta = {
 
 const original = { id: '45', codigo: 'CP-W045', modalidad: 'MESA', mesa_nombre: 'Mesa 3', cliente_nombre: 'Lucía' };
 
+const envios = () => vi.mocked(api.post).mock.calls.filter((c) => String(c[0]).endsWith('/extra'));
+
 describe('Modal de pedido en modo «extra»', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,7 +65,9 @@ describe('Modal de pedido en modo «extra»', () => {
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
     fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar comanda' }));
+    // Actualizada: el extra ya no usa «Sí, enviar comanda»; pide «¿Agregar este extra?» y envía con «Sí, agregar»
+    expect(envios()).toHaveLength(0);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, agregar' }));
 
     await waitFor(() => expect(api.post).toHaveBeenCalled());
     const [ruta, cuerpo, opciones] = vi.mocked(api.post).mock.calls.at(-1) as any[];
@@ -77,5 +81,67 @@ describe('Modal de pedido en modo «extra»', () => {
     expect(opciones.headers['Idempotency-Key']).toBeTruthy();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
     await waitFor(() => expect(alExito).toHaveBeenCalled());
+  });
+
+  async function llegarALaConfirmacion(alExito = vi.fn()) {
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={[]} canal="CAJA" extra={original} alExitoPedido={alExito} />);
+    fireEvent.click(await screen.findByText('Café Americano'));
+    fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Mario' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    const boleta = screen.queryByTestId('comprobante-BOLETA');
+    if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
+    return alExito;
+  }
+
+  it('el botón final abre «¿Agregar este extra?» con resumen y NO envía; foco inicial en «No, volver»', async () => {
+    await llegarALaConfirmacion();
+    const dlg = await screen.findByRole('dialog', { name: '¿Agregar este extra?' });
+    expect(dlg).toHaveAttribute('aria-modal', 'true');
+    expect(dlg).toHaveTextContent('CP-W045');
+    expect(dlg).toHaveTextContent('Mesa 3');
+    expect(dlg).toHaveTextContent('Lucía');
+    expect(screen.getByTestId('extra-resumen')).toHaveTextContent('1× Café Americano');
+    expect(screen.getByTestId('extra-resumen')).toHaveTextContent('S/ 8.50');
+    expect(screen.getByRole('button', { name: 'No, volver' })).toHaveFocus();
+    expect(envios()).toHaveLength(0);
+  });
+
+  it('«No, volver» y Escape cierran sin enviar y conservan el carrito', async () => {
+    await llegarALaConfirmacion();
+    fireEvent.click(await screen.findByRole('button', { name: 'No, volver' }));
+    expect(screen.queryByRole('dialog', { name: '¿Agregar este extra?' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
+    await screen.findByRole('dialog', { name: '¿Agregar este extra?' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: '¿Agregar este extra?' })).toBeNull();
+    expect(envios()).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Registrar extra' })).toHaveTextContent('S/ 8.50');
+  });
+
+  it('doble clic en «Sí, agregar» envía una sola vez', async () => {
+    await llegarALaConfirmacion();
+    const si = await screen.findByRole('button', { name: 'Sí, agregar' });
+    fireEvent.click(si);
+    fireEvent.click(si);
+    await waitFor(() => expect(envios().length).toBeGreaterThan(0));
+    expect(envios()).toHaveLength(1);
+  });
+
+  it('si falla, el error se ve en la ventana con «Reintentar» y el carrito sigue', async () => {
+    let fallo = true;
+    vi.mocked(api.post).mockImplementation(async (ruta: any) => {
+      if (String(ruta).endsWith('/extra') && fallo) {
+        fallo = false;
+        throw new Error('Sin conexión');
+      }
+      return { id: '46', codigo: 'CP-W046', total: 8.5 } as any;
+    });
+    const alExito = await llegarALaConfirmacion();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, agregar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    await waitFor(() => expect(alExito).toHaveBeenCalled());
+    expect(envios()).toHaveLength(2);
   });
 });
