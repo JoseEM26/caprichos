@@ -29,3 +29,10 @@
 .lt-estado--cola { color: #8A5A00; }
 .lt-enlace { align-self: flex-start; min-height: 44px; padding: 0 4px; background: none; border: none; color: var(--cp-navy, #0B2C3E); font-weight: 700; text-decoration: underline; cursor: pointer; font-size: 14px; }
 .lt-check--todos { width: auto; gap: 8px; margin: 0; }
+.lt-ayuda ul { margin: 2px 0 0; padding-left: 18px; }
+.lt-compu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--cp-navy, #0B2C3E); }
+.lt-compu select { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); font-size: 14px; max-width: 100%; }
+.lt-destino { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: center; font-size: 14px; color: var(--cp-soft, #2C4C5D); overflow-wrap: anywhere; }
+.lt-conexion { font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1.5px solid currentColor; }
+.lt-conexion--si { color: #1F5A32; }
+.lt-conexion--no { color: #8A3A08; }

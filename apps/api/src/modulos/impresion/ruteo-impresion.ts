@@ -121,6 +121,24 @@ export function tiposDeRoles(roles: RolImpresora[]): string[] {
   ];
 }
 
+/**
+ * Tipos que ESTA configuración deja imprimir (no basta con tener la máquina encendida: cada papel debe estar activado).
+ * Es el filtro final al tomar trabajos: una PC nunca recibe un papel que no tiene asignado, aunque el trabajo
+ * le haya quedado apuntado cuando su configuración era otra.
+ */
+export function tiposDeConfig(cfg: ConfigEquipoImpresion, roles: RolImpresora[]): string[] {
+  if (!cfg.configurado || cfg.pausado) return [];
+  const r = new Set(roles);
+  return [
+    ...(r.has('ETIQUETERA') && cfg.etiquetera && cfg.stickerGeneral ? ['ETIQUETA_GENERAL'] : []),
+    ...(r.has('ETIQUETERA') && cfg.etiquetera && cfg.stickerAreas.length ? ['ETIQUETA_AREA'] : []),
+    ...(r.has('ETIQUETERA') && cfg.etiquetera && cfg.stickerBebidaAreas.length ? ['ETIQUETA_BEBIDA'] : []),
+    ...(r.has('TICKETERA') && cfg.ticketera && cfg.ticketPago ? ['TICKET_PAGO', 'TICKET_CIERRE'] : []),
+    ...(r.has('TICKETERA') && cfg.ticketera && cfg.comandaSalon ? ['TICKET_COMANDA_SALON'] : []),
+    ...(r.has('TICKETERA') && cfg.ticketera && cfg.comandaAreas.length ? ['TICKET_COMANDA_AREA'] : []),
+  ];
+}
+
 const MODALIDADES_STICKER_GENERAL = ['LLEVAR', 'RECOGER', 'DELIVERY'];
 
 /**

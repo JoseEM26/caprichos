@@ -48,7 +48,7 @@ describe('ReimprimirPedido', () => {
     render(<ReimprimirPedido pedido={pedido} variante="detalle" />);
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir stickers y ticket' }));
     fireEvent.click(screen.getByRole('button', { name: 'Todo (stickers + ticket)' }));
-    await screen.findByText(/Se reimprimirán 3 stickers y 1 ticket en Caja \/ Etiquetera y Caja \/ Ticketera/);
+    await screen.findByText(/¿Seguro\? Se imprimirá 4 papeles \(3 stickers y 1 ticket\) en Caja \/ Etiquetera y Caja \/ Ticketera/);
     expect(reimprimir).toHaveBeenLastCalledWith('9', { tipo: 'todo', vista_previa: true });
     fireEvent.click(screen.getByRole('button', { name: 'Sí, reimprimir' }));
     await screen.findByText('Se enviaron 4 trabajos: Etiquetera de Caja: 3 stickers · Ticketera de Caja: 1 ticket');

@@ -20,3 +20,4 @@
 .cola-vaciar label { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--cp-navy, #0B2C3E); }
 .cola-vaciar textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 8px; border-radius: 8px; border: 1px solid var(--cp-line, #E3D6C6); font: inherit; }
 .cola-prueba-tag { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--cp-sand, #EDE1D1); color: var(--cp-navy, #0B2C3E); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.cola-sin-impresora { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--cp-rust, #B2500F); background: #FBE9DF; color: #8A3A08; font-size: 14px; }

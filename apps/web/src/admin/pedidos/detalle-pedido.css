@@ -192,3 +192,13 @@
 .rp-aviso a { display: inline-block; margin-top: 4px; font-weight: 800; color: var(--cp-navy, #0B2C3E); }
 .cj2-reimprimir { position: absolute; top: 14px; right: 6px; z-index: 2; min-width: 44px; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .cj2-reimprimir:disabled { opacity: 0.6; cursor: wait; }
+.rp-item { display: flex; flex-direction: column; gap: 2px; }
+.rp-item--off .rp-opcion { opacity: 0.5; cursor: not-allowed; background: #f1ebe3; }
+.rp-destino { padding: 0 6px; font-size: 12.5px; line-height: 17px; color: var(--cp-soft, #2C4C5D); overflow-wrap: anywhere; }
+.rp-destino--mal { color: #8A3A08; font-weight: 700; }
+.rp-previa-btn { align-self: flex-start; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: var(--cp-navy, #0B2C3E); font-weight: 800; font-size: 14px; cursor: pointer; }
+.rp-previa-btn:disabled { opacity: 0.6; cursor: wait; }
+.rp-prev { display: flex; flex-direction: column; gap: 12px; max-height: 40dvh; overflow-y: auto; padding: 6px 0; }
+.rp-prev-papel { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.rp-prev-ticket { margin: 0; padding: 8px; background: #fff; border: 1px solid #d8d8d8; font: 12px/15px 'DejaVu Sans Mono', Menlo, Consolas, monospace; overflow-x: auto; }
+.rp-prev-vacio { margin: 0; font-size: 13px; }

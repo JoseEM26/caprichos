@@ -149,8 +149,8 @@ describe('reimprimirPedido (reimpresión rápida desde Caja)', () => {
   });
 
   it('límite de abuso: la sexta reimpresión en un minuto da 429', async () => {
-    for (let i = 0; i < 5; i++) await service.reimprimirPedido(9, { tipo: 'ticket_pago' });
-    const err: any = await service.reimprimirPedido(9, { tipo: 'ticket_pago' }).catch((e) => e);
+    for (let i = 0; i < 5; i++) await service.reimprimirPedido(9, { tipo: 'ticket_pago', otra_copia: true });
+    const err: any = await service.reimprimirPedido(9, { tipo: 'ticket_pago', otra_copia: true }).catch((e) => e);
     expect(err).toBeInstanceOf(HttpException);
     expect(err.getStatus()).toBe(429);
     // la vista previa no cuenta
@@ -189,6 +189,7 @@ describe('reimprimirPedido (reimpresión rápida desde Caja)', () => {
       expect(creados()).toHaveLength(1);
       expect(r.porMaquina[0].conectado).toBe(false);
       prisma.printJob.create.mockClear();
+      (service as any).reimpresionIdentica.clear(); // lo repetido en 15 s se rechaza aparte
       equipos = [{ ...CAJA, config: cfg({ ticketera: true, ticketPago: false }) }];
       const r2: any = await service.imprimirPrecuenta(9, false);
       expect(prisma.printJob.create).not.toHaveBeenCalled();

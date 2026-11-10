@@ -78,6 +78,7 @@ import {
   vasoDescartadoPorCategoria,
   rolesDeConfig,
   tiposDeRoles,
+  tiposDeConfig,
 } from './ruteo-impresion';
 import {
   ESTADOS_NO_VIGENTES,
@@ -88,6 +89,7 @@ import {
   planReimpresion,
 } from './reimpresion-pedido';
 import { EquipoConfigService } from './equipo-config.service';
+import { DkLite, destinoDeTrabajoParaCola, motivoTipoSinAsignar, NOMBRE_TIPO_PAPEL, textoConexion, rolDeTipo } from './destinos-impresion';
 import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { tamanoEfectivo } from '@caprichos/compartido';
@@ -118,6 +120,20 @@ const MAX_REIMPRESION_JUNTA = 30;
 const MAX_COPIAS_EN_COLA = 60;
 /** Reimpresiones rápidas por pedido y minuto (anti doble clic y anti abuso). */
 const MAX_REIMPRESIONES_POR_MINUTO = 5;
+/** Misma reimpresión (pedido + opción) repetida antes de este tiempo: se avisa en vez de duplicar el papel (doble clic). */
+const VENTANA_REIMPRESION_IDENTICA_MS = 15 * 1000;
+
+/** Una opción del diálogo «Reimprimir» con su destino real (contrato de GET /admin/pedidos/:id/impresion/destinos). */
+export interface DestinoReimpresion {
+  tipo: string;
+  etiqueta: string;
+  disponible: boolean;
+  equipo: string | null;
+  impresora: string | null;
+  conectada: boolean;
+  motivo: string | null;
+  cantidad: number;
+}
 
 /** Por qué ninguna PC imprime un papel: sin PC vinculada, sin configurar, en pausa o sin ese papel encendido. */
 function motivoSinPc(ctx: ContextoRuteo): string {
@@ -182,8 +198,7 @@ export class ImpresionService {
     const cfg = deviceKeyId !== undefined ? await this.equipos.configDe(deviceKeyId) : null;
     const rolesAgente: RolImpresora[] = roles ?? ['ETIQUETERA', 'TICKETERA'];
     const tiposAgente = tiposDeRoles(rolesAgente);
-    const tiposConfig =
-      cfg && cfg.configurado && !cfg.pausado ? tiposDeRoles(rolesAgente.filter((r) => rolesDeConfig(cfg).includes(r))) : [];
+    const tiposConfig = cfg ? tiposDeConfig(cfg, rolesAgente) : [];
     const equipoId = deviceKeyId ?? null;
     const limite = Math.min(Math.max(1, max || 10), 10);
 
@@ -665,8 +680,18 @@ export class ImpresionService {
       this.prisma.printJob.count({ where }),
     ]);
 
+    // Computadora y estado de cada trabajo con la configuración vigente (no con lo que quedó apuntado al encolar)
+    const ctx = await this.contextoRuteo();
+    const ids = [...new Set(items.flatMap((t: any) => [t.destino_equipo_id, t.device_key_id]).filter((x: any) => x !== null && x !== undefined))];
+    const dks: DkLite[] = ids.length
+      ? ((await this.prisma.deviceKey.findMany({ where: { id: { in: ids as bigint[] } }, select: { id: true, nombre: true, ultimo_latido: true, latido_impresora: true, latido_detalle: true } }).catch(() => [])) as any) ?? []
+      : [];
+    const porId = new Map<string, DkLite>(dks.map((d) => [d.id.toString(), d]));
+    const ahora = Date.now();
     return {
-      items: items.map((t) => ({
+      items: items.map((t) => {
+        const destino = destinoDeTrabajoParaCola(t as any, ctx, porId, ahora);
+        return {
         id: t.id.toString(),
         pedidoId: t.pedido_id?.toString() ?? null,
         destinoAreaId: t.destino_area_id?.toString() ?? null,
@@ -682,8 +707,10 @@ export class ImpresionService {
         impresoEn: t.impreso_en?.toISOString() || null,
         payload: t.payload,
         maquina: rolDeTrabajo(t.tipo),
-        equipoNombre: (t as any).deviceKey?.nombre ?? ((t as any).destinoArea?.nombre ? `PC de ${(t as any).destinoArea.nombre}` : 'Caja'),
-      })),
+        equipoNombre: destino.equipoNombre ?? (destino.sinImpresora ? 'Sin computadora asignada' : ((t as any).deviceKey?.nombre ?? 'Computadora sin identificar')),
+        destino,
+        };
+      }),
       total,
       pagina,
       paginas: Math.ceil(total / take) || 1,
@@ -882,6 +909,7 @@ export class ImpresionService {
         descartados: n('DESCARTADO'),
         pendientesAntiguas: antiguas,
         minutosAntiguas: mins,
+        sinImpresora: await this.equipos.contarSinReceptor(),
       },
     };
   }
@@ -957,6 +985,21 @@ export class ImpresionService {
       where, motivo, 'VACIAR_COLA',
       { alcance: dto.alcance, minutos: dto.minutos ?? null, pedidoId: dto.pedido_id ?? null },
       usuario, ip,
+    );
+  }
+
+  /**
+   * Libera la cola de lo que ninguna computadora imprime («Sin impresora asignada»): primero reubica lo que sí tiene
+   * dueño con la configuración vigente y luego marca DESCARTADO (nada se borra) lo que sigue sin destino, con motivo y auditoría.
+   * Solo toca trabajos de pedidos que esperan; las pruebas y lo que alguna PC imprime no se tocan.
+   */
+  async descartarSinImpresora(motivoInput?: string, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    const motivo = (motivoInput || '').trim() || 'Sin impresora asignada: ninguna computadora imprimía este papel';
+    await this.equipos.reasignarPendientes().catch(() => 0);
+    return this.descartar(
+      { estado: 'PENDIENTE', pedido_id: { not: null }, destino_equipo_id: null },
+      motivo, 'DESCARTAR_SIN_IMPRESORA', {}, usuario, ip,
     );
   }
 
@@ -1731,6 +1774,8 @@ await this.anotarResaltadas(pedido);
 
   /** Reimpresiones pedidas por pedido en el último minuto (en memoria; ponytail: por instancia, suficiente con un solo API). */
   private readonly reimpresionesRecientes = new Map<string, number[]>();
+  /** Última reimpresión por pedido+opción (anti doble clic); en memoria: se pierde al reiniciar, no pasa nada. */
+  private readonly reimpresionIdentica = new Map<string, number>();
 
   /**
    * Reimpresión rápida de un pedido (stickers y/o tickets): copias nuevas (copia=true) con los mismos constructores
@@ -1756,6 +1801,7 @@ await this.anotarResaltadas(pedido);
 
     const noVigente = ESTADOS_NO_VIGENTES.includes(pedido.estado);
     const vistaPrevia = Boolean(dto.vista_previa);
+    let claveIdenticaUsada: string | null = null;
     if (!vistaPrevia) {
       if (noVigente && !dto.confirmar_anulado) {
         throw new BadRequestException({
@@ -1772,6 +1818,18 @@ await this.anotarResaltadas(pedido);
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
+      // Doble clic: la misma opción del mismo pedido dos veces en 15 s no se duplica salvo «Imprimir otra copia igual»
+      const claveIdentica = `${k}|${dto.tipo}|${dto.tipo === 'stickers' ? (dto.sub ?? 'todos') : ''}`;
+      const ultima = this.reimpresionIdentica.get(claveIdentica);
+      if (!dto.otra_copia && ultima !== undefined && ahora - ultima < VENTANA_REIMPRESION_IDENTICA_MS) {
+        const hace = Math.max(1, Math.round((ahora - ultima) / 1000));
+        throw new HttpException(
+          { codigo: 'REIMPRESION_REPETIDA', mensaje: `Ya se envió hace ${hace} s, espera a que salga`, hace },
+          HttpStatus.CONFLICT,
+        );
+      }
+      this.reimpresionIdentica.set(claveIdentica, ahora);
+      claveIdenticaUsada = claveIdentica;
       this.reimpresionesRecientes.set(k, [...recientes, ahora]);
     }
 
@@ -1794,13 +1852,15 @@ await this.anotarResaltadas(pedido);
     const clavesEnCola = new Set(enCola.map((j) => claveDeJob(j)));
 
     // Destino por PC: sin PC que lo imprima se omite con motivo; PC sin conexión se envía con advertencia
-    const nombres = new Map<string, string>(
-      ((await this.prisma.deviceKey.findMany({ where: { id: { in: ctx.equipos.map((e) => e.id) } }, select: { id: true, nombre: true } })) ?? []).map(
-        (d: any) => [d.id.toString(), d.nombre],
-      ),
-    );
+    const dkLista: DkLite[] =
+      ((await this.prisma.deviceKey.findMany({
+        where: { id: { in: ctx.equipos.map((e) => e.id) } },
+        select: { id: true, nombre: true, ultimo_latido: true, latido_impresora: true, latido_detalle: true },
+      })) as any) ?? [];
+    const dkPorId = new Map<string, DkLite>(dkLista.map((d) => [d.id.toString(), d]));
+    const nombres = new Map<string, string>(dkLista.map((d) => [d.id.toString(), d.nombre]));
     const yaEnCola: OmitidoReimpresion[] = [];
-    const aEncolar: Array<ItemReimpresion & { destino: ReturnType<ImpresionService['destinoJob']>; equipo: string | null; conectado: boolean }> = [];
+    const aEncolar: Array<ItemReimpresion & { destino: ReturnType<ImpresionService['destinoJob']>; equipo: string | null; conectado: boolean; impresora: string | null; impresoraLista: boolean; motivoNoLista: string | null }> = [];
     for (const it of items) {
       if (clavesEnCola.has(it.clave)) {
         yaEnCola.push({ tipo: it.tipo, etiqueta: it.etiqueta, motivo: 'Ya está en cola' });
@@ -1815,7 +1875,18 @@ await this.anotarResaltadas(pedido);
         continue;
       }
       const eq = ctx.equipos.find((e) => e.id === destino.destino_equipo_id);
-      aEncolar.push({ ...it, destino, equipo: nombres.get(String(destino.destino_equipo_id)) ?? `PC ${destino.destino_equipo_id}`, conectado: Boolean(eq?.conectado) });
+      const dk = dkPorId.get(String(destino.destino_equipo_id));
+      const maq = dk ? estadoPorRol(dk)[rolDeTipo(it.tipo)] : null;
+      const conectadoPc = Boolean(eq?.conectado);
+      aEncolar.push({
+        ...it,
+        destino,
+        equipo: nombres.get(String(destino.destino_equipo_id)) ?? `PC ${destino.destino_equipo_id}`,
+        conectado: conectadoPc,
+        impresora: maq?.impresoraNombre ?? null,
+        impresoraLista: conectadoPc && Boolean(maq?.conectada),
+        motivoNoLista: !conectadoPc ? 'La computadora está apagada o sin el programa' : maq && !maq.conectada ? (maq.motivo ?? 'La impresora no está lista') : null,
+      });
     }
     if (!vistaPrevia && aEncolar.length) {
       const enColaCopias = await this.prisma.printJob.count({ where: { copia: true, estado: { in: ESTADOS_EN_COLA } } });
@@ -1849,10 +1920,10 @@ await this.anotarResaltadas(pedido);
 
     const rolDe = (tipo: string) => (tipo.startsWith('ETIQUETA') ? 'ETIQUETERA' : 'TICKETERA');
     const esSticker = (tipo: string) => tipo.startsWith('ETIQUETA');
-    const porMaquina = new Map<string, { equipoId: string; equipo: string; rol: string; stickers: number; tickets: number; conectado: boolean }>();
+    const porMaquina = new Map<string, { equipoId: string; equipo: string; rol: string; stickers: number; tickets: number; conectado: boolean; impresora: string | null }>();
     for (const it of aEncolar) {
       const key = `${it.destino.destino_equipo_id}-${rolDe(it.tipo)}`;
-      const m = porMaquina.get(key) ?? { equipoId: String(it.destino.destino_equipo_id), equipo: it.equipo ?? '', rol: rolDe(it.tipo), stickers: 0, tickets: 0, conectado: it.conectado };
+      const m = porMaquina.get(key) ?? { equipoId: String(it.destino.destino_equipo_id), equipo: it.equipo ?? '', rol: rolDe(it.tipo), stickers: 0, tickets: 0, conectado: it.conectado, impresora: it.impresora };
       if (esSticker(it.tipo)) m.stickers += 1;
       else m.tickets += 1;
       porMaquina.set(key, m);
@@ -1869,7 +1940,19 @@ await this.anotarResaltadas(pedido);
       tickets,
       cantidad: aEncolar.length,
       porMaquina: [...porMaquina.values()],
-      papeles: aEncolar.map((i) => ({ tipo: i.tipo, etiqueta: i.etiqueta, equipoId: String(i.destino.destino_equipo_id), equipo: i.equipo, rol: rolDe(i.tipo), conectado: i.conectado })),
+      papeles: aEncolar.map((i) => ({
+        tipo: i.tipo,
+        etiqueta: i.etiqueta,
+        equipoId: String(i.destino.destino_equipo_id),
+        equipo: i.equipo,
+        rol: rolDe(i.tipo),
+        conectado: i.conectado,
+        impresora: i.impresora,
+        impresoraLista: i.impresoraLista,
+        motivo: i.motivoNoLista,
+        // Solo para la «Vista previa» del diálogo: lo que se va a imprimir
+        ...(vistaPrevia ? { payload: i.payload } : {}),
+      })),
       omitidos,
       yaEnCola,
       trabajoIds,
@@ -1880,6 +1963,8 @@ await this.anotarResaltadas(pedido);
           : 'No se envió nada: revisa los motivos',
     };
 
+    // Si no salió nada (ya en cola, sin PC…), el siguiente intento no es «repetido»
+    if (claveIdenticaUsada && !aEncolar.length) this.reimpresionIdentica.delete(claveIdenticaUsada);
     if (!vistaPrevia && this.auditoria && usuario) {
       await this.auditoria.registrar({
         categoria: 'CAMBIO',
@@ -1894,6 +1979,53 @@ await this.anotarResaltadas(pedido);
     }
     if (!vistaPrevia && aEncolar.length) this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'REIMPRESION' });
     return resultado;
+  }
+
+  /**
+   * Para el diálogo «Reimprimir»: por cada opción, a qué computadora/impresora va según la configuración vigente y si
+   * hoy se puede imprimir (computadora conectada, impresora reconocida y lista). Reutiliza la vista previa de la
+   * reimpresión (mismo plan y mismo ruteo), así que no puede contradecir a lo que luego se envía. No encola nada.
+   */
+  async destinosPedido(pedidoIdInput: string | number): Promise<{ pedidoId: string; destinos: DestinoReimpresion[] }> {
+    const opciones: Array<{ tipo: string; etiqueta: string; dto: ReimprimirPedidoDto }> = [
+      { tipo: 'todo', etiqueta: 'Todo (stickers + ticket)', dto: { tipo: 'todo' } },
+      { tipo: 'stickers_todos', etiqueta: 'Solo stickers: todos', dto: { tipo: 'stickers', sub: 'todos' } },
+      { tipo: 'sticker_general', etiqueta: 'Sticker general', dto: { tipo: 'stickers', sub: 'general' } },
+      { tipo: 'sticker_area', etiqueta: 'Stickers de área', dto: { tipo: 'stickers', sub: 'area' } },
+      { tipo: 'sticker_bebida', etiqueta: 'Stickers de bebida', dto: { tipo: 'stickers', sub: 'bebida' } },
+      { tipo: 'ticket_cocina', etiqueta: 'Solo ticket de cocina (comanda)', dto: { tipo: 'ticket_cocina' } },
+      { tipo: 'ticket_pago', etiqueta: 'Solo ticket de pago / boleta', dto: { tipo: 'ticket_pago' } },
+    ];
+    const unicos = (xs: Array<string | null>) => [...new Set(xs.filter((x): x is string => Boolean(x)))];
+    let pedidoId = '';
+    const destinos: DestinoReimpresion[] = [];
+    for (const o of opciones) {
+      const v: any = await this.reimprimirPedido(pedidoIdInput, { ...o.dto, vista_previa: true });
+      pedidoId = v.pedido.id;
+      const papeles: any[] = v.papeles;
+      const cantidad = papeles.length;
+      const conectada = cantidad > 0 && papeles.every((p) => p.impresoraLista);
+      let motivo: string | null = null;
+      if (cantidad === 0) {
+        motivo = v.omitidos[0]?.motivo ?? (v.yaEnCola.length ? 'Ya hay una copia esperando en la cola: espera a que salga' : 'Este pedido no tiene nada de esto para imprimir');
+      } else if (!conectada) {
+        const mal = papeles.find((p) => !p.impresoraLista);
+        motivo = `${mal.equipo}: ${mal.motivo ?? 'la impresora no está lista'}`;
+      } else if (v.omitidos.length) {
+        motivo = `No saldrán: ${v.omitidos.map((x: any) => `${x.etiqueta} (${x.motivo})`).join('; ')}`;
+      }
+      destinos.push({
+        tipo: o.tipo,
+        etiqueta: o.etiqueta,
+        disponible: cantidad > 0 && conectada,
+        equipo: unicos(papeles.map((p) => p.equipo)).join(' y ') || null,
+        impresora: unicos(papeles.map((p) => p.impresora)).join(' y ') || null,
+        conectada,
+        motivo,
+        cantidad,
+      });
+    }
+    return { pedidoId, destinos };
   }
 
   /**

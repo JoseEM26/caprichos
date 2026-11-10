@@ -860,7 +860,7 @@ describe('ImpresionService', () => {
 
     it('la toma filtra por PC y por máquina encendida: una PC con ticketera toma su comanda y no los stickers', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);
-      prismaMock.equipoImpresionConfig = { findUnique: jest.fn().mockResolvedValue(fila({ ticketera: true, etiquetera: true })) };
+      prismaMock.equipoImpresionConfig = { findUnique: jest.fn().mockResolvedValue(fila({ ticketera: true, etiquetera: true, ticket_pago: true, comanda_salon: true, comanda_areas: ['3'], sticker_areas: ['3'] })) };
       await service.tomarTrabajos(5, 20n, ['TICKETERA']);
       const args = prismaMock.$queryRaw.mock.calls[0];
       expect(args).toContain(20n);
@@ -871,7 +871,7 @@ describe('ImpresionService', () => {
 
     it('una etiquetera sin ticketera encendida en la config no toma la comanda de área', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);
-      prismaMock.equipoImpresionConfig = { findUnique: jest.fn().mockResolvedValue(fila({ ticketera: false, etiquetera: true })) };
+      prismaMock.equipoImpresionConfig = { findUnique: jest.fn().mockResolvedValue(fila({ ticketera: false, etiquetera: true, comanda_areas: ['3'], sticker_areas: ['3'] })) };
       await service.tomarTrabajos(5, 21n, ['ETIQUETERA', 'TICKETERA']);
       const [tiposConfig] = arreglos();
       expect(tiposConfig).not.toContain('TICKET_COMANDA_AREA');

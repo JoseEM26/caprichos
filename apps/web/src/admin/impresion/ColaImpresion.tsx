@@ -64,6 +64,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
   const [motivo, setMotivo] = useState('');
   const [confirmaVaciar, setConfirmaVaciar] = useState(false);
   const [grupoDescartar, setGrupoDescartar] = useState<GrupoCola | null>(null);
+  const [confirmaSinImpresora, setConfirmaSinImpresora] = useState(false);
   const [trabajando, setTrabajando] = useState(false);
   const { tiene, usuario } = useSesion();
   const puedeReimprimir = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('pedidos/cambiar_estado');
@@ -142,7 +143,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
             <button type="button" className="cola-btn" onClick={alCerrar}>Cerrar</button>
           </div>
         )}
-        <p className="cola-ayuda">Las etiquetas descartadas no se imprimen aunque la impresora vuelva; si las necesitas, usa Reimprimir.</p>
+        <p className="cola-ayuda">Cada papel dice en qué computadora está esperando y si esa computadora está encendida. Los descartados no se imprimen aunque la impresora vuelva; si los necesitas, usa Reimprimir.</p>
 
         {r && (
           <div className="cola-resumen" data-testid="cola-resumen">
@@ -156,6 +157,18 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
                 {agente?.ultimoLatido ? ` · último latido ${haceCuanto(agente.ultimoLatido)}` : ' · sin latidos'}
               </span>
             </div>
+          </div>
+        )}
+
+        {r && (r.sinImpresora ?? 0) > 0 && (
+          <div className="cola-sin-impresora" role="alert" data-testid="cola-sin-impresora">
+            <strong>{r.sinImpresora} papel(es) sin impresora asignada</strong>
+            <span>Ninguna computadora tiene activado ese papel en Impresión fácil, así que no saldrán. Actívalo en la computadora que corresponda o descártalos (queda registrado, no se borra).</span>
+            {puedeDescartar && (
+              <button type="button" className="cola-btn peligro" disabled={trabajando} onClick={() => setConfirmaSinImpresora(true)}>
+                Descartar los que no tienen impresora
+              </button>
+            )}
           </div>
         )}
 
@@ -292,6 +305,17 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
             () => { setConfirmaVaciar(false); setVaciando(false); setMotivo(''); },
           )
         }
+      />
+      <Confirmar
+        abierto={confirmaSinImpresora}
+        titulo="Descartar lo que no tiene impresora"
+        mensaje={`Se descartarán ${r?.sinImpresora ?? 0} papel(es) que ninguna computadora imprime. NO se imprimirán; quedan registrados como descartados con su motivo. ¿Continuar?`}
+        textoSi="Sí, descartar"
+        textoNo="No"
+        peligro
+        cargando={trabajando}
+        alCancelar={() => setConfirmaSinImpresora(false)}
+        alConfirmar={() => ejecutar(() => impresionApi.descartarSinImpresora(), () => setConfirmaSinImpresora(false))}
       />
       <Confirmar
         abierto={!!grupoDescartar}

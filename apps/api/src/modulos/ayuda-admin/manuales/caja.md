@@ -121,7 +121,7 @@ Ver tambien: [[repartos]]
 1. Abrir el pedido y pulsar la pestana Etiquetas. Aparece una tarjeta por cada etiqueta: la general, una por area y una por cada vaso de bebida, con su vista previa.
 2. Cada tarjeta muestra su estado: En cola (esperando la impresora), Imprimiendo, Impresa con la hora, Fallida con el motivo o Vencida (no se imprimio a tiempo o el pedido fue anulado).
 3. Arriba se resume: cuantas etiquetas hay, cuantas estan impresas, en cola, fallidas o vencidas.
-4. Para volver a imprimir una sola etiqueta, pulsar Reimprimir en su tarjeta y confirmar con Si. Para todas, usar Reimprimir todas y confirmar. Una etiqueta que ya esta en cola no se duplica.
+4. Para volver a imprimir una sola etiqueta, pulsar Reimprimir en su tarjeta y confirmar con Si. Para todas, usar Reimprimir todas y confirmar. Una etiqueta que ya esta en cola no se duplica. El boton Reimprimir de un pedido muestra para cada opcion a que computadora e impresora va y si esta conectada; lo que hoy no se puede imprimir sale apagado con el motivo, hay Vista previa y un aviso Seguro? antes de enviar. Pulsar dos veces lo mismo en menos de 15 segundos avisa que ya se envio.
 
 ## Como se hace: Revisar la impresora cuando no sale la etiqueta
 1. Si al aceptar un pedido aparece el aviso Impresora de Caja sin conexion (campana) o la franja roja arriba de Pedidos y caja, la PC de la etiquetera no esta respondiendo. Revisar que este encendida, con el programa de impresion abierto y con sesion iniciada.

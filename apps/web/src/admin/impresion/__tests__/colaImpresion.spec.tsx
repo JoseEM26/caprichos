@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ColaImpresion } from '../ColaImpresion';
 import { impresionApi } from '../impresionApi';
+import * as sesion from '../../../comun/sesion';
 
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 vi.mock('../../../comun/sesion', () => ({ useSesion: () => ({ usuario: { rol: 'ADMIN' }, tiene: () => true }) }));
@@ -16,6 +17,7 @@ vi.mock('../impresionApi', () => ({
     reimprimirTrabajos: vi.fn(),
     quitarTrabajos: vi.fn(),
     reintentarTrabajo: vi.fn(),
+    descartarSinImpresora: vi.fn(),
   },
 }));
 
@@ -147,12 +149,13 @@ describe('ColaImpresion por máquina', () => {
   });
 
   it('sin permiso no hay botones de reimprimir y la ayuda explica la diferencia', async () => {
-    const sesion = await import('../../../comun/sesion');
+
     vi.spyOn(sesion, 'useSesion').mockReturnValue({ usuario: { rol: 'MOZO' }, tiene: () => false } as any);
     render(<ColaImpresion alCerrar={() => {}} />);
     await screen.findByTestId('trabajo-1');
     expect(screen.queryByRole('button', { name: 'Reimprimir' })).toBeNull();
-    expect(screen.getByText(/saca una copia nueva de uno que ya salió/)).toBeInTheDocument();
+    expect(screen.getByText(/Qué hace cada uno/)).toBeInTheDocument();
+    expect(screen.getByText(/saca una copia NUEVA de un papel que ya salió/i)).toBeInTheDocument();
   });
 });
 
@@ -218,5 +221,76 @@ describe('ColaImpresion', () => {
     vi.mocked(impresionApi.listarCola).mockRejectedValueOnce(new Error('Falla de red'));
     montar();
     expect(await screen.findByText('Falla de red')).toBeInTheDocument();
+  });
+});
+
+describe('ColaImpresion: en qué computadora espera cada papel', () => {
+  const destino = (extra: any = {}) => ({
+    equipoId: '1', equipoNombre: 'Caja', conectado: true, ultimoLatido: new Date(Date.now() - 12000).toISOString(),
+    impresoraRol: 'TICKETERA', impresoraNombre: 'EPSON TM-T20', impresoraEstado: 'lista', sinImpresora: false, motivoSinImpresora: null,
+    textoEspera: 'Esperando su turno en la computadora «Caja» (conectada hace 12 s).', ...extra,
+  });
+  const papeles = [
+    trabajo('1', 'TICKET_PAGO', 'PENDIENTE', { equipoNombre: 'Caja', destino: destino() }),
+    trabajo('2', 'TICKET_COMANDA_SALON', 'PENDIENTE', {
+      equipoNombre: 'Sin computadora asignada',
+      destino: destino({ equipoId: null, equipoNombre: null, conectado: false, ultimoLatido: null, impresoraNombre: null, impresoraEstado: null, sinImpresora: true,
+        motivoSinImpresora: 'Ninguna computadora tiene activado «Comanda de salón» en Impresión fácil.', textoEspera: 'Sin impresora asignada: Ninguna computadora tiene activado «Comanda de salón» en Impresión fácil.' }),
+    }),
+    trabajo('3', 'ETIQUETA_GENERAL', 'PENDIENTE', {
+      equipoNombre: 'Barra',
+      destino: destino({ equipoId: '2', equipoNombre: 'Barra', conectado: false, ultimoLatido: new Date(Date.now() - 3600_000).toISOString(), impresoraRol: 'ETIQUETERA', impresoraNombre: 'TSC TTP-244',
+        textoEspera: 'Esperando en la computadora «Barra», que está apagada o sin el programa (sin conexión desde las 4:16 p. m.). Saldrá al abrirlo.' }),
+    }),
+  ];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(sesion, 'useSesion').mockReturnValue({ usuario: { rol: 'ADMIN' }, tiene: () => true } as any);
+    vi.mocked(impresionApi.listarCola).mockResolvedValue({ ...cola, resumen: { ...cola.resumen, sinImpresora: 1 } } as any);
+    vi.mocked(impresionApi.obtenerEstado).mockResolvedValue({ agente: 'conectado', impresora: 'x', ultimoLatido: null } as any);
+    vi.mocked(impresionApi.listarTrabajos).mockResolvedValue({ items: papeles, total: 3, pagina: 1, paginas: 1, conteo: { stickers: 1, tickets: 2 } } as any);
+  });
+
+  it('cada fila dice la computadora, si está conectada, la impresora y en cuál espera', async () => {
+    render(<ColaImpresion alCerrar={() => {}} />);
+    await screen.findByTestId('trabajo-1');
+    const d1 = screen.getByTestId('destino-1');
+    expect(d1).toHaveTextContent('Computadora: Caja');
+    expect(d1).toHaveTextContent('Conectada · hace');
+    expect(d1).toHaveTextContent('Impresora: Ticketera «EPSON TM-T20»');
+    expect(screen.getByTestId('trabajo-1')).toHaveTextContent('Esperando su turno en la computadora «Caja» (conectada hace 12 s).');
+    expect(screen.getByTestId('destino-3')).toHaveTextContent('Sin conexión desde las');
+    expect(screen.getByTestId('trabajo-3')).toHaveTextContent('que está apagada o sin el programa');
+  });
+
+  it('un papel que nadie imprime sale «Sin impresora asignada» con el motivo, no «En cola»', async () => {
+    render(<ColaImpresion alCerrar={() => {}} />);
+    const fila = await screen.findByTestId('trabajo-2');
+    expect(fila).toHaveTextContent('Sin impresora asignada');
+    expect(fila).not.toHaveTextContent('En cola');
+    expect(fila).toHaveTextContent('Ninguna computadora tiene activado «Comanda de salón»');
+    expect(screen.queryByTestId('destino-2')).toBeNull();
+  });
+
+  it('filtra por computadora', async () => {
+    render(<ColaImpresion alCerrar={() => {}} />);
+    await screen.findByTestId('trabajo-1');
+    fireEvent.change(screen.getByLabelText('Filtrar por computadora'), { target: { value: '2' } });
+    expect(screen.queryByTestId('trabajo-1')).toBeNull();
+    expect(screen.getByTestId('trabajo-3')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filtrar por computadora'), { target: { value: '__sin__' } });
+    expect(screen.getByTestId('trabajo-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('trabajo-3')).toBeNull();
+  });
+
+  it('el aviso de «sin impresora» ofrece descartarlos con confirmación (no se borran)', async () => {
+    vi.mocked(impresionApi.descartarSinImpresora).mockResolvedValue({ ok: true, descartadas: 1, mensaje: 'Se descartaron 1 etiqueta(s); no se imprimirán' });
+    render(<ColaImpresion alCerrar={() => {}} />);
+    const aviso = await screen.findByTestId('cola-sin-impresora');
+    expect(aviso).toHaveTextContent('1 papel(es) sin impresora asignada');
+    fireEvent.click(within(aviso).getByRole('button', { name: 'Descartar los que no tienen impresora' }));
+    expect(impresionApi.descartarSinImpresora).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+    await waitFor(() => expect(impresionApi.descartarSinImpresora).toHaveBeenCalled());
   });
 });

@@ -241,7 +241,8 @@ export function piezaDeTrabajo(t: Pick<TrabajoImpresionAdmin, 'tipo' | 'pedidoId
 
 export type EstadoSimple = 'ok' | 'fallo' | 'cola';
 
-export function estadoDeTrabajo(estado: string): { id: EstadoSimple; texto: string } {
+export function estadoDeTrabajo(estado: string, sinImpresora = false): { id: EstadoSimple; texto: string } {
+  if (sinImpresora && estado === 'PENDIENTE') return { id: 'fallo', texto: 'Sin impresora asignada' };
   switch (estado) {
     case 'IMPRESO':
       return { id: 'ok', texto: 'Salió bien' };
@@ -259,7 +260,9 @@ export function estadoDeTrabajo(estado: string): { id: EstadoSimple; texto: stri
 }
 
 /** Motivo en español simple de un trabajo que no salió o espera. null si salió bien. */
-export function motivoDeTrabajo(t: Pick<TrabajoImpresionAdmin, 'estado' | 'error'>, pcConectada: boolean | null): string | null {
+export function motivoDeTrabajo(t: Pick<TrabajoImpresionAdmin, 'estado' | 'error'> & { destino?: TrabajoImpresionAdmin['destino'] }, pcConectada: boolean | null): string | null {
+  // El servidor ya dice en cuál computadora espera y si está encendida (o que ninguna lo imprime)
+  if (t.estado === 'PENDIENTE' && t.destino?.textoEspera) return t.destino.textoEspera;
   switch (t.estado) {
     case 'IMPRESO':
       return null;

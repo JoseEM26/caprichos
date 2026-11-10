@@ -248,6 +248,19 @@ export class PedidosAdminController {
     return this.impresionService.reimprimirPedido(id, dto, req?.usuario, req?.ip);
   }
 
+  /**
+   * A qué computadora/impresora va cada opción de «Reimprimir» según la configuración real, y si se puede imprimir hoy
+   * (computadora conectada, impresora reconocida y lista). No encola nada.
+   */
+  @Get(':id/impresion/destinos')
+  @Permiso('pedidos', 'cambiar_estado')
+  async destinosImpresion(@Param('id') id: string) {
+    if (!this.impresionService) {
+      return { ok: false, mensaje: 'Módulo de impresión no configurado' };
+    }
+    return this.impresionService.destinosPedido(id);
+  }
+
   /** Copia del ticket de pago: Caja, Supervisor y Admin cualquier pedido; el mozo, solo los que él tomó. */
   @Post(':id/ticket/reimprimir')
   @Permiso('pedidos', 'reimprimir_ticket')

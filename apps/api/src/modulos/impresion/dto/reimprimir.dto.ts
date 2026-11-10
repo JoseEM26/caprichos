@@ -46,6 +46,11 @@ export class ReimprimirPedidoDto {
   @IsOptional()
   @IsBoolean()
   confirmar_anulado?: boolean;
+
+  /** Anula conscientemente el aviso de «ya se envió hace N s» (reimpresión idéntica repetida en 15 s). */
+  @IsOptional()
+  @IsBoolean()
+  otra_copia?: boolean;
 }
 
 /** Reimpresión desde la cola: lista de trabajos o un grupo de fallidos de una máquina. */
