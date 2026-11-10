@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { MATRIZ } from '../../acceso/permisos';
 import { conGuardiaSalida } from '../proveedor/guardia-salida';
-import { celular9, listaCelulares, NumerosWhatsappService } from '../servicios/numeros-whatsapp.service';
+import { celular9, destinoBloqueo, listaCelulares, NumerosWhatsappService } from '../servicios/numeros-whatsapp.service';
 
 const PROPIO = '977123456';
 const BLOQ = '955111222';
@@ -50,6 +50,18 @@ describe('normalización de celulares', () => {
     expect(celular9('0977123456')).toBe(PROPIO);
     expect(celular9('wa-user:PE.123')).toBe('');
     expect(listaCelulares('977 123 456, +51955111222; 123')).toEqual([PROPIO, BLOQ]);
+  });
+});
+
+describe('destino de bloqueo', () => {
+  it('celular peruano → 9 dígitos; otro número → todos sus dígitos; BSUID → en minúsculas; basura → vacío', () => {
+    expect(destinoBloqueo('+51 977-123-456')).toBe('977123456');
+    expect(destinoBloqueo('51977123456')).toBe('977123456');
+    expect(destinoBloqueo('+57 300 123 4567')).toBe('573001234567');
+    expect(destinoBloqueo('wa-user:PE.123')).toBe('wa-user:pe.123');
+    expect(destinoBloqueo('abc')).toBe('');
+    expect(destinoBloqueo('12345')).toBe('');
+    expect(destinoBloqueo(null)).toBe('');
   });
 });
 
@@ -125,10 +137,42 @@ describe('API de bloqueo (servicio)', () => {
   it('rechaza inválido, propio y duplicado', async () => {
     const { numeros } = montar();
     await expect(numeros.bloquear('12345', '', usuario)).rejects.toBeInstanceOf(BadRequestException);
-    await expect(numeros.bloquear('812345678', '', usuario)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(numeros.bloquear('', '', usuario)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(numeros.bloquear('hola', '', usuario)).rejects.toBeInstanceOf(BadRequestException);
     await expect(numeros.bloquear('+51977123456', '', usuario)).rejects.toMatchObject({ response: { codigo: 'NUMERO_PROPIO' } });
     await expect(numeros.bloquear(BLOQ, '', usuario)).rejects.toBeInstanceOf(ConflictException);
     await expect(numeros.bloquear('933444555', 'x'.repeat(121), usuario)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('permite bloquear cualquier número: otro país, fijo o que no empieza con 9, y deja de enviarle', async () => {
+    const { numeros, puerto, meta } = montar('977123456', []);
+    for (const [entrada, guardado] of [
+      ['+57 300 123 4567', '573001234567'],
+      ['812345678', '812345678'],
+      ['(01) 456-7890', '14567890'],
+    ] as const) {
+      const r = await numeros.bloquear(entrada, 'rappi', usuario);
+      expect(r.celular).toBe(guardado);
+      expect((await puerto.enviarTexto(guardado, 'x')).estado).toBe('OMITIDO');
+    }
+    expect(meta.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('bloquea un identificador de WhatsApp (BSUID) y no afecta a otro distinto', async () => {
+    const { numeros, puerto, meta } = montar('977123456', []);
+    const r = await numeros.bloquear('wa-user:PE.ABC123', 'spam', usuario);
+    expect(r.celular).toBe('wa-user:pe.abc123');
+    expect((await puerto.enviarTexto('WA-USER:PE.abc123', 'x')).estado).toBe('OMITIDO');
+    await puerto.enviarTexto('wa-user:PE.OTRO', 'x');
+    expect(meta.enviarTexto).toHaveBeenCalledTimes(1);
+  });
+
+  it('un número extranjero bloqueado no bloquea a un celular peruano con los mismos últimos 9 dígitos', async () => {
+    const { numeros, puerto, meta } = montar('977123456', []);
+    await numeros.bloquear('+57 933444555', '', usuario);
+    await puerto.enviarTexto('933444555', 'x');
+    expect(meta.enviarTexto).toHaveBeenCalledTimes(1);
+    expect(meta.enviarTexto.mock.calls[0].slice(0, 2)).toEqual(['933444555', 'x']);
   });
 
   it('desbloquea, audita y vuelve a enviar; desbloquear uno que no está da 404', async () => {

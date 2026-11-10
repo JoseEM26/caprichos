@@ -236,14 +236,14 @@ export interface Pedido {
   } | null;
   /** Medios con los que se pagó (EFECTIVO, YAPE...); lo trae el servidor de Caja si ya lo soporta. */
   mediosPago?: string[];
-  /** Quién atendió el pedido (mozo o cajero) y cuándo (ISO). Opcionales: según versión del servidor. */
-  atendio?: string | null;
-  atendido_en?: string | null;
+  /** Quién atendió el pedido (mozo o cajero) y cuándo (ISO), como los manda el servidor de Caja. */
+  atendidoPorNombre?: string | null;
+  atendidoEn?: string | null;
   /** Quién cobró y cuándo (ISO). */
-  cobro_por?: string | null;
-  cobrado_en?: string | null;
-  /** Minutos desde que se creó hasta que se cerró; null si sigue abierto. */
-  tiempo_total_min?: number | null;
+  cobradoPorNombre?: string | null;
+  cobradoEn?: string | null;
+  /** Segundos desde que se creó hasta que se cerró; null si sigue abierto. */
+  tiempoTotalSeg?: number | null;
 }
 
 export interface FiltrosListarPedidos {

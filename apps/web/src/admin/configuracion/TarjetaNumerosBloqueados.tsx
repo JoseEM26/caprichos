@@ -17,7 +17,19 @@ export function celularValido(texto: string): string {
   return /^9\d{8}$/.test(c) ? c : '';
 }
 
-const fmt = (c: string) => `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6)}`;
+/** Cualquier número a bloquear: celular peruano (con o sin +51), otro número con su código de país, o un identificador de WhatsApp. */
+export function destinoValido(texto: string): string {
+  const t = texto.trim();
+  if (/^wa-user:/i.test(t) || t.includes('.')) {
+    const id = t.toLowerCase().replace(/\s+/g, '');
+    return /^[a-z0-9:._-]{3,40}$/.test(id) ? id : '';
+  }
+  const d = t.replace(/\D/g, '').replace(/^0+/, '');
+  if (d.length === 11 && d.startsWith('519')) return d.slice(2);
+  return /^\d{6,20}$/.test(d) ? d : '';
+}
+
+const fmt = (c: string) => (/^9\d{8}$/.test(c) ? `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6)}` : c);
 const fecha = (iso: string) => {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Lima' }).format(d);
@@ -65,13 +77,13 @@ export function TarjetaNumerosBloqueados({ esAdmin = false }: { esAdmin?: boolea
   const pedirBloquear = (e: React.FormEvent) => {
     e.preventDefault();
     setExito(null);
-    if (!celularValido(nuevo)) {
-      setError('Escribe un celular de 9 dígitos que empiece con 9 (con o sin +51).');
+    if (!destinoValido(nuevo)) {
+      setError('Escribe un número válido: celular de 9 dígitos, u otro número con su código de país.');
       return;
     }
     setError(null);
     setErrorConfirmar(null);
-    setConfirmar({ tipo: 'bloquear', celular: celularValido(nuevo) });
+    setConfirmar({ tipo: 'bloquear', celular: destinoValido(nuevo) });
   };
 
   const pedirPropios = (e: React.FormEvent) => {
@@ -213,7 +225,7 @@ export function TarjetaNumerosBloqueados({ esAdmin = false }: { esAdmin?: boolea
               <form noValidate onSubmit={pedirBloquear} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 700 }}>
                   Número a bloquear
-                  <input aria-label="Número a bloquear" inputMode="tel" placeholder="9 dígitos" value={nuevo} onChange={(e) => setNuevo(e.target.value)} style={{ ...campo, width: 160 }} />
+                  <input aria-label="Número a bloquear" inputMode="tel" placeholder="Cualquier número" value={nuevo} onChange={(e) => setNuevo(e.target.value)} style={{ ...campo, width: 160 }} />
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 700, flex: 1, minWidth: 160 }}>
                   Motivo (opcional)

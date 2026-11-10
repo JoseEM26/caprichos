@@ -40,7 +40,7 @@ export interface ColumnaCaja {
 }
 
 const dinero = (v: unknown) => `S/ ${Number(v || 0).toFixed(2)}`;
-const cobroEn = (p: Pedido) => p.cobrado_en ?? p.cobroMozo?.en ?? p.pago_coordinado_en ?? null;
+const cobroEn = (p: Pedido) => p.cobradoEn ?? p.cobroMozo?.en ?? p.pago_coordinado_en ?? null;
 
 export const COLUMNAS_CAJA: ColumnaCaja[] = [
   { id: 'codigo', titulo: 'Código', texto: (p) => p.codigo },
@@ -54,15 +54,15 @@ export const COLUMNAS_CAJA: ColumnaCaja[] = [
   { id: 'medios', titulo: 'Medios de pago', texto: (p) => mediosDePedido(p).map(nombreMedio).join(' + ') },
   { id: 'total', titulo: 'Total', numerica: true, texto: (p) => dinero(p.total) },
   { id: 'propina', titulo: 'Propina', numerica: true, texto: (p) => (Number(p.propina || 0) > 0 ? dinero(p.propina) : '') },
-  { id: 'atendio', titulo: 'Atendió', texto: (p) => p.atendio ?? p.cobroMozo?.mozo ?? '' },
-  { id: 'horaAtencion', titulo: 'Hora de atención', texto: (p) => aHora(p.atendido_en ?? p.entregado_mesa_en ?? p.despachado_en) },
-  { id: 'cobro', titulo: 'Cobró', texto: (p) => p.cobro_por ?? '' },
+  { id: 'atendio', titulo: 'Atendió', texto: (p) => p.atendidoPorNombre ?? p.cobroMozo?.mozo ?? '' },
+  { id: 'horaAtencion', titulo: 'Hora de atención', texto: (p) => aHora(p.atendidoEn ?? p.entregado_mesa_en ?? p.despachado_en) },
+  { id: 'cobro', titulo: 'Cobró', texto: (p) => p.cobradoPorNombre ?? '' },
   { id: 'horaCobro', titulo: 'Hora de cobro', texto: (p) => aHora(cobroEn(p)) },
   {
     id: 'tiempo',
     titulo: 'Tiempo total',
     numerica: true,
-    texto: (p) => textoDuracion(p.tiempo_total_min ?? minutosEntre(p.creado_en, p.entregado_en)),
+    texto: (p) => textoDuracion((p.tiempoTotalSeg != null ? Math.round(p.tiempoTotalSeg / 60) : null) ?? minutosEntre(p.creado_en, p.entregado_en)),
   },
 ];
 
