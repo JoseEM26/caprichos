@@ -32,12 +32,31 @@ export function etiquetaDeTrabajo(t: Pick<TrabajoImpresionAdmin, 'tipo' | 'pedid
   return `${sticker ? 'STICKER' : 'TICKET'} · ${queda[t.tipo] ?? 'Papel'}`;
 }
 
+/** «12 s» / «3 min» desde un instante. */
+export function segundosDesde(iso: string, ahora = Date.now()): string {
+  const s = Math.max(0, Math.round((ahora - new Date(iso).getTime()) / 1000));
+  return s < 120 ? `${s} s` : `${Math.round(s / 60)} min`;
+}
+
 /** Hora; con fecha si no es de hoy. */
 export function horaDeTrabajo(iso: string, ahora = new Date()): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const hora = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
   return d.toDateString() === ahora.toDateString() ? hora : `${d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' })} ${hora}`;
+}
+
+const SIN_COMPUTADORA = '__sin__';
+
+/** Computadora a la que pertenece el trabajo en el filtro: su id, o «sin asignar». */
+const computadoraDe = (t: TrabajoImpresionAdmin) => t.destino?.equipoId ?? SIN_COMPUTADORA;
+
+/** «Impresora: Ticketera «EPSON TM-T20»» / «Impresora: Ticketera (no reconocida)». */
+function textoImpresora(t: TrabajoImpresionAdmin): string | null {
+  const d = t.destino;
+  if (!d) return null;
+  const rol = d.impresoraRol === 'ETIQUETERA' ? 'Etiquetera' : 'Ticketera';
+  return d.impresoraNombre ? `${rol} «${d.impresoraNombre}»` : d.equipoId ? `${rol} (sin reconocer)` : null;
 }
 
 const REIMPRIMIBLES = ['IMPRESO', 'FALLIDO', 'VENCIDO', 'DESCARTADO'];
@@ -82,10 +101,25 @@ export function ListaTrabajos(p: Props) {
   const [confirmaQuitar, setConfirmaQuitar] = useState(false);
   const [quitando, setQuitando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [compu, setCompu] = useState<string>('TODAS');
 
-  const visibles = useMemo(
+  const porPestana = useMemo(
     () => (p.filtradaPorServidor || p.pestana === 'TODO' ? p.trabajos : p.trabajos.filter((t) => maquinaDe(t) === p.pestana)),
     [p.trabajos, p.pestana, p.filtradaPorServidor],
+  );
+  // Computadoras que tienen algo en la cola (para filtrar), con cuántos papeles espera cada una
+  const computadoras = useMemo(() => {
+    const m = new Map<string, { nombre: string; n: number }>();
+    for (const t of p.trabajos) {
+      const k = computadoraDe(t);
+      const nombre = k === SIN_COMPUTADORA ? 'Sin computadora asignada' : (t.destino?.equipoNombre ?? t.equipoNombre ?? 'Computadora');
+      m.set(k, { nombre, n: (m.get(k)?.n ?? 0) + 1 });
+    }
+    return [...m.entries()];
+  }, [p.trabajos]);
+  const visibles = useMemo(
+    () => (compu === 'TODAS' ? porPestana : porPestana.filter((t) => computadoraDe(t) === compu)),
+    [porPestana, compu],
   );
   const stickers = p.conteo?.stickers ?? p.trabajos.filter((t) => maquinaDe(t) === 'ETIQUETERA').length;
   const tickets = p.conteo?.tickets ?? p.trabajos.filter((t) => maquinaDe(t) === 'TICKETERA').length;
@@ -180,9 +214,24 @@ export function ListaTrabajos(p: Props) {
           </button>
         ))}
       </div>
-      <p className="lt-ayuda">
-        <b>Reintentar</b> vuelve a mandar el mismo papel que no salió. <b>Reimprimir</b> saca una copia nueva de uno que ya salió (o falló), sin tocar el original.
-      </p>
+      <div className="lt-ayuda" data-testid="lt-ayuda">
+        <b>Qué hace cada uno</b>
+        <ul>
+          <li><b>Reintentar</b>: vuelve a mandar el MISMO papel que no salió. No crea un papel nuevo.</li>
+          <li><b>Reimprimir</b>: saca una copia NUEVA de un papel que ya salió o falló, sin tocar el original.</li>
+        </ul>
+      </div>
+      {computadoras.length > 1 && (
+        <label className="lt-compu">
+          Computadora
+          <select value={compu} onChange={(e) => setCompu(e.target.value)} aria-label="Filtrar por computadora">
+            <option value="TODAS">Todas ({p.trabajos.length})</option>
+            {computadoras.map(([k, c]) => (
+              <option key={k} value={k}>{c.nombre} ({c.n})</option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {(p.puedeReimprimir || puedeQuitar) && (
         <div className="lt-barra">
@@ -234,7 +283,7 @@ export function ListaTrabajos(p: Props) {
       ) : (
         <ul className="lt-lista" data-testid={p.testIdLista}>
           {visibles.map((t) => {
-            const est = estadoDeTrabajo(t.estado);
+            const est = estadoDeTrabajo(t.estado, Boolean(t.destino?.sinImpresora));
             const motivo = motivoDeTrabajo(t, p.pcConectada ? p.pcConectada(t) : null);
             const sticker = maquinaDe(t) === 'ETIQUETERA';
             const reimprimible = p.puedeReimprimir && REIMPRIMIBLES.includes(t.estado);
@@ -254,8 +303,17 @@ export function ListaTrabajos(p: Props) {
                 <div className="lt-datos">
                   <span>{t.pedidoCodigo ? `Pedido ${t.pedidoCodigo}` : 'Sin pedido'}</span>
                   <span>{horaDeTrabajo(t.impresoEn ?? t.en)}</span>
-                  <span>en {t.equipoNombre ?? 'su computadora'}</span>
+                  {!t.destino && <span>en {t.equipoNombre ?? 'su computadora'}</span>}
                 </div>
+                {t.destino && !t.destino.sinImpresora && (
+                  <div className="lt-destino" data-testid={`destino-${t.id}`}>
+                    <span>Computadora: <b>{t.destino.equipoNombre ?? 'sin identificar'}</b></span>
+                    <span className={`lt-conexion lt-conexion--${t.destino.conectado ? 'si' : 'no'}`}>
+                      {t.destino.conectado ? `Conectada${t.destino.ultimoLatido ? ` · hace ${segundosDesde(t.destino.ultimoLatido)}` : ''}` : `Sin conexión${t.destino.ultimoLatido ? ` desde las ${horaDeTrabajo(t.destino.ultimoLatido)}` : ''}`}
+                    </span>
+                    {textoImpresora(t) && <span>Impresora: {textoImpresora(t)}</span>}
+                  </div>
+                )}
                 {motivo && <div className="lt-motivo">{motivo}</div>}
                 <div className="lt-acc">
                   {p.puedeReintentar && FALLIDOS.includes(t.estado) && p.alReintentar && (

@@ -81,6 +81,14 @@ export class AdminImpresionController {
     return this.impresionService.vaciarCola(dto, req.usuario, this.ip(req));
   }
 
+  /** Libera la cola de lo que ninguna computadora imprime (marca DESCARTADO con motivo y auditoría; no borra). */
+  @Post('cola/descartar-sin-impresora')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async descartarSinImpresora(@Body() dto: DescartarDto, @Req() req: any) {
+    return this.impresionService.descartarSinImpresora(dto?.motivo, req.usuario, this.ip(req));
+  }
+
   /** Reimprimir = copia nueva en la misma máquina (por ids o por grupo de fallidos). Distinto de «reintentar». */
   @Post('cola/reimprimir')
   @HttpCode(HttpStatus.OK)

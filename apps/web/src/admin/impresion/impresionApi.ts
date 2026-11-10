@@ -21,8 +21,37 @@ export interface TrabajoImpresionAdmin {
   payload: any;
   /** Máquina que lo imprime: stickers = ETIQUETERA, tickets = TICKETERA. */
   maquina?: 'ETIQUETERA' | 'TICKETERA';
-  /** PC/equipo que lo imprime o imprimió (Caja si no hay otro). */
+  /** PC/equipo que lo imprime o imprimió. */
   equipoNombre?: string;
+  /** Computadora, impresora y estado con la configuración vigente (null en un servidor viejo). */
+  destino?: DestinoTrabajoAdmin;
+}
+
+export interface DestinoTrabajoAdmin {
+  equipoId: string | null;
+  equipoNombre: string | null;
+  conectado: boolean;
+  ultimoLatido: string | null;
+  impresoraRol: 'ETIQUETERA' | 'TICKETERA';
+  impresoraNombre: string | null;
+  impresoraEstado: string | null;
+  /** Pendiente que ninguna computadora imprime según la configuración: no «espera», no saldrá. */
+  sinImpresora: boolean;
+  motivoSinImpresora: string | null;
+  /** Frase lista: en cuál computadora espera y si está encendida. */
+  textoEspera: string;
+}
+
+/** Una opción de «Reimprimir» con su destino real (GET /admin/pedidos/:id/impresion/destinos). */
+export interface DestinoReimpresion {
+  tipo: 'todo' | 'stickers_todos' | 'sticker_general' | 'sticker_area' | 'sticker_bebida' | 'ticket_cocina' | 'ticket_pago';
+  etiqueta: string;
+  disponible: boolean;
+  equipo: string | null;
+  impresora: string | null;
+  conectada: boolean;
+  motivo: string | null;
+  cantidad: number;
 }
 
 export interface RespuestaReimpresion {
@@ -97,6 +126,8 @@ export interface RespuestaCola {
     descartados: number;
     pendientesAntiguas: number;
     minutosAntiguas: number;
+    /** Pedidos pendientes que ninguna computadora imprime. */
+    sinImpresora?: number;
   };
 }
 
@@ -402,6 +433,16 @@ export const impresionApi = {
     return api.post(`/admin/pedidos/${pedidoId}/reimprimir`, body);
   },
 
+  /** A dónde va cada opción de «Reimprimir» y si hoy se puede imprimir. No encola nada. */
+  destinosReimpresion: async (pedidoId: string | number): Promise<{ pedidoId: string; destinos: DestinoReimpresion[] }> => {
+    return api.get(`/admin/pedidos/${pedidoId}/impresion/destinos`);
+  },
+
+  /** Libera la cola de lo que ninguna computadora imprime (queda DESCARTADO con motivo; no se borra). */
+  descartarSinImpresora: async (motivo?: string): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
+    return api.post('/admin/impresion/cola/descartar-sin-impresora', motivo ? { motivo } : {});
+  },
+
   /** Precuenta de un pedido sin cobrar: encola el ticket «PRE-CUENTA - SIN PAGAR» en la ticketera de pago (también para el mozo). */
   imprimirPrecuenta: async (pedidoId: string | number): Promise<ResultadoReimpresionPedido> => {
     return api.post(`/admin/pedidos/${pedidoId}/precuenta/imprimir`, {});
@@ -467,6 +508,8 @@ export interface PeticionReimpresionPedido {
   sub?: 'todos' | 'general' | 'area' | 'bebida';
   vista_previa?: boolean;
   confirmar_anulado?: boolean;
+  /** «Imprimir otra copia igual»: anula el aviso de reimpresión repetida en 15 s. */
+  otra_copia?: boolean;
 }
 export interface PapelReimpresion {
   tipo: string;
@@ -475,6 +518,11 @@ export interface PapelReimpresion {
   equipo: string;
   rol: 'ETIQUETERA' | 'TICKETERA';
   conectado: boolean;
+  impresora?: string | null;
+  impresoraLista?: boolean;
+  motivo?: string | null;
+  /** Solo en la vista previa: lo que se imprimiría. */
+  payload?: any;
 }
 export interface ResultadoReimpresionPedido {
   ok: boolean;
@@ -485,7 +533,7 @@ export interface ResultadoReimpresionPedido {
   stickers: number;
   tickets: number;
   cantidad: number;
-  porMaquina: Array<{ equipoId: string; equipo: string; rol: 'ETIQUETERA' | 'TICKETERA'; stickers: number; tickets: number; conectado: boolean }>;
+  porMaquina: Array<{ equipoId: string; equipo: string; rol: 'ETIQUETERA' | 'TICKETERA'; stickers: number; tickets: number; conectado: boolean; impresora?: string | null }>;
   papeles: PapelReimpresion[];
   omitidos: Array<{ tipo: string; etiqueta: string; motivo: string }>;
   yaEnCola: Array<{ tipo: string; etiqueta: string; motivo: string }>;

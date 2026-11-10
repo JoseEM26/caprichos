@@ -138,7 +138,7 @@ describe('sticker de bebida por tipo de pedido: encolar, reimprimir y reasignar'
     expect(vasos(prisma.printJob.create)).toHaveLength(1);
     prisma.printJob.create.mockClear();
     conMod('DELIVERY');
-    await service.reimprimirPedido(9, { tipo: 'todo' }, { partyId: '3' } as any, '1.1.1.1');
+    await service.reimprimirPedido(9, { tipo: 'todo', otra_copia: true }, { partyId: '3' } as any, '1.1.1.1');
     expect(vasos(prisma.printJob.create)).toHaveLength(2);
   });
   it('reimprimir etiqueta de bebidas respeta la modalidad', async () => {
