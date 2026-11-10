@@ -69,7 +69,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'propina_reparto', 'propina_reparto_detalle',
   ]],
   ['planilla del personal: sueldos, adelantos, descuentos y períodos pagados (dinero real, historial propio de cada base)', [
-    'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo',
+    'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'prestamo_personal', 'prestamo_cuota', 'descuento_recurrente_personal',
     'vinculo_personal', 'vacacion_movimiento',
   ]],
   ['feriados: los precarga la migración y el ADMIN los edita en cada base, no se migran', [

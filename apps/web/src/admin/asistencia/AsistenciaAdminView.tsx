@@ -617,7 +617,11 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
           <div style={{ display: 'grid', gap: 12 }}>
             {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
             {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza. Hoy: 5.')}
-            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). Hoy: 50.')}
+            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de atraso. Hoy: 0 (solo se pagan los minutos trabajados).')}
+            {campo('multiplicadorExtra', 'Hora extra aprobada: multiplicador', 'Se paga a valor hora × este número (solo si el admin la aprueba). No aplica a quien se calcula por horas programadas. Hoy: 1.25.')}
+            {campo('diasMesDefecto', 'Valor hora: días del mes (general)', 'Sueldo mensual ÷ estos días ÷ horas por día. Se puede cambiar por persona en Usuarios. Hoy: 24.')}
+            {campo('horasDiaDefecto', 'Valor hora: horas por día (general)', 'Hoy: 9. Se puede cambiar por persona (ej. 8).')}
+            {campo('netflixSemanal', 'Netflix: descuento semanal (S/)', 'Monto por semana que se descuenta a quien lo paga (×4 en un pago mensual). Hoy: 1.64.')}
             {campo('dobleMarcaMin', 'Doble marca: unir marcas a menos de (min)', 'Marcas muy seguidas se unen: cuenta la primera y la otra se muestra tachada. 0 = no unir. Hoy: 3.')}
             {campo('solicitudDiasMax', 'Días para pedir corrección', 'Hasta cuántos días atrás la persona puede pedir que se corrija su asistencia (y se le avisa de inconsistencias). Hoy: 7.')}
             {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}

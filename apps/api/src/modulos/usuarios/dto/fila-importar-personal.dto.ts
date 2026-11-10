@@ -1,5 +1,6 @@
-import { IsArray, IsBoolean, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { TIPOS_DOCUMENTO } from '../../acceso/roles-usuario';
+import { ACUERDOS_LABORALES, AcuerdoLaboral } from '../importar-planilla.util';
 
 /** Una fila de «Importar personal». Se valida dentro del servicio, fila por fila. */
 export class FilaImportarPersonalDto {
@@ -54,4 +55,55 @@ export class FilaImportarPersonalDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  // --- Planilla (opcionales; ver docs/operacion/importar-personal-columnas.md) ---
+
+  /** Área del Excel (informativa; va a la nota del vínculo). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  area?: string;
+
+  @IsOptional()
+  @IsIn([...ACUERDOS_LABORALES], { message: 'El acuerdo laboral no es válido' })
+  acuerdoLaboral?: AcuerdoLaboral;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El sueldo mensual debe ser un número' })
+  @Min(0)
+  @Max(1_000_000)
+  sueldoMensual?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'La tarifa por hora debe ser un número' })
+  @Min(0.01)
+  @Max(10_000)
+  tarifaHora?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  diasMes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(24)
+  horasDia?: number;
+
+  /** Celular de Yape/Plin (dato personal: no se imprime). */
+  @IsOptional()
+  @Matches(/^\+?\d{9,15}$/, { message: 'El celular de pago no es válido' })
+  pagoCelular?: string;
+
+  @IsOptional()
+  @IsIn(['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'], { message: 'El medio de pago no es válido' })
+  pagoMedio?: string;
+
+  /** Nombres de áreas de cocina (Bebidas, Salado, Postres, Repostería...). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  areasCocina?: string[];
 }

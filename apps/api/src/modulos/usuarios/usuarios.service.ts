@@ -47,6 +47,7 @@ import { deHora, guardarHorarioTx } from './horario.util';
 import { rolRecibeAvisosPorDefecto } from '../correo/roles-avisos';
 import { CORREO_REQUERIDO_AVISOS } from '../correo/avisos-mensajes';
 import { enmascararDni, generarClaveAleatoria } from './usuarios.util';
+import { DatosPlanillaImportacion, datosPlanilla, guardarDatosPlanillaTx } from './importar-planilla.util';
 import {
   ROLES_ALERTAS_WHATSAPP,
   calcularEstadoAlertas,
@@ -338,6 +339,8 @@ export class UsuariosService {
     ip: string | undefined,
     auditar: boolean,
     claveFija?: string,
+    /** Datos de planilla de la importación: se guardan en la misma transacción que la cuenta. */
+    planilla?: DatosPlanillaImportacion,
   ) {
     const { tipo: tipoDoc, numero: dniLimpio } = this.documentoDeDto(dto.tipoDocumento, dto.documento ?? dto.dni);
     const extras = this.rolesExtraValidos(dto.rol, dto.otrosRoles);
@@ -390,6 +393,7 @@ export class UsuariosService {
     const hash = await argon2.hash(claveInicial, { type: argon2.argon2id });
 
     let nuevo;
+    let avisosPlanilla: string[] = [];
     try {
       nuevo = await this.prisma.$transaction(async (tx) => {
         const party = reutilizarId
@@ -499,6 +503,9 @@ export class UsuariosService {
         if (dto.horarios || dto.reemplazos) {
           await guardarHorarioTx(tx, party.id, dto);
         }
+        if (planilla) {
+          avisosPlanilla = await guardarDatosPlanillaTx(tx, party.id, userAccount.id, dto.rol, fechaIngreso ?? hoyLima(), planilla);
+        }
 
         return { party, person, partyIdentifier, userAccount, avisosCorreo, horario247 };
       });
@@ -560,7 +567,7 @@ export class UsuariosService {
       activo: nuevo.userAccount.activo,
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
-      avisos,
+      avisos: [...avisos, ...avisosPlanilla],
     };
   }
 
@@ -616,6 +623,9 @@ export class UsuariosService {
       this.rolesExtraValidos(objeto.rol, objeto.otrosRoles);
       fechaDe(objeto.fechaIngreso, 'de ingreso');
       fechaDe(objeto.fechaReingreso, 'de reingreso');
+      if (objeto.sueldoMensual !== undefined && objeto.tarifaHora !== undefined) {
+        throw new BadRequestException({ codigo: 'SUELDO_Y_TARIFA', mensaje: 'Indica el sueldo mensual o la tarifa por hora, no ambos' });
+      }
       const existe = await this.prisma.partyIdentifier.findFirst({
         where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
         select: { id: true },
@@ -674,6 +684,7 @@ export class UsuariosService {
           ip,
           false,
           r.numero,
+          datosPlanilla(r.objeto!),
         );
         creadas++;
         resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos });
