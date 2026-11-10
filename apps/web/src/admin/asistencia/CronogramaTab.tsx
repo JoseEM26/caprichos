@@ -30,13 +30,13 @@ const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
 };
 const ETIQUETA_ORIGEN: Record<string, string> = { CELULAR: 'QR en el celular', WEB: 'Usuario y contraseña', CORRECCION: 'Corrección del admin' };
 
-const sumarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const rangoMes = (anio: number, mes: number) => {
+export const sumarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+export const rangoMes = (anio: number, mes: number) => {
   const dias = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
   const mm = String(mes).padStart(2, '0');
   return { desde: `${anio}-${mm}-01`, hasta: `${anio}-${mm}-${String(dias).padStart(2, '0')}` };
 };
-const etiquetaDia = (iso: string) => {
+export const etiquetaDia = (iso: string) => {
   const d = new Date(`${iso}T00:00:00Z`);
   return `${DIAS_CORTOS[(d.getUTCDay() + 6) % 7]} ${d.getUTCDate()} de ${NOMBRE_MES[d.getUTCMonth()]}`;
 };
@@ -190,7 +190,7 @@ function Calendario({ anio, mes, personas, seleccionado, alElegir }: { anio: num
 
 interface Seleccion { partyId: number; jornada: string; marcaId: number }
 
-function VistaDia({ personas, jornada, onError, onOk, recargar }: { personas: CronoPersona[]; jornada: string; onError: Avisar; onOk: Avisar; recargar: () => Promise<void> }) {
+export function VistaDia({ personas, jornada, onError, onOk, recargar }: { personas: CronoPersona[]; jornada: string; onError: Avisar; onOk: Avisar; recargar: () => Promise<void> }) {
   const [sel, setSel] = useState<Seleccion | null>(null);
   const filas = personas.map((p) => ({ p, d: p.dias.find((x) => x.jornada === jornada) })).filter((x): x is { p: CronoPersona; d: CronoDia } => Boolean(x.d));
   return (
@@ -217,7 +217,7 @@ function VistaDia({ personas, jornada, onError, onOk, recargar }: { personas: Cr
   );
 }
 
-function LineaTiempo({ persona, dia, seleccionada, alElegir, onError, onOk, recargar }: {
+export function LineaTiempo({ persona, dia, seleccionada, alElegir, onError, onOk, recargar }: {
   persona: CronoPersona; dia: CronoDia; seleccionada: number | null; alElegir: (id: number | null) => void; onError: Avisar; onOk: Avisar; recargar: () => Promise<void>;
 }) {
   const puntos = [

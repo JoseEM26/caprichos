@@ -115,3 +115,12 @@
 .ma-ganado-dia { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--cp-line); font-size: 14px; }
 .ma-ganado-dia small { color: var(--cp-soft); font-size: 12px; display: block; }
 .as-form-fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+
+/* Hoy compacto */
+.as-hoy-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.as-resumen--compacto { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.as-resumen--compacto .as-cifra { padding: 8px 12px; }
+.as-resumen--compacto .as-cifra strong { font-size: 22px; line-height: 24px; }
+.as-tabla--hoy th, .as-tabla--hoy td { padding: 6px 8px; }
+@media (min-width: 721px) and (max-width: 1100px) { .as-tabla--hoy th { white-space: normal; } }
+.as-vista { max-width: 1280px; }
