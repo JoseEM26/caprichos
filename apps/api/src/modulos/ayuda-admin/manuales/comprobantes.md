@@ -50,6 +50,7 @@ Ver tambien: [[cierre]]
 ## Errores y dudas comunes
 - Un pedido con Comprobante simple no tiene boleta ni factura: no sale en Por emitir ni en Electronicos SUNAT. Si el cliente la pide despues, usa Cambiar comprobante antes de cobrar.
 - Para emitir una factura, es requisito obligatorio contar con un RUC valido de 11 digitos que inicie con 10, 15, 17 o 20 y su correspondiente razon social.
+- En la carta, el cliente que pide factura solo escribe el RUC: la razon social y la direccion fiscal salen de SUNAT (se guardan en el sistema 30 dias) y no se pueden editar. Si SUNAT no responde, el cliente escribe la razon social a mano y queda sin verificar: revisala antes de emitir. Al crear o cambiar un comprobante en Caja, al completar el RUC la razon social se rellena sola y la puedes corregir.
 - La reimpresion de notas de venta deja huella en el sistema indicando cuantas veces se ha reimpreso el ticket para prevenir duplicidades en cobranza.
 - Si la ticketera no imprime, revisar que tenga papel y este encendida antes de reintentar la reimpresion.
 

@@ -136,10 +136,59 @@ describe('Checkout de la carta ▸ comprobante simple, boleta o factura', () => 
     expect(await screen.findByText(/RUC válido de 11 dígitos/)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
 
-    fireEvent.change(screen.getByLabelText(/RUC/i), { target: { value: '20123456789' } });
-    fireEvent.change(screen.getByLabelText(/Razón social/i), { target: { value: 'Acme SAC' } });
+    fireEvent.change(screen.getByLabelText(/RUC/i), { target: { value: '20131312955' } });
+    fireEvent.change(await screen.findByLabelText(/Razón social/i), { target: { value: 'Acme SAC' } });
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
     await waitFor(() => expect(comprobanteEnviado()).toBeDefined());
-    expect(comprobanteEnviado()).toMatchObject({ tipo: 'FACTURA', ruc: '20123456789', razonSocial: 'Acme SAC' });
+    expect(comprobanteEnviado()).toMatchObject({ tipo: 'FACTURA', ruc: '20131312955', razonSocial: 'Acme SAC' });
+  });
+
+  describe('factura con consulta de RUC a SUNAT', () => {
+    const sunat = (extra: object = {}) => ({
+      ruc: '20131312955', razon_social: 'SUNAT SA', estado: 'ACTIVO', condicion: 'HABIDO', direccion: 'AV. X 123', desactualizado: false, ...extra,
+    });
+    const escribirRuc = async () => {
+      abrirPedido(false);
+      await irAPago();
+      fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
+      fireEvent.change(screen.getByLabelText(/RUC/i), { target: { value: '20131312955' } });
+    };
+
+    it('muestra la razón social de SUNAT como solo lectura y la envía con la dirección fiscal', async () => {
+      vi.mocked(api.get).mockResolvedValue(sunat());
+      await escribirRuc();
+      expect(await screen.findByTestId('razon-verificada')).toHaveTextContent('SUNAT SA');
+      expect(screen.getByText(/Verificado en SUNAT/)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Razón social/i)).not.toBeInTheDocument();
+      expect(api.get).toHaveBeenCalledWith('/carta/ruc/20131312955');
+      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      await waitFor(() => expect(comprobanteEnviado()).toBeDefined());
+      expect(comprobanteEnviado()).toMatchObject({ tipo: 'FACTURA', ruc: '20131312955', razonSocial: 'SUNAT SA', direccion: 'AV. X 123' });
+    });
+
+    it('avisa sin bloquear cuando el RUC no está activo o habido', async () => {
+      vi.mocked(api.get).mockResolvedValue(sunat({ estado: 'BAJA DE OFICIO', condicion: 'NO HABIDO' }));
+      await escribirRuc();
+      expect(await screen.findByText(/la factura podría no ser válida/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      await waitFor(() => expect(comprobanteEnviado()).toBeDefined());
+    });
+
+    it('si SUNAT no está disponible permite escribir la razón social, marcada sin verificar', async () => {
+      vi.mocked(api.get).mockRejectedValue(new ErrorApi('RUC_NO_DISPONIBLE', 'no disponible', 503));
+      await escribirRuc();
+      fireEvent.change(await screen.findByLabelText(/Razón social/i), { target: { value: 'Mi Empresa' } });
+      expect(screen.getByText(/Sin verificar/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      await waitFor(() => expect(comprobanteEnviado()).toMatchObject({ razonSocial: 'Mi Empresa' }));
+    });
+
+    it('un RUC que SUNAT no reconoce bloquea el envío', async () => {
+      vi.mocked(api.get).mockRejectedValue(new ErrorApi('RUC_NO_ENCONTRADO', 'no', 404));
+      await escribirRuc();
+      expect(await screen.findByText(/SUNAT no reconoce este RUC: revísalo\./)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      expect(comprobanteEnviado()).toBeUndefined();
+    });
   });
 });

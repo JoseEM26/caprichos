@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { api } from '../../../comun/api';
 import {
   SelectorComprobante,
   VALOR_COMPROBANTE_VACIO,
@@ -117,5 +118,21 @@ describe('SelectorComprobante: tres opciones', () => {
     expect(screen.getByLabelText('RUC')).toBeTruthy();
     fireEvent.click(screen.getByTestId('comprobante-SIMPLE'));
     expect(screen.queryByLabelText('RUC')).toBeNull();
+  });
+});
+
+describe('SelectorComprobante ▸ autocompleta desde SUNAT', () => {
+  it('al completar un RUC rellena razón social y dirección (editables)', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ razon_social: 'SUNAT SA', direccion: 'AV. X 1' });
+    function Caja() {
+      const [valor, setValor] = useState<ValorComprobante>({ tipo: 'FACTURA', doc: '', razon: '', direccion: '' });
+      return <SelectorComprobante valor={valor} onChange={setValor} idPrefijo="t" />;
+    }
+    render(<Caja />);
+    fireEvent.change(screen.getByLabelText(/^RUC/), { target: { value: '20131312955' } });
+    await waitFor(() => expect((screen.getByLabelText(/Razón social/) as HTMLInputElement).value).toBe('SUNAT SA'));
+    expect(get).toHaveBeenCalledWith('/admin/ruc/20131312955');
+    expect((screen.getByLabelText(/Dirección fiscal/) as HTMLInputElement).value).toBe('AV. X 1');
+    get.mockRestore();
   });
 });
