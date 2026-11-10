@@ -122,6 +122,51 @@ describe('AccesoGuard', () => {
     );
   });
 
+  it('debe lanzar 401 SESION_CERRADA si el token se emitió antes de «Cerrar todas las sesiones»', async () => {
+    const { context } = crearContexto({ authorization: 'Bearer token-viejo' });
+    const cierre = new Date('2026-11-10T15:00:00Z');
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '10',
+      partyId: '10',
+      iat: Math.floor(cierre.getTime() / 1000) - 60, // un minuto antes
+    });
+    prisma.userAccount.findUnique.mockResolvedValue({
+      id: BigInt(1),
+      party_id: BigInt(10),
+      rol: 'CAJERO',
+      activo: true,
+      debe_cambiar: false,
+      sesiones_cerradas_en: cierre,
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      expect.objectContaining({
+        status: HttpStatus.UNAUTHORIZED,
+        response: { codigo: 'SESION_CERRADA', mensaje: 'Tu sesión fue cerrada. Ingresa de nuevo.' },
+      }),
+    );
+  });
+
+  it('un token emitido después del cierre sigue valiendo', async () => {
+    const { context } = crearContexto({ authorization: 'Bearer token-nuevo' });
+    const cierre = new Date('2026-11-10T15:00:00Z');
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '10',
+      partyId: '10',
+      iat: Math.floor(cierre.getTime() / 1000) + 30, // después
+    });
+    prisma.userAccount.findUnique.mockResolvedValue({
+      id: BigInt(1),
+      party_id: BigInt(10),
+      rol: 'CAJERO',
+      activo: true,
+      debe_cambiar: false,
+      sesiones_cerradas_en: cierre,
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
   it('debe lanzar 403 USUARIO_DESACTIVADO si user_account.activo es false', async () => {
     const { context } = crearContexto({
       authorization: 'Bearer token-valido',

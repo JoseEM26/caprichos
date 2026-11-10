@@ -403,6 +403,26 @@ export class AuthService {
     return { ok: true };
   }
 
+  /** Cierra TODAS las sesiones de la cuenta (todos los equipos): revoca los refresh y invalida los tokens ya emitidos. */
+  async salirTodas(partyId: bigint, ip?: string, dispositivo?: string): Promise<{ ok: boolean; cerradas: number }> {
+    const ahora = new Date();
+    const [, revocadas] = await this.prisma.$transaction([
+      this.prisma.userAccount.update({ where: { party_id: partyId }, data: { sesiones_cerradas_en: ahora } }),
+      this.prisma.sesion.updateMany({ where: { party_id: partyId, revocada_en: null }, data: { revocada_en: ahora } }),
+    ]);
+    await this.auditoria.registrar({
+      categoria: 'ACCESO',
+      modulo: 'acceso',
+      accion: 'SALIDA_TODAS',
+      resultado: 'OK',
+      partyId,
+      despues: { sesionesCerradas: revocadas.count },
+      ip,
+      dispositivo,
+    });
+    return { ok: true, cerradas: revocadas.count };
+  }
+
   async cambiarContrasena(
     partyId: bigint,
     dto: CambiarContrasenaDto,

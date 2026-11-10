@@ -238,6 +238,8 @@ model UserAccount {
   alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
   /// Recibe los avisos del sistema al equipo por correo (dentro de su horario).
   avisos_correo         Boolean                @default(false)
+  /// Cierre de TODAS las sesiones: ningún token de acceso emitido antes de este instante sigue valiendo.
+  sesiones_cerradas_en  DateTime?              @db.Timestamptz
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]

@@ -101,6 +101,8 @@ export function Perfil() {
   const [confirmarQuitar, setConfirmarQuitar] = useState(false);
 
   const [confirmarSalir, setConfirmarSalir] = useState(false);
+  const [confirmarSalirTodas, setConfirmarSalirTodas] = useState(false);
+  const [errorSalirTodas, setErrorSalirTodas] = useState('');
 
   useEffect(() => {
     let vivo = true;
@@ -257,6 +259,22 @@ export function Perfil() {
   };
 
   const cerrarSesion = async () => {
+    await salir();
+    navigate('/admin/ingresar', { replace: true });
+  };
+
+  // Cierra la sesión en TODOS los equipos (si olvidaste cerrarla en otro) y también en este
+  const cerrarTodasLasSesiones = async () => {
+    setProcesando(true);
+    setErrorSalirTodas('');
+    try {
+      await api.post('/auth/salir-todas');
+    } catch (err) {
+      setErrorSalirTodas(mensajeDe(err, 'No pudimos cerrar tus sesiones. Intenta de nuevo.'));
+      setProcesando(false);
+      setConfirmarSalirTodas(false);
+      return;
+    }
     await salir();
     navigate('/admin/ingresar', { replace: true });
   };
@@ -497,6 +515,19 @@ export function Perfil() {
             Cerrar sesión
           </Boton>
         </div>
+        <div style={{ marginTop: 12 }}>
+          <Boton variante="secundario" onClick={() => setConfirmarSalirTodas(true)} deshabilitado={procesando}>
+            Cerrar todas mis sesiones
+          </Boton>
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+            Si dejaste tu sesión abierta en otro equipo, esto la cierra en todos los equipos al instante, también en este.
+          </p>
+          {errorSalirTodas && (
+            <p role="alert" style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
+              {errorSalirTodas}
+            </p>
+          )}
+        </div>
       </Tarjeta>
 
       <Confirmar
@@ -528,6 +559,16 @@ export function Perfil() {
         cargando={procesando}
         alConfirmar={quitarFoto}
         alCancelar={() => setConfirmarQuitar(false)}
+      />
+      <Confirmar
+        abierto={confirmarSalirTodas}
+        titulo="Cerrar todas tus sesiones"
+        mensaje="Se cerrará tu sesión en todos los equipos, incluido este, y tendrás que ingresar de nuevo. ¿Continuar?"
+        textoSi="Sí, cerrar todas"
+        textoNo="No, quedarme"
+        cargando={procesando}
+        alConfirmar={cerrarTodasLasSesiones}
+        alCancelar={() => setConfirmarSalirTodas(false)}
       />
       <Confirmar
         abierto={confirmarSalir}

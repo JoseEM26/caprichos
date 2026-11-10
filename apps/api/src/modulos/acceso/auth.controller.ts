@@ -112,6 +112,22 @@ export class AuthController {
     return resultado;
   }
 
+  /** Cierra todas las sesiones abiertas de quien lo pide (por si dejó la sesión en otro equipo). */
+  @UseGuards(AccesoGuard)
+  @SoloCambioClave()
+  @Post('salir-todas')
+  async salirTodas(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const usuario = (req as any).usuario as UsuarioAutenticado;
+    const ip = (req.ip || req.headers['x-forwarded-for']) as string | undefined;
+    const dispositivo = req.headers['user-agent'] as string | undefined;
+    const resultado = await this.authService.salirTodas(usuario.partyId, ip, dispositivo);
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    for (const nombre of ['refreshToken', 'refresh_token']) {
+      res.clearCookie(nombre, { httpOnly: true, secure: isProduction, sameSite: 'strict', path: '/' });
+    }
+    return resultado;
+  }
+
   @UseGuards(AccesoGuard)
   @SoloCambioClave()
   @Get('yo')
