@@ -9,6 +9,7 @@ import { AsistenciaController } from './asistencia.controller';
 import { AsistenciaPantallaPublicaController } from './asistencia-pantalla.controller';
 import { PlanillaController } from './planilla.controller';
 import { PlanillaService } from './planilla.service';
+import { PrestamosService } from './prestamos.service';
 import { AsistenciaService } from './asistencia.service';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaSelfiesTarea } from './asistencia-selfies.tarea';
@@ -16,7 +17,7 @@ import { AsistenciaSelfiesTarea } from './asistencia-selfies.tarea';
 @Module({
   imports: [ArchivosModule],
   controllers: [AsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, FeriadosController, VinculoController],
-  providers: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea],
+  providers: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea],
   exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, VacacionesService],
 })
 export class AsistenciaModule {}

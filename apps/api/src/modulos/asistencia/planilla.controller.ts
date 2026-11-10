@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, PlanillaFechaDto, ReabrirPlanillaDto, SueldoDto } from './dto/planilla.dto';
+import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SueldoDto } from './dto/planilla.dto';
 import { jornadaDe } from './asistencia.calculo';
 import { PlanillaService } from './planilla.service';
+import { PrestamosService } from './prestamos.service';
 
 const ipDe = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -14,7 +15,10 @@ const ipDe = (req: any): string | undefined => {
 @Controller('admin/planilla')
 @UseGuards(AccesoGuard)
 export class PlanillaController {
-  constructor(private readonly planilla: PlanillaService) {}
+  constructor(
+    private readonly planilla: PlanillaService,
+    private readonly prestamos: PrestamosService,
+  ) {}
 
   @Get()
   @Permiso('planilla', 'ver')
@@ -25,7 +29,10 @@ export class PlanillaController {
   @Get('persona/:partyId')
   @Permiso('planilla', 'ver')
   detalle(@Param('partyId') partyId: string, @Query() q: PlanillaFechaDto) {
-    return this.planilla.detalle(Number(partyId), q.fecha ?? jornadaDe(new Date()).jornada, q.excluir ? q.excluir.split(',').filter(Boolean) : []);
+    return this.planilla.detalle(Number(partyId), q.fecha ?? jornadaDe(new Date()).jornada, q.excluir ? q.excluir.split(',').filter(Boolean) : [], new Date(), {
+      cuotas: q.omitirCuotas ? q.omitirCuotas.split(',').filter(Boolean) : [],
+      recurrentes: q.omitirRecurrentes ? q.omitirRecurrentes.split(',').filter(Boolean) : [],
+    });
   }
 
   @Get('persona/:partyId/historial')
@@ -58,6 +65,12 @@ export class PlanillaController {
     return this.planilla.crearAjuste('DESCUENTO', dto, req.usuario, ipDe(req));
   }
 
+  @Post('bonos')
+  @Permiso('planilla', 'administrar')
+  bono(@Body() dto: AjusteDto, @Req() req: any) {
+    return this.planilla.crearAjuste('BONO', dto, req.usuario, ipDe(req));
+  }
+
   @Post('ajustes/:id/anular')
   @Permiso('planilla', 'administrar')
   anular(@Param('id') id: string, @Body() dto: AnularAjusteDto, @Req() req: any) {
@@ -73,12 +86,47 @@ export class PlanillaController {
   @Post('pagar')
   @Permiso('planilla', 'administrar')
   pagar(@Body() dto: PagarPlanillaDto, @Req() req: any) {
-    return this.planilla.pagar(dto.partyId, dto.fecha, dto.excluirConsumoIds ?? [], req.usuario, ipDe(req));
+    return this.planilla.pagar(dto.partyId, dto.fecha, dto.excluirConsumoIds ?? [], req.usuario, ipDe(req), new Date(), {
+      cuotas: dto.omitirCuotaIds ?? [],
+      recurrentes: dto.omitirRecurrenteIds ?? [],
+    });
   }
 
   @Post('periodos/:id/reabrir')
   @Permiso('planilla', 'administrar')
   reabrir(@Param('id') id: string, @Body() dto: ReabrirPlanillaDto, @Req() req: any) {
     return this.planilla.reabrir(Number(id), dto.motivo, req.usuario, ipDe(req));
+  }
+
+  // Préstamos con cuotas y descuentos recurrentes (Netflix)
+
+  @Get('persona/:partyId/prestamos')
+  @Permiso('planilla', 'ver')
+  verPrestamos(@Param('partyId') partyId: string) {
+    return this.prestamos.listar(Number(partyId));
+  }
+
+  @Post('prestamos')
+  @Permiso('planilla', 'administrar')
+  crearPrestamo(@Body() dto: PrestamoDto, @Req() req: any) {
+    return this.prestamos.crear(dto, req.usuario, ipDe(req));
+  }
+
+  @Post('prestamos/:id/anular')
+  @Permiso('planilla', 'administrar')
+  anularPrestamo(@Param('id') id: string, @Body() dto: AnularAjusteDto, @Req() req: any) {
+    return this.prestamos.anular(Number(id), dto.motivo, req.usuario, ipDe(req));
+  }
+
+  @Post('recurrentes')
+  @Permiso('planilla', 'administrar')
+  crearRecurrente(@Body() dto: RecurrenteDto, @Req() req: any) {
+    return this.prestamos.crearRecurrente(dto, req.usuario, ipDe(req));
+  }
+
+  @Put('recurrentes/:id')
+  @Permiso('planilla', 'administrar')
+  editarRecurrente(@Param('id') id: string, @Body() dto: RecurrenteEditarDto, @Req() req: any) {
+    return this.prestamos.editarRecurrente(Number(id), dto, req.usuario, ipDe(req));
   }
 }

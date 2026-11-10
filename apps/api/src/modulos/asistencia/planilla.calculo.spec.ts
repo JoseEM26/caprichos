@@ -6,6 +6,9 @@ import {
   sueldoEquivalente,
   DiaPlanilla,
   pagoDia,
+  pagoPorDiaPersona,
+  PCT_TARDANZA_DEFECTO,
+  valorHoraPersona,
 } from './planilla.calculo';
 
 const dia = (over: Partial<DiaPlanilla> = {}): DiaPlanilla => ({
@@ -146,5 +149,70 @@ describe('feriados (recargo del valor hora)', () => {
   });
   it('la hora extra aprobada no lleva recargo', () => {
     expect(pagoDia(dia({ extraMin: 60, recargo: 2 }), 20, 50, true)).toBe(20);
+  });
+});
+
+describe('valor hora por persona (planilla estilo Excel)', () => {
+  const dias = [dia({ programadaMin: 540, trabajadaMin: 625 })]; // 10 h 25 min
+
+  it('DIAS_HORAS: 1500 ÷ 24 ÷ 9 = 6.9444…/h y 10 h 25 min = 72.34', () => {
+    const vh = valorHoraPersona({ metodo: 'DIAS_HORAS', sueldoMensual: 1500 })!;
+    expect(vh).toBeCloseTo(6.9444, 4);
+    const r = calcularPlanilla({ ...base, sueldoPeriodo: 1500, dias, valorHora: vh });
+    expect(r.valorHora).toBe(6.94);
+    expect(r.ganado).toBe(72.34); // se calcula con el valor hora sin redondear (con 6.94 saldría 72.29)
+  });
+
+  it('÷ 8 por persona, defectos 24 y 9, y pago por día', () => {
+    expect(valorHoraPersona({ metodo: 'DIAS_HORAS', sueldoMensual: 1200, horasDia: 8 })).toBeCloseTo(6.25, 6);
+    expect(valorHoraPersona({ metodo: 'DIAS_HORAS', sueldoMensual: 1080, diasMes: 30, horasDia: 9 })).toBeCloseTo(4, 6);
+    expect(pagoPorDiaPersona({ metodo: 'DIAS_HORAS', sueldoMensual: 1500 })).toBe(62.5);
+  });
+
+  it('TARIFA_HORA fija por hora (sin sueldo) y PROGRAMADAS depende de las horas del período', () => {
+    expect(valorHoraPersona({ metodo: 'TARIFA_HORA', sueldoMensual: 0, tarifaHora: 15 })).toBe(15);
+    expect(valorHoraPersona({ metodo: 'PROGRAMADAS', sueldoMensual: 1000 })).toBeNull();
+    expect(pagoPorDiaPersona({ metodo: 'TARIFA_HORA', sueldoMensual: 0, tarifaHora: 15 })).toBeNull();
+  });
+
+  it('PROGRAMADAS no cambia: sueldo ÷ horas programadas y la extra ×1', () => {
+    const d = [dia({ programadaMin: 3000, trabajadaMin: 1800, extraMin: 60 })];
+    const r = calcularPlanilla({ ...base, sueldoPeriodo: 1000, dias: d, extrasAprobadas: new Set(['2026-11-02']) });
+    expect(r.valorHora).toBe(20);
+    expect(r.pagoExtra).toBe(20);
+  });
+
+  it('hora extra aprobada ×1.25 y solo si se aprueba', () => {
+    const d = [dia({ programadaMin: 540, trabajadaMin: 540, extraMin: 60 })];
+    const aprobada = calcularPlanilla({ ...base, sueldoPeriodo: 0, dias: d, valorHora: 8, multiplicadorExtra: 1.25, extrasAprobadas: new Set(['2026-11-02']) });
+    expect(aprobada.pagoExtra).toBe(10);
+    expect(pagoDia(d[0], 8, 0, true, 1.25)).toBe(82);
+    expect(calcularPlanilla({ ...base, sueldoPeriodo: 0, dias: d, valorHora: 8, multiplicadorExtra: 1.25 }).pagoExtra).toBe(0);
+  });
+
+  it('tardanza al 0 %: solo se pagan los minutos trabajados', () => {
+    const d = [dia({ programadaMin: 540, trabajadaMin: 510, tardanzaMin: 30 })];
+    const r = calcularPlanilla({ ...base, pctTardanza: PCT_TARDANZA_DEFECTO, sueldoPeriodo: 0, dias: d, valorHora: 6 });
+    expect(PCT_TARDANZA_DEFECTO).toBe(0);
+    expect(r.pagoTardanza).toBe(0);
+    expect(r.ganado).toBe(51);
+  });
+
+  it('neto estilo Excel: total + adicional − descuentos por etiqueta; diferencia = neto − adelantos', () => {
+    const d = [dia({ programadaMin: 540, trabajadaMin: 540 })];
+    const r = calcularPlanilla({
+      ...base,
+      sueldoPeriodo: 0,
+      dias: d,
+      valorHora: 10,
+      bonos: [20],
+      lineasDescuento: [{ categoria: 'NETFLIX', monto: 1.64 }, { categoria: 'MERMA', monto: 10 }, { categoria: 'MERMA', monto: 5 }],
+      consumos: [{ id: '1', monto: 8, cobrar: true }],
+      adelantos: [30],
+    });
+    expect(r.ganado).toBe(90);
+    expect(r.descuentosPorCategoria).toEqual({ CONSUMO: 8, NETFLIX: 1.64, MERMA: 15 });
+    expect(r.netoAPagar).toBe(85.36); // 90 + 20 − 8 − 16.64
+    expect(r.neto).toBe(55.36);
   });
 });

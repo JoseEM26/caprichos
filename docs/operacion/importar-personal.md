@@ -28,6 +28,7 @@ nombres,apellidos,tipo_documento,documento,celular,fecha_nacimiento,fecha_ingres
 - Historial laboral: `fecha_ingreso` abre el primer periodo trabajado. Si hay `fecha_reingreso`, el primer periodo queda cerrado el día anterior al reingreso y el segundo queda abierto; la fila sale con el aviso «Fecha de salida no registrada: corregir en el historial laboral», porque la salida no está en el CSV. Con `activo = no` la persona queda en licencia (periodo abierto, cuenta inactiva).
 - `roles_extra`: roles adicionales separados por `|`, p. ej. `MOZO|ALMACEN`.
 - `activo`: `si` o `no` (vacío = si).
+- Columnas opcionales de planilla (área, casillas de roles, acuerdo laboral, sueldo, tarifa por hora, datos de pago, licencia): ver [importar-personal-columnas.md](./importar-personal-columnas.md), con la correspondencia columna del Excel a columna del CSV.
 
 ## Pasos
 

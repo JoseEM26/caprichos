@@ -97,6 +97,10 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
       userAccountRol: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
       userAccountRolHistorial: { create: jest.fn().mockResolvedValue({}) },
       partyRole: { create: jest.fn().mockResolvedValue({}) },
+      vinculoPersonal: { create: jest.fn().mockResolvedValue({}) },
+      sueldoPersonal: { create: jest.fn().mockResolvedValue({}) },
+      areaCocina: { findMany: jest.fn().mockResolvedValue([{ id: 5n, nombre: 'Repostería' }, { id: 6n, nombre: 'Bebidas' }]) },
+      userAccountArea: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
     prismaMock = {
       partyIdentifier: {
@@ -221,5 +225,43 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
     await expect(service.importarPersonal(muchas as any, { simular: true })).rejects.toMatchObject({
       response: { codigo: 'DEMASIADAS_FILAS' },
     });
+  });
+
+  it('importar con datos de planilla: vínculo, sueldo DIAS_HORAS, pago y áreas de cocina en la misma transacción', async () => {
+    const filas = [
+      {
+        nombres: 'Ana', apellidos: 'Ruiz', tipoDocumento: 'CE', documento: 'AB12345', rol: 'COCINA', fechaIngreso: '2024-07-02',
+        area: 'Postres', acuerdoLaboral: 'TERCERIZADO_MENSUAL', sueldoMensual: 1500, pagoCelular: '999000111', pagoMedio: 'YAPE',
+        areasCocina: ['Reposteria', 'Salado'],
+      },
+    ];
+    const r: any = await service.importarPersonal(filas as any, { simular: false });
+    expect(r.resultados[0]).toMatchObject({ estado: 'CREADA', avisos: [expect.stringContaining('Salado')] });
+    expect(tx.vinculoPersonal.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tipo: 'CONTRATO_TEMPORAL', regimen_vacaciones: null, notas: 'Área: Postres · Acuerdo: Tercerizado Mensual' }),
+    });
+    expect(tx.sueldoPersonal.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ modalidad: 'MENSUAL', monto_mensual: 1500, monto_semanal: 346.15, metodo_valor_hora: 'DIAS_HORAS', pago_medio: 'YAPE' }),
+    });
+    expect(tx.userAccountArea.createMany).toHaveBeenCalledWith({ data: [{ user_account_id: 50n, area_id: 5n }] });
+    // La auditoría no lleva el celular de pago ni el sueldo
+    expect(JSON.stringify(auditoriaMock.registrar.mock.calls, (_k, v) => (typeof v === 'bigint' ? String(v) : v))).not.toMatch(/999000111|1500/);
+  });
+
+  it('importar con tarifa por hora: sueldo TARIFA_HORA sin mensual; sin planilla no toca vínculo ni sueldo', async () => {
+    const conTarifa = [{ nombres: 'Eva', apellidos: 'Ros', documento: '11223344', rol: 'MOZO', acuerdoLaboral: 'TIEMPO_PARCIAL', tarifaHora: 15 }];
+    await service.importarPersonal(conTarifa as any, { simular: false });
+    expect(tx.vinculoPersonal.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'PLANILLA', regimen_vacaciones: 30 }) });
+    expect(tx.sueldoPersonal.create).toHaveBeenCalledWith({ data: expect.objectContaining({ monto_mensual: 0, metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: 15 }) });
+    tx.vinculoPersonal.create.mockClear();
+    tx.sueldoPersonal.create.mockClear();
+    await service.importarPersonal([{ nombres: 'Sin', apellidos: 'Planilla', documento: '22334455', rol: 'MOZO' }] as any, { simular: false });
+    expect(tx.vinculoPersonal.create).not.toHaveBeenCalled();
+    expect(tx.sueldoPersonal.create).not.toHaveBeenCalled();
+  });
+
+  it('importar: sueldo y tarifa a la vez es error de la fila', async () => {
+    const r: any = await service.importarPersonal([{ nombres: 'A', apellidos: 'B', documento: '33445566', rol: 'MOZO', sueldoMensual: 1000, tarifaHora: 10 }] as any, { simular: true });
+    expect(r.resultados[0]).toMatchObject({ estado: 'ERROR', motivo: expect.stringMatching(/no ambos/) });
   });
 });

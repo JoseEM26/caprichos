@@ -4,6 +4,9 @@
  * Entrada (una de las dos): --archivo <ruta.csv>  o  --desde-env PERSONAL_CSV_B64 (CSV en base64 dentro de esa variable).
  * Columnas: nombres, apellidos, tipo_documento, documento, celular, fecha_nacimiento, fecha_ingreso,
  *           fecha_reingreso, pais_nacimiento, rol_principal, roles_extra (separados por |), activo (si/no).
+ * Columnas OPCIONALES de planilla (el CSV anterior sigue valiendo): area, casillas_roles (separadas por |),
+ *           acuerdo_laboral, sueldo_mensual, tarifa_hora, dias_mes, horas_dia, pago_celular, pago_medio, licencia (si/no).
+ *           Correspondencia con el Excel del dueño: docs/operacion/importar-personal-columnas.md
  *
  * Por defecto es SIMULACRO: no escribe nada. Imprime por fila «crear», «ya existe» o «error: motivo» con nombre y rol.
  * Nunca imprime documentos, celulares ni claves.
@@ -91,6 +94,48 @@ export function parsearCsv(texto: string): string[][] {
 
 const COLUMNAS_OBLIGATORIAS = ['nombres', 'apellidos', 'documento', 'rol_principal'];
 
+/**
+ * Casillas de rol del Excel -> rol del sistema (y área de cocina si aplica). Una casilla no listada es un error de la fila.
+ * Delivery (REPARTIDOR) no se combina con otros roles. Los textos se comparan sin tildes ni mayúsculas.
+ */
+export const CASILLAS_ROL: Record<string, { rol: string; areaCocina?: string }> = {
+  despacho: { rol: 'MOZO' },
+  mozo: { rol: 'MOZO' },
+  caja: { rol: 'CAJERO' },
+  bebidas: { rol: 'COCINA', areaCocina: 'Bebidas' },
+  salado: { rol: 'COCINA', areaCocina: 'Salado' },
+  postres: { rol: 'COCINA', areaCocina: 'Postres' },
+  reposteria: { rol: 'COCINA', areaCocina: 'Repostería' },
+  almacen: { rol: 'ALMACEN' },
+  delivery: { rol: 'REPARTIDOR' },
+  supervision: { rol: 'SUPERVISOR' },
+};
+/** Orden para elegir el rol principal cuando solo vienen casillas. */
+const PRIORIDAD_ROL = ['CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'SUPERVISOR', 'REPARTIDOR'];
+
+/**
+ * Áreas del Excel sin trabajo operativo: sin casillas de rol no se crea cuenta (así no marcan asistencia ni entran a planilla
+ * por error). Lo más seguro: omitir la fila y decirlo; el ADMIN las crea a mano si hacen falta.
+ */
+export const AREAS_ADMINISTRATIVAS = ['alquiler local', 'marketing', 'contabilidad', 'administracion'];
+
+const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+const ACUERDOS: Record<string, string> = {
+  'tiempo parcial': 'TIEMPO_PARCIAL',
+  'tiempo completo': 'TIEMPO_COMPLETO',
+  'tercerizado mensual': 'TERCERIZADO_MENSUAL',
+  tercerizado: 'TERCERIZADO_MENSUAL',
+};
+
+/** «S/ 1,500.00», «1500,50», «1 500» → número; null si no es un monto. */
+export function aMonto(v: string): number | null {
+  const t = v.replace(/s\/\.?/i, '').replace(/\s/g, '');
+  if (!t) return null;
+  const normal = t.includes(',') && t.includes('.') ? t.replace(/,/g, '') : t.replace(',', '.');
+  return /^\d+(\.\d+)?$/.test(normal) ? Number(normal) : null;
+}
+
 export interface FilaCsv {
   /** Número de línea en el archivo (la cabecera es la 1). */
   linea: number;
@@ -101,6 +146,8 @@ export interface FilaCsv {
   /** Fila para el servicio; null si el formato de la línea no sirve. */
   fila: Record<string, unknown> | null;
   errorFormato?: string;
+  /** La fila no crea cuenta a propósito (área administrativa sin rol operativo). */
+  omitida?: string;
 }
 
 /** «Call Center» / CALLCENTER ya no existe: se importa como MOZO (y se avisa en el simulacro). */
@@ -110,7 +157,8 @@ function mapearRolEliminado(rol: string): string {
 
 /** Convierte el CSV en filas para el servicio. Error de cabecera = el archivo no se puede usar. */
 /** dd/mm/aaaa (o d/m/aaaa) pasa a aaaa-mm-dd; lo demás queda igual y lo valida el DTO. */
-function aIso(v: string): string {
+function aIso(v: string | undefined): string {
+  v = v ?? '';
   const m = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : v;
 }
@@ -128,8 +176,14 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
     const opt = (k: string, valor: string) => (valor ? { [k]: valor } : {});
     const activoTexto = r.activo?.toLowerCase() ?? '';
     const nombre = `${r.nombres} ${r.apellidos}`.trim();
-    const rolPrincipal = mapearRolEliminado(r.rol_principal ?? '');
-    const extras = (r.roles_extra ?? '').split('|').map((x) => mapearRolEliminado(x.trim()).toUpperCase()).filter(Boolean);
+    // Casillas de rol del Excel (opcionales): se suman a rol_principal / roles_extra, o los deducen si vienen vacíos
+    const casillas = (r.casillas_roles ?? '').split('|').map((x) => sinTildes(x)).filter(Boolean);
+    const desconocida = casillas.find((c) => !CASILLAS_ROL[c]);
+    const deCasillas = casillas.filter((c) => CASILLAS_ROL[c]).map((c) => CASILLAS_ROL[c]);
+    const rolesCasillas = [...new Set(deCasillas.map((c) => c.rol))].sort((a, b) => PRIORIDAD_ROL.indexOf(a) - PRIORIDAD_ROL.indexOf(b));
+    const areasCocina = [...new Set(deCasillas.map((c) => c.areaCocina).filter((x): x is string => Boolean(x)))];
+    const rolPrincipal = mapearRolEliminado(r.rol_principal ?? '') || (rolesCasillas[0] ?? '');
+    const extras = [...(r.roles_extra ?? '').split('|').map((x) => mapearRolEliminado(x.trim()).toUpperCase()).filter(Boolean), ...rolesCasillas.filter((x) => x !== rolPrincipal.toUpperCase())];
     const huboCallCenter = [r.rol_principal ?? '', ...(r.roles_extra ?? '').split('|')].some((x) => mapearRolEliminado(x) !== x);
     const base = {
       linea: i + 2,
@@ -140,8 +194,34 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
     if (activoTexto && activoTexto !== 'si' && activoTexto !== 'no') {
       return { ...base, fila: null, errorFormato: 'activo debe ser si o no' };
     }
+    if (desconocida) return { ...base, fila: null, errorFormato: `casilla de rol desconocida: ${desconocida}` };
+    if (!rolPrincipal && AREAS_ADMINISTRATIVAS.includes(sinTildes(r.area ?? ''))) {
+      return { ...base, rol: '', fila: null, omitida: `área administrativa «${r.area}» sin rol operativo: no se crea cuenta` };
+    }
+    if (!rolPrincipal) return { ...base, fila: null, errorFormato: 'falta el rol (rol_principal o casillas_roles)' };
+    // Delivery no se combina: pedirlo junto a otros roles es ambiguo, se deja al ADMIN decidir
+    if ([rolPrincipal.toUpperCase(), ...extras].includes('REPARTIDOR') && extras.length > 0) {
+      return { ...base, fila: null, errorFormato: 'Delivery (REPARTIDOR) no se combina con otros roles: separa la fila' };
+    }
+    const acuerdoTexto = sinTildes(r.acuerdo_laboral ?? '');
+    if (acuerdoTexto && !ACUERDOS[acuerdoTexto]) {
+      return { ...base, fila: null, errorFormato: 'acuerdo_laboral debe ser Tiempo Parcial, Tiempo Completo o Tercerizado Mensual' };
+    }
+    const sueldo = r.sueldo_mensual ? aMonto(r.sueldo_mensual) : null;
+    const tarifa = r.tarifa_hora ? aMonto(r.tarifa_hora) : null;
+    if ((r.sueldo_mensual && sueldo === null) || (r.tarifa_hora && tarifa === null)) {
+      return { ...base, fila: null, errorFormato: 'sueldo_mensual / tarifa_hora deben ser un monto' };
+    }
+    // Reingreso: una fecha, «NO» (no reingresó) o «LICENCIA SIN GOCE» (periodo abierto con la cuenta inactiva)
+    const reingresoTexto = sinTildes(r.fecha_reingreso ?? '');
+    const licencia = (r.licencia ?? '').toLowerCase() === 'si' || reingresoTexto.startsWith('licencia');
+    const reingreso = reingresoTexto === 'no' || reingresoTexto.startsWith('licencia') ? '' : aIso(r.fecha_reingreso ?? '');
+    const celularPago = (r.pago_celular ?? '').replace(/[\s-]/g, '');
+    const medioPago = (r.pago_medio ?? '').toUpperCase();
+    const avisosPlanilla = licencia ? { avisoRol: [base.avisoRol, 'en licencia sin goce: cuenta inactiva con el periodo laboral abierto'].filter(Boolean).join('; ') } : {};
     return {
       ...base,
+      ...avisosPlanilla,
       fila: {
         nombres: r.nombres,
         apellidos: r.apellidos,
@@ -150,11 +230,20 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
         rol: rolPrincipal,
         // Si el rol viejo ya estaba como MOZO, no se repite
         otrosRoles: extras.filter((x, k) => x !== rolPrincipal && extras.indexOf(x) === k),
-        activo: activoTexto !== 'no',
+        activo: activoTexto !== 'no' && !licencia,
         ...opt('celular', r.celular),
+        ...opt('area', r.area ?? ''),
+        ...(acuerdoTexto ? { acuerdoLaboral: ACUERDOS[acuerdoTexto] } : {}),
+        ...(sueldo !== null ? { sueldoMensual: sueldo } : {}),
+        ...(tarifa !== null ? { tarifaHora: tarifa } : {}),
+        ...(r.dias_mes ? { diasMes: Number(r.dias_mes) } : {}),
+        ...(r.horas_dia ? { horasDia: aMonto(r.horas_dia) ?? Number.NaN } : {}),
+        ...opt('pagoCelular', celularPago),
+        ...opt('pagoMedio', medioPago),
+        ...(areasCocina.length ? { areasCocina } : {}),
         ...opt('fechaNacimiento', aIso(r.fecha_nacimiento)),
-        ...opt('fechaIngreso', r.fecha_ingreso),
-        ...opt('fechaReingreso', r.fecha_reingreso),
+        ...opt('fechaIngreso', aIso(r.fecha_ingreso ?? '')),
+        ...opt('fechaReingreso', reingreso),
         ...opt('paisNacimiento', r.pais_nacimiento),
       },
     };
@@ -201,7 +290,10 @@ export async function ejecutarImportacion(
     let estado: string;
     let motivo: string | undefined;
     let avisos: string[] = [];
-    if (f.fila === null) {
+    if (f.omitida) {
+      estado = 'OMITIDA';
+      motivo = f.omitida;
+    } else if (f.fila === null) {
       estado = 'ERROR';
       motivo = f.errorFormato;
     } else {
@@ -212,7 +304,7 @@ export async function ejecutarImportacion(
     }
     cuenta[estado] = (cuenta[estado] ?? 0) + 1;
     const descripcion =
-      estado === 'ERROR' ? `error: ${motivo ?? 'no se pudo revisar'}` : (etiqueta[estado] ?? estado.toLowerCase());
+      estado === 'ERROR' ? `error: ${motivo ?? 'no se pudo revisar'}` : estado === 'OMITIDA' ? `omitida: ${motivo}` : (etiqueta[estado] ?? estado.toLowerCase());
     const todosAvisos = f.avisoRol ? [f.avisoRol, ...avisos] : avisos;
     const aviso = todosAvisos.length ? ` · aviso: ${todosAvisos.join('; ')}` : '';
     salida(`fila ${f.linea}: ${descripcion} — ${f.nombre} (${f.rol || 'sin rol'})${aviso}`);
@@ -222,6 +314,7 @@ export async function ejecutarImportacion(
     `${aplicar ? 'creadas' : 'crear'} ${aplicar ? cuenta.CREADA ?? 0 : cuenta.OK ?? 0}`,
     `ya existe ${cuenta.YA_EXISTE ?? 0}`,
     `repetidas ${cuenta.DUPLICADO_EN_ARCHIVO ?? 0}`,
+    `omitidas ${cuenta.OMITIDA ?? 0}`,
     `error ${cuenta.ERROR ?? 0}`,
   ];
   salida(`Resumen: ${resumen.join(' · ')}`);

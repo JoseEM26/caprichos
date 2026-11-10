@@ -6,13 +6,19 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { Tarjeta } from '../../comun/Tarjeta';
+import { copiarAlPortapapeles } from '../comprobantes/utilidades';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
 import { ETIQUETA_ROL, ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
+import { PrestamosPersona } from './PrestamosPersona';
 import { PestanaVinculoVacaciones } from './VinculoVacaciones';
 import { ETIQUETA_VINCULO } from './vinculoApi';
 import {
+  CATEGORIAS_DESCUENTO,
   DetallePlanilla,
+  ETIQUETA_CATEGORIA,
   FilaPlanilla,
+  PagoPersona,
+  ResumenExcel,
   anularAjuste,
   aprobarExtra,
   crearAjuste,
@@ -58,26 +64,28 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas">
             <thead>
-              <tr><th>Persona</th><th>Vínculo</th><th>Modalidad</th><th>Sueldo semanal</th><th>Sueldo mensual</th><th>Período</th><th>Horas prog.</th><th>Horas trab.</th><th>Ganado</th><th>Consumos</th><th>Descuentos</th><th>Adelantos</th><th>Neto</th><th>Estado</th><th /></tr>
+              <tr><th>Persona</th><th>Vínculo</th><th>Sueldo mensual</th><th>Período</th><th>Pago por día</th><th>Valor hora</th><th>Horas y min. laborados</th><th>Horas extra</th><th>Total</th><th>Adicional</th><th>Descuentos</th><th>Neto a pagar</th><th>Adelanto</th><th>Diferencia a pagar</th><th>Pago</th><th>Estado</th><th /></tr>
             </thead>
             <tbody>
               {filas.map((f) => (
                 <tr key={f.partyId}>
                   <td data-label="Persona" className="as-nombre">{f.nombre}</td>
                   <td data-label="Vínculo">{f.vinculo ? ETIQUETA_VINCULO[f.vinculo.tipo] : '—'}</td>
-                  <td data-label="Modalidad">{f.sueldo ? (f.sueldo.modalidad === 'SEMANAL' ? 'Semanal' : 'Mensual') : <Insignia variante="aviso">Sin sueldo</Insignia>}</td>
-                  <td data-label="Sueldo semanal" className="as-num">{soles(f.sueldo?.semanal)}</td>
-                  <td data-label="Sueldo mensual" className="as-num">{soles(f.sueldo?.mensual)}</td>
+                  <td data-label="Sueldo mensual" className="as-num">{f.sueldo ? (f.sueldo.metodo === 'TARIFA_HORA' ? 'Por hora' : soles(f.sueldo.mensual)) : <Insignia variante="aviso">Sin sueldo</Insignia>}</td>
                   <td data-label="Período" className="as-num">{f.periodo ? `${f.periodo.desde} a ${f.periodo.hasta}` : '—'}</td>
-                  <td data-label="Horas prog." className="as-num">{f.programadasH ?? '—'}</td>
-                  <td data-label="Horas trab." className="as-num">{f.trabajadasH ?? '—'}</td>
-                  <td data-label="Ganado" className="as-num">{soles(f.ganado)}</td>
-                  <td data-label="Consumos" className="as-num">{soles(f.consumos)}</td>
-                  <td data-label="Descuentos" className="as-num">{soles(f.descuentos)}</td>
-                  <td data-label="Adelantos" className="as-num">{soles(f.adelantos)}</td>
-                  <td data-label="Neto" className="as-num"><strong>{soles(f.neto)}</strong></td>
+                  <td data-label="Pago por día" className="as-num">{soles(f.excel?.pagoPorDia)}</td>
+                  <td data-label="Valor hora" className="as-num">{soles(f.excel?.valorHora)}</td>
+                  <td data-label="Horas y min. laborados" className="as-num">{f.excel ? `${f.excel.horasLaboradas} h ${f.excel.minutosLaborados} min` : '—'}</td>
+                  <td data-label="Horas extra" className="as-num">{f.excel ? `${f.excel.horasExtra} h` : '—'}</td>
+                  <td data-label="Total" className="as-num">{soles(f.excel?.total ?? f.ganado)}</td>
+                  <td data-label="Adicional" className="as-num">{soles(f.excel?.adicional)}</td>
+                  <td data-label="Descuentos" className="as-num">{f.excel ? <ResumenDescuentos porCategoria={f.excel.descuentosPorCategoria} total={f.excel.descuentos} /> : soles(f.descuentos)}</td>
+                  <td data-label="Neto a pagar" className="as-num">{soles(f.excel?.netoAPagar)}</td>
+                  <td data-label="Adelanto" className="as-num">{soles(f.excel?.adelanto ?? f.adelantos)}</td>
+                  <td data-label="Diferencia a pagar" className="as-num"><strong>{soles(f.excel?.diferencia ?? f.neto)}</strong></td>
+                  <td data-label="Pago">{f.pago ? <DatosPago pago={f.pago} onOk={onOk} /> : '—'}</td>
                   <td data-label="Estado">
-                    {f.estado === 'PAGADO' ? <Insignia variante="exito">Pagado</Insignia> : f.estado ? (
+                    {f.estado === 'PAGADO' ? <Insignia variante="exito">LIQUIDADO</Insignia> : f.estado ? (
                       f.pendientes ? <Insignia variante="aviso">{f.pendientes} por revisar</Insignia> : <Insignia variante="neutro">Abierto</Insignia>
                     ) : '—'}
                   </td>
@@ -108,10 +116,13 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
   const [d, setD] = useState<DetallePlanilla | null>(null);
   // Consumos que pasan al siguiente período (el resto se cobra en este pago)
   const [excluidos, setExcluidos] = useState<string[]>([]);
+  // Cuotas de préstamo y descuentos recurrentes que NO se cobran en este pago
+  const [omitCuotas, setOmitCuotas] = useState<string[]>([]);
+  const [omitRec, setOmitRec] = useState<string[]>([]);
   const [ocupado, setOcupado] = useState(false);
   const [confirmaPago, setConfirmaPago] = useState(false);
   const [reabrir, setReabrir] = useState<string | null>(null);
-  const [aj, setAj] = useState({ tipo: 'ADELANTO' as 'ADELANTO' | 'DESCUENTO', fecha: hoyLima(), monto: '', motivo: '' });
+  const [aj, setAj] = useState({ tipo: 'ADELANTO' as 'ADELANTO' | 'DESCUENTO' | 'BONO', categoria: 'OTRO', fecha: hoyLima(), monto: '', motivo: '' });
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
   const [tab, setTab] = useState('resumen');
   const [resaltar, setResaltar] = useState<string | null>(null);
@@ -120,11 +131,11 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
 
   const cargar = useCallback(async () => {
     try {
-      setD(await detallePlanilla(fila.partyId, fecha, excluidos));
+      setD(await detallePlanilla(fila.partyId, fecha, excluidos, omitCuotas, omitRec));
     } catch (e) {
       onError(mensajeDe(e, 'No pudimos cargar el detalle.'));
     }
-  }, [fila.partyId, fecha, excluidos, onError]);
+  }, [fila.partyId, fecha, excluidos, omitCuotas, omitRec, onError]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   const ejecutar = async (fn: () => Promise<unknown>, ok: string) => {
@@ -164,8 +175,10 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="as-aviso">
         Período {d.periodo.desde} a {d.periodo.hasta} · Sueldo {d.sueldo.modalidad === 'SEMANAL' ? 'semanal' : 'mensual'}: <strong>{soles(d.sueldo.modalidad === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual)}</strong>{' '}
-        (semanal {soles(d.sueldo.semanal)} · mensual {soles(d.sueldo.mensual)}) · Valor hora {soles(r.valorHora)}
+        (semanal {soles(d.sueldo.semanal)} · mensual {soles(d.sueldo.mensual)}, solo referencia) · Valor hora {soles(r.valorHora)}
+        {d.tercerizado && <> · <Insignia variante="acento">Tercerizado: sin feriado ×2 ni vacaciones</Insignia></>}
       </div>
+      {d.excel && <TablaExcel excel={d.excel} liquidado={pagado} pago={d.pago} onOk={onOk} />}
       {pagado && <div role="status" className="as-aviso as-aviso--ok">Período pagado el {new Date(d.pagadoEn!).toLocaleString('es-PE', { timeZone: 'America/Lima' })}. Las cifras están congeladas: ya no le debemos nada de este período.</div>}
       <dl className="as-resumen-planilla" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, margin: 0 }}>
         <Dato t="Horas programadas" v={`${horas(r.programadaMin)} h`} />
@@ -176,10 +189,31 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         {!!r.pagoVacaciones && <Dato t="Vacaciones pagadas (en dinero)" v={soles(r.pagoVacaciones)} />}
         <Dato t="Ganado" v={soles(r.ganado)} fuerte />
         <Dato t="Consumos cobrados" v={`− ${soles(r.consumosCobrados)}`} />
+        {!!r.adicional && <Dato t="Adicional (bonos)" v={`+ ${soles(r.adicional)}`} />}
         <Dato t="Descuentos" v={`− ${soles(r.descuentos)}`} />
         <Dato t="Adelantos" v={`− ${soles(r.adelantos)}`} />
         <Dato t="Neto a pagar" v={soles(r.neto)} fuerte />
       </dl>
+      {((d.cuotas?.length ?? 0) > 0 || (d.recurrentes?.length ?? 0) > 0) && (
+        <fieldset style={{ border: '1px solid var(--cp-line)', borderRadius: 12, padding: 10, display: 'grid', gap: 6, margin: 0 }}>
+          <legend style={{ fontWeight: 800, fontSize: 13 }}>Descuentos automáticos de este pago</legend>
+          <small className="as-nota">Desmarca para no cobrarlo en este pago. Una cuota de préstamo omitida pasa al final del plan; un descuento recurrente simplemente no se cobra este período.</small>
+          {(d.cuotas ?? []).map((c) => (
+            <label key={`c${c.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+              <input type="checkbox" checked={c.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar la cuota ${c.numero} del préstamo`} onChange={(e) => setOmitCuotas((x) => (e.target.checked ? x.filter((i) => i !== c.id) : [...x, c.id]))} />
+              <span style={{ flex: 1 }}>Préstamo · cuota {c.numero} de {c.numCuotas}</span>
+              <strong>{soles(c.monto)}</strong>
+            </label>
+          ))}
+          {(d.recurrentes ?? []).map((c) => (
+            <label key={`r${c.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+              <input type="checkbox" checked={c.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar ${c.nombre} en este pago`} onChange={(e) => setOmitRec((x) => (e.target.checked ? x.filter((i) => i !== c.id) : [...x, c.id]))} />
+              <span style={{ flex: 1 }}>{c.nombre}</span>
+              <strong>{soles(c.monto)}</strong>
+            </label>
+          ))}
+        </fieldset>
+      )}
       {r.consumosPendientes > 0 && <small className="as-nota">Consumos que pasan al siguiente período: {soles(r.consumosPendientes)}</small>}
       {r.neto < 0 && <div role="alert" className="as-aviso as-aviso--alerta">El neto es negativo: los descuentos superan lo ganado.</div>}
       <p className="as-ayuda">Marcar como pagado no mueve la caja: solo congela esta planilla y deja los consumos cobrados como «descontados por planilla».</p>
@@ -260,27 +294,35 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
     <div style={{ display: 'grid', gap: 12 }}>
       {!pagado && (
         <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-          <legend className="as-ayuda">Nuevo adelanto o descuento (producto dañado, roto o responsabilidad)</legend>
+          <legend className="as-ayuda">Nuevo adelanto, descuento (producto dañado, merma o responsabilidad) o bono</legend>
           <div className="as-form">
             <label className="as-campo">Tipo
-              <select value={aj.tipo} onChange={(e) => setAj({ ...aj, tipo: e.target.value as 'ADELANTO' | 'DESCUENTO' })}>
+              <select value={aj.tipo} onChange={(e) => setAj({ ...aj, tipo: e.target.value as 'ADELANTO' | 'DESCUENTO' | 'BONO' })}>
                 <option value="ADELANTO">Adelanto</option>
                 <option value="DESCUENTO">Descuento</option>
+                <option value="BONO">Bono (adicional)</option>
               </select>
             </label>
+            {aj.tipo === 'DESCUENTO' && (
+              <label className="as-campo">Etiqueta
+                <select value={aj.categoria} onChange={(e) => setAj({ ...aj, categoria: e.target.value })}>
+                  {CATEGORIAS_DESCUENTO.filter((c) => c !== 'CONSUMO').map((c) => <option key={c} value={c}>{ETIQUETA_CATEGORIA[c]}</option>)}
+                </select>
+              </label>
+            )}
             <label className="as-campo">Fecha <input type="date" value={aj.fecha} min={d.periodo.desde} max={d.periodo.hasta} onChange={(e) => setAj({ ...aj, fecha: e.target.value })} /></label>
             <label className="as-campo">Monto (S/) <input type="number" min="0.01" step="0.01" inputMode="decimal" value={aj.monto} onChange={(e) => setAj({ ...aj, monto: e.target.value })} /></label>
           </div>
-          <label className="as-campo">{aj.tipo === 'ADELANTO' ? 'Nota' : 'Motivo'}
+          <label className="as-campo">{aj.tipo === 'ADELANTO' || aj.tipo === 'BONO' ? 'Nota' : 'Motivo'}
             <textarea placeholder="Mínimo 3 caracteres" value={aj.motivo} onChange={(e) => setAj({ ...aj, motivo: e.target.value })} />
           </label>
           <div className="as-acciones">
             <Boton
               type="button"
               disabled={ocupado || !(Number(aj.monto) > 0) || aj.motivo.trim().length < 3 || !aj.fecha}
-              onClick={() => void ejecutar(async () => { await crearAjuste(aj.tipo, { partyId: d.partyId, fecha: aj.fecha, monto: Number(aj.monto), motivo: aj.motivo.trim() }); setAj({ ...aj, monto: '', motivo: '' }); }, aj.tipo === 'ADELANTO' ? 'Adelanto registrado.' : 'Descuento registrado.')}
+              onClick={() => void ejecutar(async () => { await crearAjuste(aj.tipo, { partyId: d.partyId, fecha: aj.fecha, monto: Number(aj.monto), motivo: aj.motivo.trim(), ...(aj.tipo === 'DESCUENTO' ? { categoria: aj.categoria } : {}) }); setAj({ ...aj, monto: '', motivo: '' }); }, aj.tipo === 'ADELANTO' ? 'Adelanto registrado.' : aj.tipo === 'BONO' ? 'Bono registrado.' : 'Descuento registrado.')}
             >
-              Registrar {aj.tipo === 'ADELANTO' ? 'adelanto' : 'descuento'}
+              Registrar {aj.tipo === 'ADELANTO' ? 'adelanto' : aj.tipo === 'BONO' ? 'bono' : 'descuento'}
             </Boton>
           </div>
         </fieldset>
@@ -290,7 +332,7 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
           {d.ajustes.map((a) => (
             <li key={a.id} style={{ border: '1px solid var(--cp-line)', borderRadius: 12, padding: '8px 10px', opacity: a.anulado ? 0.6 : 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span><Insignia variante={a.tipo === 'ADELANTO' ? 'neutro' : 'aviso'}>{a.tipo === 'ADELANTO' ? 'Adelanto' : 'Descuento'}</Insignia> {a.fecha}</span>
+                <span><Insignia variante={a.tipo === 'ADELANTO' ? 'neutro' : a.tipo === 'BONO' ? 'exito' : 'aviso'}>{a.tipo === 'ADELANTO' ? 'Adelanto' : a.tipo === 'BONO' ? 'Bono' : `Descuento · ${ETIQUETA_CATEGORIA[a.categoria ?? 'OTRO'] ?? 'Otro'}`}</Insignia> {a.fecha}</span>
                 <strong style={{ textDecoration: a.anulado ? 'line-through' : 'none' }}>{soles(a.monto)}</strong>
               </div>
               <div>{a.motivo}</div>
@@ -333,7 +375,7 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         <>
           <span style={{ fontWeight: 700 }}>¿Pagar {soles(d.resultado.neto)}? Se congela.</span>
           <Boton type="button" variante="secundario" tamano="grande" onClick={() => setConfirmaPago(false)}>No</Boton>
-          <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos); setConfirmaPago(false); setExcluidos([]); }, 'Período marcado como pagado.')}>Sí, marcar pagado</Boton>
+          <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos, omitCuotas, omitRec); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); }, 'Período marcado como pagado.')}>Sí, marcar pagado</Boton>
         </>
       ) : (
         <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => setConfirmaPago(true)}>Marcar pagado</Boton>
@@ -388,9 +430,65 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         { id: 'jornadas', etiqueta: 'Calendario y pago por día', insignia: porRevisar.length || null, insigniaError: porRevisar.length > 0, contenido: jornadas ?? <Cargando mensaje="Cargando" /> },
         { id: 'consumos', etiqueta: 'Consumos', insignia: d?.consumos.length || null, contenido: consumos ?? <Cargando mensaje="Cargando" /> },
         { id: 'ajustes', etiqueta: 'Adelantos y descuentos', insignia: d?.ajustes.filter((a) => !a.anulado).length || null, contenido: ajustes ?? <Cargando mensaje="Cargando" /> },
+        { id: 'prestamos', etiqueta: 'Préstamos y descuentos fijos', contenido: <PrestamosPersona partyId={fila.partyId} alCambiar={() => void cargar()} />, persistente: false },
         { id: 'vinculo', etiqueta: 'Vínculo y vacaciones', contenido: <PestanaVinculoVacaciones partyId={fila.partyId} alCambiar={() => void cargar()} />, persistente: false },
       ]}
     />
+  );
+}
+
+/** Descuentos por etiqueta (reemplazan las sumas escritas a mano del Excel). */
+function ResumenDescuentos({ porCategoria, total }: { porCategoria: Record<string, number>; total: number }) {
+  const claves = Object.keys(porCategoria);
+  if (claves.length === 0) return <>{soles(total)}</>;
+  return (
+    <>
+      <strong>{soles(total)}</strong>
+      {claves.map((c) => <small key={c} style={{ display: 'block' }}>{ETIQUETA_CATEGORIA[c] ?? c}: {soles(porCategoria[c])}</small>)}
+    </>
+  );
+}
+
+/** Celular y medio de pago de la persona (dato personal, solo ADMIN) con botón de copiar. */
+function DatosPago({ pago, onOk }: { pago: PagoPersona; onOk: Avisar }) {
+  if (!pago.celular && !pago.medio) return <small className="as-nota">Sin datos de pago</small>;
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      {pago.medio && <Insignia variante="neutro">{pago.medio}</Insignia>}
+      {pago.celular && (
+        <>
+          <span className="as-num">{pago.celular}</span>
+          <Boton type="button" variante="secundario" tamano="pequeno" aria-label="Copiar el número de pago" onClick={() => void copiarAlPortapapeles(pago.celular!).then((ok) => onOk(ok ? 'Número copiado.' : 'No se pudo copiar el número.'))}>Copiar</Boton>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** Las columnas del Excel del dueño, tal cual las calcula el servidor. */
+function TablaExcel({ excel, liquidado, pago, onOk }: { excel: ResumenExcel; liquidado: boolean; pago?: PagoPersona; onOk: Avisar }) {
+  return (
+    <div className="as-tabla-wrap" data-testid="tabla-excel">
+      <table className="as-tabla as-tabla--tarjetas">
+        <thead><tr><th>Pago por día</th><th>Valor hora</th><th>Horas y min.</th><th>Horas extra</th><th>Total</th><th>Adicional</th><th>Descuentos</th><th>Neto</th><th>Adelanto</th><th>Diferencia a pagar</th><th>Estado</th></tr></thead>
+        <tbody>
+          <tr>
+            <td data-label="Pago por día" className="as-num">{soles(excel.pagoPorDia)}</td>
+            <td data-label="Valor hora" className="as-num">{soles(excel.valorHora)}</td>
+            <td data-label="Horas y min." className="as-num">{excel.horasLaboradas} h {excel.minutosLaborados} min</td>
+            <td data-label="Horas extra" className="as-num">{excel.horasExtra} h</td>
+            <td data-label="Total" className="as-num">{soles(excel.total)}</td>
+            <td data-label="Adicional" className="as-num">{soles(excel.adicional)}</td>
+            <td data-label="Descuentos" className="as-num"><ResumenDescuentos porCategoria={excel.descuentosPorCategoria} total={excel.descuentos} /></td>
+            <td data-label="Neto" className="as-num">{soles(excel.netoAPagar)}</td>
+            <td data-label="Adelanto" className="as-num">{soles(excel.adelanto)}</td>
+            <td data-label="Diferencia a pagar" className="as-num"><strong>{soles(excel.diferencia)}</strong></td>
+            <td data-label="Estado">{liquidado ? <Insignia variante="exito">LIQUIDADO</Insignia> : <Insignia variante="neutro">Abierto</Insignia>}</td>
+          </tr>
+        </tbody>
+      </table>
+      {pago && <p className="as-ayuda">Pagar a: <DatosPago pago={pago} onOk={onOk} /></p>}
+    </div>
   );
 }
 

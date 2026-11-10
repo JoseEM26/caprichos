@@ -1,5 +1,5 @@
 // Parámetros de asistencia (clave parametro «asistencia.config»). Valores por defecto del dueño:
-// radio 10 m, tolerancia 5 min, retención 90 días, tardanza pagada al 50 %.
+// radio 10 m, tolerancia 5 min, retención 90 días, tardanza pagada al 0 % (solo se paga lo trabajado).
 
 export interface ConfigAsistencia {
   radioM: number;
@@ -7,6 +7,13 @@ export interface ConfigAsistencia {
   /** Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). */
   pagoTardanzaPct: number;
   retencionDias: number;
+  /** Multiplicador de la hora extra aprobada (defecto 1.25). */
+  multiplicadorExtra: number;
+  /** Descuento semanal de Netflix por defecto (S/). */
+  netflixSemanal: number;
+  /** Valor hora DIAS_HORAS por defecto: días del mes y horas por día (editables por persona). */
+  diasMesDefecto: number;
+  horasDiaDefecto: number;
   /** Marcas a menos de estos minutos de la anterior se unen (doble marca). 0 = no unir. */
   dobleMarcaMin: number;
   /** Hasta cuántos días atrás la persona puede pedir corrección (y se le avisa de inconsistencias). */
@@ -19,8 +26,12 @@ export interface ConfigAsistencia {
 export const CONFIG_ASISTENCIA_DEFECTO: ConfigAsistencia = {
   radioM: 10,
   toleranciaMin: 5,
-  pagoTardanzaPct: 50,
+  pagoTardanzaPct: 0,
   retencionDias: 90,
+  multiplicadorExtra: 1.25,
+  netflixSemanal: 1.64,
+  diasMesDefecto: 24,
+  horasDiaDefecto: 9,
   dobleMarcaMin: 3,
   solicitudDiasMax: 7,
   precisionMaxM: 25,
@@ -44,6 +55,10 @@ export function leerConfigAsistencia(valor: unknown): ConfigAsistencia {
     radioM: numeroEn(v.radioM, CONFIG_ASISTENCIA_DEFECTO.radioM, 3, 100),
     toleranciaMin: numeroEn(v.toleranciaMin, CONFIG_ASISTENCIA_DEFECTO.toleranciaMin, 0, 60),
     pagoTardanzaPct: numeroEn(v.pagoTardanzaPct, CONFIG_ASISTENCIA_DEFECTO.pagoTardanzaPct, 0, 100),
+    multiplicadorExtra: numeroEn(v.multiplicadorExtra, CONFIG_ASISTENCIA_DEFECTO.multiplicadorExtra, 1, 5),
+    netflixSemanal: numeroEn(v.netflixSemanal, CONFIG_ASISTENCIA_DEFECTO.netflixSemanal, 0, 1000),
+    diasMesDefecto: numeroEn(v.diasMesDefecto, CONFIG_ASISTENCIA_DEFECTO.diasMesDefecto, 1, 31),
+    horasDiaDefecto: numeroEn(v.horasDiaDefecto, CONFIG_ASISTENCIA_DEFECTO.horasDiaDefecto, 1, 24),
     retencionDias: numeroEn(v.retencionDias, CONFIG_ASISTENCIA_DEFECTO.retencionDias, 7, 3650),
     dobleMarcaMin: numeroEn(v.dobleMarcaMin, CONFIG_ASISTENCIA_DEFECTO.dobleMarcaMin, 0, 30),
     solicitudDiasMax: numeroEn(v.solicitudDiasMax, CONFIG_ASISTENCIA_DEFECTO.solicitudDiasMax, 1, 31),

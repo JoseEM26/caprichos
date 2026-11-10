@@ -111,3 +111,66 @@ describe('importar-personal: el rol eliminado Call Center', () => {
     expect(salidas.join('\n')).toMatch(/Ana Ruiz \(MOZO\) · aviso: el rol Call Center ya no existe: se asigna MOZO/);
   });
 });
+
+describe('importar-personal: columnas de planilla (datos inventados)', () => {
+  const CAB = 'nombres,apellidos,tipo_documento,documento,fecha_ingreso,fecha_reingreso,rol_principal,activo,area,casillas_roles,acuerdo_laboral,sueldo_mensual,tarifa_hora,pago_celular,pago_medio,licencia';
+  const csv = (...filas: string[]) => [CAB, ...filas].join('\n');
+
+  it('mapea casillas a roles y áreas de cocina; el rol principal se deduce y Despacho/Mozo no se repite', () => {
+    const { filas } = filasDesdeCsv(csv('Ana,Ruiz,DNI,11112222,02/07/2024,NO,,si,Cocina,Despacho|Postres|Repostería|Caja,Tiempo Completo,"S/ 1,500.00",,999 000 111,yape,'));
+    expect(filas[0].fila).toMatchObject({
+      rol: 'CAJERO', otrosRoles: ['MOZO', 'COCINA'], areasCocina: ['Postres', 'Repostería'], acuerdoLaboral: 'TIEMPO_COMPLETO',
+      sueldoMensual: 1500, pagoCelular: '999000111', pagoMedio: 'YAPE', fechaIngreso: '2024-07-02', activo: true,
+    });
+    expect(filas[0].fila).not.toHaveProperty('fechaReingreso');
+  });
+
+  it('tarifa por hora y tercerizado mensual', () => {
+    const { filas } = filasDesdeCsv(csv('Eva,Ros,DNI,33334444,,,MOZO,si,Sala,,Tercerizado Mensual,,15.5,,,'));
+    expect(filas[0].fila).toMatchObject({ acuerdoLaboral: 'TERCERIZADO_MENSUAL', tarifaHora: 15.5 });
+    expect(filas[0].fila).not.toHaveProperty('sueldoMensual');
+  });
+
+  it('LICENCIA SIN GOCE: cuenta inactiva con aviso, sin fecha de reingreso', async () => {
+    const { filas } = filasDesdeCsv(csv('Luis,Paz,DNI,55556666,2024-01-10,LICENCIA SIN GOCE,MOZO,si,,,,,,,,'));
+    expect(filas[0].fila).toMatchObject({ activo: false });
+    expect(filas[0].fila).not.toHaveProperty('fechaReingreso');
+    const salidas: string[] = [];
+    await ejecutarImportacion(csv('Luis,Paz,DNI,55556666,2024-01-10,LICENCIA SIN GOCE,MOZO,si,,,,,,,,'), false, servicioFalso([{ indice: 0, estado: 'OK' }]) as any, (l) => salidas.push(l));
+    expect(salidas.join('\n')).toMatch(/Luis Paz \(MOZO\) · aviso: en licencia sin goce/);
+  });
+
+  it('área administrativa sin rol: se omite (sin cuenta) y se dice; con rol se importa', async () => {
+    const texto = csv('Ivo,Gil,DNI,77778888,,,,si,ALQUILER LOCAL,,,,,,,', 'Mar,Gil,DNI,88889999,,,,si,MARKETING,Caja,,,,,,');
+    const { filas } = filasDesdeCsv(texto);
+    expect(filas[0]).toMatchObject({ fila: null, omitida: expect.stringContaining('sin rol operativo') });
+    expect(filas[1].fila).toMatchObject({ rol: 'CAJERO' });
+    const servicio = servicioFalso([{ indice: 0, estado: 'OK' }]);
+    const salidas: string[] = [];
+    await ejecutarImportacion(texto, false, servicio as any, (l) => salidas.push(l));
+    expect((servicio.importarPersonal.mock.calls[0] as any[])[0]).toHaveLength(1);
+    expect(salidas.join('\n')).toMatch(/fila 2: omitida: área administrativa/);
+    expect(salidas.join('\n')).toMatch(/omitidas 1/);
+  });
+
+  it('Delivery con otros roles, casilla desconocida o acuerdo inválido: error de la fila', () => {
+    const { filas } = filasDesdeCsv(csv('A,B,DNI,11110000,,,,si,,Delivery|Caja,,,,,,', 'C,D,DNI,22220000,,,,si,,Cocina,,,,,,', 'E,F,DNI,33330000,,,MOZO,si,,,Mitad de tiempo,,,,,'));
+    expect(filas[0].errorFormato).toMatch(/Delivery/);
+    expect(filas[1].errorFormato).toMatch(/casilla de rol desconocida/);
+    expect(filas[2].errorFormato).toMatch(/acuerdo_laboral/);
+    expect(filasDesdeCsv(csv('G,H,DNI,44440000,,,,si,,Delivery,,,,,,')).filas[0].fila).toMatchObject({ rol: 'REPARTIDOR', otrosRoles: [] });
+  });
+
+  it('el CSV anterior (sin columnas nuevas) sigue funcionando y la salida no imprime celulares ni documentos', async () => {
+    const salidas: string[] = [];
+    await ejecutarImportacion(
+      csv('Ana,Ruiz,DNI,11112222,,,CAJERO,si,Sala,,Tiempo Parcial,1200,,987654321,PLIN,'),
+      false,
+      servicioFalso([{ indice: 0, estado: 'OK' }]) as any,
+      (l) => salidas.push(l),
+    );
+    const todo = salidas.join('\n');
+    for (const secreto of ['11112222', '987654321', '1200']) expect(todo).not.toContain(secreto);
+    expect(filasDesdeCsv('nombres,apellidos,documento,rol_principal\nA,B,11111111,MOZO').filas[0].fila).toMatchObject({ rol: 'MOZO' });
+  });
+});
