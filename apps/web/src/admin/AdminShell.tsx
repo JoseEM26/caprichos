@@ -5,6 +5,7 @@ import { Confirmar } from '../comun/Confirmar';
 import { Icono } from '../comun/Icono';
 import { useEsMovil } from '../carta/useEsMovil';
 import { GRUPOS_MODULOS, MODULOS } from './modulos';
+import { moduloVisible } from '../comun/permisosPuro';
 import { TITULOS_VISTA } from './titulos';
 import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
@@ -109,7 +110,7 @@ export function AdminShell() {
     });
   };
 
-  const modulos = useMemo(() => MODULOS.filter((m) => !m.permisoMinimo || tiene(m.permisoMinimo)), [tiene]);
+  const modulos = useMemo(() => MODULOS.filter((m) => moduloVisible(m, tiene)), [tiene]);
   const grupos = useMemo(
     () => GRUPOS_MODULOS.map((g) => ({ grupo: g, items: modulos.filter((m) => m.grupo === g) })).filter((g) => g.items.length > 0),
     [modulos],

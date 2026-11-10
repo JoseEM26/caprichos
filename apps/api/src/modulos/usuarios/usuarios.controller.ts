@@ -33,6 +33,7 @@ import { PermisosExtraDto } from './dto/permisos-extra.dto';
 import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
 import { RolesMasivoDto } from './dto/roles-masivo.dto';
 import { UsuariosActividadService } from './usuarios-actividad.service';
+import { UsuariosAccesosService } from './usuarios-accesos.service';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -43,6 +44,7 @@ export class UsuariosController {
     private readonly permisosService: UsuariosPermisosService,
     private readonly rolesMasivoService: UsuariosRolesMasivoService,
     private readonly actividadService: UsuariosActividadService,
+    private readonly accesosService: UsuariosAccesosService,
   ) {}
 
   /** Agrega o quita un rol EXTRA a varios usuarios (o a todos). Solo ADMIN; reporta quién se omitió y por qué. */
@@ -107,6 +109,13 @@ export class UsuariosController {
   @Permiso('usuarios', 'ver')
   async listar(@Query() filtros: FiltrarUsuariosDto) {
     return this.usuariosService.listar(filtros);
+  }
+
+  /** Cuadro de accesos: roles y permisos efectivos de cada persona (solo ADMIN). Sin datos sensibles. */
+  @Get('accesos-modulos')
+  @Permiso('usuarios', 'ver_accesos')
+  async accesosModulos(@Query('inactivos') inactivos?: string) {
+    return this.accesosService.listar(inactivos === 'true');
   }
 
   @Get('horarios')
