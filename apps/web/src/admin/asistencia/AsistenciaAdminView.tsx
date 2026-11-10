@@ -8,7 +8,6 @@ import {
   ConfigAsistenciaAdmin,
   ETIQUETA_ESTADO,
   FilaHoy,
-  guardarConfigAsistencia,
   obtenerConfigAsistencia,
   reiniciarCelular,
   reporteHoy,
@@ -23,11 +22,8 @@ import { PlanillaTab } from './PlanillaTab';
 import { CalendarioTab } from './CalendarioTab';
 import { calendarioFilas } from './calendarioApi';
 import { contadorSolicitudes } from './correccionesApi';
-import { FeriadosTab } from './FeriadosTab';
+import { ConfiguracionAsistenciaTab } from './ConfiguracionAsistenciaTab';
 import { coincide } from './buscar';
-import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
-import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
-import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import './asistencia.css';
 
 type Pestana = 'hoy' | 'calendario' | 'planilla' | 'config';
@@ -111,15 +107,8 @@ export function AsistenciaAdminView() {
       {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
       {pestana === 'hoy' && <HoyTab onError={setError} onOk={setMensaje} />}
       {pestana === 'calendario' && <CalendarioTab onError={setError} onOk={setMensaje} alCambiar={contar} />}
-      {/* PUNTO DE MONTAJE (agente D): sustituir por la PlanillaTab rediseñada */}
       {pestana === 'planilla' && <PlanillaTab onError={setError} onOk={setMensaje} />}
-      {/* PUNTO DE MONTAJE (agente D): sustituir ConfigTab + FeriadosTab por ConfiguracionAsistenciaTab (con Feriados dentro) */}
-      {pestana === 'config' && (
-        <>
-          <ConfigTab cfg={cfg} setCfg={setCfg} onError={setError} onOk={setMensaje} />
-          <FeriadosTab onError={setError} onOk={setMensaje} />
-        </>
-      )}
+      {pestana === 'config' && <ConfiguracionAsistenciaTab onError={setError} onOk={setMensaje} alGuardar={setCfg} />}
     </div>
   );
 }
@@ -250,136 +239,6 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
         alConfirmar={reiniciar}
         alCancelar={() => setReiniciando(null)}
       />
-    </>
-  );
-}
-
-const PRECISION_BUENA_M = 30;
-/** Peor que esto es ubicación por internet (IP/wifi): no sirve para fijar el punto del local. */
-const PRECISION_INUTIL_M = 100;
-
-/** Precisión legible: metros, o km si pasa de 1000. */
-export const formatearPrecision = (m: number): string =>
-  m >= 1000 ? `${(m / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 })} km` : `${Math.round(m)} m`;
-
-function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin | null; setCfg: (c: ConfigAsistenciaAdmin) => void; onError: Avisar; onOk: Avisar }) {
-  const [leyendo, setLeyendo] = useState(false);
-  const [precision, setPrecision] = useState<number | null>(null);
-  if (!cfg) return <Cargando mensaje="Cargando" />;
-  const campo = (k: keyof ConfigAsistenciaAdmin, etiqueta: string, ayuda: string) => (
-    <label className="as-campo">
-      {etiqueta}
-      <input
-        type="number"
-        step="any"
-        value={cfg[k] ?? ''}
-        onChange={(e) => setCfg({ ...cfg, [k]: e.target.value === '' ? null : Number(e.target.value) })}
-      />
-      <small>{ayuda}</small>
-    </label>
-  );
-  const guardar = async () => {
-    try {
-      setCfg(await guardarConfigAsistencia(cfg));
-      onOk('Configuración guardada.');
-    } catch (e) {
-      onError(mensajeDe(e, 'No se pudo guardar.'));
-    }
-  };
-  const usarMiUbicacion = () => {
-    if (!navigator.geolocation) {
-      onError('Este equipo no permite leer la ubicación. Escribe las coordenadas a mano.');
-      return;
-    }
-    setLeyendo(true);
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setLeyendo(false);
-        if (p.coords.accuracy > PRECISION_INUTIL_M) {
-          setPrecision(null);
-          onOk(null);
-          onError(`Este equipo no tiene GPS preciso (precisión ${formatearPrecision(p.coords.accuracy)}, parece ubicación por internet). Mueve el punto en el mapa o usa tu celular dentro del local.`);
-          return;
-        }
-        setPrecision(p.coords.accuracy);
-        setCfg({ ...cfg, localLat: Number(p.coords.latitude.toFixed(6)), localLng: Number(p.coords.longitude.toFixed(6)) });
-        onError(null);
-        onOk('Ubicación tomada. Revísala en el mapa y pulsa «Guardar configuración».');
-      },
-      () => {
-        setLeyendo(false);
-        onError('No pudimos leer tu ubicación. Activa la ubicación y da permiso al navegador.');
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  };
-  const moverPunto = (p: { lat: number; lng: number }) =>
-    setCfg({ ...cfg, localLat: Number(p.lat.toFixed(6)), localLng: Number(p.lng.toFixed(6)) });
-  const conUbicacion = cfg.localLat !== null && cfg.localLng !== null;
-  return (
-    <>
-      {!conUbicacion && (
-        <div role="alert" className="as-aviso as-aviso--alerta">{SIN_UBICACION}.</div>
-      )}
-      <div className="as-grilla">
-        <Tarjeta titulo="Ubicación del local" subtitulo="El punto desde el que se mide la distancia al marcar.">
-          <div className="as-form">
-            {campo('localLat', 'Latitud del local', 'Ej. -12.046374')}
-            {campo('localLng', 'Longitud del local', 'Ej. -77.042793')}
-          </div>
-          <BuscadorDireccion onElegir={(p) => moverPunto(p)} />
-          <MapaUbicacion
-            punto={conUbicacion ? { lat: cfg.localLat as number, lng: cfg.localLng as number } : null}
-            onCambiar={moverPunto}
-            altura={320}
-            etiqueta="Mapa para marcar la ubicación del local"
-            local={conUbicacion ? null : SEDE_DEFECTO}
-            ajustarA={conUbicacion ? 'punto' : 'local'}
-            radioM={cfg.radioM ?? undefined}
-          />
-          <p className="as-ayuda">
-            {conUbicacion ? 'Arrastra el punto o toca el mapa para moverlo.' : 'Toca el mapa para colocar el punto del local: hasta entonces no se guarda ninguno.'}
-          </p>
-          <p className="as-ayuda" data-testid="texto-regla">
-            La asistencia se mide desde este punto: el trabajador debe estar a {cfg.radioM ?? '—'} m o menos (radio) y con el GPS del celular con precisión mejor que {cfg.precisionMaxM ?? '—'} m.
-          </p>
-          <div className="as-acciones">
-            <Boton type="button" variante="oscuro" cargando={leyendo} onClick={usarMiUbicacion}>Usar mi ubicación actual</Boton>
-            {conUbicacion && (
-              <a className="as-enlace" href={`https://www.google.com/maps?q=${cfg.localLat},${cfg.localLng}`} target="_blank" rel="noreferrer">
-                Ver en Google Maps
-              </a>
-            )}
-          </div>
-          <p className="as-ayuda">Para usar tu ubicación, tienes que estar dentro del local, de preferencia al centro y con el GPS activado.</p>
-          {precision !== null && (
-            <div role="status" className={`as-aviso ${precision > PRECISION_BUENA_M ? 'as-aviso--alerta' : 'as-aviso--ok'}`}>
-              Precisión obtenida: {formatearPrecision(precision)}.
-              {precision > PRECISION_BUENA_M && ` Es peor que ${PRECISION_BUENA_M} m: sal a un lugar abierto y vuelve a intentar, o corrige las coordenadas a mano.`}
-            </div>
-          )}
-        </Tarjeta>
-        <Tarjeta titulo="Marcas" subtitulo="Cuándo se acepta una marca.">
-          <div style={{ display: 'grid', gap: 12 }}>
-            {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
-            {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza. Hoy: 5.')}
-            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de atraso. Hoy: 0 (solo se pagan los minutos trabajados).')}
-            {campo('multiplicadorExtra', 'Hora extra aprobada: multiplicador', 'Se paga a valor hora × este número (solo si el admin la aprueba). No aplica a quien se calcula por horas programadas. Hoy: 1.25.')}
-            {campo('diasMesDefecto', 'Valor hora: días del mes (general)', 'Sueldo mensual ÷ estos días ÷ horas por día. Se puede cambiar por persona en Usuarios. Hoy: 24.')}
-            {campo('horasDiaDefecto', 'Valor hora: horas por día (general)', 'Hoy: 9. Se puede cambiar por persona (ej. 8).')}
-            {campo('netflixSemanal', 'Netflix: descuento semanal (S/)', 'Monto por semana que se descuenta a quien lo paga (×4 en un pago mensual). Hoy: 1.64.')}
-            {campo('dobleMarcaMin', 'Doble marca: unir marcas a menos de (min)', 'Marcas muy seguidas se unen: cuenta la primera y la otra se muestra tachada. 0 = no unir. Hoy: 3.')}
-            {campo('solicitudDiasMax', 'Días para pedir corrección', 'Hasta cuántos días atrás la persona puede pedir que se corrija su asistencia (y se le avisa de inconsistencias). Hoy: 7.')}
-            {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}
-          </div>
-        </Tarjeta>
-        <Tarjeta titulo="Selfies" subtitulo="Privacidad de las fotos.">
-          {campo('retencionDias', 'Días que se guardan las selfies', 'Pasado este plazo la foto se borra; la marca se conserva.')}
-        </Tarjeta>
-      </div>
-      <div className="as-acciones">
-        <Boton type="button" onClick={() => void guardar()}>Guardar configuración</Boton>
-      </div>
     </>
   );
 }

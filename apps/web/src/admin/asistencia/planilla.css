@@ -1,0 +1,47 @@
+/* Planilla y Configuración de asistencia: tarjetas compactas y secciones plegables. Solo variables --cp-*. */
+.pl-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 0; }
+.pl-total { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+.pl-total dt { font-size: 12px; font-weight: 700; color: var(--cp-soft); }
+.pl-total dd { margin: 0; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.pl-total--fuerte { background: var(--cp-navy); border-color: var(--cp-navy); }
+.pl-total--fuerte dt, .pl-total--fuerte dd { color: var(--cp-cream); }
+.pl-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; }
+.pl-barra strong { font-family: var(--fuente-titulos); font-size: 15px; }
+.pl-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.pl-tarjeta { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
+.pl-tarjeta-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.pl-tarjeta-cab > div { min-width: 0; }
+.pl-nombre { font-family: var(--fuente-titulos); font-weight: 800; font-size: 15px; overflow-wrap: anywhere; }
+.pl-neto { text-align: right; font-weight: 900; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-neto small { display: block; font-size: 11px; font-weight: 700; color: var(--cp-soft); }
+.pl-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 8px; margin: 0; }
+.pl-cifras div { min-width: 0; }
+.pl-cifras dt { font-size: 11px; color: var(--cp-soft); font-weight: 700; }
+.pl-cifras dd { margin: 0; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pl-cifras .pl-malo dd { color: var(--cp-rust); }
+.pl-tarjeta-pie { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
+.pl-filtros { background: var(--cp-sand); border: 1px solid var(--cp-line); border-radius: 12px; padding: 10px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.pl-seccion { border: 1px solid var(--cp-line); border-radius: 12px; background: var(--cp-white); min-width: 0; }
+.pl-seccion-cab { cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px; font-weight: 800; list-style: none; }
+.pl-seccion-cab::-webkit-details-marker { display: none; }
+.pl-seccion-cab::before { content: '▸'; margin-right: 6px; color: var(--cp-soft); transition: transform .15s; }
+.pl-seccion[open] > .pl-seccion-cab::before { transform: rotate(90deg); }
+.pl-seccion-cab:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: -2px; border-radius: 10px; }
+.pl-seccion-titulo { flex: 1; font-family: var(--fuente-titulos); font-size: 14px; }
+.pl-seccion-resumen { font-size: 13px; font-weight: 700; color: var(--cp-soft); font-variant-numeric: tabular-nums; text-align: right; }
+.pl-seccion-cuerpo { padding: 4px 12px 12px; display: grid; gap: 10px; min-width: 0; }
+.pl-filas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pl-fila { display: flex; gap: 10px; align-items: center; min-height: 40px; justify-content: space-between; border-top: 1px solid var(--cp-line); padding-top: 6px; }
+.pl-fila:first-child { border-top: none; padding-top: 0; }
+.pl-fila > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pl-fila--total { font-weight: 900; }
+.pl-fila .as-num { white-space: nowrap; }
+.pl-indice { display: flex; flex-wrap: wrap; gap: 6px; }
+.pl-indice a { border: 1.5px solid var(--cp-line); background: var(--cp-white); border-radius: 999px; padding: 6px 12px; min-height: 32px; box-sizing: border-box; font-size: 13px; font-weight: 700; color: var(--cp-navy); text-decoration: none; display: inline-flex; align-items: center; }
+.pl-indice a:focus-visible, .pl-indice a:hover { border-color: var(--cp-navy); }
+.pl-cfg { display: grid; gap: 10px; max-width: 880px; }
+.pl-cfg .pl-seccion { scroll-margin-top: 12px; }
+.pl-guardar { position: sticky; bottom: 0; background: var(--cp-cream); border-top: 1px solid var(--cp-line); padding: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .pl-lista { grid-template-columns: minmax(0, 1fr); }
+}

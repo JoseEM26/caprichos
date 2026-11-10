@@ -133,8 +133,10 @@ export interface MarcaAdmin {
 export interface ConfigAsistenciaAdmin {
   radioM: number;
   toleranciaMin: number;
-  /** % del valor hora con que se pagan los minutos de tardanza (0 = solo se paga lo trabajado). */
-  pagoTardanzaPct: number;
+  /** Ya no se usa: la tardanza no se paga y se cobra la penalidad (tardanzaPenalidadPct). */
+  pagoTardanzaPct?: number;
+  /** Penalidad por tardanza: % del valor del tiempo tarde que se cobra (0 a 500, 100 por defecto). */
+  tardanzaPenalidadPct?: number;
   /** Hora extra aprobada: multiplicador del valor hora (1.25). */
   multiplicadorExtra: number;
   netflixSemanal: number;

@@ -41,7 +41,18 @@ export interface ResumenExcel {
   netoAPagar: number;
   adelanto: number;
   diferencia: number;
+  /** Penalidad por tardanza del período (0 o ausente = sin penalidad). */
+  penalidadTardanza?: number;
 }
+
+/** Penalidad por tardanza: la hora tarde no se paga y además se cobra su valor × el factor de Configuración. */
+export interface PenalidadTardanza {
+  total?: number;
+  totalCents?: number;
+  detalle: Array<{ fecha: string; minutos: number; monto: number }>;
+}
+/** Total en soles de la penalidad, aunque el servidor lo mande en céntimos. Sin dato = 0. */
+export const totalPenalidad = (p?: PenalidadTardanza | null): number => (p ? p.total ?? (p.totalCents !== undefined ? p.totalCents / 100 : 0) : 0);
 
 export interface FilaPlanilla {
   partyId: number;
@@ -60,10 +71,11 @@ export interface FilaPlanilla {
   adelantos?: number;
   neto?: number;
   pendientes?: number;
+  penalidad?: number;
 }
 
-export interface CuotaPeriodoApi { id: string; prestamoId: string; numero: number; numCuotas: number; monto: number; motivo: string | null; cobrar: boolean }
-export interface RecurrentePeriodoApi { id: string; tipo: string; nombre: string; monto: number; cobrar: boolean }
+export interface CuotaPeriodoApi { id: string; prestamoId: string; numero: number; numCuotas: number; monto: number; motivo: string | null; cobrar: boolean; capital?: number; interes?: number; capitalCuota?: number; interesCuota?: number; interesPctMensual?: number }
+export interface RecurrentePeriodoApi { id: string; tipo: string; nombre: string; monto: number; cobrar: boolean; periodicidad?: 'SEMANAL' | 'MENSUAL' }
 
 export interface DiaPlanillaApi {
   jornada: string;
@@ -122,7 +134,9 @@ export interface DetallePlanilla {
   periodoId: number | null;
   pagadoEn?: string;
   toleranciaMin: number;
-  pctTardanza: number;
+  /** Ya no se usa (antes: % pagado por tardanza). Se ignora. */
+  pctTardanza?: number;
+  penalidadTardanza?: PenalidadTardanza;
   pendientes: number;
   /** Jornadas que bloquean «Marcar pagado». */
   jornadasPorRevisar?: string[];
@@ -135,7 +149,10 @@ export interface DetallePlanilla {
     extraAprobadaMin: number;
     valorHora: number;
     pagoTrabajado: number;
-    pagoTardanza: number;
+    pagoTardanza?: number;
+    penalidadTardanza?: number;
+    /** Detalle por día de la penalidad (lo manda el servidor junto con el total). */
+    penalidadTardanzaDetalle?: Array<{ fecha: string; minutos: number; monto: number }>;
     pagoExtra: number;
     /** Vacaciones pagadas en dinero dentro del período. */
     pagoVacaciones?: number;
@@ -189,14 +206,16 @@ export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds:
 export interface CuotaPrestamoApi { id: number; numero: number; monto: number; estado: 'PENDIENTE' | 'DESCONTADA' | 'OMITIDA'; periodoDesde: string | null; periodoHasta: string | null; reprogramada: boolean }
 export interface PrestamoApi {
   id: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; montoCuota: number; fechaInicio: string;
+  /** Interés mensual del préstamo (0 o ausente = sin intereses). */
+  interesPctMensual?: number; capital?: number; interesTotal?: number; interes?: number; total?: number; cuota?: number;
   estado: 'ACTIVO' | 'SALDADO' | 'ANULADO'; motivo: string | null; anuladoMotivo: string | null; saldo: number; cuotas: CuotaPrestamoApi[];
 }
-export interface RecurrenteApi { id: number; tipo: 'NETFLIX' | 'OTRO'; nombre: string; monto: number; activo: boolean; desde: string }
+export interface RecurrenteApi { id: number; tipo: 'NETFLIX' | 'OTRO'; nombre: string; monto: number; activo: boolean; desde: string; periodicidad?: 'SEMANAL' | 'MENSUAL' }
 export const listarPrestamos = (partyId: number) => api.get<{ netflixSemanalDefecto: number; prestamos: PrestamoApi[]; recurrentes: RecurrenteApi[] }>(`/admin/planilla/persona/${partyId}/prestamos`);
-export const crearPrestamo = (d: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string }) => api.post('/admin/planilla/prestamos', d);
+export const crearPrestamo = (d: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string; interesPctMensual?: number }) => api.post('/admin/planilla/prestamos', d);
 export const anularPrestamo = (id: number, motivo: string) => api.post(`/admin/planilla/prestamos/${id}/anular`, { motivo });
-export const crearRecurrente = (d: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number }) => api.post('/admin/planilla/recurrentes', d);
-export const editarRecurrente = (id: number, d: { monto?: number; activo?: boolean }) => api.put(`/admin/planilla/recurrentes/${id}`, d);
+export const crearRecurrente = (d: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL' }) => api.post('/admin/planilla/recurrentes', d);
+export const editarRecurrente = (id: number, d: { nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL'; activo?: boolean }) => api.put(`/admin/planilla/recurrentes/${id}`, d);
 export const reabrirPlanilla = (periodoId: number, motivo: string) => api.post(`/admin/planilla/periodos/${periodoId}/reabrir`, { motivo });
 
 export interface Feriado { id: number; fecha: string; nombre: string; recargo: number; activo: boolean }

@@ -208,7 +208,7 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
     listar.mockResolvedValue({ fecha: '2026-11-09', filas: [{ partyId: 7, nombre: 'Luis Pérez', sueldo: { modalidad: 'MENSUAL', semanal: 230.77, mensual: 1000 }, periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, estado: 'ABIERTO', pendientes: 2 }] });
     detalle.mockResolvedValue({
       partyId: 7, nombre: 'Luis Pérez', periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, sueldo: { modalidad: 'MENSUAL', semanal: 230.77, mensual: 1000 },
-      estado: 'ABIERTO', periodoId: null, toleranciaMin: 5, pctTardanza: 50, pendientes: 2, jornadasPorRevisar: ['2026-11-05', '2026-11-06'], resultado,
+      estado: 'ABIERTO', periodoId: null, toleranciaMin: 5, pendientes: 2, jornadasPorRevisar: ['2026-11-05', '2026-11-06'], resultado,
       dias: [
         { jornada: '2026-11-05', estado: 'A_REVISAR', programadaMin: 540, trabajadaMin: 0, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 0, extraAprobada: false, extraAprobadaEn: null, ganado: 0,
           horario: { entrada: '09:00', salida: '18:00', almuerzo: '13:00-14:00' }, breakMin: 0, alertas: ['Marcó 3 veces: falta el regreso del break'],
@@ -220,7 +220,7 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
     });
     simples.mockResolvedValue({ total: 2, ok: 1, fallidas: 1, omitidas: 1, resultados: [{ tipo: 'MARCA', id: 5, ok: true }, { tipo: 'MARCA', id: 6, ok: false, codigo: 'PERIODO_PAGADO', mensaje: 'Período ya pagado' }] });
     render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Abrir' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Abrir la planilla de Luis/ }));
     const banner = await screen.findByTestId('banner-por-revisar');
     expect(banner).toHaveTextContent('2 jornadas por revisar');
     expect(screen.getByRole('button', { name: 'Marcar pagado' })).toBeDisabled();
