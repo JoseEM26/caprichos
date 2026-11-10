@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { tienePermiso } from './permisosPuro';
 import {
   createContext,
   useContext,
@@ -167,17 +168,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       if (!usuario) {
         return false;
       }
-      const rolUpper = (usuario.rol || '').toUpperCase();
-      if (rolUpper === 'ADMIN') {
-        return true;
-      }
-      if (permisos.includes(permiso)) {
-        return true;
-      }
-      // Soporte si se busca permiso general por módulo ('caja' -> 'caja/ver')
-      return permisos.some(
-        (p) => p === permiso || p.startsWith(`${permiso}/`),
-      );
+      return tienePermiso(permisos, permiso, (usuario.rol || '').toUpperCase() === 'ADMIN');
     },
     [usuario, permisos],
   );

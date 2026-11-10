@@ -10,11 +10,12 @@ import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import { CuadroAccesos } from './CuadroAccesos';
 import { fechaLimaCorta } from './rolesTemporalesApi';
 import { BarraSeleccion, ModalRolesMasivos } from './RolesMasivos';
 import type { ResultadoRolesMasivo } from './rolesMasivoApi';
 
-type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
+type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles' | 'accesos';
 
 const ROLES_COLUMNAS = [
   { id: 'cajero', n: 'Cajero' },
@@ -537,7 +538,15 @@ export function UsuariosView() {
         >
           <span>Qué ve cada rol</span>
         </button>
+        {esAdmin && (
+          <button type="button" role="tab" aria-selected={tabActual === 'accesos'} onClick={() => setTabActual('accesos')}
+            style={{ minHeight: '48px', padding: '0 18px', borderRadius: '12px', border: '1.5px solid var(--cp-navy)', background: tabActual === 'accesos' ? 'var(--cp-navy)' : 'transparent', color: tabActual === 'accesos' ? 'var(--cp-cream)' : 'var(--cp-navy)', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '14px', cursor: 'pointer' }}>
+            Accesos por usuario
+          </button>
+        )}
       </div>
+
+      {tabActual === 'accesos' && esAdmin && <CuadroAccesos />}
 
       {/* PESTAÑA 1: PERSONAL */}
       {tabActual === 'personal' && (
