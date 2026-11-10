@@ -55,8 +55,8 @@ describe('ResenasView (módulo Reseñas de Google)', () => {
     cleanup();
   });
 
-  it('quien no es ADMIN no ve la lista y no pide datos', () => {
-    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ usuario: { rol: 'CAJERO' }, tiene: () => true } as any);
+  it('quien no tiene resenas/ver no ve la lista y no pide datos', () => {
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ usuario: { rol: 'CAJERO' }, tiene: () => false } as any);
     const get = vi.spyOn(api, 'get');
     render(
       <MemoryRouter>

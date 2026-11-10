@@ -67,6 +67,7 @@ Ver tambien: [[usuarios]]
 1. En el editor (o al crear), en Otros roles (opcional), marca los roles adicionales. Los permisos de todos sus roles se unen.
 2. Reglas: Administrador y Repartidor no se combinan; nadie puede darse roles a si mismo ("Nadie puede darse roles a si mismo"); un usuario desactivado primero se reactiva ("Reactiva al usuario antes de darle un rol"); si ya lo tiene dice "La persona ya tiene ese rol".
 3. Solo el Administrador da o quita roles.
+4. El rol Marketing y diseño (código MARKETING) ve solo Diseño de la carta, Novedades y publicidad, Conócenos, Destacadas de la carta, Reseñas de Google y Paleta de colores, más Mi perfil, Notificaciones y Mi asistencia. Sin caja, pedidos, clientes, usuarios ni configuración; entra directo a su primer módulo. Se combina con otros roles como los demás, y en Que ve cada rol se ajusta.
 
 ## Como se hace: Registrar un usuario por pasos y con otros documentos
 1. En Personal pulsa + Nuevo usuario. El formulario va por pasos: Datos personales, Puesto, Horario y Reemplazos, y termina con un Resumen final.

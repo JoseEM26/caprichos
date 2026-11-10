@@ -19,6 +19,7 @@ const NOMBRE_ROL: Record<string, string> = {
   ALMACEN: 'Almacén',
   PRODUCCION: 'Producción',
   REPARTIDOR: 'Repartidor',
+  MARKETING: 'Marketing y diseño',
 };
 
 /** Lo que el backend devuelve de GET /auth/perfil. Rol, DNI y estado son solo lectura. */

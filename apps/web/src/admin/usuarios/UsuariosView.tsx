@@ -278,6 +278,7 @@ export function UsuariosView() {
     produccion: porRol.PRODUCCION ?? 0,
     mozo: porRol.MOZO ?? 0,
     repartidor: porRol.REPARTIDOR ?? 0,
+    marketing: porRol.MARKETING ?? 0,
   };
 
   // Manejo de DNI
@@ -683,6 +684,7 @@ export function UsuariosView() {
                 { valor: 'produccion', etiqueta: 'Producción', cantidad: conteoRoles.produccion },
                 { valor: 'mozo', etiqueta: 'Mozo', cantidad: conteoRoles.mozo },
                 { valor: 'repartidor', etiqueta: 'Motorizado', cantidad: conteoRoles.repartidor },
+                { valor: 'marketing', etiqueta: 'Marketing y diseño', cantidad: conteoRoles.marketing },
               ]}
               alCambiar={(v) => {
                 setFiltroCargo(v);

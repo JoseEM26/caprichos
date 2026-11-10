@@ -47,9 +47,9 @@ describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
 });
 
 describe('anular pedidos: todos los roles de pedidos (orden del dueño 08/11)', () => {
-  it('todos los roles de personal con acceso a pedidos tienen pedidos/anular; ALMACEN no', () => {
+  it('todos los roles de personal con acceso a pedidos tienen pedidos/anular; ALMACEN y MARKETING no', () => {
     for (const [rol, claves] of Object.entries(MATRIZ)) {
-      expect(claves.includes('pedidos/anular')).toBe(rol !== 'ALMACEN');
+      expect(claves.includes('pedidos/anular')).toBe(rol !== 'ALMACEN' && rol !== 'MARKETING');
     }
   });
 

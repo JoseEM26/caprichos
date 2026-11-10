@@ -3,7 +3,7 @@ modulo: mi-asistencia
 titulo: Mi asistencia
 ruta: /admin/mi-asistencia
 permiso: asistencia/marcar
-roles: [ADMIN, CAJERO, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, CAJERO, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR, MARKETING]
 relacionados: [asistencia, asistencia-pantalla, propinas, usuarios, escritorio]
 sugerencias:
   - Como marco mi entrada con el QR de la pantalla

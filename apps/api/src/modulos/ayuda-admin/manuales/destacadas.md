@@ -2,8 +2,8 @@
 modulo: destacadas
 titulo: Destacadas de la carta
 ruta: /admin/destacadas
-permiso: catalogo/ver
-roles: [ADMIN]
+permiso: destacadas/ver
+roles: [ADMIN, MARKETING]
 relacionados: [novedades, disenador, productos]
 sugerencias:
   - ¿Cómo creo un nuevo círculo de historias en la carta?

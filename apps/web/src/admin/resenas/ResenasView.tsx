@@ -23,10 +23,11 @@ type Accion = { tipo: 'uno'; resena: ResenaAdmin } | { tipo: 'lote'; ids: string
 
 const plural = (n: number) => (n === 1 ? 'reseña' : 'reseñas');
 
-/** Módulo «Reseñas de Google»: ver todas las guardadas y ocultar o mostrar. Solo ADMIN. Nada se borra. */
+/** Módulo «Reseñas de Google»: ver todas las guardadas y ocultar o mostrar. Con el permiso resenas/ver (ADMIN y Marketing). Nada se borra. */
 export function ResenasView() {
-  const { usuario } = useSesion();
-  const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
+  const { tiene } = useSesion();
+  const esAdmin = tiene('resenas/ver');
+  const puedeIrAConfiguracion = tiene('configuracion/ver');
 
   const [datos, setDatos] = useState<RespuestaListar | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -138,7 +139,7 @@ export function ResenasView() {
   if (!esAdmin) {
     return (
       <div data-testid="resenas-no-admin" style={{ padding: 16, fontSize: 13, color: 'var(--cp-soft)' }}>
-        Reseñas de Google: solo ADMIN.
+        Reseñas de Google: tu rol no tiene acceso.
       </div>
     );
   }
@@ -223,14 +224,16 @@ export function ResenasView() {
       {guardadas === 0 ? (
         <EstadoVacio
           titulo="Todavía no hay reseñas de Google guardadas"
-          descripcion="Las reseñas se cargan desde Configuración › Operación, con el botón «Carga inicial»."
+          descripcion={puedeIrAConfiguracion ? 'Las reseñas se cargan desde Configuración › Operación, con el botón «Carga inicial».' : 'Las reseñas las carga el administrador desde Configuración › Operación.'}
           accion={
+            !puedeIrAConfiguracion ? undefined : (
             <Link
               to="/admin/mirest?tab=operacion"
               style={{ color: 'var(--cp-rust)', fontWeight: 700, fontSize: 14, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
             >
               Ir a Configuración › Operación
             </Link>
+            )
           }
         />
       ) : (

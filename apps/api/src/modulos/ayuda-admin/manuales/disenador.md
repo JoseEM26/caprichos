@@ -2,8 +2,8 @@
 modulo: disenador
 titulo: Diseño de la carta
 ruta: /admin/disenador
-permiso: local/ver
-roles: [ADMIN]
+permiso: carta_diseno/ver
+roles: [ADMIN, MARKETING]
 relacionados: [paleta, productos, listas, novedades, destacadas]
 sugerencias:
   - ¿Cómo cambio el orden de las categorías en la carta?

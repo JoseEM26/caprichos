@@ -19,6 +19,8 @@ export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'SUPERVISOR', nombre: 'Supervisor' },
   // Rol EXTRA para que cualquiera apoye en delivery (ver, seguir, tomar y entregar). A diferencia de REPARTIDOR sí se combina
   { codigo: 'APOYO_DELIVERY', nombre: 'Apoyo en delivery' },
+  // Rol para marketing y diseño: solo Diseñador, Novedades, Conócenos, Destacadas, Reseñas y Paleta (más lo personal). Se combina como los demás
+  { codigo: 'MARKETING', nombre: 'Marketing y diseño' },
 ] as const;
 
 /** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
@@ -206,6 +208,17 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'destacadas', accion: 'editar' },
   { modulo: 'destacadas', accion: 'archivar' },
   { modulo: 'destacadas', accion: 'eliminar' },
+  // Conócenos (antes colgaba de novedades/…): módulo propio
+  { modulo: 'conocenos', accion: 'ver' },
+  { modulo: 'conocenos', accion: 'editar' },
+  { modulo: 'conocenos', accion: 'publicar' },
+  // Paleta de colores (antes colgaba de carta_diseno/…): ver, crear/modificar paletas (borrador y descartar) y publicar (aplicar)
+  { modulo: 'paleta', accion: 'ver' },
+  { modulo: 'paleta', accion: 'editar' },
+  { modulo: 'paleta', accion: 'publicar' },
+  // Reseñas de Google (antes «solo ADMIN» a mano sobre configuracion/…): ver y gestionarlas (negocio, cargas, visibilidad)
+  { modulo: 'resenas', accion: 'ver' },
+  { modulo: 'resenas', accion: 'editar' },
   { modulo: 'mensajes_carta', accion: 'ver' },
   { modulo: 'mensajes_carta', accion: 'atender' },
   // Pantallas TV (FT-COC-01)
@@ -414,12 +427,39 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/ver',
     'notificaciones/marcar',
   ],
+  // Marketing y diseño: SOLO los seis módulos de contenido de la carta. Sin caja, pedidos, cocina, clientes, usuarios,
+  // configuración, comprobantes, almacén, reportes ni mensajes. archivos/subir: las fotos que suben Diseñador, Novedades,
+  // Conócenos y Destacadas (POST /admin/archivos).
+  MARKETING: [
+    'carta_diseno/ver',
+    'carta_diseno/editar',
+    'carta_diseno/publicar',
+    'novedades/ver',
+    'novedades/crear',
+    'novedades/editar',
+    'conocenos/ver',
+    'conocenos/editar',
+    'conocenos/publicar',
+    'destacadas/ver',
+    'destacadas/crear',
+    'destacadas/editar',
+    'destacadas/archivar',
+    'destacadas/eliminar',
+    'resenas/ver',
+    'resenas/editar',
+    'paleta/ver',
+    'paleta/editar',
+    'paleta/publicar',
+    'archivos/subir',
+    'notificaciones/ver',
+    'notificaciones/marcar',
+  ],
 };
 
 // Marcar asistencia: obligatoria para todo el personal salvo el ADMIN (el servicio también lo rechaza, aunque su matriz lo
 // incluya porque ADMIN recibe todos los permisos). El SUPERVISOR se arma más abajo desde CAJERO y MOZO y ya la hereda.
 // No existe un rol CONTADOR en el sistema: si se crea, agregarlo aquí.
-for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
+for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'MARKETING']) {
   MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
 }
 

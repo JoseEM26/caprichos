@@ -109,9 +109,10 @@ export const CASILLAS_ROL: Record<string, { rol: string; areaCocina?: string }> 
   almacen: { rol: 'ALMACEN' },
   delivery: { rol: 'REPARTIDOR' },
   supervision: { rol: 'SUPERVISOR' },
+  marketing: { rol: 'MARKETING' },
 };
 /** Orden para elegir el rol principal cuando solo vienen casillas. */
-const PRIORIDAD_ROL = ['CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'SUPERVISOR', 'REPARTIDOR'];
+const PRIORIDAD_ROL = ['CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'SUPERVISOR', 'MARKETING', 'REPARTIDOR'];
 
 /**
  * Áreas del Excel sin trabajo operativo: sin casillas de rol no se crea cuenta (así no marcan asistencia ni entran a planilla
