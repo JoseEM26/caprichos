@@ -12,12 +12,19 @@ import {
 
 describe('propinas.util', () => {
   describe('interruptor por canal', () => {
-    it('carta y bot tienen interruptor propio; mozo y caja nunca ofrecen propina', () => {
+    it('carta, bot, mozo y caja tienen interruptor propio', () => {
       expect(claveCanalPropina('CARTA')).toBe('carta');
       expect(claveCanalPropina('WHATSAPP')).toBe('bot');
       expect(claveCanalPropina('BOT')).toBe('bot');
-      expect(claveCanalPropina('MOZO')).toBeNull();
-      expect(claveCanalPropina('CAJA')).toBeNull();
+      expect(claveCanalPropina('MOZO')).toBe('mozo');
+      expect(claveCanalPropina('CAJA')).toBe('caja');
+      expect(claveCanalPropina('OTRO')).toBeNull();
+    });
+
+    it('mozo y caja: encendida solo si su clave es true; sin la clave (config vieja) = apagada', () => {
+      expect(propinaActivaParaCanal({ carta: false, bot: false, mozo: true, caja: false }, 'MOZO')).toBe(true);
+      expect(propinaActivaParaCanal({ carta: false, bot: false, mozo: true, caja: false }, 'CAJA')).toBe(false);
+      expect(propinaActivaParaCanal({ carta: true, bot: true }, 'MOZO')).toBe(false);
     });
 
     it('encendida solo en carta: el bot sigue apagado; sin configuración = apagada', () => {

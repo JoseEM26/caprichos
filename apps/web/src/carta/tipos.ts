@@ -118,7 +118,7 @@ export interface DatosLocalCarta {
   /** Umbrales de «Quedan N» y «¡Últimas!» (Configuración); sin dato valen 5 y 3. */
   avisoStock?: { quedan: number; ultimas: number };
   /** Propina opcional: interruptor de la carta y tope en soles (lo decide el dueño en Configuración) */
-  propina?: { carta: boolean; bot: boolean; tope: number };
+  propina?: { carta: boolean; bot: boolean; mozo?: boolean; caja?: boolean; tope: number };
   /** Pedir como invitado (sin celular): lo decide el dueño en Configuración. Sin dato = no permitido. */
   invitadoPermitido?: boolean;
   lat?: number;

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -39,6 +40,7 @@ async function llegarAResumenLlevar(alCerrar = vi.fn()) {
   fireEvent.click(await screen.findByText('Café Americano'));
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
+  irAlPago();
   await screen.findByRole('group', { name: 'Comprobante' });
   fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
 }
@@ -62,7 +64,7 @@ describe('Nuevo pedido: STOCK_INSUFICIENTE al registrar', () => {
     );
     await llegarAResumenLlevar(alCerrar);
     llenarPagaCon();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 
     const alerta = await screen.findByRole('alert');

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -77,13 +78,15 @@ async function llegarAResumen(modalidad: 'Para llevar' | 'Delivery', alExitoPedi
   // Las bebidas piden el nombre de quien la toma (va en la etiqueta del vaso)
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
+  // Paso 1 → paso 2 «Pago»
+  irAlPago();
   return { alExitoPedido, alCerrar };
 }
 
 async function confirmarRegistro() {
   elegirBoleta();
   llenarPagaCon();
-  fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+  continuarYEnviar();
   fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 }
 
@@ -108,7 +111,15 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
       />,
     );
     await screen.findByText('Aún no agregas productos.', { exact: false });
-    // El plan de pago va en el resumen, también en mesa: se declara al crear el pedido
+    // En mesa el pago es un paso aparte y solo se detalla con «Pagar ahora»
+    fireEvent.click(await screen.findByText('Café Americano'));
+    fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Ana' } });
+    irAlPago();
+    expect(screen.queryByRole('group', { name: '¿Cómo paga?' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Pagar ahora/ }));
     expect(await screen.findByRole('group', { name: '¿Cómo paga?' })).toBeInTheDocument();
   });
 
@@ -127,13 +138,13 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     await llegarAResumen('Para llevar');
     await screen.findByRole('group', { name: '¿Cómo paga?' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     expect(await screen.findByText(/Indica con cuánto paga/)).toBeInTheDocument();
     expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /Pago exacto/ }));
     expect((document.querySelector('#plan-paga-con') as HTMLInputElement).value).toBe('8.50');
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     expect(vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0].pago).toMatchObject({ metodo: 'EFECTIVO', pagaCon: 8.5 });
@@ -223,10 +234,11 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     const { alExitoPedido, alCerrar } = await llegarAResumen('Para llevar');
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     fireEvent.click(within(grupo).getByRole('button', { name: 'Yape' }));
-    // Total 8.50: se agrega otro medio (Efectivo, el primero libre); escribir 3.50 deja Yape en 5.00 solo
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
-    fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '3.5' } });
-    expect(screen.getByLabelText('Monto en Yape')).toHaveTextContent('S/ 5.00');
+    // Total 8.50: Yape baja a 5.00 y «Añadir otro método» agrega Efectivo con el saldo (3.50) ya sugerido
+    fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /Añadir otro método/ }));
+    expect(screen.getByLabelText('Monto en Efectivo')).toHaveValue(3.5);
+    expect(screen.getByTestId('estado-pago')).toHaveTextContent('Cubierto');
 
     await confirmarRegistro();
 
@@ -253,16 +265,18 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     await llegarAResumen('Para llevar');
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     fireEvent.click(within(grupo).getByRole('button', { name: 'Yape' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
-    // Efectivo por encima del total (8.50): Yape quedaría en negativo
-    fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /Añadir otro método/ }));
+    // Efectivo por encima del saldo: sobran 0.50 sobre el total (8.50)
+    fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '4' } });
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
-    // El botón sigue activo; al tocarlo no abre la confirmación y deja el aviso del plan
+    expect(screen.getByTestId('estado-pago')).toHaveTextContent('Sobra S/ 0.50');
+    // «Enviar a cocina» queda deshabilitado y dice qué falta
     elegirBoleta();
     llenarPagaCon();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
-    expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
-    expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
+    const enviar = screen.getByRole('button', { name: /^Enviar a cocina/ });
+    expect(enviar).toBeDisabled();
+    expect(screen.getByText(/Sobra S\/ 0.50: ajusta los montos/)).toBeInTheDocument();
+    expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
   });
 });

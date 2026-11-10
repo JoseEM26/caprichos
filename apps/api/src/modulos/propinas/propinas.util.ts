@@ -5,14 +5,16 @@
 
 export const TOPE_PROPINA_DEFECTO = 200;
 
-/** Canal del pedido → clave del interruptor propina_activa. El mozo y la caja no ofrecen propina. */
-export function claveCanalPropina(canal: string | null | undefined): 'carta' | 'bot' | null {
+/** Canal del pedido → clave del interruptor propina_activa (carta, bot, mozo y caja). */
+export function claveCanalPropina(canal: string | null | undefined): 'carta' | 'bot' | 'mozo' | 'caja' | null {
   if (canal === 'CARTA') return 'carta';
+  if (canal === 'MOZO') return 'mozo';
+  if (canal === 'CAJA') return 'caja';
   if (canal === 'WHATSAPP' || canal === 'BOT') return 'bot';
   return null;
 }
 
-/** Interruptor: propina_activa = { carta: boolean, bot: boolean }. Sin valor o mal formado = apagada. */
+/** Interruptor: propina_activa = { carta, bot, mozo, caja } (booleanos). Sin valor o mal formado = apagada. */
 export function propinaActivaParaCanal(activa: unknown, canal: string | null | undefined): boolean {
   const clave = claveCanalPropina(canal);
   if (!clave || !activa || typeof activa !== 'object') return false;

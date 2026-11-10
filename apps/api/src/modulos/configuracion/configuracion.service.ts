@@ -445,15 +445,16 @@ export class ConfiguracionService {
         });
       }
       if (clave === 'propina_activa') {
-        // Interruptor por canal: { carta: boolean, bot: boolean }. Sin propina de mozo ni de caja.
+        // Interruptor por canal: carta y bot (obligatorios) y mozo y caja (opcionales; sin valor = apagado)
         const v = valor as Record<string, unknown>;
-        if (typeof v.carta !== 'boolean' || typeof v.bot !== 'boolean') {
+        const opcionalBool = (x: unknown) => x === undefined || typeof x === 'boolean';
+        if (typeof v.carta !== 'boolean' || typeof v.bot !== 'boolean' || !opcionalBool(v.mozo) || !opcionalBool(v.caja)) {
           throw new BadRequestException({
             codigo: 'VALOR_INVALIDO',
-            mensaje: 'La propina se enciende o apaga por canal: carta y bot (verdadero o falso)',
+            mensaje: 'La propina se enciende o apaga por canal: carta, bot, mozo y caja (verdadero o falso)',
           });
         }
-        valor = { carta: v.carta, bot: v.bot };
+        valor = { carta: v.carta, bot: v.bot, mozo: v.mozo === true, caja: v.caja === true };
       }
     }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { VentanaOpcionesProducto } from '../componentes/VentanaOpcionesProducto';
 import { salonApi } from '../api';
@@ -96,6 +97,7 @@ async function llegarAResumenLlevar(alCerrar = vi.fn()) {
   fireEvent.click(screen.getByRole('button', { name: 'Agregar una de Oreo' }));
   fireEvent.click(screen.getByRole('button', { name: 'Agregar una de Oreo' }));
   fireEvent.click(screen.getByText('Agregar al pedido'));
+  irAlPago();
   await screen.findByRole('group', { name: 'Comprobante' });
   fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
 }
@@ -110,7 +112,7 @@ describe('Nuevo pedido de mozo con sabores', () => {
   it('la línea viaja con sabores y su cantidad por sabor', async () => {
     await llegarAResumenLlevar();
     llenarPagaCon();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 
     await vi.waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalled());
@@ -134,7 +136,7 @@ describe('Nuevo pedido de mozo con sabores', () => {
     );
     await llegarAResumenLlevar(alCerrar);
     llenarPagaCon();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 
     const alerta = await screen.findByRole('alert');

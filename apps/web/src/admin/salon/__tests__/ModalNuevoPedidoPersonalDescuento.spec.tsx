@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -83,12 +84,13 @@ describe('Pedido del personal en Nuevo pedido: descuento del personal visible', 
   it('pagar ahora: el «paga con» y el pago exacto usan el total con descuento', async () => {
     await llegar();
     await screen.findByText('Descuento del personal 25%');
+    irAlPago();
     fireEvent.click(await screen.findByRole('button', { name: /Pagar ahora/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Pago exacto' }));
     expect((document.querySelector('#personal-paga-con') as HTMLInputElement).value).toBe('15.00');
     fireEvent.change(document.querySelector('#personal-paga-con') as HTMLInputElement, { target: { value: '16' } });
     expect(screen.getByTestId('personal-vuelto')).toHaveTextContent('Vuelto: S/ 1.00');
-    expect(screen.getByRole('button', { name: /Registrar pedido/ })).toHaveTextContent('S/ 15.00');
+    expect(screen.getByRole('button', { name: /^Enviar a cocina/ })).toHaveTextContent('S/ 15.00');
   });
 
   it('al cambiar de trabajador recalcula con su porcentaje', async () => {

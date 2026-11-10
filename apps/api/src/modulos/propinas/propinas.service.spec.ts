@@ -44,6 +44,36 @@ describe('PropinasService', () => {
     expect(prisma.devolucionPedido.findMany.mock.calls[0][0].where.creado_en.gte.toISOString()).toBe('2026-11-01T05:00:00.000Z');
   });
 
+  it('resumenMes cuenta igual la propina de MOZO y CAJA con pago mixto (propina por renglón) y la de CARTA; sin filtrar por canal', async () => {
+    const { servicio, prisma } = crearServicio({
+      cobros: [
+        // mesa de mozo, mixto: la propina 6 se reparte por renglón en proporción a lo pagado (4 efectivo + 2 yape)
+        { medio: 'EFECTIVO', propina: 4, cobro: { en: new Date('2026-11-06T15:00:00Z'), pedido: { canal: 'MOZO' } } },
+        { medio: 'YAPE', propina: 2, cobro: { en: new Date('2026-11-06T15:00:00Z'), pedido: { canal: 'MOZO' } } },
+        { medio: 'TARJETA', propina: 3, cobro: { en: new Date('2026-11-06T18:00:00Z'), pedido: { canal: 'CAJA' } } },
+        { medio: 'YAPE', propina: 5, cobro: { en: new Date('2026-11-07T15:00:00Z'), pedido: { canal: 'CARTA' } } },
+      ],
+    });
+
+    const r = await servicio.resumenMes(2026, 11);
+
+    expect(r.total).toBe(14);
+    expect(r.porCanal).toEqual(expect.arrayContaining([{ canal: 'MOZO', monto: 6 }, { canal: 'CAJA', monto: 3 }, { canal: 'CARTA', monto: 5 }]));
+    // solo cobros vigentes (un cobro anulado o rechazado sale) y de cualquier canal
+    const donde = prisma.cobroPago.findMany.mock.calls[0][0].where;
+    expect(donde.propina).toEqual({ gt: 0 });
+    expect(donde.cobro.anulado_en).toBeNull();
+    expect(donde.cobro.pedido).toBeUndefined();
+    expect(JSON.stringify(donde)).not.toContain('canal');
+  });
+
+  it('un cobro anulado (por Caja o por cambio de cobro) no entra: la consulta exige anulado_en nulo y el cobro por verificar del mozo (sin cobro) no suma', async () => {
+    const { servicio, prisma } = crearServicio({ cobros: [] });
+    const r = await servicio.resumenMes(2026, 11);
+    expect(r.total).toBe(0);
+    expect(prisma.cobroPago.findMany.mock.calls[0][0].where.cobro.anulado_en).toBeNull();
+  });
+
   it('resumenMes sin datos: todo en cero y sin días', async () => {
     const { servicio } = crearServicio({});
     const r = await servicio.resumenMes(2026, 11);

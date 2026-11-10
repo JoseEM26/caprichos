@@ -61,6 +61,8 @@ export interface AbrirPedidoMesaPayload {
   nota?: string;
   reservaId?: string;
   cuponCodigo?: string;
+  /** Propina de monto libre, aparte de la venta (el servidor la ignora si el canal la tiene apagada) */
+  propina?: number;
   canal?: 'MOZO' | 'CAJA';
   /** Personas de la mesa: el servidor valida los asientos (confirmarCapacidad la permite si faltan) */
   personas?: number;

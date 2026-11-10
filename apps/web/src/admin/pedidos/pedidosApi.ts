@@ -553,9 +553,11 @@ export const pedidosApi = {
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
         pagaCon?: number;
-        /** Pago dividido: monto por medio (el API lo valida contra el total) */
+        /** Pago dividido: monto por medio (el API lo valida contra el total + propina) */
         plan?: PlanPagoItem[];
       };
+      /** Propina de monto libre, aparte de la venta (se ignora con el canal apagado) */
+      propina?: number;
       entrega?: {
         direccion?: string;
         referencia?: string;

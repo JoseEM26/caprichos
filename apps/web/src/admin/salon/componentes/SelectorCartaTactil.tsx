@@ -60,7 +60,7 @@ export const TarjetaProducto = memo(function TarjetaProducto({
       {conImagenes && (
         <span className="np-producto-foto">
           {p.fotoUrl ? (
-            <img src={p.fotoUrl} alt={p.nombre} width={96} height={96} loading="lazy" decoding="async" />
+            <img src={p.fotoUrl} alt={p.nombre} width={56} height={56} loading="lazy" decoding="async" />
           ) : (
             <span className="np-producto-iniciales">
               {p.nombre

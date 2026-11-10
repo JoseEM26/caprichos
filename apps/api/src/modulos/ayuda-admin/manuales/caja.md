@@ -48,6 +48,18 @@ Antes: [[cocina]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]
 
+## Como se hace: Armar la comanda en dos pasos (productos y pago)
+1. Paso 1 Pedido: elige los productos (la cuadricula muestra miniaturas pequenas; el boton Con imagen / Sin imagen y el buscador siguen igual), anota el celular y el nombre del cliente y, si hace falta, Quien pide, Cupon y la mesa. Continuar queda apagado hasta que haya productos y datos validos, y debajo dice que falta.
+2. Paso 2 Pago: en una mesa del local se elige Pagar ahora o Pagar al final. Solo con Pagar ahora se abre el detalle del pago. Para llevar y delivery el pago se pide siempre.
+3. Elige el primer metodo (Efectivo, Tarjeta, Yape, Plin o Transferencia). Si es efectivo, escribe con cuanto paga y la pantalla muestra el vuelto. Para pagar con mas de un metodo baja el monto del primero y pulsa Anadir otro metodo: la fila nueva trae el saldo sugerido (hasta 3 metodos; cada fila tiene Quitar). La pantalla siempre dice Falta o Cubierto.
+4. Propina (solo si el dueño la encendio para Caja o para el mozo en Configuracion, Propinas): es un monto libre, opcional y aparte del total; no sale en el comprobante ni suma puntos. Se ofrece con cualquier medio. En un pago mixto la propina se reparte entre los medios en proporcion a lo cobrado por cada uno. La propina se acumula en [[propinas]] y en el cierre aparece como linea informativa, aparte de las ventas.
+5. Elige el comprobante (simple, boleta o factura; con factura el RUC completa la razon social) y revisa el resumen: total y total a pagar con la propina. Atras vuelve al paso 1 sin perder nada.
+6. El boton final es Enviar a cocina con el total (y la propina si hay). Con Pagar ahora desde Caja el pedido sale a cocina con el pago registrado y su comprobante; si hay medios digitales se pide la captura de cada uno (opcional: la casilla confirma que ya se hablo con el cliente). Si el cobro falla (por ejemplo caja cerrada) el pedido igual ya esta en cocina y se puede reintentar desde el aviso.
+7. Desde el celular del mozo es igual, pero el mozo no cierra el cobro: con Pagar ahora el pedido sale a cocina y queda Pagado por mozo, por verificar, a su nombre. Caja revisa la foto o recibe el efectivo en el cierre y puede rechazar el cobro del mozo (con motivo). El pedido sigue por cobrar hasta que Caja lo confirme.
+Antes: [[plano]]
+Despues: [[cocina]]
+Ver tambien: [[comprobantes]]
+
 ## Como se hace: Aplicar un cupon en un pedido nuevo
 1. En Nuevo pedido (de Caja o del mozo), pulsar Cupon, escribir el codigo y pulsar Aplicar. El sistema lo valida con las mismas reglas de la carta (vigencia, horario, compra minima, usos y acumulacion con promociones) y muestra el descuento en el resumen.
 2. Si no sirve, aparece el motivo en claro: no existe, vencido, ya canjeado, compra minima no alcanzada, sin usos disponibles o ya hay una promocion con mayor descuento. Solo valida: el cupon se gasta al registrar el pedido y no se puede usar dos veces.
@@ -66,7 +78,7 @@ Ver tambien: [[cierre]]
 5. Pago coordinado: en Pedidos por coordinar, Marcar coordinado con Yape, Plin o Transferencia pide la misma foto (o la excepcion con motivo). Efectivo y tarjeta se marcan sin foto. Sí, marcar confirma la accion.
 6. La seccion Comprobantes muestra todas las fotos asociadas a la cuenta (de mozo, caja, WhatsApp o la carta), con su lectura. Pulsa la foto para verla en grande.
 7. Si el mozo ya subio la foto del voucher de una mesa, el cobro la muestra al abrir Registrar cobro: se cobra con esa foto (con su semaforo) sin subir otra. Si no sirve, pulsa Subir otra foto.
-8. Cobro de mesa enviado por el mozo: la campana avisa "Voucher del mozo por revisar" o "Pago en efectivo del mozo" y el enlace abre el pedido directamente. El mozo no cobra: Caja revisa la foto y registra el cobro.
+8. Cobro de mesa enviado por el mozo: la campana avisa "Voucher del mozo por revisar" o "Pago en efectivo del mozo" y el enlace abre el pedido directamente. El mozo no cierra el cobro: lo deja Pagado por mozo, por verificar, y Caja revisa la foto (o recibe el efectivo en el cierre), lo confirma o lo rechaza con motivo.
 Antes: [[cocina]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]
