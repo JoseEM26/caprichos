@@ -1394,8 +1394,26 @@ describe('PedidosService', () => {
         await service.crear({ ...pedidoBaseDto, puntosCanje: 10 }, 'idemp-canje-ok', { clientePartyId: 200n });
 
         expect(puntosServiceMock.canjear).toHaveBeenCalledWith(200n, 10, 101n, expect.anything());
-        const ultimoUpdate = prismaMock.pedido.update.mock.calls.at(-1)[0];
-        expect(ultimoUpdate.data.total.toNumber()).toBe(23.0);
+        // el total se guarda YA neto (28 - 10 + 5 de envío), sin un segundo update posterior
+        const datos = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(datos.total.toNumber()).toBe(23.0);
+        expect(datos.descuento.toNumber()).toBe(0);
+      });
+
+      it('el plan de pago y «paga con» se validan contra el total NETO de puntos', async () => {
+        puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+        prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W005', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 23.0 });
+        const dto = (plan: any, pagaCon?: number) => ({ ...pedidoBaseDto, puntosCanje: 10, pago: { metodo: 'YAPE', plan, ...(pagaCon ? { pagaCon } : {}) } as any });
+
+        // el plan por el bruto (33) ya no cuadra: el cliente paga 23
+        const err = await service.crear(dto([{ medio: 'YAPE', monto: 33 }]), 'idemp-plan-bruto', { clientePartyId: 200n }).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'PLAN_PAGO_NO_CUADRA' });
+        // el plan por el neto (23) sí
+        await expect(service.crear(dto([{ medio: 'YAPE', monto: 23 }]), 'idemp-plan-neto', { clientePartyId: 200n })).resolves.toBeDefined();
+        // efectivo sin plan: paga con 25 alcanza para 23 (antes se exigía el bruto 33)
+        await expect(
+          service.crear({ ...pedidoBaseDto, puntosCanje: 10, pago: { metodo: 'EFECTIVO', pagaCon: 25 } as any }, 'idemp-efec-neto', { clientePartyId: 200n }),
+        ).resolves.toBeDefined();
       });
 
       it('si el canje falla, el error sale de la MISMA transacción (revierte pedido y stock) y no deja un pedido ANULADO', async () => {

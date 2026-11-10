@@ -242,7 +242,10 @@ export class PuntosService {
    * Revierte los puntos sumados al anular un pedido y devuelve los canjeados (RQ-CLI-02-04, RQ-CLI-02-12).
    * Totalmente IDEMPOTENTE.
    */
-  async reversarPorPedido(pedidoId: bigint | string): Promise<{ puntosReversados: number; puntosDevueltos: number }> {
+  async reversarPorPedido(
+    pedidoId: bigint | string,
+    opts: { conservarCanje?: boolean } = {},
+  ): Promise<{ puntosReversados: number; puntosDevueltos: number }> {
     const pId = BigInt(pedidoId);
 
     const pedido = await this.prisma.pedido.findUnique({
@@ -304,7 +307,8 @@ export class PuntosService {
         where: { pedido_id: pId, tipo: 'DEVOLUCION_CANJE' },
       });
 
-      if (movCanje && !movDevolucion) {
+      // conservarCanje: se anuló solo el COBRO (el pedido sigue vivo y con su descuento): los puntos canjeados no se devuelven
+      if (movCanje && !movDevolucion && !opts.conservarCanje) {
         puntosDevueltos = Number(movCanje.puntos);
         await tx.movimientoPuntos.create({
           data: {
@@ -412,12 +416,19 @@ export class PuntosService {
         },
       });
 
-      const res = await tx.customerDetail.update({
-        where: { party_role_id: rolCliente.id },
-        data: {
-          puntos: { decrement: puntos },
-        },
-      });
+      // Descuento condicionado al saldo (where con puntos >= canje): dos canjes simultáneos no dejan el saldo en negativo
+      let res;
+      try {
+        res = await tx.customerDetail.update({
+          where: { party_role_id: rolCliente.id, puntos: { gte: puntos } },
+          data: { puntos: { decrement: puntos } },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new BadRequestException({ codigo: 'PUNTOS_INSUFICIENTES', mensaje: 'Tu saldo de puntos cambió; revisa cuántos puntos tienes' });
+        }
+        throw err;
+      }
       nuevoSaldo = Number(res.puntos);
 
       if (pId) {

@@ -6,6 +6,7 @@ import { horaLima, montoEnLetras } from '../sunat/sunat.util';
 import { AmbienteSunat } from '../sunat/sunat.config';
 import { DatosPdfComprobante } from './comprobante-pdf';
 import { lineasParaComprobante } from '../../pedidos/lineas-combo.util';
+import { descuentoParaComprobante } from '../../pedidos/total-pedido';
 
 /** Texto no vacío o cadena vacía. */
 const texto = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -35,7 +36,7 @@ export function armarDatosPdf(
       subtotalCents: aCentimos(Number(l.subtotal ?? Number(l.precio_unit) * (Number(l.cantidad) || 1))),
     })),
     envioCents: aCentimos(Number(pedido.envio ?? 0)),
-    descuentoCents: aCentimos(Number(pedido.descuento ?? 0)),
+    descuentoCents: aCentimos(descuentoParaComprobante(pedido)),
     totalCents: aCentimos(Number(pedido.total)),
     igvPct: pctDerivado,
   };
@@ -49,7 +50,7 @@ export function armarDatosPdf(
   }
   const base = totales ? totales.totalGravadaCents : totalGuardado - (igvGuardado ?? 0);
   const igv = totales ? totales.totalIgvCents : igvGuardado ?? 0;
-  const descuento = totales ? totales.descuentoCents : aCentimos(Number(pedido.descuento ?? 0));
+  const descuento = totales ? totales.descuentoCents : aCentimos(descuentoParaComprobante(pedido));
   const totalCents = totales ? totales.totalCents : totalGuardado;
   if (!items.length) {
     items = lineasParaComprobante(pedido.lineas || []).map((l: any) => ({

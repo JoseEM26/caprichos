@@ -13,6 +13,7 @@ import { nombresDePartes } from './devolucion-pedido.util';
 import { calcularAjusteCobro, ESTADOS_CERRADOS_UBICACION, textoAvisoEnvio } from './cambio-ubicacion.util';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { LiquidarAjusteUbicacionDto } from './dto/liquidar-ajuste-ubicacion.dto';
+import { totalPedido } from '../pedidos/total-pedido';
 
 /** Quién origina un cambio de punto: Caja, el repartidor (propuesta) o el cliente por WhatsApp. */
 export type OrigenCambio = 'CAJA' | 'REPARTIDOR' | 'WHATSAPP_CLIENTE';
@@ -128,7 +129,7 @@ export class CambioUbicacionService {
       ahora: pedido.creado_en,
       envioGratisCupon,
     });
-    const totalNuevo = Number((subtotal - Number(pedido.descuento) + envio).toFixed(2));
+    const totalNuevo = totalPedido({ subtotal, descuento: pedido.descuento, envio, puntosCanjeados: pedido.puntos_canjeados });
     const envioAnterior = Number(pedido.envio ?? 0);
     const totalAnterior = Number(pedido.total);
     const pagado = pedido.pago_estado === 'PAGADO';

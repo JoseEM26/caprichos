@@ -44,6 +44,7 @@ import { armarDatosPdf } from './pdf/comprobante-datos';
 import { generarPdfComprobante } from './pdf/comprobante-pdf';
 import { leerParametroNumerico } from '../impresion/estado-impresion';
 import { lineasParaComprobante } from '../pedidos/lineas-combo.util';
+import { descuentoParaComprobante } from '../pedidos/total-pedido';
 
 /** Plazo de la comunicación de baja de una factura en SUNAT (días). */
 export const PLAZO_BAJA_FACTURA_DIAS = 7;
@@ -122,7 +123,7 @@ export class ComprobantesService {
         subtotalCents: aCentimos(Number(l.subtotal ?? Number(l.precio_unit) * (Number(l.cantidad) || 1))),
       })),
       envioCents: aCentimos(Number(pedido.envio ?? 0)),
-      descuentoCents: aCentimos(Number(pedido.descuento ?? 0)),
+      descuentoCents: aCentimos(descuentoParaComprobante(pedido)),
       totalCents: aCentimos(Number(pedido.total)),
     };
   }

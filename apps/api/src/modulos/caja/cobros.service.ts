@@ -741,7 +741,7 @@ export class CobrosService {
     // el cobro anulado devuelve el stock de insumos y reversa los puntos; los productos que controlan stock
     // siguen vendidos (el pedido sigue vivo y se descontaron al crearlo)
     for (const paso of [
-      () => this.puntosService?.reversarPorPedido(cobro.pedido_id),
+      () => this.puntosService?.reversarPorPedido(cobro.pedido_id, { conservarCanje: true }),
       () => this.stockService?.revertirPorPedido(cobro.pedido_id, undefined, usuario?.partyId, { soloInsumos: true }),
     ]) {
       try {

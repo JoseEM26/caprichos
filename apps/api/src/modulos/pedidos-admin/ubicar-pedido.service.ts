@@ -13,6 +13,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery } from '../ofertas/envio-gratis-promo';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
+import { totalPedido } from '../pedidos/total-pedido';
 
 const ESTADOS_CERRADOS = ['ENTREGADO', 'ANULADO'];
 
@@ -82,7 +83,7 @@ export class UbicarPedidoService {
       ahora: pedido.creado_en,
       envioGratisCupon,
     });
-    const total = Number((subtotal - Number(pedido.descuento) + envio).toFixed(2));
+    const total = totalPedido({ subtotal, descuento: pedido.descuento, envio, puntosCanjeados: pedido.puntos_canjeados });
 
     // Con el pago ya cobrado el total no puede moverse: hay que anular y rehacer
     if (pedido.pago_estado === 'PAGADO' && total !== Number(pedido.total)) {

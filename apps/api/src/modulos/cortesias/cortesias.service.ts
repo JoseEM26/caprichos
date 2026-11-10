@@ -6,6 +6,7 @@ import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '
 import { etiquetaMotivo, validarMotivoCortesia } from './cortesia.tipos';
 import { FilaCortesia, resumenCortesias } from './cortesias-informe';
 import { FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
+import { totalPedido } from '../pedidos/total-pedido';
 
 /** Fecha de Lima (UTC-5, sin horario de verano) a instante, para filtrar creado_en por día. */
 function inicioDiaLima(fecha: string): Date {
@@ -177,7 +178,7 @@ export class CortesiasService {
         mensaje: 'Un pedido solo de cortesías no se puede cobrar: registra la cortesía por separado',
       });
     }
-    const totalNuevo = Number(Math.max(0, subtotalNuevo - Number(pedido.descuento) + Number(pedido.envio ?? 0)).toFixed(2));
+    const totalNuevo = totalPedido({ subtotal: subtotalNuevo, descuento: pedido.descuento, envio: pedido.envio, puntosCanjeados: pedido.puntos_canjeados });
     const delta = Number((totalNuevo - Number(pedido.total)).toFixed(2));
     const porId = usuario.partyId;
 

@@ -1,6 +1,7 @@
 import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
+import { totalPedido } from './total-pedido';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
 import {
   BadRequestException,
@@ -1064,6 +1065,9 @@ export class PedidosService {
     // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
     if (puntosCanje > 0) {
+      if (personal) {
+        throw new BadRequestException({ codigo: 'PUNTOS_NO_APLICAN_PERSONAL', mensaje: 'El pedido del personal no canjea puntos' });
+      }
       const partyCliente = origen?.clientePartyId;
       const cuentaActiva = partyCliente && this.direcciones ? await this.direcciones.datosCuentaActiva(BigInt(partyCliente)) : null;
       if (!partyCliente || !this.puntosService || !cuentaActiva) {
@@ -1094,7 +1098,9 @@ export class PedidosService {
       }
     }
 
-    const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
+    // El total es lo que realmente se paga: ya sin los puntos canjeados (1 punto = S/ 1). El plan de pago, «paga con»,
+    // el voucher y el comprobante se validan contra este neto.
+    const totalCalculado = totalPedido({ subtotal: subtotalCalculado, descuento: descuentoAplicado, envio: envio ?? 0, puntosCanjeados: puntosCanje });
 
     // 7.5. Propina opcional: va APARTE de la venta (no suma al total, comprobante ni puntos). Lo que paga el
     // cliente (plan, voucher, efectivo) es total + propina.
@@ -1388,11 +1394,6 @@ export class PedidosService {
       totalFinal = Number(pedido.total);
       if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
         await this.puntosService.canjear(origen.clientePartyId as any, puntosCanje, pedido.id, tx);
-        totalFinal = Number(Math.max(0, totalFinal - puntosCanje).toFixed(2));
-        await tx.pedido.update({
-          where: { id: pedido.id },
-          data: { total: new Prisma.Decimal(totalFinal) },
-        });
       }
 
       return pedido;

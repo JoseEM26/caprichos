@@ -1548,6 +1548,9 @@ export class OfertasService {
       });
     }
 
+    if (Number(pedido.puntos_canjeados ?? 0) > 0) {
+      throw new BadRequestException({ codigo: 'PUNTOS_CON_CUPON', mensaje: 'No se pueden usar puntos y un cupón en el mismo pedido' });
+    }
     const validacion = await this.validarCuponParaCarta({
       codigo: dto.codigo,
       subtotal: Number(pedido.subtotal),

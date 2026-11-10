@@ -291,6 +291,21 @@ describe('PuntosService', () => {
   });
 
   describe('reversarPorPedido (RQ-CLI-02-04, RQ-CLI-02-12)', () => {
+    it('anular solo el COBRO (conservarCanje) no devuelve los puntos canjeados: el pedido sigue con su descuento', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ id: 101n, codigo: 'CP-0101', canal: 'CARTA', party_id: 200n });
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '5.00' } });
+      prismaMock.movimientoPuntos.findFirst
+        .mockResolvedValueOnce(null) // movSuma
+        .mockResolvedValueOnce(null) // movReversa
+        .mockResolvedValueOnce({ id: 2n, tipo: 'CANJE', puntos: '10.00' }) // movCanje
+        .mockResolvedValueOnce(null); // movDevolucion
+
+      const res = await service.reversarPorPedido(101n, { conservarCanje: true });
+
+      expect(res.puntosDevueltos).toBe(0);
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
     it('revierte los puntos sumados al anular un pedido', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 101n,
@@ -426,6 +441,20 @@ describe('PuntosService', () => {
 
       const res = await service.canjear(200n, 60, 300n);
       expect(res.puntosCanjeados).toBe(60);
+    });
+
+    it('dos canjes simultáneos: si el saldo ya no alcanza al descontar, PUNTOS_INSUFICIENTES (nunca saldo negativo)', async () => {
+      prismaMock.customerDetail.findFirst.mockResolvedValue({ puntos: '10.00' });
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '10.00' } });
+      prismaMock.customerDetail.update.mockRejectedValue(Object.assign(new Error('no record'), { code: 'P2025' }));
+
+      const err = await service.canjear(200n, 8).catch((e) => e);
+
+      expect(err.getResponse()).toMatchObject({ codigo: 'PUNTOS_INSUFICIENTES' });
+      // el descuento se pide condicionado al saldo
+      expect(prismaMock.customerDetail.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { party_role_id: 50n, puntos: { gte: 8 } } }),
+      );
     });
 
     it('rechaza el canje si se piden más puntos que el saldo', async () => {
