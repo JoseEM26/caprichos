@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
-import { Reparto, totalElegido } from '../comun/saboresMezcla';
-import { claveSabor, type ParteEleccion } from './ReemplazoCombo';
+import { Reparto } from '../comun/saboresMezcla';
+import { claveSabor, cuposDeClave, lugaresElegidos, type ParteEleccion } from './ReemplazoCombo';
 import './combo-armado.css';
 
 interface Props {
@@ -34,7 +34,9 @@ export function resumenReparto(parte: ParteEleccion, valor: Reparto, solo?: stri
 export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshabilitar = false, usos = {} }: Props) {
   const total = parte.cantidad * unidades;
   const base = useId();
-  const elegidas = totalElegido(valor);
+  const elegidas = lugaresElegidos(parte, valor);
+  // Hay productos que ocupan más de un lugar: el contador habla de «lugares»
+  const conCupos = parte.opciones.some((o) => (o.cupos ?? 1) > 1);
   const faltan = Math.max(0, total - elegidas);
   const sobran = Math.max(0, elegidas - total);
   const porSabor = parte.opciones.filter((o) => o.sabores && o.sabores.length > 0);
@@ -50,10 +52,15 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
   };
 
   // Un sabor: nombre (con aviso si no hay stock), y −, cantidad, + (el + solo si puedeMas)
-  const casilla = (clave: string, etiqueta: string, visible: string, cantidad: number, disponible: boolean, puedeMas: boolean, aviso: string | null) => (
+  const casilla = (clave: string, etiqueta: string, visible: string, cantidad: number, disponible: boolean, puedeMas: boolean, aviso: string | null) => {
+    const cupos = cuposDeClave(parte, clave);
+    return (
     <div key={clave} className="ca-sabor" data-n={cantidad > 0 ? 'si' : 'no'} data-agotado={disponible ? 'no' : 'si'}>
       <span style={{ minWidth: 0, fontWeight: 700, fontSize: 13, lineHeight: '16px', color: 'var(--cp-navy)' }}>
         {visible}
+        {cupos > 1 && (
+          <span data-testid={`ocupa-${clave}`} style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft)' }}>{`ocupa ${cupos}`}</span>
+        )}
         {aviso && <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-rust)' }}>{aviso}</span>}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
@@ -68,7 +75,8 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   const sueltas = parte.opciones.filter((o) => !(o.sabores && o.sabores.length > 0));
   const completo = total > 0 && elegidas === total;
@@ -82,7 +90,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
       style={{ border: `1.5px solid ${completo ? 'var(--cp-green)' : 'var(--cp-line)'}`, borderRadius: 14, padding: 12, background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)' }}>{`Elige ${total} ${total === 1 ? 'opción' : 'opciones'}`}</span>
+        <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)' }}>{conCupos ? `Elige ${total} lugares` : `Elige ${total} ${total === 1 ? 'opción' : 'opciones'}`}</span>
         <span aria-live="polite" style={{ fontWeight: 800, fontSize: 12, color: completo ? 'var(--cp-green)' : 'var(--cp-rust)' }}>
           {sobran > 0 ? `Sobran ${sobran}: quita unidades` : faltan > 0 ? `Faltan ${faltan}` : 'Completo ✓'}
         </span>
@@ -91,7 +99,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
         <div className="ca-barra" data-completo={completo ? 'si' : 'no'} role="progressbar" aria-label="Opciones elegidas" aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(elegidas, total)}>
           <span style={{ width: `${total > 0 ? Math.min(100, (elegidas / total) * 100) : 0}%` }} />
         </div>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>{`${Math.min(elegidas, total)} de ${total} elegidas`}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>{conCupos ? `${Math.min(elegidas, total)} de ${total} lugares` : `${Math.min(elegidas, total)} de ${total} elegidas`}</span>
       </div>
 
       {porSabor.map((o) => {
@@ -115,7 +123,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
                   const clave = claveSabor(o.id, s.id);
                   const cantidad = valor[clave] ?? 0;
                   const restan = s.saldo - (usos[s.id] ?? 0);
-                  const puedeMas = !deshabilitar && s.disponible && elegidas < total && restan > 0;
+                  const puedeMas = !deshabilitar && s.disponible && elegidas + cuposDeClave(parte, clave) <= total && restan > 0;
                   const sinStock = !s.disponible || (restan <= 0 && cantidad === 0);
                   return casilla(clave, `${o.nombre} · ${s.nombre}`, s.nombre, cantidad, !sinStock, puedeMas, sinStock ? 'No hay stock' : null);
                 })}
@@ -129,7 +137,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
         <div style={rejilla}>
           {sueltas.map((o) => {
             const cantidad = valor[o.id] ?? 0;
-            const puedeMas = !deshabilitar && o.disponible && elegidas < total;
+            const puedeMas = !deshabilitar && o.disponible && elegidas + cuposDeClave(parte, o.id) <= total;
             return casilla(o.id, o.nombre, o.nombre, cantidad, o.disponible, puedeMas, o.disponible ? null : o.sinStock ? 'No hay stock' : 'Agotado');
           })}
         </div>

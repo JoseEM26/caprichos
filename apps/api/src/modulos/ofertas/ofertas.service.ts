@@ -48,6 +48,7 @@ import {
   productosDeParte,
   ProductoDisp,
   saborDisponible,
+  cuposDeProducto,
 } from './combo-disponibilidad.util';
 import { estaDisponible, obtenerFotoUrl } from '../catalogo/catalogo.service';
 import { sincronizarAnfitrionCombo } from './combo-anfitrion';
@@ -461,6 +462,7 @@ export class OfertasService {
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
               ...this.opcionalDeParte(tipoParte, p),
+              ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -722,6 +724,7 @@ export class OfertasService {
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
               ...this.opcionalDeParte(tipoParte, p),
+              ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -2382,6 +2385,7 @@ export class OfertasService {
         continue;
       }
       const requeridas = parte.cantidad * unidades;
+      const ocupados = picks.reduce((a, pk) => a + cuposDeProducto(parte, String(pk.productoId)), 0);
       if (picks.length === 0) {
         // Con lista de productos (juguetes), paquete o bebidas por categoría es obligatoria; otra parte por categoría no genera líneas
         if (parte.productos.length > 0 || parte.paqueteGrupo || esParteBebidas(parte, disp)) {
@@ -2392,10 +2396,14 @@ export class OfertasService {
         }
         continue;
       }
-      if (picks.length !== requeridas) {
+      if (ocupados !== requeridas) {
+        const grandes = picks.filter((pk) => cuposDeProducto(parte, String(pk.productoId)) > 1);
+        const g = grandes[0] ? nombreDe(String(grandes[0].productoId)) : null;
         throw new BadRequestException({
           codigo: 'COMBO_ELECCION_INCOMPLETA',
-          mensaje: `Elige exactamente ${requeridas} opción(es) para ${oferta.nombre}`,
+          mensaje: g
+            ? `${g} ocupa ${cuposDeProducto(parte, String(grandes[0].productoId))} lugares: elige solo ${g.toLowerCase()} o completa con productos de 1 lugar (${requeridas} lugares en total en ${oferta.nombre})`
+            : `Elige exactamente ${requeridas} opción(es) para ${oferta.nombre}`,
         });
       }
       acumular(
@@ -2495,6 +2503,38 @@ export class OfertasService {
       incluida_por_defecto: p.incluidaPorDefecto ?? true,
       precio_extra: p.precioExtra != null ? new Prisma.Decimal(p.precioExtra) : null,
     };
+  }
+
+  /**
+   * Cupos por producto de una parte A_ELECCION ({ productoId: 2 }): solo productos de la parte, enteros de 2 a `cantidad`
+   * (un producto de 1 cupo no se guarda). Sin cupos queda NULL y todo vale 1, como siempre.
+   */
+  private async cuposDeParte(
+    tx: any,
+    tipo: string,
+    cantidad: number,
+    prodIds: bigint[],
+    catIds: bigint[],
+    crudo?: Record<string, number> | null,
+  ): Promise<{ cupos_producto?: Record<string, number> }> {
+    const invalido = (mensaje: string) => new BadRequestException({ codigo: 'COMBO_CUPOS_INVALIDOS', mensaje });
+    const entradas = Object.entries(crudo ?? {}).filter(([, n]) => n !== 1);
+    if (entradas.length === 0) return {};
+    if (tipo !== 'A_ELECCION') throw invalido('Solo una parte «El cliente elige» puede tener cupos por producto');
+    const cupos: Record<string, number> = {};
+    for (const [id, n] of entradas) {
+      if (!/^\d+$/.test(id) || !Number.isInteger(n) || n < 1 || n > cantidad) {
+        throw invalido(`Los cupos de un producto van de 1 a ${cantidad} (lo que elige el cliente en la parte)`);
+      }
+      cupos[id] = n;
+    }
+    const ids = Object.keys(cupos).map((x) => BigInt(x));
+    const pertenecen =
+      prodIds.length > 0
+        ? ids.every((x) => prodIds.includes(x))
+        : (await tx.producto.count({ where: { id: { in: ids }, categoria_id: { in: catIds } } })) === ids.length;
+    if (!pertenecen) throw invalido('Los cupos solo pueden ser de productos que están en la parte');
+    return { cupos_producto: cupos };
   }
 
   /** Ids numéricos de una lista de entrada (sabores, excluidos): sin repetir y sin valores raros. */
@@ -2739,6 +2779,11 @@ export class OfertasService {
           const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos).filter((x) => !x.oculto);
           p.opcionesDetalle = deLaParte.map((x) => detalleOpcion(x.id, deLaParte));
         }
+        // Producto que ocupa más de un lugar en la parte: la carta, el mozo y Caja lo muestran («ocupa 2»)
+        for (const o of p.opcionesDetalle ?? []) {
+          const c = cuposDeProducto(p, o.id);
+          if (c > 1) o.cupos = c;
+        }
       });
     }
     return items;
@@ -2879,6 +2924,7 @@ export class OfertasService {
             paqueteNombre: cp.paquete_nombre ?? null,
             saboresIds: (cp.sabores_ids || []).map((x: any) => x.toString()),
             productosExcluidos: (cp.productos_excluidos_ids || []).map((x: any) => x.toString()),
+            ...(cp.cupos_producto && Object.keys(cp.cupos_producto).length > 0 ? { cuposProducto: cp.cupos_producto as Record<string, number> } : {}),
             opcional: !!cp.opcional,
             cantidadMin: cp.cantidad_min ?? 0,
             cantidadMax: cp.cantidad_max ?? null,

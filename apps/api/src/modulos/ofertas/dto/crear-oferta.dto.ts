@@ -58,6 +58,22 @@ export class ComboPrecioDto {
   precio!: number;
 }
 
+/** Cupos por producto: { "<productoId>": entero de 1 a `cantidad` } (la pertenencia a la parte la valida el servicio). */
+@ValidatorConstraint({ name: 'cuposProductoValidos', async: false })
+export class CuposProductoValidosConstraint implements ValidatorConstraintInterface {
+  validate(valor: unknown, args: ValidationArguments): boolean {
+    if (valor === null || valor === undefined) return true;
+    if (typeof valor !== 'object' || Array.isArray(valor)) return false;
+    const max = Number((args.object as { cantidad?: number }).cantidad) || 1;
+    return Object.entries(valor as Record<string, unknown>).every(
+      ([id, n]) => /^\d+$/.test(id) && Number.isInteger(n) && (n as number) >= 1 && (n as number) <= max,
+    );
+  }
+  defaultMessage(): string {
+    return 'cuposProducto debe ser { productoId: entero de 1 a la cantidad de la parte }';
+  }
+}
+
 export class ComboParteDto {
   @IsOptional()
   @IsString()
@@ -113,6 +129,11 @@ export class ComboParteDto {
   @IsOptional()
   @IsArray({ message: 'productosExcluidos debe ser un arreglo' })
   productosExcluidos?: (string | number)[];
+
+  /** Solo A_ELECCION: lugares que ocupa cada producto; lo no listado vale 1. */
+  @IsOptional()
+  @Validate(CuposProductoValidosConstraint)
+  cuposProducto?: Record<string, number> | null;
 
   /** Parte FIJO opcional (el cliente puede quitarla o pedir extras). */
   @IsOptional()

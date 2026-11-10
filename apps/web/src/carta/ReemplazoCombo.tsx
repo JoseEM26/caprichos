@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react';
 import type { AlternativaParteItem, ComboParteItem, OfertaItem, OpcionDetalleCombo } from '../admin/ofertas/ofertasApi';
-import { Reparto, totalElegido } from '../comun/saboresMezcla';
+import { Reparto } from '../comun/saboresMezcla';
 
 /**
  * Parte del combo sin saldo para su original: el cliente elige una alternativa (producto y cantidad propios,
@@ -343,9 +343,16 @@ export function usosDeSabor(
   return usos;
 }
 
-/** Falta (o sobra) elegir en alguna parte: hay que elegir cantidad × unidades exactas. */
+/** Lugares que ocupa una opción (clave «productoId» o «productoId|saborId») en la parte: 1 si no dice otra cosa. */
+export const cuposDeClave = (parte: ParteEleccion, clave: string): number => parte.opciones.find((o) => o.id === clave.split('|')[0])?.cupos ?? 1;
+
+/** Lugares ocupados por lo elegido en la parte (cada unidad cuenta los cupos de su producto). */
+export const lugaresElegidos = (parte: ParteEleccion, reparto: Reparto): number =>
+  Object.entries(reparto).reduce((a, [clave, n]) => a + (Number.isFinite(n) && n > 0 ? n * cuposDeClave(parte, clave) : 0), 0);
+
+/** Falta (o sobra) elegir en alguna parte: los lugares ocupados deben ser cantidad × unidades exactas. */
 export function faltaElegirJuguetes(partes: ParteEleccion[], juguetes: Record<string, Reparto>, unidades: number): boolean {
-  return partes.some((p) => totalElegido(juguetes[p.parteId] ?? {}) !== p.cantidad * unidades);
+  return partes.some((p) => lugaresElegidos(p, juguetes[p.parteId] ?? {}) !== p.cantidad * unidades);
 }
 
 /** Hay una parte sin original disponible y sin alternativa elegida. */
