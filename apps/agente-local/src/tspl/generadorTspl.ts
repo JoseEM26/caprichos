@@ -259,7 +259,10 @@ export function generarTsplTrabajo(
   copia: boolean = false,
   formato?: Partial<FormatoEtiqueta>
 ): string {
-  const opciones: OpcionesGeneradorTspl = { copias: copia ? 2 : 1, formato };
+  // Una reimpresión es UN papel nuevo: antes `copia` mandaba `PRINT 1,2` y la etiquetera sacaba dos stickers por reimpresión
+  // (los vasos salían dobles). `copia` solo marca el trabajo como reimpresión en el servidor.
+  void copia;
+  const opciones: OpcionesGeneradorTspl = { copias: 1, formato };
 
   switch (tipo) {
     case 'ETIQUETA_GENERAL':

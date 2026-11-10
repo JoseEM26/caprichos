@@ -115,6 +115,16 @@ describe('generadorTspl', () => {
       expect(generarEtiquetaGeneral(datosGeneral, { copias: 2 })).toContain('PRINT 1,2\r\n');
     });
 
+    it('una reimpresión (copia=true) saca UN solo sticker: nunca PRINT 1,2 (los vasos salían dobles)', () => {
+      for (const [tipo, datos] of [['ETIQUETA_BEBIDA', datosBebida], ['ETIQUETA_GENERAL', datosGeneral], ['ETIQUETA_AREA', datosArea]] as const) {
+        const reimpresion = generarTsplTrabajo(tipo, datos as never, true);
+        const normal = generarTsplTrabajo(tipo, datos as never, false);
+        expect(reimpresion).toContain('PRINT 1,1\r\n');
+        expect(reimpresion).not.toContain('PRINT 1,2');
+        expect(reimpresion).toBe(normal);
+      }
+    });
+
     it('con 60 productos resume con "+ N MAS" y no escribe fuera del lienzo', () => {
       const muchos: EtiquetaGeneralDatos = {
         ...datosGeneral,
