@@ -8,6 +8,7 @@ import {
 import { historialProducto, type ConsultaHistorial } from './historial-producto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -437,10 +438,10 @@ export class AlmacenService {
     if (query.fechaDesde || query.fechaHasta) {
       where.en = {};
       if (query.fechaDesde) {
-        where.en.gte = new Date(`${query.fechaDesde}T00:00:00.000Z`);
+        where.en.gte = inicioDiaLimaIso(query.fechaDesde);
       }
       if (query.fechaHasta) {
-        where.en.lte = new Date(`${query.fechaHasta}T23:59:59.999Z`);
+        where.en.lte = finDiaLimaIso(query.fechaHasta);
       }
     }
 
@@ -458,8 +459,8 @@ export class AlmacenService {
     const baseWhereDate: Prisma.MovimientoStockWhereInput = {};
     if (query.fechaDesde || query.fechaHasta) {
       baseWhereDate.en = {};
-      if (query.fechaDesde) baseWhereDate.en.gte = new Date(`${query.fechaDesde}T00:00:00.000Z`);
-      if (query.fechaHasta) baseWhereDate.en.lte = new Date(`${query.fechaHasta}T23:59:59.999Z`);
+      if (query.fechaDesde) baseWhereDate.en.gte = inicioDiaLimaIso(query.fechaDesde);
+      if (query.fechaHasta) baseWhereDate.en.lte = finDiaLimaIso(query.fechaHasta);
     }
 
     const todosMovs = await this.prisma.movimientoStock.findMany({

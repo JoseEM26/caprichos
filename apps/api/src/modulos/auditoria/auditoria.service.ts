@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RegistroAuditoria } from './auditoria.tipos';
+import { inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
 
 export interface FiltrosAuditoria {
   modulo?: string;
@@ -9,6 +10,9 @@ export interface FiltrosAuditoria {
   desde?: Date | string;
   hasta?: Date | string;
   entidad?: string;
+  categoria?: string;
+  resultado?: string;
+  busqueda?: string;
   pagina?: number | string;
   limite?: number | string;
 }
@@ -57,6 +61,54 @@ export class AuditoriaService {
     }
   }
 
+  /** Límite de fecha: YYYY-MM-DD es día de Lima; otra cosa se interpreta como instante. */
+  private limite(valor: Date | string, final: boolean): Date | undefined {
+    if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return inicioDiaLimaIso(final ? sumarDiasIso(valor, 1) : valor);
+    }
+    const d = new Date(valor);
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+
+  /** WHERE de Prisma; `omitir` saca filtros para calcular los conteos de ese combo. */
+  private armarWhere(filtros: FiltrosAuditoria, omitir: Array<'categoria' | 'resultado'> = []) {
+    const where: any = {};
+    if (filtros.modulo) where.modulo = filtros.modulo;
+    if (filtros.accion) where.accion = filtros.accion;
+    if (filtros.partyId !== undefined && filtros.partyId !== null && filtros.partyId !== '') {
+      try {
+        where.party_id = BigInt(filtros.partyId);
+      } catch {
+        where.party_id = -1n; // id inválido: no coincide con nada
+      }
+    }
+    if (filtros.entidad) where.entidad = filtros.entidad;
+    if (filtros.categoria && !omitir.includes('categoria')) {
+      const c = filtros.categoria.toUpperCase();
+      where.categoria = c === 'SENSIBLE' ? 'LECTURA_SENSIBLE' : c;
+    }
+    if (filtros.resultado && !omitir.includes('resultado')) where.resultado = filtros.resultado.toUpperCase();
+    const desde = filtros.desde ? this.limite(filtros.desde, false) : undefined;
+    const hasta = filtros.hasta ? this.limite(filtros.hasta, true) : undefined;
+    if (desde || hasta) {
+      where.en = {};
+      if (desde) where.en.gte = desde;
+      // hasta inclusivo: el día elegido entra completo (límite exclusivo = inicio del día siguiente)
+      if (hasta) {
+        if (typeof filtros.hasta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(filtros.hasta)) where.en.lt = hasta;
+        else where.en.lte = hasta;
+      }
+    }
+    const q = filtros.busqueda?.trim();
+    if (q) {
+      const texto = (campo: string) => ({ [campo]: { contains: q, mode: 'insensitive' } });
+      const or: any[] = [texto('accion'), texto('modulo'), texto('entidad'), texto('motivo'), texto('dispositivo')];
+      if (/^\d{1,15}$/.test(q)) or.push({ entidad_id: BigInt(q) }, { party_id: BigInt(q) });
+      where.OR = or;
+    }
+    return where;
+  }
+
   /**
    * Lista los eventos de auditoría según filtros y paginación en orden cronológico descendente.
    */
@@ -65,39 +117,27 @@ export class AuditoriaService {
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
     const skip = (pagina - 1) * limite;
 
-    const where: any = {};
+    const base = this.armarWhere(filtros);
+    const catWhere = this.armarWhere(filtros, ['categoria']);
+    const resWhere = this.armarWhere(filtros, ['resultado']);
 
-    if (filtros.modulo) {
-      where.modulo = filtros.modulo;
-    }
-    if (filtros.accion) {
-      where.accion = filtros.accion;
-    }
-    if (filtros.partyId !== undefined && filtros.partyId !== null && filtros.partyId !== '') {
-      where.party_id = BigInt(filtros.partyId);
-    }
-    if (filtros.entidad) {
-      where.entidad = filtros.entidad;
-    }
-    if (filtros.desde || filtros.hasta) {
-      where.en = {};
-      if (filtros.desde) {
-        where.en.gte = new Date(filtros.desde);
-      }
-      if (filtros.hasta) {
-        where.en.lte = new Date(filtros.hasta);
-      }
-    }
-
-    const [total, registros] = await Promise.all([
-      this.prisma.auditoria.count({ where }),
+    const [total, registros, porCategoria, porResultado] = await Promise.all([
+      this.prisma.auditoria.count({ where: base }),
       this.prisma.auditoria.findMany({
-        where,
+        where: base,
         orderBy: { en: 'desc' },
         skip,
         take: limite,
       }),
+      this.prisma.auditoria.groupBy({ by: ['categoria'], where: catWhere, _count: { _all: true } }),
+      this.prisma.auditoria.groupBy({ by: ['resultado'], where: resWhere, _count: { _all: true } }),
     ]);
+
+    // Conteos reales para los combos: cada uno respeta los demás filtros pero no el suyo.
+    const conteos = {
+      categoria: Object.fromEntries(porCategoria.map((g) => [g.categoria, g._count._all])),
+      resultado: Object.fromEntries(porResultado.map((g) => [g.resultado, g._count._all])),
+    };
 
     const datos = registros.map((reg) => ({
       id: reg.id.toString(),
@@ -126,6 +166,7 @@ export class AuditoriaService {
       limite,
       paginas: Math.ceil(total / limite),
       datos,
+      conteos,
     };
   }
 

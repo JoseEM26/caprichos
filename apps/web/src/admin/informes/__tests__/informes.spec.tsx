@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { InformesView } from '../InformesView';
 import { IndicadoresView } from '../IndicadoresView';
+import * as apiModulo from '../../../comun/api';
 import * as sesionModulo from '../../../comun/sesion';
 
 describe('Vistas de Análisis e Informes', () => {
@@ -39,6 +40,22 @@ describe('Vistas de Análisis e Informes', () => {
 
       expect(screen.getByText('Ventas por producto')).toBeInTheDocument();
       expect(screen.queryByText('Resumen del día')).not.toBeInTheDocument();
+    });
+
+    it('envía pago y modalidad al resumen y muestra el error si falla', async () => {
+      const get = vi.spyOn(apiModulo.api, 'get').mockRejectedValue(new Error('caído'));
+      render(
+        <MemoryRouter>
+          <InformesView />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText(/No se pudieron cargar los indicadores/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
+      await waitFor(() => {
+        const urls = get.mock.calls.map((c) => String(c[0])).filter((u) => u.includes('/informes/resumen'));
+        expect(urls.some((u) => /pago=YAPE/i.test(u))).toBe(true);
+        expect(urls.every((u) => u.includes('modalidad='))).toBe(true);
+      });
     });
 
     it('abre el modal de detalle del reporte al hacer clic en Abrir informe', async () => {

@@ -185,6 +185,18 @@ describe('InformesService', () => {
       expect(resumen.cats2.length).toBeGreaterThan(0);
     });
 
+    it('el filtro de fechas es el día de Lima (venta de 20:00 Lima entra en su día) y trae Por cobrar y Rechazados', async () => {
+      await service.obtenerResumen({ desde: '2026-10-05', hasta: '2026-10-05', pago: 'yape', modalidad: 'mesa' });
+      const where = prisma.pedido.findMany.mock.calls[0][0].where;
+      expect(where.creado_en.gte.toISOString()).toBe('2026-10-05T05:00:00.000Z');
+      expect(where.creado_en.lte.toISOString()).toBe('2026-10-06T04:59:59.999Z');
+      expect(where.pago_metodo).toBe('YAPE');
+      expect(where.modalidad).toBe('MESA');
+      const r = await service.obtenerResumen({});
+      expect(typeof r.porCobrar).toBe('string');
+      expect(typeof r.rechazados).toBe('number');
+    });
+
     it('devuelve estado vacío y "Sin datos del período anterior" cuando no hay pedidos', async () => {
       prisma.pedido.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // sin pedidos actuales ni anteriores
       const resumen = await service.obtenerResumen({ desde: '2026-01-01', hasta: '2026-01-31' });
