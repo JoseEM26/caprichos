@@ -15,6 +15,10 @@ import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
 import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
 import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
+type DatosRuc = { ruc: string; razon_social: string; estado: string | null; condicion: string | null; direccion: string | null; desactualizado: boolean };
+type ConsultaRuc =
+  | { estado: 'idle' | 'cargando' | 'invalido' | 'noencontrado' | 'manual' }
+  | { estado: 'ok'; datos: DatosRuc };
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
 import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
@@ -127,6 +131,34 @@ export function FormularioCheckout({
   const [dni, setDni] = useState('');
   const [ruc, setRuc] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  // Consulta del RUC a SUNAT (vía servidor): la razón social sale de ahí; solo si no está disponible se escribe a mano (sin verificar)
+  const [consultaRuc, setConsultaRuc] = useState<ConsultaRuc>({ estado: 'idle' });
+
+  useEffect(() => {
+    if (tipoComprobante !== 'FACTURA' || !/^(10|15|17|20)\d{9}$/.test(ruc)) {
+      setConsultaRuc({ estado: 'idle' });
+      return;
+    }
+    let vigente = true;
+    setConsultaRuc({ estado: 'cargando' });
+    api
+      .get<DatosRuc>(`/carta/ruc/${ruc}`)
+      .then((d) => {
+        if (!vigente) return;
+        setRazonSocial(d.razon_social);
+        setConsultaRuc({ estado: 'ok', datos: d });
+      })
+      .catch((e) => {
+        if (!vigente) return;
+        const codigo = e instanceof ErrorApi ? e.codigo : '';
+        if (codigo === 'RUC_NO_ENCONTRADO') setConsultaRuc({ estado: 'noencontrado' });
+        else if (codigo === 'RUC_INVALIDO') setConsultaRuc({ estado: 'invalido' });
+        else setConsultaRuc({ estado: 'manual' });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [ruc, tipoComprobante]);
 
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
@@ -547,6 +579,9 @@ export function FormularioCheckout({
       if (!/^(10|15|17|20)\d{9}$/.test(rucLimpio)) {
         return 'Para factura se exige un RUC válido de 11 dígitos que empiece con 10, 15, 17 o 20 (un RUC de 10 dígitos no se acepta)';
       }
+      if (consultaRuc.estado === 'cargando') return 'Espera un momento: estamos consultando el RUC en SUNAT';
+      if (consultaRuc.estado === 'invalido') return 'El RUC no es válido: revisa los números';
+      if (consultaRuc.estado === 'noencontrado') return 'SUNAT no reconoce este RUC: revísalo para pedir factura';
       if (!razonSocial.trim()) {
         return 'Para factura se exige la razón social';
       }
@@ -769,6 +804,7 @@ export function FormularioCheckout({
         dni: tipoComprobante === 'BOLETA' && dni.trim() ? dni.trim() : undefined,
         ruc: tipoComprobante === 'FACTURA' ? ruc.trim() : undefined,
         razonSocial: tipoComprobante === 'FACTURA' ? razonSocial.trim() : undefined,
+        ...(tipoComprobante === 'FACTURA' && consultaRuc.estado === 'ok' && consultaRuc.datos.direccion ? { direccion: consultaRuc.datos.direccion } : {}),
       },
       cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
       puntosCanje: !cuponAplicado && puntosAplicados > 0 ? puntosAplicados : undefined,
@@ -1892,38 +1928,63 @@ export function FormularioCheckout({
                           />
                         </div>
 
-                        <div>
-                          <label
-                            htmlFor="f-rs"
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: 'var(--cp-soft)',
-                              display: 'block',
-                              marginBottom: '4px',
-                            }}
-                          >
-                            Razón social (obligatorio)
-                          </label>
-                          <input
-                            id="f-rs"
-                            type="text"
-                            value={razonSocial}
-                            onChange={(e) => setRazonSocial(e.target.value)}
-                            placeholder="Nombre o razón social de la empresa"
-                            required
-                            style={{
-                              width: '100%',
-                              minHeight: '44px',
-                              borderRadius: '10px',
-                              border: '1.5px solid var(--cp-line)',
-                              backgroundColor: 'var(--cp-cream)',
-                              color: 'var(--cp-navy)',
-                              padding: '0 12px',
-                              fontSize: '14px',
-                            }}
-                          />
-                        </div>
+                        {consultaRuc.estado === 'cargando' && (
+                          <div role="status" style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Consultando SUNAT…</div>
+                        )}
+                        {consultaRuc.estado === 'invalido' && (
+                          <div role="alert" style={{ fontSize: '12px', color: 'var(--cp-error, #b3261e)' }}>El RUC no es válido: revisa los números.</div>
+                        )}
+                        {consultaRuc.estado === 'noencontrado' && (
+                          <div role="alert" style={{ fontSize: '12px', color: 'var(--cp-error, #b3261e)' }}>SUNAT no reconoce este RUC: revísalo.</div>
+                        )}
+                        {consultaRuc.estado === 'ok' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Razón social</div>
+                            <div data-testid="razon-verificada" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>{consultaRuc.datos.razon_social}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                              Verificado en SUNAT{consultaRuc.datos.desactualizado ? ' (dato guardado, puede estar desactualizado)' : ''}
+                            </div>
+                            {consultaRuc.datos.direccion && (
+                              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Dirección fiscal: {consultaRuc.datos.direccion}</div>
+                            )}
+                            {(consultaRuc.datos.estado !== 'ACTIVO' || consultaRuc.datos.condicion !== 'HABIDO') && (
+                              <div role="alert" style={{ fontSize: '12px', color: 'var(--cp-error, #b3261e)' }}>
+                                SUNAT indica que este RUC está {[consultaRuc.datos.estado, consultaRuc.datos.condicion].filter(Boolean).join(' / ') || 'sin datos de estado'}: la factura podría no ser válida.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {consultaRuc.estado === 'manual' && (
+                          <div>
+                            <label
+                              htmlFor="f-rs"
+                              style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}
+                            >
+                              Razón social (obligatorio)
+                            </label>
+                            <input
+                              id="f-rs"
+                              type="text"
+                              value={razonSocial}
+                              onChange={(e) => setRazonSocial(e.target.value)}
+                              placeholder="Nombre o razón social de la empresa"
+                              required
+                              style={{
+                                width: '100%',
+                                minHeight: '44px',
+                                borderRadius: '10px',
+                                border: '1.5px solid var(--cp-line)',
+                                backgroundColor: 'var(--cp-cream)',
+                                color: 'var(--cp-navy)',
+                                padding: '0 12px',
+                                fontSize: '14px',
+                              }}
+                            />
+                            <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '3px' }}>
+                              Sin verificar: no pudimos consultar SUNAT; Caja revisará el dato.
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

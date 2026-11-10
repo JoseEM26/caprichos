@@ -381,9 +381,6 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.change(screen.getByLabelText(/RUC \(11 dígitos/i), {
       target: { value: '2012345678' }, // 10 dígitos
     });
-    fireEvent.change(screen.getByLabelText(/Razón social/i), {
-      target: { value: 'Empresa Demo SAC' },
-    });
 
     const btnEnviar = screen.getByRole('button', { name: /Enviar pedido/i });
     fireEvent.click(btnEnviar);

@@ -212,6 +212,7 @@ export interface DatosComprobanteFormulario {
   dni?: string;
   ruc?: string;
   razonSocial?: string;
+  direccion?: string;
 }
 
 export interface DatosPagoFormulario {

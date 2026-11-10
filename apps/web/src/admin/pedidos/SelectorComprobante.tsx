@@ -5,6 +5,9 @@
  * aquí solo se evita enviar datos que ya se sabe que no sirven.
  */
 
+import { useEffect, useRef } from 'react';
+import { api } from '../../comun/api';
+
 export type TipoComprobanteSel = 'SIMPLE' | 'BOLETA' | 'FACTURA';
 
 export interface ValorComprobante {
@@ -119,6 +122,26 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
   const set = (cambio: Partial<ValorComprobante>) => onChange({ ...valor, ...cambio });
   const sinDocObligatorio = valor.tipo === 'BOLETA' && (total ?? 0) > LIMITE_BOLETA_SIN_DNI;
   const tipos: TipoComprobanteSel[] = ['SIMPLE', 'BOLETA', 'FACTURA'];
+
+  // Autocompleta razón social y dirección desde SUNAT al completar un RUC válido (editables: aquí es personal). Si falla, se escribe a mano.
+  const actual = useRef({ valor, onChange });
+  actual.current = { valor, onChange };
+  useEffect(() => {
+    if (valor.tipo !== 'FACTURA' || !/^(10|15|17|20)\d{9}$/.test(valor.doc)) return;
+    let vigente = true;
+    api
+      .get<{ razon_social: string; direccion: string | null }>(`/admin/ruc/${valor.doc}`)
+      .then((d) => {
+        if (!vigente) return;
+        const { valor: v, onChange: cambiar } = actual.current;
+        if (v.doc !== valor.doc) return;
+        cambiar({ ...v, razon: d.razon_social, direccion: v.direccion || d.direccion || '' });
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [valor.doc, valor.tipo]);
 
   return (
     <div id={`${idPrefijo}-tipo`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
