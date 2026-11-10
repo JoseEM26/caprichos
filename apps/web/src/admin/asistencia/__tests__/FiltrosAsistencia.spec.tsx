@@ -175,7 +175,8 @@ describe('Planilla y Feriados: respuestas tardías', () => {
     listar.mockResolvedValueOnce({ fecha: 'x', filas: [fila('Inicial')] }).mockReturnValueOnce(lenta.p).mockReturnValueOnce(rapida.p);
     render(<PlanillaTab onError={ninguno} onOk={ninguno} />);
     await screen.findByText('Inicial');
-    const f = screen.getByLabelText('Día del período');
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    const f = screen.getByLabelText(/Día del período/);
     fireEvent.change(f, { target: { value: '2026-10-01' } });
     fireEvent.change(f, { target: { value: '2026-10-08' } });
     await act(async () => { rapida.ok({ fecha: 'x', filas: [fila('Nueva')] }); });

@@ -5,15 +5,17 @@ const listar = vi.fn();
 const crear = vi.fn();
 const anular = vi.fn();
 const crearRec = vi.fn();
+const editarRec = vi.fn();
 vi.mock('../planillaApi', async (orig) => ({
   ...(await orig<any>()),
   listarPrestamos: (...a: any[]) => listar(...a),
   crearPrestamo: (...a: any[]) => crear(...a),
   anularPrestamo: (...a: any[]) => anular(...a),
   crearRecurrente: (...a: any[]) => crearRec(...a),
+  editarRecurrente: (...a: any[]) => editarRec(...a),
 }));
 
-import { PrestamosPersona } from '../PrestamosPersona';
+import { PrestamosPersona, ServiciosExtraPersona } from '../PrestamosPersona';
 
 const prestamo = {
   id: 3, monto: 300, numCuotas: 3, periodicidad: 'SEMANAL', montoCuota: 100, fechaInicio: '2026-11-01', estado: 'ACTIVO', motivo: 'Emergencia', anuladoMotivo: null, saldo: 200,
@@ -31,6 +33,7 @@ describe('PrestamosPersona', () => {
     crear.mockResolvedValue({ ok: true });
     anular.mockResolvedValue({ ok: true });
     crearRec.mockResolvedValue({ ok: true });
+    editarRec.mockResolvedValue({ ok: true });
   });
 
   it('muestra el plan, el saldo y el estado de cada cuota', async () => {
@@ -62,8 +65,50 @@ describe('PrestamosPersona', () => {
   });
 
   it('agrega Netflix con el monto general', async () => {
-    render(<PrestamosPersona partyId={7} alCambiar={() => undefined} />);
+    render(<ServiciosExtraPersona partyId={7} alCambiar={() => undefined} />);
     fireEvent.click(await screen.findByRole('button', { name: /Cobrar Netflix \(S\/ 1\.64 por semana\)/ }));
     await waitFor(() => expect(crearRec).toHaveBeenCalledWith({ partyId: 7, tipo: 'NETFLIX' }));
+  });
+
+  it('préstamo sin intereses: lo dice y no manda interés al crear', async () => {
+    render(<PrestamosPersona partyId={7} alCambiar={() => undefined} />);
+    expect(await screen.findByText('Sin intereses')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Monto \(S\/\)/), { target: { value: '90' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar préstamo' }));
+    await waitFor(() => expect(crear).toHaveBeenCalled());
+    expect(crear.mock.calls[0][0]).not.toHaveProperty('interesPctMensual');
+  });
+
+  it('préstamo con interés: muestra capital, interés, cuota y saldo, y envía el % mensual', async () => {
+    listar.mockResolvedValue({
+      netflixSemanalDefecto: 1.64, recurrentes: [],
+      prestamos: [{ ...prestamo, interesPctMensual: 2, capital: 300, interesTotal: 18, cuota: 106, montoCuota: 106, saldo: 212 }],
+    });
+    render(<PrestamosPersona partyId={7} alCambiar={() => undefined} />);
+    expect(await screen.findByText('Interés 2 % mensual')).toBeInTheDocument();
+    for (const [t, v] of [['Capital', 'S/ 300.00'], ['Interés', 'S/ 18.00'], ['Cuota', 'S/ 106.00'], ['Saldo', 'S/ 212.00']]) {
+      expect(screen.getByText(t, { selector: 'dt' }).nextElementSibling).toHaveTextContent(v);
+    }
+    fireEvent.change(screen.getByLabelText(/Monto \(S\/\)/), { target: { value: '200' } });
+    fireEvent.change(screen.getByLabelText(/Interés mensual/), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar préstamo' }));
+    await waitFor(() => expect(crear).toHaveBeenCalledWith(expect.objectContaining({ monto: 200, interesPctMensual: 3 })));
+  });
+
+  it('servicio extra: check por persona, monto y periodicidad', async () => {
+    listar.mockResolvedValue({
+      netflixSemanalDefecto: 1.64, prestamos: [],
+      recurrentes: [{ id: 5, tipo: 'OTRO', nombre: 'Plan de celular', monto: 25, activo: true, desde: '2026-11-01', periodicidad: 'MENSUAL' }],
+    });
+    render(<ServiciosExtraPersona partyId={7} alCambiar={() => undefined} />);
+    expect(await screen.findByText(/S\/ 25\.00 por mes/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Cobrar Plan de celular')).toBeChecked();
+    fireEvent.click(screen.getByLabelText('Cobrar Plan de celular'));
+    await waitFor(() => expect(editarRec).toHaveBeenCalledWith(5, { activo: false }));
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Gimnasio' } });
+    fireEvent.change(screen.getByLabelText(/Monto \(S\/\)/), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Se cobra cada'), { target: { value: 'SEMANAL' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar servicio' }));
+    await waitFor(() => expect(crearRec).toHaveBeenCalledWith({ partyId: 7, tipo: 'OTRO', nombre: 'Gimnasio', monto: 12, periodicidad: 'SEMANAL' }));
   });
 });
