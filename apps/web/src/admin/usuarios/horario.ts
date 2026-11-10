@@ -23,9 +23,13 @@ export type HorarioEstado = Record<number, DiaEstado>;
 /** día -> partyId del reemplazo ('' = sin reemplazo) */
 export type ReemplazosEstado = Record<number, string>;
 
+/** Horario por defecto del dueño al activar un día (editable por día). */
+export const HORA_ENTRADA_DEFECTO = '13:30';
+export const HORA_SALIDA_DEFECTO = '22:30';
+
 export function horarioVacio(): HorarioEstado {
   const h: HorarioEstado = {};
-  DIAS.forEach((d) => (h[d.dia] = { trabaja: false, entrada: '09:00', salida: '17:00' }));
+  DIAS.forEach((d) => (h[d.dia] = { trabaja: false, entrada: HORA_ENTRADA_DEFECTO, salida: HORA_SALIDA_DEFECTO }));
   return h;
 }
 

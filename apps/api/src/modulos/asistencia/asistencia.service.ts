@@ -8,11 +8,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as argon2 from 'argon2';
 import { createHash } from 'crypto';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { TIPOS_DOCUMENTO, rolesDeCuenta } from '../acceso/roles-usuario';
 import {
   CoberturaFila,
   HorarioFila,
@@ -46,7 +48,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto } from './dto/asistencia.dto';
+import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, MarcarWebDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -66,6 +68,7 @@ export class RechazoAsistencia extends Error {
   }
 }
 
+export const MOTIVO_MARCA_WEB = 'Marcó con usuario y contraseña (sin QR ni GPS)';
 const MAX_SELFIE_BYTES = 200_000;
 const VENTANA_FALLOS_MS = 10 * 60_000;
 const BLOQUEO_MS = 5 * 60_000;
@@ -268,6 +271,9 @@ export class AsistenciaService {
 
   private async marcarValidado(dto: MarcarDto, usuario: UsuarioAutenticado, ahora: Date) {
     const partyId = usuario.partyId;
+    if ([usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+      throw new RechazoAsistencia('ADMIN_NO_MARCA', 'El administrador no marca asistencia.', false);
+    }
     const cfg = await this.obtenerConfig();
     const huella = huellaDe(dto.dispositivo);
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
@@ -311,7 +317,7 @@ export class AsistenciaService {
 
     const { jornada } = jornadaDe(ahora);
     const delDia = await this.prisma.asistenciaMarca.findMany({
-      where: { party_id: partyId, jornada: fechaDb(jornada) },
+      where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
       orderBy: { momento: 'asc' },
     });
     const tiposDelDia = new Set(delDia.map((m) => m.tipo as TipoMarca));
@@ -400,6 +406,117 @@ export class AsistenciaService {
   }
 
   // ---------------------------------------------------------------------------
+  // Marcar sin celular: usuario (documento) y contraseña de Caprichos (decisión del dueño, 09/11/2026)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Página pública /asistencia/marcar. Reutiliza el hash del login (argon2) y los límites de intentos de la asistencia.
+   * No abre sesión ni devuelve token. La marca queda A_REVISAR (origen WEB, sin GPS ni selfie) para que el admin la apruebe.
+   */
+  async marcarWeb(dto: MarcarWebDto, ip?: string, ahora = new Date()) {
+    const usuarioTxt = dto.usuario.trim();
+    const clave = `w:${usuarioTxt}`;
+    const claveIp = `ip:${ip ?? '-'}`;
+    this.exigirNoBloqueado(clave, claveIp, ahora.getTime());
+
+    const rechazo = async (partyId?: bigint) => {
+      this.registrarFallo(clave, claveIp, ahora.getTime());
+      await this.auditar('ACCESO', 'MARCAR_WEB', 'RECHAZADO', {}, partyId, ip, 'party', partyId ?? null, 'CREDENCIALES_INVALIDAS');
+      // 400 y no 401: la web usaría el 401 para renovar una sesión que esta página nunca abre
+      return new BadRequestException({ codigo: 'CREDENCIALES_INVALIDAS', mensaje: 'Usuario o contraseña incorrectos' });
+    };
+
+    const ident = await this.prisma.partyIdentifier.findFirst({
+      where: { numero: usuarioTxt, tipo: { in: [...TIPOS_DOCUMENTO] } },
+      include: { party: { include: { usuario: true } } },
+    });
+    const cuenta = ident?.party?.usuario;
+    if (!cuenta) throw await rechazo();
+    let ok = false;
+    try {
+      ok = await argon2.verify(cuenta.hash, dto.contrasena);
+    } catch {
+      ok = false;
+    }
+    if (!ok || !cuenta.activo) throw await rechazo(cuenta.party_id);
+    this.fallosUsuario.delete(clave);
+
+    const partyId = cuenta.party_id;
+    const roles = await rolesDeCuenta(this.prisma, cuenta.id, cuenta.rol);
+    if (roles.includes('ADMIN')) {
+      throw new BadRequestException({ codigo: 'ADMIN_NO_MARCA', mensaje: 'El administrador no marca asistencia.' });
+    }
+
+    const { jornada } = jornadaDe(ahora);
+    const delDia = await this.prisma.asistenciaMarca.findMany({
+      where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
+      orderBy: { momento: 'asc' },
+    });
+    const tiposDelDia = new Set(delDia.map((m) => m.tipo as TipoMarca));
+    const tipo = dto.tipo ?? marcaPendiente(tiposDelDia);
+    if (!tipo) throw new BadRequestException({ codigo: 'JORNADA_COMPLETA', mensaje: 'Tu jornada de hoy ya está completa.' });
+    const motivoOrden = motivoNoPermitida(tipo, tiposDelDia);
+    if (motivoOrden) throw new BadRequestException({ codigo: 'ORDEN_INVALIDO', mensaje: motivoOrden });
+
+    const creada = await this.prisma.asistenciaMarca.create({
+      data: {
+        party_id: partyId,
+        jornada: fechaDb(jornada),
+        tipo,
+        origen: 'WEB',
+        momento: ahora,
+        estado: 'A_REVISAR',
+        motivos_revision: MOTIVO_MARCA_WEB,
+      },
+    });
+    await this.auditar('CAMBIO', 'MARCAR_WEB', 'REVISAR', { tipo }, partyId, ip, 'asistencia_marca', creada.id);
+    const tiposNuevos = new Set<TipoMarca>([...tiposDelDia, tipo]);
+    return {
+      ok: true,
+      mensaje: `Marcaste ${etiquetaTipo(tipo)} a las ${horaLima(ahora)}. Queda pendiente de revisión del administrador.`,
+      tipo,
+      pendiente: marcaPendiente(tiposNuevos),
+    };
+  }
+
+  /** El admin aprueba (la marca cuenta) o anula (no cuenta) una marca; la fila se conserva con quién, cuándo y por qué. */
+  async revisarMarca(id: number, accion: 'APROBAR' | 'ANULAR', dto: RevisarMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
+    const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
+    if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
+    if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });
+    if (accion === 'APROBAR' && marca.estado !== 'A_REVISAR') {
+      throw new ConflictException({ codigo: 'NO_ESTA_POR_REVISAR', mensaje: 'Esa marca no está pendiente de revisión' });
+    }
+    const estado = accion === 'APROBAR' ? 'APROBADA' : 'ANULADA';
+    const motivo = dto.motivo.trim();
+    await this.prisma.asistenciaMarca.update({
+      where: { id: marca.id },
+      data: { estado, revisado_por: usuario.partyId, revisado_en: new Date(), revisado_motivo: motivo },
+    });
+    await this.auditar(
+      'CAMBIO', accion === 'APROBAR' ? 'APROBAR_MARCA' : 'ANULAR_MARCA', 'OK',
+      { antes: marca.estado, despues: estado, tipo: marca.tipo, partyId: Number(marca.party_id) },
+      usuario.partyId, ip, 'asistencia_marca', marca.id, motivo,
+    );
+    return { ok: true, estado };
+  }
+
+  /**
+   * Jornadas de una persona en un rango, listas para la planilla: turno programado, marcas que cuentan y estado.
+   * Servicio estable: lo usa PlanillaService.
+   */
+  async diasDePersona(partyId: bigint, desde: string, hasta: string, ahora = new Date()) {
+    const ctx = await this.cargarContexto(desde, hasta, [partyId]);
+    const cfg = await this.obtenerConfig();
+    const dias = [];
+    for (let j = desde; j <= hasta; j = sumarDias(j, 1)) {
+      const d = this.evaluarDia(partyId, j, ctx, ahora, cfg.toleranciaMin);
+      dias.push({ jornada: j, estado: d.resultado.estado, turno: d.turno, marcas: d.marcas });
+    }
+    return { dias, cfg };
+  }
+
+  // ---------------------------------------------------------------------------
   // Estado propio («Mi asistencia»)
   // ---------------------------------------------------------------------------
 
@@ -408,7 +525,7 @@ export class AsistenciaService {
     const ctx = await this.cargarContexto(jornada, jornada, [partyId]);
     const dia = this.evaluarDia(partyId, jornada, ctx, ahora, await this.toleranciaMin());
     const marcas = await this.prisma.asistenciaMarca.findMany({
-      where: { party_id: partyId, jornada: fechaDb(jornada) },
+      where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
       orderBy: { momento: 'asc' },
     });
     const tipos = new Set(marcas.map((m) => m.tipo as TipoMarca));
@@ -541,6 +658,7 @@ export class AsistenciaService {
       precisionM: m.precision_m === null ? null : Number(m.precision_m),
       distanciaM: m.distancia_m === null ? null : Number(m.distancia_m),
       motivo: m.motivo,
+      revisadoMotivo: m.revisado_motivo,
       tieneSelfie: Boolean(m.selfie),
     }));
   }
@@ -600,7 +718,7 @@ export class AsistenciaService {
       this.prisma.coberturaTurno.findMany({ where: { fecha: rango } }),
       this.prisma.reemplazoDia.findMany({ where: { activo: true } }),
       this.prisma.asistenciaMarca.findMany({
-        where: { jornada: rango, ...(partyIds ? { party_id: { in: partyIds } } : {}) },
+        where: { jornada: rango, estado: { not: 'ANULADA' }, ...(partyIds ? { party_id: { in: partyIds } } : {}) },
         orderBy: { momento: 'asc' },
       }),
     ]);
@@ -628,7 +746,7 @@ export class AsistenciaService {
     for (const m of marcas) {
       const clave = `${m.party_id}|${isoDe(m.jornada)}`;
       const lista = porClave.get(clave) ?? [];
-      lista.push({ tipo: m.tipo as TipoMarca, minutos: jornadaDe(m.momento).minutos, estado: m.estado as 'VALIDA' | 'A_REVISAR' });
+      lista.push({ tipo: m.tipo as TipoMarca, minutos: jornadaDe(m.momento).minutos, estado: m.estado === 'A_REVISAR' ? 'A_REVISAR' : 'VALIDA' }); // APROBADA cuenta como válida
       porClave.set(clave, lista);
     }
     return { horarios: horariosFila, coberturas: coberturasFila, reemplazos: reemplazosFila, marcas: porClave };

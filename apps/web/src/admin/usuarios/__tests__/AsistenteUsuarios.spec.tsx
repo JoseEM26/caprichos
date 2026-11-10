@@ -76,7 +76,8 @@ describe('Asistente Nuevo usuario', () => {
     expect(screen.getByText(/Paso 4 de 4/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Omitir' }));
     expect(screen.getByText('Resumen final')).toBeInTheDocument();
-    expect(screen.getByText(/Total por semana: 8 h/)).toBeInTheDocument();
+    // Horario por defecto del dueño: 13:30 a 22:30 = 9 h
+    expect(screen.getByText(/Total por semana: 9 h/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, crear' }));
     await waitFor(() => expect(api.post).toHaveBeenCalled());
@@ -86,7 +87,7 @@ describe('Asistente Nuevo usuario', () => {
       tipoDocumento: 'DNI',
       documento: '12345678',
       celular: '987654321',
-      horarios: [{ dia: 2, entrada: '09:00', salida: '17:00' }],
+      horarios: [{ dia: 2, entrada: '13:30', salida: '22:30' }],
       reemplazos: [],
     });
     await waitFor(() => expect(alUsuarioCreado).toHaveBeenCalled());

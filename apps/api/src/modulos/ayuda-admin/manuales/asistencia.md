@@ -62,7 +62,35 @@ Ver tambien: [[mi-asistencia]]
 ## Como se hace: Preparar la pantalla del QR
 1. Pulsa Pantalla del QR para generar, regenerar o desactivar el enlace de la tablet del local. Los pasos completos estan en [[asistencia-pantalla]].
 
+## Como se hace: Pagar la planilla (pestana Planilla)
+1. Pon el sueldo de cada persona en Usuarios, pestana Horario: semanal o mensual; el otro se calcula (semanal = mensual x 12 / 52).
+2. En la pestana Planilla elige un dia del periodo (semana de lunes a domingo o mes, segun la modalidad de cada persona) y abre a la persona.
+3. Valor hora = sueldo del periodo / horas programadas (sin break ni descansos). Se paga lo trabajado dentro de su turno; la tardanza (pasada la tolerancia, 5 min) se paga al 50 % (configurable en Configuracion); salir antes no se paga; el break no se paga. Las horas extra solo suman si las apruebas en Jornadas y extras.
+4. En Consumos marca los que se cobran en este pago; los demas pasan al siguiente periodo. En Adelantos y descuentos registra adelantos o descuentos por producto danado (se anulan con motivo, no se borran).
+5. Marcar pagado congela el periodo. No mueve la caja. Para cambiarlo, Reabrir periodo con motivo.
+
+## Como se hace: Vinculo y vacaciones del personal
+1. En Usuarios, pestana Horario, debajo del sueldo, elige el Tipo de vinculo: En planilla o Contrato temporal, con su fecha de ingreso (en planilla, ademas, 30 o 15 dias de vacaciones al ano; en contrato temporal, la fecha de fin si la hay). Si eliges Contrato temporal veras un aviso: un contrato sin subordinacion no es compatible con horario fijo y asistencia obligatoria; validalo con tu contador o abogado. El aviso no bloquea.
+2. Cambiar de tipo no borra nada: el vinculo anterior queda en el Historial de vinculos. Adjunta el contrato firmado (PDF, maximo 5 MB) con Subir contrato; solo el Administrador lo ve, con Ver contrato.
+3. En Planilla, abre a la persona y entra a la pestana Vinculo y vacaciones. En la tabla de Planilla ves el vinculo de cada uno.
+4. Las vacaciones son solo para personal en planilla. Se ganan por mes cumplido desde el ingreso: 30 dias al ano son 2.5 por mes; 15 dias son 1.25. Saldo = ganados + ajustes - tomadas - pagadas.
+5. Registrar vacaciones tomadas: elige desde y hasta. Solo cuentan los dias con jornada programada (los descansos no gastan). Esos dias no son falta, se pagan al valor normal de su jornada y salen como Vacaciones en Jornadas y extras.
+6. Registrar vacaciones pagadas: dias y monto liquidado en dinero; la fecha decide el periodo de planilla donde entra como Vacaciones pagadas (ingreso adicional). Registrar ajuste: dias con signo y motivo obligatorio (por ejemplo, saldo de otra empresa).
+7. Cualquier movimiento se anula con motivo (se conserva, tachado). Si el periodo ya esta pagado, primero Reabrir periodo. Cada persona ve su propio saldo, sin dinero, en [[mi-asistencia]].
+
+## Como se hace: Aprobar o anular una marca
+En Marcas y selfies, las marcas hechas con usuario y contrasena (pagina publica /asistencia/marcar) quedan A revisar. Aprobar las hace contar; Anular las deja sin efecto. Ambas piden motivo y la marca se conserva. Solo cuentan las marcas validas o aprobadas.
+
+## Como se hace: Feriados y pago doble
+En la pestana Feriados (solo Administrador) estan precargados los feriados nacionales de Peru de 2026 y 2027; revisalos cada ano porque el Estado puede mover o agregar dias. Puedes agregar uno (fecha, nombre y recargo), cambiar el recargo o Desactivarlo; nunca se borran y cada cambio queda en la auditoria. Las horas trabajadas en un feriado activo se pagan a valor hora x recargo (normal x2); la tardanza ese dia se descuenta al 50% del valor hora ya recargado. Las horas programadas del periodo no cambian, y un periodo ya pagado no se recalcula. En el detalle de planilla la jornada muestra la etiqueta "Feriado x2".
+
+## Que ve el trabajador
+En [[mi-asistencia]], la tarjeta "Lo que llevo ganado" muestra por dia las horas y lo ganado, el acumulado del periodo y si es Estimado (puede cambiar hasta que el Administrador cierre el periodo) o Pagado (con el neto recibido). Solo ve lo suyo.
+
 ## Errores y dudas
+- "Hay N jornada(s) incompletas o por revisar": corrige o aprueba las marcas de esos dias antes de pagar.
+- "Solo hay N dia(s) de saldo": no puedes tomar ni pagar mas de lo ganado; si corresponde, registra un ajuste con motivo.
+- "Las vacaciones son solo para personal en planilla": revisa el vinculo de la persona.
 - "Aun no configuras la ubicacion del local: nadie podra marcar": falta el punto del local; ve a Configuracion y guardalo.
 - "No pudimos cargar el dia / el mes / las marcas": revisa la conexion y recarga.
 - "La foto ya no esta disponible": paso el plazo de retencion y la selfie se borro; la marca sigue ahi.

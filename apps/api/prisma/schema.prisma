@@ -2802,9 +2802,9 @@ model AsistenciaMarca {
   party_id         BigInt
   jornada          DateTime  @db.Date // día laboral (Lima; antes de las 04:00 cuenta como el día anterior)
   tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA
-  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION
+  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION | WEB (usuario y contraseña, sin GPS ni selfie)
   momento          DateTime  @db.Timestamptz // hora del servidor
-  estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR
+  estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR | APROBADA (la revisó el admin) | ANULADA (no cuenta; con motivo)
   motivos_revision String?
   lat              Decimal?  @db.Decimal(9, 6)
   lng              Decimal?  @db.Decimal(9, 6)
@@ -2815,6 +2815,10 @@ model AsistenciaMarca {
   motivo           String?   // solo correcciones: motivo obligatorio
   por_party_id     BigInt?   // solo correcciones: quién la hizo
   creado_en        DateTime  @default(now()) @db.Timestamptz
+  // Revisión del admin (aprobar o anular): la fila no se borra ni cambia su hora
+  revisado_por     BigInt?
+  revisado_en      DateTime? @db.Timestamptz
+  revisado_motivo  String?
 
   party            Party                @relation("AsistenciaMarcaParty", fields: [party_id], references: [id])
   corregidaPor    Party?               @relation("AsistenciaMarcaCorrigio", fields: [por_party_id], references: [id])
@@ -2918,4 +2922,127 @@ model NumeroBloqueado {
   activo        Boolean  @default(true)
 
   @@map("numero_bloqueado")
+}
+
+
+// ---------------------------------------------------------------------------
+// Planilla del personal (migración 20270201100000_planilla). Sueldo por persona, ajustes (adelantos y descuentos),
+// horas extra aprobadas por jornada y períodos pagados (congelados). Nunca mueve caja.
+model SueldoPersonal {
+  party_id        BigInt   @id
+  modalidad       String   @db.VarChar(8) // SEMANAL | MENSUAL
+  monto_semanal   Decimal  @db.Decimal(10, 2)
+  monto_mensual   Decimal  @db.Decimal(10, 2)
+  actualizado_en  DateTime @default(now()) @db.Timestamptz
+  actualizado_por BigInt?
+
+
+  @@map("sueldo_personal")
+}
+
+model PlanillaAjuste {
+  id             BigInt    @id @default(autoincrement())
+  party_id       BigInt
+  tipo           String    @db.VarChar(10) // ADELANTO | DESCUENTO
+  fecha          DateTime  @db.Date
+  monto          Decimal   @db.Decimal(10, 2)
+  motivo         String
+  creado_por     BigInt
+  creado_en      DateTime  @default(now()) @db.Timestamptz
+  anulado_en     DateTime? @db.Timestamptz
+  anulado_por    BigInt?
+  anulado_motivo String?
+
+
+  @@index([party_id, fecha])
+  @@map("planilla_ajuste")
+}
+
+model PlanillaExtraAprobada {
+  id           BigInt   @id @default(autoincrement())
+  party_id     BigInt
+  jornada      DateTime @db.Date
+  aprobado_por BigInt
+  aprobado_en  DateTime @default(now()) @db.Timestamptz
+
+
+  @@unique([party_id, jornada])
+  @@map("planilla_extra_aprobada")
+}
+
+model PlanillaPeriodo {
+  id             BigInt    @id @default(autoincrement())
+  party_id       BigInt
+  modalidad      String    @db.VarChar(8)
+  desde          DateTime  @db.Date
+  hasta          DateTime  @db.Date
+  estado         String    @default("PAGADO") @db.VarChar(10) // PAGADO | REABIERTO
+  neto           Decimal   @db.Decimal(10, 2)
+  detalle        Json // cifras congeladas al pagar
+  pagado_en      DateTime  @default(now()) @db.Timestamptz
+  pagado_por     BigInt
+  reabierto_en   DateTime? @db.Timestamptz
+  reabierto_por  BigInt?
+  reabierto_motivo String?
+
+
+  @@index([party_id, desde])
+  @@map("planilla_periodo")
+}
+
+// Feriados (migración 20270201300000_feriados). Las horas trabajadas en un feriado activo se pagan a valor hora × recargo.
+model Feriado {
+  id              BigInt   @id @default(autoincrement())
+  fecha           DateTime @unique @db.Date
+  nombre          String   @db.VarChar(120)
+  recargo         Decimal  @default(2) @db.Decimal(4, 2)
+  activo          Boolean  @default(true)
+  creado_en       DateTime @default(now()) @db.Timestamptz
+  actualizado_en  DateTime @default(now()) @db.Timestamptz
+  actualizado_por BigInt?
+
+  @@map("feriado")
+}
+
+// ---------------------------------------------------------------------------
+// Vínculo y vacaciones del personal (migración 20270201200000_vinculo_vacaciones).
+// vinculo_personal: historial por persona (una sola fila vigente: vigente_hasta NULL). Cambiar de tipo cierra la
+// vigente y abre otra. El contrato PDF vive en la tabla archivo (privado), nunca público.
+// vacacion_movimiento: TOMADAS | PAGADAS | AJUSTE; se anulan con motivo, no se borran.
+model VinculoPersonal {
+  id                  BigInt    @id @default(autoincrement())
+  party_id            BigInt
+  tipo                String    @db.VarChar(18) // PLANILLA | CONTRATO_TEMPORAL
+  fecha_ingreso       DateTime  @db.Date
+  fecha_fin           DateTime? @db.Date
+  regimen_vacaciones  Int? // 30 | 15 días al año (solo PLANILLA)
+  contrato_archivo_id BigInt?
+  notas               String?
+  vigente_desde       DateTime  @default(now()) @db.Timestamptz
+  vigente_hasta       DateTime? @db.Timestamptz
+  creado_por          BigInt?
+
+  @@index([party_id, vigente_desde])
+  @@map("vinculo_personal")
+}
+
+model VacacionMovimiento {
+  id             BigInt    @id @default(autoincrement())
+  party_id       BigInt
+  vinculo_id     BigInt
+  tipo           String    @db.VarChar(8) // TOMADAS | PAGADAS | AJUSTE
+  fecha_desde    DateTime  @db.Date
+  fecha_hasta    DateTime  @db.Date
+  /// TOMADAS y PAGADAS: días positivos que descuentan saldo. AJUSTE: con signo (+ suma, - resta).
+  dias           Decimal   @db.Decimal(6, 2)
+  monto          Decimal?  @db.Decimal(10, 2) // solo PAGADAS
+  motivo         String?
+  creado_por     BigInt
+  creado_en      DateTime  @default(now()) @db.Timestamptz
+  anulado_en     DateTime? @db.Timestamptz
+  anulado_por    BigInt?
+  anulado_motivo String?
+
+  @@index([party_id, fecha_desde])
+  @@map("vacacion_movimiento")
 }

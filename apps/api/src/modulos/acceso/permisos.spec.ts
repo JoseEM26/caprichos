@@ -200,3 +200,14 @@ describe('puedeAnularPedido (alcance por rol)', () => {
     expect(puedeAnularPedido({ rol: 'ALMACEN', partyId: 7n }, pedido)).toBe(false);
   });
 });
+
+describe('Planilla y asistencia obligatoria', () => {
+  it('la planilla es solo del ADMIN', () => {
+    for (const r of Object.keys(MATRIZ)) {
+      for (const p of ['planilla/ver', 'planilla/administrar']) expect(MATRIZ[r].includes(p)).toBe(r === 'ADMIN');
+    }
+  });
+  it('todo el personal (supervisor incluido) puede marcar asistencia', () => {
+    for (const r of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'SUPERVISOR']) expect(MATRIZ[r]).toContain('asistencia/marcar');
+  });
+});

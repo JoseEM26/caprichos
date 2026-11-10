@@ -19,6 +19,7 @@ export const ETIQUETA_ESTADO: Record<string, string> = {
   INCOMPLETO: 'Incompleto',
   A_REVISAR: 'A revisar',
   SIN_EVALUAR: 'En curso',
+  VACACIONES: 'Vacaciones',
 };
 
 export interface QrPantalla {
@@ -33,7 +34,7 @@ export interface QrPantalla {
 export interface MiMarca {
   tipo: TipoMarca;
   momento: string;
-  estado: 'VALIDA' | 'A_REVISAR';
+  estado: 'VALIDA' | 'A_REVISAR' | 'APROBADA';
 }
 
 export interface MiHoy {
@@ -111,19 +112,22 @@ export interface MarcaAdmin {
   nombre: string;
   jornada: string;
   tipo: TipoMarca;
-  origen: 'CELULAR' | 'CORRECCION';
+  origen: 'CELULAR' | 'CORRECCION' | 'WEB';
   momento: string;
   estado: string;
   alertas: string | null;
   distanciaM: number | null;
   precisionM: number | null;
   motivo: string | null;
+  revisadoMotivo?: string | null;
   tieneSelfie: boolean;
 }
 
 export interface ConfigAsistenciaAdmin {
   radioM: number;
   toleranciaMin: number;
+  /** % del valor hora con que se pagan los minutos de tardanza (50 = mitad). */
+  pagoTardanzaPct: number;
   retencionDias: number;
   precisionMaxM: number;
   localLat: number | null;
@@ -176,6 +180,9 @@ export const corregirMarca = (datos: {
   momento: string;
   motivo: string;
 }) => api.post('/admin/asistencia/correcciones', datos);
+/** El admin aprueba (la marca cuenta) o anula (no cuenta) una marca; el motivo es obligatorio. */
+export const revisarMarca = (id: number, accion: 'aprobar' | 'anular', motivo: string) =>
+  api.post(`/admin/asistencia/marcas/${id}/${accion}`, { motivo });
 export const reiniciarCelular = (partyId: number) => api.post(`/admin/asistencia/dispositivos/${partyId}/reiniciar`);
 export const obtenerConfigAsistencia = () => api.get<ConfigAsistenciaAdmin>('/admin/asistencia/config');
 export const guardarConfigAsistencia = (datos: Partial<ConfigAsistenciaAdmin>) =>
@@ -207,3 +214,26 @@ export function csvDeFilas(filas: FilaMes[]): string {
   );
   return [cab.join(','), ...lineas].join('\n') + '\n';
 }
+
+/** Resumen del período propio, sin dinero (Mi asistencia). */
+export interface MiResumen {
+  modalidad: 'SEMANAL' | 'MENSUAL';
+  periodo: { desde: string; hasta: string };
+  programadasH: number;
+  trabajadasH: number;
+  tardanzas: number;
+  tardanzaMin: number;
+  faltas: number;
+  jornadasPorRevisar: number;
+}
+export const miResumen = () => api.get<MiResumen>('/admin/asistencia/mi/resumen');
+
+/** Marcar sin celular (página pública): usuario y contraseña de Caprichos. No abre sesión. */
+export interface ResultadoMarcaWeb {
+  ok: boolean;
+  mensaje: string;
+  tipo: TipoMarca;
+  pendiente: TipoMarca | null;
+}
+export const marcarConClave = (datos: { usuario: string; contrasena: string; tipo?: TipoMarca }) =>
+  api.post<ResultadoMarcaWeb>('/carta/asistencia-web/marcar', datos);

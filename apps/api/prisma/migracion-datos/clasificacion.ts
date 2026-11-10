@@ -68,6 +68,13 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['reparto de propinas: montos pagados a cada persona por mes (dinero real, historial propio de cada base)', [
     'propina_reparto', 'propina_reparto_detalle',
   ]],
+  ['planilla del personal: sueldos, adelantos, descuentos y períodos pagados (dinero real, historial propio de cada base)', [
+    'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo',
+    'vinculo_personal', 'vacacion_movimiento',
+  ]],
+  ['feriados: los precarga la migración y el ADMIN los edita en cada base, no se migran', [
+    'feriado',
+  ]],
   ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
     'notificacion_lectura',
   ]],
