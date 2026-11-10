@@ -659,6 +659,8 @@ model Pedido {
   comprobante_tipo       String                  @default("SIMPLE") // SIMPLE (ticket interno, sin SUNAT) | BOLETA | FACTURA
   comprobante_doc        String?
   comprobante_razon      String?
+  /// true = razón social tomada de SUNAT; false = escrita a mano (Caja la revisa); null = no aplica
+  comprobante_razon_verificada Boolean?
   comprobante_direccion  String?
   nota                   String?
   clave_idempotencia     String?                 @unique
@@ -3084,4 +3086,22 @@ model VacacionMovimiento {
 
   @@index([party_id, fecha_desde])
   @@map("vacacion_movimiento")
+}
+
+/// Caché de consultas de RUC a la API gratuita (openruc.com). razon_social vacía = negativo cacheado (RUC no encontrado).
+model RucConsulta {
+  ruc            String   @id @db.VarChar(11)
+  razon_social   String
+  estado         String?
+  condicion      String?
+  direccion      String?
+  ubigeo         String?
+  fuente         String?
+  as_of          String?
+  respuesta      Json
+  consultado_en  DateTime @default(now()) @db.Timestamptz
+  actualizado_en DateTime @default(now()) @db.Timestamptz
+
+  @@index([actualizado_en])
+  @@map("ruc_consulta")
 }

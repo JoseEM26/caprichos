@@ -37,6 +37,7 @@ import { regresoAgotado } from '../catalogo/catalogo.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
+import { RucService, rucValido } from '../ruc';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { StockService } from '../stock/stock.service';
@@ -140,6 +141,7 @@ export class PedidosService {
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly rucService?: RucService,
   ) {}
 
   /** Último pedido de delivery con dirección de ese celular (carta sin sesión). Null si no hay. */
@@ -1136,10 +1138,27 @@ export class PedidosService {
           ? dto.comprobante?.dni?.trim() || null
           : null;
 
-    const comprobanteRazon =
+    let comprobanteRazon =
       comprobanteTipo === 'FACTURA'
         ? dto.comprobante?.razonSocial?.trim() || null
         : null;
+    let comprobanteDireccion = comprobanteTipo === 'FACTURA' ? dto.comprobante?.direccion?.trim() || null : null;
+    // Factura: la razón social sale de SUNAT (caché/API), no de lo que mande el navegador. Solo si la consulta no está disponible vale la manual (sin verificar).
+    let comprobanteRazonVerificada: boolean | null = null;
+    if (comprobanteTipo === 'FACTURA' && this.rucService && rucValido(comprobanteDoc)) {
+      try {
+        const sunat = await this.rucService.consultar(comprobanteDoc!);
+        comprobanteRazon = sunat.razon_social;
+        comprobanteDireccion = sunat.direccion ?? comprobanteDireccion;
+        comprobanteRazonVerificada = true;
+      } catch (e: any) {
+        const codigo = e?.getResponse?.()?.codigo;
+        if (codigo === 'RUC_NO_ENCONTRADO') {
+          throw new BadRequestException({ codigo: 'RUC_NO_ENCONTRADO', mensaje: 'SUNAT no reconoce este RUC. Revísalo para pedir factura' });
+        }
+        comprobanteRazonVerificada = false; // RUC_NO_DISPONIBLE u otro fallo: sigue con la razón manual, Caja la revisa
+      }
+    }
 
     // Nunca se rechaza una venta por el DNI: una boleta mayor a S/ 700 sin DNI se crea y el cobro la exige.
 
@@ -1202,7 +1221,8 @@ export class PedidosService {
           comprobante_tipo: comprobanteTipo,
           comprobante_doc: comprobanteDoc,
           comprobante_razon: comprobanteRazon,
-          comprobante_direccion: comprobanteTipo === 'FACTURA' ? dto.comprobante?.direccion?.trim() || null : null,
+          comprobante_direccion: comprobanteDireccion,
+          comprobante_razon_verificada: comprobanteRazonVerificada,
           nota: dto.nota?.trim() || null,
           pedido_origen_id: origen?.pedidoOrigenId !== undefined ? BigInt(origen.pedidoOrigenId) : null,
           es_personal: personal,

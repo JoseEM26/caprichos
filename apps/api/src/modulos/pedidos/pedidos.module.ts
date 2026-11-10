@@ -12,6 +12,7 @@ import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { StockModule } from '../stock/stock.module';
+import { RucModule } from '../ruc/ruc.module';
 import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { ComprobantesModule } from '../comprobantes/comprobantes.module';
     ClientesModule,
     VouchersModule,
     ComprobantesModule,
+    RucModule,
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => ChatbotModule),
     forwardRef(() => StockModule),
