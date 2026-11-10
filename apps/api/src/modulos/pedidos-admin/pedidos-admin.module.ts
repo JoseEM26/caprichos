@@ -30,6 +30,7 @@ import { EditarPedidoController } from './editar-pedido.controller';
 import { PedidoExtraService } from './pedido-extra.service';
 import { CorregirClienteService } from './corregir-cliente.service';
 import { ReabrirPedidoService } from './reabrir-pedido.service';
+import { LineaTiempoService } from './linea-tiempo.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
@@ -37,6 +38,7 @@ import { PedidoExtraController } from './pedido-extra.controller';
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,
+    LineaTiempoService,
     UbicarPedidoService,
     CorregirClienteService,
     ReabrirPedidoService,
