@@ -33,7 +33,7 @@ const datos = (cartaActiva: boolean): DatosLocalCarta => ({
   whatsapp: '999888777',
   redes: {},
   horario: [],
-  mediosPago: { efectivo: { activo: true }, yape: { activo: true } },
+  mediosPago: { efectivo: { activo: true }, yape: { activo: true }, plin: { activo: true }, transferencia: { activo: true } },
   envioGratisDesde: 70,
   pedidoMinimo: 0,
   invitadoPermitido: false,
@@ -110,6 +110,15 @@ describe('Checkout de la carta ▸ propina opcional', () => {
     expect(screen.getByTestId('propina-resumen')).toHaveTextContent('S/ 5.00');
     // venta 14.50 + propina 5.00 = lo que paga el cliente
     expect(screen.getByRole('button', { name: /Enviar pedido/i })).toHaveTextContent('Enviar pedido · S/ 19.50');
+  });
+
+  it.each(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'])('con %s la propina (monto libre) se ofrece igual y suma al total a pagar', async (medio) => {
+    abrirPedido(true);
+    await irAPago();
+    fireEvent.click(screen.getByRole('button', { name: medio }));
+    expect(screen.getByTestId('propina-carta')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '3' } });
+    expect(screen.getByRole('button', { name: /Enviar pedido/i })).toHaveTextContent('Enviar pedido · S/ 17.50');
   });
 
   it('envía la propina aparte del pedido (campo propina, no suma al total de productos)', async () => {

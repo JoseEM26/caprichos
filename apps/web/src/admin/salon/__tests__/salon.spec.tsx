@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalDisenoTexto } from '../componentes/ModalDisenoTexto';
 import { ModalEditarElemento } from '../componentes/ModalEditarElemento';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
@@ -305,12 +306,8 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     // Seleccionar mesa 1 (atajo de «Mesas libres»)
     fireEvent.click(screen.getByRole('button', { name: /Mesa 1/i }));
 
-    // En el paso 2 sin productos, «Enviar directo a cocina» no envía y dice qué falta
-    const botonEnviar = screen.getByRole('button', {
-      name: 'Enviar directo a cocina',
-    });
-    elegirBoleta();
-    fireEvent.click(botonEnviar);
+    // Sin productos, «Continuar» queda deshabilitado y dice qué falta
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
     expect(screen.getByText('Agrega al menos un producto para enviarlo.')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
@@ -406,15 +403,14 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
 
-    // Enviar directo a cocina
-    const botonEnviar = screen.getByRole('button', {
-      name: 'Enviar directo a cocina',
-    });
+    // Paso 1 → Continuar; paso 2 → Enviar a cocina
+    const botonContinuar = screen.getByRole('button', { name: 'Continuar' });
     await waitFor(() => {
-      expect(botonEnviar).not.toBeDisabled();
+      expect(botonContinuar).not.toBeDisabled();
     });
+    fireEvent.click(botonContinuar);
     elegirBoleta();
-    fireEvent.click(botonEnviar);
+    fireEvent.click(screen.getByRole('button', { name: /^Enviar a cocina/ }));
 
     // Diálogo confirmar
     expect(
@@ -778,7 +774,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => {

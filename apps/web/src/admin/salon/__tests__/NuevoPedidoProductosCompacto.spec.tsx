@@ -68,7 +68,7 @@ describe('ModalNuevoPedidoMesa: paso productos compacto', () => {
     expect(screen.getByPlaceholderText('Código de cupón (opcional)')).toBeInTheDocument();
   });
 
-  it('el botón de enviar muestra el total del pedido', async () => {
+  it('el botón «Continuar» muestra el total del pedido', async () => {
     render(
       <ModalNuevoPedidoMesa
         abierto={true}
@@ -84,7 +84,7 @@ describe('ModalNuevoPedidoMesa: paso productos compacto', () => {
     });
     fireEvent.click(screen.getByText('Agregar al pedido'));
 
-    expect(await screen.findByRole('button', { name: 'Enviar directo a cocina' })).toHaveTextContent(
+    expect(await screen.findByRole('button', { name: 'Continuar' })).toHaveTextContent(
       'S/ 8.50',
     );
   });

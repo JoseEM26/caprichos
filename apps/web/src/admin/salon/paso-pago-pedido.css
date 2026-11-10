@@ -1,0 +1,500 @@
+/* Nuevo pedido · paso 2 «Pago» y barra de pasos. Táctil (44 px mínimo), colores --cp-*, responsive. */
+.np2-pasos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  font-family: Montserrat, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-soft);
+}
+
+.np2-paso {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.np2-paso-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--cp-line);
+  background: var(--cp-white);
+  font-size: 13px;
+}
+
+.np2-paso--actual {
+  color: var(--cp-navy);
+}
+
+.np2-paso--actual .np2-paso-num {
+  background: var(--cp-navy);
+  border-color: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.np2-paso--hecho .np2-paso-num {
+  background: var(--cp-green);
+  border-color: var(--cp-green);
+  color: var(--cp-white);
+}
+
+.np2-paso-sep {
+  flex: 0 0 24px;
+  height: 2px;
+  background: var(--cp-line);
+}
+
+/* ---- Paso 2 ---- */
+.np2-contenedor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 4px;
+}
+
+.np2-pago {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px 2px 12px;
+  box-sizing: border-box;
+  color: var(--cp-navy);
+}
+
+.np2-resumen-linea {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cp-cream);
+  border: 1px solid var(--cp-line);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.np2-titulo {
+  margin: 0;
+  font-family: Montserrat, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.np2-cuando {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.np2-cuando legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-family: Montserrat, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.np2-cuando-botones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.np2-opcion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+}
+
+.np2-opcion b {
+  font-size: 15px;
+}
+
+.np2-opcion span {
+  font-size: 12px;
+  color: var(--cp-soft);
+}
+
+.np2-opcion--on {
+  border-color: var(--cp-navy);
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.np2-opcion--on span {
+  color: var(--cp-cream);
+  opacity: 0.85;
+}
+
+.np2-metodos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.np2-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+}
+
+.np2-fila-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cp-soft);
+}
+
+.np2-medios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.np2-medio {
+  flex: 1 1 96px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 2px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: Montserrat, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.np2-medio--on {
+  border-color: var(--cp-navy);
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.np2-medio:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.np2-monto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.np2-monto-campo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.np2-monto-campo input,
+.np2-efectivo input,
+.np2-propina input {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-size: 16px;
+}
+
+.np2-monto-campo input {
+  width: 132px;
+  text-align: right;
+}
+
+.np2-propina .np2-monto-campo input {
+  width: 100%;
+}
+
+.np2-propina .np2-monto-campo {
+  max-width: 240px;
+}
+
+.np2-propina input[aria-invalid='true'],
+.np2-efectivo input[aria-invalid='true'] {
+  border-color: var(--cp-rust);
+}
+
+.np2-quitar {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.np2-anadir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  border-radius: 12px;
+  border: 2px dashed var(--cp-navy);
+  background: transparent;
+  color: var(--cp-navy);
+  font-family: Montserrat, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.np2-anadir small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cp-soft);
+}
+
+.np2-anadir:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--cp-line);
+}
+
+.np2-estado {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.np2-estado--ok {
+  background: #e6f4ea;
+  color: var(--cp-green);
+  border: 1.5px solid var(--cp-green);
+}
+
+.np2-estado--falta {
+  background: #fdeee4;
+  color: var(--cp-rust);
+  border: 1.5px solid var(--cp-rust);
+}
+
+.np2-efectivo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.np2-efectivo label {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.np2-efectivo-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.np2-efectivo-fila input {
+  flex: 1 1 160px;
+}
+
+.np2-exacto {
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.np2-vuelto {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--cp-green);
+}
+
+.np2-propina {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--cp-cream);
+  border: 1px solid var(--cp-line);
+}
+
+.np2-propina label {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.np2-ayuda {
+  margin: 0;
+  font-size: 12px;
+  color: var(--cp-soft);
+}
+
+.np2-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-rust);
+}
+
+.np2-totales {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--cp-white);
+  border: 1.5px solid var(--cp-navy);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np2-totales > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.np2-totales dt,
+.np2-totales dd {
+  margin: 0;
+}
+
+.np2-totales-final {
+  padding-top: 6px;
+  border-top: 1px dashed var(--cp-line);
+  font-family: Montserrat, sans-serif;
+  font-size: 18px !important;
+  font-weight: 800;
+}
+
+.np2-totales-detalle {
+  font-size: 12px !important;
+  color: var(--cp-soft);
+}
+
+.np2-totales-detalle dd {
+  text-align: right;
+}
+
+/* Pie fijo del paso 2: Atrás y Enviar */
+.np2-pie {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(0, 3fr);
+  gap: 10px;
+  padding: 10px 0 2px;
+  background: var(--cp-white);
+  border-top: 1px solid var(--cp-line);
+}
+
+.np2-atras,
+.np2-enviar {
+  min-height: 56px;
+  border-radius: 12px;
+  font-family: Montserrat, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.np2-atras {
+  border: 2px solid var(--cp-navy);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+}
+
+.np2-enviar {
+  border: 0;
+  background: var(--cp-orange);
+  color: var(--cp-navy);
+}
+
+.np2-enviar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.np2-motivo {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-soft);
+}
+
+/* Capturas por medio digital (después de crear el pedido) */
+.np2-capturas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 420px) {
+  .np2-cuando-botones {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .np2-monto {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .np2-monto-campo input {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np2-opcion,
+  .np2-medio,
+  .np2-anadir {
+    transition: none;
+  }
+}

@@ -13,13 +13,13 @@ describe('Propina opcional (interruptor por canal y tope)', () => {
     vi.restoreAllMocks();
   });
 
-  it('apagada por defecto en los dos canales, con tope de S/ 200', async () => {
+  it('apagada por defecto en los cuatro canales, con tope de S/ 200', async () => {
     vi.spyOn(api, 'get').mockResolvedValue(lista(undefined));
     render(<TarjetaPropinaConfiguracion esAdmin />);
 
     expect(await screen.findByText('Propina en la carta virtual')).toBeInTheDocument();
     expect(screen.getByText('Propina en WhatsApp')).toBeInTheDocument();
-    expect(screen.getAllByText('Apagada')).toHaveLength(2);
+    expect(screen.getAllByText('Apagada')).toHaveLength(4);
     expect(screen.getByDisplayValue('200')).toBeInTheDocument();
   });
 
@@ -33,7 +33,7 @@ describe('Propina opcional (interruptor por canal y tope)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, confirmar' }));
 
     await waitFor(() =>
-      expect(put).toHaveBeenCalledWith('/admin/configuracion/propina_activa', { valor: { carta: true, bot: true } }),
+      expect(put).toHaveBeenCalledWith('/admin/configuracion/propina_activa', { valor: { carta: true, bot: true, mozo: false, caja: false } }),
     );
   });
 

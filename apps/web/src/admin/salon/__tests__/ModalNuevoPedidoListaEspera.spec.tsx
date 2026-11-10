@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -85,8 +86,9 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
   it('sin celular no envía y avisa que el celular es obligatorio', async () => {
     await pedirEnEspera();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
-    expect(await screen.findByText(/Escribe el celular del cliente/)).toBeInTheDocument();
+    // «Continuar» queda deshabilitado y dice qué falta
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
+    expect(await screen.findByText(/Escribe el celular del cliente|La lista de espera necesita el celular/)).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 
@@ -96,7 +98,7 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar comanda' }));
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalled());
     const payload = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][0] as any;
@@ -106,14 +108,15 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
     expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: '987654321' });
   });
 
-  it('en lista de espera el botón se ve activo (no apagado) con productos, y sin celular dice qué falta bajo el botón', async () => {
+  it('en lista de espera «Continuar» se habilita con nombre y celular, y sin celular dice qué falta bajo el botón', async () => {
     await pedirEnEspera();
-    const boton = screen.getByRole('button', { name: 'Enviar directo a cocina' });
-    expect(boton.style.opacity).toBe('1');
-    expect(boton.style.cursor).toBe('pointer');
+    const boton = screen.getByRole('button', { name: 'Continuar' });
+    expect(boton).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
-    fireEvent.click(boton);
-    expect(await screen.findByText(/Escribe el celular del cliente/)).toBeInTheDocument();
+    expect(boton).toBeDisabled();
+    expect(await screen.findByText(/La lista de espera necesita el celular/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    expect(boton).toBeEnabled();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 
@@ -125,9 +128,8 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'sadasdas' } });
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '978456123' } });
-    const boton = screen.getByRole('button', { name: 'Enviar directo a cocina' });
-    expect(boton.style.opacity).toBe('1');
-    fireEvent.click(boton);
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar comanda' }));
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalled());
     const payload = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][0] as any;

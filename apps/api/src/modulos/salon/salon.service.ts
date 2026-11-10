@@ -357,6 +357,7 @@ export class SalonService {
       lineas: dto.lineas,
       pago: dto.pago || { metodo: 'EFECTIVO' },
       comprobante: dto.comprobante,
+      propina: dto.propina,
       nota: dto.nota,
       mesa: mesaNombre,
       cuponCodigo: dto.cuponCodigo,

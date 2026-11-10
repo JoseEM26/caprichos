@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -64,7 +65,7 @@ describe('Modal de pedido en modo «extra»', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
+    continuarYEnviar();
     // Actualizada: el extra ya no usa «Sí, enviar comanda»; pide «¿Agregar este extra?» y envía con «Sí, agregar»
     expect(envios()).toHaveLength(0);
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, agregar' }));
@@ -90,7 +91,7 @@ describe('Modal de pedido en modo «extra»', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
+    continuarYEnviar();
     return alExito;
   }
 
@@ -111,12 +112,12 @@ describe('Modal de pedido en modo «extra»', () => {
     await llegarALaConfirmacion();
     fireEvent.click(await screen.findByRole('button', { name: 'No, volver' }));
     expect(screen.queryByRole('dialog', { name: '¿Agregar este extra?' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar extra' }));
+    continuarYEnviar();
     await screen.findByRole('dialog', { name: '¿Agregar este extra?' });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: '¿Agregar este extra?' })).toBeNull();
     expect(envios()).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Registrar extra' })).toHaveTextContent('S/ 8.50');
+    expect(screen.getByRole('button', { name: /^Registrar extra/ })).toHaveTextContent('S/ 8.50');
   });
 
   it('doble clic en «Sí, agregar» envía una sola vez', async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -91,10 +92,11 @@ describe('ModalNuevoPedidoMesa: cupón con el validador real', () => {
     await conUnProducto();
     aplicar('VERANO10');
     await screen.findByText('Cupón VERANO10 aplicado: - S/ 2.00');
+    irAlPago();
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta) fireEvent.click(boleta);
     llenarPagaCon();
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() =>
       expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledWith(expect.objectContaining({ cuponCodigo: 'VERANO10' }), expect.any(String)),

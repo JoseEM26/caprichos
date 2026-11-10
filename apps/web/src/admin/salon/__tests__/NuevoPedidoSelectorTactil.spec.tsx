@@ -25,12 +25,16 @@ describe('Selector táctil de productos', () => {
     expect(screen.getByText('S/ 8.50')).toBeInTheDocument();
   });
 
-  it('CSS: chips 48px, sticky, snap, content-visibility y 1 columna <360', () => {
+  it('CSS: chips 48px, sticky, snap, content-visibility y tarjetas compactas (2, 3, 4 y 5 columnas)', () => {
     expect(css).toMatch(/\.np-chip-cat\s*\{[^}]*min-height:\s*48px/);
     expect(css).toMatch(/\.np-categorias-wrap\s*\{[^}]*position:\s*sticky/);
     expect(css).toMatch(/scroll-snap-type:\s*x proximity/);
     expect(css).toMatch(/\.np-producto\s*\{[^}]*content-visibility:\s*auto/);
-    expect(css).toMatch(/max-width:\s*419px\)\s*\{\s*\.np-grilla\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    // celular angosto 2 columnas; desde 420 px 3; escritorio 4; pantallas anchas 5
+    expect(css).toMatch(/\.np-grilla\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/min-width:\s*420px\)[^{]*\{\s*\.np-grilla\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/min-width:\s*860px\)\s*\{\s*\.np-items\s*\{[^}]*\}\s*\.np-grilla\s*\{\s*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/min-width:\s*1200px\)\s*\{\s*\.np-grilla\s*\{\s*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
     expect(css).toMatch(/touch-action:\s*manipulation/);
   });
 
@@ -39,8 +43,9 @@ describe('Selector táctil de productos', () => {
     expect(css).not.toMatch(/@media\s*\((min|max)-width:\s*(899|900|359)px/);
     expect(css).toMatch(/\.np-grilla\s*\{\s*display:\s*grid/);
     expect(css).toMatch(/\.np-producto\s*\{\s*display:\s*flex/);
-    expect(css).toMatch(/\.np-producto-foto\s*\{[^}]*display:\s*block[^}]*max-width:\s*96px[^}]*max-height:\s*96px/);
-    expect(css).toMatch(/max-height:\s*110px/);
+    expect(css).toMatch(/\.np-producto-foto\s*\{[^}]*display:\s*block[^}]*max-width:\s*56px[^}]*max-height:\s*56px/);
+    // franja baja de foto en escritorio
+    expect(css).toMatch(/max-height:\s*52px/);
     expect(css).toMatch(/max-height:\s*62dvh/);
   });
 });

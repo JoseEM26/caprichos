@@ -16,7 +16,7 @@ sugerencias:
 # Mis pedidos (mozo)
 
 ## Para que sirve
-Lista de los pedidos que tomaste tu (mesa, para llevar o delivery), con el estado que les da [[cocina]], el estado del pago y los vouchers de pagos digitales. Sirve para seguir cada pedido sin ir a Caja. El mozo no cobra: sube el voucher y Caja revisa y registra el cobro en [[caja]].
+Lista de los pedidos que tomaste tu (mesa, para llevar o delivery), con el estado que les da [[cocina]], el estado del pago y los vouchers de pagos digitales. Sirve para seguir cada pedido sin ir a Caja. El mozo no cierra el cobro: lo deja Pagado por mozo, por verificar, sube el voucher y Caja revisa y confirma el cobro en [[caja]].
 
 Arriba hay un resumen del rango elegido con Pedidos, Total vendido, En curso y Entregados, y filtros En curso, Entregados y Falta voucher. Cada tarjeta muestra el codigo, el nombre del cliente, la mesa o modalidad (Para llevar o Delivery), los productos (Ver N mas / Ver menos) y el estado del pago: Pagado, Pago pendiente o Pago coordinado.
 
@@ -47,4 +47,4 @@ Despues: [[caja]]
 - Para armar un pedido nuevo en una mesa usa el [[plano]]; para varias mesas ver ese manual.
 
 ## Quien puede hacerlo
-Mozo, Cajero, Supervisor y Administrador (permiso pedidos/crear). Ve los pedidos que el usuario tomo; Caja y Administrador ven todos en [[caja]]. El mozo no cobra ni da cortesias.
+Mozo, Cajero, Supervisor y Administrador (permiso pedidos/crear). Ve los pedidos que el usuario tomo; Caja y Administrador ven todos en [[caja]]. El mozo no cierra el cobro (Caja lo verifica) ni da cortesias.

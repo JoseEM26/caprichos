@@ -147,6 +147,7 @@ describe('PedidosService', () => {
       },
       oferta: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       parametro: {
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.clave === 'envio_gratis_monto') {
             return Promise.resolve({ clave: 'envio_gratis_monto', valor: 70 });
@@ -1487,6 +1488,65 @@ describe('PedidosService', () => {
         expect(pedidoCreadoData.mesa_nombre).toBe('Mesa 3');
         expect(pedidoCreadoData.cliente_nombre).toBe('Ana Ruiz');
         expect(pedidoCreadoData.cliente_telefono).toBe('987654321');
+      });
+
+      describe('propina (monto libre) en mesa de MOZO y CAJA', () => {
+        const dtoMesa: any = {
+          ...pedidoBaseDto,
+          modalidad: 'MESA',
+          mesa: 'Mesa 1',
+          cliente: { nombre: 'Ana Ruiz', telefono: '987654321' },
+          comprobante: { tipo: 'SIMPLE' },
+        };
+        const activa = (v: Record<string, boolean>) =>
+          prismaMock.parametro.findMany.mockResolvedValue([
+            { clave: 'propina_activa', valor: { carta: false, bot: false, mozo: false, caja: false, ...v } },
+            { clave: 'propina_tope', valor: 50 },
+          ]);
+        const crearConPropina = async (canal: 'MOZO' | 'CAJA', pago: any, propina: number, clave: string) => {
+          let data: any = null;
+          prismaMock.pedido.create.mockImplementation((args: any) => {
+            data = args.data;
+            return Promise.resolve({ id: 400n, codigo: 'CP-P400', estado: 'COLA', subtotal: 28, envio: null, total: Number(args.data.total) });
+          });
+          const res = await service.crear({ ...dtoMesa, pago, propina }, clave, { canal, usuarioPartyId: 55n, mesasIds: [3n], mesaNombre: 'Mesa 1', enTransaccion: async () => undefined });
+          return { res, data };
+        };
+
+        it.each(['MOZO', 'CAJA'] as const)('canal %s encendido: guarda la propina aparte; el plan mixto suma venta + propina', async (canal) => {
+          activa({ [canal.toLowerCase()]: true });
+          const { res, data } = await crearConPropina(
+            canal,
+            { metodo: 'EFECTIVO', pagaCon: 50, plan: [{ medio: 'EFECTIVO', monto: 20 }, { medio: 'YAPE', monto: 10.5 }, { medio: 'TARJETA', monto: 5 }] },
+            7.5,
+            `idemp-prop-${canal}-1`,
+          );
+          expect(Number(data.propina)).toBe(7.5);
+          // la venta no cambia: total 28 sin propina
+          expect(Number(data.total)).toBe(28);
+          expect(res.propina).toBe(7.5);
+        });
+
+        it.each(['MOZO', 'CAJA'] as const)('canal %s apagado: la propina se ignora (0) y el plan debe cubrir solo la venta', async (canal) => {
+          activa({});
+          const { data } = await crearConPropina(canal, { metodo: 'YAPE', plan: [{ medio: 'YAPE', monto: 28 }] }, 7.5, `idemp-prop-${canal}-2`);
+          expect(Number(data.propina)).toBe(0);
+        });
+
+        it('encendido solo en CAJA: el mozo no recibe propina', async () => {
+          activa({ caja: true });
+          const { data } = await crearConPropina('MOZO', { metodo: 'YAPE', plan: [{ medio: 'YAPE', monto: 28 }] }, 5, 'idemp-prop-solo-caja');
+          expect(Number(data.propina)).toBe(0);
+        });
+
+        it('propina sobre el tope: 400 PROPINA_INVALIDA y no crea el pedido', async () => {
+          activa({ mozo: true });
+          prismaMock.pedido.create.mockClear();
+          await expect(
+            service.crear({ ...dtoMesa, pago: { metodo: 'YAPE' }, propina: 80 }, 'idemp-prop-tope', { canal: 'MOZO', usuarioPartyId: 55n, mesasIds: [3n], mesaNombre: 'Mesa 1', enTransaccion: async () => undefined }),
+          ).rejects.toMatchObject({ response: { codigo: 'PROPINA_INVALIDA' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
       });
 
       it('acepta un medio digital (YAPE, PLIN, TRANSFERENCIA) para llevar desde el canal MOZO', async () => {

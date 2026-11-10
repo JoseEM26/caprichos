@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -56,7 +57,7 @@ async function pedirEnMesa1(personas: string) {
   fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
   const boleta = screen.queryByTestId('comprobante-BOLETA');
   if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
-  fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+  continuarYEnviar();
 }
 
 describe('Nuevo pedido en el local: personas y capacidad de las mesas', () => {

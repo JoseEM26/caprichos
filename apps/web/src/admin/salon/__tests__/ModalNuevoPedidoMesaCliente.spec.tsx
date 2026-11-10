@@ -55,7 +55,15 @@ async function agregarCafe() {
   fireEvent.click(screen.getByText('Agregar al pedido'));
 }
 
-const botonEnviar = () => screen.getByRole('button', { name: 'Enviar directo a cocina' }) as HTMLButtonElement;
+const botonContinuar = () => screen.getByRole('button', { name: 'Continuar' }) as HTMLButtonElement;
+
+/** Paso 1 → paso 2 y envío: elige boleta, «Enviar a cocina» y confirma la comanda. */
+const enviarDesdePago = () => {
+  fireEvent.click(botonContinuar());
+  elegirBoleta();
+  fireEvent.click(screen.getByRole('button', { name: /^Enviar a cocina/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+};
 
 describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
   beforeEach(() => {
@@ -67,74 +75,57 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     vi.mocked(api.get).mockResolvedValue({ items: [] } as any);
   });
 
-  it('sin nombre, Enviar muestra el mensaje junto al campo, lo enfoca y no envía; el mensaje se quita al corregirlo', async () => {
+  it('sin nombre, «Continuar» queda deshabilitado y dice qué falta; se habilita al completar nombre y celular', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
 
-    // El botón sigue habilitado: el aviso sale al tocarlo
-    expect(botonEnviar().disabled).toBe(false);
-    elegirBoleta();
-    fireEvent.click(botonEnviar());
-    const nombre = screen.getByLabelText('Nombre del cliente *');
+    expect(botonContinuar().disabled).toBe(true);
     expect(screen.getByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeInTheDocument();
-    expect(nombre).toHaveAttribute('aria-invalid', 'true');
-    expect(nombre).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
 
+    const nombre = screen.getByLabelText('Nombre del cliente *');
     fireEvent.change(nombre, { target: { value: 'L' } });
     expect(screen.getByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeInTheDocument();
     fireEvent.change(nombre, { target: { value: 'Lucía' } });
     expect(screen.queryByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeNull();
-    expect(nombre).toHaveAttribute('aria-invalid', 'false');
+    // Falta el celular
+    expect(botonContinuar().disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    expect(botonContinuar().disabled).toBe(false);
 
-    elegirBoleta();
-
-    fireEvent.click(botonEnviar());
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+    enviarDesdePago();
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
     expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: '987654321' });
   });
 
-  it('sin celular bloquea el envío con aviso claro, y 999999999 tampoco vale', async () => {
+  it('sin celular no deja continuar con aviso claro, y 999999999 tampoco vale', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
-    elegirBoleta();
 
-    fireEvent.click(botonEnviar());
-    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el celular del cliente: 9 dígitos que empiecen con 9');
-    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
+    expect(botonContinuar().disabled).toBe(true);
+    expect(screen.getByText('Escribe el celular del cliente: 9 dígitos que empiecen con 9')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '999999999' } });
-    fireEvent.click(botonEnviar());
-    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
+    expect(botonContinuar().disabled).toBe(true);
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 
-  it('un teléfono inválido bloquea el envío; uno de 9 dígitos que empieza en 9 se envía', async () => {
+  it('un teléfono inválido bloquea «Continuar»; uno de 9 dígitos que empieza en 9 se envía', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
 
     const tel = screen.getByLabelText('Celular del cliente *');
     fireEvent.change(tel, { target: { value: '12345' } });
-    expect(screen.getByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeInTheDocument();
-    elegirBoleta();
-    fireEvent.click(botonEnviar());
-    expect(tel).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
+    expect(screen.getAllByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real').length).toBeGreaterThan(0);
+    expect(botonContinuar().disabled).toBe(true);
 
     fireEvent.change(tel, { target: { value: '987654321' } });
     expect(screen.queryByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeNull();
-    elegirBoleta();
-    fireEvent.click(botonEnviar());
-    elegirBoleta();
-    fireEvent.click(botonEnviar());
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+    enviarDesdePago();
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
@@ -147,9 +138,8 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
 
-    // Sin cuenta elegida aún no se puede enviar: el aviso sale al tocar
-    elegirBoleta();
-    fireEvent.click(botonEnviar());
+    // Sin cuenta elegida aún no se puede continuar
+    expect(botonContinuar().disabled).toBe(true);
     expect(screen.getByText('Busca y elige la cuenta del cliente')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
 
@@ -162,12 +152,9 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     expect(screen.queryByLabelText('Nombre del cliente *')).toBeNull();
     expect(screen.queryByLabelText('Celular del cliente *')).toBeNull();
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
-    expect(botonEnviar().disabled).toBe(false);
+    expect(botonContinuar().disabled).toBe(false);
 
-    elegirBoleta();
-
-    fireEvent.click(botonEnviar());
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+    enviarDesdePago();
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
     expect(payload.clientePartyId).toBe('77');

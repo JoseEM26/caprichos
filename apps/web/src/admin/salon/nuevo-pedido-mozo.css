@@ -228,8 +228,8 @@
   }
 
   .np-grilla {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .np-carrito {
@@ -653,11 +653,12 @@
   color: var(--cp-cream);
 }
 
-/* Tarjetas: 2 columnas por defecto (celular y tablet vertical), 1 en pantallas muy angostas */
+/* Tarjetas compactas: miniatura cuadrada chica + nombre y precio. 2 columnas en celular angosto,
+   3 desde 420 px, 4 en escritorio (860 px) y 5 en pantallas anchas (1200 px). */
 .np-grilla {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .np-producto {
@@ -669,16 +670,16 @@
   text-align: left;
   cursor: pointer;
   color: var(--cp-navy);
-  min-height: 72px;
-  border-radius: 12px;
+  min-height: 56px;
+  border-radius: 10px;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 6px;
+  gap: 8px;
+  padding: 4px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   content-visibility: auto;
-  contain-intrinsic-size: auto 84px;
+  contain-intrinsic-size: auto 64px;
 }
 
 .np-producto:active {
@@ -688,13 +689,13 @@
 .np-producto-foto {
   display: block;
   flex: none;
-  width: 72px;
-  height: 72px;
-  max-width: 96px;
-  max-height: 96px;
+  width: 48px;
+  height: 48px;
+  max-width: 56px;
+  max-height: 56px;
   background: var(--cp-gold);
   aspect-ratio: auto;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -713,7 +714,7 @@
   justify-content: center;
   font-family: Montserrat, sans-serif;
   font-weight: 800;
-  font-size: 20px;
+  font-size: 16px;
   color: var(--cp-navy);
 }
 
@@ -722,27 +723,34 @@
   flex-direction: column;
   min-width: 0;
   flex: 1;
-  padding: 0 4px;
-  gap: 4px;
+  padding: 0 2px;
+  gap: 2px;
 }
 
 .np-producto-nombre {
-  font-size: 14px;
-  line-height: 18px;
-  min-height: 36px;
+  font-size: 13px;
+  line-height: 16px;
+  max-height: 32px;
+  overflow: hidden;
   overflow-wrap: anywhere;
   hyphens: auto;
 }
 
 .np-producto-precio {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--cp-navy);
 }
 
-@container np (max-width: 419px) {
+@container np (min-width: 420px) and (max-width: 859px) {
   .np-grilla {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container np (min-width: 1200px) {
+  .np-grilla {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -762,26 +770,26 @@
     display: none;
   }
 
+  /* Franja baja de foto arriba y texto compacto abajo: caben 4 (5 en pantallas anchas) por fila */
   .np-producto {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
     padding: 0;
     min-height: 0;
-    contain-intrinsic-size: auto 210px;
+    contain-intrinsic-size: auto 104px;
   }
 
   .np-producto-foto {
     width: 100%;
     max-width: none;
-    height: auto;
-    aspect-ratio: 16 / 10;
-    max-height: 110px;
+    height: 52px;
+    max-height: 52px;
     border-radius: 0;
   }
 
   .np-producto-texto {
-    padding: 8px 10px 10px;
+    padding: 5px 7px 6px;
   }
 }
 

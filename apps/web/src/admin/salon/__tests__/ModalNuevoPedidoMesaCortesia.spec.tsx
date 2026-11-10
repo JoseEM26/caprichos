@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import * as sesionModulo from '../../../comun/sesion';
@@ -82,7 +83,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
 
     expect(screen.getByText(/Cortesía · vale S\/ 8\.50/)).toBeInTheDocument();
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
@@ -102,7 +103,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
     fireEvent.click(confirmar);
 
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
