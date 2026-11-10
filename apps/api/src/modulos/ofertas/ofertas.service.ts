@@ -11,6 +11,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import { calcularDescuentoPersonal, resolverPctPersonal, validarColaborador } from '../creditos';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import {
@@ -1732,19 +1733,20 @@ export class OfertasService {
 
   /** Igual que al crear el pedido, pero sin guardar nada: sirve para mostrar el total antes de enviar. */
   async vistaPreviaDescuentos(
-    lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
+    lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number; ofertaId?: string }[],
     cuponCodigo?: string,
     clientePartyId?: string | null,
     canal: string = 'CARTA',
     modalidad?: string,
-  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean }> {
+    colaboradorPartyId?: string,
+  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
     const validas = (lineas || []).filter((l) => /^\d+$/.test(String(l.productoId)) && Number(l.cantidad) > 0);
     if (validas.length === 0) return { descuentoTotal: 0, montoCanjeable: 0, puntosEstimados: 0, puntosPorcentaje, detalles: [], envioGratisCupon: false };
     const productos = await this.prisma.producto.findMany({
       where: { id: { in: validas.map((l) => BigInt(l.productoId)) } },
-      select: { id: true, categoria_id: true, no_suma_beneficios: true },
+      select: { id: true, nombre: true, categoria_id: true, no_suma_beneficios: true },
     });
     const porId = new Map(productos.map((p) => [String(p.id), p]));
     const lineasCalc = validas.map((l) => {
@@ -1756,6 +1758,8 @@ export class OfertasService {
         subtotal: Number(l.subtotal),
         precioUnitario: Number(l.precioUnitario),
         noSumaBeneficios: prod?.no_suma_beneficios ?? false,
+        nombre: prod?.nombre ?? '',
+        enPromocion: Boolean(l.ofertaId),
       };
     });
     const subtotal = Number(lineasCalc.reduce((a, l) => a + l.subtotal, 0).toFixed(2));
@@ -1771,7 +1775,24 @@ export class OfertasService {
     });
     const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
     const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);
+    // Pedido del personal: mismo cálculo y criterios que PedidosService.crear (porcentaje sobre lo elegible)
+    let descuentoPersonal: { pct: number; monto: number } | undefined;
+    if (colaboradorPartyId) {
+      if (!/^\d+$/.test(String(colaboradorPartyId))) {
+        throw new BadRequestException({ codigo: 'COLABORADOR_REQUERIDO', mensaje: 'Elige al trabajador al que se le carga el pedido del personal' });
+      }
+      if (canal !== 'MOZO' && canal !== 'CAJA') {
+        throw new BadRequestException({ codigo: 'CANAL_NO_PERMITIDO', mensaje: 'Por la carta virtual no se consume crédito del personal' });
+      }
+      const colaboradorId = BigInt(colaboradorPartyId);
+      await validarColaborador(this.prisma, colaboradorId);
+      const pct = await resolverPctPersonal(this.prisma, colaboradorId);
+      descuentoPersonal = { pct, monto: calcularDescuentoPersonal(lineasCalc, desglose.detalles as any, pct) };
+    }
     return {
+      ...(descuentoPersonal
+        ? { descuentoPersonal, totalDescuentos: Number((desglose.descuentoTotal + descuentoPersonal.monto).toFixed(2)) }
+        : {}),
       envioGratisCupon: desglose.envioGratisCupon ?? false,
       descuentoTotal: desglose.descuentoTotal,
       montoCanjeable,

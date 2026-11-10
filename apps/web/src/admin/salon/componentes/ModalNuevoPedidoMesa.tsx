@@ -979,20 +979,25 @@ export function ModalNuevoPedidoMesa({
   // Lo que descontará el servidor (promociones del canal local + cupón): el total y el plan de pago
   // deben salir con ese mismo descuento o el servidor responde que el plan no cuadra.
   const [descuentoServidor, setDescuentoServidor] = useState<number | null>(null);
+  // Pedido del personal: el servidor devuelve también su descuento (misma cuenta que al guardar); null = sin confirmar
+  const [descuentoPersonal, setDescuentoPersonal] = useState<{ pct: number; monto: number } | null>(null);
+  const colaboradorPrevia = pideMode === 'personal' && !extra && !edicion ? staffElegido?.partyId : undefined;
   const claveDescuento = JSON.stringify([
-    lineas.filter((l) => !l.cortesia).map((l) => [l.productoId, l.cantidad, l.precioTotal]),
+    lineas.filter((l) => !l.cortesia).map((l) => [l.productoId, l.cantidad, l.precioTotal, l.ofertaId ?? null]),
     cuponAplicado?.codigo ?? null,
     modalidad,
+    colaboradorPrevia ? String(colaboradorPrevia) : null,
   ]);
   useEffect(() => {
     const aValidar = lineas.filter((l) => !l.cortesia);
     if (aValidar.length === 0) {
       setDescuentoServidor(null);
+      setDescuentoPersonal(null);
       return;
     }
     let vigente = true;
-    Promise.resolve(
-      api.post<{ descuentoTotal: number }>('/admin/ofertas/vista-previa', {
+    const pedir = (colaboradorPartyId?: string | number) =>
+      api.post<{ descuentoTotal: number; descuentoPersonal?: { pct: number; monto: number } }>('/admin/ofertas/vista-previa', {
         canal: edicion?.datos.canal ?? canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
         codigo: cuponAplicado?.codigo,
         // mesa/local = COMER_LOCAL: las promociones valen según el tipo de pedido
@@ -1002,11 +1007,25 @@ export function ModalNuevoPedidoMesa({
           cantidad: l.cantidad,
           subtotal: l.precioTotal,
           precioUnitario: l.precioUnitario,
+          ...(l.ofertaId ? { ofertaId: l.ofertaId } : {}),
         })),
-      }),
-    )
-      .then((r) => vigente && setDescuentoServidor(typeof r?.descuentoTotal === 'number' ? Math.round(r.descuentoTotal * 100) / 100 : null))
-      .catch(() => vigente && setDescuentoServidor(null));
+        ...(colaboradorPartyId ? { colaboradorPartyId: String(colaboradorPartyId) } : {}),
+      });
+    setDescuentoPersonal(null);
+    Promise.resolve(pedir(colaboradorPrevia))
+      // Si falla con el trabajador, se pide sin él: no se inventa el descuento del personal (el servidor aplica el real al guardar)
+      .catch((e) => (colaboradorPrevia ? pedir() : Promise.reject(e)))
+      .then((r) => {
+        if (!vigente) return;
+        setDescuentoServidor(typeof r?.descuentoTotal === 'number' ? Math.round(r.descuentoTotal * 100) / 100 : null);
+        const dp = r?.descuentoPersonal;
+        setDescuentoPersonal(colaboradorPrevia && dp && typeof dp.monto === 'number' ? { pct: Number(dp.pct), monto: Math.round(dp.monto * 100) / 100 } : null);
+      })
+      .catch(() => {
+        if (!vigente) return;
+        setDescuentoServidor(null);
+        setDescuentoPersonal(null);
+      });
     return () => {
       vigente = false;
     };
@@ -1031,7 +1050,9 @@ export function ModalNuevoPedidoMesa({
     );
   }, [modalidad, zonaInfo, subtotal]);
 
-  const total = Math.max(0, Math.round((subtotal - descuento + envioCalculado) * 100) / 100);
+  const montoPersonal = colaboradorPrevia ? (descuentoPersonal?.monto ?? 0) : 0;
+  const personalSinConfirmar = !!colaboradorPrevia && descuentoPersonal === null && lineas.some((l) => !l.cortesia);
+  const total = Math.max(0, Math.round((subtotal - descuento - montoPersonal + envioCalculado) * 100) / 100);
 
   // Plan de pago: se valida contra el total; la parte digital (si hay) pide voucher opcional
   const errorPlanAhora = total > 0 ? errorPlan(total, filasPlan) : 'Agrega productos al pedido';
@@ -1850,7 +1871,7 @@ export function ModalNuevoPedidoMesa({
                       </span>
                       <span className="np-eleccion-texto">
                         <span className="np-eleccion-nombre">Pedido del personal</span>
-                        <span className="np-eleccion-desc">Elige quién compra; el descuento de personal se aplica al cobrar a crédito</span>
+                        <span className="np-eleccion-desc">Elige quién compra; el descuento de personal se aplica al pagar ahora o a crédito</span>
                       </span>
                       <span className="np-eleccion-flecha" aria-hidden="true">›</span>
                     </button>
@@ -1866,7 +1887,7 @@ export function ModalNuevoPedidoMesa({
           {paso === 'staff' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                Busca al trabajador por su usuario, nombre o rol. El descuento del personal se aplica cuando el pedido se cobra a crédito del personal.
+                Busca al trabajador por su usuario, nombre o rol. El descuento del personal se aplica al pedido, ya sea que pague ahora o se cargue a su crédito.
               </div>
               <input
                 type="search"
@@ -2916,7 +2937,7 @@ export function ModalNuevoPedidoMesa({
                     <span>
                       <b>Pide:</b>{' '}
                       {pideMode === 'personal' && staffElegido
-                        ? `${staffElegido.nombre} (personal · descuento al cobrar a crédito)`
+                        ? `${staffElegido.nombre} (personal · con descuento)`
                         : pideMode === 'cliente' && clienteEncontrado
                         ? `Cliente: ${clienteEncontrado.nombre} (${clienteEncontrado.puntos} pts)`
                         : 'Cliente nuevo'}
@@ -3203,7 +3224,7 @@ export function ModalNuevoPedidoMesa({
                             })}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                          El descuento de personal se aplica cuando el pedido se cobra con «Cobrar a crédito del personal».
+                          El descuento de personal se aplica al pedido, ya sea que pague ahora o se cargue a su crédito.
                         </div>
                       </div>
                     )}
@@ -3423,6 +3444,15 @@ export function ModalNuevoPedidoMesa({
                       <span>{cuponAplicado ? `Descuentos (cupón ${cuponAplicado.codigo})` : 'Descuento'}</span>
                       <span>- S/ {descuento.toFixed(2)}</span>
                     </div>
+                  )}
+                  {montoPersonal > 0 && descuentoPersonal && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                      <span>Descuento del personal {descuentoPersonal.pct}%</span>
+                      <span>- S/ {montoPersonal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {personalSinConfirmar && (
+                    <div style={{ fontSize: 11, color: 'var(--cp-soft)' }}>El descuento del personal se confirma al guardar.</div>
                   )}
                   {modalidad === 'delivery' && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>

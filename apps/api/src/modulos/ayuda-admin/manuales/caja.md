@@ -53,6 +53,11 @@ Ver tambien: [[cierre]]
 2. Si no sirve, aparece el motivo en claro: no existe, vencido, ya canjeado, compra minima no alcanzada, sin usos disponibles o ya hay una promocion con mayor descuento. Solo valida: el cupon se gasta al registrar el pedido y no se puede usar dos veces.
 3. Si se cambian los productos despues de aplicarlo, el cupon se quita y hay que aplicarlo otra vez. Quitar lo deja sin descuento. Pueden hacerlo Administrador, Cajero, Mozo y Supervisor.
 
+## Como se hace: Pedido del personal con descuento
+1. En Nuevo pedido elige Personal y busca al trabajador. El resumen muestra la linea Descuento del personal (25 % por defecto, o el porcentaje de su ficha) y el total ya con ese descuento.
+2. El descuento aplica igual si el trabajador Paga ahora o si se Carga a su credito: el Pago exacto, el con cuanto paga y el vuelto se calculan sobre el total con descuento.
+3. No se descuentan combos, promociones, docenas, productos sin beneficios ni lineas que ya tienen otro descuento o cupon. Si el sistema no puede calcularlo en pantalla, avisa que se confirma al guardar y aplica el real.
+
 ## Como se hace: Adjuntar la foto del comprobante al cobrar
 1. Al elegir Yape, Plin o Transferencia aparece la seccion Comprobante del pago digital. Tomar la foto del voucher con la camara o subir el archivo; la imagen se reduce en el navegador y se guarda como archivo privado, como prueba.
 2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es informativa y la decision es de la persona de caja, pero una foto que la IA marca como ILEGIBLE no cuenta como comprobante: la pantalla avisa "No se lee: sube otra foto o confirma sin comprobante" (con el motivo).
