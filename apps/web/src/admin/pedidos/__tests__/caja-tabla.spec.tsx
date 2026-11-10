@@ -13,6 +13,15 @@ import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 
+// El contenido del detalle tiene sus propias pruebas (detalle-venta.spec.tsx): aquí solo se comprueba que se abre.
+vi.mock('../DetalleVentaModal', () => ({
+  DetalleVentaModal: ({ alCerrar }: { alCerrar: () => void }) => (
+    <div role="dialog" aria-label="Detalle de la venta">
+      <button type="button" onClick={alCerrar}>Cerrar</button>
+    </div>
+  ),
+}));
+
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({
   listarPersonalActivo: vi.fn().mockResolvedValue([]),
