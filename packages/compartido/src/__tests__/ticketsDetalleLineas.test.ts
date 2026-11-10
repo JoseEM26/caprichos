@@ -97,8 +97,8 @@ describe('comanda de cocina: tamaño, detalle y piezas de combo', () => {
     expect(t).toContain('  Tamaño: Regular 12 oz');
     expect(t).toContain('  Leche: Deslactosada (+S/ 2.00)');
     expect(t).toContain('  Para: Ana');
-    expect(t.match(/  - 1 x Latte Coffe/g)).toHaveLength(2);
-    expect(t.match(/      Tamaño: Regular 12 oz/g)).toHaveLength(2);
+    expect(t.match(/ {2}- 1 x Latte Coffe/g)).toHaveLength(2);
+    expect(t.match(/ {6}Tamaño: Regular 12 oz/g)).toHaveLength(2);
     expect(t).toContain('      Sabor: Vainilla');
   });
 
