@@ -81,6 +81,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['roles y permisos extra de cada cuenta: se asignan de nuevo en la base destino tras migrar el personal', [
     'user_account_rol', 'user_account_rol_historial', 'user_account_area', 'user_account_permiso',
   ]],
+  ['ajustes del dueño a los permisos de cada rol: se hacen de nuevo en la base destino desde Usuarios › Qué ve cada rol', [
+    'rol_permiso_ajuste',
+  ]],
   ['preferencias personales de cada usuario (p. ej. confirmar al despejar): cada persona fija la suya en su base', [
     'preferencia_usuario',
   ]],

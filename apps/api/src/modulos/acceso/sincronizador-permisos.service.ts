@@ -6,7 +6,9 @@ import { MATRIZ, PERMISOS, PERMISOS_RETIRADOS, ROLES_ANULAN_PEDIDOS, ROLES_ELIMI
  * Al arrancar, asegura que la base tenga TODOS los permisos del código y que cada rol tenga los que
  * MATRIZ le asigna. Los despliegues no corren el seed, así que un permiso nuevo o un vínculo nuevo de
  * rol (p. ej. REPARTIDOR con repartos/tomar) quedaba sin fila: el rol recibía SIN_PERMISO y la pantalla
- * se veía vacía sin error. Solo agrega, salvo los roles retirados (ROLES_ELIMINADOS: les borra los permisos) y los permisos retirados (PERMISOS_RETIRADOS).
+ * se veía vacía sin error. Después de la base aplica los AJUSTES del dueño (rol_permiso_ajuste: CONCEDE agrega, QUITA
+ * elimina), así un despliegue no pisa lo que él cambió y los permisos nuevos de MATRIZ se suman sin revertir sus QUITA.
+ * ADMIN no tiene ajustes (intocable). Solo agrega, salvo los roles retirados (ROLES_ELIMINADOS: les borra los permisos) y los permisos retirados (PERMISOS_RETIRADOS).
  */
 @Injectable()
 export class SincronizadorPermisosService implements OnModuleInit {
@@ -55,15 +57,32 @@ export class SincronizadorPermisosService implements OnModuleInit {
     const vinculos = await this.prisma.rolPermiso.findMany({ select: { rol: true, permiso_id: true } });
     const yaVinculados = new Set(vinculos.map((v) => `${v.rol}|${v.permiso_id.toString()}`));
 
+    // Ajustes del dueño (nunca sobre ADMIN ni sobre permisos retirados)
+    const ajustes = (await this.prisma.rolPermisoAjuste.findMany({ select: { rol: true, modulo: true, accion: true, efecto: true } })).filter(
+      (a) => a.rol !== 'ADMIN',
+    );
+    const quita = new Set(ajustes.filter((a) => a.efecto === 'QUITA').map((a) => `${a.rol}|${a.modulo}/${a.accion}`));
+    const concede = ajustes.filter((a) => a.efecto === 'CONCEDE').map((a) => ({ rol: a.rol, clave: `${a.modulo}/${a.accion}` }));
+
     const sinVincular: Array<{ rol: string; permiso_id: bigint }> = [];
-    for (const [rol, clavesRol] of Object.entries(MATRIZ)) {
-      for (const clave of clavesRol) {
-        const permisoId = idPorClave.get(clave);
-        if (permisoId === undefined) continue;
-        if (!yaVinculados.has(`${rol}|${permisoId.toString()}`)) {
-          sinVincular.push({ rol, permiso_id: permisoId });
-        }
-      }
+    const deseados: Array<{ rol: string; clave: string }> = [
+      ...Object.entries(MATRIZ).flatMap(([rol, claves]) => claves.map((clave) => ({ rol, clave }))),
+      ...concede,
+    ];
+    const vistos = new Set<string>();
+    for (const { rol, clave } of deseados) {
+      if (quita.has(`${rol}|${clave}`) || vistos.has(`${rol}|${clave}`)) continue;
+      vistos.add(`${rol}|${clave}`);
+      const permisoId = idPorClave.get(clave);
+      if (permisoId === undefined) continue;
+      if (!yaVinculados.has(`${rol}|${permisoId.toString()}`)) sinVincular.push({ rol, permiso_id: permisoId });
+    }
+
+    // QUITA del dueño: se eliminan los vínculos que la base (o un arranque anterior) hubiera dejado
+    for (const q of quita) {
+      const [rol, clave] = q.split('|');
+      const [modulo, accion] = clave.split('/');
+      await this.prisma.rolPermiso.deleteMany({ where: { rol, permiso: { modulo, accion } } });
     }
 
     if (sinVincular.length > 0) {

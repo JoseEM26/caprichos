@@ -34,6 +34,8 @@ import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
 import { RolesMasivoDto } from './dto/roles-masivo.dto';
 import { UsuariosActividadService } from './usuarios-actividad.service';
 import { UsuariosAccesosService } from './usuarios-accesos.service';
+import { UsuariosRolesModulosService } from './usuarios-roles-modulos.service';
+import { GuardarRolModulosDto } from './dto/roles-modulos.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -45,7 +47,31 @@ export class UsuariosController {
     private readonly rolesMasivoService: UsuariosRolesMasivoService,
     private readonly actividadService: UsuariosActividadService,
     private readonly accesosService: UsuariosAccesosService,
+    private readonly rolesModulosService: UsuariosRolesModulosService,
   ) {}
+
+  /** Módulos que ve cada rol hoy y cuáles son ajuste del dueño (solo ADMIN). */
+  @Get('roles-modulos')
+  @Permiso('usuarios', 'administrar_roles')
+  async rolesModulos() {
+    return this.rolesModulosService.listar();
+  }
+
+  /** Guarda los módulos de un rol como ajustes sobre la base del sistema y los aplica (solo ADMIN, auditado). */
+  @Put('roles-modulos/:rol')
+  @Permiso('usuarios', 'administrar_roles')
+  async guardarRolModulos(@Param('rol') rol: string, @Body() dto: GuardarRolModulosDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.rolesModulosService.guardarModulos(rol, dto.modulos, req.usuario, ip);
+  }
+
+  /** Borra los ajustes del rol y lo devuelve a la base del sistema. */
+  @Post('roles-modulos/:rol/restablecer')
+  @Permiso('usuarios', 'administrar_roles')
+  async restablecerRolModulos(@Param('rol') rol: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.rolesModulosService.restablecer(rol, req.usuario, ip);
+  }
 
   /** Agrega o quita un rol EXTRA a varios usuarios (o a todos). Solo ADMIN; reporta quién se omitió y por qué. */
   @Post('roles-masivo')

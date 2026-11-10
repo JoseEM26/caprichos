@@ -25,6 +25,8 @@ export {
   aplicarOrientacion,
   tamanoEfectivo,
 } from './constantes/index.js';
+export { MODULOS_ROL, coincideMinimo, moduloRolVisible, permisosAConceder } from './constantes/index.js';
+export type { ModuloRolCatalogo } from './constantes/index.js';
 export type { TamanoMm, TamanosEtiqueta, TamanoEtiquetaPc, OrientacionEtiqueta } from './constantes/index.js';
 export type { ReglasImpresion } from './constantes/index.js';
 export type { RolSistema } from './constantes/index.js';

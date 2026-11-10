@@ -94,7 +94,7 @@ export const CONSERVAR: string[] = [
   'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_mesa', 'pedido_pago_plan', 'pedido_proveedor',
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
   'producto_grupo', 'producto_tamano', 'queja_whatsapp', 'ranking_mes', 'receta', 'receta_linea',
-  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'ubicacion_repartidor', 'respuesta_rapida', 'rol', 'rol_permiso',
+  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'ubicacion_repartidor', 'respuesta_rapida', 'rol', 'rol_permiso', 'rol_permiso_ajuste',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'stock_sabor', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'user_account_rol', 'user_account_rol_historial', 'user_account_area', 'user_account_permiso', 'preferencia_usuario', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio',

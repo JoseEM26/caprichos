@@ -39,6 +39,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'usuarios', accion: 'restablecer' },
   // Cuadro de qué módulos ve cada usuario (solo lectura): solo ADMIN
   { modulo: 'usuarios', accion: 'ver_accesos' },
+  // Dar o quitar módulos a un rol (Usuarios › Qué ve cada rol): solo ADMIN
+  { modulo: 'usuarios', accion: 'administrar_roles' },
   { modulo: 'configuracion', accion: 'ver' },
   { modulo: 'configuracion', accion: 'editar' },
   { modulo: 'auditoria', accion: 'ver' },

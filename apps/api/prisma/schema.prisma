@@ -118,6 +118,7 @@ model Rol {
   usuariosExtra  UserAccountRol[]
   historialRolesExtra UserAccountRolHistorial[]
   notificaciones Notificacion[]
+  ajustes        RolPermisoAjuste[]
 
   @@map("rol")
 }
@@ -206,6 +207,20 @@ model RolPermiso {
 
   @@id([rol, permiso_id])
   @@map("rol_permiso")
+}
+
+/// Cambios del dueño sobre la base de permisos del sistema (MATRIZ): el sincronizador los reaplica en cada arranque.
+model RolPermisoAjuste {
+  rol        String
+  modulo     String
+  accion     String
+  efecto     String   // CONCEDE | QUITA
+  creado_por BigInt?
+  creado_en  DateTime @default(now()) @db.Timestamptz
+  r          Rol      @relation(fields: [rol], references: [codigo], onDelete: Cascade)
+
+  @@id([rol, modulo, accion])
+  @@map("rol_permiso_ajuste")
 }
 
 model UserAccount {
