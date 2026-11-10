@@ -1,0 +1,64 @@
+/* Cronograma de asistencia y bandeja de solicitudes (ADMIN). Mobile first; la línea de tiempo se desplaza en horizontal. */
+.cr-vista { display: grid; gap: 14px; }
+.cr-barra { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
+.cr-grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+.cr-grupo input[type='date'] { min-height: 44px; border-radius: 8px; border: 1.5px solid var(--cp-line); padding: 0 8px; }
+.cr-leyenda { margin: 0 0 8px; }
+
+.cr-fila { border: 1.5px solid var(--cp-line); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; background: #fff; display: grid; gap: 8px; }
+.cr-fila-cab { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.cr-fila-cab small { color: var(--cp-soft); }
+.cr-scroll { overflow-x: auto; padding-bottom: 4px; }
+.cr-pista { position: relative; height: 64px; min-width: 680px; border-bottom: 2px solid var(--cp-line); }
+.cr-turno { position: absolute; top: 4px; bottom: 4px; background: color-mix(in srgb, var(--cp-gold) 18%, transparent); border: 1px dashed var(--cp-gold); border-radius: 6px; }
+.cr-tramo { position: absolute; top: 22px; height: 20px; border-radius: 4px; font-size: 11px; line-height: 20px; overflow: hidden; color: #fff; padding: 0 4px; }
+.cr-tramo--trabajo { background: var(--cp-green); }
+.cr-tramo--break { background: repeating-linear-gradient(45deg, var(--cp-gold), var(--cp-gold) 5px, #fff 5px, #fff 9px); color: var(--cp-navy); border: 1px solid var(--cp-gold); }
+.cr-tramo--abierto { border-right: 3px dotted var(--cp-navy); }
+
+.cr-punto { position: absolute; top: 28px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--cp-navy); border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--cp-navy); padding: 0; cursor: pointer; }
+.cr-punto:focus-visible, .cr-punto--sel { outline: 3px solid var(--cp-gold); outline-offset: 2px; }
+.cr-punto--rev { border-radius: 2px; background: var(--cp-rust); box-shadow: 0 0 0 1.5px var(--cp-rust); }
+.cr-punto--corr { border-radius: 2px; transform: rotate(45deg); background: var(--cp-green); box-shadow: 0 0 0 1.5px var(--cp-green); }
+.cr-punto--dup { background: #fff; box-shadow: 0 0 0 1.5px var(--cp-soft); opacity: 0.8; }
+.cr-punto--sol { background: transparent; border: 2px dashed var(--cp-navy); box-shadow: none; cursor: help; }
+.cr-hora { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; white-space: nowrap; color: var(--cp-navy); }
+.cr-punto--corr .cr-hora { transform: translateX(-50%) rotate(-45deg); }
+.cr-hora--dup { text-decoration: line-through; color: var(--cp-soft); font-weight: 500; top: 20px; }
+.cr-eje { position: relative; height: 16px; min-width: 680px; font-size: 10px; color: var(--cp-soft); }
+.cr-eje span { position: absolute; transform: translateX(-50%); }
+
+.cr-alertas { margin: 0; padding-left: 18px; font-size: 13px; color: var(--cp-navy); }
+.cr-sols { display: grid; gap: 6px; border: 1.5px dashed var(--cp-navy); border-radius: 10px; padding: 8px; }
+.cr-sol { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.cr-sols input, .cr-detalle input { min-height: 40px; border-radius: 8px; border: 1.5px solid var(--cp-line); padding: 0 8px; }
+.cr-detalle { border: 1.5px solid var(--cp-navy); border-radius: 10px; padding: 10px; display: grid; gap: 8px; background: var(--cp-cream); }
+.cr-detalle dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; margin: 0; }
+.cr-detalle dt { font-size: 12px; color: var(--cp-soft); }
+.cr-detalle dd { margin: 0; font-weight: 700; font-size: 14px; }
+.cr-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+
+/* Calendario del mes */
+.cr-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cr-cal-cab { text-align: center; font-size: 12px; font-weight: 700; color: var(--cp-soft); text-transform: uppercase; }
+.cr-celda { min-height: 64px; border: 1.5px solid var(--cp-line); border-radius: 10px; background: #fff; padding: 4px; text-align: left; display: grid; align-content: start; gap: 2px; cursor: pointer; font: inherit; }
+.cr-celda[aria-current='date'] { outline: 3px solid var(--cp-navy); }
+.cr-celda--ok { border-color: var(--cp-green); }
+.cr-celda--tarde { border-color: var(--cp-gold); background: #FFF8E6; }
+.cr-celda--revisar { border-color: var(--cp-gold); border-style: dashed; background: #FFF3D1; }
+.cr-celda--falta { border-color: var(--cp-rust); background: #FBEDE9; }
+.cr-ind { display: flex; flex-wrap: wrap; gap: 2px 6px; font-size: 11px; font-weight: 700; }
+
+/* Bandeja de solicitudes y aprobación en lote */
+.cr-filtros { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.cr-atajos { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-lote { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border: 1.5px solid var(--cp-navy); border-radius: 12px; background: var(--cp-cream); }
+.cr-check { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.cr-check input { width: 22px; height: 22px; }
+.cr-resultado li.ok::before { content: '✓ '; color: var(--cp-green); font-weight: 900; }
+.cr-resultado li.mal::before { content: '✗ '; color: var(--cp-rust); font-weight: 900; }
+
+@media (max-width: 640px) {
+  .cr-celda { min-height: 54px; }
+  .cr-ind { font-size: 10px; }
+}

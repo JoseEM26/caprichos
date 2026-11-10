@@ -52,6 +52,8 @@ model Party {
   reemplazaDias            ReemplazoDia[]         @relation("ReemplazoDiaSuplente")
   asistenciaMarcas         AsistenciaMarca[]     @relation("AsistenciaMarcaParty")
   asistenciaCorregidas     AsistenciaMarca[]     @relation("AsistenciaMarcaCorrigio")
+  asistenciaSolicitudes    AsistenciaSolicitud[] @relation("AsistenciaSolicitudParty")
+  asistenciaSolicitudesResueltas AsistenciaSolicitud[] @relation("AsistenciaSolicitudResuelta")
   asistenciaDispositivo    AsistenciaDispositivo?
   asistenciaConsentimiento AsistenciaConsentimiento?
   pedidosProveedor         PedidoProveedor[]
@@ -2842,6 +2844,28 @@ model AsistenciaMarca {
   @@unique([party_id, qr_slot])
   @@index([party_id, jornada])
   @@map("asistencia_marca")
+}
+
+/// Solicitud de corrección de asistencia: la persona pide marcas olvidadas o mal hechas; no cuenta hasta que el admin la apruebe.
+model AsistenciaSolicitud {
+  id                 BigInt    @id @default(autoincrement())
+  party_id           BigInt
+  jornada            DateTime  @db.Date
+  items              Json      // [{ tipo, hora: "HH:MM", momento: ISO }]
+  motivo             String
+  estado             String    @default("PENDIENTE") @db.VarChar(12) // PENDIENTE | APROBADA | RECHAZADA | CANCELADA
+  creada_en          DateTime  @default(now()) @db.Timestamptz
+  resuelta_por       BigInt?
+  resuelta_en        DateTime? @db.Timestamptz
+  motivo_resolucion  String?
+  marcas_ids         Json?     // ids de las marcas creadas al aprobar
+
+  party              Party     @relation("AsistenciaSolicitudParty", fields: [party_id], references: [id])
+  resolutora         Party?    @relation("AsistenciaSolicitudResuelta", fields: [resuelta_por], references: [id])
+
+  @@index([party_id, jornada])
+  @@index([estado])
+  @@map("asistencia_solicitud")
 }
 
 model AsistenciaSelfie {

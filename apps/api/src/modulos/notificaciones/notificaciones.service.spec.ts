@@ -151,6 +151,42 @@ describe('NotificacionesService', () => {
     expect(r.notificaciones.map((n) => n.clave)).toEqual(['n:5']);
   });
 
+  describe('asistencia: avisos de corrección', () => {
+    const marcar = { partyId: 7n, rol: 'MOZO', roles: ['MOZO'], debeCambiar: false };
+    const conAsistencia = (correcciones: any) => {
+      prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'asistencia', accion: 'marcar' } }]);
+      return new NotificacionesService(prisma, auditoria, eventos, correcciones);
+    };
+
+    it('la persona recibe un aviso con la inconsistencia sin corregir (no la ya enviada) y la clave no cambia mientras siga igual', async () => {
+      const correcciones = {
+        inconsistencias: jest.fn().mockResolvedValue([
+          { estado: 'SIN_CORREGIR', jornada: '2026-11-06', texto: 'No marcaste tu salida (viernes 6)' },
+          { estado: 'ENVIADA', jornada: '2026-11-05', texto: 'No marcaste tu entrada (jueves 5)' },
+        ]),
+        contarPendientes: jest.fn(),
+      };
+      const svc = conAsistencia(correcciones);
+      const a = await svc.resumen(marcar);
+      const b = await svc.resumen(marcar);
+      const aviso = a.notificaciones.find((n) => n.clave.startsWith('c:asistencia-inc:'));
+      expect(aviso).toMatchObject({ titulo: 'No marcaste tu salida (viernes 6)', modulo: 'mi-asistencia' });
+      expect(b.notificaciones.find((n) => n.clave.startsWith('c:asistencia-inc:'))!.clave).toBe(aviso!.clave); // sin spam
+      expect(a.conteos['mi-asistencia']).toBe(1);
+      expect(correcciones.contarPendientes).not.toHaveBeenCalled(); // no es admin
+    });
+
+    it('sin inconsistencias no hay aviso; el ADMIN no recibe el de la persona y sí el contador de solicitudes', async () => {
+      const correcciones = { inconsistencias: jest.fn().mockResolvedValue([]), contarPendientes: jest.fn().mockResolvedValue(2) };
+      const svc = conAsistencia(correcciones);
+      expect((await svc.resumen(marcar)).notificaciones.some((n) => n.clave.startsWith('c:asistencia-inc:'))).toBe(false);
+      const admin = await svc.resumen(ADMIN);
+      expect(correcciones.inconsistencias).toHaveBeenCalledTimes(1); // solo la persona, no el admin
+      expect(admin.conteos.asistencia).toBe(2);
+      expect(admin.notificaciones.find((n) => n.clave.startsWith('c:asistencia-solicitudes:'))!.titulo).toMatch(/2 solicitudes de corrección/);
+    });
+  });
+
   it('un aviso dirigido a CAJERO lo ve quien tiene CAJERO como rol extra, aunque su principal sea MOZO', async () => {
     const mozoConCaja = { partyId: 9n, rol: 'MOZO', roles: ['MOZO', 'CAJERO'], debeCambiar: false };
     const r = await service.resumen(mozoConCaja);

@@ -23,17 +23,15 @@ import {
   ResultadoJornada,
   TipoMarca,
   aHoraTexto,
-  calcularJornada,
   diaSemana,
   distanciaMetros,
+  evaluarJornada,
   jornadaDe,
-  marcaPendiente,
-  marcasPermitidas,
   minutosDeHora,
-  motivoNoPermitida,
   resolverTurno,
   sumarDias,
 } from './asistencia.calculo';
+import { rolEfectivo } from './asistencia.interpretacion';
 import {
   CLAVE_CONFIG_ASISTENCIA,
   ConfigAsistencia,
@@ -48,7 +46,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, MarcarWebDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, MarcarWebDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -316,13 +314,9 @@ export class AsistenciaService {
     if (usado) throw new RechazoAsistencia('QR_YA_USADO', 'Ese QR ya lo usaste. Espera al siguiente.');
 
     const { jornada } = jornadaDe(ahora);
-    const delDia = await this.prisma.asistenciaMarca.findMany({
-      where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
-      orderBy: { momento: 'asc' },
-    });
-    const tiposDelDia = new Set(delDia.map((m) => m.tipo as TipoMarca));
-    const motivoOrden = motivoNoPermitida(dto.tipo, tiposDelDia);
-    if (motivoOrden) throw new RechazoAsistencia('ORDEN_INVALIDO', motivoOrden);
+    // Marcas múltiples: no se rechaza por «ya marcaste»; el servidor interpreta cada marca por orden y pares.
+    const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg);
+    const tipo = lectura.rol;
 
     if (dto.precision > cfg.precisionMaxM) {
       throw new RechazoAsistencia('PRECISION_BAJA', 'Acércate y activa la ubicación precisa del celular.');
@@ -352,7 +346,7 @@ export class AsistenciaService {
           data: {
             party_id: partyId,
             jornada: fechaDb(jornada),
-            tipo: dto.tipo,
+            tipo,
             origen: 'CELULAR',
             momento: ahora,
             estado,
@@ -378,28 +372,27 @@ export class AsistenciaService {
 
       await this.auditar(
         'CAMBIO', 'MARCAR', estado === 'A_REVISAR' ? 'REVISAR' : 'OK',
-        { tipo: dto.tipo, estado, distancia_m: metros, alertas },
+        { tipo, estado, distancia_m: metros, alertas, duplicada: lectura.duplicada },
         partyId, undefined, 'asistencia_marca', marca.id,
       );
 
-      const tiposNuevos = new Set<TipoMarca>([...tiposDelDia, dto.tipo]);
       return {
         ok: true,
         marca: {
           id: Number(marca.id),
-          tipo: dto.tipo,
+          tipo,
           momento: ahora.toISOString(),
           estado,
           distanciaM: Math.round(metros * 100) / 100,
           alertas,
         },
-        mensaje: `Marcaste ${etiquetaTipo(dto.tipo)} a las ${horaLima(ahora)}`,
-        pendiente: marcaPendiente(tiposNuevos),
-        permitidas: marcasPermitidas(tiposNuevos),
+        mensaje: mensajeMarca(lectura, ahora, cfg.dobleMarcaMin),
+        interpretacion: { rol: tipo, duplicada: lectura.duplicada, alertas: lectura.interp.alertas },
       };
     } catch (e: any) {
+      // Misma marca (mismo QR) reintentada: la unicidad por qr_slot sigue vigente
       if (e?.code === 'P2002') {
-        throw new ConflictException({ codigo: 'YA_MARCADO', mensaje: 'Esa marca ya quedó registrada hoy.' });
+        throw new ConflictException({ codigo: 'YA_MARCADO', mensaje: 'Esa marca ya quedó registrada.' });
       }
       throw e;
     }
@@ -448,15 +441,9 @@ export class AsistenciaService {
     }
 
     const { jornada } = jornadaDe(ahora);
-    const delDia = await this.prisma.asistenciaMarca.findMany({
-      where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
-      orderBy: { momento: 'asc' },
-    });
-    const tiposDelDia = new Set(delDia.map((m) => m.tipo as TipoMarca));
-    const tipo = dto.tipo ?? marcaPendiente(tiposDelDia);
-    if (!tipo) throw new BadRequestException({ codigo: 'JORNADA_COMPLETA', mensaje: 'Tu jornada de hoy ya está completa.' });
-    const motivoOrden = motivoNoPermitida(tipo, tiposDelDia);
-    if (motivoOrden) throw new BadRequestException({ codigo: 'ORDEN_INVALIDO', mensaje: motivoOrden });
+    const cfg = await this.obtenerConfig();
+    const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg);
+    const tipo = lectura.rol; // el `tipo` que mande el cliente se ignora: manda el orden
 
     const creada = await this.prisma.asistenciaMarca.create({
       data: {
@@ -470,31 +457,34 @@ export class AsistenciaService {
       },
     });
     await this.auditar('CAMBIO', 'MARCAR_WEB', 'REVISAR', { tipo }, partyId, ip, 'asistencia_marca', creada.id);
-    const tiposNuevos = new Set<TipoMarca>([...tiposDelDia, tipo]);
     return {
       ok: true,
-      mensaje: `Marcaste ${etiquetaTipo(tipo)} a las ${horaLima(ahora)}. Queda pendiente de revisión del administrador.`,
+      mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin)}. Queda pendiente de revisión del administrador.`,
       tipo,
-      pendiente: marcaPendiente(tiposNuevos),
+      duplicada: lectura.duplicada,
     };
   }
 
   /** El admin aprueba (la marca cuenta) o anula (no cuenta) una marca; la fila se conserva con quién, cuándo y por qué. */
-  async revisarMarca(id: number, accion: 'APROBAR' | 'ANULAR', dto: RevisarMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
+  async revisarMarca(id: number, accion: 'APROBAR' | 'ANULAR' | 'SEPARAR', dto: RevisarMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
     const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
     if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
     if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });
+    // «Separar» = el admin decide que una doble marca cuenta como marca propia (queda APROBADA y ya no se une a la anterior)
+    if (accion === 'SEPARAR' && marca.estado !== 'VALIDA' && marca.estado !== 'A_REVISAR') {
+      throw new ConflictException({ codigo: 'NO_SE_PUEDE_SEPARAR', mensaje: 'Esa marca ya está aprobada' });
+    }
     if (accion === 'APROBAR' && marca.estado !== 'A_REVISAR') {
       throw new ConflictException({ codigo: 'NO_ESTA_POR_REVISAR', mensaje: 'Esa marca no está pendiente de revisión' });
     }
-    const estado = accion === 'APROBAR' ? 'APROBADA' : 'ANULADA';
+    const estado = accion === 'ANULAR' ? 'ANULADA' : 'APROBADA';
     const motivo = dto.motivo.trim();
     await this.prisma.asistenciaMarca.update({
       where: { id: marca.id },
       data: { estado, revisado_por: usuario.partyId, revisado_en: new Date(), revisado_motivo: motivo },
     });
     await this.auditar(
-      'CAMBIO', accion === 'APROBAR' ? 'APROBAR_MARCA' : 'ANULAR_MARCA', 'OK',
+      'CAMBIO', accion === 'APROBAR' ? 'APROBAR_MARCA' : accion === 'SEPARAR' ? 'SEPARAR_MARCA' : 'ANULAR_MARCA', 'OK',
       { antes: marca.estado, despues: estado, tipo: marca.tipo, partyId: Number(marca.party_id) },
       usuario.partyId, ip, 'asistencia_marca', marca.id, motivo,
     );
@@ -510,8 +500,12 @@ export class AsistenciaService {
     const cfg = await this.obtenerConfig();
     const dias = [];
     for (let j = desde; j <= hasta; j = sumarDias(j, 1)) {
-      const d = this.evaluarDia(partyId, j, ctx, ahora, cfg.toleranciaMin);
-      dias.push({ jornada: j, estado: d.resultado.estado, turno: d.turno, marcas: d.marcas });
+      const d = this.evaluarDia(partyId, j, ctx, ahora, cfg);
+      // marcas = las que cuentan, con su rol interpretado (una sola fuente de verdad para la planilla)
+      dias.push({
+        jornada: j, estado: d.resultado.estado, turno: d.turno, marcas: d.marcas,
+        breakMin: d.interp.breakMin, interp: d.interp, turnoTexto: d.turnoTexto, alertas: d.resultado.alertas,
+      });
     }
     return { dias, cfg };
   }
@@ -523,25 +517,34 @@ export class AsistenciaService {
   async miHoy(partyId: bigint, ahora = new Date()) {
     const { jornada } = jornadaDe(ahora);
     const ctx = await this.cargarContexto(jornada, jornada, [partyId]);
-    const dia = this.evaluarDia(partyId, jornada, ctx, ahora, await this.toleranciaMin());
+    const cfg = await this.obtenerConfig();
+    const dia = this.evaluarDia(partyId, jornada, ctx, ahora, cfg);
     const marcas = await this.prisma.asistenciaMarca.findMany({
       where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
       orderBy: { momento: 'asc' },
     });
-    const tipos = new Set(marcas.map((m) => m.tipo as TipoMarca));
     const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
     const vigente = consentimiento?.version === VERSION_CONSENTIMIENTO;
-    const cfg = await this.obtenerConfig();
     return {
       jornada,
       ahora: ahora.toISOString(),
       turno: dia.turnoTexto,
       estado: dia.resultado.estado,
       resumen: dia.resultado,
-      marcas: marcas.map((m) => ({ tipo: m.tipo, momento: m.momento.toISOString(), estado: m.estado })),
-      pendiente: marcaPendiente(tipos),
-      permitidas: marcasPermitidas(tipos),
+      // Cada marca con lo que el servidor interpretó (entrada, salida a break, regreso, salida) o «unida» si es doble marca
+      marcas: marcas.map((m) => {
+        const c = dia.interp.marcas.find((x) => x.id === Number(m.id));
+        return {
+          id: Number(m.id),
+          tipo: c ? rolEfectivo(dia.interp, c) : (m.tipo as TipoMarca),
+          momento: m.momento.toISOString(),
+          estado: m.estado,
+          duplicada: Boolean(c && c.duplicadaDe !== null),
+        };
+      }),
+      interpretacion: { estado: dia.interp.estado, alertas: dia.interp.alertas, tramos: dia.interp.tramos },
+      dobleMarcaMin: cfg.dobleMarcaMin,
       consentimientoAceptado: vigente,
       consentimientoAceptadoEn: vigente ? consentimiento!.aceptado_en.toISOString() : null,
       textoConsentimiento: TEXTO_CONSENTIMIENTO,
@@ -556,11 +559,11 @@ export class AsistenciaService {
     const hoy = jornadaDe(ahora).jornada;
     const desde = sumarDias(hoy, -(dias - 1));
     const ctx = await this.cargarContexto(desde, hoy, [partyId]);
-    const tol = await this.toleranciaMin();
+    const cfg = await this.obtenerConfig();
     const filas: Array<Record<string, unknown>> = [];
     for (let j = hoy; j >= desde; j = sumarDias(j, -1)) {
-      const dia = this.evaluarDia(partyId, j, ctx, ahora, tol);
-      filas.push({ jornada: j, estado: dia.resultado.estado, trabajadaMin: dia.resultado.trabajadaMin, alertas: dia.resultado.alertas, turno: dia.turnoTexto, marcas: dia.marcas.map((m) => ({ tipo: m.tipo, hora: aHoraTexto(m.minutos), estado: m.estado })) });
+      const dia = this.evaluarDia(partyId, j, ctx, ahora, cfg);
+      filas.push({ jornada: j, estado: dia.resultado.estado, trabajadaMin: dia.resultado.trabajadaMin, alertas: dia.resultado.alertas, turno: dia.turnoTexto, marcas: dia.interp.marcas.map((m) => ({ id: m.id, tipo: rolEfectivo(dia.interp, m), hora: aHoraTexto(m.minutos), estado: m.estado, duplicada: m.duplicadaDe !== null })) });
     }
     return filas;
   }
@@ -572,12 +575,12 @@ export class AsistenciaService {
   async reporteHoy(ahora = new Date()) {
     const hoy = jornadaDe(ahora).jornada;
     const ctx = await this.cargarContexto(hoy, hoy);
-    const tol = await this.toleranciaMin();
+    const cfg = await this.obtenerConfig();
     const personas = [...this.partesConActividad(ctx, hoy)];
     const cuentas = await this.cuentas(personas);
     const filas = personas
       .map((pid) => {
-        const d = this.evaluarDia(pid, hoy, ctx, ahora, tol);
+        const d = this.evaluarDia(pid, hoy, ctx, ahora, cfg);
         const entrada = d.marcas.find((m) => m.tipo === 'ENTRADA');
         const salida = d.marcas.find((m) => m.tipo === 'SALIDA');
         return {
@@ -697,6 +700,37 @@ export class AsistenciaService {
     return { ok: true, id: Number(creada.id) };
   }
 
+  /**
+   * Reasignar el rol de una marca (p. ej. la «salida» era en realidad el regreso del break): append-only.
+   * La original queda ANULADA con el motivo y se crea una CORRECCION a la misma hora con el rol elegido (fija).
+   */
+  async reasignarMarca(id: number, dto: ReasignarMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
+    const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
+    if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
+    if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });
+    const motivo = dto.motivo.trim();
+    const nueva = await this.prisma.$transaction(async (tx) => {
+      await tx.asistenciaMarca.update({
+        where: { id: marca.id },
+        data: { estado: 'ANULADA', revisado_por: usuario.partyId, revisado_en: new Date(), revisado_motivo: `Reasignada a ${dto.tipo}: ${motivo}` },
+      });
+      return tx.asistenciaMarca.create({
+        data: {
+          party_id: marca.party_id,
+          jornada: marca.jornada,
+          tipo: dto.tipo,
+          origen: 'CORRECCION',
+          momento: marca.momento,
+          estado: 'VALIDA',
+          motivo: `Rol reasignado de la marca #${marca.id}: ${motivo}`,
+          por_party_id: usuario.partyId,
+        },
+      });
+    });
+    await this.auditar('CAMBIO', 'REASIGNAR_MARCA', 'OK', { de: marca.tipo, a: dto.tipo, marcaOriginal: Number(marca.id) }, usuario.partyId, ip, 'asistencia_marca', nueva.id, motivo);
+    return { ok: true, id: Number(nueva.id) };
+  }
+
   async reiniciarDispositivo(partyId: number, usuario: UsuarioAutenticado, ip?: string) {
     const borrados = await this.prisma.asistenciaDispositivo.deleteMany({ where: { party_id: BigInt(partyId) } });
     await this.auditar('CAMBIO', 'REINICIAR_DISPOSITIVO', 'OK', { borrados: borrados.count }, usuario.partyId, ip, 'party', partyId);
@@ -707,11 +741,23 @@ export class AsistenciaService {
   // Cálculo compartido
   // ---------------------------------------------------------------------------
 
-  private async toleranciaMin(): Promise<number> {
-    return (await this.obtenerConfig()).toleranciaMin;
+  /**
+   * Cómo quedaría la jornada con una marca nueva en `momento`: el rol que le toca (por orden y pares) y si es doble marca.
+   * No guarda nada.
+   */
+  private async leerNuevaMarca(partyId: bigint, jornada: string, momento: Date, cfg: ConfigAsistencia) {
+    const ctx = await this.cargarContexto(jornada, jornada, [partyId]);
+    const nueva: MarcaCalc = { id: -1, tipo: 'ENTRADA', minutos: jornadaDe(momento).minutos, estado: 'VALIDA' };
+    const { turno, motivoDescanso } = resolverTurno(partyId, jornada, ctx);
+    const previas = ctx.marcas.get(`${partyId}|${jornada}`) ?? [];
+    const { interp } = evaluarJornada({
+      jornada, turno, marcas: [...previas, nueva], ahora: momento, tolerancia: cfg.toleranciaMin, motivoDescanso, dobleMarcaMin: cfg.dobleMarcaMin,
+    });
+    const m = interp.marcas.find((x) => x.id === -1)!;
+    return { rol: (rolEfectivo(interp, m) ?? 'SALIDA') as TipoMarca, duplicada: m.duplicadaDe !== null, interp };
   }
 
-  private async cargarContexto(desde: string, hasta: string, partyIds?: bigint[]) {
+  async cargarContexto(desde: string, hasta: string, partyIds?: bigint[]) {
     const rango = { gte: fechaDb(desde), lte: fechaDb(hasta) };
     const [horarios, coberturas, reemplazos, marcas] = await Promise.all([
       this.prisma.horarioTrabajo.findMany({ where: { activo: true } }),
@@ -720,6 +766,7 @@ export class AsistenciaService {
       this.prisma.asistenciaMarca.findMany({
         where: { jornada: rango, estado: { not: 'ANULADA' }, ...(partyIds ? { party_id: { in: partyIds } } : {}) },
         orderBy: { momento: 'asc' },
+        include: { selfie: { select: { marca_id: true } } },
       }),
     ]);
     const horariosFila: HorarioFila[] = horarios.map((h) => ({
@@ -746,13 +793,21 @@ export class AsistenciaService {
     for (const m of marcas) {
       const clave = `${m.party_id}|${isoDe(m.jornada)}`;
       const lista = porClave.get(clave) ?? [];
-      lista.push({ tipo: m.tipo as TipoMarca, minutos: jornadaDe(m.momento).minutos, estado: m.estado === 'A_REVISAR' ? 'A_REVISAR' : 'VALIDA' }); // APROBADA cuenta como válida
+      // APROBADA cuenta como válida. Solo la corrección del admin conserva su tipo (fijo): las demás se interpretan por orden y pares.
+      lista.push({
+        id: Number(m.id),
+        tipo: m.tipo as TipoMarca,
+        minutos: jornadaDe(m.momento).minutos,
+        estado: m.estado === 'A_REVISAR' ? 'A_REVISAR' : 'VALIDA',
+        fijo: m.origen === 'CORRECCION',
+        separada: m.estado === 'APROBADA' || m.origen === 'CORRECCION',
+      });
       porClave.set(clave, lista);
     }
-    return { horarios: horariosFila, coberturas: coberturasFila, reemplazos: reemplazosFila, marcas: porClave };
+    return { horarios: horariosFila, coberturas: coberturasFila, reemplazos: reemplazosFila, marcas: porClave, filas: marcas };
   }
 
-  private partesConActividad(ctx: Awaited<ReturnType<AsistenciaService['cargarContexto']>>, jornada: string): Set<bigint> {
+  partesConActividad(ctx: Awaited<ReturnType<AsistenciaService['cargarContexto']>>, jornada: string): Set<bigint> {
     const set = new Set<bigint>();
     const dia = diaSemana(jornada);
     for (const h of ctx.horarios) if (h.dia === dia) set.add(h.partyId);
@@ -764,14 +819,18 @@ export class AsistenciaService {
     return set;
   }
 
-  private evaluarDia(partyId: bigint, jornada: string, ctx: Awaited<ReturnType<AsistenciaService['cargarContexto']>>, ahora: Date, tolerancia: number) {
+  evaluarDia(partyId: bigint, jornada: string, ctx: Awaited<ReturnType<AsistenciaService['cargarContexto']>>, ahora: Date, cfg: ConfigAsistencia) {
     const { turno, motivoDescanso } = resolverTurno(partyId, jornada, ctx);
-    const marcas = ctx.marcas.get(`${partyId}|${jornada}`) ?? [];
-    const resultado: ResultadoJornada = calcularJornada({ jornada, turno, marcas, ahora, tolerancia, motivoDescanso });
+    const crudas = ctx.marcas.get(`${partyId}|${jornada}`) ?? [];
+    const { resultado, interp } = evaluarJornada({
+      jornada, turno, marcas: crudas, ahora, tolerancia: cfg.toleranciaMin, motivoDescanso, dobleMarcaMin: cfg.dobleMarcaMin,
+    });
+    // Las que cuentan, ya con su rol interpretado (las dobles marcas no cuentan)
+    const marcas: MarcaCalc[] = interp.marcas.filter((m) => m.duplicadaDe === null && m.rol).map((m) => ({ ...m, tipo: m.rol! }));
     const turnoTexto = turno
       ? { entrada: aHoraTexto(turno.entrada), salida: aHoraTexto(turno.salida), almuerzo: turno.almuerzoIni !== undefined && turno.almuerzoFin !== undefined ? `${aHoraTexto(turno.almuerzoIni)}-${aHoraTexto(turno.almuerzoFin)}` : null }
       : null;
-    return { turno, turnoTexto, marcas, resultado };
+    return { turno, turnoTexto, marcas, resultado, interp };
   }
 
   private async calcularMes(anio: number, mes: number, ahora: Date) {
@@ -779,7 +838,7 @@ export class AsistenciaService {
     const diasMes = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
     const hasta = `${anio}-${String(mes).padStart(2, '0')}-${String(diasMes).padStart(2, '0')}`;
     const ctx = await this.cargarContexto(desde, hasta);
-    const tol = await this.toleranciaMin();
+    const cfg = await this.obtenerConfig();
     const dias: string[] = [];
     for (let i = 0; i < diasMes; i++) dias.push(sumarDias(desde, i));
     const personas = new Set<bigint>();
@@ -795,7 +854,7 @@ export class AsistenciaService {
       let jornadasARevisar = 0;
       const nombre = cuentas.get(pid)?.nombre ?? `Persona ${pid}`;
       for (const j of dias) {
-        const d = this.evaluarDia(pid, j, ctx, ahora, tol);
+        const d = this.evaluarDia(pid, j, ctx, ahora, cfg);
         filas.push({ ...d.resultado, partyId: Number(pid), nombre, jornada: j });
         if (d.resultado.estado === 'SIN_EVALUAR') continue; // en curso o futuro: no suma a los totales
         if (d.resultado.estado === 'INCOMPLETO') jornadasIncompletas++;
@@ -817,7 +876,7 @@ export class AsistenciaService {
     return { filas, personas: resumen, dias };
   }
 
-  private async cuentas(ids: bigint[]): Promise<Map<bigint, { nombre: string }>> {
+  async cuentas(ids: bigint[]): Promise<Map<bigint, { nombre: string }>> {
     const personas = await this.prisma.person.findMany({ where: { party_id: { in: ids } } });
     const mapa = new Map<bigint, { nombre: string }>();
     for (const p of personas) {
@@ -881,7 +940,13 @@ export class AsistenciaService {
 }
 
 const etiquetaTipo = (t: TipoMarca): string =>
-  ({ ENTRADA: 'tu entrada', SALIDA_ALMUERZO: 'tu salida a almuerzo', ENTRADA_ALMUERZO: 'tu regreso de almuerzo', SALIDA: 'tu salida' })[t];
+  ({ ENTRADA: 'tu entrada', SALIDA_ALMUERZO: 'tu salida a break', ENTRADA_ALMUERZO: 'tu regreso del break', SALIDA: 'tu salida' })[t];
+
+/** Lo que se le dice a la persona al marcar: qué interpretó el sistema (o que se unió a la marca anterior). */
+const mensajeMarca = (l: { rol: TipoMarca; duplicada: boolean }, ahora: Date, dobleMin: number): string =>
+  l.duplicada
+    ? `Tu marca de las ${horaLima(ahora)} se unió a la anterior (menos de ${dobleMin} min): cuenta la primera`
+    : `Marcaste ${etiquetaTipo(l.rol)} a las ${horaLima(ahora)}`;
 
 const horaLima = (d: Date): string => aHoraTexto(jornadaDe(d).minutos);
 

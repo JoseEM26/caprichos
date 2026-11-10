@@ -116,10 +116,13 @@ describe('calcularJornada (cumplimiento)', () => {
     expect(r.trabajadaMin).toBe(m(18) - m(9) - 60);
   });
 
-  it('salida sin regreso de almuerzo es INCOMPLETO al cerrar el día', () => {
+  // Por diseño (marcas múltiples): 3 marcas son dudosas → A_REVISAR (antes INCOMPLETO); ambos bloquean el pago.
+  it('3 marcas (salida sin regreso de break) quedan A_REVISAR con motivo claro al cerrar el día', () => {
     const t = turnoDe(m(9), m(18), m(13), m(14));
     const marcas = [marca('ENTRADA', m(9)), marca('SALIDA_ALMUERZO', m(13)), marca('SALIDA', m(18))];
-    expect(calcularJornada({ ...base, turno: t, marcas }).estado).toBe('INCOMPLETO');
+    const r = calcularJornada({ ...base, turno: t, marcas });
+    expect(r.estado).toBe('A_REVISAR');
+    expect(r.alertas).toContain('Marcó 3 veces: falta el regreso del break');
   });
 
   it('un turno que cruza medianoche suma la salida al día siguiente', () => {
