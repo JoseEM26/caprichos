@@ -13,6 +13,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { estaVigente, formatearFecha, obtenerAhoraLima, categoriasAlcance } from '../ofertas/ofertas.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { obtenerFotoUrl } from '../../comun/foto-url';
 import {
   CategoriaCarta,
   ProductoCarta,
@@ -69,14 +70,8 @@ export function regresoAgotado(agotadoHasta: Date | string | null | undefined): 
   return f.toISOString();
 }
 
-export function obtenerFotoUrl(archivo?: { ruta: string } | null): string | null {
-  if (!archivo?.ruta) return null;
-  if (archivo.ruta.startsWith('http://') || archivo.ruta.startsWith('https://')) {
-    return archivo.ruta;
-  }
-  const limpia = archivo.ruta.replace(/^\/+/, '');
-  return `/archivos/${limpia}`;
-}
+// La función vive en comun/ (la usan varios módulos); se vuelve a exportar aquí por compatibilidad
+export { obtenerFotoUrl };
 
 /**
  * Producto que controla stock y ya no tiene saldo: por sabor, ningún sabor activo con saldo; sin sabores, saldo 0.

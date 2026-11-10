@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { historialProducto, type ConsultaHistorial } from './historial-producto';
 import { Prisma } from '@prisma/client';
-import { obtenerFotoUrl } from '../catalogo/catalogo.service';
+import { obtenerFotoUrl } from '../../comun/foto-url';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
 import { AuditoriaService } from '../auditoria/auditoria.service';
