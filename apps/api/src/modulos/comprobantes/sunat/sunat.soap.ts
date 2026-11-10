@@ -122,6 +122,22 @@ export function esFaultCliente(fault: { codigo: string }): boolean {
   return /Client/i.test(fault.codigo);
 }
 
+/**
+ * Códigos SUNAT que llegan como fault de cliente pero son fallos INTERNOS y temporales de SUNAT («El sistema no puede
+ * responder su solicitud»): el documento no se procesó, no es un rechazo. Se tratan como sin respuesta (se reintenta con el
+ * mismo ZIP y numeración). Solo los que se confirmaron en producción; credenciales (0109, 0111, 0113...) y datos o
+ * certificado (0125, 0151...) siguen siendo definitivos. Ej.: 0133 «No se pudo grabar la entrada del log».
+ */
+export const CODIGOS_FAULT_TEMPORAL = ['0133'];
+const TEXTO_FAULT_TEMPORAL = /el sistema no puede responder su solicitud/i;
+
+export function esFaultTemporal(fault: { codigo: string; mensaje: string }): boolean {
+  return CODIGOS_FAULT_TEMPORAL.includes(/\.(\d{4})/.exec(fault.codigo)?.[1] ?? '') || TEXTO_FAULT_TEMPORAL.test(fault.mensaje);
+}
+
+/** Fault de cliente que es un rechazo definitivo (no un fallo temporal de SUNAT). */
+export const esRechazoDefinitivo = (fault: { codigo: string; mensaje: string }): boolean => esFaultCliente(fault) && !esFaultTemporal(fault);
+
 /** Código numérico SUNAT dentro del faultcode (soap-env:Client.0109 -> 0109). */
 export function codigoFault(fault: { codigo: string; mensaje: string }): string {
   return /\.(\d{4})/.exec(fault.codigo)?.[1] ?? fault.codigo;

@@ -161,6 +161,15 @@ describe('SunatEmisor (sin red real: fetch simulado)', () => {
     expect(boleta.resumen).toBeUndefined();
   });
 
+  it('0133 (fallo interno de SUNAT) no es rechazo: factura queda PENDIENTE_ENVIO; ticket y resumen sin respuesta (ErrorRedEmisor)', async () => {
+    const f0133 = () => jest.fn().mockResolvedValue(new Response(sobreFault('soap-env:Client.0133', 'El sistema no puede responder su solicitud. (No se pudo grabar la entrada del log)'), { status: 500 }));
+    expect((await crear(f0133()).generar(comprobanteFactura())).estado).toBe('PENDIENTE_ENVIO');
+    await expect(crear(f0133()).consultarTicket('123')).rejects.toBeInstanceOf(ErrorRedEmisor);
+    await expect(crear(f0133()).enviarResumen('x', zipUnico('x.xml', '<x/>'))).rejects.toBeInstanceOf(ErrorRedEmisor);
+    const f2335 = jest.fn().mockResolvedValue(new Response(sobreFault('soap-env:Client.2335', 'Dato inválido'), { status: 500 }));
+    expect(await crear(f2335).consultarTicket('123')).toMatchObject({ estado: 'RECHAZADO' });
+  });
+
   it('resumen o baja enviados: sendSummary devuelve el ticket; fault del cliente devuelve el rechazo', async () => {
     const ok = jest.fn().mockResolvedValue(new Response(`<r><ticket>1700000000001</ticket></r>`, { status: 200 }));
     expect(await crear(ok).enviarResumen('20000000001-RC-20261102-1', zipUnico('x.xml', '<x/>'))).toEqual({ ticket: '1700000000001' });

@@ -402,7 +402,7 @@ export class ComprobantesService {
    */
   async enviarElectronico(
     comprobanteId: bigint,
-    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; automatico?: boolean; interactivo?: boolean } = {},
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; automatico?: boolean; interactivo?: boolean; corregido?: boolean } = {},
   ): Promise<any> {
     // Pausa del circuito: el envío automático no sale; la fila queda PENDIENTE_ENVIO con su número
     if (opciones.automatico && (await this.salud?.circuitoAbierto())) {
@@ -442,7 +442,7 @@ export class ComprobantesService {
 
   private async enviarReclamado(
     c: any,
-    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; interactivo?: boolean },
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; interactivo?: boolean; corregido?: boolean },
   ): Promise<any> {
     const cfg = await this.leerConfigFacturacion();
     const pedido: any = c.pedido;
@@ -463,7 +463,9 @@ export class ComprobantesService {
       // Un intento previo sin respuesta, o una factura ya firmada en el cobro: se reenvía el ZIP guardado tal cual
       // (mismo documento, mismo número, mismo hash). Nunca se vuelve a firmar algo ya firmado.
       const yaFirmada = intentosPrevios > 0 || !!c.facturacion_hash;
-      const zipPrevio = c.facturacion_estado === 'PENDIENTE_ENVIO' && yaFirmada ? await this.ultimoArchivo(c.id, 'ZIP') : null;
+      // Un RECHAZADO por 0133 (falla interna de SUNAT) sin correcciones también reenvía el mismo ZIP: SUNAT nunca lo procesó
+      const reenviaTalCual = c.facturacion_estado === 'PENDIENTE_ENVIO' || (c.facturacion_estado === 'RECHAZADO' && !opciones.corregido && /\b0133\b/.test(c.facturacion_respuesta ?? ''));
+      const zipPrevio = reenviaTalCual && yaFirmada ? await this.ultimoArchivo(c.id, 'ZIP') : null;
       if (proveedor !== 'SIMULADO') {
         // Se cuenta ANTES de llamar a SUNAT: si el proceso muere en la llamada, el próximo intento consulta antes de reenviar
         await this.prisma.comprobante.update({ where: { id: c.id }, data: { facturacion_intentos: { increment: 1 } } });
@@ -621,6 +623,26 @@ export class ComprobantesService {
     usuario?: UsuarioAutenticado,
     ip?: string,
   ) {
+    try {
+      return await this.reintentarElectronicoInterno(idRaw, correccion, usuario, ip);
+    } catch (e: any) {
+      if (e instanceof HttpException) throw e;
+      // Error inesperado: se registra completo y la pantalla recibe un motivo legible en vez de un 500 sin cuerpo
+      this.logger.error(`Reintento del comprobante ${String(idRaw)}: ${e?.stack ?? e?.message ?? e}`);
+      const motivo = String(e?.message ?? 'error interno').split('\n')[0].slice(0, 120);
+      throw new HttpException(
+        { codigo: 'REENVIO_FALLIDO', mensaje: `No pudimos reenviar a SUNAT: ${motivo}; reintenta en unos minutos` },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
+  private async reintentarElectronicoInterno(
+    idRaw: bigint | string | number,
+    correccion: { documento?: string | null; razon?: string | null; direccion?: string | null },
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
     const id = this.parsearId(idRaw, 'comprobante');
     const c = await this.prisma.comprobante.findUnique({ where: { id } });
     if (!c || (c.tipo !== 'BOLETA' && c.tipo !== 'FACTURA')) {
@@ -666,7 +688,7 @@ export class ComprobantesService {
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     });
-    const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip, interactivo: true });
+    const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip, interactivo: true, corregido: Object.keys(cambios).length > 0 || correccion.direccion !== undefined });
     return this.serializarComprobante(enviado);
   }
 

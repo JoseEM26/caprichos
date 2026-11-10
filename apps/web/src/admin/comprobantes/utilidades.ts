@@ -98,3 +98,11 @@ export async function copiarAlPortapapeles(texto: string): Promise<boolean> {
   }
   return false;
 }
+
+/** RUC peruano válido: 11 dígitos, prefijo 10/15/17/20 y dígito verificador (mismo algoritmo que la API). */
+export function rucValido(ruc: string): boolean {
+  if (!/^(10|15|17|20)\d{9}$/.test(ruc)) return false;
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const suma = pesos.reduce((a, p, i) => a + p * Number(ruc[i]), 0);
+  return (11 - (suma % 11)) % 10 === Number(ruc[10]);
+}
