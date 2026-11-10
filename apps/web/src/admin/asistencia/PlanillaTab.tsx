@@ -7,6 +7,7 @@ import { Insignia } from '../../comun/Insignia';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
+import { jornadaActual, useUltimaPeticion } from './jornada';
 import { ETIQUETA_ROL, ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
 import { PestanaVinculoVacaciones } from './VinculoVacaciones';
 import { ETIQUETA_VINCULO } from './vinculoApi';
@@ -25,23 +26,26 @@ import {
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
-const hoyLima = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const horas = (min: number) => (min / 60).toFixed(2);
 
 /** Planilla del personal (solo ADMIN): una fila por persona y, al abrirla, el detalle con consumos, ajustes y pago. */
 export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
-  const [fecha, setFecha] = useState(hoyLima());
+  const [fecha, setFecha] = useState(jornadaActual());
   const [filas, setFilas] = useState<FilaPlanilla[] | null>(null);
   const [abierta, setAbierta] = useState<FilaPlanilla | null>(null);
 
+  const nueva = useUltimaPeticion();
   const cargar = useCallback(async () => {
+    const vigente = nueva();
     try {
-      setFilas((await listarPlanilla(fecha)).filas);
+      const r = await listarPlanilla(fecha);
+      if (!vigente()) return;
+      setFilas(r.filas);
       onError(null);
     } catch (e) {
-      onError(mensajeDe(e, 'No pudimos cargar la planilla.'));
+      if (vigente()) onError(mensajeDe(e, 'No pudimos cargar la planilla.'));
     }
-  }, [fecha, onError]);
+  }, [fecha, onError, nueva]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   if (!filas) return <Cargando mensaje="Cargando planilla" />;
@@ -111,20 +115,23 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
   const [ocupado, setOcupado] = useState(false);
   const [confirmaPago, setConfirmaPago] = useState(false);
   const [reabrir, setReabrir] = useState<string | null>(null);
-  const [aj, setAj] = useState({ tipo: 'ADELANTO' as 'ADELANTO' | 'DESCUENTO', fecha: hoyLima(), monto: '', motivo: '' });
+  const [aj, setAj] = useState({ tipo: 'ADELANTO' as 'ADELANTO' | 'DESCUENTO', fecha: jornadaActual(), monto: '', motivo: '' });
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
   const [tab, setTab] = useState('resumen');
   const [resaltar, setResaltar] = useState<string | null>(null);
   const [confirmaSimples, setConfirmaSimples] = useState(false);
   const [resSimples, setResSimples] = useState<ResultadoLote | null>(null);
 
+  const nueva = useUltimaPeticion();
   const cargar = useCallback(async () => {
+    const vigente = nueva();
     try {
-      setD(await detallePlanilla(fila.partyId, fecha, excluidos));
+      const r = await detallePlanilla(fila.partyId, fecha, excluidos);
+      if (vigente()) setD(r);
     } catch (e) {
-      onError(mensajeDe(e, 'No pudimos cargar el detalle.'));
+      if (vigente()) onError(mensajeDe(e, 'No pudimos cargar el detalle.'));
     }
-  }, [fila.partyId, fecha, excluidos, onError]);
+  }, [fila.partyId, fecha, excluidos, onError, nueva]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   const ejecutar = async (fn: () => Promise<unknown>, ok: string) => {
