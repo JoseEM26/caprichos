@@ -71,7 +71,10 @@ export function RolesModulosEditor() {
     setBorrador((prev) => {
       const s = new Set(prev[rol]);
       const poner = !s.has(clave);
-      for (const c of datos!.catalogo.filter((x) => x.minimo === cat.minimo && !x.bloqueado)) poner ? s.add(c.clave) : s.delete(c.clave);
+      for (const c of datos!.catalogo.filter((x) => x.minimo === cat.minimo && !x.bloqueado)) {
+        if (poner) s.add(c.clave);
+        else s.delete(c.clave);
+      }
       return { ...prev, [rol]: s };
     });
     setAviso('');

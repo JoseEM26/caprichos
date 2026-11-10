@@ -161,6 +161,7 @@ describe('sticker de bebida por tipo de pedido: encolar, reimprimir y reasignar'
     expect(vasos(prisma.printJob.upsert)).toHaveLength(2);
   });
   it('reasignarPendientes descarta el pendiente que la modalidad ya no permite', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { EquipoConfigService } = require('./equipo-config.service');
     const update = jest.fn().mockResolvedValue({});
     const pr: any = {
