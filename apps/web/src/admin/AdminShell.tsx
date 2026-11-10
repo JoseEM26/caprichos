@@ -408,12 +408,15 @@ export function AdminShell() {
     >
       <span
         title={!enLinea ? 'Sin conexión con el servidor' : socketConectado ? 'Conectado al servidor' : 'Reconectando con el servidor'}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${enLinea && socketConectado ? '#9BD3AB' : '#E9A79B'}`, background: enLinea && socketConectado ? '#E6F5EA' : '#FDECE8', borderRadius: 9999, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--cp-navy)' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${enLinea && socketConectado ? '#9BD3AB' : '#E9A79B'}`, background: enLinea && socketConectado ? '#E6F5EA' : '#FDECE8', borderRadius: 9999, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--cp-navy)', minWidth: 0, flexShrink: 1 }}
       >
-        <span style={{ width: 8, height: 8, borderRadius: 4, background: enLinea && socketConectado ? 'var(--cp-ok)' : '#C73E2A' }} />
-        {!enLinea ? 'Sin internet' : socketConectado ? 'En línea' : 'Reconectando…'}
+        <span style={{ flex: 'none', width: 8, height: 8, borderRadius: 4, background: enLinea && socketConectado ? 'var(--cp-ok)' : '#C73E2A' }} />
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {!enLinea ? 'Sin internet' : socketConectado ? 'En línea' : 'Reconectando…'}
+        </span>
       </span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums' }}>{horaLima(ahora)}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{horaLima(ahora)}</span>
+      <span id="capri-slot-barra" style={{ display: 'contents' }} />
       <BannerInstalarApp compacto />
       <CampanaNotificaciones
         notificaciones={resumen.notificaciones}

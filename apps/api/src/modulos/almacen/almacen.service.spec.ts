@@ -589,6 +589,14 @@ describe('AlmacenService', () => {
       expect(p).toMatchObject({ saldo: 4, aperturaHoy: true });
     });
 
+    it('GET: devuelve fotoUrl del producto (ruta relativa -> /archivos, http tal cual, sin foto -> null)', async () => {
+      expect(((await service.obtenerApertura()) as any).productos[0].fotoUrl).toBeNull();
+      prisma.producto.findMany = jest.fn().mockResolvedValue([{ ...dona, foto_archivo: { ruta: 'productos/dona.webp' } }]);
+      expect(((await service.obtenerApertura()) as any).productos[0].fotoUrl).toBe('/archivos/productos/dona.webp');
+      prisma.producto.findMany = jest.fn().mockResolvedValue([{ ...dona, foto_archivo: { ruta: 'https://cdn.x/d.png' } }]);
+      expect(((await service.obtenerApertura()) as any).productos[0].fotoUrl).toBe('https://cdn.x/d.png');
+    });
+
     it('GET: un producto oculto no entra a la apertura (la consulta excluye oculto y los anfitriones de combo)', async () => {
       await service.obtenerApertura();
       expect(prisma.producto.findMany).toHaveBeenCalledWith(

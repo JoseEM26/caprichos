@@ -139,6 +139,8 @@ export interface AperturaProductoItem {
   productoId: string;
   nombre: string;
   areaNombre: string | null;
+  /** Foto del producto en el catálogo (null si no tiene). */
+  fotoUrl?: string | null;
   saldo: number;
   aperturaHoy: boolean;
   aperturaCantidad: number | null;

@@ -100,6 +100,19 @@ function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
 const horaLima = (d: Date) =>
   d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
 
+/** Miniatura cuadrada del producto (carga diferida); sin foto, o si falla, un marcador neutro con la inicial. */
+function Miniatura({ url, nombre }: { url?: string | null; nombre: string }) {
+  const [falla, setFalla] = useState(false);
+  if (!url || falla) {
+    return (
+      <span className="ap-mini ap-mini--vacia" aria-hidden="true">
+        {nombre.trim().charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  return <img className="ap-mini" src={url} alt="" loading="lazy" decoding="async" onError={() => setFalla(true)} />;
+}
+
 const tieneSabores = (p: AperturaProductoItem) => !!p.sabores && p.sabores.length > 0;
 
 /** Chip de estado: «Falta contar» (ámbar), «Agotado» (rojo) o «Contado hoy» (verde). */
@@ -542,8 +555,13 @@ export function AperturaDiaView() {
                   return (
                     <tr key={p.productoId} data-testid="apertura-fila" className={`ap-fila${conError ? ' ap-fila--error' : ''}`}>
                       <td className="ap-celda-nombre">
-                        <div className="ap-nombre">{p.nombre}</div>
-                        <div className="ap-saldo">Saldo actual: {p.saldo}</div>
+                        <div className="ap-nombre-fila">
+                          <Miniatura url={p.fotoUrl} nombre={p.nombre} />
+                          <div>
+                            <div className="ap-nombre">{p.nombre}</div>
+                            <div className="ap-saldo">Saldo actual: {p.saldo}</div>
+                          </div>
+                        </div>
                       </td>
                       <td data-label="Quedaron de ayer">{celdaQuedaron(c)}</td>
                       <td data-label="Produje hoy (+)">{celdaProduccion(c)}</td>
@@ -592,6 +610,7 @@ export function AperturaDiaView() {
                           onClick={() => alternar(p.productoId)}
                         >
                           <Icono nombre="chevronDerecha" tamano={16} aria-hidden="true" className="ap-chevron" />
+                          <Miniatura url={p.fotoUrl} nombre={p.nombre} />
                           <span>
                             <span className="ap-nombre">{p.nombre}</span>
                             <span className="ap-saldo">{delProducto.length} sabores</span>

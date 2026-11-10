@@ -37,6 +37,19 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     expect(screen.getByText(/05\/11\/2026/)).toBeInTheDocument();
   });
 
+  it('muestra la miniatura del producto con carga diferida y un marcador si no hay foto', async () => {
+    vi.spyOn(almacenApi, 'obtenerApertura').mockResolvedValue({
+      fecha: '2026-11-05',
+      productos: [{ ...PRODUCTOS[0], fotoUrl: '/archivos/dona.webp' }, PRODUCTOS[1]],
+    });
+    const { container } = render(<AperturaDiaView />);
+    await screen.findByText('DONA CHOCOLATE');
+    const img = container.querySelector('img.ap-mini');
+    expect(img).toHaveAttribute('src', '/archivos/dona.webp');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(container.querySelectorAll('.ap-mini--vacia')).toHaveLength(1);
+  });
+
   it('Total = saldo real de hoy (con ventas y lo ya producido) + lo que sumes ahora; no queda en 0 si se vendió producción de hoy', async () => {
     // Ayer quedaron 2, hoy se produjeron 10 y se vendieron 5: saldo 7. La API propone «Quedaron» = max(0, 7 - 10) = 0.
     vi.spyOn(almacenApi, 'obtenerApertura').mockResolvedValue({

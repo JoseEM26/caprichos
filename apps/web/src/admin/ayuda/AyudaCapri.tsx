@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { MascotaCapri } from '../../mascota';
@@ -6,6 +7,9 @@ import { useArrastrable } from '../../comun/useArrastrable';
 import { useAyuda } from './useAyuda';
 import { formatearTextoAyuda } from './formatearTextoAyuda';
 import './AyudaCapri.css';
+
+/** Hueco de la barra superior del panel donde vive Capri minimizada (junto a la campana y «Instalar»). */
+export const ID_SLOT_CAPRI = 'capri-slot-barra';
 
 export interface AyudaCapriProps {
   ruta?: string;
@@ -63,6 +67,12 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
       /* sin almacenamiento */
     }
   };
+  // Slot en la barra superior: si existe, la Capri minimizada va ahí (portal); si no (otra pantalla/pruebas), flota como siempre
+  const [slot, setSlot] = useState<HTMLElement | null>(() => document.getElementById(ID_SLOT_CAPRI));
+  useEffect(() => {
+    const el = document.getElementById(ID_SLOT_CAPRI);
+    if (el !== slot) setSlot(el);
+  });
   const contenedorRef = useRef<HTMLDivElement>(null);
   const arr = useArrastrable(contenedorRef, { clave: 'capri.posicion', dep: `${minimizada}-${abierto}` });
   const alAbrir = () => {
@@ -162,7 +172,21 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
       )}
 
       {/* Capri minimizada: botón redondo pequeño y, aparte, el botón para agrandarla */}
-      {!abierto && minimizada && (
+      {!abierto && minimizada && slot &&
+        createPortal(
+          <button
+            type="button"
+            className="ayuda-fab-barra"
+            onClick={abrir}
+            aria-label="Abrir ayuda de Capri"
+            title="Ayuda de Capri"
+          >
+            <MascotaCapri estado="reposo" tamano={34} forzarFallback2D />
+          </button>,
+          slot,
+        )}
+
+      {!abierto && minimizada && !slot && (
         <div
           ref={contenedorRef}
           className={`ayuda-mini-wrap${arr.movida ? ' ayuda-movida' : ''}${arr.moviendo ? ' ayuda-moviendo' : ''}`}
@@ -307,6 +331,11 @@ export function AyudaCapri({ ruta }: AyudaCapriProps) {
           <div className="ayuda-pie">
             {arr.movida && (
               <button type="button" onClick={arr.restaurar}>Volver a la esquina original</button>
+            )}
+            {minimizada && slot && (
+              <button type="button" onClick={() => cambiarMinimizada(false)}>
+                Dejar flotante
+              </button>
             )}
             <button
               type="button"

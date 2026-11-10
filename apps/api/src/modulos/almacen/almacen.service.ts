@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { historialProducto, type ConsultaHistorial } from './historial-producto';
 import { Prisma } from '@prisma/client';
+import { obtenerFotoUrl } from '../catalogo/catalogo.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -81,6 +82,7 @@ export class AlmacenService {
         id: true,
         nombre: true,
         controla_stock: true,
+        foto_archivo: { select: { ruta: true } },
         categoria: { select: { area: { select: { nombre: true } } } },
         sabores: { where: { activo: true }, orderBy: { nombre: 'asc' }, select: { id: true, nombre: true, activo: true } },
       },
@@ -135,6 +137,7 @@ export class AlmacenService {
             productoId: k,
             nombre: p.nombre,
             areaNombre: p.categoria?.area?.nombre ?? null,
+            fotoUrl: obtenerFotoUrl(p.foto_archivo),
             saldo: sabores.reduce((acc, sb) => acc + sb.saldo, 0),
             aperturaHoy: sabores.some((sb) => sb.aperturaHoy),
             aperturaCantidad: null,
@@ -149,6 +152,7 @@ export class AlmacenService {
           productoId: k,
           nombre: p.nombre,
           areaNombre: p.categoria?.area?.nombre ?? null,
+          fotoUrl: obtenerFotoUrl(p.foto_archivo),
           saldo: saldoProd,
           aperturaHoy: ap !== undefined,
           aperturaCantidad: ap ?? null,

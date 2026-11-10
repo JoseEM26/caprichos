@@ -536,3 +536,23 @@
 .ayuda-mini-wrap.ayuda-moviendo {
   transition: none;
 }
+
+/* Capri minimizada en la barra superior: mismo alto táctil que la campana y «Instalar» */
+.ayuda-fab-barra {
+  flex: none;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--cp-orange, #E67929);
+  background: var(--cp-white, #FFFFFF);
+  cursor: pointer;
+  overflow: hidden;
+}
+.ayuda-fab-barra:focus-visible {
+  outline: 2px solid var(--cp-navy, #0B2C3E);
+  outline-offset: 2px;
+}

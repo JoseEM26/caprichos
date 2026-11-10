@@ -3,8 +3,8 @@
 .ap-vista {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 980px;
+  gap: 10px;
+  max-width: 1100px;
   min-width: 0;
 }
 
@@ -31,7 +31,7 @@
 
 .ap-ayuda {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--cp-soft);
 }
 
@@ -399,16 +399,71 @@
   box-shadow: 0 12px 32px rgba(11, 44, 62, 0.25);
 }
 
-/* ── Celular: filas apiladas, cada valor con su etiqueta ──────────────── */
+/* ── Miniaturas ────────────────────────────────────────────────────────── */
 
-@media (max-width: 720px) {
+.ap-mini {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--cp-sand);
+  border: 1px solid var(--cp-line);
+}
+.ap-mini--vacia {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cp-soft);
+}
+.ap-nombre-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ap-plegar {
+  align-items: center;
+}
+.ap-plegar > span:last-child {
+  min-width: 0;
+}
+.ap-chevron {
+  margin-top: 0;
+}
+
+/* ── Celular y tablet angosta: cada producto es una tarjeta densa en cuadrícula ───────── */
+
+@media (max-width: 1023px) {
+  .ap-vista {
+    gap: 8px;
+  }
+
+  .ap-ayuda {
+    display: none;
+  }
+
+  .ap-buscar {
+    flex: 1 1 100%;
+  }
+
+  .ap-filtros {
+    gap: 0 14px;
+  }
+
+  .ap-check,
+  .ap-boton-texto {
+    min-height: 40px;
+  }
+
   .ap-tabla thead {
     display: none;
   }
 
   .ap-tabla,
   .ap-tabla tbody,
-  .ap-tabla tr,
   .ap-tabla th,
   .ap-tabla td {
     display: block;
@@ -416,46 +471,146 @@
   }
 
   .ap-tabla tbody tr {
+    display: grid;
+    grid-template-columns: max-content max-content 1fr;
+    align-items: start;
+    gap: 2px 8px;
+    padding: 8px 10px;
     border-top: 1px solid var(--cp-line);
+  }
+
+  .ap-tabla tbody tr.ap-grupo-titulo {
+    display: block;
+    padding: 0;
   }
 
   .ap-tabla td,
   .ap-tabla th {
     border: none;
-    padding: 4px 12px;
+    padding: 0;
+    width: auto;
+    min-width: 0;
   }
 
   .ap-tabla .ap-grupo-titulo th {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    width: 100%;
   }
 
   .ap-tabla .ap-celda-nombre {
+    grid-column: 1 / -1;
     min-width: 0;
-    padding-top: 10px;
+    padding: 0;
+  }
+
+  .ap-tabla .ap-sabor .ap-celda-nombre {
+    padding-top: 0;
   }
 
   .ap-tabla td[data-label]::before {
     content: attr(data-label);
     display: block;
-    margin-bottom: 4px;
-    font-size: 12px;
+    margin-bottom: 2px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--cp-soft);
   }
 
+  .ap-tabla td[data-label='Total'] {
+    text-align: center;
+    align-self: center;
+    min-width: 44px;
+  }
+
+  .ap-tabla td[data-label='Estado'] {
+    grid-column: 1 / 3;
+    align-self: center;
+  }
+
+  .ap-tabla td[data-label='Estado']::before,
+  .ap-tabla td[data-label='Botar a merma']::before {
+    display: none;
+  }
+
+  .ap-tabla .ap-estado {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+
   .ap-tabla .ap-celda-merma {
+    grid-column: 3;
     width: auto;
-    text-align: left;
-    padding-bottom: 10px;
+    text-align: right;
+    padding: 0;
+  }
+
+  .ap-tabla .ap-acciones-fila {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .ap-tabla .ap-celda-merma:empty {
+    display: none;
   }
 
   .ap-tabla .ap-nombre-sabor,
   .ap-tabla .ap-saldo--sabor {
-    padding-left: 24px;
+    padding-left: 0;
+    display: inline;
+  }
+  .ap-tabla .ap-sabor .ap-saldo {
+    display: inline;
+    margin-left: 8px;
+  }
+  .ap-tabla .ap-sabor td {
+    background: transparent;
+  }
+  .ap-tabla tbody tr.ap-sabor {
+    background: #fcf9f4;
+    margin-left: 0;
+  }
+  .ap-tabla tbody tr.ap-sabor--atenuado {
+    background: var(--cp-sand);
   }
 
+  /* Táctil de 44 px, con campos angostos para que «ayer» y «hoy» quepan lado a lado */
+  .ap-paso {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .ap-tabla .ap-cantidad {
+    gap: 4px;
+  }
   .ap-tabla .ap-campo {
-    width: 96px;
+    width: 56px;
+    min-width: 0;
+    min-height: 44px;
+  }
+  .ap-tabla td[data-label='Produje hoy (+)'] .ap-campo {
+    width: 72px;
+  }
+  .ap-merma-icono {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Tablet y PC: columnas de la tabla más apretadas */
+@media (min-width: 1024px) {
+  .ap-tabla th,
+  .ap-tabla td {
+    padding: 6px 8px;
+  }
+  .ap-celda-merma {
+    width: 170px;
+  }
+  .ap-acciones-fila {
+    flex-wrap: nowrap;
   }
 }
 
