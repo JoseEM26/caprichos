@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlternativasParte } from './AlternativasParte';
 import {
-  CategoriaEditor, Parte, ProductoEditor, GRUPO_POR_DEFECTO, PlantillaOpcion, aplanar, bloquesDe, conSeleccion, faltaEnBloque, gruposDe, idsProductos,
+  CategoriaEditor, Parte, ProductoEditor, GRUPO_POR_DEFECTO, cuposLimpios, productosDeLaParte, PlantillaOpcion, aplanar, bloquesDe, conSeleccion, faltaEnBloque, gruposDe, idsProductos,
   nombreDeBloque, nombresQueElige, nombreTemporal, nuevaEleccion, nuevoFijo, nuevoOpcional, opcionesDeGrupo, perteneceACategoria, piezaVacia, piezasDePlantilla,
   resumenParaCliente, retitular, saboresDeLaParte, tipoDe,
 } from './partesComboModelo';
@@ -104,6 +104,37 @@ function QueVera({ p, productos, categorias }: { p: Parte; productos: ProductoEd
   const quitados = (p.productosExcluidos ?? []).length;
   if (nombres.length === 0) return <p className="epc-nota">Todavía no elegiste qué puede escoger el cliente.</p>;
   return <p className="epc-nota epc-queve">Podrá elegir cualquiera de: {nombres.join(', ')}{quitados ? ` (sin ${quitados} producto${quitados === 1 ? '' : 's'})` : ''}</p>;
+}
+
+/** «Cupos que ocupa»: lugares que llena cada producto de una parte A elección (1 por defecto; la torta puede ocupar 2). */
+function CuposProducto({ p, productos, categorias, onCambio }: { p: Parte; productos: ProductoEditor[]; categorias: CategoriaEditor[]; onCambio: (c: Record<string, number> | undefined) => void }) {
+  const cantidad = p.cantidad || 1;
+  const lista = productosDeLaParte(p, productos, categorias);
+  if (tipoDe(p) === 'FIJO' || cantidad < 2 || lista.length === 0) return null;
+  const cupos = p.cuposProducto ?? {};
+  const cambiar = (id: string, n: number) => {
+    const sig = { ...cupos };
+    if (n > 1) sig[id] = n;
+    else delete sig[id];
+    onCambio(Object.keys(sig).length > 0 ? sig : undefined);
+  };
+  return (
+    <details className="epc-mas" open={Object.keys(cupos).length > 0}>
+      <summary className="epc-enlace">Cupos que ocupa cada producto</summary>
+      <p className="epc-nota">Normalmente cada producto ocupa 1 lugar. Si uno ocupa 2 (ej. una torta en «Elige 2»), el cliente la elige sola o completa con productos de 1 lugar.</p>
+      <ul className="epc-lista-productos" aria-label="Cupos que ocupa cada producto">
+        {lista.map((x) => (
+          <li key={x.id} className="epc-fila">
+            <label className="epc-etiqueta">{x.nombre}
+              <select className="epc-select" aria-label={`Cupos que ocupa ${x.nombre}`} value={Math.min(cupos[x.id] ?? 1, cantidad)} onChange={(e) => cambiar(x.id, Number(e.target.value))}>
+                {Array.from({ length: cantidad }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{n === 1 ? '1 lugar' : `${n} lugares`}</option>)}
+              </select>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 /** Lista de productos con buscador (sin tope) y toque para marcar. `unico` = se marca uno solo. */
@@ -259,7 +290,7 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
     cab?.scrollIntoView?.({ block: 'center' });
   }, [mostrarErrores]);
 
-  const poner = (sig: Parte[]) => onCambiar(retitular(sig, categorias, productos));
+  const poner = (sig: Parte[]) => onCambiar(retitular(sig.map((x) => (x.cuposProducto ? { ...x, cuposProducto: cuposLimpios(x, productos, categorias) } : x)), categorias, productos));
   const parche = (i: number, cambio: Partial<Parte>) => poner(partes.map((p, j) => (j === i ? { ...p, ...cambio } : p)));
   const bloques = bloquesDe(partes);
 
@@ -316,6 +347,7 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
           onCambio={(c, pr) => poner(partes.map((x, j) => (j === i ? conSeleccion(x, c, pr, productos, true) : x)))}
         />
         <QueVera p={p} productos={productos} categorias={categorias} />
+        <CuposProducto p={p} productos={productos} categorias={categorias} onCambio={(c) => parche(i, { cuposProducto: c })} />
         {tipoDe(p) === 'FIJO' && (prod?.tamanos ?? []).length > 0 && (
           <label className="epc-etiqueta">Tamaño del producto
             <select aria-label="Tamaño del producto fijo" className="epc-select" value={p.tamanoId ?? ''} onChange={(e) => parche(i, { tamanoId: e.target.value || null })}>
@@ -532,6 +564,7 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
                 <div className="epc-fila"><span className="epc-frase">El cliente elige</span><Cuantas valor={p.cantidad || 1} etiqueta="Cantidad a elegir" onCambio={(n) => parche(i, { cantidad: n })} /><span className="epc-frase">de:</span></div>
                 <Selector categorias={categorias} productos={productos} cats={p.categorias ?? []} prods={idsProductos(p)} etiqueta="esta tarjeta" onCambio={(c, pr) => poner(partes.map((x, j) => (j === i ? conSeleccion(x, c, pr, productos) : x)))} />
                 <QueVera p={p} productos={productos} categorias={categorias} />
+                <CuposProducto p={p} productos={productos} categorias={categorias} onCambio={(c) => parche(i, { cuposProducto: c })} />
                 {!hayLista && (p.categorias ?? []).length > 0 && (
                   <details className="epc-mas" open={(p.productosExcluidos ?? []).length > 0}>
                     <summary className="epc-enlace">Excluir alguno (ej. sin Frozen)</summary>

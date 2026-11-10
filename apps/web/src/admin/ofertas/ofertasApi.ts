@@ -15,6 +15,8 @@ export interface OpcionDetalleCombo {
   disponible: boolean;
   /** Bloqueada por saldo 0 (se muestra «No hay stock») */
   sinStock?: boolean;
+  /** Lugares que ocupa en la parte (solo si es más de 1; ausente = 1). */
+  cupos?: number;
   /** Foto del producto (bebidas por categorías). */
   fotoUrl?: string;
   /** Categoría del producto (si el servidor la envía): habilita los chips de categoría en las bebidas del combo. */
@@ -52,6 +54,8 @@ export interface ComboParteItem {
   saboresIds?: string[];
   /** Productos que no entran en la parte aunque su categoría sí. */
   productosExcluidos?: string[];
+  /** Solo A_ELECCION: lugares que ocupa cada producto ({ productoId: 2 }); lo no listado vale 1. */
+  cuposProducto?: Record<string, number>;
   /** Parte FIJO opcional: el cliente puede quitarla o pedir extras. `cantidad` = incluidas; lleva de cantidadMin a cantidadMax (null = incluidas). */
   opcional?: boolean;
   cantidadMin?: number;

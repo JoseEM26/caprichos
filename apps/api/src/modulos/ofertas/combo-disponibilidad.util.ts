@@ -52,6 +52,8 @@ export interface ParteDisp {
   saboresIds?: string[];
   /** Productos que no entran aunque su categoría sí; vacío o ausente = ninguno. */
   productosExcluidos?: string[];
+  /** Cupos que ocupa cada producto en una parte A_ELECCION; lo no listado vale 1. */
+  cuposProducto?: Record<string, number>;
   /** Parte opcional: el cliente puede no llevarla, así que su falta de stock no agota el combo. */
   opcional?: boolean;
 }
@@ -151,6 +153,12 @@ export function admiteProducto(parte: ParteDisp, p: Pick<ProductoDisp, 'id' | 'c
   if (parte.productos.length > 0) return parte.productos.includes(p.id);
   // Elección por categoría: un producto oculto no se ofrece (solo vale oculto en piezas fijas o en la lista explícita)
   return !p.oculto && parte.categorias.includes(p.categoriaId);
+}
+
+/** Lugares que ocupa un producto en la parte (1 si no está en el mapa). */
+export function cuposDeProducto(parte: Pick<ParteDisp, 'cuposProducto'>, productoId: string): number {
+  const n = parte.cuposProducto?.[productoId];
+  return Number.isInteger(n) && (n as number) > 1 ? (n as number) : 1;
 }
 
 /** Por qué una pieza bloquea el combo (para el panel del dueño), o null si está disponible. */

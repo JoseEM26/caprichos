@@ -1709,6 +1709,8 @@ model ComboParte {
   sabores_ids    BigInt[] @default([])
   /// Productos que NO entran en la parte aunque su categoría sí; vacío = ninguno.
   productos_excluidos_ids BigInt[] @default([])
+  /// Solo A_ELECCION: cupos que ocupa cada producto en la parte ({ "<productoId>": 2 }); lo no listado vale 1. null = todos valen 1.
+  cupos_producto      Json?
   /// Parte FIJO opcional: el cliente puede no llevarla o pedir extras. `cantidad` = unidades incluidas en el precio del combo.
   opcional            Boolean  @default(false)
   /// Mínimo y máximo de unidades que puede llevar el cliente (null = 0 / `cantidad`).

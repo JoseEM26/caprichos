@@ -51,6 +51,18 @@ export function productosDeLaParte(p: Parte, productos: ProductoEditor[], catego
   return productos.filter((x) => cats.some((c) => perteneceACategoria(x, c)) && !quitados.includes(x.id));
 }
 
+/**
+ * Cupos por producto de una parte A elección: solo productos que la parte ofrece y valores de 2 a `cantidad`
+ * (un producto de 1 lugar no se guarda). Devuelve undefined si no queda ninguno.
+ */
+export function cuposLimpios(p: Parte, productos: ProductoEditor[], categorias: CategoriaEditor[]): Record<string, number> | undefined {
+  if (tipoDe(p) === 'FIJO' || !p.cuposProducto) return undefined;
+  const validos = new Set(productosDeLaParte(p, productos, categorias).map((x) => x.id));
+  const max = p.cantidad || 1;
+  const out = Object.fromEntries(Object.entries(p.cuposProducto).filter(([id, n]) => validos.has(id) && Number.isInteger(n) && n >= 2 && n <= max));
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Combos viejos guardaban categorías por nombre: se pasan a id si se reconocen. Rellena los campos nuevos. */
 export function normalizarPartes(partes: Parte[], categorias: CategoriaEditor[], productos: ProductoEditor[]): Parte[] {
   const normales = partes.map((p) => {
@@ -367,6 +379,7 @@ export function partesParaGuardar(partes: Parte[], categorias: CategoriaEditor[]
       paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
       saboresIds: (p.saboresIds ?? []).map(String),
       productosExcluidos: (p.productosExcluidos ?? []).map(String),
+      ...(tipo === 'A_ELECCION' && cuposLimpios(p, productos, categorias) ? { cuposProducto: cuposLimpios(p, productos, categorias) } : {}),
       ...(tipo === 'FIJO' && p.opcional
         ? {
             opcional: true,

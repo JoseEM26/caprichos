@@ -31,6 +31,7 @@ import {
   repartoAlternativa,
   unirElecciones,
   usosDeSabor,
+  lugaresElegidos,
 } from './ReemplazoCombo';
 import { PasosBebidaCombo, etiquetaBebida } from './PasosBebidaCombo';
 import { SelectorEleccionCombo, resumenReparto } from './SelectorEleccionCombo';
@@ -191,7 +192,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     if (parte.bebidas) {
       for (let i = 0; i < total; i++) if (!(bebidas[parte.parteId] ?? [])[i]) faltantes.push({ texto: `Bebida ${i + 1}`, selector: `[data-testid="bebidas-combo-${parte.parteId}"] [aria-label="Bebida ${i + 1}"]` });
     } else {
-      const n = totalElegido(elegido[parte.parteId] ?? {});
+      const n = lugaresElegidos(parte, elegido[parte.parteId] ?? {});
       if (n !== total) faltantes.push({ texto: n > total ? `Quita ${n - total} opción(es)` : `Elige ${total - n} opción(es)`, selector: `[data-testid="eleccion-combo-${parte.parteId}"]` });
     }
   }
@@ -219,7 +220,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         for (let i = 0; i < total; i++) pasos.push({ clave: `beb-${parte.parteId}-${i}`, texto: `Bebida ${i + 1}`, hecho: !!(bebidas[parte.parteId] ?? [])[i], selector: `[data-testid="bebidas-combo-${parte.parteId}"] [aria-label="Bebida ${i + 1}"]` });
       } else {
         nSuelta += 1;
-        pasos.push({ clave: `el-${parte.parteId}`, texto: sueltasN > 1 ? `Complemento ${nSuelta}` : 'Complemento', hecho: totalElegido(elegido[parte.parteId] ?? {}) === total, selector: `[data-testid="eleccion-combo-${parte.parteId}"]` });
+        pasos.push({ clave: `el-${parte.parteId}`, texto: sueltasN > 1 ? `Complemento ${nSuelta}` : 'Complemento', hecho: lugaresElegidos(parte, elegido[parte.parteId] ?? {}) === total, selector: `[data-testid="eleccion-combo-${parte.parteId}"]` });
       }
     }
     if (esCombo)
