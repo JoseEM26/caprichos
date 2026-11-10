@@ -36,7 +36,6 @@ import {
   TIPOS_DOCUMENTO,
   documentoValido,
   errorCombinacionRoles,
-  rolesDeCuenta,
 } from '../acceso/roles-usuario';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
