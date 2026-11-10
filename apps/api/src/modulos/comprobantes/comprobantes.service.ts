@@ -25,6 +25,7 @@ import {
 } from './comprobantes.util';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
+import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { ConfigFacturacionDto } from './dto/facturacion.dto';
 import { CLAVES_FACTURACION, ConfigFacturacion, interpretarConfig } from './facturacion/facturacion.config';
 import { aCentimos } from './facturacion/facturacion.calculo';
@@ -1453,29 +1454,40 @@ export class ComprobantesService {
     const skip = (pagina - 1) * limite;
 
     const where = {
-      tipo: { in: ['BOLETA', 'FACTURA'] },
+      tipo: dto.tipo ? dto.tipo : { in: ['BOLETA', 'FACTURA'] },
       emision: 'POR_EMITIR',
     };
+    const incluir = {
+      pedido: { select: { id: true, codigo: true, total: true, creado_en: true } },
+    };
+    const buscar = dto.buscar?.trim() ?? '';
 
-    const [total, comprobantes] = await Promise.all([
-      this.prisma.comprobante.count({ where }),
-      this.prisma.comprobante.findMany({
+    let total: number;
+    let comprobantes;
+    if (buscar) {
+      // La cola por emitir es corta: se busca en memoria (sin tildes) y luego se pagina con el total real.
+      const todos = await this.prisma.comprobante.findMany({
         where,
-        skip,
-        take: limite,
-        orderBy: { creado_en: 'asc' }, // Más antiguas primero
-        include: {
-          pedido: {
-            select: {
-              id: true,
-              codigo: true,
-              total: true,
-              creado_en: true,
-            },
-          },
-        },
-      }),
-    ]);
+        orderBy: { creado_en: 'asc' },
+        include: incluir,
+      });
+      const coinciden = todos.filter((c) =>
+        coincideTexto(buscar, c.numero_texto, c.pedido.codigo, c.documento, c.razon_social),
+      );
+      total = coinciden.length;
+      comprobantes = coinciden.slice(skip, skip + limite);
+    } else {
+      [total, comprobantes] = await Promise.all([
+        this.prisma.comprobante.count({ where }),
+        this.prisma.comprobante.findMany({
+          where,
+          skip,
+          take: limite,
+          orderBy: { creado_en: 'asc' }, // Más antiguas primero
+          include: incluir,
+        }),
+      ]);
+    }
 
     const esAdmin = usuario?.rol === 'ADMIN';
 

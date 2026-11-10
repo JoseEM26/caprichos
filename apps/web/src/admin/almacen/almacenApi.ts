@@ -118,6 +118,7 @@ export interface ListarMovimientosRespuesta {
     devoluciones: number;
   };
   movimientos: MovimientoItem[];
+  total?: number;
 }
 
 /** Conteo de apertura de un sabor de un producto (donas, galletas con sabores). */
@@ -284,17 +285,20 @@ export const almacenApi = {
   mermaProducto: (dto: MermaProductoDto) =>
     api.post<{ ok: true; id: string; saldo: number }>('/admin/almacen/merma-producto', dto),
 
-  listarMovimientos: async (filtros?: { tipo?: string; insumoId?: string; buscar?: string; desde?: string; hasta?: string }): Promise<ListarMovimientosRespuesta> => {
+  listarMovimientos: async (filtros?: { tipo?: string; insumoId?: string; buscar?: string; desde?: string; hasta?: string; pagina?: number; limite?: number }): Promise<ListarMovimientosRespuesta> => {
     const params = new URLSearchParams();
     if (filtros?.tipo && filtros.tipo !== 'Todos') params.append('tipo', filtros.tipo);
     if (filtros?.insumoId) params.append('insumoId', filtros.insumoId);
     if (filtros?.buscar) params.append('q', filtros.buscar);
+    if (filtros?.pagina) params.append('pagina', String(filtros.pagina));
+    if (filtros?.limite) params.append('limite', String(filtros.limite));
     if (filtros?.desde) params.append('desde', filtros.desde);
     if (filtros?.hasta) params.append('hasta', filtros.hasta);
     const qs = params.toString();
     const res = await api.get<any>(`/admin/almacen/movimientos${qs ? `?${qs}` : ''}`);
     if (res && Array.isArray(res.movimientos)) {
       return {
+        total: typeof res.total === 'number' ? res.total : undefined,
         conteos: res.conteos || { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 },
         movimientos: res.movimientos.map((m: any) => ({
           id: String(m.id),

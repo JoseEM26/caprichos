@@ -480,6 +480,28 @@ describe('ReclamosService', () => {
     });
   });
 
+  describe('búsqueda en el servidor', () => {
+    const fila = (id: bigint, nombre: string) => ({
+      id, numero: `LR-2026-00000${id}`, tipo: 'RECLAMO', nombre, documento: '45678912', telefono: '987654321',
+      domicilio: 'x', correo: null, pedido_id: null, detalle: 'Demora', monto_reclamado: null, estado: 'RECIBIDO',
+      respuesta: null, respondido_por: null, respondido_en: null,
+      fecha_limite: new Date('2026-11-13T00:00:00.000Z'), creado_en: new Date('2026-10-23T15:00:00.000Z'),
+    });
+
+    it('buscar ignora tildes, da el total real y pagina sobre lo encontrado', async () => {
+      prismaMock.reclamo.findMany.mockResolvedValue([fila(1n, 'José Peña'), fila(2n, 'Ana'), fila(3n, 'Josefina')]);
+      const res = await service.listarAdmin({ buscar: 'jose', pagina: 2, limite: 1 }, { partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+      expect(res.total).toBe(2);
+      expect(res.items.map((i) => i.nombre)).toEqual(['Josefina']);
+    });
+
+    it('un no-admin no puede buscar por el documento completo (solo lo enmascarado)', async () => {
+      prismaMock.reclamo.findMany.mockResolvedValue([fila(1n, 'Ana')]);
+      const res = await service.listarAdmin({ buscar: '45678912' }, { partyId: 2n, rol: 'CAJERO', debeCambiar: false });
+      expect(res.total).toBe(0);
+    });
+  });
+
   describe('GET /carta/legal y auditoría de lectura sensible', () => {
     it('obtiene términos, privacidad y plazo legal desde los parámetros del sistema', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([

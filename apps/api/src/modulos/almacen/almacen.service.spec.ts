@@ -135,6 +135,35 @@ describe('AlmacenService', () => {
     service = module.get<AlmacenService>(AlmacenService);
   });
 
+  describe('listarMovimientos: tipo y búsqueda en el servidor', () => {
+    const mov = (id: bigint, tipo: string, insumo: string) => ({
+      id, tipo, en: new Date('2026-11-05T15:00:00Z'), cantidad: 2, nota: null, insumo_id: id, producto_id: null,
+      produccion_id: null, compra_id: null, traslado_id: null, movimiento_anulado_id: null,
+      insumo: { nombre: insumo, unidad_almacen: 'KG' }, producto: null, lugar: { nombre: 'Almacén' },
+    });
+
+    it('sin búsqueda pagina en la BD y devuelve el total del tipo y los conteos reales', async () => {
+      prisma.movimientoStock.findMany
+        .mockResolvedValueOnce([mov(1n, 'ENTRADA', 'Harina')])
+        .mockResolvedValueOnce([{ tipo: 'ENTRADA' }, { tipo: 'SALIDA' }, { tipo: 'MERMA' }, { tipo: 'ENTRADA' }]);
+      prisma.movimientoStock.count.mockResolvedValue(2);
+      const res = await service.listarMovimientos({ tipo: 'ENTRADA', pagina: 2, limite: 1 } as any);
+      expect(prisma.movimientoStock.findMany.mock.calls[0][0]).toMatchObject({ skip: 1, take: 1 });
+      expect(res.total).toBe(2);
+      expect(res.conteos).toEqual({ todos: 4, entradas: 2, salidas: 1, mermas: 1, devoluciones: 0 });
+    });
+
+    it('con búsqueda ignora tildes, cuenta solo lo que coincide y respeta el tipo', async () => {
+      prisma.movimientoStock.findMany
+        .mockResolvedValueOnce([mov(1n, 'ENTRADA', 'Azúcar'), mov(2n, 'SALIDA', 'AZUCAR rubia'), mov(3n, 'ENTRADA', 'Harina')])
+        .mockResolvedValueOnce([]);
+      const res = await service.listarMovimientos({ tipo: 'ENTRADA', q: 'azucar' } as any);
+      expect(res.movimientos.map((m: any) => m.insumo)).toEqual(['Azúcar']);
+      expect(res.total).toBe(1);
+      expect(res.conteos).toEqual({ todos: 2, entradas: 1, salidas: 1, mermas: 0, devoluciones: 0 });
+    });
+  });
+
   describe('registrarMovimiento', () => {
     it('debe rechazar ENTRADA manual con 409 ConflictException indicando que los ingresos van por Compras', async () => {
       await expect(

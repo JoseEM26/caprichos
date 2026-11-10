@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -33,6 +33,7 @@ export function ReclamosAdminView() {
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [busqueda, setBusqueda] = useState<string>('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState<string>('');
   const [pagina, setPagina] = useState(1);
   const limite = 20;
 
@@ -58,51 +59,46 @@ export function ReclamosAdminView() {
   const [mostrarConfirmarResponder, setMostrarConfirmarResponder] = useState(false);
   const [enviandoRespuesta, setEnviandoRespuesta] = useState(false);
 
+  const peticion = useRef(0);
   const cargarReclamos = useCallback(async (pag = 1) => {
+    const mia = ++peticion.current;
     setCargando(true);
     setError(null);
     try {
       const resp = await comprobantesApi.listarReclamos({
         estado: filtroEstado === 'todos' ? undefined : filtroEstado,
         tipo: filtroTipo === 'todos' ? undefined : filtroTipo,
+        buscar: busquedaAplicada || undefined,
         pagina: pag,
         limite,
       });
+      if (mia !== peticion.current) return; // respuesta tardía
       setReclamos(resp.items || []);
       setTotal(resp.total || 0);
-      setPagina(resp.pagina || pag);
     } catch (err: any) {
+      if (mia !== peticion.current) return;
       setError(err?.message || 'Error al listar los reclamos y quejas');
     } finally {
-      setCargando(false);
+      if (mia === peticion.current) setCargando(false);
     }
-  }, [filtroEstado, filtroTipo, limite]);
+  }, [filtroEstado, filtroTipo, busquedaAplicada, limite]);
+
+  // La búsqueda va al servidor cuando se deja de escribir y vuelve a la página 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (busqueda.trim() !== busquedaAplicada) {
+        setBusquedaAplicada(busqueda.trim());
+        setPagina(1);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda, busquedaAplicada]);
 
   useEffect(() => {
     cargarReclamos(pagina);
   }, [cargarReclamos, pagina]);
 
-  // Filtrado local por término de búsqueda (número, cliente, documento, detalle, teléfono)
-  const reclamosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return reclamos;
-    return reclamos.filter((r) => {
-      const num = r.numero.toLowerCase();
-      const nom = r.nombre.toLowerCase();
-      const doc = r.documento.toLowerCase();
-      const det = r.detalle.toLowerCase();
-      const tel = (r.telefono || '').toLowerCase();
-      const ped = (r.pedido_id || '').toLowerCase();
-      return (
-        num.includes(q) ||
-        nom.includes(q) ||
-        doc.includes(q) ||
-        det.includes(q) ||
-        tel.includes(q) ||
-        ped.includes(q)
-      );
-    });
-  }, [reclamos, busqueda]);
+  const reclamosFiltrados = reclamos; // ya filtrados por el servidor
 
   const abrirDetalle = async (item: ReclamoAdminItem) => {
     setCargandoDetalle(true);
@@ -293,9 +289,7 @@ export function ReclamosAdminView() {
         </BarraFiltros>
 
         <div className="reclamos-contador-resumen">
-          {busqueda.trim()
-            ? `Mostrando ${reclamosFiltrados.length} de ${total} registros`
-            : `${total} ${total === 1 ? 'registro en total' : 'registros en total'}`}
+          {`${total} ${total === 1 ? 'registro' : 'registros'}${busquedaAplicada ? ' que coinciden' : ' en total'}`}
         </div>
       </div>
 

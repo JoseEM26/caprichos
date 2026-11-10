@@ -19,11 +19,18 @@ import type {
 
 export const comprobantesApi = {
   // Comprobantes (Admin)
-  async listarPorEmitir(pagina = 1, limite = 20): Promise<RespuestaListarPorEmitir> {
+  async listarPorEmitir(
+    pagina = 1,
+    limite = 20,
+    filtros: { tipo?: string; estado?: string; buscar?: string } = {},
+  ): Promise<RespuestaListarPorEmitir> {
     const params = new URLSearchParams({
       pagina: String(pagina),
       limite: String(limite),
     });
+    if (filtros.tipo && filtros.tipo !== 'TODOS') params.set('tipo', filtros.tipo);
+    if (filtros.estado && filtros.estado !== 'TODOS') params.set('estado', filtros.estado);
+    if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
     return clienteFetch<RespuestaListarPorEmitir>(
       `/admin/comprobantes/por-emitir?${params.toString()}`,
     );
@@ -135,6 +142,7 @@ export const comprobantesApi = {
   async listarReclamos(filtros: {
     estado?: string;
     tipo?: string;
+    buscar?: string;
     desde?: string;
     hasta?: string;
     pagina?: number;
@@ -143,6 +151,7 @@ export const comprobantesApi = {
     const params = new URLSearchParams();
     if (filtros.estado) params.set('estado', filtros.estado);
     if (filtros.tipo) params.set('tipo', filtros.tipo);
+    if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
     if (filtros.desde) params.set('desde', filtros.desde);
     if (filtros.hasta) params.set('hasta', filtros.hasta);
     if (filtros.pagina) params.set('pagina', String(filtros.pagina));

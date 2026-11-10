@@ -494,6 +494,37 @@ describe('ComprobantesService', () => {
     });
   });
 
+  describe('8b. lista por emitir con filtros en el servidor', () => {
+    const fila = (id: bigint, tipo: string, razon: string | null, cod: string) => ({
+      id, pedido_id: id + 100n, tipo, serie: 'NV01', numero: Number(id), numero_texto: `NV01-00000${id}`,
+      documento: '12345678', razon_social: razon, emision: 'POR_EMITIR', copias_impresas: 0, creado_en: fechaFija,
+      pedido: { id: id + 100n, codigo: cod, total: 10, creado_en: fechaFija },
+    });
+
+    it('buscar ignora tildes y el total y la paginación salen del filtro', async () => {
+      prismaMock.comprobante.findMany.mockResolvedValue([
+        fila(1n, 'BOLETA', 'José Peña', 'CP-1'),
+        fila(2n, 'BOLETA', 'Ana', 'CP-2'),
+        fila(3n, 'BOLETA', 'Josefina', 'CP-3'),
+      ]);
+      const res = await service.listarPorEmitir({ pagina: 1, limite: 1, buscar: 'jose' }, cajeroUsuario);
+      expect(res.total).toBe(2);
+      expect(res.totalPaginas).toBe(2);
+      expect(res.elementos).toHaveLength(1);
+      const p2 = await service.listarPorEmitir({ pagina: 2, limite: 1, buscar: 'JOSE' }, cajeroUsuario);
+      expect(p2.elementos[0].razon_social).toBe('Josefina');
+    });
+
+    it('tipo viaja al where de Prisma', async () => {
+      prismaMock.comprobante.count.mockResolvedValue(0);
+      prismaMock.comprobante.findMany.mockResolvedValue([]);
+      await service.listarPorEmitir({ pagina: 1, limite: 10, tipo: 'FACTURA' }, cajeroUsuario);
+      expect(prismaMock.comprobante.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ tipo: 'FACTURA', emision: 'POR_EMITIR' }),
+      });
+    });
+  });
+
   describe('9. emitido exige referencia externa (3 o más caracteres)', () => {
     it('falla si referenciaExterna tiene menos de 3 caracteres', async () => {
       await expect(

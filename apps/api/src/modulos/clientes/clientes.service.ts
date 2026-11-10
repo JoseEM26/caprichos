@@ -6,6 +6,7 @@ import {
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
+import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
@@ -804,7 +805,7 @@ export class ClientesService {
     paginas: number;
     contadores: { verificados: number; sinVerificar: number; gastanPuntos: number };
   }> {
-    const q = filtros.q?.trim().toLowerCase();
+    const q = filtros.q?.trim();
     // Obtener todas las partes que tienen rol CLIENTE
     const roles = await this.prisma.partyRole.findMany({
       where: {
@@ -905,7 +906,7 @@ export class ClientesService {
     if (q) {
       const digitos = q.replace(/\D/g, '');
       items = items.filter(
-        (it) => it.nombre.toLowerCase().includes(q) || (digitos.length >= 3 && it.telefono.includes(digitos)),
+        (it) => coincideTexto(q, it.nombre) || (digitos.length >= 3 && it.telefono.includes(digitos)),
       );
     }
 
