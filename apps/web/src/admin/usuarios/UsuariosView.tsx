@@ -11,34 +11,12 @@ import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { CuadroAccesos } from './CuadroAccesos';
+import { RolesModulosEditor } from './RolesModulosEditor';
 import { fechaLimaCorta } from './rolesTemporalesApi';
 import { BarraSeleccion, ModalRolesMasivos } from './RolesMasivos';
 import type { ResultadoRolesMasivo } from './rolesMasivoApi';
 
 type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles' | 'accesos';
-
-const ROLES_COLUMNAS = [
-  { id: 'cajero', n: 'Cajero' },
-  { id: 'cocina', n: 'Cocina' },
-  { id: 'mozo', n: 'Mozo' },
-  { id: 'almacen', n: 'Almacén' },
-  { id: 'produccion', n: 'Producción' },
-  { id: 'repartidor', n: 'Repartidor' },
-];
-
-const MODULOS_MATRIZ = [
-  { id: 'caja', n: 'Pedidos y caja', roles: ['cajero'] },
-  { id: 'cocina', n: 'Cocina', roles: ['cocina'] },
-  { id: 'repartos', n: 'Repartos', roles: ['repartidor'] },
-  { id: 'reservas', n: 'Reservas', roles: ['cajero', 'mozo'] },
-  { id: 'comprobantes', n: 'Comprobantes', roles: ['cajero'] },
-  { id: 'clientes', n: 'Clientes', roles: ['cajero'] },
-  { id: 'stock', n: 'Stock y recetas', roles: ['cocina', 'almacen', 'produccion'] },
-  { id: 'recetas', n: 'Recetas', roles: ['cocina', 'almacen', 'produccion'] },
-  { id: 'almacen', n: 'Almacén', roles: ['almacen', 'produccion'] },
-  { id: 'compras', n: 'Compras', roles: ['almacen'] },
-  { id: 'mensajes', n: 'Mensajes de WhatsApp', roles: ['cajero', 'mozo'] },
-];
 
 export function UsuariosView() {
   const { usuario: usuarioActual, tiene } = useSesion();
@@ -97,16 +75,6 @@ export function UsuariosView() {
   const [coberturas, setCoberturas] = useState<Array<{ t: string }>>([]);
   const [nuevaCob, setNuevaCob] = useState({ fecha: '', cubre: '', reemplaza: '' });
   const [hrMsg, setHrMsg] = useState('');
-
-  // Roles matriz state
-  const [matrizState, setMatrizState] = useState<Record<string, string[]>>(() => {
-    const init: Record<string, string[]> = {};
-    MODULOS_MATRIZ.forEach((m) => {
-      init[m.id] = [...m.roles];
-    });
-    return init;
-  });
-  const [permisosGuardadosMsg, setPermisosGuardadosMsg] = useState('');
 
   // Datos de usuarios
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
@@ -1472,94 +1440,7 @@ export function UsuariosView() {
       )}
 
       {/* PESTAÑA 4: QUÉ VE CADA ROL */}
-      {tabActual === 'roles' && (
-        <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div>
-            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>Qué ve cada rol</div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Marca los módulos de cada cargo. El administrador siempre ve todo. Escritorio y notificaciones no se pueden quitar.
-            </div>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <div style={{ minWidth: '640px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '170px repeat(7, 1fr)', gap: '4px', fontSize: '12px', fontWeight: 800 }}>
-                <span></span>
-                {ROLES_COLUMNAS.map((r) => (
-                  <span key={r.id} style={{ textAlign: 'center' }}>{r.n}</span>
-                ))}
-              </div>
-
-              {MODULOS_MATRIZ.map((mod) => (
-                <div key={mod.id} style={{ display: 'grid', gridTemplateColumns: '170px repeat(7, 1fr)', gap: '4px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px' }}>{mod.n}</span>
-                  {ROLES_COLUMNAS.map((rol) => {
-                    const on = (matrizState[mod.id] || []).includes(rol.id);
-                    return (
-                      <button
-                        key={rol.id}
-                        type="button"
-                        onClick={() => {
-                          setMatrizState((prev) => {
-                            const actual = prev[mod.id] || [];
-                            const next = on ? actual.filter((x) => x !== rol.id) : [...actual, rol.id];
-                            return { ...prev, [mod.id]: next };
-                          });
-                        }}
-                        style={{
-                          minHeight: '44px',
-                          border: '1.5px solid var(--cp-navy)',
-                          borderRadius: '10px',
-                          background: on ? 'var(--cp-navy)' : 'transparent',
-                          color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {on ? 'Sí' : '—'}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {permisosGuardadosMsg && (
-            <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
-              {permisosGuardadosMsg}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setPermisosGuardadosMsg('Permisos guardados. Cada rol verá solo los módulos marcados.');
-                setTimeout(() => setPermisosGuardadosMsg(''), 4000);
-              }}
-              style={{ minHeight: '48px', padding: '0 18px', border: 0, borderRadius: '12px', background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
-            >
-              Guardar permisos
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const init: Record<string, string[]> = {};
-                MODULOS_MATRIZ.forEach((m) => {
-                  init[m.id] = [...m.roles];
-                });
-                setMatrizState(init);
-                setPermisosGuardadosMsg('Permisos restablecidos a los de fábrica.');
-                setTimeout(() => setPermisosGuardadosMsg(''), 4000);
-              }}
-              style={{ minHeight: '48px', padding: '0 18px', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Volver a los de fábrica
-            </button>
-          </div>
-        </div>
-      )}
+      {tabActual === 'roles' && (esAdmin ? <RolesModulosEditor /> : <div role="status">Solo el administrador cambia lo que ve cada rol.</div>)}
 
       {/* Modales */}
       {modalCrearAbierto && (

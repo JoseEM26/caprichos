@@ -4,7 +4,7 @@ import { payloadQr, secretoQr, slotDe, codigoCorto } from './asistencia.qr';
 import { MarcarDto } from './dto/asistencia.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import * as argon2 from 'argon2';
-import { MOTIVO_MARCA_WEB } from './asistencia.service';
+import { MOTIVO_MARCA_MANUAL } from './asistencia.service';
 
 // Prueba del servicio con una BD en memoria mínima. Cubre reglas, no el SQL (eso lo prueba la migración en Postgres).
 
@@ -75,7 +75,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
       },
       create: async ({ data }: any) => {
         const fila = { id: id++, creado_en: AHORA, ...data };
-        if (marcas.some((m) => igual(m.party_id, fila.party_id) && igual(m.jornada, fila.jornada) && m.tipo === fila.tipo && m.origen === 'CELULAR' && fila.origen === 'CELULAR')) {
+        if (marcas.some((m) => igual(m.party_id, fila.party_id) && fila.qr_slot != null && igual(m.qr_slot, fila.qr_slot))) { // índice único (party_id, qr_slot); ya no hay unicidad por tipo
           throw Object.assign(new Error('unique'), { code: 'P2002' });
         }
         marcas.push(fila);
@@ -137,7 +137,8 @@ describe('AsistenciaService.marcar', () => {
     expect(r.marca.estado).toBe('VALIDA');
     expect(b.marcas).toHaveLength(1);
     expect(b.selfies).toHaveLength(1);
-    expect(r.permitidas).toContain('SALIDA');
+    expect(r.marca.tipo).toBe('ENTRADA');
+    expect(r.mensaje).toBe('Marcaste tu entrada a las 08:00');
   });
 
   it('rechaza un QR ajeno (firmado con otro secreto)', async () => {
@@ -181,10 +182,24 @@ describe('AsistenciaService.marcar', () => {
     expect(r.marca.alertas.join(' ')).toMatch(/simulada/);
   });
 
-  it('valida el orden: no salida sin entrada', async () => {
-    const { svc } = servicio();
-    const e = await error(svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA));
-    expect(e).toMatchObject({ codigo: 'ORDEN_INVALIDO' });
+  it('marcas múltiples: el tipo que mande el cliente se ignora; la primera siempre es la entrada', async () => {
+    const { svc, b } = servicio();
+    const r = await svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA);
+    expect(r.marca.tipo).toBe('ENTRADA');
+    expect(b.marcas[0].tipo).toBe('ENTRADA');
+  });
+
+  it('marcas múltiples: se puede marcar varias veces; la 2.ª cuenta como salida y una a <3 min se une a la anterior', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto(), LUIS, undefined, AHORA);
+    const luego = new Date(AHORA.getTime() + 60_000); // 1 min después: doble marca
+    const r2 = await svc.marcar(dto({ qr: payloadQr(SECRETO, slotDe(luego.getTime())) }), LUIS, undefined, luego);
+    expect(r2.interpretacion.duplicada).toBe(true);
+    expect(r2.mensaje).toMatch(/se unió a la anterior/);
+    const mas = new Date(AHORA.getTime() + 10 * 60_000);
+    const r3 = await svc.marcar(dto({ qr: payloadQr(SECRETO, slotDe(mas.getTime())) }), LUIS, undefined, mas);
+    expect(r3.marca.tipo).toBe('SALIDA');
+    expect(b.marcas).toHaveLength(3); // nada se rechaza ni se borra
   });
 
   it('un solo celular por trabajador: otro dispositivo se rechaza', async () => {
@@ -328,67 +343,57 @@ describe('AsistenciaService: ADMIN no marca', () => {
   });
 });
 
-describe('AsistenciaService.marcarWeb (usuario y contraseña)', () => {
-  const entrada = { usuario: '12345678', contrasena: 'clave-segura' };
+describe('AsistenciaService.marcar manual (solo GPS, sin QR ni selfie)', () => {
+  const manual = (over: Partial<MarcarDto> = {}) => dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any, ...over });
 
-  it('guarda una marca WEB A_REVISAR con motivo, sin GPS ni selfie, y sugiere la siguiente', async () => {
+  it('guarda una marca MANUAL A_REVISAR con motivo, sin selfie ni QR ni vínculo de celular', async () => {
     const { svc, b } = servicio();
-    const r = await svc.marcarWeb(entrada, '1.1.1.1', AHORA);
-    expect(r.tipo).toBe('ENTRADA');
-    expect(r.pendiente).toBe('SALIDA');
-    expect(b.marcas[0]).toMatchObject({ origen: 'WEB', estado: 'A_REVISAR', motivos_revision: MOTIVO_MARCA_WEB, tipo: 'ENTRADA' });
-    expect(b.marcas[0].lat).toBeUndefined();
+    const r = await svc.marcar(manual(), LUIS, '1.1.1.1', AHORA, true);
+    expect(r.marca.estado).toBe('A_REVISAR');
+    expect(r.mensaje).toContain('pendiente de revisión');
+    expect(b.marcas[0]).toMatchObject({ origen: 'MANUAL', estado: 'A_REVISAR', tipo: 'ENTRADA' });
+    expect(b.marcas[0].motivos_revision).toContain(MOTIVO_MARCA_MANUAL);
+    expect(b.marcas[0].qr_slot).toBeNull();
     expect(b.selfies).toHaveLength(0);
-    expect(r).not.toHaveProperty('token');
   });
 
-  it('respeta el orden: no deja marcar salida sin entrada', async () => {
-    const { svc } = servicio();
-    expect(await error(svc.marcarWeb({ ...entrada, tipo: 'SALIDA' }, undefined, AHORA))).toMatchObject({ codigo: 'ORDEN_INVALIDO' });
-  });
-
-  it('contraseña mala: mensaje genérico y mismo mensaje si el usuario no existe', async () => {
-    const { svc } = servicio();
-    const a = await error(svc.marcarWeb({ ...entrada, contrasena: 'otra' }, undefined, AHORA));
-    const b = await error(svc.marcarWeb({ usuario: '99999999', contrasena: 'otra' }, undefined, AHORA));
-    expect(a).toEqual(b);
-    expect(a).toMatchObject({ codigo: 'CREDENCIALES_INVALIDAS' });
-  });
-
-  it('bloquea tras 5 fallos', async () => {
-    const { svc } = servicio();
-    for (let i = 0; i < 5; i++) await error(svc.marcarWeb({ ...entrada, contrasena: 'x' }, undefined, AHORA));
-    expect(await error(svc.marcarWeb(entrada, undefined, AHORA))).toMatchObject({ codigo: 'ASISTENCIA_BLOQUEADA' });
-  });
-
-  it('cuenta desactivada: igual que credenciales inválidas', async () => {
-    const { svc } = servicio({ cuenta: { id: 70n, party_id: 7n, hash: HASH, activo: false, rol: 'MOZO' } });
-    expect(await error(svc.marcarWeb(entrada, undefined, AHORA))).toMatchObject({ codigo: 'CREDENCIALES_INVALIDAS' });
-  });
-
-  it('el ADMIN no puede marcar', async () => {
-    const { svc, b } = servicio({ cuenta: { id: 1n, party_id: 1n, hash: HASH, activo: true, rol: 'ADMIN' } });
-    expect(await error(svc.marcarWeb(entrada, undefined, AHORA))).toMatchObject({ codigo: 'ADMIN_NO_MARCA' });
+  it('fuera del radio o con GPS impreciso se rechaza', async () => {
+    const { svc, b } = servicio();
+    expect(await error(svc.marcar(manual({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'FUERA_DE_RADIO' });
+    expect(await error(svc.marcar(manual({ precision: 40 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'PRECISION_BAJA' });
     expect(b.marcas).toHaveLength(0);
+  });
+
+  it('el ADMIN no puede marcar manualmente', async () => {
+    const { svc, b } = servicio();
+    const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false, roles: ['ADMIN'] };
+    expect(await error(svc.marcar(manual(), admin, undefined, AHORA, true))).toMatchObject({ codigo: 'ADMIN_NO_MARCA' });
+    expect(b.marcas).toHaveLength(0);
+  });
+
+  it('un rechazo cuenta para el bloqueo por intentos', async () => {
+    const { svc } = servicio();
+    for (let i = 0; i < 5; i++) await error(svc.marcar(manual({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA, true));
+    expect(await error(svc.marcar(manual(), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'ASISTENCIA_BLOQUEADA' });
   });
 });
 
 describe('AsistenciaService.revisarMarca', () => {
   const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false };
 
-  it('aprobar una marca WEB la deja APROBADA con quién y por qué; la fila se conserva', async () => {
+  it('aprobar una marca MANUAL la deja APROBADA con quién y por qué; la fila se conserva', async () => {
     const { svc, b } = servicio();
-    await svc.marcarWeb({ usuario: '12345678', contrasena: 'clave-segura' }, undefined, AHORA);
+    await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
     await svc.revisarMarca(Number(b.marcas[0].id), 'APROBAR', { motivo: 'Estaba en el local' }, admin);
     expect(b.marcas[0]).toMatchObject({ estado: 'APROBADA', revisado_por: 1n, revisado_motivo: 'Estaba en el local' });
   });
 
   it('una marca anulada no cuenta para el orden: se puede volver a marcar la entrada', async () => {
     const { svc, b } = servicio();
-    await svc.marcarWeb({ usuario: '12345678', contrasena: 'clave-segura' }, undefined, AHORA);
+    await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
     await svc.revisarMarca(Number(b.marcas[0].id), 'ANULAR', { motivo: 'Marcó por error' }, admin);
-    const r = await svc.marcarWeb({ usuario: '12345678', contrasena: 'clave-segura' }, undefined, AHORA);
-    expect(r.tipo).toBe('ENTRADA');
+    const r = await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
+    expect(r.marca.tipo).toBe('ENTRADA');
     expect(b.marcas).toHaveLength(2);
   });
 

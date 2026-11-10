@@ -40,8 +40,10 @@ export interface DiaEntrada {
   jornada: string;
   estado: EstadoJornada;
   turno: Turno | null;
-  /** Solo marcas que cuentan (VALIDA o APROBADA). */
+  /** Marcas que cuentan, ya con su rol interpretado (ver asistencia.interpretacion.ts). */
   marcas: MarcaCalc[];
+  /** Break real descontado según la interpretación (pares válidos; sin marcas de break, el programado). Ausente = cálculo antiguo. */
+  breakMin?: number;
 }
 
 export interface DiaPlanilla {
@@ -115,7 +117,8 @@ export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPla
   const salAlm = dia.marcas.find((m) => m.tipo === 'SALIDA_ALMUERZO');
   const regAlm = dia.marcas.find((m) => m.tipo === 'ENTRADA_ALMUERZO');
   let breakMin = 0;
-  if (salAlm && regAlm) breakMin = Math.max(0, regAlm.minutos - salAlm.minutos);
+  if (dia.breakMin !== undefined) breakMin = dia.breakMin;
+  else if (salAlm && regAlm) breakMin = Math.max(0, regAlm.minutos - salAlm.minutos);
   else if (!salAlm && !regAlm && t.almuerzoIni !== undefined && t.almuerzoFin !== undefined) breakMin = t.almuerzoFin - t.almuerzoIni;
 
   base.trabajadaMin = Math.min(base.programadaMin, Math.max(0, fin - inicio - breakMin));

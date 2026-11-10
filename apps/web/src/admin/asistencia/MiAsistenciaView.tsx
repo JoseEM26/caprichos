@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ETIQUETA_ESTADO,
-  ETIQUETA_TIPO,
   MiHoy,
-  TipoMarca,
   identificadorDispositivo,
   MiPropina,
   marcarAsistencia,
+  marcarManual,
   miHistorial,
   miHoy as cargarMiHoy,
   miPropinas,
@@ -14,7 +13,10 @@ import {
   MiResumen,
 } from './asistenciaApi';
 import { TarjetaGanado } from './TarjetaGanado';
+import { CorreccionesAsistencia, type PedidoCorreccion } from './CorreccionesAsistencia';
+import { ETIQUETA_ROL } from './correccionesApi';
 import { MiVacaciones } from './MiVacaciones';
+import { BotonInstalarApp } from '../../pwa/BotonInstalarApp';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
@@ -27,6 +29,8 @@ const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
 };
 const NOMBRES_PASOS = ['QR', 'Ubicación', 'Selfie', 'Confirmar'];
 const INDICE_PASO: Partial<Record<Paso, number>> = { escanear: 0, ubicacion: 1, selfie: 2, confirmar: 3 };
+
+const horaCorta = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
 
 const MESES_TEXTO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -73,12 +77,13 @@ export function MiAsistenciaView() {
   const [resumen, setResumen] = useState<MiResumen | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<TipoMarca | null>(null);
+  const [pedido, setPedido] = useState<PedidoCorreccion | null>(null);
   const [paso, setPaso] = useState<Paso>('inicio');
   const [codigo, setCodigo] = useState('');
   const [qrTexto, setQrTexto] = useState<string | null>(null);
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
+  const [manual, setManual] = useState(false); // sin QR ni selfie: solo GPS, queda para revisión
   const [aceptaConsent, setAceptaConsent] = useState(false);
   const [aceptadoEnSesion, setAceptadoEnSesion] = useState(false);
   const [verAviso, setVerAviso] = useState(false);
@@ -126,8 +131,7 @@ export function MiAsistenciaView() {
     }
   }
 
-  const empezar = (t: TipoMarca) => {
-    setTipo(t);
+  const empezar = () => {
     setMensajeOk(null);
     setError(null);
     setCodigo('');
@@ -135,7 +139,17 @@ export function MiAsistenciaView() {
     setModoCamara('environment');
     setUbicacion(null);
     setSelfie(null);
+    setManual(false);
     setPaso('escanear');
+  };
+
+  const empezarManual = () => {
+    setMensajeOk(null);
+    setError(null);
+    setUbicacion(null);
+    setSelfie(null);
+    setManual(true);
+    setPaso('ubicacion');
   };
 
   // Escaneo del QR: BarcodeDetector si existe; si no, jsQR. El código manual siempre queda a la vista.
@@ -175,7 +189,8 @@ export function MiAsistenciaView() {
       .then((u) => {
         if (cancelado) return;
         setUbicacion(u);
-        setPaso('selfie');
+        if (manual) void enviar({ u });
+        else setPaso('selfie');
       })
       .catch((e) => {
         if (!cancelado) setError(mensajeDe(e, 'No pudimos leer tu ubicación.'));
@@ -183,7 +198,7 @@ export function MiAsistenciaView() {
     return () => {
       cancelado = true;
     };
-  }, [paso]);
+  }, [paso, manual]);
 
   // Cámara frontal para la selfie
   useEffect(() => {
@@ -203,21 +218,25 @@ export function MiAsistenciaView() {
     }
   }
 
-  async function enviar() {
-    if (!tipo || !ubicacion || !selfie) return;
+  async function enviar(directo?: { u: { lat: number; lng: number; precision: number } }) {
+    const u = directo?.u ?? ubicacion;
+    if (!u || (!directo && !selfie)) return;
     setEnviando(true);
     setError(null);
     try {
-      const r = await marcarAsistencia({
-        tipo,
-        ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
-        lat: ubicacion.lat,
-        lng: ubicacion.lng,
-        precision: ubicacion.precision,
-        selfie,
-        dispositivo: identificadorDispositivo(),
-        consentimiento: hoy?.consentimiento ? aceptaConsent : undefined,
-      });
+      // Sin `tipo`: el servidor lee cada marca por orden y pares y dice qué interpretó
+      const consentimiento = hoy?.consentimiento ? aceptaConsent : undefined;
+      const r = directo
+        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision, consentimiento })
+        : await marcarAsistencia({
+            ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
+            lat: u.lat,
+            lng: u.lng,
+            precision: u.precision,
+            selfie: selfie!,
+            dispositivo: identificadorDispositivo(),
+            consentimiento,
+          });
       setMensajeOk(r.mensaje + (r.marca.estado === 'A_REVISAR' ? ' (queda para revisión del administrador)' : ''));
       setPaso('listo');
       await recargar();
@@ -239,19 +258,22 @@ export function MiAsistenciaView() {
   if (cargando) return <Cargando mensaje="Cargando tu asistencia…" />;
   if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
-  const pendiente = hoy.pendiente;
+  const ultima = hoy.marcas.filter((m) => !m.duplicada).slice(-1)[0];
   const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado && !aceptadoEnSesion;
   const sinUbicacion = hoy.localConUbicacion === false;
-  const puedeMarcar = !sinUbicacion && (pendiente !== null || hoy.permitidas.length > 0) && (!faltaConsent || aceptaConsent);
+  const puedeMarcar = !sinUbicacion && (!faltaConsent || aceptaConsent);
   const indice = INDICE_PASO[paso];
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="ma-vista">
+      <BotonInstalarApp />
       <section className="ma-estado" aria-label="Estado de hoy">
         <span className="ma-fecha">Hoy {hoy.jornada} · {horaLima}</span>
         <div data-testid="estado-hoy" className="ma-estado-txt">
-          {pendiente ? <>Te falta marcar: <strong>{ETIQUETA_TIPO[pendiente]}</strong></> : 'Hoy ya no tienes marcas pendientes'}
+          {hoy.marcas.length === 0
+            ? <>Te falta marcar: <strong>Entrada</strong></>
+            : <>Llevas <strong>{hoy.marcas.length}</strong> {hoy.marcas.length === 1 ? 'marca' : 'marcas'} hoy. Marca cuando entres, salgas a break, regreses o termines: el sistema lo interpreta por el orden.</>}
         </div>
         {hoy.turno ? (
           <div className="ma-turno">
@@ -263,10 +285,19 @@ export function MiAsistenciaView() {
         )}
         {hoy.marcas.length > 0 && (
           <div className="ma-marcas">
-            {hoy.marcas.map((m: any, i: number) => (
-              <Insignia key={m.id ?? i} variante="exito">{ETIQUETA_TIPO[m.tipo as TipoMarca] ?? m.tipo}</Insignia>
+            {hoy.marcas.map((m, i) => (
+              <Insignia key={m.id ?? i} variante={m.duplicada ? 'neutro' : 'exito'}>
+                <span style={m.duplicada ? { textDecoration: 'line-through' } : undefined}>
+                  {horaCorta(m.momento)} {ETIQUETA_ROL[m.tipo] ?? m.tipo}
+                </span>
+                {m.duplicada && ' (unida a la anterior)'}
+              </Insignia>
             ))}
           </div>
+        )}
+        {ultima && !hoy.marcas.every((m) => m.duplicada) && <div className="as-ayuda" data-testid="ultima-interpretacion">Tu última marca se interpretó como: <strong>{ETIQUETA_ROL[ultima.tipo]}</strong></div>}
+        {hoy.interpretacion && hoy.interpretacion.alertas.length > 0 && (
+          <div role="status" className="as-aviso as-aviso--alerta">{hoy.interpretacion.alertas.join(' · ')}. Si hay un error, pide la corrección abajo.</div>
         )}
       </section>
 
@@ -306,25 +337,13 @@ export function MiAsistenciaView() {
 
       {paso === 'inicio' && (
         <>
-          <button
-            type="button"
-            className="ma-grande"
-            disabled={!puedeMarcar || enviando}
-            onClick={() => empezar(pendiente ?? hoy.permitidas[0])}
-          >
-            {pendiente ? 'Escanear QR' : 'Marcar'}
+          <button type="button" className="ma-grande" disabled={!puedeMarcar || enviando} onClick={() => empezar()}>
+            Escanear QR
           </button>
-          {hoy.permitidas.length > 1 && (
-            <div className="ma-otras">
-              {hoy.permitidas
-                .filter((t) => t !== pendiente)
-                .map((t) => (
-                  <Boton key={t} type="button" variante="secundario" disabled={!puedeMarcar} onClick={() => empezar(t)}>
-                    {ETIQUETA_TIPO[t]}
-                  </Boton>
-                ))}
-            </div>
-          )}
+          <Boton type="button" variante="texto" disabled={!puedeMarcar || enviando} onClick={() => empezarManual()}>
+            Marcar manualmente (sin QR)
+          </Boton>
+          <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca.</p>
           {faltaConsent && !aceptaConsent && <p className="as-ayuda">Acepta el aviso de datos para poder marcar.</p>}
         </>
       )}
@@ -374,10 +393,10 @@ export function MiAsistenciaView() {
         </section>
       )}
 
-      {paso === 'confirmar' && tipo && (
+      {paso === 'confirmar' && (
         <section className="ma-card">
           <h3>4. Confirmar</h3>
-          <div>Confirmar: <strong>{ETIQUETA_TIPO[tipo]}</strong></div>
+          <div>Confirmar mi marca de ahora <span className="as-ayuda">(el sistema decide si es entrada, break o salida)</span></div>
           {selfie && <img alt="Selfie de la marca" src={`data:image/jpeg;base64,${selfie}`} className="as-selfie" style={{ maxWidth: 140 }} />}
           <Boton type="button" tamano="grande" disabled={enviando} onClick={() => void enviar()}>
             {enviando ? 'Registrando…' : 'Confirmar marca'}
@@ -406,6 +425,7 @@ export function MiAsistenciaView() {
         </section>
       )}
 
+      <CorreccionesAsistencia pedido={pedido} alAbrir={setPedido} alCerrar={() => setPedido(null)} />
       <TarjetaGanado />
       <MiVacaciones />
 
@@ -430,8 +450,21 @@ export function MiAsistenciaView() {
         {historial.length === 0 && <p className="as-ayuda">Aún no tienes días registrados.</p>}
         {historial.map((d) => (
           <div key={d.jornada} className="ma-item">
-            <b>{d.jornada}</b>
+            <span>
+              <b>{d.jornada}</b>
+              <small>{d.turno ? `Horario ${d.turno.entrada} a ${d.turno.salida}${d.turno.almuerzo ? ` (break ${d.turno.almuerzo})` : ''}` : 'Sin horario'}</small>
+              {(d.marcas ?? []).length > 0 && (
+                <small>
+                  {(d.marcas as any[]).map((m, i) => (
+                    <span key={m.id ?? i} style={m.duplicada ? { textDecoration: 'line-through' } : undefined}>
+                      {i > 0 ? ' · ' : ''}{m.hora} {ETIQUETA_ROL[m.tipo as keyof typeof ETIQUETA_ROL] ?? m.tipo}
+                    </span>
+                  ))}
+                </small>
+              )}
+            </span>
             <Insignia variante={VARIANTE_ESTADO[d.estado] ?? 'neutro'}>{ETIQUETA_ESTADO[d.estado] ?? d.estado}</Insignia>
+            {d.estado !== 'DESCANSO' && <Boton type="button" variante="texto" onClick={() => setPedido({ jornada: d.jornada })}>Pedir corrección</Boton>}
           </div>
         ))}
       </section>

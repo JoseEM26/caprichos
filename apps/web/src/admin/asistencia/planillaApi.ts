@@ -39,6 +39,13 @@ export interface DiaPlanillaApi {
   feriado?: string | null;
   recargo?: number;
   ganado?: number;
+  /** Detalle del calendario (misma interpretación que calculó el pago). */
+  horario?: { entrada: string; salida: string; almuerzo: string | null } | null;
+  marcas?: Array<{ id: number | null; hora: string; rol: string | null; duplicada: boolean; estado: string }>;
+  breakMin?: number;
+  alertas?: string[];
+  extraPendiente?: boolean;
+  vacacion?: boolean;
 }
 
 export interface ConsumoPlanillaApi {
@@ -70,6 +77,8 @@ export interface DetallePlanilla {
   toleranciaMin: number;
   pctTardanza: number;
   pendientes: number;
+  /** Jornadas que bloquean «Marcar pagado». */
+  jornadasPorRevisar?: string[];
   resultado: {
     programadaMin: number;
     trabajadaMin: number;

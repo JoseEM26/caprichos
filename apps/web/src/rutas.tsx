@@ -15,7 +15,7 @@ import {
 } from "./carta/legal";
 import { PantallaCocinaView } from "./pantalla/PantallaCocinaView";
 import { PaginaMascota } from "./mascota/PaginaMascota";
-import { MarcarConClavePage, PantallaAsistenciaPublica } from "./admin/asistencia";
+import { PantallaAsistenciaPublica } from "./admin/asistencia";
 
 /** El título estático de index.html es el de la carta (SEO); el panel lo cambia en el cliente. */
 function TituloPanel() {
@@ -43,8 +43,6 @@ export function RutasApp() {
         <Route path="/legal/privacidad" element={<PrivacidadPage />} />
         <Route path="/reclamos" element={<ReclamosPublicoPage />} />
         <Route path="/mascota" element={<PaginaMascota />} />
-        {/* Marcar sin celular con usuario y contraseña: sin sesión previa, no abre sesión */}
-        <Route path="/asistencia/marcar" element={<MarcarConClavePage />} />
         {/* Pantalla del QR de asistencia del local: sin sesión, el enlace secreto va en la ruta */}
         <Route
           path="/asistencia/pantalla/:token"

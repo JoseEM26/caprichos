@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   desactivarEnlacePantalla,
@@ -30,13 +30,16 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { PlanillaTab } from './PlanillaTab';
+import { CronogramaTab } from './CronogramaTab';
+import { SolicitudesTab } from './SolicitudesTab';
+import { contadorSolicitudes } from './correccionesApi';
 import { FeriadosTab } from './FeriadosTab';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
 import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import './asistencia.css';
 
-type Pestana = 'hoy' | 'mes' | 'marcas' | 'planilla' | 'feriados' | 'config' | 'pantalla';
+type Pestana = 'hoy' | 'cronograma' | 'solicitudes' | 'mes' | 'marcas' | 'planilla' | 'feriados' | 'config' | 'pantalla';
 type Avisar = (m: string | null) => void;
 
 const ahoraLima = () => {
@@ -64,7 +67,7 @@ function Chip({ estado }: { estado: string }) {
 
 const SIN_UBICACION = 'Aún no configuras la ubicación del local: nadie podrá marcar';
 
-const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'planilla', 'feriados', 'config', 'pantalla'];
+const PESTANAS: Pestana[] = ['hoy', 'cronograma', 'solicitudes', 'mes', 'marcas', 'planilla', 'feriados', 'config', 'pantalla'];
 
 export function AsistenciaAdminView() {
   // Enlace directo (lo usa Capri): /admin/asistencia?pestana=config abre esa pestaña
@@ -80,6 +83,10 @@ export function AsistenciaAdminView() {
   useEffect(() => {
     obtenerConfigAsistencia().then(setCfg).catch((e) => setError(mensajeDe(e, 'No pudimos cargar la configuración.')));
   }, []);
+  // Contador de solicitudes de corrección pendientes (en la pestaña)
+  const [pendientes, setPendientes] = useState(0);
+  const contar = useCallback(() => { contadorSolicitudes().then((r) => setPendientes(r.pendientes)).catch(() => undefined); }, []);
+  useEffect(() => { contar(); }, [contar, pestana]);
   const cambiar = (k: Pestana) => {
     setPestana(k);
     setParams((prev) => { const n = new URLSearchParams(prev); n.set('pestana', k); return n; }, { replace: true });
@@ -88,6 +95,8 @@ export function AsistenciaAdminView() {
   };
   const tabs: Array<[Pestana, string]> = [
     ['hoy', 'Hoy'],
+    ['cronograma', 'Cronograma'],
+    ['solicitudes', pendientes > 0 ? `Solicitudes de corrección (${pendientes})` : 'Solicitudes de corrección'],
     ['mes', 'Mensual'],
     ['marcas', 'Marcas y selfies'],
     ['planilla', 'Planilla'],
@@ -118,6 +127,8 @@ export function AsistenciaAdminView() {
       {mensaje && <div role="status" className="as-aviso as-aviso--ok">{mensaje}</div>}
       {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
       {pestana === 'hoy' && <HoyTab onError={setError} onOk={setMensaje} />}
+      {pestana === 'cronograma' && <CronogramaTab onError={setError} onOk={setMensaje} />}
+      {pestana === 'solicitudes' && <SolicitudesTab onError={setError} onOk={setMensaje} alCambiar={contar} />}
       {pestana === 'mes' && <MesTab onError={setError} />}
       {pestana === 'marcas' && <MarcasTab onError={setError} onOk={setMensaje} />}
       {pestana === 'planilla' && <PlanillaTab onError={setError} onOk={setMensaje} />}
@@ -439,7 +450,7 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
                   </td>
                   <td data-label="Distancia" className="as-num">{m.distanciaM ?? '—'} m</td>
                   <td data-label="Precisión" className="as-num">{m.precisionM ?? '—'} m</td>
-                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : m.origen === 'WEB' ? 'Usuario y contraseña' : 'Celular'}</td>
+                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : m.origen === 'WEB' ? 'Usuario y contraseña' : m.origen === 'MANUAL' ? 'Manual (solo GPS)' : 'Celular'}</td>
                   <td data-label="">
                     {m.tieneSelfie && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void verFoto(m.id)}>Ver selfie</Boton>}
                     {m.estado === 'A_REVISAR' && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setRevisando({ marca: m, accion: 'aprobar', motivo: '' })}>Aprobar</Boton>}
@@ -565,6 +576,8 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
             {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
             {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza. Hoy: 5.')}
             {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). Hoy: 50.')}
+            {campo('dobleMarcaMin', 'Doble marca: unir marcas a menos de (min)', 'Marcas muy seguidas se unen: cuenta la primera y la otra se muestra tachada. 0 = no unir. Hoy: 3.')}
+            {campo('solicitudDiasMax', 'Días para pedir corrección', 'Hasta cuántos días atrás la persona puede pedir que se corrija su asistencia (y se le avisa de inconsistencias). Hoy: 7.')}
             {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}
           </div>
         </Tarjeta>

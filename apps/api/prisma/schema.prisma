@@ -52,6 +52,8 @@ model Party {
   reemplazaDias            ReemplazoDia[]         @relation("ReemplazoDiaSuplente")
   asistenciaMarcas         AsistenciaMarca[]     @relation("AsistenciaMarcaParty")
   asistenciaCorregidas     AsistenciaMarca[]     @relation("AsistenciaMarcaCorrigio")
+  asistenciaSolicitudes    AsistenciaSolicitud[] @relation("AsistenciaSolicitudParty")
+  asistenciaSolicitudesResueltas AsistenciaSolicitud[] @relation("AsistenciaSolicitudResuelta")
   asistenciaDispositivo    AsistenciaDispositivo?
   asistenciaConsentimiento AsistenciaConsentimiento?
   pedidosProveedor         PedidoProveedor[]
@@ -118,6 +120,7 @@ model Rol {
   usuariosExtra  UserAccountRol[]
   historialRolesExtra UserAccountRolHistorial[]
   notificaciones Notificacion[]
+  ajustes        RolPermisoAjuste[]
 
   @@map("rol")
 }
@@ -206,6 +209,20 @@ model RolPermiso {
 
   @@id([rol, permiso_id])
   @@map("rol_permiso")
+}
+
+/// Cambios del dueño sobre la base de permisos del sistema (MATRIZ): el sincronizador los reaplica en cada arranque.
+model RolPermisoAjuste {
+  rol        String
+  modulo     String
+  accion     String
+  efecto     String   // CONCEDE | QUITA
+  creado_por BigInt?
+  creado_en  DateTime @default(now()) @db.Timestamptz
+  r          Rol      @relation(fields: [rol], references: [codigo], onDelete: Cascade)
+
+  @@id([rol, modulo, accion])
+  @@map("rol_permiso_ajuste")
 }
 
 model UserAccount {
@@ -2802,7 +2819,7 @@ model AsistenciaMarca {
   party_id         BigInt
   jornada          DateTime  @db.Date // día laboral (Lima; antes de las 04:00 cuenta como el día anterior)
   tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA
-  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION | WEB (usuario y contraseña, sin GPS ni selfie)
+  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION | WEB (usuario y contraseña, sin GPS ni selfie) | MANUAL (solo GPS, sin QR ni selfie; A_REVISAR)
   momento          DateTime  @db.Timestamptz // hora del servidor
   estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR | APROBADA (la revisó el admin) | ANULADA (no cuenta; con motivo)
   motivos_revision String?
@@ -2827,6 +2844,28 @@ model AsistenciaMarca {
   @@unique([party_id, qr_slot])
   @@index([party_id, jornada])
   @@map("asistencia_marca")
+}
+
+/// Solicitud de corrección de asistencia: la persona pide marcas olvidadas o mal hechas; no cuenta hasta que el admin la apruebe.
+model AsistenciaSolicitud {
+  id                 BigInt    @id @default(autoincrement())
+  party_id           BigInt
+  jornada            DateTime  @db.Date
+  items              Json      // [{ tipo, hora: "HH:MM", momento: ISO }]
+  motivo             String
+  estado             String    @default("PENDIENTE") @db.VarChar(12) // PENDIENTE | APROBADA | RECHAZADA | CANCELADA
+  creada_en          DateTime  @default(now()) @db.Timestamptz
+  resuelta_por       BigInt?
+  resuelta_en        DateTime? @db.Timestamptz
+  motivo_resolucion  String?
+  marcas_ids         Json?     // ids de las marcas creadas al aprobar
+
+  party              Party     @relation("AsistenciaSolicitudParty", fields: [party_id], references: [id])
+  resolutora         Party?    @relation("AsistenciaSolicitudResuelta", fields: [resuelta_por], references: [id])
+
+  @@index([party_id, jornada])
+  @@index([estado])
+  @@map("asistencia_solicitud")
 }
 
 model AsistenciaSelfie {

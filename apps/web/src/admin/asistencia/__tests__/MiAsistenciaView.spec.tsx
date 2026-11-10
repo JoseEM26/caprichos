@@ -4,12 +4,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const miHoy = vi.fn();
 const miHistorial = vi.fn();
 const marcarAsistencia = vi.fn();
+const marcarManual = vi.fn();
 const miPropinas = vi.fn();
 vi.mock('../asistenciaApi', async (orig) => ({
   ...(await orig<any>()),
   miHoy: (...a: any[]) => miHoy(...a),
   miHistorial: (...a: any[]) => miHistorial(...a),
   marcarAsistencia: (...a: any[]) => marcarAsistencia(...a),
+  marcarManual: (...a: any[]) => marcarManual(...a),
   miPropinas: (...a: any[]) => miPropinas(...a),
 }));
 
@@ -47,6 +49,17 @@ describe('MiAsistenciaView (celular)', () => {
     expect(aviso).toHaveTextContent('El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.');
     expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeDisabled();
     expect(miHistorial).toHaveBeenCalled();
+  });
+
+  it('Marcar manualmente (sin QR): lee el GPS y envía solo ubicación, sin selfie ni QR', async () => {
+    (navigator as any).geolocation = { getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12.04, longitude: -77.04, accuracy: 9 } }) };
+    miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
+    marcarManual.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada a las 08:00', marca: { estado: 'A_REVISAR' } });
+    render(<MiAsistenciaView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Marcar manualmente (sin QR)' }));
+    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9, consentimiento: undefined }));
+    expect(marcarAsistencia).not.toHaveBeenCalled();
+    expect(await screen.findByRole('status')).toHaveTextContent('queda para revisión del administrador');
   });
 
   it('con ubicación del local: sin aviso y puede marcar', async () => {
@@ -97,11 +110,30 @@ describe('MiAsistenciaView (celular)', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled());
   });
 
-  it('sin turno hoy lo dice y no ofrece marcar', async () => {
-    miHoy.mockResolvedValue({ ...base, turno: null, pendiente: null, permitidas: [] });
+  it('sin turno hoy lo dice; igual puede marcar (el administrador la revisa)', async () => {
+    miHoy.mockResolvedValue({ ...base, turno: null });
     render(<MiAsistenciaView />);
     expect(await screen.findByText('Hoy no tienes turno programado.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Marcar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+  });
+
+  it('marcas múltiples: muestra cada marca con lo que se interpretó y la doble marca tachada; un solo botón', async () => {
+    miHoy.mockResolvedValue({
+      ...base,
+      marcas: [
+        { id: 1, tipo: 'ENTRADA', momento: '2026-11-06T14:00:00.000Z', estado: 'VALIDA', duplicada: false },
+        { id: 2, tipo: 'ENTRADA', momento: '2026-11-06T14:01:00.000Z', estado: 'VALIDA', duplicada: true },
+        { id: 3, tipo: 'SALIDA_ALMUERZO', momento: '2026-11-06T18:00:00.000Z', estado: 'VALIDA', duplicada: false },
+      ],
+      interpretacion: { estado: 'EN_CURSO', alertas: [] },
+    });
+    render(<MiAsistenciaView />);
+    expect(await screen.findByText(/09:00 Entrada/)).toBeInTheDocument();
+    expect(screen.getByText(/09:01 Entrada/)).toHaveStyle({ textDecoration: 'line-through' });
+    expect(screen.getByText(/unida a la anterior/)).toBeInTheDocument();
+    expect(screen.getByTestId('ultima-interpretacion')).toHaveTextContent('Salida a break');
+    expect(screen.getByTestId('estado-hoy')).toHaveTextContent('Llevas 3 marcas hoy');
+    expect(screen.getAllByRole('button', { name: 'Escanear QR' })).toHaveLength(1);
   });
 
   describe('aviso de datos una sola vez', () => {

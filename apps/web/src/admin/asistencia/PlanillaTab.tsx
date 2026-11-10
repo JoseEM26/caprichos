@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
+import { Confirmar } from '../../comun/Confirmar';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
+import { ETIQUETA_ROL, ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
 import { PestanaVinculoVacaciones } from './VinculoVacaciones';
 import { ETIQUETA_VINCULO } from './vinculoApi';
 import {
@@ -111,6 +113,10 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
   const [reabrir, setReabrir] = useState<string | null>(null);
   const [aj, setAj] = useState({ tipo: 'ADELANTO' as 'ADELANTO' | 'DESCUENTO', fecha: hoyLima(), monto: '', motivo: '' });
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
+  const [tab, setTab] = useState('resumen');
+  const [resaltar, setResaltar] = useState<string | null>(null);
+  const [confirmaSimples, setConfirmaSimples] = useState(false);
+  const [resSimples, setResSimples] = useState<ResultadoLote | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -136,6 +142,22 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
   };
 
   const pagado = d?.estado === 'PAGADO';
+  // Del banner a la jornada: abre la pestaña de jornadas y la resalta
+  useEffect(() => {
+    if (tab === 'jornadas' && resaltar) document.getElementById(`dia-${resaltar}`)?.scrollIntoView?.({ block: 'center' });
+  }, [tab, resaltar, d]);
+  const irAlDia = (j: string) => { setResaltar(j); setTab('jornadas'); };
+  const porRevisar = d?.jornadasPorRevisar ?? [];
+  const banner = d && !pagado && porRevisar.length > 0 ? (
+    <div role="alert" className="as-aviso as-aviso--alerta" data-testid="banner-por-revisar">
+      <strong>{porRevisar.length} {porRevisar.length === 1 ? 'jornada por revisar' : 'jornadas por revisar'}</strong>: no se puede marcar pagado hasta corregirlas.{' '}
+      {porRevisar.map((j) => <button key={j} type="button" className="as-enlace" style={{ background: 'none', border: 0, cursor: 'pointer', padding: '0 6px', minHeight: 32 }} onClick={() => irAlDia(j)}>{j}</button>)}
+      <div style={{ marginTop: 6 }}>
+        <Boton type="button" variante="secundario" disabled={ocupado} onClick={() => setConfirmaSimples(true)}>Aprobar todas las marcas dudosas del período</Boton>
+        <small style={{ display: 'block' }}>Solo las simples (marcas manuales y solicitudes pendientes). Las jornadas con cantidades raras de marcas se corrigen una por una en «Cronograma».</small>
+      </div>
+    </div>
+  ) : null;
   const r = d?.resultado;
 
   const resumen = d && r && (
@@ -145,7 +167,6 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
         (semanal {soles(d.sueldo.semanal)} · mensual {soles(d.sueldo.mensual)}) · Valor hora {soles(r.valorHora)}
       </div>
       {pagado && <div role="status" className="as-aviso as-aviso--ok">Período pagado el {new Date(d.pagadoEn!).toLocaleString('es-PE', { timeZone: 'America/Lima' })}. Las cifras están congeladas: ya no le debemos nada de este período.</div>}
-      {!pagado && d.pendientes > 0 && <div role="alert" className="as-aviso as-aviso--alerta">Hay {d.pendientes} jornada(s) incompletas o por revisar. Corrígelas en «Marcas y selfies» antes de pagar.</div>}
       <dl className="as-resumen-planilla" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, margin: 0 }}>
         <Dato t="Horas programadas" v={`${horas(r.programadaMin)} h`} />
         <Dato t="Horas trabajadas válidas" v={`${horas(r.trabajadaMin)} h → ${soles(r.pagoTrabajado)}`} />
@@ -167,18 +188,30 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
 
   const jornadas = d && (
     <div className="as-tabla-wrap">
+      <p className="as-ayuda">Cada sol sale de aquí: horario, marcas interpretadas (por orden y pares), horas pagadas y recargos. Las dobles marcas aparecen tachadas y no cuentan.</p>
       <table className="as-tabla as-tabla--tarjetas">
-        <thead><tr><th>Jornada</th><th>Estado</th><th>Prog. (h)</th><th>Trab. (h)</th><th>Tardanza (min)</th><th>Salió antes (min)</th><th>Extra (min)</th><th>Aprobar extra</th></tr></thead>
+        <thead><tr><th>Jornada</th><th>Horario</th><th>Marcas interpretadas</th><th>Estado</th><th>Prog. (h)</th><th>Pagadas (h)</th><th>Break (min)</th><th>Tardanza (min)</th><th>Extra (min)</th><th>Aprobar extra</th><th>Ganado</th></tr></thead>
         <tbody>
-          {d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0).map((x) => (
-            <tr key={x.jornada}>
-              <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">Feriado ×{x.recargo}</Insignia></> : null}</td>
-              <td data-label="Estado">{ETIQUETA_ESTADO[x.estado] ?? x.estado}</td>
+          {d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0 || (x.marcas ?? []).length > 0).map((x) => (
+            <tr key={x.jornada} id={`dia-${x.jornada}`} style={resaltar === x.jornada ? { outline: '3px solid var(--cp-gold)' } : undefined}>
+              <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">Feriado ×{x.recargo}</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}</td>
+              <td data-label="Horario" className="as-num">{x.horario ? `${x.horario.entrada}–${x.horario.salida}` : '—'}</td>
+              <td data-label="Marcas interpretadas">
+                {(x.marcas ?? []).length === 0 ? '—' : (x.marcas ?? []).map((m, i) => (
+                  <span key={m.id ?? i} style={{ display: 'block', textDecoration: m.duplicada ? 'line-through' : undefined }}>
+                    {m.hora} {m.rol ? ETIQUETA_ROL[m.rol as keyof typeof ETIQUETA_ROL] : ''}{m.duplicada ? ' (doble)' : ''}{m.estado === 'A_REVISAR' ? ' ⚠ por revisar' : ''}
+                  </span>
+                ))}
+              </td>
+              <td data-label="Estado">
+                {ETIQUETA_ESTADO[x.estado] ?? x.estado}
+                {(x.alertas ?? []).map((a, i) => <small key={i} style={{ display: 'block' }}>⚠ {a}</small>)}
+              </td>
               <td data-label="Prog. (h)" className="as-num">{horas(x.programadaMin)}</td>
-              <td data-label="Trab. (h)" className="as-num">{horas(x.trabajadaMin)}</td>
+              <td data-label="Pagadas (h)" className="as-num">{horas(x.trabajadaMin)}</td>
+              <td data-label="Break (min)" className="as-num">{x.breakMin ?? 0}</td>
               <td data-label="Tardanza (min)" className="as-num">{x.tardanzaMin}</td>
-              <td data-label="Salió antes (min)" className="as-num">{x.salidaAnticipadaMin}</td>
-              <td data-label="Extra (min)" className="as-num">{x.extraMin}</td>
+              <td data-label="Extra (min)" className="as-num">{x.extraMin}{x.extraPendiente ? <small style={{ display: 'block' }}>pendiente de aprobar</small> : null}</td>
               <td data-label="Aprobar extra">
                 {x.extraMin > 0 ? (
                   <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
@@ -193,9 +226,11 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
                   </label>
                 ) : '—'}
               </td>
+              <td data-label="Ganado" className="as-num">{soles(x.ganado)}</td>
             </tr>
           ))}
         </tbody>
+        <tfoot><tr><th colSpan={10} scope="row">Total ganado del período</th><td className="as-num"><strong>{soles(d.resultado.ganado)}</strong></td></tr></tfoot>
       </table>
     </div>
   );
@@ -313,10 +348,44 @@ function DetalleModal({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlan
       ancho={820}
       alCerrar={alCerrar}
       bloquearCierre={ocupado}
+      pestanaActiva={tab}
+      alCambiarPestana={setTab}
+      bajoPestanas={<>
+        {banner}
+        {resSimples && (
+          <div role="status" className={`as-aviso ${resSimples.fallidas ? 'as-aviso--alerta' : 'as-aviso--ok'}`}>
+            Aprobadas {resSimples.ok} de {resSimples.total}{resSimples.omitidas ? ` · ${resSimples.omitidas} marca(s) de jornadas con cantidades raras requieren corrección explícita` : ''}.
+            {resSimples.resultados.filter((r) => !r.ok).map((r) => <div key={`${r.tipo}${r.id}`}>✗ {r.tipo === 'MARCA' ? 'Marca' : 'Solicitud'} #{r.id}: {r.mensaje}</div>)}
+          </div>
+        )}
+        <Confirmar
+          abierto={confirmaSimples}
+          titulo="¿Aprobar todas las marcas dudosas del período?"
+          mensaje={`Se aprobarán las marcas manuales por revisar y las solicitudes de corrección pendientes de ${fila.nombre} del ${d?.periodo.desde} al ${d?.periodo.hasta}. Revisa antes las cámaras.`}
+          textoSi="Sí, aprobar"
+          textoNo="No"
+          cargando={ocupado}
+          alConfirmar={async () => {
+            if (!d) return;
+            setOcupado(true);
+            try {
+              setResSimples(await aprobarSimplesPeriodo(d.partyId, d.periodo.desde, d.periodo.hasta));
+              setConfirmaSimples(false);
+              onError(null);
+              await cargar();
+            } catch (e) {
+              onError(mensajeDe(e, 'No se pudo aprobar en lote.'));
+            } finally {
+              setOcupado(false);
+            }
+          }}
+          alCancelar={() => setConfirmaSimples(false)}
+        />
+      </>}
       pie={pie}
       pestanas={[
         { id: 'resumen', etiqueta: 'Resumen', contenido: resumen ?? <Cargando mensaje="Cargando" /> },
-        { id: 'jornadas', etiqueta: 'Jornadas y extras', contenido: jornadas ?? <Cargando mensaje="Cargando" /> },
+        { id: 'jornadas', etiqueta: 'Calendario y pago por día', insignia: porRevisar.length || null, insigniaError: porRevisar.length > 0, contenido: jornadas ?? <Cargando mensaje="Cargando" /> },
         { id: 'consumos', etiqueta: 'Consumos', insignia: d?.consumos.length || null, contenido: consumos ?? <Cargando mensaje="Cargando" /> },
         { id: 'ajustes', etiqueta: 'Adelantos y descuentos', insignia: d?.ajustes.filter((a) => !a.anulado).length || null, contenido: ajustes ?? <Cargando mensaje="Cargando" /> },
         { id: 'vinculo', etiqueta: 'Vínculo y vacaciones', contenido: <PestanaVinculoVacaciones partyId={fila.partyId} alCambiar={() => void cargar()} />, persistente: false },

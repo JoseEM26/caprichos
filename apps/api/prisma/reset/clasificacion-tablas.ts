@@ -79,7 +79,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
   'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento', 'numero_bloqueado',
-  'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
+  'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento', 'asistencia_solicitud',
   'propina_reparto', 'propina_reparto_detalle',
   'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'feriado',
   'vinculo_personal', 'vacacion_movimiento',
@@ -94,7 +94,7 @@ export const CONSERVAR: string[] = [
   'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_mesa', 'pedido_pago_plan', 'pedido_proveedor',
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
   'producto_grupo', 'producto_tamano', 'queja_whatsapp', 'ranking_mes', 'receta', 'receta_linea',
-  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'ubicacion_repartidor', 'respuesta_rapida', 'rol', 'rol_permiso',
+  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'ubicacion_repartidor', 'respuesta_rapida', 'rol', 'rol_permiso', 'rol_permiso_ajuste',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'stock_sabor', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'user_account_rol', 'user_account_rol_historial', 'user_account_area', 'user_account_permiso', 'preferencia_usuario', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio',
@@ -122,6 +122,7 @@ export const FK_PARTY_PERSONAL = [
   'solicitud_cambio_cobro.solicitado_por_party_id', 'solicitud_cambio_cobro.resuelto_por_party_id',
   'cortesia.dada_por_party_id', 'cortesia.autorizada_por_party_id',
   'asistencia_marca.party_id', 'asistencia_marca.por_party_id', 'asistencia_dispositivo.party_id', 'asistencia_consentimiento.party_id',
+  'asistencia_solicitud.party_id', 'asistencia_solicitud.resuelta_por',
   'propina_reparto.calculado_por', 'propina_reparto.aprobado_por', 'propina_reparto.pagado_por', 'propina_reparto.anulado_por',
   'propina_reparto_detalle.party_id',
 ];

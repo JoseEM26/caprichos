@@ -17,3 +17,4 @@ export * from './impresion.js';
 export * from './cocina.js';
 export * from './tamanosEtiqueta.js';
 export * from './tamanoPc.js';
+export * from './modulos-rol.js';

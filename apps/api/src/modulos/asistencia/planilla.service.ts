@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { jornadaDe } from './asistencia.calculo';
+import { aHoraTexto, jornadaDe } from './asistencia.calculo';
+import { rolEfectivo } from './asistencia.interpretacion';
 import { AsistenciaService } from './asistencia.service';
 import {
   ESTADOS_PENDIENTES,
@@ -198,6 +199,7 @@ export class PlanillaService {
       vacacionesPagadas: vacPagadas.map((v) => Number(v.monto ?? 0)),
     });
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
+    const crudo = new Map(dias.map((d) => [d.jornada, d]));
     return {
       partyId: Number(id),
       nombre: persona ? [persona.nombres, persona.apellidos].filter(Boolean).join(' ') : `Persona ${id}`,
@@ -207,12 +209,27 @@ export class PlanillaService {
       resultado,
       resumen: { programadasH: horas(resultado.programadaMin), trabajadasH: horas(resultado.trabajadaMin) },
       pendientes: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).length,
+      /** Jornadas que bloquean «Marcar pagado» (para el banner y su enlace al día). */
+      jornadasPorRevisar: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).map((d) => d.jornada),
       vacaciones: {
         diasTomados: diasCalc.filter((d) => d.estado === 'VACACIONES').length,
         pagadas: vacPagadas.map((v) => ({ id: Number(v.id), fecha: isoDe(v.fecha_desde), dias: Number(v.dias), monto: Number(v.monto ?? 0) })),
       },
       dias: diasCalc.map((d) => ({
         ...d,
+        // Detalle del calendario: sale de la MISMA interpretación que calculó el pago (no se recalcula en el front)
+        horario: crudo.get(d.jornada)?.turnoTexto ?? null,
+        marcas: (crudo.get(d.jornada)?.interp?.marcas ?? []).map((m) => ({
+          id: m.id ?? null,
+          hora: aHoraTexto(m.minutos),
+          rol: rolEfectivo(crudo.get(d.jornada)!.interp!, m),
+          duplicada: m.duplicadaDe !== null,
+          estado: m.estado,
+        })),
+        breakMin: crudo.get(d.jornada)?.breakMin ?? 0,
+        alertas: crudo.get(d.jornada)?.alertas ?? [],
+        extraPendiente: d.extraMin > 0 && !porDia.has(d.jornada),
+        vacacion: d.estado === 'VACACIONES',
         programadaH: horas(d.programadaMin),
         trabajadaH: horas(d.trabajadaMin),
         feriado: feriados.get(d.jornada)?.nombre ?? null,

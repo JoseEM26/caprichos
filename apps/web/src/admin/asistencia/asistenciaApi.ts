@@ -32,9 +32,13 @@ export interface QrPantalla {
 }
 
 export interface MiMarca {
+  id?: number;
+  /** Lo que el servidor interpretó (por orden y pares). */
   tipo: TipoMarca;
   momento: string;
   estado: 'VALIDA' | 'A_REVISAR' | 'APROBADA';
+  /** Doble marca: se unió a la anterior (cuenta la primera). */
+  duplicada?: boolean;
 }
 
 export interface MiHoy {
@@ -43,8 +47,8 @@ export interface MiHoy {
   turno: { entrada: string; salida: string; almuerzo: string | null } | null;
   estado: string;
   marcas: MiMarca[];
-  pendiente: TipoMarca | null;
-  permitidas: TipoMarca[];
+  interpretacion?: { estado: string; alertas: string[] };
+  dobleMarcaMin?: number;
   consentimientoAceptado: boolean;
   consentimientoAceptadoEn?: string | null;
   textoConsentimiento?: string;
@@ -58,11 +62,12 @@ export interface ResultadoMarca {
   ok: boolean;
   mensaje: string;
   marca: { id: number; tipo: TipoMarca; estado: string; alertas: string[] };
-  pendiente: TipoMarca | null;
+  interpretacion?: { rol: TipoMarca; duplicada: boolean; alertas: string[] };
 }
 
 export interface DatosMarca {
-  tipo: TipoMarca;
+  /** Ya no hace falta: el servidor interpreta cada marca por orden y pares. */
+  tipo?: TipoMarca;
   qr?: string;
   codigo?: string;
   lat: number;
@@ -112,7 +117,7 @@ export interface MarcaAdmin {
   nombre: string;
   jornada: string;
   tipo: TipoMarca;
-  origen: 'CELULAR' | 'CORRECCION' | 'WEB';
+  origen: 'CELULAR' | 'CORRECCION' | 'WEB' | 'MANUAL';
   momento: string;
   estado: string;
   alertas: string | null;
@@ -129,6 +134,10 @@ export interface ConfigAsistenciaAdmin {
   /** % del valor hora con que se pagan los minutos de tardanza (50 = mitad). */
   pagoTardanzaPct: number;
   retencionDias: number;
+  /** Marcas a menos de estos minutos de la anterior se unen (doble marca). */
+  dobleMarcaMin: number;
+  /** Días atrás en que la persona puede pedir corrección. */
+  solicitudDiasMax: number;
   precisionMaxM: number;
   localLat: number | null;
   localLng: number | null;
@@ -162,6 +171,9 @@ export interface MiPropina {
 }
 export const miPropinas = () => api.get<MiPropina[]>('/admin/asistencia/mi/propinas');
 export const marcarAsistencia = (datos: DatosMarca) => api.post<ResultadoMarca>('/admin/asistencia/marcar', datos);
+/** Sin QR ni selfie: solo GPS en el radio del local; la marca queda por revisar. */
+export const marcarManual = (datos: { lat: number; lng: number; precision: number; consentimiento?: boolean }) =>
+  api.post<ResultadoMarca>('/admin/asistencia/marcar-manual', datos);
 export const reporteHoy = () => api.get<{ jornada: string; filas: FilaHoy[] }>('/admin/asistencia/hoy');
 export const reporteMes = (anio: number, mes: number) =>
   api.get<{ dias: string[]; filas: FilaMes[]; personas: ResumenMes[] }>(`/admin/asistencia/mes?anio=${anio}&mes=${mes}&formato=json`);
@@ -227,13 +239,3 @@ export interface MiResumen {
   jornadasPorRevisar: number;
 }
 export const miResumen = () => api.get<MiResumen>('/admin/asistencia/mi/resumen');
-
-/** Marcar sin celular (página pública): usuario y contraseña de Caprichos. No abre sesión. */
-export interface ResultadoMarcaWeb {
-  ok: boolean;
-  mensaje: string;
-  tipo: TipoMarca;
-  pendiente: TipoMarca | null;
-}
-export const marcarConClave = (datos: { usuario: string; contrasena: string; tipo?: TipoMarca }) =>
-  api.post<ResultadoMarcaWeb>('/carta/asistencia-web/marcar', datos);

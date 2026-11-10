@@ -1,5 +1,8 @@
 // Cálculo puro de asistencia: tiempo (America/Lima, UTC-5 sin horario de verano), distancia,
 // turno que corresponde a una persona en una jornada y cumplimiento del día. Sin acceso a BD.
+// Las marcas se leen por orden y pares (asistencia.interpretacion.ts): el `tipo` solo manda si la marca es `fija`.
+
+import { DOBLE_MARCA_MIN_DEFECTO, Interpretacion, interpretarMarcas } from './asistencia.interpretacion';
 
 export type TipoMarca = 'ENTRADA' | 'SALIDA_ALMUERZO' | 'ENTRADA_ALMUERZO' | 'SALIDA';
 export const TIPOS_MARCA: readonly TipoMarca[] = ['ENTRADA', 'SALIDA_ALMUERZO', 'ENTRADA_ALMUERZO', 'SALIDA'];
@@ -93,7 +96,13 @@ export function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: 
 }
 
 export interface MarcaCalc {
+  /** Rol guardado. Solo cuenta si la marca es `fija` (corrección del admin); si no, se interpreta por orden y pares. */
   tipo: TipoMarca;
+  id?: number;
+  /** Corrección del admin: conserva su `tipo`. */
+  fijo?: boolean;
+  /** El admin la separó (aprobó) o es corrección: nunca se une a otra como doble marca. */
+  separada?: boolean;
   /** minutos desde el inicio de la jornada (ver jornadaDe) */
   minutos: number;
   estado: 'VALIDA' | 'A_REVISAR';
@@ -114,74 +123,70 @@ export interface ResultadoJornada {
  * Cumplimiento de una jornada de una persona. `turno` null = no le toca trabajar (descanso o cubierto).
  * `tolerancia` en minutos: por debajo de ella no hay tardanza ni salida anticipada ni extra.
  */
-export function calcularJornada(entrada: {
+export function calcularJornada(entrada: Parameters<typeof evaluarJornada>[0]): ResultadoJornada {
+  return evaluarJornada(entrada).resultado;
+}
+
+/** Igual que calcularJornada pero devuelve también la interpretación de las marcas (para cronograma y planilla). */
+export function evaluarJornada(entrada: {
   jornada: string;
   turno: Turno | null;
   marcas: MarcaCalc[];
   ahora: Date;
   tolerancia: number;
   motivoDescanso?: string;
-}): ResultadoJornada {
+  /** Minutos para unir dobles marcas (defecto 3; 0 = no unir). */
+  dobleMarcaMin?: number;
+}): { resultado: ResultadoJornada; interp: Interpretacion } {
   const { jornada, turno, ahora, tolerancia } = entrada;
-  const marcas = [...entrada.marcas].sort((a, b) => a.minutos - b.minutos);
   const base = { programadaMin: 0, trabajadaMin: 0, almuerzoMin: 0, tardanzaMin: 0, salioAntesMin: 0, extraMin: 0 };
   const cerrada = ahora.getTime() >= cierreJornada(jornada).getTime();
+  const interp = interpretarMarcas(entrada.marcas, turno, cerrada, entrada.dobleMarcaMin ?? DOBLE_MARCA_MIN_DEFECTO);
   const alertas: string[] = [];
+  const fin = (r: Omit<ResultadoJornada, 'alertas'> & { alertas?: string[] }) => ({ resultado: { alertas, ...r } as ResultadoJornada, interp });
 
   if (!turno) {
-    if (marcas.length === 0) {
-      return { ...base, estado: 'DESCANSO', alertas: entrada.motivoDescanso ? [entrada.motivoDescanso] : [] };
+    if (entrada.marcas.length === 0) {
+      return fin({ ...base, estado: 'DESCANSO', alertas: entrada.motivoDescanso ? [entrada.motivoDescanso] : [] });
     }
-    return { ...base, estado: 'A_REVISAR', alertas: ['Marcó en un día sin horario'] };
+    return fin({ ...base, estado: 'A_REVISAR', alertas: ['Marcó en un día sin horario'] });
   }
 
   base.programadaMin = minutosProgramados(turno);
-  const primero = (t: TipoMarca) => marcas.find((m) => m.tipo === t);
-  const ultimo = (t: TipoMarca) => [...marcas].reverse().find((m) => m.tipo === t);
-  const entradaM = primero('ENTRADA');
-  const salidaM = ultimo('SALIDA');
-  const salAlm = primero('SALIDA_ALMUERZO');
-  const regAlm = primero('ENTRADA_ALMUERZO');
+  const entradaM = interp.entrada;
+  const salidaM = interp.salida;
+  base.almuerzoMin = interp.breakMin;
 
-  // Almuerzo: el real si se marcó completo; si no hubo marcas de almuerzo, el programado.
-  let almuerzoDescuento = 0;
-  if (salAlm && regAlm) almuerzoDescuento = Math.max(0, regAlm.minutos - salAlm.minutos);
-  else if (!salAlm && !regAlm && turno.almuerzoIni !== undefined && turno.almuerzoFin !== undefined) {
-    almuerzoDescuento = turno.almuerzoFin - turno.almuerzoIni;
-  }
-  base.almuerzoMin = almuerzoDescuento;
+  const contadas = interp.marcas.filter((m) => m.duplicadaDe === null);
+  if (contadas.some((m) => m.estado === 'A_REVISAR')) alertas.push('Marca pendiente de revisión por el administrador');
 
-  if (marcas.some((m) => m.estado === 'A_REVISAR')) {
-    alertas.push('Marca pendiente de revisión por el administrador');
-  }
-
-  const completo = Boolean(entradaM && salidaM) && Boolean(salAlm) === Boolean(regAlm);
   if (entradaM) base.tardanzaMin = Math.max(0, entradaM.minutos - turno.entrada);
   if (salidaM) {
     base.salioAntesMin = Math.max(0, turno.salida - salidaM.minutos);
     base.extraMin = Math.max(0, salidaM.minutos - turno.salida);
-    base.trabajadaMin = Math.max(0, salidaM.minutos - (entradaM?.minutos ?? salidaM.minutos) - almuerzoDescuento);
+    base.trabajadaMin = Math.max(0, salidaM.minutos - (entradaM?.minutos ?? salidaM.minutos) - interp.breakMin);
   }
 
   const tarde = base.tardanzaMin > tolerancia;
   const antes = base.salioAntesMin > tolerancia && Boolean(salidaM);
   const despues = base.extraMin > tolerancia;
 
-  if (marcas.length === 0) {
-    if (cerrada) return { ...base, estado: 'FALTA', alertas };
-    return { ...base, estado: 'SIN_EVALUAR', alertas };
+  if (entrada.marcas.length === 0) return fin({ ...base, estado: cerrada ? 'FALTA' : 'SIN_EVALUAR' });
+  if (contadas.some((m) => m.estado === 'A_REVISAR')) return fin({ ...base, estado: 'A_REVISAR' });
+  if (interp.estado === 'A_REVISAR') {
+    alertas.push(...interp.alertas);
+    return fin({ ...base, estado: 'A_REVISAR' });
   }
-  if (marcas.some((m) => m.estado === 'A_REVISAR')) return { ...base, estado: 'A_REVISAR', alertas };
-  if (!completo) {
-    if (!cerrada) return { ...base, estado: 'SIN_EVALUAR', alertas };
+  if (interp.estado !== 'OK') {
+    if (!cerrada) return fin({ ...base, estado: 'SIN_EVALUAR' });
     alertas.push('Faltan marcas del día');
-    return { ...base, estado: 'INCOMPLETO', alertas };
+    return fin({ ...base, estado: 'INCOMPLETO' });
   }
   let estado: EstadoJornada = 'CUMPLIO';
   if (tarde) estado = 'TARDANZA';
   else if (antes) estado = 'SALIO_ANTES';
   else if (despues) estado = 'SALIO_DESPUES';
-  return { ...base, estado, alertas };
+  return fin({ ...base, estado });
 }
 
 /**

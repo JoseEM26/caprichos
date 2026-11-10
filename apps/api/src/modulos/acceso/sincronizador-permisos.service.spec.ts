@@ -20,6 +20,7 @@ describe('SincronizadorPermisosService', () => {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      rolPermisoAjuste: { findMany: jest.fn().mockResolvedValue([]) },
       rolPermiso: {
         findMany: jest.fn().mockResolvedValue(vinculos),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
