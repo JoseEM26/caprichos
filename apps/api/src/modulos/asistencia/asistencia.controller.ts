@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { CrearSolicitudDto, MarcarDto, MarcarManualDto, MiHistorialDto } from './dto/asistencia.dto';
+import { CrearSolicitudDto, MarcarDto, MarcarManualDto, MiHistorialDto, MiCalendarioDto } from './dto/asistencia.dto';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
+import { AsistenciaCalendarioService } from './asistencia-calendario.service';
 import { PlanillaService } from './planilla.service';
 import { VacacionesService } from './vacaciones.service';
 
@@ -21,12 +22,20 @@ export class AsistenciaController {
     private readonly planilla: PlanillaService,
     private readonly vacaciones: VacacionesService,
     private readonly correcciones: AsistenciaCorreccionesService,
+    private readonly calendario: AsistenciaCalendarioService,
   ) {}
 
   @Get('mi/hoy')
   @Permiso('asistencia', 'marcar')
   miHoy(@Req() req: any) {
     return this.asistencia.miHoy(req.usuario.partyId);
+  }
+
+  /** Mi calendario (por defecto el mes actual, máx. 62 días): siempre la cuenta del token, nunca otro partyId. */
+  @Get('mi/calendario')
+  @Permiso('asistencia', 'marcar')
+  miCalendario(@Req() req: any, @Query() q: MiCalendarioDto) {
+    return this.calendario.miCalendario(req.usuario.partyId, q.desde, q.hasta);
   }
 
   @Get('mi/historial')
@@ -93,5 +102,24 @@ export class AsistenciaController {
   @Permiso('asistencia', 'marcar')
   marcarManual(@Body() dto: MarcarManualDto, @Req() req: any) {
     return this.asistencia.marcar(dto as MarcarDto, req.usuario, ipDe(req), new Date(), true);
+  }
+}
+
+/** Ruta alterna `admin/mi-asistencia/*` (mismos permisos y datos que `admin/asistencia/mi/*`). */
+@Controller('admin/mi-asistencia')
+@UseGuards(AccesoGuard)
+export class MiAsistenciaController {
+  constructor(private readonly asistencia: AsistenciaService, private readonly calendario: AsistenciaCalendarioService) {}
+
+  @Get('hoy')
+  @Permiso('asistencia', 'marcar')
+  hoy(@Req() req: any) {
+    return this.asistencia.miHoy(req.usuario.partyId);
+  }
+
+  @Get('calendario')
+  @Permiso('asistencia', 'marcar')
+  calendarioPropio(@Req() req: any, @Query() q: MiCalendarioDto) {
+    return this.calendario.miCalendario(req.usuario.partyId, q.desde, q.hasta);
   }
 }

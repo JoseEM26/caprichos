@@ -107,7 +107,6 @@ function servicio(opts?: Parameters<typeof bdFalsa>[0]) {
 
 function dto(over: Partial<MarcarDto> = {}): MarcarDto {
   return {
-    tipo: 'ENTRADA',
     qr: payloadQr(SECRETO, SLOT),
     lat: LOCAL.lat + 0.00005,
     lng: LOCAL.lng,
@@ -199,11 +198,49 @@ describe('AsistenciaService.marcar', () => {
     expect(r.marca.alertas.join(' ')).toMatch(/simulada/);
   });
 
-  it('marcas múltiples: el tipo que mande el cliente se ignora; la primera siempre es la entrada', async () => {
+  it('sin tipo: la primera marca se interpreta como entrada y tipo_marca queda NULL', async () => {
     const { svc, b } = servicio();
-    const r = await svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA);
+    const r = await svc.marcar(dto(), LUIS, undefined, AHORA);
     expect(r.marca.tipo).toBe('ENTRADA');
     expect(b.marcas[0].tipo).toBe('ENTRADA');
+    expect(b.marcas[0].tipo_marca).toBeNull();
+  });
+
+  it('con tipo: se guarda lo que declaró (ALMUERZO_SALIDA) y manda sobre el orden', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto({ tipo: 'ENTRADA' }), LUIS, undefined, AHORA);
+    const luego = new Date(AHORA.getTime() + 4 * 3_600_000);
+    const r = await svc.marcar(dto({ tipo: 'ALMUERZO_SALIDA', qr: payloadQr(SECRETO, slotDe(luego.getTime())) }), LUIS, undefined, luego);
+    expect(b.marcas[1].tipo_marca).toBe('ALMUERZO_SALIDA');
+    expect(r.marca.tipo).toBe('SALIDA_ALMUERZO');
+    expect(r.marca.estado).toBe('VALIDA');
+  });
+
+  it('acepta los nombres antiguos de tipo y los convierte', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto({ tipo: 'ENTRADA' as any }), LUIS, undefined, AHORA);
+    const luego = new Date(AHORA.getTime() + 4 * 3_600_000);
+    await svc.marcar(dto({ tipo: 'SALIDA_ALMUERZO' as any, qr: payloadQr(SECRETO, slotDe(luego.getTime())) }), LUIS, undefined, luego);
+    expect(b.marcas[1].tipo_marca).toBe('ALMUERZO_SALIDA');
+  });
+
+  it('regreso de almuerzo sin salida a almorzar: se permite pero queda A_REVISAR con motivo', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto({ tipo: 'ENTRADA' }), LUIS, undefined, AHORA);
+    const luego = new Date(AHORA.getTime() + 4 * 3_600_000);
+    const r = await svc.marcar(dto({ tipo: 'ALMUERZO_VUELTA', qr: payloadQr(SECRETO, slotDe(luego.getTime())) }), LUIS, undefined, luego);
+    expect(r.marca.estado).toBe('A_REVISAR');
+    expect(b.marcas[1].motivos_revision).toMatch(/regreso del almuerzo sin haber marcado la salida/);
+  });
+
+  it('miHoy sugiere la siguiente marca y calcula el almuerzo marcado', async () => {
+    const { svc } = servicio();
+    expect((await svc.miHoy(7n, AHORA)).siguienteSugerido).toBe('ENTRADA');
+    await svc.marcar(dto({ tipo: 'ENTRADA' }), LUIS, undefined, AHORA);
+    const hoy = await svc.miHoy(LUIS.partyId, new Date(AHORA.getTime() + 60_000 * 5));
+    expect(hoy.siguienteSugerido).toBe('ALMUERZO_SALIDA');
+    expect(hoy.almuerzoMin).toBeNull();
+    expect(hoy.marcas[0]).toMatchObject({ tipo: 'ENTRADA', hora: '08:00' });
   });
 
   it('marcas múltiples: se puede marcar varias veces; la 2.ª cuenta como salida y una a <3 min se une a la anterior', async () => {
@@ -286,7 +323,7 @@ describe('AsistenciaService: correcciones y reportes', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('horasTrabajadasDelMes suma horas netas (descuenta el almuerzo) por persona', async () => {
+  it('horasTrabajadasDelMes suma horas del turno completo (el almuerzo se paga)', async () => {
     const { svc, b } = servicio();
     // Horario de lunes a viernes 09:00-18:00 con almuerzo 13:00-14:00 (una sola fila para el día 6, viernes)
     b.bd.horarioTrabajo.findMany = async () => [{
@@ -301,10 +338,10 @@ describe('AsistenciaService: correcciones y reportes', () => {
     const res = await svc.horasTrabajadasDelMes(2026, 11, new Date('2026-11-30T12:00:00Z'));
     const luis = res.find((r) => r.partyId === 7)!;
     expect(luis.nombre).toBe('Luis Pérez');
-    // 09:00-18:00 = 9 h menos 1 h de almuerzo programado = 8 h
+    // 09:00-18:00 = 9 h; el almuerzo se paga, no se descuenta
     // Solo el 6 tiene marcas; los otros viernes de noviembre (13, 20, 27) son FALTA y cuentan como programados
-    expect(luis.horasTrabajadas).toBe(8);
-    expect(luis.horasProgramadas).toBe(32);
+    expect(luis.horasTrabajadas).toBe(9);
+    expect(luis.horasProgramadas).toBe(36);
     expect(luis.diasTrabajados).toBe(1);
   });
 });

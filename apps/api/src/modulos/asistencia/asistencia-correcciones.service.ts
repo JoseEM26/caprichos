@@ -72,24 +72,14 @@ export class AsistenciaCorreccionesService {
     if (q.partyId) for (const p of [...ids]) if (p !== BigInt(q.partyId)) ids.delete(p);
     const lista = [...ids];
 
-    const [cuentas, nombres, solicitudes] = await Promise.all([
-      this.prisma.userAccount.findMany({ where: { party_id: { in: lista } }, select: { id: true, party_id: true, rol: true } }),
+    const [rolesDe, nombres, solicitudes] = await Promise.all([
+      this.rolesPorPersona(lista),
       this.asistencia.cuentas(lista),
       this.prisma.asistenciaSolicitud.findMany({
         where: { estado: 'PENDIENTE', jornada: { gte: fechaDb(q.desde), lte: fechaDb(q.hasta) } },
         orderBy: { creada_en: 'asc' },
       }),
     ]);
-    const extras = cuentas.length
-      ? await this.prisma.userAccountRol.findMany({
-          where: { user_account_id: { in: cuentas.map((c) => c.id) }, OR: vigenciaRolExtra() },
-          select: { user_account_id: true, rol: true },
-        })
-      : [];
-    const rolesDe = new Map<bigint, string[]>();
-    for (const c of cuentas) {
-      rolesDe.set(c.party_id, [c.rol, ...extras.filter((e) => e.user_account_id === c.id && e.rol !== c.rol).map((e) => e.rol)]);
-    }
     const filaPorId = new Map(ctx.filas.map((f: any) => [Number(f.id), f]));
     const solDe = new Map<string, typeof solicitudes>();
     for (const s of solicitudes) {
@@ -160,6 +150,22 @@ export class AsistenciaCorreccionesService {
     }
     personas.sort((a, b) => a.nombre.localeCompare(b.nombre));
     return { desde: q.desde, hasta: q.hasta, dias, resumen, personas };
+  }
+
+  /** Roles (principal y extras vigentes) de cada persona. Lo usan el cronograma y el calendario. */
+  async rolesPorPersona(lista: bigint[]): Promise<Map<bigint, string[]>> {
+    const cuentas = await this.prisma.userAccount.findMany({ where: { party_id: { in: lista } }, select: { id: true, party_id: true, rol: true } });
+    const extras = cuentas.length
+      ? await this.prisma.userAccountRol.findMany({
+          where: { user_account_id: { in: cuentas.map((c) => c.id) }, OR: vigenciaRolExtra() },
+          select: { user_account_id: true, rol: true },
+        })
+      : [];
+    const rolesDe = new Map<bigint, string[]>();
+    for (const c of cuentas) {
+      rolesDe.set(c.party_id, [c.rol, ...extras.filter((e) => e.user_account_id === c.id && e.rol !== c.rol).map((e) => e.rol)]);
+    }
+    return rolesDe;
   }
 
   // ---------------------------------------------------------------------------

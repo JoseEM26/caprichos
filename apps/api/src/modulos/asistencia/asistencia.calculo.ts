@@ -80,9 +80,15 @@ export function turnoDe(entrada: number, salida: number, almIni?: number | null,
   return t;
 }
 
+/** Minutos del turno SIN el almuerzo (lo usa planilla.calculo, que se ajusta aparte). Para asistencia: `minutosPagados`. */
 export function minutosProgramados(t: Turno): number {
   const almuerzo = t.almuerzoIni !== undefined && t.almuerzoFin !== undefined ? t.almuerzoFin - t.almuerzoIni : 0;
   return t.salida - t.entrada - almuerzo;
+}
+
+/** Minutos programados que se pagan: el almuerzo cuenta (decisión del dueño 10/11/2026); su horario es solo informativo. */
+export function minutosPagados(t: Turno): number {
+  return t.salida - t.entrada;
 }
 
 /** Distancia en metros entre dos coordenadas (Haversine). */
@@ -101,6 +107,8 @@ export interface MarcaCalc {
   id?: number;
   /** Corrección del admin: conserva su `tipo`. */
   fijo?: boolean;
+  /** Tipo que declaró la persona al marcar (null/ausente en marcas antiguas): manda sobre el orden y los pares. */
+  declarado?: 'ENTRADA' | 'SALIDA' | 'ALMUERZO_SALIDA' | 'ALMUERZO_VUELTA' | null;
   /** El admin la separó (aprobó) o es corrección: nunca se une a otra como doble marca. */
   separada?: boolean;
   /** minutos desde el inicio de la jornada (ver jornadaDe) */
@@ -152,7 +160,7 @@ export function evaluarJornada(entrada: {
     return fin({ ...base, estado: 'A_REVISAR', alertas: ['Marcó en un día sin horario'] });
   }
 
-  base.programadaMin = minutosProgramados(turno);
+  base.programadaMin = minutosPagados(turno);
   const entradaM = interp.entrada;
   const salidaM = interp.salida;
   base.almuerzoMin = interp.breakMin;
@@ -164,7 +172,8 @@ export function evaluarJornada(entrada: {
   if (salidaM) {
     base.salioAntesMin = Math.max(0, turno.salida - salidaM.minutos);
     base.extraMin = Math.max(0, salidaM.minutos - turno.salida);
-    base.trabajadaMin = Math.max(0, salidaM.minutos - (entradaM?.minutos ?? salidaM.minutos) - interp.breakMin);
+    // Decisión del dueño (10/11/2026): el almuerzo se paga, NO se descuenta. `almuerzoMin` es solo informativo.
+    base.trabajadaMin = Math.max(0, salidaM.minutos - (entradaM?.minutos ?? salidaM.minutos));
   }
 
   const tarde = base.tardanzaMin > tolerancia;

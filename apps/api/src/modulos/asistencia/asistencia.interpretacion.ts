@@ -4,7 +4,28 @@
 // Marcas a menos de `dobleMin` minutos de la anterior se unen (cuenta la primera; la otra queda tachada).
 // Una marca «fija» (corrección del admin) conserva el rol que el admin le dio. Sin acceso a BD.
 
+import type { TipoMarca as TipoMarcaQr } from '@caprichos/compartido';
 import type { MarcaCalc, TipoMarca, Turno } from './asistencia.calculo';
+
+const DECLARADO_A_ROL: Record<TipoMarcaQr, TipoMarca> = {
+  ENTRADA: 'ENTRADA', SALIDA: 'SALIDA', ALMUERZO_SALIDA: 'SALIDA_ALMUERZO', ALMUERZO_VUELTA: 'ENTRADA_ALMUERZO',
+};
+/** Rol que la marca trae ya decidido: corrección del admin (`fijo`) o tipo declarado por la persona; null = se interpreta por orden y pares. */
+const rolFijo = (m: MarcaCalc): TipoMarca | null => (m.fijo ? m.tipo : m.declarado ? DECLARADO_A_ROL[m.declarado] : null);
+
+/** Siguiente marca sugerida según los roles ya marcados hoy (sin dobles marcas). null = jornada cerrada con salida. */
+export function siguienteSugerido(roles: TipoMarca[]): TipoMarcaQr | null {
+  if (!roles.includes('ENTRADA')) return 'ENTRADA';
+  if (roles.includes('SALIDA')) return null;
+  const sale = roles.filter((r) => r === 'SALIDA_ALMUERZO').length;
+  const vuelve = roles.filter((r) => r === 'ENTRADA_ALMUERZO').length;
+  if (sale > vuelve) return 'ALMUERZO_VUELTA';
+  return sale > 0 ? 'SALIDA' : 'ALMUERZO_SALIDA';
+}
+
+/** Duración real del almuerzo marcado (suma de pares); null si no marcó almuerzo. */
+export const almuerzoMarcadoMin = (i: Interpretacion): number | null =>
+  i.breaks.length ? i.breaks.reduce((a, b) => a + Math.max(0, b.regresa - b.sale), 0) : null;
 
 export const DOBLE_MARCA_MIN_DEFECTO = 3;
 
@@ -68,11 +89,11 @@ export function interpretarMarcas(
   if (n === 0) return res;
 
   // 2) entrada y salida
-  let eK = v.findIndex((m) => m.fijo && m.tipo === 'ENTRADA');
-  if (eK < 0 && !v[0].fijo) eK = 0;
+  let eK = v.findIndex((m) => rolFijo(m) === 'ENTRADA');
+  if (eK < 0 && rolFijo(v[0]) === null) eK = 0;
   let sK = -1;
-  for (let k = n - 1; k >= 0; k--) if (v[k].fijo && v[k].tipo === 'SALIDA') { sK = k; break; }
-  if (sK < 0 && n >= 2 && !v[n - 1].fijo && n - 1 !== eK) {
+  for (let k = n - 1; k >= 0; k--) if (rolFijo(v[k]) === 'SALIDA') { sK = k; break; }
+  if (sK < 0 && n >= 2 && rolFijo(v[n - 1]) === null && n - 1 !== eK) {
     const clara = cerrada || !turno || v[n - 1].minutos >= turno.salida - 60;
     if (clara) sK = n - 1;
   }
@@ -95,7 +116,7 @@ export function interpretarMarcas(
   let sinSalidaBreak = false;
   for (let k = ini; k < fin; k++) {
     const m = v[k];
-    m.rol = m.fijo && m.tipo ? m.tipo : esperado === 'OUT' ? 'SALIDA_ALMUERZO' : 'ENTRADA_ALMUERZO';
+    m.rol = rolFijo(m) ?? (esperado === 'OUT' ? 'SALIDA_ALMUERZO' : 'ENTRADA_ALMUERZO');
     if (m.rol === 'SALIDA_ALMUERZO') {
       if (pendiente) sinRegreso = true;
       pendiente = m;

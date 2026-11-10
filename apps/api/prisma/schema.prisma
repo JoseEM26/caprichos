@@ -2824,7 +2824,8 @@ model AsistenciaMarca {
   id               BigInt    @id @default(autoincrement())
   party_id         BigInt
   jornada          DateTime  @db.Date // día laboral (Lima; antes de las 04:00 cuenta como el día anterior)
-  tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA
+  tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA (rol interpretado al marcar)
+  tipo_marca       String?   @db.VarChar(16) // lo que declaró la persona: ENTRADA | SALIDA | ALMUERZO_SALIDA | ALMUERZO_VUELTA (NULL en marcas antiguas)
   origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION | WEB (usuario y contraseña, sin GPS ni selfie) | MANUAL (solo GPS, sin QR ni selfie; A_REVISAR)
   momento          DateTime  @db.Timestamptz // hora del servidor
   estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR | APROBADA (la revisó el admin) | ANULADA (no cuenta; con motivo)

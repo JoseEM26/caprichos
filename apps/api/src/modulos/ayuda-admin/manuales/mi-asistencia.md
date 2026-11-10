@@ -53,6 +53,7 @@ Si no puedes escanear el QR (computadora sin camara o sin celular), inicia sesio
 En Mi asistencia o en la pantalla de ingreso toca Instalar app. En Chrome o Edge (PC y Android) se instala con un clic; en iPhone, Compartir y Anadir a pantalla de inicio. La app Caprichos Asistencia se abre directo en Mi asistencia y, si no tienes sesion, vuelve aqui despues de iniciarla.
 
 ## Como se hace: Marcar el almuerzo
+Marcar el almuerzo es opcional: el almuerzo se paga igual y no se descuenta de tus horas; solo queda registrado cuanto duro. El sistema te sugiere la siguiente marca (Entrada, Salida a almuerzo, Regreso de almuerzo, Salida) y puedes aceptarla o elegir otra.
 1. Cuando sales a almorzar, entra a Mi asistencia: el sistema te pide "Salida a almuerzo" si tu turno tiene almuerzo y ya marcaste entrada.
 2. Haz el mismo recorrido (QR, Ubicacion, Selfie, Confirmar marca).
 3. Al volver, repite y marca "Regreso de almuerzo". Si el boton grande dice Marcar en vez de Escanear QR, debajo aparecen botones con las otras marcas permitidas: elige la que corresponde.

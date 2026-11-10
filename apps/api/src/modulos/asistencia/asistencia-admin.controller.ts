@@ -4,8 +4,9 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
   AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto,
-  ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto,
+  ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto, CalendarioDto, CalendarioFilasDto,
 } from './dto/asistencia.dto';
+import { AsistenciaCalendarioService } from './asistencia-calendario.service';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
 
@@ -21,6 +22,7 @@ export class AsistenciaAdminController {
   constructor(
     private readonly asistencia: AsistenciaService,
     private readonly correcciones: AsistenciaCorreccionesService,
+    private readonly calendario: AsistenciaCalendarioService,
   ) {}
 
   @Get('pantalla/qr')
@@ -119,6 +121,20 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   cronograma(@Query() q: CronogramaDto) {
     return this.correcciones.cronograma(q);
+  }
+
+  /** Resumen por día (máx. 62 días) para pintar el calendario. */
+  @Get('calendario')
+  @Permiso('asistencia', 'administrar')
+  calendarioResumen(@Query() q: CalendarioDto) {
+    return this.calendario.resumen(q.desde, q.hasta);
+  }
+
+  /** Filas por persona y día del rango (1 a 62 días), con filtros, paginación y totales. */
+  @Get('calendario/filas')
+  @Permiso('asistencia', 'administrar')
+  calendarioFilas(@Query() q: CalendarioFilasDto) {
+    return this.calendario.filas(q);
   }
 
   /** Bandeja «Solicitudes de corrección»: pendientes y jornadas con inconsistencia sin solicitud. */

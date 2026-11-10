@@ -31,7 +31,8 @@ import {
   resolverTurno,
   sumarDias,
 } from './asistencia.calculo';
-import { rolEfectivo } from './asistencia.interpretacion';
+import type { TipoMarca as TipoMarcaQr } from '@caprichos/compartido';
+import { almuerzoMarcadoMin, rolEfectivo, siguienteSugerido } from './asistencia.interpretacion';
 import {
   CLAVE_CONFIG_ASISTENCIA,
   ConfigAsistencia,
@@ -315,8 +316,12 @@ export class AsistenciaService {
 
     const { jornada } = jornadaDe(ahora);
     // Marcas múltiples: no se rechaza por «ya marcaste»; el servidor interpreta cada marca por orden y pares.
-    const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg);
+    const declarado = declaradoDe(dto.tipo);
+    const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg, declarado);
     const tipo = lectura.rol;
+    // Coherencia (no bloquea a nadie): p. ej. regreso de almuerzo sin salida a almorzar queda A_REVISAR con motivo
+    const incoherencia = declarado === 'ALMUERZO_VUELTA' && lectura.interp.alertas.some((a) => a.includes('sin salida a break'))
+      ? ['Marcó el regreso del almuerzo sin haber marcado la salida a almorzar'] : [];
 
     // Ubicación aproximada (celulares sin GPS preciso): ya no se rechaza; se acepta si el punto, con su margen de
     // error, puede estar dentro del radio, y la marca queda A_REVISAR. Más allá de PRECISION_TOPE_M sí se rechaza.
@@ -343,6 +348,7 @@ export class AsistenciaService {
       previas.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
     );
     const avisos = [
+      ...incoherencia,
       ...(imprecisa ? [`Ubicación aproximada (±${Math.round(dto.precision)} m)`] : []),
       ...(sinFoto ? ['Sin selfie: la cámara del celular no abrió'] : []),
     ];
@@ -356,6 +362,7 @@ export class AsistenciaService {
             party_id: partyId,
             jornada: fechaDb(jornada),
             tipo,
+            tipo_marca: declarado,
             origen: manual ? 'MANUAL' : 'CELULAR',
             momento: ahora,
             estado,
@@ -475,17 +482,21 @@ export class AsistenciaService {
       turno: dia.turnoTexto,
       estado: dia.resultado.estado,
       resumen: dia.resultado,
-      // Cada marca con lo que el servidor interpretó (entrada, salida a break, regreso, salida) o «unida» si es doble marca
+      // `tipo` = lo que declaró la persona (null en marcas antiguas); `rol` = lo que interpretó el servidor (vocabulario anterior)
       marcas: marcas.map((m) => {
         const c = dia.interp.marcas.find((x) => x.id === Number(m.id));
         return {
           id: Number(m.id),
-          tipo: c ? rolEfectivo(dia.interp, c) : (m.tipo as TipoMarca),
+          tipo: (m.tipo_marca as TipoMarcaQr | null) ?? null,
+          hora: aHoraTexto(jornadaDe(m.momento).minutos),
+          rol: c ? rolEfectivo(dia.interp, c) : (m.tipo as TipoMarca),
           momento: m.momento.toISOString(),
           estado: m.estado,
           duplicada: Boolean(c && c.duplicadaDe !== null),
         };
       }),
+      siguienteSugerido: siguienteSugerido(dia.interp.marcas.filter((x) => x.duplicadaDe === null && x.rol).map((x) => x.rol!)),
+      almuerzoMin: almuerzoMarcadoMin(dia.interp),
       interpretacion: { estado: dia.interp.estado, alertas: dia.interp.alertas, tramos: dia.interp.tramos },
       dobleMarcaMin: cfg.dobleMarcaMin,
       consentimientoAceptado: false,
@@ -688,9 +699,9 @@ export class AsistenciaService {
    * Cómo quedaría la jornada con una marca nueva en `momento`: el rol que le toca (por orden y pares) y si es doble marca.
    * No guarda nada.
    */
-  private async leerNuevaMarca(partyId: bigint, jornada: string, momento: Date, cfg: ConfigAsistencia) {
+  private async leerNuevaMarca(partyId: bigint, jornada: string, momento: Date, cfg: ConfigAsistencia, declarado: TipoMarcaQr | null = null) {
     const ctx = await this.cargarContexto(jornada, jornada, [partyId]);
-    const nueva: MarcaCalc = { id: -1, tipo: 'ENTRADA', minutos: jornadaDe(momento).minutos, estado: 'VALIDA' };
+    const nueva: MarcaCalc = { id: -1, tipo: 'ENTRADA', declarado, minutos: jornadaDe(momento).minutos, estado: 'VALIDA' };
     const { turno, motivoDescanso } = resolverTurno(partyId, jornada, ctx);
     const previas = ctx.marcas.get(`${partyId}|${jornada}`) ?? [];
     const { interp } = evaluarJornada({
@@ -740,6 +751,7 @@ export class AsistenciaService {
       lista.push({
         id: Number(m.id),
         tipo: m.tipo as TipoMarca,
+        declarado: (m.tipo_marca as TipoMarcaQr | null) ?? null,
         minutos: jornadaDe(m.momento).minutos,
         estado: m.estado === 'A_REVISAR' ? 'A_REVISAR' : 'VALIDA',
         fijo: m.origen === 'CORRECCION',
@@ -881,6 +893,11 @@ export class AsistenciaService {
     } as any);
   }
 }
+
+const ANTIGUO_A_NUEVO: Record<string, TipoMarcaQr> = { ENTRADA: 'ENTRADA', SALIDA: 'SALIDA', SALIDA_ALMUERZO: 'ALMUERZO_SALIDA', ENTRADA_ALMUERZO: 'ALMUERZO_VUELTA' };
+const NUEVOS = new Set(['ENTRADA', 'SALIDA', 'ALMUERZO_SALIDA', 'ALMUERZO_VUELTA']);
+/** Tipo declarado al marcar (acepta también los nombres antiguos); null si no vino. */
+const declaradoDe = (t?: string): TipoMarcaQr | null => (!t ? null : NUEVOS.has(t) ? (t as TipoMarcaQr) : (ANTIGUO_A_NUEVO[t] ?? null));
 
 const etiquetaTipo = (t: TipoMarca): string =>
   ({ ENTRADA: 'tu entrada', SALIDA_ALMUERZO: 'tu salida a break', ENTRADA_ALMUERZO: 'tu regreso del break', SALIDA: 'tu salida' })[t];

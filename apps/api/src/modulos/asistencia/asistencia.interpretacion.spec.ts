@@ -1,5 +1,5 @@
 import { MarcaCalc, calcularJornada, evaluarJornada, turnoDe } from './asistencia.calculo';
-import { detectarInconsistencia, interpretarMarcas, rolEfectivo } from './asistencia.interpretacion';
+import { almuerzoMarcadoMin, detectarInconsistencia, interpretarMarcas, rolEfectivo, siguienteSugerido } from './asistencia.interpretacion';
 import { calcularDiaPlanilla } from './planilla.calculo';
 
 const m = (h: number, min = 0) => h * 60 + min;
@@ -95,11 +95,11 @@ describe('interpretarMarcas: orden y pares', () => {
 
 describe('una sola fuente de verdad: jornada y planilla usan la misma interpretación', () => {
   const ahora = new Date('2026-11-07T10:00:00Z'); // la jornada del 6 ya cerró
-  it('jornada normal de 4 marcas: mismas cifras que antes (trabajada = salida - entrada - break real)', () => {
+  it('jornada normal de 4 marcas: mismas cifras que antes (trabajada = salida - entrada; el break se paga)', () => {
     const marcas = g(m(9), m(13), m(13, 40), m(18));
     const { resultado, interp } = evaluarJornada({ jornada: '2026-11-06', turno, marcas, ahora, tolerancia: 10 });
     expect(resultado.estado).toBe('CUMPLIO');
-    expect(resultado.trabajadaMin).toBe(m(9) - 40);
+    expect(resultado.trabajadaMin).toBe(m(9));
     const dia = calcularDiaPlanilla(
       { jornada: '2026-11-06', estado: resultado.estado, turno, marcas: interp.marcas.filter((x) => x.rol).map((x) => ({ ...x, tipo: x.rol! })), breakMin: interp.breakMin },
       10,
@@ -146,4 +146,44 @@ describe('detectarInconsistencia', () => {
     marcas[0].estado = 'A_REVISAR';
     expect(evaluar(marcas)).toBeNull();
   });
+});
+
+describe('marcas con tipo declarado', () => {
+  const ahora = new Date('2026-11-07T10:00:00Z');
+  const t = (id: number, declarado: MarcaCalc['declarado'], minutos: number): MarcaCalc => ({ id, tipo: 'ENTRADA', declarado, minutos, estado: 'VALIDA' });
+  it('usa los tipos: entrada = primera ENTRADA, salida = última SALIDA, almuerzo = par con su duración', () => {
+    const i = interpretarMarcas([t(1, 'ENTRADA', m(9)), t(2, 'ALMUERZO_SALIDA', m(13)), t(3, 'ALMUERZO_VUELTA', m(13, 45)), t(4, 'SALIDA', m(18))], turno, true);
+    expect(i.estado).toBe('OK');
+    expect(i.entrada?.minutos).toBe(m(9));
+    expect(i.salida?.minutos).toBe(m(18));
+    expect(almuerzoMarcadoMin(i)).toBe(45);
+  });
+  it('sin almuerzo marcado: almuerzoMarcadoMin es null', () => {
+    const i = interpretarMarcas([t(1, 'ENTRADA', m(9)), t(2, 'SALIDA', m(18))], turno, true);
+    expect(almuerzoMarcadoMin(i)).toBeNull();
+    expect(i.estado).toBe('OK');
+  });
+  it('ALMUERZO_VUELTA sin salida a almorzar queda A_REVISAR', () => {
+    const i = interpretarMarcas([t(1, 'ENTRADA', m(9)), t(2, 'ALMUERZO_VUELTA', m(14)), t(3, 'SALIDA', m(18))], turno, true);
+    expect(i.estado).toBe('A_REVISAR');
+    expect(i.alertas.join(' ')).toMatch(/sin salida a break/);
+  });
+  it('mezcla: marcas viejas sin tipo siguen por pares', () => {
+    const i = interpretarMarcas([{ id: 1, tipo: 'ENTRADA', minutos: m(9), estado: 'VALIDA' }, t(2, 'ALMUERZO_SALIDA', m(13)), { id: 3, tipo: 'ENTRADA', minutos: m(14), estado: 'VALIDA' }, t(4, 'SALIDA', m(18))], turno, true);
+    expect(i.estado).toBe('OK');
+    expect(almuerzoMarcadoMin(i)).toBe(60);
+  });
+  it('la doble marca <3 min sigue uniéndose aunque tenga tipo', () => {
+    const i = interpretarMarcas([t(1, 'ENTRADA', m(9)), t(2, 'ENTRADA', m(9, 1)), t(3, 'SALIDA', m(18))], turno, true);
+    expect(i.marcas[1].duplicadaDe).toBe(0);
+    expect(i.estado).toBe('OK');
+  });
+  it('siguienteSugerido sigue el flujo', () => {
+    expect(siguienteSugerido([])).toBe('ENTRADA');
+    expect(siguienteSugerido(['ENTRADA'])).toBe('ALMUERZO_SALIDA');
+    expect(siguienteSugerido(['ENTRADA', 'SALIDA_ALMUERZO'])).toBe('ALMUERZO_VUELTA');
+    expect(siguienteSugerido(['ENTRADA', 'SALIDA_ALMUERZO', 'ENTRADA_ALMUERZO'])).toBe('SALIDA');
+    expect(siguienteSugerido(['ENTRADA', 'SALIDA'])).toBeNull();
+  });
+  void ahora;
 });

@@ -100,20 +100,20 @@ describe('calcularJornada (cumplimiento)', () => {
     expect(calcularJornada({ ...base, marcas }).estado).toBe('A_REVISAR');
   });
 
-  it('descuenta el almuerzo realmente tomado', () => {
+  it('el almuerzo se paga: no se descuenta, solo queda registrado', () => {
     const t = turnoDe(m(9), m(18), m(13), m(14));
     const marcas = [marca('ENTRADA', m(9)), marca('SALIDA_ALMUERZO', m(13)), marca('ENTRADA_ALMUERZO', m(13, 40)), marca('SALIDA', m(18))];
     const r = calcularJornada({ ...base, turno: t, marcas });
     expect(r.almuerzoMin).toBe(40);
-    expect(r.trabajadaMin).toBe(m(18) - m(9) - 40);
-    expect(r.programadaMin).toBe(m(18) - m(9) - 60);
+    expect(r.trabajadaMin).toBe(m(18) - m(9));
+    expect(r.programadaMin).toBe(m(18) - m(9));
   });
 
-  it('sin marcas de almuerzo descuenta el programado', () => {
+  it('sin marcas de almuerzo tampoco se descuenta (paga el turno completo)', () => {
     const t = turnoDe(m(9), m(18), m(13), m(14));
     const r = calcularJornada({ ...base, turno: t, marcas: [marca('ENTRADA', m(9)), marca('SALIDA', m(18))] });
     expect(r.almuerzoMin).toBe(60);
-    expect(r.trabajadaMin).toBe(m(18) - m(9) - 60);
+    expect(r.trabajadaMin).toBe(m(18) - m(9));
   });
 
   // Por diseño (marcas múltiples): 3 marcas son dudosas → A_REVISAR (antes INCOMPLETO); ambos bloquean el pago.

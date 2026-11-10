@@ -16,13 +16,17 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { TIPOS_MARCA_QR, TipoMarca as TipoMarcaQr } from '@caprichos/compartido';
 import { TIPOS_MARCA, TipoMarca } from '../asistencia.calculo';
 
+/** Tipos aceptados al marcar: los nuevos y, por compatibilidad, los antiguos (se convierten a los nuevos). */
+const TIPOS_AL_MARCAR = [...TIPOS_MARCA_QR, ...TIPOS_MARCA] as string[];
+
 export class MarcarDto {
-  /** Ya no hace falta: el servidor interpreta cada marca por orden y pares. Se acepta (y se ignora) por compatibilidad. */
+  /** Opcional: ENTRADA | SALIDA | ALMUERZO_SALIDA | ALMUERZO_VUELTA. Sin tipo, el servidor interpreta por orden y pares. */
   @IsOptional()
-  @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' })
-  tipo?: TipoMarca;
+  @IsIn(TIPOS_AL_MARCAR, { message: 'Tipo de marca no válido' })
+  tipo?: TipoMarcaQr | TipoMarca;
 
   /** Texto del QR escaneado (o vacío si se usa el código corto). */
   @IsOptional()
@@ -79,9 +83,9 @@ export class MarcarDto {
 
 /** Marca manual (sin QR ni selfie): solo GPS. Queda A_REVISAR para el admin. */
 export class MarcarManualDto {
-  /** Opcional y se ignora: el servidor interpreta cada marca por orden y pares. */
-  @IsOptional() @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' })
-  tipo?: TipoMarca;
+  /** Opcional: ENTRADA | SALIDA | ALMUERZO_SALIDA | ALMUERZO_VUELTA. */
+  @IsOptional() @IsIn(TIPOS_AL_MARCAR, { message: 'Tipo de marca no válido' })
+  tipo?: TipoMarcaQr | TipoMarca;
 
   @Type(() => Number) @IsNumber() @Min(-90) @Max(90) lat!: number;
   @Type(() => Number) @IsNumber() @Min(-180) @Max(180) lng!: number;
@@ -222,4 +226,26 @@ export class AprobarSimplesDto {
   @Type(() => Number) @IsInt() @Min(1) partyId!: number;
   @Matches(FECHA) desde!: string;
   @Matches(FECHA) hasta!: string;
+}
+
+/** Calendario propio: rango opcional (por defecto el mes actual). Cualquier partyId que llegue se ignora. */
+export class MiCalendarioDto {
+  @IsOptional() @Matches(FECHA, { message: 'La fecha inicial debe ser AAAA-MM-DD' }) desde?: string;
+  @IsOptional() @Matches(FECHA, { message: 'La fecha final debe ser AAAA-MM-DD' }) hasta?: string;
+}
+
+export class CalendarioDto {
+  @Matches(FECHA, { message: 'La fecha inicial debe ser AAAA-MM-DD' }) desde!: string;
+  @Matches(FECHA, { message: 'La fecha final debe ser AAAA-MM-DD' }) hasta!: string;
+}
+
+export class CalendarioFilasDto extends CalendarioDto {
+  @IsOptional() @IsString() @MaxLength(80) q?: string;
+  /** Lista separada por comas. */
+  @IsOptional() @IsString() @MaxLength(200) estado?: string;
+  @IsOptional() @IsString() @MaxLength(200) rol?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) partyId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) pagina?: number;
+  /** Número hasta 500, o «todas» (tope 2000). */
+  @IsOptional() @IsString() @MaxLength(10) limite?: string;
 }

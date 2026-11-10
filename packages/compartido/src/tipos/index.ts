@@ -28,3 +28,4 @@ export interface ResumenPedido {
 
 export * from './etiquetas.js';
 
+export * from './asistencia.js';
