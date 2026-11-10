@@ -16,27 +16,29 @@ function useSesionSegura() {
   }
 }
 
-type Canal = 'carta' | 'bot';
+type Canal = 'carta' | 'bot' | 'mozo' | 'caja';
 
 interface ConfigPropina {
-  activa: { carta: boolean; bot: boolean };
+  activa: Record<Canal, boolean>;
   tope: number;
 }
 
 const ETIQUETA_CANAL: Record<Canal, string> = {
   carta: 'la carta virtual',
   bot: 'WhatsApp',
+  mozo: 'el mozo (Nuevo pedido)',
+  caja: 'Caja (Nuevo pedido)',
 };
 
 /**
  * Propina opcional (parámetros propina_activa y propina_tope). El interruptor es por canal: carta virtual
- * y WhatsApp. Apagada por defecto. Va aparte de la venta: no entra a comprobantes ni puntos. Solo ADMIN.
+ * y WhatsApp. Encendida por defecto. Va aparte de la venta: no entra a comprobantes ni puntos. Solo ADMIN.
  */
 export function TarjetaPropinaConfiguracion({ esAdmin: esAdminProp }: { esAdmin?: boolean } = {}) {
   const sesion = useSesionSegura();
   const esAdmin = esAdminProp !== undefined ? esAdminProp : (sesion?.usuario?.rol || '').toUpperCase() === 'ADMIN';
 
-  const [config, setConfig] = useState<ConfigPropina>({ activa: { carta: false, bot: false }, tope: 200 });
+  const [config, setConfig] = useState<ConfigPropina>({ activa: { carta: false, bot: false, mozo: false, caja: false }, tope: 200 });
   const [topeTexto, setTopeTexto] = useState<string>('200');
   const [cargando, setCargando] = useState<boolean>(true);
   const [pendiente, setPendiente] = useState<Canal | null>(null);
@@ -52,7 +54,8 @@ export function TarjetaPropinaConfiguracion({ esAdmin: esAdminProp }: { esAdmin?
       const activa = lista.find((x) => x.clave === 'propina_activa')?.valor as Partial<ConfigPropina['activa']> | undefined;
       const tope = Number(lista.find((x) => x.clave === 'propina_tope')?.valor);
       const topeFinal = Number.isFinite(tope) && tope > 0 ? tope : 200;
-      setConfig({ activa: { carta: activa?.carta === true, bot: activa?.bot === true }, tope: topeFinal });
+      // Encendida por defecto: solo un «apagado» guardado la apaga
+      setConfig({ activa: { carta: activa?.carta !== false, bot: activa?.bot !== false, mozo: activa?.mozo !== false, caja: activa?.caja !== false }, tope: topeFinal });
       setTopeTexto(String(topeFinal));
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo leer el ajuste de propina');
@@ -157,12 +160,14 @@ export function TarjetaPropinaConfiguracion({ esAdmin: esAdminProp }: { esAdmin?
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--cp-soft)', marginTop: 2, maxWidth: 560 }}>
           El cliente puede dejar una propina para el equipo. Va aparte del pedido: no es venta, no sale en el comprobante y
-          no suma puntos. Se enciende por canal: la carta virtual y WhatsApp son independientes.
+          no suma puntos. Se enciende por canal: la carta virtual, WhatsApp, el mozo y Caja son independientes. En el mozo y en Caja se escribe el monto en el paso «Pago» del Nuevo pedido.
         </div>
       </div>
 
       {filaCanal('carta', 'operacion-propina-carta')}
       {filaCanal('bot', 'operacion-propina-bot')}
+      {filaCanal('mozo', 'operacion-propina-mozo')}
+      {filaCanal('caja', 'operacion-propina-caja')}
 
       <CampoConfig id="operacion-propina-tope" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <CampoAyuda

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -111,12 +112,13 @@ async function registrarCafe() {
     target: { value: 'Ana' },
   });
   fireEvent.click(screen.getByText('Agregar al pedido'));
+  irAlPago();
   // En delivery con efectivo «con cuánto paga» es obligatorio (el repartidor sale con el vuelto)
   const pagaCon = await screen.findByPlaceholderText(/Mínimo S\/|Obligatorio/).catch(() => null);
   if (pagaCon) fireEvent.change(pagaCon, { target: { value: '50' } });
   elegirBoleta();
   llenarPagaCon();
-  fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
+  continuarYEnviar();
   fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
   await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
   return vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
@@ -303,11 +305,12 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: /Luis Quispe/ }));
 
+    irAlPago();
     elegirBoleta();
 
     llenarPagaCon();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     const pedido = vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;

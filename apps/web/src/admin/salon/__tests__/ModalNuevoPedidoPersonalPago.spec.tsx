@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { PagoPersonalBloque, errorPagaConPersonal, textoPagoPersonal } from '../componentes/PagoPersonalBloque';
 import { salonApi } from '../api';
@@ -49,6 +50,7 @@ async function llegarAlFormularioFinal() {
   fireEvent.click(await screen.findByText('Café Americano'));
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'María' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
+  irAlPago();
 }
 
 describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
@@ -68,10 +70,10 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     expect(screen.queryByRole('group', { name: '¿Cómo paga?' })).toBeNull();
     expect(screen.queryByText('¿Con cuánto paga?')).toBeNull();
     expect(within(bloque).getByRole('button', { name: /Cargar a su crédito/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /Registrar pedido/ })).toHaveTextContent('se carga a su crédito');
+    expect(screen.getByRole('button', { name: /^Enviar a cocina/ })).toHaveTextContent('se carga a su crédito');
 
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido/ }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     const payload = vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
@@ -86,16 +88,16 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Pagar ahora/ }));
     const medios = within(screen.getByRole('radiogroup', { name: 'Medio de pago' })).getAllByRole('radio').map((r) => r.textContent);
     expect(medios).toEqual(['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']);
-    expect(screen.getByRole('button', { name: /Registrar pedido/ })).toHaveTextContent('paga ahora en efectivo');
+    expect(screen.getByRole('button', { name: /^Enviar a cocina/ })).toHaveTextContent('paga ahora en efectivo');
 
-    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido/ }));
+    continuarYEnviar();
     expect(await screen.findByText(/Indica con cuánto paga/)).toBeInTheDocument();
     expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Pago exacto' }));
     expect((document.querySelector('#personal-paga-con') as HTMLInputElement).value).toBe('8.50');
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido/ }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     expect((vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any).pagoPersonal).toEqual({ modo: 'AHORA', medio: 'EFECTIVO', pagaCon: 8.5 });
@@ -109,7 +111,7 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Transferencia' }));
     expect(screen.queryByLabelText(/¿Con cuánto paga\?/)).toBeNull();
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: /Registrar pedido/ }));
+    continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
     expect((vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any).pagoPersonal).toEqual({ modo: 'AHORA', medio: 'TRANSFERENCIA', pagaCon: undefined });

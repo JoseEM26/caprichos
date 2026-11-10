@@ -104,7 +104,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
 
     it('retorna arreglo vacío si el local está cerrado ese día por horarioDia', async () => {
-      const fechaFutura = '2026-11-15'; // Domingo futuro
+      const fechaFutura = '2027-11-14'; // Domingo futuro
       prisma.fechaEspecial.findUnique.mockResolvedValue(null);
       prisma.horarioDia.findUnique.mockResolvedValue({
         dia_semana: 0,
@@ -116,9 +116,9 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
 
     it('retorna arreglo vacío si el local está cerrado por fechaEspecial', async () => {
-      const fechaFutura = '2026-12-25';
+      const fechaFutura = '2027-12-25';
       prisma.fechaEspecial.findUnique.mockResolvedValue({
-        fecha: new Date('2026-12-25T00:00:00.000Z'),
+        fecha: new Date('2027-12-25T00:00:00.000Z'),
         cerrado: true,
       });
 
@@ -127,7 +127,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
 
     it('genera franjas de 30 minutos dentro del horario de atención excluyendo mesas ocupadas', async () => {
-      const fechaFutura = '2026-11-10'; // Martes futuro
+      const fechaFutura = '2027-11-09'; // Martes futuro (lejano, para que no dependa de la fecha de hoy)
       prisma.fechaEspecial.findUnique.mockResolvedValue(null);
       prisma.horarioDia.findUnique.mockResolvedValue({
         dia_semana: 2,
@@ -208,7 +208,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
 
     it('aprueba la solicitud, crea la reserva, audita, emite socket y notifica al cliente por WhatsApp', async () => {
-      const horaFutura = new Date('2026-11-20T20:00:00-05:00');
+      const horaFutura = new Date('2027-11-20T20:00:00-05:00');
       const mockSolicitud = {
         id: 5n,
         conversacion_id: 20n,
@@ -500,7 +500,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
 
     it('rechaza la solicitud con motivo, audita, emite socket y notifica al cliente con alternativas', async () => {
-      const horaFutura = new Date('2026-11-20T20:00:00-05:00');
+      const horaFutura = new Date('2027-11-20T20:00:00-05:00');
       const mockSolicitud = {
         id: 8n,
         conversacion_id: 30n,

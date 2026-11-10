@@ -1159,6 +1159,7 @@ describe('PedidosEstadoService', () => {
       expect(prismaMock.pedido.findMany.mock.calls[0][0].where.OR).toEqual([
         { codigo: { contains: 'Mesa 4', mode: 'insensitive' } },
         { cliente_nombre: { contains: 'Mesa 4', mode: 'insensitive' } },
+        { cliente_telefono: { contains: 'Mesa 4' } },
         { mesa_nombre: { contains: 'Mesa 4', mode: 'insensitive' } },
       ]);
     });

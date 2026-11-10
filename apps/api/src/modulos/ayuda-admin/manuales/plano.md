@@ -23,14 +23,14 @@ Representa el mapa interactivo en dos dimensiones del salón de Caprichos por pi
 1. En la parte superior, pulsa en la pestaña del piso que deseas atender (por ejemplo "Piso 1" o "Piso 2").
 2. En la cuadrícula observarás cada mesa identificada por su número y color: las mesas libres se muestran en verde claro ("LIBRE"), mientras que las mesas con clientes se indican en tono vino u oscuro ("OCUPADA").
 3. Para abrir una comanda en una mesa desocupada, haz clic sobre la mesa.
-4. Se abrirá la ventana "Nuevo pedido en mesa". Selecciona los productos de la carta que solicita el cliente, anota comentarios si es necesario y pulsa el botón "Confirmar pedido". La comanda viajará a las pantallas de cocina y la mesa pasará a estado ocupada.
+4. Se abrirá la ventana "Nuevo pedido en mesa". El Nuevo pedido tiene dos pasos. Paso 1 Pedido: selecciona los productos de la carta, anota el celular y el nombre del cliente y pulsa "Continuar" (se activa cuando hay productos y datos válidos). Paso 2 Pago: elige "Pagar ahora" o "Pagar al final". Solo con "Pagar ahora" se detalla el pago (efectivo con vuelto, tarjeta, Yape, Plin o transferencia; hasta 3 métodos con "Añadir otro método"; la propina, si el dueño la encendió para el mozo, es un monto libre aparte del total). Pulsa "Enviar a cocina": la comanda viajará a las pantallas de cocina y la mesa pasará a estado ocupada.
 5. Para consultar el consumo acumulado de una mesa ocupada o imprimir su cuenta, toca la mesa y pulsa "Cobrar mesa (enviar a Caja)" (ver abajo). Imprimir la precuenta no la cobra.
 Antes: [[plano]]
 Despues: [[caja]]
 Ver tambien: [[cocina]]
 
 ## Como se hace: enviar a Caja el cobro de una mesa (Mozos)
-El mozo no cobra: cobra Caja. El mozo toma la foto del voucher en la mesa y envía el cobro a Caja, que lo revisa y lo cobra.
+El mozo no cierra el cobro: con "Pagar ahora" el pedido sale a cocina y queda "Pagado por mozo, por verificar", a su nombre. El mozo toma la foto del voucher de cada medio digital en la mesa y Caja lo revisa, lo confirma o lo rechaza con motivo; el efectivo se concilia en el cierre.
 1. Abre el plano y toca la mesa ocupada. En la tarjeta de la mesa pulsa "Cobrar mesa (enviar a Caja)": se abre su cuenta (precuenta).
 2. En "Medio de pago en mesa", elige Efectivo, Yape, Plin o Transferencia.
 3. Si es digital, aparece la foto del voucher. Toma la foto o sube el archivo. La imagen se lee al instante.

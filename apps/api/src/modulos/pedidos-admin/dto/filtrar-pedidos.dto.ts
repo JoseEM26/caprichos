@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, ValidateIf } from 'class-validator';
 
 export class FiltrarPedidosDto {
   @IsOptional()
@@ -44,11 +44,19 @@ export class FiltrarPedidosDto {
   @Max(10000)
   pagina?: number;
 
-  /** Pedidos por página: 1 a 100 (por defecto 20). */
+  /** Pedidos por página: 1 a 100 (por defecto 20) o 'todas' (tope de 2000 en el servidor). */
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => (typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value))
+  @ValidateIf((o) => o.limite !== 'todas')
   @IsInt()
   @Min(1)
   @Max(100)
-  limite?: number;
+  limite?: number | 'todas';
+
+  /** Medios de pago (uno o varios separados por coma): YAPE,PLIN,TARJETA,EFECTIVO,TRANSFERENCIA. */
+  @IsOptional()
+  @Matches(/^(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA)(,(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA))*$/, {
+    message: 'medios no válido',
+  })
+  medios?: string;
 }

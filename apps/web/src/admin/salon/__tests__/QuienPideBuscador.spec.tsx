@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { continuarYEnviar } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -289,7 +290,7 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
 
     elegirBoleta();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     expect(screen.getByText(/Pide Ana Pérez: el pedido suma sus puntos al cobrar/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
@@ -308,7 +309,7 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
     fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
     elegirBoleta();
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
+    continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));

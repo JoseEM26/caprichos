@@ -234,6 +234,16 @@ export interface Pedido {
     nombre: string;
     precio: number | string;
   } | null;
+  /** Medios con los que se pagó (EFECTIVO, YAPE...); lo trae el servidor de Caja si ya lo soporta. */
+  mediosPago?: string[];
+  /** Quién atendió el pedido (mozo o cajero) y cuándo (ISO), como los manda el servidor de Caja. */
+  atendidoPorNombre?: string | null;
+  atendidoEn?: string | null;
+  /** Quién cobró y cuándo (ISO). */
+  cobradoPorNombre?: string | null;
+  cobradoEn?: string | null;
+  /** Segundos desde que se creó hasta que se cerró; null si sigue abierto. */
+  tiempoTotalSeg?: number | null;
 }
 
 export interface FiltrosListarPedidos {
@@ -249,6 +259,8 @@ export interface FiltrosListarPedidos {
   pendientes?: boolean;
   /** Pide también el conteo agrupado por estado y cobro de todo el filtro */
   resumen?: boolean;
+  /** Medios de pago (EFECTIVO, YAPE...); el servidor deja los pedidos pagados con alguno de ellos */
+  medios?: string[];
 }
 
 /** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
@@ -431,6 +443,7 @@ export const pedidosApi = {
     if (filtros.hasta) params.append('hasta', filtros.hasta);
     if (filtros.pendientes) params.append('pendientes', '1');
     if (filtros.resumen) params.append('resumen', '1');
+    if (filtros.medios?.length) params.append('medios', filtros.medios.join(','));
 
     const query = params.toString();
     const ruta = query ? `/admin/pedidos?${query}` : '/admin/pedidos';
@@ -553,9 +566,11 @@ export const pedidosApi = {
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
         pagaCon?: number;
-        /** Pago dividido: monto por medio (el API lo valida contra el total) */
+        /** Pago dividido: monto por medio (el API lo valida contra el total + propina) */
         plan?: PlanPagoItem[];
       };
+      /** Propina de monto libre, aparte de la venta (se ignora con el canal apagado) */
+      propina?: number;
       entrega?: {
         direccion?: string;
         referencia?: string;

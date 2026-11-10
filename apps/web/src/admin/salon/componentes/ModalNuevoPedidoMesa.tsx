@@ -32,7 +32,11 @@ import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
-import { PlanPagoEditor } from './PlanPagoEditor';
+import { PasoPagoPedido, MAX_METODOS_PAGO, type CuandoPaga } from './PasoPagoPedido';
+import { ModalCapturasPedido } from './ModalCapturasPedido';
+import { vouchersApi } from '../../vouchers/vouchersApi';
+import { digitalesDelPlan } from '../../pedidos/mediosPago';
+import '../paso-pago-pedido.css';
 import {
   SelectorComprobante,
   VALOR_COMPROBANTE_VACIO,
@@ -49,6 +53,7 @@ import {
   montoEfectivoPlan,
   planInicial,
   type FilaPlan,
+  type PlanPagoItem,
 } from '../../pedidos/planPago';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
 import {
@@ -718,6 +723,41 @@ export function ModalNuevoPedidoMesa({
   }, [abierto]);
   // Cómo paga (mesa, llevar y delivery): un medio o pago dividido. La parte digital pide voucher opcional.
   const [filasPlan, setFilasPlan] = useState<FilaPlan[]>(() => planInicial('EFECTIVO', 0));
+  // Dos pasos dentro de «items»: 1 Pedido (productos y cliente) y 2 Pago (cómo paga, propina y comprobante)
+  const [fase, setFase] = useState<'pedido' | 'pago'>('pedido');
+  // Mesa de local: «Pagar ahora» registra el pago al enviar; «Pagar al final» se cobra al cerrar la cuenta
+  const [cuandoPaga, setCuandoPaga] = useState<CuandoPaga>('final');
+  // Propina de monto libre (texto) y qué canales la tienen encendida en Configuración › Propinas
+  const [propinaTexto, setPropinaTexto] = useState('');
+  const [cfgPropina, setCfgPropina] = useState<{ mozo: boolean; caja: boolean; tope: number }>({ mozo: false, caja: false, tope: 200 });
+  const canalActual: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
+  useEffect(() => {
+    if (!abierto) {
+      setFase('pedido');
+      setPropinaTexto('');
+      return;
+    }
+    let vigente = true;
+    Promise.resolve(api.get<{ propina?: { mozo?: boolean; caja?: boolean; tope?: number } }>('/carta/local'))
+      .then((d) => {
+        if (vigente && d?.propina) {
+          setCfgPropina({ mozo: d.propina.mozo === true, caja: d.propina.caja === true, tope: d.propina.tope && d.propina.tope > 0 ? d.propina.tope : 200 });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [abierto]);
+  // Capturas por medio digital tras crear el pedido (y, con «Pagar ahora», el registro del pago)
+  const [capturasPago, setCapturasPago] = useState<{
+    pedido: { id: string; codigo: string };
+    plan: PlanPagoItem[];
+    res: any;
+    registrar: boolean;
+    pagaCon?: number;
+    errorInicial?: string;
+  } | null>(null);
   const [pedidoVoucher, setPedidoVoucher] = useState<{
     pedido: { id: string; codigo: string; pagoMetodo: MedioPagoMozo; montoDigital: number };
     res: any;
@@ -1054,8 +1094,30 @@ export function ModalNuevoPedidoMesa({
   const personalSinConfirmar = !!colaboradorPrevia && descuentoPersonal === null && lineas.some((l) => !l.cortesia);
   const total = Math.max(0, Math.round((subtotal - descuento - montoPersonal + envioCalculado) * 100) / 100);
 
-  // Plan de pago: se valida contra el total; la parte digital (si hay) pide voucher opcional
-  const errorPlanAhora = total > 0 ? errorPlan(total, filasPlan) : 'Agrega productos al pedido';
+  // ¿Se declara el pago en este pedido? Mesa de local solo con «Pagar ahora»; llevar, delivery y extra siempre.
+  const personalPide = pideMode === 'personal' && !extra;
+  const pagaAhora = !personalPide && (extra ? true : modalidad !== 'local' || cuandoPaga === 'ahora');
+  // Propina (monto libre, aparte de la venta): solo si el canal la tiene encendida y el cliente paga ahora
+  const propinaApagada = !(canalActual === 'CAJA' ? cfgPropina.caja : cfgPropina.mozo) || !!extra || personalPide;
+  const propinaLimpia = propinaTexto.trim().replace(',', '.');
+  const propinaFormatoOk = propinaLimpia === '' || /^\d+(\.\d{1,2})?$/.test(propinaLimpia);
+  const propinaMostrada = !propinaApagada && pagaAhora;
+  const propinaNum = propinaMostrada && propinaFormatoOk && propinaLimpia !== '' ? Number(propinaLimpia) : 0;
+  const propinaCobrable = propinaNum > 0 && propinaNum <= cfgPropina.tope ? Math.round(propinaNum * 100) / 100 : 0;
+  const errorPropina =
+    propinaMostrada && propinaLimpia !== '' && (!propinaFormatoOk || propinaNum > cfgPropina.tope)
+      ? `La propina debe ser un monto entre S/ 0 y S/ ${cfgPropina.tope.toFixed(2)}, con hasta 2 decimales`
+      : null;
+  // Lo que entrega el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
+  const aPagar = Math.round((total + propinaCobrable) * 100) / 100;
+
+  // Plan de pago: se valida contra lo que paga el cliente (venta + propina), hasta 3 métodos
+  const errorPlanAhora =
+    total <= 0
+      ? 'Agrega productos al pedido'
+      : filasPlan.length > MAX_METODOS_PAGO
+        ? `Máximo ${MAX_METODOS_PAGO} métodos de pago`
+        : errorPlan(aPagar, filasPlan);
   const planAhora = aPlan(filasPlan);
   const montoEfectivoAhora = montoEfectivoPlan(planAhora);
   const metodoPrincipalAhora: MedioPagoMozo = planAhora.length
@@ -1143,11 +1205,11 @@ export function ModalNuevoPedidoMesa({
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
-  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante'; mensaje: string; foco: string[] };
+  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante' | 'propina'; mensaje: string; foco: string[]; paso?: 'pago' };
   const errorComprobanteCaja = errorValorComprobante(valorComp);
   // «Con cuánto paga» es obligatorio con efectivo, salvo mesa (se pide al cobrar en la precuenta) y pedido del personal
-  const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local') || pideMode === 'personal';
-  const personalPide = pideMode === 'personal' && !extra;
+  // En la mesa solo se exime con «Pagar al final»: con «Pagar ahora» el efectivo se registra y hace falta el billete
+  const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local' && cuandoPaga !== 'ahora') || pideMode === 'personal';
   // Pedido del personal: su propio bloque de pago reemplaza al genérico (plan, medios, con cuánto paga)
   const errorPagaConPers = personalPide ? errorPagaConPersonal(pagoPersonal, medioPersonal, total, cliPagaCon) : null;
   const errorPagaCon =
@@ -1175,18 +1237,24 @@ export function ModalNuevoPedidoMesa({
       mensaje: mensajeTelefonoMesa,
       foco: ['#np-telefono-mesa'],
     });
-  if (errorPlanAhora && !personalPide)
-    erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'] });
-  if (errorPagaCon) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'] });
-  if (errorPagaConPers) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaConPers, foco: ['#personal-paga-con'] });
+  if (errorPlanAhora && pagaAhora)
+    erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'], paso: 'pago' });
+  if (errorPagaCon && pagaAhora) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'], paso: 'pago' });
+  if (errorPropina) erroresEnvio.push({ campo: 'propina', mensaje: errorPropina, foco: ['#np-propina'], paso: 'pago' });
+  if (errorPagaConPers) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaConPers, foco: ['#personal-paga-con'], paso: 'pago' });
   if (errorComprobanteCaja)
     erroresEnvio.push({
+      paso: 'pago',
       campo: 'comprobante',
       mensaje: errorComprobanteCaja.mensaje,
       foco: [errorComprobanteCaja.campo === 'razon' ? '#np-comp-razon' : errorComprobanteCaja.campo === 'tipo' ? '#np-comp-tipo' : '#np-comp-doc'],
     });
-  // Mensaje fijo bajo el botón (productos o mesa, siempre visible como antes)
-  const motivoNoEnviar = erroresEnvio.find((e) => e.campo === 'productos' || e.campo === 'mesa')?.mensaje ?? '';
+  // Paso 1: «Continuar» solo se habilita con productos y datos del cliente válidos; debajo se dice qué falta
+  const erroresPedido = erroresEnvio.filter((e) => e.paso !== 'pago');
+  const motivoNoContinuar = erroresPedido[0]?.mensaje ?? '';
+  // Paso 2: «Enviar a cocina» se habilita con el pago y el comprobante en orden
+  const erroresPago = erroresEnvio.filter((e) => e.paso === 'pago');
+  const motivoNoEnviar = erroresPago[0]?.mensaje ?? motivoNoContinuar;
 
   const enfocarCampo = (selectores: string[]) => {
     for (const selector of selectores) {
@@ -1198,11 +1266,21 @@ export function ModalNuevoPedidoMesa({
       }
     }
   };
+  const intentarContinuar = () => {
+    if (erroresPedido[0]) {
+      setIntentoEnvio(true);
+      enfocarCampo(erroresPedido[0].foco);
+      return;
+    }
+    setIntentoEnvio(false);
+    setFase('pago');
+  };
   const intentarEnviar = () => {
     const primero = erroresEnvio[0];
     if (primero) {
       setIntentoEnvio(true);
-      enfocarCampo(primero.foco);
+      if (primero.paso !== 'pago') setFase('pedido');
+      setTimeout(() => enfocarCampo(primero.foco), 0);
       return;
     }
     // Personas de más frente a los asientos: se avisa y el local lo confirma (el servidor lo exige igual)
@@ -1219,6 +1297,29 @@ export function ModalNuevoPedidoMesa({
       return;
     }
     setPaso('items');
+  };
+
+  // «Pagar ahora»: registra el pago del pedido recién creado, a nombre de quien lo hace.
+  // Caja cobra directo (cobro normal: arqueo, comprobante y propina por renglón). El mozo no cierra el cobro: deja
+  // «Pagado por mozo · por verificar» (cobro por mozo) y Caja lo verifica o lo rechaza después.
+  const registrarPagoAhora = async (pedidoId: string, plan: PlanPagoItem[], recibido: number | undefined, sinCaptura: boolean) => {
+    const efectivo = montoEfectivoPlan(plan);
+    if (canalActual === 'CAJA') {
+      await pedidosApi.cobrar({
+        pedidoId,
+        pagos: plan.map((f) => ({
+          medio: f.medio,
+          monto: f.monto,
+          ...(f.medio === 'EFECTIVO' && efectivo > 0 && recibido !== undefined ? { recibido } : {}),
+        })),
+        ...(sinCaptura ? { confirmaSinCaptura: true } : {}),
+      });
+    } else {
+      await vouchersApi.enviarACaja(pedidoId, medioPrincipalPlan(plan), plan, {
+        ...(efectivo > 0 && recibido !== undefined ? { recibido } : {}),
+        ...(sinCaptura ? { confirmaSinCaptura: true } : {}),
+      });
+    }
   };
 
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
@@ -1258,7 +1359,7 @@ export function ModalNuevoPedidoMesa({
       });
 
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
-      const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
+      const canalEnvio: 'MOZO' | 'CAJA' = canalActual;
       let res: any;
 
       if (extra) {
@@ -1293,11 +1394,11 @@ export function ModalNuevoPedidoMesa({
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
             comprobante: aComprobanteAlta(valorComp),
-            pago: {
-              metodo: metodoPrincipalAhora,
-              pagaCon: pagaConValido(),
-              plan: planAhora,
-            },
+            // «Pagar al final»: sin plan, se cobra al cerrar la cuenta. «Pagar ahora»: plan que suma venta + propina
+            pago: pagaAhora
+              ? { metodo: metodoPrincipalAhora, pagaCon: pagaConValido(), plan: planAhora }
+              : { metodo: 'EFECTIVO' as const },
+            ...(propinaCobrable > 0 ? { propina: propinaCobrable } : {}),
             // Con cuenta el nombre y el teléfono salen de la cuenta; sin cuenta va el nombre que escribe el mozo
             cliente: enEspera
               ? { nombre: nombreMesa, telefono: telefonoEspera }
@@ -1329,6 +1430,7 @@ export function ModalNuevoPedidoMesa({
               pagaCon: pagaConValido(),
               plan: planAhora,
             },
+            ...(propinaCobrable > 0 ? { propina: propinaCobrable } : {}),
             entrega:
               modalidad === 'delivery'
                 ? {
@@ -1357,19 +1459,43 @@ export function ModalNuevoPedidoMesa({
       }
 
       setConfirmarEnviar(false);
-      // Parte digital del plan: el voucher es opcional; «Subir después» lo deja pendiente en Mis pedidos
-      const medioDigital = medioDigitalDelPlan(planAhora);
-      if (medioDigital && res?.id != null) {
-        setPedidoVoucher({
-          pedido: {
-            id: String(res.id),
-            codigo: String(res.codigo ?? ''),
-            pagoMetodo: medioDigital,
-            montoDigital: montoDigitalPlan(planAhora),
-          },
-          res,
-        });
+      const pedidoNuevo = res?.id != null ? { id: String(res.id), codigo: String(res.codigo ?? '') } : null;
+      const planPago: PlanPagoItem[] = pagaAhora ? planAhora : [];
+      const digitales = digitalesDelPlan(planPago);
+      // «Pagar ahora» en la mesa: el pedido ya salió a cocina; aquí se deja pagado (Caja) o «pagado por mozo, por verificar» (mozo)
+      const cobrarAhora = !extra && modalidad === 'local' && cuandoPaga === 'ahora' && !personalPide && pedidoNuevo !== null;
+      if (cobrarAhora && pedidoNuevo) {
+        const abrirCapturas = (errorInicial?: string) =>
+          setCapturasPago({ pedido: pedidoNuevo, plan: planPago, res, registrar: true, pagaCon: pagaConValido(), errorInicial });
+        if (digitales.length > 0) {
+          abrirCapturas();
+          return;
+        }
+        try {
+          await registrarPagoAhora(pedidoNuevo.id, planPago, pagaConValido(), false);
+        } catch (e: any) {
+          abrirCapturas(e?.message || 'No se pudo registrar el pago. El pedido ya está en cocina.');
+          return;
+        }
+      } else if (pedidoNuevo && digitales.length >= 2) {
+        // Varios medios digitales: una captura por cada uno
+        setCapturasPago({ pedido: pedidoNuevo, plan: planPago, res, registrar: false });
         return;
+      } else {
+        // Un solo medio digital: el voucher es opcional; «Subir después» lo deja pendiente en Mis pedidos
+        const medioDigital = medioDigitalDelPlan(planPago);
+        if (medioDigital && pedidoNuevo) {
+          setPedidoVoucher({
+            pedido: {
+              id: pedidoNuevo.id,
+              codigo: pedidoNuevo.codigo,
+              pagoMetodo: medioDigital,
+              montoDigital: montoDigitalPlan(planPago),
+            },
+            res,
+          });
+          return;
+        }
       }
       alExitoPedido?.(res);
       await alRefrescarMesas?.();
@@ -1383,6 +1509,7 @@ export function ModalNuevoPedidoMesa({
       setConfirmarEnviar(false);
       if (err?.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
         // El pedido no se pierde: se actualizan los combos para elegir otro reemplazo
+        setFase('pedido');
         setErrorEnvio(`${err.message} El pedido sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
         try {
           const r = await api.get<OfertaItem[]>('/carta/ofertas');
@@ -1401,6 +1528,7 @@ export function ModalNuevoPedidoMesa({
           const linea = lineas.find((l) => String(l.productoId) === datos?.productoId);
           setErrorEnvio(datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este pedido.');
         }
+        setFase('pedido');
         setPaso('items');
       } else if (err?.codigo === 'MESA_OCUPADA') {
         setErrorEnvio(
@@ -1409,6 +1537,7 @@ export function ModalNuevoPedidoMesa({
         );
         await alRefrescarMesas?.();
         setMesasSeleccionadas([]);
+        setFase('pedido');
         setPaso('plan');
       } else {
         setErrorEnvio(err?.message || 'Error al registrar el pedido.');
@@ -1516,6 +1645,15 @@ export function ModalNuevoPedidoMesa({
     }
   };
 
+  // Cierra el flujo de capturas (con el pago registrado o dejado para después)
+  const terminarCapturas = async () => {
+    const res = capturasPago?.res;
+    setCapturasPago(null);
+    alExitoPedido?.(res);
+    await alRefrescarMesas?.();
+    alCerrar();
+  };
+
   // Cierra el flujo de un pedido digital (con voucher subido o dejado para después)
   const terminarPedidoDigital = async () => {
     const res = pedidoVoucher?.res;
@@ -1570,6 +1708,11 @@ export function ModalNuevoPedidoMesa({
     }
     return '';
   }, [paso, modalidad, pisosActivos, pisoActual, textoMesas, cliNombre]);
+
+  // Botón final del paso 2: «Enviar a cocina · S/ total» (+ propina si hay)
+  const etiquetaEnviar = `${extra ? 'Registrar extra' : 'Enviar a cocina'} · S/ ${total.toFixed(2)}${
+    propinaCobrable > 0 ? ` + propina S/ ${propinaCobrable.toFixed(2)}` : ''
+  }${personalPide ? ` · ${textoPagoPersonal(pagoPersonal, medioPersonal)}` : ''}`;
 
   if (!abierto) return null;
 
@@ -1641,6 +1784,9 @@ export function ModalNuevoPedidoMesa({
                 onClick={() => {
                   if (edicion) {
                     alCerrar();
+                  } else if (paso === 'items' && fase === 'pago') {
+                    // Atrás desde «Pago»: vuelve al paso 1 sin perder nada de lo escrito
+                    setFase('pedido');
                   } else if (paso === 'items') {
                     setPaso(modalidad === 'local' ? 'plan' : 'cli');
                   } else if (paso === 'cli' || paso === 'plan') {
@@ -2723,7 +2869,95 @@ export function ModalNuevoPedidoMesa({
           {/* ============================================================= */}
           {/* PASO 5: ITEMS Y CARTA PÚBLICA                                 */}
           {/* ============================================================= */}
-          {paso === 'items' && (
+          {paso === 'items' && !edicion && (
+            <ol className="np2-pasos" aria-label="Pasos del pedido">
+              <li className={fase === 'pedido' ? 'np2-paso np2-paso--actual' : 'np2-paso np2-paso--hecho'} aria-current={fase === 'pedido' ? 'step' : undefined}>
+                <span className="np2-paso-num">{fase === 'pedido' ? '1' : '✓'}</span>
+                Pedido
+              </li>
+              <li className="np2-paso-sep" aria-hidden="true" />
+              <li className={fase === 'pago' ? 'np2-paso np2-paso--actual' : 'np2-paso'} aria-current={fase === 'pago' ? 'step' : undefined}>
+                <span className="np2-paso-num">2</span>
+                Pago
+              </li>
+            </ol>
+          )}
+
+          {paso === 'items' && !edicion && fase === 'pago' && (
+            <div className="np2-contenedor">
+              <PasoPagoPedido
+                total={total}
+                aPagar={aPagar}
+                resumen={`${
+                  extra
+                    ? `Extra de ${extra.codigo}`
+                    : modalidad === 'local'
+                      ? enEspera
+                        ? 'Lista de espera'
+                        : textoMesas
+                      : modalidad === 'delivery'
+                        ? 'Delivery'
+                        : 'Para llevar'
+                } · ${(nombreMesa || cliNombre).trim() || 'Cliente'} · ${lineas.reduce((n, l) => n + l.cantidad, 0)} productos`}
+                cuandoPaga={modalidad === 'local' && !extra && !personalPide ? cuandoPaga : undefined}
+                onCuandoPaga={modalidad === 'local' && !extra && !personalPide ? setCuandoPaga : undefined}
+                avisoPagarAhora={
+                  canalActual === 'CAJA'
+                    ? 'Se cobra aquí mismo: el pedido sale a cocina ya pagado y con su comprobante.'
+                    : 'El pedido sale a cocina y queda «Pagado por mozo · por verificar»: Caja lo revisa y lo confirma.'
+                }
+                filas={filasPlan}
+                onFilas={setFilasPlan}
+                pagaCon={cliPagaCon}
+                onPagaCon={setCliPagaCon}
+                pagaConObligatorio={!pagaConExento}
+                propinaActiva={propinaMostrada}
+                propina={propinaTexto}
+                onPropina={setPropinaTexto}
+                tope={cfgPropina.tope}
+                errorPropina={errorPropina}
+                mostrarErrores={intentoEnvio}
+                bloquePersonal={
+                  personalPide ? (
+                    <PagoPersonalBloque
+                      modo={pagoPersonal}
+                      onModo={setPagoPersonal}
+                      medio={medioPersonal}
+                      onMedio={setMedioPersonal}
+                      total={total}
+                      pagaCon={cliPagaCon}
+                      onPagaCon={setCliPagaCon}
+                      puedeCobrarAhora={puedeSaldarPersonal}
+                      error={errorPagaConPers}
+                      mostrarError={intentoEnvio}
+                    />
+                  ) : undefined
+                }
+                comprobante={<SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} />}
+              />
+              <div className="np2-pie">
+                <button type="button" className="np2-atras" onClick={() => setFase('pedido')}>
+                  ← Atrás
+                </button>
+                <button
+                  type="button"
+                  className="np2-enviar"
+                  disabled={erroresEnvio.length > 0}
+                  onClick={intentarEnviar}
+                  aria-label={etiquetaEnviar}
+                >
+                  {etiquetaEnviar}
+                </button>
+                {erroresEnvio.length > 0 && (
+                  <div className="np2-motivo" role="status">
+                    {motivoNoEnviar}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {paso === 'items' && (edicion || fase === 'pedido') && (
             <div className="np-items">
               {/* IZQUIERDA: Catálogo de productos */}
               <div className="np-catalogo">
@@ -3480,44 +3714,6 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 </div>
 
-                {!edicion && (<>
-                {personalPide ? (
-                  <PagoPersonalBloque
-                    modo={pagoPersonal}
-                    onModo={setPagoPersonal}
-                    medio={medioPersonal}
-                    onMedio={setMedioPersonal}
-                    total={total}
-                    pagaCon={cliPagaCon}
-                    onPagaCon={setCliPagaCon}
-                    puedeCobrarAhora={puedeSaldarPersonal}
-                    error={errorPagaConPers}
-                    mostrarError={intentoEnvio}
-                  />
-                ) : (
-                <div id="np-plan-pago">
-                  <PlanPagoEditor
-                    total={total}
-                    filas={filasPlan}
-                    onChange={setFilasPlan}
-                    pagaCon={cliPagaCon}
-                    onPagaCon={setCliPagaCon}
-                    pagaConObligatorio={!pagaConExento}
-                    pagaConInvalido={intentoEnvio && errorPagaCon !== null}
-                  />
-                  {intentoEnvio && errorPagaCon && (
-                    <span role="alert" style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700 }}>
-                      {errorPagaCon}
-                    </span>
-                  )}
-                </div>
-                )}
-
-                <div id="np-comprobante" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} />
-                </div>
-                </>)}
-
                 {/* Editar pedido: resumen del nuevo total y botón para guardar (con confirmación) */}
                 {edicion && (
                   <>
@@ -3554,36 +3750,32 @@ export function ModalNuevoPedidoMesa({
                   </>
                 )}
 
-                {/* Botón Enviar a cocina / Registrar pedido: no se deshabilita; al tocarlo muestra qué falta */}
+                {/* Paso 1: «Continuar» pasa al pago; se habilita con productos y datos del cliente válidos */}
                 {!edicion && (<>
                 <button
                   type="button"
-                  onClick={intentarEnviar}
+                  onClick={intentarContinuar}
+                  disabled={erroresPedido.length > 0}
                   className="salon-pie-fijo np-enviar"
-                  aria-label={
-                    extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'
-                  }
+                  aria-label="Continuar"
                   style={{
-                    minHeight: '52px',
+                    minHeight: '56px',
                     border: 0,
                     borderRadius: '12px',
                     background: 'var(--cp-orange)',
                     color: 'var(--cp-navy)',
                     fontFamily: 'Montserrat, sans-serif',
                     fontWeight: 800,
-                    fontSize: '15px',
-                    // Se ve apagado solo sin productos o sin mesa (en lista de espera no hay mesa que elegir)
-                    opacity: motivoNoEnviar ? 0.5 : 1,
-                    cursor: motivoNoEnviar ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: erroresPedido.length > 0 ? 0.5 : 1,
+                    cursor: erroresPedido.length > 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}
-                  {total.toFixed(2)}
-                  {personalPide ? ` · ${textoPagoPersonal(pagoPersonal, medioPersonal)}` : ''}
+                  Continuar · S/ {total.toFixed(2)}
                 </button>
-                {motivoNoEnviar && (
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', textAlign: 'center' }}>
-                    {motivoNoEnviar}
+                {motivoNoContinuar && (
+                  <div role="status" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', textAlign: 'center' }}>
+                    {motivoNoContinuar}
                   </div>
                 )}
                 </>)}
@@ -3639,7 +3831,7 @@ export function ModalNuevoPedidoMesa({
           extra
             ? `Vas a agregar al pedido ${extra.codigo} (${[extra.modalidad === 'MESA' ? extra.mesa_nombre || 'Mesa' : extra.modalidad === 'DELIVERY' ? 'Delivery' : 'Para llevar', extra.cliente_nombre].filter(Boolean).join(' · ')}). Cocina lo recibirá como EXTRA y suma a la cuenta del pedido.`
             : modalidad === 'local'
-            ? `Se enviarán los productos ${enEspera ? 'a la lista de espera de mesa (se asigna la mesa cuando se libere una)' : `para la mesa ${textoMesas}`}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
+            ? `${cuandoPaga === 'ahora' ? (canalActual === 'CAJA' ? 'El pedido se cobra ahora y sale a cocina. ' : 'El pedido sale a cocina y queda pagado por mozo, por verificar. ') : ''}Se enviarán los productos ${enEspera ? 'a la lista de espera de mesa (se asigna la mesa cuando se libere una)' : `para la mesa ${textoMesas}`}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
             : `Se registrará el pedido (${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'}) a nombre de ${cliNombre || (clientePideId && clienteEncontrado ? clienteEncontrado.nombre : 'Cliente')} por S/ ${total.toFixed(2)}.`
         }
         textoConfirmar={extra ? 'Sí, agregar' : modalidad === 'local' ? 'Sí, enviar comanda' : 'Sí, registrar'}
@@ -3688,6 +3880,24 @@ export function ModalNuevoPedidoMesa({
         }}
         alCancelar={() => setAvisoCapacidad(false)}
       />
+
+      {/* Capturas por medio digital (y registro del pago con «Pagar ahora») */}
+      {capturasPago && (
+        <ModalCapturasPedido
+          pedido={capturasPago.pedido}
+          plan={capturasPago.plan}
+          errorInicial={capturasPago.errorInicial}
+          registrarPago={
+            capturasPago.registrar
+              ? async (sinCaptura) => {
+                  await registrarPagoAhora(capturasPago.pedido.id, capturasPago.plan, capturasPago.pagaCon, sinCaptura);
+                  await terminarCapturas();
+                }
+              : undefined
+          }
+          alTerminar={terminarCapturas}
+        />
+      )}
 
       {/* Voucher del pedido digital recién creado */}
       {pedidoVoucher && (

@@ -19,6 +19,23 @@ export function celular9(tel: unknown): string {
   return d.length >= 9 ? d.slice(-9) : '';
 }
 
+/**
+ * Identificador con el que se bloquea un destino. Celular peruano → sus 9 dígitos (con o sin +51);
+ * cualquier otro número (internacional, fijo, de una plataforma) → todos sus dígitos; identificador de WhatsApp
+ * (BSUID) → tal cual en minúsculas. '' si no es nada utilizable. Es el mismo criterio al bloquear y al comprobar.
+ */
+export function destinoBloqueo(tel: unknown): string {
+  const raw = String(tel ?? '').trim();
+  if (!raw) return '';
+  if (/^wa-user:/i.test(raw) || raw.includes('.')) {
+    const id = raw.toLowerCase().replace(/\s+/g, '');
+    return /^[a-z0-9:._-]{3,40}$/.test(id) ? id : '';
+  }
+  const d = raw.replace(/\D/g, '').replace(/^0+/, '');
+  if (d.length === 11 && d.startsWith('519')) return d.slice(2);
+  return /^\d{6,20}$/.test(d) ? d : '';
+}
+
 /** Lista «987654321, +51 912 345 678» a celulares de 9 dígitos únicos (descarta lo que no sea celular). */
 export function listaCelulares(valor: unknown): string[] {
   const partes = Array.isArray(valor) ? valor : String(valor ?? '').split(/[,;\n]/);
@@ -73,11 +90,12 @@ export class NumerosWhatsappService {
   /** Un error de lectura NO frena el envío: se registra y se deja pasar (el guardia nunca rompe el flujo). */
   async motivoOmision(tel: unknown): Promise<MotivoOmision | null> {
     const c = celular9(tel);
-    if (!c) return null;
+    const d = destinoBloqueo(tel);
+    if (!c && !d) return null;
     try {
       const { propios, bloqueados } = await this.cargar();
-      if (propios.has(c)) return 'DESTINO_NUMERO_PROPIO';
-      if (bloqueados.has(c)) return 'DESTINO_BLOQUEADO';
+      if (c && propios.has(c)) return 'DESTINO_NUMERO_PROPIO';
+      if (d && bloqueados.has(d)) return 'DESTINO_BLOQUEADO';
     } catch (e: any) {
       this.logger.warn(`No se pudo leer números propios/bloqueados: ${e?.message}`);
     }
@@ -116,16 +134,16 @@ export class NumerosWhatsappService {
   }
 
   async bloquear(numero: unknown, motivo: unknown, usuario: UsuarioBasico, ip?: string) {
-    const c = celular9(numero);
-    if (!/^9\d{8}$/.test(c)) {
-      throw new BadRequestException({ codigo: 'NUMERO_INVALIDO', mensaje: 'El número debe tener 9 dígitos y empezar con 9' });
+    const c = destinoBloqueo(numero);
+    if (!c) {
+      throw new BadRequestException({ codigo: 'NUMERO_INVALIDO', mensaje: 'Escribe un número válido (con código de país si no es peruano)' });
     }
     const motivoTexto = typeof motivo === 'string' ? motivo.trim() : '';
     if (motivoTexto.length > 120) {
       throw new BadRequestException({ codigo: 'MOTIVO_LARGO', mensaje: 'El motivo admite hasta 120 caracteres' });
     }
     this.cache = null;
-    if (await this.esPropio(c)) {
+    if (/^9\d{8}$/.test(c) && (await this.esPropio(c))) {
       throw new BadRequestException({ codigo: 'NUMERO_PROPIO', mensaje: 'Ese número es del propio negocio: no se le envía nada' });
     }
     const quien = (usuario?.nombre || usuario?.usuario || '').slice(0, 120) || null;
@@ -154,7 +172,7 @@ export class NumerosWhatsappService {
   }
 
   async desbloquear(numero: unknown, usuario: UsuarioBasico, ip?: string) {
-    const c = celular9(numero);
+    const c = destinoBloqueo(numero);
     const fila = c ? await this.prisma.numeroBloqueado.findUnique({ where: { celular: c } }) : null;
     if (!fila || !fila.activo) throw new NotFoundException({ codigo: 'NO_BLOQUEADO', mensaje: 'Ese número no está bloqueado' });
     await this.prisma.numeroBloqueado.update({ where: { celular: c }, data: { activo: false } });

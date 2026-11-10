@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -117,4 +118,11 @@ export class AbrirPedidoMesaDto {
   @ValidateNested()
   @Type(() => ComprobantePedidoDto)
   comprobante?: ComprobantePedidoDto;
+
+  /** Propina opcional en soles, aparte de la venta. Se ignora si el interruptor del canal (mozo o caja) está apagado. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  propina?: number;
 }

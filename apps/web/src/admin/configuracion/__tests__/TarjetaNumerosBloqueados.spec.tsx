@@ -38,7 +38,7 @@ describe('TarjetaNumerosBloqueados', () => {
     render(<TarjetaNumerosBloqueados esAdmin />);
     fireEvent.change(await screen.findByLabelText('Número a bloquear'), { target: { value: '12345' } });
     fireEvent.click(screen.getByRole('button', { name: 'Bloquear un número' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/9 dígitos/);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/número válido/);
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -52,6 +52,14 @@ describe('TarjetaNumerosBloqueados', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bloquear un número' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, bloquear' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/whatsapp/numeros-bloqueados', { celular: '933444555', motivo: 'Prueba' }));
+  });
+
+  it('permite bloquear un número de otro país o que no empieza con 9', async () => {
+    render(<TarjetaNumerosBloqueados esAdmin />);
+    fireEvent.change(await screen.findByLabelText('Número a bloquear'), { target: { value: '+57 300 123 4567' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bloquear un número' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, bloquear' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/whatsapp/numeros-bloqueados', { celular: '573001234567', motivo: undefined }));
   });
 
   it('desbloquea con confirmación y guarda los números del negocio', async () => {

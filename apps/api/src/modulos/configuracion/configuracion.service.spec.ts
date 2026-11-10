@@ -137,7 +137,13 @@ describe('ConfiguracionService', () => {
       prismaMock.parametro.upsert.mockResolvedValue({ clave: 'propina_activa', valor: { carta: true, bot: false } });
 
       await service.actualizar('propina_activa', { carta: true, bot: false, extra: 'x' }, adminAuth);
-      expect(prismaMock.parametro.upsert.mock.calls[0][0].create.valor).toEqual({ carta: true, bot: false });
+      expect(prismaMock.parametro.upsert.mock.calls[0][0].create.valor).toEqual({ carta: true, bot: false, mozo: true, caja: true });
+
+      await service.actualizar('propina_activa', { carta: false, bot: false, mozo: false, caja: true }, adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls[1][0].create.valor).toEqual({ carta: false, bot: false, mozo: false, caja: true });
+      await expect(service.actualizar('propina_activa', { carta: true, bot: false, mozo: 'si' }, adminAuth)).rejects.toMatchObject({
+        response: { codigo: 'VALOR_INVALIDO' },
+      });
 
       await expect(service.actualizar('propina_activa', { carta: 'si', bot: false }, adminAuth)).rejects.toMatchObject({
         response: { codigo: 'VALOR_INVALIDO' },
