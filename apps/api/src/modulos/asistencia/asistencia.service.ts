@@ -283,19 +283,7 @@ export class AsistenciaService {
       );
     }
 
-    // El aviso se pide una sola vez: se guarda en cuanto llega aceptado, antes de validar lo demás,
-    // para que un rechazo posterior (radio, QR, GPS) no lo pierda. Solo se repite si cambia la versión.
-    const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
-    if (consentimiento?.version !== VERSION_CONSENTIMIENTO) {
-      if (dto.consentimiento !== true) {
-        throw new RechazoAsistencia('CONSENTIMIENTO_REQUERIDO', 'Acepta el aviso de datos personales para marcar.', false);
-      }
-      await this.prisma.asistenciaConsentimiento.upsert({
-        where: { party_id: partyId },
-        create: { party_id: partyId, version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
-        update: { version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
-      });
-    }
+    // Decisión del dueño (10/11/2026): ya no se pide consentimiento para marcar; el aviso de datos no bloquea.
 
     if (cfg.localLat === null || cfg.localLng === null) {
       throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
@@ -464,9 +452,7 @@ export class AsistenciaService {
       where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
       orderBy: { momento: 'asc' },
     });
-    const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
-    const vigente = consentimiento?.version === VERSION_CONSENTIMIENTO;
     return {
       jornada,
       ahora: ahora.toISOString(),
@@ -486,10 +472,10 @@ export class AsistenciaService {
       }),
       interpretacion: { estado: dia.interp.estado, alertas: dia.interp.alertas, tramos: dia.interp.tramos },
       dobleMarcaMin: cfg.dobleMarcaMin,
-      consentimientoAceptado: vigente,
-      consentimientoAceptadoEn: vigente ? consentimiento!.aceptado_en.toISOString() : null,
+      consentimientoAceptado: false,
+      consentimientoAceptadoEn: null,
       textoConsentimiento: TEXTO_CONSENTIMIENTO,
-      consentimiento: vigente ? null : { version: VERSION_CONSENTIMIENTO, texto: TEXTO_CONSENTIMIENTO },
+      consentimiento: null,
       dispositivoVinculado: Boolean(dispositivo),
       /** Solo si hay punto configurado; nunca las coordenadas. */
       localConUbicacion: cfg.localLat !== null && cfg.localLng !== null,

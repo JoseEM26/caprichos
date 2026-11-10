@@ -84,9 +84,6 @@ export function MiAsistenciaView() {
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
   const [manual, setManual] = useState(false); // sin QR ni selfie: solo GPS, queda para revisión
-  const [aceptaConsent, setAceptaConsent] = useState(false);
-  const [aceptadoEnSesion, setAceptadoEnSesion] = useState(false);
-  const [verAviso, setVerAviso] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
@@ -225,9 +222,8 @@ export function MiAsistenciaView() {
     setError(null);
     try {
       // Sin `tipo`: el servidor lee cada marca por orden y pares y dice qué interpretó
-      const consentimiento = hoy?.consentimiento ? aceptaConsent : undefined;
       const r = directo
-        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision, consentimiento })
+        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision })
         : await marcarAsistencia({
             ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
             lat: u.lat,
@@ -235,7 +231,6 @@ export function MiAsistenciaView() {
             precision: u.precision,
             selfie: selfie!,
             dispositivo: identificadorDispositivo(),
-            consentimiento,
           });
       setMensajeOk(r.mensaje + (r.marca.estado === 'A_REVISAR' ? ' (queda para revisión del administrador)' : ''));
       setPaso('listo');
@@ -243,11 +238,7 @@ export function MiAsistenciaView() {
     } catch (e) {
       const x = e as any;
       const codigo = x?.codigo ?? x?.response?.codigo;
-      // El servidor guarda el aviso aceptado aunque la marca se rechace: se recarga para no volver a pedirlo.
-      if (codigo !== 'CONSENTIMIENTO_REQUERIDO') {
-        if (aceptaConsent) setAceptadoEnSesion(true);
-        await recargar();
-      }
+      await recargar();
       setError(mensajeDe(e, 'No se pudo registrar tu marca. Intenta otra vez.'));
       setPaso('inicio');
     } finally {
@@ -259,9 +250,8 @@ export function MiAsistenciaView() {
   if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
   const ultima = hoy.marcas.filter((m) => !m.duplicada).slice(-1)[0];
-  const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado && !aceptadoEnSesion;
   const sinUbicacion = hoy.localConUbicacion === false;
-  const puedeMarcar = !sinUbicacion && (!faltaConsent || aceptaConsent);
+  const puedeMarcar = !sinUbicacion;
   const indice = INDICE_PASO[paso];
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
@@ -307,23 +297,6 @@ export function MiAsistenciaView() {
         </div>
       )}
 
-      {faltaConsent && hoy.consentimiento && (
-        <label className="ma-consent">
-          <span>{hoy.consentimiento.texto}</span>
-          <span className="ma-check">
-            <input type="checkbox" checked={aceptaConsent} onChange={(e) => setAceptaConsent(e.target.checked)} /> Acepto el tratamiento de mis datos para el control de asistencia.
-          </span>
-        </label>
-      )}
-
-      {!faltaConsent && hoy.consentimientoAceptado && hoy.consentimientoAceptadoEn && (
-        <p className="as-ayuda" data-testid="aviso-aceptado">
-          Aceptaste el aviso de datos el {new Date(hoy.consentimientoAceptadoEn).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })}.{' '}
-          <button type="button" className="ma-enlace" onClick={() => setVerAviso((v) => !v)}>{verAviso ? 'Ocultar aviso' : 'Ver aviso'}</button>
-          {verAviso && <span> {hoy.textoConsentimiento}</span>}
-        </p>
-      )}
-
       {indice !== undefined && (
         <ol className="ma-pasos" aria-label="Pasos de la marca">
           {NOMBRES_PASOS.map((n, i) => (
@@ -344,7 +317,6 @@ export function MiAsistenciaView() {
             Marcar manualmente (sin QR)
           </Boton>
           <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca.</p>
-          {faltaConsent && !aceptaConsent && <p className="as-ayuda">Acepta el aviso de datos para poder marcar.</p>}
         </>
       )}
 
