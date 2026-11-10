@@ -2,16 +2,53 @@ import { api } from '../../comun/api';
 
 export type Modalidad = 'SEMANAL' | 'MENSUAL';
 
+export type MetodoValorHora = 'DIAS_HORAS' | 'TARIFA_HORA' | 'PROGRAMADAS';
+export const ETIQUETA_METODO: Record<MetodoValorHora, string> = {
+  DIAS_HORAS: 'Sueldo ÷ días del mes ÷ horas por día',
+  TARIFA_HORA: 'Tarifa fija por hora (sin sueldo mensual)',
+  PROGRAMADAS: 'Sueldo del período ÷ horas programadas (método anterior)',
+};
+
 export interface SueldoPersona {
   modalidad: Modalidad;
   semanal: number;
   mensual: number;
+  metodo?: MetodoValorHora;
+  diasMes?: number | null;
+  horasDia?: number | null;
+  tarifaHora?: number | null;
+}
+
+/** Dato personal de pago (solo ADMIN). */
+export interface PagoPersona { celular: string | null; medio: string | null }
+export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as const;
+
+/** Etiquetas de los descuentos (el valor del código no lleva tilde). */
+export const CATEGORIAS_DESCUENTO = ['CONSUMO', 'MERMA', 'DANO', 'PRESTAMO', 'NETFLIX', 'OTRO'] as const;
+export const ETIQUETA_CATEGORIA: Record<string, string> = { CONSUMO: 'Consumo', MERMA: 'Merma', DANO: 'Daño', PRESTAMO: 'Préstamo', NETFLIX: 'Netflix', OTRO: 'Otro' };
+
+/** Columnas del Excel del dueño, ya calculadas por el servidor. */
+export interface ResumenExcel {
+  pagoPorDia: number | null;
+  valorHora: number;
+  horasLaboradas: number;
+  minutosLaborados: number;
+  horasExtra: number;
+  total: number;
+  adicional: number;
+  descuentos: number;
+  descuentosPorCategoria: Record<string, number>;
+  netoAPagar: number;
+  adelanto: number;
+  diferencia: number;
 }
 
 export interface FilaPlanilla {
   partyId: number;
   nombre: string;
   sueldo: SueldoPersona | null;
+  pago?: PagoPersona;
+  excel?: ResumenExcel;
   vinculo?: { tipo: 'PLANILLA' | 'CONTRATO_TEMPORAL'; fechaIngreso: string; fechaFin: string | null } | null;
   periodo?:{ desde: string; hasta: string };
   estado?: 'ABIERTO' | 'PAGADO';
@@ -24,6 +61,9 @@ export interface FilaPlanilla {
   neto?: number;
   pendientes?: number;
 }
+
+export interface CuotaPeriodoApi { id: string; prestamoId: string; numero: number; numCuotas: number; monto: number; motivo: string | null; cobrar: boolean }
+export interface RecurrentePeriodoApi { id: string; tipo: string; nombre: string; monto: number; cobrar: boolean }
 
 export interface DiaPlanillaApi {
   jornada: string;
@@ -58,7 +98,8 @@ export interface ConsumoPlanillaApi {
 
 export interface AjustePlanillaApi {
   id: number;
-  tipo: 'ADELANTO' | 'DESCUENTO';
+  tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO';
+  categoria?: string;
   fecha: string;
   monto: number;
   motivo: string;
@@ -71,6 +112,12 @@ export interface DetallePlanilla {
   nombre: string;
   periodo: { desde: string; hasta: string };
   sueldo: SueldoPersona;
+  pago?: PagoPersona;
+  excel?: ResumenExcel;
+  tercerizado?: boolean;
+  metodoValorHora?: MetodoValorHora;
+  cuotas?: CuotaPeriodoApi[];
+  recurrentes?: RecurrentePeriodoApi[];
   estado: 'ABIERTO' | 'PAGADO';
   periodoId: number | null;
   pagadoEn?: string;
@@ -97,6 +144,9 @@ export interface DetallePlanilla {
     consumosPendientes: number;
     descuentos: number;
     adelantos: number;
+    adicional?: number;
+    descuentosPorCategoria?: Record<string, number>;
+    netoAPagar?: number;
     neto: number;
   };
   dias: DiaPlanillaApi[];
@@ -113,15 +163,40 @@ export function sueldoEquivalente(modalidad: Modalidad, monto: number): { semana
 export const soles = (n: number | undefined | null) => (n === undefined || n === null ? '—' : `S/ ${n.toFixed(2)}`);
 
 export const listarPlanilla = (fecha?: string) => api.get<{ fecha: string; filas: FilaPlanilla[] }>(`/admin/planilla${fecha ? `?fecha=${fecha}` : ''}`);
-export const detallePlanilla = (partyId: number, fecha: string, excluir: string[]) =>
-  api.get<DetallePlanilla>(`/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}`);
-export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null }>(`/admin/planilla/sueldo/${partyId}`);
-export const guardarSueldo = (partyId: number, modalidad: Modalidad, monto: number) => api.put(`/admin/planilla/sueldo/${partyId}`, { modalidad, monto });
-export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO', datos: { partyId: number; fecha: string; monto: number; motivo: string }) =>
-  api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : 'descuentos'}`, datos);
+export const detallePlanilla = (partyId: number, fecha: string, excluir: string[], omitirCuotas: string[] = [], omitirRecurrentes: string[] = []) =>
+  api.get<DetallePlanilla>(
+    `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}`,
+  );
+export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null }>(`/admin/planilla/sueldo/${partyId}`);
+export interface DatosSueldoExtra {
+  metodo?: MetodoValorHora;
+  diasMes?: number | null;
+  horasDia?: number | null;
+  tarifaHora?: number | null;
+  pagoCelular?: string | null;
+  pagoMedio?: string | null;
+}
+export const guardarSueldo = (partyId: number, modalidad: Modalidad, monto: number, extra: DatosSueldoExtra = {}) =>
+  api.put(`/admin/planilla/sueldo/${partyId}`, { modalidad, monto, ...extra });
+export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { partyId: number; fecha: string; monto: number; motivo: string; categoria?: string }) =>
+  api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
-export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[]) => api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds });
+export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = []) =>
+  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds });
+
+// Préstamos con cuotas y descuentos recurrentes (Netflix)
+export interface CuotaPrestamoApi { id: number; numero: number; monto: number; estado: 'PENDIENTE' | 'DESCONTADA' | 'OMITIDA'; periodoDesde: string | null; periodoHasta: string | null; reprogramada: boolean }
+export interface PrestamoApi {
+  id: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; montoCuota: number; fechaInicio: string;
+  estado: 'ACTIVO' | 'SALDADO' | 'ANULADO'; motivo: string | null; anuladoMotivo: string | null; saldo: number; cuotas: CuotaPrestamoApi[];
+}
+export interface RecurrenteApi { id: number; tipo: 'NETFLIX' | 'OTRO'; nombre: string; monto: number; activo: boolean; desde: string }
+export const listarPrestamos = (partyId: number) => api.get<{ netflixSemanalDefecto: number; prestamos: PrestamoApi[]; recurrentes: RecurrenteApi[] }>(`/admin/planilla/persona/${partyId}/prestamos`);
+export const crearPrestamo = (d: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string }) => api.post('/admin/planilla/prestamos', d);
+export const anularPrestamo = (id: number, motivo: string) => api.post(`/admin/planilla/prestamos/${id}/anular`, { motivo });
+export const crearRecurrente = (d: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number }) => api.post('/admin/planilla/recurrentes', d);
+export const editarRecurrente = (id: number, d: { monto?: number; activo?: boolean }) => api.put(`/admin/planilla/recurrentes/${id}`, d);
 export const reabrirPlanilla = (periodoId: number, motivo: string) => api.post(`/admin/planilla/periodos/${periodoId}/reabrir`, { motivo });
 
 export interface Feriado { id: number; fecha: string; nombre: string; recargo: number; activo: boolean }

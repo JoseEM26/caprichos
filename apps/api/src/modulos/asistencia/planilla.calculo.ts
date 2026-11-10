@@ -1,14 +1,49 @@
 // Cálculo puro de la planilla (sin BD): sueldo semanal/mensual, período, pago por jornada y neto.
 // Dinero con redondeo a céntimos. Reglas del dueño (09/11/2026):
-// valor hora = sueldo del período ÷ horas programadas del período (sin break, sin descansos);
-// pago = horas trabajadas válidas × valor hora; la tardanza (pasada la tolerancia) se paga al pctTardanza % y ya es
-// el descuento; lo no trabajado por salir antes no se paga; el break no se paga; la hora extra solo suma si el admin la aprueba.
+// Valor hora por persona (método): DIAS_HORAS (sueldo mensual ÷ días del mes ÷ horas por día, defecto 24 y 9),
+// TARIFA_HORA (monto fijo por hora) o PROGRAMADAS (sueldo del período ÷ horas programadas, el método anterior).
+// pago = horas trabajadas válidas × valor hora (sin tope por el sueldo en DIAS_HORAS/TARIFA_HORA); la tardanza (pasada
+// la tolerancia) se paga al pctTardanza % (defecto 0: el atraso no se paga); lo no trabajado por salir antes no se paga;
+// el break no se paga; la hora extra solo suma si el admin la aprueba, a valor hora × multiplicador (defecto 1.25).
 
 import { EstadoJornada, MarcaCalc, Turno, minutosProgramados, sumarDias, diaSemana } from './asistencia.calculo';
 
 export type Modalidad = 'SEMANAL' | 'MENSUAL';
 
-export const PCT_TARDANZA_DEFECTO = 50;
+export const PCT_TARDANZA_DEFECTO = 0;
+export const MULTIPLICADOR_EXTRA_DEFECTO = 1.25;
+export const DIAS_MES_DEFECTO = 24;
+export const HORAS_DIA_DEFECTO = 9;
+
+export type MetodoValorHora = 'DIAS_HORAS' | 'TARIFA_HORA' | 'PROGRAMADAS';
+export const METODOS_VALOR_HORA: readonly MetodoValorHora[] = ['DIAS_HORAS', 'TARIFA_HORA', 'PROGRAMADAS'];
+/** Etiqueta de los descuentos (ajustes manuales, cuotas de préstamo y descuentos recurrentes). */
+export const CATEGORIAS_DESCUENTO = ['CONSUMO', 'MERMA', 'DANO', 'PRESTAMO', 'NETFLIX', 'OTRO'] as const;
+export type CategoriaDescuento = (typeof CATEGORIAS_DESCUENTO)[number];
+
+export interface ParamsValorHora {
+  metodo: MetodoValorHora;
+  sueldoMensual: number;
+  diasMes?: number;
+  horasDia?: number;
+  tarifaHora?: number;
+}
+
+/** Valor hora exacto (sin redondear) del método elegido; null en PROGRAMADAS (depende de las horas del período). */
+export function valorHoraPersona(p: ParamsValorHora): number | null {
+  if (p.metodo === 'PROGRAMADAS') return null;
+  if (p.metodo === 'TARIFA_HORA') return Math.max(0, p.tarifaHora ?? 0);
+  const dias = p.diasMes && p.diasMes > 0 ? p.diasMes : DIAS_MES_DEFECTO;
+  const horas = p.horasDia && p.horasDia > 0 ? p.horasDia : HORAS_DIA_DEFECTO;
+  return p.sueldoMensual / dias / horas;
+}
+
+/** Pago por día del Excel: valor hora × horas por día (DIAS_HORAS) o sueldo mensual ÷ días del mes. */
+export const pagoPorDiaPersona = (p: ParamsValorHora): number | null =>
+  p.metodo === 'DIAS_HORAS' ? redondear2(p.sueldoMensual / (p.diasMes && p.diasMes > 0 ? p.diasMes : DIAS_MES_DEFECTO)) : null;
+
+/** Minutos a «H h M min» para el resumen estilo Excel. */
+export const horasYMinutos = (min: number): { horas: number; minutos: number } => ({ horas: Math.floor(min / 60), minutos: min % 60 });
 
 export const redondear2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -69,8 +104,8 @@ export interface DiaPlanilla {
  */
 export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.trabajadaMin / 60) * vh * (d.recargo ?? 1);
 export const pagoTardanzaDia = (d: DiaPlanilla, vh: number, pct: number): number => (d.tardanzaMin / 60) * vh * (d.recargo ?? 1) * (pct / 100);
-export const pagoDia = (d: DiaPlanilla, vh: number, pct: number, extraAprobada: boolean): number =>
-  pagoTrabajadoDia(d, vh) + pagoTardanzaDia(d, vh, pct) + (extraAprobada ? (d.extraMin / 60) * vh : 0);
+export const pagoDia = (d: DiaPlanilla, vh: number, pct: number, extraAprobada: boolean, multExtra = 1): number =>
+  pagoTrabajadoDia(d, vh) + pagoTardanzaDia(d, vh, pct) + (extraAprobada ? (d.extraMin / 60) * vh * multExtra : 0);
 
 /** Jornada de una persona: minutos programados, trabajados válidos, tardanza, salida anticipada y extra. */
 export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPlanilla {
@@ -145,6 +180,14 @@ export interface EntradaPlanilla {
   adelantos: number[];
   /** Montos de vacaciones pagadas (liquidadas en dinero) del período: ingreso adicional con su línea. */
   vacacionesPagadas?: number[];
+  /** Valor hora exacto de la persona (DIAS_HORAS o TARIFA_HORA). Ausente = PROGRAMADAS (sueldo ÷ horas programadas). */
+  valorHora?: number;
+  /** Multiplicador de la hora extra aprobada (defecto 1: método PROGRAMADAS no cambia). */
+  multiplicadorExtra?: number;
+  /** Descuentos con etiqueta (ajustes manuales, cuotas de préstamo, Netflix y otros recurrentes). */
+  lineasDescuento?: Array<{ categoria: string; monto: number }>;
+  /** «Adicional» del Excel: bonos y ajustes positivos. */
+  bonos?: number[];
 }
 
 export interface ResultadoPlanilla {
@@ -164,6 +207,15 @@ export interface ResultadoPlanilla {
   consumosPendientes: number;
   descuentos: number;
   adelantos: number;
+  /** Valor hora sin redondear (el que se usa en los cálculos). */
+  valorHoraExacto: number;
+  /** Bonos / ajustes positivos. */
+  adicional: number;
+  /** Descuentos agrupados por etiqueta (incluye CONSUMO si se cobran en este pago). */
+  descuentosPorCategoria: Record<string, number>;
+  /** NETO del Excel: ganado + adicional − consumos − descuentos (antes de restar adelantos). */
+  netoAPagar: number;
+  /** DIFERENCIA del Excel: neto a pagar − adelantos (lo que se transfiere). */
   neto: number;
 }
 
@@ -176,19 +228,28 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
   const extraMin = suma((d) => d.extraMin);
   const extraAprobadaMin = e.dias.filter((d) => e.extrasAprobadas.has(d.jornada)).reduce((a, d) => a + d.extraMin, 0);
 
-  const vh = programadaMin > 0 ? e.sueldoPeriodo / (programadaMin / 60) : 0;
+  const vh = e.valorHora !== undefined ? e.valorHora : programadaMin > 0 ? e.sueldoPeriodo / (programadaMin / 60) : 0;
+  const mult = e.multiplicadorExtra ?? 1;
   // Las horas del período para el valor hora NO cambian por feriado; solo el pago de esas horas lleva recargo.
   const pagoTrabajado = redondear2(e.dias.reduce((a, d) => a + pagoTrabajadoDia(d, vh), 0));
   const pagoTardanza = redondear2(e.dias.reduce((a, d) => a + pagoTardanzaDia(d, vh, e.pctTardanza), 0));
-  const pagoExtra = redondear2((extraAprobadaMin / 60) * vh);
+  const pagoExtra = redondear2((extraAprobadaMin / 60) * vh * mult);
   const total = (xs: number[]) => redondear2(xs.reduce((a, x) => a + x, 0));
   const pagoVacaciones = total(e.vacacionesPagadas ?? []);
   const ganado = redondear2(pagoTrabajado + pagoTardanza + pagoExtra + pagoVacaciones);
 
   const consumosCobrados = total(e.consumos.filter((c) => c.cobrar).map((c) => c.monto));
   const consumosPendientes = total(e.consumos.filter((c) => !c.cobrar).map((c) => c.monto));
-  const descuentos = total(e.descuentos);
+  const lineas = e.lineasDescuento ?? [];
+  const descuentos = redondear2(total(e.descuentos) + total(lineas.map((l) => l.monto)));
   const adelantos = total(e.adelantos);
+  const adicional = total(e.bonos ?? []);
+  const porCat: Record<string, number> = {};
+  const sumar = (c: string, m: number) => { if (m) porCat[c] = redondear2((porCat[c] ?? 0) + m); };
+  sumar('CONSUMO', consumosCobrados);
+  sumar('OTRO', total(e.descuentos));
+  lineas.forEach((l) => sumar(l.categoria, l.monto));
+  const netoAPagar = redondear2(ganado + adicional - consumosCobrados - descuentos);
   return {
     programadaMin,
     trabajadaMin,
@@ -206,6 +267,10 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
     consumosPendientes,
     descuentos,
     adelantos,
-    neto: redondear2(ganado - consumosCobrados - descuentos - adelantos),
+    valorHoraExacto: vh,
+    adicional,
+    descuentosPorCategoria: porCat,
+    netoAPagar,
+    neto: redondear2(netoAPagar - adelantos),
   };
 }

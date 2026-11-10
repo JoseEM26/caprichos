@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { controlAlmacenActivo } from '../stock/control-almacen';
@@ -643,7 +644,7 @@ export class NotificacionesService {
     };
 
     // Aplicar filtros
-    const qTerm = (filtro.q ?? '').toLowerCase().trim();
+    const qTerm = (filtro.q ?? '').trim();
     const filtroTipo = filtro.tipo && filtro.tipo !== 'Todos' ? filtro.tipo : undefined;
     const filtroEstado = filtro.estado || 'todas';
 
@@ -658,8 +659,7 @@ export class NotificacionesService {
       if (filtro.hasta && f.iso > filtro.hasta) return false;
 
       if (qTerm) {
-        const buscable = `${f.tipo} ${f.titulo} ${f.mensaje}`.toLowerCase();
-        if (!buscable.includes(qTerm)) return false;
+        if (!coincideTexto(qTerm, f.tipo, f.titulo, f.mensaje)) return false;
       }
 
       return true;

@@ -331,6 +331,16 @@ function generarPastillasPartes(
   });
 }
 
+/** dd/mm hh:mm en hora de Lima (no la del navegador). */
+function ddmmHoraLima(d: Date): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month} ${p.hour}:${p.minute}`;
+}
+
 export function OfertasAdminView() {
   const [tabActual, setTabActual] = useState<'promos' | 'descuentos' | 'cupones' | 'reglas'>('promos');
 
@@ -662,7 +672,7 @@ export function OfertasAdminView() {
     for (const e of cuponesEmitidos) {
       if (e.creadoEn) {
         const d = new Date(e.creadoEn);
-        const fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const fechaStr = ddmmHoraLima(d);
         list.push({
           t: fechaStr,
           who: 'Sistema',
@@ -674,7 +684,7 @@ export function OfertasAdminView() {
       }
       if (e.estado === 'CANJEADO' && e.canjeadoEn) {
         const d = new Date(e.canjeadoEn);
-        const fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const fechaStr = ddmmHoraLima(d);
         list.push({
           t: fechaStr,
           who: 'Sistema',
@@ -686,7 +696,7 @@ export function OfertasAdminView() {
       }
       if (e.estado === 'ANULADO' && e.anuladoEn) {
         const d = new Date(e.anuladoEn);
-        const fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const fechaStr = ddmmHoraLima(d);
         list.push({
           t: fechaStr,
           who: 'Admin',
@@ -700,7 +710,7 @@ export function OfertasAdminView() {
     for (const c of cupones) {
       if (c.creadoEn) {
         const d = new Date(c.creadoEn);
-        const fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const fechaStr = ddmmHoraLima(d);
         list.push({
           t: fechaStr,
           who: 'Admin',

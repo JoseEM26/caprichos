@@ -73,6 +73,14 @@ function formatearIso(d: Date): string {
 
 const CATEGORIAS_FILTRO = ['Todas', 'Ventas', 'Caja', 'Inventario', 'Compras', 'Clientes', 'Delivery'];
 
+const KPIS_VACIOS = [
+  { n: 'Pedidos', v: '0' },
+  { n: 'Ventas', v: 's/ 0.00' },
+  { n: 'Ticket promedio', v: 's/ 0.00' },
+  { n: 'Por cobrar', v: 's/ 0.00' },
+  { n: 'Rechazados', v: '0' },
+];
+
 export function InformesView() {
   const hoy = useMemo(() => hoyEnLima(), []);
   const ayer = useMemo(() => new Date(hoy.getTime() - 86400000), [hoy]);
@@ -95,16 +103,13 @@ export function InformesView() {
 
   // Catálogo
   const [catalogo, setCatalogo] = useState<ReporteItem[]>(CATALOGO_INICIAL);
-  const [kpisPeriodo, setKpisPeriodo] = useState<{ n: string; v: string }[]>([
-    { n: 'Pedidos', v: '0' },
-    { n: 'Ventas', v: 's/ 0.00' },
-    { n: 'Ticket promedio', v: 's/ 0.00' },
-    { n: 'Por cobrar', v: 's/ 0.00' },
-    { n: 'Rechazados', v: '0' },
-  ]);
+  const [kpisPeriodo, setKpisPeriodo] = useState<{ n: string; v: string }[]>(KPIS_VACIOS);
+  const [errorKpis, setErrorKpis] = useState('');
 
   useEffect(() => {
+    if (desde && hasta && desde > hasta) return; // rango inválido: no se consulta
     let montado = true;
+    setErrorKpis('');
     api
       .get<ReporteItem[]>(`/admin/informes/catalogo?desde=${desde}&hasta=${hasta}&canal=${canal}&pago=${pago}&modalidad=${modalidad}`)
       .then((res: any) => {
@@ -113,19 +118,23 @@ export function InformesView() {
       .catch(() => {});
 
     api
-      .get<any>(`/admin/informes/resumen?desde=${desde}&hasta=${hasta}&canal=${canal}`)
+      .get<any>(`/admin/informes/resumen?desde=${desde}&hasta=${hasta}&canal=${canal}&pago=${pago}&modalidad=${modalidad}`)
       .then((res: any) => {
         if (montado && res && res.kpisS) {
           setKpisPeriodo([
             { n: 'Pedidos', v: res.kpisS[1]?.v || '0' },
             { n: 'Ventas', v: res.kpisS[0]?.v || 's/ 0.00' },
             { n: 'Ticket promedio', v: res.kpisS[2]?.v || 's/ 0.00' },
-            { n: 'Por cobrar', v: 's/ 0.00' },
-            { n: 'Rechazados', v: '0' },
+            { n: 'Por cobrar', v: res.porCobrar ?? 's/ 0.00' },
+            { n: 'Rechazados', v: String(res.rechazados ?? 0) },
           ]);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!montado) return;
+        setKpisPeriodo(KPIS_VACIOS);
+        setErrorKpis('No se pudieron cargar los indicadores del período. Intenta de nuevo.');
+      });
 
     return () => {
       montado = false;
@@ -474,6 +483,11 @@ export function InformesView() {
         <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft)', marginBottom: '8px' }}>
           EN EL PERÍODO
         </div>
+        {errorKpis && (
+          <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
+            {errorKpis}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
           {kpisPeriodo.map((k, i) => (
             <div key={i} style={{ background: 'var(--cp-cream)', borderRadius: '12px', padding: '10px 12px' }}>

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
 import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
@@ -62,8 +63,8 @@ export class InformesService {
     const where: any = {};
     if (desde || hasta) {
       where.creado_en = {};
-      if (desde) where.creado_en.gte = new Date(`${desde}T00:00:00.000Z`);
-      if (hasta) where.creado_en.lte = new Date(`${hasta}T23:59:59.999Z`);
+      if (desde) where.creado_en.gte = inicioDiaLimaIso(desde);
+      if (hasta) where.creado_en.lte = finDiaLimaIso(hasta);
     }
     if (canal && canal !== 'todos' && canal !== 'all') {
       where.canal = canal.toUpperCase();
@@ -118,8 +119,8 @@ export class InformesService {
     let dColTicket = 'var(--cp-soft)';
 
     if (filtro.desde && filtro.hasta) {
-      const d1 = new Date(`${filtro.desde}T00:00:00.000Z`).getTime();
-      const d2 = new Date(`${filtro.hasta}T23:59:59.999Z`).getTime();
+      const d1 = inicioDiaLimaIso(filtro.desde).getTime();
+      const d2 = finDiaLimaIso(filtro.hasta).getTime();
       const duracionMs = Math.max(86400000, d2 - d1);
       const prevHasta = new Date(d1 - 1);
       const prevDesde = new Date(d1 - duracionMs);
@@ -379,8 +380,17 @@ export class InformesService {
       entPts = ptsEnt.join(' ');
     }
 
+    // Por cobrar: aceptados sin entregar ni cobro vigente (misma regla que el catálogo). Rechazados: rechazados + anulados.
+    const porCobrarPedidos = pedidos.filter(
+      (p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && !(p.cobros || []).some((c: any) => !c.anulado_en),
+    );
+    const porCobrar = porCobrarPedidos.reduce((acc, p) => acc + Number(p.total || 0), 0);
+    const rechazados = pedidos.length - noRechazados.length;
+
     return {
       kpisS,
+      porCobrar: this.soles(porCobrar),
+      rechazados,
       hoursB,
       legend,
       tops2,

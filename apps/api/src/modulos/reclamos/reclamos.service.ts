@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { TEXTO_CONSENTIMIENTO, leerTextosLegales } from './textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -302,20 +303,26 @@ export class ReclamosService {
     const limite = Math.min(100, Math.max(1, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
 
-    const [total, reclamos] = await Promise.all([
-      this.prisma.reclamo.count({ where }),
-      this.prisma.reclamo.findMany({
-        where,
-        skip,
-        take: limite,
-        orderBy: [{ fecha_limite: 'asc' }, { creado_en: 'asc' }],
-      }),
-    ]);
+    const buscar = filtros.buscar?.trim() ?? '';
+    const orden = [{ fecha_limite: 'asc' as const }, { creado_en: 'asc' as const }];
+    let total: number;
+    let reclamos;
+    if (buscar) {
+      // ponytail: con búsqueda se trae todo lo que pasa estado/tipo/fechas y se filtra en memoria (sin tildes).
+      // Se busca en lo que el rol ve (documento y teléfono enmascarados si no es ADMIN) para no filtrar datos por la búsqueda.
+      reclamos = await this.prisma.reclamo.findMany({ where, orderBy: orden });
+      total = reclamos.length;
+    } else {
+      [total, reclamos] = await Promise.all([
+        this.prisma.reclamo.count({ where }),
+        this.prisma.reclamo.findMany({ where, skip, take: limite, orderBy: orden }),
+      ]);
+    }
 
     const hoyIso = obtenerHoyLima(new Date());
     const esAdmin = usuarioActual?.rol === 'ADMIN';
 
-    const items = reclamos.map((r) => {
+    let items = reclamos.map((r) => {
       const fechaLimIso = formatearFechaIso(r.fecha_limite);
       const diasHabilesRestantes = calcularDiasHabilesRestantes(hoyIso, fechaLimIso);
       const texto = formatearTextoPlazo(diasHabilesRestantes);
@@ -350,6 +357,14 @@ export class ReclamosService {
         creadoEn: r.creado_en.toISOString(),
       };
     });
+
+    if (buscar) {
+      items = items.filter((i) =>
+        coincideTexto(buscar, i.numero, i.nombre, i.documento, i.detalle, i.telefono, i.pedido_id),
+      );
+      total = items.length;
+      items = items.slice(skip, skip + limite);
+    }
 
     return {
       total,

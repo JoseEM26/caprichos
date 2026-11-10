@@ -47,6 +47,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      pedidoMesa: { findMany: jest.fn().mockResolvedValue([]) }, // pedidos abiertos de hoy: ninguno
       reservaMesa: {
         createMany: jest.fn(),
         deleteMany: jest.fn(),

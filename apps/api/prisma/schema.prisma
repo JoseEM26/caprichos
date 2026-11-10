@@ -2976,7 +2976,14 @@ model SueldoPersonal {
   monto_mensual   Decimal  @db.Decimal(10, 2)
   actualizado_en  DateTime @default(now()) @db.Timestamptz
   actualizado_por BigInt?
-
+  /// DIAS_HORAS | TARIFA_HORA | PROGRAMADAS (planilla estilo Excel; las filas anteriores conservan PROGRAMADAS)
+  metodo_valor_hora String  @default("PROGRAMADAS") @db.VarChar(12)
+  dias_mes          Int?
+  horas_dia         Decimal? @db.Decimal(4, 1)
+  tarifa_hora       Decimal? @db.Decimal(10, 4)
+  /// Dato personal: solo ADMIN (planilla/ver)
+  pago_celular      String?  @db.VarChar(20)
+  pago_medio        String?  @db.VarChar(14) // YAPE | PLIN | TRANSFERENCIA | EFECTIVO
 
   @@map("sueldo_personal")
 }
@@ -2993,10 +3000,64 @@ model PlanillaAjuste {
   anulado_en     DateTime? @db.Timestamptz
   anulado_por    BigInt?
   anulado_motivo String?
-
+  /// CONSUMO | MERMA | DANO | PRESTAMO | NETFLIX | OTRO (etiqueta del descuento)
+  categoria      String    @default("OTRO") @db.VarChar(10)
 
   @@index([party_id, fecha])
   @@map("planilla_ajuste")
+}
+
+// Planilla estilo Excel (migración 20270201800000_planilla_excel): préstamos con cuotas y descuentos recurrentes.
+model PrestamoPersonal {
+  id             BigInt          @id @default(autoincrement())
+  party_id       BigInt
+  monto          Decimal         @db.Decimal(10, 2)
+  num_cuotas     Int
+  periodicidad   String          @db.VarChar(8) // SEMANAL | MENSUAL
+  monto_cuota    Decimal         @db.Decimal(10, 2)
+  fecha_inicio   DateTime        @db.Date
+  estado         String          @default("ACTIVO") @db.VarChar(8) // ACTIVO | SALDADO | ANULADO
+  motivo         String?
+  anulado_motivo String?
+  creado_por     BigInt
+  creado_en      DateTime        @default(now()) @db.Timestamptz
+  cuotas         PrestamoCuota[]
+
+  @@index([party_id, estado])
+  @@map("prestamo_personal")
+}
+
+model PrestamoCuota {
+  id                  BigInt           @id @default(autoincrement())
+  prestamo_id         BigInt
+  numero              Int
+  monto               Decimal          @db.Decimal(10, 2)
+  estado              String           @default("PENDIENTE") @db.VarChar(10) // PENDIENTE | DESCONTADA | OMITIDA
+  periodo_desde       DateTime?        @db.Date
+  periodo_hasta       DateTime?        @db.Date
+  planilla_periodo_id BigInt?
+  reprogramada_de     BigInt?
+  prestamo            PrestamoPersonal @relation(fields: [prestamo_id], references: [id], onDelete: Cascade)
+
+  @@index([prestamo_id, estado])
+  @@index([planilla_periodo_id])
+  @@map("prestamo_cuota")
+}
+
+model DescuentoRecurrentePersonal {
+  id           BigInt   @id @default(autoincrement())
+  party_id     BigInt
+  tipo         String   @db.VarChar(8) // NETFLIX | OTRO
+  nombre       String   @db.VarChar(80)
+  monto        Decimal  @db.Decimal(10, 2) // por semana
+  periodicidad String   @default("SEMANAL") @db.VarChar(8)
+  activo       Boolean  @default(true)
+  desde        DateTime @db.Date
+  creado_por   BigInt?
+  creado_en    DateTime @default(now()) @db.Timestamptz
+
+  @@index([party_id])
+  @@map("descuento_recurrente_personal")
 }
 
 model PlanillaExtraAprobada {

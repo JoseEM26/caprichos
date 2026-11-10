@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../comun/api';
+import { coincide } from '../asistencia/buscar';
 import { GRUPOS_MODULOS, MODULOS } from '../modulos';
 import { ETIQUETAS_ROLES } from './roles';
 import { fechaLimaCorta } from './rolesTemporalesApi';
@@ -32,6 +33,10 @@ export function CuadroAccesos() {
   }, [inactivos]);
 
   const rolesPresentes = useMemo(() => [...new Set(usuarios.flatMap((u) => u.roles.map((r) => r.rol)))].sort(), [usuarios]);
+  // Al marcar/desmarcar «Incluir inactivos» el rol elegido puede dejar de existir: se limpia para que el select no diga «Todos» con el filtro activo
+  useEffect(() => {
+    if (!cargando && rol && !rolesPresentes.includes(rol)) setRol('');
+  }, [cargando, rol, rolesPresentes]);
   const columnas = useMemo(
     () => GRUPOS_MODULOS.map((g) => ({ grupo: g, modulos: MODULOS.filter((m) => m.grupo === g && (!modulo || m.clave === modulo)) })).filter((g) => g.modulos.length),
     [modulo],
@@ -39,9 +44,8 @@ export function CuadroAccesos() {
   const mods = columnas.flatMap((c) => c.modulos);
 
   const filas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
     return usuarios.filter((u) => {
-      if (q && !u.nombre.toLowerCase().includes(q)) return false;
+      if (!coincide(u.nombre, busqueda)) return false;
       if (rol && !u.roles.some((r) => r.rol === rol)) return false;
       if (modulo) {
         const m = MODULOS.find((x) => x.clave === modulo);

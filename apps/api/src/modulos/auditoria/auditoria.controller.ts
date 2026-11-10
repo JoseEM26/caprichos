@@ -17,6 +17,9 @@ export class AuditoriaController {
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
     @Query('entidad') entidad?: string,
+    @Query('categoria') categoria?: string,
+    @Query('resultado') resultado?: string,
+    @Query('busqueda') busqueda?: string,
     @Query('pagina') pagina?: string,
     @Query('limite') limite?: string,
   ) {
@@ -27,6 +30,9 @@ export class AuditoriaController {
       desde,
       hasta,
       entidad,
+      categoria,
+      resultado,
+      busqueda,
       pagina: pagina ? parseInt(pagina, 10) : undefined,
       limite: limite ? parseInt(limite, 10) : undefined,
     };

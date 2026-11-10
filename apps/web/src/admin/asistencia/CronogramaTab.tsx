@@ -17,11 +17,11 @@ import {
   reasignarMarca,
   separarMarca,
 } from './correccionesApi';
+import { jornadaActual, useUltimaPeticion } from './jornada';
 import './cronograma.css';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
-const hoyLima = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const DIAS_CORTOS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
@@ -60,24 +60,34 @@ function resumenDe(personas: CronoPersona[], jornada: string) {
 
 /** Cronograma de asistencia (ADMIN): calendario del mes y línea de tiempo por persona con el horario, las marcas y las solicitudes. */
 export function CronogramaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
-  const [dia, setDia] = useState(() => hoyLima());
+  const [dia, setDia] = useState(() => jornadaActual());
   const [vista, setVista] = useState<'dia' | 'mes'>('dia');
   const [data, setData] = useState<Cronograma | null>(null);
   const [persona, setPersona] = useState('');
   const [rol, setRol] = useState('');
   const mesActual = dia.slice(0, 7);
 
+  const nueva = useUltimaPeticion();
   const cargar = useCallback(async () => {
     const [a, m] = mesActual.split('-').map(Number);
     const { desde, hasta } = rangoMes(a, m);
+    const vigente = nueva();
     try {
-      setData(await cronograma(desde, hasta));
+      const r = await cronograma(desde, hasta);
+      if (!vigente()) return;
+      setData(r);
       onError(null);
     } catch (e) {
-      onError(mensajeDe(e, 'No pudimos cargar el cronograma.'));
+      if (vigente()) onError(mensajeDe(e, 'No pudimos cargar el cronograma.'));
     }
-  }, [mesActual, onError]);
+  }, [mesActual, onError, nueva]);
   useEffect(() => { setData(null); void cargar(); }, [cargar]);
+  // Si la persona o el rol elegidos no existen en el mes nuevo, se limpian (el select y la lista no se desfasan)
+  useEffect(() => {
+    if (!data) return;
+    if (persona && !data.personas.some((p) => String(p.partyId) === persona)) setPersona('');
+    if (rol && !data.personas.some((p) => p.roles.includes(rol))) setRol('');
+  }, [data, persona, rol]);
 
   const personas = useMemo(
     () => (data?.personas ?? []).filter((p) => (!persona || String(p.partyId) === persona) && (!rol || p.roles.includes(rol))),
@@ -107,7 +117,7 @@ export function CronogramaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar
           <Boton type="button" variante="secundario" aria-label="Día siguiente" onClick={() => mover(1)}>Día ›</Boton>
           <Boton type="button" variante="secundario" aria-label="Semana siguiente" onClick={() => mover(7)}>Semana ›</Boton>
           <Boton type="button" variante="secundario" aria-label="Mes siguiente" onClick={() => moverMes(1)}>Mes »</Boton>
-          <Boton type="button" variante="texto" onClick={() => setDia(hoyLima())}>Hoy</Boton>
+          <Boton type="button" variante="texto" onClick={() => setDia(jornadaActual())}>Hoy</Boton>
         </div>
         <div className="cr-grupo">
           <label className="as-campo">Persona

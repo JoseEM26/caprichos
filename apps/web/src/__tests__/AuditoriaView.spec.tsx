@@ -169,9 +169,9 @@ describe('AuditoriaView (/admin/historial)', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Resultado: Todos' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Resultado: Todos' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Rechazados' }));
+    fireEvent.click(screen.getByRole('option', { name: /^Rechazados/ }));
 
-    expect(screen.getByRole('button', { name: 'Resultado: Rechazados' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Resultado: Rechazados/ })).toBeInTheDocument();
     await waitFor(() => {
       expect(spyGet).toHaveBeenLastCalledWith(expect.stringContaining('resultado=RECHAZADO'));
     });

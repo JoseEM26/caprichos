@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -40,8 +40,9 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
   const [limite] = useState(20);
   const [total, setTotal] = useState(0);
 
-  // Filtros en cliente
+  // Filtros: se aplican en el servidor (total y paginación reales)
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'BOLETA' | 'FACTURA'>('TODOS');
   const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'POR_EMITIR'>('TODOS');
 
@@ -55,24 +56,42 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
+  const peticion = useRef(0);
   const cargarComprobantes = useCallback(async (pag = 1) => {
+    const mia = ++peticion.current;
     setCargando(true);
     setError(null);
     try {
-      const resp = await comprobantesApi.listarPorEmitir(pag, limite);
+      const resp = await comprobantesApi.listarPorEmitir(pag, limite, {
+        tipo: filtroTipo,
+        estado: filtroEstado,
+        buscar: busquedaAplicada,
+      });
+      if (mia !== peticion.current) return; // respuesta tardía de un filtro anterior
       setComprobantes(resp.elementos || []);
       setTotal(resp.total || 0);
-      setPagina(resp.pagina || pag);
     } catch (err: any) {
+      if (mia !== peticion.current) return;
       setError(err?.message || 'Error al cargar comprobantes por emitir');
     } finally {
-      setCargando(false);
+      if (mia === peticion.current) setCargando(false);
     }
-  }, [limite]);
+  }, [limite, filtroTipo, filtroEstado, busquedaAplicada]);
 
   useEffect(() => {
     cargarComprobantes(pagina);
   }, [cargarComprobantes, pagina]);
+
+  // La búsqueda espera a que se deje de escribir y vuelve a la página 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (busqueda.trim() !== busquedaAplicada) {
+        setBusquedaAplicada(busqueda.trim());
+        setPagina(1);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda, busquedaAplicada]);
 
   const handleCopiar = async (c: ComprobantePorEmitir) => {
     const docMostrar = enmascararDocumento(c.documento, esAdmin);
@@ -127,26 +146,8 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
     }
   };
 
-  // Filtrado de comprobantes
-  const comprobantesFiltrados = useMemo(() => {
-    return comprobantes.filter((c) => {
-      if (filtroTipo !== 'TODOS' && c.tipo !== filtroTipo) {
-        return false;
-      }
-      if (filtroEstado !== 'TODOS' && c.emision !== filtroEstado) {
-        return false;
-      }
-      if (busqueda.trim()) {
-        const q = busqueda.trim().toLowerCase();
-        const coincideNumero = c.numero_texto?.toLowerCase().includes(q) ?? false;
-        const coincidePedido = (c.codigo_pedido || c.codigo || '').toLowerCase().includes(q);
-        const coincideDoc = (c.documento || '').toLowerCase().includes(q);
-        const coincideRazon = (c.razon_social || '').toLowerCase().includes(q);
-        return coincideNumero || coincidePedido || coincideDoc || coincideRazon;
-      }
-      return true;
-    });
-  }, [comprobantes, filtroTipo, filtroEstado, busqueda]);
+  const comprobantesFiltrados = comprobantes;
+  const hayFiltro = filtroTipo !== 'TODOS' || filtroEstado !== 'TODOS' || busquedaAplicada !== '';
 
   if (cargando && comprobantes.length === 0) {
     return <Cargando mensaje="Cargando comprobantes por emitir..." />;
@@ -217,7 +218,10 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
                 { valor: 'BOLETA', etiqueta: 'Boletas' },
                 { valor: 'FACTURA', etiqueta: 'Facturas' },
               ]}
-              alCambiar={(v) => setFiltroTipo(v as typeof filtroTipo)}
+              alCambiar={(v) => {
+                setFiltroTipo(v as typeof filtroTipo);
+                setPagina(1);
+              }}
             />
             <FiltroCombo
               etiqueta="Estado"
@@ -227,12 +231,15 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
                 { valor: 'TODOS', etiqueta: 'Todos' },
                 { valor: 'POR_EMITIR', etiqueta: 'Por emitir' },
               ]}
-              alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
+              alCambiar={(v) => {
+                setFiltroEstado(v as typeof filtroEstado);
+                setPagina(1);
+              }}
             />
           </BarraFiltros>
 
           <div style={{ fontSize: '13px', color: 'var(--cp-soft)', fontWeight: 700 }}>
-            {comprobantesFiltrados.length} {comprobantesFiltrados.length === 1 ? 'pendiente' : 'pendientes'}
+            {total} {total === 1 ? 'pendiente' : 'pendientes'}
           </div>
         </div>
       </div>
@@ -270,7 +277,7 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
         </div>
       )}
 
-      {comprobantes.length === 0 ? (
+      {comprobantes.length === 0 && !hayFiltro ? (
         <EstadoVacio
           titulo="No hay comprobantes pendientes"
           mensaje="Todas las boletas y facturas han sido emitidas o aún no se han generado cobros."

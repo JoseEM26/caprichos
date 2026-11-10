@@ -3,11 +3,12 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
+import { jornadaActual, useUltimaPeticion } from './jornada';
 import { Feriado, crearFeriado, editarFeriado, listarFeriados } from './planillaApi';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
-const anioHoy = () => new Date(Date.now() - 5 * 3600_000).getUTCFullYear();
+const anioHoy = () => Number(jornadaActual().slice(0, 4));
 
 /** Feriados (solo ADMIN): las horas trabajadas en un feriado activo se pagan a valor hora × recargo. Se desactivan, no se borran. */
 export function FeriadosTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
@@ -18,9 +19,13 @@ export function FeriadosTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   const [recargo, setRecargo] = useState('2');
   const [ocupado, setOcupado] = useState(false);
 
+  const nueva = useUltimaPeticion();
   const cargar = useCallback(() => {
-    listarFeriados(anio).then(setLista).catch((e) => onError(mensajeDe(e, 'No pudimos cargar los feriados.')));
-  }, [anio, onError]);
+    const vigente = nueva();
+    listarFeriados(anio)
+      .then((l) => vigente() && setLista(l))
+      .catch((e) => vigente() && onError(mensajeDe(e, 'No pudimos cargar los feriados.')));
+  }, [anio, onError, nueva]);
   useEffect(() => { setLista(null); cargar(); }, [cargar]);
 
   const ejecutar = async (f: () => Promise<unknown>, ok: string) => {

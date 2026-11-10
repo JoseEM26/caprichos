@@ -1,4 +1,4 @@
-import { IsOptional, IsPositive, Min } from 'class-validator';
+import { IsIn, IsOptional, IsPositive, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListarPorEmitirDto {
@@ -11,4 +11,17 @@ export class ListarPorEmitirDto {
   @Type(() => Number)
   @IsPositive({ message: 'limite debe ser positivo' })
   limite?: number = 20;
+
+  @IsOptional()
+  @IsIn(['BOLETA', 'FACTURA'])
+  tipo?: 'BOLETA' | 'FACTURA';
+
+  @IsOptional()
+  @IsIn(['POR_EMITIR'])
+  estado?: 'POR_EMITIR';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  buscar?: string;
 }

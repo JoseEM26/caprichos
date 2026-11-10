@@ -34,6 +34,8 @@ import { CronogramaTab } from './CronogramaTab';
 import { SolicitudesTab } from './SolicitudesTab';
 import { contadorSolicitudes } from './correccionesApi';
 import { FeriadosTab } from './FeriadosTab';
+import { coincide } from './buscar';
+import { jornadaActual, useUltimaPeticion } from './jornada';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
 import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
@@ -43,9 +45,11 @@ type Pestana = 'hoy' | 'cronograma' | 'solicitudes' | 'mes' | 'marcas' | 'planil
 type Avisar = (m: string | null) => void;
 
 const ahoraLima = () => {
-  const d = new Date(Date.now() - 5 * 3600_000);
-  return { anio: d.getUTCFullYear(), mes: d.getUTCMonth() + 1 };
+  const j = jornadaActual();
+  return { anio: Number(j.slice(0, 4)), mes: Number(j.slice(5, 7)) };
 };
+const sumarDiasIso = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const MAX_MARCAS = 500; // el servidor corta aquí (asistencia.service listarMarcas)
 
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
 
@@ -178,8 +182,7 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
   };
   if (!filas) return <Cargando mensaje="Cargando" />;
   const cuenta = (...e: string[]) => filas.filter((f) => e.includes(f.estado)).length;
-  const q = buscar.trim().toLowerCase();
-  const visibles = filas.filter((f) => (!q || f.nombre.toLowerCase().includes(q)) && (!estadoSel || f.estado === estadoSel));
+  const visibles = filas.filter((f) => coincide(f.nombre, buscar) && (!estadoSel || f.estado === estadoSel));
   return (
     <>
       <h3 className="as-sub">Jornada {jornada}</h3>
@@ -239,24 +242,32 @@ function MesTab({ onError }: { onError: Avisar }) {
   const hoy = ahoraLima();
   const [anio, setAnio] = useState(hoy.anio);
   const [mes, setMes] = useState(hoy.mes);
+  // Lo que se escribe (puede estar a medias); solo un valor válido pasa a anio/mes y pide al servidor
+  const [anioTxt, setAnioTxt] = useState(String(hoy.anio));
+  const [mesTxt, setMesTxt] = useState(String(hoy.mes));
   const [filas, setFilas] = useState<FilaMes[]>([]);
   const [resumen, setResumen] = useState<ResumenMes[]>([]);
   const [cargando, setCargando] = useState(false);
+  const nueva = useUltimaPeticion();
 
-  const cargar = async () => {
+  const anioOk = /^\d{4}$/.test(anioTxt) && Number(anioTxt) >= 2020 && Number(anioTxt) <= 2100;
+  const mesOk = /^\d{1,2}$/.test(mesTxt) && Number(mesTxt) >= 1 && Number(mesTxt) <= 12;
+  useEffect(() => { if (anioOk) setAnio(Number(anioTxt)); }, [anioTxt, anioOk]);
+  useEffect(() => { if (mesOk) setMes(Number(mesTxt)); }, [mesTxt, mesOk]);
+
+  useEffect(() => {
+    const vigente = nueva();
     setCargando(true);
-    try {
-      const r = await reporteMes(anio, mes);
-      setFilas(r.filas);
-      setResumen(r.personas);
-      onError(null);
-    } catch (e) {
-      onError(mensajeDe(e, 'No pudimos cargar el mes.'));
-    } finally {
-      setCargando(false);
-    }
-  };
-  useEffect(() => { void cargar(); }, [anio, mes]);
+    reporteMes(anio, mes)
+      .then((r) => {
+        if (!vigente()) return;
+        setFilas(r.filas);
+        setResumen(r.personas);
+        onError(null);
+      })
+      .catch((e) => vigente() && onError(mensajeDe(e, 'No pudimos cargar el mes.')))
+      .finally(() => vigente() && setCargando(false));
+  }, [anio, mes]);
 
   const descargar = () => {
     const blob = new Blob([csvDeFilas(filas)], { type: 'text/csv;charset=utf-8' });
@@ -271,10 +282,11 @@ function MesTab({ onError }: { onError: Avisar }) {
   return (
     <>
       <div className="as-filtros">
-        <label className="as-campo" style={{ width: 110 }}>Año <input type="number" value={anio} onChange={(e) => setAnio(Number(e.target.value))} /></label>
-        <label className="as-campo" style={{ width: 90 }}>Mes <input type="number" min={1} max={12} value={mes} onChange={(e) => setMes(Number(e.target.value))} /></label>
+        <label className="as-campo" style={{ width: 110 }}>Año <input type="number" min={2020} max={2100} value={anioTxt} aria-invalid={!anioOk} onChange={(e) => setAnioTxt(e.target.value)} /></label>
+        <label className="as-campo" style={{ width: 90 }}>Mes <input type="number" min={1} max={12} value={mesTxt} aria-invalid={!mesOk} onChange={(e) => setMesTxt(e.target.value)} /></label>
         <Boton type="button" variante="secundario" onClick={descargar} disabled={filas.length === 0}>Exportar CSV</Boton>
         {cargando && <span role="status" className="as-ayuda">Calculando…</span>}
+        {(!anioOk || !mesOk) && <span role="alert" className="as-ayuda">Año entre 2020 y 2100 y mes de 1 a 12: mientras tanto se muestra {String(mes).padStart(2, '0')}/{anio}.</span>}
       </div>
       <h3 className="as-sub">Totales por persona</h3>
       <div className="as-tabla-wrap">
@@ -324,16 +336,32 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
   const [foto, setFoto] = useState<{ id: number; url: string } | null>(null);
   const [form, setForm] = useState({ partyId: '', jornada: '', tipo: 'SALIDA' as TipoMarca, momento: '', motivo: '' });
   const [revisando, setRevisando] = useState<{ marca: MarcaAdmin; accion: 'aprobar' | 'anular'; motivo: string } | null>(null);
+  // Filtros enviados al servidor: por defecto, los últimos 7 días (jornada de Lima)
+  const [desde, setDesde] = useState(() => sumarDiasIso(jornadaActual(), -6));
+  const [hasta, setHasta] = useState(() => jornadaActual());
+  const [personaTxt, setPersonaTxt] = useState('');
+  const [cargandoMarcas, setCargandoMarcas] = useState(true);
+  const nueva = useUltimaPeticion();
+  const partyId = /^\d+$/.test(personaTxt.trim()) ? Number(personaTxt.trim()) : undefined;
+  const rangoMalo = !!desde && !!hasta && desde > hasta;
 
   const cargar = async () => {
+    if (rangoMalo) return;
+    const vigente = nueva();
+    setCargandoMarcas(true);
     try {
-      setMarcas(await listarMarcas({}));
+      const r = await listarMarcas({ ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}), ...(partyId ? { partyId } : {}) });
+      if (!vigente()) return;
+      setMarcas(r);
       onError(null);
     } catch (e) {
-      onError(mensajeDe(e, 'No pudimos cargar las marcas.'));
+      if (vigente()) onError(mensajeDe(e, 'No pudimos cargar las marcas.'));
+    } finally {
+      if (vigente()) setCargandoMarcas(false);
     }
   };
-  useEffect(() => { void cargar(); }, []);
+  useEffect(() => { setMarcas([]); void cargar();
+  }, [desde, hasta, partyId]);
 
   const verFoto = async (id: number) => {
     try {
@@ -424,8 +452,22 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
         </Tarjeta>
       )}
 
+      <Tarjeta titulo="Filtrar marcas" subtitulo="Por defecto, los últimos 7 días. Se piden al servidor.">
+        <div className="as-filtros">
+          <label className="as-campo">Desde <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} /></label>
+          <label className="as-campo">Hasta <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} /></label>
+          <label className="as-campo">ID de la persona
+            <input inputMode="numeric" placeholder="Todas" aria-label="Filtrar por ID de persona" value={personaTxt} onChange={(e) => setPersonaTxt(e.target.value)} />
+          </label>
+        </div>
+        {rangoMalo && <p role="alert" className="as-ayuda">«Desde» no puede ser posterior a «Hasta».</p>}
+        {personaTxt.trim() !== '' && partyId === undefined && <p role="alert" className="as-ayuda">El ID de la persona son solo números; mientras tanto se muestran todas.</p>}
+        {marcas.length >= MAX_MARCAS && <p role="status" className="as-ayuda">Se muestran solo las {MAX_MARCAS} marcas más recientes: acota las fechas o elige una persona para ver el resto.</p>}
+      </Tarjeta>
+
       {marcas.length === 0 ? (
-        <EstadoVacio titulo="Sin marcas" descripcion="Cuando el equipo marque, aparecerán aquí con su distancia y selfie." />
+        cargandoMarcas ? <Cargando mensaje="Cargando marcas" /> :
+        <EstadoVacio titulo="Sin marcas" descripcion="Ninguna marca en ese rango. Cambia las fechas o la persona." />
       ) : (
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas">
@@ -575,7 +617,11 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
           <div style={{ display: 'grid', gap: 12 }}>
             {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
             {campo('toleranciaMin', 'Tolerancia de tardanza (min)', 'Minutos después de la hora de entrada que aún no cuentan como tardanza. Hoy: 5.')}
-            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). Hoy: 50.')}
+            {campo('pagoTardanzaPct', 'Tardanza pagada al (%)', 'Porcentaje del valor hora con que se pagan los minutos de atraso. Hoy: 0 (solo se pagan los minutos trabajados).')}
+            {campo('multiplicadorExtra', 'Hora extra aprobada: multiplicador', 'Se paga a valor hora × este número (solo si el admin la aprueba). No aplica a quien se calcula por horas programadas. Hoy: 1.25.')}
+            {campo('diasMesDefecto', 'Valor hora: días del mes (general)', 'Sueldo mensual ÷ estos días ÷ horas por día. Se puede cambiar por persona en Usuarios. Hoy: 24.')}
+            {campo('horasDiaDefecto', 'Valor hora: horas por día (general)', 'Hoy: 9. Se puede cambiar por persona (ej. 8).')}
+            {campo('netflixSemanal', 'Netflix: descuento semanal (S/)', 'Monto por semana que se descuenta a quien lo paga (×4 en un pago mensual). Hoy: 1.64.')}
             {campo('dobleMarcaMin', 'Doble marca: unir marcas a menos de (min)', 'Marcas muy seguidas se unen: cuenta la primera y la otra se muestra tachada. 0 = no unir. Hoy: 3.')}
             {campo('solicitudDiasMax', 'Días para pedir corrección', 'Hasta cuántos días atrás la persona puede pedir que se corrija su asistencia (y se le avisa de inconsistencias). Hoy: 7.')}
             {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}

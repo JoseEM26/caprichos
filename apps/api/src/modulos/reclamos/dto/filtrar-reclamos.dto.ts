@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class FiltrarReclamosDto {
   @IsOptional()
@@ -13,6 +13,11 @@ export class FiltrarReclamosDto {
     message: 'El tipo debe ser RECLAMO o QUEJA',
   })
   tipo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  buscar?: string;
 
   @IsOptional()
   @IsString()

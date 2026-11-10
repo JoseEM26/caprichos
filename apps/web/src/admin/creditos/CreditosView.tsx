@@ -1,4 +1,4 @@
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { BotonCobradoManual, BotonPagarAhora, BotonPlanilla, EstadoCobro, ResumenCuenta } from './AccionesCredito';
 import { Cargando } from '../../comun/Cargando';
@@ -34,7 +34,11 @@ export function CreditosView() {
   const [exportando, setExportando] = useState<boolean>(false);
   const [exportMsg, setExportMsg] = useState<string>('');
 
+  const solicitudRef = useRef(0);
+  const saltarRef = useRef(false); // el autorrelleno de fechas no debe disparar otra consulta
+
   const cargarDatos = async () => {
+    const solicitud = ++solicitudRef.current;
     try {
       setError('');
       const data = await obtenerResumenCreditos({
@@ -44,19 +48,29 @@ export function CreditosView() {
         desde: periodoTipo === 'rango' && desde ? desde : undefined,
         hasta: periodoTipo === 'rango' && hasta ? hasta : undefined,
       });
+      if (solicitud !== solicitudRef.current) return; // respuesta tardía
       setResumen(data);
       if (periodoTipo === 'rango' && (!desde || !hasta)) {
+        saltarRef.current = true;
         setDesde(data.periodo.desde);
         setHasta(data.periodo.hasta);
       }
     } catch (err: any) {
+      if (solicitud !== solicitudRef.current) return;
       setError(err?.message || 'Error al cargar los créditos del personal');
     } finally {
-      setCargando(false);
+      if (solicitud === solicitudRef.current) setCargando(false);
     }
   };
 
   useEffect(() => {
+    if (saltarRef.current) {
+      saltarRef.current = false;
+      return;
+    }
+    // Rango a medias (falta una fecha): no se consulta hasta tener las dos
+    if (periodoTipo === 'rango' && desde && !hasta) return;
+    if (periodoTipo === 'rango' && !desde && hasta) return;
     startTransition(() => {
       cargarDatos();
     });

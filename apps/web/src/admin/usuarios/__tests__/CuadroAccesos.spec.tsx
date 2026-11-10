@@ -57,3 +57,25 @@ describe('CuadroAccesos', () => {
     expect(screen.getByText('Carla Extra')).toBeTruthy();
   });
 });
+
+describe('CuadroAccesos: filtros coherentes', () => {
+  it('al quitar «Incluir inactivos» el rol elegido que ya no existe se limpia; la búsqueda ignora tildes', async () => {
+    (api.get as any).mockReset();
+    (api.get as any).mockImplementation(async (url: string) => ({
+      usuarios: url.includes('inactivos')
+        ? [u({ id: '1', nombre: 'José Activo', roles: [{ rol: 'MOZO', vence_en: null }] }), u({ id: '2', nombre: 'Ines Baja', activo: false, roles: [{ rol: 'CAJERO', vence_en: null }] })]
+        : [u({ id: '1', nombre: 'José Activo', roles: [{ rol: 'MOZO', vence_en: null }] })],
+    }));
+    render(<CuadroAccesos />);
+    await screen.findByText('José Activo');
+    fireEvent.click(screen.getByLabelText(/Incluir inactivos/));
+    await screen.findByText(/Ines Baja/);
+    fireEvent.change(screen.getByLabelText('Filtrar por rol'), { target: { value: 'CAJERO' } });
+    expect(screen.queryByText('José Activo')).toBeNull();
+    fireEvent.click(screen.getByLabelText(/Incluir inactivos/));
+    await waitFor(() => expect(screen.getByLabelText('Filtrar por rol')).toHaveValue(''));
+    expect(await screen.findByText('José Activo')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Buscar usuario'), { target: { value: ' JOSE ' } });
+    expect(screen.getByText('José Activo')).toBeTruthy();
+  });
+});

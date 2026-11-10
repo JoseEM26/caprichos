@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Insignia } from '../../comun/Insignia';
@@ -26,12 +26,33 @@ const OPCIONES_MODULOS = [
   { id: 'iniciativas', n: 'Iniciativas' },
 ];
 
+function hoyLima(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+}
+
+function sumarDias(iso: string, dias: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/** Rango (día de Lima) que representa cada opción del combo «Fecha». */
+function rangoPreset(preset: string): { desde: string; hasta: string } | null {
+  const hoy = hoyLima();
+  if (preset === 'hoy') return { desde: hoy, hasta: hoy };
+  if (preset === 'ayer') return { desde: sumarDias(hoy, -1), hasta: sumarDias(hoy, -1) };
+  if (preset === '7') return { desde: sumarDias(hoy, -6), hasta: hoy };
+  return null;
+}
+
+const CATEGORIA_API: Record<string, string> = { cambio: 'CAMBIO', acceso: 'ACCESO', sensible: 'LECTURA_SENSIBLE' };
+
 export function AuditoriaView() {
   const { tiene } = useSesion();
   const puedeVer = tiene('auditoria/ver');
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroModulo, setFiltroModulo] = useState('');
   const [filtroResultado, setFiltroResultado] = useState('todos');
@@ -48,6 +69,8 @@ export function AuditoriaView() {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [conteos, setConteos] = useState<{ categoria: Record<string, number>; resultado: Record<string, number> }>({ categoria: {}, resultado: {} });
+  const solicitudRef = useRef(0);
 
   // Expansión de detalles
   const [expandidos, setExpandidos] = useState<Record<string, boolean>>({});
@@ -65,6 +88,7 @@ export function AuditoriaView() {
   const cargarAuditoria = useCallback(async () => {
     if (!puedeVer) return;
 
+    const solicitud = ++solicitudRef.current;
     setCargando(true);
     setError(null);
     try {
@@ -73,30 +97,46 @@ export function AuditoriaView() {
       params.set('limite', limite.toString());
 
       if (filtroModulo) params.set('modulo', filtroModulo);
-      if (filtroTipo !== 'todos') params.set('categoria', filtroTipo.toUpperCase());
+      if (filtroTipo !== 'todos') params.set('categoria', CATEGORIA_API[filtroTipo] ?? filtroTipo.toUpperCase());
       if (filtroResultado === 'correctos') params.set('resultado', 'OK');
       if (filtroResultado === 'rechazados') params.set('resultado', 'RECHAZADO');
       if (persona.trim()) params.set('partyId', persona.trim());
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
-      if (busqueda.trim()) params.set('busqueda', busqueda.trim());
+      const preset = rangoPreset(filtroFecha);
+      const d = preset ? preset.desde : desde;
+      const h = preset ? preset.hasta : hasta;
+      if (d) params.set('desde', d);
+      if (h) params.set('hasta', h);
+      if (busquedaAplicada.trim()) params.set('busqueda', busquedaAplicada.trim());
 
       const data = await api.get<RespuestaListarAuditoria>(
         `/admin/auditoria?${params.toString()}`,
       );
+      if (solicitud !== solicitudRef.current) return; // respuesta tardía
       setRegistros(data.datos || []);
+      setConteos(data.conteos ?? { categoria: {}, resultado: {} });
       setTotal(data.total || 0);
       setTotalPaginas(data.paginas || 1);
     } catch (err: any) {
+      if (solicitud !== solicitudRef.current) return;
       if (err instanceof ErrorApi) {
         setError(err.message || 'Error al obtener registros de auditoría.');
       } else {
         setError('Error de conexión con el servidor al cargar historial.');
       }
     } finally {
-      setCargando(false);
+      if (solicitud === solicitudRef.current) setCargando(false);
     }
-  }, [puedeVer, pagina, limite, filtroModulo, filtroTipo, filtroResultado, persona, desde, hasta, busqueda]);
+  }, [puedeVer, pagina, limite, filtroModulo, filtroTipo, filtroResultado, filtroFecha, persona, desde, hasta, busquedaAplicada]);
+
+  // Debounce de la búsqueda de texto
+  useEffect(() => {
+    if (busqueda === busquedaAplicada) return;
+    const t = setTimeout(() => {
+      setBusquedaAplicada(busqueda);
+      setPagina(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda, busquedaAplicada]);
 
   useEffect(() => {
     cargarAuditoria();
@@ -118,6 +158,7 @@ export function AuditoriaView() {
 
   const limpiarFiltros = () => {
     setBusqueda('');
+    setBusquedaAplicada('');
     setFiltroTipo('todos');
     setFiltroModulo('');
     setFiltroResultado('todos');
@@ -153,10 +194,14 @@ export function AuditoriaView() {
     }
   };
 
-  // KPIs
-  const totalCambios = useMemo(() => registros.filter((r) => r.categoria === 'CAMBIO' || r.accion?.includes('CREAR') || r.accion?.includes('MODIFICAR')).length, [registros]);
-  const totalRechazados = useMemo(() => registros.filter((r) => r.resultado === 'RECHAZADO').length, [registros]);
-  const totalSensibles = useMemo(() => registros.filter((r) => r.accion?.includes('DNI') || r.accion?.includes('EXPORTAR') || r.accion?.includes('CLAVE')).length, [registros]);
+  // KPIs: conteos reales del servidor (no de la página de 20)
+  const totalCambios = conteos.categoria.CAMBIO ?? 0;
+  const totalRechazados = conteos.resultado.RECHAZADO ?? 0;
+  const totalSensibles = conteos.categoria.LECTURA_SENSIBLE ?? 0;
+  const totalAccesos = conteos.categoria.ACCESO ?? 0;
+  const totalCorrectos = conteos.resultado.OK ?? 0;
+  const sumaCategorias = totalCambios + totalAccesos + totalSensibles;
+  const sumaResultados = totalCorrectos + totalRechazados;
 
   if (!puedeVer) {
     return (
@@ -196,8 +241,8 @@ export function AuditoriaView() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
         <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>Registros con estos filtros</span>
-          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '26px', fontVariantNumeric: 'tabular-nums' }}>{total || registros.length}</span>
-          <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>de {total || registros.length} en total</span>
+          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '26px', fontVariantNumeric: 'tabular-nums' }}>{total}</span>
+          <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>según los filtros aplicados</span>
         </div>
         <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>Cambios</span>
@@ -284,7 +329,7 @@ export function AuditoriaView() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '16px' }}>
-            Registros <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--cp-soft)' }}>· {total || registros.length} registros</span>
+            Registros <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--cp-soft)' }}>· {total} registros</span>
           </div>
           <button
             type="button"
@@ -318,10 +363,7 @@ export function AuditoriaView() {
               id="au-q"
               type="search"
               value={busqueda}
-              onChange={(e) => {
-                setBusqueda(e.target.value);
-                setPagina(1);
-              }}
+              onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar: persona, pedido, producto, motivo…"
               style={{
                 width: '100%',
@@ -372,12 +414,15 @@ export function AuditoriaView() {
             etiqueta="Tipo"
             valor={filtroTipo}
             opciones={[
-              { valor: 'todos', etiqueta: 'Todos', cantidad: total || registros.length },
-              { valor: 'cambio', etiqueta: 'Cambios', cantidad: totalCambios || 17 },
-              { valor: 'acceso', etiqueta: 'Accesos', cantidad: 5 },
-              { valor: 'sensible', etiqueta: 'Lecturas sensibles', cantidad: totalSensibles || 3 },
+              { valor: 'todos', etiqueta: 'Todos', cantidad: sumaCategorias },
+              { valor: 'cambio', etiqueta: 'Cambios', cantidad: totalCambios },
+              { valor: 'acceso', etiqueta: 'Accesos', cantidad: totalAccesos },
+              { valor: 'sensible', etiqueta: 'Lecturas sensibles', cantidad: totalSensibles },
             ]}
-            alCambiar={setFiltroTipo}
+            alCambiar={(v) => {
+              setFiltroTipo(v);
+              setPagina(1);
+            }}
           />
 
         {/* Módulo */}
@@ -396,11 +441,14 @@ export function AuditoriaView() {
             etiqueta="Resultado"
             valor={filtroResultado}
             opciones={[
-              { valor: 'todos', etiqueta: 'Todos' },
-              { valor: 'correctos', etiqueta: 'Correctos' },
-              { valor: 'rechazados', etiqueta: 'Rechazados' },
+              { valor: 'todos', etiqueta: 'Todos', cantidad: sumaResultados },
+              { valor: 'correctos', etiqueta: 'Correctos', cantidad: totalCorrectos },
+              { valor: 'rechazados', etiqueta: 'Rechazados', cantidad: totalRechazados },
             ]}
-            alCambiar={setFiltroResultado}
+            alCambiar={(v) => {
+              setFiltroResultado(v);
+              setPagina(1);
+            }}
           />
 
         {/* Fecha y rango de fechas */}
@@ -413,21 +461,32 @@ export function AuditoriaView() {
               { valor: 'ayer', etiqueta: 'Ayer' },
               { valor: '7', etiqueta: 'Últimos 7 días' },
             ]}
-            alCambiar={setFiltroFecha}
+            alCambiar={(v) => {
+              setFiltroFecha(v);
+              setPagina(1);
+            }}
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginLeft: '6px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700 }}>Desde</span>
             <input
               type="date"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={(e) => {
+                setDesde(e.target.value);
+                setFiltroFecha('todos');
+                setPagina(1);
+              }}
               style={{ minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px', fontSize: '12px' }}
             />
             <span style={{ fontSize: '12px', fontWeight: 700 }}>Hasta</span>
             <input
               type="date"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={(e) => {
+                setHasta(e.target.value);
+                setFiltroFecha('todos');
+                setPagina(1);
+              }}
               style={{ minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 6px', fontSize: '12px' }}
             />
             <button

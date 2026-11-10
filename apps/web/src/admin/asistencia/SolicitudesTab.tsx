@@ -6,11 +6,11 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { Bandeja, ETIQUETA_ROL, ResultadoLote, bandejaCorrecciones, loteCorrecciones } from './correccionesApi';
+import { jornadaActual } from './jornada';
 import './cronograma.css';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
-const hoyLima = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const sumarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const MAX_LOTE = 200;
 
@@ -83,11 +83,20 @@ export function SolicitudesTab({ onError, onOk, alCambiar }: { onError: Avisar; 
   );
   const opcionesPersona = useMemo(() => [...new Map(items.map((i) => [i.partyId, i.nombre])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [items]);
   const roles = useMemo(() => [...new Set(items.flatMap((i) => i.roles))].sort(), [items]);
-  const elegidos = items.filter((i) => sel.has(i.clave));
+  // Solo se actúa sobre lo que se ve: la selección oculta por un filtro no entra al lote ni al resumen
+  const elegidos = visibles.filter((i) => sel.has(i.clave));
+  const ocultas = items.filter((i) => sel.has(i.clave)).length - elegidos.length;
+  // Si tras recargar el rol o una persona elegidos ya no existen, el filtro se limpia (no queda activo con el select en «Todos»)
+  useEffect(() => {
+    if (!bandeja) return;
+    if (rol && !roles.includes(rol)) setRol('');
+    const existe = (id: string) => opcionesPersona.some(([x]) => String(x) === id);
+    setPersonas((p) => (p.every(existe) ? p : p.filter(existe)));
+  }, [bandeja, roles, opcionesPersona, rol]);
   const todosVisibles = visibles.length > 0 && visibles.every((i) => sel.has(i.clave));
 
   const atajo = (d: string, h: string) => { setDesde(d); setHasta(h); };
-  const hoy = hoyLima();
+  const hoy = jornadaActual();
   const lunes = sumarDias(hoy, -((new Date(`${hoy}T00:00:00Z`).getUTCDay() + 6) % 7));
   const alternar = (c: string) => setSel((s) => { const n = new Set(s); if (n.has(c)) n.delete(c); else n.add(c); return n; });
   const marcarVisibles = (v: boolean) => setSel((s) => { const n = new Set(s); visibles.forEach((i) => (v ? n.add(i.clave) : n.delete(i.clave))); return n; });
@@ -199,12 +208,13 @@ export function SolicitudesTab({ onError, onOk, alCambiar }: { onError: Avisar; 
         </div>
       )}
 
-      {elegidos.length > 0 && (
+      {(elegidos.length > 0 || ocultas > 0) && (
         <div className="cr-lote" role="region" aria-label="Acciones en lote">
           <strong>{elegidos.length} seleccionadas</strong>
+          {ocultas > 0 && <small>({ocultas} más ocultas por los filtros: no se incluyen)</small>}
           {elegidos.length > MAX_LOTE && <span role="alert">Máximo {MAX_LOTE} por vez: quita algunas.</span>}
-          <Boton type="button" disabled={elegidos.length > MAX_LOTE} onClick={() => { setErrorLote(null); setConfirmar('APROBAR'); }}>Aprobar seleccionadas</Boton>
-          <Boton type="button" variante="peligro" disabled={elegidos.length > MAX_LOTE} onClick={() => { setErrorLote(null); setConfirmar('RECHAZAR'); }}>Rechazar/anular seleccionadas</Boton>
+          <Boton type="button" disabled={elegidos.length === 0 || elegidos.length > MAX_LOTE} onClick={() => { setErrorLote(null); setConfirmar('APROBAR'); }}>Aprobar seleccionadas</Boton>
+          <Boton type="button" variante="peligro" disabled={elegidos.length === 0 || elegidos.length > MAX_LOTE} onClick={() => { setErrorLote(null); setConfirmar('RECHAZAR'); }}>Rechazar/anular seleccionadas</Boton>
           <Boton type="button" variante="texto" onClick={() => setSel(new Set())}>Quitar selección</Boton>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { coincideTexto } from '../../comun/normalizar-busqueda';
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +9,7 @@ import {
 import { historialProducto, type ConsultaHistorial } from './historial-producto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -437,29 +439,38 @@ export class AlmacenService {
     if (query.fechaDesde || query.fechaHasta) {
       where.en = {};
       if (query.fechaDesde) {
-        where.en.gte = new Date(`${query.fechaDesde}T00:00:00.000Z`);
+        where.en.gte = inicioDiaLimaIso(query.fechaDesde);
       }
       if (query.fechaHasta) {
-        where.en.lte = new Date(`${query.fechaHasta}T23:59:59.999Z`);
+        where.en.lte = finDiaLimaIso(query.fechaHasta);
       }
     }
 
+    const qBusqueda = query.q?.trim() ?? '';
+    const pagina = Math.max(1, Number(query.pagina) || 1);
+    const limite = Math.min(200, Math.max(1, Number(query.limite) || 100));
+    // ponytail: con búsqueda de texto se trae hasta 5000 movimientos del rango (sin el filtro de tipo) y se filtra
+    // en memoria sin tildes; sin búsqueda se pagina en la BD. Si el historial crece, pasar a una columna normalizada.
+    const conBusqueda = qBusqueda !== '';
+    const whereLectura: Prisma.MovimientoStockWhereInput = conBusqueda ? { ...where, tipo: undefined } : where;
     const movimientos = await this.prisma.movimientoStock.findMany({
-      where,
+      where: whereLectura,
       include: {
         insumo: true,
         producto: true,
         lugar: true,
       },
       orderBy: { en: 'desc' },
-      take: 100,
+      skip: conBusqueda ? 0 : (pagina - 1) * limite,
+      take: conBusqueda ? 5000 : limite,
     });
+    const totalTipo = conBusqueda ? 0 : await this.prisma.movimientoStock.count({ where });
 
     const baseWhereDate: Prisma.MovimientoStockWhereInput = {};
     if (query.fechaDesde || query.fechaHasta) {
       baseWhereDate.en = {};
-      if (query.fechaDesde) baseWhereDate.en.gte = new Date(`${query.fechaDesde}T00:00:00.000Z`);
-      if (query.fechaHasta) baseWhereDate.en.lte = new Date(`${query.fechaHasta}T23:59:59.999Z`);
+      if (query.fechaDesde) baseWhereDate.en.gte = inicioDiaLimaIso(query.fechaDesde);
+      if (query.fechaHasta) baseWhereDate.en.lte = finDiaLimaIso(query.fechaHasta);
     }
 
     const todosMovs = await this.prisma.movimientoStock.findMany({
@@ -467,19 +478,26 @@ export class AlmacenService {
       select: { tipo: true },
     });
 
-    const conteos = {
-      todos: todosMovs.length,
-      entradas: todosMovs.filter((m) =>
-        ['ENTRADA', 'PRODUCCION_ALTA', 'TRASLADO_ENTRADA'].includes(m.tipo),
-      ).length,
-      salidas: todosMovs.filter((m) =>
-        ['SALIDA', 'PRODUCCION_CONSUMO', 'TRASLADO_SALIDA'].includes(m.tipo),
-      ).length,
-      mermas: todosMovs.filter((m) =>
-        ['MERMA', 'DIFERENCIA_CONTEO'].includes(m.tipo),
-      ).length,
-      devoluciones: todosMovs.filter((m) => m.tipo === 'DEVOLUCION').length,
+    const grupoDe = (tipo: string) =>
+      ['ENTRADA', 'PRODUCCION_ALTA', 'TRASLADO_ENTRADA'].includes(tipo)
+        ? 'entradas'
+        : ['SALIDA', 'PRODUCCION_CONSUMO', 'TRASLADO_SALIDA'].includes(tipo)
+          ? 'salidas'
+          : ['MERMA', 'DIFERENCIA_CONTEO'].includes(tipo)
+            ? 'mermas'
+            : tipo === 'DEVOLUCION'
+              ? 'devoluciones'
+              : null;
+    const contar = (tipos: string[]) => {
+      const c = { todos: tipos.length, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 };
+      for (const t of tipos) {
+        const g = grupoDe(t);
+        if (g) c[g]++;
+      }
+      return c;
     };
+    // Sin búsqueda, los conteos son los reales del rango; con búsqueda se calculan sobre lo que coincide (abajo).
+    const conteosRango = contar(todosMovs.map((m) => m.tipo));
 
     const formateados = movimientos.map((m) => {
       const fechaObj = new Date(m.en);
@@ -553,21 +571,32 @@ export class AlmacenService {
       };
     });
 
-    let resultadoFiltrado = formateados;
-    if (query.q) {
-      const q = query.q.toLowerCase();
-      resultadoFiltrado = resultadoFiltrado.filter(
-        (m) =>
-          m.insumo.toLowerCase().includes(q) ||
-          m.documento.toLowerCase().includes(q) ||
-          m.nota.toLowerCase().includes(q) ||
-          m.origen.toLowerCase().includes(q),
-      );
+    if (!conBusqueda) {
+      return {
+        conteos: conteosRango,
+        movimientos: formateados,
+        total: totalTipo,
+        pagina,
+        limite,
+      };
     }
 
+    const coinciden = formateados.filter((m) =>
+      coincideTexto(qBusqueda, m.insumo, m.documento, m.nota, m.origen, m.destino),
+    );
+    const tipoPedido = query.tipo && query.tipo !== 'Todos' ? query.tipo.toUpperCase() : null;
+    const grupoPedido = tipoPedido
+      ? ({ ENTRADA: 'entradas', ENTRADAS: 'entradas', SALIDA: 'salidas', SALIDAS: 'salidas', MERMA: 'mermas', MERMAS: 'mermas', DEVOLUCION: 'devoluciones', DEVOLUCIONES: 'devoluciones' } as Record<string, string>)[tipoPedido]
+      : undefined;
+    const delTipo = !tipoPedido
+      ? coinciden
+      : coinciden.filter((m) => (grupoPedido ? grupoDe(m.tipoRaw) === grupoPedido : m.tipoRaw === tipoPedido));
     return {
-      conteos,
-      movimientos: resultadoFiltrado,
+      conteos: contar(coinciden.map((m) => m.tipoRaw)),
+      movimientos: delTipo.slice((pagina - 1) * limite, pagina * limite),
+      total: delTipo.length,
+      pagina,
+      limite,
     };
   }
 

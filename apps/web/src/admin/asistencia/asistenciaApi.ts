@@ -133,8 +133,13 @@ export interface MarcaAdmin {
 export interface ConfigAsistenciaAdmin {
   radioM: number;
   toleranciaMin: number;
-  /** % del valor hora con que se pagan los minutos de tardanza (50 = mitad). */
+  /** % del valor hora con que se pagan los minutos de tardanza (0 = solo se paga lo trabajado). */
   pagoTardanzaPct: number;
+  /** Hora extra aprobada: multiplicador del valor hora (1.25). */
+  multiplicadorExtra: number;
+  netflixSemanal: number;
+  diasMesDefecto: number;
+  horasDiaDefecto: number;
   retencionDias: number;
   /** Marcas a menos de estos minutos de la anterior se unen (doble marca). */
   dobleMarcaMin: number;

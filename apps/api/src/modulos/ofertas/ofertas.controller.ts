@@ -40,6 +40,7 @@ export class OfertasController {
       null,
       dto.canal === 'MOZO' ? 'MOZO' : 'CAJA',
       dto.modalidad,
+      dto.colaboradorPartyId,
     );
   }
 

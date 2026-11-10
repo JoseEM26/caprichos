@@ -27,6 +27,7 @@ import {
   type Periodo,
 } from './periodos-laborales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { hoyLimaIso, inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -35,7 +36,6 @@ import {
   TIPOS_DOCUMENTO,
   documentoValido,
   errorCombinacionRoles,
-  rolesDeCuenta,
 } from '../acceso/roles-usuario';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
@@ -47,6 +47,7 @@ import { deHora, guardarHorarioTx } from './horario.util';
 import { rolRecibeAvisosPorDefecto } from '../correo/roles-avisos';
 import { CORREO_REQUERIDO_AVISOS } from '../correo/avisos-mensajes';
 import { enmascararDni, generarClaveAleatoria } from './usuarios.util';
+import { DatosPlanillaImportacion, datosPlanilla, guardarDatosPlanillaTx } from './importar-planilla.util';
 import {
   ROLES_ALERTAS_WHATSAPP,
   calcularEstadoAlertas,
@@ -83,6 +84,9 @@ function fechaDe(valor: string | undefined | null, etiqueta: string): Date | nul
 const iguales = (a: string[], b: string[]): boolean =>
   a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
 
+/** Minúsculas sin tildes ni diéresis (la ñ queda como n). */
+export const normalizarTexto = (t: string): string => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 @Injectable()
 export class UsuariosService {
   constructor(
@@ -110,45 +114,78 @@ export class UsuariosService {
    * El DNI siempre se devuelve enmascarado.
    */
   async listar(filtros: FiltrarUsuariosDto) {
-    const { rol, activo, busqueda } = filtros;
+    const { activo, busqueda } = filtros;
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
     const limite = Math.max(1, Math.min(100, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
+    const ahoraRoles = new Date();
+    const hoy = hoyLimaIso();
+    const y = (n: number) => new Date(`${sumarDiasIso(hoy, n)}T00:00:00.000Z`); // alta_en es DATE
+    const y0 = (f: string) => new Date(`${f}T00:00:00.000Z`);
 
-    const where: any = {};
+    const and: any[] = [];
 
-    if (rol) {
-      // Cuenta por su principal o por cualquiera de sus roles extra
-      where.OR = [{ rol }, { rolesExtra: { some: { rol } } }];
+    if (filtros.rol) {
+      // «Producción» es un cargo de la pantalla que agrupa a Cocina; el resto son códigos reales.
+      const rol = filtros.rol.toUpperCase() === 'PRODUCCION' ? 'COCINA' : filtros.rol.toUpperCase();
+      // Cuenta por su principal o por cualquiera de sus roles extra vigentes
+      and.push({
+        OR: [{ rol }, { rolesExtra: { some: { rol, OR: [{ vence_en: null }, { vence_en: { gt: ahoraRoles } }] } } }],
+      });
     }
 
-    if (activo !== undefined) {
-      where.activo = activo;
+    if (activo !== undefined) and.push({ activo });
+
+    // Creado (alta_en, fecha de calendario de Lima)
+    if (filtros.creado === 'hoy') and.push({ alta_en: { gte: y0(hoy) } });
+    else if (filtros.creado === '7') and.push({ alta_en: { gte: y(-6) } });
+    else if (filtros.creado === '30') and.push({ alta_en: { gte: y(-29) } });
+    else if (filtros.creado === 'ano') and.push({ alta_en: { gte: y0(`${hoy.slice(0, 4)}-01-01`) } });
+    else if (filtros.creado === 'mas90') and.push({ alta_en: { lt: y(-90) } });
+    if (filtros.desde) and.push({ alta_en: { gte: y0(filtros.desde) } });
+    if (filtros.hasta) and.push({ alta_en: { lte: y0(filtros.hasta) } });
+
+    // Último acceso: el último INGRESO correcto en la auditoría (no hay columna propia)
+    if (filtros.acceso && filtros.acceso !== 'todos') {
+      const ingresos = await this.prisma.auditoria.groupBy({
+        by: ['party_id'],
+        where: { modulo: 'acceso', accion: 'INGRESO', resultado: 'OK', party_id: { not: null } },
+        _max: { en: true },
+      });
+      const todos = ingresos.map((g: any) => g.party_id as bigint);
+      const desdeDia = (n: number) => inicioDiaLimaIso(sumarDiasIso(hoy, n)).getTime();
+      const idsCon = (pred: (t: number) => boolean) =>
+        ingresos.filter((g: any) => g._max.en && pred(g._max.en.getTime())).map((g: any) => g.party_id as bigint);
+      if (filtros.acceso === 'nunca') and.push({ party_id: { notIn: todos } });
+      else if (filtros.acceso === 'hoy') and.push({ party_id: { in: idsCon((t) => t >= desdeDia(0)) } });
+      else if (filtros.acceso === '7') and.push({ party_id: { in: idsCon((t) => t >= desdeDia(-6)) } });
+      else if (filtros.acceso === '30') and.push({ party_id: { in: idsCon((t) => t >= desdeDia(-29)) } });
+      else if (filtros.acceso === 'mas30') and.push({ party_id: { in: idsCon((t) => t < desdeDia(-29)) } });
     }
 
-    if (busqueda && busqueda.trim()) {
-      const q = busqueda.trim();
-      where.party = {
-        OR: [
-          {
-            persona: {
-              OR: [
-                { nombres: { contains: q, mode: 'insensitive' } },
-                { apellidos: { contains: q, mode: 'insensitive' } },
-              ],
-            },
-          },
-          {
-            documentos: {
-              some: {
-                tipo: { in: [...TIPOS_DOCUMENTO] },
-                numero: { contains: q },
-              },
-            },
-          },
-        ],
-      };
+    // Búsqueda sin distinguir tildes, ñ ni mayúsculas, sobre el nombre completo (sin extensión unaccent en la BD:
+    // el personal es corto, se normaliza en memoria).
+    const q = busqueda?.trim();
+    if (q) {
+      const candidatos = await this.prisma.userAccount.findMany({
+        where: and.length ? { AND: and } : {},
+        select: {
+          id: true,
+          party: { select: { persona: { select: { nombres: true, apellidos: true } }, documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } }, select: { numero: true } } } },
+        },
+      });
+      const palabras = normalizarTexto(q).split(/\s+/).filter(Boolean);
+      const ids = candidatos
+        .filter((c: any) => {
+          const nombre = normalizarTexto(`${c.party?.persona?.nombres ?? ''} ${c.party?.persona?.apellidos ?? ''}`);
+          const docs = (c.party?.documentos ?? []).map((d: any) => String(d.numero ?? ''));
+          return palabras.every((p) => nombre.includes(p)) || docs.some((d: string) => d.includes(q));
+        })
+        .map((c: any) => c.id as bigint);
+      and.push({ id: { in: ids } });
     }
+
+    const where: any = and.length ? { AND: and } : {};
 
     const [total, usuarios] = await Promise.all([
       this.prisma.userAccount.count({ where }),
@@ -171,6 +208,7 @@ export class UsuariosService {
       }),
     ]);
 
+    const conteos = await this.conteosListado();
     const ahora = new Date();
     const elementos = usuarios.map((u) => {
       const dniDoc = u.party?.documentos?.[0]?.numero ?? '';
@@ -208,7 +246,26 @@ export class UsuariosService {
       limite,
       totalPaginas: Math.ceil(total / limite),
       elementos,
+      conteos,
     };
+  }
+
+  /** Conteos de todo el personal (no de la página): activos/inactivos y personas por rol, con sus roles extra vigentes. */
+  private async conteosListado() {
+    const ahora = Date.now();
+    const cuentas = await this.prisma.userAccount.findMany({
+      select: { rol: true, activo: true, rolesExtra: { select: { rol: true, vence_en: true } } },
+    });
+    const porRol: Record<string, number> = {};
+    let activos = 0;
+    for (const c of cuentas) {
+      if (c.activo) activos++;
+      const roles = new Set([c.rol, ...(c.rolesExtra ?? []).filter((r) => !r.vence_en || r.vence_en.getTime() > ahora).map((r) => r.rol)]);
+      for (const r of roles) porRol[r] = (porRol[r] ?? 0) + 1;
+    }
+    // «Producción» (cargo de la pantalla) = Cocina
+    porRol.PRODUCCION = porRol.COCINA ?? 0;
+    return { total: cuentas.length, activos, inactivos: cuentas.length - activos, porRol };
   }
 
   /**
@@ -282,6 +339,8 @@ export class UsuariosService {
     ip: string | undefined,
     auditar: boolean,
     claveFija?: string,
+    /** Datos de planilla de la importación: se guardan en la misma transacción que la cuenta. */
+    planilla?: DatosPlanillaImportacion,
   ) {
     const { tipo: tipoDoc, numero: dniLimpio } = this.documentoDeDto(dto.tipoDocumento, dto.documento ?? dto.dni);
     const extras = this.rolesExtraValidos(dto.rol, dto.otrosRoles);
@@ -334,6 +393,7 @@ export class UsuariosService {
     const hash = await argon2.hash(claveInicial, { type: argon2.argon2id });
 
     let nuevo;
+    let avisosPlanilla: string[] = [];
     try {
       nuevo = await this.prisma.$transaction(async (tx) => {
         const party = reutilizarId
@@ -443,6 +503,9 @@ export class UsuariosService {
         if (dto.horarios || dto.reemplazos) {
           await guardarHorarioTx(tx, party.id, dto);
         }
+        if (planilla) {
+          avisosPlanilla = await guardarDatosPlanillaTx(tx, party.id, userAccount.id, dto.rol, fechaIngreso ?? hoyLima(), planilla);
+        }
 
         return { party, person, partyIdentifier, userAccount, avisosCorreo, horario247 };
       });
@@ -504,7 +567,7 @@ export class UsuariosService {
       activo: nuevo.userAccount.activo,
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
-      avisos,
+      avisos: [...avisos, ...avisosPlanilla],
     };
   }
 
@@ -560,6 +623,9 @@ export class UsuariosService {
       this.rolesExtraValidos(objeto.rol, objeto.otrosRoles);
       fechaDe(objeto.fechaIngreso, 'de ingreso');
       fechaDe(objeto.fechaReingreso, 'de reingreso');
+      if (objeto.sueldoMensual !== undefined && objeto.tarifaHora !== undefined) {
+        throw new BadRequestException({ codigo: 'SUELDO_Y_TARIFA', mensaje: 'Indica el sueldo mensual o la tarifa por hora, no ambos' });
+      }
       const existe = await this.prisma.partyIdentifier.findFirst({
         where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
         select: { id: true },
@@ -618,6 +684,7 @@ export class UsuariosService {
           ip,
           false,
           r.numero,
+          datosPlanilla(r.objeto!),
         );
         creadas++;
         resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos });
