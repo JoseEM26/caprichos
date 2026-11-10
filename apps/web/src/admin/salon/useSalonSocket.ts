@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from 'react';
 import { useEventos } from '../../comun/socket';
 import { AvisoPedidoListo } from './tipos';
 import { reproducirAvisoListo } from './audioAlerta';
+import { useSesion } from '../../comun/sesion';
+import { debeAvisarMesaLista } from './avisoMesaLista';
 
 interface UseSalonSocketOpciones {
   onMesaCambio?: (datos: { mesaId: string; estado: 'LIBRE' | 'OCUPADA' }) => void;
@@ -12,6 +14,14 @@ interface UseSalonSocketOpciones {
 
 export function useSalonSocket(opciones: UseSalonSocketOpciones = {}) {
   const [avisoListo, setAvisoListo] = useState<AvisoPedidoListo | null>(null);
+  let sesion: ReturnType<typeof useSesion> | null = null;
+  try {
+    sesion = useSesion();
+  } catch {
+    sesion = null; // sin proveedor de sesión (pruebas): se avisa como siempre
+  }
+  const sesionRef = useRef(sesion);
+  sesionRef.current = sesion;
   // las funciones de quien llama cambian en cada render: se leen desde una ref para no volver a suscribirse
   const refOpciones = useRef(opciones);
   refOpciones.current = opciones;
@@ -19,6 +29,7 @@ export function useSalonSocket(opciones: UseSalonSocketOpciones = {}) {
   const manejarListo = useCallback(
     (datos: any) => {
       if (!datos) return;
+      if (!debeAvisarMesaLista(datos.mozoPartyId, sesionRef.current)) return;
       const aviso: AvisoPedidoListo = {
         pedidoId: String(datos.pedidoId || ''),
         codigo: String(datos.codigo || ''),

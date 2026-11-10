@@ -96,6 +96,7 @@ describe('NotificacionesService', () => {
           return Promise.resolve(take ? r.slice(0, take) : r);
         }),
         findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(notifs.find((n) => n.id === where.id) ?? null)),
+        findFirst: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(notifs.find((n) => cumple(n, where)) ?? null)),
         update: jest.fn(),
         updateMany: jest.fn(),
         create: jest.fn().mockResolvedValue({ id: 99n, titulo: 'Mensaje de prueba' }),
@@ -129,7 +130,7 @@ describe('NotificacionesService', () => {
       $transaction: jest.fn().mockImplementation((operaciones: any[]) => Promise.all(operaciones)),
     };
     auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
-    eventos = { emitirAdmin: jest.fn() };
+    eventos = { emitirAdmin: jest.fn(), emitirAParty: jest.fn() };
     service = new NotificacionesService(prisma, auditoria, eventos);
   });
 
@@ -147,8 +148,8 @@ describe('NotificacionesService', () => {
     const r = await service.resumen(MOZO);
     expect(r.conteos).toEqual({});
     expect(prisma.pedido.findMany).not.toHaveBeenCalled();
-    // sin permisos solo ve los tipos sin restricción (aquí, consumo de WhatsApp)
-    expect(r.notificaciones.map((n) => n.clave)).toEqual(['n:5']);
+    // sin permisos solo ve los tipos libres (mensaje interno, y solo si es para todos o para su rol)
+    expect(r.notificaciones.map((n) => n.clave)).toEqual([]);
   });
 
   describe('asistencia: avisos de corrección', () => {
@@ -267,7 +268,7 @@ describe('NotificacionesService', () => {
     expect(lecturas).toEqual([{ party_id: 3n, clave: 'n:3', leida_en: null }]);
     const r = await service.resumen(CAJERO_A);
     expect(r.notificaciones.find((n) => n.clave === 'n:3')).toMatchObject({ leida: false });
-    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:actualizada', { clave: 'n:3', leida: false });
+    expect(eventos.emitirAParty).toHaveBeenCalledWith(CAJERO_A.partyId, 'notificaciones:actualizada', {});
   });
 
   it('desmarcar un aviso heredado leído para todos lo deja no leído para ese usuario', async () => {
@@ -348,9 +349,10 @@ describe('NotificacionesService', () => {
     prisma.pedido.findMany.mockReset().mockResolvedValue([]);
     const r = await service.resumen(CAJERO_A);
     expect(r.conteos).toEqual({ caja: 0 });
-    // caja/ver: ve el pedido nuevo, el mensaje de caja y el consumo; no el stock bajo
-    expect(r.notificaciones.map((n) => n.clave)).toEqual(expect.arrayContaining(['n:3', 'n:4', 'n:5']));
+    // caja/ver: ve el pedido nuevo, el mensaje de caja y el error de impresora; no el stock bajo ni el consumo de WhatsApp
+    expect(r.notificaciones.map((n) => n.clave)).toEqual(expect.arrayContaining(['n:3', 'n:4', 'n:2']));
     expect(r.notificaciones.map((n) => n.clave)).not.toContain('n:1');
+    expect(r.notificaciones.map((n) => n.clave)).not.toContain('n:5');
   });
 
   it('lista el historial con métricas, conteos y el estado de este usuario', async () => {
@@ -440,5 +442,28 @@ describe('NotificacionesService', () => {
     const SUPERVISOR = { partyId: 5n, rol: 'SUPERVISOR', debeCambiar: false };
     await service.crearMensajeInterno({ rol_destino: 'supervisor', titulo: 'Turno', mensaje: 'Revisar mesas' }, ADMIN);
     expect(prisma.notificacion.create.mock.calls[0][0].data.rol_destino).toBe('SUPERVISOR');
+  });
+  it('lo dirigido a una persona (party_destino) solo lo ve, cuenta y marca esa persona', async () => {
+    notifs.push({ id: 7n, tipo: 'MESA_LISTA', rol_destino: null, party_destino: 2n, titulo: 'Mesa lista', mensaje: 'x', enlace: null, leida_en: null, en: hace(1) });
+    prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'mesas', accion: 'ver' } }]);
+    const otroMozo = { partyId: 9n, rol: 'MOZO', debeCambiar: false };
+    expect((await service.resumen(MOZO)).notificaciones.map((n) => n.clave)).toContain('n:7');
+    expect((await service.resumen(otroMozo)).notificaciones.map((n) => n.clave)).not.toContain('n:7');
+    expect((await service.resumen(ADMIN)).notificaciones.map((n) => n.clave)).not.toContain('n:7');
+    expect((await service.historial({}, otroMozo)).items.map((i) => i.id)).not.toContain('7');
+    await expect(service.marcarClave('n:7', true, otroMozo)).rejects.toMatchObject({ status: 404 });
+    await expect(service.marcarClave('n:7', true, ADMIN)).rejects.toMatchObject({ status: 404 });
+    expect((await service.marcarClave('n:7', true, MOZO)).ok).toBe(true);
+  });
+
+  it('un tipo sin mapa solo lo ve el ADMIN; «marcar todas» con ids ignora lo que no le toca', async () => {
+    notifs.push({ id: 8n, tipo: 'TIPO_NUEVO_SIN_MAPA', rol_destino: null, titulo: 'x', mensaje: 'x', enlace: null, leida_en: null, en: hace(1) });
+    prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'caja', accion: 'ver' } }]);
+    expect((await service.resumen(ADMIN)).notificaciones.map((n) => n.clave)).toContain('n:8');
+    expect((await service.resumen(CAJERO_A)).notificaciones.map((n) => n.clave)).not.toContain('n:8');
+    await expect(service.marcarClave('n:8', true, CAJERO_A)).rejects.toMatchObject({ status: 404 });
+    const r = await service.marcarTodasLeidas(CAJERO_A, ['3', '8', '5']);
+    expect(r.marcadas).toBe(1);
+    expect(lecturas.map((l) => l.clave)).toEqual(['n:3']);
   });
 });
