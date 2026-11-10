@@ -34,6 +34,7 @@ import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { ReimprimirDto, ReimprimirPedidoDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
+import { LineaTiempoService } from './linea-tiempo.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
 import { DevolucionPedidoService } from './devolucion-pedido.service';
@@ -53,6 +54,7 @@ export class PedidosAdminController {
     @Optional() private readonly pedidoComprobante?: PedidoComprobanteService,
     @Optional() private readonly devolucionPedido?: DevolucionPedidoService,
     @Optional() private readonly ajustarPagoService?: AjustarPagoService,
+    @Optional() private readonly lineaTiempoService?: LineaTiempoService,
   ) {}
 
   @Post()
@@ -120,6 +122,13 @@ export class PedidosAdminController {
   ])
   async historialVouchers(@Param('id') id: string, @Req() req: any) {
     return this.vouchersService?.historialPedido(id, req.usuario);
+  }
+
+  /** Línea de tiempo del pedido (quién lo tomó y cuánto tardó cada etapa). Antes de GET ':id'. */
+  @Get(':id/linea-tiempo')
+  @Permiso('pedidos', 'ver')
+  async lineaTiempo(@Param('id') id: string, @Req() req: any) {
+    return this.lineaTiempoService!.obtener(id, req.usuario);
   }
 
   @Get(':id')

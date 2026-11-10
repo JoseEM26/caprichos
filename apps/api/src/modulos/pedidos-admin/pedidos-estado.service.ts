@@ -1,3 +1,5 @@
+import { CANALES_CON_ATENDIDO, nombresDePersonas } from './linea-tiempo.service';
+import { totalSegDePedido } from './linea-tiempo.util';
 import { cargarAuditoriaPedido } from './auditoria-pedido';
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
@@ -41,9 +43,11 @@ import { INCLUIR_EXTRAS, resumenExtras } from './extras-pedido.util';
 const INCLUIR_LISTA = {
   lineas: { include: { opcionesElegidas: true, sabores: true, area: true } },
   zona: true,
-  cobros: { where: { anulado_en: null }, select: { id: true }, take: 1 },
+  cobros: { where: { anulado_en: null }, select: { id: true, en: true, cobrado_por: true, pagos: { select: { medio: true } } }, take: 1 },
   ...INCLUIR_EXTRAS,
 };
+/** Tope de «todas» en la lista: una jornada normal cabe sobrada. */
+export const LIMITE_TODAS = 2000;
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { FiltrosMisPedidos, RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -245,7 +249,9 @@ export class PedidosEstadoService {
     const where: any = {};
 
     if (filtros.estado) {
-      where.estado = filtros.estado;
+      // Uno o varios estados separados por coma
+      const estados = filtros.estado.split(',').map((e) => e.trim()).filter(Boolean);
+      where.estado = estados.length > 1 ? { in: estados } : estados[0];
     }
     if (filtros.canal) {
       where.canal = filtros.canal;
@@ -286,7 +292,24 @@ export class PedidosEstadoService {
       where.OR = [
         { codigo: { contains: q, mode: 'insensitive' } },
         { cliente_nombre: { contains: q, mode: 'insensitive' } },
+        { cliente_telefono: { contains: q } },
         { mesa_nombre: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    if (filtros.medios) {
+      // Medio de algún cobro vigente (basta uno si es pago mixto) o, sin cobro aún, el medio elegido (pago_metodo/pago_preferido)
+      const medios = filtros.medios.split(',').filter(Boolean);
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        {
+          OR: [
+            { cobros: { some: { anulado_en: null, pagos: { some: { medio: { in: medios } } } } } },
+            {
+              cobros: { none: { anulado_en: null } },
+              OR: medios.flatMap((m) => [{ pago_metodo: { contains: m } }, { pago_preferido: { contains: m } }]),
+            },
+          ],
+        },
       ];
     }
 
@@ -295,7 +318,8 @@ export class PedidosEstadoService {
     }
 
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
-    const limite = Math.min(100, Math.max(1, Number(filtros.limite) || 20));
+    const limite =
+      filtros.limite === 'todas' ? LIMITE_TODAS : Math.min(100, Math.max(1, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
 
     const [total, pedidos, umbrales, grupos] = await Promise.all([
@@ -343,6 +367,14 @@ export class PedidosEstadoService {
     const todos = [...pedidos, ...relacionadosCrudos];
     const cobrosMozo = await this.cobrosMozoDe(todos);
     const ajustes = await ajustesPendientesUbicacion(this.prisma, todos.map((p) => p.id));
+    // Columnas de Caja: quién tomó el pedido (mozo/cajero) y quién lo cobró
+    const nombres = await nombresDePersonas(
+      this.prisma,
+      todos.flatMap((p) => [
+        ...(CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? [p.party_id] : []),
+        ...(p.cobros?.[0]?.cobrado_por != null ? [p.cobros[0].cobrado_por] : []),
+      ]),
+    );
 
     const mapear = (p: (typeof todos)[number]) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
@@ -352,10 +384,23 @@ export class PedidosEstadoService {
         umbrales.rojoMin,
       );
 
-      const cobroVigenteId = p.cobros?.[0]?.id ? String(p.cobros[0].id) : null;
+      const cobro = p.cobros?.[0];
+      const cobroVigenteId = cobro?.id ? String(cobro.id) : null;
+      const mediosCobro = [...new Set((cobro?.pagos ?? []).map((x) => x.medio))];
+      // Sin cobro vigente: el medio elegido (pago_metodo o pago_preferido), marcado como pendiente
+      const mediosElegidos = (p.pago_metodo || p.pago_preferido || '').split('+').map((m) => m.trim()).filter(Boolean);
+      const sinCobro = !cobro;
 
       return {
         ...p,
+        mediosPago: sinCobro ? mediosElegidos : mediosCobro,
+        mediosPagoPendiente: sinCobro && mediosElegidos.length > 0,
+        atendidoPorNombre:
+          CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? (nombres.get(String(p.party_id)) ?? null) : null,
+        atendidoEn: CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? p.creado_en : null,
+        cobradoPorNombre: cobro?.cobrado_por != null ? (nombres.get(String(cobro.cobrado_por)) ?? null) : null,
+        cobradoEn: cobro?.en ?? null,
+        tiempoTotalSeg: totalSegDePedido(p),
         ...resumenExtras(p),
         cobro_vigente_id: cobroVigenteId,
         cobroMozo: cobrosMozo.get(String(p.id)) ?? null,
