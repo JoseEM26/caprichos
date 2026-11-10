@@ -96,6 +96,7 @@ export function ElectronicosTab() {
   const [corrDir, setCorrDir] = useState('');
   const [ocupado, setOcupado] = useState(false);
 
+  const [realDe, setRealDe] = useState<ComprobanteElectronico | null>(null);
   const [anularDe, setAnularDe] = useState<ComprobanteElectronico | null>(null);
   const [motivo, setMotivo] = useState('');
   const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
@@ -255,6 +256,22 @@ export function ElectronicosTab() {
     }
   };
 
+  const confirmarEmitirReal = async () => {
+    if (!realDe) return;
+    setOcupado(true);
+    try {
+      const nuevo = await comprobantesApi.emitirReal(realDe.id);
+      setAviso(`Se anuló ${realDe.numero_texto} (simulado) y se emitió ${nuevo.numero_texto} a SUNAT`);
+      setRealDe(null);
+      await cargar(pagina);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo emitir el comprobante real');
+      setRealDe(null);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const confirmarAnulacion = async () => {
     if (!anularDe) return;
     if (motivo.trim().length < 5) {
@@ -404,6 +421,7 @@ export function ElectronicosTab() {
               esAdmin &&
               (c.facturacion_estado === 'EMITIDO_SUNAT' || c.facturacion_estado === 'PENDIENTE_RESUMEN') &&
               (!c.baja_estado || c.baja_estado === 'RECHAZADA');
+            const puedeEmitirReal = esAdmin && c.simulado && !c.baja_estado;
             const tieneArchivos = c.emisor === 'SUNAT' && !c.simulado;
             return (
               <li key={c.id} data-testid={`electronico-${c.id}`} style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: 14, padding: 14 }}>
@@ -443,6 +461,11 @@ export function ElectronicosTab() {
                   {puedeReintentar && (
                     <Boton variante="secundario" onClick={() => abrirReintento(c)} style={{ minHeight: ALTO_TOQUE }}>
                       Reintentar
+                    </Boton>
+                  )}
+                  {puedeEmitirReal && (
+                    <Boton variante="primario" onClick={() => setRealDe(c)} style={{ minHeight: ALTO_TOQUE }}>
+                      Emitir real
                     </Boton>
                   )}
                   {puedeAnular && (
@@ -544,6 +567,18 @@ export function ElectronicosTab() {
           </div>
         )}
       </Confirmar>
+
+      <Confirmar
+        abierto={realDe !== null}
+        titulo="Emitir comprobante real"
+        mensaje={realDe ? `Se anulará el simulado ${realDe.numero_texto} y se emitirá uno nuevo a SUNAT con la fecha de hoy; no se puede deshacer.` : undefined}
+        textoSi="Sí, emitir real"
+        textoNo="No"
+        peligro
+        cargando={ocupado}
+        alConfirmar={confirmarEmitirReal}
+        alCancelar={() => setRealDe(null)}
+      />
 
       <Confirmar
         abierto={anularDe !== null}

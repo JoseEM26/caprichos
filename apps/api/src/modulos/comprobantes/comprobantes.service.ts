@@ -1041,6 +1041,81 @@ export class ComprobantesService {
   }
 
   /**
+   * «Emitir real»: reemplaza una boleta/factura SIMULADA (nunca salió a SUNAT) por un comprobante nuevo del mismo pedido.
+   * Una sola transacción: baja simulada (sin red) de la fila vieja + comprobante nuevo con la siguiente numeración de la
+   * serie (el índice único es parcial sobre anulado_en IS NULL, por eso primero se anula la vieja). El envío a SUNAT
+   * va después, por el camino normal (boleta: resumen diario; factura: sendBill). Fecha de emisión: hoy.
+   * El barrido no duplica: pide pedidos sin comprobante vigente y el nuevo ya existe al confirmar.
+   */
+  async emitirReal(idRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string) {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const c = await this.prisma.comprobante.findUnique({ where: { id } });
+    if (!c || !TIPOS_ELECTRONICOS.includes(c.tipo)) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    if (c.anulado_en) {
+      throw new HttpException({ codigo: 'COMPROBANTE_ANULADO', mensaje: 'El comprobante ya está anulado' }, HttpStatus.CONFLICT);
+    }
+    if (!c.simulado) {
+      throw new HttpException({ codigo: 'COMPROBANTE_YA_REAL', mensaje: 'Solo se reemite un comprobante marcado como Simulado' }, HttpStatus.CONFLICT);
+    }
+    const cfg = await this.leerConfigFacturacion();
+    if (this.proveedorEfectivo(cfg.proveedor) !== 'SUNAT') {
+      throw new HttpException(
+        { codigo: 'PROVEEDOR_NO_SUNAT', mensaje: 'Cambia el proveedor a SUNAT en Facturación primero' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    const motivo = 'Reemitido como comprobante real';
+    const partyId = usuario?.partyId ? BigInt(usuario.partyId) : undefined;
+    const nuevo = await this.prisma.$transaction(async (tx: any) => {
+      // Reclamo atómico: dos clics a la vez no reemiten dos veces
+      const baja = await tx.comprobante.updateMany({
+        where: { id, anulado_en: null, simulado: true },
+        data: {
+          anulado_en: new Date(),
+          anulado_motivo: motivo,
+          baja_estado: 'ACEPTADA',
+          baja_motivo: motivo,
+          baja_en: new Date(),
+          baja_respuesta: 'SIMULADO: baja de prueba, no enviada a SUNAT',
+        },
+      });
+      if (baja.count === 0) {
+        throw new HttpException({ codigo: 'COMPROBANTE_ANULADO', mensaje: 'El comprobante ya fue reemitido o anulado' }, HttpStatus.CONFLICT);
+      }
+      const creado: any = await this.emitirParaPedido(c.pedido_id, tx, usuario, ip);
+      // Conserva lo corregido en la fila simulada (la emisión toma los datos del pedido)
+      const fila = await tx.comprobante.update({
+        where: { id: BigInt(creado.id) },
+        data: { documento: c.documento, razon_social: c.razon_social },
+      });
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'comprobantes',
+        accion: 'EMITIR_REAL',
+        resultado: 'OK',
+        entidad: 'comprobante',
+        entidadId: fila.id,
+        motivo,
+        antes: { comprobante_origen: c.numero_texto, comprobante_origen_id: c.id.toString(), simulado: true },
+        despues: { comprobante_nuevo: fila.numero_texto, comprobante_nuevo_id: fila.id.toString(), tipo: fila.tipo, emisor: fila.emisor },
+        partyId,
+        ip,
+      }, tx);
+      return fila;
+    });
+    let enviado: any = nuevo;
+    try {
+      enviado = await this.enviarElectronico(nuevo.id, { usuario, ip, interactivo: true });
+    } catch (e: any) {
+      // El comprobante nuevo ya existe PENDIENTE_ENVIO: la tarea de reintentos lo envía
+      this.logger.warn(`Emitir real ${nuevo.numero_texto}: envío diferido (${e?.message ?? e})`);
+    }
+    return this.serializarComprobante(enviado);
+  }
+
+  /**
    * Baja de la boleta/factura vigente de un pedido cuyo cobro se anula (o cuyo pedido se anula). NUNCA lanza:
    * la anulación del cobro no depende de SUNAT.
    * - Nunca salió a SUNAT (pendiente sin intentos o rechazada): se anula aquí y no se envía.

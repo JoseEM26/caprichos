@@ -85,6 +85,11 @@ export const comprobantesApi = {
     });
   },
 
+  /** Anula el comprobante Simulado y emite uno nuevo a SUNAT (fecha de hoy). Devuelve el nuevo. */
+  async emitirReal(id: string): Promise<{ id: string; numero_texto: string }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/emitir-real`, { method: 'POST' });
+  },
+
   async obtenerFacturacion(): Promise<ConfigFacturacion> {
     return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion');
   },
