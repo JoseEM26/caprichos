@@ -57,7 +57,7 @@ describe('MiAsistenciaView (celular)', () => {
     marcarManual.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada a las 08:00', marca: { estado: 'A_REVISAR' } });
     render(<MiAsistenciaView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar manualmente (sin QR)' }));
-    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9, consentimiento: undefined }));
+    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9 }));
     expect(marcarAsistencia).not.toHaveBeenCalled();
     expect(await screen.findByRole('status')).toHaveTextContent('queda para revisión del administrador');
   });
@@ -96,18 +96,17 @@ describe('MiAsistenciaView (celular)', () => {
     expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled();
   });
 
-  it('pide aceptar el aviso de datos personales la primera vez y bloquea marcar hasta aceptarlo', async () => {
+  it('ya no pide aceptar ningún aviso de datos: ni casilla ni bloqueo, aunque el servidor mande el texto', async () => {
     miHoy.mockResolvedValue({
       ...base,
+      localConUbicacion: true,
       consentimientoAceptado: false,
       consentimiento: { version: '2026-11', texto: 'Aviso de datos' },
     });
     render(<MiAsistenciaView />);
-    expect(await screen.findByText('Aviso de datos')).toBeInTheDocument();
-    const boton = screen.getByRole('button', { name: 'Escanear QR' });
-    expect(boton).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled());
+    expect(await screen.findByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText('Aviso de datos')).toBeNull();
   });
 
   it('sin turno hoy lo dice; igual puede marcar (el administrador la revisa)', async () => {
@@ -136,19 +135,10 @@ describe('MiAsistenciaView (celular)', () => {
     expect(screen.getAllByRole('button', { name: 'Escanear QR' })).toHaveLength(1);
   });
 
-  describe('aviso de datos una sola vez', () => {
-    const sinAceptar = { ...base, consentimientoAceptado: false, consentimiento: { version: '2026-11', texto: 'Aviso de datos' } };
-    const recorrido = async () => {
-      const pista = { stop: vi.fn() };
-      (navigator as any).mediaDevices = {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [pista] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      };
-      (navigator as any).geolocation = {
-        getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12, longitude: -77, accuracy: 5 } }),
-        watchPosition: (ok: any) => { ok({ coords: { latitude: -12, longitude: -77, accuracy: 5 } }); return 1; },
-        clearWatch: () => undefined,
-      };
+  describe('GPS y cámara con fallos', () => {
+    const preparar = (geo: any, camara: any) => {
+      (navigator as any).mediaDevices = { getUserMedia: camara, enumerateDevices: vi.fn().mockResolvedValue([]) };
+      (navigator as any).geolocation = geo;
       delete (window as any).BarcodeDetector;
       Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
       HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
@@ -160,30 +150,67 @@ describe('MiAsistenciaView (celular)', () => {
       })) as any;
       HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/jpeg;base64,AAAA');
       jsqrMock.mockReturnValue({ data: 'CAPRICHOS-ASIST:123:abcdef' });
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
-      fireEvent.click(await screen.findByRole('button', { name: 'Tomar selfie' }));
-      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar marca' }));
     };
+    const pista = { stop: vi.fn() };
+    const camaraOk = () => vi.fn().mockResolvedValue({ getTracks: () => [pista] });
+    const gps = { coords: { latitude: -12, longitude: -77, accuracy: 5 } };
 
-    it('tras un rechazo no relacionado recarga y el checkbox no reaparece', async () => {
-      miHoy.mockResolvedValueOnce(sinAceptar).mockResolvedValue({ ...base, consentimientoAceptadoEn: '2026-11-06T13:00:00.000Z', textoConsentimiento: 'Aviso de datos' });
-      marcarAsistencia.mockRejectedValue({ codigo: 'FUERA_DE_RADIO', mensaje: 'Estás lejos del local.' });
+    it('si el GPS preciso falla por falta de señal, reintenta solo con ubicación aproximada y sigue', async () => {
+      const lecturas: boolean[] = [];
+      preparar(
+        { getCurrentPosition: (ok: any, err: any, o: any) => { lecturas.push(o.enableHighAccuracy); return o.enableHighAccuracy ? err({ code: 2 }) : ok(gps); } },
+        camaraOk(),
+      );
+      miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('checkbox'));
-      await recorrido();
-      expect(await screen.findByText('Estás lejos del local.')).toBeInTheDocument();
-      expect(miHoy).toHaveBeenCalledTimes(2);
-      expect(screen.queryByRole('checkbox')).toBeNull();
+      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      expect(await screen.findByRole('button', { name: 'Tomar selfie' })).toBeInTheDocument();
+      expect(lecturas).toEqual([true, false]);
     });
 
-    it('tras aceptar muestra «Aceptaste el aviso…» y Ver aviso despliega el texto', async () => {
-      miHoy.mockResolvedValue({ ...base, consentimientoAceptadoEn: '2026-11-06T13:00:00.000Z', textoConsentimiento: 'Texto del aviso' });
+    it('si el GPS falla del todo, explica qué hacer y ofrece reintentar y forzar la ubicación aproximada', async () => {
+      let falla = true;
+      const llamadas: any[] = [];
+      preparar(
+        { getCurrentPosition: (ok: any, err: any, o: any) => { llamadas.push(o); return falla ? err({ code: 2 }) : ok(gps); } },
+        camaraOk(),
+      );
+      miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       render(<MiAsistenciaView />);
-      expect(await screen.findByTestId('aviso-aceptado')).toHaveTextContent(/Aceptaste el aviso de datos el/);
-      expect(screen.queryByText(/Texto del aviso/)).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: 'Ver aviso' }));
-      expect(screen.getByText(/Texto del aviso/)).toBeInTheDocument();
-      expect(screen.queryByRole('checkbox')).toBeNull();
+      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      expect(await screen.findByTestId('error-ubicacion')).toHaveTextContent(/Activa el GPS/);
+      falla = false;
+      fireEvent.click(screen.getByRole('button', { name: 'Forzar ubicación aproximada' }));
+      expect(await screen.findByRole('button', { name: 'Tomar selfie' })).toBeInTheDocument();
+      expect(llamadas[llamadas.length - 1].enableHighAccuracy).toBe(false);
+    });
+
+    it('permiso de ubicación denegado: mensaje claro con el candado y sin reintento automático', async () => {
+      const llamadas: any[] = [];
+      preparar({ getCurrentPosition: (_ok: any, err: any, o: any) => { llamadas.push(o); err({ code: 1 }); } }, camaraOk());
+      miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
+      render(<MiAsistenciaView />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      expect(await screen.findByTestId('error-ubicacion')).toHaveTextContent(/candado/);
+      expect(llamadas).toHaveLength(1);
+    });
+
+    it('si la cámara no abre en la selfie, permite continuar sin foto y la marca viaja con sinSelfie', async () => {
+      const getUserMedia = vi.fn()
+        .mockResolvedValueOnce({ getTracks: () => [pista] }) // escáner del QR
+        .mockRejectedValue(Object.assign(new Error('x'), { name: 'NotAllowedError' })); // selfie
+      preparar({ getCurrentPosition: (ok: any) => ok(gps) }, getUserMedia);
+      miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
+      marcarAsistencia.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada', marca: { estado: 'A_REVISAR' } });
+      render(<MiAsistenciaView />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      expect(await screen.findByTestId('error-camara-selfie')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Continuar sin foto' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar marca' }));
+      await waitFor(() => expect(marcarAsistencia).toHaveBeenCalled());
+      const enviado = marcarAsistencia.mock.calls[0][0];
+      expect(enviado.sinSelfie).toBe(true);
+      expect(enviado.selfie).toBeUndefined();
     });
   });
 

@@ -170,9 +170,26 @@ describe('AsistenciaService.marcar', () => {
     expect(e.codigo).toBe('FUERA_DE_RADIO');
   });
 
-  it('rechaza una precisión GPS mala (más de 25 m)', async () => {
+  it('una precisión GPS regular (más de 25 m) se acepta pero queda A_REVISAR con el motivo', async () => {
+    const { svc, b } = servicio();
+    const r = await svc.marcar(dto({ precision: 40 }), LUIS, undefined, AHORA);
+    expect(r.marca.estado).toBe('A_REVISAR');
+    expect(b.marcas[0].motivos_revision).toContain('Ubicación aproximada');
+  });
+
+  it('una precisión pésima (más de 300 m) se rechaza', async () => {
     const { svc } = servicio();
-    expect(await error(svc.marcar(dto({ precision: 40 }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'PRECISION_BAJA' });
+    expect(await error(svc.marcar(dto({ precision: 400 }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'PRECISION_BAJA' });
+  });
+
+  it('sin selfie porque la cámara no abrió: se acepta A_REVISAR; sin foto ni aviso se rechaza', async () => {
+    const { svc, b } = servicio();
+    const r = await svc.marcar(dto({ selfie: undefined, sinSelfie: true }), LUIS, undefined, AHORA);
+    expect(r.marca.estado).toBe('A_REVISAR');
+    expect(b.marcas[0].motivos_revision).toContain('Sin selfie');
+    expect(b.selfies).toHaveLength(0);
+    const otro = servicio();
+    expect(await error(otro.svc.marcar(dto({ selfie: undefined }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'SELFIE_INVALIDA' });
   });
 
   it('marca con precisión 0 queda A_REVISAR en vez de válida', async () => {
@@ -207,26 +224,10 @@ describe('AsistenciaService.marcar', () => {
     expect(await error(svc.marcar(dto(), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'DISPOSITIVO_DISTINTO' });
   });
 
-  it('la primera vez exige aceptar el consentimiento de datos personales', async () => {
+  it('ya no pide consentimiento para marcar', async () => {
     const { svc } = servicio();
-    expect(await error(svc.marcar(dto({ consentimiento: false }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'CONSENTIMIENTO_REQUERIDO' });
-  });
-
-  it('un rechazo por radio con consentimiento aceptado lo guarda y la siguiente marca ya no lo pide', async () => {
-    const { svc, b } = servicio();
-    const lejos = dto({ lat: LOCAL.lat + 0.01 });
-    await error(svc.marcar(lejos, LUIS, undefined, AHORA));
-    expect(b.consentimiento).toMatchObject({ party_id: 7n, version: VERSION_CONSENTIMIENTO });
     const r = await svc.marcar(dto({ consentimiento: undefined }), LUIS, undefined, AHORA);
     expect(r.ok).toBe(true);
-  });
-
-  it('con el aviso ya aceptado, otra marca con consentimiento no lo duplica', async () => {
-    const { svc, b } = servicio();
-    await svc.marcar(dto(), LUIS, undefined, AHORA);
-    await error(svc.marcar(dto({ tipo: 'ENTRADA' }), LUIS, undefined, AHORA));
-    await svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA).catch(() => undefined);
-    expect(b.upserts).toBe(1);
   });
 
   it('exige selfie JPEG', async () => {
@@ -250,7 +251,7 @@ describe('AsistenciaService.marcar', () => {
 
   it('deja auditoria de la marca y del rechazo', async () => {
     const { svc, auditoria } = servicio();
-    await error(svc.marcar(dto({ precision: 50 }), LUIS, undefined, AHORA));
+    await error(svc.marcar(dto({ precision: 500 }), LUIS, undefined, AHORA));
     await svc.marcar(dto(), LUIS, undefined, AHORA);
     const acciones = auditoria.registrar.mock.calls.map((c: any[]) => c[0].resultado);
     expect(acciones).toEqual(['RECHAZADO', 'OK']);
@@ -360,7 +361,7 @@ describe('AsistenciaService.marcar manual (solo GPS, sin QR ni selfie)', () => {
   it('fuera del radio o con GPS impreciso se rechaza', async () => {
     const { svc, b } = servicio();
     expect(await error(svc.marcar(manual({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'FUERA_DE_RADIO' });
-    expect(await error(svc.marcar(manual({ precision: 40 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'PRECISION_BAJA' });
+    expect(await error(svc.marcar(manual({ precision: 400 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'PRECISION_BAJA' });
     expect(b.marcas).toHaveLength(0);
   });
 
