@@ -1,0 +1,80 @@
+/* Calendario de asistencia (admin): mes con resumen, rango, filtros ocultos, registro y detalle. Compacto, sin scroll horizontal de página. */
+.ca-vista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.ca-barra { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.ca-grupo { display: inline-flex; border: 1.5px solid var(--cp-navy); border-radius: 9999px; overflow: hidden; }
+.ca-modo { min-height: 40px; padding: 0 16px; border: 0; background: transparent; color: var(--cp-navy); font-weight: 700; font-size: 14px; cursor: pointer; }
+.ca-modo[aria-pressed='true'] { background: var(--cp-navy); color: var(--cp-cream); }
+.ca-modo-ayuda { flex: 1 1 200px; }
+
+.ca-mes { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 8px; display: grid; gap: 6px; min-width: 0; }
+.ca-mes-cab { display: flex; align-items: center; gap: 6px; }
+.ca-mes-titulo { flex: 1; text-transform: capitalize; text-align: center; }
+.ca-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; user-select: none; touch-action: manipulation; }
+.ca-cab { text-align: center; font-size: 11px; font-weight: 700; color: var(--cp-soft); text-transform: uppercase; }
+.ca-dia {
+  min-height: 56px; border: 1.5px solid var(--cp-line); border-radius: 9px; background: var(--cp-white); padding: 3px 4px;
+  text-align: left; display: grid; align-content: start; gap: 1px; cursor: pointer; font: inherit; color: var(--cp-navy); min-width: 0;
+}
+.ca-dia b { font-size: 13px; }
+.ca-dia--ok { border-color: var(--cp-green); }
+.ca-dia--tarde { border-color: var(--cp-gold); background: #FFF8E6; }
+.ca-dia--revisar { border-color: var(--cp-gold); border-style: dashed; background: #FFF3D1; }
+.ca-dia--falta { border-color: var(--cp-rust); background: #FBEDE9; }
+.ca-dia--hoy b { text-decoration: underline; text-underline-offset: 3px; }
+.ca-dia--feriado { box-shadow: inset 0 -3px 0 var(--cp-orange); }
+.ca-dia--sel { background: var(--cp-navy); color: var(--cp-cream); border-color: var(--cp-navy); }
+.ca-dia:focus-visible { outline: 3px solid var(--cp-gold); outline-offset: 1px; }
+.ca-feriado { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--cp-orange); line-height: 11px; }
+.ca-ind { display: flex; flex-wrap: wrap; gap: 2px; }
+.ca-i { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 8px; font-size: 10px; line-height: 15px; font-weight: 800; text-align: center; color: #fff; }
+.ca-i--ok { background: var(--cp-green); }
+.ca-i--tarde { background: var(--cp-gold); color: var(--cp-navy); }
+.ca-i--falta { background: var(--cp-rust); }
+.ca-i--rev { background: var(--cp-navy); border: 1px dashed var(--cp-gold); }
+.ca-i--sol { background: var(--cp-orange); color: var(--cp-navy); }
+.ca-leyenda { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; }
+
+.ca-rango { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ca-rango-txt { flex: 1 1 100%; font-size: 14px; }
+.ca-personalizado { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.ca-herramientas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ca-csv { margin-left: auto; }
+.ca-chip { min-height: 32px; padding: 0 10px; border-radius: 9999px; border: 1.5px solid var(--cp-navy); background: var(--cp-white); color: var(--cp-navy); font-size: 12px; font-weight: 700; cursor: pointer; }
+.ca-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; background: var(--cp-white); border: 1.5px solid var(--cp-navy); border-radius: 14px; padding: 12px; }
+.ca-filtros fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.ca-filtros legend { font-size: 13px; font-weight: 700; padding: 0; margin-bottom: 4px; }
+.ca-filtros .as-acciones { grid-column: 1 / -1; justify-content: flex-end; }
+.ca-check { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; font-size: 14px; font-weight: 600; }
+.ca-check input { width: 20px; height: 20px; accent-color: var(--cp-navy); }
+
+.ca-tabla-wrap { max-width: 100%; position: relative; }
+.ca-tabla th, .ca-tabla td { padding: 6px 8px; white-space: nowrap; }
+.ca-tabla td[data-label='Marcas'], .ca-tabla td[data-label='Estado'] { white-space: normal; }
+.ca-tabla td[data-label='Marcas'] { min-width: 190px; }
+.ca-estado { display: flex; flex-wrap: wrap; gap: 4px; }
+.ca-marcas { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
+@media (min-width: 721px) { .ca-marcas { justify-content: flex-start; } }
+.ca-marca { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--cp-sand); border: 1px solid var(--cp-line); white-space: nowrap; }
+.ca-marca--rev { border-color: var(--cp-rust); color: var(--cp-rust); }
+.ca-fila--sel td { background: #FFF8E6; }
+.ca-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.ca-totales { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 12px; border-radius: 12px; background: var(--cp-sand); font-size: 14px; }
+
+.ca-detalle { border: 1.5px solid var(--cp-navy); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; background: var(--cp-cream); min-width: 0; }
+.ca-detalle-cab { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.ca-detalle-cab > div { flex: 1 1 200px; }
+.ca-marcas-lista { margin: 0; padding-left: 18px; font-size: 14px; }
+.ca-correccion { border: 1.5px dashed var(--cp-navy); border-radius: 10px; padding: 8px 10px; display: grid; gap: 8px; margin: 0; min-width: 0; }
+.ca-correccion legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
+.ca-resultado { border: 1px solid var(--cp-line); border-radius: 12px; padding: 8px 12px; background: var(--cp-white); display: grid; gap: 6px; }
+.ca-programar { display: grid; gap: 6px; }
+
+@media (max-width: 640px) {
+  .ca-dia { min-height: 46px; padding: 2px 3px; }
+  .ca-feriado { display: none; }
+  .ca-i { min-width: 14px; font-size: 9px; padding: 0 3px; }
+  /* Hoja inferior para los filtros */
+  .ca-filtros { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-radius: 16px 16px 0 0; max-height: 75vh; overflow-y: auto; box-shadow: 0 -8px 24px rgba(0,0,0,.2); grid-template-columns: 1fr; }
+  .ca-filtros fieldset { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  .ca-filtros legend { grid-column: 1 / -1; }
+}
