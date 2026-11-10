@@ -9,6 +9,7 @@ describe('AuditoriaService', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       count: jest.Mock;
+      groupBy: jest.Mock;
     };
     $queryRaw: jest.Mock;
   };
@@ -19,6 +20,7 @@ describe('AuditoriaService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       $queryRaw: jest.fn(),
     };
@@ -127,6 +129,39 @@ describe('AuditoriaService', () => {
       expect(resultado.datos[0].partyId).toBe('12');
       expect(resultado.datos[0].hashAnterior).toBe('abc1');
       expect(resultado.datos[0].hash).toBe('def2');
+    });
+
+    it('categoria SENSIBLE se traduce, resultado y busqueda llegan al where', async () => {
+      prisma.auditoria.count.mockResolvedValue(0);
+      prisma.auditoria.findMany.mockResolvedValue([]);
+      await service.listar({ categoria: 'sensible', resultado: 'rechazado', busqueda: ' 42 ' });
+      const where = prisma.auditoria.findMany.mock.calls[0][0].where;
+      expect(where.categoria).toBe('LECTURA_SENSIBLE');
+      expect(where.resultado).toBe('RECHAZADO');
+      expect(where.OR).toEqual(expect.arrayContaining([{ accion: { contains: '42', mode: 'insensitive' } }, { party_id: 42n }]));
+    });
+
+    it('fechas YYYY-MM-DD son día de Lima con «hasta» inclusivo', async () => {
+      prisma.auditoria.count.mockResolvedValue(0);
+      prisma.auditoria.findMany.mockResolvedValue([]);
+      await service.listar({ desde: '2026-10-05', hasta: '2026-10-05' });
+      const en = prisma.auditoria.findMany.mock.calls[0][0].where.en;
+      expect(en.gte.toISOString()).toBe('2026-10-05T05:00:00.000Z');
+      expect(en.lt.toISOString()).toBe('2026-10-06T05:00:00.000Z');
+      expect(en.lte).toBeUndefined();
+    });
+
+    it('devuelve conteos reales por categoría y resultado, cada uno sin su propio filtro', async () => {
+      prisma.auditoria.count.mockResolvedValue(0);
+      prisma.auditoria.findMany.mockResolvedValue([]);
+      prisma.auditoria.groupBy.mockImplementation(async ({ by }: any) =>
+        by[0] === 'categoria' ? [{ categoria: 'CAMBIO', _count: { _all: 30 } }] : [{ resultado: 'OK', _count: { _all: 28 } }, { resultado: 'RECHAZADO', _count: { _all: 2 } }],
+      );
+      const r = await service.listar({ categoria: 'CAMBIO', resultado: 'OK' });
+      expect(r.conteos).toEqual({ categoria: { CAMBIO: 30 }, resultado: { OK: 28, RECHAZADO: 2 } });
+      const llamadaCat = prisma.auditoria.groupBy.mock.calls.find((c: any) => c[0].by[0] === 'categoria')[0];
+      expect(llamadaCat.where.categoria).toBeUndefined();
+      expect(llamadaCat.where.resultado).toBe('OK');
     });
 
     it('debe respetar el límite máximo de 100 registros', async () => {

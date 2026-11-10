@@ -30,6 +30,14 @@ export interface RespuestaListarUsuarios {
   limite: number;
   totalPaginas: number;
   elementos: UsuarioItem[];
+  conteos?: ConteosUsuarios;
+}
+
+export interface ConteosUsuarios {
+  total: number;
+  activos: number;
+  inactivos: number;
+  porRol: Record<string, number>;
 }
 
 export interface RegistroAuditoriaItem {
@@ -59,6 +67,7 @@ export interface RespuestaListarAuditoria {
   limite: number;
   paginas: number;
   datos: RegistroAuditoriaItem[];
+  conteos?: { categoria: Record<string, number>; resultado: Record<string, number> };
 }
 
 export interface ResultadoVerificacionCadena {

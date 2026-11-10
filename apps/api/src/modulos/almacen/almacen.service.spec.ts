@@ -878,4 +878,15 @@ describe('AlmacenService', () => {
       await expect(service.entregarPedidoInterno(21, mockUsuario)).rejects.toThrow(ConflictException);
     });
   });
+  describe('listarMovimientos: rango en día de Lima', () => {
+    it('el día de Lima va de 05:00Z a 04:59:59.999Z del día siguiente (una venta a las 20:00 Lima entra)', async () => {
+      prisma.movimientoStock.findMany.mockResolvedValue([]);
+      await service.listarMovimientos({ fechaDesde: '2026-10-05', fechaHasta: '2026-10-05' } as any);
+      const en = prisma.movimientoStock.findMany.mock.calls[0][0].where.en;
+      const ventaLima2000 = new Date('2026-10-05T20:00:00-05:00');
+      expect(en.gte.toISOString()).toBe('2026-10-05T05:00:00.000Z');
+      expect(en.lte.toISOString()).toBe('2026-10-06T04:59:59.999Z');
+      expect(ventaLima2000 >= en.gte && ventaLima2000 <= en.lte).toBe(true);
+    });
+  });
 });

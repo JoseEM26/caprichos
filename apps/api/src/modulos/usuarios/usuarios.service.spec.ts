@@ -421,5 +421,58 @@ describe('UsuariosService', () => {
       expect(res.elementos[0].dni).toBe('72****78');
       expect(res.elementos[0].nombres).toBe('Pedro');
     });
+
+    it('Producción se mapea a COCINA y solo cuenta roles extra vigentes', async () => {
+      prismaMock.userAccount.count.mockResolvedValue(0);
+      prismaMock.userAccount.findMany.mockResolvedValue([]);
+      await service.listar({ rol: 'PRODUCCION' });
+      const where = prismaMock.userAccount.findMany.mock.calls[0][0].where;
+      const or = where.AND[0].OR;
+      expect(or[0]).toEqual({ rol: 'COCINA' });
+      expect(or[1].rolesExtra.some.rol).toBe('COCINA');
+      expect(or[1].rolesExtra.some.OR).toEqual(expect.arrayContaining([{ vence_en: null }]));
+    });
+
+    it('filtra por creado, fechas y último acceso (auditoría de INGRESO)', async () => {
+      prismaMock.auditoria = { groupBy: jest.fn().mockResolvedValue([{ party_id: 7n, _max: { en: new Date() } }, { party_id: 8n, _max: { en: new Date('2020-01-01') } }]) };
+      prismaMock.userAccount.count.mockResolvedValue(0);
+      prismaMock.userAccount.findMany.mockResolvedValue([]);
+      await service.listar({ creado: '30', desde: '2026-01-01', hasta: '2026-02-01', acceso: 'hoy' });
+      const and = prismaMock.userAccount.findMany.mock.calls[0][0].where.AND;
+      expect(and.some((c: any) => c.alta_en?.gte && !c.alta_en.lte)).toBe(true);
+      expect(and).toEqual(expect.arrayContaining([{ alta_en: { lte: new Date('2026-02-01T00:00:00.000Z') } }, { party_id: { in: [7n] } }]));
+      await service.listar({ acceso: 'nunca' });
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { notIn: [7n, 8n] } }]);
+      await service.listar({ acceso: 'mas30' });
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { in: [8n] } }]);
+    });
+
+    it('la búsqueda por nombre completo ignora tildes, ñ y mayúsculas', async () => {
+      const cand = (id: bigint, nombres: string, apellidos: string) => ({ id, party: { persona: { nombres, apellidos }, documentos: [] } });
+      prismaMock.userAccount.count.mockResolvedValue(0);
+      prismaMock.userAccount.findMany.mockImplementation(async (a: any) =>
+        a.select?.party ? [cand(1n, 'Juan', 'Pérez'), cand(2n, 'Peña', 'Núñez'), cand(3n, 'Ana', 'Ruiz')] : [],
+      );
+      await service.listar({ busqueda: 'JUAN perez' });
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [1n] } }]);
+      await service.listar({ busqueda: 'pena nunez' });
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [2n] } }]);
+    });
+
+    it('devuelve conteos reales (activos, inactivos y por rol con extras vigentes) independientes de la página', async () => {
+      prismaMock.userAccount.count.mockResolvedValue(1);
+      const futuro = new Date(Date.now() + 86400000);
+      const pasado = new Date(Date.now() - 86400000);
+      prismaMock.userAccount.findMany.mockImplementation(async (a: any) =>
+        a.select?.rolesExtra
+          ? [
+              { rol: 'CAJERO', activo: true, rolesExtra: [{ rol: 'COCINA', vence_en: null }, { rol: 'MOZO', vence_en: pasado }] },
+              { rol: 'COCINA', activo: false, rolesExtra: [{ rol: 'MOZO', vence_en: futuro }] },
+            ]
+          : [],
+      );
+      const res = await service.listar({ pagina: 1, limite: 1 });
+      expect(res.conteos).toEqual({ total: 2, activos: 1, inactivos: 1, porRol: { CAJERO: 1, COCINA: 2, MOZO: 1, PRODUCCION: 2 } });
+    });
   });
 });

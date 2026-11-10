@@ -4,7 +4,7 @@ import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { Campo } from '../../comun/Campo';
 import { Boton } from '../../comun/Boton';
-import type { UsuarioItem, RespuestaListarUsuarios, PersonalHorario } from './tipos';
+import type { UsuarioItem, RespuestaListarUsuarios, PersonalHorario, ConteosUsuarios } from './tipos';
 import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
@@ -33,6 +33,9 @@ export function UsuariosView() {
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
+  const [conteos, setConteos] = useState<ConteosUsuarios | null>(null);
+  const solicitudRef = useRef(0);
   const [filtroCargo, setFiltroCargo] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroCreado, setFiltroCreado] = useState('todos');
@@ -159,6 +162,7 @@ export function UsuariosView() {
   const cargarUsuarios = useCallback(async () => {
     if (!puedeVer) return;
 
+    const solicitud = ++solicitudRef.current;
     setCargando(true);
     setError(null);
     try {
@@ -168,28 +172,45 @@ export function UsuariosView() {
       if (filtroCargo !== 'todos') params.set('rol', filtroCargo.toUpperCase());
       if (filtroEstado === 'activos') params.set('activo', 'true');
       if (filtroEstado === 'inactivos') params.set('activo', 'false');
-      if (busqueda.trim()) params.set('busqueda', busqueda.trim());
+      if (busquedaAplicada.trim()) params.set('busqueda', busquedaAplicada.trim());
+      if (filtroCreado !== 'todos') params.set('creado', filtroCreado);
+      if (filtroAcceso !== 'todos') params.set('acceso', filtroAcceso);
+      if (fechaDesde) params.set('desde', fechaDesde);
+      if (fechaHasta) params.set('hasta', fechaHasta);
 
       const data = await api.get<RespuestaListarUsuarios>(
         `/admin/usuarios?${params.toString()}`,
       );
+      if (solicitud !== solicitudRef.current) return; // respuesta tardía
+      if (data.conteos) setConteos(data.conteos);
       setUsuarios(data.elementos || []);
       setTotal(data.total || 0);
       setTotalPaginas(data.totalPaginas || 1);
 
-      if (filtroCargo === 'todos' && filtroEstado === 'todos' && !busqueda.trim()) {
+      if (filtroCargo === 'todos' && filtroEstado === 'todos' && !busquedaAplicada.trim() && filtroCreado === 'todos' && filtroAcceso === 'todos' && !fechaDesde && !fechaHasta) {
         setTodosUsuarios(data.elementos || []);
       }
     } catch (err: any) {
+      if (solicitud !== solicitudRef.current) return;
       if (err instanceof ErrorApi) {
         setError(err.message || 'Error al obtener los usuarios.');
       } else {
         setError('Error de conexión al cargar la lista de personal.');
       }
     } finally {
-      setCargando(false);
+      if (solicitud === solicitudRef.current) setCargando(false);
     }
-  }, [puedeVer, pagina, limite, filtroCargo, filtroEstado, busqueda]);
+  }, [puedeVer, pagina, limite, filtroCargo, filtroEstado, busquedaAplicada, filtroCreado, filtroAcceso, fechaDesde, fechaHasta]);
+
+  // Debounce de la búsqueda de texto
+  useEffect(() => {
+    if (busqueda === busquedaAplicada) return;
+    const t = setTimeout(() => {
+      setBusquedaAplicada(busqueda);
+      setPagina(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda, busquedaAplicada]);
 
   useEffect(() => {
     cargarUsuarios();
@@ -225,6 +246,7 @@ export function UsuariosView() {
 
   const limpiarFiltros = () => {
     setBusqueda('');
+    setBusquedaAplicada('');
     setFiltroCargo('todos');
     setFiltroEstado('todos');
     setFiltroCreado('todos');
@@ -236,9 +258,10 @@ export function UsuariosView() {
 
   // Universo de usuarios base para métricas y chips
   const baseUsuarios = todosUsuarios.length > 0 ? todosUsuarios : usuarios;
-  const totalPersonal = total || baseUsuarios.length;
-  const totalActivos = useMemo(() => baseUsuarios.filter((u) => u.activo).length, [baseUsuarios]);
-  const totalInactivos = useMemo(() => baseUsuarios.filter((u) => !u.activo).length, [baseUsuarios]);
+  // Conteos reales del servidor (todo el personal, no la página ni el filtro)
+  const totalPersonal = conteos?.total ?? baseUsuarios.length;
+  const totalActivos = conteos?.activos ?? baseUsuarios.filter((u) => u.activo).length;
+  const totalInactivos = conteos?.inactivos ?? baseUsuarios.filter((u) => !u.activo).length;
   const totalHoy = useMemo(() => baseUsuarios.filter((u) => u.activo && !u.debeCambiar).length, [baseUsuarios]);
   const totalNuevos = useMemo(() => {
     const ahora = Date.now();
@@ -247,25 +270,15 @@ export function UsuariosView() {
   }, [baseUsuarios]);
   const totalNuncaIngresaron = useMemo(() => baseUsuarios.filter((u) => u.debeCambiar).length, [baseUsuarios]);
 
-  // Conteo real por rol de cargo para pastillas de filtro
-  const conteoRoles = useMemo(() => {
-    const conteo = {
-      admin: 0,
-      cajero: 0,
-      produccion: 0,
-      mozo: 0,
-      repartidor: 0,
-    };
-    for (const u of baseUsuarios) {
-      const r = (u.rol || '').toUpperCase();
-      if (r === 'ADMIN') conteo.admin++;
-      else if (r === 'CAJERO') conteo.cajero++;
-      else if (r === 'COCINA' || r === 'BARRA') conteo.produccion++;
-      else if (r === 'MOZO') conteo.mozo++;
-      else if (r === 'REPARTIDOR') conteo.repartidor++;
-    }
-    return conteo;
-  }, [baseUsuarios]);
+  // Conteo por cargo (personas con el rol, incluidos los roles extra vigentes), calculado por el servidor
+  const porRol = conteos?.porRol ?? {};
+  const conteoRoles = {
+    admin: porRol.ADMIN ?? 0,
+    cajero: porRol.CAJERO ?? 0,
+    produccion: porRol.PRODUCCION ?? 0,
+    mozo: porRol.MOZO ?? 0,
+    repartidor: porRol.REPARTIDOR ?? 0,
+  };
 
   // Manejo de DNI
   const solicitarVerDni = (usuario: UsuarioItem) => {
@@ -641,10 +654,7 @@ export function UsuariosView() {
               id="uv-q"
               type="search"
               value={busqueda}
-              onChange={(e) => {
-                setBusqueda(e.target.value);
-                setPagina(1);
-              }}
+              onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre o DNI (usuario)..."
               style={{
                 flex: '2 1 220px',
@@ -707,7 +717,10 @@ export function UsuariosView() {
                 { valor: 'ano', etiqueta: 'Este año' },
                 { valor: 'mas90', etiqueta: 'Hace más de 90 días' },
               ]}
-              alCambiar={setFiltroCreado}
+              alCambiar={(v) => {
+                setFiltroCreado(v);
+                setPagina(1);
+              }}
             />
 
             {/* Último acceso */}
@@ -722,7 +735,10 @@ export function UsuariosView() {
                 { valor: 'mas30', etiqueta: 'Hace más de 30 días' },
                 { valor: 'nunca', etiqueta: 'Nunca ingresó' },
               ]}
-              alCambiar={setFiltroAcceso}
+              alCambiar={(v) => {
+                setFiltroAcceso(v);
+                setPagina(1);
+              }}
             />
             </BarraFiltros>
 
@@ -739,7 +755,10 @@ export function UsuariosView() {
                   id="uv-d1"
                   type="date"
                   value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
+                  onChange={(e) => {
+                    setFechaDesde(e.target.value);
+                    setPagina(1);
+                  }}
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
@@ -761,7 +780,10 @@ export function UsuariosView() {
                   id="uv-d2"
                   type="date"
                   value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
+                  onChange={(e) => {
+                    setFechaHasta(e.target.value);
+                    setPagina(1);
+                  }}
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
