@@ -191,9 +191,34 @@ Cada latido (20 s) informa el estado de cada máquina (lista, no encontrada, sin
 1. En Caprichos, el aviso «Instalar programa de impresión» ofrece **Descargar el programa de impresión para Windows** (`/api/agente-impresion/descargar/windows`).
 2. Abre el `.exe`. Pega el **código de vinculación** (un solo uso, 15 min) que genera el administrador en el mismo aviso. Tiene la forma `CODIGO@servidor`, así el mismo programa sirve para la demo y para producción según el código que pegues. No hay llaves ni secretos que copiar.
 3. El asistente lista las impresoras de Windows: elige cuál es la etiquetera y cuál la ticketera (Enter = ninguna). Se guarda en `%APPDATA%\CaprichosAgente\config.json`.
-4. Inicio automático (opcional): `Win + R` -> `shell:startup` y pon ahí un acceso directo al `.exe`.
+4. Inicio automático: ya no hace falta `shell:startup` ni accesos directos; ver «Que arranque solo con Windows» abajo.
 
 Para cambiar las impresoras o re-vincular: `agente-impresion-windows.exe configurar` (borra `agenteKey` del config para re-vincular).
+
+### Que arranque solo con Windows
+
+Ejecuta el `.exe` **una sola vez**. Al abrirlo (ya vinculado) el programa se registra solo para iniciar al iniciar sesión en Windows, en segundo plano y sin ventana, con la clave del usuario `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (valor `CaprichosImpresion`). No pide permisos de administrador.
+
+- Es idempotente: abrirlo otra vez no duplica nada. Si mueves el `.exe` o descargas una versión nueva en otra carpeta, al abrirlo (o al arrancar solo) la entrada se corrige a la ruta actual.
+- Para quitarlo: `agente-impresion-windows.exe autoinicio desactivar`. Queda recordado en `config.json` (`autoinicioDesactivado`) y no se vuelve a registrar solo. Para ponerlo de nuevo: `autoinicio activar`. `autoinicio` a secas dice si está activado. (`--instalar-inicio` y `--quitar-inicio` hacen lo mismo.)
+- En Linux/mac no usa el registro: en Linux crea el autostart del escritorio; el servicio `systemd` (sección 5) sigue siendo la opción para servidores.
+
+### Comprobar el estado
+
+`agente-impresion-windows.exe estado` (alias `diagnostico`, que además lista las impresoras que ve el equipo) no imprime nada; revisa:
+
+```
+✔ Iniciar con Windows: registrado
+✔ Vinculado con Caprichos: sí (https://caprichos.pe)
+✔ Conexión con el sistema: conectado · último latido 2026-11-10T10:00:00Z
+✔ Versión 0.1.58 (al día)
+✔ Etiquetera: ETIQUETERA Caja · instalada y en línea
+✔ Ticketera: POS-80C · instalada y en línea
+✔ Programa en marcha: sí (pid 4242, una sola instancia)
+Todo en orden.
+```
+
+Una línea con ✘ dice qué falla (ruta de inicio distinta, sin vincular, sin conexión, impresora no vista por el equipo o sin conexión, programa detenido). «Hay una versión nueva» se muestra pero no cuenta como fallo. El código de salida es 0 si todo está bien y 1 si algo falla, útil en scripts; `estado --json` entrega lo mismo en JSON, sin la llave. La conexión se prueba con una consulta ligera de solo lectura (no envía latidos ni toma trabajos); el último latido real sale del programa en marcha. Solo puede haber una instancia: un segundo programa avisa y se cierra.
 
 ### Linux (binario autocontenido, sin Node)
 
