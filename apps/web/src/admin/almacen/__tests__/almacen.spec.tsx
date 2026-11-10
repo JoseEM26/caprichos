@@ -81,7 +81,8 @@ describe('AlmacenView', () => {
       tiene: vi.fn().mockReturnValue(true),
     });
 
-    vi.spyOn(almacenApi, 'listarMovimientos').mockResolvedValue({
+    // El servidor filtra por tipo; el mock lo imita
+    vi.spyOn(almacenApi, 'listarMovimientos').mockImplementation(async (f) => ({
       conteos: {
         todos: 3,
         entradas: 1,
@@ -89,8 +90,10 @@ describe('AlmacenView', () => {
         mermas: 1,
         devoluciones: 0,
       },
-      movimientos: mockMovimientos,
-    });
+      movimientos: f?.tipo && f.tipo !== 'Todos'
+        ? mockMovimientos.filter((m: any) => String(m.tipo).toUpperCase() === f.tipo)
+        : mockMovimientos,
+    }));
     vi.spyOn(almacenApi, 'listarInsumos').mockResolvedValue(mockInsumos);
   });
 
@@ -135,6 +138,7 @@ describe('AlmacenView', () => {
       expect(screen.getByText('Donas del día')).toBeInTheDocument();
       expect(screen.queryByText('Donas (producción del día)')).not.toBeInTheDocument();
     });
+    expect(almacenApi.listarMovimientos).toHaveBeenLastCalledWith(expect.objectContaining({ tipo: 'MERMA', pagina: 1 }));
   });
 
   it('abre el modal de registrar movimiento al hacer clic', async () => {

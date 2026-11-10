@@ -664,18 +664,12 @@ describe('Ola F5: Comprobantes y Obligaciones Legales', () => {
       expect(screen.getByText('LR-2026-000002')).toBeInTheDocument();
     });
 
-    // Filtrar con la búsqueda por "Rosa"
+    // La búsqueda va al servidor (con o sin tildes se normaliza allá), no filtra la página cargada
     const inputBusqueda = screen.getByPlaceholderText(/Buscar por número, cliente o detalle/i);
     fireEvent.change(inputBusqueda, { target: { value: 'Rosa' } });
-
-    // Sólo debe mostrar a Rosa Díaz
-    expect(screen.getByText('LR-2026-000001')).toBeInTheDocument();
-    expect(screen.queryByText('LR-2026-000002')).not.toBeInTheDocument();
-
-    // Limpiar búsqueda
-    fireEvent.change(inputBusqueda, { target: { value: '' } });
-    expect(screen.getByText('LR-2026-000001')).toBeInTheDocument();
-    expect(screen.getByText('LR-2026-000002')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(spyListar).toHaveBeenCalledWith(expect.objectContaining({ buscar: 'Rosa', pagina: 1 }));
+    });
 
     // Clic en píldora "Recibidos"
     fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));

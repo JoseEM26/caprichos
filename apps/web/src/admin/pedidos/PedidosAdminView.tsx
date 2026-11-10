@@ -371,7 +371,7 @@ export function PedidosAdminView() {
     if (paginasRef.current >= MAX_PAGINAS_AUTOMATICAS) return;
     void cargarMas();
     // cargarMas solo usa refs y setters estables y el rango, que ya dispara la recarga
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [filtrando, faltanPorCargar, cargando, cargandoMas, errorMas, pedidos.length]);
 
   const cambiarRango = (nuevo: RangoPedidos) => {
@@ -590,7 +590,7 @@ export function PedidosAdminView() {
     if (cobroFiltro !== 'all') lista.push({ id: 'cobro', texto: `Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`, quitar: () => { setCobroFiltro('all'); setPaginaActual(1); } });
     return lista;
     // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
 
   const limpiarFiltros = () => {

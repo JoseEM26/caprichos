@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AvisoControlAlmacen } from '../stock/AvisoControlAlmacen';
 import { AvisoAperturaHoy } from './AvisoAperturaHoy';
 import {
   almacenApi,
   MovimientoItem,
   InsumoStockItem,
+  ListarMovimientosRespuesta,
 } from './almacenApi';
 import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
@@ -51,7 +52,7 @@ export const AlmacenView: React.FC = () => {
     try {
       setCargando(true);
       const [resMovs, resInsumos, resPeds] = await Promise.all([
-        almacenApi.listarMovimientos({ tipo: filtroTipo, buscar: buscarAplicado, pagina, limite: TAMANO_PAGINA }).catch(() => ({ conteos: { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 }, movimientos: [] })),
+        almacenApi.listarMovimientos({ tipo: filtroTipo, buscar: buscarAplicado, pagina, limite: TAMANO_PAGINA }).catch((): ListarMovimientosRespuesta => ({ conteos: { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 }, movimientos: [] })),
         almacenApi.listarInsumos().catch(() => []),
         almacenApi.listarPedidosInternos().catch(() => []),
       ]);
@@ -69,7 +70,7 @@ export const AlmacenView: React.FC = () => {
 
   useEffect(() => {
     cargarDatos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [filtroTipo, buscarAplicado, pagina]);
 
   // La búsqueda va al servidor cuando se deja de escribir y vuelve a la página 1
