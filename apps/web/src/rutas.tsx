@@ -7,6 +7,8 @@ import { AdminShell } from "./admin/AdminShell";
 import { MODULOS } from "./admin/modulos";
 import { Escritorio } from "./admin/escritorio";
 import { Perfil } from "./admin/Perfil";
+import { useSesion } from "./comun/sesion";
+import { esSoloMarketing } from "./comun/rolesUsuario";
 import { CartaPublica } from "./carta/CartaPublica";
 import {
   TerminosPage,
@@ -16,6 +18,18 @@ import {
 import { PantallaCocinaView } from "./pantalla/PantallaCocinaView";
 import { PaginaMascota } from "./mascota/PaginaMascota";
 import { PantallaAsistenciaPublica } from "./admin/asistencia";
+
+/** Inicio del panel: Marketing y diseño no tiene Escritorio; va a su primer módulo permitido (no a una pantalla sin permiso). */
+export function InicioAdmin() {
+  const { usuario, tiene } = useSesion();
+  if (esSoloMarketing(usuario)) {
+    const primero = MODULOS.find(
+      (m) => m.permisoMinimo && !["mi-asistencia", "notificaciones"].includes(m.clave) && tiene(m.permisoMinimo),
+    );
+    if (primero) return <Navigate to={primero.ruta} replace />;
+  }
+  return <Escritorio />;
+}
 
 /** El título estático de index.html es el de la carta (SEO); el panel lo cambia en el cliente. */
 function TituloPanel() {
@@ -79,7 +93,7 @@ export function RutasApp() {
             </RutaProtegida>
           }
         >
-          <Route index element={<Escritorio />} />
+          <Route index element={<InicioAdmin />} />
           <Route path="escritorio" element={<Navigate to="/admin" replace />} />
           <Route path="perfil" element={<Perfil />} />
 

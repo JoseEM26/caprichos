@@ -123,25 +123,25 @@ export class ContenidoAdminController {
   }
 
   @Get('conocenos')
-  @Permiso('novedades', 'ver')
+  @Permiso('conocenos', 'ver')
   async obtenerConocenos() {
     return this.contenidoService.obtenerConocenosAdmin();
   }
 
   @Put('conocenos')
-  @Permiso('novedades', 'editar')
+  @Permiso('conocenos', 'editar')
   async guardarBorradorConocenos(@Body() dto: any, @Req() req: any) {
     return this.contenidoService.guardarBorradorConocenos(dto, req.usuario);
   }
 
   @Post('conocenos/publicar')
-  @Permiso('novedades', 'editar')
+  @Permiso('conocenos', 'publicar')
   async publicarConocenos(@Req() req: any) {
     return this.contenidoService.publicarConocenos(req.usuario);
   }
 
   @Post('conocenos/descartar')
-  @Permiso('novedades', 'editar')
+  @Permiso('conocenos', 'editar')
   async descartarConocenos(@Req() req: any) {
     return this.contenidoService.descartarConocenos(req.usuario);
   }
@@ -235,25 +235,25 @@ export class ContenidoAdminController {
   // --- Paleta de colores ---
 
   @Get('paleta')
-  @Permiso('carta_diseno', 'ver')
+  @Permiso('paleta', 'ver')
   async obtenerPaletas() {
     return this.contenidoService.obtenerPaletasAdmin();
   }
 
   @Put('paleta/borrador')
-  @Permiso('carta_diseno', 'editar')
+  @Permiso('paleta', 'editar')
   async guardarBorradorPaleta(@Body() dto: GuardarPaletaDto, @Req() req: any) {
     return this.contenidoService.guardarBorradorPaleta(dto, req.usuario);
   }
 
   @Post('paleta/publicar')
-  @Permiso('carta_diseno', 'publicar')
+  @Permiso('paleta', 'publicar')
   async publicarPaleta(@Req() req: any) {
     return this.contenidoService.publicarPaleta(req.usuario);
   }
 
   @Post('paleta/descartar')
-  @Permiso('carta_diseno', 'editar')
+  @Permiso('paleta', 'editar')
   async descartarPaleta(@Req() req: any) {
     return this.contenidoService.descartarPaleta(req.usuario);
   }

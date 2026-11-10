@@ -8,6 +8,7 @@ export const ROLES_ASIGNABLES: string[] = [
   'REPARTIDOR',
   'SUPERVISOR',
   'APOYO_DELIVERY',
+  'MARKETING',
 ];
 
 /** Qué podrá hacer quien reciba el rol (espejo en lenguaje llano de MATRIZ del servidor). */
@@ -18,6 +19,12 @@ export const VISTA_PREVIA_ROL: Record<string, string[]> = {
     'Salir, llegar y entregar los pedidos que tomó',
     'Reportar incidencias, chatear con el cliente y proponer ubicación o cambio de cobro',
     'No liquida efectivo ni reasigna repartidores (eso sigue en Caja y Administración)',
+  ],
+  MARKETING: [
+    'Diseñador de la carta, Novedades, Conócenos y Destacadas: editar y publicar',
+    'Reseñas de Google: ver y mostrar u ocultar',
+    'Paleta de colores: crear, modificar y aplicar paletas',
+    'Sube las fotos que necesita; nada de caja, pedidos, clientes, usuarios ni configuración',
   ],
   CAJERO: ['Ventas y cobros en caja', 'Pedidos, comprobantes y mesas', 'Mensajes de WhatsApp'],
   MOZO: ['Mesas y pedidos del salón', 'Reservas', 'Mensajes de WhatsApp'],
@@ -72,4 +79,5 @@ export const ETIQUETAS_ROLES: Record<string, string> = {
   ALMACEN: 'Almacén (Stock y compras)',
   SUPERVISOR: 'Supervisor (Caja y salón, sin administración)',
   APOYO_DELIVERY: 'Apoyo en delivery (Toma y entrega pedidos)',
+  MARKETING: 'Marketing y diseño (Carta, novedades, reseñas y paleta)',
 };

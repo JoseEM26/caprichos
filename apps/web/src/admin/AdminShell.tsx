@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
+import { esSoloMarketing } from '../comun/rolesUsuario';
 import { Confirmar } from '../comun/Confirmar';
 import { Icono } from '../comun/Icono';
 import { useEsMovil } from '../carta/useEsMovil';
@@ -31,6 +32,7 @@ const COLOR_ROL: Record<string, string> = {
   PRODUCCION: '#C9A6D9',
   REPARTIDOR: '#9BD3AB',
   SUPERVISOR: 'var(--cp-gold)',
+  MARKETING: '#C9A6D9',
 };
 const NOMBRE_ROL: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -41,6 +43,7 @@ const NOMBRE_ROL: Record<string, string> = {
   PRODUCCION: 'Producción',
   REPARTIDOR: 'Repartidor',
   SUPERVISOR: 'Supervisor',
+  MARKETING: 'Marketing y diseño',
 };
 
 const leerContraido = (): boolean => {
@@ -110,7 +113,11 @@ export function AdminShell() {
     });
   };
 
-  const modulos = useMemo(() => MODULOS.filter((m) => moduloVisible(m, tiene)), [tiene]);
+  const sinEscritorio = esSoloMarketing(usuario);
+  const modulos = useMemo(
+    () => MODULOS.filter((m) => moduloVisible(m, tiene) && !(sinEscritorio && m.clave === 'escritorio')),
+    [tiene, sinEscritorio],
+  );
   const grupos = useMemo(
     () => GRUPOS_MODULOS.map((g) => ({ grupo: g, items: modulos.filter((m) => m.grupo === g) })).filter((g) => g.items.length > 0),
     [modulos],

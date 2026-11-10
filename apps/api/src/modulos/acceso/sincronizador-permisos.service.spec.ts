@@ -55,6 +55,16 @@ describe('SincronizadorPermisosService', () => {
     expect(prisma.permiso.createMany).not.toHaveBeenCalled();
   });
 
+  it('vincula al rol nuevo MARKETING con exactamente sus permisos (paleta, reseñas y Conócenos incluidos) cuando no tiene ninguno', async () => {
+    const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz().filter((v) => v.rol !== 'MARKETING'));
+    const r = await servicio.sincronizar();
+    expect(r.vinculados).toBe(MATRIZ.MARKETING.length);
+    const datos = prisma.rolPermiso.createMany.mock.calls[0][0].data;
+    expect(datos.every((d: any) => d.rol === 'MARKETING')).toBe(true);
+    expect(datos.map((d: any) => d.permiso_id).sort()).toEqual(MATRIZ.MARKETING.map(idDe).sort());
+    expect(MATRIZ.MARKETING).toEqual(expect.arrayContaining(['paleta/editar', 'resenas/ver', 'conocenos/editar']));
+  });
+
   it('no hace nada si todo existe y todos los vínculos de MATRIZ están', async () => {
     const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
     const r = await servicio.sincronizar();

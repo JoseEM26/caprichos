@@ -2,8 +2,8 @@
 modulo: novedades
 titulo: Novedades y publicidad
 ruta: /admin/novedades
-permiso: catalogo/ver
-roles: [ADMIN]
+permiso: novedades/ver
+roles: [ADMIN, MARKETING]
 relacionados: [disenador, destacadas, ofertas, productos]
 sugerencias:
   - ¿Cómo publico una nueva promoción o anuncio?

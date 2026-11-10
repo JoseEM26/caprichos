@@ -48,7 +48,7 @@ describe('menú del SUPERVISOR', () => {
   it('Novedades, Conócenos y Destacadas se miran con el permiso que exige su API', () => {
     const porClave = (c: string) => MODULOS.find((m) => m.clave === c)?.permisoMinimo;
     expect(porClave('novedades')).toBe('novedades/ver');
-    expect(porClave('conocenos')).toBe('novedades/ver');
+    expect(porClave('conocenos')).toBe('conocenos/ver');
     expect(porClave('destacadas')).toBe('destacadas/ver');
   });
 });

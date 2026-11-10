@@ -2,8 +2,8 @@
 modulo: paleta
 titulo: Paleta de colores
 ruta: /admin/paleta
-permiso: local/ver
-roles: [ADMIN]
+permiso: paleta/ver
+roles: [ADMIN, MARKETING]
 relacionados: [disenador, mirest]
 sugerencias:
   - ¿Cómo cambio los colores de los botones y textos de la carta?

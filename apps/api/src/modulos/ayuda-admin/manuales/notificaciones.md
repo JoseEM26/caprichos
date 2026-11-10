@@ -3,7 +3,7 @@ modulo: notificaciones
 titulo: Notificaciones
 ruta: /admin/notificaciones
 permiso: notificaciones/ver
-roles: [ADMIN, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR, MARKETING]
 relacionados: [cocina, caja, stock, mensajes, repartos, reservas, escritorio]
 sugerencias:
   - ¿Dónde veo los pedidos demorados y alertas urgentes de mi área?

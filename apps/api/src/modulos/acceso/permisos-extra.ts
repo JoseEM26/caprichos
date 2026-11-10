@@ -11,6 +11,7 @@ export const PERMISOS_SENSIBLES: readonly string[] = [
   'puntos/ajustar',
   'compras/anular', 'compras/pagar', 'pedidos_proveedor/anular', 'produccion/anular',
   'destacadas/eliminar',
+  'resenas/editar',
   'asistencia/administrar',
   'pantallas/vincular', 'pantallas/desactivar',
   'repartos/liquidar',
@@ -29,7 +30,7 @@ export const NOMBRES_MODULO: Record<string, string> = {
   compras: 'Compras', proveedores: 'Proveedores', pedidos_proveedor: 'Pedidos a proveedor', almacen: 'Almacén', produccion: 'Producción',
   creditos: 'Créditos', iniciativas: 'Iniciativas', mensajes: 'Mensajes de WhatsApp', whatsapp_salientes: 'Avisos de WhatsApp enviados',
   encuestas: 'Encuestas', informes: 'Reportes', indicadores: 'Indicadores', notificaciones: 'Notificaciones', carta_diseno: 'Diseñador de la carta',
-  novedades: 'Novedades', destacadas: 'Destacadas', mensajes_carta: 'Mensajes de la carta', pantallas: 'Pantallas', escritorio: 'Escritorio',
+  novedades: 'Novedades', conocenos: 'Conócenos', paleta: 'Paleta de colores', resenas: 'Reseñas de Google', destacadas: 'Destacadas', mensajes_carta: 'Mensajes de la carta', pantallas: 'Pantallas', escritorio: 'Escritorio',
   vouchers: 'Vouchers', asistencia: 'Asistencia', mascota: 'Mascota', propinas: 'Propinas',
 };
 
