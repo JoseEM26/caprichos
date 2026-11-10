@@ -79,7 +79,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
   'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento', 'numero_bloqueado',
-  'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
+  'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento', 'asistencia_solicitud',
   'propina_reparto', 'propina_reparto_detalle',
   'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'feriado',
   'vinculo_personal', 'vacacion_movimiento',
@@ -122,6 +122,7 @@ export const FK_PARTY_PERSONAL = [
   'solicitud_cambio_cobro.solicitado_por_party_id', 'solicitud_cambio_cobro.resuelto_por_party_id',
   'cortesia.dada_por_party_id', 'cortesia.autorizada_por_party_id',
   'asistencia_marca.party_id', 'asistencia_marca.por_party_id', 'asistencia_dispositivo.party_id', 'asistencia_consentimiento.party_id',
+  'asistencia_solicitud.party_id', 'asistencia_solicitud.resuelta_por',
   'propina_reparto.calculado_por', 'propina_reparto.aprobado_por', 'propina_reparto.pagado_por', 'propina_reparto.anulado_por',
   'propina_reparto_detalle.party_id',
 ];

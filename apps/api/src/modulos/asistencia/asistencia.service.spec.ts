@@ -75,7 +75,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
       },
       create: async ({ data }: any) => {
         const fila = { id: id++, creado_en: AHORA, ...data };
-        if (marcas.some((m) => igual(m.party_id, fila.party_id) && igual(m.jornada, fila.jornada) && m.tipo === fila.tipo && m.origen === 'CELULAR' && fila.origen === 'CELULAR')) {
+        if (marcas.some((m) => igual(m.party_id, fila.party_id) && fila.qr_slot !== undefined && igual(m.qr_slot, fila.qr_slot))) { // índice único (party_id, qr_slot); ya no hay unicidad por tipo
           throw Object.assign(new Error('unique'), { code: 'P2002' });
         }
         marcas.push(fila);
@@ -137,7 +137,8 @@ describe('AsistenciaService.marcar', () => {
     expect(r.marca.estado).toBe('VALIDA');
     expect(b.marcas).toHaveLength(1);
     expect(b.selfies).toHaveLength(1);
-    expect(r.permitidas).toContain('SALIDA');
+    expect(r.marca.tipo).toBe('ENTRADA');
+    expect(r.mensaje).toBe('Marcaste tu entrada a las 08:00');
   });
 
   it('rechaza un QR ajeno (firmado con otro secreto)', async () => {
@@ -181,10 +182,24 @@ describe('AsistenciaService.marcar', () => {
     expect(r.marca.alertas.join(' ')).toMatch(/simulada/);
   });
 
-  it('valida el orden: no salida sin entrada', async () => {
-    const { svc } = servicio();
-    const e = await error(svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA));
-    expect(e).toMatchObject({ codigo: 'ORDEN_INVALIDO' });
+  it('marcas múltiples: el tipo que mande el cliente se ignora; la primera siempre es la entrada', async () => {
+    const { svc, b } = servicio();
+    const r = await svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA);
+    expect(r.marca.tipo).toBe('ENTRADA');
+    expect(b.marcas[0].tipo).toBe('ENTRADA');
+  });
+
+  it('marcas múltiples: se puede marcar varias veces; la 2.ª cuenta como salida y una a <3 min se une a la anterior', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto(), LUIS, undefined, AHORA);
+    const luego = new Date(AHORA.getTime() + 60_000); // 1 min después: doble marca
+    const r2 = await svc.marcar(dto({ qr: payloadQr(SECRETO, slotDe(luego.getTime())) }), LUIS, undefined, luego);
+    expect(r2.interpretacion.duplicada).toBe(true);
+    expect(r2.mensaje).toMatch(/se unió a la anterior/);
+    const mas = new Date(AHORA.getTime() + 10 * 60_000);
+    const r3 = await svc.marcar(dto({ qr: payloadQr(SECRETO, slotDe(mas.getTime())) }), LUIS, undefined, mas);
+    expect(r3.marca.tipo).toBe('SALIDA');
+    expect(b.marcas).toHaveLength(3); // nada se rechaza ni se borra
   });
 
   it('un solo celular por trabajador: otro dispositivo se rechaza', async () => {
@@ -335,16 +350,16 @@ describe('AsistenciaService.marcarWeb (usuario y contraseña)', () => {
     const { svc, b } = servicio();
     const r = await svc.marcarWeb(entrada, '1.1.1.1', AHORA);
     expect(r.tipo).toBe('ENTRADA');
-    expect(r.pendiente).toBe('SALIDA');
+    expect(r.duplicada).toBe(false);
     expect(b.marcas[0]).toMatchObject({ origen: 'WEB', estado: 'A_REVISAR', motivos_revision: MOTIVO_MARCA_WEB, tipo: 'ENTRADA' });
     expect(b.marcas[0].lat).toBeUndefined();
     expect(b.selfies).toHaveLength(0);
     expect(r).not.toHaveProperty('token');
   });
 
-  it('respeta el orden: no deja marcar salida sin entrada', async () => {
+  it('el tipo que mande el cliente se ignora: la primera marca es la entrada', async () => {
     const { svc } = servicio();
-    expect(await error(svc.marcarWeb({ ...entrada, tipo: 'SALIDA' }, undefined, AHORA))).toMatchObject({ codigo: 'ORDEN_INVALIDO' });
+    expect((await svc.marcarWeb({ ...entrada, tipo: 'SALIDA' }, undefined, AHORA)).tipo).toBe('ENTRADA');
   });
 
   it('contraseña mala: mensaje genérico y mismo mensaje si el usuario no existe', async () => {

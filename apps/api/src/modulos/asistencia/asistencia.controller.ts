@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { MarcarDto, MiHistorialDto } from './dto/asistencia.dto';
+import { CrearSolicitudDto, MarcarDto, MiHistorialDto } from './dto/asistencia.dto';
+import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
 import { PlanillaService } from './planilla.service';
 import { VacacionesService } from './vacaciones.service';
@@ -19,6 +20,7 @@ export class AsistenciaController {
     private readonly asistencia: AsistenciaService,
     private readonly planilla: PlanillaService,
     private readonly vacaciones: VacacionesService,
+    private readonly correcciones: AsistenciaCorreccionesService,
   ) {}
 
   @Get('mi/hoy')
@@ -52,6 +54,32 @@ export class AsistenciaController {
   @Permiso('asistencia', 'marcar')
   miVacaciones(@Req() req: any) {
     return this.vacaciones.miVacaciones(req.usuario.partyId);
+  }
+
+  /** Mis jornadas con marcas que no cuadran (solo las mías): para corregirlas al día siguiente. */
+  @Get('mi/inconsistencias')
+  @Permiso('asistencia', 'marcar')
+  miInconsistencias(@Req() req: any) {
+    return this.correcciones.inconsistencias(req.usuario.partyId);
+  }
+
+  @Get('mi/solicitudes')
+  @Permiso('asistencia', 'marcar')
+  misSolicitudes(@Req() req: any) {
+    return this.correcciones.misSolicitudes(req.usuario.partyId);
+  }
+
+  /** Pedir una corrección (no cuenta hasta que el administrador la apruebe). */
+  @Post('mi/solicitudes')
+  @Permiso('asistencia', 'marcar')
+  crearSolicitud(@Body() dto: CrearSolicitudDto, @Req() req: any) {
+    return this.correcciones.crearSolicitud(dto, req.usuario, ipDe(req));
+  }
+
+  @Post('mi/solicitudes/:id/cancelar')
+  @Permiso('asistencia', 'marcar')
+  cancelarSolicitud(@Param('id') id: string, @Req() req: any) {
+    return this.correcciones.cancelarSolicitud(Number(id), req.usuario, ipDe(req));
   }
 
   @Post('marcar')

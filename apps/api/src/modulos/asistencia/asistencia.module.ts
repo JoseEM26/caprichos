@@ -10,12 +10,13 @@ import { AsistenciaMarcaWebController, AsistenciaPantallaPublicaController } fro
 import { PlanillaController } from './planilla.controller';
 import { PlanillaService } from './planilla.service';
 import { AsistenciaService } from './asistencia.service';
+import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaSelfiesTarea } from './asistencia-selfies.tarea';
 
 @Module({
   imports: [ArchivosModule],
   controllers: [AsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, AsistenciaMarcaWebController, PlanillaController, FeriadosController, VinculoController],
-  providers: [AsistenciaService, PlanillaService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea],
-  exports: [AsistenciaService, PlanillaService, VacacionesService],
+  providers: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea],
+  exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, VacacionesService],
 })
 export class AsistenciaModule {}

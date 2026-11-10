@@ -2,7 +2,11 @@ import { Body, Controller, Delete, Get, Header, Param, Post, Put, Query, Req, Re
 import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, ListarMarcasDto, ReporteMesDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import {
+  AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto,
+  ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto,
+} from './dto/asistencia.dto';
+import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -14,7 +18,10 @@ const ipDe = (req: any): string | undefined => {
 @Controller('admin/asistencia')
 @UseGuards(AccesoGuard)
 export class AsistenciaAdminController {
-  constructor(private readonly asistencia: AsistenciaService) {}
+  constructor(
+    private readonly asistencia: AsistenciaService,
+    private readonly correcciones: AsistenciaCorreccionesService,
+  ) {}
 
   @Get('pantalla/qr')
   @Permiso('asistencia', 'pantalla')
@@ -91,6 +98,67 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   anular(@Param('id') id: string, @Body() dto: RevisarMarcaDto, @Req() req: any) {
     return this.asistencia.revisarMarca(Number(id), 'ANULAR', dto, req.usuario, ipDe(req));
+  }
+
+  /** «Separar» una doble marca: el admin la aprueba como marca propia (ya no se une a la anterior). */
+  @Post('marcas/:id/separar')
+  @Permiso('asistencia', 'administrar')
+  separar(@Param('id') id: string, @Body() dto: RevisarMarcaDto, @Req() req: any) {
+    return this.asistencia.revisarMarca(Number(id), 'SEPARAR', dto, req.usuario, ipDe(req));
+  }
+
+  /** Cambiar el rol de una marca (entrada, salida, break): anula la original y crea una corrección a la misma hora. */
+  @Post('marcas/:id/reasignar')
+  @Permiso('asistencia', 'administrar')
+  reasignar(@Param('id') id: string, @Body() dto: ReasignarMarcaDto, @Req() req: any) {
+    return this.asistencia.reasignarMarca(Number(id), dto, req.usuario, ipDe(req));
+  }
+
+  /** Cronograma por rango (máx. 31 días): por persona, horario, marcas interpretadas, tramos y solicitudes pendientes. */
+  @Get('cronograma')
+  @Permiso('asistencia', 'administrar')
+  cronograma(@Query() q: CronogramaDto) {
+    return this.correcciones.cronograma(q);
+  }
+
+  /** Bandeja «Solicitudes de corrección»: pendientes y jornadas con inconsistencia sin solicitud. */
+  @Get('solicitudes')
+  @Permiso('asistencia', 'administrar')
+  solicitudes() {
+    return this.correcciones.bandeja();
+  }
+
+  /** Solo el número de solicitudes pendientes (contador de la pestaña). */
+  @Get('solicitudes/contador')
+  @Permiso('asistencia', 'administrar')
+  async contadorSolicitudes() {
+    return { pendientes: await this.correcciones.contarPendientes() };
+  }
+
+  /** Aprobar o rechazar/anular varias a la vez (máx. 200). Devuelve el resultado de cada una. */
+  @Post('lote')
+  @Permiso('asistencia', 'administrar')
+  lote(@Body() dto: LoteDto, @Req() req: any) {
+    return this.correcciones.lote(dto, req.usuario, ipDe(req));
+  }
+
+  /** Resumen de pago: aprobar de golpe las marcas dudosas simples y las solicitudes pendientes del período de una persona. */
+  @Post('aprobar-simples')
+  @Permiso('asistencia', 'administrar')
+  aprobarSimples(@Body() dto: AprobarSimplesDto, @Req() req: any) {
+    return this.correcciones.aprobarSimples(dto.partyId, dto.desde, dto.hasta, req.usuario, ipDe(req));
+  }
+
+  @Post('solicitudes/:id/aprobar')
+  @Permiso('asistencia', 'administrar')
+  aprobarSolicitud(@Param('id') id: string, @Body() dto: ResolverSolicitudDto, @Req() req: any) {
+    return this.correcciones.aprobarSolicitud(Number(id), dto.nota, req.usuario, ipDe(req));
+  }
+
+  @Post('solicitudes/:id/rechazar')
+  @Permiso('asistencia', 'administrar')
+  rechazarSolicitud(@Param('id') id: string, @Body() dto: RechazarSolicitudDto, @Req() req: any) {
+    return this.correcciones.rechazarSolicitud(Number(id), dto.motivo, req.usuario, ipDe(req));
   }
 
   @Post('dispositivos/:partyId/reiniciar')

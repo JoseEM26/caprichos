@@ -6,6 +6,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { AsistenciaCorreccionesService } from '../asistencia/asistencia-correcciones.service';
 import { AjustesNotificaciones, CLAVES_AJUSTES_NOTIF, leerAjustesNotificacion } from './ajustes-notificaciones';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
@@ -236,6 +237,7 @@ export class NotificacionesService {
     private readonly prisma: PrismaService,
     @Optional() private readonly auditoria?: AuditoriaService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly correcciones?: AsistenciaCorreccionesService,
   ) {}
 
   private async permisosDe(usuario: UsuarioAutenticado): Promise<(m: string) => boolean> {
@@ -405,6 +407,42 @@ export class NotificacionesService {
           desde: reclamos[0].creado_en.toISOString(),
           modulo: 'reclamos',
           accion: 'Ir a Reclamos',
+        });
+      }
+    }
+
+    // Asistencia: el admin ve las solicitudes de corrección pendientes
+    if (this.correcciones && puede('asistencia/administrar')) {
+      const pendientes = await this.correcciones.contarPendientes();
+      conteos.asistencia = pendientes;
+      if (pendientes) {
+        calculadas.push({
+          id: 'asistencia-solicitudes',
+          clave: claveCalculada('asistencia-solicitudes', [pendientes]),
+          titulo: plural(pendientes, 'solicitud de corrección de asistencia', 'solicitudes de corrección de asistencia'),
+          detalle: 'Compáralas con las marcas y las fotos antes de aprobar o rechazar.',
+          prioridad: 'MEDIA',
+          desde: ahoraIso,
+          modulo: 'asistencia',
+          accion: 'Ir a Asistencia',
+        });
+      }
+    }
+    // Asistencia: cada persona (no el ADMIN) recibe un aviso por jornada con marcas que no cuadran; leído, no vuelve a sonar
+    // ponytail: se calcula al consultar (1 persona x 7 días); si pesara, guardar el resultado del día en una tabla
+    if (this.correcciones && puede('asistencia/marcar') && ![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+      const sinCorregir = (await this.correcciones.inconsistencias(usuario.partyId)).filter((i) => i.estado === 'SIN_CORREGIR');
+      conteos['mi-asistencia'] = sinCorregir.length;
+      if (sinCorregir.length) {
+        calculadas.push({
+          id: 'asistencia-inconsistencias',
+          clave: claveCalculada('asistencia-inc', sinCorregir.map((i) => i.jornada)),
+          titulo: sinCorregir.length === 1 ? sinCorregir[0].texto : `Tienes ${sinCorregir.length} jornadas con marcas por corregir`,
+          detalle: 'Entra a Mi asistencia y envía la hora real: el administrador la aprobará.',
+          prioridad: 'ALTA',
+          desde: ahoraIso,
+          modulo: 'mi-asistencia',
+          accion: 'Corregir mi asistencia',
         });
       }
     }
