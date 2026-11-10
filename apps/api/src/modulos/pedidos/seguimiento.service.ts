@@ -53,24 +53,27 @@ const PASO_RECIBIDO: PasoDef = {
 };
 const PASO_COCINA: PasoDef = {
   clave: 'cocina',
-  etiqueta: 'En preparación en cocina',
+  etiqueta: 'En preparación',
   rango: 1,
   campo: 'pasa_cocina_en',
   estadosHistorial: ['PREPARANDO', 'LISTO'],
 };
-const PASO_ENTREGADO: PasoDef = {
+const pasoListo = (etiqueta: string): PasoDef => ({ clave: 'listo', etiqueta, rango: 2, campo: 'listo_en', estadosHistorial: ['LISTO'] });
+const pasoFinal = (etiqueta: string): PasoDef => ({
   clave: 'entregado',
-  etiqueta: 'Entregado',
+  etiqueta,
   rango: 4,
   campo: 'entregado_en',
   estadosHistorial: ['ENTREGADO'],
-};
+});
 
-// MESA usa los pasos de RECOGER (el contrato no define otros).
+// Cada modalidad con sus pasos y sus textos. MESA (mozo/caja) y COMER_LOCAL (carta) comparten los de mesa.
+const PASOS_MESA = [PASO_RECIBIDO, PASO_COCINA, pasoListo('Listo para servir'), pasoFinal('Servido en tu mesa')];
 const PASOS_POR_MODALIDAD: Record<Modalidad, PasoDef[]> = {
   DELIVERY: [
     PASO_RECIBIDO,
     PASO_COCINA,
+    pasoListo('Listo, esperando repartidor'),
     {
       clave: 'camino',
       etiqueta: 'En camino',
@@ -80,44 +83,11 @@ const PASOS_POR_MODALIDAD: Record<Modalidad, PasoDef[]> = {
     },
     // «Llegó» depende de llego_en (no de un estado); un pedido entregado sin ese dato también lo da por hecho
     { clave: 'llego', etiqueta: 'Tu repartidor llegó', rango: 3.5, campo: 'llego_en', estadosHistorial: [] },
-    PASO_ENTREGADO,
+    pasoFinal('Entregado'),
   ],
-  RECOGER: [
-    PASO_RECIBIDO,
-    PASO_COCINA,
-    {
-      clave: 'listo',
-      etiqueta: 'Listo para recoger',
-      rango: 2,
-      campo: 'listo_en',
-      estadosHistorial: ['LISTO'],
-    },
-    PASO_ENTREGADO,
-  ],
-  MESA: [
-    PASO_RECIBIDO,
-    PASO_COCINA,
-    {
-      clave: 'listo',
-      etiqueta: 'Listo para recoger',
-      rango: 2,
-      campo: 'listo_en',
-      estadosHistorial: ['LISTO'],
-    },
-    PASO_ENTREGADO,
-  ],
-  COMER_LOCAL: [
-    PASO_RECIBIDO,
-    PASO_COCINA,
-    {
-      clave: 'listo',
-      etiqueta: 'Listo: te llamaremos por tu nombre',
-      rango: 2,
-      campo: 'listo_en',
-      estadosHistorial: ['LISTO'],
-    },
-    PASO_ENTREGADO,
-  ],
+  RECOGER: [PASO_RECIBIDO, PASO_COCINA, pasoListo('Listo para recoger'), pasoFinal('Recogido')],
+  MESA: PASOS_MESA,
+  COMER_LOCAL: PASOS_MESA,
 };
 
 export interface PasoSeguimiento {
@@ -161,6 +131,40 @@ export interface SeguimientoPedido {
   tiempo?: TiempoSeguimiento | null;
   /** Estado del voucher (aditivo). Solo en obtener() y solo con pago digital; en efectivo no existe. */
   voucher?: VoucherSeguimiento;
+  /** Totales de lo que se cobra y cada medio con el estado de su captura (aditivo). Solo en obtener(). */
+  resumenPago?: ResumenPago;
+  /** Desglose del pedido para la pestaña «Mi pedido» (aditivo). Solo en obtener(). */
+  detalle?: DetallePedidoSeguimiento;
+}
+
+export interface DetallePedidoSeguimiento {
+  subtotal: number;
+  descuento: number;
+  /** null = por confirmar (delivery sin ubicación aún) */
+  envio: number | null;
+  puntosCanjeados: number;
+  nota: string | null;
+  lineas: { nombre: string; cantidad: number; nota: string | null }[];
+}
+
+export type EstadoPagoMedio = EstadoVoucherSeguimiento | 'AL_RECIBIR' | 'COBRADO_MOZO' | 'PAGADO';
+
+export interface PagoMedio {
+  medio: string;
+  monto: number;
+  /** Yape, Plin o transferencia: lleva captura */
+  digital: boolean;
+  estado: EstadoPagoMedio;
+  actualizadoEn: string | null;
+  motivo?: string;
+}
+
+export interface ResumenPago {
+  /** Suma de lo ya validado o cobrado */
+  pagado: number;
+  /** Venta más propina */
+  total: number;
+  pagos: PagoMedio[];
 }
 
 /** Estado del voucher para el invitado: solo el estado y el medio, nunca imagen, operación, montos ni titular. */
@@ -260,7 +264,7 @@ type PedidoSeguimiento = {
   zona: { minutos_min: number | null; minutos_max: number | null } | null;
   entregado_mesa_en: Date | null;
   repartidor_party_id: unknown;
-  lineas: { nombre: string; cantidad: number; area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
+  lineas: { nombre: string; cantidad: number; nota?: string | null; area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
   comandas: { area_id: bigint; estado: string; area: { nombre: string } }[];
   historial: { estado_nuevo: string; en: Date }[];
 };
@@ -291,6 +295,17 @@ export class SeguimientoService {
         ...SELECCION_SEGUIMIENTO,
         pago_preferido: true,
         pago_estado: true,
+        cobro_mozo_en: true,
+        subtotal: true,
+        descuento: true,
+        envio: true,
+        puntos_canjeados: true,
+        nota: true,
+        lineas: {
+          where: { linea_combo_id: null },
+          orderBy: { id: 'asc' as const },
+          select: { nombre: true, cantidad: true, nota: true, ...SELECCION_AREA_LINEA },
+        },
         planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' as const } },
       },
     });
@@ -316,23 +331,36 @@ export class SeguimientoService {
       ...(pagoDigital && montoDigital !== null
         ? { montoDigital, montoContraentrega: Math.round((totalCobrable - montoDigital) * 100) / 100 }
         : {}),
+      detalle: {
+        subtotal: Number(pedido.subtotal),
+        descuento: Number(pedido.descuento ?? 0),
+        envio: pedido.envio == null ? null : Number(pedido.envio),
+        puntosCanjeados: Number(pedido.puntos_canjeados ?? 0),
+        nota: pedido.nota ?? null,
+        lineas: (pedido.lineas ?? []).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, nota: l.nota ?? null })),
+      },
     };
-    if (!pagoDigital) return base;
 
     // Vouchers vigentes del pedido (no reemplazados ni retirados), del más nuevo al más viejo
-    const vouchers = await this.prisma.voucherPago.findMany({
-      where: { pedido_id: pedido.id, reemplazado_en: null },
-      orderBy: { creado_en: 'desc' },
-      select: { medio: true, semaforo: true, motivos: true, creado_en: true, revisado_en: true },
+    const vouchers = pagoDigital || digitales.length > 0
+      ? await this.prisma.voucherPago.findMany({
+          where: { pedido_id: pedido.id, reemplazado_en: null },
+          orderBy: { creado_en: 'desc' },
+          select: { medio: true, semaforo: true, motivos: true, creado_en: true, revisado_en: true },
+        })
+      : [];
+    const pagos = pagosDelPedido({
+      plan,
+      medioPreferido,
+      total: totalCobrable,
+      pagado: pedido.pago_estado === 'PAGADO',
+      cobradoPorMozo: !!pedido.cobro_mozo_en,
+      vouchers,
     });
-    return {
-      ...base,
-      voucher: estadoVoucherDe({
-        pagado: pedido.pago_estado === 'PAGADO',
-        medioPreferido,
-        vouchers,
-      }),
-    };
+    const pagadoMonto = pagos.filter((f) => f.estado === 'VERIFICADO' || f.estado === 'PAGADO' || f.estado === 'COBRADO_MOZO').reduce((a, f) => a + f.monto, 0);
+    const resumenPago = { pagado: Math.round(pagadoMonto * 100) / 100, total: totalCobrable, pagos };
+    if (!pagoDigital && digitales.length === 0) return { ...base, resumenPago };
+    return { ...base, resumenPago, voucher: voucherAgregado(pagos.filter((f) => f.digital), medioPreferido) };
   }
 
   /**
@@ -467,7 +495,13 @@ export class SeguimientoService {
     const autogestion = pedido.modalidad === 'COMER_LOCAL' || (pedido.modalidad === 'MESA' && pedido.canal === 'CARTA');
     const modalidad = (autogestion ? 'COMER_LOCAL' : pedido.modalidad in PASOS_POR_MODALIDAD ? pedido.modalidad : 'RECOGER') as Modalidad;
     const anulado = pedido.estado === 'ANULADO';
-    const rangoEstado = anulado ? -1 : (RANGO_ESTADO[pedido.estado] ?? 0);
+    const progreso = progresoDelPedido(pedido, ctx);
+    let rangoEstado = anulado ? -1 : (RANGO_ESTADO[pedido.estado] ?? 0);
+    // Con todas las áreas listas pero sin el aviso final (LISTO) el paso sigue siendo «En preparación»: la carta lo
+    // redacta como «Casi listo» a partir de progreso (mismo cálculo que el admin).
+    // En mesa, servido al cliente (entregado_mesa_en) cierra el último paso aunque el pedido siga abierto para cobrar
+    const mesa = modalidad === 'COMER_LOCAL' || modalidad === 'MESA';
+    if (!anulado && mesa && pedido.entregado_mesa_en) rangoEstado = 4;
 
     const pasosDef = PASOS_POR_MODALIDAD[modalidad];
     const hecho = pasosDef.map(
@@ -503,7 +537,7 @@ export class SeguimientoService {
       terminado: anulado || pedido.estado === 'ENTREGADO',
       anulado,
       pasos,
-      progreso: progresoDelPedido(pedido, ctx),
+      progreso,
       tiempo: this.tiempoDe(pedido, anulado, ctx),
     };
   }
@@ -512,6 +546,7 @@ export class SeguimientoService {
   private horaDe(pedido: PedidoSeguimiento, paso: PasoDef): string | null {
     const fecha =
       pedido[paso.campo] ??
+      (paso.clave === 'entregado' ? pedido.entregado_mesa_en : null) ??
       pedido.historial.find((h) => paso.estadosHistorial.includes(h.estado_nuevo))?.en ??
       null;
     return fecha ? obtenerFechaHoraLima(fecha).horaMinutos : null;
@@ -559,6 +594,55 @@ export function estadoVoucherDe(args: {
     };
   }
   return { estado: 'SIN_VOUCHER', medio: medioPreferido, actualizadoEn: null };
+}
+
+/**
+ * Cada medio del pedido con el estado de SU captura. Con plan: un renglón por medio; sin plan: el medio del pedido por el total.
+ * Una captura de un medio no cubre a otro. Las capturas sin medio se asignan al primer medio digital que no tiene.
+ * Pedido PAGADO por Caja: todo queda pagado. Efectivo y tarjeta no llevan captura (se pagan al recibir o por el mozo).
+ */
+export function pagosDelPedido(args: {
+  plan: { medio: string; monto: number }[];
+  medioPreferido: string;
+  total: number;
+  pagado: boolean;
+  cobradoPorMozo: boolean;
+  vouchers: FilaVoucherEstado[];
+}): PagoMedio[] {
+  const { plan, medioPreferido, total, pagado, cobradoPorMozo, vouchers } = args;
+  const filas = plan.length > 0 ? plan : medioPreferido ? [{ medio: medioPreferido, monto: total }] : [];
+  const sinMedio = vouchers.filter((v) => !v.medio);
+  const sinAsignar = [...sinMedio];
+  return filas.map((f) => {
+    const digital = MEDIOS_DIGITALES.includes(f.medio);
+    if (!digital) {
+      const estado: EstadoPagoMedio = pagado ? 'PAGADO' : cobradoPorMozo ? 'COBRADO_MOZO' : 'AL_RECIBIR';
+      return { medio: f.medio, monto: f.monto, digital, estado, actualizadoEn: null };
+    }
+    let propios = vouchers.filter((v) => v.medio === f.medio);
+    if (propios.length === 0 && sinAsignar.length > 0) propios = [sinAsignar.shift() as FilaVoucherEstado];
+    const v = estadoVoucherDe({ pagado, medioPreferido: f.medio, vouchers: propios });
+    return { medio: f.medio, monto: f.monto, digital, estado: v.estado, actualizadoEn: v.actualizadoEn, ...(v.motivo ? { motivo: v.motivo } : {}) };
+  });
+}
+
+/** Un solo estado para quien lee `voucher` (compatibilidad): verificado solo si TODOS los medios digitales lo están. */
+function voucherAgregado(digitales: PagoMedio[], medioPreferido: string): VoucherSeguimiento {
+  const pick = (e: EstadoPagoMedio) => digitales.find((f) => f.estado === e);
+  const estado: EstadoVoucherSeguimiento = digitales.every((f) => f.estado === 'VERIFICADO')
+    ? 'VERIFICADO'
+    : pick('RECHAZADO')
+      ? 'RECHAZADO'
+      : pick('EN_REVISION')
+        ? 'EN_REVISION'
+        : 'SIN_VOUCHER';
+  const f = pick(estado) ?? digitales[0];
+  return {
+    estado,
+    medio: f?.medio ?? medioPreferido,
+    actualizadoEn: f?.actualizadoEn ?? null,
+    ...(f?.motivo && estado === 'RECHAZADO' ? { motivo: f.motivo } : {}),
+  };
 }
 
 // «2 x Frappe Oreo, 1 x Waffle y 2 más»: hasta 3 productos y el resto como cuenta

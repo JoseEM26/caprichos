@@ -14,6 +14,10 @@ export interface AdjuntarCapturaPagoProps {
   total?: number;
   /** Pago dividido: lo que falta pagar al recibir; `total` es entonces solo la parte digital. */
   restoAlRecibir?: number;
+  /** Pago dividido: cada medio digital por pagar (con su monto). Sustituye a `medio` y `total`. */
+  medios?: { medio: string; monto: number }[];
+  /** Se llama al recibirse una captura (el seguimiento consulta de inmediato). */
+  onSubida?: () => void;
 }
 
 const CLAVE_MEDIO: Record<string, string> = { YAPE: 'yape', PLIN: 'plin', TRANSFERENCIA: 'transferencia' };
@@ -78,15 +82,15 @@ export function DatosParaPagar({ medio, total, local, restoAlRecibir }: { medio:
  * Captura del pago desde la pantalla de seguimiento. Opcional: el pedido ya está en cocina
  * y el equipo revisa la captura. La respuesta no muestra semáforo ni datos extraídos.
  */
-export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, restoAlRecibir }: AdjuntarCapturaPagoProps) {
+export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, restoAlRecibir, medios, onSubida }: AdjuntarCapturaPagoProps) {
   const [estado, setEstado] = useState<'inicial' | 'subiendo' | 'recibida' | 'error'>('inicial');
   const [mensaje, setMensaje] = useState<string>('');
   const [local, setLocal] = useState<DatosLocalCarta | null>(null);
 
   useEffect(() => {
-    if (!pagoDigital || !medio) return;
+    if (!pagoDigital || (!medio && !medios?.length)) return;
     clienteFetch<DatosLocalCarta>('/carta/local').then(setLocal).catch(() => setLocal(null));
-  }, [pagoDigital, medio]);
+  }, [pagoDigital, medio, medios?.length]);
 
   if (!pagoDigital || !token) return null;
 
@@ -102,6 +106,7 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, 
         { method: 'POST', body: formData },
       );
       setEstado('recibida');
+      onSubida?.();
     } catch (err) {
       setEstado('error');
       setMensaje(
@@ -127,19 +132,21 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, 
         gap: '8px',
       }}
     >
-      {medio && <DatosParaPagar medio={medio} total={total} local={local} restoAlRecibir={restoAlRecibir} />}
+      {medios?.map((m) => <DatosParaPagar key={m.medio} medio={m.medio} total={m.monto} local={local} />)}
+      {!medios && medio && <DatosParaPagar medio={medio} total={total} local={local} restoAlRecibir={restoAlRecibir} />}
       <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
-        Envía la captura de tu pago (opcional)
+        {medios && medios.length > 1 ? 'Envía una captura por cada medio de pago' : 'Envía la captura de tu pago (opcional)'}
       </div>
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
         Así lo validamos más rápido. Si no la envías ahora, también puedes mandarla por WhatsApp.
       </div>
 
-      {estado === 'recibida' ? (
+      {estado === 'recibida' && (
         <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
           Recibimos tu captura. El equipo la revisa.
         </div>
-      ) : (
+      )}
+      {(estado !== 'recibida' || (medios && medios.length > 1)) && (
         <label
           style={{
             minHeight: '44px',
@@ -154,7 +161,7 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, 
             cursor: estado === 'subiendo' ? 'not-allowed' : 'pointer',
           }}
         >
-          {estado === 'subiendo' ? 'Subiendo imagen…' : 'Adjuntar captura'}
+          {estado === 'subiendo' ? 'Subiendo imagen…' : estado === 'recibida' ? 'Adjuntar otra captura' : 'Adjuntar captura'}
           <input
             type="file"
             accept="image/*"

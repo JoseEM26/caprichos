@@ -205,7 +205,7 @@ describe('SeguimientoService.pedidosDeCuenta', () => {
       anulado: false,
       seguimientoToken: TOKEN_1,
     });
-    expect(pedido.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'camino', 'llego', 'entregado']);
+    expect(pedido.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'listo', 'camino', 'llego', 'entregado']);
     expect(JSON.stringify(pedido)).not.toContain('Nombre Privado');
     expect(JSON.stringify(pedido)).not.toContain('Calle Secreta');
   });

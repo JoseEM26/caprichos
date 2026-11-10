@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ErrorApi } from '../comun/api';
 import type { ModalidadEntrega } from './tipos';
 import type { ProgresoPedido } from '../admin/salon/tipos';
@@ -6,6 +6,8 @@ import type { ProgresoPedido } from '../admin/salon/tipos';
 const CLAVE = 'caprichos_pedidos';
 const MAXIMO = 20;
 export const INTERVALO_SEGUIMIENTO_MS = 15000;
+/** La pantalla de seguimiento abierta consulta más seguido: el cliente espera ver su voucher validado. */
+export const INTERVALO_MODAL_SEGUIMIENTO_MS = 10000;
 const DIAS_CONSERVADO_MS = 30 * 24 * 60 * 60 * 1000;
 const EVENTO_CAMBIO = 'caprichos:pedidos-cambio';
 const MODALIDADES: ModalidadEntrega[] = ['DELIVERY', 'RECOGER', 'COMER_LOCAL'];
@@ -42,6 +44,33 @@ export interface VoucherSeguimiento {
 
 export type EstadoVoucherSeguimiento = VoucherSeguimiento['estado'];
 
+/** Un medio de pago del pedido y el estado de SU captura (Yape y Plin se validan por separado). */
+export interface PagoMedioSeguimiento {
+  medio: string;
+  monto: number;
+  digital: boolean;
+  estado: EstadoVoucherSeguimiento | 'AL_RECIBIR' | 'COBRADO_MOZO' | 'PAGADO';
+  actualizadoEn: string | null;
+  motivo?: string;
+}
+
+export interface ResumenPagoSeguimiento {
+  /** Lo ya validado o cobrado */
+  pagado: number;
+  /** Venta más propina */
+  total: number;
+  pagos: PagoMedioSeguimiento[];
+}
+
+export interface DetalleSeguimiento {
+  subtotal: number;
+  descuento: number;
+  envio: number | null;
+  puntosCanjeados: number;
+  nota: string | null;
+  lineas: { nombre: string; cantidad: number; nota: string | null }[];
+}
+
 export interface EstadoSeguimiento {
   codigo: string;
   estado: string;
@@ -68,6 +97,10 @@ export interface EstadoSeguimiento {
   montoContraentrega?: number;
   /** Estado del voucher: solo con pago digital (en efectivo no viene). */
   voucher?: VoucherSeguimiento;
+  /** Cada medio de pago con el estado de su captura y el total pagado. */
+  resumenPago?: ResumenPagoSeguimiento;
+  /** Desglose para «Mi pedido». */
+  detalle?: DetalleSeguimiento;
 }
 
 export type ResultadoLote = EstadoSeguimiento | { codigo: string; noEncontrado: true };
@@ -191,10 +224,20 @@ export async function abrirSeguimientoDesdeEnlace(enlace: { codigo: string; toke
   }
 }
 
-// Consulta el estado real a la API cada 15 s mientras la pantalla esté abierta y la pestaña visible
+/** Hay un pago digital sin validar: aunque el pedido ya esté entregado, el cliente sigue esperando verlo confirmado. */
+function pagoPendiente(e: EstadoSeguimiento): boolean {
+  return !e.anulado && !!e.resumenPago?.pagos.some((p) => p.digital && p.estado !== 'VERIFICADO');
+}
+
+/**
+ * Consulta el estado real a la API cada 10 s mientras la pantalla esté abierta y la pestaña visible; al volver a la pestaña
+ * o recuperar la conexión consulta de inmediato. Termina con el pedido (anulado, o entregado y sin pago digital por validar).
+ * `refrescar` consulta ya (p. ej. justo después de subir una captura).
+ */
 export function useSeguimientoPedido(codigo: string | null, token: string | null) {
   const [estado, setEstado] = useState<EstadoSeguimiento | null>(null);
   const [error, setError] = useState<'RED' | 'NO_ENCONTRADO' | null>(null);
+  const consultarRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     if (!codigo || !token) return;
@@ -205,7 +248,7 @@ export function useSeguimientoPedido(codigo: string | null, token: string | null
 
     const programar = () => {
       clearTimeout(temporizador);
-      if (activo && !fin) temporizador = setTimeout(consultar, INTERVALO_SEGUIMIENTO_MS);
+      if (activo && !fin) temporizador = setTimeout(consultar, INTERVALO_MODAL_SEGUIMIENTO_MS);
     };
 
     const consultar = async () => {
@@ -220,7 +263,7 @@ export function useSeguimientoPedido(codigo: string | null, token: string | null
         setEstado(res);
         setError(null);
         guardarEstado(res);
-        if (res.terminado) fin = true;
+        if (res.terminado && !pagoPendiente(res)) fin = true;
       } catch (err) {
         if (!activo) return;
         if (err instanceof ErrorApi && err.statusCode === 404) {
@@ -234,19 +277,23 @@ export function useSeguimientoPedido(codigo: string | null, token: string | null
       programar();
     };
 
-    const alCambiarVisibilidad = () => {
+    const alVolver = () => {
       if (document.visibilityState === 'visible') void consultar();
     };
 
-    document.addEventListener('visibilitychange', alCambiarVisibilidad);
+    consultarRef.current = () => void consultar();
+    document.addEventListener('visibilitychange', alVolver);
+    window.addEventListener('online', alVolver);
     void consultar();
 
     return () => {
       activo = false;
       clearTimeout(temporizador);
-      document.removeEventListener('visibilitychange', alCambiarVisibilidad);
+      document.removeEventListener('visibilitychange', alVolver);
+      window.removeEventListener('online', alVolver);
     };
   }, [codigo, token]);
 
-  return { estado, error };
+  const refrescar = useCallback(() => consultarRef.current(), []);
+  return { estado, error, refrescar };
 }
