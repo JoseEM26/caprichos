@@ -57,6 +57,7 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
       rolPermiso: {
         findMany: jest.fn(),
       },
@@ -668,6 +669,27 @@ describe('AuthService', () => {
           resultado: 'OK',
           partyId: BigInt(20),
         }),
+      );
+    });
+  });
+  describe('salirTodas', () => {
+    it('revoca todas las sesiones, marca el cierre en la cuenta y audita SALIDA_TODAS', async () => {
+      prisma.userAccount.update.mockResolvedValue({});
+      prisma.sesion.updateMany.mockResolvedValue({ count: 3 });
+
+      const res = await service.salirTodas(BigInt(20), '127.0.0.1', 'Device');
+
+      expect(res).toEqual({ ok: true, cerradas: 3 });
+      expect(prisma.userAccount.update).toHaveBeenCalledWith({
+        where: { party_id: BigInt(20) },
+        data: { sesiones_cerradas_en: expect.any(Date) },
+      });
+      expect(prisma.sesion.updateMany).toHaveBeenCalledWith({
+        where: { party_id: BigInt(20), revocada_en: null },
+        data: { revocada_en: expect.any(Date) },
+      });
+      expect(auditoriaService.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'SALIDA_TODAS', resultado: 'OK', partyId: BigInt(20) }),
       );
     });
   });

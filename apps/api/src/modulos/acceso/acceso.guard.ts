@@ -82,6 +82,15 @@ export class AccesoGuard implements CanActivate {
       );
     }
 
+    // «Cerrar todas las sesiones»: un token emitido antes del cierre ya no vale, aunque no haya vencido
+    const cierre = userAccount.sesiones_cerradas_en;
+    if (cierre && typeof payload.iat === 'number' && payload.iat < Math.floor(cierre.getTime() / 1000)) {
+      throw new HttpException(
+        { codigo: 'SESION_CERRADA', mensaje: 'Tu sesión fue cerrada. Ingresa de nuevo.' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
     const roles = await rolesDeCuenta(this.prisma, userAccount.id, userAccount.rol);
     const usuario: UsuarioAutenticado = {
       partyId: userAccount.party_id,

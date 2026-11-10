@@ -5,12 +5,13 @@ import { Perfil } from '../Perfil';
 import { api, clienteFetch } from '../../comun/api';
 
 const refrescarYo = vi.fn();
+const salir = vi.fn();
 
 vi.mock('../../comun/sesion', () => ({
   useSesion: () => ({
     usuario: { partyId: '1', nombres: 'Ana', rol: 'MOZO' },
     tiene: () => true,
-    salir: vi.fn(),
+    salir,
     refrescarYo,
   }),
 }));
@@ -130,5 +131,28 @@ describe('Mi perfil (web)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Quitar foto' }));
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Quitar tu foto' })).getByRole('button', { name: 'Sí, quitar' }));
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/auth/perfil/foto'));
+  });
+  it('cerrar todas mis sesiones pide Sí/No y llama a /auth/salir-todas', async () => {
+    vi.mocked(api.post).mockResolvedValue({ ok: true, cerradas: 2 });
+    montar();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar todas mis sesiones' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Cerrar todas tus sesiones' });
+
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'No, quedarme' }));
+    expect(api.post).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar todas mis sesiones' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Cerrar todas tus sesiones' })).getByRole('button', { name: 'Sí, cerrar todas' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/auth/salir-todas'));
+    await waitFor(() => expect(salir).toHaveBeenCalled());
+  });
+
+  it('si el servidor falla al cerrar todas las sesiones, avisa y no sale de esta', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('caído'));
+    montar();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar todas mis sesiones' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Cerrar todas tus sesiones' })).getByRole('button', { name: 'Sí, cerrar todas' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No pudimos cerrar tus sesiones/);
+    expect(salir).not.toHaveBeenCalled();
   });
 });
