@@ -74,7 +74,7 @@ describe('SeguimientoService', () => {
       expect(res.total).toBe(42.5);
       expect(res.terminado).toBe(false);
       expect(res.anulado).toBe(false);
-      expect(res.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'camino', 'llego', 'entregado']);
+      expect(res.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'listo', 'camino', 'llego', 'entregado']);
       expect(res.pasos[0]).toMatchObject({ hecho: true, actual: true, hora: '12:00' });
       expect(res.pasos[1]).toMatchObject({ hecho: false, actual: false, hora: null });
     });
@@ -92,6 +92,7 @@ describe('SeguimientoService', () => {
       expect(res.pasos.map((p) => [p.hecho, p.actual, p.hora])).toEqual([
         [true, false, '12:00'],
         [true, false, '12:05'],
+        [true, false, null],
         [true, true, '12:20'],
         [false, false, null],
         [false, false, null],
@@ -112,11 +113,12 @@ describe('SeguimientoService', () => {
       expect(res.pasos.map((p) => [p.clave, p.hecho, p.actual])).toEqual([
         ['recibido', true, false],
         ['cocina', true, false],
+        ['listo', true, false],
         ['camino', true, false],
         ['llego', true, true],
         ['entregado', false, false],
       ]);
-      expect(res.pasos[3].hora).toBe('12:35');
+      expect(res.pasos[4].hora).toBe('12:35');
       expect(res.progreso.etapa).toBe('LLEGO');
     });
 
@@ -133,8 +135,8 @@ describe('SeguimientoService', () => {
       expect(res.anulado).toBe(false);
       expect(res.estadoEtiqueta).toBe('Entregado');
       expect(res.pasos.every((p) => p.hecho)).toBe(true);
-      expect(res.pasos.map((p) => p.actual)).toEqual([false, false, false, false, true]);
-      expect(res.pasos[4].hora).toBe('12:40');
+      expect(res.pasos.map((p) => p.actual)).toEqual([false, false, false, false, false, true]);
+      expect(res.pasos[5].hora).toBe('12:40');
     });
 
     it('RECOGER en LISTO: usa "Listo para recoger" y no hay paso de camino', async () => {

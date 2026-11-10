@@ -1,0 +1,36 @@
+/* Modal «Seguimiento de tu pedido» (carta/PantallaConfirmacion.tsx): tres pestañas compactas. */
+.sg-estado { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 14px 12px; border-radius: 16px; background: var(--cp-white, #fff); border: 1px solid var(--cp-line, #E3D6C6); }
+.sg-icono { width: 52px; height: 52px; border-radius: 26px; display: flex; align-items: center; justify-content: center; color: #fff; background: var(--cp-orange, #F28C28); }
+.sg-tono-listo .sg-icono, .sg-tono-fin .sg-icono { background: var(--cp-green, #2F7A45); }
+.sg-tono-anulado .sg-icono { background: var(--cp-rust, #B3412E); }
+.sg-titulo { margin: 0; font-family: Montserrat, sans-serif; font-weight: 800; font-size: 20px; line-height: 25px; color: var(--cp-navy, #0B2C3E); }
+.sg-tono-anulado .sg-titulo { color: var(--cp-rust, #B3412E); }
+.sg-detalle { margin: 0; font-size: 14px; line-height: 19px; color: var(--cp-soft, #2C4C5D); }
+.sg-local { margin: 2px 0 0; font-size: 14px; font-weight: 800; color: var(--cp-navy, #0B2C3E); }
+.sg-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sg-meta > div { background: var(--cp-sand, #EDE1D1); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+.sg-meta dt { font-size: 11px; color: var(--cp-soft, #2C4C5D); }
+.sg-meta dd { margin: 0; font-size: 14px; font-weight: 800; color: var(--cp-navy, #0B2C3E); overflow-wrap: anywhere; }
+.sg-tarjeta { background: var(--cp-white, #fff); border: 1px solid var(--cp-line, #E3D6C6); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.sg-tarjeta h3 { margin: 0; font-size: 13px; font-weight: 800; color: var(--cp-navy, #0B2C3E); }
+.sg-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; color: var(--cp-navy, #0B2C3E); }
+.sg-fila > span:last-child { font-weight: 700; text-align: right; }
+.sg-total { border-top: 1px solid var(--cp-line, #E3D6C6); padding-top: 8px; font-family: Montserrat, sans-serif; font-weight: 800; font-size: 17px; }
+.sg-total > span:last-child { color: var(--cp-rust, #B3412E); }
+.sg-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sg-chip { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--cp-sand, #EDE1D1); color: var(--cp-navy, #0B2C3E); white-space: nowrap; }
+.sg-chip-ok { background: #EAF5EC; color: #2F7A45; }
+.sg-chip-mal { background: #FBEDE4; color: var(--cp-rust, #B3412E); }
+.sg-barra { height: 8px; border-radius: 4px; background: var(--cp-sand, #EDE1D1); overflow: hidden; }
+.sg-barra > span { display: block; height: 100%; background: var(--cp-green, #2F7A45); }
+.sg-medio { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); }
+.sg-medio[data-estado='VERIFICADO'], .sg-medio[data-estado='PAGADO'] { border-color: #2F7A45; background: #EAF5EC; }
+.sg-medio[data-estado='RECHAZADO'] { border-color: var(--cp-rust, #B3412E); background: #FBEDE4; }
+.sg-medio-estado { font-size: 13px; font-weight: 700; color: var(--cp-navy, #0B2C3E); }
+.sg-pie { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.sg-pie > button { min-height: 46px; border: 0; border-radius: 12px; background: var(--cp-orange, #F28C28); color: #fff; font-family: Montserrat, sans-serif; font-weight: 800; font-size: 15px; cursor: pointer; }
+.sg-otros > summary { min-height: 40px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--cp-soft, #2C4C5D); }
+.sg-otros-lista { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 6px; }
+.sg-otros-lista > button { min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); font-size: 13px; font-weight: 700; cursor: pointer; }
+.sg-solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sg-punto { color: var(--cp-orange, #F28C28); }

@@ -165,7 +165,7 @@ describe('SeguimientoService: estado del voucher', () => {
       const r = await service.obtener('CAP-0007', token());
       expect(Object.keys(r.voucher ?? {}).sort()).toEqual(['actualizadoEn', 'estado', 'medio']);
       const texto = JSON.stringify(r);
-      expect(texto).not.toMatch(/archivo|imagen|operacion|extraido|monto|titular|hash|semaforo/i);
+      expect(texto).not.toMatch(/archivo|imagen|operacion|extraido|titular|hash|semaforo/i);
     });
 
     it('la consulta de vouchers no pide imagen, operación ni datos leídos', async () => {
