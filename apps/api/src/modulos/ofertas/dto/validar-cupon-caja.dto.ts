@@ -13,6 +13,11 @@ export class LineaCuponCajaDto {
 
   @IsNumber()
   precioUnitario!: number;
+
+  /** Línea de combo/oferta: no entra al descuento del personal (igual que al crear el pedido). */
+  @IsOptional()
+  @IsString()
+  ofertaId?: string;
 }
 
 /** Cupón en el «Nuevo pedido» de mesa/caja: solo validar, el canje ocurre al crear el pedido. */
@@ -51,4 +56,9 @@ export class VistaPreviaDescuentosCajaDto {
   @ValidateNested({ each: true })
   @Type(() => LineaCuponCajaDto)
   lineas!: LineaCuponCajaDto[];
+
+  /** Pedido del personal: si viene, la respuesta añade el descuento del personal que aplicará el servidor. */
+  @IsOptional()
+  @IsString()
+  colaboradorPartyId?: string;
 }
