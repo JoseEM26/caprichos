@@ -19,7 +19,7 @@ Permite que el cliente deje una propina al pedir. Se enciende por canal (carta v
 ## Como se hace: encender o apagar la propina en la carta o en WhatsApp
 1. Entra a Configuración del local, pestaña "Operación" ([Propina en la carta virtual](/admin/mirest?tab=operacion&campo=operacion-propina-carta)).
 2. En la tarjeta "Propina opcional" cambia el interruptor de "la carta virtual", "WhatsApp", "el mozo (Nuevo pedido)" o "Caja (Nuevo pedido)" (el parámetro propina_activa guarda los cuatro como carta, bot, mozo y caja).
-3. Confirma con "Sí, confirmar". Viene apagada por defecto.
+3. Confirma con "Sí, confirmar". Viene encendida por defecto en todos los canales: apaga solo el que no quieras.
 4. Con la propina encendida en WhatsApp, el bot pregunta "Sin propina" o "Dejar propina" antes de pagar y el cliente escribe el monto.
 
 ## Como se hace: cambiar el tope de propina por pedido

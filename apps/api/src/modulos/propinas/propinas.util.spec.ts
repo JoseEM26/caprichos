@@ -21,18 +21,21 @@ describe('propinas.util', () => {
       expect(claveCanalPropina('OTRO')).toBeNull();
     });
 
-    it('mozo y caja: encendida solo si su clave es true; sin la clave (config vieja) = apagada', () => {
+    it('mozo y caja: encendida por defecto; solo un false explícito la apaga (config vieja sin la clave = encendida)', () => {
       expect(propinaActivaParaCanal({ carta: false, bot: false, mozo: true, caja: false }, 'MOZO')).toBe(true);
       expect(propinaActivaParaCanal({ carta: false, bot: false, mozo: true, caja: false }, 'CAJA')).toBe(false);
-      expect(propinaActivaParaCanal({ carta: true, bot: true }, 'MOZO')).toBe(false);
+      expect(propinaActivaParaCanal({ carta: true, bot: true }, 'MOZO')).toBe(true);
+      expect(propinaActivaParaCanal({ carta: true, bot: true }, 'CAJA')).toBe(true);
     });
 
-    it('encendida solo en carta: el bot sigue apagado; sin configuración = apagada', () => {
+    it('encendida por defecto en todos los canales: sin configuración ofrece propina; un false explícito la apaga', () => {
       const activa = { carta: true, bot: false };
       expect(propinaActivaParaCanal(activa, 'CARTA')).toBe(true);
       expect(propinaActivaParaCanal(activa, 'WHATSAPP')).toBe(false);
-      expect(propinaActivaParaCanal(null, 'CARTA')).toBe(false);
-      expect(propinaActivaParaCanal({ carta: 'si' }, 'CARTA')).toBe(false);
+      expect(propinaActivaParaCanal(null, 'CARTA')).toBe(true);
+      expect(propinaActivaParaCanal(undefined, 'MOZO')).toBe(true);
+      expect(propinaActivaParaCanal({}, 'BOT')).toBe(true);
+      expect(propinaActivaParaCanal(null, 'OTRO')).toBe(false);
     });
 
     it('tope inválido cae al de por defecto', () => {

@@ -32,7 +32,7 @@ const ETIQUETA_CANAL: Record<Canal, string> = {
 
 /**
  * Propina opcional (parámetros propina_activa y propina_tope). El interruptor es por canal: carta virtual
- * y WhatsApp. Apagada por defecto. Va aparte de la venta: no entra a comprobantes ni puntos. Solo ADMIN.
+ * y WhatsApp. Encendida por defecto. Va aparte de la venta: no entra a comprobantes ni puntos. Solo ADMIN.
  */
 export function TarjetaPropinaConfiguracion({ esAdmin: esAdminProp }: { esAdmin?: boolean } = {}) {
   const sesion = useSesionSegura();
@@ -54,7 +54,8 @@ export function TarjetaPropinaConfiguracion({ esAdmin: esAdminProp }: { esAdmin?
       const activa = lista.find((x) => x.clave === 'propina_activa')?.valor as Partial<ConfigPropina['activa']> | undefined;
       const tope = Number(lista.find((x) => x.clave === 'propina_tope')?.valor);
       const topeFinal = Number.isFinite(tope) && tope > 0 ? tope : 200;
-      setConfig({ activa: { carta: activa?.carta === true, bot: activa?.bot === true, mozo: activa?.mozo === true, caja: activa?.caja === true }, tope: topeFinal });
+      // Encendida por defecto: solo un «apagado» guardado la apaga
+      setConfig({ activa: { carta: activa?.carta !== false, bot: activa?.bot !== false, mozo: activa?.mozo !== false, caja: activa?.caja !== false }, tope: topeFinal });
       setTopeTexto(String(topeFinal));
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo leer el ajuste de propina');

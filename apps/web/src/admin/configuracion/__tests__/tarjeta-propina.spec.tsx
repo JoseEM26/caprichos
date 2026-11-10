@@ -13,13 +13,13 @@ describe('Propina opcional (interruptor por canal y tope)', () => {
     vi.restoreAllMocks();
   });
 
-  it('apagada por defecto en los cuatro canales, con tope de S/ 200', async () => {
+  it('encendida por defecto en los cuatro canales, con tope de S/ 200', async () => {
     vi.spyOn(api, 'get').mockResolvedValue(lista(undefined));
     render(<TarjetaPropinaConfiguracion esAdmin />);
 
     expect(await screen.findByText('Propina en la carta virtual')).toBeInTheDocument();
     expect(screen.getByText('Propina en WhatsApp')).toBeInTheDocument();
-    expect(screen.getAllByText('Apagada')).toHaveLength(4);
+    expect(screen.getAllByText('Encendida')).toHaveLength(4);
     expect(screen.getByDisplayValue('200')).toBeInTheDocument();
   });
 
@@ -33,7 +33,7 @@ describe('Propina opcional (interruptor por canal y tope)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, confirmar' }));
 
     await waitFor(() =>
-      expect(put).toHaveBeenCalledWith('/admin/configuracion/propina_activa', { valor: { carta: true, bot: true, mozo: false, caja: false } }),
+      expect(put).toHaveBeenCalledWith('/admin/configuracion/propina_activa', { valor: { carta: true, bot: true, mozo: true, caja: true } }),
     );
   });
 
@@ -57,7 +57,9 @@ describe('Propina opcional (interruptor por canal y tope)', () => {
     vi.spyOn(api, 'get').mockResolvedValue(lista({ carta: true, bot: false }, 80));
     render(<TarjetaPropinaConfiguracion esAdmin={false} />);
 
-    expect(await screen.findByText('Encendida')).toBeInTheDocument();
+    // carta encendida; bot apagado a propósito; mozo y caja sin valor guardado = encendidos por defecto
+    expect(await screen.findAllByText('Encendida')).toHaveLength(3);
+    expect(screen.getAllByText('Apagada')).toHaveLength(1);
     expect(screen.getAllByText('Solo ADMIN').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Alternar propina en la carta virtual' })).not.toBeInTheDocument();
   });

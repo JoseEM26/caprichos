@@ -422,7 +422,7 @@ export class LocalService {
       ),
       invitadoPermitido,
       // Propina opcional por canal (interruptor propina_activa) y tope en soles
-      propina: { carta: propinaActiva?.carta === true, bot: propinaActiva?.bot === true, mozo: propinaActiva?.mozo === true, caja: propinaActiva?.caja === true, tope: propinaTope },
+      propina: { carta: propinaActiva?.carta !== false, bot: propinaActiva?.bot !== false, mozo: propinaActiva?.mozo !== false, caja: propinaActiva?.caja !== false, tope: propinaTope },
     };
   }
 

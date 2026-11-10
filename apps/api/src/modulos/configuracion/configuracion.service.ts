@@ -445,7 +445,7 @@ export class ConfiguracionService {
         });
       }
       if (clave === 'propina_activa') {
-        // Interruptor por canal: carta y bot (obligatorios) y mozo y caja (opcionales; sin valor = apagado)
+        // Interruptor por canal: carta y bot (obligatorios) y mozo y caja (opcionales; sin valor = encendido)
         const v = valor as Record<string, unknown>;
         const opcionalBool = (x: unknown) => x === undefined || typeof x === 'boolean';
         if (typeof v.carta !== 'boolean' || typeof v.bot !== 'boolean' || !opcionalBool(v.mozo) || !opcionalBool(v.caja)) {
@@ -454,7 +454,8 @@ export class ConfiguracionService {
             mensaje: 'La propina se enciende o apaga por canal: carta, bot, mozo y caja (verdadero o falso)',
           });
         }
-        valor = { carta: v.carta, bot: v.bot, mozo: v.mozo === true, caja: v.caja === true };
+        // Encendida por defecto: solo un `false` explícito apaga mozo o caja
+        valor = { carta: v.carta, bot: v.bot, mozo: v.mozo !== false, caja: v.caja !== false };
       }
     }
 

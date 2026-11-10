@@ -14,11 +14,15 @@ export function claveCanalPropina(canal: string | null | undefined): 'carta' | '
   return null;
 }
 
-/** Interruptor: propina_activa = { carta, bot, mozo, caja } (booleanos). Sin valor o mal formado = apagada. */
+/**
+ * Interruptor: propina_activa = { carta, bot, mozo, caja } (booleanos). ENCENDIDA POR DEFECTO: un canal sin valor
+ * (o sin configuración) ofrece propina; solo un `false` explícito la apaga. Un canal desconocido nunca la ofrece.
+ */
 export function propinaActivaParaCanal(activa: unknown, canal: string | null | undefined): boolean {
   const clave = claveCanalPropina(canal);
-  if (!clave || !activa || typeof activa !== 'object') return false;
-  return (activa as Record<string, unknown>)[clave] === true;
+  if (!clave) return false;
+  if (!activa || typeof activa !== 'object') return true;
+  return (activa as Record<string, unknown>)[clave] !== false;
 }
 
 /** Tope en soles: número positivo; si no es válido, el de por defecto. */
