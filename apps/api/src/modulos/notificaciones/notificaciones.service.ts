@@ -8,6 +8,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { AsistenciaCorreccionesService } from '../asistencia/asistencia-correcciones.service';
+import { PERMISOS_POR_PREFIJO, PERMISOS_POR_TIPO, tipoVisible } from './permisos-por-tipo';
 import { AjustesNotificaciones, CLAVES_AJUSTES_NOTIF, leerAjustesNotificacion } from './ajustes-notificaciones';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
@@ -118,49 +119,29 @@ const PRIORIDAD_POR_TIPO: Record<string, Prioridad> = {
 const prioridadDeTipo = (tipo: string): Prioridad => PRIORIDAD_POR_TIPO[tipo] ?? 'MEDIA';
 
 /**
- * Permiso (basta uno) que hace falta para VER cada aviso guardado: el mismo criterio que los calculados.
- * Un tipo fuera de este mapa se ve como antes (solo cuenta rol_destino / party_destino).
+ * Condición de Prisma de lo que ESTE usuario puede ver de las guardadas (una sola regla para resumen, historial,
+ * contadores, marcar leída y marcar todas):
+ *  - dirigido a una persona (party_destino): solo esa persona (ni siquiera el ADMIN: es un aviso personal);
+ *  - ADMIN: todo lo no dirigido a otra persona, de cualquier tipo (también los no mapeados);
+ *  - resto: lo de su rol (o de todos) Y de un tipo cuyo permiso tiene (tipo no mapeado = nadie).
  */
-const PERMISOS_POR_TIPO: Record<string, string[]> = {
-  PEDIDO_NUEVO: ['caja/ver', 'pedidos/ver'],
-  PEDIDO_POR_CONFIRMAR: ['caja/ver', 'pedidos/ver'],
-  PAGO_EFECTIVO_MOZO: ['caja/ver'],
-  CAMBIO_COBRO_SOLICITADO: ['pedidos/validar_cambio_cobro'],
-  CAMBIO_COBRO_APLICADO: ['caja/ver'],
-  REPROG_COBRAR_RECARGO: ['caja/ver'],
-  COMPROBANTE_PENDIENTE: ['comprobantes/ver'],
-  COMPROBANTE_RECIBIDO: ['comprobantes/ver'],
-  COMPROBANTE_NO_GUARDADO: ['comprobantes/ver'],
-  RESERVA_NUEVA: ['reservas/ver'],
-  RESERVA_CANCELADA: ['reservas/ver'],
-  RECLAMO_CARTA: ['reclamos/ver'],
-  QUEJA_WHATSAPP: ['reclamos/ver'],
-  VOUCHER_ILEGIBLE: ['caja/ver', 'vouchers/ver'],
-  VOUCHER_PENDIENTE_MOZO: ['caja/ver', 'vouchers/ver'],
-  VOUCHER_IA_CAIDA: ['caja/ver', 'vouchers/ver'],
-  VOUCHER_IA_RECUPERADA: ['caja/ver', 'vouchers/ver'],
-  VOUCHER_IA_TOPE: ['caja/ver', 'vouchers/ver'],
-  STOCK_BAJO: ['stock/ver', 'compras/ver'],
-  DELIVERY_POR_CONFIRMAR: ['repartos/ver'],
-  REPROGRAMACION_DELIVERY: ['repartos/ver'],
-  ATENCION_WHATSAPP: ['mensajes/ver'],
-  CHAT_SIN_RESPUESTA: ['mensajes/ver'],
-  CHAT_BLOQUEADO_SPAM: ['mensajes/ver'],
-  ESPERA_AGOTADA: ['mensajes/ver'],
-  ERROR_IMPRESORA: ['configuracion/ver', 'caja/ver'],
-  IMPRESORA_SIN_CONEXION: ['configuracion/ver', 'caja/ver'],
+export const visibleA = (
+  usuario: UsuarioAutenticado,
+  puede: (permiso: string) => boolean,
+  condicion: Prisma.NotificacionWhereInput = {},
+): Prisma.NotificacionWhereInput => {
+  const propio: Prisma.NotificacionWhereInput = { party_destino: usuario.partyId };
+  if (usuario.rol === 'ADMIN') return { AND: [{ OR: [{ party_destino: null }, propio] }, condicion] };
+  const tipos = Object.keys(PERMISOS_POR_TIPO).filter((t) => tipoVisible(t, puede));
+  const prefijos = Object.keys(PERMISOS_POR_PREFIJO).filter((p) => PERMISOS_POR_PREFIJO[p].some(puede));
+  const porTipo: Prisma.NotificacionWhereInput = {
+    OR: [{ tipo: { in: tipos } }, ...prefijos.map((p) => ({ tipo: { startsWith: p } }))],
+  };
+  const porRol: Prisma.NotificacionWhereInput = {
+    OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.roles ?? [usuario.rol]) } }],
+  };
+  return { AND: [{ OR: [propio, { party_destino: null, AND: [porRol, porTipo] }] }, condicion] };
 };
-
-/** true si el usuario (según `puede`) puede ver este tipo de aviso guardado */
-const tipoVisible = (tipo: string, puede: (permiso: string) => boolean): boolean => {
-  const permisos = PERMISOS_POR_TIPO[tipo];
-  return !permisos || permisos.some((p) => puede(p));
-};
-
-/** Condición de Prisma: quita los tipos que este usuario no puede ver */
-const visibilidadPorTipo = (puede: (permiso: string) => boolean): Prisma.NotificacionWhereInput => ({
-  tipo: { notIn: Object.keys(PERMISOS_POR_TIPO).filter((t) => !tipoVisible(t, puede)) },
-});
 
 const ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
 const HORAS_LEIDAS_VISIBLES = 24;
@@ -181,12 +162,6 @@ const claveCalculada = (tipo: string, valores: Array<string | number | bigint>):
  */
 const ROLES_QUE_VE = (roles: string[]): string[] =>
   [...new Set(roles.flatMap((rol) => (rol === 'SUPERVISOR' ? ['SUPERVISOR', 'CAJERO'] : [rol])))];
-
-/** Condición de visibilidad por rol: el administrador ve todo; el resto, lo de su rol (y el de los que hereda) o lo de todos. */
-const aRol = (usuario: UsuarioAutenticado, condicion: Prisma.NotificacionWhereInput): Prisma.NotificacionWhereInput =>
-  usuario.rol === 'ADMIN'
-    ? condicion
-    : { AND: [{ OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.roles ?? [usuario.rol]) } }] }, condicion] };
 
 const haceHoras = (horas: number): Date => new Date(Date.now() - horas * 3600000);
 const ABIERTOS = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
@@ -491,21 +466,15 @@ export class NotificacionesService {
 
     // Guardadas no leídas: sin lectura propia y sin marca global (datos anteriores), o marcadas no leídas a mano
     const noLeidas = await this.prisma.notificacion.findMany({
-      where: aRol(usuario, {
-        AND: [
-          { id: { notIn: idsLeidos } },
-          { OR: [{ leida_en: null }, { id: { in: idsNoLeidosExplicito } }] },
-          visibilidadPorTipo(puede),
-        ],
+      where: visibleA(usuario, puede, {
+        AND: [{ id: { notIn: idsLeidos } }, { OR: [{ leida_en: null }, { id: { in: idsNoLeidosExplicito } }] }],
       }),
       orderBy: { en: 'desc' },
       take: MAX_GUARDADAS_NO_LEIDAS,
     });
     // Guardadas leídas en las últimas 24 h: por lectura propia (o la marca global de datos anteriores)
     const leidas = await this.prisma.notificacion.findMany({
-      where: aRol(usuario, {
-        AND: [{ OR: [{ id: { in: idsLeidosRecientes } }, { leida_en: { gte: desdeVentana } }] }, visibilidadPorTipo(puede)],
-      }),
+      where: visibleA(usuario, puede, { OR: [{ id: { in: idsLeidosRecientes } }, { leida_en: { gte: desdeVentana } }] }),
       orderBy: { en: 'desc' },
       take: MAX_GUARDADAS_LEIDAS,
     });
@@ -579,7 +548,7 @@ export class NotificacionesService {
     // 1. Obtener todas las notificaciones visibles para el usuario o su rol
     const puede = await this.permisosDe(usuario);
     const todas = await this.prisma.notificacion.findMany({
-      where: aRol(usuario, visibilidadPorTipo(puede)),
+      where: visibleA(usuario, puede),
       orderBy: { en: 'desc' },
     });
     const lecturas = await this.lecturasGuardadas(usuario.partyId);
@@ -701,13 +670,10 @@ export class NotificacionesService {
     if (!CLAVE_VALIDA.test(clave)) throw noEncontrada;
 
     if (clave.startsWith('n:')) {
-      const existe = await this.prisma.notificacion.findUnique({
-        where: { id: BigInt(clave.slice(2)) },
-        select: { id: true, tipo: true },
-      });
-      if (!existe) throw noEncontrada;
       const puede = await this.permisosDe(usuario);
-      if (!tipoVisible(existe.tipo, puede)) throw noEncontrada;
+      const id = BigInt(clave.slice(2));
+      const existe = await this.prisma.notificacion.findFirst({ where: visibleA(usuario, puede, { id }), select: { id: true } });
+      if (!existe) throw noEncontrada;
     }
 
     // leida = false se guarda como fila con leida_en NULL: así pisa también una marca heredada
@@ -718,7 +684,7 @@ export class NotificacionesService {
       update: { leida_en: ahora },
     });
 
-    this.eventos?.emitirAdmin('notificaciones:actualizada', { clave, leida });
+    this.eventos?.emitirAParty(usuario.partyId, 'notificaciones:actualizada', {});
     return { ok: true, clave, leida };
   }
 
@@ -745,7 +711,13 @@ export class NotificacionesService {
       if (!ids.every((i) => /^\d+$/.test(i))) {
         throw new NotFoundException({ codigo: 'NOTIFICACION_NO_ENCONTRADA', mensaje: 'Notificación no encontrada' });
       }
-      claves = ids.map((i) => `n:${i}`);
+      // solo las que este usuario puede ver: no se marca (ni se «descubre») lo ajeno
+      const puede = await this.permisosDe(usuario);
+      const visibles = await this.prisma.notificacion.findMany({
+        where: visibleA(usuario, puede, { id: { in: ids.map((i) => BigInt(i)) } }),
+        select: { id: true },
+      });
+      claves = visibles.map((n) => `n:${n.id}`);
     } else {
       // Calculadas pendientes + TODAS las guardadas sin leer que ve este usuario (el resumen solo muestra las últimas 100)
       const res = await this.resumen(usuario);
@@ -755,9 +727,7 @@ export class NotificacionesService {
       const leidos = [...lecturas].filter(([, en]) => en !== null).map(([id]) => BigInt(id));
       const explicitas = [...lecturas].filter(([, en]) => en === null).map(([id]) => BigInt(id));
       const pendientes = await this.prisma.notificacion.findMany({
-        where: aRol(usuario, {
-          AND: [{ id: { notIn: leidos } }, { OR: [{ leida_en: null }, { id: { in: explicitas } }] }, visibilidadPorTipo(puede)],
-        }),
+        where: visibleA(usuario, puede, { AND: [{ id: { notIn: leidos } }, { OR: [{ leida_en: null }, { id: { in: explicitas } }] }] }),
         select: { id: true },
       });
       claves = [...calculadas, ...pendientes.map((n) => `n:${n.id}`)];
@@ -775,7 +745,7 @@ export class NotificacionesService {
       ]);
     }
 
-    this.eventos?.emitirAdmin('notificaciones:actualizada', { todas: true });
+    this.eventos?.emitirAParty(usuario.partyId, 'notificaciones:actualizada', {});
     return { ok: true, marcadas: claves.length };
   }
 
