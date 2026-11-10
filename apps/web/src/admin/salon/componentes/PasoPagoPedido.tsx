@@ -21,6 +21,8 @@ export interface PasoPagoPedidoProps {
   total: number;
   /** Lo que paga el cliente: venta + propina. El plan de pago debe sumarlo. */
   aPagar: number;
+  /** Puntos canjeados (1 punto = S/ 1): el total ya viene neto; solo se muestran como aviso. */
+  puntosCanje?: number;
   /** Resumen corto del pedido (mesa o cliente y cantidad de productos). */
   resumen: string;
   /** Solo en mesa de local: «Pagar ahora» o «Pagar al final». Sin valor, el pago es obligatorio. */
@@ -58,6 +60,7 @@ function dinero(n: number): string {
  */
 export function PasoPagoPedido({
   total,
+  puntosCanje = 0,
   aPagar,
   resumen,
   cuandoPaga,
@@ -285,6 +288,12 @@ export function PasoPagoPedido({
       </div>
 
       <dl className="np2-totales" aria-label="Resumen de pago">
+        {puntosCanje > 0 && (
+          <div data-testid="puntos-resumen">
+            <dt>Puntos canjeados ({puntosCanje})</dt>
+            <dd>- {dinero(puntosCanje)}</dd>
+          </div>
+        )}
         <div>
           <dt>Total del pedido</dt>
           <dd>{dinero(total)}</dd>

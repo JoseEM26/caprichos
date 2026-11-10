@@ -98,16 +98,20 @@ export class PuntosService {
     const pId = BigInt(pedidoId);
     const simular = opts.simular === true;
 
-    // 1. Verificar si ya existe movimiento SUMA para este pedido (Idempotencia; además la BD tiene único (pedido_id, tipo))
-    const movExistente = await this.prisma.movimientoPuntos.findFirst({
-      where: {
-        pedido_id: pId,
-        tipo: 'SUMA',
-      },
+    // 1. Idempotencia por cobro vigente: el último SUMA del pedido manda. Si sigue sin REVERSA, ya está sumado;
+    // si fue reversado (se anuló el cobro), un cobro nuevo abre el ciclo siguiente (la BD tiene único (pedido_id, tipo, ciclo)).
+    const ultimaSuma = await this.prisma.movimientoPuntos.findFirst({
+      where: { pedido_id: pId, tipo: 'SUMA' },
+      orderBy: { ciclo: 'desc' },
     });
-
-    if (movExistente) {
-      return { puntos: Number(movExistente.puntos), sumados: false, motivoNo: 'YA_SUMADO' };
+    let ciclo = 1;
+    if (ultimaSuma) {
+      const reversa = await this.prisma.movimientoPuntos.findFirst({
+        where: { pedido_id: pId, tipo: 'REVERSA', ciclo: ultimaSuma.ciclo },
+        select: { id: true },
+      });
+      if (!reversa) return { puntos: Number(ultimaSuma.puntos), sumados: false, motivoNo: 'YA_SUMADO' };
+      ciclo = ultimaSuma.ciclo + 1;
     }
 
     // 2. Obtener el pedido con sus datos
@@ -120,6 +124,11 @@ export class PuntosService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: `No se encontró el pedido ${pedidoId}`,
       });
+    }
+
+    // Re-cobro: solo suma si el pedido sigue vivo y pagado (un pedido anulado o reprogramado no vuelve a sumar)
+    if (ciclo > 1 && (pedido.pago_estado !== 'PAGADO' || ['ANULADO', 'RECHAZADO'].includes(String(pedido.estado)))) {
+      return { puntos: 0, sumados: false, motivoNo: 'YA_SUMADO' };
     }
 
     // Cliente del pedido; si no quedó ligado (pedido sin cuenta, de otro canal o anterior a «puntos por celular»),
@@ -192,6 +201,7 @@ export class PuntosService {
           party_id: partyCliente!,
           pedido_id: pId,
           tipo: 'SUMA',
+          ciclo,
           puntos: puntosCalculados,
           motivo: opts.motivo ?? `Puntos por pedido ${pedido.codigo}`,
         },
@@ -273,9 +283,10 @@ export class PuntosService {
       // 1. Revertir puntos ganados (si hubo SUMA y no hay ya REVERSA)
       const movSuma = await tx.movimientoPuntos.findFirst({
         where: { pedido_id: pId, tipo: 'SUMA' },
+        orderBy: { ciclo: 'desc' },
       });
       const movReversa = await tx.movimientoPuntos.findFirst({
-        where: { pedido_id: pId, tipo: 'REVERSA' },
+        where: { pedido_id: pId, tipo: 'REVERSA', ciclo: movSuma?.ciclo ?? 1 },
       });
 
       if (movSuma && !movReversa) {
@@ -285,6 +296,7 @@ export class PuntosService {
             party_id: partyCliente,
             pedido_id: pId,
             tipo: 'REVERSA',
+            ciclo: movSuma.ciclo,
             puntos: puntosReversados,
             motivo: `Reversa por anulación del pedido ${pedido.codigo}`,
           },

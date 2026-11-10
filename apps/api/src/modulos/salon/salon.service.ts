@@ -361,6 +361,7 @@ export class SalonService {
       nota: dto.nota,
       mesa: mesaNombre,
       cuponCodigo: dto.cuponCodigo,
+      puntosCanje: dto.puntosCanje,
       clienteTelefono: dto.clienteTelefono,
       clientePartyId: dto.clientePartyId,
     };

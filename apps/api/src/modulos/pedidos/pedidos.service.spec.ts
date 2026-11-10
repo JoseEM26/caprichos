@@ -1416,6 +1416,65 @@ describe('PedidosService', () => {
         ).resolves.toBeDefined();
       });
 
+      describe('canje en Caja y con el mozo (cuenta elegida por celular)', () => {
+        const dtoLocal = (extra: any = {}) => ({ ...pedidoBaseDto, modalidad: 'RECOGER' as const, entrega: undefined, comprobante: undefined, clienteTelefono: '987654321', puntosCanje: 10, ...extra });
+        beforeEach(() => {
+          direccionesMock.resolverPartyPorTelefono.mockResolvedValue(200n);
+          puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+          puntosServiceMock.canjear.mockResolvedValue({ puntosCanjeados: 10, saldoRestante: 40 });
+          prismaMock.pedido.create.mockImplementation(async ({ data }: any) => ({ id: 301n, codigo: 'CP-L301', estado: 'COLA', subtotal: data.subtotal, descuento: data.descuento, envio: data.envio, total: data.total }));
+        });
+
+        it.each(['CAJA', 'MOZO'] as const)('%s: canjea sobre la cuenta del celular, total neto y deja CANJE_PUNTOS_LOCAL con saldo antes/después', async (canal) => {
+          await service.crear(dtoLocal(), `idemp-local-${canal}`, { canal, usuarioPartyId: 5n, omitirChequeoCarta: true });
+          expect(puntosServiceMock.canjear).toHaveBeenCalledWith(200n, 10, 301n, expect.anything());
+          expect(prismaMock.pedido.create.mock.calls.at(-1)[0].data.total.toNumber()).toBe(18);
+          expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+            expect.objectContaining({
+              accion: 'CANJE_PUNTOS_LOCAL',
+              partyId: 5n,
+              despues: expect.objectContaining({ usuario: '5', canal, cliente: '200', puntos: 10, saldoAntes: 50, saldoDespues: 40 }),
+            }),
+            expect.anything(),
+          );
+        });
+
+        it('saldo insuficiente: PUNTOS_INSUFICIENTES y no crea el pedido', async () => {
+          puntosServiceMock.obtenerSaldo.mockResolvedValue(5);
+          await expect(service.crear(dtoLocal(), 'idemp-local-saldo', { canal: 'CAJA', usuarioPartyId: 5n, omitirChequeoCarta: true })).rejects.toMatchObject({ response: { codigo: 'PUNTOS_INSUFICIENTES' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it('con cupón: PUNTOS_CON_CUPON', async () => {
+          ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValueOnce({ descuentoTotal: 2, ofertaId: null, cuponId: '5', cuponEmitidoId: null, detalles: [] });
+          await expect(service.crear(dtoLocal({ cuponCodigo: 'ABC' }), 'idemp-local-cupon', { canal: 'CAJA', usuarioPartyId: 5n, omitirChequeoCarta: true })).rejects.toMatchObject({ response: { codigo: 'PUNTOS_CON_CUPON' } });
+        });
+
+        it('pedido del personal: PUNTOS_NO_APLICAN_PERSONAL', async () => {
+          prismaMock.party = { findUnique: jest.fn().mockResolvedValue({ id: 9n, persona: { nombres: 'Kevin', apellidos: 'Rosales' }, usuario: { activo: true }, roles: [] }) };
+          prismaMock.partyRole.findFirst = jest.fn().mockResolvedValue(null);
+          await expect(
+            service.crear(dtoLocal(), 'idemp-local-personal', { canal: 'CAJA', usuarioPartyId: 5n, clientePartyId: 9n, esPersonal: true, omitirChequeoCarta: true }),
+          ).rejects.toMatchObject({ response: { codigo: 'PUNTOS_NO_APLICAN_PERSONAL' } });
+        });
+
+        it('invitado (sin cuenta activa) o sin celular elegido: PUNTOS_REQUIEREN_CUENTA', async () => {
+          direccionesMock.datosCuentaActiva.mockResolvedValue(null);
+          await expect(service.crear(dtoLocal(), 'idemp-local-inv', { canal: 'CAJA', usuarioPartyId: 5n, omitirChequeoCarta: true })).rejects.toMatchObject({ response: { codigo: 'PUNTOS_REQUIEREN_CUENTA' } });
+          direccionesMock.datosCuentaActiva.mockResolvedValue({ nombre: 'Ana', telefono: '987654321' });
+          await expect(service.crear(dtoLocal({ clienteTelefono: undefined }), 'idemp-local-sincel', { canal: 'CAJA', usuarioPartyId: 5n, omitirChequeoCarta: true })).rejects.toMatchObject({ response: { codigo: 'PUNTOS_REQUIEREN_CUENTA' } });
+          expect(puntosServiceMock.canjear).not.toHaveBeenCalled();
+        });
+
+        it('doble clic: la misma clave de idempotencia devuelve el pedido existente y no vuelve a canjear', async () => {
+          prismaMock.pedido.findUnique.mockResolvedValueOnce({ id: 301n, codigo: 'CP-L301', estado: 'COLA', subtotal: 28, envio: 0, total: 18 });
+          const res = await service.crear(dtoLocal(), 'idemp-local-doble', { canal: 'CAJA', usuarioPartyId: 5n, omitirChequeoCarta: true });
+          expect(res.id).toBe('301');
+          expect(puntosServiceMock.canjear).not.toHaveBeenCalled();
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+      });
+
       it('si el canje falla, el error sale de la MISMA transacción (revierte pedido y stock) y no deja un pedido ANULADO', async () => {
         puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W004', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });

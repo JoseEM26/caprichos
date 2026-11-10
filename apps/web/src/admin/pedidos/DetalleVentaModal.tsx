@@ -71,6 +71,12 @@ function PestanaVenta({ p }: { p: PedidoExtra }) {
         {descuentos.length === 0 && Number(p.descuento) > 0 && (
           <li className="dv-fila"><span>Descuento{p.cupon_codigo ? ` (cupón ${p.cupon_codigo})` : ''}</span><span>- {formatearSoles(p.descuento)}</span></li>
         )}
+        {Number(p.puntos_canjeados) > 0 && (
+          <li className="dv-fila">
+            <span>Puntos canjeados: {Number(p.puntos_canjeados)}{p.canjePuntos?.aplicadoPor ? ` · aplicado por ${p.canjePuntos.aplicadoPor}` : ''}</span>
+            <span>- {formatearSoles(p.puntos_canjeados)}</span>
+          </li>
+        )}
         {Number(p.envio) > 0 && <li className="dv-fila"><span>Envío</span><span>{formatearSoles(p.envio)}</span></li>}
         <li className="dv-fila dv-total"><span>Total</span><span>{formatearSoles(p.total)}</span></li>
         <li className="dv-fila"><span>Propina (referencial)</span><span>{formatearSoles(propina)}</span></li>

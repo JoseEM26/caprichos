@@ -32,6 +32,8 @@ import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
+import { CanjePuntosLocal } from './CanjePuntosLocal';
+import { motivoSinCanje, puntosDeTexto, topeCanjeLocal } from './puntosLocal';
 import { PasoPagoPedido, MAX_METODOS_PAGO, type CuandoPaga } from './PasoPagoPedido';
 import { ModalCapturasPedido } from './ModalCapturasPedido';
 import { vouchersApi } from '../../vouchers/vouchersApi';
@@ -1019,6 +1021,9 @@ export function ModalNuevoPedidoMesa({
   // Lo que descontará el servidor (promociones del canal local + cupón): el total y el plan de pago
   // deben salir con ese mismo descuento o el servidor responde que el plan no cuadra.
   const [descuentoServidor, setDescuentoServidor] = useState<number | null>(null);
+  // Canje de puntos (cliente con cuenta): monto elegible que devuelve la vista previa y lo que escribe el cajero/mozo
+  const [montoCanjeable, setMontoCanjeable] = useState<number | null>(null);
+  const [puntosTexto, setPuntosTexto] = useState('');
   // Pedido del personal: el servidor devuelve también su descuento (misma cuenta que al guardar); null = sin confirmar
   const [descuentoPersonal, setDescuentoPersonal] = useState<{ pct: number; monto: number } | null>(null);
   const colaboradorPrevia = pideMode === 'personal' && !extra && !edicion ? staffElegido?.partyId : undefined;
@@ -1032,12 +1037,13 @@ export function ModalNuevoPedidoMesa({
     const aValidar = lineas.filter((l) => !l.cortesia);
     if (aValidar.length === 0) {
       setDescuentoServidor(null);
+      setMontoCanjeable(null);
       setDescuentoPersonal(null);
       return;
     }
     let vigente = true;
     const pedir = (colaboradorPartyId?: string | number) =>
-      api.post<{ descuentoTotal: number; descuentoPersonal?: { pct: number; monto: number } }>('/admin/ofertas/vista-previa', {
+      api.post<{ descuentoTotal: number; montoCanjeable?: number; descuentoPersonal?: { pct: number; monto: number } }>('/admin/ofertas/vista-previa', {
         canal: edicion?.datos.canal ?? canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
         codigo: cuponAplicado?.codigo,
         // mesa/local = COMER_LOCAL: las promociones valen según el tipo de pedido
@@ -1058,12 +1064,14 @@ export function ModalNuevoPedidoMesa({
       .then((r) => {
         if (!vigente) return;
         setDescuentoServidor(typeof r?.descuentoTotal === 'number' ? Math.round(r.descuentoTotal * 100) / 100 : null);
+        setMontoCanjeable(typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null);
         const dp = r?.descuentoPersonal;
         setDescuentoPersonal(colaboradorPrevia && dp && typeof dp.monto === 'number' ? { pct: Number(dp.pct), monto: Math.round(dp.monto * 100) / 100 } : null);
       })
       .catch(() => {
         if (!vigente) return;
         setDescuentoServidor(null);
+        setMontoCanjeable(null);
         setDescuentoPersonal(null);
       });
     return () => {
@@ -1092,7 +1100,30 @@ export function ModalNuevoPedidoMesa({
 
   const montoPersonal = colaboradorPrevia ? (descuentoPersonal?.monto ?? 0) : 0;
   const personalSinConfirmar = !!colaboradorPrevia && descuentoPersonal === null && lineas.some((l) => !l.cortesia);
-  const total = Math.max(0, Math.round((subtotal - descuento - montoPersonal + envioCalculado) * 100) / 100);
+  // Canje de puntos: solo con la cuenta elegida (local: «¿Quién pide?»; llevar/delivery: celular con cuenta), sin cupón
+  // y fuera del personal. El total y el plan de pago salen NETOS (1 punto = S/ 1).
+  const cuentaPuntos =
+    extra || edicion
+      ? null
+      : modalidad === 'local'
+        ? pideMode === 'cliente' && clienteEncontrado
+          ? { partyId: clienteEncontrado.partyId, saldo: clienteEncontrado.puntos }
+          : null
+        : cuenta
+          ? { partyId: cuenta.party, saldo: cuenta.puntos }
+          : null;
+  const motivoCanje = motivoSinCanje({
+    personal: pideMode === 'personal',
+    cupon: !!cuponAplicado,
+    tieneCuenta: !!cuentaPuntos,
+    saldo: cuentaPuntos?.saldo ?? 0,
+    canjeable: montoCanjeable,
+  });
+  const puntosCanje = motivoCanje ? 0 : puntosDeTexto(puntosTexto, topeCanjeLocal(cuentaPuntos?.saldo ?? 0, montoCanjeable));
+  useEffect(() => {
+    if (motivoCanje && puntosTexto !== '') setPuntosTexto('');
+  }, [motivoCanje]);
+  const total = Math.max(0, Math.round((subtotal - descuento - montoPersonal - puntosCanje + envioCalculado) * 100) / 100);
 
   // ¿Se declara el pago en este pedido? Mesa de local solo con «Pagar ahora»; llevar, delivery y extra siempre.
   const personalPide = pideMode === 'personal' && !extra;
@@ -1383,6 +1414,7 @@ export function ModalNuevoPedidoMesa({
             nota: notaGeneral.trim() || undefined,
             reservaId: reservaIdPreseleccionada,
             cuponCodigo: cuponAplicado?.codigo,
+            ...(puntosCanje > 0 ? { puntosCanje } : {}),
             canal: canalEnvio,
             // Personas (opcional): el servidor valida los asientos; confirmarCapacidad la deja pasar si el local lo aceptó
             personas: personasNum,
@@ -1443,6 +1475,7 @@ export function ModalNuevoPedidoMesa({
                 : undefined,
             nota: notaGeneral.trim() || undefined,
             cuponCodigo: cuponAplicado?.codigo,
+            ...(puntosCanje > 0 ? { puntosCanje } : {}),
             esPersonal: pideMode === 'personal',
             ...(personalPide
               ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Number(cliPagaCon) : undefined } : {}) } }
@@ -2887,6 +2920,7 @@ export function ModalNuevoPedidoMesa({
             <div className="np2-contenedor">
               <PasoPagoPedido
                 total={total}
+                puntosCanje={puntosCanje}
                 aPagar={aPagar}
                 resumen={`${
                   extra
@@ -3660,6 +3694,18 @@ export function ModalNuevoPedidoMesa({
                 )}
                 </>)}
 
+                {!edicion && !extra && (
+                  <CanjePuntosLocal
+                    tieneCuenta={!!cuentaPuntos}
+                    saldo={cuentaPuntos?.saldo ?? 0}
+                    canjeable={montoCanjeable}
+                    personal={pideMode === 'personal'}
+                    cupon={!!cuponAplicado}
+                    valor={puntosTexto}
+                    alCambiar={setPuntosTexto}
+                  />
+                )}
+
                 {/* Totales */}
                 <div className="np-totales">
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -3677,6 +3723,12 @@ export function ModalNuevoPedidoMesa({
                     >
                       <span>{cuponAplicado ? `Descuentos (cupón ${cuponAplicado.codigo})` : 'Descuento'}</span>
                       <span>- S/ {descuento.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {puntosCanje > 0 && (
+                    <div data-testid="fila-puntos-canjeados" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                      <span>Puntos canjeados ({puntosCanje})</span>
+                      <span>- S/ {puntosCanje.toFixed(2)}</span>
                     </div>
                   )}
                   {montoPersonal > 0 && descuentoPersonal && (

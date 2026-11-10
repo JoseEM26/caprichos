@@ -208,17 +208,90 @@ describe('PuntosService', () => {
     });
 
     it('es IDEMPOTENTE: no acumula de nuevo si ya existe movimiento SUMA', async () => {
-      prismaMock.movimientoPuntos.findFirst.mockResolvedValue({
-        id: 1n,
-        tipo: 'SUMA',
-        puntos: '3.50',
-      });
+      prismaMock.movimientoPuntos.findFirst
+        .mockResolvedValueOnce({ id: 1n, tipo: 'SUMA', ciclo: 1, puntos: '3.50' }) // última SUMA
+        .mockResolvedValueOnce(null); // sin REVERSA: el cobro sigue vigente
 
       const res = await service.acumularPorPedido(101n);
 
       expect(res.sumados).toBe(false);
       expect(res.puntos).toBe(3.5);
       expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
+    describe('re-cobro suma de nuevo (cobro vigente = ciclo)', () => {
+      const pedidoCobrado = (extra: any = {}) => ({
+        id: 130n, codigo: 'CP-0130', canal: 'CAJA', party_id: 55n, cliente_party_id: 200n, total: '70.00', envio: '0.00',
+        cupon_id: null, cupon_emitido_id: null, puntos_canjeados: '0', pago_estado: 'PAGADO', estado: 'ENTREGADO', ...extra,
+      });
+      const preparar = (pedido: any) => {
+        prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+        prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '0' } });
+        prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+        prismaMock.pedidoLinea.findMany.mockResolvedValue([
+          { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 2, precio_unit: '35.00', subtotal: '70.00', producto: { no_suma_beneficios: false } },
+        ]);
+      };
+
+      it('cobro, anular cobro y cobrar de nuevo: la SUMA reversada abre el ciclo 2', async () => {
+        preparar(pedidoCobrado());
+        prismaMock.movimientoPuntos.findFirst
+          .mockResolvedValueOnce({ id: 1n, tipo: 'SUMA', ciclo: 1, puntos: '3.50' })
+          .mockResolvedValueOnce({ id: 2n, tipo: 'REVERSA', ciclo: 1, puntos: '3.50' });
+        const res = await service.acumularPorPedido(130n);
+        expect(res.sumados).toBe(true);
+        expect(prismaMock.movimientoPuntos.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ tipo: 'SUMA', ciclo: 2, puntos: 3.5 }) }),
+        );
+      });
+
+      it('cobro doble por reintento: con el ciclo 2 vigente no suma otra vez', async () => {
+        preparar(pedidoCobrado());
+        prismaMock.movimientoPuntos.findFirst
+          .mockResolvedValueOnce({ id: 3n, tipo: 'SUMA', ciclo: 2, puntos: '3.50' })
+          .mockResolvedValueOnce(null);
+        const res = await service.acumularPorPedido(130n);
+        expect(res).toMatchObject({ sumados: false, motivoNo: 'YA_SUMADO' });
+        expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+      });
+
+      it('carrera: el único (pedido, tipo, ciclo) rechaza el segundo SUMA y se trata como YA_SUMADO', async () => {
+        preparar(pedidoCobrado());
+        prismaMock.movimientoPuntos.findFirst
+          .mockResolvedValueOnce({ id: 1n, tipo: 'SUMA', ciclo: 1, puntos: '3.50' })
+          .mockResolvedValueOnce({ id: 2n, tipo: 'REVERSA', ciclo: 1, puntos: '3.50' });
+        prismaMock.movimientoPuntos.create.mockRejectedValueOnce({ code: 'P2002' });
+        const res = await service.acumularPorPedido(130n);
+        expect(res).toMatchObject({ sumados: false, motivoNo: 'YA_SUMADO' });
+      });
+
+      it('pedido anulado (o ya no pagado) con SUMA reversada: no vuelve a sumar', async () => {
+        for (const extra of [{ estado: 'ANULADO' }, { pago_estado: 'PENDIENTE' }]) {
+          prismaMock.movimientoPuntos.create.mockClear();
+          preparar(pedidoCobrado(extra));
+          prismaMock.movimientoPuntos.findFirst
+            .mockResolvedValueOnce({ id: 1n, tipo: 'SUMA', ciclo: 1, puntos: '3.50' })
+            .mockResolvedValueOnce({ id: 2n, tipo: 'REVERSA', ciclo: 1, puntos: '3.50' });
+          const res = await service.acumularPorPedido(130n);
+          expect(res.sumados).toBe(false);
+          expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+        }
+      });
+
+      it('reversar tras el ciclo 2 crea la REVERSA del ciclo 2 (anulación del pedido completo o reprogramación)', async () => {
+        prismaMock.pedido.findUnique.mockResolvedValue(pedidoCobrado());
+        prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '3.50' } });
+        prismaMock.movimientoPuntos.findFirst
+          .mockResolvedValueOnce({ id: 3n, tipo: 'SUMA', ciclo: 2, puntos: '3.50' })
+          .mockResolvedValueOnce(null) // sin REVERSA del ciclo 2
+          .mockResolvedValueOnce(null); // sin canje
+        const res = await service.reversarPorPedido(130n);
+        expect(res.puntosReversados).toBe(3.5);
+        expect(prismaMock.movimientoPuntos.findFirst).toHaveBeenNthCalledWith(2, { where: { pedido_id: 130n, tipo: 'REVERSA', ciclo: 2 } });
+        expect(prismaMock.movimientoPuntos.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ tipo: 'REVERSA', ciclo: 2 }) }),
+        );
+      });
     });
 
     it('no acumula si el pedido fue de un invitado sin cuenta (party_id = null)', async () => {

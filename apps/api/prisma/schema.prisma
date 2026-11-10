@@ -1835,11 +1835,13 @@ model MovimientoPuntos {
   tipo      String   // SUMA | REVERSA | CANJE | DEVOLUCION_CANJE
   motivo    String?
   en        DateTime @default(now()) @db.Timestamptz
+  /// Cobro vigente del pedido: SUMA y REVERSA comparten ciclo; cobrar de nuevo tras anular el cobro abre el ciclo siguiente
+  ciclo     Int      @default(1)
 
   party     Party    @relation(fields: [party_id], references: [id])
   pedido    Pedido?  @relation(fields: [pedido_id], references: [id])
 
-  @@unique([pedido_id, tipo])
+  @@unique([pedido_id, tipo, ciclo])
   @@map("movimiento_puntos")
 }
 
