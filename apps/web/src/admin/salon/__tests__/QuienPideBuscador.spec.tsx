@@ -229,7 +229,7 @@ describe('¿Quién pide?: buscador de cliente y de personal', () => {
       fireEvent.click(await screen.findByRole('button', { name: /María Soto/ }));
 
       expect(
-        screen.getByText('María Soto (personal · descuento al cobrar a crédito)'),
+        screen.getByText('María Soto (personal · con descuento)'),
       ).toBeInTheDocument();
     });
   });
