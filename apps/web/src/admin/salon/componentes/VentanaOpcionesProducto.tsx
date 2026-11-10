@@ -25,6 +25,7 @@ import {
   gruposPaquetes,
   SelectorPaqueteCombo,
   faltaElegirJuguetes,
+  lugaresElegidos,
   faltaElegirReemplazo,
   notaReemplazos,
   partesConAlternativas,
@@ -265,7 +266,7 @@ export function VentanaOpcionesProducto({
     ...partesJug.flatMap((p) => {
       const tot = p.cantidad * cantidad;
       if (p.bebidas) return Array.from({ length: tot }, (_, i) => i).filter((i) => !(bebidas[p.parteId] ?? [])[i]).map((i) => `Bebida ${i + 1}`);
-      return totalElegido(elegido[p.parteId] ?? {}) !== tot ? [`Elige ${tot} opción(es)`] : [];
+      return lugaresElegidos(p, elegido[p.parteId] ?? {}) !== tot ? [`Elige ${tot} opción(es)`] : [];
     }),
     ...gruposFaltantes,
   ].join(' · ');

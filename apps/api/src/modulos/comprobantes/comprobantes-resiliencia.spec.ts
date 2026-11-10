@@ -141,6 +141,34 @@ describe('Que no se pierda nada: outbox, reintentos, DLQ, circuito y barrido', (
     expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
   });
 
+  it('0133 de SUNAT: queda PENDIENTE_ENVIO (no RECHAZADO) y un RECHAZADO por 0133 se reintenta con el mismo ZIP', async () => {
+    const fetchFn = fetchSunat({ sendBill: async () => sobreFault('soap-env:Client.0133') });
+    const { prisma, db, servicio, fetchFn: f } = montar({}, fetchFn);
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    await servicio.enviarElectronico(id, { automatico: true });
+    expect(estadosDe(db)).toEqual(['PENDIENTE_ENVIO']);
+
+    // Caso ya existente en producción: quedó RECHAZADO con 0133; Reintentar reenvía el mismo ZIP
+    db.comprobante[0].facturacion_estado = 'RECHAZADO';
+    db.comprobante[0].facturacion_respuesta = '0133: El sistema no puede responder su solicitud';
+    fetchFn.mockImplementation(async (_u: string, init: any) =>
+      String(init.body).includes('<ser:getStatusCdr>') ? consultaSinComprobante() : sobreAceptado());
+    await servicio.reintentarElectronico(id, {}, cajero);
+    const envios = f.mock.calls.filter(([, i]: any) => String(i.body).includes('<ser:sendBill>'));
+    const zip = (n: number) => String(envios[n][1].body).match(/<contentFile>([^<]+)<\/contentFile>/)![1];
+    expect(zip(1)).toBe(zip(0));
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+  });
+
+  it('error inesperado al reintentar: HttpException con codigo y mensaje legibles, y se registra', async () => {
+    const { prisma, servicio } = montar();
+    jest.spyOn(prisma.comprobante, 'findUnique').mockRejectedValue(new Error('conexión perdida\ndetalle'));
+    await expect(servicio.reintentarElectronico(1n, {}, cajero)).rejects.toMatchObject({
+      response: { codigo: 'REENVIO_FALLIDO', mensaje: expect.stringContaining('No pudimos reenviar a SUNAT: conexión perdida') },
+    });
+  });
+
   it('timeout y luego SUNAT sí la tiene: el reintento NO reenvía y guarda el CDR', async () => {
     const fetchFn = fetchSunat({
       sendBill: async () => {

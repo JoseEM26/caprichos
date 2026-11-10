@@ -7,8 +7,9 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Paginacion } from '../../comun/Paginacion';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
+import { api } from '../../comun/api';
 import { comprobantesApi } from './comprobantesApi';
-import { formatearSoles } from './utilidades';
+import { formatearSoles, rucValido } from './utilidades';
 import type { BoletaPorDefecto, ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
 
 const ALTO_TOQUE = '44px';
@@ -56,8 +57,12 @@ const fechaHoraCorta = (iso: string) => {
   return d.toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+/** Rechazo 0133: falla interna y temporal de SUNAT, no del comprobante; se reintenta tal cual. */
+const esTemporal0133 = (c: ComprobanteElectronico) => c.facturacion_estado === 'RECHAZADO' && /\b0133\b/.test(c.respuesta_sunat ?? '');
+
 /** Lo que el panel «Con problemas» dice de cada caso: qué hacer. */
 function accionDe(c: ComprobanteElectronico): string {
+  if (esTemporal0133(c)) return 'Reintentar';
   if (c.facturacion_estado === 'REVISION_MANUAL' || c.facturacion_estado === 'RECHAZADO') return 'Corregir y reintentar';
   return 'Reintentar';
 }
@@ -95,7 +100,10 @@ export function ElectronicosTab() {
   const [corrRazon, setCorrRazon] = useState('');
   const [corrDir, setCorrDir] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [buscandoRuc, setBuscandoRuc] = useState(false);
+  const [errorRuc, setErrorRuc] = useState<string | null>(null);
 
+  const [realDe, setRealDe] = useState<ComprobanteElectronico | null>(null);
   const [anularDe, setAnularDe] = useState<ComprobanteElectronico | null>(null);
   const [motivo, setMotivo] = useState('');
   const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
@@ -232,6 +240,22 @@ export function ElectronicosTab() {
     setCorrDoc(c.documento ?? '');
     setCorrRazon(c.razon_social ?? '');
     setCorrDir('');
+    setErrorRuc(null);
+  };
+
+  // Solo rellena al pulsar el botón; si el servicio no responde, se escribe a mano.
+  const buscarRuc = async () => {
+    setBuscandoRuc(true);
+    setErrorRuc(null);
+    try {
+      const d = await api.get<{ razon_social: string; direccion: string | null }>(`/admin/ruc/${corrDoc.trim()}`);
+      setCorrRazon(d.razon_social);
+      if (d.direccion) setCorrDir(d.direccion);
+    } catch {
+      setErrorRuc('No pudimos consultar el RUC; escribe la razón social a mano');
+    } finally {
+      setBuscandoRuc(false);
+    }
   };
 
   const confirmarReintento = async () => {
@@ -250,6 +274,22 @@ export function ElectronicosTab() {
     } catch (err: any) {
       setError(err?.message || 'No se pudo reintentar');
       setReintentarDe(null);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const confirmarEmitirReal = async () => {
+    if (!realDe) return;
+    setOcupado(true);
+    try {
+      const nuevo = await comprobantesApi.emitirReal(realDe.id);
+      setAviso(`Se anuló ${realDe.numero_texto} (simulado) y se emitió ${nuevo.numero_texto} a SUNAT`);
+      setRealDe(null);
+      await cargar(pagina);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo emitir el comprobante real');
+      setRealDe(null);
     } finally {
       setOcupado(false);
     }
@@ -404,6 +444,7 @@ export function ElectronicosTab() {
               esAdmin &&
               (c.facturacion_estado === 'EMITIDO_SUNAT' || c.facturacion_estado === 'PENDIENTE_RESUMEN') &&
               (!c.baja_estado || c.baja_estado === 'RECHAZADA');
+            const puedeEmitirReal = esAdmin && c.simulado && !c.baja_estado;
             const tieneArchivos = c.emisor === 'SUNAT' && !c.simulado;
             return (
               <li key={c.id} data-testid={`electronico-${c.id}`} style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: 14, padding: 14 }}>
@@ -443,6 +484,11 @@ export function ElectronicosTab() {
                   {puedeReintentar && (
                     <Boton variante="secundario" onClick={() => abrirReintento(c)} style={{ minHeight: ALTO_TOQUE }}>
                       Reintentar
+                    </Boton>
+                  )}
+                  {puedeEmitirReal && (
+                    <Boton variante="primario" onClick={() => setRealDe(c)} style={{ minHeight: ALTO_TOQUE }}>
+                      Emitir real
                     </Boton>
                   )}
                   {puedeAnular && (
@@ -524,6 +570,9 @@ export function ElectronicosTab() {
         alConfirmar={confirmarReintento}
         alCancelar={() => setReintentarDe(null)}
       >
+        {reintentarDe && esTemporal0133(reintentarDe) && (
+          <div style={{ fontSize: 13, marginTop: 8 }}>Falla temporal de SUNAT (0133): no es un rechazo del comprobante, puedes reintentar tal cual.</div>
+        )}
         {reintentarDe && reintentarDe.facturacion_estado === 'REVISION_MANUAL' && reintentarDe.revision_motivo && (
           <div style={{ fontSize: 13, marginTop: 8, wordBreak: 'break-word' }}>Motivo: {reintentarDe.revision_motivo}</div>
         )}
@@ -533,6 +582,14 @@ export function ElectronicosTab() {
               Documento (DNI o RUC)
               <input type="text" value={corrDoc} onChange={(e) => setCorrDoc(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
             </label>
+            <Boton variante="secundario" onClick={buscarRuc} disabled={buscandoRuc || !rucValido(corrDoc.trim())} style={{ minHeight: ALTO_TOQUE }}>
+              {buscandoRuc ? 'Buscando…' : 'Buscar por RUC'}
+            </Boton>
+            {errorRuc && (
+              <div role="alert" style={{ color: 'var(--cp-rust, #b00020)', fontSize: 12, fontWeight: 700 }}>
+                {errorRuc}
+              </div>
+            )}
             <label style={{ fontWeight: 700, fontSize: 13 }}>
               Razón social
               <input type="text" value={corrRazon} onChange={(e) => setCorrRazon(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
@@ -544,6 +601,18 @@ export function ElectronicosTab() {
           </div>
         )}
       </Confirmar>
+
+      <Confirmar
+        abierto={realDe !== null}
+        titulo="Emitir comprobante real"
+        mensaje={realDe ? `Se anulará el simulado ${realDe.numero_texto} y se emitirá uno nuevo a SUNAT con la fecha de hoy; no se puede deshacer.` : undefined}
+        textoSi="Sí, emitir real"
+        textoNo="No"
+        peligro
+        cargando={ocupado}
+        alConfirmar={confirmarEmitirReal}
+        alCancelar={() => setRealDe(null)}
+      />
 
       <Confirmar
         abierto={anularDe !== null}

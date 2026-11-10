@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as sesionModulo from '../../../comun/sesion';
+import { api } from '../../../comun/api';
 import { comprobantesApi } from '../comprobantesApi';
 import { ElectronicosTab } from '../ElectronicosTab';
 import type { ComprobanteElectronico } from '../tipos';
@@ -96,6 +97,40 @@ describe('ElectronicosTab', () => {
     await waitFor(() => expect(anular).toHaveBeenCalledWith('5', 'Cobro duplicado'));
   });
 
+  it('Emitir real: solo en filas Simulado, pide confirmación explícita y llama a la API', async () => {
+    conRol('ADMIN');
+    const simulado: ComprobanteElectronico = { ...base, id: '11', numero_texto: 'B002-000011', simulado: true, emisor: 'SIMULADO', enlace_pdf: null };
+    vi.spyOn(comprobantesApi, 'listarElectronicos').mockResolvedValue({ total: 2, pagina: 1, limite: 20, totalPaginas: 1, elementos: [base, simulado] });
+    const emitir = vi.spyOn(comprobantesApi, 'emitirReal').mockResolvedValue({ id: '12', numero_texto: 'B002-000012' });
+    render(<ElectronicosTab />);
+    await screen.findByText('Simulado');
+    expect(screen.getAllByRole('button', { name: 'Emitir real' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir real' }));
+    expect(await screen.findByText(/Se anulará el simulado B002-000011 y se emitirá uno nuevo a SUNAT con la fecha de hoy; no se puede deshacer/)).toBeTruthy();
+    expect(emitir).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, emitir real' }));
+    await waitFor(() => expect(emitir).toHaveBeenCalledWith('11'));
+  });
+
+  it('Emitir real: muestra el error del servidor (proveedor no SUNAT) y el cajero no ve el botón', async () => {
+    conRol('ADMIN');
+    const simulado: ComprobanteElectronico = { ...base, id: '11', simulado: true, emisor: 'SIMULADO', enlace_pdf: null };
+    vi.spyOn(comprobantesApi, 'listarElectronicos').mockResolvedValue({ total: 1, pagina: 1, limite: 20, totalPaginas: 1, elementos: [simulado] });
+    vi.spyOn(comprobantesApi, 'emitirReal').mockRejectedValue(new Error('Cambia el proveedor a SUNAT en Facturación primero'));
+    const { unmount } = render(<ElectronicosTab />);
+    await screen.findByText('Simulado');
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir real' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, emitir real' }));
+    expect(await screen.findByText('Cambia el proveedor a SUNAT en Facturación primero')).toBeTruthy();
+    unmount();
+
+    conRol('CAJERO');
+    render(<ElectronicosTab />);
+    await screen.findByText('Simulado');
+    expect(screen.queryByRole('button', { name: 'Emitir real' })).toBeNull();
+  });
+
   it('el cajero no ve Anular ni Reintentar', async () => {
     conRol('CAJERO');
     render(<ElectronicosTab />);
@@ -115,6 +150,40 @@ describe('ElectronicosTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, reintentar' }));
 
     await waitFor(() => expect(reintentar).toHaveBeenCalledWith('6', { direccion: 'Av. Lima 123' }));
+  });
+
+  describe('Buscar por RUC en la corrección', () => {
+    const abrir = async (doc: string) => {
+      conRol('ADMIN');
+      render(<ElectronicosTab />);
+      await screen.findByText('Rechazado');
+      fireEvent.click(screen.getAllByRole('button', { name: 'Reintentar' })[0]);
+      fireEvent.change(await screen.findByRole('textbox', { name: /Documento/ }), { target: { value: doc } });
+    };
+
+    it('con RUC válido rellena razón social y dirección', async () => {
+      const get = vi.spyOn(api, 'get').mockResolvedValue({ razon_social: 'EMPRESA DE PRUEBA SAC', direccion: 'Av. Prueba 1' } as any);
+      await abrir('20123456786');
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar por RUC' }));
+      await waitFor(() => expect((screen.getByRole('textbox', { name: /Razón social/ }) as HTMLInputElement).value).toBe('EMPRESA DE PRUEBA SAC'));
+      expect((screen.getByRole('textbox', { name: /Dirección/ }) as HTMLInputElement).value).toBe('Av. Prueba 1');
+      expect(get).toHaveBeenCalledWith('/admin/ruc/20123456786');
+    });
+
+    it('si el servicio falla muestra el aviso y deja escribir a mano', async () => {
+      vi.spyOn(api, 'get').mockRejectedValue(new Error('x'));
+      await abrir('20123456786');
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar por RUC' }));
+      expect((await screen.findByRole('alert')).textContent).toContain('No pudimos consultar el RUC');
+      const razon = screen.getByRole('textbox', { name: /Razón social/ }) as HTMLInputElement;
+      fireEvent.change(razon, { target: { value: 'A mano' } });
+      expect(razon.value).toBe('A mano');
+    });
+
+    it('con RUC inválido el botón está deshabilitado', async () => {
+      await abrir('20123456780');
+      expect((screen.getByRole('button', { name: 'Buscar por RUC' }) as HTMLButtonElement).disabled).toBe(true);
+    });
   });
 
   it('SUNAT directo: muestra ambiente, credenciales (sin valores), el resumen pendiente y descarga el XML y el CDR', async () => {

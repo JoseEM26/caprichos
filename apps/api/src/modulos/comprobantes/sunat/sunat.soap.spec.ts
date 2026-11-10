@@ -1,7 +1,7 @@
 import { ErrorCredencialesEmisor, ErrorRedEmisor } from '../emisor/emisor.tipos';
 import { esRechazoPermanente } from '../comprobantes-politica';
 import { zipUnico } from './sunat.util';
-import { codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
+import { codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, esFaultTemporal, esRechazoDefinitivo, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
 
 const cdrXml = (codigo: string, descripcion: string, nota?: string) =>
   `<?xml version="1.0"?><ar:ApplicationResponse xmlns:ar="urn:oasis:names:specification:ubl:schema:xsd:ApplicationResponse-2" ` +
@@ -107,5 +107,16 @@ describe('códigos reales de SUNAT beta', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('fallos temporales de SUNAT', () => {
+  it('0133 es temporal; credenciales y datos siguen siendo rechazo definitivo', () => {
+    const f = (codigo: string, mensaje = 'x') => ({ codigo, mensaje });
+    expect(esFaultTemporal(f('soap-env:Client.0133'))).toBe(true);
+    expect(esRechazoDefinitivo(f('soap-env:Client.0133'))).toBe(false);
+    expect(esRechazoDefinitivo(f('soap-env:Client.0109'))).toBe(true);
+    expect(esRechazoDefinitivo(f('soap-env:Client.2800'))).toBe(true);
+    expect(esRechazoDefinitivo(f('soap-env:Client.0125'))).toBe(true);
   });
 });

@@ -188,4 +188,12 @@ export class ComprobantesController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.comprobantesService.anularElectronico(id, dto?.motivo ?? '', req.usuario, ip);
   }
+
+  /** POST /admin/comprobantes/:id/emitir-real : reemplaza un comprobante Simulado por uno real a SUNAT. */
+  @Post(':id/emitir-real')
+  @Permiso('comprobantes', 'emitir')
+  async emitirReal(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.comprobantesService.emitirReal(id, req.usuario, ip);
+  }
 }

@@ -4,7 +4,7 @@ import { TEXTO_REGISTRADA_SIN_CDR, esCodigoAutenticacion } from '../comprobantes
 import { ConfigSunat, RUC_PRUEBA_BETA, configSunat } from './sunat.config';
 import { EmisorXml, armarBajaXml, armarFacturaXml, validarEmisorXml } from './sunat.xml';
 import { CertificadoFirma, digestDeFirma, firmarXml, leerCertificadoP12 } from './sunat.firma';
-import { Cdr, FetchSoap, codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, esYaRegistrado, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
+import { Cdr, FetchSoap, codigoFault, cuerpoEnvio, enviarSoap, esRechazoDefinitivo, esYaRegistrado, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
 import { fechaIsoLima, montoXml, yyyymmddLima, zipUnico } from './sunat.util';
 
 export interface OpcionesSunatEmisor {
@@ -224,7 +224,7 @@ export class SunatEmisor implements EmisorElectronico {
         const codigo = codigoFault(r.fault);
         if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
         if (esYaRegistrado(codigo, r.fault.mensaje)) return sinConstancia(comunes);
-        if (esFaultCliente(r.fault)) return { ...comunes, estado: 'RECHAZADO', respuesta: `${codigo}: ${r.fault.mensaje}`, codigoRechazo: codigo };
+        if (esRechazoDefinitivo(r.fault)) return { ...comunes, estado: 'RECHAZADO', respuesta: `${codigo}: ${r.fault.mensaje}`, codigoRechazo: codigo };
         throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
       }
       const cdr = leerCdr(r.textos.applicationResponse ?? '');
@@ -309,7 +309,7 @@ export class SunatEmisor implements EmisorElectronico {
     const r = parsearSoap(xml);
     if (r.fault) {
       if (esCodigoAutenticacion(codigoFault(r.fault))) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigoFault(r.fault)})`);
-      if (esFaultCliente(r.fault)) return { rechazo: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
+      if (esRechazoDefinitivo(r.fault)) return { rechazo: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
       throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
     }
     if (!r.textos.ticket) throw new ErrorRedEmisor('SUNAT no devolvió ticket');
@@ -323,7 +323,7 @@ export class SunatEmisor implements EmisorElectronico {
     const r = parsearSoap(xml);
     if (r.fault) {
       if (esCodigoAutenticacion(codigoFault(r.fault))) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigoFault(r.fault)})`);
-      if (esFaultCliente(r.fault)) return { estado: 'RECHAZADO', respuesta: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
+      if (esRechazoDefinitivo(r.fault)) return { estado: 'RECHAZADO', respuesta: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
       throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
     }
     const code = r.textos.statusCode;
