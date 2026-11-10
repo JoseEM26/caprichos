@@ -312,6 +312,14 @@ describe('NotificacionesService', () => {
     expect(lecturas.every((l) => l.party_id === CAJERO_A.partyId)).toBe(true);
   });
 
+  it('la búsqueda del historial ignora tildes y mayúsculas', async () => {
+    notifs.push({ id: BigInt(900), tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: 'Pedido de José Peña', mensaje: '', enlace: null, leida_en: null, en: hace(1) });
+    const h = await service.historial({ q: 'JOSE pena' }, ADMIN);
+    expect(h.items.map((i: any) => i.titulo)).toContain('Pedido de José Peña');
+    const nada = await service.historial({ q: 'zzzzz' }, ADMIN);
+    expect(nada.items).toHaveLength(0);
+  });
+
   it('el historial se pagina por cursor: 10 por defecto, máximo 50, sin repetir aunque entren avisos nuevos', async () => {
     for (let i = 0; i < 25; i++) {
       notifs.push({ id: BigInt(200 + i), tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: `P${i}`, mensaje: '', enlace: null, leida_en: null, en: hace(200 + i) });

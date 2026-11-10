@@ -36,16 +36,12 @@ describe('PorEmitirTab: filtros Tipo y Estado en combo', () => {
       marcarClaveCambiada: vi.fn(),
       tiene: vi.fn().mockReturnValue(true),
     } as any);
-    vi.spyOn(comprobantesApi, 'listarPorEmitir').mockResolvedValue({
-      elementos: [
-        comprobante('1', 'BOLETA', 'POR_EMITIR'),
-        comprobante('2', 'FACTURA', 'POR_EMITIR'),
-        comprobante('3', 'BOLETA', 'EMITIDO'),
-      ],
-      pagina: 1,
-      total: 3,
-      paginas: 1,
-    } as any);
+    // El servidor filtra: el mock respeta tipo y devuelve el total real
+    vi.spyOn(comprobantesApi, 'listarPorEmitir').mockImplementation(async (_p, _l, f) => {
+      const todos = [comprobante('1', 'BOLETA', 'POR_EMITIR'), comprobante('2', 'FACTURA', 'POR_EMITIR')];
+      const elementos = todos.filter((c) => !f?.tipo || f.tipo === 'TODOS' || c.tipo === f.tipo);
+      return { elementos, pagina: 1, total: elementos.length, paginas: 1 } as any;
+    });
   });
 
   it('Tipo y Estado son combos; elegir Facturas deja solo las facturas por emitir', async () => {
@@ -54,13 +50,14 @@ describe('PorEmitirTab: filtros Tipo y Estado en combo', () => {
         <PorEmitirTab />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('3 pendientes')).toBeInTheDocument();
+    expect(await screen.findByText('2 pendientes')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tipo: Todos' }));
     fireEvent.click(screen.getByRole('option', { name: 'Facturas' }));
 
     expect(screen.getByRole('button', { name: 'Tipo: Facturas' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Estado: Todos' })).toBeInTheDocument();
-    expect(screen.getByText('1 pendiente')).toBeInTheDocument();
+    expect(await screen.findByText('1 pendiente')).toBeInTheDocument();
+    expect(comprobantesApi.listarPorEmitir).toHaveBeenLastCalledWith(1, 20, expect.objectContaining({ tipo: 'FACTURA' }));
   });
 });

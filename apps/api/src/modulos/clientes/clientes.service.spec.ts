@@ -186,6 +186,14 @@ describe('ClientesService', () => {
       expect(res.items).toEqual([]);
     });
 
+    it('busca sin distinguir tildes: «jose» encuentra José y «pena» encuentra Peña', async () => {
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([rol(1, 'José', '912345678'), rol(2, 'Peña', '987654321'), rol(3, 'Luis', '900000000')]);
+      const a = await service.listarAdmin({ q: 'jose' }, { rol: 'MOZO' });
+      expect(a.items.map((i) => i.nombre)).toEqual(['José']);
+      const b = await service.listarAdmin({ q: 'PENA' }, { rol: 'MOZO' });
+      expect(b.items.map((i) => i.nombre)).toEqual(['Peña']);
+    });
+
     it('busca por nombre sin distinguir mayusculas', async () => {
       const res = await service.listarAdmin({ q: 'LUIS' }, { rol: 'MOZO' });
       expect(res.items.map((i) => i.nombre)).toEqual(['Luis']);

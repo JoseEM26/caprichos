@@ -9,6 +9,7 @@ import { PedidoDetalle } from './PedidoDetalle';
 import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
 import { PanelNoEntregados } from './PanelNoEntregados';
+import { coincideTexto } from '../../comun/normalizarBusqueda';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
 import { AccesoListaEsperaCaja } from '../salon/componentes/AccesoListaEsperaCaja';
@@ -124,6 +125,8 @@ const soles = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 
 /** Pedidos por página del API (máximo permitido); «Cargar más» pide la siguiente. */
 const LIMITE_PAGINA = 100;
+/** Con filtro o búsqueda se piden solas hasta estas páginas (2000 pedidos); más allá se avisa. */
+const MAX_PAGINAS_AUTOMATICAS = 20;
 
 /** Hoy y «pendientes de días anteriores» muestran lo activo; otro día o rango muestra todo (lo de ayer casi siempre ya está cerrado). */
 function estadoPorDefectoDeRango(r: RangoPedidos): GrupoEstadoCaja {
@@ -357,6 +360,20 @@ export function PedidosAdminView() {
     }
   };
 
+  // Con filtro o búsqueda activos hay que mirar TODO el rango (si no, un pedido sin cargar no aparece ni se cuenta).
+  // Se piden las páginas que faltan una tras otra; hay tope por seguridad y, si no se puede completar, se avisa.
+  const filtrando =
+    busqueda.trim() !== '' || contador !== null || etapa !== 'all' || canalFiltro !== 'all' ||
+    modalidadFiltro !== 'all' || cobroFiltro !== 'all' || filtro !== 'todo' || grupoEstado !== estadoPorDefectoDeRango(rango);
+  const faltanPorCargar = pedidos.length < totalDia;
+  useEffect(() => {
+    if (!filtrando || !faltanPorCargar || cargando || cargandoMas || errorMas) return;
+    if (paginasRef.current >= MAX_PAGINAS_AUTOMATICAS) return;
+    void cargarMas();
+    // cargarMas solo usa refs y setters estables y el rango, que ya dispara la recarga
+     
+  }, [filtrando, faltanPorCargar, cargando, cargandoMas, errorMas, pedidos.length]);
+
   const cambiarRango = (nuevo: RangoPedidos) => {
     paginasRef.current = 1;
     setRango(nuevo);
@@ -496,7 +513,7 @@ export function PedidosAdminView() {
 
   // Todo lo que filtra salvo las pastillas: estado (activos/cerrados), etapa, canal, modalidad, cobro y búsqueda
   const base = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = busqueda.trim();
     return pedidos.filter((p) => {
       if (grupoEstado === 'cer' ? !esCerrado(p) : grupoEstado === 'act' && esCerrado(p)) return false;
       if (contador && !enContador(p, contador)) return false;
@@ -526,13 +543,11 @@ export function PedidosAdminView() {
       }
 
       if (q) {
-        const cod = String(p.codigo || '').toLowerCase();
-        const cli = String(p.cliente_nombre || '').toLowerCase();
         // Por celular: se comparan solo dígitos (con o sin +51, espacios o guiones)
         const qDig = q.replace(/\D/g, '');
         const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
         const porCelular = qDig.length >= 3 && tel.includes(qDig.replace(/^51(?=9\d{8}$)/, ''));
-        if (!cod.includes(q) && !cli.includes(q) && !porCelular) return false;
+        if (!coincideTexto(q, p.codigo, p.cliente_nombre) && !porCelular) return false;
       }
 
       return true;
@@ -575,7 +590,7 @@ export function PedidosAdminView() {
     if (cobroFiltro !== 'all') lista.push({ id: 'cobro', texto: `Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`, quitar: () => { setCobroFiltro('all'); setPaginaActual(1); } });
     return lista;
     // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
 
   const limpiarFiltros = () => {
@@ -1107,6 +1122,11 @@ export function PedidosAdminView() {
               <button type="button" className="cj2-btn" disabled={cargandoMas} onClick={() => void cargarMas()}>
                 {cargandoMas ? 'Cargando…' : 'Cargar más'}
               </button>
+            )}
+            {filtrando && pedidos.length < totalDia && (
+              <span role="status" data-testid="aviso-filtrando-parcial" style={{ fontWeight: 700 }}>
+                {cargandoMas ? 'Buscando en todos los pedidos…' : `Filtrando solo ${pedidos.length} de ${totalDia} pedidos cargados`}
+              </span>
             )}
             {errorMas && <span role="alert" style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>{errorMas}</span>}
           </div>

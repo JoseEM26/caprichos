@@ -5,6 +5,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
+import { normalizarBusqueda } from '../../comun/normalizarBusqueda';
 import { salonApi } from './api';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalVoucherPedido } from './ModalVoucherPedido';
@@ -127,15 +128,6 @@ function mediosVoucher(p: MiPedido): Array<{ medio: 'YAPE' | 'PLIN' | 'TRANSFERE
   return (p.vouchersPorMedio ?? []).filter((m): m is { medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number; subido: boolean; voucherId?: string | null } =>
     m.medio === 'YAPE' || m.medio === 'PLIN' || m.medio === 'TRANSFERENCIA',
   );
-}
-
-/** Para buscar: sin mayúsculas, tildes, guiones ni espacios ('cp-w021' === 'CP W021'). */
-function normalizarBusqueda(texto: string | null | undefined): string {
-  return (texto ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[-\s]/g, '');
 }
 
 /** Coincide por nombre del cliente, código o nombre de la mesa. Búsqueda vacía: todo coincide. */

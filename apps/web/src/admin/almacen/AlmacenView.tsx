@@ -1,20 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AvisoControlAlmacen } from '../stock/AvisoControlAlmacen';
 import { AvisoAperturaHoy } from './AvisoAperturaHoy';
 import {
   almacenApi,
   MovimientoItem,
   InsumoStockItem,
+  ListarMovimientosRespuesta,
 } from './almacenApi';
 import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
 import { ModalCerrarDia } from './ModalCerrarDia';
 import { Confirmar } from '../../comun/Confirmar';
+import { Paginacion } from '../../comun/Paginacion';
+
+const TAMANO_PAGINA = 50;
 
 export const AlmacenView: React.FC = () => {
   const [movimientos, setMovimientos] = useState<MovimientoItem[]>([]);
   const [insumos, setInsumos] = useState<InsumoStockItem[]>([]);
   const [buscar, setBuscar] = useState('');
+  const [buscarAplicado, setBuscarAplicado] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [totalMovs, setTotalMovs] = useState(0);
+  const [conteos, setConteos] = useState({ todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 });
+  const peticion = useRef(0);
   const [filtroTipo, setFiltroTipo] = useState<string>('Todos');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -39,63 +48,56 @@ export const AlmacenView: React.FC = () => {
   const [confirmarEntregarAbierto, setConfirmarEntregarAbierto] = useState(false);
 
   const cargarDatos = async () => {
+    const mia = ++peticion.current;
     try {
       setCargando(true);
       const [resMovs, resInsumos, resPeds] = await Promise.all([
-        almacenApi.listarMovimientos().catch(() => ({ conteos: { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 }, movimientos: [] })),
+        almacenApi.listarMovimientos({ tipo: filtroTipo, buscar: buscarAplicado, pagina, limite: TAMANO_PAGINA }).catch((): ListarMovimientosRespuesta => ({ conteos: { todos: 0, entradas: 0, salidas: 0, mermas: 0, devoluciones: 0 }, movimientos: [] })),
         almacenApi.listarInsumos().catch(() => []),
         almacenApi.listarPedidosInternos().catch(() => []),
       ]);
 
+      if (mia !== peticion.current) return; // respuesta tardía de un filtro anterior
       setMovimientos(resMovs.movimientos);
+      setConteos(resMovs.conteos);
+      setTotalMovs(resMovs.total ?? resMovs.movimientos.length);
       setInsumos(resInsumos);
       setPedidosInternos(Array.isArray(resPeds) ? resPeds : []);
     } finally {
-      setCargando(false);
+      if (mia === peticion.current) setCargando(false);
     }
   };
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+     
+  }, [filtroTipo, buscarAplicado, pagina]);
 
-  // Movimientos filtrados
-  const movimientosFiltrados = useMemo(() => {
-    return movimientos.filter((m) => {
-      // Filtro por tipo
-      if (filtroTipo !== 'Todos' && m.tipo !== filtroTipo) {
-        return false;
+  // La búsqueda va al servidor cuando se deja de escribir y vuelve a la página 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (buscar.trim() !== buscarAplicado) {
+        setBuscarAplicado(buscar.trim());
+        setPagina(1);
       }
-      // Filtro por búsqueda de texto
-      if (buscar.trim()) {
-        const q = buscar.toLowerCase();
-        const coincideInsumo = m.insumoNombre.toLowerCase().includes(q);
-        const coincideDoc = m.documento.toLowerCase().includes(q);
-        const coincideOrigen = m.origen.toLowerCase().includes(q);
-        const coincideDestino = m.destino.toLowerCase().includes(q);
-        return coincideInsumo || coincideDoc || coincideOrigen || coincideDestino;
-      }
-      return true;
-    });
-  }, [movimientos, filtroTipo, buscar]);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [buscar, buscarAplicado]);
 
-  // Conteos dinámicos por tipo calculados a partir de los datos reales de la BD
-  const conteosPorTipo = useMemo(() => {
-    const counts = {
-      Todos: movimientos.length,
-      ENTRADA: 0,
-      SALIDA: 0,
-      MERMA: 0,
-      DEVOLUCION: 0,
-    };
-    movimientos.forEach((m) => {
-      if (m.tipo === 'ENTRADA') counts.ENTRADA++;
-      else if (m.tipo === 'SALIDA') counts.SALIDA++;
-      else if (m.tipo === 'MERMA') counts.MERMA++;
-      else if (m.tipo === 'DEVOLUCION') counts.DEVOLUCION++;
-    });
-    return counts;
-  }, [movimientos]);
+  const cambiarTipo = (t: string) => {
+    setFiltroTipo(t);
+    setPagina(1);
+  };
+
+  // Tipo y búsqueda ya vienen filtrados del servidor, con conteos reales por tipo
+  const movimientosFiltrados = movimientos;
+  const conteosPorTipo = {
+    Todos: conteos.todos,
+    ENTRADA: conteos.entradas,
+    SALIDA: conteos.salidas,
+    MERMA: conteos.mermas,
+    DEVOLUCION: conteos.devoluciones,
+  };
 
   const solicitarAnular = (id?: string) => {
     if (id) setMovAnularId(id);
@@ -493,7 +495,7 @@ export const AlmacenView: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setFiltroTipo('Todos')}
+              onClick={() => cambiarTipo('Todos')}
               style={{
                 minHeight: 32,
                 padding: '0 10px',
@@ -510,7 +512,7 @@ export const AlmacenView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setFiltroTipo('ENTRADA')}
+              onClick={() => cambiarTipo('ENTRADA')}
               style={{
                 minHeight: 32,
                 padding: '0 10px',
@@ -527,7 +529,7 @@ export const AlmacenView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setFiltroTipo('SALIDA')}
+              onClick={() => cambiarTipo('SALIDA')}
               style={{
                 minHeight: 32,
                 padding: '0 10px',
@@ -544,7 +546,7 @@ export const AlmacenView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setFiltroTipo('MERMA')}
+              onClick={() => cambiarTipo('MERMA')}
               style={{
                 minHeight: 32,
                 padding: '0 10px',
@@ -561,7 +563,7 @@ export const AlmacenView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setFiltroTipo('DEVOLUCION')}
+              onClick={() => cambiarTipo('DEVOLUCION')}
               style={{
                 minHeight: 32,
                 padding: '0 10px',
@@ -580,8 +582,8 @@ export const AlmacenView: React.FC = () => {
         )}
 
         <div style={{ fontSize: 13, color: 'var(--cp-soft)', fontWeight: 600 }}>
-          {movimientosFiltrados.length}{' '}
-          {movimientosFiltrados.length === 1 ? 'resultado' : 'resultados'}
+          {totalMovs}{' '}
+          {totalMovs === 1 ? 'resultado' : 'resultados'}
         </div>
       </div>
 
@@ -838,6 +840,16 @@ export const AlmacenView: React.FC = () => {
             );
           })}
         </div>
+      )}
+
+      {totalMovs > TAMANO_PAGINA && (
+        <Paginacion
+          paginaActual={pagina}
+          totalPaginas={Math.max(1, Math.ceil(totalMovs / TAMANO_PAGINA))}
+          totalRegistros={totalMovs}
+          tamanoPagina={TAMANO_PAGINA}
+          alCambiarPagina={(p) => setPagina(p)}
+        />
       )}
 
       {/* Modales */}
