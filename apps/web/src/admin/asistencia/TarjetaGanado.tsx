@@ -40,6 +40,7 @@ export function TarjetaGanado() {
         ) : (
           <p className="as-ayuda">Estimado: puede cambiar hasta que el administrador cierre el período.</p>
         )}
+        <p className="as-ayuda">El tiempo de almuerzo se paga: cuenta como hora trabajada.</p>
         {dias.length === 0 && <p className="as-ayuda">Todavía no tienes horas trabajadas en este período.</p>}
         {dias.map((d) => (
           <div key={d.jornada} className="ma-ganado-dia">

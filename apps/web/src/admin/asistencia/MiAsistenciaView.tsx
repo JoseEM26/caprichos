@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ETIQUETA_ESTADO,
   MiHoy,
   identificadorDispositivo,
   MiPropina,
   marcarAsistencia,
   marcarManual,
-  miHistorial,
   miHoy as cargarMiHoy,
   miPropinas,
   miResumen as cargarMiResumen,
@@ -14,21 +12,39 @@ import {
 } from './asistenciaApi';
 import { TarjetaGanado } from './TarjetaGanado';
 import { CorreccionesAsistencia, type PedidoCorreccion } from './CorreccionesAsistencia';
-import { ETIQUETA_ROL } from './correccionesApi';
 import { MiVacaciones } from './MiVacaciones';
+import { MiCalendario } from './MiCalendario';
+import { MisPagos } from './MisPagos';
+import { AYUDA_ACCION, ETIQUETA_ACCION, ETIQUETA_LINEA, ORDEN_TIPOS, horasMin, normalizarTipo, sugerirSiguiente, type TipoMarcaElegido } from './tiposMarca';
 import { BotonInstalarApp } from '../../pwa/BotonInstalarApp';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
-import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
+import { Insignia } from '../../comun/Insignia';
 import { leerQrDeVideo, mensajeErrorCamara, pedirCamara, mensajeErrorUbicacion, pedirUbicacionTolerante } from './escanerQr';
 import './asistencia.css';
+import './miAsistencia.css';
 
-const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
-  CUMPLIO: 'exito', TARDANZA: 'aviso', SALIO_ANTES: 'aviso', SALIO_DESPUES: 'neutro',
-  FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro',
-};
 const NOMBRES_PASOS = ['QR', 'Ubicación', 'Selfie', 'Confirmar'];
 const INDICE_PASO: Partial<Record<Paso, number>> = { escanear: 0, ubicacion: 1, selfie: 2, confirmar: 3 };
+
+/** Lo que el API de «hoy» agrega (contrato de la asistencia con tipos de marca); todo opcional para convivir con el API viejo. */
+type HoyExt = MiHoy & {
+  siguienteSugerido?: TipoMarcaElegido | null;
+  almuerzoMin?: number | null;
+};
+const horaDe = (m: any): string => m.hora ?? horaCorta(m.momento);
+const aMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+
+/** Horas ganadas hoy (el almuerzo cuenta): de la primera entrada a la salida, o a ahora si sigue en el local. */
+export function horasGanadasHoy(marcas: any[], ahoraHHmm: string): number | null {
+  const v = marcas.filter((m) => !m.duplicada);
+  const ent = v.find((m) => normalizarTipo(m.tipo) === 'ENTRADA') ?? (v[0] && normalizarTipo(v[0].tipo) === null ? v[0] : undefined);
+  if (!ent) return null;
+  const sal = [...v].reverse().find((m) => normalizarTipo(m.tipo) === 'SALIDA');
+  const fin = aMin(sal ? horaDe(sal) : ahoraHHmm);
+  const ini = aMin(horaDe(ent));
+  return fin >= ini ? fin - ini : fin + 1440 - ini;
+}
 
 const horaCorta = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -61,7 +77,6 @@ async function capturarSelfie(video: HTMLVideoElement): Promise<string> {
 
 export function MiAsistenciaView() {
   const [hoy, setHoy] = useState<MiHoy | null>(null);
-  const [historial, setHistorial] = useState<any[]>([]);
   const [propinas, setPropinas] = useState<MiPropina[]>([]);
   const [resumen, setResumen] = useState<MiResumen | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -72,6 +87,7 @@ export function MiAsistenciaView() {
   const [qrTexto, setQrTexto] = useState<string | null>(null);
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<TipoMarcaElegido | null>(null); // «¿qué estás haciendo?»
   const [manual, setManual] = useState(false); // sin QR ni selfie: solo GPS, queda para revisión
   const [enviando, setEnviando] = useState(false);
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
@@ -87,9 +103,7 @@ export function MiAsistenciaView() {
 
   const recargar = async () => {
     try {
-      const [h, hist] = await Promise.all([cargarMiHoy(), miHistorial(7)]);
-      setHoy(h);
-      setHistorial(hist);
+      setHoy(await cargarMiHoy());
       // Mis propinas: solo mi parte de los repartos aprobados o pagados. Si falla, no se muestra.
       setPropinas(await miPropinas().catch(() => []));
       setResumen(await cargarMiResumen().catch(() => null));
@@ -121,7 +135,8 @@ export function MiAsistenciaView() {
     }
   }
 
-  const empezar = () => {
+  const empezar = (t: TipoMarcaElegido) => {
+    setTipo(t);
     setMensajeOk(null);
     setError(null);
     setCodigo('');
@@ -136,7 +151,8 @@ export function MiAsistenciaView() {
     setPaso('escanear');
   };
 
-  const empezarManual = () => {
+  const empezarManual = (t: TipoMarcaElegido) => {
+    setTipo(t);
     setMensajeOk(null);
     setError(null);
     setUbicacion(null);
@@ -222,10 +238,11 @@ export function MiAsistenciaView() {
     setEnviando(true);
     setError(null);
     try {
-      // Sin `tipo`: el servidor lee cada marca por orden y pares y dice qué interpretó
+      // La persona elige qué está haciendo; si el API aún no conoce `tipo`, lo ignora y interpreta por orden.
       const r = directo
-        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision })
+        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision, ...(tipo ? { tipo } : {}) })
         : await marcarAsistencia({
+            ...(tipo ? { tipo: tipo as any } : {}),
             ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
             lat: u.lat,
             lng: u.lng,
@@ -248,11 +265,18 @@ export function MiAsistenciaView() {
   if (cargando) return <Cargando mensaje="Cargando tu asistencia…" />;
   if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
-  const ultima = hoy.marcas.filter((m) => !m.duplicada).slice(-1)[0];
+  const h = hoy as HoyExt;
+  const validas = h.marcas.filter((m) => !m.duplicada);
+  const sugerido: TipoMarcaElegido | null = h.siguienteSugerido !== undefined
+    ? h.siguienteSugerido
+    : sugerirSiguiente(validas.map((m) => m.tipo));
   const sinUbicacion = hoy.localConUbicacion === false;
   const puedeMarcar = !sinUbicacion;
   const indice = INDICE_PASO[paso];
-  const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+  const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
+  const ganadoHoy = horasGanadasHoy(h.marcas, horaLima);
+  const almuerzoMin = h.almuerzoMin ?? null;
+  const chipTipo = tipo && <p className="ma-vas" data-testid="vas-a-marcar">Vas a marcar: <strong>{ETIQUETA_ACCION[tipo]}</strong></p>;
 
   return (
     <div className="ma-vista">
@@ -260,9 +284,11 @@ export function MiAsistenciaView() {
       <section className="ma-estado" aria-label="Estado de hoy">
         <span className="ma-fecha">Hoy {hoy.jornada} · {horaLima}</span>
         <div data-testid="estado-hoy" className="ma-estado-txt">
-          {hoy.marcas.length === 0
+          {h.marcas.length === 0
             ? <>Te falta marcar: <strong>Entrada</strong></>
-            : <>Llevas <strong>{hoy.marcas.length}</strong> {hoy.marcas.length === 1 ? 'marca' : 'marcas'} hoy. Marca cuando entres, salgas a break, regreses o termines: el sistema lo interpreta por el orden.</>}
+            : sugerido
+              ? <>Lo siguiente: <strong>{ETIQUETA_ACCION[sugerido]}</strong></>
+              : <>Terminaste tu día. <strong>¡Gracias!</strong></>}
         </div>
         {hoy.turno ? (
           <div className="ma-turno">
@@ -272,19 +298,26 @@ export function MiAsistenciaView() {
         ) : (
           <div className="ma-turno">Hoy no tienes turno programado.</div>
         )}
-        {hoy.marcas.length > 0 && (
-          <div className="ma-marcas">
-            {hoy.marcas.map((m, i) => (
-              <Insignia key={m.id ?? i} variante={m.duplicada ? 'neutro' : 'exito'}>
-                <span style={m.duplicada ? { textDecoration: 'line-through' } : undefined}>
-                  {horaCorta(m.momento)} {ETIQUETA_ROL[m.tipo] ?? m.tipo}
-                </span>
-                {m.duplicada && ' (unida a la anterior)'}
-              </Insignia>
-            ))}
-          </div>
-        )}
-        {ultima && !hoy.marcas.every((m) => m.duplicada) && <div className="as-ayuda" data-testid="ultima-interpretacion">Tu última marca se interpretó como: <strong>{ETIQUETA_ROL[ultima.tipo]}</strong></div>}
+        <div className="ma-turno" data-testid="mi-dia">
+          <strong>Mi día</strong>
+          {validas.length === 0
+            ? <p className="ma-vas">Todavía no marcas nada hoy. Cuando llegues, marca tu entrada.</p>
+            : (
+              <ol className="ma-dia" aria-label="Mi día">
+                {h.marcas.map((m, i) => {
+                  const t = normalizarTipo(m.tipo);
+                  return (
+                    <li key={m.id ?? i} style={m.duplicada ? { textDecoration: 'line-through' } : undefined}>
+                      <b>{horaDe(m)}</b> {t ? ETIQUETA_LINEA[t] : 'Marca'}
+                      {t === 'ALMUERZO_VUELTA' && almuerzoMin != null && <small> (almuerzo {almuerzoMin} min, pagado)</small>}
+                      {m.duplicada && ' (unida a la anterior)'}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          {ganadoHoy !== null && <p className="ma-vas" data-testid="horas-hoy">Horas ganadas hoy: <strong>{horasMin(ganadoHoy)}</strong> (el almuerzo cuenta)</p>}
+        </div>
         {hoy.interpretacion && hoy.interpretacion.alertas.length > 0 && (
           <div role="status" className="as-aviso as-aviso--alerta">{hoy.interpretacion.alertas.join(' · ')}. Si hay un error, pide la corrección abajo.</div>
         )}
@@ -308,20 +341,35 @@ export function MiAsistenciaView() {
       )}
 
       {paso === 'inicio' && (
-        <>
-          <button type="button" className="ma-grande" disabled={!puedeMarcar || enviando} onClick={() => empezar()}>
-            Escanear QR
-          </button>
-          <Boton type="button" variante="texto" disabled={!puedeMarcar || enviando} onClick={() => empezarManual()}>
+        <section className="ma-card" aria-label="¿Qué estás haciendo?">
+          <h3>¿Qué estás haciendo?</h3>
+          <div className="as-ayuda">Elige y escanea el QR del local. El almuerzo es opcional: puedes ir directo a la salida.</div>
+          <div className="ma-acciones">
+            {[...ORDEN_TIPOS].sort((a, b) => (a === sugerido ? -1 : b === sugerido ? 1 : 0)).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className="ma-accion"
+                data-sugerido={t === sugerido}
+                disabled={!puedeMarcar || enviando}
+                onClick={() => empezar(t)}
+              >
+                <b>{ETIQUETA_ACCION[t]}</b>
+                <small>{t === sugerido ? `Sugerido · ${AYUDA_ACCION[t]}` : AYUDA_ACCION[t]}</small>
+              </button>
+            ))}
+          </div>
+          <Boton type="button" variante="texto" disabled={!puedeMarcar || enviando} onClick={() => empezarManual(sugerido ?? 'ENTRADA')}>
             Marcar manualmente (sin QR)
           </Boton>
-          <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca.</p>
-        </>
+          <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca{sugerido ? ` (se marcará: ${ETIQUETA_ACCION[sugerido]})` : ''}.</p>
+        </section>
       )}
 
       {paso === 'escanear' && (
         <section className="ma-card">
           <h3>1. Escanea el QR</h3>
+          {chipTipo}
           <div className="as-ayuda">Apunta la cámara al QR de la pantalla del local.</div>
           <video ref={video} muted playsInline autoPlay className="ma-video" />
           {errorCamara && <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-camara">{errorCamara}</div>}
@@ -350,6 +398,7 @@ export function MiAsistenciaView() {
       {paso === 'ubicacion' && (
         <section className="ma-card">
           <h3>2. Ubicación</h3>
+          {chipTipo}
           {!errorUbic && <Cargando mensaje={forzarUbic ? 'Buscando tu ubicación aproximada…' : 'Leyendo tu ubicación…'} />}
           {errorUbic && (
             <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-ubicacion">{errorUbic}</div>
@@ -391,7 +440,7 @@ export function MiAsistenciaView() {
       {paso === 'confirmar' && (
         <section className="ma-card">
           <h3>4. Confirmar</h3>
-          <div>Confirmar mi marca de ahora <span className="as-ayuda">(el sistema decide si es entrada, break o salida)</span></div>
+          <div>Confirmar mi marca de ahora: <strong>{tipo ? ETIQUETA_ACCION[tipo] : 'Marca'}</strong></div>
           {selfie && <img alt="Selfie de la marca" src={`data:image/jpeg;base64,${selfie}`} className="as-selfie" style={{ maxWidth: 140 }} />}
           <Boton type="button" tamano="grande" disabled={enviando} onClick={() => void enviar()}>
             {enviando ? 'Registrando…' : 'Confirmar marca'}
@@ -440,29 +489,8 @@ export function MiAsistenciaView() {
         </section>
       )}
 
-      <section aria-label="Historial de los últimos días" className="ma-lista">
-        <h3 className="as-sub">Últimos días</h3>
-        {historial.length === 0 && <p className="as-ayuda">Aún no tienes días registrados.</p>}
-        {historial.map((d) => (
-          <div key={d.jornada} className="ma-item">
-            <span>
-              <b>{d.jornada}</b>
-              <small>{d.turno ? `Horario ${d.turno.entrada} a ${d.turno.salida}${d.turno.almuerzo ? ` (break ${d.turno.almuerzo})` : ''}` : 'Sin horario'}</small>
-              {(d.marcas ?? []).length > 0 && (
-                <small>
-                  {(d.marcas as any[]).map((m, i) => (
-                    <span key={m.id ?? i} style={m.duplicada ? { textDecoration: 'line-through' } : undefined}>
-                      {i > 0 ? ' · ' : ''}{m.hora} {ETIQUETA_ROL[m.tipo as keyof typeof ETIQUETA_ROL] ?? m.tipo}
-                    </span>
-                  ))}
-                </small>
-              )}
-            </span>
-            <Insignia variante={VARIANTE_ESTADO[d.estado] ?? 'neutro'}>{ETIQUETA_ESTADO[d.estado] ?? d.estado}</Insignia>
-            {d.estado !== 'DESCANSO' && <Boton type="button" variante="texto" onClick={() => setPedido({ jornada: d.jornada })}>Pedir corrección</Boton>}
-          </div>
-        ))}
-      </section>
+      <MiCalendario alPedirCorreccion={(jornada) => setPedido({ jornada })} />
+      <MisPagos />
     </div>
   );
 }

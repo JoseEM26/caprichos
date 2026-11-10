@@ -6,6 +6,10 @@ const miHistorial = vi.fn();
 const marcarAsistencia = vi.fn();
 const marcarManual = vi.fn();
 const miPropinas = vi.fn();
+vi.mock('../miCalendarioApi', () => ({
+  miCalendario: vi.fn().mockResolvedValue({ desde: '2026-11-01', hasta: '2026-11-30', dias: [] }),
+  miPlanilla: vi.fn().mockResolvedValue({}),
+}));
 vi.mock('../asistenciaApi', async (orig) => ({
   ...(await orig<any>()),
   miHoy: (...a: any[]) => miHoy(...a),
@@ -41,14 +45,14 @@ describe('MiAsistenciaView (celular)', () => {
     miPropinas.mockReset().mockResolvedValue([]);
   });
 
-  it('sin ubicación del local: aviso con role alert y no deja marcar; historial sigue', async () => {
+  it('sin ubicación del local: aviso con role alert y no deja marcar; el calendario sigue', async () => {
     miHoy.mockResolvedValue({ ...base, localConUbicacion: false });
     render(<MiAsistenciaView />);
     const aviso = await screen.findByTestId('aviso-sin-ubicacion');
     expect(aviso).toHaveAttribute('role', 'alert');
     expect(aviso).toHaveTextContent('El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.');
-    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeDisabled();
-    expect(miHistorial).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /^Entrada/ })).toBeDisabled();
+    expect(await screen.findByRole('region', { name: 'Mi calendario de asistencia' })).toBeInTheDocument();
   });
 
   it('Marcar manualmente (sin QR): lee el GPS y envía solo ubicación, sin selfie ni QR', async () => {
@@ -57,7 +61,7 @@ describe('MiAsistenciaView (celular)', () => {
     marcarManual.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada a las 08:00', marca: { estado: 'A_REVISAR' } });
     render(<MiAsistenciaView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar manualmente (sin QR)' }));
-    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9 }));
+    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9, tipo: 'ENTRADA' }));
     expect(marcarAsistencia).not.toHaveBeenCalled();
     expect(await screen.findByRole('status')).toHaveTextContent('queda para revisión del administrador');
   });
@@ -65,7 +69,7 @@ describe('MiAsistenciaView (celular)', () => {
   it('con ubicación del local: sin aviso y puede marcar', async () => {
     miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
     render(<MiAsistenciaView />);
-    expect(await screen.findByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /^Entrada/ })).toBeEnabled();
     expect(screen.queryByTestId('aviso-sin-ubicacion')).toBeNull();
   });
 
@@ -93,7 +97,7 @@ describe('MiAsistenciaView (celular)', () => {
     miHoy.mockResolvedValue(base);
     render(<MiAsistenciaView />);
     expect(await screen.findByTestId('estado-hoy')).toHaveTextContent('Te falta marcar: Entrada');
-    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Entrada/ })).toBeEnabled();
   });
 
   it('ya no pide aceptar ningún aviso de datos: ni casilla ni bloqueo, aunque el servidor mande el texto', async () => {
@@ -104,7 +108,7 @@ describe('MiAsistenciaView (celular)', () => {
       consentimiento: { version: '2026-11', texto: 'Aviso de datos' },
     });
     render(<MiAsistenciaView />);
-    expect(await screen.findByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /^Entrada/ })).toBeEnabled();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText('Aviso de datos')).toBeNull();
   });
@@ -113,26 +117,73 @@ describe('MiAsistenciaView (celular)', () => {
     miHoy.mockResolvedValue({ ...base, turno: null });
     render(<MiAsistenciaView />);
     expect(await screen.findByText('Hoy no tienes turno programado.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Entrada/ })).toBeEnabled();
   });
 
-  it('marcas múltiples: muestra cada marca con lo que se interpretó y la doble marca tachada; un solo botón', async () => {
+  const marca = (id: number, tipo: string | null, hora: string, extra: any = {}) => ({ id, tipo, hora, momento: `2026-11-06T${hora}:00.000Z`, estado: 'VALIDA', ...extra });
+
+  it('marcas del día: línea de tiempo con almuerzo pagado, horas ganadas, marca vieja sin tipo y doble marca tachada', async () => {
     miHoy.mockResolvedValue({
       ...base,
-      marcas: [
-        { id: 1, tipo: 'ENTRADA', momento: '2026-11-06T14:00:00.000Z', estado: 'VALIDA', duplicada: false },
-        { id: 2, tipo: 'ENTRADA', momento: '2026-11-06T14:01:00.000Z', estado: 'VALIDA', duplicada: true },
-        { id: 3, tipo: 'SALIDA_ALMUERZO', momento: '2026-11-06T18:00:00.000Z', estado: 'VALIDA', duplicada: false },
-      ],
-      interpretacion: { estado: 'EN_CURSO', alertas: [] },
+      ahora: '2026-11-06T23:00:00.000Z',
+      marcas: [marca(1, 'ENTRADA', '09:00'), marca(2, 'ENTRADA', '09:01', { duplicada: true }), marca(3, 'ALMUERZO_SALIDA', '13:00'), marca(4, 'ALMUERZO_VUELTA', '13:40'), marca(5, null, '14:00')],
+      almuerzoMin: 40,
     });
     render(<MiAsistenciaView />);
-    expect(await screen.findByText(/09:00 Entrada/)).toBeInTheDocument();
-    expect(screen.getByText(/09:01 Entrada/)).toHaveStyle({ textDecoration: 'line-through' });
+    const dia = await screen.findByTestId('mi-dia');
+    expect(dia).toHaveTextContent('09:00 Entrada');
+    expect(dia).toHaveTextContent('13:00 Salió a almorzar');
+    expect(dia).toHaveTextContent('13:40 Volvió (almuerzo 40 min, pagado)');
+    expect(dia).toHaveTextContent('14:00 Marca');
     expect(screen.getByText(/unida a la anterior/)).toBeInTheDocument();
-    expect(screen.getByTestId('ultima-interpretacion')).toHaveTextContent('Salida a break');
-    expect(screen.getByTestId('estado-hoy')).toHaveTextContent('Llevas 3 marcas hoy');
-    expect(screen.getAllByRole('button', { name: 'Escanear QR' })).toHaveLength(1);
+    expect(screen.getByTestId('horas-hoy')).toHaveTextContent('el almuerzo cuenta');
+  });
+
+  it('sin marcas: estado vacío amistoso y sugiere Entrada destacada', async () => {
+    miHoy.mockResolvedValue(base);
+    render(<MiAsistenciaView />);
+    expect(await screen.findByText(/Todavía no marcas nada hoy/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Entrada/ })).toHaveAttribute('data-sugerido', 'true');
+    expect(screen.queryByTestId('horas-hoy')).toBeNull();
+  });
+
+  describe('sugerencia del siguiente paso', () => {
+    const casos: [string, any[], string | null][] = [
+      ['nada', [], 'Entrada'],
+      ['tras Entrada', ['ENTRADA'], 'Salir a almorzar'],
+      ['tras salir a almorzar', ['ENTRADA', 'ALMUERZO_SALIDA'], 'Volver del almuerzo'],
+      ['tras volver', ['ENTRADA', 'ALMUERZO_SALIDA', 'ALMUERZO_VUELTA'], 'Salida'],
+      ['nombres viejos del servidor', ['ENTRADA', 'SALIDA_ALMUERZO'], 'Volver del almuerzo'],
+      ['solo marca vieja sin tipo', [null], 'Salida'],
+      ['tras Salida', ['ENTRADA', 'SALIDA'], null],
+    ];
+    it.each(casos)('cliente (respaldo) %s', async (_n, tipos, esperado) => {
+      miHoy.mockResolvedValue({ ...base, marcas: tipos.map((t, i) => marca(i + 1, t, `${9 + i}:00`.padStart(5, '0'))) });
+      render(<MiAsistenciaView />);
+      await screen.findByTestId('estado-hoy');
+      const sug = document.querySelector('[data-sugerido="true"]');
+      if (esperado) expect(sug).toHaveTextContent(new RegExp(`^${esperado}`));
+      else { expect(sug).toBeNull(); expect(screen.getByTestId('estado-hoy')).toHaveTextContent('Terminaste tu día'); }
+    });
+
+    it('si el API manda siguienteSugerido, manda sobre el cálculo del cliente', async () => {
+      miHoy.mockResolvedValue({ ...base, marcas: [marca(1, 'ENTRADA', '09:00')], siguienteSugerido: 'SALIDA' });
+      render(<MiAsistenciaView />);
+      await screen.findByTestId('estado-hoy');
+      expect(document.querySelector('[data-sugerido="true"]')).toHaveTextContent(/^Salida/);
+    });
+
+    it('salto de almuerzo: de Entrada se puede elegir Salida directo y viaja como tipo', async () => {
+      (navigator as any).geolocation = { getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12, longitude: -77, accuracy: 5 } }) };
+      miHoy.mockResolvedValue({ ...base, localConUbicacion: true, marcas: [marca(1, 'ENTRADA', '09:00')] });
+      marcarManual.mockResolvedValue({ ok: true, mensaje: 'Listo', marca: { estado: 'A_REVISAR' } });
+      render(<MiAsistenciaView />);
+      expect(await screen.findByRole('button', { name: /^Salida/ })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /^Salir a almorzar/ })).toHaveAttribute('data-sugerido', 'true');
+      // el cambio manual (Salida) llega al servidor: se prueba por el camino manual, que no necesita cámara
+      fireEvent.click(screen.getByRole('button', { name: 'Marcar manualmente (sin QR)' }));
+      await waitFor(() => expect(marcarManual).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'ALMUERZO_SALIDA' })));
+    });
   });
 
   describe('GPS y cámara con fallos', () => {
@@ -163,7 +214,7 @@ describe('MiAsistenciaView (celular)', () => {
       );
       miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Entrada/ }));
       expect(await screen.findByRole('button', { name: 'Tomar selfie' })).toBeInTheDocument();
       expect(lecturas).toEqual([true, false]);
     });
@@ -177,7 +228,7 @@ describe('MiAsistenciaView (celular)', () => {
       );
       miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Entrada/ }));
       expect(await screen.findByTestId('error-ubicacion')).toHaveTextContent(/Activa el GPS/);
       falla = false;
       fireEvent.click(screen.getByRole('button', { name: 'Forzar ubicación aproximada' }));
@@ -190,7 +241,7 @@ describe('MiAsistenciaView (celular)', () => {
       preparar({ getCurrentPosition: (_ok: any, err: any, o: any) => { llamadas.push(o); err({ code: 1 }); } }, camaraOk());
       miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Entrada/ }));
       expect(await screen.findByTestId('error-ubicacion')).toHaveTextContent(/candado/);
       expect(llamadas).toHaveLength(1);
     });
@@ -203,13 +254,14 @@ describe('MiAsistenciaView (celular)', () => {
       miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
       marcarAsistencia.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada', marca: { estado: 'A_REVISAR' } });
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Entrada/ }));
       expect(await screen.findByTestId('error-camara-selfie')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Continuar sin foto' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Confirmar marca' }));
       await waitFor(() => expect(marcarAsistencia).toHaveBeenCalled());
       const enviado = marcarAsistencia.mock.calls[0][0];
       expect(enviado.sinSelfie).toBe(true);
+      expect(enviado.tipo).toBe('ENTRADA');
       expect(enviado.selfie).toBeUndefined();
     });
   });
@@ -218,7 +270,7 @@ describe('MiAsistenciaView (celular)', () => {
     const pista = { stop: vi.fn() };
     const abrir = async () => {
       render(<MiAsistenciaView />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Entrada/ }));
     };
     beforeEach(() => {
       pista.stop.mockReset();
