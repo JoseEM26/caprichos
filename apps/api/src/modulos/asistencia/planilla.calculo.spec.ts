@@ -7,14 +7,15 @@ import {
   DiaPlanilla,
   pagoDia,
   pagoPorDiaPersona,
-  PCT_TARDANZA_DEFECTO,
+  PENALIDAD_TARDANZA_PCT_DEFECTO,
+  penalidadTardanzaDia,
   valorHoraPersona,
 } from './planilla.calculo';
 
 const dia = (over: Partial<DiaPlanilla> = {}): DiaPlanilla => ({
   jornada: '2026-11-02', estado: 'CUMPLIO', programadaMin: 0, trabajadaMin: 0, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 0, ...over,
 });
-const base = { modalidad: 'MENSUAL' as const, pctTardanza: 50, extrasAprobadas: new Set<string>(), consumos: [], descuentos: [], adelantos: [] };
+const base = { modalidad: 'MENSUAL' as const, penalidadTardanzaPct: 0, extrasAprobadas: new Set<string>(), consumos: [], descuentos: [], adelantos: [] };
 
 describe('sueldoEquivalente', () => {
   it('mensual a semanal: ×12/52', () => {
@@ -36,38 +37,39 @@ describe('periodoDe', () => {
   });
 });
 
-describe('calcularDiaPlanilla (turno 13:30-22:30 con break 30 min, tolerancia 5)', () => {
+describe('calcularDiaPlanilla (turno 13:30-22:30 con break 30 min PAGADO, tolerancia 5)', () => {
   const turno = turnoDe(810, 1350, 1050, 1080); // 13:30-22:30, break 17:30-18:00
   const m = (tipo: any, minutos: number) => ({ tipo, minutos, estado: 'VALIDA' as const });
   const completo = (e: number, s: number) => [m('ENTRADA', e), m('SALIDA', s)];
 
-  it('programa 8,5 h netas y paga completo si cumple', () => {
+  it('programa 9 h (el break se paga) y paga completo si cumple', () => {
     const r = calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas: completo(810, 1350) }, 5);
-    expect(r).toMatchObject({ programadaMin: 510, trabajadaMin: 510, tardanzaMin: 0, extraMin: 0 });
+    expect(r).toMatchObject({ programadaMin: 540, trabajadaMin: 540, tardanzaMin: 0, extraMin: 0 });
   });
   it('tardanza dentro de la tolerancia no resta', () => {
     const r = calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas: completo(814, 1350) }, 5);
-    expect(r.trabajadaMin).toBe(510);
+    expect(r.trabajadaMin).toBe(540);
     expect(r.tardanzaMin).toBe(0);
   });
   it('tardanza pasada la tolerancia: minutos de tardanza aparte, no se pagan como trabajados', () => {
     const r = calcularDiaPlanilla({ jornada: 'x', estado: 'TARDANZA', turno, marcas: completo(830, 1350) }, 5);
     expect(r.tardanzaMin).toBe(20);
-    expect(r.trabajadaMin).toBe(490);
+    expect(r.trabajadaMin).toBe(520);
   });
   it('salida anticipada: minutos no trabajados, no se pagan', () => {
     const r = calcularDiaPlanilla({ jornada: 'x', estado: 'SALIO_ANTES', turno, marcas: completo(810, 1290) }, 5);
     expect(r.salidaAnticipadaMin).toBe(60);
-    expect(r.trabajadaMin).toBe(450);
+    expect(r.trabajadaMin).toBe(480);
   });
-  it('el break real se descuenta (más largo = menos pagado)', () => {
+  it('el break se paga aunque sea más largo o no se marque', () => {
     const marcas = [m('ENTRADA', 810), m('SALIDA_ALMUERZO', 1050), m('ENTRADA_ALMUERZO', 1110), m('SALIDA', 1350)];
-    expect(calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas }, 5).trabajadaMin).toBe(480);
+    expect(calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas, breakMin: 60 }, 5).trabajadaMin).toBe(540);
+    expect(calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas: completo(810, 1350) }, 5).trabajadaMin).toBe(540);
   });
   it('lo trabajado fuera del turno es extra y no entra en el pago base', () => {
     const r = calcularDiaPlanilla({ jornada: 'x', estado: 'SALIO_DESPUES', turno, marcas: completo(810, 1410) }, 5);
     expect(r.extraMin).toBe(60);
-    expect(r.trabajadaMin).toBe(510);
+    expect(r.trabajadaMin).toBe(540);
   });
   it('falta, incompleto o por revisar no pagan', () => {
     for (const estado of ['FALTA', 'INCOMPLETO', 'A_REVISAR', 'SIN_EVALUAR'] as const) {
@@ -85,17 +87,6 @@ describe('calcularPlanilla', () => {
     expect(r.valorHora).toBe(20);
     expect(r.ganado).toBe(600);
     expect(r.neto).toBe(600);
-  });
-  it('la tardanza se paga al 50 % (ya es el descuento, no se resta otra vez)', () => {
-    // 50 h programadas, 29 h trabajadas + 1 h de tardanza (valor hora 20): 580 + 10
-    const r = calcularPlanilla({ ...base, sueldoPeriodo: 1000, dias: [dia({ programadaMin: 3000, trabajadaMin: 1740, tardanzaMin: 60 })] });
-    expect(r.pagoTrabajado).toBe(580);
-    expect(r.pagoTardanza).toBe(10);
-    expect(r.ganado).toBe(590);
-  });
-  it('el porcentaje de tardanza es configurable', () => {
-    const r = calcularPlanilla({ ...base, pctTardanza: 100, sueldoPeriodo: 1000, dias: [dia({ programadaMin: 3000, trabajadaMin: 1740, tardanzaMin: 60 })] });
-    expect(r.pagoTardanza).toBe(20);
   });
   it('la hora extra solo suma si el admin la aprobó', () => {
     const dias = [dia({ jornada: '2026-11-02', programadaMin: 3000, trabajadaMin: 3000, extraMin: 60 })];
@@ -118,6 +109,12 @@ describe('calcularPlanilla', () => {
     expect(r.consumosPendientes).toBe(25.5);
     expect(r.neto).toBe(794.75);
   });
+  it('el 50 % de tardanza ya no existe: sin factor no hay pago de tardanza ni campo pagoTardanza', () => {
+    const r = calcularPlanilla({ ...base, sueldoPeriodo: 1000, dias: [dia({ programadaMin: 3000, trabajadaMin: 1740, tardanzaMin: 60 })] });
+    expect(r.pagoTrabajado).toBe(580);
+    expect(r.ganado).toBe(580);
+    expect(r).not.toHaveProperty('pagoTardanza');
+  });
   it('sin horas programadas no hay valor hora ni pago', () => {
     const r = calcularPlanilla({ ...base, sueldoPeriodo: 1000, dias: [] });
     expect(r.ganado).toBe(0);
@@ -136,19 +133,19 @@ describe('feriados (recargo del valor hora)', () => {
     expect(sin.valorHora).toBe(20);
     expect(con.valorHora).toBe(20);
     expect(con.programadaMin).toBe(sin.programadaMin);
-    expect(pagoDia(dias(2)[0], 20, 50, false)).toBe(320);
+    expect(pagoDia(dias(2)[0], 20, false)).toBe(320);
     expect(con.ganado).toBe(sin.ganado + 160);
   });
   it('sin recargo todo queda igual que antes', () => {
     expect(calcularPlanilla({ ...base, sueldoPeriodo: 1600, dias: dias() }).ganado).toBe(1600);
   });
-  it('tardanza en feriado: 50% del valor hora ya recargado', () => {
+  it('penalidad en feriado: sobre el valor hora ya recargado', () => {
     const d = dia({ programadaMin: 480, trabajadaMin: 420, tardanzaMin: 60, recargo: 2 });
-    expect(pagoDia(d, 20, 50, false)).toBe(7 * 40 + 1 * 40 * 0.5);
-    expect(calcularPlanilla({ ...base, sueldoPeriodo: 160, dias: [d] }).pagoTardanza).toBe(20);
+    expect(pagoDia(d, 20, false)).toBe(7 * 40);
+    expect(calcularPlanilla({ ...base, penalidadTardanzaPct: 100, sueldoPeriodo: 160, dias: [d] }).penalidadTardanza).toBe(40);
   });
   it('la hora extra aprobada no lleva recargo', () => {
-    expect(pagoDia(dia({ extraMin: 60, recargo: 2 }), 20, 50, true)).toBe(20);
+    expect(pagoDia(dia({ extraMin: 60, recargo: 2 }), 20, true)).toBe(20);
   });
 });
 
@@ -186,16 +183,8 @@ describe('valor hora por persona (planilla estilo Excel)', () => {
     const d = [dia({ programadaMin: 540, trabajadaMin: 540, extraMin: 60 })];
     const aprobada = calcularPlanilla({ ...base, sueldoPeriodo: 0, dias: d, valorHora: 8, multiplicadorExtra: 1.25, extrasAprobadas: new Set(['2026-11-02']) });
     expect(aprobada.pagoExtra).toBe(10);
-    expect(pagoDia(d[0], 8, 0, true, 1.25)).toBe(82);
+    expect(pagoDia(d[0], 8, true, 1.25)).toBe(82);
     expect(calcularPlanilla({ ...base, sueldoPeriodo: 0, dias: d, valorHora: 8, multiplicadorExtra: 1.25 }).pagoExtra).toBe(0);
-  });
-
-  it('tardanza al 0 %: solo se pagan los minutos trabajados', () => {
-    const d = [dia({ programadaMin: 540, trabajadaMin: 510, tardanzaMin: 30 })];
-    const r = calcularPlanilla({ ...base, pctTardanza: PCT_TARDANZA_DEFECTO, sueldoPeriodo: 0, dias: d, valorHora: 6 });
-    expect(PCT_TARDANZA_DEFECTO).toBe(0);
-    expect(r.pagoTardanza).toBe(0);
-    expect(r.ganado).toBe(51);
   });
 
   it('neto estilo Excel: total + adicional − descuentos por etiqueta; diferencia = neto − adelantos', () => {
@@ -214,5 +203,57 @@ describe('valor hora por persona (planilla estilo Excel)', () => {
     expect(r.descuentosPorCategoria).toEqual({ CONSUMO: 8, NETFLIX: 1.64, MERMA: 15 });
     expect(r.netoAPagar).toBe(85.36); // 90 + 20 − 8 − 16.64
     expect(r.neto).toBe(55.36);
+  });
+});
+
+describe('penalidad por tardanza (valor del tiempo no pagado × factor)', () => {
+  const horaDe = (tardanzaMin: number, vh: number, pct: number, extra: Partial<Parameters<typeof calcularPlanilla>[0]> = {}) =>
+    calcularPlanilla({ ...base, penalidadTardanzaPct: pct, sueldoPeriodo: 0, valorHora: vh, dias: [dia({ programadaMin: 540, trabajadaMin: 540 - tardanzaMin, tardanzaMin })], ...extra });
+
+  it('60 min con S/10/h: no se pagan S/10 y se descuentan S/10 (S/20 menos en total)', () => {
+    const r = horaDe(60, 10, 100);
+    expect(r.pagoTrabajado).toBe(80); // 8 h × 10
+    expect(r.penalidadTardanza).toBe(10);
+    expect(r.neto).toBe(70); // 90 de pleno − 10 no pagados − 10 de penalidad
+  });
+  it('60 min con S/30/h: S/30 + S/30', () => {
+    const r = horaDe(60, 30, 100);
+    expect(r.penalidadTardanza).toBe(30);
+    expect(r.pagoTrabajado).toBe(240);
+    expect(r.neto).toBe(210);
+  });
+  it('proporcional: 10 y 20 min con S/12/h (0,20 por minuto)', () => {
+    expect(horaDe(10, 12, 100).penalidadTardanza).toBe(2);
+    expect(horaDe(20, 12, 100).penalidadTardanza).toBe(4);
+    expect(horaDe(20, 12, 100).penalidadTardanzaDetalle).toEqual([{ fecha: '2026-11-02', minutos: 20, monto: 4 }]);
+  });
+  it('factor 0 = sin penalidad; 200 = el doble; defecto 100', () => {
+    expect(horaDe(60, 10, 0).penalidadTardanza).toBe(0);
+    expect(horaDe(60, 10, 0).penalidadTardanzaDetalle).toEqual([]);
+    expect(horaDe(60, 10, 200).penalidadTardanza).toBe(20);
+    expect(PENALIDAD_TARDANZA_PCT_DEFECTO).toBe(100);
+  });
+  it('dentro de la tolerancia no hay penalidad (lo decide calcularDiaPlanilla)', () => {
+    const turno = turnoDe(810, 1350, 1050, 1080);
+    const d = calcularDiaPlanilla({ jornada: 'x', estado: 'CUMPLIO', turno, marcas: [{ tipo: 'ENTRADA', minutos: 815, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1350, estado: 'VALIDA' }] }, 5);
+    expect(penalidadTardanzaDia(d, 10, 100)).toBe(0);
+    const tarde = calcularDiaPlanilla({ jornada: 'x', estado: 'TARDANZA', turno, marcas: [{ tipo: 'ENTRADA', minutos: 870, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1350, estado: 'VALIDA' }] }, 5);
+    expect(tarde.tardanzaMin).toBe(60);
+    expect(penalidadTardanzaDia(tarde, 10, 100)).toBe(10);
+  });
+  it('mensual (DIAS_HORAS 1500/24/9), por horas (PROGRAMADAS) y tarifa fija usan su valor hora', () => {
+    const vhMensual = valorHoraPersona({ metodo: 'DIAS_HORAS', sueldoMensual: 1500 })!; // 6.9444…
+    expect(horaDe(60, vhMensual, 100).penalidadTardanza).toBe(6.94);
+    expect(horaDe(60, valorHoraPersona({ metodo: 'TARIFA_HORA', sueldoMensual: 0, tarifaHora: 15 })!, 100).penalidadTardanza).toBe(15);
+    // PROGRAMADAS: sueldo 1000 ÷ 50 h = 20/h
+    const r = calcularPlanilla({ ...base, penalidadTardanzaPct: 100, sueldoPeriodo: 1000, dias: [dia({ programadaMin: 3000, trabajadaMin: 1740, tardanzaMin: 60 })] });
+    expect(r.penalidadTardanza).toBe(20);
+  });
+  it('la penalidad va en su propia línea: no se mezcla con adelantos ni consumos', () => {
+    const r = horaDe(60, 10, 100, { adelantos: [5], consumos: [{ id: '1', monto: 3, cobrar: true }] });
+    expect(r.descuentosPorCategoria).toEqual({ CONSUMO: 3, TARDANZA: 10 });
+    expect(r.adelantos).toBe(5);
+    expect(r.descuentos).toBe(0);
+    expect(r.neto).toBe(80 - 3 - 10 - 5);
   });
 });

@@ -1,4 +1,4 @@
-import { PrestamoCalc, cuotaDelPeriodo, montoRecurrenteDelPeriodo, planCuotas, saldoPrestamo } from './prestamos.calculo';
+import { interesDeCuota, interesPrestamo, PrestamoCalc, cuotaDelPeriodo, montoRecurrenteDelPeriodo, planCuotas, saldoPrestamo } from './prestamos.calculo';
 
 const prestamo = (over: Partial<PrestamoCalc> = {}): PrestamoCalc => ({
   id: '1',
@@ -48,5 +48,24 @@ describe('préstamos al personal', () => {
   it('descuento recurrente semanal: ×1 en semana, ×4 en mes', () => {
     expect(montoRecurrenteDelPeriodo(1.64, 'SEMANAL')).toBe(1.64);
     expect(montoRecurrenteDelPeriodo(1.64, 'MENSUAL')).toBe(6.56);
+  });
+});
+
+describe('interés simple mensual de los préstamos', () => {
+  it('0 % = sin interés; mensual: capital × % × n; semanal: n × 12/52 meses', () => {
+    expect(interesPrestamo(100, 0, 4, 'MENSUAL')).toBe(0);
+    expect(interesPrestamo(100, 5, 4, 'MENSUAL')).toBe(20);
+    expect(interesPrestamo(1300, 10, 13, 'SEMANAL')).toBe(390); // 13 semanas = 3 meses
+  });
+  it('parte de interés de una cuota y saldo sobre el total', () => {
+    expect(interesDeCuota(30, 100, 20)).toBe(5);
+    expect(interesDeCuota(25, 100, 0)).toBe(0);
+    expect(saldoPrestamo(120, [{ monto: 30, estado: 'DESCONTADA' }, { monto: 30, estado: 'PENDIENTE' }])).toBe(90);
+  });
+  it('servicio extra mensual: ×1 en planilla mensual, ÷4 en semanal; semanal: ×1 y ×4', () => {
+    expect(montoRecurrenteDelPeriodo(40, 'MENSUAL', 'MENSUAL')).toBe(40);
+    expect(montoRecurrenteDelPeriodo(40, 'SEMANAL', 'MENSUAL')).toBe(10);
+    expect(montoRecurrenteDelPeriodo(2, 'MENSUAL')).toBe(8);
+    expect(montoRecurrenteDelPeriodo(2, 'SEMANAL', 'SEMANAL')).toBe(2);
   });
 });

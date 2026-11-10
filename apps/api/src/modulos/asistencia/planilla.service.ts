@@ -12,6 +12,7 @@ import {
   HORAS_DIA_DEFECTO,
   METODOS_VALOR_HORA,
   MULTIPLICADOR_EXTRA_DEFECTO,
+  PENALIDAD_TARDANZA_PCT_DEFECTO,
   MetodoValorHora,
   Modalidad,
   calcularDiaPlanilla,
@@ -25,7 +26,7 @@ import {
   valorHoraPersona,
 } from './planilla.calculo';
 import { aplicarVacaciones, fechasDelRango } from './vacaciones.calculo';
-import { PrestamoCalc, cuotaDelPeriodo, montoRecurrenteDelPeriodo } from './prestamos.calculo';
+import { PrestamoCalc, cuotaDelPeriodo, interesDeCuota, montoRecurrenteDelPeriodo, saldoPrestamo } from './prestamos.calculo';
 
 export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 /** Lo que se descarta del pago de este período: cuotas de préstamo y descuentos recurrentes (ids) que NO se cobran. */
@@ -267,7 +268,9 @@ export class PlanillaService {
     };
     const vhFijo = valorHoraPersona(parametros);
     const multExtra = sueldo.metodo === 'PROGRAMADAS' ? 1 : cfg.multiplicadorExtra ?? MULTIPLICADOR_EXTRA_DEFECTO;
-    const pctTardanza = cfg.pagoTardanzaPct ?? 0;
+    // Penalidad por tardanza: factor % del valor del tiempo no pagado. Contrato temporal (sin subordinación): sin penalidad
+    // (el tiempo tarde igual no se paga, porque solo se pagan las horas trabajadas).
+    const penalidadTardanzaPct = tercerizado ? 0 : cfg.tardanzaPenalidadPct ?? PENALIDAD_TARDANZA_PCT_DEFECTO;
     // Descuentos automáticos del período: cuota de cada préstamo y recurrentes (Netflix...), con check para omitirlos
     const omitC = new Set(omitir.cuotas ?? []);
     const omitR = new Set(omitir.recurrentes ?? []);
@@ -281,14 +284,26 @@ export class PlanillaService {
       };
       const c = cuotaDelPeriodo(calc, sueldo.modalidad, periodo);
       return c
-        ? [{ id: c.id, prestamoId: c.prestamoId, numero: c.numero, numCuotas: p.cuotas.filter((x: any) => !x.reprogramada_de).length, monto: c.monto, motivo: (p.motivo as string | null) ?? null, cobrar: !omitC.has(c.id) }]
+        ? [{
+            id: c.id,
+            prestamoId: c.prestamoId,
+            numero: c.numero,
+            numCuotas: p.cuotas.filter((x: any) => !x.reprogramada_de).length,
+            monto: c.monto,
+            // Desglose (interés simple mensual opcional): capital = monto − interés; saldo = capital + interés − cuotas ya descontadas
+            interesPctMensual: Number(p.interes_pct_mensual ?? 0),
+            interesCuota: interesDeCuota(c.monto, Number(p.monto), Number(p.interes_monto ?? 0)),
+            capitalCuota: redondear2(c.monto - interesDeCuota(c.monto, Number(p.monto), Number(p.interes_monto ?? 0))),
+            saldo: saldoPrestamo(Number(p.monto) + Number(p.interes_monto ?? 0), calc.cuotas),
+            motivo: (p.motivo as string | null) ?? null, cobrar: !omitC.has(c.id) }]
         : [];
     });
     const recurrentes = recurrentesBd.map((r: any) => ({
       id: r.id.toString(),
       tipo: r.tipo as string,
       nombre: r.nombre as string,
-      monto: montoRecurrenteDelPeriodo(Number(r.monto), sueldo.modalidad),
+      periodicidad: (r.periodicidad ?? 'SEMANAL') as 'SEMANAL' | 'MENSUAL',
+      monto: montoRecurrenteDelPeriodo(Number(r.monto), sueldo.modalidad, r.periodicidad ?? 'SEMANAL'),
       cobrar: !omitR.has(r.id.toString()),
     }));
     const lineasDescuento = [
@@ -304,7 +319,7 @@ export class PlanillaService {
       modalidad: sueldo.modalidad,
       sueldoPeriodo,
       dias: diasCalc,
-      pctTardanza,
+      penalidadTardanzaPct,
       extrasAprobadas: extrasSet,
       consumos,
       descuentos: [],
@@ -318,7 +333,7 @@ export class PlanillaService {
       nombre: persona ? [persona.nombres, persona.apellidos].filter(Boolean).join(' ') : `Persona ${id}`,
       periodo,
       toleranciaMin: cfg.toleranciaMin,
-      pctTardanza,
+      penalidadTardanzaPct,
       resultado,
       tercerizado,
       metodoValorHora: sueldo.metodo,
@@ -333,7 +348,8 @@ export class PlanillaService {
         horasExtra: horas(resultado.extraAprobadaMin),
         total: resultado.ganado,
         adicional: resultado.adicional,
-        descuentos: redondear2(resultado.descuentos + resultado.consumosCobrados),
+        descuentos: redondear2(resultado.descuentos + resultado.consumosCobrados + resultado.penalidadTardanza),
+        penalidadTardanza: resultado.penalidadTardanza,
         descuentosPorCategoria: resultado.descuentosPorCategoria,
         netoAPagar: resultado.netoAPagar,
         adelanto: resultado.adelantos,
@@ -366,7 +382,7 @@ export class PlanillaService {
         programadaH: horas(d.programadaMin),
         trabajadaH: horas(d.trabajadaMin),
         feriado: feriados.get(d.jornada)?.nombre ?? null,
-        ganado: redondear2(pagoDia(d, resultado.valorHoraExacto, pctTardanza, porDia.has(d.jornada), multExtra)),
+        ganado: redondear2(pagoDia(d, resultado.valorHoraExacto, porDia.has(d.jornada), multExtra)),
         extraAprobada: porDia.has(d.jornada),
         extraAprobadaPor: porDia.has(d.jornada) ? Number(porDia.get(d.jornada)!.aprobado_por) : null,
         extraAprobadaEn: porDia.has(d.jornada) ? porDia.get(d.jornada)!.aprobado_en.toISOString() : null,
@@ -636,6 +652,76 @@ export class PlanillaService {
       })),
       acumulado: d.resultado.ganado,
       neto: d.estado === 'PAGADO' ? d.resultado.neto : null,
+    };
+  }
+
+  /**
+   * Mi planilla (el trabajador ve SU pago): mismas cifras que `detalle` (pagado = congeladas), armadas explícitamente
+   * para no filtrar nada ajeno: sin celular/medio de pago, sin totales generales, sin quién aprobó ni notas internas.
+   * `partyId` sale siempre del token. Período futuro = el actual.
+   */
+  async miPlanilla(partyId: bigint, periodoFecha?: string, ahora = new Date()) {
+    const hoy = jornadaDe(ahora).jornada;
+    const ref = periodoFecha ? (fechaValida(periodoFecha) > hoy ? hoy : periodoFecha) : hoy;
+    const s = await this.prisma.sueldoPersonal.findUnique({ where: { party_id: partyId } });
+    if (!s) return { conSueldo: false };
+    const d = await this.detalle(Number(partyId), ref, [], ahora);
+    const r = d.resultado;
+    const tipo = d.sueldo.modalidad as Modalidad;
+    const [prestamos, servicios] = await Promise.all([
+      this.prisma.prestamoPersonal.findMany({ where: { party_id: partyId, estado: { not: 'ANULADO' } }, include: { cuotas: true }, orderBy: { id: 'desc' } }),
+      this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: partyId }, orderBy: { id: 'asc' } }),
+    ]);
+    const ajustes = ((d.ajustes ?? []) as any[]).filter((a) => !a.anulado);
+    const descuentos = [
+      ...((d.consumos ?? []) as any[]).filter((c) => c.cobrar).map((c) => ({ id: `consumo-${c.id}`, fecha: c.fecha as string, etiqueta: 'CONSUMO', concepto: `Consumo ${c.pedido}`, monto: c.monto as number })),
+      ...ajustes
+        .filter((a) => a.tipo === 'DESCUENTO')
+        .map((a) => ({ id: `ajuste-${a.id}`, fecha: a.fecha as string, etiqueta: (CATEGORIAS_DESCUENTO as readonly string[]).includes(a.categoria) ? (a.categoria as string) : 'OTRO', concepto: a.motivo as string, monto: a.monto as number })),
+      ...((d.cuotas ?? []) as any[]).filter((c) => c.cobrar).map((c) => ({ id: `cuota-${c.id}`, fecha: d.periodo.hasta as string, etiqueta: 'PRESTAMO', concepto: `Cuota ${c.numero} de ${c.numCuotas} del préstamo`, monto: c.monto as number })),
+      ...((d.recurrentes ?? []) as any[]).filter((x) => x.cobrar).map((x) => ({ id: `servicio-${x.id}`, fecha: d.periodo.hasta as string, etiqueta: x.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', concepto: x.nombre as string, monto: x.monto as number })),
+    ];
+    const dias = (d.dias ?? []) as any[];
+    return {
+      conSueldo: true,
+      periodo: { desde: d.periodo.desde as string, hasta: d.periodo.hasta as string, tipo },
+      base: {
+        sueldo: tipo === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual,
+        tarifaHora: d.sueldo.metodo === 'TARIFA_HORA' ? d.sueldo.tarifaHora : null,
+        valorHora: r.valorHora,
+      },
+      horas: {
+        trabajadasMin: r.trabajadaMin,
+        extraAprobadaMin: r.extraAprobadaMin,
+        extraPendienteMin: r.extraMin - r.extraAprobadaMin,
+        // ponytail: hoy solo existe «aprobada»; quitar la aprobación deja la extra pendiente. Sin tabla de rechazos → 0.
+        extraRechazadaMin: 0,
+      },
+      ganado: { bruto: r.ganado, extras: r.pagoExtra, bonos: r.adicional },
+      descuentos,
+      adelantos: ajustes.filter((a) => a.tipo === 'ADELANTO').map((a) => ({ id: a.id as number, fecha: a.fecha as string, monto: a.monto as number, motivo: a.motivo as string })),
+      penalidadTardanza: { total: r.penalidadTardanza ?? 0, detalle: (r.penalidadTardanzaDetalle ?? []) as Array<{ fecha: string; minutos: number; monto: number }> },
+      prestamos: prestamos.map((p) => {
+        const capital = Number(p.monto);
+        const interes = Number(p.interes_monto);
+        return {
+          id: Number(p.id),
+          capital,
+          interesPctMensual: Number(p.interes_pct_mensual),
+          interes,
+          cuota: Number(p.monto_cuota),
+          saldo: saldoPrestamo(capital + interes, p.cuotas.map((c) => ({ monto: Number(c.monto), estado: c.estado }))),
+          cuotasPagadas: p.cuotas.filter((c) => c.estado === 'DESCONTADA').length,
+          cuotasTotales: p.num_cuotas,
+          estado: p.estado,
+        };
+      }),
+      serviciosExtra: servicios.map((x) => ({ nombre: x.nombre, monto: Number(x.monto), periodicidad: x.periodicidad, activo: x.activo })),
+      feriadosPagados: dias.filter((x) => x.feriado && x.trabajadaMin > 0).map((x) => ({ fecha: x.jornada as string, nombre: x.feriado as string, recargo: (x.recargo ?? 1) as number, trabajadaH: x.trabajadaH as number, ganado: (x.ganado ?? 0) as number })),
+      vacaciones: d.vacaciones && (d.vacaciones.diasTomados > 0 || d.vacaciones.pagadas.length > 0) ? { diasTomados: d.vacaciones.diasTomados as number, pagadas: d.vacaciones.pagadas.map((v: any) => ({ fecha: v.fecha, dias: v.dias, monto: v.monto })) } : null,
+      neto: r.neto,
+      estadoPago: d.estado === 'PAGADO' ? 'PAGADO' : 'PENDIENTE',
+      pagadoEn: d.estado === 'PAGADO' ? (d.pagadoEn as string) : null,
     };
   }
 

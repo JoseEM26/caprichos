@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SueldoDto } from './dto/planilla.dto';
+import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, MiPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SueldoDto } from './dto/planilla.dto';
 import { jornadaDe } from './asistencia.calculo';
 import { PlanillaService } from './planilla.service';
 import { PrestamosService } from './prestamos.service';
@@ -128,5 +128,18 @@ export class PlanillaController {
   @Permiso('planilla', 'administrar')
   editarRecurrente(@Param('id') id: string, @Body() dto: RecurrenteEditarDto, @Req() req: any) {
     return this.prestamos.editarRecurrente(Number(id), dto, req.usuario, ipDe(req));
+  }
+}
+
+/** Mi información de pago: cualquier persona autenticada con asistencia, SIEMPRE sobre su propia cuenta (nunca recibe partyId). */
+@Controller('admin/mi-planilla')
+@UseGuards(AccesoGuard)
+export class MiPlanillaController {
+  constructor(private readonly planilla: PlanillaService) {}
+
+  @Get()
+  @Permiso('asistencia', 'marcar')
+  mia(@Req() req: any, @Query() q: MiPlanillaDto) {
+    return this.planilla.miPlanilla(req.usuario.partyId, q.periodo);
   }
 }
