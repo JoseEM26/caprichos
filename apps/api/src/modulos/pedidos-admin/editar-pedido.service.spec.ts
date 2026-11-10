@@ -11,8 +11,6 @@ import { ConflictException } from '@nestjs/common';
 import { ajustarVentaProductos } from '../stock/producto-controlado';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
 import { ajustarPlanAlTotal, EditarPedidoService } from './editar-pedido.service';
-// El índice del módulo ruc arrastra controladores con @nestjs/jwt (ESM, no parsea en jest): se simula con la función real de validación.
-jest.mock('../ruc', () => ({ RucModule: class {}, RucService: class {}, rucValido: jest.requireActual('../ruc/ruc.util').rucValido }));
 
 const usuario: any = { partyId: BigInt(9), rol: 'CAJERO' };
 

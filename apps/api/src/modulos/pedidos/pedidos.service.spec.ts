@@ -23,8 +23,6 @@ import { PagoPlanService } from './pago-plan.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
-// El índice del módulo ruc arrastra controladores con @nestjs/jwt (ESM, no parsea en jest): se simula con la función real de validación.
-jest.mock('../ruc', () => ({ RucModule: class {}, RucService: class {}, rucValido: jest.requireActual('../ruc/ruc.util').rucValido }));
 
 describe('PedidosService', () => {
   let service: PedidosService;

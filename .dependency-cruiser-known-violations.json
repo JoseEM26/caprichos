@@ -3116,6 +3116,15 @@
   {
     "type": "dependency",
     "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/ruc/ruc.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
     "to": "apps/api/src/modulos/stock/stock.module.ts",
     "rule": {
       "severity": "error",
