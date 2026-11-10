@@ -75,6 +75,8 @@ export interface TarjetaPedidoCajaProps {
   /** Botón grande del pie (confirmar pago, preparar, listo…); null en los cerrados */
   accion?: AccionCaja | null;
   alAccion?: (pedido: Pedido, accion: AccionCaja) => void;
+  /** Abre el detalle de la venta (modal de cuadre). */
+  alVerDetalle?: (pedido: Pedido) => void;
   /** Refresca la lista tras asignar mesa o mandar a la lista de espera (pedidos «Comer en el local»). */
   alComerLocal?: () => void;
   /** Para pruebas: instante actual en ms. */
@@ -86,7 +88,7 @@ export interface TarjetaPedidoCajaProps {
  * y un botón grande con la acción siguiente. El botón de abrir el detalle y el de acción son hermanos (no se anidan).
  */
 export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
-  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, puedeCambiarPago, alSeleccionar, accion, alAccion, alComerLocal, ahora,
+  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, puedeCambiarPago, alSeleccionar, accion, alAccion, alVerDetalle, alComerLocal, ahora,
 }: TarjetaPedidoCajaProps) {
   const visual = estadoVisual(o);
   const pago = chipPago(o);
@@ -171,6 +173,11 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
         </span>
       </button>
       <ReimprimirPedido pedido={o} variante="tarjeta" />
+      {alVerDetalle && (
+        <div className="cj2-ver-detalle">
+          <button type="button" aria-label={`Ver detalle de la venta (${o.codigo})`} onClick={() => alVerDetalle(o)}>Ver detalle</button>
+        </div>
+      )}
       {puedeCambiarPago && (
         <div style={{ padding: '0 10px 6px' }}>
           <BotonCambiarPago permitido pedido={o} variante="tarjeta" />

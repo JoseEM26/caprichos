@@ -1,4 +1,11 @@
 import { useCuadricula } from './paginacionCaja';
+import { PaginadorCaja, TOPE_TODAS, normalizarFilas, tamanoPagina, type FilasPorPagina } from './PaginadorCaja';
+import { TablaCaja } from './TablaCaja';
+import { ConmutadorVista, FiltroMedios, SelectorColumnas, normalizarVista, type VistaCaja } from './ControlesTabla';
+import { COLUMNAS_POR_DEFECTO, normalizarColumnas } from './columnasCaja';
+import { MEDIOS_FILTRO, enMedios } from './mediosFila';
+import { CLAVE_COLUMNAS, CLAVE_FILAS, CLAVE_VISTA, usePreferenciaCaja } from './preferenciasCaja';
+import { DetalleVentaModal } from './DetalleVentaModal';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
@@ -23,6 +30,14 @@ import './pedidos.css';
 import './caja-lista.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
+
+/** ¿El pedido nuevo cae dentro del día o rango que se ve? (los de «pendientes» son de días anteriores: uno recién creado no entra) */
+export function enRangoVisible(creadoEn: string, r: RangoPedidos): boolean {
+  if (r.modo === 'pendientes') return false;
+  const dia = hoyLima(new Date(creadoEn));
+  const rr = r.modo === 'hoy' ? rangoHoy() : r;
+  return dia >= rr.desde && dia <= rr.hasta;
+}
 import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { ContadorDia, enContador, filasDePedidos, resumirDia } from './resumenDia';
@@ -194,12 +209,6 @@ function unirSinRepetir(actuales: Pedido[], nuevos: Pedido[]): Pedido[] {
   return [...actuales, ...extra];
 }
 
-const Flecha = ({ der }: { der?: boolean }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d={der ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
-  </svg>
-);
-
 export function PedidosAdminView() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorCarga, setErrorCarga] = useState<string>('');
@@ -271,6 +280,14 @@ export function PedidosAdminView() {
   const [canalFiltro, setCanalFiltro] = useState<string>('all');
   const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
   const [cobroFiltro, setCobroFiltro] = useState<string>('all');
+  const [mediosFiltro, setMediosFiltro] = useState<string[]>([]);
+  // Vista (tarjetas o tabla), columnas de la tabla y filas por página: se guardan por usuario
+  const [vista, setVista] = usePreferenciaCaja<VistaCaja>(CLAVE_VISTA, 'tarjetas', normalizarVista);
+  const [columnasTabla, setColumnasTabla] = usePreferenciaCaja<string[]>(CLAVE_COLUMNAS, COLUMNAS_POR_DEFECTO, normalizarColumnas);
+  const [filas, setFilas] = usePreferenciaCaja<FilasPorPagina>(CLAVE_FILAS, null, normalizarFilas);
+  const [detalleVentaId, setDetalleVentaId] = useState<string | null>(null);
+  // Cada carga lleva su número: una respuesta tardía de un día o filtro anterior se descarta
+  const generacion = useRef(0);
   // Sentido por tiempo: «Limpiar filtros» no lo borra (es preferencia de vista; se quita con su propio chip)
   const [orden, setOrdenState] = useState<OrdenTiempo>(() => ordenInicial());
   const cambiarOrden = (o: OrdenTiempo) => {
@@ -312,27 +329,31 @@ export function PedidosAdminView() {
   // Carga inicial y refresco (se vuelve a cargar al cambiar el día o rango)
   const cargarDatos = useCallback(async () => {
     setErrorCarga('');
+    const g = ++generacion.current;
+    // «Hoy» se recalcula en cada carga: con la pantalla abierta pasada la medianoche (Lima) no se queda en el día anterior
+    const rangoActual = rango.modo === 'hoy' ? rangoHoy() : rango;
     try {
       // Se vuelven a leer todas las páginas ya cargadas, para que un refresco no recorte lo que ya se ve
       const [paginas, pendientes] = await Promise.all([
         Promise.all(
           Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
-            pedidosApi.listar({ ...parametrosDeRango(rango), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
+            pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
           ),
         ),
         contarPendientesAnteriores(),
       ]);
+      if (g !== generacion.current) return;
       setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || [])));
       setRelacionados(unirSinRepetir([], paginas.flatMap((r) => r.relacionados || [])));
       setTotalDia(paginas[0].total ?? 0);
       setResumenApi(paginas[0].resumen ?? null);
       if (pendientes !== null) setPendientesAnteriores(pendientes);
     } catch (err: any) {
-      setErrorCarga(err?.message || 'Error al cargar los pedidos');
+      if (g === generacion.current) setErrorCarga(err?.message || 'Error al cargar los pedidos');
     } finally {
-      setCargando(false);
+      if (g === generacion.current) setCargando(false);
     }
-  }, [rango]);
+  }, [rango, mediosFiltro]);
 
   useEffect(() => {
     cargarDatos();
@@ -345,16 +366,19 @@ export function PedidosAdminView() {
   // «Cargar más»: pide la página siguiente y la une a la lista sin repetir los que ya llegaron (por socket o por un corrimiento)
   const cargarMas = async () => {
     const siguiente = paginasRef.current + 1;
+    const g = generacion.current;
     setCargandoMas(true);
     setErrorMas('');
     try {
-      const r = await pedidosApi.listar({ ...parametrosDeRango(rango), limite: LIMITE_PAGINA, pagina: siguiente });
+      const r = await pedidosApi.listar({ ...parametrosDeRango(rango.modo === 'hoy' ? rangoHoy() : rango), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, pagina: siguiente });
+      // Cambió el día o un filtro de servidor mientras llegaba: esta página ya no sirve
+      if (g !== generacion.current) return;
       paginasRef.current = siguiente;
       setTotalDia(r.total ?? 0);
       setPedidos((prev) => unirSinRepetir(prev, r.items || []));
       setRelacionados((prev) => unirSinRepetir(prev, r.relacionados || []));
     } catch (err: any) {
-      setErrorMas(err?.message || 'No se pudieron cargar más pedidos');
+      if (g === generacion.current) setErrorMas(err?.message || 'No se pudieron cargar más pedidos');
     } finally {
       setCargandoMas(false);
     }
@@ -364,22 +388,35 @@ export function PedidosAdminView() {
   // Se piden las páginas que faltan una tras otra; hay tope por seguridad y, si no se puede completar, se avisa.
   const filtrando =
     busqueda.trim() !== '' || contador !== null || etapa !== 'all' || canalFiltro !== 'all' ||
-    modalidadFiltro !== 'all' || cobroFiltro !== 'all' || filtro !== 'todo' || grupoEstado !== estadoPorDefectoDeRango(rango);
+    modalidadFiltro !== 'all' || cobroFiltro !== 'all' || mediosFiltro.length > 0 || filtro !== 'todo' || grupoEstado !== estadoPorDefectoDeRango(rango);
+  // La tabla y «Todas» necesitan toda la lista del filtro (para cuadrar), no solo la primera página
+  const necesitaTodo = filtrando || vista === 'tabla' || filas === 'todas';
   const faltanPorCargar = pedidos.length < totalDia;
   useEffect(() => {
-    if (!filtrando || !faltanPorCargar || cargando || cargandoMas || errorMas) return;
+    if (!necesitaTodo || !faltanPorCargar || cargando || cargandoMas || errorMas) return;
     if (paginasRef.current >= MAX_PAGINAS_AUTOMATICAS) return;
     void cargarMas();
     // cargarMas solo usa refs y setters estables y el rango, que ya dispara la recarga
      
-  }, [filtrando, faltanPorCargar, cargando, cargandoMas, errorMas, pedidos.length]);
+  }, [necesitaTodo, faltanPorCargar, cargando, cargandoMas, errorMas, pedidos.length]);
 
   const cambiarRango = (nuevo: RangoPedidos) => {
     paginasRef.current = 1;
+    generacion.current++;
+    setErrorMas('');
     setRango(nuevo);
     setPaginaActual(1);
     // Ayer o un rango anterior: casi todo está entregado, así que se ve TODO (activos y cerrados); hoy y «pendientes» siguen con activos
     setGrupoEstado(estadoPorDefectoDeRango(nuevo));
+  };
+
+  // El medio de pago también se pide al servidor: se vuelve a cargar desde la primera página
+  const cambiarMedios = (m: string[]) => {
+    paginasRef.current = 1;
+    generacion.current++;
+    setErrorMas('');
+    setMediosFiltro(m);
+    setPaginaActual(1);
   };
 
   const cambiarGrupoEstado = (g: GrupoEstadoCaja) => {
@@ -428,6 +465,8 @@ export function PedidosAdminView() {
         if (prev.some((p) => String(p.id) === idStr)) {
           return prev.map((p) => (String(p.id) === idStr ? nuevoPedido : p));
         }
+        // Viendo ayer o un rango pasado, un pedido de hoy no pertenece a la lista
+        if (!enRangoVisible(nuevoPedido.creado_en, rango)) return prev;
         return [nuevoPedido, ...prev];
       });
     }).catch(() => {
@@ -535,6 +574,7 @@ export function PedidosAdminView() {
           return false;
         }
       }
+      if (!enMedios(p, mediosFiltro)) return false;
       if (cobroFiltro !== 'all') {
         const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
         if (cobroFiltro === 'paid' && !pag) return false;
@@ -547,12 +587,12 @@ export function PedidosAdminView() {
         const qDig = q.replace(/\D/g, '');
         const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
         const porCelular = qDig.length >= 3 && tel.includes(qDig.replace(/^51(?=9\d{8}$)/, ''));
-        if (!coincideTexto(q, p.codigo, p.cliente_nombre) && !porCelular) return false;
+        if (!coincideTexto(q, p.codigo, p.cliente_nombre, p.mesa_nombre) && !porCelular) return false;
       }
 
       return true;
     });
-  }, [pedidos, grupoEstado, contador, etapa, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
+  }, [pedidos, grupoEstado, contador, etapa, canalFiltro, modalidadFiltro, cobroFiltro, mediosFiltro, busqueda]);
 
   const conteos = useMemo(() => {
     const r = {} as Record<FiltroCaja, number>;
@@ -588,10 +628,11 @@ export function PedidosAdminView() {
     if (canalFiltro !== 'all') lista.push({ id: 'canal', texto: `Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`, quitar: () => { setCanalFiltro('all'); setPaginaActual(1); } });
     if (modalidadFiltro !== 'all') lista.push({ id: 'mod', texto: `Modalidad: ${MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}`, quitar: () => { setModalidadFiltro('all'); setPaginaActual(1); } });
     if (cobroFiltro !== 'all') lista.push({ id: 'cobro', texto: `Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`, quitar: () => { setCobroFiltro('all'); setPaginaActual(1); } });
+    if (mediosFiltro.length > 0) lista.push({ id: 'medios', texto: `Medio: ${MEDIOS_FILTRO.filter((m) => mediosFiltro.includes(m.id)).map((m) => m.n).join(', ')}`, quitar: () => { cambiarMedios([]); setPaginaActual(1); } });
     return lista;
     // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
      
-  }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
+  }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, mediosFiltro, hoy]);
 
   const limpiarFiltros = () => {
     setGrupoEstado('act');
@@ -600,6 +641,7 @@ export function PedidosAdminView() {
     setCanalFiltro('all');
     setModalidadFiltro('all');
     setCobroFiltro('all');
+    cambiarMedios([]);
     setBusqueda('');
     setFiltro('todo');
     setPaginaActual(1);
@@ -616,6 +658,7 @@ export function PedidosAdminView() {
     setCanalFiltro('all');
     setModalidadFiltro('all');
     setCobroFiltro('all');
+    cambiarMedios([]);
     setBusqueda('');
     setFiltro('todo');
     setPaginaActual(1);
@@ -623,7 +666,7 @@ export function PedidosAdminView() {
   };
   const vistaTodo =
     grupoEstado === 'todos' && !contador && etapa === 'all' && canalFiltro === 'all' && modalidadFiltro === 'all' &&
-    cobroFiltro === 'all' && filtro === 'todo' && !busqueda.trim() && rango.modo !== 'pendientes';
+    cobroFiltro === 'all' && mediosFiltro.length === 0 && filtro === 'todo' && !busqueda.trim() && rango.modo !== 'pendientes';
 
   // El chip aparece en hoy; en ayer o un rango «todo» ya es lo normal y lo dice el chip del rango
   const chipTodo = vistaTodo && rango.modo === 'hoy';
@@ -680,8 +723,11 @@ export function PedidosAdminView() {
     }
   }, [fcOpen]);
 
-  // Paginación fina: «1–12 de 18» con flechas
-  const totalPaginas = Math.max(1, Math.ceil(cuentas.length / pedidosPorPagina));
+  // Paginación: en tarjetas cuenta tarjetas (cuentas); en tabla, pedidos. Tamaño: lo elegido o el automático (50 en tabla)
+  const enTabla = vista === 'tabla';
+  const unidades: Array<(typeof cuentas)[number] | Pedido> = enTabla ? pedidosFiltrados : cuentas;
+  const porPagina = tamanoPagina(filas, unidades.length, enTabla ? 50 : pedidosPorPagina);
+  const totalPaginas = Math.max(1, Math.ceil(unidades.length / porPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
   // Al cambiar de página se vuelve al inicio de la lista (si no, en celular queda a media pantalla)
   const listaRef = useRef<HTMLDivElement>(null);
@@ -693,16 +739,24 @@ export function PedidosAdminView() {
     }
     listaRef.current?.scrollIntoView?.({ block: 'start' });
   }, [paginaValida]);
-  const pedidosPaginados = useMemo(() => {
-    const inicio = (paginaValida - 1) * pedidosPorPagina;
-    return cuentas.slice(inicio, inicio + pedidosPorPagina);
-  }, [cuentas, paginaValida, pedidosPorPagina]);
+  const pagina = useMemo(() => {
+    const inicio = (paginaValida - 1) * porPagina;
+    return unidades.slice(inicio, inicio + porPagina);
+    // unidades cambia con cuentas/pedidosFiltrados/vista
+     
+  }, [cuentas, pedidosFiltrados, enTabla, paginaValida, porPagina]);
+  const pedidosPaginados = pagina as typeof cuentas;
+  const filasTabla = pagina as Pedido[];
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
   useEffect(() => {
     setPaginaActual((p) => (p > totalPaginas ? totalPaginas : p));
   }, [totalPaginas]);
-  const desde = cuentas.length === 0 ? 0 : (paginaValida - 1) * pedidosPorPagina + 1;
-  const hasta = Math.min(paginaValida * pedidosPorPagina, cuentas.length);
+  const desde = unidades.length === 0 ? 0 : (paginaValida - 1) * porPagina + 1;
+  const hasta = Math.min(paginaValida * porPagina, unidades.length);
+  // «Todas» no pasa del tope de carga: si el filtro tiene más, se avisa
+  const avisoTope = filas === 'todas' && totalDia > pedidos.length && paginasRef.current >= MAX_PAGINAS_AUTOMATICAS
+    ? `Solo se muestran ${pedidos.length} de ${totalDia} (tope ${TOPE_TODAS}): acota el filtro para ver el resto`
+    : null;
 
   const pedidoSeleccionado = useMemo(() => {
     return pedidos.find((p) => String(p.id) === pedidoSeleccionadoId) || (pedidoExterno && String(pedidoExterno.id) === pedidoSeleccionadoId ? pedidoExterno : null);
@@ -951,6 +1005,7 @@ export function PedidosAdminView() {
                     setPaginaActual(1);
                   }}
                 />
+                <FiltroMedios medios={mediosFiltro} alCambiar={cambiarMedios} />
                 <FiltroCombo
                   etiqueta="Cobro"
                   valor={cobroFiltro}
@@ -1058,9 +1113,15 @@ export function PedidosAdminView() {
           </span>
         </section>
 
-        {/* TARJETAS */}
+        {/* Vista y columnas */}
+        <div className="cj2-vistabar">
+          <ConmutadorVista vista={vista} alCambiar={(v) => { setVista(v); setPaginaActual(1); }} />
+          {enTabla && <SelectorColumnas columnas={columnasTabla} alCambiar={setColumnasTabla} />}
+        </div>
+
+        {/* TARJETAS / TABLA */}
         <div className="cj2-lista" ref={listaRef}>
-          {pedidosPaginados.length === 0 ? (
+          {unidades.length === 0 ? (
             <div className="cj2-vacio">
               {pedidos.length > 0 ? (
                 <>
@@ -1076,6 +1137,14 @@ export function PedidosAdminView() {
               )}
             </div>
           ) : (
+            enTabla ? (
+              <TablaCaja
+                filas={filasTabla}
+                todas={pedidosFiltrados}
+                columnas={columnasTabla}
+                alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
+              />
+            ) : (
             <div className="cj2-cuadricula" data-columnas={columnas} style={{ ['--cj2-cols' as string]: columnas }}>
               {pedidosPaginados.map((cuenta) => {
                 if (cuenta.miembros.length > 1) {
@@ -1107,11 +1176,13 @@ export function PedidosAdminView() {
                     alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
                     accion={accionDe(o)}
                     alAccion={ejecutarAccion}
+                    alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
                     alComerLocal={() => void cargarDatos()}
                   />
                 );
               })}
             </div>
+            )
           )}
         </div>
 
@@ -1132,61 +1203,19 @@ export function PedidosAdminView() {
           </div>
         )}
 
-        {/* PAGINACIÓN FINA */}
-        <div className="cj2-pag">
-          <span className="cj2-pag-rango" data-testid="rango-pagina">
-            {cuentas.length === 0 ? '0 pedidos' : `${desde}–${hasta} de ${cuentas.length}`}
-          </span>
-          <div className="cj2-pag-flechas">
-            {totalPaginas >= 5 && (
-              <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Primera página" disabled={paginaValida <= 1} onClick={() => setPaginaActual(1)}>
-                Primera
-              </button>
-            )}
-            <button
-              type="button"
-              className="cj2-btn cj2-btn--ico"
-              aria-label="Página anterior"
-              disabled={paginaValida <= 1}
-              onClick={() => setPaginaActual((p) => Math.max(1, Math.min(p, totalPaginas) - 1))}
-            >
-              <Flecha />
-              <span className="cj2-pag-txt">Anterior</span>
-            </button>
-            {totalPaginas >= 5 ? (
-              <label className="cj2-pag-ir">
-                <select
-                  className="cj2-pag-select"
-                  aria-label="Ir a la página"
-                  value={paginaValida}
-                  onChange={(e) => setPaginaActual(Number(e.target.value))}
-                >
-                  {Array.from({ length: totalPaginas }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1}</option>
-                  ))}
-                </select>
-                <span>/ {totalPaginas}</span>
-              </label>
-            ) : (
-              <span className="cj2-pag-n">Página {paginaValida} de {totalPaginas}</span>
-            )}
-            <button
-              type="button"
-              className="cj2-btn cj2-btn--ico"
-              aria-label="Página siguiente"
-              disabled={paginaValida >= totalPaginas}
-              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, Math.min(p, totalPaginas) + 1))}
-            >
-              <span className="cj2-pag-txt">Siguiente</span>
-              <Flecha der />
-            </button>
-            {totalPaginas >= 5 && (
-              <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Última página" disabled={paginaValida >= totalPaginas} onClick={() => setPaginaActual(totalPaginas)}>
-                Última
-              </button>
-            )}
-          </div>
-        </div>
+        {/* PAGINADOR: al final de la lista, pequeño y sin posición fija */}
+        <PaginadorCaja
+          total={unidades.length}
+          desde={desde}
+          hasta={hasta}
+          pagina={paginaValida}
+          totalPaginas={totalPaginas}
+          alIr={setPaginaActual}
+          filas={enTabla && filas === null ? 50 : filas}
+          alCambiarFilas={(f) => { setFilas(f); setPaginaActual(1); }}
+          conAuto={!enTabla}
+          avisoTope={avisoTope}
+        />
       </>
     )}
 
@@ -1218,6 +1247,8 @@ export function PedidosAdminView() {
         </div>
       </VentanaDetalle>
     )}
+
+    {detalleVentaId && <DetalleVentaModal pedidoId={detalleVentaId} alCerrar={() => setDetalleVentaId(null)} />}
 
     {dialogosAcciones}
 

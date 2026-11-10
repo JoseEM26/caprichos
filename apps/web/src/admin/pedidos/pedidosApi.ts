@@ -234,6 +234,16 @@ export interface Pedido {
     nombre: string;
     precio: number | string;
   } | null;
+  /** Medios con los que se pagó (EFECTIVO, YAPE...); lo trae el servidor de Caja si ya lo soporta. */
+  mediosPago?: string[];
+  /** Quién atendió el pedido (mozo o cajero) y cuándo (ISO). Opcionales: según versión del servidor. */
+  atendio?: string | null;
+  atendido_en?: string | null;
+  /** Quién cobró y cuándo (ISO). */
+  cobro_por?: string | null;
+  cobrado_en?: string | null;
+  /** Minutos desde que se creó hasta que se cerró; null si sigue abierto. */
+  tiempo_total_min?: number | null;
 }
 
 export interface FiltrosListarPedidos {
@@ -249,6 +259,8 @@ export interface FiltrosListarPedidos {
   pendientes?: boolean;
   /** Pide también el conteo agrupado por estado y cobro de todo el filtro */
   resumen?: boolean;
+  /** Medios de pago (EFECTIVO, YAPE...); el servidor deja los pedidos pagados con alguno de ellos */
+  medios?: string[];
 }
 
 /** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
@@ -431,6 +443,7 @@ export const pedidosApi = {
     if (filtros.hasta) params.append('hasta', filtros.hasta);
     if (filtros.pendientes) params.append('pendientes', '1');
     if (filtros.resumen) params.append('resumen', '1');
+    if (filtros.medios?.length) params.append('medios', filtros.medios.join(','));
 
     const query = params.toString();
     const ruta = query ? `/admin/pedidos?${query}` : '/admin/pedidos';
