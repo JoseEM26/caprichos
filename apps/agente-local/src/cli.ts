@@ -7,7 +7,10 @@ import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
 import { candidatasDeLinux, candidatasDeWindows, idGuardado } from './candidatas';
 import type { CandidataLocal } from './candidatas';
-import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque, ejecutablePropio } from './autoarranque';
+import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque, ejecutablePropio, mismaRuta, rutaRegistrada } from './autoarranque';
+import type { OpcionesAutoarranque } from './autoarranque';
+import { formatearEstado, reunirEstado } from './estadoPrograma';
+import type { DepsEstado } from './estadoPrograma';
 import {
   dirDatos, describirEstado, detenerEnMarcha, guardarEstado, pidEnMarcha, relanzarOculto,
   rutaMarcaInicio, soltarBloqueo, tomarBloqueo, vigilarParada,
@@ -17,7 +20,7 @@ import { ImpresoraUsb } from './impresora/impresoraUsb';
 import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impresoraRed';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
-import { comandoDiagnostico, comandoEstado, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
+import { comandoDiagnostico, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
 import type { DepsComandos } from './comandos';
 import { AgenteLocalServicio, leerInfoEquipo } from './agente/bucle';
 import type { EquipoLocal } from './agente/bucle';
@@ -458,9 +461,9 @@ export async function ejecutarAsistente(
         logger(`✖ No se imprimió la prueba: ${err.message}`);
       }
     }
-    if (process.platform === 'win32' && !(await autoarranqueActivo())) {
+    if (process.platform === 'win32' && !cfg.autoinicioDesactivado && !(await autoarranqueActivo())) {
       const r = await activarAutoarranque();
-      logger(r.ok ? `✔ ${r.mensaje} (Para quitarlo: programa autoarranque desactivar)` : `AVISO: ${r.mensaje}`);
+      logger(r.ok ? `✔ ${r.mensaje} (Para quitarlo: autoinicio desactivar)` : `AVISO: ${r.mensaje}`);
     }
     for (const d of [etiquetera, ticketera]) {
       if (d && d.startsWith('/') && detectadas.find((x) => x.destino === d && !x.puedeEscribir)) {
@@ -478,14 +481,82 @@ export async function ejecutarAsistente(
 
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Instala el inicio automático UNA vez (idempotente); si luego se quita con --quitar-inicio, no se vuelve a poner solo. */
-export async function asegurarInicio(log: (m: string) => void = console.log, dir = dirDatos()): Promise<void> {
-  if (fs.existsSync(rutaMarcaInicio(dir)) || !ejecutablePropio()) return;
-  const r = (await autoarranqueActivo()) ? { ok: true, mensaje: '' } : await activarAutoarranque();
-  if (!r.ok) return log(`AVISO: ${r.mensaje} (puedes intentarlo con --instalar-inicio)`);
+/** Recuerda en config.json si el usuario quitó el inicio automático a propósito. */
+export function fijarAutoinicioDesactivado(desactivado: boolean, ruta = rutaArchivoConfiguracion()): void {
+  const nuevo = { ...leerArchivoConfiguracion(ruta), autoinicioDesactivado: desactivado || undefined };
+  fs.mkdirSync(path.dirname(ruta), { recursive: true });
+  fs.writeFileSync(ruta, JSON.stringify(nuevo, null, 2), { mode: 0o600 });
+}
+
+/**
+ * «Iniciar con Windows»: se registra solo (idempotente), se corrige si el .exe cambió de ruta, y no se vuelve a poner si el
+ * usuario lo desactivó (config.autoinicioDesactivado; también cuenta la marca antigua `inicio-configurado` sin registro).
+ */
+export async function asegurarInicio(
+  log: (m: string) => void = console.log,
+  dir = dirDatos(),
+  o: OpcionesAutoarranque & { rutaConfig?: string } = {},
+): Promise<void> {
+  const exe = o.ejecutable ?? ejecutablePropio();
+  if (!exe) return;
+  if (leerArchivoConfiguracion(o.rutaConfig).autoinicioDesactivado) return;
+  const registrada = await rutaRegistrada(o);
+  const plataforma = o.plataforma ?? process.platform;
+  if (registrada && mismaRuta(registrada, exe, plataforma)) return;
+  if (!registrada && fs.existsSync(rutaMarcaInicio(dir))) return fijarAutoinicioDesactivado(true, o.rutaConfig); // instalaciones viejas que lo quitaron
+  const r = await activarAutoarranque({ ...o, ejecutable: exe });
+  if (!r.ok) return log(`AVISO: ${r.mensaje} (puedes intentarlo con: autoinicio activar)`);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString());
-  if (r.mensaje) log(`✔ ${r.mensaje}`);
+  log(registrada ? '✔ Inicio con Windows actualizado a la ubicación actual del programa.' : `✔ ${r.mensaje} (Para quitarlo: autoinicio desactivar)`);
+}
+
+/** `autoinicio activar|desactivar` (y --instalar-inicio / --quitar-inicio). Devuelve el código de salida. */
+export async function comandoAutoinicio(accion: string | undefined, log: (m: string) => void = console.log, dir = dirDatos(), o: OpcionesAutoarranque & { rutaConfig?: string } = {}): Promise<number> {
+  if (accion !== 'activar' && accion !== 'desactivar') {
+    log(`Iniciar con Windows: ${(await autoarranqueActivo(o)) ? 'ACTIVADO' : 'desactivado'}. Usa "autoinicio activar" o "autoinicio desactivar".`);
+    return 0;
+  }
+  if (accion === 'desactivar') {
+    const r = await desactivarAutoarranque(o);
+    if (r.ok) fijarAutoinicioDesactivado(true, o.rutaConfig);
+    log(r.mensaje);
+    return r.ok ? 0 : 1;
+  }
+  const r = await activarAutoarranque(o);
+  if (r.ok) {
+    fijarAutoinicioDesactivado(false, o.rutaConfig);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString());
+  }
+  log(r.mensaje);
+  return r.ok ? 0 : 1;
+}
+
+/** `estado` / `diagnostico`: informe con ✔/✘; salida 0 si todo bien, 1 si algo falla. `--json` sin secretos. */
+export async function comandoEstadoPrograma(json: boolean, log: (m: string) => void = console.log, deps?: DepsEstado): Promise<number> {
+  const ruta = rutaArchivoConfiguracion();
+  const d: DepsEstado = deps ?? {
+    archivo: leerArchivoConfiguracion(ruta),
+    dir: dirDatos(),
+    ejecutable: ejecutablePropio(),
+    listar: listarCandidatasLocales,
+    verificarRed: async (destino) => {
+      const e = await new ImpresoraRed(destino).verificarEstado();
+      return { ok: e.estado !== 'desconectada', detalle: e.detalle };
+    },
+    consultarVersion: async (apiUrl) => {
+      const res = await fetch(`${apiUrl.replace(/\/+$/, '')}/api/agente-impresion/version`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return ((await res.json()) as any)?.publicada?.version ?? undefined;
+    },
+  };
+  const e = await reunirEstado(d);
+  if (json) log(JSON.stringify(e, null, 2));
+  else {
+    formatearEstado(e).forEach((l) => log(l));
+  }
+  return e.ok ? 0 : 1;
 }
 
 /** Comandos de control (`--estado`, `--detener`...). undefined = no es uno de ellos. */
@@ -514,22 +585,10 @@ async function comandoControl(c: string | undefined): Promise<number | undefined
         console.log('(aún no hay registro)');
       }
       return 0;
-    case '--instalar-inicio': {
-      const r = await activarAutoarranque();
-      if (r.ok) {
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString());
-      }
-      console.log(r.mensaje);
-      return r.ok ? 0 : 1;
-    }
-    case '--quitar-inicio': {
-      const r = await desactivarAutoarranque();
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString()); // que no se reinstale solo
-      console.log(r.mensaje);
-      return r.ok ? 0 : 1;
-    }
+    case '--instalar-inicio':
+      return comandoAutoinicio('activar', console.log, dir);
+    case '--quitar-inicio':
+      return comandoAutoinicio('desactivar', console.log, dir);
   }
   return undefined;
 }
@@ -541,7 +600,7 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
   const segundoPlano = comando === '--segundo-plano';
-  if (!segundoPlano) console.log(LINEA_VERSION);
+  if (!segundoPlano && !process.argv.includes('--json')) console.log(LINEA_VERSION);
   const primerPlano = comando === '--primer-plano';
   if (segundoPlano) {
     modo.segundoPlano = true;
@@ -566,15 +625,12 @@ export async function main(): Promise<void> {
     await esperarEnter();
     process.exit(ok ? 0 : 1);
   }
-  if (comando === 'estado') {
-    await comandoEstado(depsComandos(), rutaArchivoConfiguracion());
-    await esperarEnter();
-    process.exit(0);
-  }
-  if (comando === 'diagnostico' || comando === 'diagnóstico') {
-    await comandoDiagnostico(depsComandos(), rutaArchivoConfiguracion());
-    await esperarEnter();
-    process.exit(0);
+  if (comando === 'estado' || comando === 'diagnostico' || comando === 'diagnóstico') {
+    const json = process.argv.includes('--json');
+    const codigo = await comandoEstadoPrograma(json);
+    if (comando !== 'estado') await comandoDiagnostico(depsComandos(), rutaArchivoConfiguracion());
+    if (!json) await esperarEnter();
+    process.exit(codigo);
   }
   if (comando === 'menu') {
     await abrirMenu();
@@ -599,15 +655,10 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
 
-  if (comando === 'autoarranque') {
-    const accion = process.argv[3]?.trim().toLowerCase();
-    if (accion === 'activar' || accion === 'desactivar') {
-      console.log((await (accion === 'activar' ? activarAutoarranque() : desactivarAutoarranque())).mensaje);
-    } else {
-      console.log(`Arranque automático: ${(await autoarranqueActivo()) ? 'ACTIVADO' : 'desactivado'}. Usa "autoarranque activar" o "autoarranque desactivar".`);
-    }
+  if (comando === 'autoinicio' || comando === 'autoarranque') {
+    const codigo = await comandoAutoinicio(process.argv[3]?.trim().toLowerCase());
     await esperarEnter();
-    process.exit(0);
+    process.exit(codigo);
   }
 
   if (comando === 'configurar' || comando === 'vincular') {
@@ -642,6 +693,7 @@ export async function main(): Promise<void> {
     console.log('El programa de impresión ya está funcionando (solo puede haber uno).');
     process.exit(0);
   }
+  if (segundoPlano) await asegurarInicio(registrarLog); // tras una actualización o mudanza del .exe, el inicio apunta a la ruta nueva
 
   // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera
   const config = obtenerConfiguracion(process.env, archivo);

@@ -55,6 +55,27 @@ export async function autoarranqueActivo(o: OpcionesAutoarranque = {}): Promise<
   }
 }
 
+/** Ruta del programa registrada para arrancar (undefined si no hay entrada). Windows: valor Run; Linux: línea Exec del .desktop. */
+export async function rutaRegistrada(o: OpcionesAutoarranque = {}): Promise<string | undefined> {
+  if (!soportada(o)) return undefined;
+  try {
+    if ((o.plataforma ?? process.platform) === 'linux') {
+      const txt = fs.readFileSync(path.join(dirAutostartDe(o), NOMBRE_DESKTOP), 'utf-8');
+      return /^Exec="?([^"\n]+?)"?(\s+--\S+)?\s*$/m.exec(txt)?.[1];
+    }
+    const salida = await (o.ejecutar ?? regReal)(['query', CLAVE_RUN, '/v', VALOR_RUN]);
+    return /REG_SZ\s+"?(.+?)"?(\s+--\S+)?\s*$/m.exec(salida)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+/** Misma ruta (Windows no distingue mayúsculas ni / de \). */
+export const mismaRuta = (a: string, b: string, plataforma: NodeJS.Platform = process.platform) => {
+  const n = (x: string) => (plataforma === 'win32' ? x.replace(/\//g, '\\').toLowerCase() : x);
+  return n(a) === n(b);
+};
+
 export async function activarAutoarranque(o: OpcionesAutoarranque = {}): Promise<{ ok: boolean; mensaje: string }> {
   if (!soportada(o)) {
     return { ok: false, mensaje: 'El arranque automático solo está disponible en Windows y Linux.' };

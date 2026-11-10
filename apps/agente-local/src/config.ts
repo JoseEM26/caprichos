@@ -21,6 +21,8 @@ export interface ArchivoConfiguracion {
   etiqueteraId?: string;
   ticketeraId?: string;
   ticketColumnas?: number;
+  /** El usuario desactivó «Iniciar con Windows» a propósito: no se vuelve a registrar solo. */
+  autoinicioDesactivado?: boolean;
   /** Tamaño del rollo y orientación del sticker (ver FormatoEtiqueta). */
   etiqueta?: Partial<FormatoEtiqueta>;
 }
