@@ -57,7 +57,7 @@ describe('MiAsistenciaView (celular)', () => {
     marcarManual.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada a las 08:00', marca: { estado: 'A_REVISAR' } });
     render(<MiAsistenciaView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar manualmente (sin QR)' }));
-    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ tipo: 'ENTRADA', lat: -12.04, lng: -77.04, precision: 9, consentimiento: undefined }));
+    await waitFor(() => expect(marcarManual).toHaveBeenCalledWith({ lat: -12.04, lng: -77.04, precision: 9, consentimiento: undefined }));
     expect(marcarAsistencia).not.toHaveBeenCalled();
     expect(await screen.findByRole('status')).toHaveTextContent('queda para revisión del administrador');
   });

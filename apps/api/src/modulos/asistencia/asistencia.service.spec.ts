@@ -75,7 +75,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
       },
       create: async ({ data }: any) => {
         const fila = { id: id++, creado_en: AHORA, ...data };
-        if (marcas.some((m) => igual(m.party_id, fila.party_id) && fila.qr_slot !== undefined && igual(m.qr_slot, fila.qr_slot))) { // índice único (party_id, qr_slot); ya no hay unicidad por tipo
+        if (marcas.some((m) => igual(m.party_id, fila.party_id) && fila.qr_slot != null && igual(m.qr_slot, fila.qr_slot))) { // índice único (party_id, qr_slot); ya no hay unicidad por tipo
           throw Object.assign(new Error('unique'), { code: 'P2002' });
         }
         marcas.push(fila);
