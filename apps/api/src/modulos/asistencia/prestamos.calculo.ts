@@ -40,10 +40,28 @@ export function cuotaDelPeriodo(p: PrestamoCalc, modalidad: Modalidad, periodo: 
   return [...p.cuotas].filter((c) => c.estado === 'PENDIENTE').sort((a, b) => a.numero - b.numero)[0] ?? null;
 }
 
-/** Saldo = lo prestado menos lo ya descontado. */
-export const saldoPrestamo = (monto: number, cuotas: Array<{ monto: number; estado: string }>): number =>
-  redondear2(monto - cuotas.filter((c) => c.estado === 'DESCONTADA').reduce((a, c) => a + c.monto, 0));
+/** Meses que dura el plan: cuotas mensuales = n; semanales = n × 12/52 (misma equivalencia que el sueldo). */
+export const mesesDelPlan = (numCuotas: number, periodicidad: 'SEMANAL' | 'MENSUAL'): number =>
+  periodicidad === 'MENSUAL' ? numCuotas : (numCuotas * 12) / 52;
 
-/** Descuento recurrente semanal en un período: 1× en semanal, 4× en mensual (como lo hace el dueño). */
-export const montoRecurrenteDelPeriodo = (montoSemanal: number, modalidad: Modalidad): number =>
-  redondear2(montoSemanal * (modalidad === 'MENSUAL' ? 4 : 1));
+/**
+ * Interés simple mensual sobre el capital (10/11/2026): interés = capital × interés% × meses del plan;
+ * total = capital + interés; cuota = total ÷ nº de cuotas. 0 % = sin intereses (préstamos viejos).
+ */
+export const interesPrestamo = (capital: number, interesPctMensual: number, numCuotas: number, periodicidad: 'SEMANAL' | 'MENSUAL'): number =>
+  redondear2(capital * (Math.max(0, interesPctMensual) / 100) * mesesDelPlan(numCuotas, periodicidad));
+
+/** Parte de una cuota que es interés (proporcional al interés del total); 0 si no hay interés. */
+export const interesDeCuota = (montoCuota: number, capital: number, interes: number): number =>
+  interes > 0 ? redondear2((montoCuota * interes) / (capital + interes)) : 0;
+
+/** Saldo = capital + interés menos lo ya descontado (pasa el total si hay interés). */
+export const saldoPrestamo = (total: number, cuotas: Array<{ monto: number; estado: string }>): number =>
+  redondear2(total - cuotas.filter((c) => c.estado === 'DESCONTADA').reduce((a, c) => a + c.monto, 0));
+
+/**
+ * Servicio extra / descuento recurrente en un período. SEMANAL (el monto es por semana): 1× en período semanal,
+ * 4× en mensual (como Netflix). MENSUAL (el monto es por mes): 1× en período mensual, ÷4 en semanal.
+ */
+export const montoRecurrenteDelPeriodo = (monto: number, modalidad: Modalidad, periodicidad: 'SEMANAL' | 'MENSUAL' = 'SEMANAL'): number =>
+  redondear2(periodicidad === 'MENSUAL' ? (modalidad === 'MENSUAL' ? monto : monto / 4) : monto * (modalidad === 'MENSUAL' ? 4 : 1));

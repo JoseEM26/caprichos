@@ -5,7 +5,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { jornadaDe } from './asistencia.calculo';
 import { AsistenciaService } from './asistencia.service';
 import { redondear2 } from './planilla.calculo';
-import { planCuotas, saldoPrestamo } from './prestamos.calculo';
+import { interesDeCuota, interesPrestamo, planCuotas, saldoPrestamo } from './prestamos.calculo';
 
 const fechaDb = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const isoDe = (d: Date) => d.toISOString().slice(0, 10);
@@ -39,10 +39,14 @@ export class PrestamosService {
     return {
       netflixSemanalDefecto: cfg.netflixSemanal,
       prestamos: prestamos.map((p) => {
+        const capital = Number(p.monto);
+        const interes = Number(p.interes_monto);
         const cuotas = [...p.cuotas].sort((a, b) => a.numero - b.numero).map((c) => ({
           id: Number(c.id),
           numero: c.numero,
           monto: Number(c.monto),
+          /** Parte de la cuota que es interés (monto − interesCuota = capital). */
+          interesCuota: interesDeCuota(Number(c.monto), capital, interes),
           estado: c.estado,
           periodoDesde: c.periodo_desde ? isoDe(c.periodo_desde) : null,
           periodoHasta: c.periodo_hasta ? isoDe(c.periodo_hasta) : null,
@@ -50,7 +54,13 @@ export class PrestamosService {
         }));
         return {
           id: Number(p.id),
-          monto: Number(p.monto),
+          /** Capital prestado (sin interés). */
+          monto: capital,
+          interesPctMensual: Number(p.interes_pct_mensual),
+          /** Interés total del plan (0 = sin intereses). */
+          interes,
+          /** Capital + interés. */
+          total: redondear2(capital + interes),
           numCuotas: p.num_cuotas,
           periodicidad: p.periodicidad,
           montoCuota: Number(p.monto_cuota),
@@ -58,16 +68,16 @@ export class PrestamosService {
           estado: p.estado,
           motivo: p.motivo,
           anuladoMotivo: p.anulado_motivo,
-          saldo: p.estado === 'ANULADO' ? 0 : saldoPrestamo(Number(p.monto), cuotas),
+          saldo: p.estado === 'ANULADO' ? 0 : saldoPrestamo(capital + interes, cuotas),
           cuotas,
         };
       }),
-      recurrentes: recurrentes.map((r) => ({ id: Number(r.id), tipo: r.tipo, nombre: r.nombre, monto: Number(r.monto), activo: r.activo, desde: isoDe(r.desde) })),
+      recurrentes: recurrentes.map((r) => ({ id: Number(r.id), tipo: r.tipo, nombre: r.nombre, monto: Number(r.monto), periodicidad: r.periodicidad, activo: r.activo, desde: isoDe(r.desde) })),
     };
   }
 
   async crear(
-    dto: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string },
+    dto: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string; interesPctMensual?: number },
     usuario: UsuarioAutenticado,
     ip?: string,
     ahora = new Date(),
@@ -75,7 +85,9 @@ export class PrestamosService {
     await this.exigirPersona(dto.partyId);
     const monto = redondear2(Number(dto.monto));
     if (!(monto > 0)) throw new BadRequestException({ codigo: 'MONTO_INVALIDO', mensaje: 'El monto debe ser mayor que cero' });
-    const plan = planCuotas(monto, dto.numCuotas);
+    const pct = redondear2(Math.min(100, Math.max(0, Number(dto.interesPctMensual ?? 0))));
+    const interes = interesPrestamo(monto, pct, Math.max(1, Math.floor(dto.numCuotas)), dto.periodicidad);
+    const plan = planCuotas(redondear2(monto + interes), dto.numCuotas);
     if (plan.some((c) => c <= 0)) throw new BadRequestException({ codigo: 'CUOTAS_INVALIDAS', mensaje: 'Demasiadas cuotas para ese monto' });
     const inicio = dto.fechaInicio ?? jornadaDe(ahora).jornada;
     const id = await this.prisma.$transaction(async (tx) => {
@@ -86,16 +98,18 @@ export class PrestamosService {
           num_cuotas: plan.length,
           periodicidad: dto.periodicidad,
           monto_cuota: plan[0],
+          interes_pct_mensual: pct,
+          interes_monto: interes,
           fecha_inicio: fechaDb(inicio),
           motivo: dto.motivo?.trim() || null,
           creado_por: usuario.partyId,
         },
       });
       await tx.prestamoCuota.createMany({ data: plan.map((m, i) => ({ prestamo_id: p.id, numero: i + 1, monto: m })) });
-      await this.auditar('CREAR_PRESTAMO', usuario, ip, 'prestamo_personal', p.id, { partyId: dto.partyId, monto, cuotas: plan.length, periodicidad: dto.periodicidad }, dto.motivo, tx);
+      await this.auditar('CREAR_PRESTAMO', usuario, ip, 'prestamo_personal', p.id, { partyId: dto.partyId, monto, interesPct: pct, interes, cuotas: plan.length, periodicidad: dto.periodicidad }, dto.motivo, tx);
       return p.id;
     });
-    return { ok: true, id: Number(id), cuotas: plan };
+    return { ok: true, id: Number(id), interes, total: redondear2(monto + interes), cuotas: plan };
   }
 
   /** Anula el préstamo (con motivo): deja de descontar. Los períodos ya pagados no cambian. */
@@ -111,7 +125,7 @@ export class PrestamosService {
   }
 
   async crearRecurrente(
-    dto: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; desde?: string },
+    dto: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL'; desde?: string },
     usuario: UsuarioAutenticado,
     ip?: string,
     ahora = new Date(),
@@ -122,19 +136,21 @@ export class PrestamosService {
     const monto = redondear2(dto.monto ?? (dto.tipo === 'NETFLIX' ? (await this.asistencia.obtenerConfig()).netflixSemanal : 0));
     if (!(monto > 0)) throw new BadRequestException({ codigo: 'MONTO_INVALIDO', mensaje: 'El monto debe ser mayor que cero' });
     const r = await this.prisma.descuentoRecurrentePersonal.create({
-      data: { party_id: BigInt(dto.partyId), tipo: dto.tipo, nombre, monto, desde: fechaDb(dto.desde ?? jornadaDe(ahora).jornada), creado_por: usuario.partyId },
+      data: { party_id: BigInt(dto.partyId), tipo: dto.tipo, nombre, monto, periodicidad: dto.periodicidad ?? 'SEMANAL', desde: fechaDb(dto.desde ?? jornadaDe(ahora).jornada), creado_por: usuario.partyId },
     });
-    await this.auditar('CREAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: dto.partyId, tipo: dto.tipo, monto });
+    await this.auditar('CREAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: dto.partyId, tipo: dto.tipo, monto, periodicidad: dto.periodicidad ?? 'SEMANAL' });
     return { ok: true, id: Number(r.id) };
   }
 
-  /** Cambia el monto semanal o la casilla «cobrar» (activo). */
-  async editarRecurrente(id: number, dto: { monto?: number; activo?: boolean }, usuario: UsuarioAutenticado, ip?: string) {
+  /** Cambia monto, nombre (OTRO), periodicidad o la casilla «cobrar» (activo). */
+  async editarRecurrente(id: number, dto: { monto?: number; activo?: boolean; nombre?: string; periodicidad?: 'SEMANAL' | 'MENSUAL' }, usuario: UsuarioAutenticado, ip?: string) {
     const r = await this.prisma.descuentoRecurrentePersonal.findUnique({ where: { id: BigInt(id) } });
     if (!r) throw new NotFoundException({ codigo: 'RECURRENTE_NO_ENCONTRADO', mensaje: 'Descuento no encontrado' });
     const data: Record<string, unknown> = {};
     if (dto.monto !== undefined) data.monto = redondear2(dto.monto);
     if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.periodicidad !== undefined) data.periodicidad = dto.periodicidad;
+    if (dto.nombre !== undefined && r.tipo === 'OTRO') data.nombre = dto.nombre.trim();
     await this.prisma.descuentoRecurrentePersonal.update({ where: { id: r.id }, data });
     await this.auditar('EDITAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: Number(r.party_id), ...data });
     return { ok: true };

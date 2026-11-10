@@ -104,10 +104,10 @@ describe('una sola fuente de verdad: jornada y planilla usan la misma interpreta
       { jornada: '2026-11-06', estado: resultado.estado, turno, marcas: interp.marcas.filter((x) => x.rol).map((x) => ({ ...x, tipo: x.rol! })), breakMin: interp.breakMin },
       10,
     );
-    expect(dia.trabajadaMin).toBe(Math.min(dia.programadaMin, m(9) - 40));
+    expect(dia.trabajadaMin).toBe(m(9)); // la planilla paga el break
   });
 
-  it('con 8 marcas la planilla descuenta los tres breaks (no solo el primero)', () => {
+  it('con 8 marcas la planilla paga los tres breaks (no se descuentan)', () => {
     const marcas = g(m(9), m(11), m(11, 15), m(13), m(13, 30), m(15), m(15, 10), m(18));
     const { resultado, interp } = evaluarJornada({ jornada: '2026-11-06', turno: sinBreak, marcas, ahora, tolerancia: 10 });
     expect(resultado.almuerzoMin).toBe(55);
@@ -115,7 +115,7 @@ describe('una sola fuente de verdad: jornada y planilla usan la misma interpreta
       { jornada: '2026-11-06', estado: resultado.estado, turno: sinBreak, marcas: interp.marcas.filter((x) => x.rol).map((x) => ({ ...x, tipo: x.rol! })), breakMin: interp.breakMin },
       10,
     );
-    expect(dia.trabajadaMin).toBe(m(9) - 55);
+    expect(dia.trabajadaMin).toBe(m(9)); // los breaks se pagan: no se descuentan
   });
 
   it('una doble marca A_REVISAR (tachada) no bloquea la jornada', () => {

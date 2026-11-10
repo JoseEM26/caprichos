@@ -99,7 +99,7 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export class ConfigurarAsistenciaDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(3) @Max(100) radioM?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(60) toleranciaMin?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) pagoTardanzaPct?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(500) tardanzaPenalidadPct?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(1) @Max(5) multiplicadorExtra?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(1000) netflixSemanal?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(31) diasMesDefecto?: number;

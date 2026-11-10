@@ -60,4 +60,37 @@ describe('PrestamosService', () => {
     await expect(svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', monto: 5 }, ADMIN)).rejects.toMatchObject({ response: { codigo: 'NOMBRE_REQUERIDO' } });
     await expect(svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', nombre: 'Seguro' }, ADMIN)).rejects.toMatchObject({ response: { codigo: 'MONTO_INVALIDO' } });
   });
+
+  it('préstamo sin interés: igual que antes (0 %, total = capital)', async () => {
+    const { svc, prestamos } = montar();
+    const r = await svc.crear({ partyId: 7, monto: 100, numCuotas: 4, periodicidad: 'MENSUAL' }, ADMIN, undefined, AHORA);
+    expect(r).toMatchObject({ interes: 0, total: 100, cuotas: [25, 25, 25, 25] });
+    expect(prestamos[0]).toMatchObject({ interes_pct_mensual: 0, interes_monto: 0 });
+  });
+
+  it('préstamo con interés simple mensual: 5 % × 4 meses sobre 100 = 20; cuotas de 30', async () => {
+    const { svc, prestamos } = montar();
+    const r = await svc.crear({ partyId: 7, monto: 100, numCuotas: 4, periodicidad: 'MENSUAL', interesPctMensual: 5 }, ADMIN, undefined, AHORA);
+    expect(r).toMatchObject({ interes: 20, total: 120, cuotas: [30, 30, 30, 30] });
+    expect(prestamos[0]).toMatchObject({ monto: 100, interes_pct_mensual: 5, interes_monto: 20, monto_cuota: 30 });
+  });
+
+  it('listar muestra capital, interés, cuota y saldo; los viejos quedan en 0 %', async () => {
+    const { svc, prestamos, cuotas } = montar();
+    await svc.crear({ partyId: 7, monto: 100, numCuotas: 4, periodicidad: 'MENSUAL', interesPctMensual: 5 }, ADMIN, undefined, AHORA);
+    (svc as any).prisma.prestamoPersonal.findMany = async () => prestamos.map((p) => ({ ...p, creado_en: AHORA, fecha_inicio: AHORA, cuotas: cuotas.map((c, i) => ({ ...c, id: BigInt(i + 1), estado: i === 0 ? 'DESCONTADA' : 'PENDIENTE', periodo_desde: null, periodo_hasta: null, reprogramada_de: null })) }));
+    (svc as any).prisma.descuentoRecurrentePersonal.findMany = async () => [{ id: 1n, tipo: 'OTRO', nombre: 'Seguro', monto: 10, periodicidad: 'MENSUAL', activo: true, desde: AHORA }];
+    const r = await svc.listar(7);
+    expect(r.prestamos[0]).toMatchObject({ monto: 100, interesPctMensual: 5, interes: 20, total: 120, montoCuota: 30, saldo: 90 });
+    expect(r.prestamos[0].cuotas[0]).toMatchObject({ monto: 30, interesCuota: 5 });
+    expect(r.recurrentes[0]).toMatchObject({ nombre: 'Seguro', periodicidad: 'MENSUAL', activo: true });
+  });
+
+  it('servicio extra con nombre, monto y periodicidad (semanal o mensual)', async () => {
+    const { svc, recurrentes } = montar();
+    await svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', nombre: 'Seguro', monto: 12, periodicidad: 'MENSUAL' }, ADMIN, undefined, AHORA);
+    await svc.crearRecurrente({ partyId: 7, tipo: 'NETFLIX' }, ADMIN, undefined, AHORA);
+    expect(recurrentes[0]).toMatchObject({ nombre: 'Seguro', monto: 12, periodicidad: 'MENSUAL' });
+    expect(recurrentes[1]).toMatchObject({ nombre: 'Netflix', periodicidad: 'SEMANAL' });
+  });
 });

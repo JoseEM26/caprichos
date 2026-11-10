@@ -38,6 +38,7 @@ Fija las reglas con las que se acepta una marca de asistencia: desde qué punto 
 - **Latitud y longitud del local**: el punto desde el que se mide la distancia al marcar. Sin ubicación, nadie puede marcar. [Ubicación del local](/admin/asistencia?pestana=config)
 - **Radio del local (m)** (radioM): a cuántos metros del punto se puede marcar; de 3 a 100, por defecto 10. [Radio del local](/admin/asistencia?pestana=config)
 - **Tolerancia de tardanza (min)** (toleranciaMin): minutos después de la hora de entrada que no cuentan como tardanza (tampoco salida anticipada ni extra); de 0 a 60, por defecto 10. [Tolerancia de tardanza](/admin/asistencia?pestana=config)
+- **Penalidad por tardanza (%)** (tardanzaPenalidadPct): ademas de no pagar el tiempo de tardanza, se descuenta su valor multiplicado por este porcentaje (valor hora ÷ 60 × minutos × %); de 0 a 500, por defecto 100 (pierde el doble); 0 = sin penalidad. [Penalidad por tardanza](/admin/asistencia?pestana=config)
 - **Precisión GPS máxima aceptada (m)** (precisionMaxM): si el GPS es peor que esto se pide reintentar; de 5 a 100, por defecto 25. [Precisión del GPS](/admin/asistencia?pestana=config)
 - **Días que se guardan las selfies** (retencionDias): luego la foto se borra y la marca se conserva; de 7 a 3650, por defecto 90. [Retención de selfies](/admin/asistencia?pestana=config)
 

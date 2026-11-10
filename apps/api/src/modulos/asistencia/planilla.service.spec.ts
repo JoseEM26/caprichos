@@ -1,6 +1,8 @@
+jest.mock('@nestjs/jwt', () => ({ JwtService: class {} }));
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { turnoDe } from './asistencia.calculo';
 import { PlanillaService } from './planilla.service';
+import { MiPlanillaController } from './planilla.controller';
 
 // Servicio con BD en memoria mínima. Cubre reglas (congelar, consumos, ajustes), no el SQL.
 
@@ -89,7 +91,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     $transaction: async (cb: any) => cb(prisma),
   };
   const asistencia: any = {
-    diasDePersona: jest.fn(async () => ({ dias, cfg: { toleranciaMin: 5, pagoTardanzaPct: 50, ...opts.cfg } })),
+    diasDePersona: jest.fn(async () => ({ dias, cfg: { toleranciaMin: 5, ...opts.cfg } })),
   };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
   const poner = (p: Fila, montos: number[]) => {
@@ -331,5 +333,93 @@ describe('PlanillaService', () => {
     expect(r.metodo).toBe('DIAS_HORAS');
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ pago_celular: '999000111', pago_medio: 'YAPE' }) }));
     expect(JSON.stringify(m.auditoria.registrar.mock.calls, (_k, v) => (typeof v === 'bigint' ? String(v) : v))).not.toContain('999000111');
+  });
+});
+
+describe('penalidad por tardanza en la planilla', () => {
+  const tarde = (m: ReturnType<typeof montar>, min: number, i = 0) => {
+    m.dias[i] = { ...m.dias[i], estado: 'TARDANZA', marcas: [{ tipo: 'ENTRADA', minutos: 780 + min, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
+  };
+  it('60 min tarde con S/20/h: no se pagan S/20 y se descuentan S/20 de penalidad (por defecto 100 %)', async () => {
+    const m = montar();
+    tarde(m, 60);
+    const r = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.resultado.pagoTrabajado).toBe(580); // 600 − 20 del tiempo no pagado
+    expect(r.resultado.penalidadTardanza).toBe(20);
+    expect(r.resultado.penalidadTardanzaDetalle).toEqual([{ fecha: '2026-11-01', minutos: 60, monto: 20 }]);
+    expect(r.excel.penalidadTardanza).toBe(20);
+    expect(r.resultado.consumosCobrados).toBe(65.5);
+    expect(r.resultado.neto).toBe(494.5); // 580 − 20 − 65,5
+    expect(r.penalidadTardanzaPct).toBe(100);
+    expect(r).not.toHaveProperty('pctTardanza');
+  });
+  it('factor 0 = sin penalidad y 200 = el doble; dentro de la tolerancia no hay', async () => {
+    const cero = montar({ cfg: { tardanzaPenalidadPct: 0 } });
+    tarde(cero, 60);
+    expect((await cero.svc.detalle(7, '2026-11-15', [], AHORA)).resultado.penalidadTardanza).toBe(0);
+    const doble = montar({ cfg: { tardanzaPenalidadPct: 200 } });
+    tarde(doble, 30);
+    expect((await doble.svc.detalle(7, '2026-11-15', [], AHORA)).resultado.penalidadTardanza).toBe(20); // 30 min × 20/60 × 2
+    const toler = montar();
+    tarde(toler, 5);
+    expect((await toler.svc.detalle(7, '2026-11-15', [], AHORA)).resultado.penalidadTardanza).toBe(0);
+  });
+  it('contrato temporal: el tiempo tarde no se paga pero no lleva penalidad', async () => {
+    const m = montar({ vinculo: { party_id: LUIS, tipo: 'CONTRATO_TEMPORAL', vigente_hasta: null } });
+    tarde(m, 60);
+    const r = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.resultado.penalidadTardanza).toBe(0);
+    expect(r.resultado.pagoTrabajado).toBe(580);
+  });
+  it('tarifa fija por hora: la penalidad usa esa tarifa', async () => {
+    const m = montar({ sueldo: { metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: 30 } });
+    tarde(m, 60);
+    expect((await m.svc.detalle(7, '2026-11-15', [], AHORA)).resultado.penalidadTardanza).toBe(30);
+  });
+});
+
+describe('mi planilla (el trabajador ve solo lo suyo)', () => {
+  it('devuelve el contrato con horas extra aprobadas y pendientes, penalidad, préstamo con interés y servicios', async () => {
+    const m = montar({ recurrentes: [{ id: 5n, party_id: LUIS, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64, periodicidad: 'SEMANAL', activo: true }] });
+    m.dias[0] = { ...m.dias[0], estado: 'TARDANZA', marcas: [{ tipo: 'ENTRADA', minutos: 840, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
+    m.dias[1] = { ...m.dias[1], estado: 'SALIO_DESPUES', marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1140, estado: 'VALIDA' }] } as any; // 60 min extra
+    m.dias[2] = { ...m.dias[2], estado: 'SALIO_DESPUES', marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1110, estado: 'VALIDA' }] } as any; // 30 min extra
+    (m.svc as any).prisma.planillaExtraAprobada.findMany = async () => [{ jornada: d('2026-11-02'), aprobado_por: 1n, aprobado_en: AHORA }];
+    m.poner({ id: 91n, party_id: LUIS, monto: 100, num_cuotas: 2, periodicidad: 'MENSUAL', fecha_inicio: d('2026-11-01'), estado: 'ACTIVO', motivo: 'nota interna', monto_cuota: 60, interes_pct_mensual: 10, interes_monto: 20 }, [60, 60]);
+    m.ajustes.push({ id: 31n, party_id: LUIS, tipo: 'ADELANTO', fecha: d('2026-11-05'), monto: 50, motivo: 'Adelanto', categoria: null, anulado_en: null, creado_en: AHORA });
+    const r: any = await m.svc.miPlanilla(LUIS, '2026-11-15', AHORA);
+    expect(r.periodo).toEqual({ desde: '2026-11-01', hasta: '2026-11-30', tipo: 'MENSUAL' });
+    expect(r.base).toEqual({ sueldo: 1000, tarifaHora: null, valorHora: 20 });
+    expect(r.horas).toMatchObject({ extraAprobadaMin: 60, extraPendienteMin: 30, extraRechazadaMin: 0 });
+    expect(r.penalidadTardanza).toEqual({ total: 20, detalle: [{ fecha: '2026-11-01', minutos: 60, monto: 20 }] });
+    expect(r.adelantos).toEqual([{ id: 31, fecha: '2026-11-05', monto: 50, motivo: 'Adelanto' }]);
+    expect(r.descuentos.map((x: any) => x.etiqueta).sort()).toEqual(['CONSUMO', 'CONSUMO', 'NETFLIX', 'PRESTAMO']);
+    expect(r.descuentos.find((x: any) => x.etiqueta === 'NETFLIX').monto).toBe(6.56); // 1,64 × 4 en mensual
+    expect(r.prestamos).toEqual([{ id: 91, capital: 100, interesPctMensual: 10, interes: 20, cuota: 60, saldo: 120, cuotasPagadas: 0, cuotasTotales: 2, estado: 'ACTIVO' }]);
+    expect(r.serviciosExtra).toEqual([{ nombre: 'Netflix', monto: 1.64, periodicidad: 'SEMANAL', activo: true }]);
+    expect(r.estadoPago).toBe('PENDIENTE');
+    expect(r.pagadoEn).toBeNull();
+    // nada ajeno ni interno
+    const txt = JSON.stringify(r);
+    expect(txt).not.toContain('nota interna');
+    expect(txt).not.toContain('Pérez');
+    expect(r).not.toHaveProperty('pago');
+    expect(r).not.toHaveProperty('filas');
+  });
+  it('consulta SIEMPRE la cuenta del token: el controlador ignora cualquier partyId enviado', async () => {
+    const mia = jest.fn(async () => ({ conSueldo: false }));
+    const ctrl = new MiPlanillaController({ miPlanilla: mia } as any);
+    await ctrl.mia({ usuario: { partyId: 7n } }, { periodo: '2026-10-15', partyId: 99 } as any);
+    expect(mia).toHaveBeenCalledWith(7n, '2026-10-15');
+  });
+  it('período anterior pagado: cifras congeladas, estado PAGADO y fecha de pago', async () => {
+    const m = montar();
+    const sinConsumos = ['1', '2'];
+    await m.svc.pagar(7, '2026-11-15', sinConsumos, ADMIN, undefined, AHORA);
+    const r: any = await m.svc.miPlanilla(LUIS, '2026-11-02', AHORA);
+    expect(r.estadoPago).toBe('PAGADO');
+    expect(r.pagadoEn).toBe(AHORA.toISOString());
+    expect(r.neto).toBe(600);
+    expect((await m.svc.miPlanilla(LUIS, '2099-01-01', AHORA) as any).periodo.desde).toBe('2026-12-01'); // futuro = actual
   });
 });

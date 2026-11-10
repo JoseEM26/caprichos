@@ -58,6 +58,8 @@ export class PrestamoDto {
   @IsIn(['SEMANAL', 'MENSUAL']) periodicidad!: 'SEMANAL' | 'MENSUAL';
   @IsOptional() @Matches(FECHA) fechaInicio?: string;
   @IsOptional() @IsString() @MaxLength(300) motivo?: string;
+  /** Interés simple mensual en % (0–100). Vacío o 0 = sin intereses. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(100) interesPctMensual?: number;
 }
 
 export class RecurrenteDto {
@@ -65,12 +67,17 @@ export class RecurrenteDto {
   @IsIn(['NETFLIX', 'OTRO']) tipo!: 'NETFLIX' | 'OTRO';
   /** OTRO: obligatorio. NETFLIX: «Netflix». */
   @IsOptional() @IsString() @MaxLength(80) nombre?: string;
-  /** Monto semanal; vacío en NETFLIX = el valor general de Configuración. */
+  /** Monto por periodicidad (por semana o por mes); vacío en NETFLIX = el valor semanal general de Configuración. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10_000) monto?: number;
+  /** SEMANAL (defecto): el monto es por semana (×4 en planilla mensual). MENSUAL: el monto es por mes (÷4 en planilla semanal). */
+  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL']) periodicidad?: 'SEMANAL' | 'MENSUAL';
   @IsOptional() @Matches(FECHA) desde?: string;
 }
 
 export class RecurrenteEditarDto {
+  /** Nombre del servicio (los de tipo OTRO). */
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(80) nombre?: string;
+  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL']) periodicidad?: 'SEMANAL' | 'MENSUAL';
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10_000) monto?: number;
   /** false = no cobrar (la casilla «cobrar» de la persona). */
   @IsOptional() @IsBoolean() activo?: boolean;
@@ -108,4 +115,9 @@ export class VacacionMovimientoDto {
   /** Solo PAGADAS. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0.01) @Max(1_000_000) monto?: number;
   @IsOptional() @IsString() @MaxLength(300) motivo?: string;
+}
+
+/** Mi planilla: solo el período (cualquier día de él). Nunca acepta partyId: siempre es la cuenta del token. */
+export class MiPlanillaDto {
+  @IsOptional() @Matches(FECHA) periodo?: string;
 }

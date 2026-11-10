@@ -3027,6 +3027,9 @@ model PrestamoPersonal {
   anulado_motivo String?
   creado_por     BigInt
   creado_en      DateTime        @default(now()) @db.Timestamptz
+  /// Interés simple mensual en % (0 = sin intereses) y el interés total ya calculado al crear (monto = capital).
+  interes_pct_mensual Decimal    @default(0) @db.Decimal(5, 2)
+  interes_monto       Decimal    @default(0) @db.Decimal(10, 2)
   cuotas         PrestamoCuota[]
 
   @@index([party_id, estado])

@@ -1,11 +1,11 @@
 // Parámetros de asistencia (clave parametro «asistencia.config»). Valores por defecto del dueño:
-// radio 10 m, tolerancia 5 min, retención 90 días, tardanza pagada al 0 % (solo se paga lo trabajado).
+// radio 10 m, tolerancia 5 min, retención 90 días, penalidad por tardanza 100 % (el tiempo tarde no se paga y además se descuenta su valor).
 
 export interface ConfigAsistencia {
   radioM: number;
   toleranciaMin: number;
-  /** Porcentaje del valor hora con que se pagan los minutos de tardanza (ya es el descuento). */
-  pagoTardanzaPct: number;
+  /** Penalidad por tardanza: % del valor del tiempo no pagado (0–500; 100 = lo mismo; 0 = sin penalidad). */
+  tardanzaPenalidadPct: number;
   retencionDias: number;
   /** Multiplicador de la hora extra aprobada (defecto 1.25). */
   multiplicadorExtra: number;
@@ -26,7 +26,7 @@ export interface ConfigAsistencia {
 export const CONFIG_ASISTENCIA_DEFECTO: ConfigAsistencia = {
   radioM: 10,
   toleranciaMin: 5,
-  pagoTardanzaPct: 0,
+  tardanzaPenalidadPct: 100,
   retencionDias: 90,
   multiplicadorExtra: 1.25,
   netflixSemanal: 1.64,
@@ -54,7 +54,7 @@ export function leerConfigAsistencia(valor: unknown): ConfigAsistencia {
   return {
     radioM: numeroEn(v.radioM, CONFIG_ASISTENCIA_DEFECTO.radioM, 3, 100),
     toleranciaMin: numeroEn(v.toleranciaMin, CONFIG_ASISTENCIA_DEFECTO.toleranciaMin, 0, 60),
-    pagoTardanzaPct: numeroEn(v.pagoTardanzaPct, CONFIG_ASISTENCIA_DEFECTO.pagoTardanzaPct, 0, 100),
+    tardanzaPenalidadPct: numeroEn(v.tardanzaPenalidadPct, CONFIG_ASISTENCIA_DEFECTO.tardanzaPenalidadPct, 0, 500),
     multiplicadorExtra: numeroEn(v.multiplicadorExtra, CONFIG_ASISTENCIA_DEFECTO.multiplicadorExtra, 1, 5),
     netflixSemanal: numeroEn(v.netflixSemanal, CONFIG_ASISTENCIA_DEFECTO.netflixSemanal, 0, 1000),
     diasMesDefecto: numeroEn(v.diasMesDefecto, CONFIG_ASISTENCIA_DEFECTO.diasMesDefecto, 1, 31),
