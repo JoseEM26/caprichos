@@ -1,7 +1,7 @@
 import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
-import { totalPedido } from './total-pedido';
+import { totalPedido } from '../../comun/total-pedido';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
 import {
   BadRequestException,

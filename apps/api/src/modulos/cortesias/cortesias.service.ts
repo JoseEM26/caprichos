@@ -6,7 +6,7 @@ import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '
 import { etiquetaMotivo, validarMotivoCortesia } from './cortesia.tipos';
 import { FilaCortesia, resumenCortesias } from './cortesias-informe';
 import { FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
-import { totalPedido } from '../pedidos/total-pedido';
+import { totalPedido } from '../../comun/total-pedido';
 
 /** Fecha de Lima (UTC-5, sin horario de verano) a instante, para filtrar creado_en por día. */
 function inicioDiaLima(fecha: string): Date {

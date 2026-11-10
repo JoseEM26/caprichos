@@ -13,7 +13,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery } from '../ofertas/envio-gratis-promo';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
-import { totalPedido } from '../pedidos/total-pedido';
+import { totalPedido } from '../../comun/total-pedido';
 
 const ESTADOS_CERRADOS = ['ENTREGADO', 'ANULADO'];
 

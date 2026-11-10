@@ -1,5 +1,5 @@
 import { descuentoParaComprobante, totalPedido } from './total-pedido';
-import { calcularComprobante, aCentimos } from '../comprobantes/facturacion/facturacion.calculo';
+import { calcularComprobante, aCentimos } from '../modulos/comprobantes/facturacion/facturacion.calculo';
 
 describe('totalPedido / canje de puntos', () => {
   it('resta descuentos y puntos, suma envío, sin negativos', () => {

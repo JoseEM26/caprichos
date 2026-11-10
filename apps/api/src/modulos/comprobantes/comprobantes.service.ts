@@ -44,7 +44,7 @@ import { armarDatosPdf } from './pdf/comprobante-datos';
 import { generarPdfComprobante } from './pdf/comprobante-pdf';
 import { leerParametroNumerico } from '../impresion/estado-impresion';
 import { lineasParaComprobante } from '../pedidos/lineas-combo.util';
-import { descuentoParaComprobante } from '../pedidos/total-pedido';
+import { descuentoParaComprobante } from '../../comun/total-pedido';
 
 /** Plazo de la comunicación de baja de una factura en SUNAT (días). */
 export const PLAZO_BAJA_FACTURA_DIAS = 7;

@@ -13,7 +13,7 @@ import { nombresDePartes } from './devolucion-pedido.util';
 import { calcularAjusteCobro, ESTADOS_CERRADOS_UBICACION, textoAvisoEnvio } from './cambio-ubicacion.util';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { LiquidarAjusteUbicacionDto } from './dto/liquidar-ajuste-ubicacion.dto';
-import { totalPedido } from '../pedidos/total-pedido';
+import { totalPedido } from '../../comun/total-pedido';
 
 /** Quién origina un cambio de punto: Caja, el repartidor (propuesta) o el cliente por WhatsApp. */
 export type OrigenCambio = 'CAJA' | 'REPARTIDOR' | 'WHATSAPP_CLIENTE';

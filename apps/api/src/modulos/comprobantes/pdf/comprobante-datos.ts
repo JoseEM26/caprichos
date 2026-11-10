@@ -6,7 +6,7 @@ import { horaLima, montoEnLetras } from '../sunat/sunat.util';
 import { AmbienteSunat } from '../sunat/sunat.config';
 import { DatosPdfComprobante } from './comprobante-pdf';
 import { lineasParaComprobante } from '../../pedidos/lineas-combo.util';
-import { descuentoParaComprobante } from '../../pedidos/total-pedido';
+import { descuentoParaComprobante } from '../../../comun/total-pedido';
 
 /** Texto no vacío o cadena vacía. */
 const texto = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
