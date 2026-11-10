@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { CrearSolicitudDto, MarcarDto, MiHistorialDto } from './dto/asistencia.dto';
+import { CrearSolicitudDto, MarcarDto, MarcarManualDto, MiHistorialDto } from './dto/asistencia.dto';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
 import { PlanillaService } from './planilla.service';
@@ -86,5 +86,12 @@ export class AsistenciaController {
   @Permiso('asistencia', 'marcar')
   marcar(@Body() dto: MarcarDto, @Req() req: any) {
     return this.asistencia.marcar(dto, req.usuario, ipDe(req));
+  }
+
+  /** Sin QR ni selfie: solo GPS dentro del radio. La marca queda A_REVISAR (origen MANUAL) hasta que el admin la apruebe. */
+  @Post('marcar-manual')
+  @Permiso('asistencia', 'marcar')
+  marcarManual(@Body() dto: MarcarManualDto, @Req() req: any) {
+    return this.asistencia.marcar(dto as MarcarDto, req.usuario, ipDe(req), new Date(), true);
   }
 }

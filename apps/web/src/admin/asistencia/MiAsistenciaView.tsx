@@ -5,6 +5,7 @@ import {
   identificadorDispositivo,
   MiPropina,
   marcarAsistencia,
+  marcarManual,
   miHistorial,
   miHoy as cargarMiHoy,
   miPropinas,
@@ -15,6 +16,7 @@ import { TarjetaGanado } from './TarjetaGanado';
 import { CorreccionesAsistencia, type PedidoCorreccion } from './CorreccionesAsistencia';
 import { ETIQUETA_ROL } from './correccionesApi';
 import { MiVacaciones } from './MiVacaciones';
+import { BotonInstalarApp } from '../../pwa/BotonInstalarApp';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
@@ -81,6 +83,7 @@ export function MiAsistenciaView() {
   const [qrTexto, setQrTexto] = useState<string | null>(null);
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
+  const [manual, setManual] = useState(false); // sin QR ni selfie: solo GPS, queda para revisión
   const [aceptaConsent, setAceptaConsent] = useState(false);
   const [aceptadoEnSesion, setAceptadoEnSesion] = useState(false);
   const [verAviso, setVerAviso] = useState(false);
@@ -136,7 +139,17 @@ export function MiAsistenciaView() {
     setModoCamara('environment');
     setUbicacion(null);
     setSelfie(null);
+    setManual(false);
     setPaso('escanear');
+  };
+
+  const empezarManual = () => {
+    setMensajeOk(null);
+    setError(null);
+    setUbicacion(null);
+    setSelfie(null);
+    setManual(true);
+    setPaso('ubicacion');
   };
 
   // Escaneo del QR: BarcodeDetector si existe; si no, jsQR. El código manual siempre queda a la vista.
@@ -176,7 +189,8 @@ export function MiAsistenciaView() {
       .then((u) => {
         if (cancelado) return;
         setUbicacion(u);
-        setPaso('selfie');
+        if (manual) void enviar({ u });
+        else setPaso('selfie');
       })
       .catch((e) => {
         if (!cancelado) setError(mensajeDe(e, 'No pudimos leer tu ubicación.'));
@@ -184,7 +198,7 @@ export function MiAsistenciaView() {
     return () => {
       cancelado = true;
     };
-  }, [paso]);
+  }, [paso, manual]);
 
   // Cámara frontal para la selfie
   useEffect(() => {
@@ -204,21 +218,25 @@ export function MiAsistenciaView() {
     }
   }
 
-  async function enviar() {
-    if (!ubicacion || !selfie) return;
+  async function enviar(directo?: { u: { lat: number; lng: number; precision: number } }) {
+    const u = directo?.u ?? ubicacion;
+    if (!u || (!directo && !selfie)) return;
     setEnviando(true);
     setError(null);
     try {
       // Sin `tipo`: el servidor lee cada marca por orden y pares y dice qué interpretó
-      const r = await marcarAsistencia({
-        ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
-        lat: ubicacion.lat,
-        lng: ubicacion.lng,
-        precision: ubicacion.precision,
-        selfie,
-        dispositivo: identificadorDispositivo(),
-        consentimiento: hoy?.consentimiento ? aceptaConsent : undefined,
-      });
+      const consentimiento = hoy?.consentimiento ? aceptaConsent : undefined;
+      const r = directo
+        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision, consentimiento })
+        : await marcarAsistencia({
+            ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
+            lat: u.lat,
+            lng: u.lng,
+            precision: u.precision,
+            selfie: selfie!,
+            dispositivo: identificadorDispositivo(),
+            consentimiento,
+          });
       setMensajeOk(r.mensaje + (r.marca.estado === 'A_REVISAR' ? ' (queda para revisión del administrador)' : ''));
       setPaso('listo');
       await recargar();
@@ -249,6 +267,7 @@ export function MiAsistenciaView() {
 
   return (
     <div className="ma-vista">
+      <BotonInstalarApp />
       <section className="ma-estado" aria-label="Estado de hoy">
         <span className="ma-fecha">Hoy {hoy.jornada} · {horaLima}</span>
         <div data-testid="estado-hoy" className="ma-estado-txt">
@@ -321,6 +340,10 @@ export function MiAsistenciaView() {
           <button type="button" className="ma-grande" disabled={!puedeMarcar || enviando} onClick={() => empezar()}>
             Escanear QR
           </button>
+          <Boton type="button" variante="texto" disabled={!puedeMarcar || enviando} onClick={() => empezarManual()}>
+            Marcar manualmente (sin QR)
+          </Boton>
+          <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca.</p>
           {faltaConsent && !aceptaConsent && <p className="as-ayuda">Acepta el aviso de datos para poder marcar.</p>}
         </>
       )}

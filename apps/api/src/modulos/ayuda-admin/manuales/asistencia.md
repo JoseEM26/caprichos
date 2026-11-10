@@ -79,7 +79,7 @@ Ver tambien: [[mi-asistencia]]
 7. Cualquier movimiento se anula con motivo (se conserva, tachado). Si el periodo ya esta pagado, primero Reabrir periodo. Cada persona ve su propio saldo, sin dinero, en [[mi-asistencia]].
 
 ## Como se hace: Aprobar o anular una marca
-En Marcas y selfies, las marcas hechas con usuario y contrasena (pagina publica /asistencia/marcar) quedan A revisar. Aprobar las hace contar; Anular las deja sin efecto. Ambas piden motivo y la marca se conserva. Solo cuentan las marcas validas o aprobadas.
+En Marcas y selfies, las marcas hechas con Marcar manualmente (origen Manual: solo GPS, sin QR ni foto) quedan A revisar. Las marcas antiguas con usuario y contrasena (origen Usuario y contrasena) ya no se crean, pero se siguen mostrando y se aprueban o anulan igual. Aprobar las hace contar; Anular las deja sin efecto. Ambas piden motivo y la marca se conserva. Solo cuentan las marcas validas o aprobadas.
 
 ## Como se hace: Feriados y pago doble
 En la pestana Feriados (solo Administrador) estan precargados los feriados nacionales de Peru de 2026 y 2027; revisalos cada ano porque el Estado puede mover o agregar dias. Puedes agregar uno (fecha, nombre y recargo), cambiar el recargo o Desactivarlo; nunca se borran y cada cambio queda en la auditoria. Las horas trabajadas en un feriado activo se pagan a valor hora x recargo (normal x2); la tardanza ese dia se descuenta al 50% del valor hora ya recargado. Las horas programadas del periodo no cambian, y un periodo ya pagado no se recalcula. En el detalle de planilla la jornada muestra la etiqueta "Feriado x2".

@@ -450,7 +450,7 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
                   </td>
                   <td data-label="Distancia" className="as-num">{m.distanciaM ?? '—'} m</td>
                   <td data-label="Precisión" className="as-num">{m.precisionM ?? '—'} m</td>
-                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : m.origen === 'WEB' ? 'Usuario y contraseña' : 'Celular'}</td>
+                  <td data-label="Origen">{m.origen === 'CORRECCION' ? 'Corrección' : m.origen === 'WEB' ? 'Usuario y contraseña' : m.origen === 'MANUAL' ? 'Manual (solo GPS)' : 'Celular'}</td>
                   <td data-label="">
                     {m.tieneSelfie && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void verFoto(m.id)}>Ver selfie</Boton>}
                     {m.estado === 'A_REVISAR' && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setRevisando({ marca: m, accion: 'aprobar', motivo: '' })}>Aprobar</Boton>}

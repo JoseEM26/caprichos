@@ -46,7 +46,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, MarcarWebDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -66,7 +66,7 @@ export class RechazoAsistencia extends Error {
   }
 }
 
-export const MOTIVO_MARCA_WEB = 'Marcó con usuario y contraseña (sin QR ni GPS)';
+export const MOTIVO_MARCA_MANUAL = 'Marcó manualmente sin QR (solo GPS)';
 const MAX_SELFIE_BYTES = 200_000;
 const VENTANA_FALLOS_MS = 10 * 60_000;
 const BLOQUEO_MS = 5 * 60_000;
@@ -251,12 +251,12 @@ export class AsistenciaService {
   // Marcar (celular del trabajador)
   // ---------------------------------------------------------------------------
 
-  async marcar(dto: MarcarDto, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
+  async marcar(dto: MarcarDto, usuario: UsuarioAutenticado, ip?: string, ahora = new Date(), manual = false) {
     const clave = `u:${usuario.partyId}`;
     const claveIp = `ip:${ip ?? '-'}`;
     this.exigirNoBloqueado(clave, claveIp, ahora.getTime());
     try {
-      const resultado = await this.marcarValidado(dto, usuario, ahora);
+      const resultado = await this.marcarValidado(dto, usuario, ahora, manual);
       this.fallosUsuario.delete(clave);
       return resultado;
     } catch (e) {
@@ -267,14 +267,15 @@ export class AsistenciaService {
     }
   }
 
-  private async marcarValidado(dto: MarcarDto, usuario: UsuarioAutenticado, ahora: Date) {
+  /** `manual` = sin QR ni selfie ni vínculo de celular: solo GPS en el radio; la marca queda A_REVISAR con origen MANUAL. */
+  private async marcarValidado(dto: MarcarDto, usuario: UsuarioAutenticado, ahora: Date, manual = false) {
     const partyId = usuario.partyId;
     if ([usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
       throw new RechazoAsistencia('ADMIN_NO_MARCA', 'El administrador no marca asistencia.', false);
     }
     const cfg = await this.obtenerConfig();
-    const huella = huellaDe(dto.dispositivo);
-    const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
+    const huella = manual ? '' : huellaDe(dto.dispositivo);
+    const dispositivo = manual ? null : await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
     if (dispositivo && dispositivo.huella_hash !== huella) {
       throw new RechazoAsistencia(
         'DISPOSITIVO_DISTINTO',
@@ -299,19 +300,22 @@ export class AsistenciaService {
     if (cfg.localLat === null || cfg.localLng === null) {
       throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
     }
-    const selfie = decodificarSelfie(dto.selfie);
+    const selfie = manual ? null : decodificarSelfie(dto.selfie);
 
     const secreto = this.secreto();
-    const slot = dto.qr !== undefined && dto.qr !== ''
-      ? verificarPayload(secreto, dto.qr, ahora.getTime())
-      : dto.codigo !== undefined
-        ? verificarCodigo(secreto, dto.codigo, ahora.getTime())
-        : null;
-    if (slot === null) {
-      throw new RechazoAsistencia('QR_INVALIDO', 'El QR venció o no es válido. Escanea el de la pantalla actual.');
+    const slot = manual ? null
+      : dto.qr !== undefined && dto.qr !== ''
+        ? verificarPayload(secreto, dto.qr, ahora.getTime())
+        : dto.codigo !== undefined
+          ? verificarCodigo(secreto, dto.codigo, ahora.getTime())
+          : null;
+    if (!manual) {
+      if (slot === null) {
+        throw new RechazoAsistencia('QR_INVALIDO', 'El QR venció o no es válido. Escanea el de la pantalla actual.');
+      }
+      const usado = await this.prisma.asistenciaMarca.findFirst({ where: { party_id: partyId, qr_slot: BigInt(slot) } });
+      if (usado) throw new RechazoAsistencia('QR_YA_USADO', 'Ese QR ya lo usaste. Espera al siguiente.');
     }
-    const usado = await this.prisma.asistenciaMarca.findFirst({ where: { party_id: partyId, qr_slot: BigInt(slot) } });
-    if (usado) throw new RechazoAsistencia('QR_YA_USADO', 'Ese QR ya lo usaste. Espera al siguiente.');
 
     const { jornada } = jornadaDe(ahora);
     // Marcas múltiples: no se rechaza por «ya marcaste»; el servidor interpreta cada marca por orden y pares.
@@ -319,7 +323,7 @@ export class AsistenciaService {
     const tipo = lectura.rol;
 
     if (dto.precision > cfg.precisionMaxM) {
-      throw new RechazoAsistencia('PRECISION_BAJA', 'Acércate y activa la ubicación precisa del celular.');
+      throw new RechazoAsistencia('PRECISION_BAJA', 'Acércate y activa la ubicación precisa del dispositivo.');
     }
     const metros = distanciaMetros(cfg.localLat, cfg.localLng, dto.lat, dto.lng);
     if (metros > cfg.radioM) {
@@ -338,7 +342,8 @@ export class AsistenciaService {
       { lat: dto.lat, lng: dto.lng, precision: dto.precision, momento: ahora },
       previas.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
     );
-    const estado = alertas.length ? 'A_REVISAR' : 'VALIDA';
+    const estado = manual || alertas.length ? 'A_REVISAR' : 'VALIDA';
+    const motivos = [...(manual ? [MOTIVO_MARCA_MANUAL] : []), ...alertas];
 
     try {
       const marca = await this.prisma.$transaction(async (tx) => {
@@ -347,21 +352,24 @@ export class AsistenciaService {
             party_id: partyId,
             jornada: fechaDb(jornada),
             tipo,
-            origen: 'CELULAR',
+            origen: manual ? 'MANUAL' : 'CELULAR',
             momento: ahora,
             estado,
-            motivos_revision: alertas.length ? alertas.join('; ') : null,
+            motivos_revision: motivos.length ? motivos.join('; ') : null,
             lat: dto.lat,
             lng: dto.lng,
             precision_m: dto.precision,
             distancia_m: Math.round(metros * 100) / 100,
-            qr_slot: BigInt(slot),
-            dispositivo_hash: huella,
+            qr_slot: slot === null ? null : BigInt(slot),
+            dispositivo_hash: manual ? null : huella,
           },
         });
-        await tx.asistenciaSelfie.create({
-          data: { marca_id: creada.id, contenido: selfie.bytes, mime: selfie.mime },
-        });
+        if (selfie) {
+          await tx.asistenciaSelfie.create({
+            data: { marca_id: creada.id, contenido: selfie.bytes, mime: selfie.mime },
+          });
+        }
+        if (manual) return creada;
         if (!dispositivo) {
           await tx.asistenciaDispositivo.create({ data: { party_id: partyId, huella_hash: huella, ultimo_uso_en: ahora } });
         } else {
@@ -371,7 +379,7 @@ export class AsistenciaService {
       });
 
       await this.auditar(
-        'CAMBIO', 'MARCAR', estado === 'A_REVISAR' ? 'REVISAR' : 'OK',
+        'CAMBIO', manual ? 'MARCAR_MANUAL' : 'MARCAR', estado === 'A_REVISAR' ? 'REVISAR' : 'OK',
         { tipo, estado, distancia_m: metros, alertas, duplicada: lectura.duplicada },
         partyId, undefined, 'asistencia_marca', marca.id,
       );
@@ -386,7 +394,7 @@ export class AsistenciaService {
           distanciaM: Math.round(metros * 100) / 100,
           alertas,
         },
-        mensaje: mensajeMarca(lectura, ahora, cfg.dobleMarcaMin),
+        mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin)}${manual ? '. Queda pendiente de revisión del administrador.' : ''}`,
         interpretacion: { rol: tipo, duplicada: lectura.duplicada, alertas: lectura.interp.alertas },
       };
     } catch (e: any) {
@@ -396,73 +404,6 @@ export class AsistenciaService {
       }
       throw e;
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Marcar sin celular: usuario (documento) y contraseña de Caprichos (decisión del dueño, 09/11/2026)
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Página pública /asistencia/marcar. Reutiliza el hash del login (argon2) y los límites de intentos de la asistencia.
-   * No abre sesión ni devuelve token. La marca queda A_REVISAR (origen WEB, sin GPS ni selfie) para que el admin la apruebe.
-   */
-  async marcarWeb(dto: MarcarWebDto, ip?: string, ahora = new Date()) {
-    const usuarioTxt = dto.usuario.trim();
-    const clave = `w:${usuarioTxt}`;
-    const claveIp = `ip:${ip ?? '-'}`;
-    this.exigirNoBloqueado(clave, claveIp, ahora.getTime());
-
-    const rechazo = async (partyId?: bigint) => {
-      this.registrarFallo(clave, claveIp, ahora.getTime());
-      await this.auditar('ACCESO', 'MARCAR_WEB', 'RECHAZADO', {}, partyId, ip, 'party', partyId ?? null, 'CREDENCIALES_INVALIDAS');
-      // 400 y no 401: la web usaría el 401 para renovar una sesión que esta página nunca abre
-      return new BadRequestException({ codigo: 'CREDENCIALES_INVALIDAS', mensaje: 'Usuario o contraseña incorrectos' });
-    };
-
-    const ident = await this.prisma.partyIdentifier.findFirst({
-      where: { numero: usuarioTxt, tipo: { in: [...TIPOS_DOCUMENTO] } },
-      include: { party: { include: { usuario: true } } },
-    });
-    const cuenta = ident?.party?.usuario;
-    if (!cuenta) throw await rechazo();
-    let ok = false;
-    try {
-      ok = await argon2.verify(cuenta.hash, dto.contrasena);
-    } catch {
-      ok = false;
-    }
-    if (!ok || !cuenta.activo) throw await rechazo(cuenta.party_id);
-    this.fallosUsuario.delete(clave);
-
-    const partyId = cuenta.party_id;
-    const roles = await rolesDeCuenta(this.prisma, cuenta.id, cuenta.rol);
-    if (roles.includes('ADMIN')) {
-      throw new BadRequestException({ codigo: 'ADMIN_NO_MARCA', mensaje: 'El administrador no marca asistencia.' });
-    }
-
-    const { jornada } = jornadaDe(ahora);
-    const cfg = await this.obtenerConfig();
-    const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg);
-    const tipo = lectura.rol; // el `tipo` que mande el cliente se ignora: manda el orden
-
-    const creada = await this.prisma.asistenciaMarca.create({
-      data: {
-        party_id: partyId,
-        jornada: fechaDb(jornada),
-        tipo,
-        origen: 'WEB',
-        momento: ahora,
-        estado: 'A_REVISAR',
-        motivos_revision: MOTIVO_MARCA_WEB,
-      },
-    });
-    await this.auditar('CAMBIO', 'MARCAR_WEB', 'REVISAR', { tipo }, partyId, ip, 'asistencia_marca', creada.id);
-    return {
-      ok: true,
-      mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin)}. Queda pendiente de revisión del administrador.`,
-      tipo,
-      duplicada: lectura.duplicada,
-    };
   }
 
   /** El admin aprueba (la marca cuenta) o anula (no cuenta) una marca; la fila se conserva con quién, cuándo y por qué. */

@@ -71,6 +71,19 @@ export class MarcarDto {
   consentimiento?: boolean;
 }
 
+/** Marca manual (sin QR ni selfie): solo GPS. Queda A_REVISAR para el admin. */
+export class MarcarManualDto {
+  /** Opcional y se ignora: el servidor interpreta cada marca por orden y pares. */
+  @IsOptional() @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' })
+  tipo?: TipoMarca;
+
+  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) lat!: number;
+  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) lng!: number;
+  @Type(() => Number) @IsNumber() @Min(0) @Max(100000) precision!: number;
+
+  @IsOptional() @IsBoolean() consentimiento?: boolean;
+}
+
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 export class ConfigurarAsistenciaDto {
@@ -122,13 +135,6 @@ export class ListarMarcasDto {
 
 export class MiHistorialDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(62) dias?: number;
-}
-
-/** Marca sin celular: usuario (documento) y contraseña de Caprichos. `tipo` vacío = la siguiente marca lógica. */
-export class MarcarWebDto {
-  @IsString() @MinLength(3) @MaxLength(20) usuario!: string;
-  @IsString() @MinLength(1) @MaxLength(200) contrasena!: string;
-  @IsOptional() @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' }) tipo?: TipoMarca;
 }
 
 export class RevisarMarcaDto {
