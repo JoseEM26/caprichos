@@ -75,6 +75,9 @@ const LIMITE_FALLOS_USUARIO = 5;
 const LIMITE_FALLOS_IP = 20;
 const MAX_SALTO_KMH = 150;
 const MAX_SALTO_M = 50;
+/** Más allá de esta precisión (m) la ubicación no sirve ni para revisión. */
+export const PRECISION_TOPE_M = 300;
+
 export const VERSION_CONSENTIMIENTO = '2026-11';
 export const TEXTO_CONSENTIMIENTO =
   'Para registrar tu asistencia se usan tu ubicación en el momento de marcar, una foto (selfie) y la hora del servidor. ' +
@@ -283,24 +286,17 @@ export class AsistenciaService {
       );
     }
 
-    // El aviso se pide una sola vez: se guarda en cuanto llega aceptado, antes de validar lo demás,
-    // para que un rechazo posterior (radio, QR, GPS) no lo pierda. Solo se repite si cambia la versión.
-    const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
-    if (consentimiento?.version !== VERSION_CONSENTIMIENTO) {
-      if (dto.consentimiento !== true) {
-        throw new RechazoAsistencia('CONSENTIMIENTO_REQUERIDO', 'Acepta el aviso de datos personales para marcar.', false);
-      }
-      await this.prisma.asistenciaConsentimiento.upsert({
-        where: { party_id: partyId },
-        create: { party_id: partyId, version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
-        update: { version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
-      });
-    }
+    // Decisión del dueño (10/11/2026): ya no se pide consentimiento para marcar; el aviso de datos no bloquea.
 
     if (cfg.localLat === null || cfg.localLng === null) {
       throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
     }
-    const selfie = manual ? null : decodificarSelfie(dto.selfie);
+    // Sin foto solo si la cámara no abrió (`sinSelfie`): se acepta pero queda A_REVISAR
+    const sinFoto = !manual && !dto.selfie && dto.sinSelfie === true;
+    if (!manual && !dto.selfie && !sinFoto) {
+      throw new RechazoAsistencia('SELFIE_INVALIDA', 'Falta la foto. Si la cámara no abre, elige «Continuar sin foto».');
+    }
+    const selfie = manual || sinFoto ? null : decodificarSelfie(dto.selfie as string);
 
     const secreto = this.secreto();
     const slot = manual ? null
@@ -322,11 +318,15 @@ export class AsistenciaService {
     const lectura = await this.leerNuevaMarca(partyId, jornada, ahora, cfg);
     const tipo = lectura.rol;
 
-    if (dto.precision > cfg.precisionMaxM) {
-      throw new RechazoAsistencia('PRECISION_BAJA', 'Acércate y activa la ubicación precisa del dispositivo.');
+    // Ubicación aproximada (celulares sin GPS preciso): ya no se rechaza; se acepta si el punto, con su margen de
+    // error, puede estar dentro del radio, y la marca queda A_REVISAR. Más allá de PRECISION_TOPE_M sí se rechaza.
+    if (dto.precision > PRECISION_TOPE_M) {
+      throw new RechazoAsistencia('PRECISION_BAJA', 'La ubicación es muy imprecisa. Activa el GPS del celular y sal a un lugar abierto.');
     }
     const metros = distanciaMetros(cfg.localLat, cfg.localLng, dto.lat, dto.lng);
-    if (metros > cfg.radioM) {
+    const imprecisa = dto.precision > cfg.precisionMaxM;
+    const margen = imprecisa ? Math.min(dto.precision, PRECISION_TOPE_M) : 0;
+    if (metros > cfg.radioM + margen) {
       throw new RechazoAsistencia(
         'FUERA_DE_RADIO',
         `Estás a ${Math.round(metros)} m del local. Debes estar a ${cfg.radioM} m o menos para marcar.`,
@@ -342,8 +342,12 @@ export class AsistenciaService {
       { lat: dto.lat, lng: dto.lng, precision: dto.precision, momento: ahora },
       previas.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
     );
-    const estado = manual || alertas.length ? 'A_REVISAR' : 'VALIDA';
-    const motivos = [...(manual ? [MOTIVO_MARCA_MANUAL] : []), ...alertas];
+    const avisos = [
+      ...(imprecisa ? [`Ubicación aproximada (±${Math.round(dto.precision)} m)`] : []),
+      ...(sinFoto ? ['Sin selfie: la cámara del celular no abrió'] : []),
+    ];
+    const estado = manual || alertas.length || avisos.length ? 'A_REVISAR' : 'VALIDA';
+    const motivos = [...(manual ? [MOTIVO_MARCA_MANUAL] : []), ...avisos, ...alertas];
 
     try {
       const marca = await this.prisma.$transaction(async (tx) => {
@@ -464,9 +468,7 @@ export class AsistenciaService {
       where: { party_id: partyId, jornada: fechaDb(jornada), estado: { not: 'ANULADA' } },
       orderBy: { momento: 'asc' },
     });
-    const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
-    const vigente = consentimiento?.version === VERSION_CONSENTIMIENTO;
     return {
       jornada,
       ahora: ahora.toISOString(),
@@ -486,10 +488,10 @@ export class AsistenciaService {
       }),
       interpretacion: { estado: dia.interp.estado, alertas: dia.interp.alertas, tramos: dia.interp.tramos },
       dobleMarcaMin: cfg.dobleMarcaMin,
-      consentimientoAceptado: vigente,
-      consentimientoAceptadoEn: vigente ? consentimiento!.aceptado_en.toISOString() : null,
+      consentimientoAceptado: false,
+      consentimientoAceptadoEn: null,
       textoConsentimiento: TEXTO_CONSENTIMIENTO,
-      consentimiento: vigente ? null : { version: VERSION_CONSENTIMIENTO, texto: TEXTO_CONSENTIMIENTO },
+      consentimiento: null,
       dispositivoVinculado: Boolean(dispositivo),
       /** Solo si hay punto configurado; nunca las coordenadas. */
       localConUbicacion: cfg.localLat !== null && cfg.localLng !== null,

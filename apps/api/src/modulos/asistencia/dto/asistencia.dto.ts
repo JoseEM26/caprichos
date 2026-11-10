@@ -55,10 +55,16 @@ export class MarcarDto {
   @Max(100000)
   precision!: number;
 
-  /** Selfie JPEG en base64 (con o sin prefijo data:). */
+  /** Selfie JPEG en base64 (con o sin prefijo data:). Opcional si la cámara no abrió (`sinSelfie`). */
+  @IsOptional()
   @IsString()
   @MaxLength(400000)
-  selfie!: string;
+  selfie?: string;
+
+  /** La cámara del celular no abrió: se acepta la marca sin foto y queda A_REVISAR. */
+  @IsOptional()
+  @IsBoolean()
+  sinSelfie?: boolean;
 
   /** Identificador aleatorio del navegador (se guarda como huella, nunca en claro). */
   @IsString()

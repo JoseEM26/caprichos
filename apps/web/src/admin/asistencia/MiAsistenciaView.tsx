@@ -20,7 +20,7 @@ import { BotonInstalarApp } from '../../pwa/BotonInstalarApp';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
-import { leerQrDeVideo, mensajeErrorCamara, pedirCamara } from './escanerQr';
+import { leerQrDeVideo, mensajeErrorCamara, pedirCamara, mensajeErrorUbicacion, pedirUbicacionTolerante } from './escanerQr';
 import './asistencia.css';
 
 const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
@@ -59,17 +59,6 @@ async function capturarSelfie(video: HTMLVideoElement): Promise<string> {
   throw new Error('La foto quedó muy pesada. Vuelve a tomarla con menos luz de fondo.');
 }
 
-function pedirUbicacion(): Promise<{ lat: number; lng: number; precision: number }> {
-  return new Promise((resolver, rechazar) => {
-    if (!navigator.geolocation) return rechazar(new Error('Este celular no permite ubicación.'));
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolver({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy }),
-      () => rechazar(new Error('Activa la ubicación del celular y da permiso al navegador.')),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  });
-}
-
 export function MiAsistenciaView() {
   const [hoy, setHoy] = useState<MiHoy | null>(null);
   const [historial, setHistorial] = useState<any[]>([]);
@@ -84,9 +73,6 @@ export function MiAsistenciaView() {
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
   const [manual, setManual] = useState(false); // sin QR ni selfie: solo GPS, queda para revisión
-  const [aceptaConsent, setAceptaConsent] = useState(false);
-  const [aceptadoEnSesion, setAceptadoEnSesion] = useState(false);
-  const [verAviso, setVerAviso] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
@@ -94,6 +80,10 @@ export function MiAsistenciaView() {
   const [modoCamara, setModoCamara] = useState<'environment' | 'user'>('environment');
   const [variasCamaras, setVariasCamaras] = useState(false);
   const [errorCamara, setErrorCamara] = useState<string | null>(null);
+  const [errorUbic, setErrorUbic] = useState<string | null>(null);
+  const [intentoUbic, setIntentoUbic] = useState(0);
+  const [forzarUbic, setForzarUbic] = useState(false);
+  const [sinFoto, setSinFoto] = useState(false); // la cámara no abrió: se marca sin selfie y queda para revisión
 
   const recargar = async () => {
     try {
@@ -139,6 +129,9 @@ export function MiAsistenciaView() {
     setModoCamara('environment');
     setUbicacion(null);
     setSelfie(null);
+    setSinFoto(false);
+    setErrorUbic(null);
+    setForzarUbic(false);
     setManual(false);
     setPaso('escanear');
   };
@@ -148,6 +141,9 @@ export function MiAsistenciaView() {
     setError(null);
     setUbicacion(null);
     setSelfie(null);
+    setSinFoto(false);
+    setErrorUbic(null);
+    setForzarUbic(false);
     setManual(true);
     setPaso('ubicacion');
   };
@@ -181,11 +177,12 @@ export function MiAsistenciaView() {
     };
   }, [paso, modoCamara]);
 
-  // Ubicación al entrar a su paso
+  // Ubicación al entrar a su paso (con reintento y modo aproximado si el GPS preciso falla)
   useEffect(() => {
     if (paso !== 'ubicacion') return;
     let cancelado = false;
-    pedirUbicacion()
+    setErrorUbic(null);
+    pedirUbicacionTolerante(forzarUbic)
       .then((u) => {
         if (cancelado) return;
         setUbicacion(u);
@@ -193,17 +190,18 @@ export function MiAsistenciaView() {
         else setPaso('selfie');
       })
       .catch((e) => {
-        if (!cancelado) setError(mensajeDe(e, 'No pudimos leer tu ubicación.'));
+        if (!cancelado) setErrorUbic(mensajeErrorUbicacion(e));
       });
     return () => {
       cancelado = true;
     };
-  }, [paso, manual]);
+  }, [paso, manual, intentoUbic, forzarUbic]);
 
   // Cámara frontal para la selfie
   useEffect(() => {
     if (paso !== 'selfie') return;
-    abrirCamara('user').catch((e) => setError(mensajeErrorCamara(e)));
+    setErrorCamara(null);
+    abrirCamara('user').catch((e) => setErrorCamara(mensajeErrorCamara(e)));
     return () => detenerCamara();
   }, [paso]);
 
@@ -220,34 +218,26 @@ export function MiAsistenciaView() {
 
   async function enviar(directo?: { u: { lat: number; lng: number; precision: number } }) {
     const u = directo?.u ?? ubicacion;
-    if (!u || (!directo && !selfie)) return;
+    if (!u || (!directo && !selfie && !sinFoto)) return;
     setEnviando(true);
     setError(null);
     try {
       // Sin `tipo`: el servidor lee cada marca por orden y pares y dice qué interpretó
-      const consentimiento = hoy?.consentimiento ? aceptaConsent : undefined;
       const r = directo
-        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision, consentimiento })
+        ? await marcarManual({ lat: u.lat, lng: u.lng, precision: u.precision })
         : await marcarAsistencia({
             ...(qrTexto ? { qr: qrTexto } : { codigo: codigo.replace(/\s+/g, '') }),
             lat: u.lat,
             lng: u.lng,
             precision: u.precision,
-            selfie: selfie!,
+            ...(selfie ? { selfie } : { sinSelfie: true }),
             dispositivo: identificadorDispositivo(),
-            consentimiento,
           });
       setMensajeOk(r.mensaje + (r.marca.estado === 'A_REVISAR' ? ' (queda para revisión del administrador)' : ''));
       setPaso('listo');
       await recargar();
     } catch (e) {
-      const x = e as any;
-      const codigo = x?.codigo ?? x?.response?.codigo;
-      // El servidor guarda el aviso aceptado aunque la marca se rechace: se recarga para no volver a pedirlo.
-      if (codigo !== 'CONSENTIMIENTO_REQUERIDO') {
-        if (aceptaConsent) setAceptadoEnSesion(true);
-        await recargar();
-      }
+      await recargar();
       setError(mensajeDe(e, 'No se pudo registrar tu marca. Intenta otra vez.'));
       setPaso('inicio');
     } finally {
@@ -259,9 +249,8 @@ export function MiAsistenciaView() {
   if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
   const ultima = hoy.marcas.filter((m) => !m.duplicada).slice(-1)[0];
-  const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado && !aceptadoEnSesion;
   const sinUbicacion = hoy.localConUbicacion === false;
-  const puedeMarcar = !sinUbicacion && (!faltaConsent || aceptaConsent);
+  const puedeMarcar = !sinUbicacion;
   const indice = INDICE_PASO[paso];
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
@@ -307,23 +296,6 @@ export function MiAsistenciaView() {
         </div>
       )}
 
-      {faltaConsent && hoy.consentimiento && (
-        <label className="ma-consent">
-          <span>{hoy.consentimiento.texto}</span>
-          <span className="ma-check">
-            <input type="checkbox" checked={aceptaConsent} onChange={(e) => setAceptaConsent(e.target.checked)} /> Acepto el tratamiento de mis datos para el control de asistencia.
-          </span>
-        </label>
-      )}
-
-      {!faltaConsent && hoy.consentimientoAceptado && hoy.consentimientoAceptadoEn && (
-        <p className="as-ayuda" data-testid="aviso-aceptado">
-          Aceptaste el aviso de datos el {new Date(hoy.consentimientoAceptadoEn).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })}.{' '}
-          <button type="button" className="ma-enlace" onClick={() => setVerAviso((v) => !v)}>{verAviso ? 'Ocultar aviso' : 'Ver aviso'}</button>
-          {verAviso && <span> {hoy.textoConsentimiento}</span>}
-        </p>
-      )}
-
       {indice !== undefined && (
         <ol className="ma-pasos" aria-label="Pasos de la marca">
           {NOMBRES_PASOS.map((n, i) => (
@@ -344,7 +316,6 @@ export function MiAsistenciaView() {
             Marcar manualmente (sin QR)
           </Boton>
           <p className="as-ayuda">Si no puedes escanear el QR: se usa solo tu ubicación, sin foto, y el administrador revisa tu marca.</p>
-          {faltaConsent && !aceptaConsent && <p className="as-ayuda">Acepta el aviso de datos para poder marcar.</p>}
         </>
       )}
 
@@ -379,8 +350,20 @@ export function MiAsistenciaView() {
       {paso === 'ubicacion' && (
         <section className="ma-card">
           <h3>2. Ubicación</h3>
-          <Cargando mensaje="Leyendo tu ubicación precisa…" />
-          {error && <Boton type="button" variante="texto" onClick={() => setPaso('inicio')}>Cancelar</Boton>}
+          {!errorUbic && <Cargando mensaje={forzarUbic ? 'Buscando tu ubicación aproximada…' : 'Leyendo tu ubicación…'} />}
+          {errorUbic && (
+            <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-ubicacion">{errorUbic}</div>
+          )}
+          {errorUbic && (
+            <>
+              <Boton type="button" tamano="grande" onClick={() => setIntentoUbic((n) => n + 1)}>Volver a pedir ubicación</Boton>
+              <Boton type="button" variante="secundario" onClick={() => { setForzarUbic(true); setIntentoUbic((n) => n + 1); }}>
+                Forzar ubicación aproximada
+              </Boton>
+              <p className="as-ayuda">«Forzar» usa la ubicación por red/WiFi cuando el GPS no responde. La marca puede quedar para revisión del administrador.</p>
+            </>
+          )}
+          <Boton type="button" variante="texto" onClick={() => setPaso('inicio')}>Cancelar</Boton>
         </section>
       )}
 
@@ -389,7 +372,19 @@ export function MiAsistenciaView() {
           <h3>3. Selfie</h3>
           <div className="as-ayuda">Tómate una selfie para confirmar tu marca.</div>
           <video ref={video} muted playsInline className="ma-video" />
-          <Boton type="button" tamano="grande" onClick={() => void tomarSelfie()}>Tomar selfie</Boton>
+          {errorCamara && <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-camara-selfie">{errorCamara}</div>}
+          {!errorCamara && <Boton type="button" tamano="grande" onClick={() => void tomarSelfie()}>Tomar selfie</Boton>}
+          {errorCamara && (
+            <>
+              <Boton type="button" variante="secundario" onClick={() => { setErrorCamara(null); abrirCamara('user').catch((e) => setErrorCamara(mensajeErrorCamara(e))); }}>
+                Reintentar cámara
+              </Boton>
+              <Boton type="button" tamano="grande" onClick={() => { setSinFoto(true); setSelfie(null); setPaso('confirmar'); }}>
+                Continuar sin foto
+              </Boton>
+              <p className="as-ayuda">Sin foto la marca queda para revisión del administrador.</p>
+            </>
+          )}
         </section>
       )}
 

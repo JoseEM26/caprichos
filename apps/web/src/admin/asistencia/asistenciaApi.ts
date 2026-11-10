@@ -73,7 +73,9 @@ export interface DatosMarca {
   lat: number;
   lng: number;
   precision: number;
-  selfie: string;
+  selfie?: string;
+  /** La cámara no abrió: la marca se acepta sin foto y queda para revisión. */
+  sinSelfie?: boolean;
   dispositivo: string;
   consentimiento?: boolean;
 }

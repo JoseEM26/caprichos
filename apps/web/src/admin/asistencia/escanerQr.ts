@@ -26,7 +26,69 @@ export async function pedirCamara(modo: 'environment' | 'user'): Promise<MediaSt
     e.name = 'SinCamara';
     throw e;
   }
-  return navigator.mediaDevices.getUserMedia({ video: { facingMode: modo }, audio: false });
+  try {
+    return await navigator.mediaDevices.getUserMedia({ video: { facingMode: modo }, audio: false });
+  } catch (e) {
+    const nombre = (e as { name?: string })?.name;
+    // Celulares viejos o con restricciones raras: se reintenta con cualquier cámara disponible
+    if (nombre === 'OverconstrainedError' || nombre === 'NotFoundError' || nombre === 'NotReadableError' || nombre === 'AbortError') {
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    throw e;
+  }
+}
+
+export interface PuntoGps {
+  lat: number;
+  lng: number;
+  precision: number;
+}
+
+/** Mensaje claro y accionable para cada fallo del GPS (códigos 1 permiso, 2 sin señal, 3 tiempo agotado). */
+export function mensajeErrorUbicacion(e: unknown): string {
+  const codigo = (e as { code?: number })?.code;
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    return 'La ubicación solo funciona en una página segura (HTTPS).';
+  }
+  if (codigo === 1) {
+    return 'El navegador no tiene permiso para tu ubicación. Toca el candado de la barra de direcciones › Permisos › Ubicación › Permitir, y vuelve a intentar.';
+  }
+  if (codigo === 2) {
+    return 'No hay señal de ubicación. Activa el GPS (Ubicación) del celular, sal a un lugar abierto o acércate a una ventana, y vuelve a intentar.';
+  }
+  if (codigo === 3) {
+    return 'La ubicación tardó demasiado en responder. Activa el GPS del celular y vuelve a intentar.';
+  }
+  return (e as { message?: string })?.message || 'No pudimos leer tu ubicación. Activa el GPS y da permiso al navegador.';
+}
+
+const leerGps = (opciones: PositionOptions): Promise<PuntoGps> =>
+  new Promise((resolver, rechazar) => {
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolver({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy }),
+      rechazar,
+      opciones,
+    );
+  });
+
+/**
+ * Lee la ubicación con tolerancia: primero GPS preciso (12 s); si falla por tiempo o por falta de señal, reintenta con
+ * ubicación aproximada (red/WiFi, hasta 20 s, acepta una lectura de hasta 60 s). «Forzar» salta directo al modo aproximado.
+ * Si el permiso está denegado no se reintenta: el mensaje explica cómo permitirlo.
+ */
+export async function pedirUbicacionTolerante(forzar = false): Promise<PuntoGps> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    const e = new Error('Este celular o navegador no permite leer la ubicación.');
+    throw e;
+  }
+  if (!forzar) {
+    try {
+      return await leerGps({ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    } catch (e) {
+      if ((e as { code?: number })?.code === 1) throw e;
+    }
+  }
+  return leerGps({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
 }
 
 const ANCHO_ANALISIS = 640;
