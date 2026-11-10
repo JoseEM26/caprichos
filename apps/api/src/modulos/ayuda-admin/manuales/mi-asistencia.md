@@ -46,6 +46,12 @@ Ver tambien: [[asistencia]]
 5. Si hay varias camaras y la que se abre no sirve, pulsa Cambiar cámara. Si el navegador bloqueo la camara, el aviso explica como permitirla.
 Antes: [[asistencia-pantalla]]
 
+## Como se hace: Marcar manualmente (sin QR)
+Si no puedes escanear el QR (computadora sin camara o sin celular), inicia sesion normal, entra a Mi asistencia y toca Marcar manualmente (sin QR). Solo se lee tu ubicacion: debes estar dentro del radio del local; no hay foto. Si estas lejos o sin GPS, se rechaza con un mensaje. La marca queda A revisar y solo cuenta para el pago cuando el Administrador la aprueba.
+
+## Como se hace: Instalar la app
+En Mi asistencia o en la pantalla de ingreso toca Instalar app. En Chrome o Edge (PC y Android) se instala con un clic; en iPhone, Compartir y Anadir a pantalla de inicio. La app Caprichos Asistencia se abre directo en Mi asistencia y, si no tienes sesion, vuelve aqui despues de iniciarla.
+
 ## Como se hace: Marcar el almuerzo
 1. Cuando sales a almorzar, entra a Mi asistencia: el sistema te pide "Salida a almuerzo" si tu turno tiene almuerzo y ya marcaste entrada.
 2. Haz el mismo recorrido (QR, Ubicacion, Selfie, Confirmar marca).

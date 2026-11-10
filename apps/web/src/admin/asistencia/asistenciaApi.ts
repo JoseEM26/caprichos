@@ -112,7 +112,7 @@ export interface MarcaAdmin {
   nombre: string;
   jornada: string;
   tipo: TipoMarca;
-  origen: 'CELULAR' | 'CORRECCION' | 'WEB';
+  origen: 'CELULAR' | 'CORRECCION' | 'WEB' | 'MANUAL';
   momento: string;
   estado: string;
   alertas: string | null;
@@ -162,6 +162,9 @@ export interface MiPropina {
 }
 export const miPropinas = () => api.get<MiPropina[]>('/admin/asistencia/mi/propinas');
 export const marcarAsistencia = (datos: DatosMarca) => api.post<ResultadoMarca>('/admin/asistencia/marcar', datos);
+/** Sin QR ni selfie: solo GPS en el radio del local; la marca queda por revisar. */
+export const marcarManual = (datos: { tipo: TipoMarca; lat: number; lng: number; precision: number; consentimiento?: boolean }) =>
+  api.post<ResultadoMarca>('/admin/asistencia/marcar-manual', datos);
 export const reporteHoy = () => api.get<{ jornada: string; filas: FilaHoy[] }>('/admin/asistencia/hoy');
 export const reporteMes = (anio: number, mes: number) =>
   api.get<{ dias: string[]; filas: FilaMes[]; personas: ResumenMes[] }>(`/admin/asistencia/mes?anio=${anio}&mes=${mes}&formato=json`);
@@ -227,13 +230,3 @@ export interface MiResumen {
   jornadasPorRevisar: number;
 }
 export const miResumen = () => api.get<MiResumen>('/admin/asistencia/mi/resumen');
-
-/** Marcar sin celular (página pública): usuario y contraseña de Caprichos. No abre sesión. */
-export interface ResultadoMarcaWeb {
-  ok: boolean;
-  mensaje: string;
-  tipo: TipoMarca;
-  pendiente: TipoMarca | null;
-}
-export const marcarConClave = (datos: { usuario: string; contrasena: string; tipo?: TipoMarca }) =>
-  api.post<ResultadoMarcaWeb>('/carta/asistencia-web/marcar', datos);

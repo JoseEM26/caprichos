@@ -1,11 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const marcar = vi.fn();
-vi.mock('../asistenciaApi', async (orig) => ({
-  ...(await orig<any>()),
-  marcarConClave: (...a: any[]) => marcar(...a),
-}));
 const listar = vi.fn();
 const detalle = vi.fn();
 const pagar = vi.fn();
@@ -16,7 +11,6 @@ vi.mock('../planillaApi', async (orig) => ({
   pagarPlanilla: (...a: any[]) => pagar(...a),
 }));
 
-import { MarcarConClavePage } from '../MarcarConClavePage';
 import { PlanillaTab } from '../PlanillaTab';
 import { sueldoEquivalente } from '../planillaApi';
 
@@ -24,28 +18,6 @@ describe('sueldoEquivalente (web)', () => {
   it('mensual ×12/52 y semanal ×52/12', () => {
     expect(sueldoEquivalente('MENSUAL', 1000)).toEqual({ semanal: 230.77, mensual: 1000 });
     expect(sueldoEquivalente('SEMANAL', 300)).toEqual({ semanal: 300, mensual: 1300 });
-  });
-});
-
-describe('MarcarConClavePage (pública)', () => {
-  it('envía usuario y contraseña, muestra el resultado y limpia la contraseña', async () => {
-    marcar.mockResolvedValue({ ok: true, mensaje: 'Marcaste tu entrada a las 13:30. Queda pendiente de revisión del administrador.', tipo: 'ENTRADA', pendiente: 'SALIDA' });
-    render(<MarcarConClavePage />);
-    fireEvent.change(screen.getByLabelText(/Usuario/), { target: { value: '12345678' } });
-    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'secreta' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Marcaste tu entrada');
-    expect(marcar).toHaveBeenCalledWith({ usuario: '12345678', contrasena: 'secreta' });
-    expect((screen.getByLabelText('Contraseña') as HTMLInputElement).value).toBe('');
-  });
-
-  it('muestra el mensaje genérico del servidor si falla', async () => {
-    marcar.mockRejectedValue({ message: 'Usuario o contraseña incorrectos' });
-    render(<MarcarConClavePage />);
-    fireEvent.change(screen.getByLabelText(/Usuario/), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Usuario o contraseña incorrectos');
   });
 });
 
