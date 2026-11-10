@@ -208,6 +208,8 @@ export interface Pedido {
   /** Promociones, cupón y descuento del personal aplicados (con su monto) */
   descuento_detalle?: unknown;
   puntos_canjeados?: string | number | null;
+  /** Canje de puntos en el local: cuántos y quién lo aplicó (auditoría CANJE_PUNTOS_LOCAL) */
+  canjePuntos?: { puntos: number; aplicadoPor: string | null } | null;
   envio?: string | number | null;
   total: string | number;
   comprobante_tipo?: string | null;

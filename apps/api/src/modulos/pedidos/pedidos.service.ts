@@ -1064,16 +1064,22 @@ export class PedidosService {
 
     // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
+    let partyCanje: bigint | string | number | null = null;
     if (puntosCanje > 0) {
       if (personal) {
         throw new BadRequestException({ codigo: 'PUNTOS_NO_APLICAN_PERSONAL', mensaje: 'El pedido del personal no canjea puntos' });
       }
-      const partyCliente = origen?.clientePartyId;
+      // Carta/WhatsApp: la cuenta con sesión. Caja/mozo: SOLO la cuenta elegida en este pedido por celular
+      // (clienteTelefono o clientePartyId verificado en clienteIdentificado); el colaborador del personal no cuenta.
+      const canalLocalCanje = canalPedido === 'MOZO' || canalPedido === 'CAJA';
+      const partyCliente = canalLocalCanje ? (dto.clienteTelefono || dto.clientePartyId ? clienteFinal : null) : origen?.clientePartyId;
       const cuentaActiva = partyCliente && this.direcciones ? await this.direcciones.datosCuentaActiva(BigInt(partyCliente)) : null;
       if (!partyCliente || !this.puntosService || !cuentaActiva) {
         throw new BadRequestException({
           codigo: 'PUNTOS_REQUIEREN_CUENTA',
-          mensaje: 'Ingresa con tu cuenta para usar tus puntos',
+          mensaje: canalLocalCanje
+            ? 'Elige al cliente con su cuenta (por celular) para canjear sus puntos; un invitado no tiene puntos'
+            : 'Ingresa con tu cuenta para usar tus puntos',
         });
       }
       if (desgloseDescuento.cuponId || desgloseDescuento.cuponEmitidoId) {
@@ -1082,6 +1088,7 @@ export class PedidosService {
           mensaje: 'No se pueden usar puntos y un cupón en el mismo pedido',
         });
       }
+      partyCanje = partyCliente;
       const saldo = await this.puntosService.obtenerSaldo(partyCliente as any);
       if (puntosCanje > saldo) {
         throw new BadRequestException({
@@ -1392,8 +1399,29 @@ export class PedidosService {
       // 9.5. Canje de puntos DENTRO de la misma transacción: si falla, se revierte todo (pedido, stock controlado,
       // cupones y puntos) en lugar de dejar un pedido ANULADO con el stock ya descontado.
       totalFinal = Number(pedido.total);
-      if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
-        await this.puntosService.canjear(origen.clientePartyId as any, puntosCanje, pedido.id, tx);
+      if (puntosCanje > 0 && this.puntosService && partyCanje) {
+        const saldoAntes = await this.puntosService.obtenerSaldo(partyCanje as any);
+        const r = await this.puntosService.canjear(partyCanje as any, puntosCanje, pedido.id, tx);
+        if (canalPedido === 'MOZO' || canalPedido === 'CAJA') {
+          // Canje en el local: queda quién lo aplicó (dentro de la transacción: si el pedido no se crea, tampoco la auditoría)
+          await this.auditoria?.registrar({
+            categoria: 'CAMBIO',
+            modulo: 'puntos',
+            accion: 'CANJE_PUNTOS_LOCAL',
+            entidad: 'pedido',
+            entidadId: pedido.id,
+            partyId: origen?.usuarioPartyId !== undefined ? BigInt(origen.usuarioPartyId) : undefined,
+            despues: {
+              usuario: origen?.usuarioPartyId?.toString() ?? null,
+              canal: canalPedido,
+              cliente: partyCanje.toString(),
+              pedido: pedido.codigo,
+              puntos: puntosCanje,
+              saldoAntes,
+              saldoDespues: r.saldoRestante,
+            },
+          }, tx);
+        }
       }
 
       return pedido;

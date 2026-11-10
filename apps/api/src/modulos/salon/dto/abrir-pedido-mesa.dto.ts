@@ -58,6 +58,13 @@ export class AbrirPedidoMesaDto {
   @IsString()
   cuponCodigo?: string;
 
+  /** Puntos que canjea el cliente elegido por celular (1 punto = S/ 1). Mismas reglas que la carta; lo valida PedidosService. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  puntosCanje?: number;
+
   @IsOptional()
   @IsString()
   canal?: 'MOZO' | 'CAJA';

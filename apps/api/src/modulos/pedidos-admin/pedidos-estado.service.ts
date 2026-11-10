@@ -1010,8 +1010,18 @@ export class PedidosEstadoService {
           texto: String(ultimoAjuste.motivo),
         }
       : null;
+    // Canje de puntos hecho en el local: quién lo aplicó (auditoría CANJE_PUNTOS_LOCAL)
+    let canjePuntos: { puntos: number; aplicadoPor: string | null } | null = null;
+    if (Number(pedido.puntos_canjeados ?? 0) > 0) {
+      const reg = await this.prisma.auditoria
+        .findFirst({ where: { accion: 'CANJE_PUNTOS_LOCAL', entidad: 'pedido', entidad_id: pedido.id }, select: { party_id: true } })
+        .catch(() => null);
+      const nombre = reg?.party_id ? (await nombresDePartes(this.prisma, [reg.party_id]).catch(() => new Map<string, string>())).get(String(reg.party_id)) ?? null : null;
+      canjePuntos = { puntos: Number(pedido.puntos_canjeados), aplicadoPor: nombre };
+    }
     return {
       ...pedidoSinIncidentes,
+      canjePuntos,
       ajustePago,
       lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
       eventos: eventosPedido,

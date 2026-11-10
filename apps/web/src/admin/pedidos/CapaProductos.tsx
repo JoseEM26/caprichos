@@ -113,7 +113,10 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
           </div>
           {descuentos.map((d, i) => (
             <div className="dp-fila" key={i}>
-              <span>{d.nombre === 'Descuento' || d.tipo === 'PUNTOS' ? d.nombre : `Descuento · ${d.nombre}`}</span>
+              <span>
+                {d.nombre === 'Descuento' || d.tipo === 'PUNTOS' ? d.nombre : `Descuento · ${d.nombre}`}
+                {d.tipo === 'PUNTOS' && pedido.canjePuntos?.aplicadoPor ? ` · aplicado por ${pedido.canjePuntos.aplicadoPor}` : ''}
+              </span>
               <strong style={{ color: 'var(--cp-green, #2F7A45)' }}>- {soles(d.monto)}</strong>
             </div>
           ))}

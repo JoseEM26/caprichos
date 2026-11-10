@@ -79,7 +79,7 @@ describe('puntos por celular (acumularPorPedido)', () => {
 
   it('idempotente: si ya hay SUMA no vuelve a escribir', async () => {
     const { servicio, prisma } = armar(base);
-    prisma.movimientoPuntos.findFirst.mockResolvedValue({ puntos: '5' });
+    prisma.movimientoPuntos.findFirst.mockResolvedValueOnce({ puntos: '5', ciclo: 1 }).mockResolvedValueOnce(null);
     expect(await servicio.acumularPorPedido(1n)).toEqual({ puntos: 5, sumados: false, motivoNo: 'YA_SUMADO' });
     expect(prisma.movimientoPuntos.create).not.toHaveBeenCalled();
   });
