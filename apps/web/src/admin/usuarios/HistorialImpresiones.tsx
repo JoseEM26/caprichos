@@ -237,7 +237,7 @@ export function HistorialImpresiones() {
         </div>
       )}
       {!cargando && !error && datos && datos.datos.length === 0 && (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--cp-soft)', ...caja }}>No hay impresiones con estos filtros.</div>
+        <div style={{ ...caja, padding: 24, textAlign: 'center', color: 'var(--cp-soft)' }}>No hay impresiones con estos filtros.</div>
       )}
 
       {datos && datos.datos.length > 0 && (
