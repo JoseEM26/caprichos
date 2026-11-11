@@ -6,6 +6,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { despacharCompleto, devolverComanda, listarDespacho } from './cocinaApi';
 import { estaSilenciado, reproducirCampanaCocina, setSilenciado } from './audioAlerta';
 import { TiempoEspera } from './TiempoEspera';
+import { InsigniaMesa, textoMesa } from './InsigniaMesa';
 import { detalleLinea, textoSabores } from './cocinaTipos';
 import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
@@ -56,7 +57,7 @@ function detalleConResaltado(l: LineaComanda) {
 
 /** Quién o dónde: mesa, cliente o ambos. */
 function destino(p: PedidoDespacho): string {
-  const mesa = p.enEsperaMesa ? 'En espera de mesa' : p.modalidad === 'MESA' && p.mesa ? `Mesa ${p.mesa}` : '';
+  const mesa = p.enEsperaMesa ? 'En espera de mesa' : p.modalidad === 'MESA' && p.mesa ? (textoMesa(p) ?? '') : '';
   return [mesa, p.cliente].filter(Boolean).join(' · ');
 }
 
@@ -317,6 +318,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 )}
                 <TiempoEspera desde={p.creado_en} minutosRespaldo={p.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '16px' }} />
               </header>
+              <InsigniaMesa modalidad={p.modalidad} mesa={p.mesa} enEsperaMesa={p.enEsperaMesa} testId={`mesa-${p.pedidoId}`} />
               <div data-testid={`nombre-${p.pedidoId}`} title={destino(p) || 'Sin nombre'} style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '24px', fontWeight: 900, lineHeight: 1.15, color: NAVY, ...clamp2 }}>{destino(p) || 'Sin nombre'}</div>
               {p.modalidad === 'DELIVERY' && (p.direccion || p.referencia) && (
                 <div style={{ fontSize: '15px', color: '#2C4C5D', overflowWrap: 'anywhere' }}>{[p.direccion, p.referencia].filter(Boolean).join(' · ')}</div>

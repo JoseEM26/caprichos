@@ -4,6 +4,7 @@ import { devolverComanda } from './cocinaApi';
 import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 import { NumeroDia } from './TiempoEspera';
+import { InsigniaMesa } from './InsigniaMesa';
 
 export interface HistorialViewProps {
   historial: HistorialComanda[];
@@ -127,6 +128,7 @@ export function HistorialView({
                 >
                   {h.ticket || h.codigo}
                 </span>
+                <InsigniaMesa modalidad={h.modalidad} mesa={h.mesa} enEsperaMesa={h.enEsperaMesa} testId={`mesa-${h.id}`} grande={false} />
 
                 <span
                   style={{

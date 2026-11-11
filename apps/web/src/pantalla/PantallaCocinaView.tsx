@@ -9,6 +9,7 @@ import { textoSabores } from '../admin/cocina/cocinaTipos';
 import type { UmbralesCocina } from '../admin/cocina/cocinaTipos';
 import { colorPorMinutos, useTiempoEnVivo } from '../admin/cocina/tiempoEnVivo';
 import { COLOR_TV, NumeroDia, TiempoEspera } from '../admin/cocina/TiempoEspera';
+import { textoMesa } from '../admin/cocina/InsigniaMesa';
 
 export type ModoTV = 'orders' | 'pair' | 'off' | 'out';
 
@@ -106,8 +107,8 @@ function TarjetaCocinaTV({ k }: { k: DatosTarjetaTV }) {
                 {k.code}{' '}
                 <span
                   style={{
-                    fontSize: '13px',
-                    fontWeight: 700,
+                    fontSize: /^(MESA|EN ESPERA)/.test(k.modal) ? '22px' : '13px',
+                    fontWeight: /^(MESA|EN ESPERA)/.test(k.modal) ? 800 : 700,
                     borderRadius: '9999px',
                     padding: '2px 10px',
                     background: '#0B2C3E',
@@ -353,16 +354,14 @@ export function PantallaCocinaView() {
     const mod = (c.modalidad || '').toUpperCase();
     const modalText =
       mod === 'MESA' || mod === 'LOCAL'
-        ? c.mesa
-          ? `MESA ${c.mesa}`
-          : 'MESA'
+        ? (textoMesa(c) ?? 'MESA').toUpperCase()
         : mod === 'DELIVERY'
         ? 'DELIVERY'
         : 'LLEVAR';
     const whoText = c.mesa
       ? c.mozo
         ? `Mozo: ${c.mozo}`
-        : `Mesa ${c.mesa}`
+        : (textoMesa(c) ?? c.mesa)
       : c.mozo
       ? `Mozo: ${c.mozo}`
       : c.canal

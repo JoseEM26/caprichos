@@ -44,6 +44,11 @@ describe('DespachoService', () => {
     expect(p.minutos).toBeGreaterThanOrEqual(10);
   });
 
+  it('la mesa del pedido viaja en el listado de despacho', async () => {
+    prisma.pedido.findMany.mockResolvedValue([pedido({ mesa_nombre: 'Mesas 4 y 5' })]);
+    expect((await service.listar()).pedidos[0].mesa).toBe('Mesas 4 y 5');
+  });
+
   it('completo cuando todas las áreas están listas', async () => {
     prisma.pedido.findMany.mockResolvedValue([
       pedido({

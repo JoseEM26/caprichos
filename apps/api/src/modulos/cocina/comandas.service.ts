@@ -25,6 +25,7 @@ import {
 } from './cocina.util';
 import { motivoResaltado, resaltadoDeLineas, type Resaltado } from './opcion-menos-pedida';
 import { asignarNumeroDia } from './numero-dia';
+import { mesaDePedido } from './mesa-comanda.util';
 
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
@@ -471,9 +472,7 @@ export class ComandasService {
         }))
         .sort((x, y) => Number(BigInt(x.areaId) - BigInt(y.areaId)));
 
-      const mesa =
-        (p as any).mesa ??
-        (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
+      const mesa = mesaDePedido(p);
 
       return {
         id: `${c.pedido_id}-${c.area_id}`,
@@ -1398,9 +1397,7 @@ export class ComandasService {
           nota: l.nota ?? null,
         }));
 
-      const mesa =
-        (p as any).mesa ??
-        (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
+      const mesa = mesaDePedido(p);
 
       return {
         id: `${c.pedido_id}-${c.area_id}`,
