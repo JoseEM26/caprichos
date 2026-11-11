@@ -22,6 +22,7 @@ import {
 import { aplicarCambio, configAFila, configDesdeComportamientoActual, configDesdeGeneral, filaAConfig } from './equipo-config';
 import { leerReglasImpresion } from './reglas-impresion';
 import { FilaEquipo, IdentidadEquipo, clasificarEquipos, claveHost, reconocerEquipo } from './identidad-equipo';
+import { datosOrigen } from './origen-impresion';
 import { construirEtiquetaBebidaPrueba, construirEtiquetaPrueba } from './constructor-etiquetas';
 
 const ESPERA_PRUEBA_MS = 10 * 1000;
@@ -496,6 +497,7 @@ export class EquipoConfigService {
         payload: { ...datos, ...(medida ? { tamanoMm: { anchoMm: medida.anchoMm, altoMm: medida.altoMm, ...(medida.margenMm ? { margenMm: medida.margenMm } : {}) } } : {}) } as any,
         copia: false,
         estado: 'PENDIENTE',
+        ...datosOrigen('PRUEBA', usuario),
         destino_equipo_id: e.id,
         destino_area_id: e.area_id,
       },

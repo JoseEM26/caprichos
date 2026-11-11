@@ -94,6 +94,7 @@ import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPo
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { tamanoEfectivo } from '@caprichos/compartido';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
+import { datosOrigen, deducirOrigen } from './origen-impresion';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
 const TIPOS_ETIQUETA = ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
@@ -799,6 +800,7 @@ export class ImpresionService {
             payload: o.payload as any,
             copia: true,
             estado: 'PENDIENTE',
+            ...datosOrigen('REIMPRESION', usuario),
             clave_idempotencia: `copia:${k}:${Date.now()}`,
           },
         }),
@@ -1056,7 +1058,7 @@ export class ImpresionService {
   /**
    * Pasa un trabajo FALLIDO a PENDIENTE para reintentarlo.
    */
-  async reintentarTrabajo(id: string | number) {
+  async reintentarTrabajo(id: string | number, usuario?: UsuarioAutenticado) {
     let bigId: bigint;
     try {
       bigId = BigInt(id);
@@ -1085,6 +1087,8 @@ export class ImpresionService {
         intentos: 0,
         error: null,
         tomado_en: null,
+        // El mismo trabajo vuelve a la cola: queda como REINTENTO, recordando de qué origen venía
+        ...datosOrigen('REINTENTO', usuario, `era ${deducirOrigen(trabajo as any)}`),
       },
     });
 
@@ -1152,6 +1156,7 @@ await this.anotarResaltadas(pedido);
             payload: payload as any,
             copia: false,
             estado: 'PENDIENTE',
+            ...datosOrigen('AUTOMATICA'),
           },
           update: {}, // No sobreescribir si ya existe
         }).catch((e) => this.logger.debug(`${tipo} ya existe: ${e.message}`));
@@ -1234,6 +1239,7 @@ await this.anotarResaltadas(pedido);
           payload: payload as any,
           copia: false,
           estado: 'PENDIENTE',
+          ...datosOrigen('AUTOMATICA'),
         },
         update: {},
       });
@@ -1343,6 +1349,7 @@ await this.anotarResaltadas(pedido);
         payload: payload as any,
         copia: false,
         estado: 'PENDIENTE',
+        ...datosOrigen('AUTOMATICA'),
       },
       update: {},
     });
@@ -1398,6 +1405,7 @@ await this.anotarResaltadas(pedido);
           payload: { ...payload, simulacion: true } as any,
           copia: false,
           estado: 'PENDIENTE',
+          ...datosOrigen('PRUEBA', usuario, 'simulación de pedido'),
         },
       });
       total += 1;
@@ -1666,6 +1674,7 @@ await this.anotarResaltadas(pedido);
             payload: s.payload as any,
             copia: true,
             estado: 'PENDIENTE',
+            ...datosOrigen('REIMPRESION', usuario),
           },
         }),
       );
@@ -1710,6 +1719,7 @@ await this.anotarResaltadas(pedido);
         payload: payload as any,
         copia: true,
         estado: 'PENDIENTE',
+        ...datosOrigen('REIMPRESION', usuario),
       },
     });
     if (this.auditoria && usuario) {
@@ -1754,7 +1764,7 @@ await this.anotarResaltadas(pedido);
       throw new HttpException({ codigo: 'SIN_IMPRESORA_CAJA', mensaje: motivoSinPc(ctx) }, HttpStatus.CONFLICT);
     }
     const trabajo = await this.prisma.printJob.create({
-      data: { pedido_id: null, ...destino, tipo: 'TICKET_CIERRE', payload: payload as any, copia: false, estado: 'PENDIENTE' },
+      data: { pedido_id: null, ...destino, tipo: 'TICKET_CIERRE', payload: payload as any, copia: false, estado: 'PENDIENTE', ...datosOrigen(usuario ? 'REIMPRESION' : 'AUTOMATICA', usuario) },
     });
     if (this.auditoria && usuario) {
       await this.auditoria.registrar({
@@ -1911,6 +1921,7 @@ await this.anotarResaltadas(pedido);
               payload: it.payload as any,
               copia: true,
               estado: 'PENDIENTE',
+              ...datosOrigen('REIMPRESION', usuario),
             },
           }),
         ),
@@ -2141,6 +2152,7 @@ await this.anotarResaltadas(pedido);
             payload: e.payload as any,
             copia: true,
             estado: 'PENDIENTE',
+            ...datosOrigen('AUTOMATICA', null, 'pedido editado'),
           },
         });
         n += 1;
@@ -2208,6 +2220,7 @@ await this.anotarResaltadas(pedido);
         } as any,
         copia: false,
         estado: 'PENDIENTE',
+        ...datosOrigen('PRUEBA', usuario),
         destino_area_id: dirigida ? areaDestino : (equipoDestino?.areaId ?? null),
         destino_equipo_id: equipoDestino?.id ?? null,
       },
@@ -2286,6 +2299,7 @@ await this.anotarResaltadas(pedido);
             } as any,
             copia: false,
             estado: 'PENDIENTE',
+            ...datosOrigen('PRUEBA', usuario),
             destino_area_id: agente.area_id ?? null,
             destino_equipo_id: agente.id,
           },

@@ -10,6 +10,7 @@ import type {
   ResultadoVerificacionCadena,
 } from './tipos';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import { HistorialImpresiones } from './HistorialImpresiones';
 
 const OPCIONES_MODULOS = [
   { id: '', n: 'Todos' },
@@ -46,7 +47,7 @@ function rangoPreset(preset: string): { desde: string; hasta: string } | null {
 
 const CATEGORIA_API: Record<string, string> = { cambio: 'CAMBIO', acceso: 'ACCESO', sensible: 'LECTURA_SENSIBLE' };
 
-export function AuditoriaView() {
+function AccionesAuditoria() {
   const { tiene } = useSesion();
   const puedeVer = tiene('auditoria/ver');
 
@@ -698,6 +699,53 @@ export function AuditoriaView() {
           Cada registro de auditoría calcula su resumen criptográfico SHA-256 encadenando el hash del registro anterior, asegurando inmutabilidad y no repudio. Si alguien intentara modificar un registro en la base de datos directamente, la cadena se rompería en la verificación nocturna automática.
         </div>
       </details>
+    </div>
+  );
+}
+
+/** Historial: pestaña «Acciones» (auditoría inmutable) y pestaña «Impresiones» (todo lo impreso y de dónde nació). */
+export function AuditoriaView() {
+  const { tiene } = useSesion();
+  const verImpresiones = tiene('pedidos/ver');
+  const [pestana, setPestana] = useState<'acciones' | 'impresiones'>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'impresiones' ? 'impresiones' : 'acciones',
+  );
+  const activa = verImpresiones ? pestana : 'acciones';
+  const boton = (id: 'acciones' | 'impresiones', texto: string) => (
+    <button
+      key={id}
+      type="button"
+      role="tab"
+      id={`hist-tab-${id}`}
+      aria-selected={activa === id}
+      aria-controls="hist-panel"
+      onClick={() => setPestana(id)}
+      style={{
+        minHeight: 44,
+        padding: '0 18px',
+        borderRadius: 9999,
+        border: '1.5px solid var(--cp-navy)',
+        background: activa === id ? 'var(--cp-navy)' : 'transparent',
+        color: activa === id ? 'var(--cp-cream)' : 'var(--cp-navy)',
+        fontWeight: 800,
+        fontSize: 14,
+        cursor: 'pointer',
+      }}
+    >
+      {texto}
+    </button>
+  );
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {verImpresiones && (
+        <div role="tablist" aria-label="Historial" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {boton('acciones', 'Acciones')}
+          {boton('impresiones', 'Impresiones')}
+        </div>
+      )}
+      <div role="tabpanel" id="hist-panel" aria-labelledby={`hist-tab-${activa}`}>
+        {activa === 'impresiones' ? <HistorialImpresiones /> : <AccionesAuditoria />}
+      </div>
     </div>
   );
 }

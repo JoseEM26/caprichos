@@ -109,8 +109,8 @@ describe('Controladores de Impresión', () => {
     });
 
     it('POST /trabajos/:id/reintentar delega al servicio', async () => {
-      await adminController.reintentarTrabajo('12');
-      expect(impresionServiceMock.reintentarTrabajo).toHaveBeenCalledWith('12');
+      await adminController.reintentarTrabajo('12', {});
+      expect(impresionServiceMock.reintentarTrabajo).toHaveBeenCalledWith('12', undefined);
     });
 
     it('POST /pedidos/:id/reimprimir delega al servicio', async () => {

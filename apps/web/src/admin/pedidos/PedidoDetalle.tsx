@@ -42,6 +42,7 @@ import { CapaPago } from './CapaPago';
 import { CapaEntrega } from './CapaEntrega';
 import { PanelImpresion } from './PanelImpresion';
 import { ReimprimirPedido } from './ReimprimirPedido';
+import { ImpresionesDelPedido } from './ImpresionesDelPedido';
 import './detalle-pedido.css';
 
 export interface PedidoDetalleProps {
@@ -435,6 +436,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               alActualizar={alActualizar}
             />
           )}
+          {tiene('pedidos/ver') && <ImpresionesDelPedido pedidoId={String(pedido.id)} />}
         </div>
 
         {/* BARRA DE ACCIONES FIJA */}
