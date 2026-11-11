@@ -13,6 +13,8 @@ sugerencias:
   - ¿Cómo agrego otra computadora para imprimir?
   - ¿Cómo reintento un papel que falló?
   - ¿Cómo reimprimo un sticker o un ticket que ya salió?
+  - ¿Cómo actualizo el programa de impresión a una versión nueva?
+  - Salen papeles dobles: ¿tengo varias copias del programa abiertas?
 ---
 # Configuración: Impresión
 
@@ -88,6 +90,14 @@ Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y esta
 - **Sticker general: alto** (impresion_etiqueta_general_alto_mm): Medida en milímetros del alto del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200. Ejemplo: Con 100: es el segundo 100 de «100 x 100». [Sticker general: alto](/admin/mirest?tab=parametros&campo=parametros-impresion-etiqueta-general-alto-mm)
 
 
+## Como se hace: actualizar el programa y comandos útiles
+Antes de abrir una versión nueva, ciérrala siempre: dos copias a la vez pueden imprimir doble. En Configuración > Impresión, junto a la descarga, está la sección "Comandos útiles y cómo actualizar" con todo para copiar y pegar.
+1. En la PC, abre una ventana de comandos en la carpeta del programa (por ejemplo C:\Caprichos): en la carpeta escribe `cmd` en la barra de direcciones y pulsa Enter.
+2. Cierra TODAS las copias: `agente-impresion-windows.exe --detener-todo`. Dice cuáles cerró ("Cerré 4 copias: pid ...").
+3. Reemplaza el archivo de la carpeta por el recién descargado.
+4. Ábrelo UNA vez (doble clic): queda en segundo plano y arranca solo con Windows. El programa nuevo también cierra solo las copias anteriores que encuentre.
+Otros comandos (en la misma ventana): `--estado` (versión en uso, última disponible, cuántas copias hay y desde dónde arranca con Windows), `--copias` (lista las copias corriendo), `--version` (solo la versión), `autoinicio desactivar` y `autoinicio activar` (quitar o poner el inicio con Windows).
+
 ## Errores y dudas comunes
 - ¿Se configura por cada PC o una para todas? Las reglas (Paso 2) son una sola para todo el local. Cada PC solo elige sus impresoras y su área (Paso 1).
 - Me sale un papel que no pedí: mira la tabla del Paso 2 y apaga esa pieza en esa columna. En el local no debe salir ningún sticker.
@@ -99,6 +109,7 @@ Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y esta
 - Quiero otro sticker o ticket igual a uno que ya salió: en "Lo último que se imprimió" (o "Ver toda la cola") busca la fila, pulsa "Reimprimir" y confirma. Sale en la misma máquina, marcado COPIA.
 - El sticker sale cortado o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado.
 - "No elegiste impresora de tickets/stickers": entra a "Cambiar impresoras" de esa PC y elige una.
+- Salen papeles dobles o el estado dice "Hay N copias": quedaron varias copias del programa abiertas. Escribe `--detener-todo` junto al programa (ventana de comandos en su carpeta) y ábrelo una sola vez.
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
 
 ## Quien puede hacerlo

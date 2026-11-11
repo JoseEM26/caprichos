@@ -7,6 +7,7 @@ import { mismaRuta, rutaRegistrada } from './autoarranque';
 import type { OpcionesAutoarranque } from './autoarranque';
 import { leerEstado, pidEnMarcha } from './segundoPlano';
 import type { VivoFn } from './segundoPlano';
+import type { CopiaPrograma } from './copias';
 
 /** Todo inyectable: los tests no tocan el registro, la red ni las impresoras reales. */
 export interface DepsEstado extends OpcionesAutoarranque {
@@ -18,6 +19,15 @@ export interface DepsEstado extends OpcionesAutoarranque {
   verificarRed(destino: string): Promise<{ ok: boolean; detalle?: string }>;
   /** Última versión publicada (GET ligero, sin llave). Lanza si no hay conexión. */
   consultarVersion(apiUrl: string): Promise<string | undefined>;
+  /** Otras copias del programa corriendo (ver copias.ts). Opcional: si falta, el informe no habla de copias. */
+  copias?(): Promise<CopiaPrograma[]>;
+}
+
+/** Última versión publicada: GET ligero a la API, con tiempo máximo corto. Lanza si no hay red. */
+export async function consultarUltimaVersion(apiUrl: string, ms = 4000, f: typeof fetch = fetch): Promise<string | undefined> {
+  const res = await f(`${apiUrl.replace(/\/+$/, '')}/api/agente-impresion/version`, { signal: AbortSignal.timeout(ms) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return ((await res.json()) as any)?.publicada?.version ?? undefined;
 }
 
 export interface InformeEstado {
@@ -29,6 +39,8 @@ export interface InformeEstado {
   conexion: { ok: boolean; error?: string; ultimoLatido?: string };
   impresoras: { rol: RolImpresora; configurada: boolean; destino?: string; nombre?: string; ok: boolean; detalle?: string }[];
   instancia: { corriendo: boolean; pid?: number };
+  /** Otras copias corriendo (undefined = no se pudo comprobar). Más de una = hay duplicados. */
+  copias?: { cantidad: number; pids: number[] };
   ok: boolean;
 }
 
@@ -83,9 +95,11 @@ export async function reunirEstado(d: DepsEstado): Promise<InformeEstado> {
 
   const pid = pidEnMarcha(d.dir, d.vivo);
   const instancia = { corriendo: Boolean(pid), pid };
+  const otras = await d.copias?.().catch(() => undefined);
+  const copias = otras ? { cantidad: otras.length, pids: otras.map((c) => c.pid) } : undefined;
   const hayVersionNueva = numero(versionPublicada) > (numero(VERSION_NUMERO) || 0);
-  const ok = autoinicio.ok && vinculado.ok && conexion.ok && impresoras.every((i) => i.ok) && impresoras.some((i) => i.configurada) && instancia.corriendo;
-  return { version: VERSION_NUMERO, versionPublicada, hayVersionNueva, autoinicio, vinculado, conexion, impresoras, instancia, ok };
+  const ok = autoinicio.ok && vinculado.ok && conexion.ok && impresoras.every((i) => i.ok) && impresoras.some((i) => i.configurada) && instancia.corriendo && (copias?.cantidad ?? 0) <= 1;
+  return { version: VERSION_NUMERO, versionPublicada, hayVersionNueva, autoinicio, vinculado, conexion, impresoras, instancia, copias, ok };
 }
 
 const m = (ok: boolean) => (ok ? '✔' : '✘');
@@ -107,6 +121,11 @@ export function formatearEstado(e: InformeEstado): string[] {
     l.push(i.configurada ? `${m(i.ok)} ${n}: ${i.nombre} · ${i.detalle}` : `- ${n}: sin elegir (usa: usar ${n.toLowerCase()} <número>)`);
   }
   l.push(`${m(e.instancia.corriendo)} Programa en marcha: ${e.instancia.corriendo ? `sí (pid ${e.instancia.pid}, una sola instancia)` : 'no está corriendo; ábrelo o reinicia la PC'}`);
+  if (e.copias) {
+    l.push(e.copias.cantidad > 1
+      ? `✘ Copias corriendo: ${e.copias.cantidad} (pid ${e.copias.pids.join(', ')}). Hay ${e.copias.cantidad} copias: usa --detener-todo y vuelve a abrir el programa`
+      : `✔ Copias corriendo: ${e.copias.cantidad}`);
+  }
   l.push(e.ok ? 'Todo en orden.' : 'Hay algo por revisar (ver ✘).');
   return l;
 }

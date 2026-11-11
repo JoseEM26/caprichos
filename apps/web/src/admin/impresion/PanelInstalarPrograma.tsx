@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { textoFecha, type VersionPublicada } from './versionPrograma';
 import { useSesion } from '../../comun/sesion';
 import { impresionApi } from './impresionApi';
+import { ComandosUtiles } from './ComandosUtiles';
 import './cola-impresion.css';
 
 export const URL_DESCARGA_WINDOWS = '/api/agente-impresion/descargar/windows';
@@ -190,6 +191,7 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
             </li>
           </ol>
         )}
+        {sistema === 'windows' && <ComandosUtiles ultima={ultima} />}
         {error && <p role="alert" style={{ color: 'var(--cp-rust, #B2500F)' }}>{error}</p>}
       </div>
     </div>

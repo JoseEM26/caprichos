@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { LINEA_VERSION, rutaArchivoConfiguracion } from './config';
+import { LINEA_VERSION, VERSION_NUMERO, rutaArchivoConfiguracion } from './config';
 
 /**
  * Ciclo de vida como proceso de segundo plano: instancia única (archivo de bloqueo con el pid),
@@ -15,6 +15,9 @@ export const rutaEstado = (dir = dirDatos()) => f(dir, 'estado.json');
 export const rutaParada = (dir = dirDatos()) => f(dir, 'detener.flag');
 /** Marca de que el inicio automático ya se instaló una vez: así `--quitar-inicio` no se deshace solo en la próxima ejecución. */
 export const rutaMarcaInicio = (dir = dirDatos()) => f(dir, 'inicio-configurado');
+
+/** N de «0.1.N»; 0 para una compilación de desarrollo o un texto raro. */
+export const numeroVersion = (v?: string): number => Number(/^\d+\.\d+\.(\d+)/.exec(v ?? '')?.[1] ?? 0);
 
 export type VivoFn = (pid: number) => boolean;
 export const procesoVivo: VivoFn = (pid) => {
@@ -41,7 +44,7 @@ export function tomarBloqueo(dir = dirDatos(), pid = process.pid, vivo: VivoFn =
   fs.mkdirSync(dir, { recursive: true });
   for (let i = 0; i < 2; i++) {
     try {
-      fs.writeFileSync(rutaBloqueo(dir), JSON.stringify({ pid, inicio: new Date().toISOString() }), { flag: 'wx' });
+      fs.writeFileSync(rutaBloqueo(dir), JSON.stringify({ pid, inicio: new Date().toISOString(), version: VERSION_NUMERO }), { flag: 'wx' });
       fs.rmSync(rutaParada(dir), { force: true });
       return true;
     } catch (e: any) {
@@ -51,6 +54,21 @@ export function tomarBloqueo(dir = dirDatos(), pid = process.pid, vivo: VivoFn =
     }
   }
   return false;
+}
+
+/** Versión escrita en el bloqueo por la copia en marcha (las versiones viejas no la escribían). */
+export function versionEnMarcha(dir = dirDatos()): string | undefined {
+  try {
+    const v = JSON.parse(fs.readFileSync(rutaBloqueo(dir), 'utf-8')).version;
+    return typeof v === 'string' ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** La copia en marcha es de una versión anterior (o muy vieja, sin versión) y esta puede reemplazarla. Misma versión o más nueva: se respeta. */
+export function reemplazable(dir = dirDatos(), vivo: VivoFn = procesoVivo, miVersion = VERSION_NUMERO): boolean {
+  return Boolean(pidEnMarcha(dir, vivo)) && numeroVersion(versionEnMarcha(dir)) < numeroVersion(miVersion);
 }
 
 export function soltarBloqueo(dir = dirDatos(), pid = process.pid): void {
