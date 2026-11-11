@@ -115,9 +115,11 @@ export interface SelectorComprobanteProps {
   total?: number;
   /** Prefijo de los id de los campos (para enfocarlos desde fuera): `${idPrefijo}-doc`, `${idPrefijo}-razon` */
   idPrefijo: string;
+  /** RUC guardado en la cuenta del cliente (ya identificado por su celular en el paso anterior). Rellena la factura, editable. */
+  guardada?: { ruc: string; razonSocial: string | null; direccion: string | null } | null;
 }
 
-export function SelectorComprobante({ valor, onChange, total, idPrefijo }: SelectorComprobanteProps) {
+export function SelectorComprobante({ valor, onChange, total, idPrefijo, guardada }: SelectorComprobanteProps) {
   const err = errorValorComprobante(valor);
   const aviso = avisoValorComprobante(valor, total);
   const set = (cambio: Partial<ValorComprobante>) => onChange({ ...valor, ...cambio });
@@ -126,10 +128,19 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
 
   // «DNI o RUC»: boleta consulta un DNI (8), factura un RUC (11). Solo ayuda a rellenar; si falla, se escribe a mano.
   // Se consulta solo con el largo que corresponde al comprobante: un RUC pasa por 8 dígitos al escribirse y no debe gastar una consulta de DNI.
-  const consultable = (valor.tipo === 'BOLETA' && tipoPorLongitud(valor.doc) === 'DNI') || (valor.tipo === 'FACTURA' && tipoPorLongitud(valor.doc) === 'RUC');
+  // Con razón social ya guardada para este RUC no se consulta otra vez
+  const rucGuardadoCompleto = !!guardada && guardada.ruc === valor.doc && !!guardada.razonSocial && valor.razon === guardada.razonSocial;
+  const consultable = (valor.tipo === 'BOLETA' && tipoPorLongitud(valor.doc) === 'DNI') || (valor.tipo === 'FACTURA' && tipoPorLongitud(valor.doc) === 'RUC' && !rucGuardadoCompleto);
   const consulta = useConsultaDocumento(consultable ? valor.doc : '', consultable);
   const actual = useRef({ valor, onChange });
   actual.current = { valor, onChange };
+  // RUC guardado en la cuenta: al elegir factura con el RUC vacío se rellena una sola vez (celular primero, RUC después)
+  const rellenado = useRef<string | null>(null);
+  useEffect(() => {
+    if (valor.tipo !== 'FACTURA' || !guardada || rellenado.current === guardada.ruc || valor.doc !== '') return;
+    rellenado.current = guardada.ruc;
+    onChange({ ...valor, doc: guardada.ruc, razon: guardada.razonSocial ?? '', direccion: guardada.direccion ?? '' });
+  }, [valor, guardada, onChange]);
   useEffect(() => {
     if (consulta.estado !== 'ok' || consulta.tipo !== 'RUC') return;
     const { valor: v, onChange: cambiar } = actual.current;
@@ -190,6 +201,9 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
 
       {valor.tipo === 'FACTURA' && (
         <>
+          {guardada && valor.doc === guardada.ruc && (
+            <div role="status" style={aviso_}>RUC guardado en la cuenta del cliente. Puedes corregirlo para este pedido.</div>
+          )}
           <label style={etiqueta}>
             DNI o RUC
             <input

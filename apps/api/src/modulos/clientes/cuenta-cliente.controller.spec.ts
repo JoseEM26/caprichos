@@ -16,6 +16,7 @@ import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesService } from './clientes.service';
 import { RecuperarClaveService } from './recuperar-clave.service';
 import { CodigoRegistroService } from './codigo-registro.service';
+import { FacturacionClienteService } from './facturacion-cliente.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 
 describe('CuentaClienteController', () => {
@@ -25,6 +26,7 @@ describe('CuentaClienteController', () => {
     consumir: jest.fn().mockResolvedValue(undefined),
     verificar: jest.fn().mockResolvedValue({ ok: true }),
   };
+  const facturacionMock = { obtener: jest.fn() };
   const recuperarMock = { solicitar: jest.fn().mockResolvedValue({ ok: true }), confirmar: jest.fn().mockResolvedValue({ ok: true }) };
   let clientesServiceMock: any;
   let configServiceMock: any;
@@ -53,6 +55,7 @@ describe('CuentaClienteController', () => {
         { provide: ConfigService, useValue: configServiceMock },
         { provide: DireccionesClienteService, useValue: { listar: jest.fn(), desactivar: jest.fn() } },
         { provide: RecuperarClaveService, useValue: recuperarMock },
+        { provide: FacturacionClienteService, useValue: facturacionMock },
         { provide: CodigoRegistroService, useValue: codigoRegistroMock },
       ],
     }).compile();
@@ -222,5 +225,17 @@ describe('CuentaClienteController', () => {
     const r = await controller.verificarCodigoRegistro({ telefono: '912345678', codigo: '123456' });
     expect(codigoRegistroMock.verificar).toHaveBeenCalledWith('912345678', '123456');
     expect(r).toEqual({ ok: true });
+  });
+  it('facturacion: sin sesión no devuelve el RUC (nadie lo obtiene tecleando un celular)', async () => {
+    clientesServiceMock.clienteDesdeRequest.mockResolvedValue(null);
+    expect(await controller.datosFacturacion({} as any)).toEqual({ facturacion: null });
+    expect(facturacionMock.obtener).not.toHaveBeenCalled();
+  });
+  it('facturacion: con sesión devuelve el RUC de SU cuenta', async () => {
+    clientesServiceMock.clienteDesdeRequest.mockResolvedValue({ partyId: '100', nombre: 'Ana' });
+    facturacionMock.obtener.mockResolvedValue({ ruc: '20000000015', razonSocial: 'X SAC', direccion: null });
+    const r = await controller.datosFacturacion({} as any);
+    expect(facturacionMock.obtener).toHaveBeenCalledWith('100');
+    expect(r.facturacion?.ruc).toBe('20000000015');
   });
 });

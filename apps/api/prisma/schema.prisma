@@ -39,6 +39,7 @@ model Party {
   comprobantesEmitidos     Comprobante[]          @relation("ComprobantesEmitidos")
   reclamosRespondidos      Reclamo[]              @relation("ReclamosRespondidos")
   cuentaCliente            CustomerAccount?
+  facturacion              ClienteFacturacion?
   roles                    PartyRole[]
   consentimientos          Consent[]
   contactos                ContactMechanism[]
@@ -833,6 +834,20 @@ model ClienteDireccion {
 
   @@index([party_id, activo, ultimo_uso_en(sort: Desc)], map: "cliente_direccion_party_activo_uso_idx")
   @@map("cliente_direccion")
+}
+
+/// RUC opcional de la cuenta del cliente (se guarda la primera vez que pide factura) con su razón social y dirección fiscal.
+model ClienteFacturacion {
+  party_id     BigInt   @id
+  ruc          String   @db.VarChar(11)
+  razon_social String?
+  direccion    String?
+  /// Canal con el que se asignó: CARTA | MOZO | CAJA | WHATSAPP | BOT
+  origen       String
+  creado_en    DateTime @default(now()) @db.Timestamptz
+  party        Party    @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@map("cliente_facturacion")
 }
 
 model PedidoLinea {

@@ -19,6 +19,7 @@ import { OfertasService } from '../ofertas/ofertas.service';
 import { PuntosService } from '../clientes/puntos.service';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
+import { FacturacionClienteService } from '../clientes/facturacion-cliente.service';
 import { PagoPlanService } from './pago-plan.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
@@ -36,6 +37,7 @@ describe('PedidosService', () => {
   let partyPuntosMock: any;
   let redisMock: any;
   let auditoriaMock: any;
+  let facturacionMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -224,11 +226,13 @@ describe('PedidosService', () => {
     redisMock = { incr: jest.fn().mockResolvedValue(1), expire: jest.fn().mockResolvedValue(1) };
 
     auditoriaMock = { registrar: jest.fn().mockResolvedValue(undefined) };
+    facturacionMock = { asignarSiFalta: jest.fn().mockResolvedValue(true) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosService,
         { provide: AuditoriaService, useValue: auditoriaMock },
+        { provide: FacturacionClienteService, useValue: facturacionMock },
         { provide: RedisService, useValue: { obtenerCliente: () => redisMock } },
         { provide: PartyPuntosService, useValue: partyPuntosMock },
         { provide: DireccionesClienteService, useValue: direccionesMock },
@@ -1926,6 +1930,40 @@ describe('PedidosService', () => {
       expect(capturado.data.cliente_party_id).toBe(88n);
       expect(capturado.data.party_id).toBe(88n);
       expect(direccionesMock.registrarUso).toHaveBeenCalledWith(88n, expect.any(Object), 'CARTA', prismaMock);
+    });
+
+    describe('RUC en la cuenta del cliente', () => {
+      // RUC de prueba con dígito verificador válido (calculado, no real)
+      const rucPrueba = (() => {
+        const base = '2000000001';
+        const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+        const suma = pesos.reduce((a, p, i) => a + p * Number(base[i]), 0);
+        return base + ((11 - (suma % 11)) % 10);
+      })();
+      const factura = { tipo: 'FACTURA', ruc: rucPrueba, razonSocial: 'Empresa de Prueba SAC' } as any;
+
+      it('mozo con cliente por celular: factura valida intenta guardar el RUC en la cuenta (canal y actor)', async () => {
+        crearPedidoCapturado();
+        direccionesMock.resolverPartyPorTelefono.mockResolvedValue(77n);
+        await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678', comprobante: factura } as any, 'idemp-ruc-1', { canal: 'MOZO', usuarioPartyId: 55n });
+        expect(facturacionMock.asignarSiFalta).toHaveBeenCalledWith(77n, expect.objectContaining({ ruc: rucPrueba }), expect.objectContaining({ canal: 'MOZO', actorPartyId: 55n }));
+      });
+
+      it('carta con sesion: guarda; carta sin sesion (solo celular tecleado): NO guarda', async () => {
+        crearPedidoCapturado();
+        await service.crear({ ...pedidoBaseDto, comprobante: factura } as any, 'idemp-ruc-2', { canal: 'CARTA', clientePartyId: 88n });
+        expect(facturacionMock.asignarSiFalta).toHaveBeenCalledTimes(1);
+        facturacionMock.asignarSiFalta.mockClear();
+        partyPuntosMock.resolverOCrear.mockResolvedValue(99n);
+        await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '912345678' }, comprobante: factura } as any, 'idemp-ruc-3', { canal: 'CARTA' });
+        expect(facturacionMock.asignarSiFalta).not.toHaveBeenCalled();
+      });
+
+      it('boleta con DNI: no se guarda nada en la cuenta', async () => {
+        crearPedidoCapturado();
+        await service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'BOLETA', dni: '12345678' } } as any, 'idemp-ruc-4', { canal: 'CARTA', clientePartyId: 88n });
+        expect(facturacionMock.asignarSiFalta).not.toHaveBeenCalled();
+      });
     });
 
     it('carta sin sesión: invitado, y un clienteDni enviado desde la carta se ignora', async () => {

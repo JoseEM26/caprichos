@@ -7,6 +7,7 @@ import { PuntosService } from './puntos.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { PartyPuntosService } from './party-puntos.service';
 import { CodigoRegistroService } from './codigo-registro.service';
+import { FacturacionClienteService } from './facturacion-cliente.service';
 import { AvisoCuentaService } from './aviso-cuenta.service';
 import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesAdminController } from './clientes-admin.controller';
@@ -28,12 +29,14 @@ import { ClientesAdminController } from './clientes-admin.controller';
     PartyPuntosService,
     CodigoRegistroService,
     AvisoCuentaService,
+    FacturacionClienteService,
   ],
   exports: [
     ClientesService,
     PuntosService,
     DireccionesClienteService,
     PartyPuntosService,
+    FacturacionClienteService,
   ],
 })
 export class ClientesModule {}

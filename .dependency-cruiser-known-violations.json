@@ -4039,5 +4039,23 @@
       "severity": "error",
       "name": "modulo-sin-importes-internos"
     }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/facturacion-cliente.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/clientes/facturacion-cliente.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
   }
 ]

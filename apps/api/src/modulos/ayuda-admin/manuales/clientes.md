@@ -64,6 +64,7 @@ Ver tambien: [[mensajes]]
 - Si un cliente solicita ser dado de baja, se puede cambiar su estado a Inactivo pulsando Desactivar cliente, lo cual inhabilita sus canjes sin borrar su historial de pedidos previo.
 - El celular debe tener 9 digitos y empezar con 9. No puede repetirse entre cuentas activas.
 - Los clientes no tienen DNI guardado: el DNI solo queda en el comprobante o en el reclamo cuando la ley lo exige.
+- Lo unico que se guarda para facturar es el RUC (con su razon social y direccion fiscal), y solo cuando el cliente pide factura por primera vez. No se pide al crear la cuenta. Un RUC que empieza con 10 pertenece a una persona y contiene su DNI: tratalo como dato personal y no lo compartas.
 
 ## Quien puede hacerlo
 - Solo el Administrador tiene autorizacion para acceder al modulo de Clientes y editar informacion.

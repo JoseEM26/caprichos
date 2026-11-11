@@ -35,6 +35,7 @@ import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service'
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 import { regresoAgotado } from '../catalogo/catalogo.service';
+import { FacturacionClienteService } from '../clientes/facturacion-cliente.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
@@ -143,6 +144,7 @@ export class PedidosService {
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly auditoria?: AuditoriaService,
     @Optional() private readonly rucService?: RucService,
+    @Optional() private readonly facturacionCliente?: FacturacionClienteService,
   ) {}
 
   /** Último pedido de delivery con dirección de ese celular (carta sin sesión). Null si no hay. */
@@ -1426,6 +1428,17 @@ export class PedidosService {
 
       return pedido;
     });
+
+    // Cuenta del cliente: la primera vez que pide factura con un RUC válido, el RUC queda en su cuenta (no se pisa uno ya guardado).
+    // En la carta solo con sesión iniciada (con solo teclear un celular cualquiera podría ensuciar la cuenta de otra persona).
+    // Va después de crear el pedido y nunca lo rompe.
+    if (comprobanteTipo === 'FACTURA' && clienteFinal && !personal && this.facturacionCliente && (canalPedido !== 'CARTA' || origen?.clientePartyId)) {
+      await this.facturacionCliente.asignarSiFalta(
+        clienteFinal,
+        { ruc: comprobanteDoc, razonSocial: comprobanteRazon, direccion: comprobanteDireccion },
+        { canal: canalPedido, actorPartyId: origen?.usuarioPartyId ?? null, pedido: pedidoCreado.codigo },
+      );
+    }
 
     if (cobroAhora) {
       try {

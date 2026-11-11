@@ -204,6 +204,22 @@ export function FormularioCheckout({
     setNombre(clienteCuenta.nombre);
     if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
   }, [clienteCuenta, otroTelefono]);
+  // RUC guardado en la cuenta: solo con sesión iniciada (el servidor no lo da por un celular tecleado). Se rellena una vez.
+  const [rucGuardado, setRucGuardado] = useState<string | null>(null);
+  const rucPrecargado = useRef(false);
+  useEffect(() => {
+    if (tipoComprobante !== 'FACTURA' || !clienteCuenta || rucPrecargado.current) return;
+    rucPrecargado.current = true;
+    api
+      .get<{ facturacion: { ruc: string } | null }>('/carta/cuenta/facturacion')
+      .then((r) => {
+        if (!r.facturacion?.ruc) return;
+        setRucGuardado(r.facturacion.ruc);
+        setRuc((actual) => actual || r.facturacion!.ruc);
+      })
+      .catch(() => {});
+  }, [tipoComprobante, clienteCuenta]);
+
   // Sin cuenta, con un celular completo: pedimos la pista de la dirección anterior (sin dirección completa)
   const tieneCuenta = Boolean(clienteCuenta);
   useEffect(() => {
@@ -1926,6 +1942,11 @@ export function FormularioCheckout({
                               fontSize: '14px',
                             }}
                           />
+                          {rucGuardado && ruc === rucGuardado && (
+                            <div role="status" style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '3px' }}>
+                              RUC guardado en tu cuenta. Puedes escribir otro para este pedido.
+                            </div>
+                          )}
                         </div>
 
                         {consultaRuc.estado === 'cargando' && (

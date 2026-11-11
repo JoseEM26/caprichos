@@ -44,7 +44,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'cierre_medio', 'cierre_dia', 'consumo_personal', 'cierre_ajuste_medio', 'devolucion_pedido',
   ]],
   ['clientes: cuentas, puntos, direcciones y consentimientos', [
-    'customer_account', 'customer_detail', 'consent', 'contact_mechanism', 'cliente_direccion',
+    'customer_account', 'customer_detail', 'consent', 'contact_mechanism', 'cliente_direccion', 'cliente_facturacion',
     'movimiento_puntos', 'cupon_emitido', 'cupon_canje_compartido', 'cliente_whatsapp_consentimiento', 'numero_bloqueado',
     'data_request', 'encuesta', 'encuesta_posventa', 'ranking_mes', 'aviso_cliente_unico',
   ]],
@@ -100,7 +100,7 @@ export const NO_MIGRAR: Record<string, string> = Object.fromEntries(
 export const TABLAS_SENSIBLES: string[] = [
   'sesion', 'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'auditoria', 'voucher_pago',
   'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
-  'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
+  'contact_mechanism', 'cliente_direccion', 'cliente_facturacion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
   'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request',
 ];
