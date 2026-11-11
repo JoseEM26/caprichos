@@ -264,9 +264,7 @@ export function FormularioCheckout({
   const tieneSesion = Boolean(clienteCuenta);
   const detalleEquipo = promos.detalles.find((d) => d.tipo === 'PERSONAL');
   const pctEquipo = detalleEquipo?.nombre.match(/\((\d+(?:[.,]\d+)?) %\)/)?.[1];
-  // Solo se consulta con un celular completo; el servidor decide si es del equipo (nunca se manda un porcentaje)
-  const celularEquipo = /^9\d{8}$/.test(telefono.trim()) ? telefono.trim() : '';
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad, celularEquipo]);
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
@@ -276,7 +274,6 @@ export function FormularioCheckout({
         cuponCodigo: cuponAplicado?.codigo,
         // Las promociones valen según el tipo de pedido: al cambiarlo se recalcula sin perder el carrito
         modalidad,
-        ...(celularEquipo ? { celular: celularEquipo } : {}),
       })
       .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
       .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));
@@ -1432,11 +1429,6 @@ export function FormularioCheckout({
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
                           Te enviaremos una breve encuesta de satisfacción por WhatsApp
                         </div>
-                        {detalleEquipo && (
-                          <div role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px', marginTop: '6px' }}>
-                            Tienes {pctEquipo ? `${pctEquipo} % de` : 'tu'} descuento por ser parte del equipo Caprichos. No aplica a combos, promociones ni productos que ya tienen descuento.
-                          </div>
-                        )}
                       </div>
                           {clienteCuenta && otroTelefono && clienteCuenta.telefono && (
                             <button
@@ -2490,6 +2482,12 @@ export function FormularioCheckout({
                       </div>
                     )}
 
+                    {clienteCuenta && detalleEquipo && (
+                          <div role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px', margin: 0 }}>
+                            Tienes {pctEquipo ? `${pctEquipo} % de` : 'tu'} descuento por ser parte del equipo Caprichos. No aplica a combos, promociones ni productos que ya tienen descuento.
+                          </div>
+                        )}
+
                     {primeraCompra && !tieneSesion && (
                       <div role="note" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px' }}>
                         Tienes {primeraCompra.descuento} de descuento en tu primera compra. Inicia sesión con tu celular para aplicarlo. No aplica a promociones ni combos.
@@ -2542,7 +2540,13 @@ export function FormularioCheckout({
 
                     {clienteCuenta && (
                       <div data-testid="puntos-estimados" style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)' }}>
-                        <b>Con este pedido ganarás ~{puntosEstimados.toFixed(2)} pts</b> (0 si usas cupón o es solo promoción).
+                        {detalleEquipo ? (
+                          <b>Este pedido no suma puntos porque lleva el descuento del equipo.</b>
+                        ) : (
+                          <>
+                            <b>Con este pedido ganarás ~{puntosEstimados.toFixed(2)} pts</b> (0 si usas cupón o es solo promoción).
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

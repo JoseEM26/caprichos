@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { api } from '../../comun/api';
 import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
@@ -63,17 +63,32 @@ function Pagina({ invitadoPermitido }: { invitadoPermitido: boolean | undefined 
   );
 }
 
-function abrirPedido(invitadoPermitido: boolean | undefined) {
-  vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(null);
+function abrirPedido(conSesion: boolean) {
+  const ctx = conSesion ? ({ cliente: { partyId: '1', nombre: 'Luis', telefono: '912345678', puntos: 0 }, abrirPanel: vi.fn() } as any) : null;
+  vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(ctx);
+  if (ctx) vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue(ctx);
   render(
     <CarritoProvider>
-      <Pagina invitadoPermitido={invitadoPermitido} />
+      <Pagina invitadoPermitido={false} />
     </CarritoProvider>,
   );
   fireEvent.click(screen.getByText('Abrir pedido'));
 }
 
-describe('Checkout ▸ descuento del equipo por celular', () => {
+async function irAlResumen(conSesion: boolean) {
+  abrirPedido(conSesion);
+  if (!conSesion) {
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+  }
+  fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+  await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
+  fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+  await screen.findByRole('button', { name: /Enviar pedido/i });
+}
+
+describe('Checkout ▸ descuento del equipo (solo con sesión)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.get).mockImplementation(async (ruta: string) => {
@@ -82,26 +97,29 @@ describe('Checkout ▸ descuento del equipo por celular', () => {
     });
   });
 
-  const respuestaEquipo = { descuentoTotal: 3.63, detalles: [{ tipo: 'PERSONAL', nombre: 'Descuento por ser del equipo (25 %)', monto: 3.63 }] };
+  const respuestaEquipo = { descuentoTotal: 3.63, puntosEstimados: 0, detalles: [{ tipo: 'PERSONAL', nombre: 'Descuento por ser del equipo (25 %)', monto: 3.63 }] };
 
-  it('celular completo de un trabajador activo: manda solo el celular (nunca un porcentaje) y muestra el mensaje y la línea', async () => {
+  it('con sesión y descuento del equipo: mensaje, línea del resumen, sin «ganarás N puntos», y no manda celular ni porcentaje', async () => {
     vi.mocked(api.post).mockResolvedValue(respuestaEquipo);
-    abrirPedido(false);
-    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    await irAlResumen(true);
     expect(await screen.findByText(/Tienes 25 % de descuento por ser parte del equipo Caprichos/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Descuento por ser del equipo \(25 %\)/).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/no suma puntos/);
+    expect(screen.getByTestId('puntos-estimados').textContent).not.toMatch(/ganarás/);
     const llamada = vi.mocked(api.post).mock.calls.filter(([r]) => r === '/carta/descuentos/vista-previa').pop()!;
-    expect(llamada[1]).toMatchObject({ celular: '912345678' });
-    expect(JSON.stringify(llamada[1])).not.toMatch(/pct|porcentaje/i);
+    expect(JSON.stringify(llamada[1])).not.toMatch(/celular|pct|porcentaje|telefono/i);
   });
 
-  it('sin descuento del equipo no se muestra nada y con celular incompleto no se consulta con celular', async () => {
-    vi.mocked(api.post).mockResolvedValue({ descuentoTotal: 0, detalles: [] });
-    abrirPedido(false);
-    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '91234' } });
-    await waitFor(() => expect(api.post).toHaveBeenCalled());
+  it('sin sesión no se muestra nada del equipo aunque el servidor lo devolviera', async () => {
+    vi.mocked(api.post).mockResolvedValue(respuestaEquipo);
+    await irAlResumen(false);
     expect(screen.queryByText(/parte del equipo Caprichos/)).not.toBeInTheDocument();
-    for (const [r, cuerpo] of vi.mocked(api.post).mock.calls) {
-      if (r === '/carta/descuentos/vista-previa') expect(cuerpo).not.toHaveProperty('celular');
-    }
+  });
+
+  it('con sesión pero sin descuento del equipo: no se muestra nada y sí «ganarás»', async () => {
+    vi.mocked(api.post).mockResolvedValue({ descuentoTotal: 0, detalles: [] });
+    await irAlResumen(true);
+    expect(screen.queryByText(/parte del equipo Caprichos/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/ganarás/);
   });
 });

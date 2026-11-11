@@ -24,16 +24,13 @@ export class OfertasPublicoController {
       lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[];
       cuponCodigo?: string;
       modalidad?: string;
-      celular?: string;
     },
     @Req() req: any,
   ) {
     // Con sesión iniciada en la carta, la vista previa incluye la primera compra igual que al crear el pedido
     const cliente = await this.clientesService.clienteDesdeRequest(req).catch(() => null);
-    // Celular escrito en el pedido (9 dígitos): da el descuento del equipo si es de un trabajador activo; la respuesta no dice de quién
-    const celular = typeof dto?.celular === 'string' && /^9\d{8}$/.test(dto.celular.trim()) ? dto.celular.trim() : undefined;
-    if (celular) await this.ofertasService.limitarConsultaCelular(celular, req?.ip);
-    return this.ofertasService.vistaPreviaDescuentos(dto?.lineas ?? [], dto?.cuponCodigo, cliente?.partyId ?? null, 'CARTA', dto?.modalidad, undefined, celular);
+    if (cliente?.partyId) await this.ofertasService.limitarConsultaCelular(String(cliente.partyId), req?.ip);
+    return this.ofertasService.vistaPreviaDescuentos(dto?.lineas ?? [], dto?.cuponCodigo, cliente?.partyId ?? null, 'CARTA', dto?.modalidad);
   }
 
   @Post('cupon/validar')

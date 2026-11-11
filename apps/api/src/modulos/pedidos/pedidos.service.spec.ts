@@ -519,14 +519,16 @@ describe('PedidosService', () => {
         expect(Number(c.monto)).toBe(21);
       });
 
-      describe('carta pública con celular de trabajador', () => {
+      describe('carta con sesión de cliente que es del equipo', () => {
+        const sesion = { canal: 'CARTA' as const, clientePartyId: 9n };
         const dtoCarta: CrearPedidoDto = { ...dtoPersonal, pago: { metodo: 'EFECTIVO', pagaCon: 50 } };
         beforeEach(() => {
+          prismaMock.customerAccount = { ...(prismaMock.customerAccount ?? {}), findFirst: jest.fn().mockResolvedValue({ telefono: '900000001' }) };
           prismaMock.contactMechanism = { findFirst: jest.fn().mockResolvedValue({ party_id: 9n }) };
         });
 
         it('celular de trabajador activo: 25 % de descuento, pero NO es pedido del personal ni crédito', async () => {
-          await service.crear(dtoCarta, 'idemp-carta-dp-1');
+          await service.crear(dtoCarta, 'idemp-carta-dp-1', sesion);
           const data = prismaMock.pedido.create.mock.calls[0][0].data;
           expect(Number(data.descuento)).toBe(7);
           expect(Number(data.total)).toBe(21);
@@ -536,9 +538,25 @@ describe('PedidosService', () => {
           expect(data.descuento_detalle).toEqual([expect.objectContaining({ tipo: 'PERSONAL', descuentoValor: 25 })]);
         });
 
+        it('sin sesión no aplica aunque el celular escrito sea de un trabajador', async () => {
+          await service.crear(dtoCarta, 'idemp-carta-dp-0');
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(Number(data.descuento)).toBe(0);
+          expect(Number(data.total)).toBe(28);
+        });
+
+        it('delivery: el descuento es solo sobre los productos (75 %) y el envío se paga íntegro', async () => {
+          await service.crear({ ...pedidoBaseDto, pago: { metodo: 'EFECTIVO', pagaCon: 50 } }, 'idemp-carta-dp-5', sesion);
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(Number(data.subtotal)).toBe(28);
+          expect(Number(data.envio)).toBe(5);
+          expect(Number(data.descuento)).toBe(7);
+          expect(Number(data.total)).toBe(26); // 28 - 25 % + 5 de envío
+        });
+
         it('celular de no-personal (inactivo o inexistente): sin descuento', async () => {
           prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
-          await service.crear(dtoCarta, 'idemp-carta-dp-2');
+          await service.crear(dtoCarta, 'idemp-carta-dp-2', sesion);
           const data = prismaMock.pedido.create.mock.calls[0][0].data;
           expect(Number(data.descuento)).toBe(0);
           expect(Number(data.total)).toBe(28);
@@ -549,12 +567,12 @@ describe('PedidosService', () => {
             descuentoTotal: 5, ofertaId: null, cuponId: null, cuponEmitidoId: null,
             detalles: [{ tipo: 'DESCUENTO', nombre: '2x', montoDescontado: 5, lineasAfectadas: [{ productoId: '1', cantidad: 2, subtotal: 28, descuento: 5 }] }],
           });
-          await service.crear(dtoCarta, 'idemp-carta-dp-3');
+          await service.crear(dtoCarta, 'idemp-carta-dp-3', sesion);
           expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.descuento)).toBe(5);
         });
 
         it('con el descuento del equipo no se canjean puntos', async () => {
-          await expect(service.crear({ ...dtoCarta, puntosCanje: 1 } as any, 'idemp-carta-dp-4')).rejects.toMatchObject({
+          await expect(service.crear({ ...dtoCarta, puntosCanje: 1 } as any, 'idemp-carta-dp-4', sesion)).rejects.toMatchObject({
             response: { codigo: 'PUNTOS_NO_APLICAN_PERSONAL' },
           });
         });

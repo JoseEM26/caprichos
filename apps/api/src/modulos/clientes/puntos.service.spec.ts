@@ -114,6 +114,18 @@ describe('PuntosService', () => {
       );
     });
 
+    it('pedido con el descuento del equipo (PERSONAL) no suma puntos', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 130n, canal: 'CARTA', party_id: null, cliente_party_id: 300n, total: '52.50', envio: '0.00',
+        cupon_id: null, cupon_emitido_id: null, puntos_canjeados: '0',
+        descuento_detalle: [{ tipo: 'PERSONAL', montoDescontado: 17.5 }],
+      });
+      const res = await service.acumularPorPedido(130n);
+      expect(res).toMatchObject({ sumados: false, puntos: 0, motivoNo: 'PERSONAL' });
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
     it('pedido de MOZO sin DNI (invitado) no suma puntos aunque party_id sea el mozo', async () => {
       prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({

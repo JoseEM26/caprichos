@@ -11,7 +11,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import { calcularDescuentoPersonal, descuentoPersonalPorCelular, resolverPctPersonal, validarColaborador } from '../creditos';
+import { calcularDescuentoPersonal, descuentoPersonalDeCuenta, resolverPctPersonal, validarColaborador } from '../creditos';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import {
@@ -1274,12 +1274,12 @@ export class OfertasService {
   // VALIDACIÓN Y CANJE DE CUPONES
   // ==========================================
 
-  /** Tope de consultas públicas con celular (evita enumerar celulares del personal): 10 por celular y 40 por IP cada hora. Sin Redis no bloquea. */
-  async limitarConsultaCelular(celular: string, ip?: string): Promise<void> {
+  /** Tope de consultas del descuento del equipo: 60 por cuenta y 120 por IP cada hora. Sin Redis no bloquea. */
+  async limitarConsultaCelular(cuenta: string, ip?: string): Promise<void> {
     try {
       const r = this.redisService.obtenerCliente();
-      const limites: [string, number][] = [[`carta:dpers:tel:${celular}`, 10]];
-      if (ip) limites.push([`carta:dpers:ip:${ip}`, 40]);
+      const limites: [string, number][] = [[`carta:dpers:cta:${cuenta}`, 60]];
+      if (ip) limites.push([`carta:dpers:ip:${ip}`, 120]);
       for (const [clave, max] of limites) {
         const n = await r.incr(clave);
         if (n === 1) await r.expire(clave, 3600);
@@ -1763,7 +1763,6 @@ export class OfertasService {
     canal: string = 'CARTA',
     modalidad?: string,
     colaboradorPartyId?: string,
-    celularCarta?: string,
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1814,13 +1813,13 @@ export class OfertasService {
       const pct = await resolverPctPersonal(this.prisma, colaboradorId);
       descuentoPersonal = { pct, monto: calcularDescuentoPersonal(lineasCalc, desglose.detalles as any, pct) };
     }
-    // Carta: el celular de un trabajador activo da su descuento de personal (mismo cálculo que PedidosService.crear)
+    // Carta con sesión: la cuenta autenticada, si es de un trabajador activo, da su descuento de personal (mismo cálculo que PedidosService.crear)
     let detallesVista = (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) }));
     let descuentoTotalVista = desglose.descuentoTotal;
     let montoCanjeableVista = montoCanjeable;
     let puntosEstimadosVista = conCupon ? 0 : Math.round(montoCanjeable * (puntosPorcentaje / 100) * 100) / 100;
-    if (!colaboradorPartyId && canal === 'CARTA' && celularCarta) {
-      const dp = await descuentoPersonalPorCelular(this.prisma, celularCarta);
+    if (!colaboradorPartyId && canal === 'CARTA' && clientePartyId) {
+      const dp = await descuentoPersonalDeCuenta(this.prisma, clientePartyId);
       if (dp) {
         const monto = calcularDescuentoPersonal(lineasCalc, desglose.detalles as any, dp.pct);
         if (monto > 0) {

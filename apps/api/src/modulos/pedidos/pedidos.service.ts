@@ -1,4 +1,4 @@
-import { calcularDescuentoPersonal, descuentoPersonalPorCelular, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
+import { calcularDescuentoPersonal, descuentoPersonalDeCuenta, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { totalPedido } from '../../comun/total-pedido';
@@ -950,10 +950,10 @@ export class PedidosService {
         pctPersonal,
       );
     }
-    // Carta: quien pone el celular de un trabajador con usuario activo recibe su descuento de personal (solo el descuento:
-    // el pedido NO se carga a su crédito y se paga como cualquier pedido de cliente). El porcentaje lo decide el servidor.
-    if (!origen?.esPersonal && canalPedido === 'CARTA' && telefonoLimpio) {
-      const dp = await descuentoPersonalPorCelular(this.prisma, telefonoLimpio);
+    // Carta CON SESIÓN de cliente: si el celular de su cuenta es de un trabajador con usuario activo, recibe su descuento
+    // de personal (solo el descuento: el pedido NO se carga a su crédito). El celular escrito en el pedido no cuenta.
+    if (!origen?.esPersonal && canalPedido === 'CARTA' && origen?.clientePartyId) {
+      const dp = await descuentoPersonalDeCuenta(this.prisma, origen.clientePartyId);
       if (dp) {
         pctPersonal = dp.pct;
         descuentoPersonal = calcularDescuentoPersonal(

@@ -76,6 +76,16 @@ export async function descuentoPersonalPorCelular(db: any, celular: string | nul
   return { pct: await resolverPctPersonal(db, contacto.party_id) };
 }
 
+/**
+ * Descuento de personal para la cuenta de cliente con sesión iniciada en la carta: el celular sale de la cuenta
+ * autenticada (nunca de un campo escrito). Sin cuenta activa o sin celular de trabajador activo: null.
+ */
+export async function descuentoPersonalDeCuenta(db: any, partyId: bigint | string | number | null | undefined): Promise<{ pct: number } | null> {
+  if (partyId === null || partyId === undefined || !/^\d+$/.test(String(partyId))) return null;
+  const cuenta = await db.customerAccount?.findFirst?.({ where: { party_id: BigInt(partyId), activo: true }, select: { telefono: true } });
+  return descuentoPersonalPorCelular(db, cuenta?.telefono);
+}
+
 /** El crédito es solo para el personal (cuenta activa o rol de empleado), nunca para clientes. */
 export async function validarColaborador(db: any, partyId: bigint) {
   const party = await db.party.findUnique({

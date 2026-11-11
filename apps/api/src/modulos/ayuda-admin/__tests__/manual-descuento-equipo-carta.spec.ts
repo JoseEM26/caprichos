@@ -7,5 +7,7 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     expect(t).toContain('Descuento del equipo en la carta virtual');
     expect(t).toContain('NO se carga a su credito');
     expect(t).toContain('usuario esta inactivo');
+    expect(t).toContain('Sin sesion iniciada no se aplica ni se muestra nada');
+    expect(t).toContain('no suma puntos');
   });
 });

@@ -24,6 +24,10 @@ describe('explicarPuntosPedido', () => {
   it('cupón', () => {
     expect(explicarPuntosPedido(base({ cupon_emitido_id: 3n }), ctx).motivo).toBe('CUPON');
   });
+  it('descuento del equipo (PERSONAL): no suma puntos', () => {
+    const r = explicarPuntosPedido(base({ descuento_detalle: [{ tipo: 'PERSONAL', montoDescontado: 3 }] }), ctx);
+    expect(r).toMatchObject({ estado: 'NO_SUMA', motivo: 'PERSONAL' });
+  });
   it('anulado', () => {
     expect(explicarPuntosPedido(base({ estado: 'ANULADO' }), ctx).motivo).toBe('ANULADO');
   });

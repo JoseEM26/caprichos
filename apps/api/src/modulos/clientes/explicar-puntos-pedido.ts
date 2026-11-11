@@ -4,6 +4,7 @@ import { partyClienteDelPedido } from './cliente-del-pedido';
 export type MotivoSinPuntos =
   | 'INVITADO'
   | 'CUPON'
+  | 'PERSONAL'
   | 'SOLO_PROMOCION'
   | 'SIN_BENEFICIOS'
   | 'SIN_CUENTA_CLIENTE'
@@ -69,6 +70,9 @@ export function explicarPuntosPedido(pedido: PedidoParaPuntos, ctx: ContextoPunt
   }
   if (pedido.cupon_id || pedido.cupon_emitido_id) {
     return no('CUPON', 'Este pedido no suma puntos porque usaste un cupón');
+  }
+  if (Array.isArray(pedido.descuento_detalle) && (pedido.descuento_detalle as any[]).some((d) => d?.tipo === 'PERSONAL')) {
+    return no('PERSONAL', 'Este pedido no suma puntos porque tiene el descuento del equipo');
   }
   if (!ctx.tieneRolCliente) {
     return no('SIN_CUENTA_CLIENTE', 'La persona no tiene una cuenta de cliente activa: no suma puntos');

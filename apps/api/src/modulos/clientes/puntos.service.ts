@@ -22,7 +22,7 @@ export interface ResultadoAcumular {
   puntos: number;
   sumados: boolean;
   /** Por qué no sumó */
-  motivoNo?: 'YA_SUMADO' | 'SIN_CELULAR' | 'CUPON' | 'SIN_CUENTA_CLIENTE' | 'SIN_PUNTOS';
+  motivoNo?: 'YA_SUMADO' | 'SIN_CELULAR' | 'CUPON' | 'PERSONAL' | 'SIN_CUENTA_CLIENTE' | 'SIN_PUNTOS';
   partyId?: bigint | null;
   /** simulacro: el celular todavía no tiene party y se crearía al aplicar */
   partyNuevo?: boolean;
@@ -153,6 +153,11 @@ export class PuntosService {
     // Si usó cupón, no suma puntos (DT-56, RQ-CLI-02-02)
     if (pedido.cupon_id || pedido.cupon_emitido_id) {
       return { puntos: 0, sumados: false, motivoNo: 'CUPON', partyId: partyCliente };
+    }
+
+    // Con el descuento del equipo (detalle tipo PERSONAL) el pedido cuenta como descuento: no suma puntos
+    if (Array.isArray(pedido.descuento_detalle) && (pedido.descuento_detalle as any[]).some((d) => d?.tipo === 'PERSONAL')) {
+      return { puntos: 0, sumados: false, motivoNo: 'PERSONAL', partyId: partyCliente };
     }
 
     // Rol CLIENTE vigente. Quien nunca fue cliente lo recibe (cuenta sin verificar); a quien se le dio de baja, no.
