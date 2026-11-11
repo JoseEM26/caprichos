@@ -7,6 +7,7 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({
@@ -127,6 +128,7 @@ describe('Encabezado compacto de Caja', () => {
     expect(boton.querySelector('.cj2-n-filtros')).toBeNull();
     fireEvent.click(within(screen.getByTestId('resumen-dia')).getByRole('button', { name: /entregado/ }));
     expect(boton.querySelector('.cj2-n-filtros')?.textContent).toBe('2');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Solo entregados' }));
     expect(boton.querySelector('.cj2-n-filtros')?.textContent).toBe('1');
   });
@@ -160,5 +162,31 @@ describe('Encabezado compacto de Caja', () => {
     const r2 = await screen.findByTestId('resumen-dia');
     fireEvent.click(within(r2).getByRole('button', { name: /Resumen/ }));
     expect(within(r2).queryByRole('button', { name: /activo/ })).toBeNull();
+  });
+
+  it('arriba queda una línea (Filtros, búsqueda y «Limpiar» si hay filtros); el panel es accesible y devuelve el foco con Esc', async () => {
+    montar(dia);
+    const boton = await screen.findByRole('button', { name: /^Filtros/ });
+    expect(screen.queryByRole('link', { name: /Limpiar/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Limpiar' })).toBeNull();
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    expect(boton).toHaveAttribute('aria-controls', 'cj2-panel-filtros');
+    fireEvent.click(within(screen.getByTestId('resumen-dia')).getByRole('button', { name: /entregado/ }));
+    // Con filtros activos: insignia con el número y «Limpiar» en la misma línea (fuera del panel)
+    expect(boton.querySelector('.cj2-n-filtros')).not.toBeNull();
+    const limpiar = screen.getByRole('button', { name: 'Limpiar' });
+    expect(limpiar).toHaveClass('cj2-limpiar--linea');
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute('aria-expanded', 'true');
+    const panel = document.getElementById('cj2-panel-filtros') as HTMLElement;
+    expect(panel).toBeTruthy();
+    expect(within(panel).getByRole('navigation', { name: 'Estado de los pedidos' })).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: /Todo el día/ })).toBeTruthy();
+    expect(within(panel).getAllByRole('button', { name: /^Quitar filtro/ }).length).toBeGreaterThan(0);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: 'Filtros' })).toBeNull();
+    expect(document.activeElement).toBe(boton);
+    fireEvent.click(limpiar);
+    expect(boton.querySelector('.cj2-n-filtros')).toBeNull();
   });
 });

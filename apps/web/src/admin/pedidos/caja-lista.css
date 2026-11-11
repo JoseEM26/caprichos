@@ -347,7 +347,7 @@
 /* PC y monitores grandes: alto fijo = pantalla; solo las tarjetas se desplazan y el pie de paginación queda siempre a la vista */
 @media (min-width: 1100px) {
   .cj2 {
-    height: calc(100vh - 150px);
+    height: calc(100vh - 105px);
     min-height: 520px;
   }
 
@@ -1170,6 +1170,14 @@
   font-size: 12px; line-height: 1.2; color: var(--cp-soft, #2C4C5D);
 }
 .cj2-pag-rango { font-size: 12px; font-weight: 700; }
+.cj2-pag-carga { font-size: 12px; font-weight: 700; white-space: nowrap; }
+/* «Cargar más» como enlace chico en la misma línea; el área de toque llega a 44 px con ::after (la línea no crece) */
+.cj2-pag-mas {
+  position: relative; display: inline; min-height: 0; padding: 0; border: 0; background: transparent;
+  color: var(--cp-rust, #B2500F); font: 800 12px 'Open Sans', sans-serif; text-decoration: underline; cursor: pointer;
+}
+.cj2-pag-mas::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); }
+.cj2-pag-mas:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; border-radius: 4px; }
 .cj2-pag-filas { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; }
 .cj2-pag-select {
   position: relative; min-height: 24px; min-width: 0; padding: 0 4px; border: 1px solid var(--cp-navy, #0B2C3E); border-radius: 8px;
@@ -1243,3 +1251,12 @@
 @media (max-width: 699px) {
   .cj2-cab > .cj-estado, .cj2-cab > .cj2-vistabar--cab { order: 1; }
 }
+
+/* ---- Panel de Filtros: estado y día, combos y filtros activos, todo dentro (la barra de arriba queda en una línea) ---- */
+.cj2-panel-sec { display: flex; flex-direction: column; gap: 8px; }
+.cj2-panel-tit { margin: 0; font: 800 13px Montserrat, sans-serif; color: var(--cp-soft, #2C4C5D); }
+.cj2-panel .cj2-pastillas { flex-wrap: wrap; overflow: visible; flex: 0 0 auto; order: 0; }
+.cj2-panel .cj2-pastilla--todo { align-self: flex-start; order: 0; }
+.cj2-panel .cj2-activos { flex-wrap: wrap; overflow: visible; }
+.cj2-limpiar--linea { order: 4; flex: 0 0 auto; min-height: var(--cj2-h); }
+.cj2-panel .cj2-panel-cab .cj2-limpiar { margin-left: auto; }

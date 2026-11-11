@@ -4,6 +4,7 @@ import { PedidosAdminView } from '../PedidosAdminView';
 import { pedidosApi } from '../pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({
   reproducirCampana: vi.fn(),
@@ -34,6 +35,12 @@ describe('Barra de Pedidos y caja', () => {
     render(<PedidosAdminView />);
 
     const nuevo = await screen.findByRole('button', { name: 'Nuevo pedido' });
+    // Los combos viejos ya no están a la vista
+    expect(screen.queryByRole('button', { name: /^Ver pedidos: / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Mostrar: / })).not.toBeInTheDocument();
+    // Arriba queda UNA línea: Filtros y buscador; las pastillas de estado viven dentro del panel
+    expect(screen.queryByRole('navigation', { name: 'Estado de los pedidos' })).not.toBeInTheDocument();
+    abrirFiltros();
     const filtros = screen.getByRole('navigation', { name: 'Estado de los pedidos' });
     expect(within(filtros).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Todo0',
@@ -46,9 +53,6 @@ describe('Barra de Pedidos y caja', () => {
     expect(nuevo).toHaveClass('cj2-btn--nuevo');
     // Celular: botón flotante redondo con nombre accesible (la cabecera oculta el suyo con CSS)
     expect(screen.getByRole('button', { name: 'Agregar nuevo pedido' })).toHaveClass('cj2-fab');
-    // Los combos viejos ya no están a la vista
-    expect(screen.queryByRole('button', { name: /^Ver pedidos: / })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Mostrar: / })).not.toBeInTheDocument();
   });
 
   it('«Registrar cortesía» es secundario y en celular también está dentro de «Más acciones»', async () => {

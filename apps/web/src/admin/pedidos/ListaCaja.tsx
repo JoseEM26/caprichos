@@ -10,7 +10,6 @@ import { CANAL, MOD, aHora, textoPago } from './columnasCaja';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import { mediosDePedido, nombreMedio } from './mediosFila';
 import { totalDe } from './resumenDia';
-import { CAMPOS_ORDEN_LISTA, PESTANAS_LISTA, type CampoOrdenLista, type OrdenLista, type PestanaLista } from './listaCaja';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import './lista-caja.css';
 
@@ -29,67 +28,6 @@ const titulo = (t: string) => t.charAt(0) + t.slice(1).toLowerCase();
 const IcoPuntos = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
 );
-
-/** Pestañas por tipo de servicio (ARIA tablist, flechas, Inicio y Fin). */
-export function PestanasLista({ activa, conteos, alCambiar }: { activa: PestanaLista; conteos: Record<PestanaLista, number>; alCambiar: (t: PestanaLista) => void }) {
-  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const mover = (e: KeyboardEvent, i: number) => {
-    const n = PESTANAS_LISTA.length;
-    const j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
-    if (j < 0) return;
-    e.preventDefault();
-    const t = PESTANAS_LISTA[j].id;
-    alCambiar(t);
-    refs.current[t]?.focus();
-  };
-  return (
-    <div className="lc-tabs" role="tablist" aria-label="Tipo de servicio">
-      {PESTANAS_LISTA.map((t, i) => (
-        <button
-          key={t.id}
-          ref={(el) => { refs.current[t.id] = el; }}
-          type="button"
-          role="tab"
-          id={`lc-tab-${t.id}`}
-          aria-selected={activa === t.id}
-          aria-controls="lc-panel"
-          tabIndex={activa === t.id ? 0 : -1}
-          className="lc-tab"
-          onClick={() => alCambiar(t.id)}
-          onKeyDown={(e) => mover(e, i)}
-        >
-          {t.n}
-          <span className="lc-tab-n" data-testid={`lista-cuenta-${t.id}`}>{conteos[t.id]}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** «Ordenar por» sencillo: un campo y el sentido. */
-export function OrdenarLista({ orden, alCambiar }: { orden: OrdenLista; alCambiar: (o: OrdenLista) => void }) {
-  return (
-    <div className="lc-orden">
-      <label className="lc-orden-campo">
-        <span>Ordenar por</span>
-        <select value={orden.campo} onChange={(e) => alCambiar({ ...orden, campo: e.target.value as CampoOrdenLista })}>
-          {CAMPOS_ORDEN_LISTA.map((c) => (
-            <option key={c.id} value={c.id}>{c.n}</option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        className="lc-orden-dir"
-        aria-label={orden.dir === 'asc' ? 'Orden ascendente, tocar para ordenar de mayor a menor' : 'Orden descendente, tocar para ordenar de menor a mayor'}
-        onClick={() => alCambiar({ ...orden, dir: orden.dir === 'asc' ? 'desc' : 'asc' })}
-      >
-        <span aria-hidden="true">{orden.dir === 'asc' ? '↑' : '↓'}</span>
-        {orden.dir === 'asc' ? 'Ascendente' : 'Descendente'}
-      </button>
-    </div>
-  );
-}
 
 /** Solo un menú «⋮» abierto a la vez: el que se abre cierra al anterior. */
 let cerrarMenuAbierto: (() => void) | null = null;
@@ -258,16 +196,15 @@ export interface ListaCajaProps {
   alAccion: (p: Pedido, a: AccionCaja) => void;
   alVerDetalle: (p: Pedido) => void;
   alAbrir: (p: Pedido) => void;
-  pestana: PestanaLista;
 }
 
 /** Cola de pedidos: una fila por pedido, con franja de color por tipo de servicio y acciones rápidas. */
-export function ListaCaja({ filas, accionDe, resaltados, alAccion, alVerDetalle, alAbrir, pestana }: ListaCajaProps) {
-  // Que la lectura de pantalla anuncie el cambio de pestaña sin mover el foco
+export function ListaCaja({ filas, accionDe, resaltados, alAccion, alVerDetalle, alAbrir }: ListaCajaProps) {
+  // Que la lectura de pantalla anuncie el cambio de página o de filtros sin mover el foco
   const [anuncio, setAnuncio] = useState('');
-  useEffect(() => setAnuncio(`${filas.length} ${filas.length === 1 ? 'pedido' : 'pedidos'} en esta página`), [filas.length, pestana]);
+  useEffect(() => setAnuncio(`${filas.length} ${filas.length === 1 ? 'pedido' : 'pedidos'} en esta página`), [filas.length]);
   return (
-    <div id="lc-panel" role="tabpanel" aria-labelledby={`lc-tab-${pestana}`} className="lc-panel" data-testid="lista-caja">
+    <div className="lc-panel" data-testid="lista-caja">
       <ul className="lc-lista">
         {filas.map((p) => (
           <FilaLista key={p.id} pedido={p} accion={accionDe(p)} resaltado={resaltados.has(String(p.id))} alAccion={alAccion} alVerDetalle={alVerDetalle} alAbrir={alAbrir} />

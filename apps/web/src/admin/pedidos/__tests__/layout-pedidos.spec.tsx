@@ -153,7 +153,7 @@ describe('Pedidos y caja: tarjetas y ventana de detalle', () => {
   it('renderiza tarjetas a todo el ancho y el detalle solo se abre en una ventana', async () => {
     const { container } = render(<PedidosAdminView />);
 
-    expect(await screen.findByRole('navigation', { name: 'Estado de los pedidos' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Filtros/ })).toBeInTheDocument();
     expect(container.querySelector('.cj2-cuadricula')).not.toBeNull();
     expect(container.querySelector('.cj-left')).toBeNull();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

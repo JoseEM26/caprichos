@@ -50,4 +50,21 @@ describe('PaginadorCaja compacto', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Ir a la página' }), { target: { value: '2' } });
     expect(alIr).toHaveBeenCalledWith(2);
   });
+
+  it('carga progresiva en la MISMA línea: «Cargar más» es un enlace chico y «Cargando…» un texto, sin segunda barra', () => {
+    const alCargarMas = vi.fn();
+    const { rerender } = render(<PaginadorCaja {...base} carga={{ cargados: 200, totalServidor: 253, cargando: false, alCargarMas }} />);
+    expect(screen.getAllByRole('navigation', { name: 'Paginación' })).toHaveLength(1);
+    expect(screen.getByTestId('pag-carga')).toHaveTextContent('200/253');
+    const boton = screen.getByRole('button', { name: 'Cargar más' });
+    expect(boton).toHaveClass('cj2-pag-mas');
+    expect(screen.getByRole('navigation', { name: 'Paginación' })).toContainElement(boton);
+    fireEvent.click(boton);
+    expect(alCargarMas).toHaveBeenCalledTimes(1);
+    rerender(<PaginadorCaja {...base} carga={{ cargados: 200, totalServidor: 253, cargando: true, alCargarMas }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando… 200/253');
+    expect(screen.queryByRole('button', { name: /Cargar|Cargando/ })).toBeNull();
+    rerender(<PaginadorCaja {...base} carga={{ cargados: 253, totalServidor: 253, cargando: false, alCargarMas }} />);
+    expect(screen.queryByTestId('pag-carga')).toBeNull();
+  });
 });

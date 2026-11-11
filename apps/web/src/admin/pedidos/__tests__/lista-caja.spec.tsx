@@ -6,7 +6,7 @@ import { ListaCaja, ranurasDeAccion } from '../ListaCaja';
 import { pedidosApi, type Pedido } from '../pedidosApi';
 import { preferenciasApi } from '../preferenciasCaja';
 import { normalizarVistaCaja } from '../ControlesTabla';
-import { contarPestanas, normalizarOrdenLista, ordenarLista, pestanaDe, ORDEN_LISTA_POR_DEFECTO } from '../listaCaja';
+import { abrirFiltros } from './abrirFiltros';
 import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
@@ -147,17 +147,18 @@ describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
     await irALista();
     expect(screen.getByPlaceholderText(/Buscar por código/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Filtros/ })).toBeTruthy();
+    // Estado y «Todo el día» viven dentro del panel «Filtros» (la barra de arriba es una sola línea)
+    expect(screen.queryByRole('navigation', { name: 'Estado de los pedidos' })).toBeNull();
+    abrirFiltros();
     expect(screen.getByTestId('cuenta-todo')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Todo el día/ })).toBeTruthy();
     expect(screen.getByRole('navigation', { name: 'Estado de los pedidos' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /activo/ })).not.toBeDisabled();
     expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
     expect(screen.queryByText(/los filtros aplican en/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     expect(screen.getByRole('button', { name: /^Medio de pago:/ })).toBeTruthy();
-    // «Orden por tiempo» es de Tarjetas y Tabla; la Lista tiene su propio «Ordenar por»
-    expect(screen.queryByRole('group', { name: 'Orden por tiempo' })).toBeNull();
-    expect(screen.getByRole('combobox', { name: 'Ordenar por' })).toBeTruthy();
+    // El orden es el general de Caja («Orden por tiempo»), el mismo de Tarjetas y Tabla
+    expect(screen.getByRole('group', { name: 'Orden por tiempo' })).toBeTruthy();
   });
 
   it('la búsqueda da los mismos pedidos en Tarjetas, Tabla y Lista, y se conserva al cambiar de vista', async () => {
@@ -180,9 +181,10 @@ describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
     montar(surtido());
     await irALista();
     expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-004']); // por defecto: los activos
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-003', 'CP-004']);
-    expect(screen.getByTestId('lista-cuenta-todos')).toHaveTextContent('4');
+    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–4 de 4');
   });
 
   it('un contador del Resumen filtra la Lista (Entregados) y los chips lo muestran', async () => {
@@ -190,6 +192,7 @@ describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
     await irALista();
     fireEvent.click(screen.getByRole('button', { name: /entregado/ }));
     await waitFor(() => expect(codigosEnLista()).toEqual(['CP-003']));
+    abrirFiltros();
     expect(screen.getAllByRole('button', { name: /^Quitar filtro/ }).length).toBeGreaterThan(0);
     fireEvent.click(within(screen.getByTestId('resumen-dia')).getByRole('button', { name: /activo/ }));
     expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-004']);
@@ -209,20 +212,8 @@ describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
     await screen.findByTestId('lista-caja');
     // cambiar de vista no vuelve a pedir ni suelta el medio
     expect(listar.mock.calls.filter(([f]: any) => !f?.pendientes && !f?.medios)).toHaveLength(0);
+    abrirFiltros();
     expect(screen.getByRole('button', { name: /^Quitar filtro Medio: Yape/ })).toBeTruthy();
-  });
-
-  it('pestañas + filtros: los filtros van antes y los contadores de las pestañas cuentan lo ya filtrado', async () => {
-    montar(surtido());
-    await irALista();
-    fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
-    expect(within(screen.getByRole('tablist')).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos4', 'Mostrador1', 'A domicilio1', 'Mesas2']);
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
-    await waitFor(() => expect(within(screen.getByRole('tablist')).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos2', 'Mostrador1', 'A domicilio0', 'Mesas1']));
-    fireEvent.click(screen.getByRole('tab', { name: /Mesas/ }));
-    expect(codigosEnLista()).toEqual(['CP-004']);
-    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
-    expect(screen.getByText('No hay pedidos de este tipo de servicio.')).toBeTruthy();
   });
 
   it('un filtro sin resultados dice «No hay pedidos con estos filtros» y permite limpiarlos', async () => {
@@ -235,102 +226,103 @@ describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
   });
 });
 
-describe('Vista Lista: pestañas por tipo de servicio', () => {
-  const surtido = () => [
-    ped(1, { modalidad: 'LLEVAR' }),
-    ped(2, { modalidad: 'LOCAL' }),
-    ped(3, { modalidad: 'DELIVERY' }),
-    ped(4, { modalidad: 'MESA', mesa_nombre: 'Mesa 4' }),
-    ped(5, { modalidad: 'COMER_LOCAL' }),
-    ped(6, { modalidad: 'RECOGER' }),
-  ];
-
-  it('mapea las modalidades reales y cuenta bien', () => {
-    expect(surtido().map(pestanaDe)).toEqual(['mostrador', 'mostrador', 'domicilio', 'mesas', 'mesas', 'mostrador']);
-    expect(contarPestanas(surtido())).toEqual({ todos: 6, mostrador: 3, domicilio: 1, mesas: 2 });
-  });
-
-  it('cada pestaña filtra la lista y muestra su contador; ARIA tablist/tab/tabpanel', async () => {
-    montar(surtido());
-    await irALista();
-    const tabs = screen.getByRole('tablist', { name: 'Tipo de servicio' });
-    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos6', 'Mostrador3', 'A domicilio1', 'Mesas2']);
-    expect(screen.getByRole('tabpanel')).toBeTruthy();
-    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
-    expect(codigosEnLista()).toEqual(['CP-003']);
-    fireEvent.click(screen.getByRole('tab', { name: /Mesas/ }));
-    expect(codigosEnLista().sort()).toEqual(['CP-004', 'CP-005']);
-    fireEvent.click(screen.getByRole('tab', { name: /Mostrador/ }));
-    expect(codigosEnLista()).toHaveLength(3);
-  });
-
-  it('las flechas del teclado cambian de pestaña y mueven el foco', async () => {
-    montar(surtido());
-    await irALista();
-    const todos = screen.getByRole('tab', { name: /Todos/ });
-    expect(todos).toHaveAttribute('aria-selected', 'true');
-    expect(todos).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('tab', { name: /Mostrador/ })).toHaveAttribute('tabindex', '-1');
-    fireEvent.keyDown(todos, { key: 'ArrowRight' });
-    const mostrador = screen.getByRole('tab', { name: /Mostrador/ });
-    expect(mostrador).toHaveAttribute('aria-selected', 'true');
-    expect(document.activeElement).toBe(mostrador);
-    fireEvent.keyDown(mostrador, { key: 'ArrowLeft' });
-    fireEvent.keyDown(screen.getByRole('tab', { name: /Todos/ }), { key: 'ArrowLeft' }); // da la vuelta: Mesas
-    expect(screen.getByRole('tab', { name: /Mesas/ })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('una pestaña sin pedidos dice que no hay de ese tipo', async () => {
-    montar([ped(1)]);
-    await irALista();
-    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
-    expect(screen.getByText('No hay pedidos de este tipo de servicio.')).toBeTruthy();
-  });
-});
-
-describe('Vista Lista: ordenar por', () => {
+describe('Vista Lista: sin pestañas ni «Ordenar por» propio; orden general y un solo pie', () => {
+  // Del servidor llegan del más reciente al más antiguo (creado_en desc)
   const tres = () => [
-    ped(1, { total: 30, cliente_nombre: 'Beto Prueba', creado_en: '2026-11-10T15:00:00Z' }),
     ped(2, { total: 10, cliente_nombre: 'Ana Prueba', creado_en: '2026-11-10T16:00:00Z' }),
+    ped(1, { total: 30, cliente_nombre: 'Beto Prueba', creado_en: '2026-11-10T15:00:00Z' }),
     ped(3, { total: 20, cliente_nombre: 'Carla Prueba', creado_en: '2026-11-10T14:00:00Z' }),
   ];
+  const codigosTarjetas = () => screen.getAllByText(/^CP-\d+$/).map((e) => e.textContent);
 
-  it('ordenarLista: fecha, total, cliente y estado, ascendente y descendente', () => {
-    expect(ordenarLista(tres(), { campo: 'fecha', dir: 'desc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-001', 'CP-003']);
-    expect(ordenarLista(tres(), { campo: 'total', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-003', 'CP-001']);
-    expect(ordenarLista(tres(), { campo: 'cliente', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-001', 'CP-003']);
-    const estados = [ped(1, { estado: 'ENTREGADO' }), ped(2, { estado: 'COLA', pago_estado: 'PENDIENTE' }), ped(3, { estado: 'LISTO' })];
-    expect(ordenarLista(estados, { campo: 'estado', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-003', 'CP-001']);
-  });
-
-  it('normalizarOrdenLista rechaza valores raros', () => {
-    expect(normalizarOrdenLista({ campo: 'total', dir: 'asc' })).toEqual({ campo: 'total', dir: 'asc' });
-    expect(normalizarOrdenLista({ campo: 'otro', dir: 'asc' })).toEqual(ORDEN_LISTA_POR_DEFECTO);
-    expect(normalizarOrdenLista({ campo: 'total', dir: 'x' })).toEqual(ORDEN_LISTA_POR_DEFECTO);
-    expect(normalizarOrdenLista('hola')).toEqual(ORDEN_LISTA_POR_DEFECTO);
-    expect(normalizarOrdenLista(null)).toEqual(ORDEN_LISTA_POR_DEFECTO);
-  });
-
-  it('cambiar el campo y el sentido reordena y se guarda por usuario', async () => {
+  it('no hay pestañas por tipo de servicio ni el bloque «Ordenar por»', async () => {
     montar(tres());
     await irALista();
-    expect(codigosEnLista()).toEqual(['CP-002', 'CP-001', 'CP-003']); // por defecto: fecha, la más reciente primero
-    fireEvent.change(screen.getByRole('combobox', { name: 'Ordenar por' }), { target: { value: 'total' } });
-    expect(preferenciasApi.guardar).toHaveBeenCalledWith('caja.lista.orden', { campo: 'total', dir: 'desc' });
-    expect(codigosEnLista()).toEqual(['CP-001', 'CP-003', 'CP-002']);
-    fireEvent.click(screen.getByRole('button', { name: /Orden descendente/ }));
-    expect(preferenciasApi.guardar).toHaveBeenCalledWith('caja.lista.orden', { campo: 'total', dir: 'asc' });
-    expect(codigosEnLista()).toEqual(['CP-002', 'CP-003', 'CP-001']);
-    expect(window.localStorage.getItem('caprichos.caja.lista.orden')).toBe('{"campo":"total","dir":"asc"}');
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByRole('tabpanel')).toBeNull();
+    expect(screen.queryByText('Ordenar por')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Ordenar por' })).toBeNull();
+    expect(screen.queryByTestId('lista-cuenta-todos')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ascendente|Descendente/ })).toBeNull();
   });
 
-  it('el orden guardado se restaura al abrir', async () => {
+  it('el orden por defecto de la Lista es el de Tarjetas (más recientes arriba) y el orden general lo invierte', async () => {
+    montar(tres());
+    await screen.findByTestId('resumen-dia');
+    const enTarjetas = codigosTarjetas();
+    expect(enTarjetas).toEqual(['CP-002', 'CP-001', 'CP-003']);
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    await screen.findByTestId('lista-caja');
+    expect(codigosEnLista()).toEqual(enTarjetas);
+    abrirFiltros();
+    fireEvent.click(screen.getByRole('button', { name: /^Más tiempo primero/ }));
+    expect(codigosEnLista()).toEqual(['CP-003', 'CP-001', 'CP-002']);
+    expect(screen.getByRole('button', { name: 'Quitar orden: más tiempo primero' })).toBeTruthy();
+  });
+
+  it('una preferencia vieja «caja.lista.orden» se ignora sin error: ni se lee ni se guarda', async () => {
     window.localStorage.setItem('caprichos.caja.vista', '"lista"');
     window.localStorage.setItem('caprichos.caja.lista.orden', JSON.stringify({ campo: 'cliente', dir: 'asc' }));
     montar(tres());
     await screen.findByTestId('lista-caja');
     expect(codigosEnLista()).toEqual(['CP-002', 'CP-001', 'CP-003']);
-    expect((screen.getByRole('combobox', { name: 'Ordenar por' }) as HTMLSelectElement).value).toBe('cliente');
+    const claves = [...vi.mocked(preferenciasApi.obtener).mock.calls, ...vi.mocked(preferenciasApi.guardar).mock.calls].map((c) => c[0]);
+    expect(claves).not.toContain('caja.lista.orden');
+  });
+
+  describe('pie único', () => {
+    const muchos = () => Array.from({ length: 120 }, (_, i) => ped(i + 1));
+    const montarPaginado = (pagina2: () => Promise<any>) => {
+      const todos = muchos();
+      vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+        usuario: { partyId: '1', nombres: 'Usuario Prueba', rol: 'CAJERO' }, permisos: [], debeCambiar: false, cargando: false, autenticado: true, tiene: vi.fn(() => true),
+      } as any);
+      vi.spyOn(socketModulo, 'useEventos').mockImplementation(() => {});
+      vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true } as any);
+      vi.spyOn(pedidosApi, 'listarNoEntregados').mockResolvedValue({ reprogramar: [], cancelados: [], total: 0 } as any);
+      vi.spyOn(impresionApi, 'obtenerEstado').mockRejectedValue(new Error('sin consulta'));
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([]);
+      vi.spyOn(pedidosApi, 'listar').mockImplementation(async (f: any) => {
+        if (f?.pendientes) return { total: 0, pagina: 1, limite: 1, items: [] } as any;
+        if (f?.pagina === 2) return pagina2();
+        return { total: 120, pagina: 1, limite: 100, items: todos.slice(0, 100) } as any;
+      });
+      window.localStorage.setItem('caprichos.caja.vista', '"lista"');
+      return render(<MemoryRouter><PedidosAdminView /></MemoryRouter>);
+    };
+
+    it('mientras carga: una sola barra, con el conteo coherente y «Cargando…» como texto (no un botón)', async () => {
+      let soltar: (v: any) => void = () => {};
+      montarPaginado(() => new Promise((r) => { soltar = r; }));
+      await screen.findByTestId('lista-caja');
+      const pie = await screen.findByRole('navigation', { name: 'Paginación' });
+      expect(screen.getAllByRole('navigation', { name: 'Paginación' })).toHaveLength(1);
+      expect(screen.queryByTestId('mas-pedidos')).toBeNull();
+      await waitFor(() => expect(within(pie).getByTestId('pag-carga')).toHaveTextContent('Cargando… 100/120'));
+      expect(within(pie).queryByRole('button', { name: /Cargar|Cargando/ })).toBeNull();
+      expect(within(pie).getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–25 de 100');
+      await act(async () => { soltar({ total: 120, pagina: 2, limite: 100, items: muchos().slice(100) }); });
+      await waitFor(() => expect(screen.queryByTestId('pag-carga')).toBeNull());
+      expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–25 de 120');
+    });
+
+    it('si falla la carga, «Cargar más» queda como enlace en la MISMA barra y reintenta', async () => {
+      let intento = 0;
+      montarPaginado(async () => {
+        intento++;
+        if (intento === 1) throw new Error('sin red');
+        return { total: 120, pagina: 2, limite: 100, items: muchos().slice(100) } as any;
+      });
+      await screen.findByTestId('lista-caja');
+      const pie = await screen.findByRole('navigation', { name: 'Paginación' });
+      const boton = await within(pie).findByRole('button', { name: 'Cargar más' });
+      expect(within(pie).getByRole('alert')).toHaveTextContent('sin red');
+      expect(boton).toHaveClass('cj2-pag-mas');
+      fireEvent.click(boton);
+      await waitFor(() => expect(screen.queryByTestId('pag-carga')).toBeNull());
+      expect(screen.getByTestId('rango-pagina')).toHaveTextContent('de 120');
+    });
   });
 });
 
@@ -428,7 +420,7 @@ describe('Vista Lista: cronómetro', () => {
   const cargar = (filas: Pedido[]) =>
     render(
       <MemoryRouter>
-        <ListaCaja filas={filas} pestana="todos" accionDe={() => null} resaltados={new Set()} alAccion={() => {}} alVerDetalle={() => {}} alAbrir={() => {}} />
+        <ListaCaja filas={filas} accionDe={() => null} resaltados={new Set()} alAccion={() => {}} alVerDetalle={() => {}} alAbrir={() => {}} />
       </MemoryRouter>,
     );
 
@@ -472,7 +464,6 @@ describe('Vista Lista: celular y paginación', () => {
     const fila = screen.getByTestId('fila-lista');
     expect(within(fila).getByRole('button', { name: /COBRAR/ })).toBeTruthy();
     expect(within(fila).getByRole('button', { name: 'Más acciones de CP-001' })).toBeTruthy();
-    expect(screen.getByRole('tablist')).toBeTruthy();
   });
 
   it('usa el paginador de Caja: 25 por defecto, sin «Auto», y 10 por página se respeta', async () => {
@@ -488,12 +479,13 @@ describe('Vista Lista: celular y paginación', () => {
 });
 
 describe('Vista Lista: el Resumen coincide con la lista', () => {
-  it('con «Todo el día»: total del resumen = filas de la pestaña Todos y ventas = suma sin anulados', async () => {
+  it('con «Todo el día»: total del resumen = filas de la lista y ventas = suma sin anulados', async () => {
     montar([ped(1, { total: 30 }), ped(2, { total: 20, pago_estado: 'PENDIENTE' }), ped(3, { total: 99, estado: 'ANULADO' }), ped(4, { total: 10, estado: 'ENTREGADO' })]);
     await irALista();
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     expect(screen.getByTestId('resumen-dia')).toHaveTextContent('4 pedidos');
-    expect(screen.getByTestId('lista-cuenta-todos')).toHaveTextContent('4');
+    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–4 de 4');
     expect(screen.getAllByTestId('fila-lista')).toHaveLength(4);
     expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 60.00'); // 30 + 20 + 10; el anulado no suma
   });

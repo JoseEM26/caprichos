@@ -10,6 +10,7 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({
@@ -206,6 +207,7 @@ describe('Lista de Caja: tarjetas, ventana y paginación', () => {
     fireEvent.click(await screen.findByRole('button', { name: '1 por confirmar' }));
     expect(screen.getByText('CP-001')).toBeInTheDocument();
     expect(screen.queryByText('CP-002')).not.toBeInTheDocument();
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Por confirmar' }));
     expect(screen.getByText('CP-002')).toBeInTheDocument();
   });
