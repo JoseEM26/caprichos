@@ -706,7 +706,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       '/admin/caja',
       undefined,
       `impresion:sin-agente:${masViejo.id}`,
-      { correo: true },
+      { correo: true, tipoCorreo: 'IMPRESORA' },
     );
     return 1;
   }

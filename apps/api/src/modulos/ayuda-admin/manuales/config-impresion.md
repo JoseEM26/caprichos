@@ -13,6 +13,7 @@ sugerencias:
   - ¿Cómo agrego otra computadora para imprimir?
   - ¿Cómo reintento un papel que falló?
   - ¿Cómo reimprimo un sticker o un ticket que ya salió?
+  - ¿Por qué me llegó un correo de computadoras de impresión sin conectar?
 ---
 # Configuración: Impresión
 
@@ -100,6 +101,8 @@ Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y esta
 - El sticker sale cortado o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado.
 - "No elegiste impresora de tickets/stickers": entra a "Cambiar impresoras" de esa PC y elige una.
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
+
+- Correo de computadoras de impresión sin conectar: 20 minutos después de abrir la caja se cuenta cuántas computadoras vinculadas están en línea (con señal en el último minuto). Si hay menos en línea que vinculadas, llega UN correo con cuántas faltan, cuáles son, su función y desde cuándo no dan señal. Abre el programa en esa PC (o escribe `--estado` junto al programa) y deja la ventana abierta. Si sigue igual, llega UN recordatorio una hora después. Las PC desvinculadas, eliminadas o pausadas a propósito no cuentan. Quién lo recibe y los minutos se cambian en Configuración, [Correos de aviso](/admin/mirest?tab=correos).
 
 ## Quien puede hacerlo
 Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Cambiar qué se imprime requiere configuracion/editar; crear llaves, solo ADMIN.

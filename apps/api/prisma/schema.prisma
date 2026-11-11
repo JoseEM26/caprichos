@@ -304,6 +304,34 @@ model CorreoEnvio {
   @@map("correo_envio")
 }
 
+/// Correos EXTRA que reciben avisos del sistema sin ser usuarios (contador, socio...). Dato personal: se enmascara en logs y auditoría.
+model CorreoAvisoExtra {
+  id             BigInt   @id @default(autoincrement())
+  /// Normalizado en minúsculas; único
+  correo         String   @unique @db.VarChar(160)
+  etiqueta       String?  @db.VarChar(60)
+  activo         Boolean  @default(true)
+  /// Tipos de aviso que recibe (STOCK, IMPRESORA, PC_IMPRESION, CHAT_SIN_RESPONDER, COMPROBANTES, OTROS)
+  tipos          String[] @default([])
+  creado_en      DateTime @default(now()) @db.Timestamptz
+  creado_por     BigInt?
+  actualizado_en DateTime @default(now()) @db.Timestamptz
+
+  @@map("correo_aviso_extra")
+}
+
+/// Marca de idempotencia de avisos programados (por día, chat o prueba): la clave única evita duplicados entre instancias.
+model AvisoMarca {
+  id         BigInt   @id @default(autoincrement())
+  clave      String   @unique @db.VarChar(160)
+  tipo       String   @db.VarChar(30)
+  referencia String?  @db.VarChar(160)
+  creado_en  DateTime @default(now()) @db.Timestamptz
+
+  @@index([tipo, creado_en])
+  @@map("aviso_marca")
+}
+
 // Solo se inserta: los triggers de la migración encadenan el hash y bloquean update y delete.
 model Auditoria {
   id            BigInt   @id @default(autoincrement())
@@ -2208,6 +2236,8 @@ model Conversacion {
   vouchers           VoucherPago[]
 
   @@index([atendido_en])
+  // Además existe (solo en la migración 20270216100000: Prisma no declara índices parciales) conversacion_espera_humana_idx:
+  // (ultima_actividad) WHERE urgente OR estado = 'VALIDAR_PAGO', para el aviso «chat sin responder».
   @@map("conversacion")
 }
 

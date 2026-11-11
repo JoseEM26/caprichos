@@ -22,6 +22,7 @@ import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
 import { TarjetaNotificacionesConfiguracion } from './TarjetaNotificacionesConfiguracion';
+import { CorreosAvisoTab } from './CorreosAvisoTab';
 import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespejarConfiguracion';
 import { TarjetaMinutosPreparacionConfiguracion } from './TarjetaMinutosPreparacionConfiguracion';
 import { TarjetaResenasGoogleConfiguracion } from './TarjetaResenasGoogleConfiguracion';
@@ -263,6 +264,12 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     fields: [],
   },
   {
+    id: 'correos',
+    n: 'Correos de aviso',
+    d: 'A quién le llegan por correo los avisos del sistema (solo administrador)',
+    fields: [],
+  },
+  {
     id: 'ingreso',
     n: 'Pantalla de ingreso',
     d: 'Imágenes del carrusel y frase de la pantalla de ingreso',
@@ -281,7 +288,7 @@ const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
 const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
 
 /** Pestañas con componente propio: no usan el formulario genérico. */
-const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
+const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso', 'correos'];
 
 const estiloInputCoord = {
   width: '100%',
@@ -468,7 +475,7 @@ export function ConfiguracionLocalView() {
     );
   };
 
-  const categoriasVisibles = CATEGORIAS_CONFIG.filter((c) => c.id !== 'ingreso' || puedeEditarIngreso);
+  const categoriasVisibles = CATEGORIAS_CONFIG.filter((c) => (c.id !== 'ingreso' || puedeEditarIngreso) && (c.id !== 'correos' || esAdmin));
 
   const handleChange = (key: keyof InfoLocalState, value: string) => {
     setInfo((prev) => ({ ...prev, [key]: value }));
@@ -954,6 +961,9 @@ export function ConfiguracionLocalView() {
             <TarjetaVouchersIaConfiguracion />
           )}
 
+          {/* Subcaso: CORREOS DE AVISO (solo ADMIN) */}
+          {tabId === 'correos' && esAdmin && <CorreosAvisoTab />}
+
           {/* Subcaso: PANTALLA DE INGRESO (solo configuracion/editar) */}
           {tabId === 'ingreso' && puedeEditarIngreso && (
             <TarjetaPantallaIngresoConfiguracion />
@@ -964,6 +974,16 @@ export function ConfiguracionLocalView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && <TarjetaControlAlmacenConfiguracion />}
               {tabId === 'operacion' && <TarjetaNotificacionesConfiguracion />}
+              {tabId === 'operacion' && esAdmin && (
+                <div data-testid="atajo-correos-aviso" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px 14px', background: '#FFFFFF' }}>
+                  <span style={{ flex: '1 1 240px', fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '18px' }}>
+                    ¿Quieres que tu contador o un socio reciba avisos por correo (stock, impresoras, chats sin responder)? Se agregan sin crear usuarios.
+                  </span>
+                  <button type="button" onClick={() => irACategoria('correos')} style={{ minHeight: '44px', padding: '0 14px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                    Ir a Correos de aviso
+                  </button>
+                </div>
+              )}
               {tabId === 'operacion' && <TarjetaResenasGoogleConfiguracion />}
               {tabId === 'operacion' && <TarjetaInvitadoConfiguracion />}
               {tabId === 'operacion' && <TarjetaPropinaConfiguracion />}

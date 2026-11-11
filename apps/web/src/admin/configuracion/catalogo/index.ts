@@ -14,12 +14,13 @@ import { VOUCHERS } from './vouchers';
 import { INGRESO } from './ingreso';
 import { OPERACION } from './operacion';
 import { COCINA } from './cocina';
+import { CORREOS } from './correos';
 
 export type { EntradaConfig, PeligroConfig } from './tipos';
 
 export const CATALOGO: EntradaConfig[] = [
   ...LOCAL, ...HORARIO, ...FECHAS, ...PAGOS, ...ZONAS, ...DEMANDA, ...REPARTO, ...PARAMETROS,
-  ...CHATBOT, ...IMPRESION, ...AYUDA, ...VOUCHERS, ...INGRESO, ...OPERACION, ...COCINA,
+  ...CHATBOT, ...IMPRESION, ...AYUDA, ...VOUCHERS, ...INGRESO, ...OPERACION, ...COCINA, ...CORREOS,
 ];
 
 /** Ids repetidos o mal formados (lo valida el test del catálogo). */

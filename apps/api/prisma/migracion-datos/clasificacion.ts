@@ -53,7 +53,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ]],
   ['bot, WhatsApp y mensajes: conversaciones, historial y salientes', [
     'conversacion', 'mensaje_chat', 'whatsapp_mensaje', 'saliente_whatsapp', 'queja_whatsapp',
-    'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo', 'correo_envio',
+    'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo', 'correo_envio', 'correo_aviso_extra', 'aviso_marca',
   ]],
   ['stock y compras: saldos, movimientos y pedidos a proveedores', [
     'stock', 'stock_sabor', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
@@ -102,7 +102,7 @@ export const TABLAS_SENSIBLES: string[] = [
   'comprobante', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'cliente_facturacion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
-  'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request',
+  'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request', 'correo_aviso_extra',
 ];
 
 /** Columnas que NUNCA se exportan, en ninguna tabla (contraseñas, hashes, PIN). */

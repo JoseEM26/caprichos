@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { CorreoService, ResultadoCorreo } from './correo.service';
+import { CorreosExtraService } from './correos-extra.service';
+import { TipoAviso } from './tipos-aviso';
 import {
   CoberturaDia,
   PersonaTurno,
@@ -14,6 +16,8 @@ export interface AvisoEquipo {
   origen: string;
   asunto: string;
   texto: string;
+  /** Tipo de aviso: decide qué correos extra (Configuración › Correos de aviso) lo reciben. Sin tipo = OTROS. */
+  tipo?: TipoAviso;
   ahora?: Date;
 }
 
@@ -25,7 +29,18 @@ export class AvisosEquipoCorreoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly correo: CorreoService,
+    @Optional() private readonly extras?: CorreosExtraService,
   ) {}
+
+  /** Correos extra activos del tipo; si falla la lectura, el aviso sigue con quienes ya recibían. */
+  private async extrasDe(tipo?: TipoAviso): Promise<string[]> {
+    try {
+      return (await this.extras?.extrasPara(tipo ?? 'OTROS')) ?? [];
+    } catch (err: any) {
+      this.logger.warn(JSON.stringify({ evento: 'correo_extras_error', error: err?.message ?? 'DESCONOCIDO' }));
+      return [];
+    }
+  }
 
   /** Nunca lanza: si algo falla, el aviso queda en el log y el flujo que lo originó sigue. */
   async avisar(aviso: AvisoEquipo): Promise<ResultadoCorreo | null> {
@@ -33,7 +48,7 @@ export class AvisosEquipoCorreoService {
       const momento = momentoLima(aviso.ahora ?? new Date());
       const { personas, correos, coberturas } = await this.cargar(momento.fecha);
       const ids = elegirDestinatarios(momento, personas, coberturas);
-      const destinatarios = ids.map((id) => correos.get(id)).filter((c): c is string => !!c);
+      const destinatarios = [...ids.map((id) => correos.get(id)).filter((c): c is string => !!c), ...(await this.extrasDe(aviso.tipo))];
       return await this.correo.enviar({
         clave: aviso.clave,
         origen: aviso.origen,
@@ -58,8 +73,11 @@ export class AvisosEquipoCorreoService {
         },
         select: { party: { select: { persona: { select: { correo: true } } } } },
       });
-      const destinatarios = cuentas.map((c) => c.party?.persona?.correo?.trim().toLowerCase()).filter((c): c is string => !!c);
-      return await this.correo.enviar({ ...aviso, destinatarios });
+      const destinatarios = [
+        ...cuentas.map((c) => c.party?.persona?.correo?.trim().toLowerCase()).filter((c): c is string => !!c),
+        ...(await this.extrasDe(aviso.tipo)),
+      ];
+      return await this.correo.enviar({ clave: aviso.clave, origen: aviso.origen, asunto: aviso.asunto, texto: aviso.texto, destinatarios });
     } catch (err: any) {
       this.logger.error(JSON.stringify({ evento: 'correo_aviso_error', origen: aviso.origen, error: err?.message ?? 'DESCONOCIDO' }));
       return null;
