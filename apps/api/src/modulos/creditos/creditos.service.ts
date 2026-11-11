@@ -498,6 +498,12 @@ export class CreditosService {
   private async nombresDeCobradores(consumos: any[]): Promise<Map<string, string>> {
     const ids = Array.from(new Set(consumos.map((c) => c.pagado_por).filter((x) => x != null).map((x) => x.toString()))).map((x) => BigInt(x));
     const mapa = new Map<string, string>();
+    // Planilla que cobró cada consumo (clave `planilla:<id>` = «desde a hasta»), para el chip «Planilla 03/11 a 09/11»
+    const pids = Array.from(new Set(consumos.map((c) => c.planilla_periodo_id).filter((x) => x != null).map((x) => x.toString()))).map((x) => BigInt(x));
+    if (pids.length) {
+      const per = await this.prisma.planillaPeriodo.findMany({ where: { id: { in: pids } }, select: { id: true, desde: true, hasta: true } }).catch(() => []);
+      for (const p of per) mapa.set(`planilla:${p.id}`, `${p.desde.toISOString().slice(0, 10)} a ${p.hasta.toISOString().slice(0, 10)}`);
+    }
     if (ids.length === 0) return mapa;
     const personas = await this.prisma.person.findMany({ where: { party_id: { in: ids } } }).catch(() => []);
     for (const p of personas) mapa.set(p.party_id.toString(), `${p.nombres || ''} ${p.apellidos || ''}`.trim());
@@ -512,6 +518,8 @@ export class CreditosService {
       pagoModo: c.pago_modo ?? null,
       pagoMedio: c.pago_medio ?? null,
       pagoDetalle: c.pago_motivo ?? null,
+      planillaPeriodoId: c.planilla_periodo_id != null ? c.planilla_periodo_id.toString() : null,
+      planillaPeriodo: c.planilla_periodo_id != null ? (nombres.get(`planilla:${c.planilla_periodo_id}`) ?? null) : null,
       cobradoPor: c.pagado_por != null ? (nombres.get(c.pagado_por.toString()) ?? `Usuario ${c.pagado_por}`) : null,
     };
   }
@@ -683,6 +691,12 @@ export class CreditosService {
       if (r.count !== 1) throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Ese consumo ya estaba cobrado' });
     } else {
       if (!c.pagado_en) throw new ConflictException({ codigo: 'YA_PENDIENTE', mensaje: 'Ese consumo ya está pendiente' });
+      if (c.planilla_periodo_id != null) {
+        throw new ConflictException({
+          codigo: 'COBRO_EN_PLANILLA',
+          mensaje: 'Ese consumo lo cobró una planilla pagada; para devolverlo a pendiente reabre ese período en Asistencia › Planilla',
+        });
+      }
       if (c.movimiento_caja_id != null) {
         throw new ConflictException({
           codigo: 'COBRO_EN_CAJA',

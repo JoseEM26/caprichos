@@ -63,6 +63,18 @@ describe('Créditos: check «Cobrado», marcar a mano y quién cobró', () => {
     await expect(service.marcarCobrado({ consumoId: 2, cobrado: false }, admin)).rejects.toMatchObject({ response: { codigo: 'COBRO_EN_CAJA' } });
   });
 
+  it('un consumo cobrado por una planilla muestra a qué período pertenece y no se desmarca desde Créditos (409: se reabre la planilla)', async () => {
+    prisma.planillaPeriodo = { findMany: jest.fn().mockResolvedValue([{ id: 40n, desde: new Date('2026-11-02T00:00:00Z'), hasta: new Date('2026-11-08T00:00:00Z') }]) };
+    const cobrado = consumo(1, { pagado_en: new Date(), pagado_por: 8n, pago_modo: 'PLANILLA', planilla_periodo_id: 40n });
+    prisma.consumoPersonal.findMany.mockResolvedValue([cobrado, consumo(2)]);
+    const r = await service.obtenerCuenta('5', new Date('2026-11-08T15:00:00Z'));
+    expect(r.consumos.find((c: any) => c.pedidoCodigo === 'P-1')).toMatchObject({ estadoPago: 'PAGADO', pagoModo: 'PLANILLA', planillaPeriodoId: '40', planillaPeriodo: '2026-11-02 a 2026-11-08' });
+    expect(r.consumos.find((c: any) => c.pedidoCodigo === 'P-2')).toMatchObject({ estadoPago: 'PENDIENTE', planillaPeriodoId: null });
+    prisma.consumoPersonal.findUnique.mockResolvedValue(cobrado);
+    await expect(service.marcarCobrado({ consumoId: 1, cobrado: false }, admin)).rejects.toMatchObject({ response: { codigo: 'COBRO_EN_PLANILLA' } });
+    expect(prisma.consumoPersonal.update).not.toHaveBeenCalled();
+  });
+
   it('saldar, planilla y marcar-cobrado son solo de quien tiene creditos/saldar (ADMIN); ver sigue en creditos/ver', () => {
     const permiso = (m: string) => Reflect.getMetadata(CLAVE_PERMISO, (CreditosController.prototype as any)[m]);
     for (const m of ['saldar', 'planilla', 'marcarCobrado']) expect(permiso(m)).toEqual({ modulo: 'creditos', accion: 'saldar' });

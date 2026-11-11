@@ -119,7 +119,7 @@ export function BotonPlanilla({ desde, hasta, etiqueta, alTerminar }: { desde: s
 }
 
 /** Check visible de un consumo: «✓ Cobrado» (verde) o «Pendiente» (ámbar), con texto, no solo color. */
-export function EstadoCobro({ item }: { item: { estadoPago?: 'PENDIENTE' | 'PAGADO'; pagadoEn?: string | null; pagoMedio?: string | null; cobradoPor?: string | null } }) {
+export function EstadoCobro({ item }: { item: { estadoPago?: 'PENDIENTE' | 'PAGADO'; pagadoEn?: string | null; pagoMedio?: string | null; cobradoPor?: string | null; planillaPeriodoId?: string | null; planillaPeriodo?: string | null } }) {
   const cobrado = item.estadoPago === 'PAGADO';
   const cuando = item.pagadoEn
     ? new Date(item.pagadoEn).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -144,6 +144,7 @@ export function EstadoCobro({ item }: { item: { estadoPago?: 'PENDIENTE' | 'PAGA
           {cuando}
           {item.cobradoPor ? ` · cobró ${item.cobradoPor}` : ''}
           {item.pagoMedio ? ` · ${item.pagoMedio === 'PLANILLA' ? 'por planilla' : item.pagoMedio.toLowerCase()}` : ''}
+          {item.planillaPeriodoId ? ` · Planilla ${item.planillaPeriodo ?? `#${item.planillaPeriodoId}`}` : ''}
         </span>
       )}
     </span>
@@ -151,7 +152,7 @@ export function EstadoCobro({ item }: { item: { estadoPago?: 'PENDIENTE' | 'PAGA
 }
 
 /** ADMIN: «Ya se le descontó» (marcar) o desmarcar un consumo a mano, con confirmación Sí/No. */
-export function BotonCobradoManual({ consumoId, cobrado, codigo, alTerminar }: { consumoId: string; cobrado: boolean; codigo: string; alTerminar: () => void }) {
+export function BotonCobradoManual({ consumoId, cobrado, codigo, alTerminar, enPlanilla = false }: { consumoId: string; cobrado: boolean; codigo: string; alTerminar: () => void; enPlanilla?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -168,6 +169,8 @@ export function BotonCobradoManual({ consumoId, cobrado, codigo, alTerminar }: {
       setCargando(false);
     }
   };
+  // Lo cobró una planilla pagada: se devuelve a pendiente reabriendo ese período (si no, la planilla quedaría descuadrada)
+  if (cobrado && enPlanilla) return <small className="as-nota">Lo cobró una planilla pagada: para devolverlo a pendiente reabre ese período en Asistencia › Planilla.</small>;
   return (
     <>
       <button type="button" className="btn" onClick={() => setAbierto(true)} style={{ minHeight: 44, fontSize: 12, fontWeight: 700 }}>

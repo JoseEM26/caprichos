@@ -27,6 +27,10 @@ export class PlanillaFechaDto {
   /** Ids (coma) de cuotas de préstamo / descuentos recurrentes que no se cobran en este período. */
   @IsOptional() @IsString() @MaxLength(2000) omitirCuotas?: string;
   @IsOptional() @IsString() @MaxLength(2000) omitirRecurrentes?: string;
+  /** Ids (coma) de consumos de períodos ANTERIORES que sí se cobran en este pago. */
+  @IsOptional() @IsString() @MaxLength(2000) incluirAnteriores?: string;
+  /** Vista de la lista: SEMANA (lunes a domingo) o MES (calendario). Vacío = el período de cada persona. */
+  @IsOptional() @IsIn(['SEMANA', 'MES']) modo?: 'SEMANA' | 'MES';
 }
 
 export class PagarPlanillaDto {
@@ -36,6 +40,8 @@ export class PagarPlanillaDto {
   /** Cuotas de préstamo y descuentos recurrentes que NO se cobran en este pago. */
   @IsOptional() @IsString({ each: true }) omitirCuotaIds?: string[];
   @IsOptional() @IsString({ each: true }) omitirRecurrenteIds?: string[];
+  /** Consumos de períodos anteriores que SÍ se cobran en este pago. */
+  @IsOptional() @IsString({ each: true }) incluirConsumoIds?: string[];
 }
 
 export class ReabrirPlanillaDto {

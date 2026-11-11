@@ -65,6 +65,19 @@ describe('Créditos: cuenta del trabajador, pagar ahora y planilla', () => {
     expect(screen.getByText(/CP-2/)).toBeInTheDocument();
   });
 
+  it('un consumo cobrado por planilla muestra a qué período pertenece y no se desmarca desde aquí', async () => {
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['creditos/ver', 'creditos/saldar']));
+    const conPlanilla = structuredClone(resumen);
+    Object.assign(conPlanilla.trabajadores[0].items[1], { pagoModo: 'PLANILLA', pagoMedio: 'PLANILLA', pagadoEn: '2026-11-09T15:30:00.000Z', planillaPeriodoId: '40', planillaPeriodo: '2026-11-02 a 2026-11-08' });
+    vi.spyOn(api, 'obtenerResumenCreditos').mockResolvedValue(conPlanilla);
+    render(<CreditosView />);
+    fireEvent.click(await screen.findByText('Jorge Salas'));
+    expect(screen.getByText(/Planilla 2026-11-02 a 2026-11-08/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Desmarcar CP-2/ })).toBeNull();
+    expect(screen.getByText(/reabre ese período en Asistencia/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ya se le descontó CP-1/ })).toBeInTheDocument();
+  });
+
   it('solo con creditos/saldar aparece «Ya se le descontó»; confirma Sí/No y llama a marcarCobrado', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['creditos/ver']));
     const { unmount } = render(<CreditosView />);

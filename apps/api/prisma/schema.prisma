@@ -2074,10 +2074,13 @@ model ConsumoPersonal {
   pago_medio         String?
   pago_motivo        String?
   movimiento_caja_id BigInt?
+  // Planilla que lo cobró (migración 20270205100000): null = no lo cobró una planilla. Reabrir el período lo limpia.
+  planilla_periodo_id BigInt?
 
   party     Party    @relation(fields: [party_id], references: [id])
   pedido    Pedido   @relation(fields: [pedido_id], references: [id])
 
+  @@index([planilla_periodo_id])
   @@map("consumo_personal")
 }
 

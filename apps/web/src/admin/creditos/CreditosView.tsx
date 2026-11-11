@@ -525,7 +525,7 @@ export function CreditosView() {
                               </div>
                             ) : null}
                             {puedeSaldar && (
-                              <BotonCobradoManual consumoId={item.id} cobrado={item.estadoPago === 'PAGADO'} codigo={item.pedidoCodigo} alTerminar={alSaldar} />
+                              <BotonCobradoManual consumoId={item.id} cobrado={item.estadoPago === 'PAGADO'} codigo={item.pedidoCodigo} alTerminar={alSaldar} enPlanilla={!!item.planillaPeriodoId} />
                             )}
                             {item.lineas.map((linea, idx) => (
                               <div

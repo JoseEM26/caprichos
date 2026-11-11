@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { aHoraTexto, jornadaDe } from './asistencia.calculo';
+import { aHoraTexto, jornadaDe, sumarDias } from './asistencia.calculo';
 import { rolEfectivo } from './asistencia.interpretacion';
 import { AsistenciaService } from './asistencia.service';
 import {
@@ -30,7 +30,8 @@ import { PrestamoCalc, cuotaDelPeriodo, interesDeCuota, montoRecurrenteDelPeriod
 
 export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 /** Lo que se descarta del pago de este período: cuotas de préstamo y descuentos recurrentes (ids) que NO se cobran. */
-export interface OmitirPeriodo { cuotas?: string[]; recurrentes?: string[] }
+/** `incluirAnteriores`: consumos de períodos anteriores que SÍ se cobran en este pago (por defecto pasan al siguiente). */
+export interface OmitirPeriodo { cuotas?: string[]; recurrentes?: string[]; incluirAnteriores?: string[] }
 
 /** Sueldo y método de valor hora de la persona, tal como lo usa el cálculo. */
 export interface SueldoCalc {
@@ -131,8 +132,15 @@ export class PlanillaService {
   // Lista y detalle
   // ---------------------------------------------------------------------------
 
-  /** Una fila por persona activa (sin ADMIN) con el período que contiene la fecha según su modalidad. */
-  async listar(fecha?: string, ahora = new Date()) {
+  /**
+   * Una fila por persona activa (sin ADMIN). Sin `modo`: el período de cada persona según su modalidad (comportamiento clásico).
+   * Con `modo` (SEMANA lunes–domingo | MES calendario) y la fecha, la regla cuando NO coincide con la modalidad de la persona es:
+   *  - MES + persona SEMANAL: suma de sus semanas cuyo domingo cae en ese mes (cada semana con su propio estado; las pagadas
+   *    salen congeladas). `semanas` lista cada una para abrirla/pagarla por separado.
+   *  - SEMANA + persona MENSUAL: se muestra su mes (el que contiene el domingo de la semana) como referencia, con aviso
+   *    «se paga por mes» y FUERA de los totales (si no, se contaría dos veces el sueldo del mes).
+   */
+  async listar(fecha?: string, ahora = new Date(), modo?: 'SEMANA' | 'MES') {
     const ref = fecha ? fechaValida(fecha) : jornadaDe(ahora).jornada;
     const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true } });
     const ids = cuentas.map((c) => c.party_id);
@@ -143,7 +151,8 @@ export class PlanillaService {
     ]);
     const vinculoDe = new Map(vinculos.map((v) => [v.party_id, { tipo: v.tipo, fechaIngreso: isoDe(v.fecha_ingreso), fechaFin: v.fecha_fin ? isoDe(v.fecha_fin) : null }]));
     const nombre = new Map(personas.map((p) => [p.party_id, [p.nombres, p.apellidos].filter(Boolean).join(' ')]));
-    const filas = [];
+    const vista = modo ? periodoDe(modo === 'SEMANA' ? 'SEMANAL' : 'MENSUAL', ref) : null;
+    const filas: any[] = [];
     for (const id of ids) {
       const s = sueldos.find((x) => x.party_id === id);
       const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}`, vinculo: vinculoDe.get(id) ?? null };
@@ -151,28 +160,88 @@ export class PlanillaService {
         filas.push({ ...base, sueldo: null });
         continue;
       }
-      const d = await this.detalle(Number(id), ref, [], ahora);
-      filas.push({
-        ...base,
-        sueldo: d.sueldo,
-        pago: d.pago,
-        excel: d.excel,
-        periodo: d.periodo,
-        estado: d.estado,
-        programadasH: d.resumen.programadasH,
-        trabajadasH: d.resumen.trabajadasH,
-        ganado: d.resultado.ganado,
-        consumos: d.resultado.consumosCobrados,
-        adicional: d.resultado.adicional,
-        netoAPagar: d.resultado.netoAPagar,
-        descuentosPorCategoria: d.resultado.descuentosPorCategoria,
-        descuentos: d.resultado.descuentos,
-        adelantos: d.resultado.adelantos,
-        neto: d.resultado.neto,
-        pendientes: d.pendientes,
-      });
+      const modalidad = s.modalidad as Modalidad;
+      let ds: any[];
+      let extra: Record<string, unknown> = {};
+      if (!vista || (modo === 'SEMANA') === (modalidad === 'SEMANAL')) {
+        ds = [await this.detalle(Number(id), vista ? vista.desde : ref, [], ahora)];
+      } else if (modo === 'MES') {
+        // semanas (lunes–domingo) cuyo domingo cae dentro del mes
+        const semanas: string[] = [];
+        for (let d = periodoDe('SEMANAL', vista!.desde).desde; d <= vista!.hasta; d = sumarDias(d, 7)) {
+          const domingo = sumarDias(d, 6);
+          if (domingo >= vista!.desde && domingo <= vista!.hasta) semanas.push(d);
+        }
+        ds = [];
+        for (const d of semanas) ds.push(await this.detalle(Number(id), d, [], ahora));
+        extra = { aviso: `Se paga por semana: suma de ${ds.length} semanas del mes` };
+      } else {
+        ds = [await this.detalle(Number(id), sumarDias(vista!.desde, 6), [], ahora)];
+        extra = { fueraDeModalidad: true, aviso: 'Se paga por mes: se muestra su mes (no suma en los totales de la semana)' };
+      }
+      filas.push({ ...base, ...this.filaDeDetalles(ds), ...extra });
     }
-    return { fecha: ref, filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)) };
+    const enTotales = filas.filter((f) => f.sueldo && !f.fueraDeModalidad);
+    const sum = (g: (f: any) => number) => redondear2(enTotales.reduce((a, f) => a + (g(f) || 0), 0));
+    const totales = {
+      personas: enTotales.length,
+      aPagar: sum((f) => f.neto),
+      pagado: sum((f) => f.netoPagado),
+      pendiente: sum((f) => f.netoPendiente),
+      pagados: enTotales.filter((f) => f.estado === 'PAGADO').length,
+    };
+    return { fecha: ref, modo: modo ?? null, vista, totales, filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)) };
+  }
+
+  /** Une 1..n detalles semanales (o uno solo) en la fila que ve la lista. Los períodos pagados ya vienen congelados. */
+  private filaDeDetalles(ds: any[]) {
+    const r = (g: (d: any) => number) => redondear2(ds.reduce((a, d) => a + (g(d) || 0), 0));
+    const primero = ds[0];
+    const porCat: Record<string, number> = {};
+    for (const d of ds) for (const [c, m] of Object.entries(d.resultado.descuentosPorCategoria ?? {})) porCat[c] = redondear2((porCat[c] ?? 0) + (m as number));
+    const minTot = ds.reduce((a, d) => a + (d.excel.horasLaboradas * 60 + d.excel.minutosLaborados), 0);
+    const neto = r((d) => d.resultado.neto);
+    const netoPagado = r((d) => (d.estado === 'PAGADO' ? d.resultado.neto : 0));
+    const todosPagados = ds.every((d) => d.estado === 'PAGADO');
+    const abrir = ds.find((d) => d.estado !== 'PAGADO') ?? primero;
+    return {
+      sueldo: primero.sueldo,
+      pago: primero.pago,
+      periodo: { desde: ds[0].periodo.desde, hasta: ds[ds.length - 1].periodo.hasta },
+      /** Fecha con la que se abre el panel (la primera semana sin pagar). */
+      abrirFecha: abrir.periodo.desde,
+      estado: todosPagados ? 'PAGADO' : 'ABIERTO',
+      semanas: ds.length > 1 ? ds.map((d) => ({ desde: d.periodo.desde, hasta: d.periodo.hasta, estado: d.estado, neto: d.resultado.neto, pendientes: d.pendientes })) : undefined,
+      excel: {
+        ...primero.excel,
+        pagoPorDia: ds.length > 1 ? null : primero.excel.pagoPorDia,
+        horasLaboradas: Math.floor(minTot / 60),
+        minutosLaborados: minTot % 60,
+        horasExtra: r((d) => d.excel.horasExtra),
+        total: r((d) => d.resultado.ganado),
+        adicional: r((d) => d.resultado.adicional),
+        descuentos: r((d) => d.excel.descuentos),
+        penalidadTardanza: r((d) => d.resultado.penalidadTardanza),
+        descuentosPorCategoria: porCat,
+        netoAPagar: r((d) => d.resultado.netoAPagar),
+        adelanto: r((d) => d.resultado.adelantos),
+        diferencia: neto,
+      },
+      programadasH: r((d) => d.resumen.programadasH),
+      trabajadasH: r((d) => d.resumen.trabajadasH),
+      ganado: r((d) => d.resultado.ganado),
+      consumos: r((d) => d.resultado.consumosCobrados),
+      consumosAnterioresPendiente: ds[0].consumosAnterioresPendiente ?? 0,
+      adicional: r((d) => d.resultado.adicional),
+      netoAPagar: r((d) => d.resultado.netoAPagar),
+      descuentosPorCategoria: porCat,
+      descuentos: r((d) => d.resultado.descuentos),
+      adelantos: r((d) => d.resultado.adelantos),
+      neto,
+      netoPagado,
+      netoPendiente: redondear2(neto - netoPagado),
+      pendientes: ds.reduce((a, d) => a + (d.pendientes ?? 0), 0),
+    };
   }
 
   /**
@@ -233,7 +302,7 @@ export class PlanillaService {
       // Pendientes hasta el fin del período (incluye los que otro período dejó pasar)
       this.prisma.consumoPersonal.findMany({
         where: { party_id: id, pagado_en: null, fecha: { lte: fechaDb(periodo.hasta) }, pedido: { estado: { notIn: ['ANULADO', 'RECHAZADO'] } } },
-        include: { pedido: { select: { codigo: true } } },
+        include: { pedido: { select: { codigo: true, lineas: { select: { cantidad: true, nombre: true, tamano: true, linea_combo_id: true } } } } },
         orderBy: { fecha: 'asc' },
       }),
       this.prisma.person.findUnique({ where: { party_id: id } }),
@@ -249,13 +318,24 @@ export class PlanillaService {
       return f && f.recargo !== 1 && c.estado !== 'VACACIONES' ? { ...c, recargo: f.recargo } : c;
     });
     const vigentes = ajustes.filter((a) => !a.anulado_en);
-    const consumos = consumosBd.map((c) => ({
-      id: c.id.toString(),
-      fecha: isoDe(c.fecha),
-      pedido: c.pedido?.codigo ?? `P-${c.pedido_id}`,
-      monto: Number(c.monto),
-      cobrar: !excluidos.has(c.id.toString()),
-    }));
+    // Mismo origen que Admin › Créditos (consumo_personal sin pagado_en). Los del período se cobran salvo que se excluyan;
+    // los de períodos anteriores quedan sin cobrar salvo que el admin los marque (`incluirAnteriores`).
+    const incluirAnt = new Set(omitir.incluirAnteriores ?? []);
+    const consumos = consumosBd.map((c) => {
+      const anterior = isoDe(c.fecha) < periodo.desde;
+      const idc = c.id.toString();
+      return {
+        id: idc,
+        fecha: isoDe(c.fecha),
+        pedido: c.pedido?.codigo ?? `P-${c.pedido_id}`,
+        // productos (las partes de un combo no se listan: va solo la madre, como en Créditos)
+        productos: (c.pedido?.lineas ?? []).filter((l: any) => l.linea_combo_id == null).map((l: any) => `${l.cantidad} × ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`),
+        monto: Number(c.monto),
+        anterior,
+        cobrar: anterior ? incluirAnt.has(idc) : !excluidos.has(idc),
+      };
+    });
+    const consumosAnterioresPendiente = redondear2(consumos.filter((c) => c.anterior && !c.cobrar).reduce((a, c) => a + c.monto, 0));
     const extrasSet = new Set(extras.map((e) => isoDe(e.jornada)));
     const sueldoPeriodo = sueldo.modalidad === 'SEMANAL' ? sueldo.semanal : sueldo.mensual;
     // Valor hora de la persona: DIAS_HORAS y TARIFA_HORA fijan uno propio; PROGRAMADAS usa sueldo ÷ horas programadas.
@@ -388,6 +468,7 @@ export class PlanillaService {
         extraAprobadaEn: porDia.has(d.jornada) ? porDia.get(d.jornada)!.aprobado_en.toISOString() : null,
       })),
       consumos,
+      consumosAnterioresPendiente,
       ajustes: ajustes.map((a) => ({
         id: Number(a.id),
         tipo: a.tipo,
@@ -436,7 +517,7 @@ export class PlanillaService {
       if (aCobrar.length) {
         const r = await tx.consumoPersonal.updateMany({
           where: { id: { in: aCobrar.map((c) => BigInt(c)) }, pagado_en: null },
-          data: { pagado_en: new Date(), pagado_por: usuario.partyId, pago_modo: 'PLANILLA', pago_medio: 'PLANILLA', pago_motivo: motivo },
+          data: { pagado_en: new Date(), pagado_por: usuario.partyId, pago_modo: 'PLANILLA', pago_medio: 'PLANILLA', pago_motivo: motivo, planilla_periodo_id: fila.id },
         });
         if (r.count !== aCobrar.length) {
           throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Alguno de los consumos ya estaba cobrado. Vuelve a abrir la planilla.' });
@@ -464,7 +545,7 @@ export class PlanillaService {
       if (ids.length) {
         await tx.consumoPersonal.updateMany({
           where: { id: { in: ids.map((i) => BigInt(i)) }, pago_modo: 'PLANILLA', movimiento_caja_id: null },
-          data: { pagado_en: null, pagado_por: null, pago_modo: null, pago_medio: null, pago_motivo: null },
+          data: { pagado_en: null, pagado_por: null, pago_modo: null, pago_medio: null, pago_motivo: null, planilla_periodo_id: null },
         });
       }
       await this.auditar('CAMBIO', 'REABRIR_PLANILLA', usuario, ip, 'planilla_periodo', p.id, { periodo: { desde: isoDe(p.desde), hasta: isoDe(p.hasta) }, neto: Number(p.neto), consumos: ids }, motivo, tx);

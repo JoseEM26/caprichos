@@ -23,7 +23,7 @@ export class PlanillaController {
   @Get()
   @Permiso('planilla', 'ver')
   listar(@Query() q: PlanillaFechaDto) {
-    return this.planilla.listar(q.fecha);
+    return this.planilla.listar(q.fecha, new Date(), q.modo);
   }
 
   @Get('persona/:partyId')
@@ -32,6 +32,7 @@ export class PlanillaController {
     return this.planilla.detalle(Number(partyId), q.fecha ?? jornadaDe(new Date()).jornada, q.excluir ? q.excluir.split(',').filter(Boolean) : [], new Date(), {
       cuotas: q.omitirCuotas ? q.omitirCuotas.split(',').filter(Boolean) : [],
       recurrentes: q.omitirRecurrentes ? q.omitirRecurrentes.split(',').filter(Boolean) : [],
+      incluirAnteriores: q.incluirAnteriores ? q.incluirAnteriores.split(',').filter(Boolean) : [],
     });
   }
 
@@ -89,6 +90,7 @@ export class PlanillaController {
     return this.planilla.pagar(dto.partyId, dto.fecha, dto.excluirConsumoIds ?? [], req.usuario, ipDe(req), new Date(), {
       cuotas: dto.omitirCuotaIds ?? [],
       recurrentes: dto.omitirRecurrenteIds ?? [],
+      incluirAnteriores: dto.incluirConsumoIds ?? [],
     });
   }
 

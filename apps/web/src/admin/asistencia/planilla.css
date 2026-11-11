@@ -45,3 +45,21 @@
 @media (max-width: 480px) {
   .pl-lista { grid-template-columns: minmax(0, 1fr); }
 }
+/* Selector de período: Semana | Mes con flechas */
+.pl-periodo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pl-modo { display: inline-flex; border: 1.5px solid var(--cp-navy); border-radius: 12px; overflow: hidden; }
+.pl-modo button, .pl-nav button, .pl-presets button, .pl-semanas button { font: inherit; cursor: pointer; }
+.pl-modo button { min-height: 44px; min-width: 84px; padding: 0 16px; border: 0; background: var(--cp-white); color: var(--cp-navy); font-size: 15px; font-weight: 800; }
+.pl-modo button.activo { background: var(--cp-navy); color: var(--cp-cream); }
+.pl-nav { display: inline-flex; align-items: center; gap: 4px; min-width: 0; flex: 1 1 260px; }
+.pl-nav button { min-width: 44px; min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; background: var(--cp-white); color: var(--cp-navy); font-size: 22px; font-weight: 800; line-height: 1; }
+.pl-etiqueta { flex: 1; text-align: center; font-family: var(--fuente-titulos); font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.pl-presets { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.pl-presets button { min-height: 44px; padding: 0 14px; border: 1.5px solid var(--cp-line); border-radius: 999px; background: var(--cp-white); color: var(--cp-navy); font-size: 14px; font-weight: 700; }
+.pl-presets button[aria-pressed='true'] { border-color: var(--cp-navy); background: var(--cp-sand); }
+.pl-modo button:focus-visible, .pl-nav button:focus-visible, .pl-presets button:focus-visible, .pl-semanas button:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 2px; }
+.pl-aviso { font-size: 12.5px; font-weight: 700; color: var(--cp-navy); background: var(--cp-sand); border-radius: 8px; padding: 4px 8px; }
+.pl-aviso--fuera { color: var(--cp-rust); }
+.pl-semanas { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pl-semanas button { min-height: 36px; padding: 0 10px; border: 1.5px solid var(--cp-line); border-radius: 999px; background: var(--cp-white); color: var(--cp-navy); font-size: 13px; font-weight: 700; }
+@media (max-width: 480px) { .pl-modo, .pl-modo button { flex: 1; } .pl-periodo { gap: 8px; } }

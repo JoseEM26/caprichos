@@ -72,6 +72,17 @@ export interface FilaPlanilla {
   neto?: number;
   pendientes?: number;
   penalidad?: number;
+  /** Lista por semana/mes: cuando el período elegido no es el de su modalidad. */
+  aviso?: string;
+  fueraDeModalidad?: boolean;
+  /** Semanas del mes de una persona semanal (vista Mes). */
+  semanas?: Array<{ desde: string; hasta: string; estado: 'ABIERTO' | 'PAGADO'; neto: number; pendientes: number }>;
+  /** Fecha para abrir el panel (la primera semana sin pagar). */
+  abrirFecha?: string;
+  netoPagado?: number;
+  netoPendiente?: number;
+  /** Consumos de períodos anteriores sin cobrar (no entran en este pago salvo que se marquen). */
+  consumosAnterioresPendiente?: number;
 }
 
 export interface CuotaPeriodoApi { id: string; prestamoId: string; numero: number; numCuotas: number; monto: number; motivo: string | null; cobrar: boolean; capital?: number; interes?: number; capitalCuota?: number; interesCuota?: number; interesPctMensual?: number }
@@ -106,6 +117,10 @@ export interface ConsumoPlanillaApi {
   pedido: string;
   monto: number;
   cobrar: boolean;
+  /** Productos del consumo («2 × Café (Grande)»). */
+  productos?: string[];
+  /** Es de un período anterior: queda sin cobrar salvo que se marque. */
+  anterior?: boolean;
 }
 
 export interface AjustePlanillaApi {
@@ -168,6 +183,7 @@ export interface DetallePlanilla {
   };
   dias: DiaPlanillaApi[];
   consumos: ConsumoPlanillaApi[];
+  consumosAnterioresPendiente?: number;
   ajustes: AjustePlanillaApi[];
 }
 
@@ -179,10 +195,20 @@ export function sueldoEquivalente(modalidad: Modalidad, monto: number): { semana
 
 export const soles = (n: number | undefined | null) => (n === undefined || n === null ? '—' : `S/ ${n.toFixed(2)}`);
 
-export const listarPlanilla = (fecha?: string) => api.get<{ fecha: string; filas: FilaPlanilla[] }>(`/admin/planilla${fecha ? `?fecha=${fecha}` : ''}`);
-export const detallePlanilla = (partyId: number, fecha: string, excluir: string[], omitirCuotas: string[] = [], omitirRecurrentes: string[] = []) =>
+export interface ListaPlanilla {
+  fecha: string;
+  modo?: 'SEMANA' | 'MES' | null;
+  vista?: { desde: string; hasta: string } | null;
+  totales?: { personas: number; aPagar: number; pagado: number; pendiente: number; pagados: number };
+  filas: FilaPlanilla[];
+}
+export const listarPlanilla = (fecha?: string, modo?: 'SEMANA' | 'MES') => {
+  const q = [fecha ? `fecha=${fecha}` : '', modo ? `modo=${modo}` : ''].filter(Boolean).join('&');
+  return api.get<ListaPlanilla>(`/admin/planilla${q ? `?${q}` : ''}`);
+};
+export const detallePlanilla = (partyId: number, fecha: string, excluir: string[], omitirCuotas: string[] = [], omitirRecurrentes: string[] = [], incluirAnteriores: string[] = []) =>
   api.get<DetallePlanilla>(
-    `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}`,
+    `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}${incluirAnteriores.length ? `&incluirAnteriores=${incluirAnteriores.join(',')}` : ''}`,
   );
 export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null }>(`/admin/planilla/sueldo/${partyId}`);
 export interface DatosSueldoExtra {
@@ -199,8 +225,8 @@ export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { pa
   api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
-export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = []) =>
-  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds });
+export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = []) =>
+  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds });
 
 // Préstamos con cuotas y descuentos recurrentes (Netflix)
 export interface CuotaPrestamoApi { id: number; numero: number; monto: number; estado: 'PENDIENTE' | 'DESCONTADA' | 'OMITIDA'; periodoDesde: string | null; periodoHasta: string | null; reprogramada: boolean }
