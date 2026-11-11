@@ -19,35 +19,36 @@ sugerencias:
 ## Para que sirve
 Es la pantalla donde cada persona del equipo marca su propia asistencia desde su celular: Entrada, Salida a almuerzo, Regreso de almuerzo y Salida. Para que la marca valga hay que estar en el local: se lee el QR de la pantalla del local (ver [[asistencia-pantalla]]), se toma la ubicacion GPS del celular y una selfie. El administrador revisa los resultados en [[asistencia]].
 
-Tambien muestra tu turno de hoy, las marcas que ya hiciste, tus ultimos 7 dias con su estado (Cumplio, Tardanza, Salio antes, Salio despues, Falta, Descanso, Incompleto, A revisar, En curso) y, si hay reparto de propinas, la lista Mis propinas (ver [[propinas]]).
+La pantalla tiene cuatro pestanas arriba: Marcar (donde marcas), Periodo (tus horas de la semana o el mes, lo que llevas ganado, tus vacaciones y tus propinas), Calendario (tus dias con su estado y las correcciones) y Pagos (lo que se te suma, lo que se te descuenta, tus prestamos y el neto). Por encima de las pestanas siempre ves el estado de hoy: la fecha, la hora, que te falta marcar y tu turno. La pantalla recuerda la ultima pestana que abriste en ese celular; si estas en otra, el boton Ir a marcar te devuelve a Marcar.
 
 Estado de la funcion: la asistencia esta probada en preproduccion. En produccion se activa cuando el administrador deja la ubicacion del local configurada y publica la pantalla del QR; mientras el local no tenga ubicacion nadie puede marcar.
 
 ## Que pasa si el local no tiene ubicacion
-Si el administrador aun no fijo la ubicacion del local, al abrir Mi asistencia ves el aviso "El administrador aun no configuro la ubicacion del local. Todavia no puedes marcar; avisale." y el boton Escanear QR queda desactivado (tampoco se puede escribir el codigo). Tu historial y tus propinas se siguen viendo. Avisa al administrador: cuando guarde el punto en [[asistencia]], pestana Configuracion, vuelve a abrir la pantalla y ya podras marcar. El repartidor ve el mismo aviso.
+Si el administrador aun no fijo la ubicacion del local, al abrir Mi asistencia ves el aviso "El administrador aun no configuro la ubicacion del local. Todavia no puedes marcar; avisale." y los botones de la accion (Entrada, Salida...) en la pestana Marcar quedan desactivados. Las demas pestanas (periodo, calendario y pagos) se siguen viendo. Avisa al administrador: cuando guarde el punto en [[asistencia]], pestana Configuracion, vuelve a abrir la pantalla y ya podras marcar. El repartidor ve el mismo aviso.
 
 ## Como se hace: Marcar mi entrada, almuerzo o salida
 1. Entra al sistema con tu usuario. Si estas en la pantalla de ingreso, puedes pulsar Marcar mi asistencia: despues de iniciar sesion te lleva directo a Mi asistencia. En el menu tambien aparece Marcar asistencia.
 2. Arriba lees el estado del dia: "Te falta marcar: Entrada" (o la que toque) y tu turno, por ejemplo "Tu turno: 09:00 a 18:00 (almuerzo 13:00-14:00)". Si no hay turno dice "Hoy no tienes turno programado.".
-3. Solo la primera vez aparece un aviso de datos personales (se usan tu ubicacion, tu selfie y la hora). Marca la casilla "Acepto el tratamiento de mis datos para el control de asistencia." Sin aceptar no puedes marcar. Se acepta una sola vez: queda guardado aunque esa primera marca sea rechazada (por ejemplo, fuera del radio) y no se vuelve a pedir; abajo ves "Aceptaste el aviso de datos el..." con el enlace Ver aviso.
-4. Pulsa el boton grande Escanear QR. Los pasos aparecen arriba: QR, Ubicacion, Selfie, Confirmar.
-5. Paso 1, QR: apunta la camara al QR de la pantalla del local. Cambia cada 30 segundos, asi que escanea el que esta en pantalla en ese momento. Se lee solo.
-6. Paso 2, Ubicacion: el celular pide permiso de ubicacion. Acepta. Dice "Leyendo tu ubicacion precisa..." y pasa solo al siguiente paso.
-7. Paso 3, Selfie: se abre la camara frontal. Pulsa Tomar selfie.
-8. Paso 4, Confirmar: revisa el tipo de marca y la foto, y pulsa Confirmar marca. Veras "Marca registrada" con la hora, por ejemplo "Marcaste Entrada a las 08:58".
+3. En la pestana Marcar el marcado va por pasos, una parte a la vez, con "Paso N de 5" y una barra de avance. Paso 1, Que estas haciendo: toca Entrada, Salir a almorzar, Volver del almuerzo o Salida (la sugerida sale primero).
+4. Paso 2, Escanea el QR: apunta la camara al QR de la pantalla del local. Cambia cada 30 segundos, asi que escanea el que esta en pantalla en ese momento. Se lee solo y pasa al siguiente paso.
+5. Paso 3, Tu ubicacion: el celular pide permiso de ubicacion. Acepta. Dice "Leyendo tu ubicacion..." y pasa solo al siguiente paso.
+6. Paso 4, Tu selfie: se abre la camara frontal. Pulsa Tomar selfie.
+7. Paso 5, Confirma tu marca: ves un resumen con la marca, la hora, que el QR fue leido, tu ubicacion y la foto en miniatura. Pulsa Confirmar marca. Veras "Marca registrada" con la hora, por ejemplo "Marcaste Entrada a las 08:58", y el boton Hacer otra marca.
+8. Si algo falta, el boton Siguiente queda apagado y justo encima dice que falta (por ejemplo "Falta escanear el QR o escribir los 6 numeros de la pantalla"). El boton Atras te devuelve al paso anterior sin perder lo que ya hiciste: el QR, la ubicacion y la selfie se conservan. Si cambias de pestana y vuelves, el paso en que ibas tambien se conserva.
+9. Si el servidor rechaza la marca (por ejemplo QR vencido, estas lejos del local o la foto no sirve), la pantalla vuelve al paso del problema y explica que hacer.
 Antes: [[asistencia-pantalla]]
 Ver tambien: [[asistencia]]
 
 ## Como se hace: Marcar con el codigo de 6 digitos (si la camara no lee el QR)
-1. En el paso Escanea el QR, mira la pantalla del local: debajo del QR dice "Si la camara no funciona, escribe este codigo" con 6 digitos.
+1. En el paso 2, Escanea el QR, mira la pantalla del local: debajo del QR dice "Si la camara no funciona, escribe este codigo" con 6 digitos.
 2. En el campo "O escribe el codigo de 6 digitos de la pantalla" escribe los numeros (los espacios no importan).
-3. Pulsa Continuar y sigue con Ubicacion, Selfie y Confirmar marca como siempre.
+3. Pulsa Siguiente (se enciende cuando hay 6 digitos) y sigue con Tu ubicacion, Tu selfie y Confirmar marca como siempre.
 4. El codigo tambien cambia cada 30 segundos: si tardas, escribe el nuevo.
 5. Si hay varias camaras y la que se abre no sirve, pulsa Cambiar cámara. Si el navegador bloqueo la camara, el aviso explica como permitirla.
 Antes: [[asistencia-pantalla]]
 
 ## Como se hace: Marcar manualmente (sin QR)
-Si no puedes escanear el QR (computadora sin camara o sin celular), inicia sesion normal, entra a Mi asistencia y toca Marcar manualmente (sin QR). Solo se lee tu ubicacion: debes estar dentro del radio del local; no hay foto. Si estas lejos o sin GPS, se rechaza con un mensaje. La marca queda A revisar y solo cuenta para el pago cuando el Administrador la aprueba.
+Si no puedes escanear el QR (computadora sin camara o sin celular), inicia sesion normal, entra a Mi asistencia, pestana Marcar, y toca Marcar manualmente (sin QR). Son solo 2 pasos (la accion y la ubicacion): el QR y la selfie no son necesarios. Solo se lee tu ubicacion: debes estar dentro del radio del local; no hay foto. Si estas lejos o sin GPS, se rechaza con un mensaje. La marca queda A revisar y solo cuenta para el pago cuando el Administrador la aprueba.
 
 ## Como se hace: Instalar la app
 En Mi asistencia o en la pantalla de ingreso toca Instalar app. En Chrome o Edge (PC y Android) se instala con un clic; en iPhone, Compartir y Anadir a pantalla de inicio. La app Caprichos Asistencia se abre directo en Mi asistencia y, si no tienes sesion, vuelve aqui despues de iniciarla.
@@ -55,13 +56,14 @@ En Mi asistencia o en la pantalla de ingreso toca Instalar app. En Chrome o Edge
 ## Como se hace: Marcar el almuerzo
 Marcar el almuerzo es opcional: el almuerzo se paga igual y no se descuenta de tus horas; solo queda registrado cuanto duro. El sistema te sugiere la siguiente marca (Entrada, Salida a almuerzo, Regreso de almuerzo, Salida) y puedes aceptarla o elegir otra.
 1. Cuando sales a almorzar, entra a Mi asistencia: el sistema te pide "Salida a almuerzo" si tu turno tiene almuerzo y ya marcaste entrada.
-2. Haz el mismo recorrido (QR, Ubicacion, Selfie, Confirmar marca).
-3. Al volver, repite y marca "Regreso de almuerzo". Si el boton grande dice Marcar en vez de Escanear QR, debajo aparecen botones con las otras marcas permitidas: elige la que corresponde.
+2. Haz el mismo recorrido por pasos (QR, Ubicacion, Selfie, Confirmar marca).
+3. Al volver, repite y marca "Regreso de almuerzo". En el paso 1 puedes elegir otra marca distinta de la sugerida.
 4. Al terminar el dia marca Salida. Una vez que existe la Salida, el sistema avisa "Tu jornada ya tiene salida registrada".
 
-## Como se hace: Ver mis ultimos dias y mis propinas
-1. Baja en la misma pantalla: la seccion Últimos días muestra cada fecha con su estado (por ejemplo Cumplio o Tardanza).
-2. Si el administrador ya aprobo un reparto de propinas, aparece la seccion Mis propinas: cada mes con tus horas, tu porcentaje, el monto en soles y si esta Por pagar o Pagado (con el medio). Solo ves tu parte.
+## Como se hace: Ver mi periodo, mi calendario y mis pagos
+1. Pestana Periodo: tus horas programadas y trabajadas, tardanzas y faltas; lo que llevas ganado dia por dia; tus vacaciones y, si el administrador ya aprobo un reparto de propinas, la lista Mis propinas (mes, horas, porcentaje, monto y si esta Por pagar o Pagado con el medio). Se ven las 3 mas recientes; Ver N mas muestra el resto. Solo ves tu parte. El numero junto al nombre de la pestana son tus propinas por pagar.
+2. Pestana Calendario: tus dias del mes con su estado (Cumplio, Tardanza, Salio antes, Falta, Descanso, Incompleto, En revision, En curso). Toca un dia para ver sus marcas y pedir una correccion. El numero rojo son las jornadas con una marca que falta o no cuadra: ahi puedes pedir la correccion.
+3. Pestana Pagos: lo que se te suma, lo que se te descuenta, tus prestamos y el neto estimado. Si no carga, pulsa Reintentar.
 Ver tambien: [[propinas]]
 
 ## Errores y dudas
@@ -72,7 +74,6 @@ Ver tambien: [[propinas]]
 - "El QR vencio o no es valido. Escanea el de la pantalla actual.": el QR dura 30 segundos; escanea el que esta en pantalla ahora. No sirve una foto del QR.
 - "Ese QR ya lo usaste. Espera al siguiente.": cada QR vale para una sola marca por persona.
 - "Tu asistencia esta vinculada a otro celular. Pide al administrador que reinicie el vinculo.": la asistencia se ata al primer celular que usas. Si cambiaste de equipo, el administrador pulsa Reiniciar celular en [[asistencia]] y vuelves a marcar.
-- "Acepta el aviso de datos personales para marcar.": marca la casilla de consentimiento.
 - "Esa marca ya quedo registrada hoy.": ya marcaste ese tipo; no hace falta repetir.
 - "Demasiados intentos. Espera unos minutos y vuelve a intentar.": hubo varios intentos fallidos seguidos; espera unos 5 minutos.
 - Errores de la foto ("La foto no es valida", "La foto es muy grande o esta vacia"): vuelve a tomar la selfie, con buena luz.

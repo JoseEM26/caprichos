@@ -77,4 +77,35 @@
   .mc-resumen { grid-template-columns: repeat(6, 1fr); }
 }
 @media (min-width: 1200px) { .ma-vista { max-width: 860px; } }
+
+/* Mi asistencia por pestañas: franja de estado + barra fijas arriba; el marcado, un paso a la vez */
+.ma-cab { position: sticky; top: 0; z-index: 5; background: var(--cp-cream); display: flex; flex-direction: column; gap: 6px; padding-bottom: 2px; }
+.ma-cab .ma-estado { padding: 10px 14px; border-radius: 16px; gap: 2px; }
+.ma-cab .ma-estado-txt { font-size: 17px; line-height: 22px; }
+.ma-cab .ma-turno { font-size: 13px; }
+.ma-ir-marcar { align-self: flex-start; margin-top: 6px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--cp-orange); background: var(--cp-orange); color: var(--cp-navy); font-family: var(--fuente-titulos); font-weight: 800; font-size: 14px; cursor: pointer; }
+.ma-ir-marcar:focus-visible { outline: 3px solid var(--cp-cream); outline-offset: 2px; }
+.ma-cab .mcp-barra { padding: 0 2px; }
+.ma-cab .mcp-pestana { padding: 0 6px; gap: 4px; font-size: 13px; flex: 1 1 auto; justify-content: center; }
+.ma-asistente { gap: 10px; }
+.ma-progreso-cab { display: flex; align-items: center; gap: 10px; }
+.ma-paso-n { font-family: var(--fuente-titulos); font-weight: 800; font-size: 14px; white-space: nowrap; }
+.ma-progreso { flex: 1; height: 8px; min-width: 0; accent-color: var(--cp-orange); }
+.ma-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ma-pie { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--cp-line); padding-top: 10px; }
+.ma-pie-botones { display: flex; justify-content: space-between; gap: 8px; }
+.ma-pie-botones > * { min-width: 0; }
+.ma-falta { margin: 0; font-size: 13px; font-weight: 700; color: var(--cp-rust); }
+.ma-resumen { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ma-resumen > div { background: var(--cp-cream); border: 1px solid var(--cp-line); border-radius: 12px; padding: 6px 10px; }
+.ma-resumen dt { font-size: 11px; color: var(--cp-soft); }
+.ma-resumen dd { margin: 0; font-weight: 700; font-size: 14px; }
+.ma-miniatura { max-width: 96px; border-radius: 10px; display: block; }
+.ma-scroll { max-height: 44dvh; overflow-y: auto; overscroll-behavior: contain; }
+.mp-bloque { max-height: 52dvh; overflow-y: auto; }
+.ma-pasos li > span, .ma-progreso { transition: background-color .2s, width .2s; }
+@media (prefers-reduced-motion: reduce) { .ma-pasos li > span, .ma-progreso { transition: none; } }
+.ma-asistente button:focus-visible, .ma-codigo:focus-visible { outline: 3px solid var(--cp-navy); outline-offset: 2px; }
+@media (max-width: 480px) { .ma-acciones { grid-template-columns: 1fr; } .ma-resumen { grid-template-columns: 1fr; } }
 .mc-atajo-corr { min-height: 44px; border-radius: 12px; border: 1.5px solid var(--cp-navy); background: var(--cp-white); color: var(--cp-navy); font-weight: 700; cursor: pointer; }
+.ma-asistente .ma-video { max-height: 46dvh; width: 100%; max-width: 420px; margin-inline: auto; }

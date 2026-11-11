@@ -124,6 +124,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
   const [datos, setDatos] = useState<Datos | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
   const [elegido, setElegido] = useState<string | null>(null);
   const [semana, setSemana] = useState<string | null>(null); // lunes de la semana resaltada
 
@@ -140,7 +141,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
       .catch(() => vigente && (setDatos(null), setError(true)))
       .finally(() => vigente && setCargando(false));
     return () => { vigente = false; };
-  }, [desde, hasta]);
+  }, [desde, hasta, intento]);
 
   const porFecha = useMemo(() => new Map((datos?.dias ?? []).map((d) => [d.fecha, d])), [datos]);
   const mover = (delta: number) => {
@@ -199,6 +200,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
 
       {cargando && <Cargando mensaje="Cargando tu calendario…" />}
       {error && !cargando && <p role="alert" className="as-aviso as-aviso--alerta">No pudimos cargar tu calendario. Intenta otra vez.</p>}
+      {error && !cargando && <button type="button" className="mc-atajo-corr" onClick={() => setIntento((n) => n + 1)}>Reintentar</button>}
 
       {!error && (
         <div className="mc-grilla" role="group" aria-label={`Días de ${MESES[mes.m0]} ${mes.a}`} aria-busy={cargando}>

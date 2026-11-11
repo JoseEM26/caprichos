@@ -12,14 +12,17 @@ export function MisPagos() {
   const [p, setP] = useState<MiPlanilla | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
   useEffect(() => {
+    setCargando(true);
+    setError(false);
     (async () => {
       try { setP(await miPlanilla()); } catch { setError(true); } finally { setCargando(false); }
     })();
-  }, []);
+  }, [intento]);
 
   if (cargando) return <Cargando mensaje="Cargando tus pagos…" />;
-  if (error || !p) return <section className="mp" aria-label="Mis pagos"><h3 className="as-sub">Mis pagos</h3><p role="alert" className="as-aviso as-aviso--alerta">No pudimos cargar tus pagos. Intenta otra vez.</p></section>;
+  if (error || !p) return <section className="mp" aria-label="Mis pagos"><h3 className="as-sub">Mis pagos</h3><p role="alert" className="as-aviso as-aviso--alerta">No pudimos cargar tus pagos. Intenta otra vez.</p><button type="button" className="mc-atajo-corr" onClick={() => setIntento((n) => n + 1)}>Reintentar</button></section>;
 
   const pagado = p.estadoPago === 'PAGADO';
   const penal = p.penalidadTardanza;

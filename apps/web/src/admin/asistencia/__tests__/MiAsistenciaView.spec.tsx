@@ -39,6 +39,8 @@ const base = {
 
 describe('MiAsistenciaView (celular)', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.history.replaceState(null, '', '/');
     miHoy.mockReset();
     miHistorial.mockReset().mockResolvedValue([]);
     marcarAsistencia.mockReset();
@@ -52,6 +54,7 @@ describe('MiAsistenciaView (celular)', () => {
     expect(aviso).toHaveAttribute('role', 'alert');
     expect(aviso).toHaveTextContent('El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.');
     expect(screen.getByRole('button', { name: /^Entrada/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('tab', { name: /Calendario/ }));
     expect(await screen.findByRole('region', { name: 'Mi calendario de asistencia' })).toBeInTheDocument();
   });
 
@@ -79,6 +82,8 @@ describe('MiAsistenciaView (celular)', () => {
       { anio: 2026, mes: 10, estado: 'PAGADO', horas: 56, porcentaje: 46.67, monto: 70, pagadoEn: '2026-11-03T15:00:00Z', pagadoMedio: 'EFECTIVO' },
     ]);
     render(<MiAsistenciaView />);
+    await screen.findByTestId('estado-hoy');
+    fireEvent.click(screen.getByRole('tab', { name: /Período/ }));
     const bloque = await screen.findByRole('region', { name: 'Mis propinas' });
     expect(bloque).toHaveTextContent('octubre 2026');
     expect(bloque).toHaveTextContent('56.00 h · 46.67 %');
@@ -295,7 +300,7 @@ describe('MiAsistenciaView (celular)', () => {
       (navigator as any).geolocation = { getCurrentPosition: () => undefined };
       jsqrMock.mockReturnValue({ data: 'CAPRICHOS-ASIST:123:abcdef' });
       await abrir();
-      await waitFor(() => expect(screen.getByRole('heading', { name: '2. Ubicación' })).toBeInTheDocument(), { timeout: 2000 });
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Tu ubicación' })).toBeInTheDocument(), { timeout: 2000 });
       expect(jsqrMock.mock.calls[0][1]).toBe(640); // fotograma reducido a 640 px de ancho
       expect(pista.stop).toHaveBeenCalled(); // cámara apagada al terminar
     });

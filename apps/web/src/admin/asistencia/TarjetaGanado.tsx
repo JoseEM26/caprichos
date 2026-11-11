@@ -12,9 +12,21 @@ const etiquetaDia = (iso: string) => {
 /** «Lo que llevo ganado»: por día y acumulado del período actual. Solo lo propio; estimado hasta que el admin pague. */
 export function TarjetaGanado() {
   const [g, setG] = useState<MiGanado | null>(null);
+  const [fallo, setFallo] = useState(false);
+  const [intento, setIntento] = useState(0);
   useEffect(() => {
-    miGanado().then(setG).catch(() => setG(null));
-  }, []);
+    setFallo(false);
+    miGanado().then(setG).catch(() => { setG(null); setFallo(true); });
+  }, [intento]);
+  if (!g && fallo) {
+    return (
+      <section aria-label="Lo que llevo ganado" className="ma-lista">
+        <h3 className="as-sub">Lo que llevo ganado</h3>
+        <p role="alert" className="as-aviso as-aviso--alerta">No pudimos cargar lo que llevas ganado.</p>
+        <button type="button" className="mc-atajo-corr" onClick={() => setIntento((n) => n + 1)}>Reintentar</button>
+      </section>
+    );
+  }
   if (!g) return null;
   if (!g.conSueldo) {
     return (
@@ -42,16 +54,18 @@ export function TarjetaGanado() {
         )}
         <p className="as-ayuda">El tiempo de almuerzo se paga: cuenta como hora trabajada.</p>
         {dias.length === 0 && <p className="as-ayuda">Todavía no tienes horas trabajadas en este período.</p>}
-        {dias.map((d) => (
-          <div key={d.jornada} className="ma-ganado-dia">
-            <span>
-              <b>{etiquetaDia(d.jornada)}</b>
-              <small>{d.trabajadaH} h trabajadas</small>
-            </span>
-            {d.feriado && d.recargo !== 1 && <Insignia variante="acento">Feriado ×{d.recargo}</Insignia>}
-            <strong>{soles(d.ganado)}</strong>
-          </div>
-        ))}
+        <div className="ma-scroll">
+          {dias.map((d) => (
+            <div key={d.jornada} className="ma-ganado-dia">
+              <span>
+                <b>{etiquetaDia(d.jornada)}</b>
+                <small>{d.trabajadaH} h trabajadas</small>
+              </span>
+              {d.feriado && d.recargo !== 1 && <Insignia variante="acento">Feriado ×{d.recargo}</Insignia>}
+              <strong>{soles(d.ganado)}</strong>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
