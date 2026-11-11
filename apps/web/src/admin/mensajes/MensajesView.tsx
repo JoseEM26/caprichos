@@ -10,6 +10,8 @@ import {
   listarConversaciones,
   listarMensajesAnteriores,
   listarRespuestasRapidas,
+  obtenerConteosChats,
+  obtenerFilaChat,
   marcarAtendido,
   enviarImagenChat,
   enviarDocumentoChat,
@@ -32,7 +34,7 @@ import { useSesion } from '../../comun/sesion';
 import { ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
-import { ChatResumen, DetalleConversacion, FiltroChat, FiltroPos, RespuestaRapida } from './mensajesTipos';
+import { ChatResumen, DetalleConversacion, DiasBandeja, EventoEnvioMensaje, FiltroChat, FiltroPos, RespuestaRapida } from './mensajesTipos';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
@@ -44,7 +46,16 @@ import { PanelPedido } from './PanelPedido';
 import { CuadroEscribir } from './CuadroEscribir';
 import { ModalRechazoCambio } from './ModalRechazoCambio';
 import { eventosDelChat } from './EventoSistema';
-import { esUsuarioWhatsApp, fusionarMensajes, mensajeOptimista, nuevoIdCliente, telefonoDeUrl } from './utilidadesChat';
+import {
+  agregarPagina,
+  aplicarEstadoEnvio,
+  aplicarFilaEnVivo,
+  esUsuarioWhatsApp,
+  fusionarMensajes,
+  mensajeOptimista,
+  nuevoIdCliente,
+  telefonoDeUrl,
+} from './utilidadesChat';
 import { useAtrasCierraPanel, esVistaMovil } from '../../comun/useAtrasCierraPanel';
 import './mensajes.css';
 
@@ -77,7 +88,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   // Filtro por día (Lima): «Hoy» por defecto. La elección se recuerda mientras la bandeja está abierta (no se guarda al recargar)
   const [dia, setDia] = useState<FiltroDia>('hoy');
   const [avisoAtendido, setAvisoAtendido] = useState<{ id: string; nombre: string } | null>(null);
+  // La lista llega por PÁGINAS desde el servidor, que ya filtra por día y bloqueados y ordena: aquí solo se muestra.
+  // (Si el servidor no manda `dias`, se filtra y ordena en el navegador como antes.)
+  const [diasServidor, setDiasServidor] = useState<DiasBandeja | null>(null);
+  const [siguienteCursor, setSiguienteCursor] = useState<string | null>(null);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const { chatsOrdenados, dias } = useMemo(() => {
+    if (diasServidor) return { chatsOrdenados: chats, dias: filtro === 'reprogramar' ? null : diasServidor };
     const base = soloBloqueados ? chats.filter((c) => c.bloqueoSpam?.activo) : chats;
     const porDia = filtro !== 'reprogramar';
     let diasInfo: { hoy: number; ayer: number; manana: number; anteriores: number; total: number } | null = null;
@@ -96,7 +114,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     }
     if (filtro === 'atender') lista = ordenarCola(lista);
     return { chatsOrdenados: lista, dias: diasInfo };
-  }, [chats, filtro, soloBloqueados, dia]);
+  }, [chats, filtro, soloBloqueados, dia, diasServidor]);
   useEffect(() => {
     if (!avisoAtendido) return;
     const t = setTimeout(() => setAvisoAtendido(null), 7000);
@@ -223,10 +241,24 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   };
 
   // Cargar lista de conversaciones
+  // Opciones que viajan al servidor: la pestaña «Por reprogramar» no se filtra por día
+  const opcionesServidor = useCallback(
+    () => ({ dia: filtro === 'reprogramar' ? 'todos' : dia, soloBloqueados }),
+    [filtro, dia, soloBloqueados],
+  );
+  const cargadosRef = React.useRef(0);
   const cargarLista = useCallback(async (mantenerSeleccion = true) => {
     try {
-      const res = await (filtroPos ? listarConversaciones(filtro, busqueda, filtroPos) : listarConversaciones(filtro, busqueda));
+      // Un refresco recarga TANTOS chats como ya se habían cargado (hasta 100): «Cargar más» no se pierde al actualizar
+      const limite = Math.min(100, Math.max(40, cargadosRef.current));
+      const res = await (filtroPos
+        ? listarConversaciones(filtro, busqueda, filtroPos, { ...opcionesServidor(), limite })
+        : listarConversaciones(filtro, busqueda, undefined, { ...opcionesServidor(), limite }));
       setChats(res.chats);
+      cargadosRef.current = res.chats.length;
+      setDiasServidor(res.dias ?? null);
+      setSiguienteCursor(res.siguienteCursor ?? null);
+      setHayMas(Boolean(res.hayMas));
       setConteos({ bloqueadosSpam: 0, sinVer: 0, ...res.conteos });
 
       const pendiente = telefonoPendiente.current;
@@ -256,7 +288,27 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     } finally {
       setCargando(false);
     }
-  }, [filtro, busqueda, filtroPos]);
+  }, [filtro, busqueda, filtroPos, opcionesServidor]);
+
+  /** «Cargar más»: la siguiente página de chats (por cursor), sin repetir los que ya están. */
+  const cargarMasChats = useCallback(async () => {
+    if (!siguienteCursor || cargandoMas) return;
+    setCargandoMas(true);
+    try {
+      const res = await listarConversaciones(filtro, busqueda, filtroPos ?? undefined, { ...opcionesServidor(), cursor: siguienteCursor });
+      setChats((prev) => {
+        const lista = agregarPagina(prev, res.chats);
+        cargadosRef.current = lista.length;
+        return lista;
+      });
+      setSiguienteCursor(res.siguienteCursor ?? null);
+      setHayMas(Boolean(res.hayMas));
+    } catch {
+      /* se puede volver a tocar «Cargar más» */
+    } finally {
+      setCargandoMas(false);
+    }
+  }, [siguienteCursor, cargandoMas, filtro, busqueda, filtroPos, opcionesServidor]);
 
   // Chat que la persona abrió ella misma: solo ese se da por visto (el que se abre solo al cargar la lista, no)
   const abiertoPorPersona = React.useRef<string | null>(null);
@@ -305,6 +357,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   // Cargar chats al cambiar filtro o búsqueda
   useEffect(() => {
+    cargadosRef.current = 0; // otra pestaña, búsqueda o día: se empieza de nuevo por la primera página
     cargarLista(false);
   }, [cargarLista]);
 
@@ -357,21 +410,67 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   }, [chatSeleccionadoId, cargarDetalle]);
 
   // Recargas en segundo plano juntadas: una ráfaga de eventos (o un envío) provoca UNA lectura de lista y de chat
-  const recargaPendiente = React.useRef<{ timer: ReturnType<typeof setTimeout> | null; detalle: boolean }>({ timer: null, detalle: false });
+  const chatsRef = React.useRef<ChatResumen[]>([]);
+  chatsRef.current = chats;
+  const hayMasRef = React.useRef(false);
+  hayMasRef.current = hayMas;
+
+  /**
+   * Evento en vivo de uno o pocos chats: se pide SOLO su fila (con los filtros actuales) y los contadores; la lista entera
+   * no se recarga. Si el chat está cargado se actualiza y reordena; si no, solo entra cuando cae entre los ya cargados.
+   */
+  const actualizarFilas = useCallback(
+    async (ids: string[]) => {
+      if (!diasServidor || chatsRef.current.some((c) => !c.clave)) return cargarLista(true);
+      const lista = chatsRef.current;
+      const hasta = hayMasRef.current ? lista[lista.length - 1]?.clave : undefined;
+      await Promise.all([
+        obtenerConteosChats()
+          .then((c) => setConteos((prev) => ({ ...prev, ...c })))
+          .catch(() => undefined),
+        ...ids.map((id) =>
+          obtenerFilaChat(id, filtro, busqueda, filtroPos ?? undefined, { ...opcionesServidor(), hasta })
+            .then((r) =>
+              setChats((prev) => {
+                const nueva = aplicarFilaEnVivo(prev, id, r);
+                cargadosRef.current = nueva.length;
+                return nueva;
+              }),
+            )
+            .catch(() => undefined),
+        ),
+      ]);
+    },
+    [diasServidor, cargarLista, filtro, busqueda, filtroPos, opcionesServidor],
+  );
+
+  const recargaPendiente = React.useRef<{ timer: ReturnType<typeof setTimeout> | null; detalle: boolean; ids: Set<string>; todo: boolean }>({
+    timer: null,
+    detalle: false,
+    ids: new Set(),
+    todo: false,
+  });
   const programarRecarga = useCallback(
-    (conDetalle: boolean) => {
+    (conDetalle: boolean, chatId?: string | null) => {
       const p = recargaPendiente.current;
       p.detalle = p.detalle || conDetalle;
+      if (chatId) p.ids.add(chatId);
+      else p.todo = true;
       if (p.timer) return;
       p.timer = setTimeout(() => {
         p.timer = null;
         const detalleTambien = p.detalle;
+        const ids = [...p.ids];
+        const todo = p.todo || ids.length > 5;
         p.detalle = false;
-        void cargarLista(true);
+        p.todo = false;
+        p.ids.clear();
+        if (todo) void cargarLista(true);
+        else void actualizarFilas(ids);
         if (detalleTambien && seleccionRef.current) void cargarDetalle(seleccionRef.current, true);
       }, 300);
     },
-    [cargarLista, cargarDetalle],
+    [cargarLista, cargarDetalle, actualizarFilas],
   );
   useEffect(() => () => {
     if (recargaPendiente.current.timer) clearTimeout(recargaPendiente.current.timer);
@@ -388,7 +487,25 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   // Escuchar eventos en vivo: el chat abierto solo se relee si el evento es de ese chat (antes cualquier evento lo releía)
   useEventos('mensajes:actualizado', (datos: { id?: string } | undefined) => {
     const id = datos?.id != null ? String(datos.id) : null;
-    programarRecarga(id === null || id === seleccionRef.current);
+    programarRecarga(id === null || id === seleccionRef.current, id);
+  });
+
+  // Anuncio discreto para el lector de pantalla cuando un envío en segundo plano termina
+  const [anuncioEnvio, setAnuncioEnvio] = useState('');
+  const detalleRef = React.useRef<DetalleConversacion | null>(null);
+  detalleRef.current = detalle;
+  // Un mensaje enviado en segundo plano llegó a su estado final: se cambia SOLO ese mensaje (sin recargar el chat ni la lista)
+  useEventos('mensajes:envio', (ev: EventoEnvioMensaje | undefined) => {
+    if (!ev?.id) return;
+    const actual = detalleRef.current;
+    if (!actual || actual.id !== ev.id) return;
+    const { encontrado } = aplicarEstadoEnvio(actual.mensajes, ev);
+    if (!encontrado) {
+      programarRecarga(true, ev.id); // un mensaje que esta pantalla no conocía (p. ej. lo mandó otra persona)
+      return;
+    }
+    setDetalle((prev) => (prev && prev.id === ev.id ? { ...prev, mensajes: aplicarEstadoEnvio(prev.mensajes, ev).mensajes } : prev));
+    setAnuncioEnvio(ev.estado === 'ENVIADO' || ev.estado === 'SIMULADO' ? 'Mensaje enviado' : 'No se envió el mensaje. Puedes reintentarlo');
   });
 
   const handleCargarAnteriores = async () => {
@@ -468,10 +585,16 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
       textoSi: 'Sí, reintentar',
       accion: async () => {
         try {
+          // Mismo mensaje, otra vez en cola: vuelve a «Enviando…» y el socket avisa cómo terminó
           await reintentarMensaje(chatSeleccionadoId, mensajeId);
           setPulirError(null);
-          await cargarDetalle(chatSeleccionadoId);
-          await cargarLista(true);
+          setDetalle((prev) =>
+            prev && prev.id === chatSeleccionadoId
+              ? { ...prev, mensajes: prev.mensajes.map((m) => (m.id === mensajeId ? { ...m, estado: 'ENVIANDO', motivoFallo: null } : m)) }
+              : prev,
+          );
+          await cargarDetalle(chatSeleccionadoId, true);
+          programarRecarga(false, chatSeleccionadoId);
         } catch (err: any) {
           setPulirError(err?.message || 'Error al reintentar mensaje');
           await cargarDetalle(chatSeleccionadoId);
@@ -520,9 +643,9 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     setTextoPulido(null);
     setPulirError(null);
     try {
+      // El servidor responde YA (mensaje guardado y en cola). Sigue «Enviando…» hasta que avise por socket que salió o falló.
       await enviarMensaje(chatId, txt, idCliente);
-      alCambiarLocal('ENVIADO');
-      programarRecarga(true);
+      programarRecarga(true, chatId);
     } catch (err: any) {
       // No salió: se quita el mensaje local, el texto vuelve a la caja y el servidor (que guarda el intento fallido) lo muestra con «Reintentar»
       alCambiarLocal(null);
@@ -846,6 +969,9 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           dia={dia}
           onDia={setDia}
           dias={dias}
+          hayMas={hayMas}
+          cargandoMas={cargandoMas}
+          onCargarMas={cargarMasChats}
           onAtendido={atenderChat}
           onVolverPorAtender={(id) => void volverDeFila(id)}
           chatSeleccionadoId={chatSeleccionadoId}
@@ -900,6 +1026,9 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
               >
                 {detalle.marcadoNoVisto ? 'Marcar como visto' : 'Marcar como no visto'}
               </button>
+              <div className="msg-solo-lectores" role="status" aria-live="polite" data-testid="anuncio-envio">
+                {anuncioEnvio}
+              </div>
               <FlujoMensajes
                 mensajes={detalle.mensajes}
                 eventos={eventos}

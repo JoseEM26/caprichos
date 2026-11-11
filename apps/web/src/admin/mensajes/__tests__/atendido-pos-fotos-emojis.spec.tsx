@@ -81,7 +81,7 @@ describe('Atendido y punto de venta en la pantalla', () => {
 
     await abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Faltan procesar \(1\)/ }));
-    await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('todos', '', 'faltan'));
+    await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('todos', '', 'faltan', expect.any(Object)));
   });
 
   it('ListaChats lista «Ya procesados» y devuelve el filtro elegido', async () => {

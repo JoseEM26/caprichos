@@ -41,12 +41,13 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
           {m.hora}
         </span>
         {!esCliente && (
-          <>
-            {m.estado === 'ENVIANDO' ? (
+          // role=status: el lector de pantalla anuncia (con calma) el paso de «Enviando…» a «Enviado» o «No se envió»
+          <span role="status" aria-live="polite" style={{ display: 'contents' }}>
+            {m.estado === 'ENVIANDO' || m.estado === 'ENCOLADO' ? (
               <span data-testid="estado-enviando" style={{ fontStyle: 'italic' }}>Enviando…</span>
-            ) : m.estado === 'FALLIDO' ? (
+            ) : m.estado === 'FALLIDO' || m.estado === 'REVISAR' ? (
               <span style={{ color: '#A3261A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span>{m.motivoFallo ? `No se pudo enviar: ${m.motivoFallo}` : 'No se pudo enviar'}</span>
+                <span>{m.estado === 'REVISAR' ? `No se pudo confirmar el envío. ${m.motivoFallo ?? ''}`.trim() : m.motivoFallo ? `No se pudo enviar: ${m.motivoFallo}` : 'No se pudo enviar'}</span>
                 {m.puedeReintentar !== false && <button
                   type="button"
                   className="msg-btn"
@@ -71,9 +72,9 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
             ) : m.estado === 'ENTREGADO' ? (
               <span>Entregado</span>
             ) : (
-              <span>Enviado</span>
+              <span>{m.estado === 'ENVIADO' && <span aria-hidden="true">✓ </span>}Enviado</span>
             )}
-          </>
+          </span>
         )}
       </div>
     </article>

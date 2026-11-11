@@ -88,6 +88,8 @@ export interface ChatResumen {
   volvioAEscribir?: boolean;
   /** El cliente aceptó reprogramar la entrega y falta reenviarla a reparto (el sistema no guarda fecha). */
   porReprogramar?: boolean;
+  /** Posición en el orden de la lista (la pone el servidor): la web reordena por ella sin recalcular reglas. */
+  clave?: string;
 }
 
 export interface DetallePedidoChat {
@@ -180,4 +182,33 @@ export interface RespuestaListarChats {
     reprogramar?: number;
   };
   chats: ChatResumen[];
+  /** Contadores por día de la pestaña (antes de elegir el día). Si falta, la web filtra por día en el navegador. */
+  dias?: DiasBandeja;
+  /** La lista viene por páginas: con `hayMas` se ofrece «Cargar más» pidiendo `siguienteCursor`. */
+  hayMas?: boolean;
+  siguienteCursor?: string | null;
+}
+
+export interface DiasBandeja {
+  hoy: number;
+  ayer: number;
+  manana: number;
+  anteriores: number;
+  total: number;
+}
+
+/** Una fila en vivo: `chat` es null si ya no cumple los filtros; `dentro` = cae entre los chats ya cargados. */
+export interface RespuestaFilaChat {
+  chat: ChatResumen | null;
+  dentro: boolean;
+}
+
+/** Lo que avisa el servidor por socket cuando un mensaje en segundo plano llega a un estado final. */
+export interface EventoEnvioMensaje {
+  id: string;
+  mensajeId: string;
+  idCliente?: string;
+  estado: 'ENVIADO' | 'SIMULADO' | 'FALLIDO' | 'REVISAR';
+  motivoFallo?: string | null;
+  puedeReintentar?: boolean;
 }

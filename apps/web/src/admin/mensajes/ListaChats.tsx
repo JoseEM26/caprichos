@@ -42,6 +42,10 @@ export interface ListaChatsProps {
   dia?: FiltroDia;
   onDia?: (dia: FiltroDia) => void;
   dias?: { hoy: number; ayer: number; manana: number; anteriores: number; total: number } | null;
+  /** La lista llega por páginas: «Cargar más» pide la siguiente. */
+  hayMas?: boolean;
+  cargandoMas?: boolean;
+  onCargarMas?: () => void;
 }
 
 /** Chip de estado de la lista. */
@@ -72,6 +76,9 @@ export function ListaChats({
   dia = 'todos',
   onDia,
   dias = null,
+  hayMas = false,
+  cargandoMas = false,
+  onCargarMas,
 }: ListaChatsProps) {
   const pendientes = conteos.atender;
   const sinVerTotal = conteos.sinVer ?? 0;
@@ -470,6 +477,13 @@ export function ListaChats({
               </React.Fragment>
             );
           })}
+          {hayMas && onCargarMas && (
+            <li className="msg-li-fila" style={{ justifyContent: 'center', padding: '8px' }}>
+              <button type="button" className="msg-btn" data-testid="cargar-mas-chats" disabled={cargandoMas} onClick={onCargarMas}>
+                {cargandoMas ? 'Cargando…' : 'Cargar más chats'}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </aside>

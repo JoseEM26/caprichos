@@ -10,6 +10,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { Ventana24hService } from '../chatbot/servicios/ventana-24h.service';
 import { MensajeEnviado, WHATSAPP_GATEWAY, WhatsAppGateway } from './whatsapp.gateway';
 import { pulirMensaje } from './pulir.util';
+import { EnvioEncoladoService, MOTIVO_REVISAR } from './envio-encolado.service';
 import {
   esRemitenteSinTelefono,
   obtenerNombreMostrar,
@@ -47,6 +48,10 @@ import {
   resolverPos,
   ultimos9,
 } from './utilidades/pos-chat.util';
+
+/** Día calendario de Lima (AAAA-MM-DD) de una fecha. */
+const FORMATO_DIA_LIMA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }); // crearlo por llamada era lo más caro de la lista
+export const diaLima = (d: Date): string => FORMATO_DIA_LIMA.format(d);
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
@@ -134,6 +139,8 @@ const nombreUsuario = (p: any, fallback: string): string =>
 /** Dentro de este tiempo no se envía otra plantilla de reapertura sin confirmación (cada una cuesta en Meta). */
 const VENTANA_PLANTILLA_RECIENTE_MS = 60 * 60 * 1000;
 
+type FilaClasificada = Awaited<ReturnType<MensajesService['clasificar']>>[number];
+
 @Injectable()
 export class MensajesService {
   private readonly logger = new Logger(MensajesService.name);
@@ -149,6 +156,7 @@ export class MensajesService {
     @Optional() private readonly stockService?: StockService,
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() private readonly numeros?: NumerosWhatsappService,
+    @Optional() private readonly cola?: EnvioEncoladoService,
   ) {}
 
   /** Escribir a mano al número del negocio o a uno bloqueado no se permite: los bots se contestarían entre sí. */
@@ -299,10 +307,20 @@ export class MensajesService {
    * Últimos `n` mensajes de cada chat (más nuevo primero) en UNA consulta con LATERAL + el índice (conversacion_id, id).
    * Antes `include: { mensajes: { take: 20 } }` hacía que Prisma leyera TODOS los mensajes de TODOS los chats y recortara en memoria.
    */
-  private async ultimosMensajesPorChat(ids: bigint[], n = 20): Promise<Map<bigint, any[]>> {
+  private async ultimosMensajesPorChat(ids: bigint[], n = 20, liviano = false): Promise<Map<bigint, any[]>> {
     const mapa = new Map<bigint, any[]>();
     if (!ids.length) return mapa;
-    const filas = await this.prisma.$queryRaw<any[]>`
+    // liviano: solo lo que decide pestaña, orden y «sin leer» (sin el contenido ni el id de Meta)
+    const filas = liviano
+      ? await this.prisma.$queryRaw<any[]>`
+      SELECT m.id, m.conversacion_id, m.direccion, m.autor, m.en
+      FROM unnest(${ids}::bigint[]) AS c(id)
+      CROSS JOIN LATERAL (
+        SELECT id, conversacion_id, direccion, autor, en
+        FROM mensaje_chat WHERE conversacion_id = c.id ORDER BY id DESC LIMIT ${n}
+      ) m
+      ORDER BY m.conversacion_id, m.id DESC`
+      : await this.prisma.$queryRaw<any[]>`
       SELECT m.id, m.conversacion_id, m.direccion, m.autor, m.tipo, m.contenido, m.meta_id, m.en
       FROM unnest(${ids}::bigint[]) AS c(id)
       CROSS JOIN LATERAL (
@@ -318,39 +336,129 @@ export class MensajesService {
     return mapa;
   }
 
-  async listar(filtro: FiltroChat = 'todos', q = '', pos?: FiltroPos) {
-    const todas: any[] = await this.prisma.conversacion.findMany({
-      orderBy: { ultima_actividad: 'desc' },
-      include: this.incluir,
-    });
-    // Todo lo que sigue es independiente entre sí: en paralelo (antes 5 esperas en fila)
-    const [mensajesPorChat, bloqueos, posMapa, quienes, porReprogramar, motivosNumero] = await Promise.all([
+  /** Columnas que necesita la clasificación de TODOS los chats (sin `include`: ni usuario que lo tomó ni mensajes completos). */
+  private static readonly SELECCION_LISTA = {
+    id: true, telefono: true, estado: true, duenio: true, urgente: true, tomado_por: true, atendido_en: true, atendido_por: true,
+    visto_en: true, marcado_no_visto: true, ultima_actividad: true, motivo_derivacion: true, nombre_contacto: true,
+    nombre_editado: true, identificador_tipo: true, flujo: true,
+    party: { select: { persona: { select: { nombres: true, apellidos: true } } } },
+  } as const;
+
+  /** Tamaño de página de la lista de chats. */
+  static readonly PAGINA_CHATS = 40;
+
+  /**
+   * Lo mínimo de cada chat para decidir pestaña, contadores, orden y búsqueda: sale de UNA lectura de `conversacion` (sin include),
+   * los últimos 20 mensajes con solo autor/dirección/hora, los pedidos de hoy, los bloqueos y las reprogramaciones.
+   * Los mensajes completos, los nombres de quienes archivaron y el estado del número se piden SOLO para la página que se muestra.
+   */
+  async clasificar(todas: any[]) {
+    const [mensajesPorChat, bloqueos, posMapa, porReprogramar] = await Promise.all([
       // (si la fila ya trae `mensajes`, p. ej. en pruebas con datos armados, no se vuelve a pedir)
-      this.ultimosMensajesPorChat(todas.filter((c) => !c.mensajes).map((c) => c.id)),
+      this.ultimosMensajesPorChat(todas.filter((c) => !c.mensajes).map((c) => c.id), 20, true),
       this.bloqueosSpam(todas),
       this.posDeChats(todas),
-      this.nombresDe(todas.map((c) => c.atendido_por)),
       this.celularesPorReprogramar(),
-      Promise.all(todas.map(async (c) => [c.telefono, await this.numeros?.motivoOmision(c.telefono)] as const)).then((e) => new Map(e)),
     ]);
-    for (const c of todas) c.mensajes ??= mensajesPorChat.get(c.id) ?? [];
     const hoy0 = inicioHoyLima();
-    const filas = todas.map((c) => {
-      const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, c.mensajes));
-      const ult = c.mensajes[0];
+    return todas.map((c) => {
+      const mensajes: any[] = c.mensajes ?? mensajesPorChat.get(c.id) ?? [];
+      const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, mensajes));
+      const ult = mensajes[0];
       const posChat = posMapa.get(c.id) as PosChat;
       let sinLeer = 0;
       if (estado === 'atencion' || estado === 'validar') {
-        for (const m of c.mensajes) {
+        for (const m of mensajes) {
           if (m.autor !== 'CLIENTE') break;
           if (c.visto_en && m.en <= c.visto_en) break;
           sinLeer++;
         }
       }
+      const esperando = !!ult && ult.direccion === 'ENTRA' && !c.tomado_por;
+      const fecha: Date = ult ? ult.en : c.ultima_actividad;
+      return {
+        c,
+        ult,
+        estado,
+        sinLeer,
+        marcadoNoVisto: c.marcado_no_visto as boolean,
+        pos: posChat,
+        faltaProcesar: faltaProcesar(posChat, mensajes.some((m: any) => m.autor === 'CLIENTE' && m.en >= hoy0)),
+        porReprogramar: porReprogramar.has(ultimos9(c.telefono)),
+        bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
+        nombre: obtenerNombreMostrar(c),
+        esperando,
+        fecha,
+        dia: diaLima(fecha),
+      };
+    });
+  }
+
+  private conteosDe(base: { estado: EstadoChat; sinLeer: number; marcadoNoVisto: boolean; porReprogramar: boolean; bloqueoSpam: any; faltaProcesar: boolean }[]) {
+    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>) => base.filter((f) => GRUPOS[g].includes(f.estado)).length;
+    return {
+      todos: base.filter((f) => f.estado !== 'atendido').length,
+      atender: cuenta('atender'),
+      bot: cuenta('bot'),
+      atendidos: cuenta('atendidos'),
+      sinVer: base.filter(sinVer).length,
+      reprogramar: base.filter((f) => f.porReprogramar).length,
+      bloqueadosSpam: base.filter((f) => f.bloqueoSpam?.activo).length,
+      faltanProcesar: base.filter((f) => f.faltaProcesar).length,
+    };
+  }
+
+  /** Pestaña, «procesados», búsqueda y «solo bloqueados» (todo menos el día). */
+  private pasaFiltros(f: FilaClasificada, filtro: FiltroChat, q: string, pos?: FiltroPos, soloBloqueados = false): boolean {
+    const termino = q.toLowerCase().trim();
+    const digitos = termino.replace(/\D/g, '');
+    const c = f.c;
+    return (
+      // «Todos» no trae los archivados: esos viven en «Atendidos» hasta que alguien vuelva a escribir
+      (filtro === 'todos'
+        ? f.estado !== 'atendido'
+        : filtro === 'novistos'
+          ? sinVer(f)
+          : filtro === 'reprogramar'
+            ? f.porReprogramar
+            : GRUPOS[filtro].includes(f.estado)) &&
+      (!pos || (pos === 'faltan' ? f.faltaProcesar : f.pos.estado !== 'SIN_PEDIDO')) &&
+      (!soloBloqueados || !!f.bloqueoSpam?.activo) &&
+      (!termino ||
+        f.nombre.toLowerCase().includes(termino) ||
+        (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(termino)) ||
+        (!esRemitenteSinTelefono(c) && digitos !== '' && c.telefono.replace(/\D/g, '').includes(digitos)))
+    );
+  }
+
+  /**
+   * Clave de orden de cada chat (texto que se compara con < y >). «Por atender»: día más reciente, urgentes, el que más espera.
+   * Resto: última actividad más reciente. Siempre desempata por id, así el cursor es estable y no repite ni salta chats.
+   */
+  private claveOrden(f: FilaClasificada, filtro: FiltroChat): string {
+    const inv = (n: number | bigint, ancho: number) => (10n ** BigInt(ancho) - BigInt(n)).toString().padStart(ancho, '0');
+    const ua = new Date(f.c.ultima_actividad).getTime();
+    const id = inv(f.c.id, 19);
+    if (filtro !== 'atender') return inv(ua, 14) + id;
+    const espera = f.esperando ? new Date(f.ult.en).getTime().toString().padStart(14, '0') : inv(ua, 14);
+    return inv(Number(f.dia.replace(/-/g, '')), 8) + (f.c.urgente ? '0' : '1') + (f.esperando ? '0' : '1') + espera + id;
+  }
+
+  /** Completa con lo costoso (texto del último mensaje, quién archivó, estado del número) SOLO los chats que se van a mostrar. */
+  private async filasDe(items: FilaClasificada[], claves: Map<bigint, string>) {
+    const [completos, quienes, motivosNumero] = await Promise.all([
+      this.ultimosMensajesPorChat(items.filter((f) => !f.c.mensajes).map((f) => f.c.id), 1),
+      this.nombresDe(items.map((f) => f.c.atendido_por)),
+      Promise.all(items.map(async (f) => [f.c.telefono, await this.numeros?.motivoOmision(f.c.telefono)] as const)).then((e) => new Map(e)),
+    ]);
+    return items.map((f) => {
+      const c = f.c;
+      const estado = f.estado;
+      const ult = c.mensajes ? f.ult : completos.get(c.id)?.[0] ?? f.ult;
       const prefijo = !ult ? '' : ult.autor === 'CLIENTE' ? '' : ult.autor === 'BOT' ? 'Bot: ' : 'Tú: ';
       return {
         id: c.id.toString(),
-        nombre: obtenerNombreMostrar(c),
+        nombre: f.nombre,
         telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
         identificador_tipo: c.identificador_tipo,
         nombre_contacto: c.nombre_contacto,
@@ -359,67 +467,112 @@ export class MensajesService {
         urgente: c.urgente,
         ultimo: ult ? prefijo + (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
-        fecha: (ult ? ult.en : c.ultima_actividad).toISOString(),
+        fecha: f.fecha.toISOString(),
         marcadoNoVisto: c.marcado_no_visto,
         ultimaActividadDate: c.ultima_actividad,
-        sinLeer,
+        sinLeer: f.sinLeer,
         // El último mensaje es del cliente y nadie lo tomó: minutos que lleva sin respuesta (null si no aplica)
-        sinRespuestaMin:
-          ult && ult.direccion === 'ENTRA' && !c.tomado_por
-            ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000))
-            : null,
-        bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
+        sinRespuestaMin: f.esperando ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000)) : null,
+        bloqueoSpam: f.bloqueoSpam,
         numeroBloqueado: motivosNumero.get(c.telefono) === 'DESTINO_BLOQUEADO',
         numeroPropio: motivosNumero.get(c.telefono) === 'DESTINO_NUMERO_PROPIO',
-        pos: posChat,
-        faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m: any) => m.autor === 'CLIENTE' && m.en >= hoy0)),
+        pos: f.pos,
+        faltaProcesar: f.faltaProcesar,
         atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
         atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
         // Archivado y el cliente volvió a escribir: ya está en «Por atender» con este indicador
         volvioAEscribir: !!c.atendido_en && estado !== 'atendido',
-        porReprogramar: porReprogramar.has(ultimos9(c.telefono)),
+        porReprogramar: f.porReprogramar,
+        /** Posición en el orden de la lista: la web reordena por ella sin recalcular reglas. */
+        clave: claves.get(c.id) as string,
       };
     });
-    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
-    const termino = q.toLowerCase().trim();
-    const digitos = termino.replace(/\D/g, '');
-    const chats = filas.filter(
-      (f) =>
-        // «Todos» no trae los archivados: esos viven en «Atendidos» hasta que alguien vuelva a escribir
-        (filtro === 'todos'
-          ? f.estado !== 'atendido'
-          : filtro === 'novistos'
-            ? sinVer(f)
-            : filtro === 'reprogramar'
-              ? f.porReprogramar
-              : GRUPOS[filtro].includes(f.estado)) &&
-        (!pos || (pos === 'faltan' ? f.faltaProcesar : f.pos.estado !== 'SIN_PEDIDO')) &&
-        (!termino ||
-          f.nombre.toLowerCase().includes(termino) ||
-          (f.nombre_contacto && f.nombre_contacto.toLowerCase().includes(termino)) ||
-          (!esRemitenteSinTelefono(f) && digitos !== '' && f.telefono.replace(/\D/g, '').includes(digitos))),
-    );
+  }
 
-    // En cola de atención: ordenar urgentes primero y por antigüedad (más antiguos primero)
-    if (filtro === 'atender') {
-      chats.sort((a, b) => {
-        if (a.urgente !== b.urgente) return a.urgente ? -1 : 1;
-        return a.ultimaActividadDate.getTime() - b.ultimaActividadDate.getTime();
-      });
-    }
-    return {
-      conteos: {
-        todos: filas.filter((f) => f.estado !== 'atendido').length,
-        atender: cuenta('atender'),
-        bot: cuenta('bot'),
-        atendidos: cuenta('atendidos'),
-        sinVer: filas.filter(sinVer).length,
-        reprogramar: filas.filter((f) => f.porReprogramar).length,
-        bloqueadosSpam: filas.filter((f) => f.bloqueoSpam?.activo).length,
-        faltanProcesar: filas.filter((f) => f.faltaProcesar).length,
-      },
-      chats,
+  private diaPedido(dia?: string): string | null {
+    const d = (ms: number) => diaLima(new Date(Date.now() + ms));
+    return dia === 'hoy' ? d(0) : dia === 'ayer' ? d(-86_400_000) : dia === 'manana' ? d(86_400_000) : dia && dia !== 'todos' ? dia : null;
+  }
+
+  /**
+   * Lista de chats por PÁGINAS con cursor. `conteos` (de las pestañas) y `dias` salen de todos los chats con la lectura liviana,
+   * sin traer mensajes completos; solo los chats de la página llevan texto del último mensaje, quién archivó y estado del número.
+   * Compatible: sin cursor ni límite devuelve la primera página (40) con los mismos campos de siempre.
+   */
+  async listar(
+    filtro: FiltroChat = 'todos',
+    q = '',
+    pos?: FiltroPos,
+    opciones: { cursor?: string; limite?: number; dia?: string; soloBloqueados?: boolean } = {},
+  ) {
+    const todas: any[] = await this.prisma.conversacion.findMany({
+      orderBy: [{ ultima_actividad: 'desc' }, { id: 'desc' }],
+      select: MensajesService.SELECCION_LISTA,
+    });
+    const base = await this.clasificar(todas);
+    const conteos = this.conteosDe(base);
+    const limite = Math.min(Math.max(Math.trunc(opciones.limite ?? MensajesService.PAGINA_CHATS) || MensajesService.PAGINA_CHATS, 1), 100);
+
+    const candidatos = base.filter((f) => this.pasaFiltros(f, filtro, q, pos, opciones.soloBloqueados));
+    // Contadores por día de lo que muestra la pestaña (antes de elegir el día)
+    const hoy = this.diaPedido('hoy')!;
+    const dias = {
+      hoy: candidatos.filter((f) => f.dia === hoy).length,
+      ayer: candidatos.filter((f) => f.dia === this.diaPedido('ayer')).length,
+      manana: candidatos.filter((f) => f.dia === this.diaPedido('manana')).length,
+      anteriores: candidatos.filter((f) => f.dia < hoy).length,
+      total: candidatos.length,
     };
+    const dia = this.diaPedido(opciones.dia);
+    const delDia = dia ? candidatos.filter((f) => f.dia === dia) : candidatos;
+
+    const claves = new Map(delDia.map((f) => [f.c.id, this.claveOrden(f, filtro)] as const));
+    const ordenados = delDia.sort((a, b) => (claves.get(a.c.id)! < claves.get(b.c.id)! ? -1 : 1));
+    const cursor = opciones.cursor ?? '';
+    const restantes = cursor ? ordenados.filter((f) => claves.get(f.c.id)! > cursor) : ordenados;
+    const pagina = restantes.slice(0, limite);
+    const hayMas = restantes.length > limite;
+    const chats = await this.filasDe(pagina, claves);
+    return {
+      conteos,
+      dias,
+      chats,
+      hayMas,
+      siguienteCursor: hayMas ? claves.get(pagina[pagina.length - 1].c.id)! : null,
+    };
+  }
+
+  /** Solo los contadores de las pestañas (para refrescarlos con un evento en vivo sin recargar ninguna página). */
+  async conteos() {
+    const todas: any[] = await this.prisma.conversacion.findMany({ select: MensajesService.SELECCION_LISTA });
+    return this.conteosDe(await this.clasificar(todas));
+  }
+
+  /**
+   * UNA fila de la lista con las mismas reglas que `listar` (para una actualización en vivo): `chat` es null si el chat ya no
+   * cumple pestaña/búsqueda/día; `dentro` dice si por su orden cae entre lo ya cargado (hasta `hasta`, la clave del último cargado).
+   */
+  async fila(
+    id: string,
+    filtro: FiltroChat = 'todos',
+    q = '',
+    pos?: FiltroPos,
+    opciones: { hasta?: string; dia?: string; soloBloqueados?: boolean } = {},
+  ) {
+    let n: bigint;
+    try {
+      n = BigInt(id);
+    } catch {
+      return { chat: null, dentro: false };
+    }
+    const fila: any = await this.prisma.conversacion.findUnique({ where: { id: n }, select: MensajesService.SELECCION_LISTA });
+    if (!fila) return { chat: null, dentro: false };
+    const [f] = await this.clasificar([fila]);
+    const dia = this.diaPedido(opciones.dia);
+    if (!this.pasaFiltros(f, filtro, q, pos, opciones.soloBloqueados) || (dia && f.dia !== dia)) return { chat: null, dentro: false };
+    const clave = this.claveOrden(f, filtro);
+    const [chat] = await this.filasDe([f], new Map([[f.c.id, clave]]));
+    return { chat, dentro: !opciones.hasta || clave <= opciones.hasta };
   }
 
   /** Tamaño de la primera página del historial de un chat; «Cargar anteriores» trae páginas de este mismo tamaño. */
@@ -464,7 +617,7 @@ export class MensajesService {
         const errorCodigo = wa?.error_codigo || contenido.errorCodigo || null;
         const errorDetalle = wa?.error_detalle || contenido.errorDetalle || null;
         const motivoFallo =
-          estadoMsg === 'FALLIDO' ? mapearErrorWhatsApp(errorCodigo, errorDetalle) : null;
+          estadoMsg === 'REVISAR' ? MOTIVO_REVISAR : estadoMsg === 'FALLIDO' ? mapearErrorWhatsApp(errorCodigo, errorDetalle) : null;
         // Detalle técnico (código de Meta y texto original): solo ADMIN
         const tecnico = esAdmin && estadoMsg === 'FALLIDO' ? separarDetalleTecnico(errorCodigo, errorDetalle) : null;
 
@@ -501,7 +654,9 @@ export class MensajesService {
           metaCodigo: esAdmin ? tecnico?.codigoMeta ?? null : null,
           motivoFallo,
           puedeReintentar:
-            estadoMsg === 'FALLIDO' ? m.tipo !== 'IMAGEN' && m.tipo !== 'DOCUMENTO' && !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
+            estadoMsg === 'FALLIDO' || estadoMsg === 'REVISAR'
+              ? m.tipo !== 'IMAGEN' && m.tipo !== 'DOCUMENTO' && !esErrorVentana24h(errorCodigo, errorDetalle)
+              : undefined,
         };
       });
   }
@@ -734,10 +889,51 @@ export class MensajesService {
     }
 
     // Mismo idCliente otra vez: ya se está enviando o ya salió; no se manda de nuevo
+    const previo = await this.mensajeConIdCliente(c.id, idCliente);
+    if (previo) return { id: previo, duplicado: true };
     if (await this.yaEnviado(c.id, idCliente)) return { id: '', duplicado: true };
 
-    const m = await this.gateway.enviarTexto(c.id, c.telefono, limpio, 'PERSONA', ...(idCliente ? [idCliente] : []));
+    // Sin cola (pruebas o pasarela sin envío en segundo plano): el envío síncrono de siempre
+    if (!this.cola || !this.gateway.transmitirTexto) return this.enviarSincrono(c, limpio, usuario, ip, idCliente);
+
+    // Segundo plano: el mensaje queda guardado ENCOLADO y se responde YA; el servidor habla con Meta después
+    const m = await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: c.id,
+        direccion: 'SALE',
+        autor: 'PERSONA',
+        tipo: 'TEXTO',
+        contenido: {
+          texto: limpio,
+          ...(idCliente ? { idCliente } : {}),
+          estado: 'ENCOLADO',
+          intentos: 0,
+          listoEn: Date.now() + 10_000,
+          origen: { partyId: usuario.partyId?.toString() ?? null, ip: ip ?? null, accion: 'ENVIAR' },
+        },
+      },
+    });
     // al escribir una persona, el bot calla: el chat deja de ser urgente y queda a cargo de la persona
+    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
+    this.cola.despertar(m.id);
+    return { id: m.id.toString(), estado: 'ENCOLADO' };
+  }
+
+  /** Id del mensaje ya guardado con este idCliente en este chat (mira solo los últimos 30: es una repetición reciente). */
+  private async mensajeConIdCliente(conversacionId: bigint, idCliente?: string): Promise<string | null> {
+    if (!idCliente) return null;
+    const ultimos = await this.prisma.mensajeChat.findMany({
+      where: { conversacion_id: conversacionId },
+      orderBy: { id: 'desc' },
+      take: 30,
+      select: { id: true, contenido: true },
+    });
+    const hallado = (ultimos ?? []).find((m: any) => m.contenido?.idCliente === idCliente);
+    return hallado ? hallado.id.toString() : null;
+  }
+
+  private async enviarSincrono(c: any, limpio: string, usuario: UsuarioAutenticado, ip?: string, idCliente?: string) {
+    const m = await this.gateway.enviarTexto(c.id, c.telefono, limpio, 'PERSONA', ...(idCliente ? [idCliente] : []));
     await Promise.all([
       this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado }),
       this.auditar(usuario, 'ENVIAR', c.id, { mensajeId: m.id, estado: m.estado }, ip),
@@ -746,11 +942,7 @@ export class MensajesService {
     if (m.estado === 'FALLIDO') {
       const mensajeError = mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle);
       throw new HttpException(
-        {
-          codigo: m.errorCodigo || 'ENVIO_FALLIDO',
-          mensaje: mensajeError,
-          mensajeId: m.id,
-        },
+        { codigo: m.errorCodigo || 'ENVIO_FALLIDO', mensaje: mensajeError, mensajeId: m.id },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -1009,6 +1201,38 @@ export class MensajesService {
     const contenidoObj = (mensajeAnterior.contenido as any) || {};
     const texto = String(contenidoObj.texto || '');
     const esPlantilla = mensajeAnterior.tipo === 'PLANTILLA';
+
+    // Texto: se REUSA el mismo mensaje (no se crea otro), se vuelve a poner en la cola y se responde YA
+    if (!esPlantilla && mensajeAnterior.tipo === 'TEXTO' && this.cola && this.gateway.transmitirTexto) {
+      if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+        throw new HttpException(
+          {
+            codigo: 'VENTANA_CERRADA',
+            mensaje: 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+            plantillaReapertura: 'caprichos_reabrir_conversacion',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+      const wa = mensajeAnterior.whatsapp_mensaje_id
+        ? await this.prisma.whatsappMensaje.findUnique({ where: { id: mensajeAnterior.whatsapp_mensaje_id }, select: { estado: true } })
+        : null;
+      const fallo = ['FALLIDO', 'REVISAR'].includes(String(contenidoObj.estado)) || wa?.estado === 'FALLIDO';
+      const origen = { partyId: usuario.partyId?.toString() ?? null, ip: ip ?? null, accion: 'REINTENTAR_MENSAJE' };
+      // Atómico: solo pasa a ENCOLADO si nadie más lo reintentó antes (mismo meta_id que se leyó)
+      const n = fallo
+        ? await this.prisma.$executeRaw`
+            UPDATE mensaje_chat
+            SET whatsapp_mensaje_id = NULL, meta_id = NULL, en = now(),
+                contenido = (contenido - 'errorCodigo' - 'errorDetalle') || ${JSON.stringify({ estado: 'ENCOLADO', intentos: 0, listoEn: Date.now() + 10_000, origen })}::jsonb
+            WHERE id = ${mensajeAnterior.id} AND COALESCE(contenido->>'estado', '') NOT IN ('ENCOLADO', 'ENVIANDO')
+              AND meta_id IS NOT DISTINCT FROM ${mensajeAnterior.meta_id}::text`
+        : 0;
+      if (!n) throw error(HttpStatus.CONFLICT, 'REINTENTO_NO_APLICA', 'Este mensaje ya se está enviando o no necesita reintento');
+      await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
+      this.cola.despertar(mensajeAnterior.id);
+      return { ok: true, id: mensajeAnterior.id.toString(), estado: 'ENCOLADO' };
+    }
 
     let m: MensajeEnviado;
     if (esPlantilla && this.gateway.enviarPlantilla) {

@@ -75,6 +75,23 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
     };
   }
 
+  async transmitirTexto(conversacionId: bigint, telefono: string, texto: string): Promise<MensajeEnviado> {
+    const estadoConexion = this.mensajeria.estaConectado();
+    const resultado = await this.mensajeria.enviarTexto(telefono, texto, { conversacionId });
+    return {
+      id: '',
+      autor: 'PERSONA',
+      texto,
+      en: new Date(),
+      metaId: resultado.waMessageId || null,
+      estado: resultado.estado,
+      errorCodigo: resultado.errorCodigo || null,
+      errorDetalle: resultado.errorDetalle || null,
+      modo: estadoConexion.modo,
+      whatsappMensajeId: resultado.id ? BigInt(resultado.id) : null,
+    };
+  }
+
   async enviarPlantilla(
     conversacionId: bigint,
     telefono: string,

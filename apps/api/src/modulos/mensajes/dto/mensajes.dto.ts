@@ -2,18 +2,21 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Length,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 export class ListarConversacionesDto {
   @IsOptional()
-  @IsIn(['todos', 'atender', 'bot', 'atendidos', 'novistos'])
-  filtro?: 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
+  @IsIn(['todos', 'atender', 'bot', 'atendidos', 'novistos', 'reprogramar'])
+  filtro?: 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
 
   @IsOptional()
   @IsString()
@@ -22,6 +25,34 @@ export class ListarConversacionesDto {
   @IsOptional()
   @IsIn(['faltan', 'procesados'])
   pos?: 'faltan' | 'procesados';
+
+  /** Cursor de la página anterior (`siguienteCursor`). Sin él, la primera página. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  cursor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined || value === '' ? undefined : Number(value)))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limite?: number;
+
+  /** 'todos' (por defecto), 'hoy', 'ayer', 'manana' o un día de Lima AAAA-MM-DD. */
+  @IsOptional()
+  @Matches(/^(todos|hoy|ayer|manana|\d{4}-\d{2}-\d{2})$/)
+  dia?: string;
+
+  @IsOptional()
+  @IsIn(['1'])
+  soloBloqueados?: '1';
+
+  /** Solo para `fila`: clave del último chat ya cargado (para saber si el chat cae dentro de lo cargado). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  hasta?: string;
 }
 
 export class AtendidoDto {
