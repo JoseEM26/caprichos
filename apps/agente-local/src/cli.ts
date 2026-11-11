@@ -2,18 +2,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { crearReenlace } from './revinculacion';
-import { LINEA_VERSION, obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
+import { COMMIT_AGENTE, LINEA_VERSION, VERSION_NUMERO, obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
 import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
 import { candidatasDeLinux, candidatasDeWindows, idGuardado } from './candidatas';
 import type { CandidataLocal } from './candidatas';
 import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque, ejecutablePropio, mismaRuta, rutaRegistrada } from './autoarranque';
 import type { OpcionesAutoarranque } from './autoarranque';
-import { formatearEstado, reunirEstado } from './estadoPrograma';
+import { consultarUltimaVersion, formatearEstado, reunirEstado } from './estadoPrograma';
+import { cerrarCopiasPrevias, describirCopias, detenerTodo, listarCopias, noCerrarOtras } from './copias';
+import type { CopiaPrograma } from './copias';
 import type { DepsEstado } from './estadoPrograma';
 import {
   dirDatos, describirEstado, detenerEnMarcha, guardarEstado, pidEnMarcha, relanzarOculto,
-  rutaMarcaInicio, soltarBloqueo, tomarBloqueo, vigilarParada,
+  reemplazable, rutaMarcaInicio, soltarBloqueo, tomarBloqueo, vigilarParada,
 } from './segundoPlano';
 import { generarPruebaEtiqueta, generarPruebaTicket } from './pruebaImpresora';
 import { ImpresoraUsb } from './impresora/impresoraUsb';
@@ -545,11 +547,8 @@ export async function comandoEstadoPrograma(json: boolean, log: (m: string) => v
       const e = await new ImpresoraRed(destino).verificarEstado();
       return { ok: e.estado !== 'desconectada', detalle: e.detalle };
     },
-    consultarVersion: async (apiUrl) => {
-      const res = await fetch(`${apiUrl.replace(/\/+$/, '')}/api/agente-impresion/version`, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return ((await res.json()) as any)?.publicada?.version ?? undefined;
-    },
+    consultarVersion: (apiUrl) => consultarUltimaVersion(apiUrl, 8000),
+    copias: () => listarCopias(),
   };
   const e = await reunirEstado(d);
   if (json) log(JSON.stringify(e, null, 2));
@@ -559,13 +558,63 @@ export async function comandoEstadoPrograma(json: boolean, log: (m: string) => v
   return e.ok ? 0 : 1;
 }
 
+const nombreExe = () => path.basename(process.execPath);
+const rojo = (t: string) => (process.stdout.isTTY && !process.env.NO_COLOR ? `\x1b[31m${t}\x1b[0m` : t);
+
+/** Líneas que `--estado` añade: versión en uso, última disponible (sin fallar si no hay red), copias e inicio con Windows. */
+export async function lineasExtraEstado(o: { archivo?: ArchivoConfiguracion; consultar?: typeof consultarUltimaVersion; copias?: () => Promise<CopiaPrograma[]>; auto?: OpcionesAutoarranque; nombre?: string } = {}): Promise<string[]> {
+  const archivo = o.archivo ?? leerArchivoConfiguracion();
+  const l = [`Versión en uso: ${VERSION_NUMERO}${COMMIT_AGENTE === 'dev' ? '' : ` (${COMMIT_AGENTE})`}`];
+  try {
+    if (!archivo.apiUrl) throw new Error('sin vincular');
+    const ultima = await (o.consultar ?? consultarUltimaVersion)(archivo.apiUrl, 4000);
+    l.push(ultima ? `Última versión disponible: ${ultima}` : 'Última versión disponible: No se pudo consultar (aún no hay una publicada)');
+  } catch {
+    l.push('Última versión disponible: No se pudo consultar');
+  }
+  try {
+    const n = (await (o.copias ?? listarCopias)()).length;
+    l.push(n > 1 ? rojo(`✘ Copias corriendo: ${n}. Hay ${n} copias: usa --detener-todo y vuelve a abrir el programa`) : `Copias corriendo: ${n}`);
+  } catch {
+    l.push('Copias corriendo: No se pudo comprobar');
+  }
+  const auto = o.auto ?? { ejecutable: ejecutablePropio() };
+  if ((auto.plataforma ?? process.platform) === 'win32') {
+    const r = await rutaRegistrada(auto);
+    l.push(r ? `Inicio con Windows: registrado desde ${r}` : 'Inicio con Windows: no registrado (se registra al abrir el programa, o con: autoinicio activar)');
+  }
+  return l;
+}
+
 /** Comandos de control (`--estado`, `--detener`...). undefined = no es uno de ellos. */
 async function comandoControl(c: string | undefined): Promise<number | undefined> {
   const dir = dirDatos();
   switch (c) {
     case '--estado':
       console.log(describirEstado(dir));
+      (await lineasExtraEstado()).forEach((l) => console.log(l));
       return 0;
+    case '--copias': {
+      const nombre = nombreExe();
+      try {
+        describirCopias(await listarCopias(), nombre).forEach((l) => console.log(l));
+        return 0;
+      } catch (e: any) {
+        console.log(`No se pudo consultar las copias: ${e?.message ?? e}`);
+        return 1;
+      }
+    }
+    case '--detener-todo': {
+      try {
+        const r = await detenerTodo({}, nombreExe());
+        r.lineas.forEach((l) => console.log(l));
+        if (!r.codigo) console.log('Listo. Ahora puedes abrir la versión nueva (doble clic, una sola vez).');
+        return r.codigo;
+      } catch (e: any) {
+        console.log(`No se pudo consultar las copias: ${e?.message ?? e}`);
+        return 1;
+      }
+    }
     case '--detener': {
       const r = await detenerEnMarcha(dir);
       console.log(r === 'no-corria' ? 'El programa no estaba corriendo.' : 'Programa detenido. Para volver a prenderlo, ábrelo de nuevo (o reinicia la PC).');
@@ -599,9 +648,11 @@ export async function main(): Promise<void> {
     console.log(LINEA_VERSION);
     process.exit(0);
   }
+  if (comando === 'copias' || comando === 'detener-todo') comando = `--${comando}`;
   const segundoPlano = comando === '--segundo-plano';
   if (!segundoPlano && !process.argv.includes('--json')) console.log(LINEA_VERSION);
   const primerPlano = comando === '--primer-plano';
+  const cerrarOtras = !noCerrarOtras();
   if (segundoPlano) {
     modo.segundoPlano = true;
     redirigirConsolaALog();
@@ -679,10 +730,11 @@ export async function main(): Promise<void> {
   // Doble clic o terminal: deja el programa en segundo plano (sin ventana) y esta ventana se cierra
   if (!segundoPlano && !primerPlano) {
     await asegurarInicio();
-    if (pidEnMarcha()) {
+    if (pidEnMarcha() && !(cerrarOtras && reemplazable())) {
       console.log('El programa de impresión ya está funcionando en segundo plano. Revisa con --estado.');
     } else {
-      relanzarOculto(['--segundo-plano']);
+      // Si hay una versión anterior en marcha, la copia nueva (en segundo plano) la reemplaza al arrancar
+      relanzarOculto(['--segundo-plano', ...(cerrarOtras ? [] : ['--no-cerrar-otras'])]);
       console.log('Listo: el programa de impresión quedó funcionando en segundo plano y arrancará solo al prender la PC.');
       console.log('Puedes cerrar esta ventana. Para ver cómo va: --estado. Para detenerlo: --detener.');
     }
@@ -690,9 +742,19 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
   if (!tomarBloqueo()) {
-    console.log('El programa de impresión ya está funcionando (solo puede haber uno).');
-    process.exit(0);
+    // Solo se reemplaza a una versión ANTERIOR (misma o más nueva se respeta): así, si dos nuevas arrancan a la vez, queda una
+    const reemplazar = cerrarOtras && reemplazable();
+    if (reemplazar) {
+      console.log('Había una versión anterior del programa en marcha; la cierro para que quede esta.');
+      await detenerEnMarcha(dirDatos());
+    }
+    if (!reemplazar || !tomarBloqueo()) {
+      console.log('El programa de impresión ya está funcionando (solo puede haber uno).');
+      process.exit(0);
+    }
   }
+  // Con el bloqueo ya en la mano (atómico), se cierran las copias que no lo respetan: versiones viejas, otra carpeta, huérfanas
+  if (cerrarOtras) await cerrarCopiasPrevias(segundoPlano ? registrarLog : console.log);
   if (segundoPlano) await asegurarInicio(registrarLog); // tras una actualización o mudanza del .exe, el inicio apunta a la ruta nueva
 
   // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera

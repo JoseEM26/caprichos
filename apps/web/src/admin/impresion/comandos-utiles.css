@@ -1,0 +1,13 @@
+.cu-seccion { border: 1px solid var(--cp-line, #E3D6C6); border-radius: 10px; margin: 8px 0; min-width: 0; }
+.cu-cab { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border: 0; }
+.cu-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; min-width: 0; max-height: 60vh; overflow-y: auto; }
+.cu-aviso { margin: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--cp-rust, #B2500F); background: var(--cp-cream, #FBF5EC); color: var(--cp-navy, #0B2C3E); font-size: 14px; font-weight: 700; line-height: 20px; }
+.cu-tarjeta { border: 1px solid var(--cp-line, #E3D6C6); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.cu-titulo { margin: 0 0 4px; font-size: 14px; color: var(--cp-navy, #0B2C3E); }
+.cu-pasos { margin: 0; padding-left: 20px; font-size: 13px; line-height: 20px; color: var(--cp-soft, #2C4C5D); }
+.cu-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; min-width: 0; }
+.cu-pre { flex: 1 1 200px; min-width: 0; margin: 0; padding: 8px; border-radius: 6px; background: var(--cp-sand, #F1E7D8); color: var(--cp-navy, #0B2C3E); font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.cu-copiar { min-width: 96px; }
+.cu-error { flex-basis: 100%; font-size: 12px; color: var(--cp-rust, #B2500F); }
+.cu-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 480px) { .cu-copiar { flex: 1 1 100%; } }

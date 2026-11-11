@@ -220,6 +220,31 @@ Todo en orden.
 
 Una línea con ✘ dice qué falla (ruta de inicio distinta, sin vincular, sin conexión, impresora no vista por el equipo o sin conexión, programa detenido). «Hay una versión nueva» se muestra pero no cuenta como fallo. El código de salida es 0 si todo está bien y 1 si algo falla, útil en scripts; `estado --json` entrega lo mismo en JSON, sin la llave. La conexión se prueba con una consulta ligera de solo lectura (no envía latidos ni toma trabajos); el último latido real sale del programa en marcha. Solo puede haber una instancia: un segundo programa avisa y se cierra.
 
+### Copias, versión y cómo actualizar (comandos útiles)
+
+Si se abre una versión nueva sin cerrar la anterior pueden quedar varias copias imprimiendo a la vez (tickets dobles). El bloqueo `agente.lock` solo conoce UNA copia, y solo existe desde el 08/11/2026 (commit 6985cc48): las versiones anteriores no lo tienen, y una copia con otra carpeta de datos (`AGENTE_CONFIG`, otro usuario de Windows) tiene su propio bloqueo. Por eso hay estos comandos (todos en español, sin administrador; el nombre del archivo es el que se descargó, p. ej. `agente-impresion-windows.exe`):
+
+| Comando | Qué hace |
+|---|---|
+| `--version` (`-v`, `version`) | Una línea: `Programa de impresión Caprichos v0.1.N (commit)`. |
+| `--estado` | Lo de siempre + «Versión en uso», «Última versión disponible» (o «No se pudo consultar» sin red), «Copias corriendo: N» (✘ si N > 1) e «Inicio con Windows: registrado desde <ruta>». |
+| `--copias` (`copias`) | Lista TODAS las copias del programa corriendo (pid, versión si se sabe o «versión desconocida», hora de inicio, ruta), sin contar la ventana que ejecuta el comando. |
+| `--detener-todo` (`detener-todo`) | Cierra todas las copias (la registrada con parada ordenada; las demás con `taskkill /F` o `Stop-Process`; en Linux SIGTERM y luego SIGKILL), limpia `agente.lock` y `detener.flag` huérfanos y dice qué cerró: «Cerré 4 copias: pid …». Avisa con ✘ si alguna no se pudo cerrar (otro usuario o permisos). |
+| `autoinicio activar` / `desactivar` | Registra o quita el inicio con Windows. |
+
+**Actualizar la versión:** 1) `agente-impresion-windows.exe --detener-todo`; 2) reemplaza el archivo en la carpeta fija (p. ej. `C:\Caprichos`); 3) ábrelo UNA vez (doble clic).
+
+**Al arrancar** (modo normal o `--segundo-plano`) el programa nuevo, con el bloqueo ya tomado, busca otras copias del mismo ejecutable (mismo nombre de imagen; solo las de servicio, no `--estado`/`--copias`/`--version`) que arrancaron ANTES y las cierra, dejando en `agente.log`: «Había N copias del programa; cerré las anteriores». Si el bloqueo lo tiene una versión anterior (o sin versión), también la reemplaza; con la misma versión o una más nueva se respeta. Si dos copias nuevas arrancan a la vez, manda el bloqueo atómico y, para copias sin bloqueo, la más nueva cierra a la más vieja (nunca al revés). Nunca toca procesos de otro nombre ni de otros usuarios (si no tiene permiso, lo avisa en el log). Para desactivarlo: `--no-cerrar-otras` o la variable `CAPRICHOS_NO_CERRAR_OTRAS=1`.
+
+Cómo se listan los procesos: Windows, PowerShell (`Get-CimInstance Win32_Process`) → `wmic` → `tasklist` (sin hora ni ruta); Linux, `/proc` (solo se ven los del mismo usuario).
+
+**Receta de prueba manual en Windows** (no se pudo probar en un Windows real desde el desarrollo; solo con funciones simuladas):
+1. Copia el `.exe` nuevo a `C:\Caprichos` y otra copia (renombrada, mismo contenido) a `C:\Prueba`. Ábrelas con doble clic una tras otra: debe quedar UNA sola: el Administrador de tareas (pestaña Detalles) muestra un solo proceso con ese nombre; en agente.log (`--ver-logs`) aparece «Había 1 copia del programa; cerré las anteriores».
+2. Abre una consola en `C:\Caprichos` (escribe `cmd` en la barra de direcciones) y ejecuta `agente-impresion-windows.exe --estado`: debe mostrar «Versión en uso», «Última versión disponible», «Copias corriendo: 1» e «Inicio con Windows: registrado desde C:\Caprichos\…».
+3. Con una versión VIEJA (sin bloqueo) abierta a mano además de la nueva: `--copias` debe listarla con «versión desconocida»; `--estado` debe mostrar ✘ «Hay 2 copias…»; `--detener-todo` debe decir «Cerré 2 copias: pid …» y el Administrador de tareas no debe dejar ninguna.
+4. Abre la versión nueva con `agente-impresion-windows.exe --no-cerrar-otras` junto a una vieja: no debe cerrarla.
+5. Repite `--detener-todo` con el Administrador de tareas abierto: ninguna copia debe sobrevivir y `%APPDATA%\CaprichosAgente\agente.lock` no debe existir.
+
 ### Linux (binario autocontenido, sin Node)
 
 El panel «Instalar programa de impresión» tiene la pestaña **Linux** con estos mismos comandos listos para copiar (con la URL del sitio):
