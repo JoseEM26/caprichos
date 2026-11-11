@@ -165,6 +165,7 @@ describe('Que no se pierda nada: outbox, reintentos, DLQ, circuito y barrido', (
     const { prisma, servicio } = montar();
     jest.spyOn(prisma.comprobante, 'findUnique').mockRejectedValue(new Error('conexión perdida\ndetalle'));
     await expect(servicio.reintentarElectronico(1n, {}, cajero)).rejects.toMatchObject({
+      status: 500,
       response: { codigo: 'REENVIO_FALLIDO', mensaje: expect.stringContaining('No pudimos reenviar a SUNAT: conexión perdida') },
     });
   });
@@ -214,6 +215,40 @@ describe('Que no se pierda nada: outbox, reintentos, DLQ, circuito y barrido', (
     await servicio.enviarElectronico(id, { automatico: true });
     expect(estadosDe(db)).toEqual(['REVISION_MANUAL']);
     expect(db.comprobante[0].facturacion_intentos).toBe(3);
+  });
+
+  it('si guardar REVISION_MANUAL falla (CHECK de la base), no se vuelve a llamar a SUNAT en cada pasada y la fila se aparta', async () => {
+    const fetchFn = fetchSunat({ sendBill: async () => Promise.reject(new Error('ECONNRESET')) });
+    const { prisma, db, servicio, fetchFn: f } = montar({ parametro: [{ clave: 'facturacion_proveedor', valor: 'SUNAT' }, { clave: 'facturacion_max_intentos', valor: 2 }] }, fetchFn);
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    // Simula el CHECK que no admitía REVISION_MANUAL (23514)
+    const original = prisma.comprobante.update.bind(prisma.comprobante);
+    let checkActivo = true;
+    jest.spyOn(prisma.comprobante, 'update').mockImplementation((args: any) => {
+      if (checkActivo && args.data?.facturacion_estado === 'REVISION_MANUAL') throw new Error('23514 ck_comprobante_facturacion_estado');
+      return original(args);
+    });
+    const enviosSunat = () => f.mock.calls.filter(([, i]: any) => String(i.body).includes('<ser:sendBill>')).length;
+
+    await servicio.enviarElectronico(id, { automatico: true });
+    await expect(servicio.enviarElectronico(id, { automatico: true })).rejects.toThrow('23514');
+    expect(enviosSunat()).toBe(2);
+    expect(db.comprobante[0].facturacion_estado).toBe('PENDIENTE_ENVIO');
+    expect(db.comprobante[0].enviando_hasta).toBeNull();
+    expect(db.comprobante[0].proximo_intento_en.getTime()).toBeGreaterThan(Date.now());
+
+    // Pasadas siguientes: no hay más llamadas a SUNAT ni más intentos contados
+    for (let i = 0; i < 3; i++) await expect(servicio.enviarElectronico(id, { automatico: true })).rejects.toThrow('23514');
+    expect(enviosSunat()).toBe(2);
+    expect(db.comprobante[0].facturacion_intentos).toBe(2);
+
+    // Con la base corregida, la siguiente pasada la deja en REVISION_MANUAL sin llamar a SUNAT
+    checkActivo = false;
+    await servicio.enviarElectronico(id, { automatico: true });
+    expect(db.comprobante[0].facturacion_estado).toBe('REVISION_MANUAL');
+    expect(db.comprobante[0].revision_motivo).toContain('tras 2 intentos');
+    expect(enviosSunat()).toBe(2);
   });
 
   it('credenciales inválidas: pausan los envíos, dejan PENDIENTE_ENVIO y avisan una sola vez', async () => {

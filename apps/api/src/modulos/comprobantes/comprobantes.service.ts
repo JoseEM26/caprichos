@@ -443,7 +443,7 @@ export class ComprobantesService {
 
   private async enviarReclamado(
     c: any,
-    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; interactivo?: boolean; corregido?: boolean },
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; interactivo?: boolean; corregido?: boolean; automatico?: boolean },
   ): Promise<any> {
     const cfg = await this.leerConfigFacturacion();
     const pedido: any = c.pedido;
@@ -459,13 +459,25 @@ export class ComprobantesService {
 
     const intentosPrevios = c.facturacion_intentos ?? 0;
     const maxIntentos = await leerParametroNumerico(this.prisma, 'facturacion_max_intentos', MAX_INTENTOS_DEFECTO);
+    // Tope duro del envío automático: si un guardado anterior falló, la fila sigue PENDIENTE_ENVIO con intentos >= máximo.
+    // No se vuelve a llamar a SUNAT: solo se intenta dejarla en REVISION_MANUAL (un click manual sí envía, una vez).
+    if (opciones.automatico && proveedor !== 'SIMULADO' && c.facturacion_estado === 'PENDIENTE_ENVIO' && intentosPrevios >= maxIntentos) {
+      const respuesta = c.facturacion_respuesta ?? 'Sin respuesta de SUNAT';
+      return this.guardarSeguro(
+        c,
+        { estado: 'PENDIENTE_ENVIO', respuesta, simulado: false },
+        opciones,
+        { estado: 'REVISION_MANUAL', revisionMotivo: `Sin respuesta de SUNAT tras ${intentosPrevios} intentos: ${respuesta}`, proximoIntentoEn: null },
+        intentosPrevios,
+      );
+    }
     let res: ResultadoEmision;
     try {
       // Un intento previo sin respuesta, o una factura ya firmada en el cobro: se reenvía el ZIP guardado tal cual
       // (mismo documento, mismo número, mismo hash). Nunca se vuelve a firmar algo ya firmado.
       const yaFirmada = intentosPrevios > 0 || !!c.facturacion_hash;
       // Un RECHAZADO por 0133 (falla interna de SUNAT) sin correcciones también reenvía el mismo ZIP: SUNAT nunca lo procesó
-      const reenviaTalCual = c.facturacion_estado === 'PENDIENTE_ENVIO' || (c.facturacion_estado === 'RECHAZADO' && !opciones.corregido && /\b0133\b/.test(c.facturacion_respuesta ?? ''));
+      const reenviaTalCual = c.facturacion_estado === 'PENDIENTE_ENVIO' || (c.facturacion_estado === 'REVISION_MANUAL' && !opciones.corregido) || (c.facturacion_estado === 'RECHAZADO' && !opciones.corregido && /\b0133\b/.test(c.facturacion_respuesta ?? ''));
       const zipPrevio = reenviaTalCual && yaFirmada ? await this.ultimoArchivo(c.id, 'ZIP') : null;
       if (proveedor !== 'SIMULADO') {
         // Se cuenta ANTES de llamar a SUNAT: si el proceso muere en la llamada, el próximo intento consulta antes de reenviar
@@ -514,7 +526,33 @@ export class ComprobantesService {
       revisionMotivo = `Rechazo permanente ${res.codigoRechazo}: ${res.respuesta}`;
     }
     const proximoIntentoEn = estado === 'PENDIENTE_ENVIO' ? new Date(Date.now() + esperaFacturacionMs(intentosTras)) : null;
-    return this.guardarResultado(c, res, opciones, { estado, revisionMotivo, proximoIntentoEn });
+    return this.guardarSeguro(c, res, opciones, { estado, revisionMotivo, proximoIntentoEn }, intentosTras);
+  }
+
+  /**
+   * guardarResultado con red de seguridad: si el guardado falla (p. ej. un CHECK de la base), SUNAT ya fue llamada y el
+   * intento ya se contó. Se aparta la fila con la espera normal y se suelta el lease, con un UPDATE mínimo que no toca
+   * el estado, para que el barrido no la vuelva a enviar en cada pasada. El error original se relanza.
+   */
+  private async guardarSeguro(
+    c: any,
+    res: ResultadoEmision,
+    opciones: { usuario?: UsuarioAutenticado; ip?: string },
+    extra: { estado?: string; revisionMotivo?: string | null; proximoIntentoEn?: Date | null },
+    intentos: number,
+  ) {
+    try {
+      return await this.guardarResultado(c, res, opciones, extra);
+    } catch (e: any) {
+      this.logger.error(`Guardado del resultado del comprobante ${c.id} (${extra.estado ?? res.estado}): ${e?.message ?? e}`);
+      await this.prisma.comprobante
+        .update({
+          where: { id: c.id },
+          data: { enviando_hasta: null, proximo_intento_en: new Date(Date.now() + esperaFacturacionMs(intentos)), facturacion_respuesta: textoRespuesta(res.respuesta || 'Sin detalle de SUNAT') },
+        })
+        .catch(() => undefined);
+      throw e;
+    }
   }
 
   /** Una sola vez por comprobante: la consulta getStatusCdr falló y se reenvió el mismo ZIP. */
@@ -633,7 +671,8 @@ export class ComprobantesService {
       const motivo = String(e?.message ?? 'error interno').split('\n')[0].slice(0, 120);
       throw new HttpException(
         { codigo: 'REENVIO_FALLIDO', mensaje: `No pudimos reenviar a SUNAT: ${motivo}; reintenta en unos minutos` },
-        HttpStatus.BAD_GATEWAY,
+        // 500 y no 502: los proxies de borde reemplazan el cuerpo de un 502/504 por su página y la pantalla perdía el mensaje
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
