@@ -217,8 +217,10 @@ export function VistaDia({ personas, jornada, onError, onOk, recargar }: { perso
   );
 }
 
-export function LineaTiempo({ persona, dia, seleccionada, alElegir, onError, onOk, recargar }: {
+export function LineaTiempo({ persona, dia, seleccionada, alElegir, onError, onOk, recargar, sinSolicitudes = false }: {
   persona: CronoPersona; dia: CronoDia; seleccionada: number | null; alElegir: (id: number | null) => void; onError: Avisar; onOk: Avisar; recargar: () => Promise<void>;
+  /** true = las solicitudes se muestran aparte (pestaña «Solicitudes» del detalle). */
+  sinSolicitudes?: boolean;
 }) {
   const puntos = [
     ...dia.marcas.map((m) => m.minutos),
@@ -287,7 +289,7 @@ export function LineaTiempo({ persona, dia, seleccionada, alElegir, onError, onO
           {dia.inconsistencia?.sinSolicitud && <li>✉ Sin solicitud de corrección todavía: {dia.inconsistencia.texto}</li>}
         </ul>
       )}
-      {dia.solicitudes.length > 0 && <SolicitudesDelDia dia={dia} onError={onError} onOk={onOk} recargar={recargar} />}
+      {!sinSolicitudes && dia.solicitudes.length > 0 && <SolicitudesDelDia dia={dia} onError={onError} onOk={onOk} recargar={recargar} />}
       {marca && <DetalleMarca marca={marca} dia={dia} onError={onError} onOk={onOk} recargar={recargar} />}
     </article>
   );
@@ -299,7 +301,7 @@ const minutosDe = (hora: string) => {
   return hm < 240 ? hm + 1440 : hm;
 };
 
-function SolicitudesDelDia({ dia, onError, onOk, recargar }: { dia: CronoDia; onError: Avisar; onOk: Avisar; recargar: () => Promise<void> }) {
+export function SolicitudesDelDia({ dia, onError, onOk, recargar }: { dia: CronoDia; onError: Avisar; onOk: Avisar; recargar: () => Promise<void> }) {
   const [motivo, setMotivo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const resolver = async (id: number, accion: 'APROBAR' | 'RECHAZAR') => {
@@ -362,6 +364,7 @@ function DetalleMarca({ marca, dia, onError, onOk, recargar }: { marca: CronoMar
         <div><dt>Hora exacta</dt><dd>{marca.momento ? new Date(marca.momento).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour12: false }) : marca.hora}</dd></div>
         <div><dt>Interpretada como</dt><dd>{marca.rol ? ETIQUETA_ROL[marca.rol] : 'sin rol'}{marca.duplicada ? ' (doble marca: no cuenta)' : ''}</dd></div>
         <div><dt>Origen</dt><dd>{ETIQUETA_ORIGEN[marca.origen ?? ''] ?? '—'}</dd></div>
+        {marca.distanciaM != null && <div><dt>GPS aproximado</dt><dd>a {marca.distanciaM} m del local{marca.precisionM != null ? ` (± ${marca.precisionM} m)` : ''}</dd></div>}
         <div><dt>Estado</dt><dd>{marca.estado === 'A_REVISAR' ? 'Por revisar' : marca.estado === 'APROBADA' ? 'Aprobada' : 'Válida'}</dd></div>
         {(marca.alertas || marca.motivo) && <div><dt>Notas</dt><dd>{marca.alertas ?? marca.motivo}</dd></div>}
       </dl>

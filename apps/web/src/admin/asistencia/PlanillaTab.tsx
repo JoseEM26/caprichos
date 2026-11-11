@@ -59,7 +59,6 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   const presets: Array<[string, string]> = modo === 'SEMANA'
     ? [['Esta semana', hoy], ['Semana pasada', moverPeriodo('SEMANA', hoy, -1)]]
     : [['Este mes', hoy], ['Mes pasado', moverPeriodo('MES', hoy, -1)]];
-  const nombreModo = modo === 'SEMANA' ? 'semana' : 'mes';
   // las personas que se pagan por el otro período se ven, pero no suman en los totales (se contarían dos veces)
   const enTotales = visibles.filter((f) => !f.fueraDeModalidad);
   const pagados = enTotales.filter((f) => f.estado === 'PAGADO').length;

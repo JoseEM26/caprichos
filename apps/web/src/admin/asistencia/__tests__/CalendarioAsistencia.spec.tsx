@@ -17,6 +17,8 @@ vi.mock('../correccionesApi', async (orig) => ({
   cronograma: (...a: any[]) => crono(...a),
   contadorSolicitudes: vi.fn(async () => ({ pendientes: 3 })),
 }));
+const detallePago = vi.fn();
+vi.mock('../planillaApi', async (orig) => ({ ...(await orig<any>()), detallePlanilla: (...a: any[]) => detallePago(...a) }));
 const reporteHoy = vi.fn();
 const reiniciar = vi.fn();
 vi.mock('../asistenciaApi', async (orig) => ({
@@ -48,7 +50,7 @@ const cronoDia = {
 const abrir = (url = '/admin/asistencia?pestana=calendario') => render(<MemoryRouter initialEntries={[url]}><AsistenciaAdminView /></MemoryRouter>);
 
 beforeEach(() => {
-  [calendario, filasApi, lote, crono, reporteHoy, reiniciar].forEach((f) => f.mockReset());
+  [calendario, filasApi, lote, crono, reporteHoy, reiniciar, detallePago].forEach((f) => f.mockReset());
   calendario.mockResolvedValue({ desde: '', hasta: '', dias: [{ fecha: HOY, feriado: null, programadas: 2, presentes: 1, tardanzas: 0, faltas: 1, aRevisar: 1, solicitudesPendientes: 1, inconsistencias: 0 }] });
   filasApi.mockResolvedValue(registro([mkFila({}), mkFila({ partyId: '2', nombre: 'Luis Gómez', rol: 'CAJERO', solicitudes: [], marcas: [], estado: 'FALTA', entrada: null, almuerzoSalida: null, almuerzoVuelta: null, almuerzoMin: null, trabajadaMin: 0 })]));
   crono.mockResolvedValue({ desde: HOY, hasta: HOY, dias: [HOY], resumen: {}, personas: [{ partyId: 1, nombre: 'Ana Pérez', roles: ['MOZO'], dias: [cronoDia] }] });
@@ -73,24 +75,61 @@ describe('Estructura de pestañas', () => {
   });
 });
 
+const abrirDia = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: /1 presentes, 0 tardanzas, 1 faltas, 1 a revisar, 1 solicitudes pendientes/ }));
+  return screen.findByRole('dialog', { name: /Movimientos del/ });
+};
+
+describe('Calendario: barra de controles legible', () => {
+  it('los controles principales son botones de 44 px con texto de 14 px o más, agrupados: modo, rango, filtros', async () => {
+    abrir();
+    await screen.findByRole('button', { name: /1 presentes/ });
+    const grupo = screen.getByRole('group', { name: 'Modo del calendario' });
+    expect(within(grupo).getAllByRole('button').map((b) => b.textContent)).toEqual(['Ver', 'Programar']);
+    const rango = screen.getByRole('group', { name: 'Rango de días' });
+    expect(within(rango).getAllByRole('button').map((b) => b.textContent)).toEqual(['1 día', '3 días', 'Semana', 'Mes', 'Rango personalizado', 'Ver movimientos']);
+    // ningún botón de la barra usa el tamaño chico de 13 px
+    for (const b of [...within(rango).getAllByRole('button'), screen.getByRole('button', { name: 'Filtros' }), screen.getByRole('button', { name: 'Mes anterior' })]) {
+      expect(b.style.minHeight).toBe('44px');
+      expect(parseInt(b.style.fontSize || '14', 10)).toBeGreaterThanOrEqual(14);
+    }
+  });
+});
+
 describe('Calendario: días y rangos', () => {
   const ult = () => filasApi.mock.calls.at(-1)![0];
 
-  it('tocar un día pide ese día; 3 días, Semana y Mes cambian el rango', async () => {
+  it('al entrar no abre nada; tocar un día abre el modal grande y pide ese día', async () => {
     abrir();
-    await screen.findByText('Ana Pérez');
+    await screen.findByRole('button', { name: /1 presentes/ });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(filasApi).not.toHaveBeenCalled();
+    const dlg = await abrirDia();
+    expect(dlg).toHaveAttribute('aria-modal', 'true');
+    await within(dlg).findByText('Ana Pérez');
     expect(ult()).toMatchObject({ desde: HOY, hasta: HOY });
+  });
+
+  it('3 días, Semana y Mes cambian el rango; «Ver movimientos» lo abre con una pestaña por día', async () => {
+    abrir();
+    await screen.findByRole('button', { name: /1 presentes/ });
     fireEvent.click(screen.getByRole('button', { name: '3 días' }));
-    await waitFor(() => expect(ult().hasta > ult().desde).toBe(true));
-    expect(ult().desde).toBe(HOY);
     expect(screen.getByText(/· 3 días/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }));
+    const dlg = await screen.findByRole('dialog', { name: /Movimientos del .* al / });
+    await waitFor(() => expect(ult().hasta > ult().desde).toBe(true));
+    // «Todo el rango» + 3 días
+    expect(within(dlg).getAllByRole('tab')).toHaveLength(4);
+    expect(within(dlg).getByRole('tab', { name: /Todo el rango/, selected: true })).toBeInTheDocument();
+    fireEvent.click(within(dlg).getAllByRole('button', { name: 'Cerrar' }).at(-1)!);
+    expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Semana' }));
-    await waitFor(() => expect(screen.getByText(/· 7 días/)).toBeInTheDocument());
+    expect(screen.getByText(/· 7 días/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Mes' }));
-    await waitFor(() => expect(screen.getByText(/· (28|29|30|31) días/)).toBeInTheDocument());
-    expect(ult().desde.endsWith('-01')).toBe(true);
+    expect(screen.getByText(/· (28|29|30|31) días/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '1 día' }));
-    await waitFor(() => expect(screen.getByText(/· 1 día$/)).toBeInTheDocument());
+    expect(screen.getByText(/· 1 día$/)).toBeInTheDocument();
   });
 
   it('el día del calendario trae su resumen accesible y se puede elegir', async () => {
@@ -104,83 +143,159 @@ describe('Calendario: días y rangos', () => {
 
   it('un rango personalizado de más de 62 días avisa y no pide al servidor', async () => {
     abrir();
-    await screen.findByText('Ana Pérez');
+    await screen.findByRole('button', { name: /1 presentes/ });
     fireEvent.click(screen.getByRole('button', { name: 'Rango personalizado' }));
-    const n = filasApi.mock.calls.length;
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2099-01-01' } });
     expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('1 a 62 días');
-    expect(filasApi.mock.calls.length).toBe(n);
+    expect(screen.getByRole('button', { name: 'Ver movimientos' })).toBeDisabled();
+    expect(filasApi).not.toHaveBeenCalled();
   });
 });
 
-describe('Calendario: registro y filtros', () => {
-  it('muestra todas las columnas del registro y los totales', async () => {
+describe('Modal del día: movimientos de todos', () => {
+  it('resumen del día, todas las columnas y totales; Esc cierra', async () => {
     abrir();
-    const tabla = await screen.findByRole('table');
-    for (const c of ['Persona', 'Turno', 'Entrada', 'Sal. almorzar', 'Vuelta', 'Almuerzo (min)', 'Salida', 'Trabajado', 'Tardanza', 'Extra', 'Estado', 'Marcas']) {
+    const dlg = await abrirDia();
+    const resumen = await within(dlg).findByRole('list', { name: 'Resumen' });
+    expect(resumen).toHaveTextContent('1 Presentes');
+    expect(resumen).toHaveTextContent('1 Faltas');
+    expect(resumen).toHaveTextContent('1 A revisar');
+    expect(resumen).toHaveTextContent('1 Solicitudes pendientes');
+    const tabla = await within(dlg).findByRole('table');
+    for (const c of ['Persona', 'Turno', 'Entrada', 'Sal. almorzar', 'Vuelta', 'Salida', 'Trabajado', 'Tardanza', 'Extra', 'Estado', 'Marcas']) {
       expect(within(tabla).getByRole('columnheader', { name: c })).toBeInTheDocument();
     }
     expect(within(tabla).getByText('17:40')).toBeInTheDocument();
     expect(within(tabla).getByText('Entrada 13:28')).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Totales del rango' })).toHaveTextContent('Faltas 1');
+    expect(within(dlg).getByRole('status', { name: 'Totales del rango' })).toHaveTextContent('Faltas 1');
+    fireEvent.keyDown(dlg, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('los filtros están ocultos tras «Filtros»; buscar sin tildes crea un chip y «Limpiar» lo quita', async () => {
+  it('muestra el feriado del día', async () => {
+    calendario.mockResolvedValue({ desde: '', hasta: '', dias: [{ fecha: HOY, feriado: 'Día de prueba', programadas: 2, presentes: 1, tardanzas: 0, faltas: 1, aRevisar: 1, solicitudesPendientes: 1, inconsistencias: 0 }] });
     abrir();
-    await screen.findByText('Luis Gómez');
-    expect(screen.queryByRole('region', { name: 'Filtros del registro' })).toBeNull();
+    const dlg = await abrirDia();
+    expect(within(dlg).getByText('Feriado: Día de prueba')).toBeInTheDocument();
+  });
+
+  it('buscar sin tildes y los filtros rápidos por estado recortan la lista', async () => {
+    abrir();
+    const dlg = await abrirDia();
+    await within(dlg).findByText('Luis Gómez');
+    fireEvent.change(within(dlg).getByLabelText('Buscar persona'), { target: { value: 'gomez' } });
+    expect(within(dlg).queryByText('Ana Pérez')).toBeNull();
+    expect(within(dlg).getByText('Luis Gómez')).toBeInTheDocument();
+    fireEvent.change(within(dlg).getByLabelText('Buscar persona'), { target: { value: '' } });
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Faltas 1' }));
+    expect(within(dlg).getByRole('button', { name: 'Faltas 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dlg).queryByText('Ana Pérez')).toBeNull();
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Con solicitud 1' }));
+    expect(within(dlg).queryByText('Luis Gómez')).toBeNull();
+    expect(within(dlg).getByText('Ana Pérez')).toBeInTheDocument();
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Todos' }));
+    expect(within(dlg).getByText('Luis Gómez')).toBeInTheDocument();
+  });
+
+  it('los filtros de la página (rol, estado, persona) también aplican a lo que muestra el modal', async () => {
+    abrir();
+    await screen.findByRole('button', { name: /1 presentes/ });
     fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
     fireEvent.change(screen.getByLabelText('Persona'), { target: { value: 'gomez' } });
-    expect(screen.queryByText('Ana Pérez')).toBeNull();
-    expect(screen.getByText('Luis Gómez')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Quitar filtro Persona: gomez' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filtros (1)' })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Limpiar' })[0]);
-    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }));
+    const dlg = await screen.findByRole('dialog');
+    await within(dlg).findByText('Luis Gómez');
+    expect(within(dlg).queryByText('Ana Pérez')).toBeNull();
   });
 
-  it('filtra por estado, por «solo con solicitudes pendientes» y por rol', async () => {
+  it('un rango de varios días trae «Todo el rango» y una pestaña por día', async () => {
     abrir();
-    await screen.findByText('Luis Gómez');
-    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
-    fireEvent.click(screen.getByLabelText('Falta'));
-    expect(screen.queryByText('Ana Pérez')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Falta'));
-    fireEvent.click(screen.getByLabelText('Solo con solicitudes pendientes'));
-    expect(screen.queryByText('Luis Gómez')).toBeNull();
-    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Solo con solicitudes pendientes'));
-    fireEvent.click(screen.getByLabelText('Cajero/a'));
-    expect(screen.queryByText('Ana Pérez')).toBeNull();
+    await screen.findByRole('button', { name: /1 presentes/ });
+    fireEvent.click(screen.getByRole('button', { name: '3 días' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }));
+    const dlg = await screen.findByRole('dialog');
+    await within(dlg).findByText('Ana Pérez');
+    const tabs = within(dlg).getAllByRole('tab');
+    expect(tabs).toHaveLength(4);
+    fireEvent.click(tabs[1]);
+    expect(within(dlg).getByRole('tab', { selected: true })).toBe(tabs[1]);
   });
 });
 
-describe('Calendario: detalle y lote', () => {
-  it('«Detalle» abre el día de la persona con sus marcas y la corrección manual', async () => {
+describe('Calendario: detalle de la persona y lote', () => {
+  it('«Ver detalle» abre el detalle de la persona por pestañas, apilado sobre el día, con «← Volver al día»', async () => {
     abrir();
-    fireEvent.click(await screen.findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
-    const det = await screen.findByTestId('detalle-dia');
+    const dia = await abrirDia();
+    fireEvent.click(await within(dia).findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
+    const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
+    expect(screen.getAllByRole('dialog')).toHaveLength(2); // el del día sigue debajo
+    expect(within(det).getAllByRole('tab').map((t) => t.textContent?.replace(/\d+$/, ''))).toEqual(['Resumen', 'Marcas', 'Solicitudes', 'Pago del período']);
+    expect(within(det).getByText('Salida a almorzar')).toBeInTheDocument();
+    // Marcas: lista, línea de tiempo y corrección manual
+    fireEvent.click(within(det).getByRole('tab', { name: /Marcas/ }));
     expect(within(det).getByRole('list', { name: 'Marcas del día' })).toHaveTextContent('Salida a almorzar');
     expect(await within(det).findByRole('group', { name: 'Línea de tiempo de Ana Pérez' })).toBeInTheDocument();
     expect(within(det).getByText('Agregar una marca que falta (corrección manual)')).toBeInTheDocument();
-    fireEvent.click(within(det).getByRole('button', { name: 'Cerrar detalle' }));
-    expect(screen.queryByTestId('detalle-dia')).toBeNull();
+    // tocar una marca de la línea muestra su detalle con las acciones (aprobar/anular/reasignar)
+    fireEvent.click(within(det).getByRole('button', { name: /13:28 Entrada/ }));
+    const reg = within(det).getByRole('region', { name: /Detalle de la marca de las 13:28/ });
+    expect(within(reg).getByRole('button', { name: 'Aprobar' })).toBeInTheDocument();
+    expect(within(reg).getByRole('button', { name: 'Anular' })).toBeInTheDocument();
+    expect(within(reg).getByRole('button', { name: 'Reasignar' })).toBeInTheDocument();
+    // flechas entre pestañas
+    const tab = within(det).getByRole('tab', { name: /Marcas/ });
+    tab.focus();
+    fireEvent.keyDown(tab, { key: 'ArrowRight' });
+    expect(within(det).getByRole('tab', { name: /Solicitudes/, selected: true })).toBeInTheDocument();
+    // Volver al día
+    fireEvent.click(within(det).getByRole('button', { name: '← Volver al día' }));
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    expect(screen.getByRole('dialog', { name: /Movimientos del/ })).toBeInTheDocument();
+  });
+
+  it('«Pago del período» trae lo ganado y descontado de esa persona desde su planilla', async () => {
+    detallePago.mockResolvedValue({
+      estado: 'ABIERTO', periodo: { desde: '2099-01-01', hasta: '2099-01-07' }, consumosAnterioresPendiente: 12,
+      resultado: { ganado: 300, adicional: 20, penalidadTardanza: 5, consumosCobrados: 40, descuentos: 30, adelantos: 50, neto: 195 },
+    });
+    abrir();
+    const dia = await abrirDia();
+    fireEvent.click(await within(dia).findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
+    const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
+    fireEvent.click(within(det).getByRole('tab', { name: 'Pago del período' }));
+    expect(await within(det).findByText('S/ 195.00')).toBeInTheDocument();
+    expect(detallePago).toHaveBeenCalledWith(1, HOY, []);
+    expect(within(det).getByText('− S/ 40.00')).toBeInTheDocument();
+    expect(within(det).getByText(/Consumos de períodos anteriores sin cobrar: S\/ 12\.00/)).toBeInTheDocument();
+  });
+
+  it('Esc en el detalle cierra solo el detalle y no el modal del día', async () => {
+    abrir();
+    const dia = await abrirDia();
+    fireEvent.click(await within(dia).findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
+    const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
+    fireEvent.keyDown(det, { key: 'Escape' });
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    expect(screen.getByRole('dialog', { name: /Movimientos del/ })).toBeInTheDocument();
   });
 
   it('aprobación en lote: elige la fila, confirma «Sí» y manda solicitudes y marcas por revisar', async () => {
     abrir();
-    fireEvent.click(await screen.findByLabelText(`Elegir Ana Pérez del ${HOY}`));
-    fireEvent.click(screen.getByRole('button', { name: 'Aprobar seleccionadas' }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const dlg = await abrirDia();
+    fireEvent.click(await within(dlg).findByLabelText(`Elegir Ana Pérez del ${HOY}`));
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Aprobar seleccionadas' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, aprobar' }));
     await waitFor(() => expect(lote).toHaveBeenCalledWith({ accion: 'APROBAR', items: [{ tipo: 'SOLICITUD', id: 5 }, { tipo: 'MARCA', id: 11 }] }));
-    expect(await screen.findByRole('region', { name: 'Resultado del lote' })).toHaveTextContent('Resultado: 2 de 2');
+    expect(await screen.findByRole('dialog', { name: /Resultado: 2 de 2/ })).toBeInTheDocument();
   });
 
   it('rechazar exige un motivo de 10 caracteres', async () => {
     abrir();
-    fireEvent.click(await screen.findByLabelText(`Elegir Ana Pérez del ${HOY}`));
-    fireEvent.click(screen.getByRole('button', { name: 'Rechazar/anular seleccionadas' }));
+    const dlg = await abrirDia();
+    fireEvent.click(await within(dlg).findByLabelText(`Elegir Ana Pérez del ${HOY}`));
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Rechazar/anular seleccionadas' }));
     const si = screen.getByRole('button', { name: 'Sí, rechazar' });
     expect(si).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/Un solo motivo/), { target: { value: 'No coincide con la cámara' } });
@@ -189,9 +304,9 @@ describe('Calendario: detalle y lote', () => {
 });
 
 describe('Calendario: modo Programar', () => {
-  it('Ver | Programar: Programar muestra turnos y línea de tiempo; un rango largo pide acotar', async () => {
+  it('Ver | Programar: Programar muestra turnos y línea de tiempo (sin modal); un rango largo pide acotar', async () => {
     abrir();
-    await screen.findByText('Ana Pérez');
+    await screen.findByRole('button', { name: /1 presentes/ });
     fireEvent.click(screen.getByRole('button', { name: 'Programar' }));
     expect(await screen.findByRole('group', { name: 'Línea de tiempo de Ana Pérez' })).toBeInTheDocument();
     expect(crono).toHaveBeenCalledWith(HOY, HOY);
@@ -199,7 +314,7 @@ describe('Calendario: modo Programar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mes' }));
     expect(await screen.findByText('Rango muy largo para programar')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver' }));
-    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
 

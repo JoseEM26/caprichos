@@ -139,6 +139,9 @@ export class AsistenciaCorreccionesService {
               tieneSelfie: Boolean(f?.selfie),
               motivo: f?.motivo ?? null,
               alertas: f?.motivos_revision ?? null,
+              // GPS aproximado (distancia al local y precisión del celular), sin coordenadas: solo para el admin
+              distanciaM: f?.distancia_m != null ? Math.round(Number(f.distancia_m)) : null,
+              precisionM: f?.precision_m != null ? Math.round(Number(f.precision_m)) : null,
             };
           }),
           solicitudes: sols.map((s) => ({ id: Number(s.id), motivo: s.motivo, creadaEn: s.creada_en.toISOString(), items: this.itemsDe(s.items) })),
