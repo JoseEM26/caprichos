@@ -26,6 +26,7 @@ import { PlanoModule } from './modulos/plano/plano.module';
 import { ReservasModule } from './modulos/reservas/reservas.module';
 import { SalonModule } from './modulos/salon/salon.module';
 import { ComprobantesModule } from './modulos/comprobantes/comprobantes.module';
+import { FacturaWhatsappModule } from './modulos/comprobantes/factura-whatsapp.module';
 import { RucModule } from './modulos/ruc/ruc.module';
 import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
@@ -81,6 +82,7 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     ReservasModule,
     SalonModule,
     ComprobantesModule,
+    FacturaWhatsappModule,
     RucModule,
     ChatbotModule,
     ReclamosModule,

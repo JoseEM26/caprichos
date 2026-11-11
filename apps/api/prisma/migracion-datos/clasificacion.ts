@@ -36,7 +36,7 @@ export const MIGRAR: string[] = [
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_estado_historial', 'secuencia_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cortesia', 'contador_diario',
-    'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
+    'pedido_mesa', 'comprobante', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'incidente_entrega', 'incidente_entrega_foto', 'ruc_consulta', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto', 'ubicacion_repartidor',
   ]],
   ['caja y cierres: dinero real del día', [
@@ -99,7 +99,7 @@ export const NO_MIGRAR: Record<string, string> = Object.fromEntries(
 /** Tablas que jamás pueden estar en MIGRAR (la prueba jest lo verifica). */
 export const TABLAS_SENSIBLES: string[] = [
   'sesion', 'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'auditoria', 'voucher_pago',
-  'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
+  'comprobante', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'cliente_facturacion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
   'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request',

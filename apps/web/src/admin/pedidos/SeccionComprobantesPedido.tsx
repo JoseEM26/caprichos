@@ -5,6 +5,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { comprobantesApi } from '../comprobantes/comprobantesApi';
 import { estadoDe } from '../comprobantes/ElectronicosTab';
+import { EnvioWhatsappFactura } from '../comprobantes/EnvioWhatsappFactura';
 import { formatearSoles } from '../comprobantes/utilidades';
 import type { ComprobantePedido } from '../comprobantes/tipos';
 import './comprobantes-pedido.css';
@@ -128,6 +129,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
                 {c.baja_motivo || c.anulado_motivo ? `Motivo: ${c.baja_motivo || c.anulado_motivo}` : ''}
               </p>
             )}
+            <EnvioWhatsappFactura comprobante={c} puedeReenviar={tiene('comprobantes/emitir') && !c.baja_estado} alCambiar={cargar} />
             <div className="cpd-acciones">
               {electronico && <button type="button" className="cpd-btn" onClick={() => abrirPdf(c)} aria-label={`Ver PDF ${c.numero_texto}`}>Ver PDF</button>}
               {electronico && c.tiene_xml && <button type="button" className="cpd-btn" onClick={() => bajar(c, 'XML')} aria-label={`Descargar XML firmado ${c.numero_texto}`}>XML firmado</button>}

@@ -23,6 +23,8 @@ export interface OpcionesEnvio {
   botonCodigo?: string;
   /** Payloads de los botones de respuesta rápida de la plantilla, en orden (index 0, 1, 2). Solo plantillas con botones. */
   botonesRespuesta?: string[];
+  /** Plantilla con encabezado de DOCUMENTO: el PDF ya subido a la Media API (media id, nunca link) y su nombre. */
+  documentoCabecera?: { mediaId: string; nombre: string };
 }
 
 export interface ResultadoEnvioWhatsApp {
