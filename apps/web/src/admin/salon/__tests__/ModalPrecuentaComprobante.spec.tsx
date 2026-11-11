@@ -79,7 +79,7 @@ describe('ModalPrecuenta - comprobante, Pagó con y foto del POS', () => {
     fireEvent.change(screen.getByPlaceholderText(/^Mínimo S\/|^Obligatorio$/), { target: { value: '50' } });
     fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
     expect(botonEnviar()).not.toBeDisabled();
-    const dni = screen.getByLabelText('DNI (opcional)');
+    const dni = screen.getByLabelText('DNI o RUC (opcional)');
     fireEvent.change(dni, { target: { value: '1234567' } });
     expect(screen.getByText(/El DNI debe tener 8 dígitos/)).toBeInTheDocument();
     expect(botonEnviar()).toBeDisabled();

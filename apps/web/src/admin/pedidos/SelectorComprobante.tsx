@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { api } from '../../comun/api';
+import { mensajeConsulta, tipoPorLongitud, useConsultaDocumento } from './consultaDocumento';
+import { rucValido } from '../comprobantes/utilidades';
 
 export type TipoComprobanteSel = 'SIMPLE' | 'BOLETA' | 'FACTURA';
 
@@ -36,7 +37,7 @@ export function errorValorComprobante(v: ValorComprobante): { campo: 'tipo' | 'd
   if (v.tipo === 'SIMPLE') return null;
   const doc = v.doc.trim();
   if (v.tipo === 'BOLETA') {
-    if (doc !== '' && !/^\d{8}$/.test(doc)) return { campo: 'doc', mensaje: 'El DNI debe tener 8 dígitos (o déjalo vacío)' };
+    if (doc !== '' && !/^\d{8}$/.test(doc)) return { campo: 'doc', mensaje: 'El DNI debe tener 8 dígitos (o déjalo vacío); un RUC de 11 dígitos es para factura' };
     return null;
   }
   if (!/^(10|15|17|20)\d{9}$/.test(doc))
@@ -123,25 +124,24 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
   const sinDocObligatorio = valor.tipo === 'BOLETA' && (total ?? 0) > LIMITE_BOLETA_SIN_DNI;
   const tipos: TipoComprobanteSel[] = ['SIMPLE', 'BOLETA', 'FACTURA'];
 
-  // Autocompleta razón social y dirección desde SUNAT al completar un RUC válido (editables: aquí es personal). Si falla, se escribe a mano.
+  // «DNI o RUC»: boleta consulta un DNI (8), factura un RUC (11). Solo ayuda a rellenar; si falla, se escribe a mano.
+  // Se consulta solo con el largo que corresponde al comprobante: un RUC pasa por 8 dígitos al escribirse y no debe gastar una consulta de DNI.
+  const consultable = (valor.tipo === 'BOLETA' && tipoPorLongitud(valor.doc) === 'DNI') || (valor.tipo === 'FACTURA' && tipoPorLongitud(valor.doc) === 'RUC');
+  const consulta = useConsultaDocumento(consultable ? valor.doc : '', consultable);
   const actual = useRef({ valor, onChange });
   actual.current = { valor, onChange };
   useEffect(() => {
-    if (valor.tipo !== 'FACTURA' || !/^(10|15|17|20)\d{9}$/.test(valor.doc)) return;
-    let vigente = true;
-    api
-      .get<{ razon_social: string; direccion: string | null }>(`/admin/ruc/${valor.doc}`)
-      .then((d) => {
-        if (!vigente) return;
-        const { valor: v, onChange: cambiar } = actual.current;
-        if (v.doc !== valor.doc) return;
-        cambiar({ ...v, razon: d.razon_social, direccion: v.direccion || d.direccion || '' });
-      })
-      .catch(() => {});
-    return () => {
-      vigente = false;
-    };
-  }, [valor.doc, valor.tipo]);
+    if (consulta.estado !== 'ok' || consulta.tipo !== 'RUC') return;
+    const { valor: v, onChange: cambiar } = actual.current;
+    if (v.tipo !== 'FACTURA') return;
+    cambiar({ ...v, razon: consulta.razon, direccion: v.direccion || consulta.direccion || '' });
+  }, [consulta]);
+  // Escribir 11 dígitos de un RUC válido estando en boleta pasa a factura (con el mismo número)
+  const escribirDoc = (texto: string) => {
+    const doc = texto.replace(/\D/g, '');
+    set(valor.tipo === 'BOLETA' && rucValido(doc) ? { doc, tipo: 'FACTURA' } : { doc });
+  };
+  const estadoConsulta = mensajeConsulta(consulta);
 
   return (
     <div id={`${idPrefijo}-tipo`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -169,27 +169,7 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
       {valor.tipo === 'BOLETA' && (
         <>
           <label style={etiqueta}>
-            {sinDocObligatorio ? 'DNI (obligatorio)' : 'DNI (opcional)'}
-            <input
-              id={`${idPrefijo}-doc`}
-              type="text"
-              inputMode="numeric"
-              maxLength={8}
-              value={valor.doc}
-              aria-invalid={!!err && err.campo === 'doc'}
-              onChange={(e) => set({ doc: e.target.value.replace(/\D/g, '') })}
-              style={campo}
-            />
-          </label>
-          {err?.campo === 'doc' && <div role="alert" style={error}>{err.mensaje}</div>}
-          {aviso && <div role="status" style={aviso_}>{aviso}</div>}
-        </>
-      )}
-
-      {valor.tipo === 'FACTURA' && (
-        <>
-          <label style={etiqueta}>
-            RUC
+            {sinDocObligatorio ? 'DNI o RUC (obligatorio)' : 'DNI o RUC (opcional)'}
             <input
               id={`${idPrefijo}-doc`}
               type="text"
@@ -197,11 +177,39 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
               maxLength={11}
               value={valor.doc}
               aria-invalid={!!err && err.campo === 'doc'}
-              onChange={(e) => set({ doc: e.target.value.replace(/\D/g, '') })}
+              onChange={(e) => escribirDoc(e.target.value)}
               style={campo}
             />
           </label>
           {err?.campo === 'doc' && <div role="alert" style={error}>{err.mensaje}</div>}
+          {estadoConsulta && <div role="status" style={aviso_}>{estadoConsulta}</div>}
+          {consulta.estado === 'ok' && consulta.tipo === 'DNI' && <div role="status" style={aviso_}>Nombre del DNI: {consulta.nombre}</div>}
+          {aviso && <div role="status" style={aviso_}>{aviso}</div>}
+        </>
+      )}
+
+      {valor.tipo === 'FACTURA' && (
+        <>
+          <label style={etiqueta}>
+            DNI o RUC
+            <input
+              id={`${idPrefijo}-doc`}
+              type="text"
+              inputMode="numeric"
+              maxLength={11}
+              value={valor.doc}
+              aria-invalid={!!err && err.campo === 'doc'}
+              onChange={(e) => escribirDoc(e.target.value)}
+              style={campo}
+            />
+          </label>
+          {err?.campo === 'doc' && <div role="alert" style={error}>{err.mensaje}</div>}
+          {estadoConsulta && <div role="status" style={aviso_}>{estadoConsulta}</div>}
+          {tipoPorLongitud(valor.doc) === 'DNI' && (
+            <button type="button" onClick={() => set({ tipo: 'BOLETA' })} style={{ ...botonTipo(false), minHeight: 36 }}>
+              Es un DNI: pasar a boleta
+            </button>
+          )}
           <label style={etiqueta}>
             Razón social
             <input

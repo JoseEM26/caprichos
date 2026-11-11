@@ -40,7 +40,7 @@ Ver tambien: [[cierre]]
 ## Como se hace: Elegir el comprobante del pedido (simple, boleta o factura)
 1. En la carta virtual, en WhatsApp, en Nuevo pedido del mozo y en [[caja]] el pedido lleva uno de tres comprobantes. Por defecto es Comprobante simple.
 2. Comprobante simple es el ticket interno del pedido: no pide DNI ni RUC y no se envia a SUNAT.
-3. Boleta pide el DNI de 8 digitos (es opcional hasta S/ 700; por encima de S/ 700 es obligatorio). Factura pide RUC de 11 digitos y razon social.
+3. En Boleta y en Factura hay un solo campo: DNI o RUC. Escribe 8 digitos y es un DNI (boleta); escribe 11 y es un RUC (factura, y pasa sola a Factura si estabas en Boleta). Al completar los digitos el sistema busca el nombre o la razon social y la direccion fiscal; puedes corregirlos. Si dice "No encontramos" o "el servicio no esta disponible", escribe los datos a mano. La boleta lleva el DNI opcional hasta S/ 700 y obligatorio por encima. La factura exige RUC de 11 digitos y razon social. En boleta el nombre del DNI solo se muestra para que confirmes que es la persona correcta; no se guarda.
 4. El documento se guarda solo en el pedido y en el comprobante, nunca en la cuenta del cliente.
 5. Antes de cobrar, en el detalle del pedido pulsa Cambiar comprobante para pasar de uno a otro. Con un comprobante ya emitido hay que anularlo antes.
 6. Solo la boleta y la factura se emiten a SUNAT y aparecen en Electronicos SUNAT; el simple no deja nada pendiente de envio.

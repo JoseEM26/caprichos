@@ -7,9 +7,9 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Paginacion } from '../../comun/Paginacion';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
-import { api } from '../../comun/api';
 import { comprobantesApi } from './comprobantesApi';
 import { formatearSoles, rucValido } from './utilidades';
+import { consultarDocumento, mensajeConsulta, tipoPorLongitud } from '../pedidos/consultaDocumento';
 import type { BoletaPorDefecto, ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
 
 const ALTO_TOQUE = '44px';
@@ -243,19 +243,18 @@ export function ElectronicosTab() {
     setErrorRuc(null);
   };
 
-  // Solo rellena al pulsar el botón; si el servicio no responde, se escribe a mano.
+  // Solo rellena al pulsar el botón; si el servicio no responde o no encuentra, se escribe a mano.
+  const puedeBuscar = tipoPorLongitud(corrDoc.trim()) === 'DNI' || rucValido(corrDoc.trim());
   const buscarRuc = async () => {
     setBuscandoRuc(true);
     setErrorRuc(null);
-    try {
-      const d = await api.get<{ razon_social: string; direccion: string | null }>(`/admin/ruc/${corrDoc.trim()}`);
-      setCorrRazon(d.razon_social);
-      if (d.direccion) setCorrDir(d.direccion);
-    } catch {
-      setErrorRuc('No pudimos consultar el RUC; escribe la razón social a mano');
-    } finally {
-      setBuscandoRuc(false);
-    }
+    const r = await consultarDocumento(corrDoc.trim());
+    if (r.estado === 'ok' && r.tipo === 'DNI') setCorrRazon(r.nombre);
+    else if (r.estado === 'ok') {
+      setCorrRazon(r.razon);
+      if (r.direccion) setCorrDir(r.direccion);
+    } else setErrorRuc(mensajeConsulta(r));
+    setBuscandoRuc(false);
   };
 
   const confirmarReintento = async () => {
@@ -582,8 +581,8 @@ export function ElectronicosTab() {
               Documento (DNI o RUC)
               <input type="text" value={corrDoc} onChange={(e) => setCorrDoc(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
             </label>
-            <Boton variante="secundario" onClick={buscarRuc} disabled={buscandoRuc || !rucValido(corrDoc.trim())} style={{ minHeight: ALTO_TOQUE }}>
-              {buscandoRuc ? 'Buscando…' : 'Buscar por RUC'}
+            <Boton variante="secundario" onClick={buscarRuc} disabled={buscandoRuc || !puedeBuscar} style={{ minHeight: ALTO_TOQUE }}>
+              {buscandoRuc ? 'Buscando…' : 'Buscar por DNI o RUC'}
             </Boton>
             {errorRuc && (
               <div role="alert" style={{ color: 'var(--cp-rust, #b00020)', fontSize: 12, fontWeight: 700 }}>

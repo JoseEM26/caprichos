@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-correo (guarda el secreto RESEND_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), copiar-ia-a-prod (copia la clave de la IA OpenAI de la demo al .env de PRODUCCIÓN dentro del servidor, sin mostrarla, y redespliega prod con el mismo tag; solo prod, exige PRODUCCION), configurar-whatsapp (guarda los secretos WHATSAPP_VERIFY_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TOKEN y WHATSAPP_APP_SECRET que existan en el entorno, en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), probar-restauracion-externa (baja el último respaldo del repositorio externo restic/Backblaze y lo restaura en una base temporal; solo lectura; demo o prod, prod exige PRODUCCION), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto), reconstruir-puntos (acredita los puntos de ventas pagadas anteriores que nunca sumaron; simulacro por defecto, aplicar con aplicar_puntos=true; demo o prod, prod exige PRODUCCION), conciliar-cobros (pedidos pagados sin cobro de un rango de fechas: simulacro por defecto que lista por día y da un CSV; con aplicar_cobros=true crea los cobros de regularización sin emitir comprobantes; demo o prod, prod exige PRODUCCION)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-correo (guarda el secreto RESEND_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-dniruc (guarda el secreto DNIRUC_TOKEN de dniruc.apisperu.com, para consultar DNI y RUC, en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), copiar-ia-a-prod (copia la clave de la IA OpenAI de la demo al .env de PRODUCCIÓN dentro del servidor, sin mostrarla, y redespliega prod con el mismo tag; solo prod, exige PRODUCCION), configurar-whatsapp (guarda los secretos WHATSAPP_VERIFY_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TOKEN y WHATSAPP_APP_SECRET que existan en el entorno, en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), probar-restauracion-externa (baja el último respaldo del repositorio externo restic/Backblaze y lo restaura en una base temporal; solo lectura; demo o prod, prod exige PRODUCCION), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto), reconstruir-puntos (acredita los puntos de ventas pagadas anteriores que nunca sumaron; simulacro por defecto, aplicar con aplicar_puntos=true; demo o prod, prod exige PRODUCCION), conciliar-cobros (pedidos pagados sin cobro de un rango de fechas: simulacro por defecto que lista por día y da un CSV; con aplicar_cobros=true crea los cobros de regularización sin emitir comprobantes; demo o prod, prod exige PRODUCCION)'
         required: false
         default: 'desplegar'
         type: choice
@@ -38,6 +38,7 @@ on:
           - cargar-resenas
           - configurar-sunat
           - configurar-correo
+          - configurar-dniruc
           - copiar-ia-a-prod
           - configurar-whatsapp
           - preparar-produccion
@@ -311,6 +312,15 @@ jobs:
             ACCION="configurar-correo"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::configurar-correo en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Token de consulta de DNI y RUC (apisperu): manual; producción pasa por la validación de prod de más abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "configurar-dniruc" ]; then
+            ACCION="configurar-dniruc"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::configurar-dniruc en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -1195,6 +1205,85 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(== |RESEND|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" correo.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Guarda el token de dniruc.apisperu.com (consulta de DNI y RUC) en el .env del ambiente y redespliega con el mismo tag.
+  # El token viaja por la entrada estándar del ssh: no aparece en la línea de comandos ni en el log.
+  configurar-dniruc:
+    name: Configurar consulta de DNI y RUC (apisperu)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-dniruc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: configurar-dniruc
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Guardar el token de DNI y RUC y redesplegar (sin mostrar el token)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          TOKEN_DNIRUC: ${{ secrets.DNIRUC_TOKEN }}
+        run: |
+          set -o pipefail
+          if [ -z "$TOKEN_DNIRUC" ]; then
+            echo "::error::Falta el secreto DNIRUC_TOKEN. Guárdelo con: gh secret set DNIRUC_TOKEN --env ${AMBIENTE} --repo JoseEM26/caprichos"
+            exit 1
+          fi
+          printf '%s' "$TOKEN_DNIRUC" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-dniruc.sh '${AMBIENTE}'" 2>&1 | tee dniruc.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Consulta de DNI y RUC (apisperu)"
+            echo ""
+            echo '```'
+            grep -E "^(== |DNIRUC|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" dniruc.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

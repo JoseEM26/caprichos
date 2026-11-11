@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { api } from '../../../comun/api';
+import { api, ErrorApi } from '../../../comun/api';
 import {
   SelectorComprobante,
   VALOR_COMPROBANTE_VACIO,
@@ -63,7 +63,7 @@ describe('SelectorComprobante', () => {
       return <SelectorComprobante idPrefijo="t" valor={valor} onChange={setValor} />;
     };
     render(<Envoltura />);
-    const ruc = screen.getByLabelText('RUC');
+    const ruc = screen.getByLabelText('DNI o RUC');
     fireEvent.change(ruc, { target: { value: '1234' } });
     expect(screen.getByRole('alert').textContent).toMatch(/El RUC debe tener 11 dígitos/);
     expect(ruc.getAttribute('aria-invalid')).toBe('true');
@@ -82,7 +82,7 @@ describe('SelectorComprobante', () => {
     expect(screen.getByTestId('comprobante-FACTURA').getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByRole('button', { name: 'Sin elegir' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Nota de venta' })).toBeNull();
-    expect(screen.queryByLabelText('DNI (opcional)')).toBeNull();
+    expect(screen.queryByLabelText('DNI o RUC (opcional)')).toBeNull();
   });
 
   it('un pedido antiguo sin comprobante (null) avisa que hay que elegir', () => {
@@ -98,7 +98,7 @@ describe('SelectorComprobante', () => {
     render(<Envoltura />);
     fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
     expect(screen.getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByLabelText('DNI (opcional)')).toBeTruthy();
+    expect(screen.getByLabelText('DNI o RUC (opcional)')).toBeTruthy();
     expect(screen.queryByText(/para continuar/)).toBeNull();
   });
 });
@@ -115,9 +115,9 @@ describe('SelectorComprobante: tres opciones', () => {
     fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
     expect(screen.getByLabelText(/DNI/)).toBeTruthy();
     fireEvent.click(screen.getByTestId('comprobante-FACTURA'));
-    expect(screen.getByLabelText('RUC')).toBeTruthy();
+    expect(screen.getByLabelText('DNI o RUC')).toBeTruthy();
     fireEvent.click(screen.getByTestId('comprobante-SIMPLE'));
-    expect(screen.queryByLabelText('RUC')).toBeNull();
+    expect(screen.queryByLabelText('DNI o RUC')).toBeNull();
   });
 });
 
@@ -129,10 +129,71 @@ describe('SelectorComprobante ▸ autocompleta desde SUNAT', () => {
       return <SelectorComprobante valor={valor} onChange={setValor} idPrefijo="t" />;
     }
     render(<Caja />);
-    fireEvent.change(screen.getByLabelText(/^RUC/), { target: { value: '20131312955' } });
+    fireEvent.change(screen.getByLabelText(/^DNI o RUC/), { target: { value: '20131312955' } });
     await waitFor(() => expect((screen.getByLabelText(/Razón social/) as HTMLInputElement).value).toBe('SUNAT SA'));
     expect(get).toHaveBeenCalledWith('/admin/ruc/20131312955');
     expect((screen.getByLabelText(/Dirección fiscal/) as HTMLInputElement).value).toBe('AV. X 1');
+    get.mockRestore();
+  });
+});
+
+describe('SelectorComprobante ▸ DNI o RUC', () => {
+  const Caja = ({ inicial }: { inicial: ValorComprobante }) => {
+    const [valor, setValor] = useState<ValorComprobante>(inicial);
+    return <SelectorComprobante valor={valor} onChange={setValor} idPrefijo="d" />;
+  };
+  const boleta: ValorComprobante = { tipo: 'BOLETA', doc: '', razon: '', direccion: '' };
+  const factura: ValorComprobante = { ...boleta, tipo: 'FACTURA' };
+  const escribir = (doc: string) => fireEvent.change(screen.getByLabelText(/^DNI o RUC/), { target: { value: doc } });
+
+  it('boleta con 8 dígitos consulta el DNI y muestra el nombre (no lo guarda)', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ nombre_completo: 'MARIA PRUEBA LOPEZ' });
+    render(<Caja inicial={boleta} />);
+    escribir('12345678');
+    expect(await screen.findByText(/Nombre del DNI: MARIA PRUEBA LOPEZ/)).toBeTruthy();
+    expect(get).toHaveBeenCalledWith('/admin/dni/12345678');
+    get.mockRestore();
+  });
+
+  it('DNI no encontrado y servicio no disponible: avisa y deja escribir a mano', async () => {
+    const get = vi.spyOn(api, 'get').mockRejectedValue(new ErrorApi('DNI_NO_ENCONTRADO', 'x', 404));
+    render(<Caja inicial={boleta} />);
+    escribir('12345678');
+    expect(await screen.findByText(/No encontramos ese DNI/)).toBeTruthy();
+    get.mockRejectedValue(new Error('caído'));
+    escribir('87654321');
+    expect(await screen.findByText(/servicio de consulta no está disponible/)).toBeTruthy();
+    expect((screen.getByLabelText(/^DNI o RUC/) as HTMLInputElement).value).toBe('87654321');
+    get.mockRestore();
+  });
+
+  it('en boleta, un RUC válido de 11 dígitos pasa a factura y se autocompleta', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ razon_social: 'EMPRESA DE PRUEBA SAC', direccion: 'AV. PRUEBA 1' });
+    render(<Caja inicial={boleta} />);
+    escribir('20131312955');
+    await waitFor(() => expect((screen.getByLabelText(/Razón social/) as HTMLInputElement).value).toBe('EMPRESA DE PRUEBA SAC'));
+    expect(screen.getByTestId('comprobante-FACTURA').getAttribute('aria-pressed')).toBe('true');
+    expect(get).toHaveBeenCalledWith('/admin/ruc/20131312955');
+    get.mockRestore();
+  });
+
+  it('en factura, 8 dígitos NO consultan (se está escribiendo un RUC) y ofrecen pasar a boleta', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({});
+    render(<Caja inicial={factura} />);
+    escribir('12345678');
+    await new Promise((r) => setTimeout(r, 450));
+    expect(get).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Es un DNI: pasar a boleta' }));
+    expect(screen.getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('true');
+    get.mockRestore();
+  });
+
+  it('RUC con dígito verificador malo: avisa sin consultar', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({});
+    render(<Caja inicial={factura} />);
+    escribir('20123456780');
+    expect(await screen.findByText(/El RUC no es válido/)).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
     get.mockRestore();
   });
 });
