@@ -20,6 +20,12 @@ sugerencias:
 ## Para que sirve
 Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para llevar y a domicilio. Conecta la preparacion en [[cocina]], la atencion de comprobantes en [[mensajes]], la entrega por [[repartos]], la emision de [[comprobantes]] y el balance final en [[cierre]].
 
+## Como se hace: Leer la barra Resumen y sus montos
+1. La barra Resumen muestra los contadores del dia (pedidos, activos, entregados, anulados, por cobrar) y tres montos: Ventas (pedidos no anulados ni rechazados, con el total neto: ya descontados puntos y cupones; la propina va aparte), Cobrado (los ya pagados) y Por cobrar (los vivos aun sin pagar). Ventas = Cobrado + Por cobrar.
+2. Por cobrar coincide con el contador "N por cobrar" y con el "Por cobrar" de cada tarjeta de cuenta y del cobro.
+3. Cuando usas un filtro (un contador, estado, canal, modalidad, medio de pago, busqueda o pastilla), los montos suman solo lo que ves y aparece "Filtrado: N pedidos"; al lado, "Dia: S/ X" deja a la vista la cifra del dia completo. Al pulsar "7 por cobrar" ves la suma de esos 7.
+4. La barra se actualiza sola cuando entra un pedido, un cobro, una anulacion o un cambio de estado (puede tardar un segundo).
+
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.
 2. En el campo Monto inicial en soles ya aparece el monto oficial que configura el administrador (Configuracion > Parametros del sistema > Caja > Monto inicial de la caja). Si es el correcto, no se toca.

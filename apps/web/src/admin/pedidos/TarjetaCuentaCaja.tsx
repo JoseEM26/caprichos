@@ -11,7 +11,7 @@ import { itemsCaja, textoDetalle, type ItemCaja } from './detalleCaja';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 import { NombreCliente } from './TarjetaPedidoCaja';
 import { ChipCobroMozo } from './PedidosAdminView';
-import { esPorCobrar } from './resumenDia';
+import { esPorCobrar, totalDe } from './resumenDia';
 import { suma, type Cuenta } from './agruparCuentas';
 
 /** Productos que se ven por pedido dentro de la cuenta antes del «+N más» (la tarjeta no crece sin límite). */
@@ -25,8 +25,8 @@ const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 export function totalesCuenta(miembros: Pedido[]) {
   const vigentes = miembros.filter((m) => suma(m.estado));
   return {
-    total: vigentes.reduce((a, m) => a + Number(m.total || 0), 0),
-    porCobrar: vigentes.filter(esPorCobrar).reduce((a, m) => a + Number(m.total || 0), 0),
+    total: vigentes.reduce((a, m) => a + totalDe(m), 0),
+    porCobrar: vigentes.filter(esPorCobrar).reduce((a, m) => a + totalDe(m), 0),
   };
 }
 
