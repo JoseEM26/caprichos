@@ -24,6 +24,9 @@ export interface CronoMarca {
   tieneSelfie: boolean;
   motivo: string | null;
   alertas: string | null;
+  /** GPS aproximado: distancia al local y precisión del celular, en metros (null si no hubo GPS). */
+  distanciaM?: number | null;
+  precisionM?: number | null;
 }
 export interface ItemSolicitud { tipo: TipoMarca; hora: string; momento: string }
 export interface CronoSolicitud { id: number; motivo: string; creadaEn: string; items: ItemSolicitud[] }

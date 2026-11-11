@@ -14,13 +14,14 @@ const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[] } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[] } = {}) {
   const sueldoFila = () => ({ party_id: LUIS, modalidad: 'MENSUAL', monto_semanal: 230.77, monto_mensual: 1000, ...opts.sueldo });
   const prestamos: Fila[] = [];
   const cuotas: Fila[] = [];
   const consumos: Fila[] = [
     { id: 1n, party_id: LUIS, fecha: d('2026-11-10'), pedido_id: 100n, monto: 40, pagado_en: null, pedido: { codigo: 'P-100' } },
     { id: 2n, party_id: LUIS, fecha: d('2026-11-20'), pedido_id: 101n, monto: 25.5, pagado_en: null, pedido: { codigo: 'P-101' } },
+    ...(opts.consumosExtra ?? []),
   ];
   const periodos: Fila[] = [];
   const ajustes: Fila[] = [];
@@ -75,7 +76,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       update: async ({ where, data }: any) => Object.assign(ajustes.find((a) => a.id === where.id)!, data),
     },
     consumoPersonal: {
-      findMany: async () => consumos.filter((c) => !c.pagado_en),
+      findMany: async ({ where }: any = {}) => consumos.filter((c) => !c.pagado_en && (!where?.fecha?.lte || c.fecha <= where.fecha.lte)),
       updateMany: async ({ where, data }: any) => {
         const sel = consumos.filter((c) => where.id.in.includes(c.id) && (where.pagado_en === null ? !c.pagado_en : true) && (!where.pago_modo || c.pago_modo === where.pago_modo));
         sel.forEach((c) => Object.assign(c, data));
@@ -421,5 +422,136 @@ describe('mi planilla (el trabajador ve solo lo suyo)', () => {
     expect(r.pagadoEn).toBe(AHORA.toISOString());
     expect(r.neto).toBe(600);
     expect((await m.svc.miPlanilla(LUIS, '2099-01-01', AHORA) as any).periodo.desde).toBe('2026-12-01'); // futuro = actual
+  });
+});
+
+describe('planilla por semana y por mes (lista con modo)', () => {
+  const pagarSemana = (m: ReturnType<typeof montar>, fecha: string) => m.svc.pagar(7, fecha, [], ADMIN, undefined, AHORA);
+
+  it('sin modo: el período de cada persona según su modalidad (compatibilidad)', async () => {
+    const { svc } = montar();
+    const r = await svc.listar('2026-11-15', AHORA);
+    expect(r.modo).toBeNull();
+    expect(r.filas[0].periodo).toEqual({ desde: '2026-11-01', hasta: '2026-11-30' });
+  });
+
+  it('MES con persona MENSUAL: su mes, entra en los totales', async () => {
+    const { svc } = montar();
+    const r = await svc.listar('2026-11-15', AHORA, 'MES');
+    expect(r.vista).toEqual({ desde: '2026-11-01', hasta: '2026-11-30' });
+    expect(r.filas[0].fueraDeModalidad).toBeUndefined();
+    expect(r.totales).toMatchObject({ personas: 1, aPagar: 534.5, pagado: 0, pendiente: 534.5 });
+  });
+
+  it('SEMANA con persona MENSUAL: se muestra su mes con aviso y NO suma en los totales', async () => {
+    const { svc } = montar();
+    const r = await svc.listar('2026-11-11', AHORA, 'SEMANA');
+    expect(r.vista).toEqual({ desde: '2026-11-09', hasta: '2026-11-15' });
+    expect(r.filas[0]).toMatchObject({ fueraDeModalidad: true, periodo: { desde: '2026-11-01', hasta: '2026-11-30' } });
+    expect(r.filas[0].aviso).toMatch(/por mes/);
+    expect(r.totales).toMatchObject({ personas: 0, aPagar: 0, pagado: 0, pendiente: 0 });
+  });
+
+  it('SEMANA con persona SEMANAL: su semana lunes a domingo', async () => {
+    const { svc } = montar({ sueldo: { modalidad: 'SEMANAL' } });
+    const r = await svc.listar('2026-11-11', AHORA, 'SEMANA');
+    expect(r.filas[0].periodo).toEqual({ desde: '2026-11-09', hasta: '2026-11-15' });
+    expect(r.filas[0].semanas).toBeUndefined();
+    expect(r.totales.personas).toBe(1);
+  });
+
+  it('MES con persona SEMANAL: suma las semanas cuyo domingo cae en el mes (5 en noviembre 2026), cada una con su estado', async () => {
+    const m = montar({ sueldo: { modalidad: 'SEMANAL' } });
+    const antes = await m.svc.listar('2026-11-15', AHORA, 'MES');
+    const f = antes.filas[0];
+    expect(f.semanas.map((x: any) => x.desde)).toEqual(['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
+    expect(f.aviso).toMatch(/por semana/);
+    expect(f.neto).toBeCloseTo(f.semanas.reduce((a: number, x: any) => a + x.neto, 0), 2);
+    expect(f.estado).toBe('ABIERTO');
+    expect(f.abrirFecha).toBe('2026-10-26');
+
+    // una semana pagada queda congelada: el total del mes no cambia y se refleja en «pagado»
+    await pagarSemana(m, '2026-11-09');
+    const despues = await m.svc.listar('2026-11-15', AHORA, 'MES');
+    const g = despues.filas[0];
+    expect(g.semanas.filter((x: any) => x.estado === 'PAGADO')).toHaveLength(1);
+    expect(g.estado).toBe('ABIERTO');
+    expect(g.netoPagado).toBeGreaterThan(0);
+    expect(despues.totales.pagado).toBe(g.netoPagado);
+    expect(despues.totales.pendiente).toBeCloseTo(despues.totales.aPagar - despues.totales.pagado, 2);
+  });
+});
+
+describe('consumos del personal en la planilla (misma fuente que Admin › Créditos)', () => {
+  const oct = { id: 3n, party_id: LUIS, fecha: d('2026-10-20'), pedido_id: 99n, monto: 12, pagado_en: null, pedido: { codigo: 'P-99' } };
+
+  it('lista productos y separa los de períodos anteriores: sin cobrar por defecto, con total aparte', async () => {
+    const { svc, consumos } = montar({ consumosExtra: [oct] });
+    consumos[0].pedido = { codigo: 'P-100', lineas: [{ cantidad: 2, nombre: 'Café', tamano: 'Grande', linea_combo_id: null }, { cantidad: 1, nombre: 'Parte combo', linea_combo_id: 5n }] };
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    const por = Object.fromEntries(r.consumos.map((c: any) => [c.id, c]));
+    expect(por['1']).toMatchObject({ anterior: false, cobrar: true, productos: ['2 × Café (Grande)'] });
+    expect(por['3']).toMatchObject({ anterior: true, cobrar: false });
+    expect(r.consumosAnterioresPendiente).toBe(12);
+    expect(r.resultado.consumosCobrados).toBe(65.5);
+    // marcarlo lo cobra en este pago
+    const inc = await svc.detalle(7, '2026-11-15', [], AHORA, { incluirAnteriores: ['3'] });
+    expect(inc.resultado.consumosCobrados).toBe(77.5);
+    expect(inc.consumosAnterioresPendiente).toBe(0);
+  });
+
+  it('pagar deja COBRADOS (fecha, planilla y período) solo los marcados; el resto sigue pendiente', async () => {
+    const { svc, consumos } = montar({ consumosExtra: [oct] });
+    const pago = await svc.pagar(7, '2026-11-15', ['2'], ADMIN, undefined, AHORA);
+    expect(pago.neto).toBe(560);
+    expect(consumos[0]).toMatchObject({ pago_modo: 'PLANILLA', planilla_periodo_id: BigInt(pago.periodoId) });
+    expect(consumos[0].pagado_en).toBeInstanceOf(Date);
+    expect(consumos[1].pagado_en).toBeNull(); // excluido: pasa al siguiente
+    expect(consumos[2].pagado_en).toBeNull(); // anterior sin marcar
+    expect(consumos[1].planilla_periodo_id).toBeUndefined();
+  });
+
+  it('sin doble cobro: un consumo ya cobrado no se cobra en otra planilla', async () => {
+    const { svc, consumos } = montar();
+    consumos[0].pagado_en = AHORA; // lo cobró alguien antes (p. ej. a mano en Créditos)
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.consumos.map((c: any) => c.id)).toEqual(['2']);
+    expect(r.resultado.consumosCobrados).toBe(25.5);
+  });
+
+  it('reabrir devuelve a pendiente y limpia el enlace con la planilla', async () => {
+    const { svc, consumos } = montar();
+    const { periodoId } = await svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA);
+    expect(consumos.every((c) => c.planilla_periodo_id === BigInt(periodoId))).toBe(true);
+    await svc.reabrir(periodoId, 'Faltaba un descuento por producto roto', ADMIN);
+    expect(consumos.every((c) => c.pagado_en === null && c.planilla_periodo_id === null)).toBe(true);
+    const otra = await svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA);
+    expect(otra.periodoId).not.toBe(periodoId);
+    expect(consumos.every((c) => c.planilla_periodo_id === BigInt(otra.periodoId))).toBe(true);
+  });
+});
+
+describe('neto con todos los descuentos, sin doble descuento', () => {
+  it('neto = ganado + bonos − consumos − descuentos − penalidad − cuotas − servicios − adelantos', async () => {
+    const m = montar({ recurrentes: [{ id: 5n, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64 }] });
+    m.dias[0] = { ...m.dias[0], estado: 'TARDANZA', marcas: [{ tipo: 'ENTRADA', minutos: 840, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any; // 60 min tarde
+    m.poner({ id: 90n, party_id: LUIS, monto: 300, num_cuotas: 3, periodicidad: 'MENSUAL', fecha_inicio: d('2026-11-01'), estado: 'ACTIVO', motivo: null }, [100, 100, 100]);
+    await m.svc.crearAjuste('ADELANTO', { partyId: 7, fecha: '2026-11-12', monto: 50, motivo: 'Adelanto' }, ADMIN);
+    await m.svc.crearAjuste('DESCUENTO', { partyId: 7, fecha: '2026-11-13', monto: 10, motivo: 'Vaso roto', categoria: 'DANO' }, ADMIN);
+    await m.svc.crearAjuste('BONO', { partyId: 7, fecha: '2026-11-14', monto: 20, motivo: 'Premio' }, ADMIN);
+    const r = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    const x = r.resultado;
+    // 30 h × 20 = 600; la hora tarde no se paga (−20) y se penaliza 20
+    expect(x.ganado).toBe(580);
+    expect(x.penalidadTardanza).toBe(20);
+    expect(x.consumosCobrados).toBe(65.5);
+    expect(x.descuentosPorCategoria).toMatchObject({ DANO: 10, PRESTAMO: 100, NETFLIX: 6.56 });
+    expect(x.descuentos).toBe(116.56); // sin el consumo ni la penalidad: no se cuentan dos veces
+    expect(x.netoAPagar).toBe(580 + 20 - 65.5 - 116.56 - 20); // 397.94
+    expect(x.neto).toBe(347.94); // − 50 de adelanto
+    expect(r.excel.diferencia).toBe(347.94);
+    // la fila de la lista trae exactamente lo mismo
+    const fila = (await m.svc.listar('2026-11-15', AHORA, 'MES')).filas[0];
+    expect(fila.neto).toBe(347.94);
   });
 });

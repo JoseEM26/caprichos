@@ -43,7 +43,7 @@ describe('PlanillaTab', () => {
     await abrir();
     expect(await screen.findByText('Neto a pagar')).toBeInTheDocument();
     fireEvent.click(await screen.findByLabelText('Cobrar en este pago el consumo P-100'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), ['1'], [], []));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), ['1'], [], [], []));
   });
 
   it('resumen por persona: penalidad, préstamos, adelantos, medio de pago, LIQUIDADO y copiar; sin ningún «50 %»', async () => {
@@ -117,9 +117,9 @@ describe('PlanillaTab', () => {
     await abrir();
     expect(await screen.findByText(/capital S\/ 100\.00 \+ interés S\/ 6\.00/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Cobrar la cuota 1 del préstamo'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], []));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], [], []));
     fireEvent.click(screen.getByLabelText('Cobrar Netflix en este pago'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], ['5']));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], ['5'], []));
   });
 
   it('las secciones del detalle son plegables y marcar pagado pide confirmación', async () => {
@@ -133,6 +133,83 @@ describe('PlanillaTab', () => {
     }
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar pagado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
-    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], []));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], []));
+  });
+
+  it('selector Semana | Mes: pide la lista con el modo, avanza y retrocede de período y muestra la etiqueta', async () => {
+    listar.mockResolvedValue({ fecha: '2026-11-11', filas: [{ ...persona, estado: 'ABIERTO', neto: 100 }] });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await screen.findByText('Luis Pérez');
+    expect(listar).toHaveBeenLastCalledWith(expect.any(String), 'SEMANA');
+    expect(screen.getByRole('button', { name: 'Semana', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText(/^Semana del \d+/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Esta semana' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Semana pasada' })).toBeInTheDocument();
+    const antes = listar.mock.calls.length;
+    const fechaAntes = listar.mock.calls[antes - 1][0] as string;
+    fireEvent.click(screen.getByRole('button', { name: 'Semana anterior' }));
+    await waitFor(() => expect(listar.mock.calls.length).toBeGreaterThan(antes));
+    expect(Date.parse(fechaAntes) - Date.parse(listar.mock.calls[listar.mock.calls.length - 1][0] as string)).toBe(7 * 86_400_000);
+    fireEvent.click(screen.getByRole('button', { name: 'Mes' }));
+    await waitFor(() => expect(listar).toHaveBeenLastCalledWith(expect.any(String), 'MES'));
+    expect(screen.getByRole('button', { name: 'Este mes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mes pasado' })).toBeInTheDocument();
+    expect(screen.getByText(/^(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre) \d{4}$/)).toBeInTheDocument();
+  });
+
+  it('totales del período: a pagar, pagado y pendiente; quien se paga por otro período avisa y no suma', async () => {
+    listar.mockResolvedValue({
+      fecha: '2026-11-11',
+      filas: [
+        { ...persona, partyId: 7, estado: 'ABIERTO', neto: 100, netoPagado: 0 },
+        { ...persona, partyId: 8, nombre: 'Ana Ríos', estado: 'PAGADO', neto: 50, netoPagado: 50 },
+        { ...persona, partyId: 9, nombre: 'Rosa Mes', estado: 'ABIERTO', neto: 900, fueraDeModalidad: true, aviso: 'Se paga por mes: se muestra su mes (no suma en los totales de la semana)' },
+      ],
+    });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await screen.findByText('Rosa Mes');
+    const tot = within(screen.getByLabelText('Totales de la planilla'));
+    expect(tot.getByText('A pagar').nextElementSibling).toHaveTextContent('S/ 150.00');
+    expect(tot.getByText('Pagado').nextElementSibling).toHaveTextContent('S/ 50.00');
+    expect(tot.getByText('Pendiente').nextElementSibling).toHaveTextContent('S/ 100.00');
+    expect(screen.getByText(/Se paga por mes/)).toBeInTheDocument();
+  });
+
+  it('persona semanal en vista Mes: lista sus semanas y cada una abre su detalle', async () => {
+    listar.mockResolvedValue({
+      fecha: '2026-11-11',
+      filas: [{ ...persona, estado: 'ABIERTO', neto: 300, aviso: 'Se paga por semana: suma de 2 semanas del mes', abrirFecha: '2026-11-09',
+        semanas: [{ desde: '2026-11-02', hasta: '2026-11-08', estado: 'PAGADO', neto: 100, pendientes: 0 }, { desde: '2026-11-09', hasta: '2026-11-15', estado: 'ABIERTO', neto: 200, pendientes: 0 }] }],
+    });
+    detalle.mockResolvedValue(base);
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir la semana del 2026-11-09 de Luis Pérez' }));
+    await waitFor(() => expect(detalle).toHaveBeenCalledWith(7, '2026-11-09', [], [], [], []));
+    expect(screen.getByRole('button', { name: 'Abrir la semana del 2026-11-02 de Luis Pérez' })).toHaveTextContent('Pagada');
+  });
+
+  it('consumos del personal: productos, los de períodos anteriores sin marcar y se piden aparte al pagar', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO', consumosAnterioresPendiente: 12 }] });
+    detalle.mockResolvedValue({
+      ...base,
+      consumos: [
+        { id: '1', fecha: '2026-11-10', pedido: 'P-100', monto: 40, cobrar: true, productos: ['2 × Café (Grande)'] },
+        { id: '3', fecha: '2026-10-20', pedido: 'P-99', monto: 12, cobrar: false, anterior: true, productos: ['1 × Torta'] },
+      ],
+      consumosAnterioresPendiente: 12,
+    });
+    pagar.mockResolvedValue({});
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    expect(await screen.findByText('Consumos de períodos anteriores sin cobrar: S/ 12.00')).toBeInTheDocument();
+    await abrir();
+    expect(await screen.findByText('2 × Café (Grande)')).toBeInTheDocument();
+    expect(screen.getByText(/Consumos de períodos anteriores sin cobrar · S\/ 12\.00/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Cobrar en este pago el consumo P-99')).not.toBeChecked();
+    expect(screen.getByLabelText('Cobrar en este pago el consumo P-100')).toBeChecked();
+    fireEvent.click(screen.getByLabelText('Cobrar en este pago el consumo P-99'));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], [], [], ['3']));
+    fireEvent.click(await screen.findByRole('button', { name: 'Marcar pagado' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], ['3']));
   });
 });

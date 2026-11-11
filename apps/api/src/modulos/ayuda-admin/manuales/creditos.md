@@ -4,7 +4,7 @@ titulo: Créditos del personal
 ruta: /admin/creditos
 permiso: creditos/ver
 roles: [ADMIN]
-relacionados: [caja, usuarios]
+relacionados: [caja, usuarios, asistencia]
 sugerencias:
   - Como consulto los consumos que el personal tiene pendientes
   - Como descargo el reporte de consumos para la planilla
@@ -30,6 +30,12 @@ Ver tambien: [[caja]]
 4. Se listaran todos los pedidos consumidos en [[caja]] con su fecha, codigo de pedido, platos solicitados y monto correspondiente con descuento aplicado.
 Antes: [[caja]]
 Ver tambien: [[usuarios]]
+
+## Como se hace: Saber si un consumo ya fue cobrado y por que planilla
+1. Cada consumo muestra Pendiente o Cobrado (con fecha, quien cobro y el medio). Es el mismo dato que usa la Planilla de [[asistencia]]: un consumo cobrado en una planilla pagada dice Planilla y el periodo (por ejemplo Planilla 2026-11-02 a 2026-11-08).
+2. Para descontar consumos del sueldo, ve a Asistencia, Planilla, abre a la persona y marca los consumos que se cobran en ese pago; al Marcar pagado quedan Cobrados aqui. Los de periodos anteriores sin cobrar aparecen tambien ahi.
+3. Un consumo cobrado por planilla no se desmarca desde Creditos: reabre ese periodo en la Planilla (con motivo) y vuelve a Pendiente. Los consumos que marcaste a mano con Ya se le descontó si se desmarcan aqui.
+Ver tambien: [[asistencia]]
 
 ## Como se hace: Exportar el reporte a Excel para recursos humanos o contabilidad
 1. Seleccionar el periodo que se desea liquidar (semana o mes cerrado).

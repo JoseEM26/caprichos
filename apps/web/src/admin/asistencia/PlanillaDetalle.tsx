@@ -42,6 +42,8 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
   const [excluidos, setExcluidos] = useState<string[]>([]);
   const [omitCuotas, setOmitCuotas] = useState<string[]>([]);
   const [omitRec, setOmitRec] = useState<string[]>([]);
+  // consumos de períodos anteriores que se marcan para cobrar en este pago (por defecto pasan al siguiente)
+  const [incluirAnt, setIncluirAnt] = useState<string[]>([]);
   const [ocupado, setOcupado] = useState(false);
   const [confirmaPago, setConfirmaPago] = useState(false);
   const [reabrir, setReabrir] = useState<string | null>(null);
@@ -60,12 +62,12 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
   const cargar = useCallback(async () => {
     const vigente = nueva();
     try {
-      const r = await detallePlanilla(fila.partyId, fecha, excluidos, omitCuotas, omitRec);
+      const r = await detallePlanilla(fila.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt);
       if (vigente()) setD(r);
     } catch (e) {
       if (vigente()) onError(mensajeDe(e, 'No pudimos cargar el detalle.'));
     }
-  }, [fila.partyId, fecha, excluidos, omitCuotas, omitRec, onError, nueva]);
+  }, [fila.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt, onError, nueva]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   const ejecutar = async (fn: () => Promise<unknown>, ok: string) => {
@@ -204,7 +206,11 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
           <Fila t="Adelantos" v={`− ${soles(r.adelantos)}`} />
           <Fila t="Neto a pagar" v={soles(r.neto)} fuerte />
         </ul>
+        {r.descuentosPorCategoria && Object.keys(r.descuentosPorCategoria).length > 0 && (
+          <small className="as-nota">Se descuenta: {Object.entries(r.descuentosPorCategoria).map(([c, m]) => `${ETIQUETA_CATEGORIA[c] ?? (c === 'TARDANZA' ? 'Tardanza' : c)}: ${soles(m)}`).join(' · ')}</small>
+        )}
         {r.consumosPendientes > 0 && <small className="as-nota">Consumos que pasan al siguiente período: {soles(r.consumosPendientes)}</small>}
+        {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)} (se marcan en «Descuentos y consumos»).</small>}
         {d.pago && <p className="as-ayuda">Pagar a: <DatosPago pago={d.pago} onOk={onOk} /></p>}
         <p className="as-ayuda">Marcar como pagado no mueve la caja: solo congela esta planilla y deja los consumos cobrados como «descontados por planilla».</p>
       </Plegable>
@@ -269,19 +275,36 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
       </Plegable>
 
       <Plegable titulo="Descuentos y consumos" resumen={`− ${soles(r.descuentos + r.consumosCobrados)}`}>
-        {d.consumos.length > 0 && (
-          <div style={{ display: 'grid', gap: 6 }}>
-            <p className="as-ayuda">Consumos del personal: marca los que se cobran en este pago. Los que dejes sin marcar pasan al siguiente período.</p>
-            {d.consumos.map((c) => (
-              <label key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, border: '1px solid var(--cp-line)', borderRadius: 12, padding: '4px 10px' }}>
-                <input type="checkbox" checked={c.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar en este pago el consumo ${c.pedido}`}
-                  onChange={(e) => setExcluidos((x) => (e.target.checked ? x.filter((i) => i !== c.id) : [...x, c.id]))} />
-                <span style={{ flex: 1 }}>{c.pedido} · {c.fecha}</span>
-                <strong>{soles(c.monto)}</strong>
-              </label>
-            ))}
-          </div>
-        )}
+        {d.consumos.length > 0 && (() => {
+          const filaC = (c: DetallePlanilla['consumos'][number]) => (
+            <label key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, border: '1px solid var(--cp-line)', borderRadius: 12, padding: '4px 10px' }}>
+              <input type="checkbox" checked={c.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar en este pago el consumo ${c.pedido}`}
+                onChange={(e) => (c.anterior
+                  ? setIncluirAnt((x) => (e.target.checked ? [...x, c.id] : x.filter((i) => i !== c.id)))
+                  : setExcluidos((x) => (e.target.checked ? x.filter((i) => i !== c.id) : [...x, c.id])))} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {c.pedido} · {c.fecha}
+                {c.productos && c.productos.length > 0 && <small className="as-nota" style={{ display: 'block' }}>{c.productos.join(', ')}</small>}
+              </span>
+              <strong>{soles(c.monto)}</strong>
+            </label>
+          );
+          const delPeriodo = d.consumos.filter((c) => !c.anterior);
+          const anteriores = d.consumos.filter((c) => c.anterior);
+          return (
+            <div style={{ display: 'grid', gap: 6 }}>
+              <p className="as-ayuda">Consumos del personal (los mismos de Admin › Créditos): marca los que se cobran en este pago. Los del período vienen marcados; los que dejes sin marcar pasan al siguiente. Al marcar pagado quedan como «Cobrado» en Créditos.</p>
+              {delPeriodo.map(filaC)}
+              {anteriores.length > 0 && (
+                <>
+                  <strong style={{ fontSize: 13 }}>Consumos de períodos anteriores sin cobrar · {soles(anteriores.reduce((a, c) => a + c.monto, 0))}</strong>
+                  <small className="as-nota">Marca los que también quieres descontar en este pago.</small>
+                  {anteriores.map(filaC)}
+                </>
+              )}
+            </div>
+          );
+        })()}
         {d.consumos.length === 0 && <small className="as-nota">No tiene consumos del personal por cobrar.</small>}
         {formAjuste(['DESCUENTO', 'BONO'])}
         {listaAjustes(descuentos, 'En este período no hay descuentos ni bonos.')}
@@ -345,7 +368,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
         <>
           <span style={{ fontWeight: 700 }}>¿Pagar {soles(d.resultado.neto)}? Se congela.</span>
           <Boton type="button" variante="secundario" tamano="grande" onClick={() => setConfirmaPago(false)}>No</Boton>
-          <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos, omitCuotas, omitRec); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); }, 'Período marcado como pagado.')}>Sí, marcar pagado</Boton>
+          <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); }, 'Período marcado como pagado.')}>Sí, marcar pagado</Boton>
         </>
       ) : (
         <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => setConfirmaPago(true)}>Marcar pagado</Boton>

@@ -19,6 +19,9 @@ export interface ConsumoItem {
   pagoMedio?: string | null;
   pagoDetalle?: string | null;
   cobradoPor?: string | null;
+  /** Planilla de asistencia que lo cobró (id y «desde a hasta»); null si no lo cobró una planilla. */
+  planillaPeriodoId?: string | null;
+  planillaPeriodo?: string | null;
 }
 
 export interface CuentaCredito {
