@@ -1,0 +1,3 @@
+Hola Kevin, buenos días. Te envío un Excel (Plantilla-Almacen-Caprichos) para que nos ayudes a dejar listo el almacén del sistema: proveedores, insumos, recetas y lo que hay en stock hoy.
+Empieza por la hoja LEEME, que explica todo en 5 pasos; las filas amarillas son ejemplos que debes borrar, y si no sabes algún dato, déjalo vacío.
+Si puedes devolverlo lleno para el [FECHA], mejor; cualquier duda me escribes y lo vemos juntos. ¡Gracias!
