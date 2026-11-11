@@ -19,13 +19,20 @@ describe('PaginadorCaja compacto', () => {
     expect(alIr).toHaveBeenCalledWith(2);
   });
 
-  it('una sola página: oculta «Página 1 de 1» y las flechas, pero deja el conteo y el selector de filas', () => {
-    render(<PaginadorCaja {...base} total={5} hasta={5} totalPaginas={1} filas="todas" />);
+  it('una sola página con más de 10 filas: oculta «Página 1 de 1» y las flechas, pero deja el conteo y el selector de filas', () => {
+    render(<PaginadorCaja {...base} total={12} hasta={12} totalPaginas={1} filas="todas" />);
     expect(screen.queryByText(/Página 1 de 1/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Página anterior' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Página siguiente' })).toBeNull();
-    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–5 de 5');
+    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–12 de 12');
     expect(screen.getByRole('combobox', { name: 'Filas por página' })).toBeTruthy();
+  });
+
+  it('10 filas o menos: el selector no aporta, solo queda el conteo', () => {
+    render(<PaginadorCaja {...base} total={5} hasta={5} totalPaginas={1} filas="todas" />);
+    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–5 de 5');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('0 elementos: solo el conteo', () => {

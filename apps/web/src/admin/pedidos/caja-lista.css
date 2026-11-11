@@ -3,6 +3,8 @@
 .cj2 {
   display: flex;
   flex-direction: column;
+  /* sin esto, dentro del <main> flex se encoge a su min-height y la lista (min-height: 0) desborda por encima del paginador */
+  flex-shrink: 0;
   gap: 10px;
   /* la lista ocupa la pantalla; solo se desplazan las tarjetas */
   min-height: clamp(520px, calc(100vh - 150px), 900px);
@@ -1179,7 +1181,7 @@
 .cj2-pag-n, .cj2-pag-ir { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--cp-navy, #0B2C3E); white-space: nowrap; }
 /* Se ven chicos; el área de toque llega a 44 px con el pseudo-elemento (no cambia el alto de la línea) */
 .cj2-pag-btn {
-  position: relative; min-width: 28px; height: 26px; padding: 0 8px; border: 1px solid var(--cp-navy, #0B2C3E); border-radius: 8px;
+  position: relative; min-width: 28px; height: 26px; min-height: 0; padding: 0 8px; border: 1px solid var(--cp-navy, #0B2C3E); border-radius: 8px;
   background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: 800 12px 'Open Sans', sans-serif; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
