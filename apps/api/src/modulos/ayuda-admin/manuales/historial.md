@@ -10,6 +10,8 @@ sugerencias:
   - ¿Cómo busco las acciones realizadas en una fecha o por un usuario?
   - ¿Cómo descargo o copio los registros de auditoría a Excel?
   - ¿Para qué sirve el botón de verificar la cadena criptográfica?
+  - ¿Cómo veo todo lo que se ha impreso y quién pidió una reimpresión?
+  - ¿Cómo sé si un sticker salió solo o lo reimprimió alguien?
 ---
 # Historial de acciones
 
@@ -40,9 +42,19 @@ Ver tambien: [[usuarios]]
 4. El sistema copiará el contenido formateado al portapapeles y mostrará el mensaje "Registros copiados al portapapeles como CSV". Luego podrás pegarlo directamente en Excel o Google Sheets.
 Ver tambien: [[historial]]
 
+## Como se hace: ver todo lo que se imprimió (pestaña Impresiones)
+1. Arriba del Historial elige la pestaña "Impresiones" (la ve quien tiene permiso para ver pedidos). Por defecto muestra lo de hoy.
+2. Cada impresión indica su origen con un texto de color: "Automática" (salió sola al aceptar, cobrar o cerrar), "Reimpresión" (alguien pulsó Reimprimir), "Prueba" (hoja de prueba o simulación, sin pedido) o "Reintento" (el mismo trabajo volvió a la cola).
+3. También ves el estado (Impreso, Falló, En cola, Imprimiendo, Venció, Descartado), qué se imprimió (por ejemplo "Sticker · Bebida" o "Ticket · Comanda salón"), el pedido, quién lo pidió, cuándo, en qué computadora e impresora salió y el error si falló. En lo automático dice "Sistema (automático)"; si en una impresión antigua no quedó registrado quién la pidió, dice "No registrado".
+4. Los botones de origen (Automática, Reimpresión, Prueba, Reintento) muestran cuántas hay con los filtros actuales y, al pulsarlos, filtran; puedes marcar varios.
+5. El botón "Filtros" abre Tipo, Estado, Computadora y Fecha (o un rango Desde/Hasta); arriba puedes buscar por código de pedido sin importar tildes ni guiones.
+6. Si la fila tiene pedido, el botón "Reimprimir" abre el mismo diálogo seguro de siempre: eliges qué copiar, ves a qué impresora irá, confirmas con Sí y no se repite por un doble clic. Aparece solo si tienes permiso para reimprimir.
+7. En el detalle de cualquier pedido, el bloque plegable "Impresiones de este pedido" muestra solo las de ese pedido.
+Ver tambien: [[caja]]
+
 ## Errores y dudas comunes
 - No puedo editar ni borrar un registro: los registros de auditoría son inmutables por diseño de seguridad y ley; nadie, ni siquiera el administrador, puede modificar o eliminar entradas del historial.
 - Un pedido fue anulado y no sé quién fue: filtra por el módulo "pedidos" o "caja" y busca la palabra "anular"; allí verás el identificador del usuario que realizó la anulación y la hora exacta.
 
 ## Quien puede hacerlo
-El acceso al Historial de acciones requiere el permiso auditoria/ver y está restringido de forma exclusiva al Administrador (ADMIN). Los cajeros, cocineros, mozos y repartidores no tienen acceso a la bitácora de auditoría.
+La pestaña Impresiones requiere además poder ver pedidos y el botón Reimprimir, poder cambiar el estado de pedidos. El acceso al Historial de acciones requiere el permiso auditoria/ver y está restringido de forma exclusiva al Administrador (ADMIN). Los cajeros, cocineros, mozos y repartidores no tienen acceso a la bitácora de auditoría.

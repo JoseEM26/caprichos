@@ -285,6 +285,9 @@ describe('ImpresionService', () => {
           intentos: 0,
           error: null,
           tomado_en: null,
+          origen: 'REINTENTO',
+          solicitado_por_party_id: null,
+          motivo_origen: 'era AUTOMATICA',
         },
       });
     });

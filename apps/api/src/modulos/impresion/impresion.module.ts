@@ -10,6 +10,8 @@ import { ImpresionConfigService } from './impresion-config.service';
 import { EquipoConfigController } from './equipo-config.controller';
 import { EquipoConfigService } from './equipo-config.service';
 import { DescargaAgenteController } from './descarga-agente.controller';
+import { HistorialImpresionController } from './historial-impresion.controller';
+import { HistorialImpresionService } from './historial-impresion.service';
 import { AgenteImpresionGuard } from './agente-impresion.guard';
 
 @Module({
@@ -23,12 +25,14 @@ import { AgenteImpresionGuard } from './agente-impresion.guard';
     ImpresionConfigController,
     EquipoConfigController,
     DescargaAgenteController,
+    HistorialImpresionController,
   ],
   providers: [
     PrismaService,
     ImpresionService,
     ImpresionConfigService,
     EquipoConfigService,
+    HistorialImpresionService,
     AgenteImpresionGuard,
   ],
   exports: [ImpresionService],

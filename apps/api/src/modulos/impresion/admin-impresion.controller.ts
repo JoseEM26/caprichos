@@ -167,8 +167,8 @@ export class AdminImpresionController {
 
   @Post('trabajos/:id/reintentar')
   @Permiso('pedidos', 'cambiar_estado')
-  async reintentarTrabajo(@Param('id') id: string) {
-    return this.impresionService.reintentarTrabajo(id);
+  async reintentarTrabajo(@Param('id') id: string, @Req() req: any) {
+    return this.impresionService.reintentarTrabajo(id, req.usuario);
   }
 
   @Post('pedidos/:id/reimprimir')

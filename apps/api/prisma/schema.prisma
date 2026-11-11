@@ -2429,6 +2429,12 @@ model PrintJob {
   destino_area_id     BigInt?
   /// Computadora que imprime este trabajo según su configuración. NULL = ninguna PC lo imprime todavía (espera en cola).
   destino_equipo_id   BigInt?
+  /// De dónde nació: AUTOMATICA | REIMPRESION | PRUEBA | REINTENTO. NULL en lo anterior a la columna (se deduce al leer).
+  origen              String?
+  /// Quién lo pidió (party). NULL = sistema o no registrado.
+  solicitado_por_party_id BigInt?
+  /// Nota corta del origen (p. ej. «pedido editado», o el origen que tenía antes de un reintento).
+  motivo_origen       String?
 
   pedido              Pedido?     @relation(fields: [pedido_id], references: [id])
   area                AreaCocina? @relation(fields: [area_id], references: [id])
@@ -2437,6 +2443,7 @@ model PrintJob {
 
   @@index([destino_area_id, estado])
   @@index([destino_equipo_id, estado])
+  @@index([creado_en(sort: Desc)], map: "print_job_creado_en_idx")
   @@map("print_job")
 }
 
