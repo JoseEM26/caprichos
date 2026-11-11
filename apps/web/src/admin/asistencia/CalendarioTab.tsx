@@ -128,7 +128,7 @@ export function CalendarioTab({ onError, onOk, alCambiar }: { onError: Avisar; o
 
   return (
     <div className="ca-vista">
-      <div className="ca-barra">
+      <div className="ca-modos">
         <div className="ca-grupo" role="group" aria-label="Modo del calendario">
           <button type="button" className="ca-modo" aria-pressed={modo === 'ver'} onClick={() => setModo('ver')}>Ver</button>
           <button type="button" className="ca-modo" aria-pressed={modo === 'programar'} onClick={() => setModo('programar')}>Programar</button>
@@ -146,7 +146,7 @@ export function CalendarioTab({ onError, onOk, alCambiar }: { onError: Avisar; o
           <Boton type="button" variante="secundario" onClick={() => { setMes(hoy.slice(0, 7)); elegirRango(hoy, hoy); }}>Hoy</Boton>
         </div>
         <div className="ca-cal" role="group" aria-label="Días del mes. Toca un día; arrastra o usa Mayús para elegir varios" onPointerUp={() => { if (arrastre.current?.movio && modo === 'ver') setModalAbierto(true); setTimeout(() => { arrastre.current = null; }, 0); }}>
-          {DIAS_CORTOS.map((d) => <div key={d} className="ca-cab" aria-hidden>{d}</div>)}
+          {DIAS_CORTOS.map((d) => <div key={d} className="ca-cabdia" aria-hidden>{d}</div>)}
           {Array.from({ length: huecos }).map((_, i) => <div key={`h${i}`} aria-hidden />)}
           {diasDelMes.map((j) => {
             const d = porDia.get(j);

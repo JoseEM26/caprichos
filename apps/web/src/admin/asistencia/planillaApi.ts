@@ -25,7 +25,7 @@ export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as cons
 
 /** Etiquetas de los descuentos (el valor del código no lleva tilde). */
 export const CATEGORIAS_DESCUENTO = ['CONSUMO', 'MERMA', 'DANO', 'PRESTAMO', 'NETFLIX', 'OTRO'] as const;
-export const ETIQUETA_CATEGORIA: Record<string, string> = { CONSUMO: 'Consumo', MERMA: 'Merma', DANO: 'Daño', PRESTAMO: 'Préstamo', NETFLIX: 'Netflix', OTRO: 'Otro' };
+export const ETIQUETA_CATEGORIA: Record<string, string> = { CONSUMO: 'Consumo', MERMA: 'Merma', DANO: 'Daño', PRESTAMO: 'Préstamo', NETFLIX: 'Netflix', OTRO: 'Otro', TARDANZA: 'Tardanza' };
 
 /** Columnas del Excel del dueño, ya calculadas por el servidor. */
 export interface ResumenExcel {

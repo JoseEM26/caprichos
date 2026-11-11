@@ -151,7 +151,7 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
               <tr>
                 <th><label className="ca-check"><input type="checkbox" disabled={aprobables.length === 0} checked={todas} aria-label="Seleccionar todo lo que se puede aprobar"
                   onChange={(e) => setElegidas(e.target.checked ? new Set(aprobables.map(clave)) : new Set())} /></label></th>
-                <th>Persona</th>{agrupar && <th>Día</th>}<th>Turno</th><th>Entrada</th><th>Sal. almorzar</th><th>Vuelta</th><th>Salida</th>
+                <th>Persona</th>{agrupar && <th>Día</th>}<th className="ca-col-sec">Turno</th><th>Entrada</th><th className="ca-col-sec">Sal. almorzar</th><th className="ca-col-sec">Vuelta</th><th>Salida</th>
                 <th>Trabajado</th><th>Tardanza</th><th>Extra</th><th>Estado</th><th>Marcas</th><th><span className="ca-sr">Detalle</span></th>
               </tr>
             </thead>
@@ -280,10 +280,10 @@ function FilaMov({ f, pend, agrupar, nuevoDia, elegida, alElegir, alDetalle }: {
       </td>
       <td data-label="Persona" className="as-nombre">{f.nombre}<small className="as-nota">{nombreRol(f.rol)}</small></td>
       {agrupar && <td data-label="Día" className={`as-num${nuevoDia ? ' ca-nuevo-dia' : ''}`}>{etiquetaDia(f.fecha)}</td>}
-      <td data-label="Turno" className="as-num">{f.turno ? `${f.turno.entrada}-${f.turno.salida}` : '—'}</td>
+      <td data-label="Turno" className="as-num ca-col-sec">{f.turno ? `${f.turno.entrada}-${f.turno.salida}` : '—'}</td>
       <td data-label="Entrada" className="as-num">{f.entrada ?? '—'}</td>
-      <td data-label="Sal. almorzar" className="as-num">{f.almuerzoSalida ?? '—'}</td>
-      <td data-label="Vuelta" className="as-num">{f.almuerzoVuelta ?? '—'}</td>
+      <td data-label="Sal. almorzar" className="as-num ca-col-sec">{f.almuerzoSalida ?? '—'}</td>
+      <td data-label="Vuelta" className="as-num ca-col-sec">{f.almuerzoVuelta ?? '—'}</td>
       <td data-label="Salida" className="as-num">{f.salida ?? '—'}</td>
       <td data-label="Trabajado" className="as-num">{f.trabajadaMin ? hh(f.trabajadaMin) : '—'}</td>
       <td data-label="Tardanza" className="as-num">{f.tardanzaMin ? `${f.tardanzaMin} min` : '—'}</td>

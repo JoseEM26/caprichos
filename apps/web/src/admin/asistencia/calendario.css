@@ -1,6 +1,6 @@
 /* Calendario de asistencia (admin): mes con resumen, rango, filtros ocultos, registro y detalle. Compacto, sin scroll horizontal de página. */
 .ca-vista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
-.ca-barra { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.ca-modos { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .ca-grupo { display: inline-flex; border: 1.5px solid var(--cp-navy); border-radius: 9999px; overflow: hidden; }
 .ca-modo { min-height: 44px; min-width: 96px; padding: 0 18px; border: 0; background: transparent; color: var(--cp-navy); font-weight: 700; font-size: 15px; cursor: pointer; }
 .ca-modo:focus-visible { outline: 3px solid var(--cp-gold); outline-offset: -3px; }
@@ -11,7 +11,7 @@
 .ca-mes-cab { display: flex; align-items: center; gap: 6px; }
 .ca-mes-titulo { flex: 1; text-transform: capitalize; text-align: center; }
 .ca-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; user-select: none; touch-action: manipulation; }
-.ca-cab { text-align: center; font-size: 12px; font-weight: 700; color: var(--cp-soft); text-transform: uppercase; }
+.ca-cabdia { text-align: center; font-size: 12px; font-weight: 700; color: var(--cp-soft); text-transform: uppercase; }
 .ca-dia {
   min-height: 56px; border: 1.5px solid var(--cp-line); border-radius: 9px; background: var(--cp-white); padding: 3px 4px;
   text-align: left; display: grid; align-content: start; gap: 1px; cursor: pointer; font: inherit; color: var(--cp-navy); min-width: 0;
@@ -54,9 +54,9 @@
 .ca-check input { width: 20px; height: 20px; accent-color: var(--cp-navy); }
 
 .ca-tabla-wrap { max-width: 100%; position: relative; }
-.ca-tabla th, .ca-tabla td { padding: 6px 8px; white-space: nowrap; }
+.ca-tabla th, .ca-tabla td { padding: 6px 6px; white-space: nowrap; }
 .ca-tabla td[data-label='Marcas'], .ca-tabla td[data-label='Estado'] { white-space: normal; }
-.ca-tabla td[data-label='Marcas'] { min-width: 190px; }
+.ca-tabla td[data-label='Marcas'] { min-width: 150px; }
 .ca-estado { display: flex; flex-wrap: wrap; gap: 4px; }
 .ca-marcas { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
 @media (min-width: 721px) { .ca-marcas { justify-content: flex-start; } }
@@ -88,7 +88,7 @@
 }
 
 /* Modal del día: franja fija bajo las pestañas (resumen + búsqueda + filtros rápidos) y pie con totales o lote */
-.ca-modal-franja { flex: 0 0 auto; display: grid; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--cp-line); background: var(--cp-white); }
+.ca-modal-franja { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--cp-line); background: var(--cp-white); }
 .ca-modal-resumen { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .ca-modal-res { font-size: 14px; padding: 4px 10px; border-radius: 9999px; background: var(--cp-sand); border: 1px solid var(--cp-line); }
 .ca-modal-res b { font-variant-numeric: tabular-nums; }
@@ -111,8 +111,32 @@
 .ca-resumen-dl dt { font-size: 12px; font-weight: 700; color: var(--cp-soft); }
 .ca-resumen-dl dd { margin: 0; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
-  .ca-modal-franja { padding: 6px 10px; }
+  .ca-modal-franja { padding: 6px 10px; gap: 6px; }
+  .ca-modal-resumen { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .ca-modal-res { flex: 0 0 auto; white-space: nowrap; }
+  /* la etiqueta «Buscar persona» sigue para lectores de pantalla; a la vista queda el texto de ayuda del campo */
+  .ca-modal-q { font-size: 0; }
+  .ca-modal-q input { font-size: 15px; }
   .ca-modal-rapidos { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .ca-rapido { flex: 0 0 auto; }
   .ca-modal-lote > button { flex: 1 1 auto; }
 }
+
+/* El shell del celular (hasta 699 px) se dibuja con zoom 0.82 (ZOOM_CELULAR de AdminShell): los controles compensan
+   para quedar de 44 px y 14 px reales al tacto. Los modales van en un portal fuera del zoom y no lo necesitan. */
+@media (max-width: 699px) {
+  .ca-vista .ca-modo { min-height: 54px; font-size: 18px; }
+  .ca-vista .ca-modo-ayuda { font-size: 17px; }
+  .ca-vista .ca-mes-cab button, .ca-vista .ca-rango > button, .ca-vista .ca-herramientas > button { min-height: 54px !important; font-size: 17px !important; }
+  .ca-vista .ca-chip { min-height: 54px; font-size: 17px; }
+  .ca-vista .ca-rango-txt { font-size: 19px; }
+  .ca-vista .ca-cabdia { font-size: 14px; }
+  .ca-vista .ca-dia { min-height: 56px; }
+  .ca-vista .ca-dia b { font-size: 17px; }
+  .ca-vista .ca-i { font-size: 13px; min-width: 18px; line-height: 17px; }
+  .ca-vista .ca-leyenda, .ca-vista .ca-pista { font-size: 16px; }
+  .ca-vista .ca-check { min-height: 54px; font-size: 18px; }
+}
+
+/* Tablet: turno y almuerzo ya salen en las marcas de la fila; se ocultan para que la tabla quepa sin scroll lateral */
+@media (min-width: 721px) and (max-width: 1060px) { .ca-tabla .ca-col-sec { display: none; } }
