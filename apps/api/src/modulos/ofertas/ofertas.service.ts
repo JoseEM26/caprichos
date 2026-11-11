@@ -11,7 +11,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import { calcularDescuentoPersonal, resolverPctPersonal, validarColaborador } from '../creditos';
+import { calcularDescuentoPersonal, descuentoPersonalPorCelular, resolverPctPersonal, validarColaborador } from '../creditos';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import {
@@ -1274,6 +1274,24 @@ export class OfertasService {
   // VALIDACIÓN Y CANJE DE CUPONES
   // ==========================================
 
+  /** Tope de consultas públicas con celular (evita enumerar celulares del personal): 10 por celular y 40 por IP cada hora. Sin Redis no bloquea. */
+  async limitarConsultaCelular(celular: string, ip?: string): Promise<void> {
+    try {
+      const r = this.redisService.obtenerCliente();
+      const limites: [string, number][] = [[`carta:dpers:tel:${celular}`, 10]];
+      if (ip) limites.push([`carta:dpers:ip:${ip}`, 40]);
+      for (const [clave, max] of limites) {
+        const n = await r.incr(clave);
+        if (n === 1) await r.expire(clave, 3600);
+        if (n > max) {
+          throw new HttpException({ codigo: 'DEMASIADAS_CONSULTAS', mensaje: 'Espera un poco antes de volver a consultar.' }, HttpStatus.TOO_MANY_REQUESTS);
+        }
+      }
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+    }
+  }
+
   async validarCuponParaCarta(dto: ValidarCuponDto, ipCliente?: string) {
     const claveBloqueo = `bloqueo_cupon:${ipCliente || 'anon'}`;
     const redis = this.redisService.obtenerCliente();
@@ -1745,6 +1763,7 @@ export class OfertasService {
     canal: string = 'CARTA',
     modalidad?: string,
     colaboradorPartyId?: string,
+    celularCarta?: string,
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1795,17 +1814,34 @@ export class OfertasService {
       const pct = await resolverPctPersonal(this.prisma, colaboradorId);
       descuentoPersonal = { pct, monto: calcularDescuentoPersonal(lineasCalc, desglose.detalles as any, pct) };
     }
+    // Carta: el celular de un trabajador activo da su descuento de personal (mismo cálculo que PedidosService.crear)
+    let detallesVista = (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) }));
+    let descuentoTotalVista = desglose.descuentoTotal;
+    let montoCanjeableVista = montoCanjeable;
+    let puntosEstimadosVista = conCupon ? 0 : Math.round(montoCanjeable * (puntosPorcentaje / 100) * 100) / 100;
+    if (!colaboradorPartyId && canal === 'CARTA' && celularCarta) {
+      const dp = await descuentoPersonalPorCelular(this.prisma, celularCarta);
+      if (dp) {
+        const monto = calcularDescuentoPersonal(lineasCalc, desglose.detalles as any, dp.pct);
+        if (monto > 0) {
+          detallesVista = [...detallesVista, { tipo: 'PERSONAL', nombre: `Descuento por ser del equipo (${dp.pct} %)`, monto }];
+          descuentoTotalVista = Number((descuentoTotalVista + monto).toFixed(2));
+          montoCanjeableVista = 0; // con el descuento del equipo no se canjean puntos
+          puntosEstimadosVista = 0;
+        }
+      }
+    }
     return {
       ...(descuentoPersonal
         ? { descuentoPersonal, totalDescuentos: Number((desglose.descuentoTotal + descuentoPersonal.monto).toFixed(2)) }
         : {}),
       envioGratisCupon: desglose.envioGratisCupon ?? false,
-      descuentoTotal: desglose.descuentoTotal,
-      montoCanjeable,
+      descuentoTotal: descuentoTotalVista,
+      montoCanjeable: montoCanjeableVista,
       // con cupón no se suman puntos (DT-56); misma base y porcentaje que PuntosService.acumularPorPedido
-      puntosEstimados: conCupon ? 0 : Math.round(montoCanjeable * (puntosPorcentaje / 100) * 100) / 100,
+      puntosEstimados: puntosEstimadosVista,
       puntosPorcentaje,
-      detalles: (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) })),
+      detalles: detallesVista,
     };
   }
 

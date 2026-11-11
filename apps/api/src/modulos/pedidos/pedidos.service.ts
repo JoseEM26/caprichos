@@ -1,4 +1,4 @@
-import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
+import { calcularDescuentoPersonal, descuentoPersonalPorCelular, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { totalPedido } from '../../comun/total-pedido';
@@ -950,6 +950,27 @@ export class PedidosService {
         pctPersonal,
       );
     }
+    // Carta: quien pone el celular de un trabajador con usuario activo recibe su descuento de personal (solo el descuento:
+    // el pedido NO se carga a su crédito y se paga como cualquier pedido de cliente). El porcentaje lo decide el servidor.
+    if (!origen?.esPersonal && canalPedido === 'CARTA' && telefonoLimpio) {
+      const dp = await descuentoPersonalPorCelular(this.prisma, telefonoLimpio);
+      if (dp) {
+        pctPersonal = dp.pct;
+        descuentoPersonal = calcularDescuentoPersonal(
+          lineasCalculadas
+            .filter((lin) => !lin.cortesia)
+            .map((lin) => ({
+              productoId: lin.productoId,
+              nombre: lin.nombre,
+              subtotal: lin.subtotal,
+              noSumaBeneficios: lin.noSumaBeneficios,
+              enPromocion: Boolean(lin.ofertaId) || Boolean(lin.contenedora) || (lin.partesCombo?.length ?? 0) > 0,
+            })),
+          desgloseDescuento.detalles as any,
+          pctPersonal,
+        );
+      }
+    }
     const personal = colaboradorId !== null;
     const descuentoAplicado = Number((desgloseDescuento.descuentoTotal + descuentoPersonal).toFixed(2));
     const detallesDescuento: any[] = [
@@ -1068,8 +1089,8 @@ export class PedidosService {
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
     let partyCanje: bigint | string | number | null = null;
     if (puntosCanje > 0) {
-      if (personal) {
-        throw new BadRequestException({ codigo: 'PUNTOS_NO_APLICAN_PERSONAL', mensaje: 'El pedido del personal no canjea puntos' });
+      if (personal || descuentoPersonal > 0) {
+        throw new BadRequestException({ codigo: 'PUNTOS_NO_APLICAN_PERSONAL', mensaje: 'Con el descuento del equipo no se canjean puntos' });
       }
       // Carta/WhatsApp: la cuenta con sesión. Caja/mozo: SOLO la cuenta elegida en este pedido por celular
       // (clienteTelefono o clientePartyId verificado en clienteIdentificado); el colaborador del personal no cuenta.

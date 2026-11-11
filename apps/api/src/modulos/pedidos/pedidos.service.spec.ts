@@ -519,6 +519,47 @@ describe('PedidosService', () => {
         expect(Number(c.monto)).toBe(21);
       });
 
+      describe('carta pública con celular de trabajador', () => {
+        const dtoCarta: CrearPedidoDto = { ...dtoPersonal, pago: { metodo: 'EFECTIVO', pagaCon: 50 } };
+        beforeEach(() => {
+          prismaMock.contactMechanism = { findFirst: jest.fn().mockResolvedValue({ party_id: 9n }) };
+        });
+
+        it('celular de trabajador activo: 25 % de descuento, pero NO es pedido del personal ni crédito', async () => {
+          await service.crear(dtoCarta, 'idemp-carta-dp-1');
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(Number(data.descuento)).toBe(7);
+          expect(Number(data.total)).toBe(21);
+          expect(data.es_personal).toBe(false);
+          expect(data.pago_metodo).not.toBe('CREDITO_PERSONAL');
+          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+          expect(data.descuento_detalle).toEqual([expect.objectContaining({ tipo: 'PERSONAL', descuentoValor: 25 })]);
+        });
+
+        it('celular de no-personal (inactivo o inexistente): sin descuento', async () => {
+          prismaMock.contactMechanism.findFirst.mockResolvedValue(null);
+          await service.crear(dtoCarta, 'idemp-carta-dp-2');
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(Number(data.descuento)).toBe(0);
+          expect(Number(data.total)).toBe(28);
+        });
+
+        it('no acumula sobre una línea que ya tiene otra promoción', async () => {
+          ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValue({
+            descuentoTotal: 5, ofertaId: null, cuponId: null, cuponEmitidoId: null,
+            detalles: [{ tipo: 'DESCUENTO', nombre: '2x', montoDescontado: 5, lineasAfectadas: [{ productoId: '1', cantidad: 2, subtotal: 28, descuento: 5 }] }],
+          });
+          await service.crear(dtoCarta, 'idemp-carta-dp-3');
+          expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.descuento)).toBe(5);
+        });
+
+        it('con el descuento del equipo no se canjean puntos', async () => {
+          await expect(service.crear({ ...dtoCarta, puntosCanje: 1 } as any, 'idemp-carta-dp-4')).rejects.toMatchObject({
+            response: { codigo: 'PUNTOS_NO_APLICAN_PERSONAL' },
+          });
+        });
+      });
+
       it('respeta el porcentaje configurado en el local', async () => {
         prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
           Promise.resolve(where.clave === 'descuento_personal_pct' ? { valor: 20 } : where.clave === 'pedido_minimo' ? { valor: 0 } : null),

@@ -55,6 +55,27 @@ export async function resolverPctPersonal(db: any, partyId: bigint): Promise<num
   return PCT_DESCUENTO_PERSONAL_DEFECTO;
 }
 
+/**
+ * Descuento de personal para quien escribe un celular en la carta pública: solo si ese celular es contacto de un
+ * trabajador con usuario ACTIVO. Devuelve únicamente el porcentaje (nunca datos del trabajador). El celular NO está
+ * verificado: por eso solo da descuento, jamás crédito. Fuente única del porcentaje: resolverPctPersonal.
+ */
+export async function descuentoPersonalPorCelular(db: any, celular: string | null | undefined): Promise<{ pct: number } | null> {
+  const nacional = String(celular ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+  if (!/^9\d{8}$/.test(nacional)) return null;
+  const contacto = await db.contactMechanism?.findFirst?.({
+    where: {
+      tipo: { in: ['TELEFONO', 'WHATSAPP'] },
+      valor: { in: [nacional, `51${nacional}`] },
+      activo: true,
+      party: { usuario: { is: { activo: true } } },
+    },
+    select: { party_id: true },
+  });
+  if (!contacto) return null;
+  return { pct: await resolverPctPersonal(db, contacto.party_id) };
+}
+
 /** El crédito es solo para el personal (cuenta activa o rol de empleado), nunca para clientes. */
 export async function validarColaborador(db: any, partyId: bigint) {
   const party = await db.party.findUnique({
