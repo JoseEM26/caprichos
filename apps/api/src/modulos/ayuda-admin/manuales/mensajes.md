@@ -11,9 +11,9 @@ sugerencias:
   - Que hago si expiro la ventana de 24 horas del chat
   - Como utilizo la funcion de pulir mensaje con IA
   - Como veo la ubicacion que me mando el cliente
-  - Que pasa con el chat que el repartidor tiene abierto
-  - Por que le llego una factura por WhatsApp al cliente
   - Que hago si un mensaje mio dice No se pudo enviar
+  - Como uso las plantillas de respuesta rapida en un chat
+  - Como creo o edito una plantilla de respuesta para todo el equipo
 ---
 # Mensajes de WhatsApp
 
@@ -144,7 +144,25 @@ Ver tambien: [[caja]]
 - Una validacion como ventana de 24 horas cerrada, chat tomado por otra persona, numero bloqueado o limite de 20 mensajes por minuto avisa al instante, antes de enviar, y el mensaje no se guarda. Las fotos, documentos y notas de voz siguen enviandose en el momento (con su barra de espera).
 - La lista de chats carga de 40 en 40: al final aparece Cargar mas chats. Los numeros de las pestanas, la busqueda y los filtros por dia cuentan y buscan en todos los chats, no solo en los cargados. Si llega un mensaje de un chat que aun no cargaste y por su hora le toca ir arriba, aparece solo; si le toca mas abajo, lo veras al pulsar Cargar mas chats.
 
+## Como se hace: Responder rapido con una plantilla
+1. Abrir el chat (con el chat tomado) y pulsar el boton Plantillas, el del rayo, junto al cuadro de texto. Tambien puedes escribir una barra / al inicio y el nombre (por ejemplo /yape): aparecen sugerencias; con las flechas eliges y con Enter la insertas.
+2. Buscar por palabra en el buscador o tocar un chip de categoria: Pagos, Horarios, Ubicacion, Delivery, Pedidos, Saludo, Cierre u Otros. Cada plantilla muestra una vista previa del texto ya completado.
+3. Tocar la plantilla: el texto se escribe en el cuadro de mensaje (si ya habia algo, se agrega donde esta el cursor). NO se envia sola: revisalo, cambia lo que haga falta y envialo tu con Enter o el boton Enviar.
+4. Los datos se completan solos: {{nombre}} (nombre del cliente de este chat), {{mi_nombre}} (tu nombre), {{local}}, {{direccion}}, {{horario}} y los medios de pago ({{medios_pago}}, {{yape}}, {{plin}}, {{transferencia}}), que salen de Configuracion (Datos del local, Horario y Pagos): no se escriben a mano en las plantillas.
+5. Si un dato no existe (por ejemplo el chat no tiene nombre, solo numero, o el medio de pago esta apagado), el marcador entre llaves queda visible y aparece el aviso Falta completar a mano. El sistema NO deja enviar el mensaje mientras quede un marcador {{...}}: escribe el dato y envia.
+Ver tambien: [[mirest]]
+
+## Como se hace: Crear, editar, pausar o borrar plantillas
+1. En el panel Plantillas pulsar Administrar plantillas. Se abre una sola ventana con dos pestanas: Plantillas (la lista) y Nueva o Editar (el formulario).
+2. Nueva plantilla: escribir el titulo (unico, hasta 60 letras), elegir la categoria y escribir el texto (hasta 1000 letras). Los botones de datos automaticos insertan la variable donde esta el cursor. Abajo se ve la vista previa con un cliente de ejemplo. Pulsar Guardar.
+3. En la lista: las flechas suben y bajan el orden en que aparecen en el chat; Editar cambia titulo, categoria o texto; Pausar la oculta del chat sin borrarla (Activar la devuelve); Duplicar crea una copia pausada para que la ajustes; Borrar pide confirmar con Si, borrar o No en la misma fila.
+4. Las plantillas son las mismas para todo el equipo: lo que alguien crea o cambia lo ven todos. Cada cambio queda en el historial (quien, cuando y que).
+5. Vienen precargadas unas 20 de ejemplo (saludo, medios de pago, Yape, Plin, transferencia, horario, ubicacion, delivery, pedido recibido, en preparacion, listo, agotado, disculpa, gracias). Puedes cambiarlas o borrarlas.
+Importante: las plantillas rapidas NO son las plantillas de Meta. Son texto libre que solo se puede enviar dentro de las 24 horas desde el ultimo mensaje del cliente (igual que cualquier mensaje escrito); no necesitan aprobacion de Meta. Para escribir al cliente pasadas las 24 horas se usa la plantilla de Meta que reabre la conversacion (Reabrir con plantilla).
+Ver tambien: [[mensajes]]
+
 ## Quien puede hacerlo
+- Usar las plantillas en un chat: quien puede ver mensajes (permiso mensajes/ver). Crear, editar, pausar, ordenar y borrar: quien puede responder chats (permiso mensajes/enviar); no hay un permiso aparte.
 - Tienen acceso completo a los mensajes: Administrador, Cajero, Mozo y Supervisor.
 - Los roles de Administrador y Cajero cuentan con el permiso vouchers/ver para visualizar la tarjeta de analisis del voucher y confirmar la aprobacion o rechazo.
 - Mozos, Cocina y Repartidores no tienen acceso a esta bandeja de mensajes.

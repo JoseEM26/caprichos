@@ -35,7 +35,7 @@ describe('MensajesController', () => {
       reintentarMensaje: jest.fn().mockResolvedValue({ ok: true, id: '10' }),
     };
 
-    controller = new MensajesController(service);
+    controller = new MensajesController(service, {} as any);
   });
 
   it('enviar delega en service.enviar extrayendo ip del request', async () => {

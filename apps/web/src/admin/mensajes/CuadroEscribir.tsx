@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { marcadoresPendientes, resolverPlantilla as resolverPlantillaTexto } from '@caprichos/compartido';
 import { insertarEnCursor } from './emojis';
-import { DetalleConversacion, RespuestaRapida } from './mensajesTipos';
+import { ContextoPlantillas, DetalleConversacion, RespuestaRapida } from './mensajesTipos';
+import { filtrarPlantillas, PanelPlantillas, valoresPlantilla } from './PanelPlantillas';
+import { ModalPlantillas } from './ModalPlantillas';
 import { SelectorEmojis } from './SelectorEmojis';
 import { formatearTamano } from './TarjetaDocumento';
 
@@ -30,7 +33,14 @@ export interface CuadroEscribirProps {
   pulirError: string | null;
   mensajeCopiado: string | null;
   enviando: boolean;
-  onElegirRapida: (texto: string) => void;
+  /** Ya no se usa: la plantilla se inserta en el cuadro desde aquí (se deja por compatibilidad). */
+  onElegirRapida?: (texto: string) => void;
+  /** Datos del local para las {{variables}} de las plantillas. */
+  contextoPlantillas?: ContextoPlantillas;
+  /** Crear, editar, pausar y borrar plantillas (quien puede responder chats). */
+  puedeAdministrarPlantillas?: boolean;
+  /** Se guardó un cambio en las plantillas: la bandeja las vuelve a pedir. */
+  onPlantillasCambiaron?: () => void;
   onPulir: () => void;
   onUsarPulido: (texto: string) => void;
   onDejarPulido: () => void;
@@ -51,7 +61,9 @@ export function CuadroEscribir({
   pulirError,
   mensajeCopiado,
   enviando,
-  onElegirRapida,
+  contextoPlantillas,
+  puedeAdministrarPlantillas = false,
+  onPlantillasCambiaron,
   onPulir,
   onUsarPulido,
   onDejarPulido,
@@ -62,6 +74,12 @@ export function CuadroEscribir({
   const cajaRef = useRef<HTMLTextAreaElement>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
   const [emojisAbierto, setEmojisAbierto] = useState(false);
+  const plantillasRef = useRef<HTMLButtonElement>(null);
+  const [plantillasAbierto, setPlantillasAbierto] = useState(false);
+  const [adminAbierto, setAdminAbierto] = useState(false);
+  const [faltan, setFaltan] = useState<string[]>([]);
+  const [errorMarcador, setErrorMarcador] = useState<string | null>(null);
+  const [sugerida, setSugerida] = useState(0);
   const [foto, setFoto] = useState<{ archivo: File; url: string } | null>(null);
   const [subtitulo, setSubtitulo] = useState('');
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -76,7 +94,65 @@ export function CuadroEscribir({
   }, [foto]);
 
   // al cambiar de chat el selector no se queda abierto
-  useEffect(() => setEmojisAbierto(false), [detalle.id]);
+  useEffect(() => {
+    setEmojisAbierto(false);
+    setPlantillasAbierto(false);
+    setFaltan([]);
+    setErrorMarcador(null);
+  }, [detalle.id]);
+
+  // la caja crece con el texto aunque se llene desde una plantilla, y vuelve a una línea al vaciarse
+  useEffect(() => {
+    const c = cajaRef.current;
+    if (!c) return;
+    c.style.height = 'auto';
+    if (textoMensaje) c.style.height = `${Math.min(c.scrollHeight, 150)}px`;
+  }, [textoMensaje]);
+
+  const valores = valoresPlantilla(contextoPlantillas ?? {}, detalle.nombre);
+  const puedePlantillas = respuestasRapidas.length > 0 || puedeAdministrarPlantillas;
+  // atajo: escribir «/» al inicio sugiere plantillas por título
+  const sugerencias = puedePlantillas && /^\/\S*$/.test(textoMensaje)
+    ? filtrarPlantillas(respuestasRapidas.filter((p) => p.activo !== false), textoMensaje.slice(1), null).slice(0, 6)
+    : [];
+
+  /** Pone el texto en el cuadro (nunca envía): al inicio si estaba vacío o escribiendo «/…», si no donde está el cursor. */
+  const insertarPlantilla = (texto: string, faltantes: string[]) => {
+    const caja = cajaRef.current;
+    const vacio = !textoMensaje.trim() || /^\/\S*$/.test(textoMensaje);
+    const r = vacio
+      ? { texto, cursor: texto.length }
+      : insertarEnCursor(textoMensaje, texto, caja?.selectionStart ?? null, caja?.selectionEnd ?? null);
+    onCambiarTexto(r.texto);
+    setFaltan(faltantes);
+    setErrorMarcador(null);
+    setPlantillasAbierto(false);
+    setSugerida(0);
+    setTimeout(() => {
+      caja?.focus();
+      caja?.setSelectionRange(r.cursor, r.cursor);
+    }, 0);
+  };
+
+  const elegirSugerida = (i: number) => {
+    const p = sugerencias[i];
+    if (!p) return;
+    const r = resolverPlantillaTexto(p.texto, valores);
+    insertarPlantilla(r.texto, r.faltantes);
+  };
+
+  /** No se envía con un {{marcador}} sin completar: se avisa cuál falta. */
+  const intentarEnviar = () => {
+    const pendientes = marcadoresPendientes(textoMensaje);
+    if (pendientes.length > 0) {
+      setErrorMarcador(`Completa antes de enviar: ${pendientes.map((m) => `{{${m}}}`).join(', ')}`);
+      cajaRef.current?.focus();
+      return;
+    }
+    setErrorMarcador(null);
+    setFaltan([]);
+    onEnviar();
+  };
 
   const cerrarEmojis = () => {
     setEmojisAbierto(false);
@@ -177,13 +253,27 @@ export function CuadroEscribir({
         </div>
       )}
 
-      {respuestasRapidas.length > 0 && (
-        <div className="msg-rapidas" aria-label="Respuestas rápidas">
-          {respuestasRapidas.map((q) => (
-            <button key={q.id} type="button" className="msg-rapida" onClick={() => onElegirRapida(q.texto)}>
-              {q.titulo}
-            </button>
+      {sugerencias.length > 0 && (
+        <ul className="msg-pl-sugerencias" role="listbox" aria-label="Plantillas sugeridas">
+          {sugerencias.map((p, i) => (
+            <li key={p.id} role="option" aria-selected={i === sugerida}>
+              <button type="button" className={i === sugerida ? 'msg-pl-sug msg-pl-sug-activa' : 'msg-pl-sug'} onClick={() => elegirSugerida(i)}>
+                <b>{p.titulo}</b>
+              </button>
+            </li>
           ))}
+        </ul>
+      )}
+
+      {faltan.length > 0 && !errorMarcador && (
+        <div role="status" className="msg-error" data-testid="plantilla-falta">
+          Falta completar a mano: {faltan.map((f) => `{{${f}}}`).join(', ')}
+        </div>
+      )}
+
+      {errorMarcador && (
+        <div role="alert" className="msg-error" data-testid="plantilla-pendiente">
+          {errorMarcador}
         </div>
       )}
 
@@ -317,6 +407,22 @@ export function CuadroEscribir({
               </button>
             </>
           )}
+          {puedePlantillas && (
+            <button
+              ref={plantillasRef}
+              type="button"
+              className="msg-icono-btn"
+              aria-label="Plantillas de respuesta"
+              aria-haspopup="dialog"
+              aria-expanded={plantillasAbierto}
+              title={detalle.ocupado ? 'Para usar plantillas, toma el chat' : 'Plantillas de respuesta rápida (también escribe «/»)'}
+              disabled={detalle.ocupado}
+              onClick={() => setPlantillasAbierto((v) => !v)}
+            >
+              <span aria-hidden="true">⚡</span>
+              <span className="msg-icono-txt">Plantillas</span>
+            </button>
+          )}
           <div style={{ position: 'relative', flex: 'none' }}>
             <button
               type="button"
@@ -347,10 +453,22 @@ export function CuadroEscribir({
               e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
             }}
             onKeyDown={(e) => {
+              if (sugerencias.length > 0 && !e.nativeEvent.isComposing) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setSugerida((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + sugerencias.length) % sugerencias.length);
+                  return;
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  elegirSugerida(Math.min(sugerida, sugerencias.length - 1));
+                  return;
+                }
+              }
               // Enter envía; Shift+Enter baja a la línea siguiente sin enviar
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onEnviar();
+                intentarEnviar();
               }
             }}
           />
@@ -368,13 +486,33 @@ export function CuadroEscribir({
             className="msg-enviar"
             aria-label="Enviar mensaje"
             disabled={detalle.ocupado || enviando}
-            onClick={() => onEnviar()}
+            onClick={() => intentarEnviar()}
           >
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
               <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#FFFFFF" />
             </svg>
           </button>
         </div>
+      )}
+      {plantillasAbierto && (
+        <PanelPlantillas
+          plantillas={respuestasRapidas}
+          valores={valores}
+          ancla={plantillasRef}
+          puedeAdministrar={puedeAdministrarPlantillas}
+          alElegir={insertarPlantilla}
+          alAdministrar={() => {
+            setPlantillasAbierto(false);
+            setAdminAbierto(true);
+          }}
+          alCerrar={() => {
+            setPlantillasAbierto(false);
+            cajaRef.current?.focus();
+          }}
+        />
+      )}
+      {adminAbierto && (
+        <ModalPlantillas contexto={valores} alCambiar={() => onPlantillasCambiaron?.()} alCerrar={() => setAdminAbierto(false)} />
       )}
     </div>
   );

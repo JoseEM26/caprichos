@@ -831,8 +831,8 @@ export class MensajesService {
   }
 
   async respuestasRapidas() {
-    const filas = await this.prisma.respuestaRapida.findMany({ where: { activo: true }, orderBy: { id: 'asc' } });
-    return filas.map((r) => ({ id: r.id.toString(), titulo: r.titulo, texto: r.texto }));
+    const filas = await this.prisma.respuestaRapida.findMany({ where: { activo: true }, orderBy: [{ orden: 'asc' }, { id: 'asc' }] });
+    return filas.map((r) => ({ id: r.id.toString(), titulo: r.titulo, texto: r.texto, categoria: r.categoria ?? 'OTROS' }));
   }
 
   /**

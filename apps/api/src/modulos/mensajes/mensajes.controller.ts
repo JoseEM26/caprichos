@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -24,12 +25,15 @@ import {
   DocumentoDto,
   ImagenDto,
   ListarConversacionesDto,
+  OrdenPlantillasDto,
+  PlantillaRespuestaDto,
   RechazarCambioDto,
   RechazarPagoDto,
   TextoDto,
   TomarDto,
 } from './dto/mensajes.dto';
 import { MensajesService } from './mensajes.service';
+import { PlantillasRespuestaService } from './plantillas-respuesta.service';
 import { conServerTiming } from './utilidades/server-timing.util';
 
 const ipDe = (req: any): string | undefined => {
@@ -40,7 +44,10 @@ const ipDe = (req: any): string | undefined => {
 @Controller('admin/mensajes')
 @UseGuards(AccesoGuard)
 export class MensajesController {
-  constructor(private readonly mensajes: MensajesService) {}
+  constructor(
+    private readonly mensajes: MensajesService,
+    private readonly plantillas: PlantillasRespuestaService,
+  ) {}
 
   @Get('conversaciones')
   @Permiso('mensajes', 'ver')
@@ -73,6 +80,50 @@ export class MensajesController {
   @Permiso('mensajes', 'ver')
   respuestasRapidas() {
     return this.mensajes.respuestasRapidas();
+  }
+
+  // Plantillas de respuesta rápida del equipo (compartidas). Ver/usar: 'ver'; crear, editar, pausar, borrar y ordenar: 'enviar'
+  // (quien puede responder chats). Las literales van antes que ':id' para que no se confundan.
+  @Get('plantillas/gestion')
+  @Permiso('mensajes', 'enviar')
+  plantillasGestion() {
+    return this.plantillas.listarTodas();
+  }
+
+  @Get('plantillas/contexto')
+  @Permiso('mensajes', 'ver')
+  plantillasContexto(@Req() req: any) {
+    return this.plantillas.contexto(req.usuario);
+  }
+
+  @Post('plantillas/orden')
+  @Permiso('mensajes', 'enviar')
+  plantillasOrden(@Body() dto: OrdenPlantillasDto, @Req() req: any) {
+    return this.plantillas.ordenar(dto.ids, req.usuario, ipDe(req));
+  }
+
+  @Post('plantillas')
+  @Permiso('mensajes', 'enviar')
+  plantillaCrear(@Body() dto: PlantillaRespuestaDto, @Req() req: any) {
+    return this.plantillas.crear(dto, req.usuario, ipDe(req));
+  }
+
+  @Post('plantillas/:id/duplicar')
+  @Permiso('mensajes', 'enviar')
+  plantillaDuplicar(@Param('id') id: string, @Req() req: any) {
+    return this.plantillas.duplicar(id, req.usuario, ipDe(req));
+  }
+
+  @Patch('plantillas/:id')
+  @Permiso('mensajes', 'enviar')
+  plantillaEditar(@Param('id') id: string, @Body() dto: PlantillaRespuestaDto, @Req() req: any) {
+    return this.plantillas.editar(id, dto, req.usuario, ipDe(req));
+  }
+
+  @Delete('plantillas/:id')
+  @Permiso('mensajes', 'enviar')
+  plantillaBorrar(@Param('id') id: string, @Req() req: any) {
+    return this.plantillas.borrar(id, req.usuario, ipDe(req));
   }
 
   @Get('conversaciones/:id')

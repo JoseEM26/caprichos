@@ -106,3 +106,12 @@ export {
   esPlusCodeCorto,
 } from './utilidades/plus-code.js';
 export type { AreaPlusCode } from './utilidades/plus-code.js';
+
+export {
+  CATEGORIAS_PLANTILLA,
+  ETIQUETA_CATEGORIA_PLANTILLA,
+  VARIABLES_PLANTILLA,
+  resolverPlantilla,
+  marcadoresPendientes,
+} from './utilidades/plantillas-respuesta.js';
+export type { CategoriaPlantilla } from './utilidades/plantillas-respuesta.js';
