@@ -10,7 +10,11 @@ import {
 } from '../../comun/tabla/ControlesTabla';
 
 // El conmutador, el selector de columnas y la vista viven en comun/tabla (los comparte el Cierre).
-export type VistaCaja = VistaLista;
+/** Caja tiene tres vistas; el Cierre solo dos (por eso `normalizarVista` común no conoce «lista»). */
+export type VistaCaja = VistaLista | 'lista';
+export const VISTAS_CAJA: readonly VistaCaja[] = ['tarjetas', 'tabla', 'lista'];
+/** Preferencia guardada → vista válida; un valor desconocido vuelve a «tarjetas». */
+export const normalizarVistaCaja = (v: unknown): VistaCaja => (v === 'lista' ? 'lista' : normalizarVista(v));
 export { ConmutadorVista, normalizarVista };
 
 /** Selector de columnas de Caja: las columnas de Caja sobre el selector común. */

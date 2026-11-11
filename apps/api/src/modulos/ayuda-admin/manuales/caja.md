@@ -26,6 +26,13 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 3. Cuando usas un filtro (un contador, estado, canal, modalidad, medio de pago, busqueda o pastilla), los montos suman solo lo que ves y aparece "Filtrado: N pedidos"; al lado, "Dia: S/ X" deja a la vista la cifra del dia completo. Al pulsar "7 por cobrar" ves la suma de esos 7.
 4. La barra se actualiza sola cuando entra un pedido, un cobro, una anulacion o un cambio de estado (puede tardar un segundo).
 
+## Como se hace: Ver los pedidos como Lista
+1. En Pedidos y caja, arriba de los pedidos, elige Lista (junto a Tarjetas y Tabla). Tu eleccion queda guardada para tu usuario.
+2. La Lista muestra una fila por pedido: codigo y tipo, cuanto tiempo lleva (se pone en rojo desde los 50 minutos), quien lo registro, el estado, el total con su pago y el nombre del cliente. La franja de color de la izquierda indica si es delivery, para llevar o mesa.
+3. Las pestanas Mostrador, A domicilio y Mesas separan los pedidos por tipo de servicio y cada una dice cuantos tiene; Todos los suma. Con Ordenar por eliges fecha, estado, total o cliente, y el sentido; se recuerda para ti.
+4. Cada fila trae sus botones: imprimir, Estado (preparar, listo, enviar), Pago (confirmar pago o cobrar) y Finalizar (entregar). Solo salen los que tu usuario puede usar. El menu de tres puntos abre Ver detalle de la venta o el pedido completo. En un delivery sin repartidor aparece Elige un repartidor, que te lleva a Repartos.
+5. La Lista no tiene filtros ni busqueda: muestra todos los pedidos del dia o rango cargado y la barra Resumen suma esos mismos pedidos. Si dejaste filtros puestos en Tabla o Tarjetas, un aviso lo dice y el boton Quitar filtros los limpia.
+
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.
 2. En el campo Monto inicial en soles ya aparece el monto oficial que configura el administrador (Configuracion > Parametros del sistema > Caja > Monto inicial de la caja). Si es el correcto, no se toca.

@@ -1,10 +1,12 @@
 import { useCuadricula } from './paginacionCaja';
 import { PaginadorCaja, TOPE_TODAS, normalizarFilas, tamanoPagina, type FilasPorPagina } from './PaginadorCaja';
 import { TablaCaja } from './TablaCaja';
-import { ConmutadorVista, FiltroMedios, SelectorColumnas, normalizarVista, type VistaCaja } from './ControlesTabla';
+import { ConmutadorVista, FiltroMedios, SelectorColumnas, VISTAS_CAJA, normalizarVistaCaja, type VistaCaja } from './ControlesTabla';
+import { ListaCaja, OrdenarLista, PestanasLista } from './ListaCaja';
+import { ORDEN_LISTA_POR_DEFECTO, contarPestanas, enPestana, normalizarOrdenLista, ordenarLista, type OrdenLista, type PestanaLista } from './listaCaja';
 import { COLUMNAS_POR_DEFECTO, normalizarColumnas } from './columnasCaja';
 import { MEDIOS_FILTRO, enMedios } from './mediosFila';
-import { CLAVE_COLUMNAS, CLAVE_FILAS, CLAVE_VISTA, usePreferenciaCaja } from './preferenciasCaja';
+import { CLAVE_COLUMNAS, CLAVE_FILAS, CLAVE_ORDEN_LISTA, CLAVE_VISTA, usePreferenciaCaja } from './preferenciasCaja';
 import { DetalleVentaModal } from './DetalleVentaModal';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
@@ -282,7 +284,13 @@ export function PedidosAdminView() {
   const [cobroFiltro, setCobroFiltro] = useState<string>('all');
   const [mediosFiltro, setMediosFiltro] = useState<string[]>([]);
   // Vista (tarjetas o tabla), columnas de la tabla y filas por página: se guardan por usuario
-  const [vista, setVista] = usePreferenciaCaja<VistaCaja>(CLAVE_VISTA, 'tarjetas', normalizarVista);
+  const [vista, setVista] = usePreferenciaCaja<VistaCaja>(CLAVE_VISTA, 'tarjetas', normalizarVistaCaja);
+  // Lista: pestaña por tipo de servicio (de esta visita) y orden (guardado por usuario). La Lista no usa ningún filtro.
+  const [pestanaLista, setPestanaLista] = useState<PestanaLista>('todos');
+  const [ordenLista, setOrdenLista] = usePreferenciaCaja<OrdenLista>(CLAVE_ORDEN_LISTA, ORDEN_LISTA_POR_DEFECTO, normalizarOrdenLista);
+  const enLista = vista === 'lista';
+  // El medio de pago se pide al servidor: en la Lista no se aplica (se ven todos los pedidos del rango)
+  const mediosServidor = enLista ? [] : mediosFiltro;
   const [columnasTabla, setColumnasTabla] = usePreferenciaCaja<string[]>(CLAVE_COLUMNAS, COLUMNAS_POR_DEFECTO, normalizarColumnas);
   const [filas, setFilas] = usePreferenciaCaja<FilasPorPagina>(CLAVE_FILAS, null, normalizarFilas);
   const [detalleVentaId, setDetalleVentaId] = useState<string | null>(null);
@@ -337,7 +345,7 @@ export function PedidosAdminView() {
       const [paginas, pendientes] = await Promise.all([
         Promise.all(
           Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
-            pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
+            pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosServidor.length ? { medios: mediosServidor } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
           ),
         ),
         contarPendientesAnteriores(),
@@ -353,7 +361,7 @@ export function PedidosAdminView() {
     } finally {
       if (g === generacion.current) setCargando(false);
     }
-  }, [rango, mediosFiltro]);
+  }, [rango, mediosServidor.join('|')]);
 
   useEffect(() => {
     cargarDatos();
@@ -381,7 +389,7 @@ export function PedidosAdminView() {
     setCargandoMas(true);
     setErrorMas('');
     try {
-      const r = await pedidosApi.listar({ ...parametrosDeRango(rango.modo === 'hoy' ? rangoHoy() : rango), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, pagina: siguiente });
+      const r = await pedidosApi.listar({ ...parametrosDeRango(rango.modo === 'hoy' ? rangoHoy() : rango), ...(mediosServidor.length ? { medios: mediosServidor } : {}), limite: LIMITE_PAGINA, pagina: siguiente });
       // Cambió el día o un filtro de servidor mientras llegaba: esta página ya no sirve
       if (g !== generacion.current) return;
       paginasRef.current = siguiente;
@@ -401,7 +409,7 @@ export function PedidosAdminView() {
     busqueda.trim() !== '' || contador !== null || etapa !== 'all' || canalFiltro !== 'all' ||
     modalidadFiltro !== 'all' || cobroFiltro !== 'all' || mediosFiltro.length > 0 || filtro !== 'todo' || grupoEstado !== estadoPorDefectoDeRango(rango);
   // La tabla y «Todas» necesitan toda la lista del filtro (para cuadrar), no solo la primera página
-  const necesitaTodo = filtrando || vista === 'tabla' || filas === 'todas';
+  const necesitaTodo = filtrando || vista === 'tabla' || enLista || filas === 'todas';
   const faltanPorCargar = pedidos.length < totalDia;
   useEffect(() => {
     if (!necesitaTodo || !faltanPorCargar || cargando || cargandoMas || errorMas) return;
@@ -631,6 +639,13 @@ export function PedidosAdminView() {
   // Atajos: lo que necesita atención no queda escondido
   const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
 
+  // Lista: TODOS los pedidos del rango cargado (sin filtros), por pestaña de tipo de servicio y con su orden propio
+  const conteosLista = useMemo(() => contarPestanas(pedidos), [pedidos]);
+  const pedidosLista = useMemo(
+    () => ordenarLista(pedidos.filter((p) => enPestana(p, pestanaLista)), ordenLista),
+    [pedidos, pestanaLista, ordenLista],
+  );
+
   // Filtros activos del panel (chips removibles arriba)
   const hoy = hoyLima();
   const chips = useMemo(() => {
@@ -702,7 +717,7 @@ export function PedidosAdminView() {
     [pedidos, totalDia, resumenApi],
   );
   // Los montos siguen lo que se ve: con algún filtro (contador, estado, canal, medio, búsqueda, pastilla) suman SOLO esos pedidos
-  const filtrado = pedidosFiltrados.length !== pedidos.length;
+  const filtrado = !enLista && pedidosFiltrados.length !== pedidos.length;
   const montos: ResumenDia = useMemo(
     () => (filtrado ? resumirDia(filasDePedidos(pedidosFiltrados)) : resumen),
     [filtrado, pedidosFiltrados, resumen],
@@ -746,8 +761,8 @@ export function PedidosAdminView() {
 
   // Paginación: en tarjetas cuenta tarjetas (cuentas); en tabla, pedidos. Tamaño: lo elegido o el automático (50 en tabla)
   const enTabla = vista === 'tabla';
-  const unidades: Array<(typeof cuentas)[number] | Pedido> = enTabla ? pedidosFiltrados : cuentas;
-  const porPagina = tamanoPagina(filas, unidades.length, enTabla ? 50 : pedidosPorPagina);
+  const unidades: Array<(typeof cuentas)[number] | Pedido> = enLista ? pedidosLista : enTabla ? pedidosFiltrados : cuentas;
+  const porPagina = tamanoPagina(filas, unidades.length, enLista ? 25 : enTabla ? 50 : pedidosPorPagina);
   const totalPaginas = Math.max(1, Math.ceil(unidades.length / porPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
   // Al cambiar de página se vuelve al inicio de la lista (si no, en celular queda a media pantalla)
@@ -765,9 +780,11 @@ export function PedidosAdminView() {
     return unidades.slice(inicio, inicio + porPagina);
     // unidades cambia con cuentas/pedidosFiltrados/vista
      
-  }, [cuentas, pedidosFiltrados, enTabla, paginaValida, porPagina]);
+  }, [cuentas, pedidosFiltrados, pedidosLista, enTabla, enLista, paginaValida, porPagina]);
   const pedidosPaginados = pagina as typeof cuentas;
   const filasTabla = pagina as Pedido[];
+  // Aviso de la Lista: hay filtros guardados de Tabla y Tarjetas que aquí no se aplican
+  const hayFiltrosEscondidos = chips.length > 0 || filtro !== 'todo' || busqueda.trim() !== '';
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
   useEffect(() => {
     setPaginaActual((p) => (p > totalPaginas ? totalPaginas : p));
@@ -811,7 +828,8 @@ export function PedidosAdminView() {
     );
   }
 
-  const enNoEntregados = grupoEstado === 'noent';
+  // La Lista no filtra: «No entregados» es un filtro más y no se muestra en ella
+  const enNoEntregados = grupoEstado === 'noent' && !enLista;
   const totalNoEntregados = noEntregados?.total ?? 0;
   const puedeCortesia = tiene('cortesias/dar');
 
@@ -837,12 +855,12 @@ export function PedidosAdminView() {
         <span className="cj2-sub" aria-hidden="true">{SUBTITULO_CAJA}</span>
       </div>
 
-      {!enNoEntregados && totalNoEntregados > 0 && (
+      {!enNoEntregados && !enLista && totalNoEntregados > 0 && (
         <button type="button" className="cj2-atajo cj2-atajo--rust" onClick={() => cambiarGrupoEstado('noent')}>
           {totalNoEntregados} no {totalNoEntregados === 1 ? 'entregado' : 'entregados'}
         </button>
       )}
-      {etapa !== 'confirmar' && grupoEstado === 'act' && porConfirmar > 0 && (
+      {!enLista && etapa !== 'confirmar' && grupoEstado === 'act' && porConfirmar > 0 && (
         <button
           type="button"
           className="cj2-atajo"
@@ -851,7 +869,7 @@ export function PedidosAdminView() {
           {porConfirmar} por confirmar
         </button>
       )}
-      {pendientesAnteriores > 0 && rango.modo !== 'pendientes' && (
+      {!enLista && pendientesAnteriores > 0 && rango.modo !== 'pendientes' && (
         <button
           type="button"
           className="cj2-atajo"
@@ -904,7 +922,7 @@ export function PedidosAdminView() {
     {/* Barra de control (fija arriba al desplazar): estados, buscador, atajo y Filtros; debajo, los filtros activos */}
     <div className="cj2-control">
     {/* Los cuatro filtros visibles, buscador y panel de Filtros */}
-    {!enNoEntregados && (
+    {!enNoEntregados && !enLista && (
       <div className="cj2-fila" ref={filaFiltrosRef}>
         <nav aria-label="Estado de los pedidos" className="cj2-pastillas">
           {FILTROS_CAJA.map((f) => (
@@ -1057,7 +1075,7 @@ export function PedidosAdminView() {
     )}
 
     {/* Filtros activos: chips que se quitan con un toque */}
-    {(chips.length > 0 || orden !== ORDEN_POR_DEFECTO || chipTodo) && (
+    {!enLista && (chips.length > 0 || orden !== ORDEN_POR_DEFECTO || chipTodo) && (
       <div className="cj2-activos" aria-label="Filtros activos">
         {chipTodo && (
           <button type="button" className="cj2-quitar" aria-label="Quitar Mostrando todo el día" onClick={limpiarFiltros}>
@@ -1105,21 +1123,21 @@ export function PedidosAdminView() {
           </span>
           {resumenAbierto && (
             <>
-              <button type="button" className="cj2-res" aria-pressed={grupoEstado === 'act' && !contador} onClick={() => elegirContador('activos')}>
+              <button type="button" className="cj2-res" aria-pressed={!enLista && grupoEstado === 'act' && !contador} disabled={enLista} onClick={() => elegirContador('activos')}>
                 <strong>{resumen.activos}</strong> {resumen.activos === 1 ? 'activo' : 'activos'}
               </button>
-              <button type="button" className="cj2-res" aria-pressed={contador === 'entregados'} onClick={() => elegirContador('entregados')}>
+              <button type="button" className="cj2-res" aria-pressed={!enLista && contador === 'entregados'} disabled={enLista} onClick={() => elegirContador('entregados')}>
                 <strong>{resumen.entregados}</strong> {resumen.entregados === 1 ? 'entregado' : 'entregados'}
               </button>
-              <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'anulados'} onClick={() => elegirContador('anulados')}>
+              <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={!enLista && contador === 'anulados'} disabled={enLista} onClick={() => elegirContador('anulados')}>
                 <strong>{resumen.anulados}</strong> {resumen.anulados === 1 ? 'anulado' : 'anulados'}
               </button>
               {(resumen.rechazados > 0 || contador === 'rechazados') && (
-                <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'rechazados'} onClick={() => elegirContador('rechazados')}>
+                <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={!enLista && contador === 'rechazados'} disabled={enLista} onClick={() => elegirContador('rechazados')}>
                   <strong>{resumen.rechazados}</strong> {resumen.rechazados === 1 ? 'rechazado' : 'rechazados'}
                 </button>
               )}
-              <button type="button" className="cj2-res" aria-pressed={contador === 'porcobrar'} onClick={() => elegirContador('porcobrar')}>
+              <button type="button" className="cj2-res" aria-pressed={!enLista && contador === 'porcobrar'} disabled={enLista} onClick={() => elegirContador('porcobrar')}>
                 <strong>{resumen.porCobrar}</strong> por cobrar
               </button>
             </>
@@ -1140,15 +1158,42 @@ export function PedidosAdminView() {
 
         {/* Vista y columnas */}
         <div className="cj2-vistabar">
-          <ConmutadorVista vista={vista} alCambiar={(v) => { setVista(v); setPaginaActual(1); }} />
+          <ConmutadorVista
+            vista={vista}
+            opciones={VISTAS_CAJA}
+            alCambiar={(v) => {
+              // El medio de pago viaja al servidor solo fuera de la Lista: se vuelve a leer desde la primera página
+              if (mediosFiltro.length) { paginasRef.current = 1; generacion.current++; }
+              setVista(v);
+              setPaginaActual(1);
+            }}
+          />
           {enTabla && <SelectorColumnas columnas={columnasTabla} alCambiar={setColumnasTabla} />}
         </div>
 
-        {/* TARJETAS / TABLA */}
+        {/* LISTA: pestañas por tipo de servicio y orden; sin filtros ni búsqueda */}
+        {enLista && (
+          <>
+            {hayFiltrosEscondidos && (
+              <p className="lc-nota" role="note" data-testid="nota-lista-filtros">
+                <span>La lista muestra todos los pedidos; los filtros aplican en Tabla y Tarjetas.</span>
+                <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Quitar filtros</button>
+              </p>
+            )}
+            <div className="lc-barra">
+              <PestanasLista activa={pestanaLista} conteos={conteosLista} alCambiar={(t) => { setPestanaLista(t); setPaginaActual(1); }} />
+              <OrdenarLista orden={ordenLista} alCambiar={(o) => { setOrdenLista(o); setPaginaActual(1); }} />
+            </div>
+          </>
+        )}
+
+        {/* TARJETAS / TABLA / LISTA */}
         <div className="cj2-lista" ref={listaRef}>
           {unidades.length === 0 ? (
             <div className="cj2-vacio">
-              {pedidos.length > 0 ? (
+              {enLista && pedidos.length > 0 ? (
+                'No hay pedidos de este tipo de servicio.'
+              ) : pedidos.length > 0 ? (
                 <>
                   <div>No hay pedidos con estos filtros.</div>
                   <button type="button" className="cj2-btn" style={{ marginTop: 12 }} onClick={limpiarFiltros}>Limpiar filtros</button>
@@ -1162,7 +1207,17 @@ export function PedidosAdminView() {
               )}
             </div>
           ) : (
-            enTabla ? (
+            enLista ? (
+              <ListaCaja
+                filas={filasTabla}
+                pestana={pestanaLista}
+                accionDe={accionDe}
+                resaltados={pedidosResaltados}
+                alAccion={ejecutarAccion}
+                alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
+                alAbrir={abrirDetalle}
+              />
+            ) : enTabla ? (
               <TablaCaja
                 filas={filasTabla}
                 todas={pedidosFiltrados}
@@ -1236,9 +1291,9 @@ export function PedidosAdminView() {
           pagina={paginaValida}
           totalPaginas={totalPaginas}
           alIr={setPaginaActual}
-          filas={enTabla && filas === null ? 50 : filas}
+          filas={filas === null && (enTabla || enLista) ? (enLista ? 25 : 50) : filas}
           alCambiarFilas={(f) => { setFilas(f); setPaginaActual(1); }}
-          conAuto={!enTabla}
+          conAuto={!enTabla && !enLista}
           avisoTope={avisoTope}
         />
       </>

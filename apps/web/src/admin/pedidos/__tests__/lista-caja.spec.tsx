@@ -1,0 +1,467 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, screen, fireEvent, cleanup, within, waitFor, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { PedidosAdminView } from '../PedidosAdminView';
+import { ListaCaja, ranurasDeAccion } from '../ListaCaja';
+import { pedidosApi, type Pedido } from '../pedidosApi';
+import { preferenciasApi } from '../preferenciasCaja';
+import { normalizarVistaCaja } from '../ControlesTabla';
+import { contarPestanas, normalizarOrdenLista, ordenarLista, pestanaDe, ORDEN_LISTA_POR_DEFECTO } from '../listaCaja';
+import * as sesionModulo from '../../../comun/sesion';
+import * as socketModulo from '../../../comun/socket';
+import { impresionApi } from '../../impresion/impresionApi';
+import { vouchersApi } from '../../vouchers/vouchersApi';
+
+vi.mock('../DetalleVentaModal', () => ({
+  DetalleVentaModal: ({ alCerrar }: { alCerrar: () => void }) => (
+    <div role="dialog" aria-label="Detalle de la venta">
+      <button type="button" onClick={alCerrar}>Cerrar</button>
+    </div>
+  ),
+}));
+vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
+vi.mock('../../creditos/creditosApi', () => ({
+  listarPersonalActivo: vi.fn().mockResolvedValue([]),
+  registrarConsumoCredito: vi.fn(),
+}));
+vi.mock('../../vouchers/vouchersApi', () => ({
+  vouchersApi: { listarVouchers: vi.fn().mockResolvedValue([]) },
+}));
+
+const ahora = new Date().toISOString();
+const ped = (n: number, extra: Partial<Pedido> = {}) =>
+  ({
+    id: String(n),
+    codigo: `CP-${String(n).padStart(3, '0')}`,
+    canal: 'CAJA',
+    modalidad: 'LLEVAR',
+    estado: 'PREPARANDO',
+    pago_estado: 'PAGADO',
+    total: 20,
+    subtotal: 20,
+    descuento: 0,
+    cliente_nombre: `Cliente ${n}`,
+    creado_en: ahora,
+    lineas: [{ id: `l${n}`, nombre: 'Café', cantidad: 1, precio_unit: 20, subtotal: 20 }],
+    ...extra,
+  }) as unknown as Pedido;
+
+let listar: { mock: { calls: any[][] } };
+
+function montar(items: Pedido[], permisos: string[] | 'todos' = 'todos') {
+  vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+    usuario: { partyId: '1', nombres: 'Usuario Prueba', rol: 'CAJERO' },
+    permisos: [],
+    debeCambiar: false,
+    cargando: false,
+    autenticado: true,
+    tiene: vi.fn((p: string) => permisos === 'todos' || permisos.includes(p)),
+  } as any);
+  vi.spyOn(socketModulo, 'useEventos').mockImplementation(() => {});
+  vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true } as any);
+  vi.spyOn(pedidosApi, 'listarNoEntregados').mockResolvedValue({ reprogramar: [], cancelados: [], total: 0 } as any);
+  listar = vi.spyOn(pedidosApi, 'listar').mockImplementation(async (f: any) =>
+    f?.pendientes ? ({ total: 0, pagina: 1, limite: 1, items: [] } as any) : ({ total: items.length, pagina: 1, limite: 100, items } as any),
+  );
+  vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([]);
+  vi.spyOn(impresionApi, 'obtenerEstado').mockRejectedValue(new Error('sin consulta'));
+  return render(
+    <MemoryRouter>
+      <PedidosAdminView />
+    </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  vi.spyOn(preferenciasApi, 'obtener').mockRejectedValue(new Error('sin servidor'));
+  vi.spyOn(preferenciasApi, 'guardar').mockResolvedValue({ clave: '', valor: null });
+});
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const irALista = async () => {
+  await screen.findByTestId('resumen-dia');
+  fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+  return screen.findByTestId('lista-caja');
+};
+const codigosEnLista = () => screen.getAllByTestId('fila-lista').map((f) => within(f).getByText(/^CP-\d+$/).textContent);
+
+describe('Vista Lista: interruptor y preferencia', () => {
+  it('Tabla | Tarjetas | Lista: se alterna y se recuerda por usuario', async () => {
+    montar([ped(1)]);
+    await screen.findByTestId('resumen-dia');
+    const grupo = screen.getByRole('group', { name: 'Vista de la lista' });
+    expect(within(grupo).getAllByRole('button').map((b) => b.textContent)).toEqual(['Tarjetas', 'Tabla', 'Lista']);
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    expect(await screen.findByTestId('lista-caja')).toBeTruthy();
+    expect(window.localStorage.getItem('caprichos.caja.vista')).toBe('"lista"');
+    expect(preferenciasApi.guardar).toHaveBeenCalledWith('caja.vista', 'lista');
+    fireEvent.click(screen.getByRole('button', { name: 'Tabla' }));
+    expect(screen.queryByTestId('lista-caja')).toBeNull();
+    expect(screen.getByTestId('tabla-caja')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Tarjetas' }));
+    expect(screen.queryByTestId('tabla-caja')).toBeNull();
+  });
+
+  it('arranca en Lista si así quedó guardado; una preferencia antigua (tabla) o desconocida sigue siendo válida', async () => {
+    vi.mocked(preferenciasApi.obtener).mockImplementation(async (c: string) => ({ clave: c, valor: c === 'caja.vista' ? 'lista' : null }));
+    montar([ped(1)]);
+    expect(await screen.findByTestId('lista-caja')).toBeTruthy();
+    expect(normalizarVistaCaja('tabla')).toBe('tabla');
+    expect(normalizarVistaCaja('tarjetas')).toBe('tarjetas');
+    expect(normalizarVistaCaja('lista')).toBe('lista');
+    expect(normalizarVistaCaja('cuadro')).toBe('tarjetas');
+    expect(normalizarVistaCaja(null)).toBe('tarjetas');
+  });
+});
+
+describe('Vista Lista: sin filtros', () => {
+  it('no hay búsqueda, botón Filtros, pastillas ni «Todo el día»', async () => {
+    montar([ped(1)]);
+    await irALista();
+    expect(screen.queryByPlaceholderText(/Buscar por código/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Filtros/ })).toBeNull();
+    expect(screen.queryByTestId('cuenta-todo')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Todo el día/ })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Estado de los pedidos' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Medio de pago/ })).toBeNull();
+  });
+
+  it('muestra todos los pedidos aunque haya filtros en otra vista, avisa y «Quitar filtros» los limpia', async () => {
+    montar([ped(1, { cliente_nombre: 'Ana Prueba' }), ped(2, { cliente_nombre: 'Luis Prueba' }), ped(3, { cliente_nombre: 'Rosa Prueba', estado: 'ENTREGADO' })]);
+    await screen.findByTestId('resumen-dia');
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
+    await waitFor(() => expect(screen.queryByText('Luis Prueba')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    await screen.findByTestId('lista-caja');
+    expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-003']); // incluye el entregado y el que la búsqueda ocultaba
+    const nota = screen.getByTestId('nota-lista-filtros');
+    expect(nota).toHaveTextContent('La lista muestra todos los pedidos; los filtros aplican en Tabla y Tarjetas');
+    fireEvent.click(within(nota).getByRole('button', { name: 'Quitar filtros' }));
+    expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Tarjetas' }));
+    expect((screen.getByPlaceholderText(/Buscar por código/) as HTMLInputElement).value).toBe('');
+  });
+
+  it('sin filtros activos no sale la nota', async () => {
+    montar([ped(1)]);
+    await irALista();
+    expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
+  });
+
+  it('el filtro de medio de pago no viaja al servidor en la Lista', async () => {
+    montar([ped(1, { mediosPago: ['YAPE'] })]);
+    await screen.findByTestId('resumen-dia');
+    fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Medio de pago:/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Yape/ }));
+    await waitFor(() => expect(listar.mock.calls.some(([f]: any) => f?.medios?.join(',') === 'YAPE')).toBe(true));
+    listar.mock.calls.length = 0;
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    await waitFor(() => expect(listar.mock.calls.some(([f]: any) => !f?.pendientes)).toBe(true));
+    expect(listar.mock.calls.filter(([f]: any) => !f?.pendientes).every(([f]: any) => !f?.medios)).toBe(true);
+  });
+});
+
+describe('Vista Lista: pestañas por tipo de servicio', () => {
+  const surtido = () => [
+    ped(1, { modalidad: 'LLEVAR' }),
+    ped(2, { modalidad: 'LOCAL' }),
+    ped(3, { modalidad: 'DELIVERY' }),
+    ped(4, { modalidad: 'MESA', mesa_nombre: 'Mesa 4' }),
+    ped(5, { modalidad: 'COMER_LOCAL' }),
+    ped(6, { modalidad: 'RECOGER' }),
+  ];
+
+  it('mapea las modalidades reales y cuenta bien', () => {
+    expect(surtido().map(pestanaDe)).toEqual(['mostrador', 'mostrador', 'domicilio', 'mesas', 'mesas', 'mostrador']);
+    expect(contarPestanas(surtido())).toEqual({ todos: 6, mostrador: 3, domicilio: 1, mesas: 2 });
+  });
+
+  it('cada pestaña filtra la lista y muestra su contador; ARIA tablist/tab/tabpanel', async () => {
+    montar(surtido());
+    await irALista();
+    const tabs = screen.getByRole('tablist', { name: 'Tipo de servicio' });
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos6', 'Mostrador3', 'A domicilio1', 'Mesas2']);
+    expect(screen.getByRole('tabpanel')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
+    expect(codigosEnLista()).toEqual(['CP-003']);
+    fireEvent.click(screen.getByRole('tab', { name: /Mesas/ }));
+    expect(codigosEnLista().sort()).toEqual(['CP-004', 'CP-005']);
+    fireEvent.click(screen.getByRole('tab', { name: /Mostrador/ }));
+    expect(codigosEnLista()).toHaveLength(3);
+  });
+
+  it('las flechas del teclado cambian de pestaña y mueven el foco', async () => {
+    montar(surtido());
+    await irALista();
+    const todos = screen.getByRole('tab', { name: /Todos/ });
+    expect(todos).toHaveAttribute('aria-selected', 'true');
+    expect(todos).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: /Mostrador/ })).toHaveAttribute('tabindex', '-1');
+    fireEvent.keyDown(todos, { key: 'ArrowRight' });
+    const mostrador = screen.getByRole('tab', { name: /Mostrador/ });
+    expect(mostrador).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(mostrador);
+    fireEvent.keyDown(mostrador, { key: 'ArrowLeft' });
+    fireEvent.keyDown(screen.getByRole('tab', { name: /Todos/ }), { key: 'ArrowLeft' }); // da la vuelta: Mesas
+    expect(screen.getByRole('tab', { name: /Mesas/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('una pestaña sin pedidos dice que no hay de ese tipo', async () => {
+    montar([ped(1)]);
+    await irALista();
+    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
+    expect(screen.getByText('No hay pedidos de este tipo de servicio.')).toBeTruthy();
+  });
+});
+
+describe('Vista Lista: ordenar por', () => {
+  const tres = () => [
+    ped(1, { total: 30, cliente_nombre: 'Beto Prueba', creado_en: '2026-11-10T15:00:00Z' }),
+    ped(2, { total: 10, cliente_nombre: 'Ana Prueba', creado_en: '2026-11-10T16:00:00Z' }),
+    ped(3, { total: 20, cliente_nombre: 'Carla Prueba', creado_en: '2026-11-10T14:00:00Z' }),
+  ];
+
+  it('ordenarLista: fecha, total, cliente y estado, ascendente y descendente', () => {
+    expect(ordenarLista(tres(), { campo: 'fecha', dir: 'desc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-001', 'CP-003']);
+    expect(ordenarLista(tres(), { campo: 'total', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-003', 'CP-001']);
+    expect(ordenarLista(tres(), { campo: 'cliente', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-001', 'CP-003']);
+    const estados = [ped(1, { estado: 'ENTREGADO' }), ped(2, { estado: 'COLA', pago_estado: 'PENDIENTE' }), ped(3, { estado: 'LISTO' })];
+    expect(ordenarLista(estados, { campo: 'estado', dir: 'asc' }).map((p) => p.codigo)).toEqual(['CP-002', 'CP-003', 'CP-001']);
+  });
+
+  it('normalizarOrdenLista rechaza valores raros', () => {
+    expect(normalizarOrdenLista({ campo: 'total', dir: 'asc' })).toEqual({ campo: 'total', dir: 'asc' });
+    expect(normalizarOrdenLista({ campo: 'otro', dir: 'asc' })).toEqual(ORDEN_LISTA_POR_DEFECTO);
+    expect(normalizarOrdenLista({ campo: 'total', dir: 'x' })).toEqual(ORDEN_LISTA_POR_DEFECTO);
+    expect(normalizarOrdenLista('hola')).toEqual(ORDEN_LISTA_POR_DEFECTO);
+    expect(normalizarOrdenLista(null)).toEqual(ORDEN_LISTA_POR_DEFECTO);
+  });
+
+  it('cambiar el campo y el sentido reordena y se guarda por usuario', async () => {
+    montar(tres());
+    await irALista();
+    expect(codigosEnLista()).toEqual(['CP-002', 'CP-001', 'CP-003']); // por defecto: fecha, la más reciente primero
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ordenar por' }), { target: { value: 'total' } });
+    expect(preferenciasApi.guardar).toHaveBeenCalledWith('caja.lista.orden', { campo: 'total', dir: 'desc' });
+    expect(codigosEnLista()).toEqual(['CP-001', 'CP-003', 'CP-002']);
+    fireEvent.click(screen.getByRole('button', { name: /Orden descendente/ }));
+    expect(preferenciasApi.guardar).toHaveBeenCalledWith('caja.lista.orden', { campo: 'total', dir: 'asc' });
+    expect(codigosEnLista()).toEqual(['CP-002', 'CP-003', 'CP-001']);
+    expect(window.localStorage.getItem('caprichos.caja.lista.orden')).toBe('{"campo":"total","dir":"asc"}');
+  });
+
+  it('el orden guardado se restaura al abrir', async () => {
+    window.localStorage.setItem('caprichos.caja.vista', '"lista"');
+    window.localStorage.setItem('caprichos.caja.lista.orden', JSON.stringify({ campo: 'cliente', dir: 'asc' }));
+    montar(tres());
+    await screen.findByTestId('lista-caja');
+    expect(codigosEnLista()).toEqual(['CP-002', 'CP-001', 'CP-003']);
+    expect((screen.getByRole('combobox', { name: 'Ordenar por' }) as HTMLSelectElement).value).toBe('cliente');
+  });
+});
+
+describe('Vista Lista: acciones por fila y permisos', () => {
+  const filaDe = (codigo: string) => screen.getAllByTestId('fila-lista').find((f) => within(f).queryByText(codigo))!;
+
+  it('cajero: Estado, Pago y Finalizar según el pedido, imprimir y menú ⋮ con Ver detalle', async () => {
+    montar([
+      ped(1, { estado: 'PREPARANDO' }),
+      ped(2, { estado: 'LISTO', pago_estado: 'PENDIENTE', total: 18 }),
+      ped(3, { estado: 'LISTO', pago_estado: 'PAGADO' }),
+      ped(4, { estado: 'COLA', pago_estado: 'PENDIENTE' }),
+    ]);
+    await irALista();
+    expect(within(filaDe('CP-001')).getByRole('button', { name: 'LISTO CP-001' })).toHaveTextContent('Estado');
+    expect(within(filaDe('CP-001')).queryByRole('button', { name: /Finalizar|COBRAR/ })).toBeNull();
+    expect(within(filaDe('CP-002')).getByRole('button', { name: /COBRAR S\/ 18.00 CP-002/ })).toHaveTextContent('Cobrar S/ 18.00');
+    expect(within(filaDe('CP-003')).getByRole('button', { name: 'ENTREGAR CP-003' })).toHaveTextContent('Finalizar');
+    expect(within(filaDe('CP-004')).getByRole('button', { name: 'CONFIRMAR PAGO CP-004' })).toHaveTextContent('Pago');
+    expect(within(filaDe('CP-001')).getByRole('button', { name: 'Reimprimir pedido CP-001' })).toBeTruthy();
+    fireEvent.click(within(filaDe('CP-001')).getByRole('button', { name: 'Más acciones de CP-001' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Ver detalle de la venta' }));
+    expect(await screen.findByRole('dialog', { name: 'Detalle de la venta' })).toBeTruthy();
+  });
+
+  it('el botón Estado abre la confirmación existente y cambia el estado con el mismo endpoint', async () => {
+    montar([ped(1, { estado: 'LISTO', modalidad: 'LLEVAR', pago_estado: 'PAGADO' })]);
+    const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
+    await irALista();
+    fireEvent.click(screen.getByRole('button', { name: 'ENTREGAR CP-001' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, continuar' }));
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('1', 'ENTREGADO'));
+  });
+
+  it('mozo sin permiso de cambiar estado ni de cobrar: sin Estado, Pago ni Finalizar (queda imprimir y ⋮)', async () => {
+    montar([ped(1, { estado: 'PREPARANDO' }), ped(2, { estado: 'LISTO', pago_estado: 'PENDIENTE' })], []);
+    await irALista();
+    for (const c of ['CP-001', 'CP-002']) {
+      const f = filaDe(c);
+      expect(within(f).queryByText('Estado')).toBeNull();
+      expect(within(f).queryByText('Pago')).toBeNull();
+      expect(within(f).queryByText('Finalizar')).toBeNull();
+      expect(within(f).getByRole('button', { name: `Más acciones de ${c}` })).toBeTruthy();
+    }
+  });
+
+  it('solo cobrar (sin cambiar estado): hay Pago y no Estado', async () => {
+    montar([ped(1, { estado: 'LISTO', pago_estado: 'PENDIENTE' })], ['caja/cobrar']);
+    await irALista();
+    expect(within(filaDe('CP-001')).getByText('Pago')).toBeTruthy();
+    expect(within(filaDe('CP-001')).queryByText('Estado')).toBeNull();
+  });
+
+  it('nunca hay anular, chat de WhatsApp ni «Finalizar todo»', async () => {
+    montar([ped(1), ped(2, { estado: 'LISTO' })]);
+    await irALista();
+    expect(screen.queryByRole('button', { name: /anular/i })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Más acciones de/ })[0]);
+    expect(screen.queryByRole('menuitem', { name: /anular/i })).toBeNull();
+    expect(screen.queryByText(/whatsapp/i)).toBeNull();
+    expect(screen.queryByText(/Finalizar todo/i)).toBeNull();
+  });
+
+  it('ranurasDeAccion reparte la acción siguiente en un solo botón', () => {
+    const a = (tipo: any, extra: any = {}) => ({ tipo, texto: 'X', bg: '', fg: '', ...extra });
+    expect(ranurasDeAccion(null)).toEqual({});
+    expect(Object.keys(ranurasDeAccion(a('cobrar')))).toEqual(['pago']);
+    expect(Object.keys(ranurasDeAccion(a('confirmar_pago')))).toEqual(['pago']);
+    expect(Object.keys(ranurasDeAccion(a('mesa')))).toEqual(['finalizar']);
+    expect(Object.keys(ranurasDeAccion(a('estado', { nuevoEstado: 'ENTREGADO' })))).toEqual(['finalizar']);
+    expect(Object.keys(ranurasDeAccion(a('estado', { nuevoEstado: 'LISTO' })))).toEqual(['estado']);
+    expect(Object.keys(ranurasDeAccion(a('detalle')))).toEqual(['estado']);
+  });
+});
+
+describe('Vista Lista: delivery sin repartidor', () => {
+  it('«Elige un repartidor» solo en delivery abierto sin repartidor, y lleva a Repartos', async () => {
+    montar([
+      ped(1, { modalidad: 'DELIVERY', estado: 'LISTO', repartidor_party_id: null }),
+      ped(2, { modalidad: 'DELIVERY', estado: 'LISTO', repartidor_party_id: '9' }),
+      ped(3, { modalidad: 'LLEVAR', estado: 'LISTO' }),
+      ped(4, { modalidad: 'DELIVERY', estado: 'ENTREGADO', repartidor_party_id: null }),
+    ]);
+    await irALista();
+    const enlaces = screen.getAllByRole('link', { name: /Elige un repartidor/ });
+    expect(enlaces).toHaveLength(1);
+    expect(enlaces[0]).toHaveAttribute('href', '/admin/repartos');
+    expect(enlaces[0]).toHaveAttribute('aria-label', 'Elige un repartidor para CP-001');
+  });
+});
+
+describe('Vista Lista: cronómetro', () => {
+  const T0 = Date.parse('2026-11-08T15:00:00Z');
+  const minAtras = (m: number, s = 0) => new Date(T0 - m * 60000 - s * 1000).toISOString();
+  const cargar = (filas: Pedido[]) =>
+    render(
+      <MemoryRouter>
+        <ListaCaja filas={filas} pestana="todos" accionDe={() => null} resaltados={new Set()} alAccion={() => {}} alVerDetalle={() => {}} alAbrir={() => {}} />
+      </MemoryRouter>,
+    );
+
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(T0); });
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  it('texto accesible «Hace N minutos», avanza solo cada 30 s y se pone rojo desde los 50 min', () => {
+    cargar([ped(1, { creado_en: minAtras(49, 40) })]);
+    const reloj = screen.getByRole('timer');
+    expect(reloj).toHaveAttribute('aria-label', 'Hace 49 minutos, atención');
+    expect(reloj).toHaveAttribute('data-nivel', 'oxido');
+    act(() => { vi.advanceTimersByTime(30000); });
+    expect(screen.getByRole('timer')).toHaveAttribute('data-nivel', 'rojo');
+    expect(screen.getByRole('timer')).toHaveAttribute('aria-label', 'Hace 50 minutos, tarde');
+  });
+
+  it('un solo intervalo para toda la lista y se limpia al desmontar', () => {
+    const set = vi.spyOn(globalThis, 'setInterval');
+    const clear = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = cargar([ped(1, { creado_en: minAtras(5) }), ped(2, { creado_en: minAtras(8) }), ped(3, { creado_en: minAtras(70) })]);
+    expect(screen.getAllByRole('timer')).toHaveLength(3);
+    expect(set).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('un pedido cerrado no corre: muestra la hora y no se pone rojo', () => {
+    cargar([ped(1, { estado: 'ENTREGADO', creado_en: minAtras(200) })]);
+    expect(screen.getByRole('timer')).toHaveAttribute('data-nivel', 'neutro');
+  });
+});
+
+describe('Vista Lista: celular y paginación', () => {
+  const anchoOriginal = window.innerWidth;
+  afterEach(() => { window.innerWidth = anchoOriginal; });
+
+  it('a 360 px la Lista se arma igual (el diseño pasa a 2–3 líneas por CSS) y las acciones siguen presentes', async () => {
+    window.innerWidth = 360;
+    montar([ped(1, { estado: 'LISTO', pago_estado: 'PENDIENTE' })]);
+    await irALista();
+    const fila = screen.getByTestId('fila-lista');
+    expect(within(fila).getByRole('button', { name: /COBRAR/ })).toBeTruthy();
+    expect(within(fila).getByRole('button', { name: 'Más acciones de CP-001' })).toBeTruthy();
+    expect(screen.getByRole('tablist')).toBeTruthy();
+  });
+
+  it('usa el paginador de Caja: 25 por defecto, sin «Auto», y 10 por página se respeta', async () => {
+    montar(Array.from({ length: 30 }, (_, i) => ped(i + 1)));
+    await irALista();
+    expect(screen.getAllByTestId('fila-lista')).toHaveLength(25);
+    expect(screen.getByTestId('rango-pagina')).toHaveTextContent('Mostrando 1–25 de 30');
+    const sel = screen.getByRole('combobox', { name: 'Filas por página' });
+    expect(within(sel).queryByRole('option', { name: 'Auto' })).toBeNull();
+    fireEvent.change(sel, { target: { value: '10' } });
+    expect(screen.getAllByTestId('fila-lista')).toHaveLength(10);
+  });
+});
+
+describe('Vista Lista: el Resumen coincide con la lista', () => {
+  it('mismos pedidos: total del resumen = filas de la pestaña Todos y ventas = suma de la lista sin anulados', async () => {
+    montar([ped(1, { total: 30 }), ped(2, { total: 20, pago_estado: 'PENDIENTE' }), ped(3, { total: 99, estado: 'ANULADO' }), ped(4, { total: 10, estado: 'ENTREGADO' })]);
+    await irALista();
+    const resumen = screen.getByTestId('resumen-dia');
+    expect(resumen).toHaveTextContent('4 pedidos');
+    expect(screen.getByTestId('lista-cuenta-todos')).toHaveTextContent('4');
+    expect(screen.getAllByTestId('fila-lista')).toHaveLength(4);
+    expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 60.00'); // 30 + 20 + 10; el anulado no suma
+  });
+
+  it('con un filtro activo en otra vista, la Lista sigue mostrando los montos del total (sin «Filtrado»)', async () => {
+    montar([ped(1, { total: 30, cliente_nombre: 'Ana Prueba' }), ped(2, { total: 20, cliente_nombre: 'Luis Prueba' })]);
+    await screen.findByTestId('resumen-dia');
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
+    await waitFor(() => expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Filtrado: 1 pedido'));
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    await screen.findByTestId('lista-caja');
+    expect(screen.getByTestId('montos-resumen')).not.toHaveTextContent('Filtrado');
+    expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 50.00');
+    expect(screen.getAllByTestId('fila-lista')).toHaveLength(2);
+  });
+
+  it('los contadores del resumen no filtran en la Lista (quedan deshabilitados)', async () => {
+    montar([ped(1)]);
+    await irALista();
+    expect(screen.getByRole('button', { name: /activo/ })).toBeDisabled();
+  });
+});
+
+describe('Vista Lista: estados', () => {
+  it('sin pedidos: mensaje de vacío', async () => {
+    montar([]);
+    await screen.findByTestId('resumen-dia');
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
+    expect(await screen.findByText('No hay pedidos hoy.')).toBeTruthy();
+  });
+
+  it('con error al cargar: el mismo estado de error de Caja', async () => {
+    montar([]);
+    vi.mocked(pedidosApi.listar).mockRejectedValue(new Error('sin conexión de prueba'));
+    cleanup();
+    vi.mocked(sesionModulo.useSesion).mockReturnValue({ tiene: () => true, usuario: { partyId: '1' } } as any);
+    render(<MemoryRouter><PedidosAdminView /></MemoryRouter>);
+    expect(await screen.findByText(/sin conexión de prueba/)).toBeTruthy();
+  });
+});
