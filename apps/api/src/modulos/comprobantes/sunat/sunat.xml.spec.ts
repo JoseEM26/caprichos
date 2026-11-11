@@ -66,9 +66,41 @@ describe('UBL 2.1 de factura y boleta (IGV 10.5, sin red)', () => {
     const r = armarFacturaXml({ tipo: 'FACTURA', serie: 'F002', numero: 1, fecha, emisor: EMISOR_PRUEBA, datos: conDescuento });
     const doc2 = parsear(r.xml);
     expect(doc2.getElementsByTagNameNS('*', 'AllowanceCharge').length).toBe(1);
-    expect(valor(doc2, 'AllowanceTotalAmount')).toBe(montoXml(r.totales.descuentoBaseCents));
+    // Descuento código 02: sin AllowanceTotalAmount (SUNAT da 3300) y LineExtensionAmount ya descontado
+    expect(doc2.getElementsByTagNameNS('*', 'AllowanceTotalAmount').length).toBe(0);
     expect(valor(doc2, 'PayableAmount')).toBe('30.00');
     expect(r.totales.totalCents).toBe(3000);
+  });
+
+  it.each([
+    // [igvPct, líneas con IGV, envío, descuento]
+    [10.5, [2360, 1189], 600, 962], // caso real: base del descuento 8.71, total 31.87
+    [10.5, [2210], 0, 1105],
+    [18, [1000, 2555], 0, 333], // descuento no redondo, otra tasa
+    [10.5, [5000], 700, 5700], // descuento grande (casi todo)
+    [18, [1234], 450, 0], // sin descuento
+  ])('totales UBL cuadran con la regla SUNAT (igv %p, descuento %p)', (igvPct, subs, envio, desc) => {
+    const lineas = (subs as number[]).map((c, i) => ({ nombre: `Producto ${i}`, cantidad: 1, subtotalCents: c }));
+    const total = (subs as number[]).reduce((a, b) => a + b, 0) + (envio as number) - (desc as number);
+    const d = datosDePrueba({ igvPct: igvPct as number, lineas, envioCents: envio as number, descuentoCents: desc as number, totalCents: total });
+    const { xml } = armarFacturaXml({ tipo: 'FACTURA', serie: 'F002', numero: 1, fecha, emisor: EMISOR_PRUEBA, datos: d });
+    const doc = parsear(xml);
+    const c = (t: string, i = 0) => Math.round(Number(doc.getElementsByTagNameNS('*', t)[i].textContent) * 100);
+    const lm = doc.getElementsByTagNameNS('*', 'LegalMonetaryTotal')[0];
+    const en = (t: string) => Math.round(Number(lm.getElementsByTagNameNS('*', t)[0].textContent) * 100);
+    const sumaLineas = (Array.from(doc.getElementsByTagNameNS('*', 'InvoiceLine')) as Element[]).reduce((a: number, l: Element) => a + Math.round(Number(l.getElementsByTagNameNS('*', 'LineExtensionAmount')[0].textContent) * 100), 0);
+    const monto = doc.getElementsByTagNameNS('*', 'AllowanceCharge').length ? c('Amount') : 0;
+    // Solo el descuento (código 02) afecta la base: valor de venta descontado = suma de líneas - descuento
+    expect(en('LineExtensionAmount')).toBe(sumaLineas - monto);
+    expect(lm.getElementsByTagNameNS('*', 'AllowanceTotalAmount').length).toBe(0);
+    // Base gravada del documento = valor de venta descontado; base + IGV = total a pagar
+    const tt = (Array.from(doc.documentElement.childNodes) as any[]).find((n) => n.localName === 'TaxTotal');
+    const gravada = Math.round(Number(tt.getElementsByTagNameNS('*', 'TaxableAmount')[0].textContent) * 100);
+    const igv = Math.round(Number(tt.getElementsByTagNameNS('*', 'TaxAmount')[0].textContent) * 100);
+    expect(gravada).toBe(en('LineExtensionAmount'));
+    expect(en('PayableAmount')).toBe(total);
+    expect(en('TaxInclusiveAmount')).toBe(total);
+    expect(gravada + igv).toBe(total);
   });
 
   it('boleta sin documento: schemeID 0 y "-", CLIENTE VARIOS; con DNI: schemeID 1', () => {

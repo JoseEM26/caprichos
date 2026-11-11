@@ -161,6 +161,45 @@ describe('Que no se pierda nada: outbox, reintentos, DLQ, circuito y barrido', (
     expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
   });
 
+  it('REVISION_MANUAL por rechazo permanente (3300): Reintentar REGENERA y vuelve a firmar con el mismo número; el ZIP viejo se conserva', async () => {
+    const fetchFn = fetchSunat({ sendBill: async () => sobreAceptado('3300') });
+    const { prisma, db, servicio, fetchFn: f } = montar({}, fetchFn);
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    await servicio.enviarElectronico(id, { automatico: true });
+    expect(estadosDe(db)).toEqual(['REVISION_MANUAL']);
+    expect(db.comprobante[0].revision_motivo).toMatch(/^Rechazo permanente 3300/);
+    const numero = db.comprobante[0].numero_texto;
+    expect(db.comprobanteArchivo.filter((a: any) => a.tipo === 'ZIP')).toHaveLength(1);
+
+    fetchFn.mockImplementation(async (_u: string, init: any) =>
+      String(init.body).includes('<ser:getStatusCdr>') ? consultaSinComprobante() : sobreAceptado());
+    await servicio.reintentarElectronico(id, {}, cajero);
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+    expect(db.comprobante[0].numero_texto).toBe(numero);
+    // Se firmó de nuevo (nuevo ZIP guardado) y nada se borró
+    expect(db.comprobanteArchivo.filter((a: any) => a.tipo === 'ZIP')).toHaveLength(2);
+    expect(f.mock.calls.filter(([, i]: any) => String(i.body).includes('<ser:sendBill>'))).toHaveLength(2);
+  });
+
+  it('REVISION_MANUAL por "sin respuesta": Reintentar reenvía el MISMO ZIP (no firma de nuevo)', async () => {
+    const fetchFn = fetchSunat({ sendBill: async () => Promise.reject(new Error('ECONNRESET')) });
+    const { prisma, db, servicio, fetchFn: f } = montar({ parametro: [{ clave: 'facturacion_proveedor', valor: 'SUNAT' }, { clave: 'facturacion_max_intentos', valor: 1 }] }, fetchFn);
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    await servicio.enviarElectronico(id, { automatico: true });
+    expect(estadosDe(db)).toEqual(['REVISION_MANUAL']);
+    expect(db.comprobante[0].revision_motivo).toMatch(/^Sin respuesta/);
+
+    fetchFn.mockImplementation(async (_u: string, init: any) =>
+      String(init.body).includes('<ser:getStatusCdr>') ? consultaSinComprobante() : sobreAceptado());
+    await servicio.reintentarElectronico(id, {}, cajero);
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+    expect(db.comprobanteArchivo.filter((a: any) => a.tipo === 'ZIP')).toHaveLength(1);
+    const envios = f.mock.calls.filter(([, i]: any) => String(i.body).includes('<ser:sendBill>'));
+    expect(String(envios[1][1].body)).toBe(String(envios[0][1].body));
+  });
+
   it('error inesperado al reintentar: HttpException con codigo y mensaje legibles, y se registra', async () => {
     const { prisma, servicio } = montar();
     jest.spyOn(prisma.comprobante, 'findUnique').mockRejectedValue(new Error('conexión perdida\ndetalle'));

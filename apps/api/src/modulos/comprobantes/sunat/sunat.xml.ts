@@ -152,9 +152,10 @@ export function armarFacturaXml(p: DatosFacturaXml): ResultadoArmado {
     `<cbc:TaxAmount currencyID="PEN">${montoXml(totales.totalIgvCents)}</cbc:TaxAmount>` +
     `<cac:TaxCategory><cac:TaxScheme><cbc:ID>1000</cbc:ID><cbc:Name>IGV</cbc:Name><cbc:TaxTypeCode>VAT</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory>` +
     `</cac:TaxSubtotal></cac:TaxTotal>` +
-    `<cac:LegalMonetaryTotal><cbc:LineExtensionAmount currencyID="PEN">${montoXml(baseLineas)}</cbc:LineExtensionAmount>` +
+    // Descuento global código 02 (afecta la base): LineExtensionAmount es el valor de venta YA descontado y NO va AllowanceTotalAmount
+    // (SUNAT beta: con él devuelve 3300; AllowanceTotalAmount solo sirve para descuentos que no afectan la base, código 03).
+    `<cac:LegalMonetaryTotal><cbc:LineExtensionAmount currencyID="PEN">${montoXml(baseLineas - totales.descuentoBaseCents)}</cbc:LineExtensionAmount>` +
     `<cbc:TaxInclusiveAmount currencyID="PEN">${montoXml(totales.totalCents)}</cbc:TaxInclusiveAmount>` +
-    (totales.descuentoCents > 0 ? `<cbc:AllowanceTotalAmount currencyID="PEN">${montoXml(totales.descuentoBaseCents)}</cbc:AllowanceTotalAmount>` : '') +
     `<cbc:PayableAmount currencyID="PEN">${montoXml(totales.totalCents)}</cbc:PayableAmount></cac:LegalMonetaryTotal>` +
     lineas +
     `</Invoice>`;

@@ -477,7 +477,10 @@ export class ComprobantesService {
       // (mismo documento, mismo número, mismo hash). Nunca se vuelve a firmar algo ya firmado.
       const yaFirmada = intentosPrevios > 0 || !!c.facturacion_hash;
       // Un RECHAZADO por 0133 (falla interna de SUNAT) sin correcciones también reenvía el mismo ZIP: SUNAT nunca lo procesó
-      const reenviaTalCual = c.facturacion_estado === 'PENDIENTE_ENVIO' || (c.facturacion_estado === 'REVISION_MANUAL' && !opciones.corregido) || (c.facturacion_estado === 'RECHAZADO' && !opciones.corregido && /\b0133\b/.test(c.facturacion_respuesta ?? ''));
+      // REVISION_MANUAL por "Rechazo permanente" (SUNAT rechazó con 2xxx/3xxx): el ZIP guardado tiene el defecto, reenviarlo
+      // fallaría siempre. Se regenera y se vuelve a firmar con el mismo número y fecha (SUNAT no registra esos rechazos).
+      const rechazoDeSunat = /^Rechazo permanente/.test(c.revision_motivo ?? '');
+      const reenviaTalCual = c.facturacion_estado === 'PENDIENTE_ENVIO' || (c.facturacion_estado === 'REVISION_MANUAL' && !opciones.corregido && !rechazoDeSunat) || (c.facturacion_estado === 'RECHAZADO' && !opciones.corregido && /\b0133\b/.test(c.facturacion_respuesta ?? ''));
       const zipPrevio = reenviaTalCual && yaFirmada ? await this.ultimoArchivo(c.id, 'ZIP') : null;
       if (proveedor !== 'SIMULADO') {
         // Se cuenta ANTES de llamar a SUNAT: si el proceso muere en la llamada, el próximo intento consulta antes de reenviar
