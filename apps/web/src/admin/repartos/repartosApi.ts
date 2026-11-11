@@ -263,7 +263,7 @@ export interface Seguimiento {
 export interface PedidoPerdido {
   pedidoId: string;
   codigo: string;
-  motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+  motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO' | 'COBRO_PENDIENTE';
   tomadoPor?: string;
 }
 
@@ -449,8 +449,9 @@ export const repartosApi = {
   reasignarPedido: (id: string, repartidorPartyId: string, motivo: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/reasignar`, { repartidorPartyId, motivo }),
 
-  salir: (id: string) =>
-    api.post<PedidoReparto>(`/admin/repartos/${id}/salir`),
+  /** `sinCobro`: solo el administrador, con motivo, cuando el pedido digital aún no está cobrado. */
+  salir: (id: string, sinCobro?: { forzarSinCobro: true; motivo: string }) =>
+    api.post<PedidoReparto>(`/admin/repartos/${id}/salir`, sinCobro ?? {}),
 
   /** Reordena la ruta por cercanía empezando por este pedido (solo antes de salir). */
   empezarPor: (id: string) =>
@@ -470,9 +471,10 @@ export const repartosApi = {
   /** El repartidor devuelve al local un pedido suyo que ya salió. */
   devolverAlLocal: (id: string) => api.post<{ ok: boolean }>(`/admin/repartos/${id}/devolver-local`),
 
-  entregar: (id: string) =>
+  entregar: (id: string, sinCobro?: { forzarSinCobro: true; motivo: string }) =>
     api.post<PedidoReparto & { por_rendir_efectivo?: number; efectivo_a_rendir?: number }>(
       `/admin/repartos/${id}/entregar`,
+      sinCobro ?? {},
     ),
 
   /** Sube una foto del lugar como archivo privado (reducida antes, para conexiones lentas). Devuelve su id. */

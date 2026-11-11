@@ -24,6 +24,7 @@ Gestion del cierre formal de la caja diaria y cambio de turno. Implementa el pro
 1. En la pestana Cierre actual, revisar la seccion 1: Pedidos pendientes de cobro.
 2. Si aparecen pedidos en la lista, la caja no podra cerrarse por regla del sistema.
 3. Para cada pedido pendiente, pulsar Ir a cobrar en [[caja]] o proceder a anularlo si fue cancelado o desistido.
+4. Un pedido ya Entregado que sigue sin cobrar (Para llevar, Recoger o Delivery digital) tambien impide cerrar: cobralo o anulalo. Si no se puede, solo el Administrador puede cerrar justificandolo: en el panel escribe un motivo (minimo 10 letras) y pulsa Justificar y permitir el cierre. El sistema avisa con la lista (ENTREGADOS_SIN_COBRAR) y deja auditado el cierre con el motivo. Si ademas hay pedidos todavia en curso, siguen bloqueando.
 Requiere: [[caja]]
 Antes: [[caja]]
 Ver tambien: [[caja]]

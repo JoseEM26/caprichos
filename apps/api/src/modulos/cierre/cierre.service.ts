@@ -5,6 +5,8 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { pedidoDebeEstarCobrado, MOTIVO_SIN_COBRO_MIN } from '../pedidos';
+import { tieneRol } from '../acceso/roles-usuario';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -521,6 +523,7 @@ export class CierreService {
     const cajaAbierta = await this.obtenerCajaAbierta();
 
     let pagosSinCobro: string[] = [];
+    let entregadosJustificados: string[] = [];
     const cierre = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
@@ -533,13 +536,41 @@ export class CierreService {
       });
 
       if (cobrosEnCurso > 0) {
-        throw new HttpException(
-          {
-            codigo: 'COBROS_EN_CURSO',
-            mensaje: `No se puede cerrar la caja: hay ${cobrosEnCurso} pedido(s) con cobro en curso o por confirmar.`,
-          },
-          HttpStatus.CONFLICT,
-        );
+        // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
+        const entregados = await tx.pedido.findMany({
+          where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO' },
+          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, total: true, planPago: { select: { medio: true, monto: true } } },
+          orderBy: { creado_en: 'asc' },
+        });
+        const sinCobrar = entregados.filter((p: any) => pedidoDebeEstarCobrado(p));
+        const lista = sinCobrar.map((p: any) => ({ id: Number(p.id), codigo: p.codigo, modalidad: p.modalidad, pagoEstado: p.pago_estado, total: Number(p.total) }));
+        if (cobrosEnCurso > sinCobrar.length) {
+          throw new HttpException(
+            {
+              codigo: 'COBROS_EN_CURSO',
+              mensaje: `No se puede cerrar la caja: hay ${cobrosEnCurso} pedido(s) con cobro en curso o por confirmar.`,
+              ...(lista.length ? { entregadosSinCobrar: lista } : {}),
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+        // Solo quedan entregados sin cobrar: el ADMIN puede cerrar con un motivo (queda auditado)
+        const esAdmin = tieneRol(usuario, 'ADMIN');
+        const motivo = (dto.motivoEntregadosSinCobrar ?? '').trim();
+        if (!esAdmin || motivo.length < MOTIVO_SIN_COBRO_MIN) {
+          throw new HttpException(
+            {
+              codigo: 'ENTREGADOS_SIN_COBRAR',
+              mensaje:
+                `No se puede cerrar la caja: hay ${lista.length} pedido(s) entregados sin cobrar. Cóbralos o anúlalos.` +
+                (esAdmin ? ' Como administrador puedes cerrar escribiendo un motivo (mínimo 10 letras).' : ''),
+              entregadosSinCobrar: lista,
+              puedeJustificar: esAdmin,
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+        entregadosJustificados = lista.map((p) => `${p.codigo} S/ ${p.total.toFixed(2)}`);
       }
 
       // 2. Ningún repartidor con efectivo sin liquidar (RN-CAP-097 / RQ-CIE-02-08)
@@ -676,6 +707,20 @@ export class CierreService {
       partyId: usuario.partyId,
       ip,
     });
+    if (entregadosJustificados.length) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'cierre',
+        accion: 'CIERRE_ENTREGADOS_SIN_COBRO',
+        resultado: 'OK',
+        entidad: 'cierre_caja',
+        entidadId: caja.id,
+        despues: { pedidos: entregadosJustificados, forzadoPorAdministrador: true },
+        motivo: dto.motivoEntregadosSinCobrar?.trim(),
+        partyId: usuario.partyId,
+        ip,
+      });
+    }
 
     try {
       this.eventosGateway?.emitirAdmin?.('caja:cerrada', {

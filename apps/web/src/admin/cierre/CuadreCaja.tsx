@@ -39,6 +39,8 @@ export interface CierrePayload {
   efectivoTotal?: number;
   medios: Partial<Record<ClaveDigital, number>>;
   nota?: string;
+  /** Solo el administrador: justifica cerrar con pedidos entregados sin cobrar */
+  motivoEntregadosSinCobrar?: string;
 }
 
 export interface CuadreCajaProps {
@@ -48,6 +50,8 @@ export interface CuadreCajaProps {
   diaAnterior?: boolean;
   cajero: string;
   pendientesCount: number;
+  /** Motivo con el que el administrador justifica los entregados sin cobrar: deja cerrar con ellos */
+  motivoSinCobro?: string;
   /** Panel de pedidos sin cobrar (se abre en la misma pantalla con «resolver») */
   pendientesPanel?: ReactNode;
   repartidores: RepartidorPorLiquidar[];
@@ -87,6 +91,7 @@ export function CuadreCaja({
   diaAnterior = false,
   cajero,
   pendientesCount,
+  motivoSinCobro,
   pendientesPanel,
   repartidores,
   onRecibirRepartidor,
@@ -147,7 +152,7 @@ export function CuadreCaja({
   const estadoTotal = estadoDif(total);
 
   const pendientesRepartidor = repartidores.filter((r) => r.pendiente > 0);
-  const bloqueado = pendientesCount > 0 || pendientesRepartidor.length > 0;
+  const bloqueado = (pendientesCount > 0 && !motivoSinCobro) || pendientesRepartidor.length > 0;
 
   // ---------- Acciones del conteo ----------
   const fijarCantidad = (clave: string, valor: string) =>
@@ -182,6 +187,7 @@ export function CuadreCaja({
       if (v !== null) medios[m.clave] = v;
     }
     const base: CierrePayload = { medios, nota: borrador.nota.trim() || undefined };
+    if (motivoSinCobro && pendientesCount > 0) base.motivoEntregadosSinCobrar = motivoSinCobro;
     if (borrador.modo === 'total') {
       if (efectivoTocado) base.efectivoTotal = efectivoContado;
     } else {
@@ -260,7 +266,10 @@ export function CuadreCaja({
           </div>
         ) : (
           <div className="cc-aviso cc-aviso-ok" role="status">
-            <span aria-hidden="true">✓</span> Sin pendientes: no hay pedidos sin cobrar ni repartidores por liquidar.
+            <span aria-hidden="true">✓</span>{' '}
+            {motivoSinCobro && pendientesCount > 0
+              ? 'Cierre con pedidos entregados sin cobrar justificados por el administrador.'
+              : 'Sin pendientes: no hay pedidos sin cobrar ni repartidores por liquidar.'}
           </div>
         )}
         {verPendientes && pendientesCount > 0 && <div className="cc-pendientes">{pendientesPanel}</div>}

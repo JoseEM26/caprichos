@@ -1,4 +1,5 @@
 import { SalonService } from '../salon/salon.service';
+import { pedidoDebeEstarCobrado } from '../pedidos';
 import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
@@ -1108,7 +1109,8 @@ export class ComandasService {
       }
 
       // Para llevar o recoger, lo despachado completo es lo entregado (mesa va por entregado en mesa)
-      if (pedido.modalidad !== 'MESA' && estadoFinal === 'LISTO') {
+      // Si falta cobrar (Para llevar / Recoger) se queda en LISTO: Caja cobra y luego se entrega
+      if (pedido.modalidad !== 'MESA' && estadoFinal === 'LISTO' && !pedidoDebeEstarCobrado(pedido)) {
         await tx.pedido.update({
           where: { id: pId },
           data: { estado: 'ENTREGADO', entregado_en: ahora },

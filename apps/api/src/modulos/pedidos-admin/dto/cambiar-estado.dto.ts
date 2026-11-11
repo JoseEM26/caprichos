@@ -14,6 +14,11 @@ export class CambiarEstadoDto {
   @IsBoolean()
   forzar?: boolean;
 
+  /** Solo el administrador: entrega o despacha aunque el pedido no esté cobrado (exige `motivo`). */
+  @IsOptional()
+  @IsBoolean()
+  forzarSinCobro?: boolean;
+
   /** Al anular con el control de almacén encendido: MERMA (se llegó a preparar; defecto) o DEVOLVER los insumos a Cocina. */
   @IsOptional()
   @IsIn(['MERMA', 'DEVOLVER'])

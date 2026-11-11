@@ -364,6 +364,7 @@ export function CierreView() {
   };
 
   // Cierra la caja con lo que trae el panel. Nunca se bloquea por diferencia; sí por pendientes (el servidor lo vuelve a validar).
+  const [motivoSinCobro, setMotivoSinCobro] = useState('');
   const handleCerrarCaja = async (p: CierrePayload): Promise<boolean> => {
     if (guardando || cerrandoCaja) return false;
     setMsgCierreError('');
@@ -430,6 +431,7 @@ export function CierreView() {
           diaAnterior={fechaTurno < hoyLima()}
           cajero={cajeroNombre}
           pendientesCount={pedidosAbiertos.length}
+          motivoSinCobro={motivoSinCobro}
           pendientesPanel={
             <PendientesCobroCierre
               pendientes={pedidosAbiertos}
@@ -438,6 +440,9 @@ export function CierreView() {
               errorLista={errorPendientes}
               alReintentar={cargarTurno}
               fechaCaja={fechaTurno}
+              esAdmin={esAdmin}
+              motivoSinCobro={motivoSinCobro}
+              alJustificar={setMotivoSinCobro}
             />
           }
           repartidores={repartidores}

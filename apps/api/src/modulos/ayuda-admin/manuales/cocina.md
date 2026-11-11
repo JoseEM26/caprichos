@@ -112,6 +112,7 @@ Antes: [[caja]]
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
 - Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes de que el pedido pase a LISTO.
 - Caja no puede pasar a Listo ni a Entregado un pedido que aun tenga areas sin despejar: le sale un aviso con el nombre de las areas que faltan y debe pedirles que pulsen Listo. Solo el Administrador puede forzarlo con un motivo; en ese caso las comandas pendientes se dan por despejadas y quedan auditadas. Lo que haces tu en Cocina (despejar, marcar unidades listas, despachar) no cambia. Las comandas viejas de pedidos ya entregados se pueden despejar a mano.
+- Un pedido Para llevar que aun no esta cobrado no pasa solo a Entregado cuando despachas todo: se queda en Listo hasta que Caja lo cobre y lo entregue. Lo que haces en Cocina no cambia.
 - Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
 
 ## Quien puede hacerlo

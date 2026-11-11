@@ -476,8 +476,9 @@ export const pedidosApi = {
   },
 
   /** `forzar`: solo el administrador, con motivo, cuando Cocina aún no despejó el pedido. */
-  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER'): Promise<Pedido> {
+  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER', forzarSinCobro?: boolean): Promise<Pedido> {
     const cuerpo: Record<string, unknown> = forzar ? { estado, motivo, forzar: true } : { estado, motivo };
+    if (forzarSinCobro) cuerpo.forzarSinCobro = true;
     if (consumoAlmacen) cuerpo.consumoAlmacen = consumoAlmacen;
     return api.post<Pedido>(`/admin/pedidos/${id}/estado`, cuerpo);
   },

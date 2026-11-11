@@ -156,6 +156,7 @@ Ver tambien: [[mensajes]]
 - 409 CAMBIO_COBRO_PENDIENTE "Esperando que Caja valide el pago…": hay un cambio de forma de pago sin resolver; espera a Caja (aprobar, rechazar o autorizar la entrega sin validar).
 - 400 CAPTURA_REQUERIDA: falta la captura de un medio digital del cambio de pago. 400 CAPTURA_ILEGIBLE: toma otra foto. 400 SIN_CAMBIO: elegiste el mismo medio que ya tiene el pedido.
 - 409 ESTADO_INVALIDO "Solo puedes cambiar la forma de pago de un pedido que va en camino o ya llego" o 409 YA_PAGADO: el pedido todavia no salio, ya se entrego o ya esta pagado.
+- 409 COBRO_PENDIENTE "Este pedido aun no esta cobrado": un delivery pagado con Yape, Plin, transferencia o tarjeta no sale ni se entrega hasta que Caja lo cobre; avisa a Caja. El delivery en efectivo contra entrega no tiene este bloqueo. Solo el Administrador puede salir o entregar sin cobrar, con motivo (minimo 10 letras); queda auditado y el pedido sigue Falta cobrar. Si iniciar ruta deja un pedido fuera por cobro pendiente, cobralo en Caja y vuelve a tomarlo.
 - Si otro repartidor tomo antes un pedido de la ruta sugerida, el sistema avisa cual se perdio.
 - Si llegas al tope de pedidos simultaneos debes entregar alguno antes de tomar otro.
 - Un repartidor solo ve sus pedidos y el telefono aparece despues de tomar el pedido.

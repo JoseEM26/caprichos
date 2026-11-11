@@ -49,6 +49,7 @@ describe('RepartosService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      pedidoPagoPlan: { findMany: jest.fn().mockResolvedValue([]) },
       solicitudCambioCobro: { findFirst: jest.fn().mockResolvedValue(null) },
       parametro: {
         findMany: jest.fn().mockResolvedValue([
@@ -242,6 +243,7 @@ describe('RepartosService', () => {
         id: 30n,
         codigo: 'CP-0102',
         modalidad: 'DELIVERY',
+        pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,
         creado_en: new Date(),
@@ -346,8 +348,8 @@ describe('RepartosService', () => {
         pago_estado: 'PENDIENTE', total: new Prisma.Decimal(40), creado_en: new Date(), zona: null,
       };
       prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue(null) };
-      // efectivo → Yape aprobado: ya no hay efectivo que rendir
-      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, pago_metodo: 'YAPE', planPago: [] });
+      // efectivo → Yape aprobado y ya cobrado: no hay efectivo que rendir
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, pago_estado: 'PAGADO', pago_metodo: 'YAPE', planPago: [] });
       prismaMock.pedido.update.mockResolvedValue({ ...base, pago_metodo: 'YAPE', estado: 'ENTREGADO' });
       expect((await service.entregar('36', repartidor1)).por_rendir_efectivo).toBe(0);
       // efectivo + Yape aprobado: solo el renglón de efectivo
@@ -406,30 +408,58 @@ describe('RepartosService', () => {
       zona: null,
     };
 
-    it('salir con Yape pendiente y SIN voucher: pasa a EN_CAMINO (la captura no frena la salida)', async () => {
+    const admin: any = { partyId: 1n, rol: 'ADMIN' };
+
+    it('salir con Yape sin cobrar: 409 COBRO_PENDIENTE y no cambia el estado', async () => {
       const pedido = { ...digitalPendiente, id: 50n, codigo: 'CP-0150', estado: 'LISTO' };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+      prismaMock.pedidoPagoPlan = { findMany: jest.fn().mockResolvedValue([]) };
+
+      await expect(service.salir('50', repartidor1)).rejects.toMatchObject({ response: { codigo: 'COBRO_PENDIENTE' } });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('salir con Yape sin cobrar: el ADMIN con motivo sale y queda auditado PEDIDO_FORZAR_SIN_COBRO', async () => {
+      const pedido = { ...digitalPendiente, id: 50n, codigo: 'CP-0150', estado: 'LISTO' };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+      prismaMock.pedidoPagoPlan = { findMany: jest.fn().mockResolvedValue([]) };
+      prismaMock.pedido.update.mockResolvedValue({ ...pedido, estado: 'EN_CAMINO', salio_en: new Date() });
+
+      const res = await service.salir('50', admin, undefined, { forzarSinCobro: true, motivo: 'El cliente paga luego' });
+
+      expect(res.estado).toBe('EN_CAMINO');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'PEDIDO_FORZAR_SIN_COBRO' }));
+    });
+
+    it('salir con Yape ya cobrado (PAGADO): pasa a EN_CAMINO', async () => {
+      const pedido = { ...digitalPendiente, pago_estado: 'PAGADO', id: 50n, codigo: 'CP-0150', estado: 'LISTO' };
       prismaMock.pedido.findUnique.mockResolvedValue(pedido);
       prismaMock.pedido.update.mockResolvedValue({ ...pedido, estado: 'EN_CAMINO', salio_en: new Date() });
 
-      const res = await service.salir('50', repartidor1);
-
-      expect(res.estado).toBe('EN_CAMINO');
+      expect((await service.salir('50', repartidor1)).estado).toBe('EN_CAMINO');
     });
 
-    it('entregar con Yape pendiente y SIN voucher: ENTREGADO, sigue por cobrar (PENDIENTE) y no hay efectivo que rendir', async () => {
+    it('entregar con Yape sin cobrar: 409 COBRO_PENDIENTE; el repartidor no puede forzar (403)', async () => {
       const pedido = { ...digitalPendiente, id: 51n, codigo: 'CP-0151', estado: 'EN_CAMINO', planPago: [] };
-      prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue(null) };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+
+      await expect(service.entregar('51', repartidor1)).rejects.toMatchObject({ response: { codigo: 'COBRO_PENDIENTE' } });
+      await expect(
+        service.entregar('51', repartidor1, undefined, { forzarSinCobro: true, motivo: 'Cliente pagó luego, sin problema' }),
+      ).rejects.toMatchObject({ response: { codigo: 'FORZAR_SOLO_ADMIN' } });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('entregar con efectivo contra entrega sin cobrar: sigue permitido y deja el efectivo por rendir', async () => {
+      const pedido = { ...digitalPendiente, pago_metodo: 'EFECTIVO', id: 53n, codigo: 'CP-0153', estado: 'EN_CAMINO', planPago: [] };
       prismaMock.pedido.findUnique.mockResolvedValue(pedido);
       prismaMock.pedido.update.mockResolvedValue({ ...pedido, estado: 'ENTREGADO', entregado_en: new Date() });
 
-      const res = await service.entregar('51', repartidor1);
+      const res = await service.entregar('53', repartidor1);
 
       expect(res.estado).toBe('ENTREGADO');
       expect(res.pago_estado).toBe('PENDIENTE');
-      expect(res.por_rendir_efectivo).toBe(0);
-      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ estado: 'ENTREGADO' }) }),
-      );
+      expect(res.por_rendir_efectivo).toBe(45);
     });
 
     it('«proximos»: un delivery con Yape sin voucher ya figura EN_COCINA, nunca «por validar»', async () => {
@@ -1010,6 +1040,7 @@ describe('RepartosService', () => {
           id: 10n,
           codigo: 'CP-010',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: null,
           anulado_en: null,
@@ -1021,6 +1052,7 @@ describe('RepartosService', () => {
           id: 20n,
           codigo: 'CP-020',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: null,
           anulado_en: null,
@@ -1078,6 +1110,7 @@ describe('RepartosService', () => {
           id: 10n,
           codigo: 'CP-010',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: 102n, // tomado por Carlos
           anulado_en: null,
@@ -1089,6 +1122,7 @@ describe('RepartosService', () => {
           id: 11n,
           codigo: 'CP-011',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'ANULADO',
           repartidor_party_id: null,
           anulado_en: new Date(),
@@ -1100,6 +1134,7 @@ describe('RepartosService', () => {
           id: 12n,
           codigo: 'CP-012',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: null,
           anulado_en: null,
@@ -1111,6 +1146,7 @@ describe('RepartosService', () => {
           id: 13n,
           codigo: 'CP-013',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: null,
           anulado_en: null,
@@ -1122,6 +1158,7 @@ describe('RepartosService', () => {
           id: 14n,
           codigo: 'CP-014',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: null,
           anulado_en: null,
@@ -1170,6 +1207,7 @@ describe('RepartosService', () => {
           id: 50n,
           codigo: 'CP-050',
           modalidad: 'DELIVERY',
+          pago_estado: 'PAGADO',
           estado: 'LISTO',
           repartidor_party_id: 101n, // ya asignado a este mismo repartidor
           anulado_en: null,
@@ -1204,6 +1242,7 @@ describe('RepartosService', () => {
         id: 100n,
         codigo: 'CP-100',
         modalidad: 'DELIVERY',
+        pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: null,
         anulado_en: null,
@@ -1256,6 +1295,7 @@ describe('RepartosService', () => {
         id: 300n,
         codigo: 'CP-300',
         modalidad: 'DELIVERY',
+        pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,
         tomado_en: new Date(),
@@ -1314,6 +1354,7 @@ describe('RepartosService', () => {
         id: 400n,
         codigo: 'CP-400',
         modalidad: 'DELIVERY',
+        pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,
         total: new Prisma.Decimal(30),
@@ -1359,6 +1400,7 @@ describe('RepartosService', () => {
         id: 500n,
         codigo: 'CP-500',
         modalidad: 'DELIVERY',
+        pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,
         tomado_en: tomadoHace15Min,

@@ -21,6 +21,7 @@ import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
+import { SinCobroDto } from './dto/sin-cobro.dto';
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
@@ -244,9 +245,9 @@ export class RepartosController {
 
   @Post(':id/salir')
   @Permiso('repartos', 'entregar')
-  async salir(@Param('id') id: string, @Req() req: any) {
+  async salir(@Param('id') id: string, @Body() dto: SinCobroDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.repartosService.salir(id, req.usuario, ip);
+    return this.repartosService.salir(id, req.usuario, ip, dto);
   }
 
   @Post(':id/llegue')
@@ -258,9 +259,9 @@ export class RepartosController {
 
   @Post(':id/entregar')
   @Permiso('repartos', 'entregar')
-  async entregar(@Param('id') id: string, @Req() req: any) {
+  async entregar(@Param('id') id: string, @Body() dto: SinCobroDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.repartosService.entregar(id, req.usuario, ip);
+    return this.repartosService.entregar(id, req.usuario, ip, dto);
   }
 
   @Post(':id/empezar-por')

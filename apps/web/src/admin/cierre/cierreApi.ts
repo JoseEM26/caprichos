@@ -56,6 +56,8 @@ export interface CerrarCajaDto {
   efectivoTotal?: number;
   medios?: MediosVistos;
   nota?: string;
+  /** Solo el administrador: justifica cerrar con pedidos entregados sin cobrar (mínimo 10 letras) */
+  motivoEntregadosSinCobrar?: string;
 }
 
 export interface CierreMedioDetalle {

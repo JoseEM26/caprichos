@@ -12,7 +12,7 @@ import { RutaService } from './ruta.service';
 const rep = { partyId: 10n, rol: 'REPARTIDOR', debeCambiar: false } as any;
 const ped = (id: bigint, orden: number | null, lat: number, estado = 'LISTO') => ({
   id, codigo: `CP-${id}`, estado, orden_ruta: orden, numero_ruta: orden, ruta_reparto_id: null as bigint | null, repartidor_party_id: 10n, entrega_lat: lat, entrega_lng: -77,
-  modalidad: 'DELIVERY', zona: null, lineas: [],
+  modalidad: 'DELIVERY', pago_estado: 'PAGADO', zona: null, lineas: [],
 });
 
 function montar(pedidos: any[], saltosPrevios = 0) {

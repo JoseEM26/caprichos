@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { repartosApi, PedidoReparto } from './repartosApi';
 import { ErrorApi } from '../../comun/api';
+import { useAvisoCobroPendiente } from '../pedidos/avisoCobroPendiente';
 
 export function useAccionesReparto({ alActualizar }: { alActualizar: () => void }) {
   const [cargandoAccion, setCargandoAccion] = useState(false);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+
+  // Delivery digital sin cobrar: aviso claro; el administrador puede salir o entregar sin cobrar con motivo
+  const { manejar: avisoCobro, dialogo: dialogoCobro } = useAvisoCobroPendiente(
+    () => alActualizar(),
+    (id, estado, motivo) =>
+      estado === 'EN_CAMINO'
+        ? repartosApi.salir(String(id), { forzarSinCobro: true, motivo })
+        : repartosApi.entregar(String(id), { forzarSinCobro: true, motivo }),
+  );
 
   const [confirmarAccion, setConfirmarAccion] = useState<{
     abierto: boolean;
@@ -92,6 +102,7 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
           alActualizar();
         } catch (err: any) {
           cerrarConfirmacion();
+          if (avisoCobro(err, pedido.id, 'EN_CAMINO')) return;
           setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al marcar salida');
         } finally {
           setCargandoAccion(false);
@@ -149,6 +160,7 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
           alActualizar();
         } catch (err: any) {
           cerrarConfirmacion();
+          if (avisoCobro(err, pedido.id, 'ENTREGADO')) return;
           setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al entregar pedido');
         } finally {
           setCargandoAccion(false);
@@ -159,6 +171,7 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
 
   return {
     cargandoAccion,
+    dialogoCobro,
     errorAccion,
     setErrorAccion,
     confirmarAccion,

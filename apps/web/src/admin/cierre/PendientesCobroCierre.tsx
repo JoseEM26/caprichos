@@ -27,7 +27,13 @@ export interface PendientesCobroCierreProps {
   foco?: FocoPendientes | null;
   /** Día (AAAA-MM-DD) de la caja que se cierra: lo anterior se marca como «de días anteriores» */
   fechaCaja?: string;
+  /** Solo el administrador: justificar los pedidos entregados sin cobrar para poder cerrar */
+  esAdmin?: boolean;
+  motivoSinCobro?: string;
+  alJustificar?: (motivo: string) => void;
 }
+
+export const MOTIVO_SIN_COBRO_MIN = 10;
 
 const PAGINA = 30;
 const ESTADOS_COLA = ['COLA', 'PREPARANDO', 'LISTO'];
@@ -141,7 +147,11 @@ export function PendientesCobroCierre({
   alReintentar,
   foco = null,
   fechaCaja,
+  esAdmin = false,
+  motivoSinCobro = '',
+  alJustificar,
 }: PendientesCobroCierreProps) {
+  const [borradorMotivo, setBorradorMotivo] = useState('');
   const [error, setError] = useState('');
   const [pedidoCobrar, setPedidoCobrar] = useState<Pedido | null>(null);
   const [pendienteAnular, setPendienteAnular] = useState<PendienteCobro | null>(null);
@@ -324,6 +334,34 @@ export function PendientesCobroCierre({
           alCambiar={(v) => setChip(v as Chip)}
         />
       </BarraFiltros>
+
+      {esAdmin && alJustificar && pendientes.every((p) => p.estado === 'ENTREGADO') && (
+        <div className="pdc-justificar" role="group" aria-label="Justificar entregados sin cobrar">
+          {motivoSinCobro ? (
+            <>
+              <span>Justificación para cerrar: <b>{motivoSinCobro}</b></span>
+              <button type="button" className="pdc-boton pdc-boton-secundario" onClick={() => alJustificar('')}>
+                Quitar justificación
+              </button>
+            </>
+          ) : (
+            <>
+              <label>
+                Cerrar sin cobrarlos (motivo, mínimo {MOTIVO_SIN_COBRO_MIN} letras)
+                <input type="text" value={borradorMotivo} maxLength={300} onChange={(e) => setBorradorMotivo(e.target.value)} />
+              </label>
+              <button
+                type="button"
+                className="pdc-boton pdc-boton-oscuro"
+                disabled={borradorMotivo.trim().length < MOTIVO_SIN_COBRO_MIN}
+                onClick={() => alJustificar(borradorMotivo.trim())}
+              >
+                Justificar y permitir el cierre
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="pdc-lista">
         {grupos.length === 0 && <div className="pdc-vacio">Ningún pedido coincide con el filtro o la búsqueda.</div>}
