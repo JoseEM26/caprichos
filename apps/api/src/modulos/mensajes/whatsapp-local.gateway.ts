@@ -12,9 +12,10 @@ export class WhatsAppLocalGateway implements WhatsAppGateway {
     _telefono: string,
     texto: string,
     autor: 'BOT' | 'PERSONA',
+    idCliente?: string,
   ): Promise<MensajeEnviado> {
     const m = await this.prisma.mensajeChat.create({
-      data: { conversacion_id: conversacionId, direccion: 'SALE', autor, tipo: 'TEXTO', contenido: { texto } },
+      data: { conversacion_id: conversacionId, direccion: 'SALE', autor, tipo: 'TEXTO', contenido: { texto, ...(idCliente ? { idCliente } : {}) } },
     });
     return { id: m.id.toString(), autor, texto, en: m.en, metaId: null };
   }

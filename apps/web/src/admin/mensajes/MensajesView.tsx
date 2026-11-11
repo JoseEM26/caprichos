@@ -8,6 +8,7 @@ import {
   editarNombreContacto,
   enviarMensaje,
   listarConversaciones,
+  listarMensajesAnteriores,
   listarRespuestasRapidas,
   marcarAtendido,
   enviarImagenChat,
@@ -43,7 +44,7 @@ import { PanelPedido } from './PanelPedido';
 import { CuadroEscribir } from './CuadroEscribir';
 import { ModalRechazoCambio } from './ModalRechazoCambio';
 import { eventosDelChat } from './EventoSistema';
-import { esUsuarioWhatsApp, telefonoDeUrl } from './utilidadesChat';
+import { esUsuarioWhatsApp, fusionarMensajes, mensajeOptimista, nuevoIdCliente, telefonoDeUrl } from './utilidadesChat';
 import { useAtrasCierraPanel, esVistaMovil } from '../../comun/useAtrasCierraPanel';
 import './mensajes.css';
 
@@ -135,7 +136,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   // Redacción de mensaje
   const [textoMensaje, setTextoMensaje] = useState('');
-  const [enviando, setEnviando] = useState(false);
+  const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
   const [textoPulido, setTextoPulido] = useState<string | null>(null);
   const [pulirError, setPulirError] = useState<string | null>(null);
   const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
@@ -307,44 +308,108 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     cargarLista(false);
   }, [cargarLista]);
 
-  // Cargar detalle del chat seleccionado
-  const cargarDetalle = useCallback(async (id: string) => {
-    setCargandoDetalle(true);
-    setTextoPulido(null);
-    setPulirError(null);
-    setMensajeCopiado(null);
+  // Chat abierto ahora (para descartar respuestas tardías de otro chat) y últimos chats vistos (abrirlos de nuevo es instantáneo)
+  const seleccionRef = React.useRef<string | null>(null);
+  const secuenciaDetalle = React.useRef(0);
+  const cacheDetalle = React.useRef(new Map<string, DetalleConversacion>());
+  seleccionRef.current = chatSeleccionadoId;
+
+  // Cargar detalle del chat seleccionado. `silencioso` = refresco en segundo plano: sin parpadeo y sin tocar lo que se escribe.
+  const cargarDetalle = useCallback(async (id: string, silencioso = false) => {
+    const n = ++secuenciaDetalle.current;
+    if (!silencioso) {
+      setCargandoDetalle(true);
+      setTextoPulido(null);
+      setPulirError(null);
+      setMensajeCopiado(null);
+    }
     try {
       const d = await obtenerDetalleConversacion(id);
-      setDetalle(d);
+      // Llegó tarde: la persona ya abrió otro chat u otra lectura más nueva salió después
+      if (n !== secuenciaDetalle.current || seleccionRef.current !== id) return;
+      setDetalle((prev) => {
+        let nuevo = d;
+        if (prev && prev.id === d.id) {
+          const mensajes = fusionarMensajes(prev.mensajes, d.mensajes);
+          // si ya se pidieron páginas anteriores, «hay más» lo dice la última que se pidió
+          const conAnteriores = mensajes.length > 0 && d.mensajes.length > 0 && mensajes[0].id !== d.mensajes[0].id && !mensajes[0].id.startsWith('tmp-');
+          nuevo = { ...d, mensajes, hayMasAnteriores: conAnteriores ? prev.hayMasAnteriores : d.hayMasAnteriores };
+        }
+        const cache = cacheDetalle.current;
+        cache.delete(nuevo.id);
+        cache.set(nuevo.id, nuevo);
+        if (cache.size > 8) cache.delete(cache.keys().next().value as string);
+        return nuevo;
+      });
     } catch {
-      setDetalle(null);
+      if (n === secuenciaDetalle.current && !silencioso) setDetalle(null);
     } finally {
-      setCargandoDetalle(false);
+      if (n === secuenciaDetalle.current) setCargandoDetalle(false);
     }
   }, []);
 
   useEffect(() => {
-    if (chatSeleccionadoId) {
-      cargarDetalle(chatSeleccionadoId);
-    }
+    if (!chatSeleccionadoId) return;
+    // Un chat ya visto se muestra al instante y se refresca por detrás; uno nuevo no deja ver el chat anterior mientras carga
+    const guardado = cacheDetalle.current.get(chatSeleccionadoId);
+    setDetalle((prev) => (prev && prev.id === chatSeleccionadoId ? prev : guardado ?? null));
+    void cargarDetalle(chatSeleccionadoId, !!guardado);
   }, [chatSeleccionadoId, cargarDetalle]);
+
+  // Recargas en segundo plano juntadas: una ráfaga de eventos (o un envío) provoca UNA lectura de lista y de chat
+  const recargaPendiente = React.useRef<{ timer: ReturnType<typeof setTimeout> | null; detalle: boolean }>({ timer: null, detalle: false });
+  const programarRecarga = useCallback(
+    (conDetalle: boolean) => {
+      const p = recargaPendiente.current;
+      p.detalle = p.detalle || conDetalle;
+      if (p.timer) return;
+      p.timer = setTimeout(() => {
+        p.timer = null;
+        const detalleTambien = p.detalle;
+        p.detalle = false;
+        void cargarLista(true);
+        if (detalleTambien && seleccionRef.current) void cargarDetalle(seleccionRef.current, true);
+      }, 300);
+    },
+    [cargarLista, cargarDetalle],
+  );
+  useEffect(() => () => {
+    if (recargaPendiente.current.timer) clearTimeout(recargaPendiente.current.timer);
+  }, []);
 
   // Respaldo por si el canal en vivo se cae: refresca la lista cada 20 s
   useEffect(() => {
     const cada = setInterval(() => {
-      cargarLista(true);
-      if (chatSeleccionadoId) cargarDetalle(chatSeleccionadoId);
+      programarRecarga(true);
     }, 20000);
     return () => clearInterval(cada);
-  }, [cargarLista, cargarDetalle, chatSeleccionadoId]);
+  }, [programarRecarga]);
 
-  // Escuchar eventos en vivo
-  useEventos('mensajes:actualizado', () => {
-    cargarLista(true);
-    if (chatSeleccionadoId) {
-      cargarDetalle(chatSeleccionadoId);
-    }
+  // Escuchar eventos en vivo: el chat abierto solo se relee si el evento es de ese chat (antes cualquier evento lo releía)
+  useEventos('mensajes:actualizado', (datos: { id?: string } | undefined) => {
+    const id = datos?.id != null ? String(datos.id) : null;
+    programarRecarga(id === null || id === seleccionRef.current);
   });
+
+  const handleCargarAnteriores = async () => {
+    const d = detalle;
+    if (!d || cargandoAnteriores) return;
+    const masViejo = d.mensajes.find((m) => !m.id.startsWith('tmp-'));
+    if (!masViejo) return;
+    setCargandoAnteriores(true);
+    try {
+      const r = await listarMensajesAnteriores(d.id, masViejo.id);
+      setDetalle((prev) => {
+        if (!prev || prev.id !== d.id) return prev;
+        const ya = new Set(prev.mensajes.map((m) => m.id));
+        return { ...prev, mensajes: [...r.mensajes.filter((m) => !ya.has(m.id)), ...prev.mensajes], hayMasAnteriores: r.hayMasAnteriores };
+      });
+    } catch {
+      /* se puede volver a tocar el botón */
+    } finally {
+      setCargandoAnteriores(false);
+    }
+  };
 
   // El bloqueo por spam caduca solo: al llegar su hora se vuelve a leer, sin esperar un evento
   const vencimientosSpam = [...chats.map((c) => c.bloqueoSpam), detalle?.bloqueoSpam]
@@ -438,21 +503,33 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   const handleEnviarMensaje = async (textoAEnviar?: string) => {
     const txt = (textoAEnviar !== undefined ? textoAEnviar : textoMensaje).trim();
-    if (!txt || !chatSeleccionadoId || enviando) return;
-    setEnviando(true);
+    if (!txt || !chatSeleccionadoId) return;
+    const chatId = chatSeleccionadoId;
+    // El mensaje aparece YA con «Enviando…»; el servidor habla con WhatsApp mientras tanto. Mismo id para no duplicarlo ni enviarlo dos veces.
+    const idCliente = nuevoIdCliente();
+    const alCambiarLocal = (estado: string | null) =>
+      setDetalle((prev) => {
+        if (!prev || prev.id !== chatId) return prev;
+        return {
+          ...prev,
+          mensajes: estado === null ? prev.mensajes.filter((m) => m.id !== idCliente) : prev.mensajes.map((m) => (m.id === idCliente ? { ...m, estado } : m)),
+        };
+      });
+    setDetalle((prev) => (prev && prev.id === chatId ? { ...prev, mensajes: [...prev.mensajes, mensajeOptimista(idCliente, txt)] } : prev));
+    setTextoMensaje('');
+    setTextoPulido(null);
+    setPulirError(null);
     try {
-      await enviarMensaje(chatSeleccionadoId, txt);
-      setTextoMensaje('');
-      setTextoPulido(null);
-      setPulirError(null);
-      await cargarDetalle(chatSeleccionadoId);
-      await cargarLista(true);
+      await enviarMensaje(chatId, txt, idCliente);
+      alCambiarLocal('ENVIADO');
+      programarRecarga(true);
     } catch (err: any) {
+      // No salió: se quita el mensaje local, el texto vuelve a la caja y el servidor (que guarda el intento fallido) lo muestra con «Reintentar»
+      alCambiarLocal(null);
+      setTextoMensaje((actual) => actual || txt);
       setPulirError(err?.message || 'Error al enviar mensaje');
-      await cargarDetalle(chatSeleccionadoId);
-      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) ofrecerReabrirConPlantilla(chatSeleccionadoId);
-    } finally {
-      setEnviando(false);
+      void cargarDetalle(chatId, true);
+      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) ofrecerReabrirConPlantilla(chatId);
     }
   };
 
@@ -823,7 +900,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
               >
                 {detalle.marcadoNoVisto ? 'Marcar como visto' : 'Marcar como no visto'}
               </button>
-              <FlujoMensajes mensajes={detalle.mensajes} eventos={eventos} onReintentar={handleReintentarMensaje} />
+              <FlujoMensajes
+                mensajes={detalle.mensajes}
+                eventos={eventos}
+                onReintentar={handleReintentarMensaje}
+                hayMasAnteriores={detalle.hayMasAnteriores}
+                cargandoAnteriores={cargandoAnteriores}
+                onCargarAnteriores={handleCargarAnteriores}
+              />
               <BarraAccionPendiente
                 detalle={detalle}
                 onReabrirPlantilla={handleReabrirPlantilla}
@@ -840,7 +924,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 textoPulido={textoPulido}
                 pulirError={pulirError}
                 mensajeCopiado={mensajeCopiado}
-                enviando={enviando}
+                enviando={false}
                 onElegirRapida={setTextoMensaje}
                 onPulir={handlePulir}
                 onUsarPulido={(texto) => {

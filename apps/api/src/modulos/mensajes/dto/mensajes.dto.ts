@@ -50,6 +50,19 @@ export class TextoDto {
   @IsNotEmpty({ message: 'Escribe un mensaje' })
   @MaxLength(1000, { message: 'El mensaje es demasiado largo' })
   texto!: string;
+
+  /** Identificador que genera la web por mensaje: el mismo id dos veces no envía dos veces (idempotencia). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  idCliente?: string;
+}
+
+export class AnterioresDto {
+  /** Id del mensaje más antiguo que la web ya tiene: se piden los anteriores a ese. */
+  @IsString()
+  @MaxLength(20)
+  antes!: string;
 }
 
 export class TomarDto {

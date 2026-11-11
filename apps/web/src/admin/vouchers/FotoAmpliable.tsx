@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { obtenerBlobAutenticado } from '../../comun/api';
+import { useVisibleUnaVez } from '../../comun/useVisibleUnaVez';
 
 export interface FotoAmpliableProps {
   archivoId?: string | number | null;
@@ -12,9 +13,11 @@ export function FotoAmpliable({ archivoId, alt = 'Foto del comprobante', alturaM
   const [url, setUrl] = useState('');
   const [fallo, setFallo] = useState(false);
   const [abierta, setAbierta] = useState(false);
+  // la foto se descarga cuando se ve, no al montar (un chat largo trae muchas)
+  const { ref: refVisible, visible } = useVisibleUnaVez<HTMLDivElement>();
 
   useEffect(() => {
-    if (!archivoId) return;
+    if (!archivoId || !visible) return;
     let vigente = true;
     setFallo(false);
     obtenerBlobAutenticado(`/admin/archivos/${archivoId}`)
@@ -23,7 +26,7 @@ export function FotoAmpliable({ archivoId, alt = 'Foto del comprobante', alturaM
     return () => {
       vigente = false;
     };
-  }, [archivoId]);
+  }, [archivoId, visible]);
 
   useEffect(() => {
     if (!abierta) return;
@@ -34,7 +37,7 @@ export function FotoAmpliable({ archivoId, alt = 'Foto del comprobante', alturaM
 
   if (!archivoId || fallo || !url) {
     return (
-      <div className="cv-img">
+      <div className="cv-img" ref={refVisible}>
         <span>{fallo ? 'No se pudo cargar la foto' : archivoId ? 'Cargando foto…' : 'Foto'}</span>
       </div>
     );

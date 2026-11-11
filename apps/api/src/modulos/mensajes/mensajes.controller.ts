@@ -19,6 +19,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
   EditarNombreContactoDto,
+  AnterioresDto,
   AtendidoDto,
   DocumentoDto,
   ImagenDto,
@@ -29,6 +30,7 @@ import {
   TomarDto,
 } from './dto/mensajes.dto';
 import { MensajesService } from './mensajes.service';
+import { conServerTiming } from './utilidades/server-timing.util';
 
 const ipDe = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -42,8 +44,8 @@ export class MensajesController {
 
   @Get('conversaciones')
   @Permiso('mensajes', 'ver')
-  listar(@Query() f: ListarConversacionesDto) {
-    return this.mensajes.listar(f.filtro, f.q, f.pos);
+  listar(@Query() f: ListarConversacionesDto, @Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones', () => this.mensajes.listar(f.filtro, f.q, f.pos), (r) => r.chats.length);
   }
 
   @Get('respuestas-rapidas')
@@ -54,14 +56,21 @@ export class MensajesController {
 
   @Get('conversaciones/:id')
   @Permiso('mensajes', 'ver')
-  detalle(@Param('id') id: string, @Req() req: any) {
-    return this.mensajes.detalle(id, req.usuario);
+  detalle(@Param('id') id: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones/:id', () => this.mensajes.detalle(id, req.usuario), (r) => r.mensajes.length);
+  }
+
+  /** «Cargar anteriores»: la página de historial previa a `antes` (id del mensaje más antiguo que ya se tiene). */
+  @Get('conversaciones/:id/mensajes')
+  @Permiso('mensajes', 'ver')
+  anteriores(@Param('id') id: string, @Query() q: AnterioresDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones/:id/mensajes', () => this.mensajes.mensajesAnteriores(id, q.antes, req.usuario), (r) => r.mensajes.length);
   }
 
   @Post('conversaciones/:id/enviar')
   @Permiso('mensajes', 'enviar')
-  enviar(@Param('id') id: string, @Body() dto: TextoDto, @Req() req: any) {
-    return this.mensajes.enviar(id, dto.texto, req.usuario, ipDe(req));
+  enviar(@Param('id') id: string, @Body() dto: TextoDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones/:id/enviar', () => this.mensajes.enviar(id, dto.texto, req.usuario, ipDe(req), dto.idCliente));
   }
 
   @Post('conversaciones/:id/enviar-imagen')

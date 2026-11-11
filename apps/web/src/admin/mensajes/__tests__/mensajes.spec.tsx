@@ -121,7 +121,7 @@ describe('MensajesView (/admin/mensajes)', () => {
     fireEvent.click(sendBtn);
 
     await waitFor(() => {
-      expect(api.enviarMensaje).toHaveBeenCalledWith('1', 'Hola Ana, te enviamos la salsa');
+      expect(api.enviarMensaje).toHaveBeenCalledWith('1', 'Hola Ana, te enviamos la salsa', expect.stringMatching(/^tmp-/));
     });
   });
 

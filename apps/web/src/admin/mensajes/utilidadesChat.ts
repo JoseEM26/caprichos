@@ -1,4 +1,4 @@
-import type { EstadoChat } from './mensajesTipos';
+import type { EstadoChat, MensajeItem } from './mensajesTipos';
 
 export function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
   if (!c) return false;
@@ -82,4 +82,51 @@ export function formatearNumeroReceptor(n: string): string {
   const d = n.replace(/\D/g, "");
   const m = /^(51)(\d{3})(\d{3})(\d{3})$/.exec(d);
   return m ? `+${m[1]} ${m[2]} ${m[3]} ${m[4]}` : `+${d}`;
+}
+
+// --- Envío optimista y páginas del historial ---
+
+const PREFIJO_LOCAL = 'tmp-';
+
+/** true = mensaje que solo existe en esta pantalla (todavía no lo devolvió el servidor). */
+export const esMensajeLocal = (m: Pick<MensajeItem, 'id'>): boolean => m.id.startsWith(PREFIJO_LOCAL);
+
+/** Id nuevo para un envío; viaja al servidor como `idCliente` (idempotencia) y nombra el mensaje local. */
+export const nuevoIdCliente = (): string =>
+  `${PREFIJO_LOCAL}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** El mensaje que aparece al instante, con «Enviando…», mientras el servidor habla con WhatsApp. */
+export function mensajeOptimista(idCliente: string, texto: string, ahora = new Date()): MensajeItem {
+  return {
+    id: idCliente,
+    idCliente,
+    autor: 'PERSONA',
+    saliente: true,
+    imagen: false,
+    texto,
+    hora: new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(ahora),
+    fecha: ahora.toISOString(),
+    estado: 'ENVIANDO',
+  };
+}
+
+const esMasViejo = (a: string, b: string): boolean => {
+  try {
+    return BigInt(a) < BigInt(b);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Une lo que la pantalla ya tiene con una página recién leída (la más reciente) del servidor:
+ * conserva el historial anterior ya pedido con «Cargar anteriores», no repite mensajes y deja al final los mensajes
+ * locales que el servidor todavía no devolvió. Un local se descarta cuando llega el real con su mismo `idCliente`.
+ */
+export function fusionarMensajes(previos: MensajeItem[], nuevos: MensajeItem[]): MensajeItem[] {
+  const primero = nuevos[0]?.id;
+  const anteriores = primero ? previos.filter((m) => !esMensajeLocal(m) && esMasViejo(m.id, primero)) : [];
+  const confirmados = new Set(nuevos.map((m) => m.idCliente).filter(Boolean));
+  const pendientes = previos.filter((m) => esMensajeLocal(m) && !confirmados.has(m.idCliente ?? m.id));
+  return [...anteriores, ...nuevos, ...pendientes];
 }

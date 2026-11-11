@@ -40,9 +40,9 @@ describe('MensajesController', () => {
 
   it('enviar delega en service.enviar extrayendo ip del request', async () => {
     const req = { usuario: { partyId: 1n }, ip: '127.0.0.1' };
-    const res = await controller.enviar('1', { texto: 'Hola' }, req);
+    const res = await controller.enviar('1', { texto: 'Hola' }, req, { setHeader: jest.fn() } as any);
     expect(res).toEqual({ id: 'msg-1' });
-    expect(service.enviar).toHaveBeenCalledWith('1', 'Hola', req.usuario, '127.0.0.1');
+    expect(service.enviar).toHaveBeenCalledWith('1', 'Hola', req.usuario, '127.0.0.1', undefined);
   });
 
   it('reabrirPlantilla delega en service.reabrirConPlantilla', async () => {

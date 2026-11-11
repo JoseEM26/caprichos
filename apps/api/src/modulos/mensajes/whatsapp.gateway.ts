@@ -21,6 +21,8 @@ export interface WhatsAppGateway {
     telefono: string,
     texto: string,
     autor: 'BOT' | 'PERSONA',
+    /** Id que generó la web para este mensaje: se guarda en el contenido para que la bandeja reconozca su mensaje «Enviando…». */
+    idCliente?: string,
   ): Promise<MensajeEnviado>;
 
   enviarPlantilla?(

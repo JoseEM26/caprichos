@@ -3,6 +3,7 @@ import {
   DetalleConversacion,
   FiltroChat,
   FiltroPos,
+  MensajeItem,
   RespuestaListarChats,
   RespuestaRapida,
 } from './mensajesTipos';
@@ -40,8 +41,17 @@ export async function listarRespuestasRapidas(): Promise<RespuestaRapida[]> {
   return api.get<RespuestaRapida[]>('/admin/mensajes/respuestas-rapidas');
 }
 
-export async function enviarMensaje(id: string, texto: string): Promise<{ id: string }> {
-  return api.post<{ id: string }>(`/admin/mensajes/conversaciones/${id}/enviar`, { texto });
+/** `idCliente` identifica este envío: si la misma petición llega dos veces, el servidor no le escribe dos veces al cliente. */
+export async function enviarMensaje(id: string, texto: string, idCliente?: string): Promise<{ id: string; duplicado?: boolean }> {
+  return api.post<{ id: string; duplicado?: boolean }>(`/admin/mensajes/conversaciones/${id}/enviar`, idCliente ? { texto, idCliente } : { texto });
+}
+
+/** «Cargar anteriores»: la página de historial previa al mensaje `antes` (el más antiguo que ya se tiene). */
+export async function listarMensajesAnteriores(
+  id: string,
+  antes: string,
+): Promise<{ mensajes: MensajeItem[]; hayMasAnteriores: boolean }> {
+  return api.get(`/admin/mensajes/conversaciones/${id}/mensajes?antes=${encodeURIComponent(antes)}`);
 }
 
 export async function pulirMensaje(id: string, texto: string): Promise<{ texto: string }> {

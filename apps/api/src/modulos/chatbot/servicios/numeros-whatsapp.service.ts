@@ -71,8 +71,16 @@ export class NumerosWhatsappService {
     }
   }
 
+  /** Lectura en curso: llamadas simultáneas con la caché fría comparten UNA sola lectura (antes cada una leía por su lado). */
+  private leyendo: Promise<{ en: number; propios: Set<string>; bloqueados: Set<string> }> | null = null;
+
   private async cargar() {
     if (this.cache && Date.now() - this.cache.en < TTL_MS) return this.cache;
+    if (!this.leyendo) this.leyendo = this.leerListas().finally(() => (this.leyendo = null));
+    return this.leyendo;
+  }
+
+  private async leerListas() {
     const propios = new Set<string>(this.aprendidos);
     const bloqueados = new Set<string>();
     const leer = async (clave: string) => (await this.prisma.parametro.findUnique({ where: { clave } }))?.valor;
