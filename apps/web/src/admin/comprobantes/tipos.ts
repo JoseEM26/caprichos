@@ -233,6 +233,20 @@ export type ProveedorFacturacion = 'SIMULADO' | 'SUNAT';
 /** Estado de la comunicación de baja (factura) o de la anulación en resumen (boleta). */
 export type EstadoBaja = 'SOLICITADA' | 'ACEPTADA' | 'RECHAZADA' | 'PENDIENTE_RESUMEN';
 
+/** Estado del envío automático de la factura por WhatsApp (solo facturas; null si nunca se intentó). */
+export type EstadoEnvioWhatsapp = 'PENDIENTE' | 'ENVIADO' | 'SIN_CELULAR' | 'SIN_VENTANA' | 'ERROR' | 'APAGADO' | 'OMITIDO';
+export interface EnvioWhatsappFactura {
+  estado: EstadoEnvioWhatsapp;
+  via: 'DOCUMENTO' | 'PLANTILLA' | null;
+  enviado_en: string | null;
+  intentos: number;
+  detalle: string | null;
+}
+export interface ConfigFacturaWhatsapp {
+  activo: boolean;
+  plantilla: string;
+}
+
 export interface ComprobanteElectronico {
   id: string;
   pedido_id: string;
@@ -260,6 +274,8 @@ export interface ComprobanteElectronico {
   baja_estado: EstadoBaja | null;
   baja_motivo: string | null;
   baja_en: string | null;
+  /** Envío de la factura por WhatsApp (solo FACTURA). */
+  envio_whatsapp?: EnvioWhatsappFactura | null;
 }
 
 /** Comprobante de un pedido (o de un extra suyo) tal como lo da GET /admin/comprobantes/pedido/:id/lista. */

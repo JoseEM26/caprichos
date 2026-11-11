@@ -7,6 +7,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Paginacion } from '../../comun/Paginacion';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
+import { EnvioWhatsappFactura } from './EnvioWhatsappFactura';
+import { FacturaWhatsappConfig } from './FacturaWhatsappConfig';
 import { comprobantesApi } from './comprobantesApi';
 import { formatearSoles, rucValido } from './utilidades';
 import { consultarDocumento, mensajeConsulta, tipoPorLongitud } from '../pedidos/consultaDocumento';
@@ -68,7 +70,7 @@ function accionDe(c: ComprobanteElectronico): string {
 }
 
 export function ElectronicosTab() {
-  const { usuario } = useSesion();
+  const { usuario, tiene } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
 
   const [filas, setFilas] = useState<ComprobanteElectronico[]>([]);
@@ -419,6 +421,8 @@ export function ElectronicosTab() {
         </section>
       )}
 
+      {esAdmin && <FacturaWhatsappConfig />}
+
       {esAdmin && salud && (
         <div data-testid="contador-facturacion" role="status" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontWeight: 700 }}>
           <span>Pendientes: {salud.pendientes}</span>
@@ -458,6 +462,7 @@ export function ElectronicosTab() {
                 {c.respuesta_sunat && <div style={{ fontSize: 12, marginTop: 6, wordBreak: 'break-word' }}>{c.respuesta_sunat}</div>}
                 {c.baja_motivo && <div style={{ fontSize: 12, marginTop: 4 }}>Motivo de baja: {c.baja_motivo}</div>}
                 {c.baja_estado === 'RECHAZADA' && <div style={{ fontSize: 12, marginTop: 4, color: 'var(--cp-red, #b00020)' }}>SUNAT rechazó la baja: revise la respuesta</div>}
+                <EnvioWhatsappFactura comprobante={c} puedeReenviar={tiene('comprobantes/emitir') && !c.baja_estado} alCambiar={() => void cargar(pagina)} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
                   <Boton variante="secundario" onClick={() => verPdf(c)} style={{ minHeight: ALTO_TOQUE }}>
                     Ver PDF

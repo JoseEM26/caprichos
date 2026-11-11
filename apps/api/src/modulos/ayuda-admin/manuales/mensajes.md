@@ -13,6 +13,7 @@ sugerencias:
   - Como utilizo la funcion de pulir mensaje con IA
   - Como veo la ubicacion que me mando el cliente
   - Que pasa con el chat que el repartidor tiene abierto
+  - Por que le llego una factura por WhatsApp al cliente
 ---
 # Mensajes de WhatsApp
 
@@ -85,6 +86,12 @@ Ver tambien: [[mensajes]]
 1. El repartidor puede escribir al cliente de su pedido desde la app de reparto (mientras el pedido esta Listo o En camino y hasta 2 horas despues de entregado). Los mensajes aparecen aqui en la misma conversacion como "Local".
 2. Si tu tienes tomado el chat, el repartidor ve "El local esta atendiendo este chat ahora. Podras escribir cuando lo suelte."; sueltalo para que pueda escribir. Si pasaron 24 horas sin respuesta del cliente, solo se puede reabrir con plantilla (ver abajo).
 Ver tambien: [[repartos]]
+
+## Como se hace: Entender la factura que el bot manda sola
+1. Cuando SUNAT acepta una factura, el bot manda su PDF al WhatsApp del cliente (el celular del pedido) con una linea de agradecimiento. Si el pedido no tiene celular valido, no se envia nada.
+2. En el chat aparece como cualquier documento enviado, con el nombre Factura F002-000123.pdf. Se puede descargar desde ahi.
+3. Si el cliente no escribio al bot en las ultimas 24 horas, el documento libre no se entrega: sale por una plantilla aprobada en Meta, y sin plantilla se reintenta unas pocas veces y se cierra. El estado de cada factura se ve en Comprobantes, Electronicos SUNAT.
+Ver tambien: [[caja]]
 
 ## Como se hace: Reabrir una conversacion fuera de la ventana de 24 horas
 1. Si han pasado mas de 24 horas desde el ultimo mensaje del cliente, WhatsApp bloquea el envio de texto libre.

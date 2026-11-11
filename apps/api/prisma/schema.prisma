@@ -1502,9 +1502,31 @@ model Comprobante {
   pedido             Pedido    @relation(fields: [pedido_id], references: [id])
   emitidoPor         Party?    @relation("ComprobantesEmitidos", fields: [emitido_por], references: [id])
   archivos           ComprobanteArchivo[]
+  envioWhatsapp      FacturaWhatsappEnvio?
 
   @@unique([serie, numero])
   @@map("comprobante")
+}
+
+/// Envío automático de la FACTURA aceptada por SUNAT al WhatsApp del cliente. Una fila por comprobante (la clave única
+/// es la idempotencia: una transición repetida no duplica el envío). No guarda el PDF ni el celular.
+model FacturaWhatsappEnvio {
+  comprobante_id    BigInt      @id
+  // PENDIENTE | ENVIADO | SIN_CELULAR | SIN_VENTANA | ERROR | APAGADO | OMITIDO (CHECK en BD)
+  estado            String      @default("PENDIENTE")
+  // DOCUMENTO (ventana abierta) | PLANTILLA (plantilla con el PDF) | null si no salió nada
+  via               String?
+  intentos          Int         @default(0)
+  proximo_intento_en DateTime?  @db.Timestamptz
+  enviado_en        DateTime?   @db.Timestamptz
+  // Código corto del motivo (sin datos personales)
+  detalle           String?
+  creado_en         DateTime    @default(now()) @db.Timestamptz
+  actualizado_en    DateTime    @default(now()) @db.Timestamptz
+  comprobante       Comprobante @relation(fields: [comprobante_id], references: [id], onDelete: Cascade)
+
+  @@index([estado, proximo_intento_en])
+  @@map("factura_whatsapp_envio")
 }
 
 /// XML firmado, ZIP enviado y CDR de cada comprobante electrónico. Se conservan años: nada se borra.

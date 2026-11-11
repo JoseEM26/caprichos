@@ -504,6 +504,13 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
     // Armar componentes de la plantilla según variables
     const components: any[] = [];
+    // Plantilla con encabezado de documento (p. ej. la factura): el PDF va por media id; el encabezado va antes del cuerpo
+    if (opciones?.documentoCabecera) {
+      components.push({
+        type: 'header',
+        parameters: [{ type: 'document', document: { id: opciones.documentoCabecera.mediaId, filename: opciones.documentoCabecera.nombre } }],
+      });
+    }
     if (variables) {
       let params: Array<{ type: 'text'; text: string }> = [];
       if (Array.isArray(variables)) {

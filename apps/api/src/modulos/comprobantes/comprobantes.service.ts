@@ -78,6 +78,12 @@ function proveedorDeFila(c: { emisor?: string | null; simulado?: boolean | null 
 export class ComprobantesService {
   private readonly logger = new Logger(ComprobantesService.name);
 
+  /**
+   * Aviso de «factura aceptada por SUNAT» (lo registra FacturaWhatsappService al iniciar). Se llama una vez por transición
+   * y no debe lanzar ni esperar: el envío por WhatsApp nunca retrasa ni cambia la emisión.
+   */
+  alAceptarFactura: ((comprobanteId: bigint) => void) | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
@@ -176,6 +182,31 @@ export class ComprobantesService {
    * Nada se guarda en base. Audita la lectura (datos personales). DNI/RUC completos solo para ADMIN.
    */
   async pdfComprobante(idRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string): Promise<{ nombre: string; contenido: Buffer }> {
+    const { c, datos, contenido } = await this.generarPdf(idRaw, usuario?.rol === 'ADMIN');
+    await this.auditoria.registrar({
+      categoria: 'LECTURA_SENSIBLE',
+      modulo: 'comprobantes',
+      accion: 'VER_PDF_ELECTRONICO',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: c.id,
+      despues: { tipo: c.tipo, numero_texto: c.numero_texto, situacion: datos.situacion },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return { nombre: `${c.numero_texto}.pdf`, contenido };
+  }
+
+  /**
+   * PDF de una factura para enviarlo al propio cliente por WhatsApp: su RUC completo (es su documento) y sin auditar
+   * una «lectura» de persona (el envío audita aparte). Se genera una vez por envío.
+   */
+  async pdfParaEnvio(idRaw: bigint | string | number): Promise<{ nombre: string; contenido: Buffer }> {
+    const { c, contenido } = await this.generarPdf(idRaw, true);
+    return { nombre: `${c.numero_texto}.pdf`, contenido };
+  }
+
+  private async generarPdf(idRaw: bigint | string | number, esAdmin: boolean) {
     const id = this.parsearId(idRaw, 'comprobante');
     const c = await this.prisma.comprobante.findUnique({
       where: { id },
@@ -192,22 +223,11 @@ export class ComprobantesService {
     }
     const local = ((await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }))?.valor ?? {}) as Record<string, unknown>;
     const datos = armarDatosPdf(c, c.pedido, local, {
-      esAdmin: usuario?.rol === 'ADMIN',
+      esAdmin,
       ambiente: this.sunatEmisor?.config().ambiente ?? ambienteSunat(),
     });
     const contenido = await generarPdfComprobante(datos);
-    await this.auditoria.registrar({
-      categoria: 'LECTURA_SENSIBLE',
-      modulo: 'comprobantes',
-      accion: 'VER_PDF_ELECTRONICO',
-      resultado: 'OK',
-      entidad: 'comprobante',
-      entidadId: id,
-      despues: { tipo: c.tipo, numero_texto: c.numero_texto, situacion: datos.situacion },
-      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
-      ip,
-    });
-    return { nombre: `${c.numero_texto}.pdf`, contenido };
+    return { c, datos, contenido };
   }
 
   private parsearId(id: bigint | string | number, entidad = 'comprobante'): bigint {
@@ -632,6 +652,15 @@ export class ComprobantesService {
       partyId: opciones.usuario?.partyId ? BigInt(opciones.usuario.partyId) : undefined,
       ip: opciones.ip,
     });
+
+    // Factura aceptada por SUNAT con su CDR (no simulada): el WhatsApp al cliente sale aparte, sin esperar ni afectar la emisión
+    if (aceptado && c.tipo === 'FACTURA' && !data.simulado && !res.yaRegistrado) {
+      try {
+        this.alAceptarFactura?.(c.id);
+      } catch (e: any) {
+        this.logger.warn(`Aviso de factura aceptada no entregado: ${e?.message ?? e}`);
+      }
+    }
 
     if (estado === 'RECHAZADO' || estado === 'REVISION_MANUAL') {
       await this.salud?.avisar({
@@ -1252,6 +1281,22 @@ export class ComprobantesService {
     return filas.length;
   }
 
+  /** Estado del envío por WhatsApp de cada factura (solo FACTURA); sin la tabla o con error de lectura, nada (la pantalla sigue). */
+  private async enviosWhatsapp(filas: Array<{ id: bigint; tipo: string }>): Promise<Map<string, any>> {
+    const ids = filas.filter((f) => f.tipo === 'FACTURA').map((f) => f.id);
+    const mapa = new Map<string, any>();
+    if (ids.length === 0) return mapa;
+    try {
+      const envios = await (this.prisma as any).facturaWhatsappEnvio?.findMany({ where: { comprobante_id: { in: ids } } });
+      for (const e of envios ?? []) {
+        mapa.set(e.comprobante_id.toString(), { estado: e.estado, via: e.via ?? null, enviado_en: e.enviado_en ?? null, intentos: e.intentos, detalle: e.detalle ?? null });
+      }
+    } catch (e: any) {
+      this.logger.warn(`No se pudo leer el envío de facturas por WhatsApp: ${e?.message ?? e}`);
+    }
+    return mapa;
+  }
+
   /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. */
   async listarElectronicos(pagina = 1, limite = 20, soloProblemas = false) {
     const where: any = soloProblemas
@@ -1267,6 +1312,7 @@ export class ComprobantesService {
         include: { pedido: { select: { codigo: true, total: true } } },
       }),
     ]);
+    const envios = await this.enviosWhatsapp(filas);
     return {
       total,
       pagina,
@@ -1274,6 +1320,7 @@ export class ComprobantesService {
       totalPaginas: Math.ceil(total / limite),
       elementos: filas.map((c) => ({
         ...this.serializarComprobante(c),
+        envio_whatsapp: envios.get(c.id.toString()) ?? null,
         codigo_pedido: c.pedido.codigo,
         total: Number(c.pedido.total),
         numero_texto: c.numero_texto,
@@ -1300,6 +1347,7 @@ export class ComprobantesService {
       ? await this.prisma.comprobanteArchivo.findMany({ where: { comprobante_id: { in: filas.map((c: any) => c.id) } }, select: { comprobante_id: true, tipo: true } })
       : [];
     const esAdmin = usuario?.rol === 'ADMIN';
+    const envios = await this.enviosWhatsapp(filas);
     const tiene = (id: bigint, tipo: string) => archivos.some((a: any) => a.comprobante_id === id && a.tipo === tipo);
     const orden = (c: any) => new Date(c.creado_en).getTime();
     const elementos = [...filas]
@@ -1308,6 +1356,7 @@ export class ComprobantesService {
         const ped = porId.get(c.pedido_id.toString());
         return {
           ...this.serializarComprobante(c),
+          envio_whatsapp: envios.get(c.id.toString()) ?? null,
           documento: esAdmin ? c.documento ?? null : c.documento ? enmascararDni(c.documento) : null,
           anulado_en: c.anulado_en ?? null,
           anulado_motivo: c.anulado_motivo ?? null,

@@ -11,6 +11,7 @@ sugerencias:
   - Como marco un comprobante como emitido en el facturador
   - Que datos necesito para emitir una factura
   - Que es el comprobante simple y se envia a SUNAT
+  - Como se envia la factura por WhatsApp al cliente
 ---
 # Comprobantes
 
@@ -48,10 +49,22 @@ Ver tambien: [[cierre]]
 Antes: [[caja]]
 Ver tambien: [[cierre]]
 
+## Como se hace: Factura enviada por WhatsApp al cliente
+1. Cuando SUNAT acepta una FACTURA real (no una boleta, no una nota de venta, no una de prueba), el bot manda el PDF al celular del pedido, que es su WhatsApp. Sale una sola vez por factura, sin que nadie haga nada.
+2. Si el pedido no tiene celular valido (9 digitos que empiezan con 9), no se envia nada y la etiqueta dice Sin celular. Los pedidos del personal tampoco reciben nada.
+3. En Electronicos SUNAT y en el detalle del pedido, cada factura muestra una etiqueta: Enviada por WhatsApp (con la hora), Sin celular, Sin ventana de WhatsApp, Error al enviar, Apagado o No enviada.
+4. WhatsApp solo deja mandar un documento libre si el cliente escribio al bot en las ultimas 24 horas. Si no, y hay una plantilla de factura configurada y aprobada en Meta, sale por la plantilla; si no hay plantilla queda Sin ventana de WhatsApp y el sistema reintenta unas pocas veces (a los 15 minutos, 1 hora, 4 horas y 12 horas) por si el cliente escribe, y luego se cierra.
+5. Para volver a mandarla (fallo, o el cliente la pide de nuevo), pulsar Reenviar por WhatsApp en la factura y confirmar con Si. Respeta la ventana de 24 horas y cuenta como un mensaje mas en Meta. Requiere el permiso de emitir comprobantes.
+6. El Administrador enciende o apaga el envio automatico (y escribe el nombre de la plantilla de Meta) en Electronicos SUNAT, seccion Factura por WhatsApp. Viene encendido. Apagado, no se envia nada, ni siquiera con Reenviar.
+7. Las facturas aceptadas antes de activar esta funcion no se envian solas: usa Reenviar por WhatsApp si hace falta.
+Antes: [[caja]]
+Ver tambien: [[mensajes]]
+
 ## Errores y dudas comunes
 - Un pedido con Comprobante simple no tiene boleta ni factura: no sale en Por emitir ni en Electronicos SUNAT. Si el cliente la pide despues, usa Cambiar comprobante antes de cobrar.
 - Para emitir una factura, es requisito obligatorio contar con un RUC valido de 11 digitos que inicie con 10, 15, 17 o 20 y su correspondiente razon social.
 - En la carta, el cliente que pide factura solo escribe el RUC: la razon social y la direccion fiscal salen de SUNAT (se guardan en el sistema 30 dias) y no se pueden editar. Si SUNAT no responde, el cliente escribe la razon social a mano y queda sin verificar: revisala antes de emitir. Al crear o cambiar un comprobante en Caja, al completar el RUC la razon social se rellena sola y la puedes corregir.
+- La factura por WhatsApp no se manda con la ventana de 24 horas cerrada si no hay plantilla aprobada en Meta: la etiqueta dice Sin ventana de WhatsApp. Pide al cliente que escriba al bot y vuelve a pulsar Reenviar por WhatsApp.
 - La reimpresion de notas de venta deja huella en el sistema indicando cuantas veces se ha reimpreso el ticket para prevenir duplicidades en cobranza.
 - Si la ticketera no imprime, revisar que tenga papel y este encendida antes de reintentar la reimpresion.
 

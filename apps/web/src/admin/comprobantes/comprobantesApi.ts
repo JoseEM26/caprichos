@@ -16,6 +16,8 @@ import type {
   ComprobantePedido,
   ProveedorFacturacion,
   SaludFacturacion,
+  ConfigFacturaWhatsapp,
+  EstadoEnvioWhatsapp,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -112,6 +114,20 @@ export const comprobantesApi = {
       method: 'PUT',
       body: JSON.stringify({ activo }),
     });
+  },
+
+  /** Interruptor y plantilla del envío de facturas por WhatsApp. */
+  async obtenerFacturaWhatsapp(): Promise<ConfigFacturaWhatsapp> {
+    return clienteFetch<ConfigFacturaWhatsapp>('/admin/comprobantes/config/factura-whatsapp');
+  },
+
+  async guardarFacturaWhatsapp(config: ConfigFacturaWhatsapp): Promise<ConfigFacturaWhatsapp> {
+    return clienteFetch<ConfigFacturaWhatsapp>('/admin/comprobantes/config/factura-whatsapp', { method: 'PUT', body: JSON.stringify(config) });
+  },
+
+  /** Vuelve a mandar la factura por WhatsApp (respeta la ventana de 24 h). */
+  async reenviarFacturaWhatsapp(id: string): Promise<{ estado: EstadoEnvioWhatsapp; via: 'DOCUMENTO' | 'PLANTILLA' | null }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/reenviar-whatsapp`, { method: 'POST' });
   },
 
   /** Envía ahora el resumen diario de boletas SUNAT (ADMIN). */
