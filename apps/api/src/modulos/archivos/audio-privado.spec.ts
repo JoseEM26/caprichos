@@ -127,3 +127,31 @@ describe('Range y permiso del endpoint privado', () => {
     expect(permisos).toEqual(expect.arrayContaining([{ modulo: 'mensajes', accion: 'ver' }]));
   });
 });
+
+describe('Documentos privados (WhatsApp)', () => {
+  let dir: string;
+  let svc: ArchivosService;
+  let prisma: any;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doc-test-'));
+    prisma = { archivo: { create: jest.fn(async ({ data }: any) => ({ id: 41n, ...data })) } };
+    svc = new ArchivosService(prisma, { get: () => dir } as any, { registrar: jest.fn() } as any);
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('guarda un PDF en privado con nombre aleatorio (el nombre original no toca el disco)', async () => {
+    const r = await svc.subirDocumento(Buffer.from('%PDF-1.4 x'), 'application/pdf', '../../etc/carta.pdf');
+    const fila = prisma.archivo.create.mock.calls[0][0].data;
+    expect(fila).toMatchObject({ tipo_mime: 'application/pdf', privado: true, bytes: 10 });
+    expect(fila.ruta).toMatch(/^privado\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.pdf$/);
+    expect(r.nombre).toBe('carta.pdf');
+    expect(fs.existsSync(path.join(dir, fila.ruta))).toBe(true);
+  });
+
+  it('rechaza tipo no permitido, contenido falso y tamaños fuera de límite', async () => {
+    await expect(svc.subirDocumento(Buffer.from('MZ'), 'application/pdf', 'a.exe')).rejects.toMatchObject({ status: 415 });
+    await expect(svc.subirDocumento(Buffer.from('MZ-programa'), 'application/pdf', 'a.pdf')).rejects.toMatchObject({ status: 415 });
+    await expect(svc.subirDocumento(Buffer.alloc(0), 'text/plain', 'a.txt')).rejects.toMatchObject({ status: 413 });
+    await expect(svc.subirDocumento(Buffer.alloc(17 * 1024 * 1024), 'text/plain', 'a.txt')).rejects.toMatchObject({ status: 413 });
+  });
+});

@@ -51,6 +51,18 @@ export interface WhatsAppGateway {
     phoneNumberId?: string,
   ): Promise<MensajeEnviado>;
 
+  /** Sube el documento a la Media API y lo envía con su id y nombre; guarda el mensaje saliente con la tarjeta (documento). */
+  enviarDocumento?(
+    conversacionId: bigint,
+    telefono: string,
+    documento: Buffer,
+    mime: string,
+    nombre: string,
+    autor: 'BOT' | 'PERSONA',
+    archivoId: string,
+    phoneNumberId?: string,
+  ): Promise<MensajeEnviado>;
+
   estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado'; razon?: string };
 }
 

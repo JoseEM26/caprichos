@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { MAX_DOCUMENTO_BYTES, contenidoCoincide, validarDocumento } from '../../comun/documentos-whatsapp.util';
 
 export interface ArchivoSubidoDto {
   id: string;
@@ -181,6 +182,35 @@ export class ArchivosService {
       data: { ruta: rutaRelativa, tipo_mime: mimeType, bytes: buffer.length, privado: true },
     });
     return { id: archivo.id.toString(), url: `/admin/archivos/${archivo.id.toString()}` };
+  }
+
+  /**
+   * Guarda un documento de WhatsApp (PDF, Word, Excel, PowerPoint, texto) en la carpeta privada.
+   * Valida extensión y tipo a la vez, los primeros bytes y el tamaño. El nombre original NO se usa en disco.
+   */
+  async subirDocumento(buffer: Buffer, mimeType: string, nombre: string): Promise<ArchivoSubidoDto & { nombre: string }> {
+    const v = validarDocumento(nombre, mimeType);
+    if (!buffer?.length || buffer.length > MAX_DOCUMENTO_BYTES) {
+      throw new HttpException(
+        { codigo: 'ARCHIVO_GRANDE', mensaje: 'El documento está vacío o pesa más de 16 MB' },
+        HttpStatus.PAYLOAD_TOO_LARGE,
+      );
+    }
+    if (!v.ok || !contenidoCoincide(buffer, v.ext)) {
+      throw new HttpException(
+        { codigo: 'TIPO_NO_PERMITIDO', mensaje: 'Solo se aceptan documentos PDF, Word, Excel, PowerPoint o de texto' },
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      );
+    }
+    const now = new Date();
+    const rutaRelativa = `privado/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${crypto.randomUUID()}.${v.ext}`;
+    const rutaAbsoluta = path.resolve(this.getUploadsDir(), rutaRelativa);
+    fs.mkdirSync(path.dirname(rutaAbsoluta), { recursive: true });
+    fs.writeFileSync(rutaAbsoluta, buffer);
+    const archivo = await this.prisma.archivo.create({
+      data: { ruta: rutaRelativa, tipo_mime: v.mime, bytes: buffer.length, privado: true },
+    });
+    return { id: archivo.id.toString(), url: `/admin/archivos/${archivo.id.toString()}`, nombre: v.nombre };
   }
 
   /** Borra el archivo físico y su fila (retención/baja Ley 29733). Nunca lanza: si la fila sigue referenciada, solo borra el archivo. */

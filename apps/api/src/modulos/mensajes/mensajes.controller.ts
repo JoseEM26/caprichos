@@ -7,16 +7,20 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import * as fs from 'fs';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
   EditarNombreContactoDto,
   AtendidoDto,
+  DocumentoDto,
   ImagenDto,
   ListarConversacionesDto,
   RechazarCambioDto,
@@ -70,6 +74,31 @@ export class MensajesController {
     @Req() req: any,
   ) {
     return this.mensajes.enviarImagen(id, imagen, dto?.subtitulo, req.usuario, ipDe(req));
+  }
+
+  @Post('conversaciones/:id/enviar-documento')
+  @Permiso('mensajes', 'enviar')
+  @UseInterceptors(FileInterceptor('documento', { limits: { fileSize: 16 * 1024 * 1024 + 1 } }))
+  enviarDocumento(
+    @Param('id') id: string,
+    @UploadedFile() documento: Express.Multer.File,
+    @Body() dto: DocumentoDto,
+    @Req() req: any,
+  ) {
+    return this.mensajes.enviarDocumento(id, documento, dto?.nombre, req.usuario, ipDe(req));
+  }
+
+  /** Descarga de un documento del chat: solo con sesión y permiso, siempre como archivo adjunto (nunca se abre en la página). */
+  @Get('documentos/:mensajeId')
+  @Permiso('mensajes', 'ver')
+  async descargarDocumento(@Param('mensajeId') mensajeId: string, @Req() req: any, @Res() res: Response) {
+    const d = await this.mensajes.documentoDeMensaje(mensajeId, req.usuario, ipDe(req), req.headers?.['user-agent']);
+    res.setHeader('Content-Type', d.tipoMime || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `attachment; filename="documento"; filename*=UTF-8''${encodeURIComponent(d.nombre)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Length', d.bytes);
+    fs.createReadStream(d.rutaAbsoluta).pipe(res);
   }
 
   @Post('conversaciones/:id/reabrir-plantilla')

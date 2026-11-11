@@ -4,6 +4,7 @@ import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
 } from '../chatbot/puerto/whatsapp-mensajeria.puerto';
+import { textoDocumentoChat } from '../../comun/documentos-whatsapp.util';
 import { MensajeEnviado, WhatsAppGateway } from './whatsapp.gateway';
 
 /**
@@ -163,6 +164,62 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
       },
     });
 
+    return {
+      id: m.id.toString(),
+      autor,
+      texto,
+      en: m.en,
+      metaId,
+      estado: resultado.estado,
+      errorCodigo: resultado.errorCodigo || null,
+      errorDetalle: resultado.errorDetalle || null,
+      modo: estadoConexion.modo,
+      whatsappMensajeId,
+    };
+  }
+
+  async enviarDocumento(
+    conversacionId: bigint,
+    telefono: string,
+    documento: Buffer,
+    mime: string,
+    nombre: string,
+    autor: 'BOT' | 'PERSONA',
+    archivoId: string,
+    phoneNumberId?: string,
+  ): Promise<MensajeEnviado> {
+    const estadoConexion = this.mensajeria.estaConectado();
+    const opciones = { conversacionId, ...(phoneNumberId ? { phoneNumberId } : {}) };
+
+    // Meta: se sube a la Media API y se envía por media id (por link falla con 131000); el simulado no sube nada
+    let referencia: string | null = 'simulado';
+    if (estadoConexion.modo === 'meta') {
+      referencia = (await this.mensajeria.subirMedia?.(documento, mime, phoneNumberId, nombre)) ?? null;
+    }
+    const resultado = referencia
+      ? await this.mensajeria.enviarDocumento(telefono, referencia, nombre, undefined, opciones)
+      : ({ exito: false, estado: 'FALLIDO', errorCodigo: 'SUBIDA_MEDIA', errorDetalle: 'Meta no aceptó el documento' } as const);
+
+    const whatsappMensajeId = 'id' in resultado && resultado.id ? BigInt(resultado.id) : null;
+    const metaId = ('waMessageId' in resultado && resultado.waMessageId) || null;
+    const texto = textoDocumentoChat(nombre, documento.length);
+    const m = await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor,
+        tipo: 'DOCUMENTO',
+        contenido: {
+          texto,
+          documento: { archivoId, nombre, mime, bytes: documento.length },
+          ...(resultado.errorDetalle ? { errorDetalle: resultado.errorDetalle } : {}),
+          ...(resultado.errorCodigo ? { errorCodigo: resultado.errorCodigo } : {}),
+          estado: resultado.estado,
+        },
+        meta_id: metaId,
+        whatsapp_mensaje_id: whatsappMensajeId,
+      },
+    });
     return {
       id: m.id.toString(),
       autor,

@@ -33,6 +33,12 @@ import { PuntosService } from '../clientes/puntos.service';
 import { cerrarRutaTrasAnular } from '../repartos/rutas-reparto';
 import sharp from 'sharp';
 import {
+  MAX_DOCUMENTO_ENVIO_BYTES,
+  contenidoCoincide,
+  sanearNombreDocumento,
+  validarDocumento,
+} from '../../comun/documentos-whatsapp.util';
+import {
   PosChat,
   faltaProcesar,
   inicioHoyLima,
@@ -535,6 +541,15 @@ export class MensajesService {
           plantilla: m.tipo === 'PLANTILLA',
           // Nota de voz guardada: se escucha con GET /admin/archivos/:id (siempre la escucha una persona)
           audioId: m.tipo === 'AUDIO' && contenido.audio?.archivoId ? String(contenido.audio.archivoId) : null,
+          documento:
+            m.tipo === 'DOCUMENTO' && contenido.documento?.archivoId
+              ? {
+                  nombre: sanearNombreDocumento(contenido.documento.nombre),
+                  bytes: Number(contenido.documento.bytes) || 0,
+                  mime: String(contenido.documento.mime || ''),
+                  url: `/admin/mensajes/documentos/${m.id.toString()}`,
+                }
+              : null,
           ubicacion: contenido.ubicacion ?? null,
           hora: hora(m.en),
           fecha: m.en.toISOString(),
@@ -544,7 +559,7 @@ export class MensajesService {
           metaCodigo: esAdmin ? tecnico?.codigoMeta ?? null : null,
           motivoFallo,
           puedeReintentar:
-            estadoMsg === 'FALLIDO' ? m.tipo !== 'IMAGEN' && !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
+            estadoMsg === 'FALLIDO' ? m.tipo !== 'IMAGEN' && m.tipo !== 'DOCUMENTO' && !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
         };
       }),
       pedido: pedido
@@ -715,6 +730,80 @@ export class MensajesService {
       );
     }
     return { id: m.id };
+  }
+
+  /**
+   * Documento del equipo al cliente (PDF, Word, Excel, PowerPoint o texto, hasta 16 MB). Se guarda en privado y se envía por
+   * la Media API de Meta (media id). Misma ventana de 24 h que el texto: fuera de ella no se entrega y se avisa.
+   */
+  async enviarDocumento(
+    id: string,
+    archivo: { buffer?: Buffer; mimetype?: string; originalname?: string } | undefined,
+    nombreCrudo: string | undefined,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const bytes = archivo?.buffer;
+    if (!archivo || !bytes?.length) throw error(HttpStatus.BAD_REQUEST, 'DOCUMENTO_REQUERIDO', 'Elige un documento para enviar');
+    if (bytes.length > MAX_DOCUMENTO_ENVIO_BYTES) {
+      throw error(HttpStatus.PAYLOAD_TOO_LARGE, 'DOCUMENTO_GRANDE', 'El documento pesa más de 16 MB');
+    }
+    const nombre = sanearNombreDocumento(nombreCrudo || archivo.originalname);
+    const v = validarDocumento(nombre, archivo.mimetype);
+    if (!v.ok || !contenidoCoincide(bytes, v.ext)) {
+      throw error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'DOCUMENTO_TIPO', 'Solo se pueden enviar documentos PDF, Word, Excel, PowerPoint o de texto');
+    }
+
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para escribir.');
+    if (!this.tieneIdentificador(c)) {
+      throw error(HttpStatus.CONFLICT, 'CONTACTO_SIN_IDENTIFICADOR', 'Este contacto no tiene ningun identificador: no se puede responder');
+    }
+    if (!this.gateway.enviarDocumento || !this.archivos) {
+      throw error(HttpStatus.NOT_IMPLEMENTED, 'DOCUMENTO_NO_DISPONIBLE', 'Este canal no permite enviar documentos');
+    }
+    await this.exigirNumeroEnviable(c);
+    await this.verificarLimiteTasaUsuario(usuario.partyId);
+    if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+      throw new HttpException(
+        {
+          codigo: 'VENTANA_CERRADA',
+          mensaje: 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+          plantillaReapertura: 'caprichos_reabrir_conversacion',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const guardado = await this.archivos.subirDocumento(bytes, v.mime, v.nombre);
+    const m = await this.gateway.enviarDocumento(c.id, c.telefono, bytes, v.mime, v.nombre, 'PERSONA', String(guardado.id), c.phone_number_id ?? undefined);
+    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
+    await this.auditar(usuario, 'ENVIAR_DOCUMENTO', c.id, { mensajeId: m.id, estado: m.estado, archivoId: guardado.id, mime: v.mime, bytes: bytes.length }, ip);
+
+    if (m.estado === 'FALLIDO') {
+      throw new HttpException(
+        { codigo: m.errorCodigo || 'ENVIO_FALLIDO', mensaje: mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle), mensajeId: m.id },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return { id: m.id };
+  }
+
+  /** Ruta física y nombre original de un documento del chat (para la descarga). Solo lo que el mensaje dice que es un documento. */
+  async documentoDeMensaje(mensajeId: string, usuario: UsuarioAutenticado, ip?: string, dispositivo?: string) {
+    let n: bigint;
+    try {
+      n = BigInt(mensajeId);
+    } catch {
+      throw new NotFoundException({ codigo: 'DOCUMENTO_NO_ENCONTRADO', mensaje: 'No se encontró el documento' });
+    }
+    const m = await this.prisma.mensajeChat.findUnique({ where: { id: n } });
+    const d = (m?.contenido as any)?.documento;
+    if (!m || m.tipo !== 'DOCUMENTO' || !d?.archivoId || !this.archivos) {
+      throw new NotFoundException({ codigo: 'DOCUMENTO_NO_ENCONTRADO', mensaje: 'No se encontró el documento' });
+    }
+    const f = await this.archivos.obtenerArchivoPrivado(String(d.archivoId), usuario, ip, dispositivo);
+    return { ...f, nombre: sanearNombreDocumento(d.nombre) };
   }
 
   async reabrirConPlantilla(id: string, usuario: UsuarioAutenticado, ip?: string, forzar = false) {

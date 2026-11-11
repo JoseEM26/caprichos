@@ -2,10 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { insertarEnCursor } from './emojis';
 import { DetalleConversacion, RespuestaRapida } from './mensajesTipos';
 import { SelectorEmojis } from './SelectorEmojis';
+import { formatearTamano } from './TarjetaDocumento';
 
 /** El servidor comprime a ≤5 MB (límite de WhatsApp); aquí solo se corta lo absurdo. */
 export const MAX_FOTO_BYTES = 16 * 1024 * 1024;
 export const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
+/** Documentos permitidos (mismo criterio que el servidor: extensión y tipo coherentes). */
+export const MAX_DOCUMENTO_BYTES = 16 * 1024 * 1024;
+export const ACCEPT_DOCUMENTOS = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv';
+const EXT_DOCUMENTO = ACCEPT_DOCUMENTOS.split(',').map((e) => e.slice(1));
+export function errorDocumento(a: { name: string; size: number }): string | null {
+  const ext = a.name.includes('.') ? a.name.split('.').pop()!.toLowerCase() : '';
+  if (!EXT_DOCUMENTO.includes(ext)) return 'Solo se pueden enviar documentos PDF, Word, Excel, PowerPoint o de texto.';
+  if (a.size === 0) return 'El documento está vacío.';
+  if (a.size > MAX_DOCUMENTO_BYTES) return 'El documento pesa más de 16 MB. Elige uno más liviano.';
+  return null;
+}
 export const MOTIVO_VENTANA = 'Pasaron más de 24 h: solo se pueden enviar plantillas';
 
 
@@ -25,6 +37,8 @@ export interface CuadroEscribirProps {
   onEnviar: () => void;
   /** Envía una foto al cliente; si falla, lanza (el padre ya muestra el aviso) y la vista previa se queda. */
   onEnviarImagen?: (archivo: File, subtitulo: string) => Promise<void>;
+  /** Envía un documento al cliente; si falla, lanza (el padre ya muestra el aviso). */
+  onEnviarDocumento?: (archivo: File) => Promise<void>;
 }
 
 /** Cuadro para escribir, siempre abajo: respuestas rápidas, «Pulir» y enviar. */
@@ -43,6 +57,7 @@ export function CuadroEscribir({
   onDejarPulido,
   onEnviar,
   onEnviarImagen,
+  onEnviarDocumento,
 }: CuadroEscribirProps) {
   const cajaRef = useRef<HTMLTextAreaElement>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
@@ -51,6 +66,10 @@ export function CuadroEscribir({
   const [subtitulo, setSubtitulo] = useState('');
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const docRef = useRef<HTMLInputElement>(null);
+  const [doc, setDoc] = useState<File | null>(null);
+  const [errorDoc, setErrorDoc] = useState<string | null>(null);
+  const [enviandoDoc, setEnviandoDoc] = useState(false);
 
   useEffect(() => () => {
     if (foto) URL.revokeObjectURL(foto.url);
@@ -121,6 +140,28 @@ export function CuadroEscribir({
     }
   };
 
+  const elegirDocumento = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo || !onEnviarDocumento || fotoBloqueada || detalle.ocupado) return;
+    const problema = errorDocumento(archivo);
+    setErrorDoc(problema);
+    setDoc(problema ? null : archivo);
+  };
+
+  const enviarDocumento = async () => {
+    if (!doc || !onEnviarDocumento || enviandoDoc) return;
+    setEnviandoDoc(true);
+    try {
+      await onEnviarDocumento(doc);
+      setDoc(null);
+    } catch {
+      // el padre muestra el motivo; la vista previa queda para reintentar
+    } finally {
+      setEnviandoDoc(false);
+    }
+  };
+
   const sinIdentificador = !detalle.telefono || !detalle.telefono.trim();
   return (
     <div
@@ -179,6 +220,33 @@ export function CuadroEscribir({
         </div>
       )}
 
+      {errorDoc && (
+        <div role="status" className="msg-error" data-testid="error-documento">
+          {errorDoc}
+        </div>
+      )}
+
+      {doc && (
+        <div className="msg-doc-previa" role="group" aria-label="Vista previa del documento">
+          <div className="msg-doc">
+            <span className="msg-doc-icono" aria-hidden="true">📄</span>
+            <div className="msg-doc-datos">
+              <div className="msg-doc-nombre">{doc.name}</div>
+              <div className="msg-doc-tam">{formatearTamano(doc.size)}</div>
+            </div>
+          </div>
+          <div>¿Enviar este documento a {detalle.nombre || 'este cliente'}?</div>
+          <div className="msg-pulir-botones">
+            <button type="button" className="msg-ok" disabled={enviandoDoc} onClick={enviarDocumento}>
+              {enviandoDoc ? 'Enviando…' : 'Sí, enviar'}
+            </button>
+            <button type="button" className="msg-no" disabled={enviandoDoc} onClick={() => setDoc(null)}>
+              No
+            </button>
+          </div>
+        </div>
+      )}
+
       {foto && (
         <div className="msg-foto-previa" role="group" aria-label="Vista previa de la foto">
           <img src={foto.url} alt="Foto que se va a enviar" />
@@ -230,6 +298,22 @@ export function CuadroEscribir({
                   />
                 </svg>
                 <span className="msg-icono-txt">Foto</span>
+              </button>
+            </>
+          )}
+          {onEnviarDocumento && (
+            <>
+              <input ref={docRef} type="file" accept={ACCEPT_DOCUMENTOS} hidden data-testid="entrada-documento" onChange={elegirDocumento} />
+              <button
+                type="button"
+                className="msg-icono-btn"
+                aria-label="Adjuntar documento"
+                title={fotoBloqueada ? MOTIVO_VENTANA : 'Adjuntar documento (PDF, Word, Excel, PowerPoint o texto, hasta 16 MB)'}
+                disabled={detalle.ocupado || fotoBloqueada || enviandoDoc}
+                onClick={() => docRef.current?.click()}
+              >
+                <span aria-hidden="true">📄</span>
+                <span className="msg-icono-txt">Documento</span>
               </button>
             </>
           )}
