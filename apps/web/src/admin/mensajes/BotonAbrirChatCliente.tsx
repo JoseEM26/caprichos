@@ -15,7 +15,7 @@ type EstadoChat = 'buscando' | 'existe' | 'no_existe' | 'sin_permiso';
  * seleccionado). Así el mensaje queda en el sistema (mensaje_chat y outbox). Sin chat o sin permiso,
  * deshabilitado; wa.me queda solo como enlace secundario de último recurso.
  */
-export function BotonAbrirChatCliente({ telefono, estilo }: { telefono: string | null | undefined; estilo?: React.CSSProperties }) {
+export function BotonAbrirChatCliente({ telefono, estilo, nombre, respaldoWa }: { telefono: string | null | undefined; estilo?: React.CSSProperties; nombre?: string | null; respaldoWa?: boolean }) {
   let puedeMensajes = false;
   try {
     const sesion = useSesion();
@@ -65,6 +65,23 @@ export function BotonAbrirChatCliente({ telefono, estilo }: { telefono: string |
   };
   const deshabilitado: React.CSSProperties = { ...base, background: '#D9D9D9', color: '#54656F', cursor: 'not-allowed' };
   const linkWa = digitos ? `https://wa.me/51${digitos}` : null;
+
+  // Detalle del cliente: sin celular válido no hay botón; sin chat interno o sin permiso, abre WhatsApp directo
+  if (respaldoWa) {
+    if (!/^9\d{8}$/.test(digitos)) return null;
+    const etiqueta = `Abrir chat de WhatsApp con ${nombre?.trim() || 'el cliente'}`;
+    const interno = estado === 'existe';
+    if (estado === 'buscando' && puedeMensajes) return <span style={{ ...base, background: '#D9D9D9', color: '#54656F', padding: '0 14px' }} role="status">Buscando el chat...</span>;
+    return (
+      <a
+        href={interno ? `/admin/mensajes?telefono=${digitos}` : `https://wa.me/51${digitos}`}
+        target="_blank" rel="noopener noreferrer" aria-label={etiqueta} data-destino={interno ? 'interno' : 'wa'}
+        style={{ ...base, padding: '0 14px' }}
+      >
+        Chat de WhatsApp
+      </a>
+    );
+  }
 
   if (!digitos) {
     return (

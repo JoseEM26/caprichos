@@ -1280,6 +1280,45 @@ export class ComprobantesService {
   }
 
   /**
+   * Comprobantes de un pedido y de sus pedidos extra, solo lectura (no emite nada): vigentes primero, luego los anulados.
+   * DNI/RUC enmascarado salvo para ADMIN. Dice si hay XML y CDR guardados, sin leer su contenido.
+   */
+  async listarPorPedido(pedidoIdRaw: bigint | string | number, usuario?: UsuarioAutenticado) {
+    const pedidoId = this.parsearId(pedidoIdRaw, 'pedido');
+    const pedidos = await this.prisma.pedido.findMany({
+      where: { OR: [{ id: pedidoId }, { pedido_origen_id: pedidoId }] },
+      select: { id: true, codigo: true, total: true },
+    });
+    const porId = new Map<string, { codigo: string; total: number }>(pedidos.map((p: any) => [p.id.toString(), { codigo: p.codigo, total: Number(p.total) }]));
+    const ids = pedidos.map((p: any) => p.id);
+    if (ids.length === 0) return { elementos: [] };
+    const filas = await this.prisma.comprobante.findMany({ where: { pedido_id: { in: ids } } });
+    const archivos = filas.length
+      ? await this.prisma.comprobanteArchivo.findMany({ where: { comprobante_id: { in: filas.map((c: any) => c.id) } }, select: { comprobante_id: true, tipo: true } })
+      : [];
+    const esAdmin = usuario?.rol === 'ADMIN';
+    const tiene = (id: bigint, tipo: string) => archivos.some((a: any) => a.comprobante_id === id && a.tipo === tipo);
+    const orden = (c: any) => new Date(c.creado_en).getTime();
+    const elementos = [...filas]
+      .sort((a: any, b: any) => (a.anulado_en ? 1 : 0) - (b.anulado_en ? 1 : 0) || orden(b) - orden(a))
+      .map((c: any) => {
+        const ped = porId.get(c.pedido_id.toString());
+        return {
+          ...this.serializarComprobante(c),
+          documento: esAdmin ? c.documento ?? null : c.documento ? enmascararDni(c.documento) : null,
+          anulado_en: c.anulado_en ?? null,
+          anulado_motivo: c.anulado_motivo ?? null,
+          codigo_pedido: ped?.codigo ?? null,
+          total: ped?.total ?? 0,
+          fecha_lima: formatearFechaHoraLima(c.creado_en),
+          tiene_xml: tiene(c.id, 'XML'),
+          tiene_cdr: tiene(c.id, 'CDR'),
+        };
+      });
+    return { elementos };
+  }
+
+  /**
    * Construye el documento listo para impresión física o visualización de Nota de Venta.
    */
   private async construirDatosImpresion(pedido: any, comprobante: any, esCopia: boolean) {

@@ -4,6 +4,8 @@ import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
 import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { PlanoMesaResaltada } from '../salon/componentes/PlanoMesaResaltada';
 import { canalLabel } from './PedidosAdminView';
+import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
+import { SeccionComprobantesPedido } from './SeccionComprobantesPedido';
 import type { Pedido } from './pedidosApi';
 
 export interface CapaEntregaProps {
@@ -83,6 +85,9 @@ export function CapaEntrega({ pedido, esDelivery, esMesa, puedeCorregirCliente, 
               <strong>{mozo}</strong>
             </div>
           )}
+          <BotonAbrirChatCliente telefono={pedido.cliente_telefono} nombre={pedido.cliente_nombre} respaldoWa estilo={{ alignSelf: 'flex-start' }} />
+          <h3 className="dp-sec-titulo">Comprobantes</h3>
+          <SeccionComprobantesPedido pedido={pedido} />
           {puedeCorregirCliente && (
             <button type="button" className="dp-btn" style={{ alignSelf: 'flex-start' }} onClick={alCorregirCliente}>
               Corregir datos del cliente

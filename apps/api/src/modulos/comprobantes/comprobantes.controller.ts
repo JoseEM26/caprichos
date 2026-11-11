@@ -46,6 +46,13 @@ export class ComprobantesController {
     return this.comprobantesService.listarPorEmitir(query, req.usuario, ip);
   }
 
+  /** GET /admin/comprobantes/pedido/:pedidoId/lista : todos los comprobantes del pedido y sus extras (solo lectura). */
+  @Get('pedido/:pedidoId/lista')
+  @Permiso('comprobantes', 'ver')
+  async listarPorPedido(@Param('pedidoId') pedidoId: string, @Req() req: any) {
+    return this.comprobantesService.listarPorPedido(pedidoId, req.usuario);
+  }
+
   /**
    * GET /admin/comprobantes/pedido/:pedidoId
    * Obtiene los datos completos para la impresión de la nota de venta.

@@ -15,7 +15,7 @@ import type { BoletaPorDefecto, ComprobanteElectronico, ConfigFacturacion, Prove
 const ALTO_TOQUE = '44px';
 
 /** Estado para la vista: lo que SUNAT dice (y si es de prueba). */
-function estadoDe(c: ComprobanteElectronico): { texto: string; variante: VarianteInsignia } {
+export function estadoDe(c: Pick<ComprobanteElectronico, 'baja_estado' | 'facturacion_estado' | 'simulado'>): { texto: string; variante: VarianteInsignia } {
   if (c.baja_estado === 'ACEPTADA') return { texto: 'Anulado (baja aceptada)', variante: 'neutro' };
   if (c.baja_estado === 'SOLICITADA') return { texto: 'Baja solicitada', variante: 'aviso' };
   if (c.baja_estado === 'PENDIENTE_RESUMEN') return { texto: 'Baja en el resumen diario', variante: 'aviso' };
