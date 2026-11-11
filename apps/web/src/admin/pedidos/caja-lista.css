@@ -1273,40 +1273,6 @@
 .cj2-ver-detalle button { border: 0; background: transparent; padding: 4px 2px; min-height: 28px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--cp-soft, #2C4C5D); text-decoration: underline; cursor: pointer; }
 @media (pointer: coarse) { .cj2-ver-detalle button { min-height: 40px; } }
 
-/* ---- Barra de vista (Tarjetas | Tabla) y columnas ---- */
-.cj2-vistabar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
-.cj2-vista { display: inline-flex; border: 1.5px solid var(--cp-navy, #0B2C3E); border-radius: 10px; overflow: hidden; }
-.cj2-vista-op { min-height: 34px; padding: 0 14px; border: 0; background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
-.cj2-vista-op[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
-.cj2-vistabar .cj2-btn { min-height: 34px; font-size: 13px; padding: 0 12px; }
-@media (pointer: coarse), (max-width: 699px) { .cj2-vista-op, .cj2-vistabar .cj2-btn { min-height: 40px; } }
-.cj2-menu-rel { position: relative; }
-.cj2-col-panel { position: absolute; right: 0; top: calc(100% + 4px); z-index: 60; width: min(280px, 86vw); max-height: 60vh; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; background: var(--cp-white, #FFFFFF); border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; box-shadow: 0 8px 24px rgba(11, 44, 62, 0.15); }
-.cj2-col-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
-.cj2-col-fila label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; flex: 1; min-width: 0; cursor: pointer; }
-.cj2-col-mover button { border: 1px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #FFFFFF); border-radius: 6px; width: 30px; height: 28px; cursor: pointer; font-weight: 800; }
-.cj2-col-mover button:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* ---- Tabla de cuadre ---- */
-.cj2-tabla-marco { border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; background: var(--cp-white, #FFFFFF); overflow: hidden; min-width: 0; }
-.cj2-tabla-scroll { overflow: auto; max-height: min(70vh, 720px); max-width: 100%; -webkit-overflow-scrolling: touch; }
-.cj2-tabla { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; color: var(--cp-navy, #0B2C3E); font-variant-numeric: tabular-nums; }
-.cj2-tabla th { position: sticky; top: 0; z-index: 1; background: var(--cp-sand, #EDE1D1); text-align: left; font-weight: 800; font-size: 12px; padding: 6px 8px; white-space: nowrap; border-bottom: 1.5px solid var(--cp-line, #E3D6C6); }
-.cj2-tabla td { padding: 4px 8px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--cp-line, #E3D6C6); line-height: 1.25; }
-.cj2-tabla tbody tr:hover { background: var(--cp-cream, #FBF4EC); }
-.cj2-tabla tr[data-estado='anulado'] td { color: var(--cp-rust, #B2500F); text-decoration: line-through; }
-.cj2-tb-num { text-align: right !important; }
-.cj2-tb-chip { display: inline-block; padding: 1px 8px; margin-right: 3px; border-radius: 9999px; font-size: 11.5px; font-weight: 800; }
-.cj2-tb-medio { background: var(--cp-sand, #EDE1D1); color: var(--cp-navy, #0B2C3E); }
-.cj2-tb-ver { text-align: right; }
-.cj2-tb-btn { min-height: 28px !important; padding: 0 10px !important; font-size: 12px !important; }
-.cj2-tabla-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 10px; border-top: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-cream, #FBF4EC); font-size: 12.5px; font-weight: 600; }
-.cj2-tabla-nota { margin-left: auto; font-size: 11.5px; color: var(--cp-soft, #2C4C5D); }
-@media (max-width: 699px) {
-  .cj2-tabla-scroll { max-height: 62vh; }
-  .cj2-tabla-nota { margin-left: 0; flex: 1 1 100%; }
-}
-
 /* ---- Encabezado: contadores y pestañas caben en celular y PC ---- */
 .cj2-pastillas { min-width: 0; max-width: 100%; }
 .cj2-resumen { max-width: 100%; overflow-x: auto; }

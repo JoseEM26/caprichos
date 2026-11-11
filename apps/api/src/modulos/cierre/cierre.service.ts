@@ -44,6 +44,7 @@ import {
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
+import { detallarVentasTurno, idsDePersonas, nombresDeCobros } from './ventas-turno.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -706,12 +707,38 @@ export class CierreService {
     // Mismos cobros y movimientos que la caja de hoy, pero de la caja que se cierra: totales y listas cuadran
     const cobros = await this.prisma.cobro.findMany({
       where: { caja_id: caja.id },
-      include: { pagos: true, pedido: { select: { codigo: true, cliente_nombre: true } } },
+      include: {
+        pagos: true,
+        pedido: {
+          select: {
+            codigo: true,
+            cliente_nombre: true,
+            // Solo para el detalle de ventas del cierre (no entra en ningún cálculo)
+            modalidad: true,
+            canal: true,
+            estado: true,
+            mesa_nombre: true,
+            creado_en: true,
+            party_id: true,
+            repartidor_party_id: true,
+            cobro_mozo_party_id: true,
+            lineas: { select: { producto: { select: { categoria: { select: { nombre: true } } } } } },
+            comprobante: { select: { tipo: true, numero_texto: true, facturacion_estado: true, emision: true, anulado_en: true } },
+          },
+        },
+      },
     });
     const movimientos = await this.prisma.movimientoCaja.findMany({
       where: { caja_id: caja.id },
       orderBy: { id: 'asc' },
     });
+    // Nombres para el detalle: si falla, el cierre sigue igual y el detalle sale sin nombres
+    let nombres = new Map<string, string>();
+    try {
+      nombres = await nombresDeCobros(this.prisma, idsDePersonas(cobros as any));
+    } catch {
+      nombres = new Map();
+    }
 
     // Vueltos entregados en efectivo (informativo: el monto cobrado ya es neto de vuelto)
     const vueltos = cobros
@@ -724,6 +751,8 @@ export class CierreService {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
       cobrados: mapearCobrosCaja(cobros),
+      // Detalle de cada venta (quién, tipo, categoría, repartidor…): aditivo, se une por pedidoId
+      ventas: detallarVentasTurno(cobros as any, nombres),
       movimientos: mapearMovimientosCaja(movimientos),
       apertura: Number(caja.apertura),
       efectivoEsperado: montos.esperadoEfectivo,

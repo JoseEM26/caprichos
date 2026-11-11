@@ -29,6 +29,13 @@ describe('PreferenciasController', () => {
     expect(svc.borrar).toHaveBeenCalledWith(7n, 'caja.vista');
   });
 
+  it('acepta las preferencias de la tabla de ventas del cierre', async () => {
+    await ctl.guardar('cierre.ventas.vista', { valor: 'tabla' }, req);
+    await ctl.guardar('cierre.ventas.columnas', { valor: ['codigo', 'total'] }, req);
+    await ctl.guardar('cierre.ventas.filas', { valor: 25 }, req);
+    expect(svc.guardar).toHaveBeenCalledTimes(3);
+  });
+
   it('rechaza claves fuera de la lista y valores enormes', async () => {
     await expect(ctl.obtener('otra.cosa', req)).rejects.toBeInstanceOf(BadRequestException);
     await expect(ctl.guardar('caja.vista', { valor: 'x'.repeat(MAX_BYTES_PREFERENCIA + 1) }, req)).rejects.toBeInstanceOf(BadRequestException);

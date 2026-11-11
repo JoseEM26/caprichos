@@ -5,11 +5,11 @@ import { mediosDePedido } from './mediosFila';
 import { nombreMedio } from './planPago';
 import { totalDe } from './resumenDia';
 
-const aHora = (iso?: string | null) =>
+export const aHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) : '';
 
-const MOD: Record<string, string> = { DELIVERY: 'Delivery', LLEVAR: 'Para llevar', MESA: 'En mesa', COMER_LOCAL: 'Comer en el local', LOCAL: 'En el local' };
-const CANAL: Record<string, string> = { CARTA: 'Web', WEB: 'Web', BOT: 'WhatsApp', WHATSAPP: 'WhatsApp', MOZO: 'Mozo', CAJA: 'Caja' };
+export const MOD: Record<string, string> = { DELIVERY: 'Delivery', LLEVAR: 'Para llevar', MESA: 'En mesa', COMER_LOCAL: 'Comer en el local', LOCAL: 'En el local' };
+export const CANAL: Record<string, string> = { CARTA: 'Web', WEB: 'Web', BOT: 'WhatsApp', WHATSAPP: 'WhatsApp', MOZO: 'Mozo', CAJA: 'Caja' };
 
 export function textoPago(p: Pedido): string {
   const pag = String(p.pago_estado || '').toUpperCase();
