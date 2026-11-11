@@ -857,6 +857,10 @@ export const TEXTOS_BOT = {
     return 'Por favor escribe el RUC de tu empresa (11 dígitos):';
   },
 
+  pedidoComprobanteRucGuardado: (rucMasc: string, razon: string | null): string => {
+    return `Tengo guardado el RUC ${rucMasc}${razon ? ` (${razon})` : ''} de tu cuenta. Escribe SI para usarlo o escribe otro RUC (11 dígitos):`;
+  },
+
   pedidoComprobanteRazon: (): string => {
     return 'Por favor escribe la Razón Social de tu empresa:';
   },

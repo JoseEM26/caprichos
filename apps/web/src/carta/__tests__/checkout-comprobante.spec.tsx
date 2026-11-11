@@ -65,8 +65,10 @@ function Pagina({ cartaActiva }: { cartaActiva: boolean }) {
   );
 }
 
-function abrirPedido(cartaActiva: boolean) {
-  vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(null);
+function abrirPedido(cartaActiva: boolean, conSesion = false) {
+  const ctx = conSesion ? ({ cliente: { partyId: '1', nombre: 'Luis', telefono: '912345678', puntos: 0 }, abrirPanel: vi.fn() } as any) : null;
+  vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(ctx);
+  if (ctx) vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue(ctx);
   render(
     <CarritoProvider>
       <Pagina cartaActiva={cartaActiva} />
@@ -80,6 +82,15 @@ async function irAPago() {
   fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
   fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
   fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+  fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+  expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+  expect(await screen.findByRole('button', { name: /Enviar pedido/i })).toBeInTheDocument();
+}
+
+/** Con sesión no se pide nombre ni celular: el paso 1 solo elige la modalidad. */
+async function irAPagoConSesion() {
+  fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
@@ -141,6 +152,46 @@ describe('Checkout de la carta ▸ comprobante simple, boleta o factura', () => 
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
     await waitFor(() => expect(comprobanteEnviado()).toBeDefined());
     expect(comprobanteEnviado()).toMatchObject({ tipo: 'FACTURA', ruc: '20131312955', razonSocial: 'Acme SAC' });
+  });
+
+  describe('RUC guardado en la cuenta', () => {
+    const conRucGuardado = () =>
+      vi.mocked(api.get).mockImplementation(async (ruta: string) => {
+        if (ruta === '/carta/cuenta/facturacion') return { facturacion: { ruc: '20000000015' } } as any;
+        return { ruc: '20000000015', razon_social: 'EMPRESA PRUEBA SAC', estado: 'ACTIVO', condicion: 'HABIDO', direccion: null, desactualizado: false } as any;
+      });
+
+    it('con sesión: al elegir Factura el RUC aparece puesto y se puede cambiar', async () => {
+      conRucGuardado();
+      abrirPedido(false, true);
+      await irAPagoConSesion();
+      fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
+      await waitFor(() => expect(screen.getByLabelText(/RUC/i)).toHaveValue('20000000015'));
+      expect(screen.getByText(/RUC guardado en tu cuenta/)).toBeInTheDocument();
+      expect(api.get).toHaveBeenCalledWith('/carta/cuenta/facturacion');
+      fireEvent.change(screen.getByLabelText(/RUC/i), { target: { value: '2013131295' } });
+      expect(screen.getByLabelText(/RUC/i)).toHaveValue('2013131295');
+    });
+
+    it('sin sesión: nunca consulta el RUC guardado (no se obtiene tecleando un celular)', async () => {
+      conRucGuardado();
+      abrirPedido(false);
+      await irAPago();
+      fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
+      fireEvent.change(screen.getByLabelText(/RUC/i), { target: { value: '2013131295' } });
+      expect(api.get).not.toHaveBeenCalledWith('/carta/cuenta/facturacion');
+    });
+
+    it('el celular se pide ANTES que el RUC (en el orden de la página)', async () => {
+      abrirPedido(false);
+      // el celular está en el paso 1; la factura, en el de pago: el celular ya quedó puesto antes
+      fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
+      const tel = screen.getByLabelText(/Teléfono celular/i);
+      await irAPago();
+      expect(tel).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
+      expect(screen.getByLabelText(/RUC/i)).toBeInTheDocument();
+    });
   });
 
   describe('factura con consulta de RUC a SUNAT', () => {

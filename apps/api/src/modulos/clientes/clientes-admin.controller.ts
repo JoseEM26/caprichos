@@ -14,6 +14,7 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ClientesService } from './clientes.service';
+import { FacturacionClienteService } from './facturacion-cliente.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { PuntosService } from './puntos.service';
 import {
@@ -29,6 +30,7 @@ export class ClientesAdminController {
     private readonly clientesService: ClientesService,
     private readonly puntosService: PuntosService,
     private readonly direcciones: DireccionesClienteService,
+    private readonly facturacion: FacturacionClienteService,
   ) {}
 
   /** Cliente con cuenta por celular exacto (9 dígitos) para atender un pedido. */
@@ -41,7 +43,9 @@ export class ClientesAdminController {
     if (!/^9\d{8}$/.test(telefono ?? '')) {
       throw new BadRequestException({ codigo: 'TELEFONO_INVALIDO', mensaje: 'El celular debe tener 9 dígitos y empezar con 9.' });
     }
-    return this.direcciones.buscarPorTelefono(telefono, req.usuario?.partyId);
+    const r = await this.direcciones.buscarPorTelefono(telefono, req.usuario?.partyId);
+    // RUC guardado en la cuenta para rellenar la factura (solo personal con permiso; nunca en la carta pública)
+    return r.encontrado ? { ...r, facturacion: await this.facturacion.obtener(r.party) } : r;
   }
 
   /** Retirada: los clientes ya no se buscan por DNI. */

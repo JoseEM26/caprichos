@@ -41,7 +41,8 @@ Ver tambien: [[cierre]]
 1. En la carta virtual, en WhatsApp, en Nuevo pedido del mozo y en [[caja]] el pedido lleva uno de tres comprobantes. Por defecto es Comprobante simple.
 2. Comprobante simple es el ticket interno del pedido: no pide DNI ni RUC y no se envia a SUNAT.
 3. Boleta pide el DNI de 8 digitos (es opcional hasta S/ 700; por encima de S/ 700 es obligatorio). Factura pide RUC de 11 digitos y razon social.
-4. El documento se guarda solo en el pedido y en el comprobante, nunca en la cuenta del cliente.
+4. El DNI de la boleta se guarda solo en el pedido y en el comprobante, nunca en la cuenta del cliente. El RUC de la factura si se guarda en la cuenta del cliente (por su celular), la primera vez que pide factura. Si la cuenta ya tiene un RUC y el cliente escribe otro, ese pedido usa el que escribio y la cuenta conserva el guardado.
+4b. La proxima vez que pida factura, al poner su celular el RUC, la razon social y la direccion fiscal salen puestos y se pueden corregir. En la carta el RUC guardado solo aparece si el cliente inicio sesion. En el bot de WhatsApp el cliente escribe SI para usar su RUC guardado.
 5. Antes de cobrar, en el detalle del pedido pulsa Cambiar comprobante para pasar de uno a otro. Con un comprobante ya emitido hay que anularlo antes.
 6. Solo la boleta y la factura se emiten a SUNAT y aparecen en Electronicos SUNAT; el simple no deja nada pendiente de envio.
 Antes: [[caja]]

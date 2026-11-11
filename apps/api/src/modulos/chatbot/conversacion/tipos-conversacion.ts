@@ -332,6 +332,8 @@ export interface ContextoConversacion {
   conversacionId?: string | bigint;
   nombreCliente?: string | null;
   telefonoCliente?: string | null;
+  /** RUC guardado en la cuenta del celular que escribe (solo en el paso de la factura). El bot lo ofrece, no lo exige. */
+  facturaGuardada?: { ruc: string; razonSocial: string | null } | null;
   cartaUrlPublica?: string;
   datosLocal?: DatosHorarioLocal;
   datosLocalPublicos?: any;

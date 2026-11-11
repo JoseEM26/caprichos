@@ -13,6 +13,7 @@ import { Reflector } from '@nestjs/core';
 import { ClientesAdminController } from './clientes-admin.controller';
 import { ClientesService } from './clientes.service';
 import { PuntosService } from './puntos.service';
+import { FacturacionClienteService } from './facturacion-cliente.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -42,6 +43,7 @@ describe('ClientesAdminController', () => {
         { provide: ClientesService, useValue: clientesServiceMock },
         { provide: PuntosService, useValue: puntosServiceMock },
         { provide: DireccionesClienteService, useValue: { buscarPorTelefono: jest.fn() } },
+        { provide: FacturacionClienteService, useValue: { obtener: jest.fn() } },
         { provide: PrismaService, useValue: {} },
         { provide: Reflector, useValue: {} },
       ],
@@ -107,8 +109,17 @@ describe('ClientesAdminController', () => {
       const r: any = await controller.buscarPorTelefono('987654321', { usuario: { partyId: 55n } } as any);
 
       expect(direccionesDe().buscarPorTelefono).toHaveBeenCalledWith('987654321', 55n);
-      expect(r).toEqual(datos);
+      expect(r).toEqual({ ...datos, facturacion: undefined });
       for (const k of ['dniMascara', 'dni', 'correo', 'cumpleanos']) expect(r).not.toHaveProperty(k);
+    });
+
+    it('encontrado con RUC guardado: lo trae para rellenar la factura (personal con permiso)', async () => {
+      const f = { ruc: '20000000015', razonSocial: 'Empresa de Prueba SAC', direccion: null };
+      direccionesDe().buscarPorTelefono.mockResolvedValue({ encontrado: true, party: '100', nombre: 'Ana', telefono: '987654321', puntos: 0, direcciones: [] });
+      (controller as any).facturacion.obtener.mockResolvedValue(f);
+      const r: any = await controller.buscarPorTelefono('987654321', { usuario: { partyId: 55n } } as any);
+      expect((controller as any).facturacion.obtener).toHaveBeenCalledWith('100');
+      expect(r.facturacion).toEqual(f);
     });
 
     it('no encontrado: { encontrado: false } sin datos', async () => {

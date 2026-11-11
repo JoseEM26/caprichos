@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { PuntosService } from './puntos.service';
 import { ClientesService } from './clientes.service';
+import { FacturacionClienteService } from './facturacion-cliente.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { RecuperarClaveService } from './recuperar-clave.service';
 import { CodigoRegistroService } from './codigo-registro.service';
@@ -30,6 +31,7 @@ export class CuentaClienteController {
     private readonly clientesService: ClientesService,
     private readonly configService: ConfigService,
     private readonly direcciones: DireccionesClienteService,
+    private readonly facturacion: FacturacionClienteService,
     private readonly puntos: PuntosService,
     private readonly recuperar: RecuperarClaveService,
     private readonly codigoRegistro: CodigoRegistroService,
@@ -178,6 +180,14 @@ export class CuentaClienteController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     const actualizado = await this.clientesService.quitarFoto(cliente.partyId, ip);
     return { cliente: actualizado };
+  }
+
+  /** RUC guardado en la cuenta (solo con sesión iniciada: nunca por teclear un celular). */
+  @Get('facturacion')
+  async datosFacturacion(@Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) return { facturacion: null };
+    return { facturacion: await this.facturacion.obtener(cliente.partyId) };
   }
 
   @Get('direcciones')

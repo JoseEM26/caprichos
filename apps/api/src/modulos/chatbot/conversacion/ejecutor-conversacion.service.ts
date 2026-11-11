@@ -17,6 +17,7 @@ import { textosNotificacionSolicitud } from '../../reservas/notificacion-solicit
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
+import { FacturacionClienteService } from '../../clientes/facturacion-cliente.service';
 import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { CODIGOS_COMBO_RECHAZADO, carritoTrasComboRechazado, carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
@@ -108,6 +109,7 @@ export class EjecutorConversacionService {
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() @Inject(CUENTA_CLIENTE_BOT_PUERTO) private readonly clientesService?: CuentaClienteBotPuerto,
     @Optional() private readonly reanudacionBot?: ReanudacionBotService,
+    @Optional() private readonly facturacionCliente?: FacturacionClienteService,
   ) {}
 
   /**
@@ -1275,7 +1277,19 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Factura: el RUC guardado en la cuenta de este celular (solo al elegir el comprobante; es su propio chat de WhatsApp)
+    let facturaGuardada: { ruc: string; razonSocial: string | null } | null = null;
+    if (telefonoCliente && this.facturacionCliente && this.direccionesService && ['PEDIDO_COMPROBANTE_TIPO', 'PEDIDO_COMPROBANTE_RUC'].includes(String(flujoPrevio?.estado))) {
+      try {
+        const partyId = await this.direccionesService.resolverPartyPorTelefono(telefonoCliente);
+        facturaGuardada = partyId ? await this.facturacionCliente.obtener(partyId) : null;
+      } catch (err: any) {
+        this.logger.warn(`Sin RUC guardado para la factura: ${err?.name ?? 'error'}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
+      facturaGuardada,
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
       telefonoCliente,

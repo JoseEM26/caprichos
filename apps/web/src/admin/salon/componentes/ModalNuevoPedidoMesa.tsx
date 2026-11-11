@@ -2967,7 +2967,7 @@ export function ModalNuevoPedidoMesa({
                     />
                   ) : undefined
                 }
-                comprobante={<SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} />}
+                comprobante={<SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} guardada={cuenta?.facturacion ?? null} />}
               />
               <div className="np2-pie">
                 <button type="button" className="np2-atras" onClick={() => setFase('pedido')}>

@@ -114,9 +114,11 @@ export interface SelectorComprobanteProps {
   total?: number;
   /** Prefijo de los id de los campos (para enfocarlos desde fuera): `${idPrefijo}-doc`, `${idPrefijo}-razon` */
   idPrefijo: string;
+  /** RUC guardado en la cuenta del cliente (ya identificado por su celular en el paso anterior). Rellena la factura, editable. */
+  guardada?: { ruc: string; razonSocial: string | null; direccion: string | null } | null;
 }
 
-export function SelectorComprobante({ valor, onChange, total, idPrefijo }: SelectorComprobanteProps) {
+export function SelectorComprobante({ valor, onChange, total, idPrefijo, guardada }: SelectorComprobanteProps) {
   const err = errorValorComprobante(valor);
   const aviso = avisoValorComprobante(valor, total);
   const set = (cambio: Partial<ValorComprobante>) => onChange({ ...valor, ...cambio });
@@ -126,8 +128,18 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
   // Autocompleta razón social y dirección desde SUNAT al completar un RUC válido (editables: aquí es personal). Si falla, se escribe a mano.
   const actual = useRef({ valor, onChange });
   actual.current = { valor, onChange };
+  // RUC guardado en la cuenta: al elegir factura con el RUC vacío se rellena una sola vez (celular primero, RUC después)
+  const rellenado = useRef<string | null>(null);
+  useEffect(() => {
+    if (valor.tipo !== 'FACTURA' || !guardada || rellenado.current === guardada.ruc || valor.doc !== '') return;
+    rellenado.current = guardada.ruc;
+    onChange({ ...valor, doc: guardada.ruc, razon: guardada.razonSocial ?? '', direccion: guardada.direccion ?? '' });
+  }, [valor, guardada, onChange]);
+
   useEffect(() => {
     if (valor.tipo !== 'FACTURA' || !/^(10|15|17|20)\d{9}$/.test(valor.doc)) return;
+    // Ya hay razón social guardada para este RUC: no se consulta SUNAT otra vez
+    if (guardada && guardada.ruc === valor.doc && guardada.razonSocial && valor.razon === guardada.razonSocial) return;
     let vigente = true;
     api
       .get<{ razon_social: string; direccion: string | null }>(`/admin/ruc/${valor.doc}`)
@@ -188,6 +200,9 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo }: Selec
 
       {valor.tipo === 'FACTURA' && (
         <>
+          {guardada && valor.doc === guardada.ruc && (
+            <div role="status" style={aviso_}>RUC guardado en la cuenta del cliente. Puedes corregirlo para este pedido.</div>
+          )}
           <label style={etiqueta}>
             RUC
             <input

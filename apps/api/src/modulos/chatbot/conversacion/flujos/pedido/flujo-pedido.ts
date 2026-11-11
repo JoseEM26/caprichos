@@ -2255,7 +2255,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         acciones: [
           {
             tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoComprobanteRuc(),
+            texto: this.textoPedirRuc(contexto),
           },
         ],
         nuevoFlujo: {
@@ -2301,13 +2301,27 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
   }
 
+  private textoPedirRuc(contexto: ContextoConversacion): string {
+    const g = contexto.facturaGuardada;
+    return g ? TEXTOS_BOT.pedidoComprobanteRucGuardado(`${g.ruc.slice(0, 2)}${'*'.repeat(7)}${g.ruc.slice(-2)}`, g.razonSocial) : TEXTOS_BOT.pedidoComprobanteRuc();
+  }
+
   private pasoComprobanteRuc(
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     entrada: EntradaNormalizada,
-    _contexto: ContextoConversacion,
+    contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const ruc = entrada.textoOriginal.trim();
+    // RUC guardado en la cuenta: «SI» lo usa (con su razón social) y no vuelve a pedir nada
+    const guardada = contexto.facturaGuardada;
+    if (guardada && /^s[ií]$/i.test(ruc)) {
+      return this.avanzarHaciaCheckout(
+        flujo,
+        { ...pedido, comprobante: { tipo: 'FACTURA', ruc: guardada.ruc, ...(guardada.razonSocial ? { razonSocial: guardada.razonSocial } : {}) } },
+        contexto,
+      );
+    }
     if (!/^(10|15|17|20)\d{9}$/.test(ruc)) {
       return {
         nuevoEstado: 'PEDIDO_COMPROBANTE_RUC',
@@ -3338,7 +3352,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           estado === 'PEDIDO_COMPROBANTE_DNI'
             ? TEXTOS_BOT.pedidoComprobanteDni()
             : estado === 'PEDIDO_COMPROBANTE_RUC'
-              ? TEXTOS_BOT.pedidoComprobanteRuc()
+              ? this.textoPedirRuc(contexto)
               : TEXTOS_BOT.pedidoComprobanteRazon();
         return {
           nuevoEstado: estado,

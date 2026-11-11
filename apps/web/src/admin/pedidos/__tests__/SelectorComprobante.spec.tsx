@@ -136,3 +136,28 @@ describe('SelectorComprobante ▸ autocompleta desde SUNAT', () => {
     get.mockRestore();
   });
 });
+
+describe('SelectorComprobante: RUC guardado en la cuenta', () => {
+  const guardada = { ruc: '20000000015', razonSocial: 'Empresa de Prueba SAC', direccion: 'Av. Falsa 123' };
+  const Envoltura = ({ g }: { g: typeof guardada | null }) => {
+    const [valor, setValor] = useState<ValorComprobante>({ ...VALOR_COMPROBANTE_VACIO, tipo: 'FACTURA' });
+    return <SelectorComprobante idPrefijo="g" valor={valor} onChange={setValor} guardada={g} />;
+  };
+
+  it('al elegir factura rellena RUC, razón social y dirección guardados (editables) sin consultar SUNAT', async () => {
+    const get = vi.spyOn(api, 'get');
+    render(<Envoltura g={guardada} />);
+    await waitFor(() => expect(screen.getByLabelText('RUC')).toHaveValue('20000000015'));
+    expect(screen.getByLabelText('Razón social')).toHaveValue('Empresa de Prueba SAC');
+    expect(screen.getByText(/RUC guardado en la cuenta/)).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Razón social'), { target: { value: 'Otra SAC' } });
+    expect(screen.getByLabelText('Razón social')).toHaveValue('Otra SAC');
+    get.mockRestore();
+  });
+
+  it('cuenta sin RUC guardado: el formulario queda vacío', () => {
+    render(<Envoltura g={null} />);
+    expect(screen.getByLabelText('RUC')).toHaveValue('');
+  });
+});

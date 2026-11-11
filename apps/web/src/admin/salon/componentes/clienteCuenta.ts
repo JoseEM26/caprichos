@@ -21,6 +21,8 @@ export interface CuentaCliente {
   telefono: string | null;
   puntos: number;
   direcciones: DireccionCliente[];
+  /** RUC guardado en la cuenta (solo personal con permiso); null si nunca pidió factura */
+  facturacion: { ruc: string; razonSocial: string | null; direccion: string | null } | null;
 }
 
 /** Consulta la cuenta por celular. Devuelve null si no hay cuenta. Lanza ErrorApi si falla. */
@@ -32,6 +34,9 @@ export async function buscarCuentaPorTelefono(telefono: string): Promise<CuentaC
     nombre: String(res.nombre ?? ''),
     telefono: res.telefono ? String(res.telefono) : null,
     puntos: Number(res.puntos ?? 0),
+    facturacion: res.facturacion?.ruc
+      ? { ruc: String(res.facturacion.ruc), razonSocial: res.facturacion.razonSocial ?? null, direccion: res.facturacion.direccion ?? null }
+      : null,
     direcciones: (Array.isArray(res.direcciones) ? res.direcciones : [])
       .slice(0, 5)
       .map((d: any) => ({
