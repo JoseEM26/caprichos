@@ -152,7 +152,7 @@ describe('ElectronicosTab', () => {
     await waitFor(() => expect(reintentar).toHaveBeenCalledWith('6', { direccion: 'Av. Lima 123' }));
   });
 
-  describe('Buscar por RUC en la corrección', () => {
+  describe('Buscar por DNI o RUC en la corrección', () => {
     const abrir = async (doc: string) => {
       conRol('ADMIN');
       render(<ElectronicosTab />);
@@ -164,7 +164,7 @@ describe('ElectronicosTab', () => {
     it('con RUC válido rellena razón social y dirección', async () => {
       const get = vi.spyOn(api, 'get').mockResolvedValue({ razon_social: 'EMPRESA DE PRUEBA SAC', direccion: 'Av. Prueba 1' } as any);
       await abrir('20123456786');
-      fireEvent.click(screen.getByRole('button', { name: 'Buscar por RUC' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar por DNI o RUC' }));
       await waitFor(() => expect((screen.getByRole('textbox', { name: /Razón social/ }) as HTMLInputElement).value).toBe('EMPRESA DE PRUEBA SAC'));
       expect((screen.getByRole('textbox', { name: /Dirección/ }) as HTMLInputElement).value).toBe('Av. Prueba 1');
       expect(get).toHaveBeenCalledWith('/admin/ruc/20123456786');
@@ -173,16 +173,24 @@ describe('ElectronicosTab', () => {
     it('si el servicio falla muestra el aviso y deja escribir a mano', async () => {
       vi.spyOn(api, 'get').mockRejectedValue(new Error('x'));
       await abrir('20123456786');
-      fireEvent.click(screen.getByRole('button', { name: 'Buscar por RUC' }));
-      expect((await screen.findByRole('alert')).textContent).toContain('No pudimos consultar el RUC');
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar por DNI o RUC' }));
+      expect((await screen.findByRole('alert')).textContent).toContain('no está disponible');
       const razon = screen.getByRole('textbox', { name: /Razón social/ }) as HTMLInputElement;
       fireEvent.change(razon, { target: { value: 'A mano' } });
       expect(razon.value).toBe('A mano');
     });
 
+    it('con DNI de 8 dígitos rellena el nombre', async () => {
+      const get = vi.spyOn(api, 'get').mockResolvedValue({ nombre_completo: 'MARIA PRUEBA LOPEZ' } as any);
+      await abrir('12345678');
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar por DNI o RUC' }));
+      await waitFor(() => expect((screen.getByRole('textbox', { name: /Razón social/ }) as HTMLInputElement).value).toBe('MARIA PRUEBA LOPEZ'));
+      expect(get).toHaveBeenCalledWith('/admin/dni/12345678');
+    });
+
     it('con RUC inválido el botón está deshabilitado', async () => {
       await abrir('20123456780');
-      expect((screen.getByRole('button', { name: 'Buscar por RUC' }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: 'Buscar por DNI o RUC' }) as HTMLButtonElement).disabled).toBe(true);
     });
   });
 

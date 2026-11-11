@@ -57,7 +57,7 @@ describe('PedidoDetalle: cambiar comprobante antes de cobrar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar comprobante' }));
     const panel = screen.getByLabelText('Cambiar comprobante');
     fireEvent.click(within(panel).getByTestId('comprobante-FACTURA'));
-    fireEvent.change(within(panel).getByLabelText('RUC'), { target: { value: '20123456789' } });
+    fireEvent.change(within(panel).getByLabelText('DNI o RUC'), { target: { value: '20123456789' } });
     fireEvent.change(within(panel).getByLabelText('Razón social'), { target: { value: 'Acme SAC' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar comprobante' }));

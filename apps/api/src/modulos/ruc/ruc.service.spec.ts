@@ -1,5 +1,6 @@
 jest.mock('../acceso/acceso.guard', () => ({ AccesoGuard: class {} }));
 import { RucService, RUC_TOPE_MENSUAL } from './ruc.service';
+import { Logger } from '@nestjs/common';
 import { rucValido } from './ruc.util';
 import { RucPublicoController } from './ruc.controller';
 
@@ -48,6 +49,8 @@ describe('RucService', () => {
   beforeEach(() => {
     fetchMock = jest.fn();
     (global as any).fetch = fetchMock;
+    delete process.env.DNIRUC_TOKEN; // sin token: proveedor anterior (openruc)
+    delete process.env.DNIRUC_TOPE_MENSUAL;
   });
 
   it('rechaza dígito verificador sin llamar a la API', async () => {
@@ -117,6 +120,115 @@ describe('RucService', () => {
     const { svc, prisma } = montar();
     await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
     expect(prisma.rucConsulta.upsert).not.toHaveBeenCalled();
+  });
+});
+
+const TOKEN = 'tok-de-prueba-ABC123';
+const REAL = {
+  ruc: RUC,
+  razonSocial: 'EMPRESA DE PRUEBA SAC',
+  nombreComercial: null,
+  estado: 'ACTIVO',
+  condicion: 'HABIDO',
+  direccion: 'AV PRUEBA 123',
+  departamento: 'LIMA',
+  provincia: 'LIMA',
+  distrito: 'MIRAFLORES',
+  ubigeo: '150132',
+};
+
+describe('RucService con apisperu (DNIRUC_TOKEN definido)', () => {
+  let fetchMock: jest.Mock;
+  beforeEach(() => {
+    fetchMock = jest.fn();
+    (global as any).fetch = fetchMock;
+    process.env.DNIRUC_TOKEN = TOKEN;
+    delete process.env.DNIRUC_TOPE_MENSUAL;
+  });
+  afterAll(() => {
+    delete process.env.DNIRUC_TOKEN;
+    delete process.env.DNIRUC_TOPE_MENSUAL;
+  });
+
+  it('éxito: mapea razonSocial, token en header Bearer y nunca en la URL', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, REAL));
+    const { svc, prisma } = montar();
+    const r = await svc.consultar(RUC, AHORA);
+    expect(r).toEqual({ ruc: RUC, razon_social: 'EMPRESA DE PRUEBA SAC', estado: 'ACTIVO', condicion: 'HABIDO', direccion: 'AV PRUEBA 123', desactualizado: false });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`https://dniruc.apisperu.com/api/v1/ruc/${RUC}`);
+    expect(String(url)).not.toContain(TOKEN);
+    expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(init.redirect).toBe('error');
+    const { create } = prisma.rucConsulta.upsert.mock.calls[0][0];
+    expect(create.fuente).toBe('apisperu');
+    expect(create.ubigeo).toBe('150132');
+  });
+
+  it('no encontrado llega como HTTP 200 con success:false: RUC_NO_ENCONTRADO y negativo cacheado', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { success: false, message: 'No se encontraron resultados.' }));
+    const { svc, prisma } = montar();
+    await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_ENCONTRADO' } });
+    expect(prisma.rucConsulta.upsert.mock.calls[0][0].create.razon_social).toBe('');
+  });
+
+  it.each([401, 403, 429, 500])('HTTP %i: servicio no disponible sin guardar nada', async (status) => {
+    fetchMock.mockResolvedValue(respuesta(status, { message: 'x' }));
+    const { svc, prisma } = montar();
+    await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
+    expect(prisma.rucConsulta.upsert).not.toHaveBeenCalled();
+  });
+
+  it('success:false con otro mensaje (token/cuota) no es «no encontrado»', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { success: false, message: 'Token inválido' }));
+    const { svc, prisma } = montar();
+    await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
+    expect(prisma.rucConsulta.upsert).not.toHaveBeenCalled();
+  });
+
+  it('timeout con caché vencida: devuelve la caché desactualizada', async () => {
+    fetchMock.mockRejectedValue(Object.assign(new Error('t'), { name: 'TimeoutError' }));
+    const { svc } = montar(filaCache(40));
+    expect(await svc.consultar(RUC, AHORA)).toMatchObject({ razon_social: 'CACHE SAC', desactualizado: true });
+  });
+
+  it.each([
+    ['ruc distinto', { ...REAL, ruc: '20100047218' }],
+    ['sin razonSocial', { ...REAL, razonSocial: null }],
+    ['no es objeto', ['x']],
+  ])('respuesta malformada (%s): no se guarda', async (_n, cuerpo) => {
+    fetchMock.mockResolvedValue(respuesta(200, cuerpo));
+    const { svc, prisma } = montar();
+    await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
+    expect(prisma.rucConsulta.upsert).not.toHaveBeenCalled();
+  });
+
+  it('JSON roto: no disponible', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => { throw new Error('x'); } });
+    const { svc } = montar();
+    await expect(svc.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
+  });
+
+  it('el tope mensual es configurable (DNIRUC_TOPE_MENSUAL) y mucho mayor que el de openruc', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, REAL));
+    const { svc } = montar(null, RUC_TOPE_MENSUAL + 10);
+    expect((await svc.consultar(RUC, AHORA)).razon_social).toBe('EMPRESA DE PRUEBA SAC');
+    process.env.DNIRUC_TOPE_MENSUAL = '5';
+    fetchMock.mockClear();
+    const { svc: svc2 } = montar(null, 5);
+    await expect(svc2.consultar(RUC, AHORA)).rejects.toMatchObject({ response: { codigo: 'RUC_NO_DISPONIBLE' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('no registra en logs ni el token ni la razón social', async () => {
+    const espia = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    fetchMock.mockResolvedValue(respuesta(401, REAL));
+    const { svc } = montar();
+    await svc.consultar(RUC, AHORA).catch(() => {});
+    const log = JSON.stringify(espia.mock.calls);
+    expect(log).not.toContain(TOKEN);
+    expect(log).not.toContain('EMPRESA DE PRUEBA');
+    espia.mockRestore();
   });
 });
 

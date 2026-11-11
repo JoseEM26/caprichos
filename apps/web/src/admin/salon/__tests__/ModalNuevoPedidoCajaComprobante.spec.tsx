@@ -54,7 +54,7 @@ describe('Nuevo pedido en Caja: comprobante', () => {
   it('con factura envía el RUC, la razón social y la dirección al crear', async () => {
     await llegarAResumenLlevar();
     fireEvent.click(screen.getByTestId('comprobante-FACTURA'));
-    fireEvent.change(screen.getByLabelText('RUC'), { target: { value: '20123456789' } });
+    fireEvent.change(screen.getByLabelText('DNI o RUC'), { target: { value: '20123456789' } });
     fireEvent.change(screen.getByLabelText('Razón social'), { target: { value: 'Acme SAC' } });
     fireEvent.change(screen.getByLabelText('Dirección fiscal (opcional)'), { target: { value: 'Av. Uno 123' } });
 
@@ -97,7 +97,7 @@ describe('Nuevo pedido en Caja: comprobante', () => {
   it('un RUC de 10 dígitos muestra el error y no registra el pedido', async () => {
     await llegarAResumenLlevar();
     fireEvent.click(screen.getByTestId('comprobante-FACTURA'));
-    fireEvent.change(screen.getByLabelText('RUC'), { target: { value: '1234567890' } });
+    fireEvent.change(screen.getByLabelText('DNI o RUC'), { target: { value: '1234567890' } });
     expect(screen.getByText(/El RUC debe tener 11 dígitos/)).toBeTruthy();
     llenarPagaCon();
     continuarYEnviar();
