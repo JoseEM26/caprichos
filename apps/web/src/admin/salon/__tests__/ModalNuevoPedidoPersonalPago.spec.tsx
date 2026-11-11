@@ -79,6 +79,8 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     const payload = vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
     expect(payload.esPersonal).toBe(true);
     expect(payload.pagoPersonal).toEqual({ modo: 'CREDITO' });
+    // El pago del personal NO usa el plan de pago normal: un plan vacío lo rechaza el servidor («necesita al menos un medio»)
+    expect(payload.pago?.plan === undefined || payload.pago.plan.length > 0).toBe(true);
     expect(vi.mocked(api.post).mock.calls.some((c) => String(c[0]).includes('/creditos/saldar'))).toBe(false);
   });
 
@@ -100,7 +102,9 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     continuarYEnviar();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
-    expect((vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any).pagoPersonal).toEqual({ modo: 'AHORA', medio: 'EFECTIVO', pagaCon: 8.5 });
+    const payloadAhora = vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0] as any;
+    expect(payloadAhora.pagoPersonal).toEqual({ modo: 'AHORA', medio: 'EFECTIVO', pagaCon: 8.5 });
+    expect(payloadAhora.pago?.plan === undefined || payloadAhora.pago.plan.length > 0).toBe(true);
     expect(vi.mocked(api.post).mock.calls.some((c) => String(c[0]).includes('/creditos/saldar'))).toBe(false);
   });
 

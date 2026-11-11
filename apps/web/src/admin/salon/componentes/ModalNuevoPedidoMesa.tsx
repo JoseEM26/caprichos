@@ -1457,10 +1457,11 @@ export function ModalNuevoPedidoMesa({
               telefono: telefonoFinal,
             },
             lineas: payloadLineas,
+            // El pedido del personal paga con su propio bloque (pagoPersonal): no usa el plan, y un plan vacío lo rechaza el servidor
             pago: {
               metodo: metodoPrincipalAhora,
               pagaCon: pagaConValido(),
-              plan: planAhora,
+              ...(planAhora.length > 0 ? { plan: planAhora } : {}),
             },
             ...(propinaCobrable > 0 ? { propina: propinaCobrable } : {}),
             entrega:
