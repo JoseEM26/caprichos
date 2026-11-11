@@ -11,6 +11,7 @@ import {
   listarRespuestasRapidas,
   marcarAtendido,
   enviarImagenChat,
+  enviarDocumentoChat,
   volverPorAtender,
   marcarChatNoVisto,
   marcarChatVisto,
@@ -471,6 +472,22 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     }
   };
 
+  /** Documento al cliente. Misma ventana de 24 h que el texto y la foto. */
+  const handleEnviarDocumento = async (archivo: File) => {
+    if (!chatSeleccionadoId) return;
+    try {
+      await enviarDocumentoChat(chatSeleccionadoId, archivo);
+      setPulirError(null);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      setPulirError(err?.message || 'No se pudo enviar el documento');
+      await cargarDetalle(chatSeleccionadoId);
+      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) ofrecerReabrirConPlantilla(chatSeleccionadoId);
+      throw err;
+    }
+  };
+
   const handlePulir = async () => {
     const raw = textoMensaje.trim();
     if (!raw) {
@@ -834,6 +851,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 onDejarPulido={() => setTextoPulido(null)}
                 onEnviar={() => handleEnviarMensaje()}
                 onEnviarImagen={handleEnviarImagen}
+                onEnviarDocumento={handleEnviarDocumento}
               />
             </>
           )}

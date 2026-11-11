@@ -77,6 +77,10 @@ export class ArchivosController {
     );
 
     res.setHeader('Content-Type', tipoMime);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Imágenes, audios y el PDF del voucher se ven en el panel; Word, Excel, texto, etc. solo se descargan.
+    // Los documentos del chat se sirven por GET admin/mensajes/documentos/:id, siempre como descarga.
+    if (!/^(image|audio)\//.test(tipoMime) && tipoMime !== 'application/pdf') res.setHeader('Content-Disposition', 'attachment');
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'private, no-store');
     // Range: permite adelantar un audio sin bajarlo entero

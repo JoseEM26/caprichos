@@ -744,11 +744,11 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   private static readonly VIDA_MEDIA_MS = 25 * 24 * 3600 * 1000;
 
   /** Sube un JPEG a la Media API de Meta y devuelve el media id (null si falla). */
-  async subirMedia(jpg: Buffer, mime = 'image/jpeg', phoneNumberId?: string): Promise<string | null> {
+  async subirMedia(jpg: Buffer, mime = 'image/jpeg', phoneNumberId?: string, nombreArchivo?: string): Promise<string | null> {
     const form = new FormData();
     form.append('messaging_product', 'whatsapp');
     form.append('type', mime);
-    form.append('file', new Blob([new Uint8Array(jpg)], { type: mime }), mime === 'image/png' ? 'imagen.png' : 'imagen.jpg');
+    form.append('file', new Blob([new Uint8Array(jpg)], { type: mime }), nombreArchivo || (mime === 'image/png' ? 'imagen.png' : 'imagen.jpg'));
     try {
       const r = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneDe({ phoneNumberId })}/media`, {
         method: 'POST',
@@ -937,6 +937,70 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         telefono_enmascarado: telMask,
         telefono_hash: telHash,
         tipo: 'IMAGEN',
+        plantilla: null,
+        estado,
+        error_codigo: resultado.error?.codigo || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
+        pedido_id: this.parsearId(opciones?.pedidoId),
+        conversacion_id: this.parsearId(opciones?.conversacionId),
+      },
+    });
+
+    return {
+      exito: resultado.exito,
+      id: registro.id.toString(),
+      waMessageId,
+      estado,
+      errorCodigo: resultado.error?.codigo,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
+      reintentos: resultado.intentos,
+    };
+  }
+
+  async enviarDocumento(
+    telefono: string,
+    mediaId: string,
+    nombreArchivo: string,
+    caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
+    const destinatario = construirDestinatario(telefono);
+    const telMask = enmascararTelefono(telefono);
+
+    if (!this.token || !this.phoneDe(opciones)) {
+      return {
+        exito: false,
+        estado: 'FALLIDO',
+        errorCodigo: 'SIN_CREDENCIALES_META',
+        errorDetalle: 'Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en la configuración',
+      };
+    }
+
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
+    const payload: any = {
+      messaging_product: 'whatsapp',
+      ...destinatario,
+      type: 'document',
+      document: {
+        id: mediaId,
+        filename: nombreArchivo,
+        ...(caption ? { caption: caption.slice(0, 1024) } : {}),
+      },
+    };
+    if (opciones?.replyToWaMessageId) payload.context = { message_id: opciones.replyToWaMessageId };
+
+    const resultado = await this.ejecutarConReintentos(url, payload, telMask);
+    const waMessageId = resultado.data?.messages?.[0]?.id;
+    const estado = resultado.exito ? 'ENVIADO' : 'FALLIDO';
+
+    const registro = await this.prisma.whatsappMensaje.create({
+      data: {
+        direccion: 'SALIENTE',
+        wa_message_id: waMessageId || null,
+        telefono_enmascarado: telMask,
+        telefono_hash: hashTelefono(telefono),
+        tipo: 'DOCUMENTO',
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,

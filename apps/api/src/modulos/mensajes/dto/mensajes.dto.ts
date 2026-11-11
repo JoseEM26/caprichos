@@ -37,6 +37,14 @@ export class ImagenDto {
   subtitulo?: string;
 }
 
+export class DocumentoDto {
+  /** Nombre original en UTF-8 (multer lo entrega mal codificado cuando tiene tildes). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  nombre?: string;
+}
+
 export class TextoDto {
   @IsString()
   @IsNotEmpty({ message: 'Escribe un mensaje' })

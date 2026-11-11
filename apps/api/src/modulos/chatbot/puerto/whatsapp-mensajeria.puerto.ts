@@ -82,8 +82,17 @@ export interface WhatsAppMensajeriaPuerto {
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp>;
 
-  /** Sube una foto a la Media API de Meta y devuelve su media id (solo el adaptador real; null si falla). */
-  subirMedia?(imagen: Buffer, mime?: string, phoneNumberId?: string): Promise<string | null>;
+  /** Envía un documento ya subido a la Media API (por media id, nunca por link: Meta lo rechaza con 131000). */
+  enviarDocumento(
+    telefono: string,
+    mediaId: string,
+    nombreArchivo: string,
+    caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp>;
+
+  /** Sube un archivo (foto o documento) a la Media API de Meta y devuelve su media id (solo el adaptador real; null si falla). */
+  subirMedia?(archivo: Buffer, mime?: string, phoneNumberId?: string, nombreArchivo?: string): Promise<string | null>;
 
   marcarLeido(waMessageId: string, phoneNumberId?: string): Promise<boolean>;
 

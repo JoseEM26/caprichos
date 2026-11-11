@@ -250,6 +250,36 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
     }
   }
 
+  async enviarDocumento(
+    telefono: string,
+    _mediaId: string,
+    nombreArchivo: string,
+    _caption?: string,
+    opciones?: OpcionesEnvio,
+  ): Promise<ResultadoEnvioWhatsApp> {
+    const waMessageId = this.generarWaMessageId();
+    const telMask = enmascararTelefono(telefono);
+    this.logger.log(`[SIMULADO] Enviar documento a ${telMask} (${nombreArchivo.length} caracteres de nombre)`);
+    try {
+      const registro = await this.prisma.whatsappMensaje.create({
+        data: {
+          direccion: 'SALIENTE',
+          wa_message_id: waMessageId,
+          telefono_enmascarado: telMask,
+          telefono_hash: hashTelefono(telefono),
+          tipo: 'DOCUMENTO',
+          plantilla: null,
+          estado: 'SIMULADO',
+          pedido_id: this.parsearId(opciones?.pedidoId),
+          conversacion_id: this.parsearId(opciones?.conversacionId),
+        },
+      });
+      return { exito: true, id: registro.id.toString(), waMessageId, estado: 'SIMULADO' };
+    } catch (error: any) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'ERROR_BD_SIMULADO', errorDetalle: error.message };
+    }
+  }
+
   async enviarImagen(
     telefono: string,
     urlOArchivo: string,

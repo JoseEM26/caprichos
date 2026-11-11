@@ -50,6 +50,20 @@ Ver tambien: [[caja]]
 ## Como se hace: mover un voucher desde el chat
 En el panel de validar pago, debajo de la lectura del comprobante, pulsa "Reasignar a otro pedido" para pasarlo a otro pedido del mismo cliente con pago pendiente. Confirma con Sí. El chat se actualiza con el pedido nuevo; el pago se aprueba aparte con "Aprobar el pago".
 
+## Como se hace: Enviar un documento al cliente (PDF, Word, Excel)
+1. Abrir el chat y pulsar Tomar chat si todavia no es tuyo.
+2. Pulsar el boton Documento, junto al cuadro de texto, y elegir el archivo. Se aceptan PDF, Word (doc, docx), Excel (xls, xlsx), PowerPoint (ppt, pptx), texto (txt) y csv, de hasta 16 MB. Otros archivos (programas, zip) no se pueden enviar.
+3. Revisar el nombre y el tamano que aparecen y responder a la pregunta Enviar este documento a (nombre del cliente): pulsar Si, enviar o No.
+4. Mientras se envia el boton dice Enviando. El documento queda en el hilo como una tarjeta con su nombre, tamano y el boton Descargar, y se registra quien lo envio.
+5. Si pasaron mas de 24 horas desde el ultimo mensaje del cliente, WhatsApp no entrega documentos: primero reabre la conversacion con la plantilla (mismo aviso que con los textos).
+Ver tambien: [[mensajes]]
+
+## Que pasa cuando el cliente envia un documento
+1. Si el cliente manda un PDF, Word, Excel o texto, el bot no lo lee: lo guarda en privado, responde una sola vez (como mucho una vez cada 2 minutos aunque mande varios) Recibi tu documento y pasa el chat a Por atender con una notificacion en la campana.
+2. En el hilo aparece la tarjeta del documento. Pulsa Descargar para bajarlo: siempre se descarga como archivo y no se abre dentro de la pagina; abrelo en tu computadora solo si confias en el cliente.
+3. Si el cliente manda un archivo de otro tipo (zip, programas) o que pesa mas de 16 MB, el bot le avisa que solo recibe PDF, Word, Excel, PowerPoint o texto y no lo guarda.
+4. Si el bot estaba esperando el comprobante de un pago y llega un PDF, sigue pidiendo una foto o captura de pantalla: el voucher debe ser una imagen legible.
+
 ## Como se hace: Pulir la respuesta con IA antes de enviarla
 1. Escribir el borrador del mensaje en el area de texto de respuesta.
 2. Pulsar el boton Pulir con IA.

@@ -167,7 +167,7 @@ describe('Mensajes no compatibles en el webhook', () => {
     expect(encolados()[0].carga.textoLibre).toContain(aviso);
   });
 
-  it('PDF esperando voucher pide una foto; PDF fuera de ese contexto, aviso genérico', async () => {
+  it('PDF esperando voucher pide una foto; PDF fuera de ese contexto se intenta recibir (aquí falla la descarga y se avisa)', async () => {
     conv.estado = 'VALIDAR_PAGO';
     await webhook.procesarPayload(payload({ type: 'document', document: { id: 'd', mime_type: 'application/pdf' } }));
     expect(encolados()[0].carga.textoLibre).toContain('Envíame una foto o captura de pantalla del pago');
@@ -175,7 +175,7 @@ describe('Mensajes no compatibles en el webhook', () => {
     outbox.encolar.mockClear();
     conv = { ...conv, estado: 'ABIERTA' };
     await webhook.procesarPayload(payload({ type: 'document', document: { id: 'd2', mime_type: 'application/pdf' } }));
-    expect(encolados()[0].carga.textoLibre).toContain('No puedo abrir documentos');
+    expect(encolados()[0].carga.textoLibre).toContain('No pude recibir tu documento');
   });
 
   it('como mucho un aviso cada 2 minutos por conversación', async () => {

@@ -2,7 +2,7 @@ import type { ResultadoEnvioWhatsApp, WhatsAppMensajeriaPuerto } from '../puerto
 import type { NumerosWhatsappService } from '../servicios/numeros-whatsapp.service';
 import { TEXTO_OMISION } from '../servicios/numeros-whatsapp.service';
 
-const METODOS_DE_ENVIO = new Set(['enviarTexto', 'enviarPlantilla', 'enviarBotones', 'enviarLista', 'enviarCarrusel', 'enviarImagen']);
+const METODOS_DE_ENVIO = new Set(['enviarTexto', 'enviarPlantilla', 'enviarBotones', 'enviarLista', 'enviarCarrusel', 'enviarImagen', 'enviarDocumento']);
 
 /**
  * ÚNICO guardia de salida: envuelve al puerto (Meta o Simulado). Todo envío a un número propio del negocio o bloqueado

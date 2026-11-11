@@ -11,6 +11,14 @@ export interface PosChat {
   pedidoId: string | null;
 }
 
+export interface DocumentoChat {
+  nombre: string;
+  bytes: number;
+  mime: string;
+  /** Ruta de descarga con sesión (siempre como archivo adjunto). */
+  url: string;
+}
+
 export interface MensajeItem {
   id: string;
   autor: 'CLIENTE' | 'BOT' | 'PERSONA';
@@ -20,6 +28,8 @@ export interface MensajeItem {
   /** Nota de voz del cliente (archivo privado). */
   audioId?: string | null;
   texto: string;
+  /** Documento (PDF, Word...) recibido o enviado: se muestra como tarjeta con «Descargar». */
+  documento?: DocumentoChat | null;
   ubicacion?: UbicacionChat | null;
   hora: string;
   /** Fecha y hora exactas (ISO) del mensaje, para los separadores de día y el title de la burbuja. */

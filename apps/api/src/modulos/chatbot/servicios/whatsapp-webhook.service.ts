@@ -62,6 +62,18 @@ import {
   tipoChatNoCompatible,
   textoAvisoNoCompatible,
 } from '../utilidades/no-compatibles.util';
+import {
+  MAX_DOCUMENTO_BYTES,
+  MOTIVO_DERIVACION_DOCUMENTO,
+  TEXTO_DOCUMENTO_NO_RECIBIDO,
+  TEXTO_DOCUMENTO_RECIBIDO,
+  TEXTO_DOCUMENTO_TIPO_NO_PERMITIDO,
+  TIPOS_DOCUMENTO_PERMITIDOS,
+  contenidoCoincide,
+  nombreSegunMime,
+  textoDocumentoChat,
+  validarDocumento,
+} from '../../../comun/documentos-whatsapp.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 /** Notas de voz y audios: hasta 16 MB (Meta entrega las notas de voz como audio/ogg; codecs=opus). */
@@ -431,6 +443,9 @@ export class WhatsappWebhookService {
     let imagenMime = '';
     // Nota de voz / audio: se guarda en privado (se escucha en Mensajes) 
     let audioGuardado: { archivoId: string; mime: string } | null = null;
+    // Documento (PDF, Word...) del cliente cuando el bot no espera un voucher: se guarda privado y lo revisa una persona
+    let documentoGuardado: { archivoId: string; nombre: string; mime: string; bytes: number } | null = null;
+    let avisoDocumento: string | null = null;
     let ubicacion: { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined;
     const clasificacion: ClasificacionMensajeEntrante = clasificarMensajeEntrante(msg);
     const esNoCompatible = clasificacion.clase === 'NO_COMPATIBLE';
@@ -533,6 +548,18 @@ export class WhatsappWebhookService {
         where: { id: conversacion.id },
         data: dataUpdate,
       });
+    }
+
+    // Documento del cliente: si el bot espera un voucher se mantiene lo de siempre (pedir foto); si no, se recibe
+    if (tipo === 'document' && msg.document?.id) {
+      const esperaVoucher =
+        conversacion.estado === 'VALIDAR_PAGO' ||
+        Boolean(await pedidoEsperandoVoucher(this.prisma, conversacion.flujo, telefonoNorm));
+      if (!esperaVoucher) {
+        const r = await this.guardarDocumento(msg.document);
+        if (r.ok) documentoGuardado = r.doc;
+        else avisoDocumento = r.aviso;
+      }
     }
 
     // 1. Detección de consentimiento Ley 29733 (BAJA / STOP / NO MAS / ALTA)
@@ -686,7 +713,15 @@ export class WhatsappWebhookService {
               : 'TEXTO',
           contenido: archivoMensajeId
             ? { texto, archivoId: archivoMensajeId }
-            : esNoCompatible
+            : documentoGuardado
+              ? {
+                  texto: textoDocumentoChat(documentoGuardado.nombre, documentoGuardado.bytes),
+                  clase: 'DOCUMENTO',
+                  subtipo: 'document',
+                  waMessageId: waMessageId || null,
+                  documento: documentoGuardado,
+                }
+              : esNoCompatible
               ? { texto, clase: audioGuardado ? 'NOTA_DE_VOZ' : clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null,
                   ...(audioGuardado ? { audio: { archivoId: audioGuardado.archivoId, mime: audioGuardado.mime } } : {}) }
               : ubicacionGuardada
@@ -730,8 +765,21 @@ export class WhatsappWebhookService {
       await this.atenderNotaDeVoz(conversacion, identificador, telefonoNorm, telHash, waMessageId);
       return true;
     }
+    if (documentoGuardado) {
+      await this.atenderMediaParaPersona(conversacion, identificador, telefonoNorm, telHash, waMessageId, {
+        motivo: MOTIVO_DERIVACION_DOCUMENTO,
+        titulo: `Documento de ${obtenerNombreMostrar(conversacion)}: hay que revisarlo`,
+        mensaje: 'El cliente envió un documento. Ábrelo en el chat (botón Descargar) y respóndele.',
+        textoCliente: TEXTO_DOCUMENTO_RECIBIDO,
+        etapa: 'DOCUMENTO_RECIBIDO',
+        clave: 'documento',
+        limitarAviso: true,
+      });
+      return true;
+    }
     if (esNoCompatible) {
       await this.atenderNoCompatible({
+        avisoPropio: avisoDocumento,
         conversacion,
         clasificacion,
         identificador,
@@ -977,6 +1025,30 @@ export class WhatsappWebhookService {
     telHash: string,
     waMessageId?: string,
   ): Promise<void> {
+    await this.atenderMediaParaPersona(conversacion, identificador, telefonoNorm, telHash, waMessageId, {
+      motivo: MOTIVO_DERIVACION_NOTA_DE_VOZ,
+      titulo: `Nota de voz de ${obtenerNombreMostrar(conversacion)}: hay que escucharla`,
+      mensaje: 'El cliente envió una nota de voz. El bot no la interpreta: escúchala en el chat y respóndele.',
+      textoCliente: TEXTO_NOTA_DE_VOZ,
+      etapa: 'NOTA_DE_VOZ',
+      clave: 'nota-de-voz',
+      limitarAviso: false,
+    });
+  }
+
+  /**
+   * Nota de voz o documento del cliente (ya guardado en el chat): campana al equipo, chat a una persona si lo llevaba el bot
+   * (o estaba Atendido) y UN solo aviso al cliente. Con limitarAviso, como mucho un aviso cada 2 minutos por conversación
+   * (el cliente puede mandar 20 archivos seguidos). Nunca lanza.
+   */
+  private async atenderMediaParaPersona(
+    conversacion: any,
+    identificador: string,
+    telefonoNorm: string | null,
+    telHash: string,
+    waMessageId: string | undefined,
+    cfg: { motivo: string; titulo: string; mensaje: string; textoCliente: string; etapa: string; clave: string; limitarAviso: boolean },
+  ): Promise<void> {
     try {
       const bot = this.botAtiendeAudio(conversacion);
       const atendido = conversacion.estado === 'ATENDIDA' || Boolean(conversacion.atendido_en);
@@ -987,38 +1059,82 @@ export class WhatsappWebhookService {
             duenio: 'PERSONA',
             urgente: true,
             estado: !conversacion.estado || conversacion.estado === 'ATENDIDA' ? 'ABIERTA' : conversacion.estado,
-            motivo_derivacion: MOTIVO_DERIVACION_NOTA_DE_VOZ,
+            motivo_derivacion: cfg.motivo,
             ultima_actividad: new Date(),
           },
         });
       }
 
-      const titulo = `Nota de voz de ${obtenerNombreMostrar(conversacion)}: hay que escucharla`;
       const notif = await this.prisma.notificacion.create({
         data: {
           tipo: 'ATENCION_WHATSAPP',
           rol_destino: null,
-          titulo,
-          mensaje: 'El cliente envió una nota de voz. El bot no la interpreta: escúchala en el chat y respóndele.',
+          titulo: cfg.titulo,
+          mensaje: cfg.mensaje,
           enlace: telefonoNorm ? `/admin/mensajes?telefono=${telefonoNorm.replace(/\D/g, '')}` : '/admin/mensajes',
         },
       });
-      this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
+      this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: cfg.titulo });
 
       // Aviso al cliente solo si el chat era del bot (consentimiento vigente y sin bloqueo por spam)
       if (!bot || !this.outbox) return;
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({ where: { telefono_hash: telHash } });
       if ((consentimiento && !consentimiento.acepta) || (await this.spamBloqueado(identificador))) return;
+      if (cfg.limitarAviso) {
+        const reciente = await this.prisma.salienteWhatsapp.findFirst({
+          where: {
+            telefono_destino: identificador,
+            origen: ORIGEN_NO_COMPATIBLE,
+            creado_en: { gte: new Date(Date.now() - VENTANA_AVISO_NO_COMPATIBLE_MS) },
+          },
+          select: { id: true },
+        });
+        if (reciente) return;
+      }
       await this.outbox.encolar({
         telefono: identificador,
         tipo: 'TEXTO',
-        clave: `nota-de-voz-${waMessageId || `${identificador}-${Date.now()}`}`,
+        clave: `${cfg.clave}-${waMessageId || `${identificador}-${Date.now()}`}`,
         origen: ORIGEN_NO_COMPATIBLE,
-        carga: { textoLibre: TEXTO_NOTA_DE_VOZ, autor: 'BOT', nombre: obtenerNombreMostrar(conversacion), etapa: 'NOTA_DE_VOZ' },
+        carga: { textoLibre: cfg.textoCliente, autor: 'BOT', nombre: obtenerNombreMostrar(conversacion), etapa: cfg.etapa },
       });
       this.outbox.despertar();
     } catch (err: any) {
-      this.logger.warn(`No se pudo atender una nota de voz: ${err.message}`);
+      this.logger.warn(`No se pudo atender un mensaje con archivo del cliente: ${err.message}`);
+    }
+  }
+
+  /**
+   * Descarga y guarda en privado un documento del cliente. Valida extensión + tipo + primeros bytes y tamaño.
+   * En logs solo tipo y tamaño, nunca el contenido ni el nombre.
+   */
+  private async guardarDocumento(
+    doc: any,
+  ): Promise<
+    | { ok: true; doc: { archivoId: string; nombre: string; mime: string; bytes: number } }
+    | { ok: false; aviso: string }
+  > {
+    const v = validarDocumento(doc?.filename || nombreSegunMime(doc?.mime_type), doc?.mime_type);
+    if (!v.ok) {
+      this.logger.warn(`Documento rechazado por tipo (${String(doc?.mime_type ?? '').slice(0, 80)})`);
+      return { ok: false, aviso: TEXTO_DOCUMENTO_TIPO_NO_PERMITIDO };
+    }
+    const buffer = await this.descargarMediaSegura(String(doc.id), v.mime, {
+      tipos: TIPOS_DOCUMENTO_PERMITIDOS,
+      maxBytes: MAX_DOCUMENTO_BYTES,
+    });
+    if (!buffer) return { ok: false, aviso: TEXTO_DOCUMENTO_NO_RECIBIDO };
+    if (!contenidoCoincide(buffer, v.ext)) {
+      this.logger.warn(`Documento rechazado: el contenido no coincide con ${v.ext} (${buffer.length} bytes)`);
+      return { ok: false, aviso: TEXTO_DOCUMENTO_TIPO_NO_PERMITIDO };
+    }
+    try {
+      const sub = await this.archivosService.subirDocumento(buffer, v.mime, v.nombre);
+      this.logger.log(`Documento del cliente guardado (${v.mime}, ${buffer.length} bytes)`);
+      return { ok: true, doc: { archivoId: sub.id, nombre: v.nombre, mime: v.mime, bytes: buffer.length } };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo guardar el documento del chat: ${err.message}`);
+      return { ok: false, aviso: TEXTO_DOCUMENTO_NO_RECIBIDO };
     }
   }
 
@@ -1035,6 +1151,8 @@ export class WhatsappWebhookService {
     telefonoNorm: string | null;
     telHash: string;
     waMessageId?: string;
+    /** Aviso fijo (documento de tipo no permitido o que no se pudo recibir) en lugar del aviso genérico. */
+    avisoPropio?: string | null;
   }): Promise<void> {
     try {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
@@ -1084,9 +1202,9 @@ export class WhatsappWebhookService {
           Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm)));
       const prompt = await this.ultimoPromptDelBot(p.conversacion.id);
       const repeticion = armarTextoRepeticion(prompt);
-      const aviso = textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher);
+      const aviso = p.avisoPropio ?? textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher);
       // Si el último mensaje del bot tenía botones o lista, se repite con ellos reales; si no, texto con viñetas
-      const interactivo = interactivoDesdeContenido(prompt, aviso);
+      const interactivo = p.avisoPropio ? null : interactivoDesdeContenido(prompt, aviso);
 
       await this.outbox.encolar({
         telefono: p.identificador,
@@ -1094,7 +1212,7 @@ export class WhatsappWebhookService {
         clave: `no-compatible-${p.waMessageId || `${p.identificador}-${Date.now()}`}`,
         origen: ORIGEN_NO_COMPATIBLE,
         carga: {
-          textoLibre: repeticion ? `${aviso}\n\n${repeticion}` : aviso,
+          textoLibre: repeticion && !p.avisoPropio ? `${aviso}\n\n${repeticion}` : aviso,
           ...(interactivo ? { interactivo } : {}),
           autor: 'BOT',
           nombre: obtenerNombreMostrar(p.conversacion),

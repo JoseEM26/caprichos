@@ -81,6 +81,14 @@ export async function enviarImagenChat(id: string, archivo: File, subtitulo = ''
   return clienteFetch<{ id: string }>(`/admin/mensajes/conversaciones/${id}/enviar-imagen`, { method: 'POST', body: fd });
 }
 
+/** Documento del equipo al cliente (PDF, Word, Excel, PowerPoint o texto, hasta 16 MB). */
+export async function enviarDocumentoChat(id: string, archivo: File): Promise<{ id: string }> {
+  const fd = new FormData();
+  fd.append('nombre', archivo.name);
+  fd.append('documento', archivo, archivo.name);
+  return clienteFetch<{ id: string }>(`/admin/mensajes/conversaciones/${id}/enviar-documento`, { method: 'POST', body: fd });
+}
+
 export async function marcarChatVisto(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/visto`, {});
 }
