@@ -11,6 +11,7 @@ export interface PedidoParaCobro {
   modalidad: string;
   pago_estado: string | null;
   pago_metodo?: string | null;
+  es_personal?: boolean | null;
   total: unknown;
   planPago?: Array<{ medio: string; monto: unknown }> | null;
 }
@@ -19,16 +20,20 @@ export interface PedidoParaCobro {
  * Criterio único (puro). Un pedido NO pasa a ENTREGADO ni sale a reparto sin estar PAGADO cuando es:
  *  - PARA LLEVAR o RECOGER, o
  *  - DELIVERY sin efectivo contra entrega (Yape, Plin, transferencia, tarjeta o sin medio).
- * Quedan libres: MESA y COMER_LOCAL (se cobra al final) y el DELIVERY con efectivo por cobrar en la puerta
- * (renglón EFECTIVO del plan, o medio EFECTIVO sin plan): ese efectivo lo rinde el repartidor.
+ * Quedan libres: pedidos del personal, MESA y COMER_LOCAL (se cobra al final) y el DELIVERY con efectivo por cobrar en la puerta
+ * o con tarjeta (POS) por cobrar en la puerta (renglón EFECTIVO/TARJETA del plan, o ese medio sin plan): ese efectivo lo rinde el repartidor.
  * COORDINADO cuenta como no cobrado (falta validar el voucher o liquidar).
  */
 export function pedidoDebeEstarCobrado(p: PedidoParaCobro): boolean {
   if (p.pago_estado === 'PAGADO') return false;
+  // Pedido del personal: se carga a su crédito/planilla, se cobra al final.
+  if (p.es_personal) return false;
   if (p.modalidad === 'LLEVAR' || p.modalidad === 'RECOGER') return true;
   if (p.modalidad !== 'DELIVERY') return false;
   const plan = (p.planPago ?? []).map((f) => ({ medio: f.medio, monto: Number(f.monto) }));
-  return efectivoDelPedido(plan, p.pago_metodo, Number(p.total)) <= 0;
+  // Efectivo y tarjeta (POS en la puerta) se cobran contra entrega: los rinde el repartidor.
+  const contraEntrega = plan.some((f) => f.medio === 'TARJETA' && f.monto > 0) || p.pago_metodo === 'TARJETA';
+  return !contraEntrega && efectivoDelPedido(plan, p.pago_metodo, Number(p.total)) <= 0;
 }
 
 /** Igual que el criterio puro, pero carga el plan de pago del delivery si hace falta. */

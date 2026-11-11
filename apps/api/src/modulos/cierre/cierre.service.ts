@@ -539,7 +539,7 @@ export class CierreService {
         // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
         const entregados = await tx.pedido.findMany({
           where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO' },
-          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, total: true, planPago: { select: { medio: true, monto: true } } },
+          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, planPago: { select: { medio: true, monto: true } } },
           orderBy: { creado_en: 'asc' },
         });
         const sinCobrar = entregados.filter((p: any) => pedidoDebeEstarCobrado(p));

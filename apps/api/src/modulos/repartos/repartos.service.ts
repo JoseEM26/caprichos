@@ -2201,7 +2201,7 @@ export class RepartosService {
         const lockedRows: any[] = await tx.$queryRaw`
           SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
                  p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng,
-                 p.pago_estado, p.pago_metodo, p.total
+                 p.pago_estado, p.pago_metodo, p.es_personal, p.total
           FROM pedido p
           WHERE p.id IN (${Prisma.join(idsOrdenadosAsc)})
           ORDER BY p.id ASC

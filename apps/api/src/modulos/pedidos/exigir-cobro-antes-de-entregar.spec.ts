@@ -15,12 +15,21 @@ describe('pedidoDebeEstarCobrado: qué pedidos exigen cobro antes de entregar', 
     ['DELIVERY', 'PENDIENTE', 'YAPE', true],
     ['DELIVERY', 'COORDINADO', 'PLIN', true],
     ['DELIVERY', 'PENDIENTE', 'TRANSFERENCIA', true],
-    ['DELIVERY', 'PENDIENTE', 'TARJETA', true],
+    ['DELIVERY', 'PENDIENTE', 'TARJETA', false],
     ['DELIVERY', 'PENDIENTE', null, true],
     ['DELIVERY', 'PENDIENTE', 'EFECTIVO', false],
     ['DELIVERY', 'PAGADO', 'YAPE', false],
   ])('%s %s con %s -> exige cobro: %s', (modalidad, pago_estado, pago_metodo, esperado) => {
     expect(pedidoDebeEstarCobrado({ ...base, modalidad, pago_estado, pago_metodo })).toBe(esperado);
+  });
+
+  it('pedido del personal: no exige cobro (se carga a su crédito)', () => {
+    expect(pedidoDebeEstarCobrado({ ...base, modalidad: 'LLEVAR', es_personal: true })).toBe(false);
+    expect(pedidoDebeEstarCobrado({ ...base, modalidad: 'DELIVERY', pago_metodo: 'YAPE', es_personal: true })).toBe(false);
+  });
+
+  it('delivery con tarjeta en el plan: POS en la puerta, no exige', () => {
+    expect(pedidoDebeEstarCobrado({ ...base, modalidad: 'DELIVERY', pago_metodo: 'YAPE', planPago: [{ medio: 'TARJETA', monto: 40 }] })).toBe(false);
   });
 
   it('delivery con plan mixto: con renglón de efectivo no exige; solo digital sí', () => {

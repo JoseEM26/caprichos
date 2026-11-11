@@ -576,6 +576,7 @@ export class PedidosEstadoService {
         propina: true,
         pago_estado: true,
         pago_metodo: true,
+        es_personal: true,
         pago_coordinado_en: true,
         cliente_nombre: true,
         creado_en: true,
