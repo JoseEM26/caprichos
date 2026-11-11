@@ -218,7 +218,7 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     respuesta = { ...respuesta, chats: [respuesta.chats[2]] };
     fireEvent.click(chip);
     expect(await screen.findByTestId('reprogramar-3')).toHaveTextContent('Entrega por reprogramar');
-    expect(api.listarConversaciones).toHaveBeenLastCalledWith('reprogramar', '');
+    expect(api.listarConversaciones).toHaveBeenLastCalledWith('reprogramar', '', undefined, expect.any(Object));
   });
 
   it('el check tiene nombre accesible y tamaño táctil', async () => {

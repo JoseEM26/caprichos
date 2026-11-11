@@ -45,7 +45,28 @@ export class MensajesController {
   @Get('conversaciones')
   @Permiso('mensajes', 'ver')
   listar(@Query() f: ListarConversacionesDto, @Res({ passthrough: true }) res: Response) {
-    return conServerTiming(res, 'conversaciones', () => this.mensajes.listar(f.filtro, f.q, f.pos), (r) => r.chats.length);
+    return conServerTiming(
+      res,
+      'conversaciones',
+      () => this.mensajes.listar(f.filtro, f.q, f.pos, { cursor: f.cursor, limite: f.limite, dia: f.dia, soloBloqueados: !!f.soloBloqueados }),
+      (r) => r.chats.length,
+    );
+  }
+
+  /** Solo los contadores de las pestañas (la web los refresca con eventos en vivo sin recargar la lista). */
+  @Get('conversaciones/conteos')
+  @Permiso('mensajes', 'ver')
+  conteos(@Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones/conteos', () => this.mensajes.conteos());
+  }
+
+  /** Una fila de la lista con los mismos filtros que `listar` (actualización en vivo de un chat). */
+  @Get('conversaciones/:id/fila')
+  @Permiso('mensajes', 'ver')
+  fila(@Param('id') id: string, @Query() f: ListarConversacionesDto, @Res({ passthrough: true }) res: Response) {
+    return conServerTiming(res, 'conversaciones/:id/fila', () =>
+      this.mensajes.fila(id, f.filtro, f.q, f.pos, { hasta: f.hasta, dia: f.dia, soloBloqueados: !!f.soloBloqueados }),
+    );
   }
 
   @Get('respuestas-rapidas')

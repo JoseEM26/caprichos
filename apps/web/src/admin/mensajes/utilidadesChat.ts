@@ -1,4 +1,4 @@
-import type { EstadoChat, MensajeItem } from './mensajesTipos';
+import type { ChatResumen, EstadoChat, MensajeItem } from './mensajesTipos';
 
 export function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
   if (!c) return false;
@@ -129,4 +129,46 @@ export function fusionarMensajes(previos: MensajeItem[], nuevos: MensajeItem[]):
   const confirmados = new Set(nuevos.map((m) => m.idCliente).filter(Boolean));
   const pendientes = previos.filter((m) => esMensajeLocal(m) && !confirmados.has(m.idCliente ?? m.id));
   return [...anteriores, ...nuevos, ...pendientes];
+}
+
+// --- Lista de chats por páginas y actualización en vivo ---
+
+const porClave = (a: ChatResumen, b: ChatResumen): number => {
+  const x = a.clave ?? '';
+  const y = b.clave ?? '';
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
+/** Añade una página nueva al final sin repetir chats que ya estaban (si algo cambió de sitio entre páginas, gana la fila nueva). */
+export function agregarPagina(actuales: ChatResumen[], pagina: ChatResumen[]): ChatResumen[] {
+  const nuevos = new Set(pagina.map((c) => c.id));
+  return [...actuales.filter((c) => !nuevos.has(c.id)), ...pagina].sort(porClave);
+}
+
+/**
+ * Aplica la fila que devolvió el servidor para UN chat tras un evento en vivo:
+ *  - cargado y sigue cumpliendo los filtros: se actualiza su fila y se reordena;
+ *  - cargado y ya no cumple: sale de la lista;
+ *  - sin cargar: solo entra si por su orden cae entre los ya cargados (`dentro`); si no, aparecerá al pedir más páginas.
+ * Devuelve la MISMA lista (sin cambios) cuando no hay nada que hacer, para no repintar.
+ */
+export function aplicarFilaEnVivo(chats: ChatResumen[], id: string, res: { chat: ChatResumen | null; dentro: boolean }): ChatResumen[] {
+  const cargado = chats.some((c) => c.id === id);
+  if (!res.chat) return cargado ? chats.filter((c) => c.id !== id) : chats;
+  if (!cargado && !res.dentro) return chats;
+  return [...chats.filter((c) => c.id !== id), res.chat].sort(porClave);
+}
+
+/** Pasa un mensaje al estado que avisó el servidor (por id real o por idCliente); `encontrado` = si el mensaje estaba en pantalla. */
+export function aplicarEstadoEnvio(
+  mensajes: MensajeItem[],
+  ev: { mensajeId: string; idCliente?: string; estado: string; motivoFallo?: string | null; puedeReintentar?: boolean },
+): { mensajes: MensajeItem[]; encontrado: boolean } {
+  let encontrado = false;
+  const nuevos = mensajes.map((m) => {
+    if (m.id !== ev.mensajeId && !(ev.idCliente && m.idCliente === ev.idCliente)) return m;
+    encontrado = true;
+    return { ...m, id: ev.mensajeId, estado: ev.estado, motivoFallo: ev.motivoFallo ?? null, puedeReintentar: ev.puedeReintentar };
+  });
+  return { mensajes: nuevos, encontrado };
 }

@@ -230,12 +230,12 @@ describe('MensajesService', () => {
     expect(r.chats.length).toBe(4);
 
     // Chat 3 sin party muestra teléfono enmascarado (+51 9*** ***66)
-    expect(r.chats[2].nombre).toBe('+51 9*** ***66');
+    expect(r.chats.find((c) => c.id === '3')!.nombre).toBe('+51 9*** ***66');
 
     // Chat 4 sin teléfono muestra perfil de usuario de WhatsApp con prefijo Usuario de WhatsApp
-    expect(r.chats[3].nombre).toBe('Usuario de WhatsApp (Usuario Sin Fono)');
-    expect(r.chats[3].identificador_tipo).toBe('USUARIO_WA');
-    expect(r.chats[3].telefono).toBe('***');
+    expect(r.chats.find((c) => c.id === '4')!.nombre).toBe('Usuario de WhatsApp (Usuario Sin Fono)');
+    expect(r.chats.find((c) => c.id === '4')!.identificador_tipo).toBe('USUARIO_WA');
+    expect(r.chats.find((c) => c.id === '4')!.telefono).toBe('***');
 
     const filtrado = await service.listar('todos', 'Ana');
     expect(filtrado.chats.length).toBe(1);

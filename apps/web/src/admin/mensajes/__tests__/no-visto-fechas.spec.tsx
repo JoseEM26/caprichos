@@ -85,7 +85,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
     expect(screen.queryByTestId('no-visto-c1')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /No vistos/ }));
-    await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('novistos', ''));
+    await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('novistos', '', undefined, expect.any(Object)));
   });
 
   it('abrir la lista no marca visto; abrir el chat sí', async () => {

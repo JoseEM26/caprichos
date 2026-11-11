@@ -104,7 +104,7 @@ describe('MensajesView abre el chat indicado por ?telefono=', () => {
     vi.spyOn(api, 'listarRespuestasRapidas').mockResolvedValue([]);
     render(<MensajesView />);
 
-    await waitFor(() => expect(lista).toHaveBeenCalledWith('todos', '977503006'));
+    await waitFor(() => expect(lista).toHaveBeenCalledWith('todos', '977503006', undefined, expect.any(Object)));
     await waitFor(() => expect(detalle).toHaveBeenCalledWith('1'));
   });
 });

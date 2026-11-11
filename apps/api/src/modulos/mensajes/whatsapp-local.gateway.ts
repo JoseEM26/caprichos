@@ -20,6 +20,10 @@ export class WhatsAppLocalGateway implements WhatsAppGateway {
     return { id: m.id.toString(), autor, texto, en: m.en, metaId: null };
   }
 
+  async transmitirTexto(_c: bigint, _telefono: string, texto: string): Promise<MensajeEnviado> {
+    return { id: '', autor: 'PERSONA', texto, en: new Date(), metaId: null, estado: 'SIMULADO', modo: 'simulado' };
+  }
+
   async enviarBotones(
     conversacionId: bigint,
     _telefono: string,

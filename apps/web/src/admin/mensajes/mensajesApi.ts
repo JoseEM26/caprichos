@@ -1,5 +1,6 @@
 import { api, clienteFetch } from '../../comun/api';
 import {
+  RespuestaFilaChat,
   DetalleConversacion,
   FiltroChat,
   FiltroPos,
@@ -8,17 +9,52 @@ import {
   RespuestaRapida,
 } from './mensajesTipos';
 
-export async function listarConversaciones(
-  filtro: FiltroChat = 'todos',
-  q = '',
-  pos?: FiltroPos,
-): Promise<RespuestaListarChats> {
+/** Filtros que viajan al servidor (la lista llega por páginas y el día también se filtra allá). */
+export interface OpcionesLista {
+  dia?: string;
+  soloBloqueados?: boolean;
+  /** `siguienteCursor` de la página anterior. */
+  cursor?: string;
+  limite?: number;
+}
+
+const paramsLista = (filtro: FiltroChat, q: string, pos: FiltroPos | undefined, o: OpcionesLista & { hasta?: string }) => {
   const params = new URLSearchParams();
   if (filtro !== 'todos') params.set('filtro', filtro);
   if (q.trim()) params.set('q', q.trim());
   if (pos) params.set('pos', pos);
+  if (o.dia) params.set('dia', o.dia);
+  if (o.soloBloqueados) params.set('soloBloqueados', '1');
+  if (o.cursor) params.set('cursor', o.cursor);
+  if (o.limite) params.set('limite', String(o.limite));
+  if (o.hasta) params.set('hasta', o.hasta);
   const qs = params.toString();
-  return api.get<RespuestaListarChats>(`/admin/mensajes/conversaciones${qs ? `?${qs}` : ''}`);
+  return qs ? `?${qs}` : '';
+};
+
+export async function listarConversaciones(
+  filtro: FiltroChat = 'todos',
+  q = '',
+  pos?: FiltroPos,
+  opciones: OpcionesLista = {},
+): Promise<RespuestaListarChats> {
+  return api.get<RespuestaListarChats>(`/admin/mensajes/conversaciones${paramsLista(filtro, q, pos, opciones)}`);
+}
+
+/** Solo los contadores de las pestañas. */
+export async function obtenerConteosChats(): Promise<RespuestaListarChats['conteos']> {
+  return api.get<RespuestaListarChats['conteos']>('/admin/mensajes/conversaciones/conteos');
+}
+
+/** Una fila de la lista con los mismos filtros (actualización en vivo); `hasta` = clave del último chat cargado. */
+export async function obtenerFilaChat(
+  id: string,
+  filtro: FiltroChat,
+  q: string,
+  pos: FiltroPos | undefined,
+  opciones: Pick<OpcionesLista, 'dia' | 'soloBloqueados'> & { hasta?: string },
+): Promise<RespuestaFilaChat> {
+  return api.get<RespuestaFilaChat>(`/admin/mensajes/conversaciones/${id}/fila${paramsLista(filtro, q, pos, opciones)}`);
 }
 
 export async function desbloquearSpam(id: string, motivo: string): Promise<{ ok: boolean }> {
@@ -42,8 +78,8 @@ export async function listarRespuestasRapidas(): Promise<RespuestaRapida[]> {
 }
 
 /** `idCliente` identifica este envío: si la misma petición llega dos veces, el servidor no le escribe dos veces al cliente. */
-export async function enviarMensaje(id: string, texto: string, idCliente?: string): Promise<{ id: string; duplicado?: boolean }> {
-  return api.post<{ id: string; duplicado?: boolean }>(`/admin/mensajes/conversaciones/${id}/enviar`, idCliente ? { texto, idCliente } : { texto });
+export async function enviarMensaje(id: string, texto: string, idCliente?: string): Promise<{ id: string; estado?: string; duplicado?: boolean }> {
+  return api.post<{ id: string; estado?: string; duplicado?: boolean }>(`/admin/mensajes/conversaciones/${id}/enviar`, idCliente ? { texto, idCliente } : { texto });
 }
 
 /** «Cargar anteriores»: la página de historial previa al mensaje `antes` (el más antiguo que ya se tiene). */
@@ -150,8 +186,8 @@ export async function reabrirConversacionPlantilla(
 export async function reintentarMensaje(
   conversacionId: string,
   mensajeId: string,
-): Promise<{ ok: boolean; id: string }> {
-  return api.post<{ ok: boolean; id: string }>(
+): Promise<{ ok: boolean; id: string; estado?: string }> {
+  return api.post<{ ok: boolean; id: string; estado?: string }>(
     `/admin/mensajes/conversaciones/${conversacionId}/mensajes/${mensajeId}/reintentar`,
     {},
   );

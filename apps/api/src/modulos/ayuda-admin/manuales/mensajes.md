@@ -13,6 +13,7 @@ sugerencias:
   - Como utilizo la funcion de pulir mensaje con IA
   - Como veo la ubicacion que me mando el cliente
   - Que pasa con el chat que el repartidor tiene abierto
+  - Que hago si un mensaje mio dice No se pudo enviar
 ---
 # Mensajes de WhatsApp
 
@@ -131,7 +132,11 @@ Ver tambien: [[caja]]
 - Un pedido de la carta virtual con Yape, Plin o transferencia y celular deja su chat en Validar pago y urgente: el cliente recibe el aviso de que un asesor gestionara el voucher, y el chat aparece aqui para que lo atiendas.
 
 - Al abrir un chat largo se ven los ultimos mensajes; para leer lo anterior pulsar Cargar mensajes anteriores, arriba de la conversacion. Asi el chat abre rapido aunque tenga cientos de mensajes. Las fotos y notas de voz se descargan cuando llegan a la pantalla.
-- Al enviar un mensaje aparece de inmediato con la palabra Enviando; cuando WhatsApp lo recibe pasa a Enviado. Si no sale, el mensaje desaparece, el texto vuelve al cuadro para que lo intentes de nuevo y se muestra el motivo. Apretar Enviar dos veces seguidas no manda el mensaje dos veces.
+- Al enviar un mensaje aparece de inmediato con la palabra Enviando; el sistema habla con WhatsApp por detras y, cuando lo recibe, pasa a Enviado con una marca de visto (y luego Entregado o Leido). Puedes seguir escribiendo sin esperar. Apretar Enviar dos veces seguidas no manda el mensaje dos veces.
+- Si el mensaje no sale, queda en la conversacion con el aviso No se pudo enviar y el motivo, y el boton Reintentar. Reintentar vuelve a mandar ESE mismo mensaje (no crea otro) y respeta la ventana de 24 horas. El sistema solo reintenta solo cuando Meta rechazo el mensaje por limite o fallo suyo (hasta 3 intentos); si no hubo respuesta de Meta no lo repite solo, porque podria llegar duplicado al cliente.
+- Si el aviso dice No se pudo confirmar el envio, el servidor se reinicio justo mientras enviaba y no se sabe si el cliente lo recibio: revisa en WhatsApp antes de pulsar Reintentar para no mandarlo dos veces.
+- Una validacion como ventana de 24 horas cerrada, chat tomado por otra persona, numero bloqueado o limite de 20 mensajes por minuto avisa al instante, antes de enviar, y el mensaje no se guarda. Las fotos, documentos y notas de voz siguen enviandose en el momento (con su barra de espera).
+- La lista de chats carga de 40 en 40: al final aparece Cargar mas chats. Los numeros de las pestanas, la busqueda y los filtros por dia cuentan y buscan en todos los chats, no solo en los cargados. Si llega un mensaje de un chat que aun no cargaste y por su hora le toca ir arriba, aparece solo; si le toca mas abajo, lo veras al pulsar Cargar mas chats.
 
 ## Quien puede hacerlo
 - Tienen acceso completo a los mensajes: Administrador, Cajero, Mozo y Supervisor.
