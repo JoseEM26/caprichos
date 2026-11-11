@@ -94,6 +94,10 @@ export const CLAVES_NUMERICAS = [
   // Avisos de stock de productos terminados (carta, admin y bot)
   'aviso_stock_quedan_desde',
   'aviso_stock_ultimas_desde',
+  // Avisos por correo programados (Configuración › Correos de aviso): solo el ADMIN los cambia
+  'aviso_pc_impresion_minutos_tras_abrir',
+  'aviso_pc_impresion_recordatorio_min',
+  'aviso_chat_sin_responder_min',
 ] as const;
 
 /** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
@@ -116,6 +120,9 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   aviso_stock_quedan_desde: [0, 20, true, 'El aviso «Quedan N» debe ser un entero entre 0 y 20 (0 = sin aviso)'],
   aviso_stock_ultimas_desde: [0, 20, true, 'La franja «¡Últimas!» debe ser un entero entre 0 y 20 (0 = sin franja)'],
   voucher_ia_corte_min: [1, 120, true, 'La pausa del corte automático debe ser un entero entre 1 y 120 minutos'],
+  aviso_pc_impresion_minutos_tras_abrir: [5, 120, true, 'Los minutos tras abrir la caja deben ser un entero entre 5 y 120'],
+  aviso_pc_impresion_recordatorio_min: [15, 240, true, 'El recordatorio debe ser un entero entre 15 y 240 minutos'],
+  aviso_chat_sin_responder_min: [5, 120, true, 'Los minutos de espera del chat deben ser un entero entre 5 y 120'],
 };
 
 /** Rangos válidos (enteros) de los parámetros de protección contra spam y pedidos falsos. */
@@ -137,6 +144,8 @@ export const CLAVES_TEXTO = [
   'envio_gratis_modo',
   'reprog_recargo_modo',
   'carta_aviso_entrada',
+  'aviso_pc_impresion_activo',
+  'aviso_chat_sin_responder_activo',
   'ayuda_ia_activo',
   'stock_control_activo',
   'carta_invitado_activo',
@@ -270,6 +279,12 @@ export class ConfiguracionService {
       });
     }
 
+    if (clave.startsWith('aviso_pc_impresion_') || clave.startsWith('aviso_chat_sin_responder_')) {
+      if (usuarioActual?.rol !== 'ADMIN') {
+        throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia los avisos por correo' });
+      }
+    }
+
     // Validación según tipo de dato esperado
     if ((CLAVES_NUMERICAS as readonly string[]).includes(clave)) {
       if (typeof valor !== 'number' || isNaN(valor) || valor < 0) {
@@ -348,6 +363,8 @@ export class ConfiguracionService {
         }
       } else if (
         clave === 'carta_aviso_entrada' ||
+        clave === 'aviso_pc_impresion_activo' ||
+        clave === 'aviso_chat_sin_responder_activo' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||
         clave === 'carta_invitado_activo' ||

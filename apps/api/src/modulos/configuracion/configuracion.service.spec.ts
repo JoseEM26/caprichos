@@ -174,6 +174,26 @@ describe('ConfiguracionService', () => {
       expect(prismaMock.parametro.upsert).toHaveBeenCalled();
     });
 
+    it('avisos por correo programados: solo ADMIN, rangos validados e interruptores si/no', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+      const supervisor = { ...adminAuth, rol: 'SUPERVISOR' } as any;
+      await expect(service.actualizar('aviso_chat_sin_responder_min', 15, supervisor)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('aviso_pc_impresion_activo', 'no', supervisor)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('aviso_chat_sin_responder_min', 4, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_chat_sin_responder_min', 121, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_chat_sin_responder_min', 7.5, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_pc_impresion_minutos_tras_abrir', 4, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_pc_impresion_recordatorio_min', 14, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_pc_impresion_recordatorio_min', 241, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_pc_impresion_activo', 'quizás', adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await service.actualizar('aviso_chat_sin_responder_min', 15, adminAuth);
+      await service.actualizar('aviso_pc_impresion_minutos_tras_abrir', 20, adminAuth);
+      await service.actualizar('aviso_pc_impresion_recordatorio_min', 60, adminAuth);
+      await service.actualizar('aviso_chat_sin_responder_activo', false, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalledTimes(4);
+    });
+
     it('avisos de stock: 0–20 enteros, 0 desactiva y la franja nunca pasa del aviso', async () => {
       prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
       prismaMock.parametro.findUnique.mockResolvedValue(null); // el otro vale su defecto (5 y 3)

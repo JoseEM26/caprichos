@@ -80,6 +80,6 @@ export class ComprobantesCertificadoAvisoService implements OnModuleInit, OnModu
     const vence = this.sunat.certificadoVence() ?? new Date(`${VENCIMIENTO_CERTIFICADO_AVISO}T12:00:00Z`);
     const aviso = avisoCertificado(vence, ahora);
     if (!aviso) return null;
-    return this.correo.avisarAdministradores({ clave: aviso.clave, origen: 'CERTIFICADO_SUNAT', asunto: aviso.asunto, texto: aviso.texto });
+    return this.correo.avisarAdministradores({ clave: aviso.clave, origen: 'CERTIFICADO_SUNAT', tipo: 'COMPROBANTES', asunto: aviso.asunto, texto: aviso.texto });
   }
 }

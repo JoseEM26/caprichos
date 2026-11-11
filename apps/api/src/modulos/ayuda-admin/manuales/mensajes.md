@@ -149,3 +149,4 @@ Ver tambien: [[caja]]
 - Los roles de Administrador y Cajero cuentan con el permiso vouchers/ver para visualizar la tarjeta de analisis del voucher y confirmar la aprobacion o rechazo.
 - Mozos, Cocina y Repartidores no tienen acceso a esta bandeja de mensajes.
 - Los avisos del pedido salen en orden (aceptado, listo, salida, llegada, entregado): si uno falla temporalmente, los siguientes del mismo pedido esperan a que se resuelva y no llegan antes.
+- Aviso por correo de chat sin responder: si un chat esta en Por atender o Validar pago y el ultimo mensaje es del cliente (nadie le respondio, ni persona ni bot) y pasan 15 minutos, el administrador y quienes reciben avisos por correo reciben UN correo con el nombre (o el telefono oculto), cuanto espera, el ultimo mensaje y un enlace que abre este chat. Solo dentro del horario del local; al abrir llega un solo correo con los que quedaron esperando. Se maneja en Configuracion, Correos de aviso.

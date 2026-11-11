@@ -31,6 +31,7 @@ import {
 } from './avisos-internos.textos';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { AvisosEquipoCorreoService, AvisoEquipo } from '../../correo/avisos-equipo-correo.service';
+import type { TipoAviso } from '../../correo';
 import {
   ROLES_ALERTAS_WHATSAPP,
   normalizarCelularPeru,
@@ -418,6 +419,7 @@ export class AvisosInternosService {
     this.correoAlEquipo({
       clave: `almacen:${datos.nombreInsumo.slice(0, 100)}:${datos.tipoAlerta}:${new Date().toISOString().slice(0, 10)}`,
       origen: 'ALMACEN',
+      tipo: 'STOCK',
       asunto: `Almacén: ${datos.nombreInsumo} (${etiqueta})`,
       texto:
         `${datos.nombreInsumo}: stock actual ${Number(datos.stockActual).toFixed(2)} ${datos.unidadMedida || 'UND'}` +
@@ -793,7 +795,7 @@ export class AvisosInternosService {
     enlace: string,
     botones?: BotonAccion[],
     claveIdempotencia?: string,
-    opciones?: { sinCampana?: boolean; correo?: boolean; sinWhatsapp?: boolean },
+    opciones?: { sinCampana?: boolean; correo?: boolean; sinWhatsapp?: boolean; tipoCorreo?: TipoAviso },
   ): Promise<ResultadoNotificacionEquipo> {
     // Alerta va SIEMPRE a la campana del panel (respaldo y registro), salvo que quien avisa ya la haya puesto
     if (!opciones?.sinCampana) {
@@ -804,6 +806,7 @@ export class AvisosInternosService {
       this.correoAlEquipo({
         clave: claveIdempotencia ?? `alerta:${randomUUID()}`,
         origen: 'ALERTA_ADMIN',
+        tipo: opciones.tipoCorreo,
         asunto: titulo,
         texto: `${detalle}\n\nVer en el panel: ${enlace}`,
       });

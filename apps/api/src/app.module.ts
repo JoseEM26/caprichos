@@ -17,6 +17,7 @@ import { PedidosModule } from './modulos/pedidos/pedidos.module';
 import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module';
 import { CortesiasModule } from './modulos/cortesias/cortesias.module';
 import { CajaModule } from './modulos/caja/caja.module';
+import { AvisosProgramadosModule } from './modulos/avisos-programados';
 import { CierreModule } from './modulos/cierre/cierre.module';
 import { PropinasModule } from './modulos/propinas/propinas.module';
 import { PropinasRepartoModule } from './modulos/propinas/propinas-reparto.module';
@@ -73,6 +74,7 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     PedidosAdminModule,
     CortesiasModule,
     CajaModule,
+    AvisosProgramadosModule,
     CierreModule,
     PropinasModule,
     PropinasRepartoModule,
