@@ -198,8 +198,13 @@ export async function clienteFetch<T = any>(
         : respuesta.status === 404
         ? 'NO_ENCONTRADO'
         : 'ERROR_API');
+    // Nest (ValidationPipe, HttpException con texto) manda `message` (texto o lista), no `mensaje`
+    const msgNest = Array.isArray(datosErr?.message) ? datosErr.message[0] : datosErr?.message;
     const mensaje =
-      datosErr?.mensaje || respuesta.statusText || 'Error al procesar la solicitud';
+      datosErr?.mensaje ||
+      (typeof msgNest === 'string' && msgNest ? msgNest : '') ||
+      respuesta.statusText ||
+      'Error al procesar la solicitud';
     throw new ErrorApi(codigo, mensaje, respuesta.status, datosErr);
   }
 
