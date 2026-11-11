@@ -196,7 +196,7 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
           </select>
         </label>
       </div>
-      <p className="as-ayuda">«Reiniciar celular» borra el celular asociado a esta persona para que pueda marcar desde uno nuevo.</p>
+      <p className="as-ayuda">La asistencia de cada persona queda ligada al primer celular desde el que marca. Si cambió de celular, pulsa “Reiniciar celular”: su próxima marca registrará el nuevo.</p>
       {visibles.length === 0 ? (
         <EstadoVacio titulo="Nadie coincide" descripcion="Cambia la búsqueda o el estado." />
       ) : (
@@ -220,7 +220,7 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
                   </td>
                   <td data-label="Trabajado" className="as-num">{(f.trabajadaMin / 60).toFixed(2)} h</td>
                   <td data-label="">
-                    <Boton type="button" variante="secundario" tamano="pequeno" title="Borra el celular asociado a esta persona para que pueda marcar desde uno nuevo" onClick={() => { setErrorReinicio(null); setReiniciando(f); }}>Reiniciar celular</Boton>
+                    <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Reiniciar celular de ${f.nombre}`} onClick={() => { setErrorReinicio(null); setReiniciando(f); }}>Reiniciar celular</Boton>
                   </td>
                 </tr>
               ))}
@@ -231,7 +231,7 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
       <Confirmar
         abierto={reiniciando !== null}
         titulo="¿Reiniciar el celular?"
-        mensaje={reiniciando ? `Se borra el celular asociado a ${reiniciando.nombre}. Podrá marcar desde un celular nuevo; el actual dejará de servir.` : ''}
+        mensaje={reiniciando ? `¿Borrar el celular de ${reiniciando.nombre}? Podrá marcar desde un celular nuevo; el actual dejará de valer.` : ''}
         textoSi="Sí, reiniciar"
         textoNo="No"
         focoInicialNo

@@ -2,41 +2,44 @@ import { useCallback, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
-import { ModalConPestanas, type PestanaModal } from '../../comun/ModalConPestanas';
+import { type PestanaModal } from '../../comun/ModalConPestanas';
 import { ETIQUETA_ESTADO, ETIQUETA_TIPO, TipoMarca, corregirMarca } from './asistenciaApi';
-import { ETIQUETA_TIPO_CAL, type FilaCal } from './calendarioApi';
+import { type FilaCal } from './calendarioApi';
 import { Cronograma, cronograma } from './correccionesApi';
-import { LineaTiempo, SolicitudesDelDia, etiquetaDia, sumarDias } from './CronogramaTab';
+import { SolicitudesDelDia, etiquetaDia, sumarDias } from './CronogramaTab';
+import { TarjetasMarcas } from './TarjetasMarcas';
 import { DetallePlanilla, detallePlanilla, soles } from './planillaApi';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
 const hh = (min: number) => (min ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min` : '—');
-const ORIGEN: Record<string, string> = { CORRECCION: 'corrección del admin', WEB: 'usuario y contraseña', MANUAL: 'manual (solo GPS)', CELULAR: 'QR en el celular' };
 
 /**
- * Detalle de UNA persona en UN día, como modal con pestañas (partes que no dependen entre sí):
- * Resumen · Marcas (línea de tiempo, aprobar/anular/separar/reasignar, selfie, corrección manual) · Solicitudes · Pago del período.
- * Se abre apilado sobre el modal del día (al cerrarlo, el foco vuelve a la lista).
+ * Detalle de UNA persona en UN día. NO es un modal: devuelve el título, el subtítulo y las pestañas
+ * (Resumen · Marcas · Solicitudes · Pago del período) para que el MISMO modal del día los muestre en su lugar.
+ * Sin `fila` no pide nada (el modal está en la vista del día).
  */
-export function DetalleDiaPersona({ fila, onCerrar, onCambio, onError, onOk, volverAlDia = false }: {
-  fila: FilaCal; onCerrar: () => void; onCambio: () => void; onError: Avisar; onOk: Avisar; volverAlDia?: boolean;
-}) {
+export function useDetalleDia(fila: FilaCal | null, { onCambio, onError, onOk }: { onCambio: () => void; onError: Avisar; onOk: Avisar }) {
   const [data, setData] = useState<Cronograma | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [seleccionada, setSeleccionada] = useState<number | null>(null);
+  const [fallo, setFallo] = useState(false);
+  const fecha = fila?.fecha;
   const cargar = useCallback(async () => {
+    if (!fecha) return;
     try {
-      setData(await cronograma(fila.fecha, fila.fecha));
+      setData(await cronograma(fecha, fecha));
+      setFallo(false);
     } catch (e) {
+      setFallo(true);
       onError(mensajeDe(e, 'No pudimos cargar el detalle del día.'));
     } finally {
       setCargando(false);
     }
-  }, [fila.fecha, onError]);
-  useEffect(() => { setCargando(true); void cargar(); }, [cargar]);
+  }, [fecha, onError]);
+  useEffect(() => { if (fecha) { setCargando(true); void cargar(); } }, [fecha, cargar]);
+  if (!fila) return null;
   const persona = data?.personas.find((p) => String(p.partyId) === fila.partyId);
-  const dia = persona?.dias.find((d) => d.jornada === fila.fecha);
+  const dia = persona?.dias.find((d) => d.jornada === fila.fecha) ?? null;
   const recargar = async () => { await cargar(); onCambio(); };
   const pendientes = dia?.solicitudes.length ?? fila.solicitudes.filter((s) => s.estado === 'PENDIENTE').length;
 
@@ -46,19 +49,7 @@ export function DetalleDiaPersona({ fila, onCerrar, onCambio, onError, onOk, vol
       id: 'marcas', etiqueta: 'Marcas', insignia: fila.marcas.length || null,
       contenido: (
         <div className="ca-detalle-sec">
-          <ol className="ca-marcas-lista" aria-label="Marcas del día">
-            {fila.marcas.length === 0 && <li>Sin marcas este día.</li>}
-            {fila.marcas.map((m) => (
-              <li key={m.id}>
-                <b>{m.hora}</b> {m.tipo ? ETIQUETA_TIPO_CAL[m.tipo] : 'Marca sin tipo'}
-                <small> · {ORIGEN[m.origen] ?? 'QR en el celular'}{m.estado === 'A_REVISAR' ? ' · por revisar' : ''}{m.tieneSelfie ? ' · con selfie' : ''}</small>
-              </li>
-            ))}
-          </ol>
-          {cargando ? <Cargando mensaje="Cargando línea de tiempo" /> : dia && persona ? (
-            <LineaTiempo persona={persona} dia={dia} seleccionada={seleccionada} alElegir={setSeleccionada} onError={onError} onOk={onOk} recargar={recargar} sinSolicitudes />
-          ) : <p className="as-ayuda">No hay línea de tiempo para este día.</p>}
-          <small className="as-ayuda">Toca una marca de la línea para ver su detalle, la selfie y aprobarla, anularla o cambiar su rol.</small>
+          <TarjetasMarcas fila={fila} dia={dia} cargando={cargando} error={fallo || (!cargando && !dia)} reintentar={() => { setCargando(true); void cargar(); }} onError={onError} onOk={onOk} recargar={recargar} />
           <CorreccionManual fila={fila} onCambio={recargar} onError={onError} onOk={onOk} />
         </div>
       ),
@@ -76,17 +67,11 @@ export function DetalleDiaPersona({ fila, onCerrar, onCambio, onError, onOk, vol
     },
     { id: 'pago', etiqueta: 'Pago del período', persistente: false, contenido: <PagoDelPeriodo partyId={Number(fila.partyId)} fecha={fila.fecha} /> },
   ];
-
-  return (
-    <ModalConPestanas
-      titulo={`${fila.nombre} · ${etiquetaDia(fila.fecha)}`}
-      subtitulo={<>{fila.rol}{fila.turno ? ` · Horario ${fila.turno.entrada}–${fila.turno.salida}` : ' · Sin horario'} <Insignia variante="neutro">{ETIQUETA_ESTADO[fila.estado] ?? fila.estado}</Insignia></>}
-      pestanas={pestanas}
-      alCerrar={onCerrar}
-      ancho={820}
-      pie={<Boton type="button" variante="secundario" onClick={onCerrar}>{volverAlDia ? '← Volver al día' : 'Cerrar'}</Boton>}
-    />
-  );
+  return {
+    titulo: `${fila.nombre} · ${etiquetaDia(fila.fecha)}`,
+    subtitulo: <>{fila.rol}{fila.turno ? ` · Horario ${fila.turno.entrada}–${fila.turno.salida}` : ' · Sin horario'} <Insignia variante="neutro">{ETIQUETA_ESTADO[fila.estado] ?? fila.estado}</Insignia></>,
+    pestanas,
+  };
 }
 
 function ResumenDia({ fila }: { fila: FilaCal }) {

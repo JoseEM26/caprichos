@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
@@ -11,7 +11,7 @@ import { coincide } from './buscar';
 import { DiaResumen, ETIQUETA_TIPO_CAL, FilaCal, RegistroCal, csvDeRegistro, esARevisar, esPresente, totalesDe } from './calendarioApi';
 import { ResultadoLote, loteCorrecciones } from './correccionesApi';
 import { etiquetaDia, sumarDias } from './CronogramaTab';
-import { DetalleDiaPersona } from './DetalleDiaPersona';
+import { useDetalleDia } from './DetalleDiaPersona';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
@@ -68,7 +68,8 @@ function resumenDe(dias: string[], resumen: DiaResumen[], filas: FilaCal[]) {
 /**
  * Modal grande con TODOS los movimientos de un día (o de un rango de días): resumen, búsqueda por nombre, filtros rápidos
  * por estado, marcas de cada persona y aprobación en lote. Un rango muestra una pestaña «Todo el rango» (agrupada por fecha)
- * y una pestaña por día. «Ver detalle» abre el detalle de la persona apilado encima (al cerrarlo se vuelve a esta lista).
+ * y una pestaña por día. «Ver detalle» cambia ESTE MISMO modal al detalle de la persona (nunca hay dos modales a la vez);
+ * «← Volver al día» o Esc regresan a la lista tal como estaba (búsqueda, filtros, selección, pestaña, scroll y foco).
  */
 export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase, resumen, onCerrar, recargar, onError, onOk }: {
   desde: string; hasta: string; registro: RegistroCal | null; cargando: boolean; filasBase: FilaCal[]; resumen: DiaResumen[];
@@ -82,11 +83,37 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
   const [elegidas, setElegidas] = useState<Set<string>>(new Set());
   const [visibles, setVisibles] = useState(POR_PAGINA);
   const [detalle, setDetalle] = useState<FilaCal | null>(null);
+  const [pestDet, setPestDet] = useState('resumen');
+  const retorno = useRef<{ clave: string; scroll: number } | null>(null);
   const [confirmar, setConfirmar] = useState<'APROBAR' | 'RECHAZAR' | null>(null);
   const [motivo, setMotivo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [errorLote, setErrorLote] = useState<string | null>(null);
   const [resultado, setResultado] = useState<ResultadoLote | null>(null);
+
+  // Detalle de la persona dentro de este mismo modal; usa la fila fresca si el calendario se recargó
+  const filaDetalle = detalle ? filasBase.find((f) => clave(f) === clave(detalle)) ?? detalle : null;
+  const det = useDetalleDia(filaDetalle, { onCambio: () => void recargar(), onError, onOk });
+  const abrirDetalle = (f: FilaCal, el: HTMLElement) => {
+    retorno.current = { clave: clave(f), scroll: el.closest('.mcp-cuerpo')?.scrollTop ?? 0 };
+    setPestDet('resumen');
+    setDetalle(f);
+  };
+  const volverAlDia = () => setDetalle(null);
+  // Al entrar al detalle: cuerpo arriba y foco en su pestaña. Al volver: scroll y foco en el «Ver detalle» de esa persona.
+  useLayoutEffect(() => {
+    const cuerpo = document.querySelector<HTMLElement>('.mcp-dialogo .mcp-cuerpo');
+    if (detalle) {
+      if (cuerpo) cuerpo.scrollTop = 0;
+      document.querySelector<HTMLElement>('.mcp-dialogo [role="tab"][aria-selected="true"]')?.focus();
+    } else if (retorno.current) {
+      const { clave: k, scroll } = retorno.current;
+      retorno.current = null;
+      const b = document.querySelector<HTMLElement>(`[data-detalle-clave="${k}"]`);
+      b?.focus({ preventScroll: true });
+      if (cuerpo) cuerpo.scrollTop = scroll;
+    }
+  }, [detalle]);
 
   const filaActual = rapido === 'TODOS' ? () => true : RAPIDOS.find((r) => r[0] === rapido)![2];
   const filtradas = (lista: FilaCal[]) => lista.filter((f) => coincide(f.nombre, texto) && filaActual(f));
@@ -160,7 +187,7 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
                 const pend = f.solicitudes.filter((s) => s.estado === 'PENDIENTE').length;
                 const nuevoDia = agrupar && (i === 0 || mostradas[i - 1].fecha !== f.fecha);
                 return (
-                  <FilaMov key={clave(f)} f={f} pend={pend} agrupar={agrupar} nuevoDia={nuevoDia} elegida={elegidas.has(clave(f))} alElegir={() => alternarFila(f)} alDetalle={() => setDetalle(f)} />
+                  <FilaMov key={clave(f)} f={f} pend={pend} agrupar={agrupar} nuevoDia={nuevoDia} elegida={elegidas.has(clave(f))} alElegir={() => alternarFila(f)} alDetalle={(el) => abrirDetalle(f, el)} />
                 );
               })}
             </tbody>
@@ -194,14 +221,14 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
   return (
     <>
       <ModalConPestanas
-        titulo={titulo}
-        subtitulo={res.feriados.length > 0 ? <Insignia variante="acento">Feriado: {[...new Set(res.feriados)].join(', ')}</Insignia> : undefined}
-        pestanas={pestanas}
-        pestanaActiva={activa}
-        alCambiarPestana={(id) => { setActiva(id); setVisibles(POR_PAGINA); }}
-        alCerrar={onCerrar}
-        ancho={1180}
-        bajoPestanas={(
+        titulo={det ? det.titulo : titulo}
+        subtitulo={det ? det.subtitulo : res.feriados.length > 0 ? <Insignia variante="acento">Feriado: {[...new Set(res.feriados)].join(', ')}</Insignia> : undefined}
+        pestanas={det ? det.pestanas : pestanas}
+        pestanaActiva={det ? pestDet : activa}
+        alCambiarPestana={det ? setPestDet : (id) => { setActiva(id); setVisibles(POR_PAGINA); }}
+        alCerrar={det ? volverAlDia : onCerrar}
+        ancho={det ? 860 : 1180}
+        bajoPestanas={det ? undefined : (
           <div className="ca-modal-franja">
             <ul className="ca-modal-resumen" aria-label="Resumen" >
               {resumenTxt.map(([t, n, k]) => <li key={t} className={`ca-modal-res ca-modal-res--${k}`}><b>{n}</b> {t}</li>)}
@@ -220,7 +247,9 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
             </div>
           </div>
         )}
-        pie={elegidasVisibles.length > 0 ? (
+        pie={det ? (
+          <Boton type="button" variante="secundario" onClick={volverAlDia}>← Volver al día</Boton>
+        ) : elegidasVisibles.length > 0 ? (
           <div className="ca-modal-lote" role="region" aria-label="Acciones en lote">
             <strong>{elegidasVisibles.length} {elegidasVisibles.length === 1 ? 'día seleccionado' : 'días seleccionados'} ({itemsLote.length} {itemsLote.length === 1 ? 'ítem' : 'ítems'})</strong>
             {itemsLote.length > MAX_LOTE && <span role="alert">Máximo {MAX_LOTE} por vez: quita algunas.</span>}
@@ -240,9 +269,6 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
       />
       {resultado && (
         <ModalResultado r={resultado} onCerrar={() => setResultado(null)} />
-      )}
-      {detalle && (
-        <DetalleDiaPersona fila={detalle} volverAlDia onCerrar={() => setDetalle(null)} onCambio={() => void recargar()} onError={onError} onOk={onOk} />
       )}
       <Confirmar
         abierto={confirmar !== null}
@@ -269,7 +295,7 @@ export function ModalDiaCalendario({ desde, hasta, registro, cargando, filasBase
 }
 
 function FilaMov({ f, pend, agrupar, nuevoDia, elegida, alElegir, alDetalle }: {
-  f: FilaCal; pend: number; agrupar: boolean; nuevoDia: boolean; elegida: boolean; alElegir: () => void; alDetalle: () => void;
+  f: FilaCal; pend: number; agrupar: boolean; nuevoDia: boolean; elegida: boolean; alElegir: () => void; alDetalle: (el: HTMLElement) => void;
 }) {
   return (
     <tr>
@@ -303,7 +329,7 @@ function FilaMov({ f, pend, agrupar, nuevoDia, elegida, alElegir, alDetalle }: {
         ))}</div>}
       </td>
       <td data-label="">
-        <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Detalle de ${f.nombre} del ${f.fecha}`} onClick={alDetalle}>Ver detalle</Boton>
+        <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Detalle de ${f.nombre} del ${f.fecha}`} data-detalle-clave={clave(f)} onClick={(e) => alDetalle(e.currentTarget)}>Ver detalle</Boton>
       </td>
     </tr>
   );

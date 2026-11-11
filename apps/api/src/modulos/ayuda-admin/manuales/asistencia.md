@@ -13,6 +13,7 @@ sugerencias:
   - Donde veo las selfies de las marcas
   - Como descargo la asistencia del mes
   - Que significa A revisar en una marca
+  - Como veo el detalle de una persona en un dia
 ---
 # Asistencia del personal
 
@@ -37,7 +38,7 @@ Ver tambien: [[usuarios]]
 
 ## Como se hace: Revisar marcas y selfies
 1. Pulsa Marcas y selfies. La tabla lista Persona, Jornada, Tipo, Hora, Estado (Valida o A revisar), Distancia al local, Precision del GPS y Origen (Celular o Correccion).
-2. Pulsa Ver selfie para abrir la foto de esa marca; Cerrar foto la oculta. Solo el Administrador puede ver las fotos, y se borran solas pasado el plazo de retencion (90 dias por defecto).
+2. Pulsa la miniatura (o Ver selfie) para abrir la foto de esa marca; Cerrar la oculta. Solo el Administrador puede ver las fotos, y se borran solas pasado el plazo de retencion (90 dias por defecto).
 3. Una marca A revisar significa que el sistema vio algo raro: GPS con precision perfecta de 0 m, coordenadas identicas repetidas en varias marcas o un salto de ubicacion imposible. Mira el motivo bajo el estado y decide.
 
 ## Como se hace: Corregir una marca olvidada
@@ -55,7 +56,7 @@ Ver tambien: [[historial]]
 
 ## Como se hace: Reiniciar el celular de una persona
 1. La asistencia queda atada al primer celular que usa cada persona. Si cambio de equipo o perdio el celular, abre la pestana Hoy.
-2. En su fila pulsa Reiniciar celular. Aparece "Vinculo de celular reiniciado. La persona debe volver a marcar desde su celular.".
+2. En su fila pulsa Reiniciar celular de (su nombre) y confirma con Si: "Borrar el celular de (nombre)? Podra marcar desde un celular nuevo; el actual dejara de valer.". Con No no pasa nada. Queda en la auditoria. Aparece "Vinculo de celular reiniciado. La persona debe volver a marcar desde su celular.".
 3. La persona marca otra vez desde el celular nuevo, que queda vinculado.
 Ver tambien: [[mi-asistencia]]
 
@@ -73,7 +74,8 @@ Ver tambien: [[mi-asistencia]]
 ## Como se hace: Calendario, el modal del dia y el detalle de la persona
 1. En la pestana Calendario, arriba estan los controles agrupados y con letra grande: Ver | Programar, el mes con flechas, el rango (1 dia, 3 dias, Semana, Mes, Rango personalizado, Ver movimientos) y Filtros con sus chips.
 2. En el modo Ver toca un dia (o arrastra, o usa Mayus para varios) y se abre una ventana grande con TODOS los movimientos: resumen (feriado, presentes, tardanzas, faltas, a revisar, solicitudes pendientes), buscador por nombre sin tildes, filtros rapidos por estado y la lista de personas con entrada, salida a almorzar, vuelta, salida, trabajado, tardanza, extra, estado y solicitudes. Un rango trae la pestana Todo el rango (agrupada por fecha) y una pestana por dia. Con las casillas aprueba o rechaza en lote. Esc o Cerrar la cierran. Si no quieres abrirla al tocar, usa Programar.
-3. En cada persona, Ver detalle abre otra ventana encima (la del dia queda debajo; al cerrarla con Volver al dia regresas a la lista) con pestanas: Resumen, Marcas (linea de tiempo, origen, GPS aproximado, selfie solo para ti, aprobar, anular, separar, cambiar rol y agregar una marca que falta), Solicitudes (aprobar o rechazar con motivo) y Pago del periodo (lo que lleva ganado y descontado en su planilla).
+3. En cada persona, Ver detalle cambia la MISMA ventana al detalle de esa persona (nunca se abren dos ventanas). Arriba ves su nombre, rol, fecha y estado, y las pestanas: Resumen, Marcas, Solicitudes (aprobar o rechazar con motivo) y Pago del periodo (lo que lleva ganado y descontado en su planilla). Con Volver al dia (o Esc) regresas a la lista tal como la dejaste: misma busqueda, filtros, seleccion y lugar. Esc en la lista la cierra.
+4. En Marcas ves una franja con entrada, salida, trabajado, tardanza y almuerzo, y debajo una tarjeta por marca, en orden de hora: la selfie en miniatura (toca para ampliarla; Esc o Cerrar la cierran), la hora grande, el tipo (Entrada, Salida a almorzar, Vuelta del almuerzo, Salida), el estado (Aprobada, Por revisar, Anulada), el origen y a cuantos metros del local estaba. Si no hubo foto dice Sin selfie; si ya paso el plazo dice que la selfie se borro. Solo tu ves las fotos. Pulsa Acciones en una tarjeta para aprobar, anular, separar o cambiar su rol, y abajo puedes agregar una marca que falta.
 
 ## Como se hace: Vinculo y vacaciones del personal
 1. En Usuarios, pestana Horario, debajo del sueldo, elige el Tipo de vinculo: En planilla o Contrato temporal, con su fecha de ingreso (en planilla, ademas, 30 o 15 dias de vacaciones al ano; en contrato temporal, la fecha de fin si la hay). Si eliges Contrato temporal veras un aviso: un contrato sin subordinacion no es compatible con horario fijo y asistencia obligatoria; validalo con tu contador o abogado. El aviso no bloquea.

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { obtenerBlobAutenticado } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -18,6 +17,7 @@ import {
   separarMarca,
 } from './correccionesApi';
 import { jornadaActual, useUltimaPeticion } from './jornada';
+import { SelfieMarca } from './SelfieMarca';
 import './cronograma.css';
 
 type Avisar = (m: string | null) => void;
@@ -332,10 +332,13 @@ export function SolicitudesDelDia({ dia, onError, onOk, recargar }: { dia: Crono
   );
 }
 
-function DetalleMarca({ marca, dia, onError, onOk, recargar }: { marca: CronoMarca; dia: CronoDia; onError: Avisar; onOk: Avisar; recargar: () => Promise<void> }) {
+export function DetalleMarca({ marca, dia, onError, onOk, recargar, sinSelfie = false }: {
+  marca: CronoMarca; dia: CronoDia; onError: Avisar; onOk: Avisar; recargar: () => Promise<void>;
+  /** true = la selfie ya se muestra en otra parte (tarjeta de la marca). */
+  sinSelfie?: boolean;
+}) {
   const [motivo, setMotivo] = useState('');
   const [nuevoRol, setNuevoRol] = useState<TipoMarca>(marca.rol ?? 'SALIDA');
-  const [foto, setFoto] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const valido = motivo.trim().length >= 10;
   const hacer = async (fn: () => Promise<unknown>, ok: string) => {
@@ -351,13 +354,6 @@ function DetalleMarca({ marca, dia, onError, onOk, recargar }: { marca: CronoMar
       setOcupado(false);
     }
   };
-  const verFoto = async () => {
-    try {
-      setFoto(await obtenerBlobAutenticado(`/admin/asistencia/marcas/${marca.id}/selfie`));
-    } catch (e) {
-      onError(mensajeDe(e, 'La foto ya no está disponible.'));
-    }
-  };
   return (
     <div className="cr-detalle" role="region" aria-label={`Detalle de la marca de las ${marca.hora}`}>
       <dl>
@@ -368,8 +364,7 @@ function DetalleMarca({ marca, dia, onError, onOk, recargar }: { marca: CronoMar
         <div><dt>Estado</dt><dd>{marca.estado === 'A_REVISAR' ? 'Por revisar' : marca.estado === 'APROBADA' ? 'Aprobada' : 'Válida'}</dd></div>
         {(marca.alertas || marca.motivo) && <div><dt>Notas</dt><dd>{marca.alertas ?? marca.motivo}</dd></div>}
       </dl>
-      {marca.tieneSelfie && <Boton type="button" variante="secundario" onClick={() => void verFoto()}>Ver selfie</Boton>}
-      {foto && <img src={foto} alt={`Selfie de la marca de las ${marca.hora}`} className="as-selfie" style={{ maxWidth: 160 }} />}
+      {!sinSelfie && marca.tieneSelfie && <SelfieMarca marcaId={marca.id} hora={marca.hora} tieneSelfie />}
       <label className="as-campo">Motivo (mínimo 10 caracteres)
         <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} />
       </label>

@@ -1,0 +1,21 @@
+/* Pestaña «Marcas» del detalle: franja-resumen y tarjetas por marca (TarjetasMarcas.tsx). Sin scroll horizontal a 360 px. */
+.tm-franja { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px 10px; margin: 0; }
+.tm-franja div { min-width: 0; background: #fff; border: 1px solid var(--cp-line); border-radius: 10px; padding: 6px 10px; }
+.tm-franja dt { font-size: 12px; font-weight: 700; color: var(--cp-soft); }
+.tm-franja dd { margin: 0; font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
+.tm-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.tm-tarjeta { min-width: 0; background: #fff; border: 1.5px solid var(--cp-line); border-left: 6px solid var(--cp-soft); border-radius: 14px; padding: 10px; display: grid; gap: 8px; }
+.tm-tarjeta--verde { border-left-color: var(--cp-green); }
+.tm-tarjeta--rojo { border-left-color: var(--cp-rust); }
+.tm-tarjeta--dorado { border-left-color: var(--cp-gold); }
+.tm-tarjeta--azul { border-left-color: var(--cp-navy); }
+.tm-tarjeta--dup { opacity: 0.8; }
+.tm-fila { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.tm-datos { flex: 1 1 160px; min-width: 0; display: grid; gap: 3px; }
+.tm-hora { font-family: Montserrat, sans-serif; font-size: 26px; line-height: 30px; }
+.tm-tipo { font-weight: 700; font-size: 14px; }
+.tm-icono { display: inline-block; width: 18px; text-align: center; }
+.tm-insignias { display: flex; flex-wrap: wrap; gap: 4px; }
+.tm-origen { color: var(--cp-soft); font-size: 12px; overflow-wrap: anywhere; }
+.tm-error { display: grid; gap: 8px; justify-items: start; padding: 12px; border: 1.5px solid var(--cp-rust); border-radius: 12px; background: #FBEDE9; }
+.tm-error p { margin: 0; }

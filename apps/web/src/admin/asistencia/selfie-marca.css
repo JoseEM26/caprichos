@@ -1,0 +1,17 @@
+/* Miniatura de selfie por marca y visor dentro del modal (SelfieMarca.tsx). */
+.sf-caja { flex: 0 0 auto; width: 64px; min-height: 64px; display: grid; place-items: center; text-align: center; }
+.sf-mini { width: 64px; height: 64px; padding: 0; border: 2px solid var(--cp-line); border-radius: 12px; overflow: hidden; background: var(--cp-sand); cursor: pointer; }
+.sf-mini:focus-visible { outline: 3px solid var(--cp-gold); outline-offset: 2px; }
+.sf-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sf-vacia { border: 2px dashed var(--cp-line); border-radius: 12px; color: var(--cp-soft); align-content: center; }
+.sf-vacia .sf-icono { font-size: 22px; line-height: 1; }
+.sf-vacia small, .sf-aviso { font-size: 11px; line-height: 13px; color: var(--cp-soft); }
+.sf-esqueleto { width: 64px; height: 64px; border-radius: 12px; background: linear-gradient(90deg, var(--cp-sand), var(--cp-cream), var(--cp-sand)); background-size: 200% 100%; animation: sf-brillo 1.2s linear infinite; }
+.sf-reintentar { min-height: 44px; font-size: 11px; border: 1.5px solid var(--cp-navy); border-radius: 10px; background: transparent; color: var(--cp-navy); cursor: pointer; }
+.sf-visor { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 12px; background: rgba(11, 44, 62, 0.88); }
+.sf-visor-cuerpo { display: grid; gap: 10px; justify-items: center; max-width: 100%; max-height: 100%; min-height: 0; }
+.sf-visor-titulo { margin: 0; color: #fff; font-family: Montserrat, sans-serif; font-size: 16px; }
+.sf-visor img { max-width: min(100%, 520px); max-height: 62dvh; object-fit: contain; border-radius: 14px; background: #fff; }
+.sf-cerrar { min-height: 44px; padding: 0 24px; border-radius: 10px; border: 0; background: var(--cp-orange); color: #fff; font-weight: 800; cursor: pointer; }
+@keyframes sf-brillo { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .sf-esqueleto { animation: none; } }

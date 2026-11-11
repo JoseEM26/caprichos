@@ -225,21 +225,24 @@ describe('Modal del día: movimientos de todos', () => {
 });
 
 describe('Calendario: detalle de la persona y lote', () => {
-  it('«Ver detalle» abre el detalle de la persona por pestañas, apilado sobre el día, con «← Volver al día»', async () => {
+  it('«Ver detalle» cambia el MISMO modal al detalle de la persona (una sola ventana) con «← Volver al día»', async () => {
     abrir();
     const dia = await abrirDia();
     fireEvent.click(await within(dia).findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
     const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
-    expect(screen.getAllByRole('dialog')).toHaveLength(2); // el del día sigue debajo
+    expect(det).toBe(dia); // el mismo elemento: nunca dos modales
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(within(det).getAllByRole('tab').map((t) => t.textContent?.replace(/\d+$/, ''))).toEqual(['Resumen', 'Marcas', 'Solicitudes', 'Pago del período']);
     expect(within(det).getByText('Salida a almorzar')).toBeInTheDocument();
-    // Marcas: lista, línea de tiempo y corrección manual
+    // Marcas: tarjetas ordenadas, con tipo y estado, y corrección manual
     fireEvent.click(within(det).getByRole('tab', { name: /Marcas/ }));
-    expect(within(det).getByRole('list', { name: 'Marcas del día' })).toHaveTextContent('Salida a almorzar');
-    expect(await within(det).findByRole('group', { name: 'Línea de tiempo de Ana Pérez' })).toBeInTheDocument();
+    const tarjeta = await within(det).findByRole('listitem', { name: 'Marca de las 13:28' });
+    expect(within(tarjeta).getByText('Entrada')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Por revisar')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Sin selfie')).toBeInTheDocument();
     expect(within(det).getByText('Agregar una marca que falta (corrección manual)')).toBeInTheDocument();
-    // tocar una marca de la línea muestra su detalle con las acciones (aprobar/anular/reasignar)
-    fireEvent.click(within(det).getByRole('button', { name: /13:28 Entrada/ }));
+    // «Acciones» muestra aprobar/anular/reasignar
+    fireEvent.click(within(tarjeta).getByRole('button', { name: 'Acciones de la marca de las 13:28' }));
     const reg = within(det).getByRole('region', { name: /Detalle de la marca de las 13:28/ });
     expect(within(reg).getByRole('button', { name: 'Aprobar' })).toBeInTheDocument();
     expect(within(reg).getByRole('button', { name: 'Anular' })).toBeInTheDocument();
@@ -249,10 +252,11 @@ describe('Calendario: detalle de la persona y lote', () => {
     tab.focus();
     fireEvent.keyDown(tab, { key: 'ArrowRight' });
     expect(within(det).getByRole('tab', { name: /Solicitudes/, selected: true })).toBeInTheDocument();
-    // Volver al día
+    // Volver al día: la lista vuelve y el foco regresa al «Ver detalle» de esa persona
     fireEvent.click(within(det).getByRole('button', { name: '← Volver al día' }));
-    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(screen.getByRole('dialog', { name: /Movimientos del/ })).toBeInTheDocument();
+    expect(document.activeElement).toBe(within(screen.getByRole('dialog')).getByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
   });
 
   it('«Pago del período» trae lo ganado y descontado de esa persona desde su planilla', async () => {
@@ -271,14 +275,36 @@ describe('Calendario: detalle de la persona y lote', () => {
     expect(within(det).getByText(/Consumos de períodos anteriores sin cobrar: S\/ 12\.00/)).toBeInTheDocument();
   });
 
-  it('Esc en el detalle cierra solo el detalle y no el modal del día', async () => {
+  it('Esc en el detalle vuelve al día (conservando la búsqueda y el filtro); Esc en el día cierra el modal', async () => {
     abrir();
     const dia = await abrirDia();
+    fireEvent.change(within(dia).getByLabelText('Buscar persona'), { target: { value: 'ana' } });
+    fireEvent.click(within(dia).getByRole('button', { name: /Con solicitud/ }));
     fireEvent.click(await within(dia).findByRole('button', { name: `Detalle de Ana Pérez del ${HOY}` }));
     const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
     fireEvent.keyDown(det, { key: 'Escape' });
-    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
-    expect(screen.getByRole('dialog', { name: /Movimientos del/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    const vuelta = screen.getByRole('dialog', { name: /Movimientos del/ });
+    expect(within(vuelta).getByLabelText('Buscar persona')).toHaveValue('ana');
+    expect(within(vuelta).getByRole('button', { name: /Con solicitud/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.keyDown(vuelta, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('en un rango, «← Volver al día» regresa a la pestaña del día en la que estaba', async () => {
+    abrir();
+    await screen.findByRole('button', { name: /1 presentes/ });
+    fireEvent.click(screen.getByRole('button', { name: '3 días' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }));
+    const dlg = await screen.findByRole('dialog');
+    await within(dlg).findByText('Ana Pérez');
+    const tabs = within(dlg).getAllByRole('tab');
+    fireEvent.click(tabs[1]);
+    const nombre = tabs[1].textContent;
+    fireEvent.click(await within(dlg).findByRole('button', { name: /Detalle de Ana Pérez/ }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    fireEvent.click(within(dlg).getByRole('button', { name: '← Volver al día' }));
+    expect(within(dlg).getByRole('tab', { selected: true }).textContent).toBe(nombre);
   });
 
   it('aprobación en lote: elige la fila, confirma «Sí» y manda solicitudes y marcas por revisar', async () => {
@@ -322,14 +348,14 @@ describe('Hoy: Reiniciar celular', () => {
   it('explica el botón, pide confirmación Sí/No y solo reinicia con «Sí»', async () => {
     reiniciar.mockResolvedValue({});
     abrir('/admin/asistencia');
-    expect(await screen.findByText(/borra el celular asociado a esta persona para que pueda marcar desde uno nuevo/)).toBeInTheDocument();
+    expect(await screen.findByText(/ligada al primer celular desde el que marca/)).toBeInTheDocument();
     const tabla = screen.getByRole('table');
     for (const c of ['Entrada', 'Salida a almorzar', 'Vuelta', 'Almuerzo (min)', 'Salida']) expect(within(tabla).getByRole('columnheader', { name: c })).toBeInTheDocument();
     expect(within(tabla).getByText('17:40')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular de Ana Pérez' }));
     fireEvent.click(screen.getByRole('button', { name: 'No' }));
     expect(reiniciar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular de Ana Pérez' }));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sí, reiniciar' })); });
     expect(reiniciar).toHaveBeenCalledWith(1);
     expect(await screen.findByRole('status')).toHaveTextContent('Celular de Ana Pérez reiniciado');

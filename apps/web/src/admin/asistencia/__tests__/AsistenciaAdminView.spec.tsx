@@ -30,7 +30,7 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByText('Tardanza')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reiniciar celular' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reiniciar celular de Luis Pérez' })).toBeInTheDocument();
   });
 
   it('sin ubicación del local lo avisa y «Usar mi ubicación actual» llena las coordenadas con su precisión', async () => {
