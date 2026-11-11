@@ -103,7 +103,7 @@ export class PcImpresionAvisoService implements OnModuleInit, OnModuleDestroy {
         `Sin conexión:\n${lineas.join('\n')}\n\n` +
         'Qué hacer: abre el programa de impresión en esa computadora y deja la ventana abierta. ' +
         'Si no estás seguro de si está funcionando, en esa computadora escribe el comando "agente-impresion-windows.exe --estado" y mira la última conexión.\n\n' +
-        'Ver el estado: /admin/configuracion?tab=impresion',
+        'Ver el estado: /admin/mirest?tab=impresion',
       ahora,
     });
     if (numero === 0) await this.prisma.avisoMarca.update({ where: { clave: `${claveBase}:0` }, data: { referencia: 'ENVIADO' } });
