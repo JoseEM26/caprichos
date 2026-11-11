@@ -60,6 +60,17 @@ describe('Plantilla de Excel de almacén', () => {
     expect(todo).not.toMatch(/\b(10|20)\d{9}\b/); // RUC reales (los de ejemplo son 00000000000)
   });
 
+  it('refleja las decisiones del dueño: un costo con IGV Sí/No, merma solo en insumos, sabor en recetas, una sola cocina', () => {
+    const cols = (n: string) => HOJAS.find((h) => h.nombre === n)!.columnas.map((c) => c.h);
+    expect(cols('INSUMOS')).toEqual(expect.arrayContaining(['Costo por unidad de compra (S/)', '¿Ese costo incluye IGV?', 'Merma habitual (%)']));
+    expect(cols('INSUMOS').filter((h) => /IGV/.test(h))).toHaveLength(1); // solo «¿Ese costo incluye IGV?»; no hay segunda columna de costo
+    expect(cols('RECETAS').some((h) => /Merma/.test(h))).toBe(false);
+    expect(cols('PRODUCCION_TANDA').some((h) => /Merma/.test(h))).toBe(false);
+    expect(cols('RECETAS')).toContain('Sabor');
+    expect(cols('PRODUCCION_TANDA')).toContain('Sabor');
+    expect(LISTAS.LUGARES.valores).toEqual(['Almacén central', 'Cocina']);
+  });
+
   it('se puede releer y es reproducible', () => {
     expect(Object.keys(libro)).toEqual(expect.arrayContaining(['[Content_Types].xml', 'xl/workbook.xml', 'xl/styles.xml']));
     expect(Buffer.from(generarPlantilla()).equals(Buffer.from(generarPlantilla()))).toBe(true);
