@@ -1,3 +1,4 @@
+import '../../comun/tabla/tabla-comun.css';
 import { totalDe } from './resumenDia';
 import { memo, useMemo } from 'react';
 import type { Pedido } from './pedidosApi';

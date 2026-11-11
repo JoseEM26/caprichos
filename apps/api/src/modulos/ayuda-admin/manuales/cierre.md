@@ -13,6 +13,7 @@ sugerencias:
   - Donde veo las propinas del dia en el cierre
   - Las cortesias suman en el cierre
   - Una devolucion pendiente por cambio de ubicacion afecta el cierre
+  - Como veo las ventas del turno en tabla o tarjetas con sus columnas y filtros
 ---
 # Caja y cierres
 
@@ -52,6 +53,18 @@ Ver tambien: [[repartos]]
 Antes: [[caja]]
 Despues: [[informes]]
 Ver tambien: [[comprobantes]]
+
+## Como se hace: Revisar las ventas del turno en tabla o tarjetas
+1. En la pestana Turno actual, con la caja abierta, baja hasta la seccion Ventas del turno. Cada fila es una venta ya cobrada de la caja que vas a cerrar.
+2. Arriba a la derecha elige Tabla o Tarjetas. La tabla es compacta para revisar muchas ventas; las tarjetas muestran cada venta completa y se leen bien en el celular. El sistema recuerda tu eleccion para la proxima vez.
+3. En la vista Tabla pulsa Columnas para marcar o quitar las que quieres ver y usa las flechas para cambiar su orden. Puedes elegir: codigo, hora de la venta, quien la registro, tipo (local, para llevar, delivery), categoria, medio de pago, repartidor, cliente, total, propina, estado de cobro, quien cobro (Caja), cobrado por mozo, hora de cobro, comprobante, canal de origen, estado del pedido y mesa. Pulsa Restablecer columnas para volver a las de siempre. Tus columnas tambien se recuerdan.
+4. Pulsa un titulo de columna para ordenar; pulsalo otra vez para invertir el orden y una tercera para quitarlo.
+5. Escribe en la caja de busqueda un codigo o el nombre del cliente para encontrar una venta.
+6. Pulsa Filtros para acotar por usuario que registro, quien cobro, tipo, categoria, medio de pago, repartidor, estado de cobro, comprobante o canal de origen. Los filtros se combinan entre si. Cada filtro elegido queda como una etiqueta con una x para quitarlo, y Quitar todos los borra juntos.
+7. La franja de totales (ventas, total, propinas y monto por medio) siempre suma lo que estas viendo con los filtros. Si no hay filtros, coincide con las ventas del turno de arriba.
+8. Pulsa Descargar CSV para bajar a Excel lo que estas viendo, con las columnas elegidas.
+9. Abajo puedes cambiar cuantas ventas ver por pagina y pasar de pagina.
+Ver tambien: [[caja]]
 
 ## Como se hace: Proceder cuando la caja no cuadra
 1. Si los montos declarados difieren de las ventas registradas, la pantalla muestra el aviso No cuadra y solicita un segundo conteo fisico.

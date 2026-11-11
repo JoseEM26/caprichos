@@ -76,12 +76,35 @@ export interface CierreCajaRespuesta {
   medios?: CierreMedioDetalle[];
 }
 
+/** Detalle de una venta cobrada del turno (solo para mostrar); se une a `cobrados` por `pedidoId`. */
+export interface VentaDetalle {
+  pedidoId: string;
+  modalidad: string | null;
+  canal: string | null;
+  estadoPedido: string | null;
+  mesa: string | null;
+  /** Cuándo se registró el pedido */
+  creadoEn: string | null;
+  /** Mozo o cajero que tomó el pedido; null si lo hizo el cliente */
+  registradoPor: string | null;
+  cobradoPor: string | null;
+  cobradoPorMozo: string | null;
+  repartidor: string | null;
+  categorias: string[];
+  pagos: Array<{ medio: string; monto: number }>;
+  propina: number;
+  creditoPersonal: boolean;
+  comprobante: { tipo: string; numero: string; estado: string | null } | null;
+}
+
 export interface MontosEsperados {
   cajaId: number;
   /** Fecha de la caja ABIERTA que se cierra (puede ser de un día anterior) */
   fecha: string;
   /** Cobros y movimientos de esa misma caja: los mismos que suman los montos de abajo */
   cobrados: CobroTurno[];
+  /** Detalle de cada venta de `cobrados` (quién, tipo, categoría, repartidor…); puede faltar en servidores viejos */
+  ventas?: VentaDetalle[];
   movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;

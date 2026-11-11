@@ -1,92 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
-import { COLUMNAS_CAJA, COLUMNAS_POR_DEFECTO, ordenSelector } from './columnasCaja';
+import { useState } from 'react';
+import { COLUMNAS_CAJA, COLUMNAS_POR_DEFECTO } from './columnasCaja';
 import { MEDIOS_FILTRO } from './mediosFila';
+import {
+  ConmutadorVista,
+  SelectorColumnas as SelectorColumnasComun,
+  normalizarVista,
+  useCerrarFuera,
+  type VistaLista,
+} from '../../comun/tabla/ControlesTabla';
 
-export type VistaCaja = 'tarjetas' | 'tabla';
-export const normalizarVista = (v: unknown): VistaCaja => (v === 'tabla' ? 'tabla' : 'tarjetas');
+// El conmutador, el selector de columnas y la vista viven en comun/tabla (los comparte el Cierre).
+export type VistaCaja = VistaLista;
+export { ConmutadorVista, normalizarVista };
 
-/** Conmutador «Tarjetas | Tabla». */
-export function ConmutadorVista({ vista, alCambiar }: { vista: VistaCaja; alCambiar: (v: VistaCaja) => void }) {
-  return (
-    <div className="cj2-vista" role="group" aria-label="Vista de la lista">
-      {(['tarjetas', 'tabla'] as const).map((v) => (
-        <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} onClick={() => alCambiar(v)}>
-          {v === 'tarjetas' ? 'Tarjetas' : 'Tabla'}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Cierra un menú con clic fuera o Escape. */
-function useCerrarFuera(abierto: boolean, cerrar: () => void) {
-  const raiz = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: MouseEvent) => {
-      if (raiz.current && !raiz.current.contains(e.target as Node)) cerrar();
-    };
-    const tecla = (e: KeyboardEvent) => e.key === 'Escape' && cerrar();
-    document.addEventListener('mousedown', fuera);
-    document.addEventListener('keydown', tecla);
-    return () => {
-      document.removeEventListener('mousedown', fuera);
-      document.removeEventListener('keydown', tecla);
-    };
-  }, [abierto, cerrar]);
-  return raiz;
-}
-
-/** Botón «Columnas»: casillas para mostrar u ocultar y flechas para el orden. Siempre queda al menos una. */
+/** Selector de columnas de Caja: las columnas de Caja sobre el selector común. */
 export function SelectorColumnas({ columnas, alCambiar }: { columnas: string[]; alCambiar: (c: string[]) => void }) {
-  const [abierto, setAbierto] = useState(false);
-  const raiz = useCerrarFuera(abierto, () => setAbierto(false));
-  const lista = ordenSelector(columnas);
-  const titulo = (id: string) => COLUMNAS_CAJA.find((c) => c.id === id)!.titulo;
-  const alternar = (id: string) => {
-    if (columnas.includes(id)) {
-      if (columnas.length > 1) alCambiar(columnas.filter((x) => x !== id));
-    } else {
-      alCambiar([...columnas, id]);
-    }
-  };
-  const mover = (id: string, d: -1 | 1) => {
-    const i = columnas.indexOf(id);
-    const j = i + d;
-    if (i < 0 || j < 0 || j >= columnas.length) return;
-    const n = [...columnas];
-    [n[i], n[j]] = [n[j], n[i]];
-    alCambiar(n);
-  };
-  return (
-    <div className="cj2-menu-rel" ref={raiz}>
-      <button type="button" className="cj2-btn" aria-expanded={abierto} aria-haspopup="true" onClick={() => setAbierto((a) => !a)}>
-        Columnas
-      </button>
-      {abierto && (
-        <div className="cj2-col-panel" role="group" aria-label="Columnas de la tabla">
-          {lista.map((id) => {
-            const visible = columnas.includes(id);
-            return (
-              <div key={id} className="cj2-col-fila">
-                <label>
-                  <input type="checkbox" checked={visible} onChange={() => alternar(id)} />
-                  <span>{titulo(id)}</span>
-                </label>
-                {visible && (
-                  <span className="cj2-col-mover">
-                    <button type="button" aria-label={`Subir ${titulo(id)}`} disabled={columnas[0] === id} onClick={() => mover(id, -1)}>↑</button>
-                    <button type="button" aria-label={`Bajar ${titulo(id)}`} disabled={columnas[columnas.length - 1] === id} onClick={() => mover(id, 1)}>↓</button>
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          <button type="button" className="cj2-limpiar" onClick={() => alCambiar(COLUMNAS_POR_DEFECTO)}>Restablecer</button>
-        </div>
-      )}
-    </div>
-  );
+  return <SelectorColumnasComun todas={COLUMNAS_CAJA} columnas={columnas} porDefecto={COLUMNAS_POR_DEFECTO} alCambiar={alCambiar} />;
 }
 
 /** Filtro de varios medios de pago, con la misma apariencia que FiltroCombo. Vacío = todos. */

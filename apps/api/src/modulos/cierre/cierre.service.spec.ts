@@ -817,6 +817,16 @@ describe('CierreService', () => {
       expect(esperado.movimientos.map((m) => m.motivo)).toEqual(['Sencillo inicial extra', 'Compra de hielo']);
     });
 
+    it('agrega el detalle de ventas (ventas) sin tocar cobrados ni los totales del cierre', async () => {
+      const esperado = await service.obtenerEsperado(mockUsuarioAdmin);
+      expect(esperado.ventas).toHaveLength(esperado.cobrados.length);
+      expect(esperado.ventas.map((v) => v.pedidoId)).toEqual(esperado.cobrados.map((c) => c.pedidoId));
+      // Los mismos totales de siempre
+      expect(esperado.efectivoEsperado).toBe(355);
+      expect(esperado.medios).toEqual({ efectivo: 355, yape: 200, plin: 0, transferencia: 50, tarjeta: 100 });
+      expect(esperado.cobrados.reduce((a, c) => a + c.total, 0)).toBe(650);
+    });
+
     it('el cajero también recibe cobros y movimientos de la caja abierta (sin código)', async () => {
       const esperado = await service.obtenerEsperado(mockUsuarioCajero);
       expect(esperado.cajaId).toBe(7);

@@ -1,0 +1,51 @@
+/* Ventas del turno (Cierre): tabla o tarjetas. Reusa los estilos cj2-* de Caja (tabla, vista, columnas, paginador). */
+.vt { background: var(--cp-white, #FFFFFF); border: 1px solid var(--cp-line, #E3D6C6); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
+.vt-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.vt-titulo { margin: 0; font-family: Montserrat, sans-serif; font-weight: 800; font-size: 15px; color: var(--cp-navy, #0B2C3E); }
+.vt-sub { font-size: 12.5px; color: var(--cp-soft, #2C4C5D); font-weight: 700; }
+.vt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.vt-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vt-buscar { flex: 1 1 220px; min-width: 0; }
+.vt-buscar input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: inherit; font-size: 14px; }
+.vt-buscar input:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+
+.vt-filtros { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-radius: 12px; background: var(--cp-cream, #FBF4EC); border: 1px solid var(--cp-line, #E3D6C6); }
+.vt-activos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vt-chip-filtro { min-height: 44px; padding: 0 12px; border-radius: 9999px; border: 1.5px solid var(--cp-orange, #E67929); background: var(--cp-cream, #FBF4EC); color: var(--cp-navy, #0B2C3E); font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.vt-chip-filtro:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+
+.vt-resumen { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 8px 10px; border-radius: 10px; background: var(--cp-cream, #FBF4EC); font-size: 13px; color: var(--cp-navy, #0B2C3E); }
+.vt-resumen b { font-variant-numeric: tabular-nums; }
+.vt-fil { font-weight: 800; color: var(--cp-rust, #B2500F); }
+
+.vt-th { border: 0; background: transparent; padding: 0; margin: 0; font: inherit; font-weight: 800; color: inherit; cursor: pointer; white-space: nowrap; }
+.vt-th:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+@media (pointer: coarse), (max-width: 699px) { .vt-th { min-height: 44px; padding: 0 4px; } }
+.cj2-tabla-scroll:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: -3px; }
+
+.vt-sin { text-align: center; padding: 24px 12px; border: 1.5px dashed var(--cp-line, #E3D6C6); border-radius: 12px; color: var(--cp-soft, #2C4C5D); }
+.vt-sin p { margin: 0 0 10px; font-weight: 700; }
+
+.vt-cuadricula { display: grid; grid-template-columns: 1fr; gap: 10px; min-width: 0; }
+@media (min-width: 700px) { .vt-cuadricula { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .vt-cuadricula { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.vt-card { border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; padding: 10px 12px; background: var(--cp-white, #FFFFFF); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.vt-card-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.vt-card-cod { display: block; font-family: Montserrat, sans-serif; font-size: 15px; color: var(--cp-navy, #0B2C3E); }
+.vt-card-hora { font-size: 12px; color: var(--cp-soft, #2C4C5D); font-weight: 700; }
+.vt-card-total { font-family: Montserrat, sans-serif; font-size: 18px; color: var(--cp-navy, #0B2C3E); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vt-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.vt-chip-tipo { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
+.vt-chip-estado { background: var(--cp-greenbg, #DFF3E3); color: #1F5C33; }
+.vt-dato { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; min-width: 0; }
+.vt-dato-t { color: var(--cp-soft, #2C4C5D); font-weight: 700; flex: none; }
+.vt-dato-v { color: var(--cp-navy, #0B2C3E); font-weight: 700; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+
+@media (max-width: 699px) {
+  .vt { padding: 12px; }
+  .vt-barra > .cj2-btn, .vt-barra .cj2-vistabar { flex: 1 1 auto; }
+  .vt-barra .cj2-vistabar { justify-content: flex-start; }
+  .vt .cj2-col-panel { right: auto; left: 0; }
+  .vt-barra .cj2-btn { min-height: 44px; }
+}

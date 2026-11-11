@@ -17,6 +17,7 @@ import {
 import { DialogoCorregirMedio, ETIQUETA_MEDIO } from './CorreccionesMedios';
 import { CuadreCaja, type CierrePayload } from './CuadreCaja';
 import { PendientesCobroCierre } from './PendientesCobroCierre';
+import { VentasTurno } from './VentasTurno';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -834,6 +835,9 @@ export function CierreView() {
                   </div>
                 </div>
               )}
+
+              {/* Ventas del turno: una fila por venta cobrada, en tabla o tarjetas (solo muestra, no calcula) */}
+              {esperado && <VentasTurno cobrados={pedidosCobrados} ventas={esperado.ventas} fecha={fechaTurno} />}
 
               {/* Movimientos de caja */}
               <div
