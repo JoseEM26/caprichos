@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { EscritorioOperativoService } from './escritorio-operativo.service';
@@ -8,11 +8,10 @@ import { EscritorioOperativoService } from './escritorio-operativo.service';
 export class EscritorioOperativoController {
   constructor(private readonly escritorio: EscritorioOperativoService) {}
 
-  /** Escritorio del SUPERVISOR: conteos y horarios, sin dinero. */
-  @Get('operativo')
-  @Permiso('escritorio', 'operativo')
-  obtener() {
-    return this.escritorio.obtener();
+  /** Escritorio del personal (todo rol salvo ADMIN): conteos y horarios, sin dinero, solo los bloques que su permiso alcanza. */
+  @Get('mio')
+  mio(@Req() req: any) {
+    return this.escritorio.mio(req.usuario);
   }
 
   /** Cumpleaños más cercanos del personal activo: solo ADMIN y SUPERVISOR. */
