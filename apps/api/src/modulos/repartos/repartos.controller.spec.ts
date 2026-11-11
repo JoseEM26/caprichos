@@ -130,8 +130,8 @@ describe('RepartosController', () => {
   it('POST /admin/repartos/:id/salir delega a service.salir', async () => {
     serviceMock.salir.mockResolvedValue({ id: '10', estado: 'EN_CAMINO' });
     const reqMock: any = { usuario: repartidorAuth, ip: '127.0.0.1' };
-    const res = await controller.salir('10', reqMock);
-    expect(serviceMock.salir).toHaveBeenCalledWith('10', repartidorAuth, '127.0.0.1');
+    const res = await controller.salir('10', {}, reqMock);
+    expect(serviceMock.salir).toHaveBeenCalledWith('10', repartidorAuth, '127.0.0.1', {});
     expect(res.estado).toBe('EN_CAMINO');
   });
 
@@ -146,8 +146,8 @@ describe('RepartosController', () => {
   it('POST /admin/repartos/:id/entregar delega a service.entregar', async () => {
     serviceMock.entregar.mockResolvedValue({ id: '10', estado: 'ENTREGADO' });
     const reqMock: any = { usuario: repartidorAuth, ip: '127.0.0.1' };
-    const res = await controller.entregar('10', reqMock);
-    expect(serviceMock.entregar).toHaveBeenCalledWith('10', repartidorAuth, '127.0.0.1');
+    const res = await controller.entregar('10', { forzarSinCobro: true, motivo: 'Cliente pagó por otro medio' }, reqMock);
+    expect(serviceMock.entregar).toHaveBeenCalledWith('10', repartidorAuth, '127.0.0.1', { forzarSinCobro: true, motivo: 'Cliente pagó por otro medio' });
     expect(res.estado).toBe('ENTREGADO');
   });
 

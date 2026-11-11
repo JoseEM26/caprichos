@@ -271,7 +271,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n, pago_estado: 'PAGADO',
         estado: 'LISTO',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -288,7 +288,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 11n,
         codigo: 'CP-W002',
-        modalidad: 'RECOGER',
+        modalidad: 'RECOGER', pago_estado: 'PAGADO',
         estado: 'LISTO',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -322,7 +322,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n, pago_estado: 'PAGADO',
         estado: 'EN_CAMINO',
         repartidor_party_id: 55n,
       };

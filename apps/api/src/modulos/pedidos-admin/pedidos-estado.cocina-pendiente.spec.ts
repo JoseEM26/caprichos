@@ -60,7 +60,7 @@ describe('Cocina manda: LISTO y ENTREGADO exigen comandas despejadas', () => {
     ['MESA', 'LISTO', 'ENTREGADO'],
     ['RECOGER', 'LISTO', 'ENTREGADO'],
   ])('%s %s -> %s con áreas pendientes: 409 COCINA_PENDIENTE con áreas', async (modalidad, desde, hacia) => {
-    Object.assign(pedido, { modalidad, estado: desde, zona_id: 1n, entrega_lat: -12, entrega_lng: -77 });
+    Object.assign(pedido, { modalidad, estado: desde, pago_estado: 'PAGADO', zona_id: 1n, entrega_lat: -12, entrega_lng: -77 });
     pendientes([1n, 'Cocina caliente'], [2n, 'Bebidas']);
     const err: any = await service.cambiarEstado(10n, { estado: hacia }, cajero).catch((e) => e);
     expect(err.getStatus()).toBe(409);

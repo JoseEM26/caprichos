@@ -272,9 +272,19 @@ describe('ComandasService: listo por producto y despacho', () => {
       expect(salon.marcarEntregadoMesa).toHaveBeenCalledWith(1n, usuario, undefined);
     });
 
+    it('para llevar sin cobrar con todo despachado: se queda en LISTO hasta que Caja cobre', async () => {
+      prisma.pedido.findUnique.mockResolvedValue(
+        pedidoBd({ estado: 'LISTO', modalidad: 'LLEVAR', pago_estado: 'PENDIENTE', lineas: [linea(10n, 2, 2, 0)] }),
+      );
+
+      await service.despachar(1n, undefined, usuario);
+
+      expect(prisma.pedido.update).not.toHaveBeenCalled();
+    });
+
     it('para llevar con todo despachado: pasa a ENTREGADO con historial, sin marcar mesa', async () => {
       prisma.pedido.findUnique.mockResolvedValue(
-        pedidoBd({ estado: 'LISTO', modalidad: 'RECOGER', lineas: [linea(10n, 2, 2, 0)] }),
+        pedidoBd({ estado: 'LISTO', modalidad: 'RECOGER', pago_estado: 'PAGADO', lineas: [linea(10n, 2, 2, 0)] }),
       );
 
       await service.despachar(1n, undefined, usuario);

@@ -24,4 +24,9 @@ export class CerrarCajaDto {
   @IsOptional()
   @IsString()
   nota?: string;
+
+  /** Solo el administrador: cierra con pedidos entregados sin cobrar, justificándolos (mínimo 10 caracteres). */
+  @IsOptional()
+  @IsString()
+  motivoEntregadosSinCobrar?: string;
 }

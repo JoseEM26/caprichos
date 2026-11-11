@@ -7,6 +7,7 @@ import { pedidosApi, type Pedido } from './pedidosApi';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { ModalCobrar } from './ModalCobrar';
 import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
+import { useAvisoCobroPendiente } from './avisoCobroPendiente';
 import { esDeliveryContraEntrega } from './mediosPago';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import { esCerrado, esPorConfirmar, estadoVisual } from './estadosCaja';
@@ -107,10 +108,11 @@ export function useAccionesCaja({ alActualizar, abrirDetalle }: Opciones): {
   const [error, setError] = useState<string | null>(null);
 
   const { manejar: avisoCocina, dialogo: dialogoCocina } = useAvisoCocinaPendiente(() => alActualizar());
+  const { manejar: avisoCobro, dialogo: dialogoCobro } = useAvisoCobroPendiente(() => alActualizar());
 
   const accionDe = useCallback((p: Pedido) => accionDePedido(p, tiene), [tiene]);
 
-  const correr = async (fn: () => Promise<void>, pedido?: { id: string | number; estado: string }) => {
+  const correr = async (fn: () => Promise<void>, pedido?: { id: string | number; estado: string; cobrar?: () => void }) => {
     setProcesando(true);
     setError(null);
     try {
@@ -118,6 +120,7 @@ export function useAccionesCaja({ alActualizar, abrirDetalle }: Opciones): {
       alActualizar();
     } catch (err: any) {
       if (pedido && avisoCocina(err, pedido.id, pedido.estado)) return;
+      if (pedido && avisoCobro(err, pedido.id, pedido.estado, pedido.cobrar)) return;
       setError(err?.message || 'No se pudo completar la acción');
     } finally {
       setProcesando(false);
@@ -138,7 +141,7 @@ export function useAccionesCaja({ alActualizar, abrirDetalle }: Opciones): {
       });
     }
     const nuevo = a.nuevoEstado as string;
-    const cambiar = () => correr(() => pedidosApi.cambiarEstado(p.id, nuevo).then(() => undefined), { id: p.id, estado: nuevo });
+    const cambiar = () => correr(() => pedidosApi.cambiarEstado(p.id, nuevo).then(() => undefined), { id: p.id, estado: nuevo, cobrar: () => setCobroDe(p) });
     setPendiente({
       titulo: `¿${a.texto === 'LISTO' ? 'Marcar como listo' : a.texto === 'PREPARAR' ? 'Pasar a preparar' : a.texto === 'ENVIAR' ? 'Enviar con repartidor' : 'Entregar al cliente'} ${p.codigo}?`,
       mensaje: `El pedido pasa a «${nuevo === 'PREPARANDO' ? 'En preparación' : nuevo === 'LISTO' ? 'Listo' : nuevo === 'EN_CAMINO' ? 'En camino' : 'Entregado'}».`,
@@ -152,6 +155,7 @@ export function useAccionesCaja({ alActualizar, abrirDetalle }: Opciones): {
     <>
       {dialogoImpresion}
       {dialogoCocina}
+      {dialogoCobro}
       {error && (
         <div
           role="alert"

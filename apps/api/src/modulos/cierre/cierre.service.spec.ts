@@ -734,6 +734,50 @@ describe('CierreService', () => {
     });
   });
 
+  describe('7.b entregados sin cobrar impiden cerrar (salvo justificación del ADMIN)', () => {
+    const llevarEntregado = { id: 5n, codigo: 'CP-0005', modalidad: 'LLEVAR', pago_estado: 'PENDIENTE', pago_metodo: null, total: 30, planPago: [] };
+    const cerrarDto = { conteo: { '200': 1 }, medios: { yape: 200 } };
+
+    it('409 ENTREGADOS_SIN_COBRAR con la lista; el cajero no puede justificar', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      prismaMock.pedido.findMany.mockResolvedValue([llevarEntregado]);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoEntregadosSinCobrar: 'Motivo suficientemente largo' }, mockUsuarioCajero).catch((x) => x);
+      expect(e.getStatus()).toBe(HttpStatus.CONFLICT);
+      expect(e.getResponse()).toMatchObject({ codigo: 'ENTREGADOS_SIN_COBRAR', puedeJustificar: false });
+      expect(e.getResponse().entregadosSinCobrar).toEqual([{ id: 5, codigo: 'CP-0005', modalidad: 'LLEVAR', pagoEstado: 'PENDIENTE', total: 30 }]);
+    });
+
+    it('el ADMIN sin motivo recibe 409 con puedeJustificar', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      prismaMock.pedido.findMany.mockResolvedValue([llevarEntregado]);
+      const e: any = await service.cerrar(cerrarDto, mockUsuarioAdmin).catch((x) => x);
+      expect(e.getResponse()).toMatchObject({ codigo: 'ENTREGADOS_SIN_COBRAR', puedeJustificar: true });
+    });
+
+    it('el ADMIN con motivo cierra y deja auditoría CIERRE_ENTREGADOS_SIN_COBRO', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      prismaMock.pedido.findMany.mockResolvedValueOnce([llevarEntregado]);
+      await service.cerrar({ ...cerrarDto, motivoEntregadosSinCobrar: 'Se cobra al cliente mañana' }, mockUsuarioAdmin);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'CIERRE_ENTREGADOS_SIN_COBRO', motivo: 'Se cobra al cliente mañana' }),
+      );
+    });
+
+    it('si además hay un pedido en curso (no entregado), sigue COBROS_EN_CURSO aunque el ADMIN justifique', async () => {
+      prismaMock.pedido.count.mockResolvedValue(2);
+      prismaMock.pedido.findMany.mockResolvedValue([llevarEntregado]);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoEntregadosSinCobrar: 'Se cobra al cliente mañana' }, mockUsuarioAdmin).catch((x) => x);
+      expect(e.getResponse().codigo).toBe('COBROS_EN_CURSO');
+    });
+
+    it('un entregado de mesa sin cobrar no se puede justificar: sigue COBROS_EN_CURSO', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      prismaMock.pedido.findMany.mockResolvedValue([{ ...llevarEntregado, modalidad: 'MESA' }]);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoEntregadosSinCobrar: 'Se cobra al cliente mañana' }, mockUsuarioAdmin).catch((x) => x);
+      expect(e.getResponse().codigo).toBe('COBROS_EN_CURSO');
+    });
+  });
+
   // -------------------------------------------------------------------------
   // 8. Montos esperados del sistema (solo ADMIN)
   // -------------------------------------------------------------------------

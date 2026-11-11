@@ -287,6 +287,7 @@ function SeguimientoRepartosView() {
         alConfirmar={acciones.confirmarAccion.ejecutar}
         alCancelar={acciones.cerrarConfirmacion}
       />
+      {acciones.dialogoCobro}
     </div>
   );
 }

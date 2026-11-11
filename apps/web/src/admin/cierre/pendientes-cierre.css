@@ -428,3 +428,27 @@
 .pdc-avisos .pdc-boton {
   flex: 1 1 180px;
 }
+
+.pdc-justificar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--cp-line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.pdc-justificar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  font-weight: 700;
+}
+.pdc-justificar input {
+  font: inherit;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--cp-line);
+}

@@ -17,6 +17,7 @@ import { CobrosService } from '../caja/cobros.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
 import { ComandasService, exigirCocinaDespejada } from '../cocina';
+import { exigirCobroAntesDeEntregar } from '../pedidos';
 import {
   BadRequestException,
   ConflictException,
@@ -1289,6 +1290,16 @@ export class PedidosEstadoService {
       });
     }
 
+    // Cobro antes de entregar (Para llevar, Recoger, Delivery digital): a la salida o a ENTREGADO solo con el pedido
+    // pagado; el administrador puede entregar sin cobrar con motivo. Va antes de Cocina para no despejar nada si falla.
+    let forzadoSinCobro = false;
+    if (nuevoEstado === 'EN_CAMINO' || nuevoEstado === 'ENTREGADO') {
+      forzadoSinCobro = await exigirCobroAntesDeEntregar(this.prisma, pedido as any, usuarioActual, {
+        forzar: dto.forzarSinCobro === true,
+        motivo: dto.motivo,
+      });
+    }
+
     // Cocina manda: a LISTO o ENTREGADO solo con todas sus áreas despejadas (el administrador puede forzar con motivo)
     let forzadoAreas: string[] = [];
     if (nuevoEstado === 'LISTO' || nuevoEstado === 'ENTREGADO') {
@@ -1368,6 +1379,22 @@ export class PedidosEstadoService {
         entidadId: pedido.id,
         antes: { estado: estadoAnterior },
         despues: { estado: nuevoEstado, areasPendientes: forzadoAreas, forzadoPorAdministrador: true },
+        motivo: dto.motivo?.trim(),
+        partyId: usuarioActual.partyId,
+        ip,
+      });
+    }
+
+    if (forzadoSinCobro) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'pedidos',
+        accion: 'PEDIDO_FORZAR_SIN_COBRO',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        antes: { estado: estadoAnterior, pagoEstado: pedido.pago_estado },
+        despues: { estado: nuevoEstado, pagoEstado: pedido.pago_estado, forzadoPorAdministrador: true },
         motivo: dto.motivo?.trim(),
         partyId: usuarioActual.partyId,
         ip,

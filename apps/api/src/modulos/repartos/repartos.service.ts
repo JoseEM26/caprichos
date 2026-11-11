@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { exigirCobroAntesDeEntregar, requiereCobroAntesDeEntregar } from '../pedidos';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -1356,7 +1357,7 @@ export class RepartosService {
    * LISTO -> EN_CAMINO, salio_en = ahora.
    * Registra aviso 1 «En camino» en mensaje_reparto como PENDIENTE.
    */
-  async salir(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
+  async salir(id: string | bigint, usuario: UsuarioAutenticado, ip?: string, sinCobro?: { forzarSinCobro?: boolean; motivo?: string }) {
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
     const config = await this.obtenerParametrosReparto();
@@ -1389,6 +1390,12 @@ export class RepartosService {
         mensaje: `Solo se puede salir con un pedido en estado LISTO (estado actual: ${pedido.estado})`,
       });
     }
+
+    // Delivery digital: no sale sin cobrar (el efectivo contra entrega sí sale); solo el ADMIN fuerza con motivo
+    const forzadoSinCobro = await exigirCobroAntesDeEntregar(this.prisma, pedido as any, usuario, {
+      forzar: sinCobro?.forzarSinCobro === true,
+      motivo: sinCobro?.motivo,
+    });
 
     const ahora = new Date();
 
@@ -1431,6 +1438,7 @@ export class RepartosService {
       partyId,
       ip,
     });
+    if (forzadoSinCobro) await this.auditarSinCobro(pedido, 'EN_CAMINO', sinCobro?.motivo, partyId, ip);
 
     // WebSocket
     this.eventosGateway?.emitirAdmin('pedido:estado', {
@@ -1535,6 +1543,23 @@ export class RepartosService {
     return this.formatearPedidoReparto(pedidoActualizado, config, ahora, usuario);
   }
 
+  /** Auditoría del ADMIN que despacha o entrega sin cobrar (mismo patrón que forzar sin Cocina). */
+  private async auditarSinCobro(pedido: any, hacia: string, motivo: string | undefined, partyId: bigint, ip?: string) {
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'pedidos',
+      accion: 'PEDIDO_FORZAR_SIN_COBRO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      antes: { estado: pedido.estado, pagoEstado: pedido.pago_estado },
+      despues: { estado: hacia, pagoEstado: pedido.pago_estado, forzadoPorAdministrador: true },
+      motivo: motivo?.trim(),
+      partyId,
+      ip,
+    });
+  }
+
   /**
    * 2) POST /admin/repartos/:id/entregar (repartos/entregar):
    * EN_CAMINO -> ENTREGADO, entregado_en = ahora.
@@ -1544,6 +1569,7 @@ export class RepartosService {
     id: string | bigint,
     usuario: UsuarioAutenticado,
     ip?: string,
+    sinCobro?: { forzarSinCobro?: boolean; motivo?: string },
   ) {
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
@@ -1584,6 +1610,12 @@ export class RepartosService {
         mensaje: 'Asigna un repartidor antes de marcar el pedido como entregado',
       });
     }
+
+    // Delivery digital sin cobrar no se entrega (el efectivo contra entrega sí: lo rinde el repartidor); solo el ADMIN fuerza
+    const forzadoSinCobro = await exigirCobroAntesDeEntregar(this.prisma, pedido as any, usuario, {
+      forzar: sinCobro?.forzarSinCobro === true,
+      motivo: sinCobro?.motivo,
+    });
 
     const ahora = new Date();
 
@@ -1639,6 +1671,7 @@ export class RepartosService {
       partyId,
       ip,
     });
+    if (forzadoSinCobro) await this.auditarSinCobro(pedido, 'ENTREGADO', sinCobro?.motivo, partyId, ip);
 
     // WebSocket
     this.eventosGateway?.emitirAdmin('pedido:estado', {
@@ -2112,7 +2145,7 @@ export class RepartosService {
     perdidos: Array<{
       pedidoId: string;
       codigo: string;
-      motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+      motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO' | 'COBRO_PENDIENTE';
       tomadoPor?: string;
     }>;
   }> {
@@ -2148,7 +2181,7 @@ export class RepartosService {
         const perdidos: Array<{
           pedidoId: string;
           codigo: string;
-          motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO';
+          motivo: 'OTRO_REPARTIDOR' | 'NO_DISPONIBLE' | 'LIMITE' | 'ANULADO' | 'COBRO_PENDIENTE';
           tomadoPor?: string;
         }> = [];
 
@@ -2167,7 +2200,8 @@ export class RepartosService {
         // 1. Bloqueo pesimista determinista SELECT ... FOR UPDATE en orden de ID
         const lockedRows: any[] = await tx.$queryRaw`
           SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
-                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng,
+                 p.pago_estado, p.pago_metodo, p.total
           FROM pedido p
           WHERE p.id IN (${Prisma.join(idsOrdenadosAsc)})
           ORDER BY p.id ASC
@@ -2233,7 +2267,10 @@ export class RepartosService {
 
           // Idempotencia: el pedido ya pertenecía a este mismo repartidor
           if (esMio) {
-            if (p.estado === 'LISTO') {
+            if (p.estado === 'LISTO' && (await requiereCobroAntesDeEntregar(this.prisma, p))) {
+              // Delivery digital sin cobrar: el repartidor no sale con él (Caja lo cobra o el ADMIN lo despacha)
+              perdidos.push({ pedidoId: idStr, codigo: p.codigo, motivo: 'COBRO_PENDIENTE' });
+            } else if (p.estado === 'LISTO') {
               // Estaba asignado pero aún no había salido -> sale ahora
               await tx.pedido.update({
                 where: { id: p.id },
@@ -2317,6 +2354,12 @@ export class RepartosService {
               codigo: p.codigo,
               motivo: 'NO_DISPONIBLE',
             });
+            continue;
+          }
+
+          // Delivery digital sin cobrar no sale a reparto
+          if (await requiereCobroAntesDeEntregar(this.prisma, p)) {
+            perdidos.push({ pedidoId: idStr, codigo: p.codigo, motivo: 'COBRO_PENDIENTE' });
             continue;
           }
 
@@ -3085,7 +3128,8 @@ export class RepartosService {
       async (tx) => {
         const bloqueadas: any[] = await tx.$queryRaw`
           SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
-                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng,
+                 p.pago_estado, p.pago_metodo, p.total
           FROM pedido p
           WHERE p.id IN (${Prisma.join(idsAsc)})
           ORDER BY p.id ASC
@@ -3285,7 +3329,8 @@ export class RepartosService {
       async (tx) => {
         const bloqueadas: any[] = await tx.$queryRaw`
           SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
-                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng,
+                 p.pago_estado, p.pago_metodo, p.total
           FROM pedido p
           WHERE p.id IN (${Prisma.join(idsAsc)})
           ORDER BY p.id ASC

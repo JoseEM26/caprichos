@@ -1586,6 +1586,7 @@ export function RepartidorView() {
         alConfirmar={acciones.confirmarAccion.ejecutar}
         alCancelar={acciones.cerrarConfirmacion}
       />
+      {acciones.dialogoCobro}
       <Confirmar
         abierto={confirmarSalida}
         titulo="Cerrar sesión"
