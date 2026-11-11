@@ -1421,7 +1421,7 @@ export function ModalNuevoPedidoMesa({
             ...(capacidadAceptada ? { confirmarCapacidad: true } : {}),
             esPersonal: pideMode === 'personal',
             ...(personalPide
-              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Number(cliPagaCon) : undefined } : {}) } }
+              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Math.round(Number(cliPagaCon) * 100) / 100 : undefined } : {}) } }
               : {}),
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
@@ -1478,7 +1478,7 @@ export function ModalNuevoPedidoMesa({
             ...(puntosCanje > 0 ? { puntosCanje } : {}),
             esPersonal: pideMode === 'personal',
             ...(personalPide
-              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Number(cliPagaCon) : undefined } : {}) } }
+              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Math.round(Number(cliPagaCon) * 100) / 100 : undefined } : {}) } }
               : {}),
             colaboradorPartyId: staffElegido?.partyId,
             canal: canalEnvio,
