@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { inicioDiaLimaIso, finDiaLimaIso } from '../../comun/fechas-lima';
+import { inicioDiaLimaIso, finDiaLimaIso, horaLimaEntera } from '../../comun/fechas-lima';
 import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
@@ -12,6 +12,7 @@ import {
   ReporteItemCatalogo,
   KpiItem,
   PuntoEntregaMapa,
+  ResumenEscritorio,
   ZonaVentasFila,
   RadioDistanciaFila,
 } from './informes.tipos';
@@ -42,6 +43,54 @@ export const CATALOGO_REPORTES = [
   { id: 'repartidor', n: 'Delivery por repartidor', cat: 'Delivery', que: 'Pedidos y monto que lleva cada repartidor.', fil: 'Fecha, repartidor', exp: 'PDF · Excel' },
   { id: 'zonas', n: 'Delivery por zona', cat: 'Delivery', que: 'Pedidos a domicilio por barrio, para ver dónde conviene reforzar el reparto.', fil: 'Fecha, zona', exp: 'PDF' },
 ];
+
+/** Meta de entrega del local: 13 minutos. */
+const META_ENTREGA_MIN = 13;
+const SIN_COMPARAR = { dTxt: 'Sin datos del período anterior', dCol: 'var(--cp-soft)' };
+const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+/** Colores con contraste sobre fondo claro; los gráficos además rotulan cada serie con texto. */
+const COLORES_SERIE = ['#E67929', '#0B2C3E', '#2B824E', '#8B5CF6', '#D99E39', '#3B82F6', '#EC4899'];
+
+/** Grupos de canal del filtro del escritorio: el primero que coincide gana (un delivery por WhatsApp cuenta en WhatsApp). */
+const GRUPOS_CANAL = [
+  { id: 'salon', nombre: 'Salón', color: '#E67929' },
+  { id: 'delivery', nombre: 'Delivery', color: '#0B2C3E' },
+  { id: 'web', nombre: 'Web (recojo)', color: '#D99E39' },
+  { id: 'whatsapp', nombre: 'WhatsApp', color: '#2B824E' },
+] as const;
+
+const MODALIDADES = [
+  { nombre: 'En el local', color: '#E67929' },
+  { nombre: 'Para llevar', color: '#D99E39' },
+  { nombre: 'Delivery', color: '#0B2C3E' },
+  { nombre: 'Otra', color: '#8B5CF6' },
+] as const;
+
+const MODALIDAD_LOCAL = ['MESA', 'COMER_LOCAL', 'LOCAL', 'SALON'];
+const MODALIDAD_LLEVAR = ['LLEVAR', 'RECOGER', 'RECOJO'];
+
+export function grupoDePedido(p: { canal: string | null; modalidad: string | null }): (typeof GRUPOS_CANAL)[number]['id'] {
+  const c = (p.canal || '').toUpperCase();
+  const m = (p.modalidad || '').toUpperCase();
+  if (c === 'WHATSAPP' || c === 'BOT') return 'whatsapp';
+  if (m === 'DELIVERY' || c === 'DELIVERY') return 'delivery';
+  if (MODALIDAD_LOCAL.includes(m) || c === 'MOZO' || c === 'LOCAL' || c === 'CAJA') return 'salon';
+  return 'web';
+}
+
+const nombreModalidad = (modalidad: string | null): (typeof MODALIDADES)[number]['nombre'] => {
+  const m = (modalidad || '').toUpperCase();
+  if (MODALIDAD_LOCAL.includes(m)) return 'En el local';
+  if (MODALIDAD_LLEVAR.includes(m)) return 'Para llevar';
+  if (m === 'DELIVERY') return 'Delivery';
+  return 'Otra';
+};
+
+const MEDIOS: Record<string, string> = { EFECTIVO: 'Efectivo', YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia', TARJETA: 'Tarjeta' };
+const medioLegible = (medio: string) => MEDIOS[(medio || '').toUpperCase()] ?? 'Otro';
+
+const diaLima = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(d);
+const diaSemanaLima = (d: Date): number => new Date(`${diaLima(d)}T12:00:00Z`).getUTCDay();
 
 @Injectable()
 export class InformesService {
@@ -79,332 +128,218 @@ export class InformesService {
   }
 
   /**
-   * Resumen ejecutivo y estadístico para el Escritorio de Administrador
-   * Calcula todos los KPIs, gráficos y tareas pendientes desde la base de datos real.
+   * Escritorio del ADMIN: KPIs, gráficos y tareas pendientes desde la base de datos real.
+   * Dinero del negocio (ventas, ticket, comparativos, montos por canal, medio de pago, categoría o producto, por cobrar)
+   * SOLO sale para ADMIN. Para cualquier otra cuenta el servidor arma la respuesta sin esos campos: conteos y tiempos.
    */
-  async obtenerResumen(filtro: FiltroInformeDto) {
-    const where = this.armarWherePedidos(filtro);
+  async obtenerResumen(filtro: FiltroInformeDto, usuario?: { rol: string; roles?: string[] }): Promise<ResumenEscritorio> {
+    const esAdmin = !!usuario && (usuario.roles ?? [usuario.rol]).includes('ADMIN');
+    // El filtro de canal del escritorio usa grupos (Salón, Delivery, Web, WhatsApp): se aplica sobre los pedidos ya traídos
+    const grupoCanal = GRUPOS_CANAL.find((g) => g.id === (filtro.canal ?? '').toLowerCase());
+    const where = this.armarWherePedidos(grupoCanal ? { ...filtro, canal: undefined } : filtro);
+    const delGrupo = <T extends { canal: string | null; modalidad: string | null }>(ps: T[]) =>
+      grupoCanal ? ps.filter((p) => grupoDePedido(p) === grupoCanal.id) : ps;
+    const sumar = (ns: number[]) => ns.reduce((a, b) => a + b, 0);
+    const media = (ns: number[]) => (ns.length ? Math.round(sumar(ns) / ns.length) : 0);
 
-    // Consulta de pedidos del período
-    const pedidos = await this.prisma.pedido.findMany({
-      where,
-      include: {
-        lineas: { include: { producto: { include: { categoria: true } } } },
-        cobros: { include: { pagos: true } },
-      },
-      orderBy: { creado_en: 'asc' },
-    });
+    const pedidos = delGrupo(
+      await this.prisma.pedido.findMany({
+        where,
+        include: {
+          lineas: { include: { producto: { include: { categoria: true } } } },
+          cobros: { include: { pagos: true } },
+        },
+        orderBy: { creado_en: 'asc' },
+      }),
+    );
 
     const noRechazados = pedidos.filter((p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO');
-    const totalVentas = noRechazados.reduce((acc, p) => acc + Number(p.total || 0), 0);
+    const totalVentas = sumar(noRechazados.map((p) => Number(p.total || 0)));
     const cantidadPedidos = noRechazados.length;
     const ticketPromedio = cantidadPedidos > 0 ? totalVentas / cantidadPedidos : 0;
 
-    // Tiempos reales de entrega (creado a entregado de los pedidos entregados)
-    const pedidosEntregados = noRechazados.filter((p) => p.entregado_en);
-    const tiempos = pedidosEntregados.map((p) => {
-      const fin = p.entregado_en!.getTime();
-      const inicio = (p.creado_en || p.confirmado_en)!.getTime();
-      return Math.max(1, Math.round((fin - inicio) / 60000));
-    });
-    const tiempoEntregaPromedio =
-      tiempos.length > 0 ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) : 0;
-
-    // Comparación con período anterior de la misma duración
-    let dTxtVentas = 'Sin datos del período anterior';
-    let dColVentas = 'var(--cp-soft)';
-    let dTxtPedidos = 'Sin datos del período anterior';
-    let dColPedidos = 'var(--cp-soft)';
-    let dTxtTicket = 'Sin datos del período anterior';
-    let dColTicket = 'var(--cp-soft)';
-
-    if (filtro.desde && filtro.hasta) {
-      const d1 = inicioDiaLimaIso(filtro.desde).getTime();
-      const d2 = finDiaLimaIso(filtro.hasta).getTime();
-      const duracionMs = Math.max(86400000, d2 - d1);
-      const prevHasta = new Date(d1 - 1);
-      const prevDesde = new Date(d1 - duracionMs);
-
-      const pedidosAnteriores = await this.prisma.pedido.findMany({
-        where: {
-          creado_en: { gte: prevDesde, lte: prevHasta },
-          estado: { notIn: ['RECHAZADO', 'ANULADO'] },
-        },
-      });
-      const prevTotal = pedidosAnteriores.reduce((acc, p) => acc + Number(p.total || 0), 0);
-      const prevCant = pedidosAnteriores.length;
-      const prevTicket = prevCant > 0 ? prevTotal / prevCant : 0;
-
-      if (prevTotal > 0) {
-        const diffV = ((totalVentas - prevTotal) / prevTotal) * 100;
-        dTxtVentas = `${diffV >= 0 ? '+' : ''}${diffV.toFixed(1)}% frente al período anterior`;
-        dColVentas = diffV >= 0 ? 'var(--cp-ok)' : 'var(--cp-rust)';
-      }
-      if (prevCant > 0) {
-        const diffP = ((cantidadPedidos - prevCant) / prevCant) * 100;
-        dTxtPedidos = `${diffP >= 0 ? '+' : ''}${diffP.toFixed(1)}% frente al período anterior`;
-        dColPedidos = diffP >= 0 ? 'var(--cp-ok)' : 'var(--cp-rust)';
-      }
-      if (prevTicket > 0) {
-        const diffT = ((ticketPromedio - prevTicket) / prevTicket) * 100;
-        dTxtTicket = `${diffT >= 0 ? '+' : ''}${diffT.toFixed(1)}% frente al período anterior`;
-        dColTicket = diffT >= 0 ? 'var(--cp-ok)' : 'var(--cp-rust)';
-      }
-    }
-
-    const dTxtEntrega =
-      tiempoEntregaPromedio > 0
-        ? tiempoEntregaPromedio <= 13
-          ? 'Meta 13 min · Cumple la meta'
-          : `Meta 13 min · +${tiempoEntregaPromedio - 13} min sobre la meta`
-        : 'Sin datos en el período';
-    const dColEntrega =
-      tiempoEntregaPromedio > 0
-        ? tiempoEntregaPromedio <= 13
-          ? 'var(--cp-ok)'
-          : 'var(--cp-rust)'
-        : 'var(--cp-soft)';
+    // Tiempo real de entrega: de creado a entregado, en minutos
+    const minutosEntrega = (p: { entregado_en: Date | null; creado_en: Date | null; confirmado_en: Date | null }) =>
+      Math.max(1, Math.round((p.entregado_en!.getTime() - (p.creado_en || p.confirmado_en)!.getTime()) / 60000));
+    const tiempoEntregaPromedio = media(noRechazados.filter((p) => p.entregado_en).map(minutosEntrega));
 
     const kpisS: KpiItem[] = [
-      { n: 'VENTAS', v: this.soles(totalVentas), dTxt: dTxtVentas, dCol: dColVentas },
-      { n: 'PEDIDOS', v: String(cantidadPedidos), dTxt: dTxtPedidos, dCol: dColPedidos },
-      { n: 'TICKET PROMEDIO', v: this.soles(ticketPromedio), dTxt: dTxtTicket, dCol: dColTicket },
+      ...(esAdmin ? [{ n: 'VENTAS', v: this.soles(totalVentas), ...SIN_COMPARAR }] : []),
+      { n: 'PEDIDOS', v: String(cantidadPedidos), ...SIN_COMPARAR },
+      ...(esAdmin ? [{ n: 'TICKET PROMEDIO', v: this.soles(ticketPromedio), ...SIN_COMPARAR }] : []),
       {
         n: 'TIEMPO DE ENTREGA',
         v: tiempoEntregaPromedio > 0 ? `${tiempoEntregaPromedio} min` : '- min',
-        dTxt: dTxtEntrega,
-        dCol: dColEntrega,
+        dTxt:
+          tiempoEntregaPromedio === 0
+            ? 'Sin datos en el período'
+            : tiempoEntregaPromedio <= META_ENTREGA_MIN
+              ? `Meta ${META_ENTREGA_MIN} min · Cumple la meta`
+              : `Meta ${META_ENTREGA_MIN} min · +${tiempoEntregaPromedio - META_ENTREGA_MIN} min sobre la meta`,
+        dCol: tiempoEntregaPromedio === 0 ? 'var(--cp-soft)' : tiempoEntregaPromedio <= META_ENTREGA_MIN ? 'var(--cp-ok)' : 'var(--cp-rust)',
       },
     ];
 
-    // Agrupación real de ventas por canal / modalidad
-    let salonMonto = 0;
-    let deliveryMonto = 0;
-    let webMonto = 0;
-    let wsMonto = 0;
-
-    for (const p of noRechazados) {
-      const monto = Number(p.total || 0);
-      const c = (p.canal || '').toUpperCase();
-      const m = (p.modalidad || '').toUpperCase();
-
-      if (c === 'WHATSAPP') {
-        wsMonto += monto;
-      } else if (m === 'DELIVERY' || c === 'DELIVERY') {
-        deliveryMonto += monto;
-      } else if (m === 'MESA' || c === 'MOZO' || c === 'LOCAL') {
-        salonMonto += monto;
-      } else {
-        webMonto += monto;
-      }
-    }
-
-    const canalesList = [
-      { n: 'Salón', c: '#E67929', monto: salonMonto },
-      { n: 'Delivery', c: '#0B2C3E', monto: deliveryMonto },
-      { n: 'Web (recojo)', c: '#F5C84B', monto: webMonto },
-      { n: 'WhatsApp', c: '#2B824E', monto: wsMonto },
-    ];
-
-    const legend = canalesList.map((cl) => {
-      const pct = totalVentas > 0 ? Math.round((cl.monto / totalVentas) * 100) : 0;
-      return {
-        n: cl.n,
-        v: `${pct} % · ${this.soles(cl.monto)}`,
-        monto: this.soles(cl.monto),
-        c: cl.c,
-        pct,
+    // Comparación con el período anterior de la misma duración, con los mismos filtros (solo ADMIN: son montos)
+    const comparar = async () => {
+      if (!(esAdmin && filtro.desde && filtro.hasta)) return;
+      const d1 = inicioDiaLimaIso(filtro.desde).getTime();
+      const duracionMs = Math.max(86400000, finDiaLimaIso(filtro.hasta).getTime() - d1);
+      const otrosFiltros = { ...where };
+      delete otrosFiltros.creado_en;
+      const anteriores = delGrupo(
+        await this.prisma.pedido.findMany({
+          where: { ...otrosFiltros, creado_en: { gte: new Date(d1 - duracionMs), lte: new Date(d1 - 1) }, estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+          select: { total: true, canal: true, modalidad: true },
+        }),
+      );
+      const prevTotal = sumar(anteriores.map((p) => Number(p.total || 0)));
+      const prevCant = anteriores.length;
+      const variacion = (actual: number, previo: number) => {
+        if (!(previo > 0)) return null;
+        const d = ((actual - previo) / previo) * 100;
+        return { dTxt: `${d >= 0 ? '+' : ''}${d.toFixed(1)}% frente al período anterior`, dCol: d >= 0 ? 'var(--cp-ok)' : 'var(--cp-rust)' };
       };
-    });
-
-    // Pedidos por hora (14:00 a 21:00) en hora de Lima
-    const horasBase = [14, 15, 16, 17, 18, 19, 20, 21];
-    const horasCountMap: Record<number, number> = {};
-    for (const p of noRechazados) {
-      const hStr = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Lima',
-        hour: 'numeric',
-        hour12: false,
-      }).format(new Date(p.creado_en));
-      const h = parseInt(hStr, 10);
-      if (h >= 14 && h <= 21) {
-        horasCountMap[h] = (horasCountMap[h] || 0) + 1;
-      }
-    }
-    const maxHCount = Math.max(...horasBase.map((h) => horasCountMap[h] || 0), 1);
-    const hoursB = horasBase.map((h) => {
-      const v = horasCountMap[h] || 0;
-      const esPunta = v > 0 && v === maxHCount;
-      return {
-        h: `${h}:00`,
-        v,
-        px: `${Math.round((v / maxHCount) * 110)}px`,
-        op: esPunta ? 1 : 0.6,
+      const cambios: Record<string, ReturnType<typeof variacion>> = {
+        VENTAS: variacion(totalVentas, prevTotal),
+        PEDIDOS: variacion(cantidadPedidos, prevCant),
+        'TICKET PROMEDIO': variacion(ticketPromedio, prevCant > 0 ? prevTotal / prevCant : 0),
       };
-    });
-
-    // Top productos y ventas por categoría
-    const prodMap: Record<string, { q: number; sub: number }> = {};
-    const catMap: Record<string, { monto: number; unidades: number }> = {};
-    for (const p of noRechazados) {
-      for (const l of p.lineas) {
-        const prodNombre = l.nombre || l.producto?.nombre || 'Producto';
-        const catNombre = l.producto?.categoria?.nombre || 'General';
-        const q = Number(l.cantidad || 1);
-        const sub = Number(l.subtotal || 0);
-
-        prodMap[prodNombre] = prodMap[prodNombre] || { q: 0, sub: 0 };
-        prodMap[prodNombre].q += q;
-        prodMap[prodNombre].sub += sub;
-
-        catMap[catNombre] = catMap[catNombre] || { monto: 0, unidades: 0 };
-        catMap[catNombre].monto += sub;
-        catMap[catNombre].unidades += q;
-      }
-    }
-
-    const topProdEntries = Object.entries(prodMap)
-      .sort((a, b) => b[1].q - a[1].q)
-      .slice(0, 5);
-    const maxTopQ = Math.max(...topProdEntries.map((e) => e[1].q), 1);
-    const tops2 = topProdEntries.map(([n, d]) => ({
-      n,
-      v: `${d.q} u.`,
-      w: `${Math.round((d.q / maxTopQ) * 100)}%`,
-    }));
-
-    const catColors: Record<string, string> = {
-      Frappes: '#E67929',
-      FRAPPES: '#E67929',
-      Calientes: '#0B2C3E',
-      CALIENTES: '#0B2C3E',
-      Waffles: '#D97706',
-      WAFFLES: '#D97706',
-      Salados: '#10B981',
-      SALADOS: '#10B981',
-      Iced: '#3B82F6',
-      ICED: '#3B82F6',
-      Postres: '#8B5CF6',
-      POSTRES: '#8B5CF6',
-      Combos: '#EC4899',
-      COMBOS: '#EC4899',
+      for (const k of kpisS) if (cambios[k.n]) Object.assign(k, cambios[k.n]);
     };
-    const catEntries = Object.entries(catMap).sort((a, b) => b[1].monto - a[1].monto);
-    const maxCatMonto = Math.max(...catEntries.map((e) => e[1].monto), 1);
-    const cats2 = catEntries.map(([n, d]) => ({
-      n,
-      v: this.soles(d.monto),
-      w: `${Math.round((d.monto / maxCatMonto) * 100)}%`,
-      c: catColors[n] || '#0B2C3E',
-    }));
 
-    // Tareas pendientes "Para hacer ahora" calculadas desde la BD
-    const porConfirmarCount = await this.prisma.pedido.count({ where: { estado: 'NUEVO' } });
-    const enCocinaCount = await this.prisma.pedido.count({
-      where: { estado: { in: ['COLA', 'PREPARACION'] } },
-    });
-    const repartosActivosCount = await this.prisma.pedido.count({ where: { estado: 'RUTA' } });
-    const insumosBajoMinimo = await this.prisma.stock.count({
-      where: { insumo: { activo: true }, cantidad: { lt: 10 } },
-    });
-
+    // Tareas pendientes «Para hacer ahora» (todo el local, no solo el período)
+    const stockActivo = await controlAlmacenActivo(this.prisma);
+    const [, porConfirmarCount, enCocinaCount, repartosActivosCount, insumosBajoMinimo] = await Promise.all([
+      comparar(),
+      this.prisma.pedido.count({ where: { estado: 'NUEVO' } }),
+      this.prisma.pedido.count({ where: { estado: { in: ['COLA', 'PREPARANDO'] } } }),
+      this.prisma.pedido.count({ where: { estado: 'EN_CAMINO' } }),
+      stockActivo ? this.prisma.stock.count({ where: { insumo: { activo: true }, cantidad: { lt: 10 } } }) : Promise.resolve(0),
+    ]);
     const pending = [
       { n: 'Por confirmar', v: porConfirmarCount, view: '/admin/caja' },
       { n: 'En cocina', v: enCocinaCount, view: '/admin/cocina' },
       { n: 'Repartos activos', v: repartosActivosCount, view: '/admin/repartos' },
       // Con el «Control de almacén» apagado no se muestran avisos de insumos
-      ...((await controlAlmacenActivo(this.prisma))
-        ? [{ n: 'Insumos con stock bajo', v: insumosBajoMinimo, view: '/admin/stock' }]
-        : []),
+      ...(stockActivo ? [{ n: 'Insumos con stock bajo', v: insumosBajoMinimo, view: '/admin/stock' }] : []),
     ];
 
-    // Agrupación por días para el gráfico de línea de ventas y entregas en hora de Lima
-    const ventasPorDiaMap: Record<string, { ventas: number; tiempos: number[] }> = {};
+    // Una sola pasada por los pedidos: canal, modalidad, hora, día, día de la semana, medio de pago, productos y categorías
+    type Fila = { pedidos: number; monto: number };
+    const porGrupo = new Map<string, Fila>();
+    const porModalidad = new Map<string, Fila>();
+    const porHora = new Map<number, Fila>();
+    const porDia = new Map<string, Fila>();
+    const entregaPorDia = new Map<string, number[]>();
+    const porSemana = new Map<number, Fila>();
+    const porPago = new Map<string, Fila>();
+    const porProducto = new Map<string, { q: number; monto: number }>();
+    const porCategoria = new Map<string, { monto: number; q: number }>();
+    const acumular = <K>(m: Map<K, Fila>, k: K, monto: number) => {
+      const f = m.get(k) ?? { pedidos: 0, monto: 0 };
+      f.pedidos += 1;
+      f.monto += monto;
+      m.set(k, f);
+    };
     for (const p of noRechazados) {
-      const fLima = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Lima',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(p.creado_en)); // MM-DD
-      ventasPorDiaMap[fLima] = ventasPorDiaMap[fLima] || { ventas: 0, tiempos: [] };
-      ventasPorDiaMap[fLima].ventas += Number(p.total || 0);
-      if (p.entregado_en) {
-        const inicio = (p.creado_en || p.confirmado_en)!.getTime();
-        const fin = p.entregado_en.getTime();
-        const t = Math.max(1, Math.round((fin - inicio) / 60000));
-        ventasPorDiaMap[fLima].tiempos.push(t);
+      const monto = Number(p.total || 0);
+      const dia = diaLima(p.creado_en);
+      acumular(porGrupo, grupoDePedido(p), monto);
+      acumular(porModalidad, nombreModalidad(p.modalidad), monto);
+      acumular(porHora, horaLimaEntera(p.creado_en), monto);
+      acumular(porSemana, diaSemanaLima(p.creado_en), monto);
+      acumular(porDia, dia, monto);
+      if (p.entregado_en) entregaPorDia.set(dia, [...(entregaPorDia.get(dia) ?? []), minutosEntrega(p)]);
+      for (const c of (p.cobros || []).filter((c: any) => !c.anulado_en)) {
+        for (const pg of c.pagos) acumular(porPago, medioLegible(pg.medio), Number(pg.monto || 0));
+      }
+      for (const l of p.lineas) {
+        const nombre = l.nombre || l.producto?.nombre || 'Producto';
+        const cat = l.producto?.categoria?.nombre || 'General';
+        const q = Number(l.cantidad || 1);
+        const sub = Number(l.subtotal || 0);
+        const pr = porProducto.get(nombre) ?? { q: 0, monto: 0 };
+        pr.q += q;
+        pr.monto += sub;
+        porProducto.set(nombre, pr);
+        const ca = porCategoria.get(cat) ?? { monto: 0, q: 0 };
+        ca.monto += sub;
+        ca.q += q;
+        porCategoria.set(cat, ca);
       }
     }
+    // Conteos siempre; montos solo para ADMIN
+    const conMonto = (monto: number) => (esAdmin ? { monto: this.soles(monto), valor: Math.round(monto * 100) / 100 } : {});
+    const pct = (n: number, total: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+    const parte = (f: Fila) => (esAdmin ? pct(f.monto, totalVentas) : pct(f.pedidos, cantidadPedidos));
 
-    const diasKeys = Object.keys(ventasPorDiaMap).sort();
-    let peak = 'Sin ventas en el período';
-    let linePts = '';
-    let lineArea = '';
-    let entPts = '';
-    const xl: { t: string }[] = [];
-    let yTop = 's/ 0.00';
-    let yMid = 's/ 0.00';
+    const legend = GRUPOS_CANAL.map((g) => {
+      const f = porGrupo.get(g.id) ?? { pedidos: 0, monto: 0 };
+      return { n: g.nombre, c: g.color, pedidos: f.pedidos, pct: parte(f), ...conMonto(f.monto) };
+    });
+    const modalidades = MODALIDADES.map((m) => {
+      const f = porModalidad.get(m.nombre) ?? { pedidos: 0, monto: 0 };
+      return { n: m.nombre, c: m.color, pedidos: f.pedidos, pct: parte(f), ...conMonto(f.monto) };
+    });
 
-    if (diasKeys.length > 0) {
-      const maxDiaMonto = Math.max(...diasKeys.map((k) => ventasPorDiaMap[k].ventas), 1);
-      yTop = this.soles(maxDiaMonto);
-      yMid = this.soles(maxDiaMonto / 2);
+    const horasConDatos = [...porHora.keys()];
+    const horaMin = horasConDatos.length ? Math.min(...horasConDatos) : 0;
+    const horaMax = horasConDatos.length ? Math.max(...horasConDatos) : -1;
+    const porHoraLista = Array.from({ length: horaMax - horaMin + 1 }, (_, i) => {
+      const f = porHora.get(horaMin + i) ?? { pedidos: 0, monto: 0 };
+      return { hora: horaMin + i, pedidos: f.pedidos, ...conMonto(f.monto) };
+    });
+    // Lunes primero
+    const porSemanaLista = [1, 2, 3, 4, 5, 6, 0].map((d) => {
+      const f = porSemana.get(d) ?? { pedidos: 0, monto: 0 };
+      return { dia: DIAS_SEMANA[d], pedidos: f.pedidos, ...conMonto(f.monto) };
+    });
+    const porDiaLista = [...porDia.keys()].sort().map((fecha) => {
+      const f = porDia.get(fecha)!;
+      return { fecha, pedidos: f.pedidos, entregaMin: media(entregaPorDia.get(fecha) ?? []), ...conMonto(f.monto) };
+    });
+    const conteoEstados = new Map<string, number>();
+    for (const p of pedidos) conteoEstados.set(p.estado, (conteoEstados.get(p.estado) ?? 0) + 1);
 
-      const diaPico = diasKeys.reduce(
-        (maxK, k) => (ventasPorDiaMap[k].ventas > ventasPorDiaMap[maxK].ventas ? k : maxK),
-        diasKeys[0],
-      );
-      peak = `Pico: ${this.soles(ventasPorDiaMap[diaPico].ventas)} el ${diaPico.replace('-', '/')}`;
-
-      const nP = Math.max(diasKeys.length, 2);
-      const stepX = 600 / (nP - 1);
-
-      const ptsSales: string[] = [];
-      const ptsEnt: string[] = [];
-
-      diasKeys.forEach((k, idx) => {
-        const x = Math.round(idx * stepX);
-        const ySales = Math.round(150 - (ventasPorDiaMap[k].ventas / maxDiaMonto) * 130);
-        ptsSales.push(`${x},${ySales}`);
-
-        const arrT = ventasPorDiaMap[k].tiempos;
-        const promT = arrT.length > 0 ? arrT.reduce((a, b) => a + b, 0) / arrT.length : 0;
-        const yEnt = promT > 0 ? Math.round(150 - (promT / 25) * 130) : 150;
-        ptsEnt.push(`${x},${Math.max(10, Math.min(150, yEnt))}`);
-
-        xl.push({ t: k.replace('-', '/') });
-      });
-
-      linePts = ptsSales.join(' ');
-      lineArea = `0,160 ${ptsSales.join(' ')} 600,160`;
-      entPts = ptsEnt.join(' ');
-    }
-
-    // Por cobrar: aceptados sin entregar ni cobro vigente (misma regla que el catálogo). Rechazados: rechazados + anulados.
-    const porCobrarPedidos = pedidos.filter(
-      (p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && !(p.cobros || []).some((c: any) => !c.anulado_en),
-    );
-    const porCobrar = porCobrarPedidos.reduce((acc, p) => acc + Number(p.total || 0), 0);
-    const rechazados = pedidos.length - noRechazados.length;
-
-    return {
+    // Productos: el ranking es por unidades (operativo); el monto solo sale para ADMIN
+    const tops2 = [...porProducto.entries()]
+      .sort((a, b) => b[1].q - a[1].q)
+      .slice(0, 8)
+      .map(([n, d]) => ({ n, unidades: d.q, ...conMonto(d.monto) }));
+    const base = {
       kpisS,
-      porCobrar: this.soles(porCobrar),
-      rechazados,
-      hoursB,
+      rechazados: pedidos.length - noRechazados.length,
       legend,
+      modalidades,
+      porHora: porHoraLista,
+      porDiaSemana: porSemanaLista,
+      porDia: porDiaLista,
+      porEstado: [...conteoEstados.entries()].map(([estado, n]) => ({ estado, n })),
       tops2,
-      cats2,
       pending,
-      tBaseN: 13,
-      metaY: 60,
-      yTop,
-      yMid,
-      peak,
-      linePts,
-      lineArea,
-      entPts,
-      xl,
+      metaEntregaMin: META_ENTREGA_MIN,
+    };
+    if (!esAdmin) return base;
+
+    // Solo ADMIN: por cobrar (aceptados sin entregar ni cobro vigente), medios de pago, categorías y el día pico
+    const porCobrar = sumar(
+      pedidos
+        .filter((p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && !(p.cobros || []).some((c: any) => !c.anulado_en))
+        .map((p) => Number(p.total || 0)),
+    );
+    const diaPico = porDiaLista.reduce<(typeof porDiaLista)[number] | null>((m, d) => (!m || (d.valor ?? 0) > (m.valor ?? 0) ? d : m), null);
+    const totalPagos = sumar([...porPago.values()].map((f) => f.monto));
+    return {
+      ...base,
+      porCobrar: this.soles(porCobrar),
+      peak: diaPico ? `Pico: ${diaPico.monto} el ${diaPico.fecha.slice(8)}/${diaPico.fecha.slice(5, 7)}` : 'Sin ventas en el período',
+      pagos: [...porPago.entries()]
+        .sort((a, b) => b[1].monto - a[1].monto)
+        .map(([n, f], i) => ({ n, c: COLORES_SERIE[i % COLORES_SERIE.length], pedidos: f.pedidos, pct: pct(f.monto, totalPagos), ...conMonto(f.monto) })),
+      cats2: [...porCategoria.entries()]
+        .sort((a, b) => b[1].monto - a[1].monto)
+        .map(([n, d], i) => ({ n, c: COLORES_SERIE[i % COLORES_SERIE.length], unidades: d.q, ...conMonto(d.monto) })),
     };
   }
 

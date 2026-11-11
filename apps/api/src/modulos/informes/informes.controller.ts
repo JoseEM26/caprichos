@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { InformesService } from './informes.service';
@@ -23,8 +23,8 @@ export class InformesController {
 
   @Get('resumen')
   @Permiso('auditoria', 'ver')
-  obtenerResumen(@Query() filtro: FiltroInformeDto) {
-    return this.informesService.obtenerResumen(filtro);
+  obtenerResumen(@Query() filtro: FiltroInformeDto, @Req() req: any) {
+    return this.informesService.obtenerResumen(filtro, req.usuario);
   }
 
   @Get('catalogo')

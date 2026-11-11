@@ -94,3 +94,39 @@ export interface MapaEntregasData {
   fueraCoberturaTexto: string;
   fueraCoberturaConteo: number;
 }
+
+/** Cifras con monto opcional: el monto solo viaja para ADMIN. */
+interface ConMonto {
+  monto?: string;
+  valor?: number;
+}
+
+export interface FilaGrupoResumen extends ConMonto {
+  n: string;
+  c: string;
+  pedidos: number;
+  pct: number;
+}
+
+/** Respuesta de `GET /admin/informes/resumen`. Los campos marcados «solo ADMIN» no existen en la respuesta de otras cuentas. */
+export interface ResumenEscritorio {
+  kpisS: KpiItem[];
+  rechazados: number;
+  legend: FilaGrupoResumen[];
+  modalidades: FilaGrupoResumen[];
+  porHora: ({ hora: number; pedidos: number } & ConMonto)[];
+  porDiaSemana: ({ dia: string; pedidos: number } & ConMonto)[];
+  porDia: ({ fecha: string; pedidos: number; entregaMin: number } & ConMonto)[];
+  porEstado: { estado: string; n: number }[];
+  tops2: ({ n: string; unidades: number } & ConMonto)[];
+  pending: { n: string; v: number; view: string }[];
+  metaEntregaMin: number;
+  /** Solo ADMIN */
+  porCobrar?: string;
+  /** Solo ADMIN */
+  peak?: string;
+  /** Solo ADMIN */
+  pagos?: FilaGrupoResumen[];
+  /** Solo ADMIN */
+  cats2?: ({ n: string; c: string; unidades: number } & ConMonto)[];
+}

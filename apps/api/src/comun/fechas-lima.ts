@@ -11,3 +11,7 @@ export function sumarDiasIso(fecha: string, dias: number): string {
   const [y, m, d] = fecha.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
 }
+
+/** Hora entera (0 a 23) en Lima de un instante. */
+export const horaLimaEntera = (d: Date): number =>
+  Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Lima', hour: 'numeric', hourCycle: 'h23' }).format(d));

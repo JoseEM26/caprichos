@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InformesService } from './informes.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
+const ADMIN = { rol: 'ADMIN' };
+
 describe('InformesService', () => {
   let service: InformesService;
   let prisma: any;
@@ -169,7 +171,7 @@ describe('InformesService', () => {
 
   describe('obtenerResumen', () => {
     it('calcula ventas, pedidos, ticket promedio y tiempo promedio correctamente', async () => {
-      const resumen = await service.obtenerResumen({});
+      const resumen = await service.obtenerResumen({}, ADMIN);
       expect(resumen.kpisS).toHaveLength(4);
       expect(resumen.kpisS[0].n).toBe('VENTAS');
       expect(resumen.kpisS[0].v).toContain('63.50');
@@ -179,27 +181,80 @@ describe('InformesService', () => {
       expect(resumen.kpisS[2].v).toContain('31.75');
       expect(resumen.kpisS[3].n).toBe('TIEMPO DE ENTREGA');
       expect(resumen.pending).toHaveLength(4);
-      expect(resumen.hoursB.length).toBeGreaterThan(0);
+      expect(resumen.porHora.length).toBeGreaterThan(0);
       expect(resumen.legend.length).toBeGreaterThan(0);
       expect(resumen.tops2.length).toBeGreaterThan(0);
-      expect(resumen.cats2.length).toBeGreaterThan(0);
+      expect(resumen.cats2!.length).toBeGreaterThan(0);
+      expect(resumen.porDiaSemana).toHaveLength(7);
+      expect(resumen.modalidades.find((m) => m.n === 'Delivery')?.pedidos).toBe(1);
+      expect(resumen.porDia[0]).toMatchObject({ fecha: '2026-10-15', pedidos: 2, monto: 's/ 63.50' });
+    });
+
+    it('el filtro de canal del escritorio (Salón, Delivery, Web, WhatsApp) filtra de verdad', async () => {
+      const salon = await service.obtenerResumen({ canal: 'salon' }, ADMIN);
+      expect(salon.kpisS[1].v).toBe('1');
+      expect(salon.kpisS[0].v).toContain('35.50');
+      const delivery = await service.obtenerResumen({ canal: 'delivery' }, ADMIN);
+      expect(delivery.kpisS[1].v).toBe('1');
+      const whatsapp = await service.obtenerResumen({ canal: 'whatsapp' }, ADMIN);
+      expect(whatsapp.kpisS[1].v).toBe('0');
+      // el grupo no se manda a la base como si fuera un canal real
+      expect(prisma.pedido.findMany.mock.calls[0][0].where.canal).toBeUndefined();
+    });
+
+    it('«En cocina» y «Repartos activos» cuentan los estados reales (PREPARANDO y EN_CAMINO)', async () => {
+      await service.obtenerResumen({}, ADMIN);
+      const estados = prisma.pedido.count.mock.calls.map(([a]: any) => JSON.stringify(a.where.estado));
+      expect(estados).toContain(JSON.stringify({ in: ['COLA', 'PREPARANDO'] }));
+      expect(estados).toContain(JSON.stringify('EN_CAMINO'));
+    });
+
+    describe('seguridad por rol: el JSON no lleva dinero si no es ADMIN', () => {
+      const DINERO = /monto|valor|porCobrar|peak|pagos|cats2|s\/\s|VENTAS|TICKET/;
+      const claves = (o: unknown): string[] =>
+        o && typeof o === 'object' ? Object.entries(o).flatMap(([k, v]) => [k, ...claves(v)]) : [];
+
+      it.each([['CAJERO'], ['MOZO'], ['SUPERVISOR'], ['COCINA'], ['MARKETING']])('%s no recibe montos ni ventas', async (rol) => {
+        const r = await service.obtenerResumen({ desde: '2026-10-01', hasta: '2026-10-31' }, { rol });
+        const texto = JSON.stringify(r);
+        expect(claves(r).filter((k) => /^(monto|valor|porCobrar|peak|pagos|cats2)$/.test(k))).toEqual([]);
+        expect(texto).not.toMatch(DINERO);
+        expect(r.kpisS.map((k) => k.n)).toEqual(['PEDIDOS', 'TIEMPO DE ENTREGA']);
+        // lo operativo sí llega
+        expect(r.porHora.length).toBeGreaterThan(0);
+        expect(r.tops2[0].unidades).toBeGreaterThan(0);
+      });
+
+      it('sin usuario no hay dinero; roles combinados sin ADMIN tampoco; con ADMIN en la lista sí', async () => {
+        expect(JSON.stringify(await service.obtenerResumen({}))).not.toMatch(DINERO);
+        const combinado = await service.obtenerResumen({}, { rol: 'CAJERO', roles: ['CAJERO', 'SUPERVISOR', 'COCINA'] });
+        expect(JSON.stringify(combinado)).not.toMatch(DINERO);
+        const admin = await service.obtenerResumen({}, { rol: 'ADMIN', roles: ['ADMIN'] });
+        expect(admin.porCobrar).toBeDefined();
+        expect(admin.pagos).toBeDefined();
+      });
+
+      it('no consulta el período anterior (comparativo de ventas) para quien no es ADMIN', async () => {
+        await service.obtenerResumen({ desde: '2026-10-01', hasta: '2026-10-15' }, { rol: 'SUPERVISOR' });
+        expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('el filtro de fechas es el día de Lima (venta de 20:00 Lima entra en su día) y trae Por cobrar y Rechazados', async () => {
-      await service.obtenerResumen({ desde: '2026-10-05', hasta: '2026-10-05', pago: 'yape', modalidad: 'mesa' });
+      await service.obtenerResumen({ desde: '2026-10-05', hasta: '2026-10-05', pago: 'yape', modalidad: 'mesa' }, ADMIN);
       const where = prisma.pedido.findMany.mock.calls[0][0].where;
       expect(where.creado_en.gte.toISOString()).toBe('2026-10-05T05:00:00.000Z');
       expect(where.creado_en.lte.toISOString()).toBe('2026-10-06T04:59:59.999Z');
       expect(where.pago_metodo).toBe('YAPE');
       expect(where.modalidad).toBe('MESA');
-      const r = await service.obtenerResumen({});
+      const r = await service.obtenerResumen({}, ADMIN);
       expect(typeof r.porCobrar).toBe('string');
       expect(typeof r.rechazados).toBe('number');
     });
 
     it('devuelve estado vacío y "Sin datos del período anterior" cuando no hay pedidos', async () => {
       prisma.pedido.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // sin pedidos actuales ni anteriores
-      const resumen = await service.obtenerResumen({ desde: '2026-01-01', hasta: '2026-01-31' });
+      const resumen = await service.obtenerResumen({ desde: '2026-01-01', hasta: '2026-01-31' }, ADMIN);
       expect(resumen.kpisS[0].v).toBe('s/ 0.00');
       expect(resumen.kpisS[0].dTxt).toBe('Sin datos del período anterior');
       expect(resumen.kpisS[1].v).toBe('0');
@@ -236,7 +291,7 @@ describe('InformesService', () => {
           },
         ]);
 
-      const resumen = await service.obtenerResumen({ desde: '2026-10-01', hasta: '2026-10-15' });
+      const resumen = await service.obtenerResumen({ desde: '2026-10-01', hasta: '2026-10-15' }, ADMIN);
       // (63.5 - 50.0) / 50.0 = +27.0%
       expect(resumen.kpisS[0].dTxt).toContain('+27.0%');
       expect(resumen.kpisS[0].dCol).toBe('var(--cp-ok)');

@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { horaLimaEntera } from '../../comun/fechas-lima';
 import { ROLES } from '../acceso/permisos';
+import { permisosDeCuenta } from '../acceso/roles-usuario';
+import type { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
 /** Estados de pedido que todavía no llegaron al cliente (NUEVO = por confirmar). */
 const NO_ENTREGADOS = ['NUEVO', 'COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
 const PROXIMAS_MAX = 5;
+/** Meta de cocina: un pedido que lleva más de 13 min en cola o preparación está atrasado (misma meta del escritorio del admin). */
+const META_COCINA_MIN = 13;
+const STOCK_BAJO_MENOR_QUE = 10;
+const ROLES_SOLO_REPARTO = ['REPARTIDOR', 'APOYO_DELIVERY'];
 
 /** Día calendario de Lima (YYYY-MM-DD) de un instante. */
 const diaLima = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(d);
@@ -60,25 +67,117 @@ export function proximosCumpleanos(
 }
 
 /**
- * Escritorio operativo del SUPERVISOR: solo conteos, horarios y estados. Nunca montos, ventas ni cobros.
- * Las cifras van en `cantidad`, `ocupadas`... para que ningún campo lleve nombre de dinero.
+ * Escritorio de TODO el personal que no es ADMIN: solo conteos, horarios y estados, nunca dinero (ventas, cobros, propinas,
+ * ticket) ni datos de clientes. Cada bloque se arma SOLO si la persona tiene el permiso del módulo al que pertenece
+ * (la unión de sus roles y permisos extra); el servidor no manda lo que el rol no ve.
  */
 @Injectable()
 export class EscritorioOperativoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async obtener(ahora: Date = new Date()) {
+  /** Permisos efectivos de la cuenta (unión de roles y extras) y respuesta del escritorio. */
+  async mio(usuario: UsuarioAutenticado, ahora: Date = new Date()) {
+    const cuenta = await this.prisma.userAccount.findUnique({ where: { party_id: usuario.partyId }, select: { id: true } });
+    const roles = usuario.roles ?? [usuario.rol];
+    const permisos = cuenta ? await permisosDeCuenta(this.prisma, cuenta.id, roles) : [];
+    return this.miEscritorio(new Set(permisos), roles, usuario.partyId, ahora);
+  }
+
+  async miEscritorio(permisos: ReadonlySet<string>, roles: string[], partyId: bigint, ahora: Date = new Date()) {
+    const puede = (...claves: string[]) => claves.some((c) => permisos.has(c));
     const hoy = diaLima(ahora);
     // Lima no tiene horario de verano: el día empieza a las 05:00 UTC
     const inicioDia = new Date(`${hoy}T00:00:00-05:00`);
     const finDia = new Date(inicioDia.getTime() + 24 * 3600000);
+    const soloReparto = roles.every((r) => ROLES_SOLO_REPARTO.includes(r));
 
-    const [porEstado, reservasHoy, proximas, mesas, mesasOcupadas, caja] = await Promise.all([
+    const [pedidos, reparto, stockBajo, operativo] = await Promise.all([
+      puede('pedidos/ver', 'cocina/ver') ? this.bloquePedidos(ahora, inicioDia, finDia) : undefined,
+      puede('repartos/ver') ? this.bloqueReparto(partyId, soloReparto, inicioDia, finDia) : undefined,
+      puede('stock/ver') ? this.bloqueStockBajo() : undefined,
+      puede('escritorio/operativo') ? this.bloqueSalon(hoy, ahora, inicioDia, finDia) : undefined,
+    ]);
+
+    return { generadoEn: ahora.toISOString(), pedidos, reparto, stockBajo, ...operativo };
+  }
+
+  /** Cola por estado, pedidos por hora de hoy y tiempos de cocina. */
+  private async bloquePedidos(ahora: Date, inicioDia: Date, finDia: Date) {
+    const limite = new Date(ahora.getTime() - META_COCINA_MIN * 60000);
+    const [porEstado, deHoy, atrasados] = await Promise.all([
       this.prisma.pedido.groupBy({
         by: ['estado'],
         where: { estado: { in: NO_ENTREGADOS }, es_personal: false },
         _count: { _all: true },
       }),
+      this.prisma.pedido.findMany({
+        where: { creado_en: { gte: inicioDia, lt: finDia }, es_personal: false, estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+        select: { creado_en: true, pasa_cocina_en: true, listo_en: true },
+      }),
+      this.prisma.pedido.count({
+        where: {
+          estado: { in: ['COLA', 'PREPARANDO'] },
+          es_personal: false,
+          OR: [{ pasa_cocina_en: { lt: limite } }, { pasa_cocina_en: null, creado_en: { lt: limite } }],
+        },
+      }),
+    ]);
+    const contar = (estado: string) => porEstado.find((g) => g.estado === estado)?._count._all ?? 0;
+
+    const conteoHora: Record<number, number> = {};
+    const minutosCocina: number[] = [];
+    for (const p of deHoy) {
+      const h = horaLimaEntera(p.creado_en);
+      conteoHora[h] = (conteoHora[h] ?? 0) + 1;
+      if (p.pasa_cocina_en && p.listo_en) minutosCocina.push(Math.max(1, Math.round((p.listo_en.getTime() - p.pasa_cocina_en.getTime()) / 60000)));
+    }
+    const horas = Object.keys(conteoHora).map(Number);
+    const porHora = horas.length
+      ? Array.from({ length: Math.max(...horas) - Math.min(...horas) + 1 }, (_, i) => Math.min(...horas) + i).map((h) => ({ hora: h, pedidos: conteoHora[h] ?? 0 }))
+      : [];
+
+    return {
+      porConfirmar: contar('NUEVO'),
+      enPreparacion: contar('PREPARANDO'),
+      enCola: contar('COLA'),
+      listos: contar('LISTO'),
+      enReparto: contar('EN_CAMINO'),
+      noEntregados: NO_ENTREGADOS.reduce((n, e) => n + contar(e), 0),
+      atrasados,
+      tiempoCocinaMin: minutosCocina.length ? Math.round(minutosCocina.reduce((a, b) => a + b, 0) / minutosCocina.length) : null,
+      metaCocinaMin: META_COCINA_MIN,
+      porHora,
+    };
+  }
+
+  /** Reparto: el repartidor que solo es repartidor ve únicamente lo suyo; el resto ve el conjunto. */
+  private async bloqueReparto(partyId: bigint, soloMio: boolean, inicioDia: Date, finDia: Date) {
+    const mio = soloMio ? { repartidor_party_id: partyId } : {};
+    const [disponibles, enCamino, entregadosHoy] = await Promise.all([
+      this.prisma.pedido.count({ where: { modalidad: 'DELIVERY', estado: 'LISTO', repartidor_party_id: null, es_personal: false } }),
+      this.prisma.pedido.count({ where: { estado: 'EN_CAMINO', es_personal: false, ...mio } }),
+      this.prisma.pedido.count({ where: { modalidad: 'DELIVERY', estado: 'ENTREGADO', entregado_en: { gte: inicioDia, lt: finDia }, es_personal: false, ...mio } }),
+    ]);
+    return { propio: soloMio, disponibles, enCamino, entregadosHoy };
+  }
+
+  /** Insumos con poca existencia (mismo criterio del escritorio del admin); apagado con el «Control de almacén». */
+  private async bloqueStockBajo() {
+    // Interruptor «Control de almacén» (parámetro stock_control_activo = «si»); sin parámetro, apagado
+    const control = await this.prisma.parametro.findUnique({ where: { clave: 'stock_control_activo' } });
+    const v = control?.valor;
+    if (!(v === true || String(v ?? '').toLowerCase().trim() === 'si')) return undefined;
+    const donde = { insumo: { activo: true }, cantidad: { lt: STOCK_BAJO_MENOR_QUE } };
+    const [cantidad, filas] = await Promise.all([
+      this.prisma.stock.count({ where: donde }),
+      this.prisma.stock.findMany({ where: donde, select: { insumo: { select: { nombre: true } } }, orderBy: { cantidad: 'asc' }, take: PROXIMAS_MAX }),
+    ]);
+    return { cantidad, insumos: filas.map((f) => f.insumo?.nombre ?? 'Insumo') };
+  }
+
+  /** Reservas, mesas y estado de la caja (supervisor): sin montos. */
+  private async bloqueSalon(hoy: string, ahora: Date, inicioDia: Date, finDia: Date) {
+    const [reservasHoy, proximas, mesas, mesasOcupadas, caja] = await Promise.all([
       this.prisma.reserva.count({ where: { estado: 'ACTIVA', hora: { gte: inicioDia, lt: finDia } } }),
       this.prisma.reserva.findMany({
         where: { estado: 'ACTIVA', hora: { gte: ahora, lt: finDia } },
@@ -94,32 +193,11 @@ export class EscritorioOperativoService {
       }),
       this.prisma.caja.findUnique({ where: { fecha: new Date(`${hoy}T00:00:00Z`) }, select: { estado: true } }),
     ]);
-
-    const contar = (estado: string) => porEstado.find((g) => g.estado === estado)?._count._all ?? 0;
     const ocupadas = mesasOcupadas.length;
-
     return {
-      generadoEn: ahora.toISOString(),
-      pedidos: {
-        porConfirmar: contar('NUEVO'),
-        enPreparacion: contar('PREPARANDO'),
-        enCola: contar('COLA'),
-        listos: contar('LISTO'),
-        enReparto: contar('EN_CAMINO'),
-        noEntregados: NO_ENTREGADOS.reduce((n, e) => n + contar(e), 0),
-      },
-      reservas: {
-        cantidadHoy: reservasHoy,
-        proximas: proximas.map((r) => ({ nombre: r.nombre, personas: r.personas, hora: horaLima(r.hora) })),
-      },
-      mesas: {
-        cantidad: mesas,
-        ocupadas,
-        libres: Math.max(0, mesas - ocupadas),
-      },
-      caja: {
-        estado: caja ? (caja.estado === 'ABIERTA' ? 'ABIERTA' : 'CERRADA') : 'SIN_ABRIR',
-      },
+      reservas: { cantidadHoy: reservasHoy, proximas: proximas.map((r) => ({ nombre: r.nombre, personas: r.personas, hora: horaLima(r.hora) })) },
+      mesas: { cantidad: mesas, ocupadas, libres: Math.max(0, mesas - ocupadas) },
+      caja: { estado: caja ? (caja.estado === 'ABIERTA' ? 'ABIERTA' : 'CERRADA') : 'SIN_ABRIR' },
     };
   }
 
