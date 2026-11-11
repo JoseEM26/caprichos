@@ -3,7 +3,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { PreferenciasUsuarioService } from './preferencias-usuario.service';
 
 /** Solo estas claves se pueden leer/guardar por la API (lista cerrada: no es un cajón libre). */
-export const CLAVES_PREFERENCIA_PERMITIDAS = ['caja.tabla.columnas', 'caja.vista', 'caja.tabla.filas', 'cierre.ventas.columnas', 'cierre.ventas.vista', 'cierre.ventas.filas'] as const;
+export const CLAVES_PREFERENCIA_PERMITIDAS = ['caja.tabla.columnas', 'caja.vista', 'caja.lista.orden', 'caja.tabla.filas', 'cierre.ventas.columnas', 'cierre.ventas.vista', 'cierre.ventas.filas'] as const;
 /** Tope del valor serializado (caracteres aprox.). */
 export const MAX_BYTES_PREFERENCIA = 2000;
 

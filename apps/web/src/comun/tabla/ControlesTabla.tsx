@@ -28,13 +28,23 @@ export function ordenSelectorDe(visibles: string[], todas: ColumnaElegible[]): s
   return [...visibles, ...todas.map((c) => c.id).filter((i) => !visibles.includes(i))];
 }
 
-/** Conmutador «Tarjetas | Tabla». */
-export function ConmutadorVista({ vista, alCambiar }: { vista: VistaLista; alCambiar: (v: VistaLista) => void }) {
+const ROTULO_VISTA = { tarjetas: 'Tarjetas', tabla: 'Tabla', lista: 'Lista' } as const;
+
+/** Conmutador «Tarjetas | Tabla» (Caja le agrega «Lista» con `opciones`). */
+export function ConmutadorVista<V extends keyof typeof ROTULO_VISTA = VistaLista>({
+  vista,
+  alCambiar,
+  opciones = ['tarjetas', 'tabla'] as unknown as V[],
+}: {
+  vista: V;
+  alCambiar: (v: V) => void;
+  opciones?: readonly V[];
+}) {
   return (
     <div className="cj2-vista" role="group" aria-label="Vista de la lista">
-      {(['tarjetas', 'tabla'] as const).map((v) => (
+      {opciones.map((v) => (
         <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} onClick={() => alCambiar(v)}>
-          {v === 'tarjetas' ? 'Tarjetas' : 'Tabla'}
+          {ROTULO_VISTA[v]}
         </button>
       ))}
     </div>
