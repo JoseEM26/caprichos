@@ -128,3 +128,31 @@ export class RechazarCambioDto {
   @Length(3, 300, { message: 'El motivo debe tener entre 3 y 300 caracteres' })
   motivo!: string;
 }
+
+/** Plantilla de respuesta rápida (los límites finos y la limpieza del texto los aplica el servicio). */
+export class PlantillaRespuestaDto {
+  @IsOptional()
+  @IsString({ message: 'El título debe ser texto' })
+  @MaxLength(200)
+  titulo?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El texto debe ser texto' })
+  @MaxLength(4096, { message: 'El texto es demasiado largo' })
+  texto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  categoria?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+}
+
+export class OrdenPlantillasDto {
+  @IsString({ each: true })
+  @MaxLength(20, { each: true })
+  ids!: string[];
+}

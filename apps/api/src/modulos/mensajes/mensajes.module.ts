@@ -6,6 +6,7 @@ import { ClientesModule } from '../clientes/clientes.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { MensajesController } from './mensajes.controller';
 import { MensajesService } from './mensajes.service';
+import { PlantillasRespuestaService } from './plantillas-respuesta.service';
 import { EnvioEncoladoService } from './envio-encolado.service';
 import { WHATSAPP_GATEWAY } from './whatsapp.gateway';
 import { WhatsAppMetaGateway } from './whatsapp-meta.gateway';
@@ -17,6 +18,7 @@ import { WhatsAppLocalGateway } from './whatsapp-local.gateway';
   providers: [
     MensajesService,
     EnvioEncoladoService,
+    PlantillasRespuestaService,
     WhatsAppLocalGateway,
     WhatsAppMetaGateway,
     { provide: WHATSAPP_GATEWAY, useClass: WhatsAppMetaGateway },

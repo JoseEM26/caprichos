@@ -164,11 +164,19 @@ export interface DetalleConversacion {
   voucher?: import('../vouchers/tipos').VoucherResumenChat | null;
 }
 
+/** Plantilla de respuesta rápida del equipo (texto libre; no es una plantilla de Meta). */
 export interface RespuestaRapida {
   id: string;
   titulo: string;
   texto: string;
+  /** PAGOS | HORARIOS | UBICACION | DELIVERY | PEDIDOS | SALUDO | CIERRE | OTROS */
+  categoria?: string;
+  activo?: boolean;
+  orden?: number;
 }
+
+/** Datos del local y de quien escribe para reemplazar {{variables}}. */
+export type ContextoPlantillas = Record<string, string>;
 
 export interface RespuestaListarChats {
   conteos: {

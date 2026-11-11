@@ -77,6 +77,34 @@ export async function listarRespuestasRapidas(): Promise<RespuestaRapida[]> {
   return api.get<RespuestaRapida[]>('/admin/mensajes/respuestas-rapidas');
 }
 
+export async function obtenerContextoPlantillas(): Promise<Record<string, string>> {
+  return api.get<Record<string, string>>('/admin/mensajes/plantillas/contexto');
+}
+export async function listarPlantillasGestion(): Promise<RespuestaRapida[]> {
+  return api.get<RespuestaRapida[]>('/admin/mensajes/plantillas/gestion');
+}
+export interface DatosPlantilla {
+  titulo?: string;
+  texto?: string;
+  categoria?: string;
+  activo?: boolean;
+}
+export async function crearPlantilla(d: DatosPlantilla): Promise<RespuestaRapida> {
+  return api.post<RespuestaRapida>('/admin/mensajes/plantillas', d);
+}
+export async function editarPlantilla(id: string, d: DatosPlantilla): Promise<RespuestaRapida> {
+  return api.patch<RespuestaRapida>(`/admin/mensajes/plantillas/${id}`, d);
+}
+export async function borrarPlantilla(id: string): Promise<{ ok: boolean }> {
+  return api.delete<{ ok: boolean }>(`/admin/mensajes/plantillas/${id}`);
+}
+export async function duplicarPlantilla(id: string): Promise<RespuestaRapida> {
+  return api.post<RespuestaRapida>(`/admin/mensajes/plantillas/${id}/duplicar`);
+}
+export async function ordenarPlantillas(ids: string[]): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>('/admin/mensajes/plantillas/orden', { ids });
+}
+
 /** `idCliente` identifica este envío: si la misma petición llega dos veces, el servidor no le escribe dos veces al cliente. */
 export async function enviarMensaje(id: string, texto: string, idCliente?: string): Promise<{ id: string; estado?: string; duplicado?: boolean }> {
   return api.post<{ id: string; estado?: string; duplicado?: boolean }>(`/admin/mensajes/conversaciones/${id}/enviar`, idCliente ? { texto, idCliente } : { texto });

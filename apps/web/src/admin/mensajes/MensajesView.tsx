@@ -10,6 +10,7 @@ import {
   listarConversaciones,
   listarMensajesAnteriores,
   listarRespuestasRapidas,
+  obtenerContextoPlantillas,
   obtenerConteosChats,
   obtenerFilaChat,
   marcarAtendido,
@@ -127,6 +128,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [detalle, setDetalle] = useState<DetalleConversacion | null>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [respuestasRapidas, setRespuestasRapidas] = useState<RespuestaRapida[]>([]);
+  const [contextoPlantillas, setContextoPlantillas] = useState<Record<string, string>>({});
 
   // Vista móvil: chat abierto
   const [chatAbiertoMovil, setChatAbiertoMovil] = useState(false);
@@ -348,12 +350,18 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     if (fila && fila.sinLeer > 0 && !fila.marcadoNoVisto) void marcarChatVisto(id).then(() => cargarLista(true)).catch(() => {});
   }, [chats, cargarLista]);
 
-  // Cargar respuestas rápidas una vez
-  useEffect(() => {
+  // Cargar las plantillas de respuesta (y los datos del local para sus {{variables}}) una vez; se recargan al administrarlas
+  const recargarPlantillas = useCallback(() => {
     listarRespuestasRapidas()
       .then((rr) => setRespuestasRapidas(rr))
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    recargarPlantillas();
+    obtenerContextoPlantillas()
+      .then((c) => setContextoPlantillas(c ?? {}))
+      .catch(() => {});
+  }, [recargarPlantillas]);
 
   // Cargar chats al cambiar filtro o búsqueda
   useEffect(() => {
@@ -1054,7 +1062,9 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 pulirError={pulirError}
                 mensajeCopiado={mensajeCopiado}
                 enviando={false}
-                onElegirRapida={setTextoMensaje}
+                contextoPlantillas={contextoPlantillas}
+                puedeAdministrarPlantillas={puedeDesbloquear}
+                onPlantillasCambiaron={recargarPlantillas}
                 onPulir={handlePulir}
                 onUsarPulido={(texto) => {
                   setTextoMensaje(texto);
