@@ -104,6 +104,7 @@ Antes: [[caja]]
 - En los pedidos de mesa, la tarjeta muestra grande, en la parte de arriba, la insignia con la mesa (por ejemplo Mesa 6, o Mesas 4 y 5 si se unieron). Un pedido extra muestra la misma mesa. Si dice Mesa sin asignar, la mesa no esta registrada: pregunta al mozo. Para llevar y delivery no llevan insignia de mesa.
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
 - Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes de que el pedido pase a LISTO.
+- Caja no puede pasar a Listo ni a Entregado un pedido que aun tenga areas sin despejar: le sale un aviso con el nombre de las areas que faltan y debe pedirles que pulsen Listo. Solo el Administrador puede forzarlo con un motivo; en ese caso las comandas pendientes se dan por despejadas y quedan auditadas. Lo que haces tu en Cocina (despejar, marcar unidades listas, despachar) no cambia. Las comandas viejas de pedidos ya entregados se pueden despejar a mano.
 - Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
 
 ## Quien puede hacerlo

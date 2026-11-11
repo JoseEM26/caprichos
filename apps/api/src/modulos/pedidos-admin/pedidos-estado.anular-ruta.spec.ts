@@ -11,6 +11,8 @@ describe('anular un pedido con repartidor sincroniza su ruta', () => {
       pedido: { findUnique: jest.fn().mockResolvedValue(pedido), update: jest.fn().mockResolvedValue({ ...pedido, estado: 'ANULADO' }), count: jest.fn().mockResolvedValue(0) },
       cobro: { findFirst: jest.fn().mockResolvedValue(null) },
       pedidoEstadoHistorial: { create: jest.fn() },
+      // sin comandas pendientes en Cocina (la regla «Cocina manda» tiene su propio spec)
+      comandaArea: { findMany: jest.fn().mockResolvedValue([]) },
       rutaReparto: { findFirst: rutaFindFirst, update: jest.fn(), delete: jest.fn() },
     };
     const eventos: any = { emitirAdmin: jest.fn() };

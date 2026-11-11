@@ -12,7 +12,7 @@ sugerencias:
   - Como anulo un pedido que el cliente cancelo
   - Como doy una cortesia a un cliente
   - Como cambio la ubicacion de un pedido de delivery
-  - Que significa Direccion editada o #7 del dia
+  - Por que no puedo marcar un pedido como listo o entregado
   - El repartidor pidio cambiar la forma de pago, como lo valido
 ---
 # Pedidos y caja
@@ -206,6 +206,7 @@ Ver tambien: [[repartos]], [[mensajes]]
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
 - "La solicitud ya fue resuelta" (SOLICITUD_NO_VIGENTE): otra persona de Caja ya la aprobo, rechazo o autorizo; recarga la lista. "Escribe el motivo para autorizar la entrega sin validar": falta el motivo (minimo 5 caracteres). "El pedido ya esta anulado o pagado: no se puede cambiar el cobro": ya no admite el cambio.
+- "Cocina aun no marco como listo este pedido: faltan ..." (COCINA_PENDIENTE): Caja no puede pasar un pedido a Listo ni a Entregado mientras alguna area de Cocina no haya pulsado Listo. El aviso dice que areas faltan: pidele a Cocina que pulse Listo y vuelve a intentar. Un pedido sin productos de cocina no tiene este problema. Solo el Administrador ve el boton Forzar como administrador: pide un motivo (minimo 10 letras) y confirmacion Si/No, da por despejadas las comandas pendientes y queda auditado con el motivo y las areas. Ningun otro rol puede forzar.
 - Si un pedido por delivery no tiene ubicacion en el mapa, no se confirma, no se cobra y no pasa a cocina (409 DELIVERY_SIN_UBICACION): usa Pedir ubicacion por WhatsApp o Ubicar en el mapa.
 - Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 

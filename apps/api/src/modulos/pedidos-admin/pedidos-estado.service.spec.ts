@@ -80,6 +80,8 @@ describe('PedidosEstadoService', () => {
       rolPermiso: {
         findFirst: jest.fn(),
       },
+      // Cocina manda: por defecto ningún pedido tiene comandas pendientes (la regla nueva tiene su propio spec)
+      comandaArea: { findMany: jest.fn().mockResolvedValue([]) },
       parametro: {
         findMany: jest.fn().mockResolvedValue([]),
       },
