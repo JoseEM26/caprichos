@@ -46,6 +46,8 @@ export interface MensajeItem {
   motivoFallo?: string | null;
   /** false: reintentar no sirve (ventana de 24 h); hay que reabrir con plantilla. */
   puedeReintentar?: boolean;
+  /** Id que generó esta bandeja al enviarlo: el servidor lo devuelve para reconocer el mensaje «Enviando…» sin duplicarlo. */
+  idCliente?: string;
 }
 
 export interface BloqueoSpam {
@@ -146,6 +148,8 @@ export interface DetalleConversacion {
   modo?: 'meta' | 'simulado';
   simulado?: boolean;
   mensajes: MensajeItem[];
+  /** El historial viene por páginas (las últimas); true = hay mensajes más antiguos por pedir. */
+  hayMasAnteriores?: boolean;
   pedido: DetallePedidoChat | null;
   solicitud: DetalleSolicitudChat | null;
   solicitudReserva?: DetalleSolicitudReservaChat | null;

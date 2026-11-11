@@ -30,6 +30,7 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
     telefono: string,
     texto: string,
     autor: 'BOT' | 'PERSONA',
+    idCliente?: string,
   ): Promise<MensajeEnviado> {
     const estadoConexion = this.mensajeria.estaConectado();
 
@@ -50,6 +51,7 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
         tipo: 'TEXTO',
         contenido: {
           texto,
+          ...(idCliente ? { idCliente } : {}),
           ...(resultado.errorDetalle ? { errorDetalle: resultado.errorDetalle } : {}),
           ...(resultado.errorCodigo ? { errorCodigo: resultado.errorCodigo } : {}),
           estado: resultado.estado,

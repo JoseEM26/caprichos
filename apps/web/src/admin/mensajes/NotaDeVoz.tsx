@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { obtenerBlobAutenticado } from '../../comun/api';
+import { useVisibleUnaVez } from '../../comun/useVisibleUnaVez';
 
 const VELOCIDADES = [1, 1.5, 2];
 
@@ -17,8 +18,11 @@ export function NotaDeVoz({ audioId }: NotaDeVozProps) {
   const [fallo, setFallo] = useState(false);
   const [velocidad, setVelocidad] = useState(1);
   const audio = useRef<HTMLAudioElement>(null);
+  // el audio se descarga cuando la nota se ve, no al abrir el chat
+  const { ref: refVisible, visible } = useVisibleUnaVez<HTMLDivElement>();
 
   useEffect(() => {
+    if (!visible) return;
     let vigente = true;
     setFallo(false);
     obtenerBlobAutenticado(`/admin/archivos/${audioId}`)
@@ -27,7 +31,7 @@ export function NotaDeVoz({ audioId }: NotaDeVozProps) {
     return () => {
       vigente = false;
     };
-  }, [audioId]);
+  }, [audioId, visible]);
 
   const cambiarVelocidad = () => {
     const siguiente = VELOCIDADES[(VELOCIDADES.indexOf(velocidad) + 1) % VELOCIDADES.length];
@@ -36,7 +40,7 @@ export function NotaDeVoz({ audioId }: NotaDeVozProps) {
   };
 
   return (
-    <div className="msg-audio" data-testid="nota-de-voz">
+    <div className="msg-audio" data-testid="nota-de-voz" ref={refVisible}>
       {!url && !fallo && <span className="msg-audio-estado">Cargando audio…</span>}
       {fallo && <span className="msg-audio-estado">No se pudo reproducir el audio en este navegador</span>}
       {url && !fallo && (

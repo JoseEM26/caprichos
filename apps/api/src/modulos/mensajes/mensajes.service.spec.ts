@@ -157,9 +157,10 @@ describe('MensajesService', () => {
       },
       mensajeChat: {
         findFirst: jest.fn().mockResolvedValue(null),
+        // la base devuelve el más nuevo primero (orderBy id desc); el servicio los entrega en orden cronológico
         findMany: jest.fn().mockResolvedValue([
-          { id: 10n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
           { id: 11n, autor: 'BOT', direccion: 'SALE', tipo: 'TEXTO', contenido: { texto: '¡Hola!' }, en: new Date() },
+          { id: 10n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
         ]),
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.id === 500n) {
@@ -331,8 +332,8 @@ describe('MensajesService', () => {
   it('detalle entrega la ubicación del cliente tal cual (lat, lng, dirección y aproximada)', async () => {
     const ubicacion = { lat: -12.07, lng: -77.04, nombre: 'Casa', direccion: 'Av. Brasil 1234', direccionAprox: 'Jesús María, Lima' };
     prisma.mensajeChat.findMany.mockResolvedValueOnce([
-      { id: 12n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Av. Brasil 1234', ubicacion }, en: new Date() },
       { id: 13n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
+      { id: 12n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Av. Brasil 1234', ubicacion }, en: new Date() },
     ]);
     const d = await service.detalle('1', usuarioAdmin);
     expect(d.mensajes[0]).toMatchObject({ texto: 'Av. Brasil 1234', ubicacion });
@@ -906,6 +907,78 @@ describe('MensajesService', () => {
       const cocina = await service.detalle('1', { partyId: 30n, rol: 'COCINA', debeCambiar: false });
       expect(cocina.mensajes[0]).toMatchObject({ errorCodigo: null, errorDetalle: null, metaCodigo: null });
       expect(cocina.mensajes[0].motivoFallo).toContain('formato que Meta no admite');
+    });
+  });
+
+  describe('Historial paginado y envío idempotente', () => {
+    const fila = (id: bigint) => ({ id, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: `m${id}` }, en: new Date() });
+
+    it('detalle pide una página (limite + 1, más nuevo primero) y la entrega en orden cronológico', async () => {
+      const limite = MensajesService.PAGINA_MENSAJES;
+      // la base devuelve limite + 1 filas, de la 100 hacia abajo: sobra una = hay más anteriores
+      prisma.mensajeChat.findMany.mockResolvedValueOnce(Array.from({ length: limite + 1 }, (_, i) => fila(BigInt(100 - i))));
+      const d: any = await service.detalle('1', usuarioAdmin);
+      const args = prisma.mensajeChat.findMany.mock.calls[0][0];
+      expect(args).toMatchObject({ orderBy: { id: 'desc' }, take: limite + 1, where: { conversacion_id: 1n } });
+      expect(d.mensajes).toHaveLength(limite);
+      expect(d.hayMasAnteriores).toBe(true);
+      const ids = d.mensajes.map((m: any) => BigInt(m.id));
+      expect(ids[ids.length - 1]).toBe(100n);
+      expect([...ids].sort((a, b) => Number(a - b))).toEqual(ids); // ascendente: orden de lectura
+    });
+
+    it('con pocos mensajes no hay más anteriores y la forma de la respuesta no cambia', async () => {
+      const d: any = await service.detalle('1', usuarioAdmin);
+      expect(d.hayMasAnteriores).toBe(false);
+      expect(d.mensajes.map((m: any) => m.id)).toEqual(['10', '11']);
+      expect(Object.keys(d.mensajes[0])).toEqual(
+        expect.arrayContaining(['id', 'autor', 'saliente', 'imagen', 'imagenId', 'texto', 'plantilla', 'audioId', 'documento', 'ubicacion', 'hora', 'fecha', 'estado', 'motivoFallo']),
+      );
+    });
+
+    it('mensajesAnteriores usa el cursor, no recalcula pedido ni voucher y devuelve solo mensajes + hayMasAnteriores', async () => {
+      prisma.mensajeChat.findMany.mockResolvedValueOnce([fila(9n), fila(8n)]);
+      const r: any = await service.mensajesAnteriores('1', '10', usuarioAdmin);
+      expect(prisma.mensajeChat.findMany.mock.calls[0][0].where).toMatchObject({ conversacion_id: 1n, id: { lt: 10n } });
+      expect(r.mensajes.map((m: any) => m.id)).toEqual(['8', '9']);
+      expect(r.hayMasAnteriores).toBe(false);
+      expect(Object.keys(r).sort()).toEqual(['hayMasAnteriores', 'mensajes']);
+      expect(prisma.pedido.findFirst).not.toHaveBeenCalled();
+      await expect(service.mensajesAnteriores('1', 'abc', usuarioAdmin)).rejects.toMatchObject({ status: 400 });
+    });
+
+    describe('idCliente (idempotencia del envío)', () => {
+      let redisClient: any;
+      beforeEach(() => {
+        const vistos = new Set<string>();
+        redisClient = {
+          incr: jest.fn().mockResolvedValue(1),
+          expire: jest.fn().mockResolvedValue(1),
+          // SET ... NX: 'OK' la primera vez, null si ya existía
+          set: jest.fn().mockImplementation(async (k: string) => (vistos.has(k) ? null : (vistos.add(k), 'OK'))),
+        };
+        service = new MensajesService(prisma, auditoria, gateway, eventos, undefined, { obtenerCliente: () => redisClient } as any);
+      });
+
+      it('el mismo idCliente dos veces escribe UNA sola vez al cliente', async () => {
+        const a = await service.enviar('1', 'Hola', usuarioAdmin, undefined, 'tmp-1');
+        const b: any = await service.enviar('1', 'Hola', usuarioAdmin, undefined, 'tmp-1');
+        expect(a).toEqual({ id: 'msg-1' });
+        expect(b).toEqual({ id: '', duplicado: true });
+        expect(gateway.enviarTexto).toHaveBeenCalledTimes(1);
+      });
+
+      it('idCliente distintos envían los dos; sin idCliente se comporta como siempre', async () => {
+        await service.enviar('1', 'Uno', usuarioAdmin, undefined, 'tmp-1');
+        await service.enviar('1', 'Dos', usuarioAdmin, undefined, 'tmp-2');
+        await service.enviar('1', 'Tres', usuarioAdmin);
+        expect(gateway.enviarTexto).toHaveBeenCalledTimes(3);
+      });
+
+      it('un envío rechazado por validación no consume el idCliente (se puede reintentar con el mismo)', async () => {
+        await expect(service.enviar('1', '   ', usuarioAdmin, undefined, 'tmp-9')).rejects.toThrow();
+        expect(redisClient.set).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -2193,6 +2193,7 @@ model MensajeChat {
   whatsappMensaje     WhatsappMensaje? @relation(fields: [whatsapp_mensaje_id], references: [id], onDelete: SetNull)
 
   @@index([whatsapp_mensaje_id])
+  @@index([conversacion_id, id])
   @@map("mensaje_chat")
 }
 

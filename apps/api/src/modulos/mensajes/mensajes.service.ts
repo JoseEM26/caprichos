@@ -295,17 +295,46 @@ export class MensajesService {
     return new Set(filas.map((f) => ultimos9(f.pedido.cliente_telefono)).filter(Boolean));
   }
 
+  /**
+   * Últimos `n` mensajes de cada chat (más nuevo primero) en UNA consulta con LATERAL + el índice (conversacion_id, id).
+   * Antes `include: { mensajes: { take: 20 } }` hacía que Prisma leyera TODOS los mensajes de TODOS los chats y recortara en memoria.
+   */
+  private async ultimosMensajesPorChat(ids: bigint[], n = 20): Promise<Map<bigint, any[]>> {
+    const mapa = new Map<bigint, any[]>();
+    if (!ids.length) return mapa;
+    const filas = await this.prisma.$queryRaw<any[]>`
+      SELECT m.id, m.conversacion_id, m.direccion, m.autor, m.tipo, m.contenido, m.meta_id, m.en
+      FROM unnest(${ids}::bigint[]) AS c(id)
+      CROSS JOIN LATERAL (
+        SELECT id, conversacion_id, direccion, autor, tipo, contenido, meta_id, en
+        FROM mensaje_chat WHERE conversacion_id = c.id ORDER BY id DESC LIMIT ${n}
+      ) m
+      ORDER BY m.conversacion_id, m.id DESC`;
+    for (const f of filas) {
+      const lista = mapa.get(f.conversacion_id) ?? [];
+      lista.push(f);
+      mapa.set(f.conversacion_id, lista);
+    }
+    return mapa;
+  }
+
   async listar(filtro: FiltroChat = 'todos', q = '', pos?: FiltroPos) {
-    const todas = await this.prisma.conversacion.findMany({
+    const todas: any[] = await this.prisma.conversacion.findMany({
       orderBy: { ultima_actividad: 'desc' },
-      include: { ...this.incluir, mensajes: { orderBy: { en: 'desc' }, take: 20 } },
+      include: this.incluir,
     });
-    const bloqueos = await this.bloqueosSpam(todas);
-    const posMapa = await this.posDeChats(todas);
-    const quienes = await this.nombresDe(todas.map((c) => c.atendido_por));
-    const porReprogramar = await this.celularesPorReprogramar();
+    // Todo lo que sigue es independiente entre sí: en paralelo (antes 5 esperas en fila)
+    const [mensajesPorChat, bloqueos, posMapa, quienes, porReprogramar, motivosNumero] = await Promise.all([
+      // (si la fila ya trae `mensajes`, p. ej. en pruebas con datos armados, no se vuelve a pedir)
+      this.ultimosMensajesPorChat(todas.filter((c) => !c.mensajes).map((c) => c.id)),
+      this.bloqueosSpam(todas),
+      this.posDeChats(todas),
+      this.nombresDe(todas.map((c) => c.atendido_por)),
+      this.celularesPorReprogramar(),
+      Promise.all(todas.map(async (c) => [c.telefono, await this.numeros?.motivoOmision(c.telefono)] as const)).then((e) => new Map(e)),
+    ]);
+    for (const c of todas) c.mensajes ??= mensajesPorChat.get(c.id) ?? [];
     const hoy0 = inicioHoyLima();
-    const motivosNumero = new Map(await Promise.all(todas.map(async (c) => [c.telefono, await this.numeros?.motivoOmision(c.telefono)] as const)));
     const filas = todas.map((c) => {
       const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, c.mensajes));
       const ult = c.mensajes[0];
@@ -343,7 +372,7 @@ export class MensajesService {
         numeroBloqueado: motivosNumero.get(c.telefono) === 'DESTINO_BLOQUEADO',
         numeroPropio: motivosNumero.get(c.telefono) === 'DESTINO_NUMERO_PROPIO',
         pos: posChat,
-        faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m) => m.autor === 'CLIENTE' && m.en >= hoy0)),
+        faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m: any) => m.autor === 'CLIENTE' && m.en >= hoy0)),
         atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
         atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
         // Archivado y el cliente volvió a escribir: ya está en «Por atender» con este indicador
@@ -393,128 +422,39 @@ export class MensajesService {
     };
   }
 
-  async detalle(id: string, usuario: UsuarioAutenticado) {
-    const c = await this.cargar(id);
-    const mensajes = await this.prisma.mensajeChat.findMany({
-      where: { conversacion_id: c.id },
+  /** Tamaño de la primera página del historial de un chat; «Cargar anteriores» trae páginas de este mismo tamaño. */
+  static readonly PAGINA_MENSAJES = 60;
+
+  private esAdminDe(usuario: UsuarioAutenticado): boolean {
+    return (usuario?.roles ?? [usuario?.rol ?? '']).some((r) => String(r || '').toUpperCase() === 'ADMIN');
+  }
+
+  /**
+   * Una página del historial: los `limite` mensajes más recientes (o los anteriores a `antes`, un id de mensaje),
+   * ya en orden cronológico, con el estado de entrega de WhatsApp. Usa el índice (conversacion_id, id).
+   */
+  private async paginaMensajes(c: any, modo: string, esAdmin: boolean, antes?: bigint, limite = MensajesService.PAGINA_MENSAJES) {
+    const filas = await this.prisma.mensajeChat.findMany({
+      where: { conversacion_id: c.id, ...(antes ? { id: { lt: antes } } : {}) },
       include: { whatsappMensaje: true },
-      orderBy: { en: 'asc' },
+      orderBy: { id: 'desc' },
+      take: limite + 1,
     });
+    const hayMasAnteriores = filas.length > limite;
+    const mensajes = filas.slice(0, limite).reverse();
 
     // Relación adicional por meta_id si whatsapp_mensaje_id aún no está enlazado
-    const metaIdsSinRelacion = mensajes
-      .filter((m) => !m.whatsappMensaje && m.meta_id)
-      .map((m) => m.meta_id as string);
-
+    const metaIdsSinRelacion = mensajes.filter((m) => !m.whatsappMensaje && m.meta_id).map((m) => m.meta_id as string);
     const waPorMetaId = new Map<string, any>();
     if (metaIdsSinRelacion.length > 0) {
-      const encontrados = await this.prisma.whatsappMensaje.findMany({
-        where: { wa_message_id: { in: metaIdsSinRelacion } },
-      });
-      for (const item of encontrados) {
-        if (item.wa_message_id) {
-          waPorMetaId.set(item.wa_message_id, item);
-        }
-      }
+      const encontrados = await this.prisma.whatsappMensaje.findMany({ where: { wa_message_id: { in: metaIdsSinRelacion } } });
+      for (const item of encontrados) if (item.wa_message_id) waPorMetaId.set(item.wa_message_id, item);
     }
+    return { crudos: mensajes, hayMasAnteriores, mensajes: this.formatearMensajes(mensajes, c, waPorMetaId, modo, esAdmin) };
+  }
 
-    const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, mensajes));
-    const pos = (await this.posDeChats([c])).get(c.id) as PosChat;
-    const quienes = await this.nombresDe([c.atendido_por]);
-    // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
-    const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
-    const condicion: any[] = [{ cliente_telefono: c.telefono }];
-    if (ultimos9.length === 9) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
-    if (c.party_id) condicion.push({ party_id: c.party_id });
-    // El pedido cuyo voucher llegó por este chat tiene prioridad
-    const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
-    if (pedidoVoucherId && /^\d+$/.test(String(pedidoVoucherId))) condicion.push({ id: BigInt(pedidoVoucherId) });
-    // El pedido que espera pago en este chat; si no hay, el más reciente como antes (para datos del chat)
-    const pedidoEnEspera = await pedidoEsperandoVoucher(this.prisma, c.flujo, c.telefono);
-    const pedido = pedidoEnEspera
-      ? await this.prisma.pedido.findFirst({
-          where: { id: pedidoEnEspera.id },
-          include: { lineas: { orderBy: { id: 'asc' } } },
-        })
-      : await this.prisma.pedido.findFirst({
-          where: { OR: condicion, estado: { notIn: ['ANULADO', 'ENTREGADO'] }, es_personal: false },
-          orderBy: { creado_en: 'desc' },
-          include: { lineas: { orderBy: { id: 'asc' } } },
-        });
-    const solicitud = pedido
-      ? await this.prisma.solicitudCambio.findFirst({ where: { pedido_id: pedido.id, estado: 'PENDIENTE' }, orderBy: { id: 'desc' } })
-      : null;
-    const solicitudReserva = this.prisma.solicitudReserva
-      ? await this.prisma.solicitudReserva.findFirst({
-          where: { conversacion_id: c.id, estado: 'PENDIENTE' },
-          orderBy: { id: 'desc' },
-        })
-      : null;
-    const parametro = await this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } });
-    const base = Number(parametro?.valor) || null;
-    const alta = await this.prisma.altaDemanda.findFirst({ where: { hasta: null }, orderBy: { id: 'desc' } });
-    const yo = await this.yo(usuario);
-
-    const estadoConexion = this.gateway.estaConectado ? this.gateway.estaConectado() : { modo: 'simulado' as const };
-    const modo = estadoConexion.modo;
-    const simulado = modo === 'simulado';
-
-    let ventanaAbierta = true;
-    if (this.ventana24hService) {
-      ventanaAbierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
-    }
-
-    // Voucher de la conversación para quien tenga permiso vouchers/ver
-    let voucherDetalle: any = null;
-    // Cualquiera de sus roles (principal o extra) con permiso; ADMIN solo como principal
-    const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
-    const esAdmin = rolesUsuario.includes('ADMIN');
-    const tienePermisoVerVouchers =
-      esAdmin ||
-      rolesUsuario.some((r) => Boolean(MATRIZ[r]) && MATRIZ[r].includes('vouchers/ver'));
-
-    if (tienePermisoVerVouchers && pedido?.id) {
-      // Solo vouchers del pedido en espera: nunca el último de la conversación ni de otro pedido
-      const ultimoVoucher = await this.prisma.voucherPago.findFirst({
-        where: { pedido_id: pedido.id, reemplazado_en: null },
-        orderBy: { creado_en: 'desc' },
-      });
-
-      if (ultimoVoucher) {
-        voucherDetalle = {
-          id: ultimoVoucher.id.toString(),
-          archivoId: ultimoVoucher.archivo_id?.toString() ?? null,
-          semaforo: ultimoVoucher.semaforo,
-          motivos: ultimoVoucher.motivos,
-          extraido: ultimoVoucher.extraido,
-          medio: ultimoVoucher.medio,
-          pedidoTotal: pedido?.total ? pedido.total.toString() : null,
-        };
-      }
-    }
-
-    return {
-      id: c.id.toString(),
-      nombre: obtenerNombreMostrar(c),
-      telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
-      identificador_tipo: c.identificador_tipo,
-      nombre_contacto: c.nombre_contacto,
-      nombre_editado: c.nombre_editado,
-      modalidad: pedido ? MODALIDADES[pedido.modalidad] ?? pedido.modalidad : null,
-      estado,
-      urgente: c.urgente,
-      marcadoNoVisto: c.marcado_no_visto,
-      pos,
-      atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
-      atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
-      dueno: this.dueno(c),
-      esMio: !!c.tomado_por && c.tomado_por === yo,
-      ocupado: !!c.tomado_por && c.tomado_por !== yo,
-      ventanaAbierta,
-      modo,
-      simulado,
-      numeroReceptor: c.numero_receptor ?? null,
-      mensajes: mensajes.map((m) => {
+  private formatearMensajes(mensajes: any[], c: any, waPorMetaId: Map<string, any>, modo: string, esAdmin: boolean) {
+    return mensajes.map((m: any) => {
         const wa = m.whatsappMensaje || (m.meta_id ? waPorMetaId.get(m.meta_id) : null);
         const contenido = (m.contenido as any) || {};
         const estadoMsg =
@@ -551,6 +491,8 @@ export class MensajesService {
                 }
               : null,
           ubicacion: contenido.ubicacion ?? null,
+          // el que mandó la web: con él la bandeja reemplaza su mensaje «Enviando…» por el real sin duplicarlo
+          idCliente: typeof contenido.idCliente === 'string' ? contenido.idCliente : undefined,
           hora: hora(m.en),
           fecha: m.en.toISOString(),
           estado: estadoMsg,
@@ -561,7 +503,126 @@ export class MensajesService {
           puedeReintentar:
             estadoMsg === 'FALLIDO' ? m.tipo !== 'IMAGEN' && m.tipo !== 'DOCUMENTO' && !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
         };
-      }),
+      });
+  }
+
+  /** Solo el historial anterior a `antes` (botón «Cargar anteriores»): sin recalcular pedido, voucher ni pagos. */
+  async mensajesAnteriores(id: string, antes: string, usuario: UsuarioAutenticado) {
+    const c = await this.cargar(id);
+    let desde: bigint;
+    try {
+      desde = BigInt(antes);
+    } catch {
+      throw error(HttpStatus.BAD_REQUEST, 'CURSOR_INVALIDO', 'Cursor de mensajes inválido');
+    }
+    const modo = (this.gateway.estaConectado ? this.gateway.estaConectado() : { modo: 'simulado' as const }).modo;
+    const { mensajes, hayMasAnteriores } = await this.paginaMensajes(c, modo, this.esAdminDe(usuario), desde);
+    return { mensajes, hayMasAnteriores };
+  }
+
+  async detalle(id: string, usuario: UsuarioAutenticado) {
+    const c = await this.cargar(id);
+    const estadoConexion = this.gateway.estaConectado ? this.gateway.estaConectado() : { modo: 'simulado' as const };
+    const modo = estadoConexion.modo;
+    const simulado = modo === 'simulado';
+    // Cualquiera de sus roles (principal o extra) con permiso; ADMIN solo como principal
+    const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
+    const esAdmin = rolesUsuario.includes('ADMIN');
+    const tienePermisoVerVouchers = esAdmin || rolesUsuario.some((r) => Boolean(MATRIZ[r]) && MATRIZ[r].includes('vouchers/ver'));
+
+    // El pedido del chat y lo que cuelga de él (solicitud, voucher) van en una cadena; el resto corre en paralelo con ella
+    const cadenaPedido = (async () => {
+      // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
+      const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
+      const condicion: any[] = [{ cliente_telefono: c.telefono }];
+      if (ultimos9.length === 9) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+      if (c.party_id) condicion.push({ party_id: c.party_id });
+      // El pedido cuyo voucher llegó por este chat tiene prioridad
+      const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
+      if (pedidoVoucherId && /^\d+$/.test(String(pedidoVoucherId))) condicion.push({ id: BigInt(pedidoVoucherId) });
+      // El pedido que espera pago en este chat; si no hay, el más reciente como antes (para datos del chat)
+      const pedidoEnEspera = await pedidoEsperandoVoucher(this.prisma, c.flujo, c.telefono);
+      const pedido = pedidoEnEspera
+        ? await this.prisma.pedido.findFirst({ where: { id: pedidoEnEspera.id }, include: { lineas: { orderBy: { id: 'asc' } } } })
+        : await this.prisma.pedido.findFirst({
+            where: { OR: condicion, estado: { notIn: ['ANULADO', 'ENTREGADO'] }, es_personal: false },
+            orderBy: { creado_en: 'desc' },
+            include: { lineas: { orderBy: { id: 'asc' } } },
+          });
+      if (!pedido) return { pedido: null as any, solicitud: null as any, ultimoVoucher: null as any };
+      const [solicitud, ultimoVoucher] = await Promise.all([
+        this.prisma.solicitudCambio.findFirst({ where: { pedido_id: pedido.id, estado: 'PENDIENTE' }, orderBy: { id: 'desc' } }),
+        // Solo vouchers del pedido en espera: nunca el último de la conversación ni de otro pedido
+        tienePermisoVerVouchers
+          ? this.prisma.voucherPago.findFirst({ where: { pedido_id: pedido.id, reemplazado_en: null }, orderBy: { creado_en: 'desc' } })
+          : Promise.resolve(null),
+      ]);
+      return { pedido, solicitud, ultimoVoucher };
+    })();
+
+    const [pagina, pos, { pedido, solicitud, ultimoVoucher }, solicitudReserva, parametro, alta, yo, ventanaAbierta, bloqueos, motivoNumero, quienes] = await Promise.all([
+      this.paginaMensajes(c, modo, esAdmin),
+      this.posDeChats([c]).then((m) => m.get(c.id) as PosChat),
+      cadenaPedido,
+      this.prisma.solicitudReserva
+        ? this.prisma.solicitudReserva.findFirst({ where: { conversacion_id: c.id, estado: 'PENDIENTE' }, orderBy: { id: 'desc' } })
+        : Promise.resolve(null),
+      this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } }),
+      this.prisma.altaDemanda.findFirst({ where: { hasta: null }, orderBy: { id: 'desc' } }),
+      this.yo(usuario),
+      this.ventana24hService ? this.ventana24hService.esVentanaAbierta(c.telefono, c.id) : Promise.resolve(true),
+      this.bloqueosSpam([c]),
+      this.numeros?.motivoOmision(c.telefono),
+      this.nombresDe([c.atendido_por]),
+    ]);
+    const { mensajes, crudos, hayMasAnteriores } = pagina;
+    // «Reabierto» = el cliente escribió después de archivar. Si la página no llega hasta esa fecha, se pregunta aparte
+    let reabierto = reabiertoTrasAtendido(c.atendido_en, crudos);
+    if (c.atendido_en && !reabierto && hayMasAnteriores && crudos[0]?.en > c.atendido_en) {
+      reabierto = !!(await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: c.id, autor: 'CLIENTE', en: { gt: c.atendido_en } },
+        select: { id: true },
+      }));
+    }
+    const estado = estadoDe(c, reabierto);
+    const base = Number(parametro?.valor) || null;
+
+    let voucherDetalle: any = null;
+    if (ultimoVoucher) {
+      voucherDetalle = {
+        id: ultimoVoucher.id.toString(),
+        archivoId: ultimoVoucher.archivo_id?.toString() ?? null,
+        semaforo: ultimoVoucher.semaforo,
+        motivos: ultimoVoucher.motivos,
+        extraido: ultimoVoucher.extraido,
+        medio: ultimoVoucher.medio,
+        pedidoTotal: pedido?.total ? pedido.total.toString() : null,
+      };
+    }
+
+    return {
+      id: c.id.toString(),
+      nombre: obtenerNombreMostrar(c),
+      telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
+      identificador_tipo: c.identificador_tipo,
+      nombre_contacto: c.nombre_contacto,
+      nombre_editado: c.nombre_editado,
+      modalidad: pedido ? MODALIDADES[pedido.modalidad] ?? pedido.modalidad : null,
+      estado,
+      urgente: c.urgente,
+      marcadoNoVisto: c.marcado_no_visto,
+      pos,
+      atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
+      atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
+      dueno: this.dueno(c),
+      esMio: !!c.tomado_por && c.tomado_por === yo,
+      ocupado: !!c.tomado_por && c.tomado_por !== yo,
+      ventanaAbierta,
+      modo,
+      simulado,
+      numeroReceptor: c.numero_receptor ?? null,
+      mensajes,
+      hayMasAnteriores,
       pedido: pedido
         ? {
             id: pedido.id.toString(),
@@ -594,9 +655,9 @@ export class MensajesService {
         : null,
       motivoDerivacion:
         (c.motivo_derivacion !== MOTIVO_BLOQUEO_SPAM ? c.motivo_derivacion : null) || (c.flujo as any)?.motivoDerivacion || null,
-      bloqueoSpam: (await this.bloqueosSpam([c]))?.get(c.telefono) ?? null,
-      numeroBloqueado: (await this.numeros?.motivoOmision(c.telefono)) === 'DESTINO_BLOQUEADO',
-      numeroPropio: (await this.numeros?.motivoOmision(c.telefono)) === 'DESTINO_NUMERO_PROPIO',
+      bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
+      numeroBloqueado: motivoNumero === 'DESTINO_BLOQUEADO',
+      numeroPropio: motivoNumero === 'DESTINO_NUMERO_PROPIO',
       solicitudReserva: solicitudReserva
         ? {
             id: solicitudReserva.id.toString(),
@@ -619,10 +680,30 @@ export class MensajesService {
     return filas.map((r) => ({ id: r.id.toString(), titulo: r.titulo, texto: r.texto }));
   }
 
-  async enviar(id: string, texto: string, usuario: UsuarioAutenticado, ip?: string) {
+  /**
+   * Idempotencia del envío: la web manda un `idCliente` por mensaje; si el mismo llega dos veces (doble clic, reintento
+   * de red) el segundo NO vuelve a escribirle al cliente (Meta cobra por mensaje). Redis, 2 min. Sin Redis no hay control.
+   * Devuelve true si este idCliente ya se estaba atendiendo o ya se envió.
+   */
+  private async yaEnviado(conversacionId: bigint, idCliente?: string): Promise<boolean> {
+    if (!idCliente || !this.redisService) return false;
+    try {
+      const r = await this.redisService.obtenerCliente().set(`mensajes:idem:${conversacionId}:${idCliente}`, '1', 'EX', 120, 'NX');
+      return r !== 'OK';
+    } catch {
+      return false;
+    }
+  }
+
+  async enviar(id: string, texto: string, usuario: UsuarioAutenticado, ip?: string, idCliente?: string) {
     const limpio = String(texto ?? '').trim();
     if (!limpio) throw error(HttpStatus.BAD_REQUEST, 'MENSAJE_VACIO', 'Escribe un mensaje');
     const c = await this.cargar(id);
+    // Las lecturas independientes arrancan juntas; los errores se evalúan en el mismo orden de siempre
+    const ventana = this.ventana24hService ? this.ventana24hService.esVentanaAbierta(c.telefono, c.id) : Promise.resolve(true);
+    ventana.catch(() => undefined);
+    const numero = this.exigirNumeroEnviable(c);
+    numero.catch(() => undefined);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para escribir.');
     if (!this.tieneIdentificador(c)) {
       throw error(
@@ -632,13 +713,13 @@ export class MensajesService {
       );
     }
 
-    await this.exigirNumeroEnviable(c);
+    await numero;
     // Límite de 20 mensajes por minuto por usuario
     await this.verificarLimiteTasaUsuario(usuario.partyId);
 
     // Verificación de ventana de 24 horas
     if (this.ventana24hService) {
-      const abierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
+      const abierta = await ventana;
       if (!abierta) {
         throw new HttpException(
           {
@@ -652,10 +733,15 @@ export class MensajesService {
       }
     }
 
-    const m = await this.gateway.enviarTexto(c.id, c.telefono, limpio, 'PERSONA');
+    // Mismo idCliente otra vez: ya se está enviando o ya salió; no se manda de nuevo
+    if (await this.yaEnviado(c.id, idCliente)) return { id: '', duplicado: true };
+
+    const m = await this.gateway.enviarTexto(c.id, c.telefono, limpio, 'PERSONA', ...(idCliente ? [idCliente] : []));
     // al escribir una persona, el bot calla: el chat deja de ser urgente y queda a cargo de la persona
-    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
-    await this.auditar(usuario, 'ENVIAR', c.id, { mensajeId: m.id, estado: m.estado }, ip);
+    await Promise.all([
+      this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado }),
+      this.auditar(usuario, 'ENVIAR', c.id, { mensajeId: m.id, estado: m.estado }, ip),
+    ]);
 
     if (m.estado === 'FALLIDO') {
       const mensajeError = mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle);

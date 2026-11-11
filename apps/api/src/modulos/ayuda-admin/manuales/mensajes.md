@@ -130,6 +130,9 @@ Ver tambien: [[caja]]
 - El nombre del contacto se puede editar pulsando el icono del lapiz al costado del nombre en la cabecera.
 - Un pedido de la carta virtual con Yape, Plin o transferencia y celular deja su chat en Validar pago y urgente: el cliente recibe el aviso de que un asesor gestionara el voucher, y el chat aparece aqui para que lo atiendas.
 
+- Al abrir un chat largo se ven los ultimos mensajes; para leer lo anterior pulsar Cargar mensajes anteriores, arriba de la conversacion. Asi el chat abre rapido aunque tenga cientos de mensajes. Las fotos y notas de voz se descargan cuando llegan a la pantalla.
+- Al enviar un mensaje aparece de inmediato con la palabra Enviando; cuando WhatsApp lo recibe pasa a Enviado. Si no sale, el mensaje desaparece, el texto vuelve al cuadro para que lo intentes de nuevo y se muestra el motivo. Apretar Enviar dos veces seguidas no manda el mensaje dos veces.
+
 ## Quien puede hacerlo
 - Tienen acceso completo a los mensajes: Administrador, Cajero, Mozo y Supervisor.
 - Los roles de Administrador y Cajero cuentan con el permiso vouchers/ver para visualizar la tarjeta de analisis del voucher y confirmar la aprobacion o rechazo.

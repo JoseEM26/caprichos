@@ -42,7 +42,9 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
         </span>
         {!esCliente && (
           <>
-            {m.estado === 'FALLIDO' ? (
+            {m.estado === 'ENVIANDO' ? (
+              <span data-testid="estado-enviando" style={{ fontStyle: 'italic' }}>Enviando…</span>
+            ) : m.estado === 'FALLIDO' ? (
               <span style={{ color: '#A3261A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span>{m.motivoFallo ? `No se pudo enviar: ${m.motivoFallo}` : 'No se pudo enviar'}</span>
                 {m.puedeReintentar !== false && <button
