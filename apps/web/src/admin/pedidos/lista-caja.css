@@ -73,7 +73,8 @@
 }
 .lc-mas { position: relative; }
 .lc-menu {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 60; min-width: 210px; background: var(--cp-white, #FFFFFF);
+  /* En un portal a <body> y fija: ni el overflow de la fila ni el de la lista la recortan (la posición la calcula MenuMas) */
+  position: fixed; z-index: 1000; min-width: 210px; max-width: calc(100vw - 16px); background: var(--cp-white, #FFFFFF);
   border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; box-shadow: 0 8px 24px rgba(11, 44, 62, 0.15); overflow: hidden;
 }
 .lc-menu button {

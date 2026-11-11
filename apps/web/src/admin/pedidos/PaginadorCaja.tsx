@@ -52,7 +52,8 @@ export function PaginadorCaja({ total, desde, hasta, pagina, totalPaginas, alIr,
       <span className="cj2-pag-rango" data-testid="rango-pagina">
         {total === 0 ? `0 ${unidad}` : `Mostrando ${desde}–${hasta} de ${total}`}
       </span>
-      {total > 0 && (
+      {/* Con pocas filas (caben en la menor página) el selector no aporta: solo queda el conteo */}
+      {total > OPCIONES_FILAS[0] && (
         <label className="cj2-pag-filas">
           <span aria-hidden="true">Filas</span>
           <select

@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { useCerrarFuera } from '../../comun/tabla/ControlesTabla';
 import type { Pedido } from './pedidosApi';
 import type { AccionCaja } from './accionesCaja';
 import { PastillaEspera } from './PastillaEspera';
@@ -91,21 +91,91 @@ export function OrdenarLista({ orden, alCambiar }: { orden: OrdenLista; alCambia
   );
 }
 
-/** Menú «⋮»: lo que no cabe como botón rápido. Los cambios de pago, edición y demás viven en «Abrir el pedido». */
-function MenuMas({ p, alVerDetalle, alAbrir }: { p: Pedido; alVerDetalle: (p: Pedido) => void; alAbrir: (p: Pedido) => void }) {
+/** Solo un menú «⋮» abierto a la vez: el que se abre cierra al anterior. */
+let cerrarMenuAbierto: (() => void) | null = null;
+
+/**
+ * Menú «⋮»: lo que no cabe como botón rápido. Los cambios de pago, edición y demás viven en «Abrir el pedido».
+ * Se dibuja en un portal a <body> con posición fija calculada desde el botón: así queda por encima de las otras filas y
+ * no lo recorta el overflow de la fila ni el de la lista. Si no cabe abajo se abre hacia arriba; en horizontal se ajusta a la pantalla.
+ */
+export function MenuMas({ p, alVerDetalle, alAbrir }: { p: Pedido; alVerDetalle: (p: Pedido) => void; alAbrir: (p: Pedido) => void }) {
   const [abierto, setAbierto] = useState(false);
-  const raiz = useCerrarFuera(abierto, () => setAbierto(false));
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const cerrar = useCallback((devolverFoco = false) => {
+    setAbierto(false);
+    if (devolverFoco) boton.current?.focus();
+  }, []);
+
+  // Posición: debajo del botón, o encima si no cabe; alineado a su borde derecho sin salirse de la pantalla
+  useLayoutEffect(() => {
+    if (!abierto || !boton.current || !menu.current) return;
+    const b = boton.current.getBoundingClientRect();
+    const { offsetWidth: w, offsetHeight: h } = menu.current;
+    const abajo = b.bottom + 4;
+    const top = abajo + h <= window.innerHeight - 8 || b.top - 4 - h < 8 ? abajo : b.top - 4 - h;
+    const left = Math.max(8, Math.min(b.right - w, window.innerWidth - w - 8));
+    setPos({ top, left });
+    menu.current.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+  }, [abierto]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    cerrarMenuAbierto?.();
+    const yo = () => { setAbierto(false); setPos(null); };
+    cerrarMenuAbierto = yo;
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!boton.current?.contains(t) && !menu.current?.contains(t)) yo();
+    };
+    const alMover = (e: Event) => { if (!(e.target instanceof Node && menu.current?.contains(e.target))) yo(); };
+    document.addEventListener('mousedown', fuera);
+    window.addEventListener('scroll', alMover, true);
+    window.addEventListener('resize', yo);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      window.removeEventListener('scroll', alMover, true);
+      window.removeEventListener('resize', yo);
+      if (cerrarMenuAbierto === yo) cerrarMenuAbierto = null;
+    };
+  }, [abierto]);
+
+  const alTeclear = (e: KeyboardEvent) => {
+    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const ir = (j: number) => { e.preventDefault(); items[(j + items.length) % items.length]?.focus(); };
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(true); }
+    else if (e.key === 'ArrowDown') ir(i + 1);
+    else if (e.key === 'ArrowUp') ir(i - 1);
+    else if (e.key === 'Home') ir(0);
+    else if (e.key === 'End') ir(items.length - 1);
+    else if (e.key === 'Tab') cerrar();
+  };
+
   return (
-    <div className="lc-mas" ref={raiz}>
-      <button type="button" className="lc-btn lc-btn--ico" aria-haspopup="menu" aria-expanded={abierto} aria-label={`Más acciones de ${p.codigo}`} onClick={() => setAbierto((a) => !a)}>
+    <div className="lc-mas">
+      <button
+        ref={boton}
+        type="button"
+        className="lc-btn lc-btn--ico"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        aria-label={`Más acciones de ${p.codigo}`}
+        onClick={() => (abierto ? cerrar() : setAbierto(true))}
+        onKeyDown={(e) => { if (e.key === 'ArrowDown' && !abierto) { e.preventDefault(); setAbierto(true); } }}
+      >
         <IcoPuntos />
       </button>
-      {abierto && (
-        <div className="lc-menu" role="menu" aria-label={`Acciones de ${p.codigo}`}>
-          <button type="button" role="menuitem" onClick={() => { setAbierto(false); alVerDetalle(p); }}>Ver detalle de la venta</button>
-          <button type="button" role="menuitem" onClick={() => { setAbierto(false); alAbrir(p); }}>Abrir el pedido</button>
-        </div>
-      )}
+      {abierto &&
+        createPortal(
+          <div ref={menu} className="lc-menu" role="menu" aria-label={`Acciones de ${p.codigo}`} onKeyDown={alTeclear} style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
+            <button type="button" role="menuitem" tabIndex={-1} onClick={() => { cerrar(); alVerDetalle(p); }}>Ver detalle de la venta</button>
+            <button type="button" role="menuitem" tabIndex={-1} onClick={() => { cerrar(); alAbrir(p); }}>Abrir el pedido</button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
