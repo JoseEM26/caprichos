@@ -41,7 +41,6 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
-import { ModalAnular } from '../pedidos/ModalAnular';
 import { AvisoAperturaHoy } from '../almacen/AvisoAperturaHoy';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
@@ -145,7 +144,6 @@ export function CocinaAdminView() {
   const { tiene, usuario } = useSesion();
   const usuarioId = usuario?.partyId ?? null;
 
-  const [comandaAnular, setComandaAnular] = useState<Comanda | null>(null);
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
   const puedeDespachar = tiene('cocina/despachar');
@@ -1096,7 +1094,6 @@ export function CocinaAdminView() {
                   puedeDespachar={puedeDespachar && enTodas}
                   alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                   alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                  alAnular={tiene('pedidos/anular') ? setComandaAnular : undefined}
                 />
                 </MarcoNuevo>
               ))}
@@ -1338,7 +1335,6 @@ export function CocinaAdminView() {
                       puedeDespachar={puedeDespachar && enTodas}
                       alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                       alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                  alAnular={tiene('pedidos/anular') ? setComandaAnular : undefined}
                     />
                     </MarcoNuevo>
                   ))}
@@ -1439,14 +1435,6 @@ export function CocinaAdminView() {
           }
         }}
       />
-      {comandaAnular && (
-        <ModalAnular
-          pedidoId={comandaAnular.pedidoId}
-          codigoPedido={comandaAnular.codigo}
-          alCerrar={() => setComandaAnular(null)}
-          alAnularExitoso={() => setComandaAnular(null)}
-        />
-      )}
     </div>
   );
 }
