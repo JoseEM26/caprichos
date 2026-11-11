@@ -40,67 +40,71 @@ const Flecha = ({ der }: { der?: boolean }) => (
 );
 
 /**
- * Paginador pequeño al final de la lista, en el flujo normal (sin sticky ni fixed): en celular no salta con el teclado
- * ni tapa contenido. Una línea que se parte en dos si no cabe.
+ * Paginador compacto al final de la lista, en el flujo normal (sin sticky ni fixed): una línea delgada, alineada a la derecha
+ * y del ancho de su contenido. Con una sola página no muestra «Página 1 de 1» ni las flechas; con 0 elementos, solo el conteo.
+ * Los botones se ven chicos pero su área de toque llega a 44 px (ver `.cj2-pag-btn::after` en caja-lista.css).
  */
 export function PaginadorCaja({ total, desde, hasta, pagina, totalPaginas, alIr, filas, alCambiarFilas, conAuto = true, avisoTope, unidad = 'pedidos' }: PaginadorCajaProps) {
   const valorSelect = filas === null ? 'auto' : String(filas);
+  const variasPaginas = totalPaginas > 1;
   return (
     <nav className="cj2-pag" aria-label="Paginación">
       <span className="cj2-pag-rango" data-testid="rango-pagina">
         {total === 0 ? `0 ${unidad}` : `Mostrando ${desde}–${hasta} de ${total}`}
       </span>
-      <label className="cj2-pag-filas">
-        <span>Filas por página</span>
-        <select
-          className="cj2-pag-select"
-          aria-label="Filas por página"
-          value={valorSelect}
-          onChange={(e) => {
-            const v = e.target.value;
-            alCambiarFilas(v === 'auto' ? null : v === 'todas' ? 'todas' : Number(v));
-          }}
-        >
-          {conAuto && <option value="auto">Auto</option>}
-          {OPCIONES_FILAS.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-          <option value="todas">Todas</option>
-        </select>
-      </label>
+      {total > 0 && (
+        <label className="cj2-pag-filas">
+          <span aria-hidden="true">Filas</span>
+          <select
+            className="cj2-pag-select"
+            aria-label="Filas por página"
+            value={valorSelect}
+            onChange={(e) => {
+              const v = e.target.value;
+              alCambiarFilas(v === 'auto' ? null : v === 'todas' ? 'todas' : Number(v));
+            }}
+          >
+            {conAuto && <option value="auto">Auto</option>}
+            {OPCIONES_FILAS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+            <option value="todas">Todas</option>
+          </select>
+        </label>
+      )}
       {avisoTope && <span className="cj2-pag-aviso" role="status">{avisoTope}</span>}
-      <div className="cj2-pag-flechas">
-        {totalPaginas >= 5 && (
-          <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Primera página" disabled={pagina <= 1} onClick={() => alIr(1)}>
-            Primera
+      {variasPaginas && (
+        <div className="cj2-pag-flechas">
+          {totalPaginas >= 5 && (
+            <button type="button" className="cj2-pag-btn cj2-pag-extremo" aria-label="Primera página" disabled={pagina <= 1} onClick={() => alIr(1)}>
+              Primera
+            </button>
+          )}
+          <button type="button" className="cj2-pag-btn" aria-label="Página anterior" disabled={pagina <= 1} onClick={() => alIr(Math.max(1, pagina - 1))}>
+            <Flecha />
           </button>
-        )}
-        <button type="button" className="cj2-btn cj2-btn--ico" aria-label="Página anterior" disabled={pagina <= 1} onClick={() => alIr(Math.max(1, pagina - 1))}>
-          <Flecha />
-          <span className="cj2-pag-txt">Anterior</span>
-        </button>
-        {totalPaginas >= 5 ? (
-          <label className="cj2-pag-ir">
-            <select className="cj2-pag-select" aria-label="Ir a la página" value={pagina} onChange={(e) => alIr(Number(e.target.value))}>
-              {Array.from({ length: totalPaginas }, (_, i) => (
-                <option key={i + 1} value={i + 1}>{i + 1}</option>
-              ))}
-            </select>
-            <span>/ {totalPaginas}</span>
-          </label>
-        ) : (
-          <span className="cj2-pag-n">Página {pagina} de {totalPaginas}</span>
-        )}
-        <button type="button" className="cj2-btn cj2-btn--ico" aria-label="Página siguiente" disabled={pagina >= totalPaginas} onClick={() => alIr(Math.min(totalPaginas, pagina + 1))}>
-          <span className="cj2-pag-txt">Siguiente</span>
-          <Flecha der />
-        </button>
-        {totalPaginas >= 5 && (
-          <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Última página" disabled={pagina >= totalPaginas} onClick={() => alIr(totalPaginas)}>
-            Última
+          {totalPaginas >= 5 ? (
+            <label className="cj2-pag-ir">
+              <select className="cj2-pag-select" aria-label="Ir a la página" value={pagina} onChange={(e) => alIr(Number(e.target.value))}>
+                {Array.from({ length: totalPaginas }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>{i + 1}</option>
+                ))}
+              </select>
+              <span>/ {totalPaginas}</span>
+            </label>
+          ) : (
+            <span className="cj2-pag-n">Página {pagina} de {totalPaginas}</span>
+          )}
+          <button type="button" className="cj2-pag-btn" aria-label="Página siguiente" disabled={pagina >= totalPaginas} onClick={() => alIr(Math.min(totalPaginas, pagina + 1))}>
+            <Flecha der />
           </button>
-        )}
-      </div>
+          {totalPaginas >= 5 && (
+            <button type="button" className="cj2-pag-btn cj2-pag-extremo" aria-label="Última página" disabled={pagina >= totalPaginas} onClick={() => alIr(totalPaginas)}>
+              Última
+            </button>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

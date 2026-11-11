@@ -677,70 +677,6 @@
   filter: brightness(0.93);
 }
 
-/* ---- Paginación fina de una línea ---- */
-.cj2-pag {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 40px;
-  padding: 2px 4px;
-  flex-wrap: wrap;
-  border-top: 1.5px solid var(--cp-line, #E3D6C6);
-  background: var(--cp-cream, #FBF4EC);
-}
-
-.cj2-pag-rango {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--cp-soft, #2C4C5D);
-}
-
-.cj2-pag-flechas {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.cj2-pag-flechas button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.cj2-pag-extremo {
-  padding: 0 14px;
-  font-size: 14px;
-}
-
-.cj2-pag-ir {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 800;
-  font-size: 15px;
-  color: var(--cp-navy, #0B2C3E);
-}
-
-.cj2-pag-select {
-  min-height: 34px;
-  min-width: 56px;
-  border: 1.5px solid var(--cp-navy, #0B2C3E);
-  border-radius: 12px;
-  background: var(--cp-white, #FFFFFF);
-  color: var(--cp-navy, #0B2C3E);
-  font-weight: 800;
-  font-size: 15px;
-  padding: 0 8px;
-}
-
-.cj2-pag-n {
-  font-weight: 800;
-  font-size: 15px;
-  min-width: 54px;
-  text-align: center;
-  color: var(--cp-navy, #0B2C3E);
-}
-
 /* ---- Botón flotante Nuevo pedido (solo celular) ---- */
 .cj2-fab {
   display: none;
@@ -1218,34 +1154,40 @@
 .cj2-cta-pend { color: #B2500F; font-weight: 900; }
 .cj2-cta-ok { color: #2F7A45; font-weight: 900; }
 
-/* ---- Celular y tablet angosta: paginación pegada al fondo, compacta, botones de 44 px ---- */
-.cj2-pag-txt { display: none; }
 /* Tablet vertical (700–979): las pastillas ocupan su fila y la búsqueda no queda minúscula */
 @media (min-width: 700px) and (max-width: 979px) {
   .cj2-fila { flex-wrap: wrap; }
   .cj2-pastillas { flex: 1 1 100%; order: 1; }
   .cj2-busqueda { flex: 1 1 200px; order: 3; }
 }
-@media (max-width: 899px) {
-  /* Paginador en el flujo normal al final de la lista: no se mueve con el scroll ni con el teclado y no tapa nada */
-  .cj2-pag { flex-wrap: wrap; gap: 4px 8px; padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px)); }
-  .cj2-pag-flechas { flex: 1 1 100%; justify-content: space-between; gap: 6px; }
-  .cj2-pag-extremo { display: none; }
-  .cj2-pag-txt { display: inline; }
-  .cj2-pag-n, .cj2-pag-ir { flex: 1 1 auto; text-align: center; justify-content: center; }
-}
 
-/* ---- Paginador pequeño ---- */
-.cj2-pag-rango { font-size: 12.5px; }
-.cj2-pag-n, .cj2-pag-ir { font-size: 13px; }
-.cj2-pag-flechas .cj2-btn { min-height: 34px; padding: 0 10px; font-size: 13px; }
-.cj2-pag-flechas .cj2-btn--ico { min-width: 34px; gap: 4px; }
-.cj2-pag-select { font-size: 13px; }
-.cj2-pag-filas { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--cp-soft, #2C4C5D); }
-.cj2-pag-aviso { flex: 1 1 100%; font-size: 12.5px; font-weight: 700; color: var(--cp-rust, #B2500F); }
-@media (pointer: coarse), (max-width: 699px) {
-  .cj2-pag-flechas .cj2-btn, .cj2-pag-select { min-height: 40px; }
+/* ---- Paginador compacto: una línea delgada, del ancho de su contenido y alineada a la derecha ---- */
+.cj2-pag {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 12px;
+  width: fit-content; max-width: 100%; margin-left: auto; padding: 2px 4px calc(2px + env(safe-area-inset-bottom, 0px));
+  font-size: 12px; line-height: 1.2; color: var(--cp-soft, #2C4C5D);
 }
+.cj2-pag-rango { font-size: 12px; font-weight: 700; }
+.cj2-pag-filas { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; }
+.cj2-pag-select {
+  position: relative; min-height: 24px; min-width: 0; padding: 0 4px; border: 1px solid var(--cp-navy, #0B2C3E); border-radius: 8px;
+  background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: 800 12px 'Open Sans', sans-serif; cursor: pointer;
+}
+.cj2-pag-select:focus-visible, .cj2-pag-btn:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 1px; }
+.cj2-pag-aviso { flex: 1 1 100%; text-align: right; font-size: 12px; font-weight: 700; color: var(--cp-rust, #B2500F); }
+.cj2-pag-flechas { display: inline-flex; align-items: center; gap: 6px; }
+.cj2-pag-n, .cj2-pag-ir { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--cp-navy, #0B2C3E); white-space: nowrap; }
+/* Se ven chicos; el área de toque llega a 44 px con el pseudo-elemento (no cambia el alto de la línea) */
+.cj2-pag-btn {
+  position: relative; min-width: 28px; height: 26px; padding: 0 8px; border: 1px solid var(--cp-navy, #0B2C3E); border-radius: 8px;
+  background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: 800 12px 'Open Sans', sans-serif; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cj2-pag-btn::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); }
+/* Táctil: el selector llega a 44 px de alto con margen negativo (la línea no crece) */
+@media (pointer: coarse), (max-width: 699px) { .cj2-pag-select { min-height: 44px; margin: -10px 0; } }
+.cj2-pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (max-width: 899px) { .cj2-pag-extremo { display: none; } }
 
 /* ---- Tarjeta: rótulos de modalidad y mesa con tamaño moderado y sin desbordes ----
    (overflow-wrap: break-word y no «anywhere»: así solo se parte una palabra que no cabe sola, nunca «DELI VERY») */
@@ -1287,4 +1229,15 @@
   .cj2-lista > .cj2-tabla-marco { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
   .cj2-lista > .cj2-tabla-marco .cj2-tabla-scroll { flex: 1 1 auto; min-height: 0; max-height: none; }
   .cj2-lista > .cj2-tabla-marco .cj2-tabla-pie { flex: none; }
+}
+
+/* ---- Interruptor de vistas dentro de la cabecera (sin fila propia) ---- */
+.cj2-vistabar--cab { flex: 0 0 auto; flex-wrap: nowrap; }
+.cj2-vistabar--cab .cj2-vista-op { min-height: var(--cj2-h); padding: 0 10px; min-width: 36px; justify-content: center; }
+/* Con el menú lateral abierto el espacio es corto: solo íconos (con nombre y título) hasta los 1500 px */
+@media (max-width: 1499px) { .cj2-vistabar--cab .cj2-vista-txt { display: none; } }
+@media (max-width: 699px) { .cj2-vistabar--cab .cj2-vista-op { min-width: 44px; padding: 0; } }
+/* Celular: el menu de tres puntos sube junto al titulo; la segunda linea queda para caja, impresion y vistas */
+@media (max-width: 699px) {
+  .cj2-cab > .cj-estado, .cj2-cab > .cj2-vistabar--cab { order: 1; }
 }

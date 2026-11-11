@@ -1,10 +1,14 @@
 /* ---- Barra de vista (Tarjetas | Tabla) y columnas ---- */
 .cj2-vistabar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
 .cj2-vista { display: inline-flex; border: 1.5px solid var(--cp-navy, #0B2C3E); border-radius: 10px; overflow: hidden; }
-.cj2-vista-op { min-height: 34px; padding: 0 14px; border: 0; background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.cj2-vista-op { min-height: 34px; padding: 0 10px; border: 0; background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.cj2-vista-op + .cj2-vista-op { border-left: 1.5px solid var(--cp-navy, #0B2C3E); }
 .cj2-vista-op[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
+.cj2-vista-op:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: -3px; }
 .cj2-vistabar .cj2-btn { min-height: 34px; font-size: 13px; padding: 0 12px; }
-@media (pointer: coarse), (max-width: 699px) { .cj2-vista-op, .cj2-vistabar .cj2-btn { min-height: 40px; } }
+/* Táctil: 44 px de alto aunque el control sea compacto; en angosto solo íconos (44 px de ancho) */
+@media (pointer: coarse), (max-width: 699px) { .cj2-vista-op, .cj2-vistabar .cj2-btn { min-height: 44px; } }
+@media (max-width: 699px) { .cj2-vista-op { min-width: 44px; padding: 0; justify-content: center; } .cj2-vista-txt { display: none; } }
 .cj2-menu-rel { position: relative; }
 .cj2-col-panel { position: absolute; right: 0; top: calc(100% + 4px); z-index: 60; width: min(280px, 86vw); max-height: 60vh; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; background: var(--cp-white, #FFFFFF); border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; box-shadow: 0 8px 24px rgba(11, 44, 62, 0.15); }
 .cj2-col-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
