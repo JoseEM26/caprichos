@@ -30,7 +30,13 @@ export function ordenSelectorDe(visibles: string[], todas: ColumnaElegible[]): s
 
 const ROTULO_VISTA = { tarjetas: 'Tarjetas', tabla: 'Tabla', lista: 'Lista' } as const;
 
-/** Conmutador «Tarjetas | Tabla» (Caja le agrega «Lista» con `opciones`). */
+const ICONO_VISTA = {
+  tarjetas: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  tabla: 'M3 5h18v14H3zM3 10h18M3 15h18M9 5v14',
+  lista: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
+} as const;
+
+/** Conmutador «Tarjetas | Tabla» compacto: ícono y texto corto (en pantallas angostas solo el ícono; el nombre accesible siempre está). Caja le agrega «Lista» con `opciones`. */
 export function ConmutadorVista<V extends keyof typeof ROTULO_VISTA = VistaLista>({
   vista,
   alCambiar,
@@ -43,8 +49,11 @@ export function ConmutadorVista<V extends keyof typeof ROTULO_VISTA = VistaLista
   return (
     <div className="cj2-vista" role="group" aria-label="Vista de la lista">
       {opciones.map((v) => (
-        <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} onClick={() => alCambiar(v)}>
-          {ROTULO_VISTA[v]}
+        <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} aria-label={ROTULO_VISTA[v]} title={ROTULO_VISTA[v]} onClick={() => alCambiar(v)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d={ICONO_VISTA[v]} />
+          </svg>
+          <span className="cj2-vista-txt">{ROTULO_VISTA[v]}</span>
         </button>
       ))}
     </div>

@@ -285,12 +285,10 @@ export function PedidosAdminView() {
   const [mediosFiltro, setMediosFiltro] = useState<string[]>([]);
   // Vista (tarjetas o tabla), columnas de la tabla y filas por página: se guardan por usuario
   const [vista, setVista] = usePreferenciaCaja<VistaCaja>(CLAVE_VISTA, 'tarjetas', normalizarVistaCaja);
-  // Lista: pestaña por tipo de servicio (de esta visita) y orden (guardado por usuario). La Lista no usa ningún filtro.
+  // Lista: pestaña por tipo de servicio (de esta visita) y orden (guardado por usuario). Los filtros son los mismos de las tres vistas.
   const [pestanaLista, setPestanaLista] = useState<PestanaLista>('todos');
   const [ordenLista, setOrdenLista] = usePreferenciaCaja<OrdenLista>(CLAVE_ORDEN_LISTA, ORDEN_LISTA_POR_DEFECTO, normalizarOrdenLista);
   const enLista = vista === 'lista';
-  // El medio de pago se pide al servidor: en la Lista no se aplica (se ven todos los pedidos del rango)
-  const mediosServidor = enLista ? [] : mediosFiltro;
   const [columnasTabla, setColumnasTabla] = usePreferenciaCaja<string[]>(CLAVE_COLUMNAS, COLUMNAS_POR_DEFECTO, normalizarColumnas);
   const [filas, setFilas] = usePreferenciaCaja<FilasPorPagina>(CLAVE_FILAS, null, normalizarFilas);
   const [detalleVentaId, setDetalleVentaId] = useState<string | null>(null);
@@ -345,7 +343,7 @@ export function PedidosAdminView() {
       const [paginas, pendientes] = await Promise.all([
         Promise.all(
           Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
-            pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosServidor.length ? { medios: mediosServidor } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
+            pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
           ),
         ),
         contarPendientesAnteriores(),
@@ -361,7 +359,7 @@ export function PedidosAdminView() {
     } finally {
       if (g === generacion.current) setCargando(false);
     }
-  }, [rango, mediosServidor.join('|')]);
+  }, [rango, mediosFiltro.join('|')]);
 
   useEffect(() => {
     cargarDatos();
@@ -389,7 +387,7 @@ export function PedidosAdminView() {
     setCargandoMas(true);
     setErrorMas('');
     try {
-      const r = await pedidosApi.listar({ ...parametrosDeRango(rango.modo === 'hoy' ? rangoHoy() : rango), ...(mediosServidor.length ? { medios: mediosServidor } : {}), limite: LIMITE_PAGINA, pagina: siguiente });
+      const r = await pedidosApi.listar({ ...parametrosDeRango(rango.modo === 'hoy' ? rangoHoy() : rango), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, pagina: siguiente });
       // Cambió el día o un filtro de servidor mientras llegaba: esta página ya no sirve
       if (g !== generacion.current) return;
       paginasRef.current = siguiente;
@@ -639,11 +637,12 @@ export function PedidosAdminView() {
   // Atajos: lo que necesita atención no queda escondido
   const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
 
-  // Lista: TODOS los pedidos del rango cargado (sin filtros), por pestaña de tipo de servicio y con su orden propio
-  const conteosLista = useMemo(() => contarPestanas(pedidos), [pedidos]);
+  // Lista: primero los filtros (los mismos de Tarjetas y Tabla), después las pestañas por tipo de servicio con su orden propio.
+  // Así los contadores de las pestañas cuentan solo lo ya filtrado y «Todos» coincide con el total de la búsqueda.
+  const conteosLista = useMemo(() => contarPestanas(pedidosFiltrados), [pedidosFiltrados]);
   const pedidosLista = useMemo(
-    () => ordenarLista(pedidos.filter((p) => enPestana(p, pestanaLista)), ordenLista),
-    [pedidos, pestanaLista, ordenLista],
+    () => ordenarLista(pedidosFiltrados.filter((p) => enPestana(p, pestanaLista)), ordenLista),
+    [pedidosFiltrados, pestanaLista, ordenLista],
   );
 
   // Filtros activos del panel (chips removibles arriba)
@@ -717,7 +716,7 @@ export function PedidosAdminView() {
     [pedidos, totalDia, resumenApi],
   );
   // Los montos siguen lo que se ve: con algún filtro (contador, estado, canal, medio, búsqueda, pastilla) suman SOLO esos pedidos
-  const filtrado = !enLista && pedidosFiltrados.length !== pedidos.length;
+  const filtrado = pedidosFiltrados.length !== pedidos.length;
   const montos: ResumenDia = useMemo(
     () => (filtrado ? resumirDia(filasDePedidos(pedidosFiltrados)) : resumen),
     [filtrado, pedidosFiltrados, resumen],
@@ -783,8 +782,6 @@ export function PedidosAdminView() {
   }, [cuentas, pedidosFiltrados, pedidosLista, enTabla, enLista, paginaValida, porPagina]);
   const pedidosPaginados = pagina as typeof cuentas;
   const filasTabla = pagina as Pedido[];
-  // Aviso de la Lista: hay filtros guardados de Tabla y Tarjetas que aquí no se aplican
-  const hayFiltrosEscondidos = chips.length > 0 || filtro !== 'todo' || busqueda.trim() !== '';
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
   useEffect(() => {
     setPaginaActual((p) => (p > totalPaginas ? totalPaginas : p));
@@ -828,8 +825,7 @@ export function PedidosAdminView() {
     );
   }
 
-  // La Lista no filtra: «No entregados» es un filtro más y no se muestra en ella
-  const enNoEntregados = grupoEstado === 'noent' && !enLista;
+  const enNoEntregados = grupoEstado === 'noent';
   const totalNoEntregados = noEntregados?.total ?? 0;
   const puedeCortesia = tiene('cortesias/dar');
 
@@ -855,12 +851,12 @@ export function PedidosAdminView() {
         <span className="cj2-sub" aria-hidden="true">{SUBTITULO_CAJA}</span>
       </div>
 
-      {!enNoEntregados && !enLista && totalNoEntregados > 0 && (
+      {!enNoEntregados && totalNoEntregados > 0 && (
         <button type="button" className="cj2-atajo cj2-atajo--rust" onClick={() => cambiarGrupoEstado('noent')}>
           {totalNoEntregados} no {totalNoEntregados === 1 ? 'entregado' : 'entregados'}
         </button>
       )}
-      {!enLista && etapa !== 'confirmar' && grupoEstado === 'act' && porConfirmar > 0 && (
+      {etapa !== 'confirmar' && grupoEstado === 'act' && porConfirmar > 0 && (
         <button
           type="button"
           className="cj2-atajo"
@@ -869,7 +865,7 @@ export function PedidosAdminView() {
           {porConfirmar} por confirmar
         </button>
       )}
-      {!enLista && pendientesAnteriores > 0 && rango.modo !== 'pendientes' && (
+      {pendientesAnteriores > 0 && rango.modo !== 'pendientes' && (
         <button
           type="button"
           className="cj2-atajo"
@@ -891,6 +887,17 @@ export function PedidosAdminView() {
         </button>
       )}
       <AccesoListaEsperaCaja />
+      {/* Vista y columnas: dentro de la cabecera para no gastar una fila propia */}
+      {!enNoEntregados && (
+        <div className="cj2-vistabar cj2-vistabar--cab">
+          {enTabla && <SelectorColumnas columnas={columnasTabla} alCambiar={setColumnasTabla} />}
+          <ConmutadorVista
+            vista={vista}
+            opciones={VISTAS_CAJA}
+            alCambiar={(v) => { setVista(v); setPaginaActual(1); }}
+          />
+        </div>
+      )}
       <button type="button" className="cj2-btn cj2-btn--nuevo cj2-btn--nuevo-cab cj-nuevo" onClick={abrirNuevoPedido}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         Nuevo pedido
@@ -922,7 +929,7 @@ export function PedidosAdminView() {
     {/* Barra de control (fija arriba al desplazar): estados, buscador, atajo y Filtros; debajo, los filtros activos */}
     <div className="cj2-control">
     {/* Los cuatro filtros visibles, buscador y panel de Filtros */}
-    {!enNoEntregados && !enLista && (
+    {!enNoEntregados && (
       <div className="cj2-fila" ref={filaFiltrosRef}>
         <nav aria-label="Estado de los pedidos" className="cj2-pastillas">
           {FILTROS_CAJA.map((f) => (
@@ -1055,6 +1062,7 @@ export function PedidosAdminView() {
                   }}
                 />
               </BarraFiltros>
+              {!enLista && (
               <div className="cj2-orden" role="group" aria-label="Orden por tiempo">
                 <span className="cj2-orden-t">Orden por tiempo</span>
                 {(['mas', 'menos'] as const).map((o) => (
@@ -1063,6 +1071,7 @@ export function PedidosAdminView() {
                   </button>
                 ))}
               </div>
+              )}
               {chips.length > 0 && (
                 <button type="button" className="cj2-limpiar" style={{ alignSelf: 'flex-start' }} onClick={limpiarFiltros}>
                   Limpiar filtros
@@ -1075,14 +1084,14 @@ export function PedidosAdminView() {
     )}
 
     {/* Filtros activos: chips que se quitan con un toque */}
-    {!enLista && (chips.length > 0 || orden !== ORDEN_POR_DEFECTO || chipTodo) && (
+    {(chips.length > 0 || (!enLista && orden !== ORDEN_POR_DEFECTO) || chipTodo) && (
       <div className="cj2-activos" aria-label="Filtros activos">
         {chipTodo && (
           <button type="button" className="cj2-quitar" aria-label="Quitar Mostrando todo el día" onClick={limpiarFiltros}>
             Mostrando: todo el día <span aria-hidden="true">✕</span>
           </button>
         )}
-        {orden !== ORDEN_POR_DEFECTO && (
+        {!enLista && orden !== ORDEN_POR_DEFECTO && (
           <button type="button" className="cj2-quitar" aria-label="Quitar orden: más tiempo primero" onClick={() => cambiarOrden(ORDEN_POR_DEFECTO)}>
             <span aria-hidden="true">↑↓ </span>Orden: más tiempo primero <span aria-hidden="true">×</span>
           </button>
@@ -1123,21 +1132,21 @@ export function PedidosAdminView() {
           </span>
           {resumenAbierto && (
             <>
-              <button type="button" className="cj2-res" aria-pressed={!enLista && grupoEstado === 'act' && !contador} disabled={enLista} onClick={() => elegirContador('activos')}>
+              <button type="button" className="cj2-res" aria-pressed={grupoEstado === 'act' && !contador} onClick={() => elegirContador('activos')}>
                 <strong>{resumen.activos}</strong> {resumen.activos === 1 ? 'activo' : 'activos'}
               </button>
-              <button type="button" className="cj2-res" aria-pressed={!enLista && contador === 'entregados'} disabled={enLista} onClick={() => elegirContador('entregados')}>
+              <button type="button" className="cj2-res" aria-pressed={contador === 'entregados'} onClick={() => elegirContador('entregados')}>
                 <strong>{resumen.entregados}</strong> {resumen.entregados === 1 ? 'entregado' : 'entregados'}
               </button>
-              <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={!enLista && contador === 'anulados'} disabled={enLista} onClick={() => elegirContador('anulados')}>
+              <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'anulados'} onClick={() => elegirContador('anulados')}>
                 <strong>{resumen.anulados}</strong> {resumen.anulados === 1 ? 'anulado' : 'anulados'}
               </button>
               {(resumen.rechazados > 0 || contador === 'rechazados') && (
-                <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={!enLista && contador === 'rechazados'} disabled={enLista} onClick={() => elegirContador('rechazados')}>
+                <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'rechazados'} onClick={() => elegirContador('rechazados')}>
                   <strong>{resumen.rechazados}</strong> {resumen.rechazados === 1 ? 'rechazado' : 'rechazados'}
                 </button>
               )}
-              <button type="button" className="cj2-res" aria-pressed={!enLista && contador === 'porcobrar'} disabled={enLista} onClick={() => elegirContador('porcobrar')}>
+              <button type="button" className="cj2-res" aria-pressed={contador === 'porcobrar'} onClick={() => elegirContador('porcobrar')}>
                 <strong>{resumen.porCobrar}</strong> por cobrar
               </button>
             </>
@@ -1156,42 +1165,19 @@ export function PedidosAdminView() {
           </span>
         </section>
 
-        {/* Vista y columnas */}
-        <div className="cj2-vistabar">
-          <ConmutadorVista
-            vista={vista}
-            opciones={VISTAS_CAJA}
-            alCambiar={(v) => {
-              // El medio de pago viaja al servidor solo fuera de la Lista: se vuelve a leer desde la primera página
-              if (mediosFiltro.length) { paginasRef.current = 1; generacion.current++; }
-              setVista(v);
-              setPaginaActual(1);
-            }}
-          />
-          {enTabla && <SelectorColumnas columnas={columnasTabla} alCambiar={setColumnasTabla} />}
-        </div>
-
-        {/* LISTA: pestañas por tipo de servicio y orden; sin filtros ni búsqueda */}
+        {/* LISTA: pestañas por tipo de servicio y orden; se combinan con los filtros de arriba */}
         {enLista && (
-          <>
-            {hayFiltrosEscondidos && (
-              <p className="lc-nota" role="note" data-testid="nota-lista-filtros">
-                <span>La lista muestra todos los pedidos; los filtros aplican en Tabla y Tarjetas.</span>
-                <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Quitar filtros</button>
-              </p>
-            )}
-            <div className="lc-barra">
-              <PestanasLista activa={pestanaLista} conteos={conteosLista} alCambiar={(t) => { setPestanaLista(t); setPaginaActual(1); }} />
-              <OrdenarLista orden={ordenLista} alCambiar={(o) => { setOrdenLista(o); setPaginaActual(1); }} />
-            </div>
-          </>
+          <div className="lc-barra">
+            <PestanasLista activa={pestanaLista} conteos={conteosLista} alCambiar={(t) => { setPestanaLista(t); setPaginaActual(1); }} />
+            <OrdenarLista orden={ordenLista} alCambiar={(o) => { setOrdenLista(o); setPaginaActual(1); }} />
+          </div>
         )}
 
         {/* TARJETAS / TABLA / LISTA */}
         <div className="cj2-lista" ref={listaRef}>
           {unidades.length === 0 ? (
             <div className="cj2-vacio">
-              {enLista && pedidos.length > 0 ? (
+              {enLista && pedidosFiltrados.length > 0 ? (
                 'No hay pedidos de este tipo de servicio.'
               ) : pedidos.length > 0 ? (
                 <>

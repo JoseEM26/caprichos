@@ -1,11 +1,5 @@
 /* Vista «Lista» de Caja: cola de pedidos con franja por tipo de servicio. Solo lo nuevo; botones y chips de estado reutilizan los de Caja. */
 .lc-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.lc-nota {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; padding: 8px 12px;
-  border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; background: var(--cp-cream, #FBF4EC);
-  color: var(--cp-soft, #2C4C5D); font-size: 13px; font-weight: 600;
-}
-.lc-nota .cj2-limpiar { min-height: 44px; }
 
 /* Pestañas */
 .lc-tabs { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; padding-bottom: 2px; }

@@ -27,11 +27,11 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 4. La barra se actualiza sola cuando entra un pedido, un cobro, una anulacion o un cambio de estado (puede tardar un segundo).
 
 ## Como se hace: Ver los pedidos como Lista
-1. En Pedidos y caja, arriba de los pedidos, elige Lista (junto a Tarjetas y Tabla). Tu eleccion queda guardada para tu usuario.
+1. En Pedidos y caja, arriba a la derecha de la cabecera (junto a Nuevo pedido) esta el interruptor de vistas Tarjetas | Tabla | Lista; en el celular se ve solo con iconos. Elige Lista: tu eleccion queda guardada para tu usuario.
 2. La Lista muestra una fila por pedido: codigo y tipo, cuanto tiempo lleva (se pone en rojo desde los 50 minutos), quien lo registro, el estado, el total con su pago y el nombre del cliente. La franja de color de la izquierda indica si es delivery, para llevar o mesa.
 3. Las pestanas Mostrador, A domicilio y Mesas separan los pedidos por tipo de servicio y cada una dice cuantos tiene; Todos los suma. Con Ordenar por eliges fecha, estado, total o cliente, y el sentido; se recuerda para ti.
 4. Cada fila trae sus botones: imprimir, Estado (preparar, listo, enviar), Pago (confirmar pago o cobrar) y Finalizar (entregar). Solo salen los que tu usuario puede usar. El menu de tres puntos abre Ver detalle de la venta o el pedido completo. En un delivery sin repartidor aparece Elige un repartidor, que te lleva a Repartos.
-5. La Lista no tiene filtros ni busqueda: muestra todos los pedidos del dia o rango cargado y la barra Resumen suma esos mismos pedidos. Si dejaste filtros puestos en Tabla o Tarjetas, un aviso lo dice y el boton Quitar filtros los limpia.
+5. La Lista tiene los mismos filtros que Tarjetas y Tabla: busqueda, Filtros, los estados, Todo el dia o un rango, medio de pago, No entregados y los contadores de Resumen. Los filtros se aplican primero y las pestanas por tipo de servicio muestran cuantos pedidos quedan de cada tipo ya filtrados. La barra Resumen suma esos mismos pedidos. Los filtros se comparten entre las tres vistas: al cambiar de vista se conservan.
 
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.

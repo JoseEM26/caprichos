@@ -106,6 +106,21 @@ describe('Vista Lista: interruptor y preferencia', () => {
     expect(screen.queryByTestId('tabla-caja')).toBeNull();
   });
 
+  it('el interruptor vive dentro de la cabecera (con Nuevo pedido), no en una fila propia, con nombre y título por opción', async () => {
+    montar([ped(1)]);
+    await screen.findByTestId('resumen-dia');
+    const grupo = screen.getByRole('group', { name: 'Vista de la lista' });
+    const cabecera = grupo.closest('.cj2-cab') as HTMLElement;
+    expect(cabecera).toBeTruthy();
+    expect(within(cabecera).getByRole('button', { name: 'Nuevo pedido' })).toBeTruthy();
+    expect(grupo.closest('.cj2-control')).toBeNull();
+    for (const n of ['Tarjetas', 'Tabla', 'Lista']) expect(within(grupo).getByRole('button', { name: n })).toHaveAttribute('title', n);
+    // el selector de columnas aparece junto al interruptor solo en Tabla
+    expect(within(cabecera).queryByRole('button', { name: /Columnas/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Tabla' }));
+    expect(within(cabecera).getByRole('button', { name: /Columnas/ })).toBeTruthy();
+  });
+
   it('arranca en Lista si así quedó guardado; una preferencia antigua (tabla) o desconocida sigue siendo válida', async () => {
     vi.mocked(preferenciasApi.obtener).mockImplementation(async (c: string) => ({ clave: c, valor: c === 'caja.vista' ? 'lista' : null }));
     montar([ped(1)]);
@@ -118,51 +133,105 @@ describe('Vista Lista: interruptor y preferencia', () => {
   });
 });
 
-describe('Vista Lista: sin filtros', () => {
-  it('no hay búsqueda, botón Filtros, pastillas ni «Todo el día»', async () => {
+describe('Vista Lista: mismos filtros que Tarjetas y Tabla', () => {
+  const surtido = () => [
+    ped(1, { cliente_nombre: 'Ana Prueba', modalidad: 'LLEVAR', mediosPago: ['YAPE'] }),
+    ped(2, { cliente_nombre: 'Luis Prueba', modalidad: 'DELIVERY', mediosPago: ['EFECTIVO'] }),
+    ped(3, { cliente_nombre: 'Rosa Prueba', modalidad: 'MESA', mesa_nombre: 'Mesa 3', estado: 'ENTREGADO' }),
+    ped(4, { cliente_nombre: 'Ana Maria Prueba', modalidad: 'MESA', mesa_nombre: 'Mesa 4', pago_estado: 'PENDIENTE' }),
+  ];
+  const codigosTarjetas = () => screen.getAllByText(/^CP-\d+$/).map((e) => e.textContent).sort();
+
+  it('hay búsqueda, botón Filtros, pastillas de estado, «Todo el día» y Resumen que filtra; no hay la nota vieja', async () => {
     montar([ped(1)]);
     await irALista();
-    expect(screen.queryByPlaceholderText(/Buscar por código/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Filtros/ })).toBeNull();
-    expect(screen.queryByTestId('cuenta-todo')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Todo el día/ })).toBeNull();
-    expect(screen.queryByRole('navigation', { name: 'Estado de los pedidos' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Medio de pago/ })).toBeNull();
+    expect(screen.getByPlaceholderText(/Buscar por código/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Filtros/ })).toBeTruthy();
+    expect(screen.getByTestId('cuenta-todo')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Todo el día/ })).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Estado de los pedidos' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /activo/ })).not.toBeDisabled();
+    expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
+    expect(screen.queryByText(/los filtros aplican en/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    expect(screen.getByRole('button', { name: /^Medio de pago:/ })).toBeTruthy();
+    // «Orden por tiempo» es de Tarjetas y Tabla; la Lista tiene su propio «Ordenar por»
+    expect(screen.queryByRole('group', { name: 'Orden por tiempo' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Ordenar por' })).toBeTruthy();
   });
 
-  it('muestra todos los pedidos aunque haya filtros en otra vista, avisa y «Quitar filtros» los limpia', async () => {
-    montar([ped(1, { cliente_nombre: 'Ana Prueba' }), ped(2, { cliente_nombre: 'Luis Prueba' }), ped(3, { cliente_nombre: 'Rosa Prueba', estado: 'ENTREGADO' })]);
+  it('la búsqueda da los mismos pedidos en Tarjetas, Tabla y Lista, y se conserva al cambiar de vista', async () => {
+    montar(surtido());
     await screen.findByTestId('resumen-dia');
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
     await waitFor(() => expect(screen.queryByText('Luis Prueba')).toBeNull());
+    const enTarjetas = codigosTarjetas();
+    expect(enTarjetas).toEqual(['CP-001', 'CP-004']);
+    fireEvent.click(screen.getByRole('button', { name: 'Tabla' }));
+    const enTabla = within(await screen.findByTestId('tabla-caja')).getAllByText(/^CP-\d+$/).map((e) => e.textContent).sort();
     fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
     await screen.findByTestId('lista-caja');
-    expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-003']); // incluye el entregado y el que la búsqueda ocultaba
-    const nota = screen.getByTestId('nota-lista-filtros');
-    expect(nota).toHaveTextContent('La lista muestra todos los pedidos; los filtros aplican en Tabla y Tarjetas');
-    fireEvent.click(within(nota).getByRole('button', { name: 'Quitar filtros' }));
-    expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Tarjetas' }));
-    expect((screen.getByPlaceholderText(/Buscar por código/) as HTMLInputElement).value).toBe('');
+    expect(enTabla).toEqual(enTarjetas);
+    expect(codigosEnLista().sort()).toEqual(enTarjetas);
+    expect((screen.getByPlaceholderText(/Buscar por código/) as HTMLInputElement).value).toBe('Ana');
   });
 
-  it('sin filtros activos no sale la nota', async () => {
-    montar([ped(1)]);
+  it('las pastillas de estado y «Todo el día» filtran la Lista igual que las tarjetas (entregados solo con «Todo el día»)', async () => {
+    montar(surtido());
     await irALista();
-    expect(screen.queryByTestId('nota-lista-filtros')).toBeNull();
+    expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-004']); // por defecto: los activos
+    fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
+    expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-003', 'CP-004']);
+    expect(screen.getByTestId('lista-cuenta-todos')).toHaveTextContent('4');
   });
 
-  it('el filtro de medio de pago no viaja al servidor en la Lista', async () => {
+  it('un contador del Resumen filtra la Lista (Entregados) y los chips lo muestran', async () => {
+    montar(surtido());
+    await irALista();
+    fireEvent.click(screen.getByRole('button', { name: /entregado/ }));
+    await waitFor(() => expect(codigosEnLista()).toEqual(['CP-003']));
+    expect(screen.getAllByRole('button', { name: /^Quitar filtro/ }).length).toBeGreaterThan(0);
+    fireEvent.click(within(screen.getByTestId('resumen-dia')).getByRole('button', { name: /activo/ }));
+    expect(codigosEnLista().sort()).toEqual(['CP-001', 'CP-002', 'CP-004']);
+  });
+
+  it('el filtro por medio de pago llega al servidor también desde la Lista, y no se pierde al cambiar de vista', async () => {
     montar([ped(1, { mediosPago: ['YAPE'] })]);
-    await screen.findByTestId('resumen-dia');
+    await irALista();
+    listar.mock.calls.length = 0;
     fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Medio de pago:/ }));
     fireEvent.click(screen.getByRole('option', { name: /Yape/ }));
     await waitFor(() => expect(listar.mock.calls.some(([f]: any) => f?.medios?.join(',') === 'YAPE')).toBe(true));
     listar.mock.calls.length = 0;
+    fireEvent.click(screen.getByRole('button', { name: 'Tarjetas' }));
     fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
-    await waitFor(() => expect(listar.mock.calls.some(([f]: any) => !f?.pendientes)).toBe(true));
-    expect(listar.mock.calls.filter(([f]: any) => !f?.pendientes).every(([f]: any) => !f?.medios)).toBe(true);
+    await screen.findByTestId('lista-caja');
+    // cambiar de vista no vuelve a pedir ni suelta el medio
+    expect(listar.mock.calls.filter(([f]: any) => !f?.pendientes && !f?.medios)).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /^Quitar filtro Medio: Yape/ })).toBeTruthy();
+  });
+
+  it('pestañas + filtros: los filtros van antes y los contadores de las pestañas cuentan lo ya filtrado', async () => {
+    montar(surtido());
+    await irALista();
+    fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
+    expect(within(screen.getByRole('tablist')).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos4', 'Mostrador1', 'A domicilio1', 'Mesas2']);
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
+    await waitFor(() => expect(within(screen.getByRole('tablist')).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Todos2', 'Mostrador1', 'A domicilio0', 'Mesas1']));
+    fireEvent.click(screen.getByRole('tab', { name: /Mesas/ }));
+    expect(codigosEnLista()).toEqual(['CP-004']);
+    fireEvent.click(screen.getByRole('tab', { name: /A domicilio/ }));
+    expect(screen.getByText('No hay pedidos de este tipo de servicio.')).toBeTruthy();
+  });
+
+  it('un filtro sin resultados dice «No hay pedidos con estos filtros» y permite limpiarlos', async () => {
+    montar(surtido());
+    await irALista();
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'zzz' } });
+    expect(await screen.findByText('No hay pedidos con estos filtros.')).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Limpiar filtros' })[0]);
+    await waitFor(() => expect(codigosEnLista()).toHaveLength(3));
   });
 });
 
@@ -419,32 +488,25 @@ describe('Vista Lista: celular y paginación', () => {
 });
 
 describe('Vista Lista: el Resumen coincide con la lista', () => {
-  it('mismos pedidos: total del resumen = filas de la pestaña Todos y ventas = suma de la lista sin anulados', async () => {
+  it('con «Todo el día»: total del resumen = filas de la pestaña Todos y ventas = suma sin anulados', async () => {
     montar([ped(1, { total: 30 }), ped(2, { total: 20, pago_estado: 'PENDIENTE' }), ped(3, { total: 99, estado: 'ANULADO' }), ped(4, { total: 10, estado: 'ENTREGADO' })]);
     await irALista();
-    const resumen = screen.getByTestId('resumen-dia');
-    expect(resumen).toHaveTextContent('4 pedidos');
+    fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
+    expect(screen.getByTestId('resumen-dia')).toHaveTextContent('4 pedidos');
     expect(screen.getByTestId('lista-cuenta-todos')).toHaveTextContent('4');
     expect(screen.getAllByTestId('fila-lista')).toHaveLength(4);
     expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 60.00'); // 30 + 20 + 10; el anulado no suma
   });
 
-  it('con un filtro activo en otra vista, la Lista sigue mostrando los montos del total (sin «Filtrado»)', async () => {
+  it('los montos siguen los filtros también en la Lista: «Filtrado», solo esos pedidos y el total del día aparte', async () => {
     montar([ped(1, { total: 30, cliente_nombre: 'Ana Prueba' }), ped(2, { total: 20, cliente_nombre: 'Luis Prueba' })]);
-    await screen.findByTestId('resumen-dia');
+    await irALista();
+    expect(screen.getByTestId('montos-resumen')).not.toHaveTextContent('Filtrado');
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'Ana' } });
     await waitFor(() => expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Filtrado: 1 pedido'));
-    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
-    await screen.findByTestId('lista-caja');
-    expect(screen.getByTestId('montos-resumen')).not.toHaveTextContent('Filtrado');
-    expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 50.00');
-    expect(screen.getAllByTestId('fila-lista')).toHaveLength(2);
-  });
-
-  it('los contadores del resumen no filtran en la Lista (quedan deshabilitados)', async () => {
-    montar([ped(1)]);
-    await irALista();
-    expect(screen.getByRole('button', { name: /activo/ })).toBeDisabled();
+    expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Ventas S/ 30.00');
+    expect(screen.getByTestId('montos-resumen')).toHaveTextContent('Día: S/ 50.00');
+    expect(screen.getAllByTestId('fila-lista')).toHaveLength(1);
   });
 });
 
