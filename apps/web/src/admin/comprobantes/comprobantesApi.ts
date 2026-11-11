@@ -13,6 +13,7 @@ import type {
   EstadoConexionWhatsAppInfo,
   RespuestaListarElectronicos,
   ConfigFacturacion,
+  ComprobantePedido,
   ProveedorFacturacion,
   SaludFacturacion,
 } from './tipos';
@@ -39,6 +40,13 @@ export const comprobantesApi = {
   async obtenerNotaVenta(pedidoId: string): Promise<NotaVentaDatos> {
     return clienteFetch<NotaVentaDatos>(
       `/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}`,
+    );
+  },
+
+  /** Todos los comprobantes de un pedido y sus extras (solo lectura), vigentes primero. */
+  async listarPorPedido(pedidoId: string): Promise<{ elementos: ComprobantePedido[] }> {
+    return clienteFetch<{ elementos: ComprobantePedido[] }>(
+      `/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}/lista`,
     );
   },
 

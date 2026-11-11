@@ -182,6 +182,14 @@ Ver tambien: [[repartos]], [[mensajes]]
 1. "#N del dia" en el detalle del pedido es el orden de llegada a cocina de hoy (referencial; reinicia a medianoche de Lima). El codigo CP-xxxx es el que vale. Un pedido sin numero (anterior a esta funcion) muestra un guion.
 2. Si el pedido trae propina (la dejo el cliente en la carta o el bot), el cobro muestra "Venta S/ X + propina S/ Y (va aparte, no es venta)". Se cobra la suma; la propina no es ingreso ni sale en comprobantes y se ve en [[propinas]] y en el bloque de propinas del [[cierre]].
 
+## Como se hace: Ver el detalle de una venta y sus comprobantes
+1. En la lista de Caja pulsa Ver detalle. Arriba queda fijo el codigo, el estado, si esta pagado y el total. Abajo hay cuatro pestanas (puedes pasar de una a otra con las flechas del teclado): Venta, Cliente, Pagos y Tiempos.
+2. Venta: modalidad, mesa o entrega, observaciones, tabla de productos, importes con descuentos y puntos canjeados, y los pedidos extra de la misma cuenta.
+3. Cliente: nombre, celular, cuenta y puntos, y el RUC guardado (solo si tienes permiso de ver clientes; sale con asteriscos, el administrador lo ve completo). Debajo estan los comprobantes: nota de venta, boleta y factura, con su numero, fecha, estado (Emitido SUNAT, Pendiente, Rechazado, Revision manual, Simulado o Anulado), documento del cliente y total. El vigente va primero y los anulados despues, con su motivo.
+4. En cada boleta o factura puedes pulsar Ver PDF, XML firmado y CDR SUNAT (si ya existen y tienes permiso de Comprobantes). Ver nota de venta térmica abre el ticket en otra pestana.
+5. El boton Chat de WhatsApp aparece en el apartado del cliente si el pedido tiene celular: abre su chat en Mensajes si existe y tienes permiso; si no, abre WhatsApp en una pestana nueva.
+6. Pagos: medios, efectivo y vuelto, propina, quien cobro y las capturas del pago (aprobada, por verificar o rechazada). Tiempos: la linea de tiempo del pedido.
+
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si el boton Registrar cobro no se activa con Yape o Plin, falta la foto del comprobante: subela, o usa la excepcion con motivo.

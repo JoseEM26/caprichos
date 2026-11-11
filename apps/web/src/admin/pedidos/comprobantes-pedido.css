@@ -1,0 +1,17 @@
+/* Comprobantes del pedido (detalle de Caja): tarjetas con espaciado igual, botones de 44 px, textos largos con salto */
+.cpd-lista { display: flex; flex-direction: column; gap: 10px; }
+.cpd-tarjeta { background: var(--cp-white, #fff); border: 1px solid var(--cp-line, #E3D6C6); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cpd-anulado { background: var(--cp-sand, #EDE1D1); }
+.cpd-anulado .cpd-cab strong { text-decoration: line-through; }
+.cpd-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; font-family: Montserrat, sans-serif; font-size: 14px; color: var(--cp-navy, #0B2C3E); overflow-wrap: anywhere; }
+.cpd-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px 12px; margin: 0; }
+.cpd-datos dt { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--cp-soft, #2C4C5D); }
+.cpd-datos dd { margin: 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.cpd-monto { text-align: left; font-variant-numeric: tabular-nums; }
+.cpd-nota { margin: 0; font-size: 12px; color: var(--cp-soft, #2C4C5D); overflow-wrap: anywhere; }
+.cpd-aviso { margin: 0; font-size: 13px; font-weight: 700; color: var(--cp-rust, #B3412E); }
+.cpd-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.cpd-btn, .cpd-enlace { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: var(--cp-navy, #0B2C3E); font: 700 14px 'Open Sans', sans-serif; cursor: pointer; text-decoration: none; }
+.cpd-enlace { border-color: transparent; text-decoration: underline; }
+.cpd-btn:focus-visible, .cpd-enlace:focus-visible { outline: 3px solid var(--cp-gold, #D99E39); outline-offset: 2px; }
+@media (max-width: 480px) { .cpd-btn { flex: 1 1 auto; } }

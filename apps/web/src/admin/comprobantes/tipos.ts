@@ -262,6 +262,14 @@ export interface ComprobanteElectronico {
   baja_en: string | null;
 }
 
+/** Comprobante de un pedido (o de un extra suyo) tal como lo da GET /admin/comprobantes/pedido/:id/lista. */
+export interface ComprobantePedido extends ComprobanteElectronico {
+  anulado_en: string | null;
+  anulado_motivo: string | null;
+  tiene_xml: boolean;
+  tiene_cdr: boolean;
+}
+
 export interface RespuestaListarElectronicos {
   total: number;
   pagina: number;
