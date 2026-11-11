@@ -57,7 +57,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ]],
   ['stock y compras: saldos, movimientos y pedidos a proveedores', [
     'stock', 'stock_sabor', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
-    'traslado', 'pedido_interno', 'produccion', 'conteo_apertura',
+    'traslado', 'pedido_interno', 'produccion', 'conteo_apertura', 'consumo_linea', 'pendiente_almacen',
   ]],
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
     'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'sesion',

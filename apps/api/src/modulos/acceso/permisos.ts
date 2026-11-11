@@ -159,6 +159,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'almacen', accion: 'traslados' },
   { modulo: 'almacen', accion: 'pedidos_internos' },
   { modulo: 'almacen', accion: 'cierre' },
+  // Pendientes de almacén y recuento de insumos: solo Administrador y Almacén (Cocina consume, no mueve stock)
+  { modulo: 'almacen', accion: 'emitir' },
+  { modulo: 'almacen', accion: 'ajustar' },
   // Conteo de apertura del día de los productos que controlan stock (donas, galletas)
   { modulo: 'almacen', accion: 'apertura' },
   // Merma de producto terminado: Cocina decide y queda auditada
@@ -376,6 +379,8 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/traslados',
     'almacen/pedidos_internos',
     'almacen/cierre',
+    'almacen/emitir',
+    'almacen/ajustar',
     'almacen/apertura',
     'compras/ver',
     'compras/crear',

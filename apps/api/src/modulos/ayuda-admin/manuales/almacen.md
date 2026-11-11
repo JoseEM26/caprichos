@@ -72,6 +72,25 @@ Ver tambien: [[compras]]
 3. Cuales productos se cuentan y como se descuentan por sabor y por tamano se configura en [[productos]].
 Despues: [[apertura]]
 
+## Como se hace: Emitir los pendientes de almacen (Cocina uso lo que no tenia)
+Solo se ve con el control de almacen encendido. Cuando Cocina prepara algo y no tiene suficiente insumo, no se detiene: su stock queda en negativo y aparece un pendiente. Es lo que Cocina le debe al almacen.
+1. Abre Almacen y busca la seccion "Pendientes de almacen". Cada insumo muestra en rojo, por ejemplo, "Debe a almacen: 10 kg".
+2. Pulsa "Emitir" en un pendiente, o "Emitir todo" para todos los de ese insumo.
+3. Responde "Si, emitir" en la pregunta. El sistema hace un traslado real de Almacen a Cocina y Cocina queda al dia.
+4. Si el almacen no alcanza, se emite lo que haya y el aviso te dice cuanto falta.
+Nota: solo el Administrador y Almacen pueden emitir. Cocina solo consume.
+Ver tambien: [[cocina]]
+
+## Como se hace: Recuento nocturno de insumos
+1. En "Pendientes de almacen" pulsa "Recuento de insumos".
+2. En las pestanas Cocina y Almacen escribe lo que contaste. Solo se ajusta lo que escribas.
+3. Mira la diferencia contra el sistema y pulsa "Guardar recuento". Responde "Si, ajustar".
+4. Se crean movimientos de ajuste con tu nombre y el motivo. Los pendientes que el recuento resuelve pasan a "Ajustado".
+
+## Como se hace: Merma habitual y receta por sabor
+1. La receta guarda la cantidad neta. Si un insumo siempre se pierde un poco (por ejemplo 10 %), anota esa "merma habitual %" en el insumo: el sistema descuenta cantidad / (1 - merma). No se acepta 100 %.
+2. Si un sabor lleva otra receta, el sistema usa la de ese sabor; si no la tiene, usa la receta general del producto.
+
 ## Errores y dudas comunes
 - Anular un movimiento, una tanda de produccion o registrar una merma grande no pide ningun codigo: basta tener el permiso del modulo y escribir el motivo. Todo queda auditado con quien lo hizo y cuando.
 - Como atender pedidos de insumos enviados por cocina: en la seccion de pedidos internos, localiza el pedido pendiente y pulsa el boton "Marcar entregado" luego de despachar fisicamente los productos.

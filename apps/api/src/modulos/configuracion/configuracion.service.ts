@@ -139,6 +139,9 @@ export const CLAVES_TEXTO = [
   'carta_aviso_entrada',
   'ayuda_ia_activo',
   'stock_control_activo',
+  // Almacén: descontar insumos de Cocina al preparar (nace «no») y permitir Cocina en negativo con pendiente de emitir (nace «si»)
+  'almacen_consumir_al_preparar',
+  'almacen_permitir_cocina_negativa',
   'carta_invitado_activo',
   'terminos_texto',
   'privacidad_texto',
@@ -350,6 +353,8 @@ export class ConfiguracionService {
         clave === 'carta_aviso_entrada' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||
+        clave === 'almacen_consumir_al_preparar' ||
+        clave === 'almacen_permitir_cocina_negativa' ||
         clave === 'carta_invitado_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||

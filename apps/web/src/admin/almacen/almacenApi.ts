@@ -261,6 +261,40 @@ export interface HistorialProductoRespuesta {
   eventos: EventoHistorial[];
 }
 
+export interface PendienteAlmacenItem {
+  id: string;
+  cantidad: number;
+  emitido: number;
+  ajustado: number;
+  saldo: number;
+  estado: 'PENDIENTE' | 'EMITIDO' | 'AJUSTADO' | 'ANULADO';
+  origen: string;
+  creadoEn: string;
+}
+
+export interface PendienteGrupo {
+  insumoId: string;
+  nombre: string;
+  unidad: string;
+  saldoPendiente: number;
+  stockCocina: number;
+  stockAlmacen: number;
+  pendientes: PendienteAlmacenItem[];
+}
+
+export interface ResultadoEmision {
+  ok: boolean;
+  resultados: Array<{ insumoId: string; nombre: string; unidad: string; emitido: number; faltaAlmacen: number; parcial: boolean }>;
+}
+
+export interface FilaRecuentoInsumo {
+  insumoId: string;
+  nombre: string;
+  unidad: string;
+  sistema: number;
+  pendiente: number;
+}
+
 export const almacenApi = {
   /** Historial de movimientos de un producto (y sus sabores) por día de Lima (permiso almacen/apertura). */
   historialProducto: (
@@ -346,6 +380,18 @@ export const almacenApi = {
 
   cerrarDia: (dto: CierreDiaDto) =>
     api.post<{ ok: boolean; id?: string }>('/admin/almacen/cierre-dia', dto),
+
+  /** Pendientes de almacén (lo que Cocina consumió sin tener). `activo` = Control de almacén encendido. */
+  listarPendientes: () => api.get<{ activo: boolean; grupos: PendienteGrupo[] }>('/admin/almacen/pendientes'),
+
+  emitirPendientes: (dto: { ids?: string[]; insumoId?: string }) =>
+    api.post<ResultadoEmision>('/admin/almacen/pendientes/emitir', dto),
+
+  listarInsumosRecuento: (lugar: 'COCINA' | 'ALMACEN') =>
+    api.get<FilaRecuentoInsumo[]>(`/admin/almacen/cierre-dia/insumos?lugar=${lugar}`),
+
+  aplicarRecuentoInsumos: (dto: { lugar: 'COCINA' | 'ALMACEN'; filas: Array<{ insumoId: string; contado: number }>; motivo?: string }) =>
+    api.post<{ ok: boolean }>('/admin/almacen/cierre-dia/insumos', dto),
 
   listarLugares: () =>
     api.get<LugarItem[]>('/admin/stock/lugares'),

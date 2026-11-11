@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CambiarEstadoDto {
   @IsString()
@@ -13,4 +13,9 @@ export class CambiarEstadoDto {
   @IsOptional()
   @IsBoolean()
   forzar?: boolean;
+
+  /** Al anular con el control de almacén encendido: MERMA (se llegó a preparar; defecto) o DEVOLVER los insumos a Cocina. */
+  @IsOptional()
+  @IsIn(['MERMA', 'DEVOLVER'])
+  consumoAlmacen?: 'MERMA' | 'DEVOLVER';
 }

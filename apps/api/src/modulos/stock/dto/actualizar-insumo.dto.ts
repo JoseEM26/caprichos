@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ActualizarInsumoDto {
@@ -49,6 +49,14 @@ export class ActualizarInsumoDto {
   @Type(() => Number)
   @IsNumber({}, { message: 'El costo unitario debe ser un número' })
   costo_unit?: number;
+
+  /** Merma habitual % del insumo (0 a 99,99). La receta lleva la cantidad neta; el consumo real es cantidad ÷ (1 − merma). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'La merma debe ser un número' })
+  @Min(0, { message: 'La merma no puede ser negativa' })
+  @Max(99.99, { message: 'La merma debe ser menor a 100%' })
+  merma_pct?: number;
 
   @IsOptional()
   lugar_consumo_id?: string | number | null;

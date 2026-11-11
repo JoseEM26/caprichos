@@ -37,7 +37,8 @@ describe('StockService', () => {
 
     prisma = {
       $transaction: jest.fn(async (cb) => cb(prisma)),
-      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'si' }) },
+      // «Consumir al preparar» nace en «no»: los demás parámetros del almacén están encendidos
+      parametro: { findUnique: jest.fn(async ({ where }: any) => ({ valor: where?.clave === 'almacen_consumir_al_preparar' ? 'no' : 'si' })) },
       insumo: {
         findUnique: jest.fn(),
         findMany: jest.fn(),

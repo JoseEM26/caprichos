@@ -33,6 +33,7 @@ import {
   saldoSabor,
 } from '../stock/producto-controlado';
 import { StockService } from '../stock/stock.service';
+import { ConsumoRecetaService } from './consumo-receta.service';
 
 @Injectable()
 export class AlmacenService {
@@ -41,6 +42,7 @@ export class AlmacenService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly consumo?: ConsumoRecetaService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -430,7 +432,7 @@ export class AlmacenService {
       if (tipoMapeado === 'ENTRADAS' || tipoMapeado === 'ENTRADA') {
         where.tipo = { in: ['ENTRADA', 'PRODUCCION_ALTA', 'TRASLADO_ENTRADA'] };
       } else if (tipoMapeado === 'SALIDAS' || tipoMapeado === 'SALIDA') {
-        where.tipo = { in: ['SALIDA', 'PRODUCCION_CONSUMO', 'TRASLADO_SALIDA'] };
+        where.tipo = { in: ['SALIDA', 'PRODUCCION_CONSUMO', 'TRASLADO_SALIDA', 'CONSUMO_RECETA'] };
       } else if (tipoMapeado === 'MERMAS' || tipoMapeado === 'MERMA') {
         where.tipo = { in: ['MERMA', 'DIFERENCIA_CONTEO'] };
       } else if (tipoMapeado === 'DEVOLUCIONES' || tipoMapeado === 'DEVOLUCION') {
@@ -1065,7 +1067,7 @@ export class AlmacenService {
   // ==========================================
   async listarRecetasProduccion() {
     const recetas = await this.prisma.receta.findMany({
-      where: { es_produccion: true },
+      where: { es_produccion: true, sabor_id: null },
       include: {
         producto: true,
         lineas: {
@@ -1177,7 +1179,13 @@ export class AlmacenService {
       });
     }
 
-    const rinde = Number(receta.rinde) > 0 ? Number(receta.rinde) : 1;
+    // Control de almacén encendido: se descuenta de Cocina con conversión de unidades y merma del insumo; si el sabor tiene su
+    // propia receta se usa esa (si no, la general); si Cocina no alcanza la tanda sigue (stock negativo + pendiente de emitir)
+    // salvo que «permitir cocina negativa» esté en «no». Apagado: flujo de siempre, sin tocar nada nuevo.
+    const modoAlmacen = this.consumo ? await this.consumo.modoTanda() : null;
+    const recetaEf = modoAlmacen ? await this.consumo!.recetaDeTanda(receta, saborProduccion?.id ?? null) : receta;
+
+    const rinde = Number(recetaEf.rinde) > 0 ? Number(recetaEf.rinde) : 1;
     let yieldTotal: number;
     let tandasCalculadas: number;
 
@@ -1198,6 +1206,17 @@ export class AlmacenService {
 
     const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
 
+    if (modoAlmacen) {
+      if (!modoAlmacen.permitirNegativa) {
+        const f = await this.consumo!.faltantesTanda(recetaEf, yieldTotal);
+        if (f.length > 0) {
+          throw new BadRequestException({
+            codigo: 'STOCK_MATERIA_PRIMA_INSUFICIENTE',
+            mensaje: `No alcanza el stock en Cocina: faltan ${f.map((x) => `${x.insumo} (requiere ${x.requiere.toFixed(2)} ${x.unidad}, en Cocina hay ${x.hay.toFixed(2)})`).join(', ')}. Pide insumos al almacén primero.`,
+          });
+        }
+      }
+    } else {
     const faltantes: string[] = [];
 
     // Se descuenta exclusivamente de Cocina
@@ -1224,8 +1243,10 @@ export class AlmacenService {
       });
     }
 
+    }
+
     const resultado = await this.prisma.$transaction(async (tx) => {
-      for (const lin of receta.lineas) {
+      for (const lin of modoAlmacen ? [] : receta.lineas) {
         const ins = lin.insumo;
         const necPorTanda = Number(lin.cantidad);
         const necTotal = (yieldTotal / rinde) * necPorTanda;
@@ -1256,6 +1277,8 @@ export class AlmacenService {
           por: usuario ? usuario.partyId : BigInt(1),
         },
       });
+
+      if (modoAlmacen) await this.consumo!.consumirTanda(tx, recetaEf, yieldTotal, prod.id, usuario ? usuario.partyId : BigInt(1));
 
       if (saborProduccion) {
         await tx.stockSabor.upsert({
@@ -1415,7 +1438,10 @@ export class AlmacenService {
         },
       });
 
-      for (const lin of prod.receta.lineas) {
+      // Tanda registrada con el control de almacén: se devuelve exactamente lo que descontó (y baja sus pendientes)
+      const yaRevertida = this.consumo && (await this.consumo.activo()) ? await this.consumo.revertirTanda(tx, prodId, usuario ? usuario.partyId : BigInt(1)) : false;
+
+      for (const lin of yaRevertida ? [] : prod.receta.lineas) {
         const necPorTanda = Number(lin.cantidad);
         const rinde = Number(prod.receta.rinde) > 0 ? Number(prod.receta.rinde) : 1;
         // Lo mismo que consumió registrarProduccion: (unidades / rinde) × cantidad por tanda. Con «tandas» distintas de
@@ -1484,7 +1510,7 @@ export class AlmacenService {
     const idsPorSabor = new Set(porSabor.map((p) => p.id.toString()));
 
     const recetas = await this.prisma.receta.findMany({
-      where: { es_produccion: true },
+      where: { es_produccion: true, sabor_id: null },
       include: {
         producto: {
           include: {

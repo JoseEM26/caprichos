@@ -51,6 +51,9 @@ export function ModalAnular({
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
+  // Solo con el Control de almacén encendido y consumo registrado (el API avisa con tieneConsumoAlmacen)
+  const [consumoAlmacen, setConsumoAlmacen] = useState<'MERMA' | 'DEVOLVER'>('MERMA');
+  const preguntaAlmacen = !esCobro && pedido?.tieneConsumoAlmacen === true;
   // Todos los roles anulan el pedido completo con la misma advertencia; anular un cobro es aparte
   const pedidoCompleto = !esCobro;
 
@@ -94,7 +97,8 @@ export function ModalAnular({
       if (esCobro && idCobro) {
         await pedidosApi.anularCobro(idCobro, motivoParaEnviar);
       } else {
-        await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar);
+        if (preguntaAlmacen) await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar, undefined, consumoAlmacen);
+        else await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar);
       }
       alAnularExitoso();
     } catch (err: any) {
@@ -257,6 +261,20 @@ export function ModalAnular({
               }}
             />
           </div>
+
+          {preguntaAlmacen && (
+            <fieldset style={{ border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: 10, padding: 10, margin: 0 }}>
+              <legend style={{ fontWeight: 700, fontSize: 13 }}>¿Se llegó a preparar?</legend>
+              <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center', fontSize: 13 }}>
+                <input type="radio" name="consumo-almacen" checked={consumoAlmacen === 'MERMA'} onChange={() => setConsumoAlmacen('MERMA')} />
+                Sí, se llegó a preparar: los ingredientes quedan como merma
+              </label>
+              <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center', fontSize: 13 }}>
+                <input type="radio" name="consumo-almacen" checked={consumoAlmacen === 'DEVOLVER'} onChange={() => setConsumoAlmacen('DEVOLVER')} />
+                No, nunca se preparó: devolver los ingredientes a Cocina
+              </label>
+            </fieldset>
+          )}
 
           {errorMensaje && (
             <div role="alert" className="ad-error">

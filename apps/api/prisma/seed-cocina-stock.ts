@@ -2,6 +2,12 @@ import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+/** Receta general (sin sabor) de un producto y tamaño: la busca o la crea (la clave única incluye el sabor, que es NULL aquí). */
+async function recetaGeneral(db: PrismaClient, productoId: bigint, tamanoValorId: bigint) {
+  const existente = await db.receta.findFirst({ where: { producto_id: productoId, tamano_valor_id: tamanoValorId, es_produccion: false, sabor_id: null } });
+  return existente ?? db.receta.create({ data: { producto_id: productoId, tamano_valor_id: tamanoValorId, es_produccion: false } });
+}
+
 export async function main() {
   console.log('--- Iniciando seed-cocina-stock ---');
 
@@ -311,21 +317,7 @@ export async function main() {
       const ingredientes = lineasPorTamano[nombreTamano];
       if (!ingredientes) continue;
 
-      const receta = await prisma.receta.upsert({
-        where: {
-          producto_id_tamano_valor_id_es_produccion: {
-            producto_id: capuccino.id,
-            tamano_valor_id: pt.tamano_valor_id,
-            es_produccion: false,
-          },
-        },
-        update: {},
-        create: {
-          producto_id: capuccino.id,
-          tamano_valor_id: pt.tamano_valor_id,
-          es_produccion: false,
-        },
-      });
+      const receta = await recetaGeneral(prisma, capuccino.id, pt.tamano_valor_id);
 
       for (const ing of ingredientes) {
         const insumoId = mapaInsumos.get(ing.insumo);
@@ -382,21 +374,7 @@ export async function main() {
       const ingredientes = lineasPorTamano[nombreTamano];
       if (!ingredientes) continue;
 
-      const receta = await prisma.receta.upsert({
-        where: {
-          producto_id_tamano_valor_id_es_produccion: {
-            producto_id: frappeCafe.id,
-            tamano_valor_id: pt.tamano_valor_id,
-            es_produccion: false,
-          },
-        },
-        update: {},
-        create: {
-          producto_id: frappeCafe.id,
-          tamano_valor_id: pt.tamano_valor_id,
-          es_produccion: false,
-        },
-      });
+      const receta = await recetaGeneral(prisma, frappeCafe.id, pt.tamano_valor_id);
 
       for (const ing of ingredientes) {
         const insumoId = mapaInsumos.get(ing.insumo);
@@ -447,21 +425,7 @@ export async function main() {
       const ingredientes = lineasPorTamano[nombreTamano];
       if (!ingredientes) continue;
 
-      const receta = await prisma.receta.upsert({
-        where: {
-          producto_id_tamano_valor_id_es_produccion: {
-            producto_id: waffle.id,
-            tamano_valor_id: pt.tamano_valor_id,
-            es_produccion: false,
-          },
-        },
-        update: {},
-        create: {
-          producto_id: waffle.id,
-          tamano_valor_id: pt.tamano_valor_id,
-          es_produccion: false,
-        },
-      });
+      const receta = await recetaGeneral(prisma, waffle.id, pt.tamano_valor_id);
 
       for (const ing of ingredientes) {
         const insumoId = mapaInsumos.get(ing.insumo);

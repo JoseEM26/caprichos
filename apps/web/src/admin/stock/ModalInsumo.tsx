@@ -29,6 +29,7 @@ export function ModalInsumo({
     insumo?.intermedio != null ? String(insumo.intermedio) : '15',
   );
   const [maximo, setMaximo] = useState(insumo ? String(insumo.maximo) : '40');
+  const [mermaPct, setMermaPct] = useState(insumo?.merma_pct ? String(insumo.merma_pct) : '');
   const [costoUnit] = useState(
     insumo?.costo_unit != null ? String(insumo.costo_unit) : '',
   );
@@ -97,6 +98,7 @@ export function ModalInsumo({
         intermedio: intermedio.trim() ? parseFloat(intermedio) : null,
         maximo: parseFloat(maximo),
         costo_unit: costoUnit ? parseFloat(costoUnit) : undefined,
+        ...(mermaPct.trim() !== '' || insumo?.merma_pct ? { merma_pct: parseFloat(mermaPct.replace(',', '.')) || 0 } : {}),
         lugar_consumo_id: lugarConsumoId || undefined,
         proveedor_a: proveedorA.trim() || undefined,
         proveedor_b: proveedorB.trim() || undefined,
@@ -475,6 +477,25 @@ export function ModalInsumo({
                     color: 'var(--cp-navy)',
                   }}
                 />
+              </div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <label htmlFor="ins-merma" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                Merma habitual (%)
+              </label>
+              <input
+                id="ins-merma"
+                type="number"
+                step="any"
+                min={0}
+                max={99.99}
+                value={mermaPct}
+                onChange={(e) => setMermaPct(e.target.value)}
+                placeholder="0"
+                style={{ width: '100%', boxSizing: 'border-box', minHeight: '42px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', padding: '0 10px', fontFamily: 'inherit', fontSize: '14px', color: 'var(--cp-navy)' }}
+              />
+              <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>
+                Lo que siempre se pierde al usarlo (cáscaras, recortes). La receta lleva la cantidad neta; al descontar se suma esta merma. Menos de 100.
               </div>
             </div>
           </div>

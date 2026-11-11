@@ -21,6 +21,10 @@ export class GuardarRecetaDto {
   @IsBoolean()
   es_produccion?: boolean;
 
+  /** Receta específica de un sabor del producto; vacío = receta general (vale cuando el sabor no tiene la suya). */
+  @IsOptional()
+  sabor_id?: string | number | null;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

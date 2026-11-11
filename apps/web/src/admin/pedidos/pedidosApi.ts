@@ -167,6 +167,8 @@ export interface Pedido {
   pago_estado?: string | null;
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
+  /** Solo con el Control de almacén encendido y el pedido con consumo de insumos registrado: al anular hay que decidir. */
+  tieneConsumoAlmacen?: boolean;
   /** Último cambio de pago (Caja, mozo o repartidor): quién, cuándo y «Pago modificado: antes → ahora» */
   ajustePago?: { por: string | null; en: string; texto: string } | null;
   /** Número del día en cocina (referencial); null si no llegó a cocina */
@@ -474,8 +476,10 @@ export const pedidosApi = {
   },
 
   /** `forzar`: solo el administrador, con motivo, cuando Cocina aún no despejó el pedido. */
-  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean): Promise<Pedido> {
-    return api.post<Pedido>(`/admin/pedidos/${id}/estado`, forzar ? { estado, motivo, forzar: true } : { estado, motivo });
+  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER'): Promise<Pedido> {
+    const cuerpo: Record<string, unknown> = forzar ? { estado, motivo, forzar: true } : { estado, motivo };
+    if (consumoAlmacen) cuerpo.consumoAlmacen = consumoAlmacen;
+    return api.post<Pedido>(`/admin/pedidos/${id}/estado`, cuerpo);
   },
 
   /** «Volver atrás» un pedido entregado por error (solo Caja y Administrador; motivo obligatorio). */

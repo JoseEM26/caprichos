@@ -65,6 +65,7 @@ import {
   obtenerInicioDiaLima,
   sumarDiasFechaIso,
 } from '../cocina/cocina.util';
+import { ConsumoRecetaService } from '../almacen';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ajustesPendientesUbicacion } from './cambio-ubicacion.util';
 
@@ -125,6 +126,7 @@ export class PedidosEstadoService {
     @Optional() private readonly avisos?: AvisosPedidoService,
     @Optional() private readonly cobros?: CobrosService,
     @Optional() private readonly comandas?: ComandasService,
+    @Optional() private readonly consumoAlmacen?: ConsumoRecetaService,
   ) {}
 
   /**
@@ -1021,8 +1023,11 @@ export class PedidosEstadoService {
       const nombre = reg?.party_id ? (await nombresDePartes(this.prisma, [reg.party_id]).catch(() => new Map<string, string>())).get(String(reg.party_id)) ?? null : null;
       canjePuntos = { puntos: Number(pedido.puntos_canjeados), aplicadoPor: nombre };
     }
+    // Solo con el control de almacén encendido y consumo registrado; si no, la respuesta no cambia
+    const tieneConsumoAlmacen = (await this.consumoAlmacen?.tieneConsumo(pedido.id)) === true;
     return {
       ...pedidoSinIncidentes,
+      ...(tieneConsumoAlmacen ? { tieneConsumoAlmacen: true } : {}),
       canjePuntos,
       ajustePago,
       lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
@@ -1180,6 +1185,8 @@ export class PedidosEstadoService {
 
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
       await this.devolverAlAnular(pedido.id, pedido.codigo, usuarioActual?.partyId, ip);
+      // Control de almacén encendido y pedido con consumo: «se llegó a preparar» (merma, por defecto) o «nunca» (devolver). Apagado: no hace nada.
+      await this.consumoAlmacen?.decidirAnulacion(pedido.id, dto.consumoAlmacen, motivo, usuarioActual?.partyId);
 
       // Insertar en historial
       await this.prisma.pedidoEstadoHistorial.create({

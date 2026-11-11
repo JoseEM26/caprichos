@@ -145,6 +145,8 @@ export class InsumosService {
         intermedio,
         maximo,
         costo_unit: ins.costo_unit != null ? Number(ins.costo_unit) : null,
+      ...(Number(ins.merma_pct) > 0 ? { merma_pct: Number(ins.merma_pct) } : {}),
+        ...(Number(ins.merma_pct) > 0 ? { merma_pct: Number(ins.merma_pct) } : {}),
         lugar_consumo_id: ins.lugar_consumo_id ? ins.lugar_consumo_id.toString() : null,
         lugar_consumo_nombre: ins.lugarConsumo?.nombre ?? null,
         proveedor_a: ins.proveedor_a ? ins.proveedor_a.toString() : null,
@@ -283,6 +285,7 @@ export class InsumosService {
         maximo: new Prisma.Decimal(dto.maximo),
         costo_unit: dto.costo_unit != null ? new Prisma.Decimal(dto.costo_unit) : null,
         lugar_consumo_id: lugarConsumoId,
+        ...(dto.merma_pct != null ? { merma_pct: new Prisma.Decimal(dto.merma_pct) } : {}),
         proveedor_a: proveedorA,
         proveedor_b: proveedorB,
         proveedor_c: proveedorC,
@@ -361,6 +364,7 @@ export class InsumosService {
       data.intermedio = dto.intermedio != null ? new Prisma.Decimal(dto.intermedio) : null;
     }
     if (dto.maximo !== undefined) data.maximo = new Prisma.Decimal(dto.maximo);
+    if (dto.merma_pct !== undefined && dto.merma_pct !== null) data.merma_pct = new Prisma.Decimal(dto.merma_pct);
     if (dto.costo_unit !== undefined) {
       data.costo_unit = dto.costo_unit != null ? new Prisma.Decimal(dto.costo_unit) : null;
     }

@@ -568,6 +568,7 @@ model Sabor {
   conteosApertura ConteoApertura[]
   pedidoLineaSabores PedidoLineaSabor[]
   opcionRequisitos   OpcionRequiere[]
+  recetas            Receta[]
 
   @@unique([producto_id, nombre])
   @@map("sabor")
@@ -1222,6 +1223,7 @@ model LugarStock {
   trasladosDestino Traslado[]
   cierresDia       CierreDia[]
   conteosApertura  ConteoApertura[]
+  pendientesAlmacen PendienteAlmacen[]
 
   @@map("lugar_stock")
 }
@@ -1238,6 +1240,8 @@ model Insumo {
   intermedio            Decimal?               @db.Decimal(14, 3)
   maximo                Decimal                @db.Decimal(14, 3)
   lugar_consumo_id      BigInt?
+  /// Merma habitual % del insumo (0–99.99). La receta guarda la cantidad NETA; el consumo real es cantidad ÷ (1 − merma/100)
+  merma_pct             Decimal                @default(0) @db.Decimal(5, 2)
   costo_unit            Decimal?               @db.Decimal(12, 4)
   proveedor_a           BigInt?
   proveedor_b           BigInt?
@@ -1253,6 +1257,7 @@ model Insumo {
   pedidoProveedorLineas PedidoProveedorLinea[]
   compraLineas          CompraLinea[]
   traslados             Traslado[]
+  pendientesAlmacen     PendienteAlmacen[]
 
   @@map("insumo")
 }
@@ -1286,6 +1291,8 @@ model MovimientoStock {
   sabor_id              BigInt?
   traslado_id           BigInt?
   compra_id             BigInt?
+  /// Línea de pedido que originó un CONSUMO_RECETA (consumo de insumos al preparar)
+  pedido_linea_id       BigInt?
   nota                  String?
   movimiento_anulado_id BigInt?
   por                   BigInt
@@ -1301,6 +1308,7 @@ model MovimientoStock {
   movimientoAnulado     MovimientoStock?  @relation("MovimientosAnulados", fields: [movimiento_anulado_id], references: [id])
   movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
 
+  @@index([pedido_linea_id])
   @@map("movimiento_stock")
 }
 
@@ -1331,13 +1339,16 @@ model Receta {
   tamano_valor_id BigInt?
   es_produccion   Boolean       @default(false)
   rinde           Decimal?      @db.Decimal(14, 3)
+  /// Receta específica de un sabor (producto con sabores). Vacío = receta general; si no hay una del sabor, vale la general.
+  sabor_id        BigInt?
+  sabor           Sabor?        @relation(fields: [sabor_id], references: [id])
 
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor?   @relation(fields: [tamano_valor_id], references: [id])
   lineas          RecetaLinea[]
   producciones    Produccion[]
 
-  @@unique([producto_id, tamano_valor_id, es_produccion])
+  @@unique([producto_id, tamano_valor_id, es_produccion, sabor_id])
   @@map("receta")
 }
 
@@ -3224,4 +3235,43 @@ model RucConsulta {
 
   @@index([actualizado_en])
   @@map("ruc_consulta")
+}
+
+/// Unidades de una línea de pedido cuyo consumo de insumos por receta ya se descontó del stock de Cocina.
+/// Es la clave de idempotencia: el consumo se reconcilia contra `pedido_linea.listas`, nunca se suma a ciegas.
+model ConsumoLinea {
+  pedido_linea_id BigInt   @id
+  unidades        Int      @default(0)
+  actualizado_en  DateTime @default(now()) @db.Timestamptz
+
+  @@map("consumo_linea")
+}
+
+/// Faltante de un insumo en Cocina: Cocina le debe a Almacén. Estados: PENDIENTE | EMITIDO | AJUSTADO | ANULADO.
+/// saldo = cantidad - emitido - ajustado
+model PendienteAlmacen {
+  id              BigInt     @id @default(autoincrement())
+  insumo_id       BigInt
+  lugar_id        BigInt
+  cantidad        Decimal    @db.Decimal(14, 3)
+  emitido         Decimal    @default(0) @db.Decimal(14, 3)
+  ajustado        Decimal    @default(0) @db.Decimal(14, 3)
+  estado          String     @default("PENDIENTE")
+  origen_tipo     String     // LINEA | TANDA
+  pedido_id       BigInt?
+  pedido_linea_id BigInt?
+  produccion_id   BigInt?
+  traslado_id     BigInt?
+  nota            String?
+  creado_en       DateTime   @default(now()) @db.Timestamptz
+  resuelto_en     DateTime?  @db.Timestamptz
+  resuelto_por    BigInt?
+
+  insumo          Insumo     @relation(fields: [insumo_id], references: [id])
+  lugar           LugarStock @relation(fields: [lugar_id], references: [id])
+
+  @@index([estado, insumo_id])
+  @@index([pedido_linea_id])
+  @@index([produccion_id])
+  @@map("pendiente_almacen")
 }

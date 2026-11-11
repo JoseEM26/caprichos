@@ -26,6 +26,7 @@ import {
 import { motivoResaltado, resaltadoDeLineas, type Resaltado } from './opcion-menos-pedida';
 import { asignarNumeroDia } from './numero-dia';
 import { mesaDePedido } from './mesa-comanda.util';
+import { ConsumoRecetaService } from '../almacen';
 
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
@@ -98,6 +99,7 @@ export class ComandasService {
     private readonly descuentoService?: DescuentoPedidoHook,
     @Optional() private readonly salonService?: SalonService,
     @Optional() private readonly avisos?: AvisosPedidoService,
+    @Optional() private readonly consumoAlmacen?: ConsumoRecetaService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'pedido'): bigint {
@@ -607,6 +609,9 @@ export class ComandasService {
       },
     });
 
+    // Lo preparado descuenta insumos de Cocina (no hace nada con el almacén apagado; nunca rompe el despeje)
+    await this.consumoAlmacen?.reconciliarPedido(pId, usuarioActual.partyId);
+
     // Evaluar si todas las áreas del pedido están despejadas
     const todasComandas = await this.prisma.comandaArea.findMany({
       where: { pedido_id: pId },
@@ -925,6 +930,9 @@ export class ComandasService {
       }
       reabierta = true;
     }
+
+    // Lo marcado listo (o deshecho) descuenta (o devuelve) insumos de Cocina; nunca rompe a la cocina
+    await this.consumoAlmacen?.reconciliarPedido(pId, usuarioActual.partyId);
 
     let despejada = false;
     if (completa && comanda.estado === 'EN_COCINA') {

@@ -41,6 +41,13 @@ Ver tambien: [[pantallas]]
 4. La comanda volvera de inmediato a la pantalla activa conservando su tiempo transcurrido original.
 Ver tambien: [[caja]]
 
+## Como se hace: Descontar insumos al preparar (control de almacen encendido)
+1. Cuando despejas o marcas lista una comanda de un plato con receta (por ejemplo un club sandwich), el sistema descuenta los insumos del stock de Cocina.
+2. Si marcas y desmarcas, o devuelves la comanda en los 15 segundos, no se duplica: solo cuenta lo que quedo listo.
+3. Si a Cocina le falta un insumo, igual puedes seguir: el faltante queda como pendiente para que Almacen lo emita.
+Nota: Cocina solo consume; no mueve stock ni emite pendientes. Con el control apagado no cambia nada.
+Ver tambien: [[almacen]]
+
 ## Como se hace: Pedir que anulen un pedido que ya esta en cocina
 1. Cocina no anula pedidos: solo Caja o el Administrador pueden hacerlo (decision del dueno).
 2. Si un pedido no se debe preparar, avisa a Caja; ella lo anula desde el detalle del pedido, con motivo, y el pedido desaparece de todas las areas de cocina.

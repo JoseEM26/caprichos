@@ -32,6 +32,25 @@ describe('Control de almacén (interruptor)', () => {
     await waitFor(() => expect(put).toHaveBeenCalledWith('/admin/configuracion/stock_control_activo', { valor: true }));
   });
 
+  it('encendido, el administrador ve los dos ajustes de Cocina; apagado no se ve ninguno', async () => {
+    const get = vi.spyOn(api, 'get').mockImplementation(async (u: string) =>
+      u === '/admin/configuracion' ? ([{ clave: 'almacen_consumir_al_preparar', valor: 'no' }] as any) : (estado({ activo: true }) as any),
+    );
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
+    const { unmount } = render(<TarjetaControlAlmacenConfiguracion esAdmin />);
+    const caja = await screen.findByRole('checkbox', { name: /Descontar los insumos de Cocina/ });
+    expect((caja as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole('checkbox', { name: /Dejar que Cocina siga/ }) as HTMLInputElement).checked).toBe(true); // valor de fábrica
+    fireEvent.click(caja);
+    await waitFor(() => expect(put).toHaveBeenCalledWith('/admin/configuracion/almacen_consumir_al_preparar', { valor: true }));
+    unmount();
+
+    get.mockImplementation(async () => estado({ activo: false }) as any);
+    render(<TarjetaControlAlmacenConfiguracion esAdmin />);
+    await screen.findByText('Apagado');
+    expect(screen.queryByTestId('ajustes-cocina-almacen')).not.toBeInTheDocument();
+  });
+
   it('No, cancelar no cambia nada', async () => {
     vi.spyOn(api, 'get').mockResolvedValue(estado());
     const put = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });

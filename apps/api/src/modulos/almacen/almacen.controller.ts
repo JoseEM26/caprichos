@@ -19,12 +19,19 @@ import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
 import { MermaProductoDto } from './dto/merma-producto.dto';
+import { PendientesAlmacenService } from './pendientes-almacen.service';
+import { ConsumoRecetaService } from './consumo-receta.service';
+import { EmitirPendientesDto, RecuentoInsumosDto } from './dto/pendientes-almacen.dto';
 
 
 @Controller('admin/almacen')
 @UseGuards(AccesoGuard)
 export class AlmacenController {
-  constructor(private readonly almacenService: AlmacenService) {}
+  constructor(
+    private readonly almacenService: AlmacenService,
+    private readonly pendientes: PendientesAlmacenService,
+    private readonly consumo: ConsumoRecetaService,
+  ) {}
 
   // --- Movimientos ---
   @Get('movimientos')
@@ -183,5 +190,39 @@ export class AlmacenController {
       req.usuario,
       req.ip,
     );
+  }
+
+  // --- Pendientes de almacén (faltante de Cocina) y recuento de insumos ---
+  /** Lista agrupada por insumo. `?todos=1` incluye los ya emitidos, ajustados o anulados. */
+  @Get('pendientes')
+  @Permiso('almacen', 'ver')
+  async listarPendientes(@Query('todos') todos?: string) {
+    return this.pendientes.listar(todos === '1' || todos === 'true');
+  }
+
+  /** Emite (traslado Almacén → Cocina) pendientes por `ids` o todos los de un `insumoId`. Solo Almacén y Administrador. */
+  @Post('pendientes/emitir')
+  @Permiso('almacen', 'emitir')
+  async emitirPendientes(@Body() dto: EmitirPendientesDto, @Req() req: any) {
+    return this.pendientes.emitir(dto, req.usuario, req.ip);
+  }
+
+  @Get('cierre-dia/insumos')
+  @Permiso('almacen', 'ver')
+  async insumosParaRecuento(@Query('lugar') lugar?: string) {
+    return this.pendientes.listarRecuento(lugar === 'ALMACEN' ? 'ALMACEN' : 'COCINA');
+  }
+
+  @Post('cierre-dia/insumos')
+  @Permiso('almacen', 'ajustar')
+  async aplicarRecuentoInsumos(@Body() dto: RecuentoInsumosDto, @Req() req: any) {
+    return this.pendientes.aplicarRecuento(dto, req.usuario, req.ip);
+  }
+
+  /** Reintenta el consumo por receta de un pedido cuyo descuento falló (queda en auditoría como CONSUMO_RECETA_FALLO). */
+  @Post('consumo/reintentar/:pedidoId')
+  @Permiso('almacen', 'emitir')
+  async reintentarConsumo(@Param('pedidoId') pedidoId: string, @Req() req: any) {
+    return this.consumo.reintentarPedido(pedidoId, req.usuario?.partyId);
   }
 }

@@ -17,7 +17,7 @@ import { MovimientosQueryDto } from './dto/movimientos-query.dto';
 import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
-import { controlAlmacenActivo } from './control-almacen';
+import { almacenConsumirAlPreparar, controlAlmacenActivo } from './control-almacen';
 import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoSabor, sincronizarAgotadoSabor } from './producto-controlado';
 
 @Injectable()
@@ -644,6 +644,10 @@ export class StockService {
       }
     }
 
+    // «Consumir al preparar» encendido: los insumos por receta salen del stock de Cocina cuando Cocina marca lo preparado
+    // (ConsumoRecetaService), no al cobrar. Apagado (defecto), este método se comporta igual que siempre.
+    const insumosAlPreparar = await almacenConsumirAlPreparar(runner);
+
     const insumosAgotadosDetectados = new Set<string>();
     const productosAgotadosDetectados = new Set<string>();
     const insumosModificados = new Set<string>();
@@ -687,6 +691,7 @@ export class StockService {
           where: {
             producto_id: linea.producto_id,
             es_produccion: false,
+            sabor_id: null,
           },
           include: {
             lineas: {
@@ -706,6 +711,7 @@ export class StockService {
                 where: {
                   producto_id: linea.producto_id,
                   es_produccion: true,
+                  sabor_id: null,
                 },
               })
             : null;
@@ -779,6 +785,8 @@ export class StockService {
           }
           continue;
         }
+
+        if (insumosAlPreparar) continue;
 
         // Determinar tamano_valor_id
         let tamanoValorId: bigint | null = null;

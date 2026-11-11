@@ -5,6 +5,7 @@ import { ComandasService } from './comandas.service';
 import { AgotadosService } from './agotados.service';
 import { DespachoService } from './despacho.service';
 import { AltaDemandaService } from './alta-demanda.service';
+import { ConsumoRecetaModule } from '../almacen';
 import { SalonModule } from '../salon/salon.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
@@ -13,6 +14,7 @@ import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
 
 @Module({
   imports: [
+    ConsumoRecetaModule,
     SalonModule,
     PreferenciasModule,
     forwardRef(() => AvisosInternosModule),

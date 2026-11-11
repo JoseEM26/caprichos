@@ -27,6 +27,8 @@ export interface InsumoItem {
   intermedio: number | null;
   maximo: number;
   costo_unit: number | null;
+  /** Merma habitual % (el API solo la manda si es mayor que 0) */
+  merma_pct?: number;
   lugar_consumo_id: string | null;
   lugar_consumo_nombre: string | null;
   proveedor_a: string | null;

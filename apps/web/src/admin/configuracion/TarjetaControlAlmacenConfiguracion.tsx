@@ -8,6 +8,45 @@ import { Cargando } from '../../comun/Cargando';
 import { CampoConfig } from './CampoConfig';
 import { stockApi, EstadoControlAlmacen } from '../stock/stockApi';
 
+const AJUSTES_COCINA = [
+  { clave: 'almacen_consumir_al_preparar', defecto: false, texto: 'Descontar los insumos de Cocina cuando Cocina marca lista la comanda (en vez de al cobrar)' },
+  { clave: 'almacen_permitir_cocina_negativa', defecto: true, texto: 'Dejar que Cocina siga aunque le falte insumo (queda en negativo y se crea un pendiente de almacén)' },
+] as const;
+
+const esSi = (v: unknown, defecto: boolean) => (v === undefined || v === null || v === '' ? defecto : v === true || /^(si|sí|true)$/i.test(String(v)));
+
+/** Parámetros de Cocina y almacén: solo con el control encendido y solo el administrador los cambia. */
+function AjustesCocinaAlmacen() {
+  const [valores, setValores] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api
+      .get<Array<{ clave: string; valor: unknown }>>('/admin/configuracion')
+      .then((lista) => setValores(Object.fromEntries(AJUSTES_COCINA.map((a) => [a.clave, esSi((Array.isArray(lista) ? lista : []).find((p) => p.clave === a.clave)?.valor, a.defecto)]))))
+      .catch(() => setError('No se pudieron leer los ajustes'));
+  }, []);
+  const cambiar = async (clave: string, nuevo: boolean) => {
+    setError(null);
+    try {
+      await api.put(`/admin/configuracion/${clave}`, { valor: nuevo });
+      setValores((v) => ({ ...v, [clave]: nuevo }));
+    } catch (err) {
+      setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar el ajuste');
+    }
+  };
+  return (
+    <div data-testid="ajustes-cocina-almacen" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {AJUSTES_COCINA.map((a) => (
+        <label key={a.clave} style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44, fontSize: 13 }}>
+          <input type="checkbox" checked={valores[a.clave] ?? a.defecto} onChange={(e) => void cambiar(a.clave, e.target.checked)} />
+          {a.texto}
+        </label>
+      ))}
+      {error && <div role="alert" style={{ fontSize: 13, color: 'var(--cp-red, #b3261e)' }}>{error}</div>}
+    </div>
+  );
+}
+
 function useSesionSegura() {
   try {
     return useSesion();
@@ -136,6 +175,8 @@ export function TarjetaControlAlmacenConfiguracion({ esAdmin: esAdminProp }: { e
           )}
         </CampoConfig>
       </div>
+
+      {activo && esAdmin && <AjustesCocinaAlmacen />}
 
       {error && (
         <div role="alert" style={{ fontSize: 13, color: 'var(--cp-red, #b3261e)' }}>

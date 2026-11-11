@@ -10,6 +10,7 @@ import {
 import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
 import { ModalCerrarDia } from './ModalCerrarDia';
+import { PendientesAlmacen } from './PendientesAlmacen';
 import { Confirmar } from '../../comun/Confirmar';
 import { Paginacion } from '../../comun/Paginacion';
 
@@ -288,6 +289,9 @@ export const AlmacenView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Solo se dibuja con el Control de almacén encendido */}
+      <PendientesAlmacen />
 
       {mensajeExito && (
         <div

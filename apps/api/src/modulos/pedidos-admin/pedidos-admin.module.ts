@@ -24,6 +24,7 @@ import { AjustarPagoService } from './ajustar-pago.service';
 import { CambioCobroController } from './cambio-cobro.controller';
 import { CajaModule } from '../caja/caja.module';
 import { ComandasService } from '../cocina';
+import { ConsumoRecetaModule } from '../almacen';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { EditarPedidoService } from './editar-pedido.service';
@@ -35,7 +36,7 @@ import { LineaTiempoService } from './linea-tiempo.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule],
+  imports: [ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule],
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,

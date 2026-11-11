@@ -49,7 +49,9 @@ export class RecetasService {
             tamano_valor_id: 'asc',
           },
         },
+        // La pantalla de recetas sigue trabajando con la receta general; las de sabor se guardan con `sabor_id`
         recetas: {
+          where: { sabor_id: null },
           include: {
             lineas: {
               include: {
@@ -158,7 +160,9 @@ export class RecetasService {
             tamano_valor_id: 'asc',
           },
         },
+        // La pantalla de recetas sigue trabajando con la receta general; las de sabor se guardan con `sabor_id`
         recetas: {
+          where: { sabor_id: null },
           include: {
             lineas: {
               include: {
@@ -279,12 +283,20 @@ export class RecetasService {
       : null;
 
     const esProduccion = dto.es_produccion ?? false;
+    const saborId = dto.sabor_id ? this.parsearId(dto.sabor_id, 'sabor') : null;
+    if (saborId) {
+      const sabor = await this.prisma.sabor.findUnique({ where: { id: saborId }, select: { producto_id: true } });
+      if (!sabor || sabor.producto_id !== id) {
+        throw new BadRequestException({ codigo: 'SABOR_INVALIDO', mensaje: 'El sabor no pertenece a este producto' });
+      }
+    }
 
     // Obtener receta previa para auditar
     const recetaPrevia = await this.prisma.receta.findFirst({
       where: {
         producto_id: id,
         tamano_valor_id: tamanoValorId,
+        sabor_id: saborId,
       },
       include: {
         lineas: true,
@@ -298,6 +310,7 @@ export class RecetasService {
           producto_id: id,
           tamano_valor_id: tamanoValorId,
           es_produccion: esProduccion,
+          sabor_id: saborId,
         },
       });
 
@@ -306,6 +319,7 @@ export class RecetasService {
           where: {
             producto_id: id,
             tamano_valor_id: tamanoValorId,
+            sabor_id: saborId,
           },
         });
         if (recExistente) {
@@ -322,6 +336,7 @@ export class RecetasService {
               producto_id: id,
               tamano_valor_id: tamanoValorId,
               es_produccion: esProduccion,
+              sabor_id: saborId,
               rinde: dto.rinde != null ? new Prisma.Decimal(dto.rinde) : null,
             },
           });
