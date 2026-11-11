@@ -16,9 +16,16 @@ export interface ResumenDia {
   anulados: number;
   rechazados: number;
   porCobrar: number;
-  /** Suma de los no anulados ni rechazados */
+  /** Suma de los no anulados ni rechazados (total neto: ya descontados puntos/cupones; la propina va aparte) */
   ventas: number;
+  /** De esas ventas, lo de los pedidos PAGADOS */
+  cobrado: number;
+  /** De esas ventas, lo de los vivos no pagados (ventas = cobrado + montoPorCobrar); su cantidad es `porCobrar` */
+  montoPorCobrar: number;
 }
+
+/** Total neto de UN pedido: la única cifra que usan tarjetas, tabla, resumen y modal (la propina va aparte). */
+export const totalDe = (p: Pick<Pedido, 'total'>): number => Number(p.total || 0);
 
 /** Filtro por un contador del resumen (más fino que Activos/Cerrados/Todos). */
 export type ContadorDia = 'entregados' | 'anulados' | 'rechazados' | 'porcobrar';
@@ -40,11 +47,11 @@ export const enContador = (p: Pedido, c: ContadorDia): boolean =>
   c === 'porcobrar' ? esPorCobrar(p) : mayus(p.estado) === ESTADO_DE[c];
 
 export function filasDePedidos(pedidos: Pedido[]): FilaResumen[] {
-  return pedidos.map((p) => ({ estado: String(p.estado), pago_estado: p.pago_estado ?? null, n: 1, total: Number(p.total || 0) }));
+  return pedidos.map((p) => ({ estado: String(p.estado), pago_estado: p.pago_estado ?? null, n: 1, total: totalDe(p) }));
 }
 
 export function resumirDia(filas: FilaResumen[]): ResumenDia {
-  const r: ResumenDia = { total: 0, activos: 0, entregados: 0, anulados: 0, rechazados: 0, porCobrar: 0, ventas: 0 };
+  const r: ResumenDia = { total: 0, activos: 0, entregados: 0, anulados: 0, rechazados: 0, porCobrar: 0, ventas: 0, cobrado: 0, montoPorCobrar: 0 };
   for (const f of filas) {
     const e = mayus(f.estado);
     r.total += f.n;
@@ -54,7 +61,8 @@ export function resumirDia(filas: FilaResumen[]): ResumenDia {
     else r.activos += f.n;
     if (!sinValor(e)) {
       r.ventas += f.total;
-      if (mayus(f.pago_estado) !== 'PAGADO') r.porCobrar += f.n;
+      if (mayus(f.pago_estado) !== 'PAGADO') { r.porCobrar += f.n; r.montoPorCobrar += f.total; }
+      else r.cobrado += f.total;
     }
   }
   return r;

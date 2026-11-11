@@ -1,3 +1,4 @@
+import { totalDe } from './resumenDia';
 import { memo, useMemo } from 'react';
 import type { Pedido } from './pedidosApi';
 import { COLUMNAS_CAJA } from './columnasCaja';
@@ -19,7 +20,7 @@ export function totalesDeFilas(filas: Pedido[]): TotalesTabla {
   const t: TotalesTabla = { filas: filas.length, total: 0, propina: 0, porMedio: {} };
   for (const p of filas) {
     if (anulado(p)) continue;
-    t.total += Number(p.total || 0);
+    t.total += totalDe(p);
     t.propina += Number(p.propina || 0);
     for (const [m, v] of Object.entries(montosPorMedio(p))) t.porMedio[m] = (t.porMedio[m] ?? 0) + v;
   }

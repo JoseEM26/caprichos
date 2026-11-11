@@ -1,3 +1,4 @@
+import { totalDe } from './resumenDia';
 import { memo } from 'react';
 import type { Pedido } from './pedidosApi';
 import { InsigniaMesa } from './InsigniaMesa';
@@ -169,7 +170,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
             <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`}>{pago.texto}</span>
             {o.total_con_extras != null && <span className="cj-pc-chip" data-testid="total-con-extras" style={{ background: '#FFF4D6', color: 'var(--cp-navy)' }}>Total con extras S/ {o.total_con_extras.toFixed(2)}</span>}
           </span>
-          <span className={`cj2-total${visual.clave === 'anulado' ? ' cj2-total--anulado' : ''}`}>S/ {Number(o.total || 0).toFixed(2)}{visual.clave === 'anulado' && <span className="cj2-nosuma"> no suma</span>}</span>
+          <span className={`cj2-total${visual.clave === 'anulado' ? ' cj2-total--anulado' : ''}`}>S/ {totalDe(o).toFixed(2)}{visual.clave === 'anulado' && <span className="cj2-nosuma"> no suma</span>}</span>
         </span>
       </button>
       <ReimprimirPedido pedido={o} variante="tarjeta" />

@@ -40,7 +40,7 @@ export function enRangoVisible(creadoEn: string, r: RangoPedidos): boolean {
 }
 import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
-import { ContadorDia, enContador, filasDePedidos, resumirDia } from './resumenDia';
+import { ContadorDia, enContador, filasDePedidos, resumirDia, type ResumenDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
 import { TarjetaCuentaCaja } from './TarjetaCuentaCaja';
 import { agruparCuentas } from './agruparCuentas';
@@ -359,6 +359,17 @@ export function PedidosAdminView() {
     cargarDatos();
   }, [cargarDatos]);
 
+  // En vivo: un evento (pedido nuevo, estado, cobro, edición) relee la lista Y el resumen agrupado del servidor, con antirrebote de 1 s.
+  // cargarDatos descarta toda respuesta anterior a la última (generacion), así una respuesta vieja no pisa una más nueva.
+  const cargarRef = useRef(cargarDatos);
+  cargarRef.current = cargarDatos;
+  const temporizadorVivo = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refrescarEnVivo = useCallback(() => {
+    if (temporizadorVivo.current) clearTimeout(temporizadorVivo.current);
+    temporizadorVivo.current = setTimeout(() => void cargarRef.current(), 1000);
+  }, []);
+  useEffect(() => () => { if (temporizadorVivo.current) clearTimeout(temporizadorVivo.current); }, []);
+
   useEffect(() => {
     void cargarNoEntregados();
   }, [cargarNoEntregados]);
@@ -472,6 +483,7 @@ export function PedidosAdminView() {
     }).catch(() => {
       cargarDatos();
     });
+    refrescarEnVivo();
   });
 
   // Retiro por espera agotada o cambio de estado: refresca la pestaña No entregados
@@ -491,6 +503,7 @@ export function PedidosAdminView() {
     pedidosApi.obtenerPorId(idStr).then((pActualizado) => {
       setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pActualizado : p)));
     }).catch(() => {});
+    refrescarEnVivo();
   });
 
   // «Ana está editando este pedido»: llega por socket y vale 2 minutos si no se repite; se libera al guardar o cerrar
@@ -520,6 +533,7 @@ export function PedidosAdminView() {
     pedidosApi.obtenerPorId(idStr).then((pa) => {
       setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pa : p)));
     }).catch(() => {});
+    refrescarEnVivo();
   });
 
   useEventos('pedido:pago', (datos: { id: string | number; pago_estado?: string }) => {
@@ -531,6 +545,7 @@ export function PedidosAdminView() {
     pedidosApi.obtenerPorId(idStr).then((pa) => {
       setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pa : p)));
     }).catch(() => {});
+    // el cobro ya relee todo por useTiempoReal (abajo)
   });
 
   // Tiempo real de Caja: voucher/plan, cobros, cierre y respaldo (reconexión, volver a la pestaña, sondeo sin socket).
@@ -685,6 +700,12 @@ export function PedidosAdminView() {
   const resumen = useMemo(
     () => (resumenApi && pedidos.length < totalDia ? resumirDia(resumenApi) : resumirDia(filasDePedidos(pedidos))),
     [pedidos, totalDia, resumenApi],
+  );
+  // Los montos siguen lo que se ve: con algún filtro (contador, estado, canal, medio, búsqueda, pastilla) suman SOLO esos pedidos
+  const filtrado = pedidosFiltrados.length !== pedidos.length;
+  const montos: ResumenDia = useMemo(
+    () => (filtrado ? resumirDia(filasDePedidos(pedidosFiltrados)) : resumen),
+    [filtrado, pedidosFiltrados, resumen],
   );
 
   // Cerrar el panel de Filtros y el menú «Más» con un clic fuera o Escape
@@ -1105,11 +1126,15 @@ export function PedidosAdminView() {
           )}
           <span
             className="cj2-ventas"
-            role="img"
-            title="Ventas (sin anulados ni rechazados)"
-            aria-label={`Ventas (sin anulados ni rechazados): S/ ${soles(resumen.ventas)}`}
+            data-testid="montos-resumen"
+            title="Ventas: pedidos no anulados ni rechazados, total neto (ya descontados puntos y cupones; la propina va aparte). Cobrado: los ya pagados. Por cobrar: los vivos aún sin pagar (los de «por cobrar»)."
           >
-            S/ {soles(resumen.ventas)} <span aria-hidden="true" className="cj2-ventas-i">ⓘ</span>
+            {filtrado && <span className="cj2-m-fil">Filtrado: {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}</span>}
+            <span className="cj2-m cj2-m--ventas">Ventas <strong>S/ {soles(montos.ventas)}</strong></span>
+            <span className="cj2-m cj2-m--cobrado">Cobrado <strong>S/ {soles(montos.cobrado)}</strong></span>
+            <span className="cj2-m cj2-m--pend">Por cobrar <strong>S/ {soles(montos.montoPorCobrar)}</strong></span>
+            {filtrado && <span className="cj2-m-dia">Día: S/ {soles(resumen.ventas)}</span>}
+            <span aria-hidden="true" className="cj2-ventas-i">ⓘ</span>
           </span>
         </section>
 

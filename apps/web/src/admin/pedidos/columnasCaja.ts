@@ -3,6 +3,7 @@ import { estadoVisual } from './estadosCaja';
 import { claveModalidad } from './InsigniaModalidad';
 import { mediosDePedido } from './mediosFila';
 import { nombreMedio } from './planPago';
+import { totalDe } from './resumenDia';
 
 const aHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) : '';
@@ -52,7 +53,7 @@ export const COLUMNAS_CAJA: ColumnaCaja[] = [
   { id: 'estado', titulo: 'Estado', texto: (p) => estadoVisual(p).l },
   { id: 'pago', titulo: 'Estado de pago', texto: textoPago },
   { id: 'medios', titulo: 'Medios de pago', texto: (p) => mediosDePedido(p).map(nombreMedio).join(' + ') },
-  { id: 'total', titulo: 'Total', numerica: true, texto: (p) => dinero(p.total) },
+  { id: 'total', titulo: 'Total', numerica: true, texto: (p) => dinero(totalDe(p)) },
   { id: 'propina', titulo: 'Propina', numerica: true, texto: (p) => (Number(p.propina || 0) > 0 ? dinero(p.propina) : '') },
   { id: 'atendio', titulo: 'Atendió', texto: (p) => p.atendidoPorNombre ?? p.cobroMozo?.mozo ?? '' },
   { id: 'horaAtencion', titulo: 'Hora de atención', texto: (p) => aHora(p.atendidoEn ?? p.entregado_mesa_en ?? p.despachado_en) },
