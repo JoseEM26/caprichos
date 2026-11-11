@@ -103,6 +103,7 @@ Antes: [[caja]]
 - Las tarjetas cambian de color segun el tiempo de espera, con una etiqueta que acompana al color: verde En tiempo, naranja Atencion (desde 35 minutos) y rojo Urgente (desde 50 minutos). Los minutos de corte son los parametros rep_naranja_min y rep_rojo_min de Configuracion. Ver la seccion del tiempo en vivo.
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
 - Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes de que el pedido pase a LISTO.
+- Caja no puede pasar a Listo ni a Entregado un pedido que aun tenga areas sin despejar: le sale un aviso con el nombre de las areas que faltan y debe pedirles que pulsen Listo. Solo el Administrador puede forzarlo con un motivo; en ese caso las comandas pendientes se dan por despejadas y quedan auditadas. Lo que haces tu en Cocina (despejar, marcar unidades listas, despachar) no cambia. Las comandas viejas de pedidos ya entregados se pueden despejar a mano.
 - Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
 
 ## Quien puede hacerlo

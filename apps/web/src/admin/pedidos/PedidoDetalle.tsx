@@ -17,6 +17,7 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalCorregirCliente } from './ModalCorregirCliente';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
+import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
 import { esDeliveryContraEntrega } from './mediosPago';
 import { InsigniaModalidad } from './InsigniaModalidad';
 import { InsigniaMesa } from './InsigniaMesa';
@@ -124,6 +125,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   } | null>(null);
 
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const { manejar: avisoCocina, dialogo: dialogoCocina } = useAvisoCocinaPendiente(() => alActualizar());
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [coordinandoDestino, setCoordinandoDestino] = useState('Merma');
@@ -238,6 +240,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
       await pedidosApi.cambiarEstado(pedido.id, nuevoEstado, motivo);
       alActualizar();
     } catch (err: any) {
+      if (avisoCocina(err, pedido.id, nuevoEstado)) return;
       setErrorAccion(err?.message || 'Error al actualizar el estado del pedido');
     } finally {
       setProcesando(false);
@@ -864,6 +867,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
       )}
 
 
+      {dialogoCocina}
       <Confirmar
         abierto={Boolean(accionConfirmar)}
         titulo={accionConfirmar?.titulo || '¿Confirmar acción?'}

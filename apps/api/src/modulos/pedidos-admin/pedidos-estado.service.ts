@@ -16,6 +16,7 @@ import { StockService } from '../stock/stock.service';
 import { CobrosService } from '../caja/cobros.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
+import { ComandasService, exigirCocinaDespejada } from '../cocina';
 import {
   BadRequestException,
   ConflictException,
@@ -123,6 +124,7 @@ export class PedidosEstadoService {
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly avisos?: AvisosPedidoService,
     @Optional() private readonly cobros?: CobrosService,
+    @Optional() private readonly comandas?: ComandasService,
   ) {}
 
   /**
@@ -1280,6 +1282,18 @@ export class PedidosEstadoService {
       });
     }
 
+    // Cocina manda: a LISTO o ENTREGADO solo con todas sus áreas despejadas (el administrador puede forzar con motivo)
+    let forzadoAreas: string[] = [];
+    if (nuevoEstado === 'LISTO' || nuevoEstado === 'ENTREGADO') {
+      const pendientes = await exigirCocinaDespejada(this.prisma, pedido.id, usuarioActual, { forzar: dto.forzar === true, motivo: dto.motivo });
+      if (pendientes.length > 0) {
+        if (!this.comandas) throw new ConflictException({ codigo: 'COCINA_PENDIENTE', mensaje: 'No se pudo despejar Cocina. Pídele a Cocina que pulse “Listo”.' });
+        // misma lógica de despejar de Cocina (líneas completas, auditoría y aviso en vivo), área por área
+        for (const a of pendientes) await this.comandas.despejar(pedido.id, a.areaId, usuarioActual, ip);
+        forzadoAreas = pendientes.map((a) => a.nombre);
+      }
+    }
+
     // Construir campos de actualización según el estado al que avanza
     const datosActualizacion: any = {
       estado: nuevoEstado,
@@ -1337,6 +1351,21 @@ export class PedidosEstadoService {
       partyId: usuarioActual.partyId,
       ip,
     });
+    if (forzadoAreas.length > 0) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'pedidos',
+        accion: 'PEDIDO_FORZAR_SIN_COCINA',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        antes: { estado: estadoAnterior },
+        despues: { estado: nuevoEstado, areasPendientes: forzadoAreas, forzadoPorAdministrador: true },
+        motivo: dto.motivo?.trim(),
+        partyId: usuarioActual.partyId,
+        ip,
+      });
+    }
 
     // Emitir evento por WebSocket
     this.eventosGateway?.emitirAdmin('pedido:estado', {

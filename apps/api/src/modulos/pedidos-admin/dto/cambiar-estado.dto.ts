@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CambiarEstadoDto {
   @IsString()
@@ -8,4 +8,9 @@ export class CambiarEstadoDto {
   @IsOptional()
   @IsString()
   motivo?: string;
+
+  /** Solo el administrador: pasa el pedido aunque Cocina no haya despejado (exige `motivo`). */
+  @IsOptional()
+  @IsBoolean()
+  forzar?: boolean;
 }

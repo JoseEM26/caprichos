@@ -473,8 +473,9 @@ export const pedidosApi = {
     return api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos);
   },
 
-  async cambiarEstado(id: string | number, estado: string, motivo?: string): Promise<Pedido> {
-    return api.post<Pedido>(`/admin/pedidos/${id}/estado`, { estado, motivo });
+  /** `forzar`: solo el administrador, con motivo, cuando Cocina aún no despejó el pedido. */
+  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean): Promise<Pedido> {
+    return api.post<Pedido>(`/admin/pedidos/${id}/estado`, forzar ? { estado, motivo, forzar: true } : { estado, motivo });
   },
 
   /** «Volver atrás» un pedido entregado por error (solo Caja y Administrador; motivo obligatorio). */

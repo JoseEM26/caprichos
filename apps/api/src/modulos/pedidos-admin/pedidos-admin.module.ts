@@ -23,6 +23,7 @@ import { CambioCobroService } from './cambio-cobro.service';
 import { AjustarPagoService } from './ajustar-pago.service';
 import { CambioCobroController } from './cambio-cobro.controller';
 import { CajaModule } from '../caja/caja.module';
+import { ComandasService } from '../cocina';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { EditarPedidoService } from './editar-pedido.service';
@@ -38,6 +39,8 @@ import { PedidoExtraController } from './pedido-extra.controller';
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,
+    // Sin estado: se usa para despejar las comandas al forzar un pedido (importar CocinaModule arrastraría sus controladores)
+    ComandasService,
     LineaTiempoService,
     UbicarPedidoService,
     CorregirClienteService,
