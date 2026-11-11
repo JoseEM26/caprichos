@@ -2,11 +2,10 @@ import { useCuadricula } from './paginacionCaja';
 import { PaginadorCaja, TOPE_TODAS, normalizarFilas, tamanoPagina, type FilasPorPagina } from './PaginadorCaja';
 import { TablaCaja } from './TablaCaja';
 import { ConmutadorVista, FiltroMedios, SelectorColumnas, VISTAS_CAJA, normalizarVistaCaja, type VistaCaja } from './ControlesTabla';
-import { ListaCaja, OrdenarLista, PestanasLista } from './ListaCaja';
-import { ORDEN_LISTA_POR_DEFECTO, contarPestanas, enPestana, normalizarOrdenLista, ordenarLista, type OrdenLista, type PestanaLista } from './listaCaja';
+import { ListaCaja } from './ListaCaja';
 import { COLUMNAS_POR_DEFECTO, normalizarColumnas } from './columnasCaja';
 import { MEDIOS_FILTRO, enMedios } from './mediosFila';
-import { CLAVE_COLUMNAS, CLAVE_FILAS, CLAVE_ORDEN_LISTA, CLAVE_VISTA, usePreferenciaCaja } from './preferenciasCaja';
+import { CLAVE_COLUMNAS, CLAVE_FILAS, CLAVE_VISTA, usePreferenciaCaja } from './preferenciasCaja';
 import { DetalleVentaModal } from './DetalleVentaModal';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
@@ -285,9 +284,7 @@ export function PedidosAdminView() {
   const [mediosFiltro, setMediosFiltro] = useState<string[]>([]);
   // Vista (tarjetas o tabla), columnas de la tabla y filas por página: se guardan por usuario
   const [vista, setVista] = usePreferenciaCaja<VistaCaja>(CLAVE_VISTA, 'tarjetas', normalizarVistaCaja);
-  // Lista: pestaña por tipo de servicio (de esta visita) y orden (guardado por usuario). Los filtros son los mismos de las tres vistas.
-  const [pestanaLista, setPestanaLista] = useState<PestanaLista>('todos');
-  const [ordenLista, setOrdenLista] = usePreferenciaCaja<OrdenLista>(CLAVE_ORDEN_LISTA, ORDEN_LISTA_POR_DEFECTO, normalizarOrdenLista);
+  // Lista: usa los mismos filtros y el mismo orden por tiempo que Tarjetas y Tabla
   const enLista = vista === 'lista';
   const [columnasTabla, setColumnasTabla] = usePreferenciaCaja<string[]>(CLAVE_COLUMNAS, COLUMNAS_POR_DEFECTO, normalizarColumnas);
   const [filas, setFilas] = usePreferenciaCaja<FilasPorPagina>(CLAVE_FILAS, null, normalizarFilas);
@@ -637,20 +634,13 @@ export function PedidosAdminView() {
   // Atajos: lo que necesita atención no queda escondido
   const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
 
-  // Lista: primero los filtros (los mismos de Tarjetas y Tabla), después las pestañas por tipo de servicio con su orden propio.
-  // Así los contadores de las pestañas cuentan solo lo ya filtrado y «Todos» coincide con el total de la búsqueda.
-  const conteosLista = useMemo(() => contarPestanas(pedidosFiltrados), [pedidosFiltrados]);
-  const pedidosLista = useMemo(
-    () => ordenarLista(pedidosFiltrados.filter((p) => enPestana(p, pestanaLista)), ordenLista),
-    [pedidosFiltrados, pestanaLista, ordenLista],
-  );
-
   // Filtros activos del panel (chips removibles arriba)
   const hoy = hoyLima();
   const chips = useMemo(() => {
     const lista: { id: string; texto: string; quitar: () => void }[] = [];
     const estadoPorDefecto = estadoPorDefectoDeRango(rango);
     if (grupoEstado !== estadoPorDefecto) lista.push({ id: 'estado', texto: ESTADO_OPCIONES.find((e) => e.id === grupoEstado)!.n, quitar: () => cambiarGrupoEstado(estadoPorDefecto) });
+    if (filtro !== 'todo') lista.push({ id: 'pastilla', texto: FILTROS_CAJA.find((f) => f.id === filtro)!.n, quitar: () => { setFiltro('todo'); setPaginaActual(1); } });
     if (contador) lista.push({ id: 'contador', texto: TEXTO_CONTADOR[contador], quitar: () => { setContador(null); setPaginaActual(1); } });
     if (etapa !== 'all') lista.push({ id: 'etapa', texto: ETAPA_OPCIONES.find((e) => e.id === etapa)!.n, quitar: () => { setEtapa('all'); setPaginaActual(1); } });
     if (rango.modo !== 'hoy') lista.push({ id: 'dia', texto: textoRango(rango, hoy), quitar: () => cambiarRango(rangoHoy(hoy)) });
@@ -661,8 +651,9 @@ export function PedidosAdminView() {
     return lista;
     // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
      
-  }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, mediosFiltro, hoy]);
+  }, [filtro, grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, mediosFiltro, hoy]);
 
+  const nActivos = chips.length;
   const limpiarFiltros = () => {
     setGrupoEstado('act');
     setContador(null);
@@ -760,7 +751,7 @@ export function PedidosAdminView() {
 
   // Paginación: en tarjetas cuenta tarjetas (cuentas); en tabla, pedidos. Tamaño: lo elegido o el automático (50 en tabla)
   const enTabla = vista === 'tabla';
-  const unidades: Array<(typeof cuentas)[number] | Pedido> = enLista ? pedidosLista : enTabla ? pedidosFiltrados : cuentas;
+  const unidades: Array<(typeof cuentas)[number] | Pedido> = enLista || enTabla ? pedidosFiltrados : cuentas;
   const porPagina = tamanoPagina(filas, unidades.length, enLista ? 25 : enTabla ? 50 : pedidosPorPagina);
   const totalPaginas = Math.max(1, Math.ceil(unidades.length / porPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
@@ -779,7 +770,7 @@ export function PedidosAdminView() {
     return unidades.slice(inicio, inicio + porPagina);
     // unidades cambia con cuentas/pedidosFiltrados/vista
      
-  }, [cuentas, pedidosFiltrados, pedidosLista, enTabla, enLista, paginaValida, porPagina]);
+  }, [cuentas, pedidosFiltrados, enTabla, enLista, paginaValida, porPagina]);
   const pedidosPaginados = pagina as typeof cuentas;
   const filasTabla = pagina as Pedido[];
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
@@ -828,6 +819,30 @@ export function PedidosAdminView() {
   const enNoEntregados = grupoEstado === 'noent';
   const totalNoEntregados = noEntregados?.total ?? 0;
   const puedeCortesia = tiene('cortesias/dar');
+
+  const filtrosActivos = (
+    <>
+    {(chips.length > 0 || orden !== ORDEN_POR_DEFECTO || chipTodo) && (
+      <div className="cj2-activos" aria-label="Filtros activos">
+        {chipTodo && (
+          <button type="button" className="cj2-quitar" aria-label="Quitar Mostrando todo el día" onClick={limpiarFiltros}>
+            Mostrando: todo el día <span aria-hidden="true">✕</span>
+          </button>
+        )}
+        {orden !== ORDEN_POR_DEFECTO && (
+          <button type="button" className="cj2-quitar" aria-label="Quitar orden: más tiempo primero" onClick={() => cambiarOrden(ORDEN_POR_DEFECTO)}>
+            <span aria-hidden="true">↑↓ </span>Orden: más tiempo primero <span aria-hidden="true">×</span>
+          </button>
+        )}
+        {chips.map((c) => (
+          <button key={c.id} type="button" className="cj2-quitar" aria-label={`Quitar filtro ${c.texto}`} onClick={c.quitar}>
+            {c.texto} <span aria-hidden="true">×</span>
+          </button>
+        ))}
+      </div>
+    )}
+    </>
+  );
 
   return (
     <div className="cj2">
@@ -931,26 +946,6 @@ export function PedidosAdminView() {
     {/* Los cuatro filtros visibles, buscador y panel de Filtros */}
     {!enNoEntregados && (
       <div className="cj2-fila" ref={filaFiltrosRef}>
-        <nav aria-label="Estado de los pedidos" className="cj2-pastillas">
-          {FILTROS_CAJA.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className="cj2-pastilla"
-              aria-pressed={filtro === f.id}
-              onClick={() => { setFiltro(f.id); setPaginaActual(1); }}
-            >
-              {f.punto && <span aria-hidden="true" className="cj2-punto" style={{ background: f.punto, boxShadow: filtro === f.id ? '0 0 0 2px #FBF4EC' : undefined }} />}
-              {f.n}
-              <span className="cj2-cuenta" data-testid={`cuenta-${f.id}`}>{conteos[f.id]}</span>
-            </button>
-          ))}
-        </nav>
-        <button type="button" className="cj2-pastilla cj2-pastilla--todo" aria-pressed={vistaTodo} onClick={verTodoElDia}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>
-          Todo el día
-          {vistaTodo && <span aria-hidden="true">✓</span>}
-        </button>
         <div className="cj2-busqueda">
           <svg className="cj2-busqueda-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="6.5" />
@@ -984,29 +979,57 @@ export function PedidosAdminView() {
             </button>
           )}
         </div>
+        {nActivos > 0 && (
+          <button type="button" className="cj2-limpiar cj2-limpiar--linea" onClick={limpiarFiltros}>Limpiar</button>
+        )}
         <button
           type="button"
           ref={botonFiltrosRef}
           className="cj2-btn cj2-btn--filtros"
           onClick={() => setFcOpen(!fcOpen)}
           aria-expanded={fcOpen}
+          aria-controls="cj2-panel-filtros"
           style={{ background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : undefined, color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : undefined }}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
           Filtros
-          {chips.length > 0 && <span className="cj2-n-filtros">{chips.length}</span>}
+          {nActivos > 0 && <span className="cj2-n-filtros" aria-label={`${nActivos} filtros activos`}>{nActivos}</span>}
         </button>
 
         {fcOpen && (
           <>
             <div className="cj2-panel-fondo" onClick={() => setFcOpen(false)} />
-            <div className="cj2-panel" role="group" aria-label="Filtros" ref={panelRef} tabIndex={-1}>
+            <div className="cj2-panel" id="cj2-panel-filtros" role="group" aria-label="Filtros" ref={panelRef} tabIndex={-1}>
               <div className="cj2-panel-cab">
                 <span>Filtros</span>
+                {nActivos > 0 && <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar</button>}
                 <button type="button" className="cj2-btn" onClick={() => setFcOpen(false)}>Listo</button>
               </div>
+              <section className="cj2-panel-sec" aria-label="Estado y día">
+                <h3 className="cj2-panel-tit">Estado y día</h3>
+<nav aria-label="Estado de los pedidos" className="cj2-pastillas">
+                  {FILTROS_CAJA.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className="cj2-pastilla"
+                      aria-pressed={filtro === f.id}
+                      onClick={() => { setFiltro(f.id); setPaginaActual(1); }}
+                    >
+                      {f.punto && <span aria-hidden="true" className="cj2-punto" style={{ background: f.punto, boxShadow: filtro === f.id ? '0 0 0 2px #FBF4EC' : undefined }} />}
+                      {f.n}
+                      <span className="cj2-cuenta" data-testid={`cuenta-${f.id}`}>{conteos[f.id]}</span>
+                    </button>
+                  ))}
+                </nav>
+                <button type="button" className="cj2-pastilla cj2-pastilla--todo" aria-pressed={vistaTodo} onClick={verTodoElDia}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>
+                  Todo el día
+                  {vistaTodo && <span aria-hidden="true">✓</span>}
+                </button>
+              </section>
               <BarraFiltros>
                 <FiltroCombo
                   etiqueta="Estado"
@@ -1062,7 +1085,6 @@ export function PedidosAdminView() {
                   }}
                 />
               </BarraFiltros>
-              {!enLista && (
               <div className="cj2-orden" role="group" aria-label="Orden por tiempo">
                 <span className="cj2-orden-t">Orden por tiempo</span>
                 {(['mas', 'menos'] as const).map((o) => (
@@ -1071,39 +1093,14 @@ export function PedidosAdminView() {
                   </button>
                 ))}
               </div>
-              )}
-              {chips.length > 0 && (
-                <button type="button" className="cj2-limpiar" style={{ alignSelf: 'flex-start' }} onClick={limpiarFiltros}>
-                  Limpiar filtros
-                </button>
-              )}
+              {filtrosActivos}
             </div>
           </>
         )}
       </div>
     )}
 
-    {/* Filtros activos: chips que se quitan con un toque */}
-    {(chips.length > 0 || (!enLista && orden !== ORDEN_POR_DEFECTO) || chipTodo) && (
-      <div className="cj2-activos" aria-label="Filtros activos">
-        {chipTodo && (
-          <button type="button" className="cj2-quitar" aria-label="Quitar Mostrando todo el día" onClick={limpiarFiltros}>
-            Mostrando: todo el día <span aria-hidden="true">✕</span>
-          </button>
-        )}
-        {!enLista && orden !== ORDEN_POR_DEFECTO && (
-          <button type="button" className="cj2-quitar" aria-label="Quitar orden: más tiempo primero" onClick={() => cambiarOrden(ORDEN_POR_DEFECTO)}>
-            <span aria-hidden="true">↑↓ </span>Orden: más tiempo primero <span aria-hidden="true">×</span>
-          </button>
-        )}
-        {chips.map((c) => (
-          <button key={c.id} type="button" className="cj2-quitar" aria-label={`Quitar filtro ${c.texto}`} onClick={c.quitar}>
-            {c.texto} <span aria-hidden="true">×</span>
-          </button>
-        ))}
-        {chips.length > 0 && <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>}
-      </div>
-    )}
+    {enNoEntregados && filtrosActivos}
     </div>
 
     {enNoEntregados ? (
@@ -1165,21 +1162,11 @@ export function PedidosAdminView() {
           </span>
         </section>
 
-        {/* LISTA: pestañas por tipo de servicio y orden; se combinan con los filtros de arriba */}
-        {enLista && (
-          <div className="lc-barra">
-            <PestanasLista activa={pestanaLista} conteos={conteosLista} alCambiar={(t) => { setPestanaLista(t); setPaginaActual(1); }} />
-            <OrdenarLista orden={ordenLista} alCambiar={(o) => { setOrdenLista(o); setPaginaActual(1); }} />
-          </div>
-        )}
-
         {/* TARJETAS / TABLA / LISTA */}
         <div className="cj2-lista" ref={listaRef}>
           {unidades.length === 0 ? (
             <div className="cj2-vacio">
-              {enLista && pedidosFiltrados.length > 0 ? (
-                'No hay pedidos de este tipo de servicio.'
-              ) : pedidos.length > 0 ? (
+              {pedidos.length > 0 ? (
                 <>
                   <div>No hay pedidos con estos filtros.</div>
                   <button type="button" className="cj2-btn" style={{ marginTop: 12 }} onClick={limpiarFiltros}>Limpiar filtros</button>
@@ -1196,7 +1183,6 @@ export function PedidosAdminView() {
             enLista ? (
               <ListaCaja
                 filas={filasTabla}
-                pestana={pestanaLista}
                 accionDe={accionDe}
                 resaltados={pedidosResaltados}
                 alAccion={ejecutarAccion}
@@ -1252,23 +1238,6 @@ export function PedidosAdminView() {
           )}
         </div>
 
-        {totalDia > LIMITE_PAGINA && (
-          <div className="cj2-mas" data-testid="mas-pedidos">
-            <span>Mostrando {pedidos.length} de {totalDia}</span>
-            {pedidos.length < totalDia && (
-              <button type="button" className="cj2-btn" disabled={cargandoMas} onClick={() => void cargarMas()}>
-                {cargandoMas ? 'Cargando…' : 'Cargar más'}
-              </button>
-            )}
-            {filtrando && pedidos.length < totalDia && (
-              <span role="status" data-testid="aviso-filtrando-parcial" style={{ fontWeight: 700 }}>
-                {cargandoMas ? 'Buscando en todos los pedidos…' : `Filtrando solo ${pedidos.length} de ${totalDia} pedidos cargados`}
-              </span>
-            )}
-            {errorMas && <span role="alert" style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>{errorMas}</span>}
-          </div>
-        )}
-
         {/* PAGINADOR: al final de la lista, pequeño y sin posición fija */}
         <PaginadorCaja
           total={unidades.length}
@@ -1281,6 +1250,7 @@ export function PedidosAdminView() {
           alCambiarFilas={(f) => { setFilas(f); setPaginaActual(1); }}
           conAuto={!enTabla && !enLista}
           avisoTope={avisoTope}
+          carga={{ cargados: pedidos.length, totalServidor: totalDia, cargando: cargandoMas, alCargarMas: () => void cargarMas(), error: errorMas, buscando: filtrando }}
         />
       </>
     )}

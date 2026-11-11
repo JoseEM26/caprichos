@@ -8,6 +8,7 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({
@@ -123,6 +124,7 @@ describe('Caja: una tarjeta por cuenta (original + extras)', () => {
   it('el filtro de estado con mezcla: aparece si CUALQUIER pedido lo cumple y marca los demás', async () => {
     montar([extra1(), original()]);
     await screen.findByTestId('tarjeta-cuenta');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Listos/ }));
     const tarjeta = screen.getByTestId('tarjeta-cuenta');
     expect(within(tarjeta).getAllByTestId('seccion-pedido')).toHaveLength(2);

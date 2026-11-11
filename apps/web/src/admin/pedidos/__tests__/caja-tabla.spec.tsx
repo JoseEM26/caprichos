@@ -147,6 +147,7 @@ describe('Filtros de Caja', () => {
   it('pestañas: «Todo» cuenta todo y «Listos» solo los listos', async () => {
     montar([ped(1, { estado: 'LISTO' }), ped(2, { estado: 'PREPARANDO' })]);
     await screen.findByTestId('resumen-dia');
+    await abrirFiltros();
     expect(screen.getByTestId('cuenta-todo')).toHaveTextContent('2');
     expect(screen.getByTestId('cuenta-listos')).toHaveTextContent('1');
   });

@@ -9,6 +9,7 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({ listarPersonalActivo: vi.fn().mockResolvedValue([]), registrarConsumoCredito: vi.fn() }));
@@ -82,6 +83,7 @@ describe('Montos del resumen en Caja', () => {
   it('sin filtro del día muestra las tres cifras; el contador «por cobrar» muestra la suma de esos pedidos', async () => {
     montar(dia);
     await screen.findByText('CP-003');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     let t = await montos();
     expect(t).toContain('Ventas S/ 125.00');
@@ -100,6 +102,7 @@ describe('Montos del resumen en Caja', () => {
   it('cambia con la búsqueda', async () => {
     montar(dia);
     await screen.findByText('CP-003');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/), { target: { value: 'CP-004' } });
     await waitFor(async () => expect(await montos()).toContain('Filtrado: 1 pedido'));
@@ -113,6 +116,7 @@ describe('Montos del resumen en Caja', () => {
     let agrupado = [{ estado: 'COLA', pago_estado: 'PENDIENTE', n: 2, total: 50 }];
     const listar = montar(() => lista, () => agrupado);
     await screen.findByText('CP-003');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     expect(await montos()).toContain('Por cobrar S/ 50.00');
     lista = lista.map((p) => (p.id === '3' ? ({ ...p, pago_estado: 'PAGADO' } as Pedido) : p));
@@ -132,6 +136,7 @@ describe('Montos del resumen en Caja', () => {
     let lista = dia();
     const listar = montar(() => lista);
     await screen.findByText('CP-003');
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Todo el día/ }));
     let soltarVieja: (v: any) => void = () => {};
     const viejo = lista;

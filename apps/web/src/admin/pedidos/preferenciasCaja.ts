@@ -7,4 +7,3 @@ export const usePreferenciaCaja = usePreferencia;
 export const CLAVE_COLUMNAS = 'caja.tabla.columnas';
 export const CLAVE_VISTA = 'caja.vista';
 export const CLAVE_FILAS = 'caja.tabla.filas';
-export const CLAVE_ORDEN_LISTA = 'caja.lista.orden';

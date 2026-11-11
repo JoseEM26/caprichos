@@ -6,6 +6,7 @@ import { ModalAnular } from '../ModalAnular';
 import { pedidosApi, Pedido } from '../pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
+import { abrirFiltros } from './abrirFiltros';
 
 // Mock de audio para evitar excepciones en jsdom
 vi.mock('../audioAlerta', () => ({
@@ -164,7 +165,9 @@ describe('Ola F4: Pedidos y Caja', () => {
 
     render(<PedidosAdminView />);
 
-    const filtros = await screen.findByRole('navigation', { name: 'Estado de los pedidos' });
+    await screen.findByText('CP-001');
+    abrirFiltros();
+    const filtros = screen.getByRole('navigation', { name: 'Estado de los pedidos' });
     // Activos: CP-001 (por confirmar, delivery), CP-002 (preparando), CP-003 (listo), CP-004 (en camino, delivery)
     expect(within(filtros).getByRole('button', { name: /^Todo/ })).toHaveTextContent('Todo4');
     expect(within(filtros).getByRole('button', { name: /^En preparación/ })).toHaveTextContent('En preparación1');

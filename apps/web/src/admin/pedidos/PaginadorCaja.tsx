@@ -31,6 +31,8 @@ export interface PaginadorCajaProps {
   /** «Todas» pidió más de lo que se pudo cargar. */
   avisoTope?: string | null;
   unidad?: string;
+  /** Pedidos que el servidor tiene y aún no llegaron: se muestran en la MISMA línea (conteo de cargados + «Cargar más» o «Cargando…»). */
+  carga?: { cargados: number; totalServidor: number; cargando: boolean; alCargarMas: () => void; error?: string; buscando?: boolean };
 }
 
 const Flecha = ({ der }: { der?: boolean }) => (
@@ -44,14 +46,29 @@ const Flecha = ({ der }: { der?: boolean }) => (
  * y del ancho de su contenido. Con una sola página no muestra «Página 1 de 1» ni las flechas; con 0 elementos, solo el conteo.
  * Los botones se ven chicos pero su área de toque llega a 44 px (ver `.cj2-pag-btn::after` en caja-lista.css).
  */
-export function PaginadorCaja({ total, desde, hasta, pagina, totalPaginas, alIr, filas, alCambiarFilas, conAuto = true, avisoTope, unidad = 'pedidos' }: PaginadorCajaProps) {
+export function PaginadorCaja({ total, desde, hasta, pagina, totalPaginas, alIr, filas, alCambiarFilas, conAuto = true, avisoTope, unidad = 'pedidos', carga }: PaginadorCajaProps) {
   const valorSelect = filas === null ? 'auto' : String(filas);
   const variasPaginas = totalPaginas > 1;
+  const faltan = !!carga && carga.cargados < carga.totalServidor;
   return (
     <nav className="cj2-pag" aria-label="Paginación">
       <span className="cj2-pag-rango" data-testid="rango-pagina">
         {total === 0 ? `0 ${unidad}` : `Mostrando ${desde}–${hasta} de ${total}`}
       </span>
+      {faltan && carga && (
+        <span className="cj2-pag-carga" data-testid="pag-carga" title={`${carga.cargados} de ${carga.totalServidor} pedidos cargados`}>
+          {carga.cargando ? (
+            <span role="status">{carga.buscando ? 'Buscando…' : 'Cargando…'} {carga.cargados}/{carga.totalServidor}</span>
+          ) : (
+            <>
+              {carga.cargados}/{carga.totalServidor}
+              {' · '}
+              <button type="button" className="cj2-pag-mas" onClick={carga.alCargarMas}>Cargar más</button>
+            </>
+          )}
+        </span>
+      )}
+      {carga?.error && <span className="cj2-pag-aviso" role="alert">{carga.error}</span>}
       {/* Con pocas filas (caben en la menor página) el selector no aporta: solo queda el conteo */}
       {total > OPCIONES_FILAS[0] && (
         <label className="cj2-pag-filas">

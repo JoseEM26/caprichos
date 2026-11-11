@@ -8,6 +8,7 @@ import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
 import { impresionApi } from '../../impresion/impresionApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { abrirFiltros } from './abrirFiltros';
 
 vi.mock('../audioAlerta', () => ({ reproducirCampana: vi.fn() }));
 vi.mock('../../creditos/creditosApi', () => ({
@@ -87,18 +88,23 @@ const dia = [
 ];
 
 describe('Todo el día', () => {
-  it('por defecto la lista sigue en Activos y el botón está fuera del panel de Filtros, sin pulsar', async () => {
+  it('por defecto la lista sigue en Activos y el botón vive dentro del panel de Filtros (cerrado), sin pulsar', async () => {
     montar(dia);
-    const boton = await screen.findByRole('button', { name: /Todo el día/ });
+    await screen.findByText('CP-001');
+    expect(screen.queryByRole('button', { name: /Todo el día/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Filtros' })).toBeNull();
+    abrirFiltros();
+    const boton = screen.getByRole('button', { name: /Todo el día/ });
     expect(boton.getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByText('CP-002')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Filtros' })).toBeNull();
   });
 
   it('un toque muestra todos los estados, limpia los demás filtros y pone el chip para volver', async () => {
     montar(dia);
     fireEvent.change(await screen.findByPlaceholderText(/Buscar por código/), { target: { value: 'zzz' } });
+    abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /^Todo el día/ }));
+    abrirFiltros();
     const boton = screen.getByRole('button', { name: /Todo el día/ });
     expect(boton.getAttribute('aria-pressed')).toBe('true');
     for (const c of ['CP-001', 'CP-002', 'CP-003', 'CP-004', 'CP-005']) expect(screen.getByText(c)).toBeTruthy();
@@ -111,7 +117,9 @@ describe('Todo el día', () => {
 
   it('anulados y rechazados se ven con texto y sin sumar a las ventas', async () => {
     montar(dia);
-    fireEvent.click(await screen.findByRole('button', { name: /^Todo el día/ }));
+    await screen.findByText('CP-001');
+    abrirFiltros();
+    fireEvent.click(screen.getByRole('button', { name: /^Todo el día/ }));
     expect(screen.getByText('ANULADO')).toBeTruthy();
     expect(screen.getByText('RECHAZADO')).toBeTruthy();
     const resumen = screen.getByTestId('resumen-dia');
@@ -139,11 +147,13 @@ describe('Todo el día', () => {
   it('con más de 100 pedidos muestra «Mostrando N de M» y «Cargar más» trae el resto sin repetir', async () => {
     const muchos = Array.from({ length: 120 }, (_, i) => ped(i + 1, { estado: i % 2 ? 'ENTREGADO' : 'PREPARANDO' }));
     const listar = montar(muchos);
-    const barra = await screen.findByTestId('mas-pedidos');
-    expect(barra.textContent).toContain('Mostrando 100 de 120');
-    fireEvent.click(within(barra).getByRole('button', { name: 'Cargar más' }));
-    await waitFor(() => expect(screen.getByTestId('mas-pedidos').textContent).toContain('Mostrando 120 de 120'));
-    expect(within(screen.getByTestId('mas-pedidos')).queryByRole('button', { name: 'Cargar más' })).toBeNull();
+    // Un SOLO pie: el rango, lo cargado y «Cargar más» van juntos en el mismo paginador
+    const pie = await screen.findByRole('navigation', { name: 'Paginación' });
+    expect(screen.getAllByRole('navigation', { name: 'Paginación' })).toHaveLength(1);
+    expect(within(pie).getByTestId('pag-carga').textContent).toContain('100/120');
+    fireEvent.click(within(pie).getByRole('button', { name: 'Cargar más' }));
+    await waitFor(() => expect(screen.queryByTestId('pag-carga')).toBeNull());
+    expect(within(screen.getByRole('navigation', { name: 'Paginación' })).queryByRole('button', { name: 'Cargar más' })).toBeNull();
     expect(listar.mock.calls.some(([f]: any[]) => f?.pagina === 2 && f?.limite === 100)).toBe(true);
   });
 

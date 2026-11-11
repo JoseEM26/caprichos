@@ -43,13 +43,14 @@ describe('Pedidos y Caja: búsqueda en un día con más de 100 pedidos', () => {
     vi.spyOn(impresionApi, 'obtenerEstado').mockRejectedValue(new Error('sin consulta'));
 
     render(<MemoryRouter><PedidosAdminView /></MemoryRouter>);
-    await screen.findByTestId('mas-pedidos');
+    await screen.findByTestId('pag-carga');
     expect(screen.queryByText('José Peña')).not.toBeInTheDocument();
 
     fireEvent.change(document.getElementById('ord-q') as HTMLInputElement, { target: { value: 'jose' } });
 
     await waitFor(() => expect(screen.getByText('José Peña')).toBeInTheDocument());
     expect(listar.mock.calls.some(([f]: any) => f?.pagina === 3)).toBe(true);
-    expect(screen.queryByTestId('aviso-filtrando-parcial')).not.toBeInTheDocument();
+    // Con todo cargado ya no queda el aviso de carga en el pie
+    await waitFor(() => expect(screen.queryByTestId('pag-carga')).not.toBeInTheDocument());
   });
 });
