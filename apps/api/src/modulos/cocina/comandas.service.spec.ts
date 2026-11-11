@@ -635,6 +635,26 @@ describe('ComandasService', () => {
       })),
     });
 
+    it('la comanda de una mesa trae su mesa (una, varias, sin dato) y la de delivery no', async () => {
+      const base = pedidoTresAreas(8n, {});
+      const fila = (id: bigint, extra: any) => ({
+        pedido_id: id, area_id: 1n, estado: 'EN_COCINA', llego_en: new Date(),
+        pedido: { ...base, id, ...extra },
+      });
+      prisma.pedido.findMany.mockResolvedValue([]);
+      prisma.areaCocina.findFirst.mockResolvedValue({ id: 1n, nombre: 'Barra' });
+      prisma.comandaArea.findMany.mockResolvedValue([
+        fila(1n, { modalidad: 'MESA', mesa_nombre: 'Mesa 6' }),
+        fila(2n, { modalidad: 'MESA', mesa_nombre: 'Mesas 4 y 5' }),
+        fila(3n, { modalidad: 'MESA', mesa_nombre: null }),
+        fila(4n, { modalidad: 'DELIVERY', mesa_nombre: null }),
+      ]);
+
+      const r = await service.listarComandas('Barra');
+
+      expect(r.map((c: any) => c.mesa)).toEqual(['Mesa 6', 'Mesas 4 y 5', null, null]);
+    });
+
     it('la pantalla de Barra sigue mostrando el pedido despejado por Barra, con el estado de cada área', async () => {
       const pedido = pedidoTresAreas(7n, { Barra: 'DESPEJADA' });
       prisma.pedido.findMany.mockResolvedValue([]);

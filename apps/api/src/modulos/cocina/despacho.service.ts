@@ -9,6 +9,7 @@ import { estadoAreasDePedido } from './areas-pedido';
 import { obtenerInicioDiaLima } from './cocina.util';
 import { resaltadoDeLineas } from './opcion-menos-pedida';
 import { resumenPagoDespacho } from './resumen-pago-despacho';
+import { mesaDePedido } from './mesa-comanda.util';
 
 const FUERA = ['ANULADO', 'RECHAZADO'];
 /** Pedidos que esperan a Despacho: cocina ya los tiene en curso y aún no pasan a LISTO. */
@@ -71,7 +72,7 @@ export class DespachoService {
         ...a,
         lineas: lineasDeArea(p.lineas, BigInt(a.areaId), resaltado),
       }));
-      const mesa = (p as any).mesa ?? (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
+      const mesa = mesaDePedido(p);
       const delivery = p.modalidad === 'DELIVERY';
       return {
         pedidoId: p.id.toString(),

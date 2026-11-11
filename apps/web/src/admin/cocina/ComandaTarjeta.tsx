@@ -4,6 +4,7 @@ import { textoSabores } from './cocinaTipos';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
 import { colorPorMinutos } from './tiempoEnVivo';
 import { NumeroDia, TiempoEspera } from './TiempoEspera';
+import { InsigniaMesa } from './InsigniaMesa';
 
 /** Tiempo para deshacer un «completa» (la línea vuelve a 0) antes de que el botón desaparezca. */
 export const SEGUNDOS_DESHACER = 5;
@@ -551,8 +552,8 @@ export function ComandaTarjeta({
   const formatoModalidad = () => {
     const mod = (comanda.modalidad || '').toUpperCase();
     if (mod === 'MESA' || mod === 'LOCAL') {
-      if (comanda.enEsperaMesa) return 'En espera de mesa';
-      return comanda.mesa ? `En mesa · M${comanda.mesa}` : 'En mesa';
+      // El número de mesa va en la insignia grande de la cabecera
+      return comanda.enEsperaMesa ? 'En espera de mesa' : 'En mesa';
     }
     if (mod === 'DELIVERY') return 'Delivery';
     if (mod === 'COMER_LOCAL') return 'Comer en el local';
@@ -564,8 +565,6 @@ export function ComandaTarjeta({
   const canalTxt = comanda.canal ? `${comanda.canal}` : 'Web';
   const whoTxt = comanda.enEsperaMesa
     ? 'En espera de mesa'
-    : comanda.mesa
-    ? `M${comanda.mesa}`
     : comanda.modalidad === 'COMER_LOCAL' && comanda.cliente
     ? comanda.cliente
     : comanda.mozo
@@ -655,6 +654,8 @@ export function ComandaTarjeta({
           />
         </span>
       </div>
+
+      <InsigniaMesa modalidad={comanda.modalidad} mesa={comanda.mesa} enEsperaMesa={comanda.enEsperaMesa} />
 
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
         {modalName} · {canalTxt} · {whoTxt}
