@@ -100,6 +100,35 @@ export function origenAgotadoAdmin(
   return sinSaldo ? 'AUTOMATICO' : null;
 }
 
+export interface DisponibilidadCarta {
+  productos: Array<{
+    id: string;
+    disponible: boolean;
+    controlaStock: boolean;
+    quedan: number | null;
+    sabores?: Array<{ id: string; disponible: boolean; quedan: number | null }>;
+  }>;
+  generadoEn: string;
+}
+
+/** Deja de la carta solo lo que cambia con el stock. */
+export function proyectarDisponibilidad(categorias: CategoriaCarta[], ahora: Date = new Date()): DisponibilidadCarta {
+  return {
+    productos: categorias.flatMap((c) =>
+      c.productos.map((p) => ({
+        id: p.id,
+        disponible: p.disponible,
+        controlaStock: p.controlaStock === true,
+        quedan: p.controlaStock === true ? (p.quedan ?? null) : null,
+        ...(p.saboresConStock === true
+          ? { sabores: (p.sabores ?? []).map((s) => ({ id: s.id, disponible: s.disponible, quedan: s.quedan ?? null })) }
+          : {}),
+      })),
+    ),
+    generadoEn: ahora.toISOString(),
+  };
+}
+
 @Injectable()
 export class CatalogoService implements OnApplicationBootstrap {
   constructor(
@@ -187,6 +216,15 @@ export class CatalogoService implements OnApplicationBootstrap {
       select: { nombre: true, foto_archivo: { select: { ruta: true } } },
     });
     return p ? { nombre: p.nombre, ruta: p.foto_archivo?.ruta ?? null } : null;
+  }
+
+  /**
+   * Stock y disponibilidad en vivo de la carta pública (liviano, para el sondeo del navegador).
+   * Sale del MISMO cálculo que GET /carta, así nunca discrepa de lo que muestra la carta al cargar.
+   * ponytail: recalcula la carta entera; si pesa, cachear unos segundos en memoria.
+   */
+  async obtenerDisponibilidad(): Promise<DisponibilidadCarta> {
+    return proyectarDisponibilidad(await this.obtenerCarta());
   }
 
   async obtenerCarta(q?: string): Promise<CategoriaCarta[]> {

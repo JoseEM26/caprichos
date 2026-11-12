@@ -52,6 +52,13 @@ export class CartaController {
     @Optional() private readonly config?: ConfigService,
   ) {}
 
+  /** Stock en vivo para el sondeo de la carta: sin auth, caché corta compartida. */
+  @Get('disponibilidad')
+  @Header('Cache-Control', 'public, max-age=5')
+  async obtenerDisponibilidad() {
+    return this.catalogoService.obtenerDisponibilidad();
+  }
+
   @Get()
   async obtenerCarta(@Query('q') q?: string) {
     return this.catalogoService.obtenerCarta(q);

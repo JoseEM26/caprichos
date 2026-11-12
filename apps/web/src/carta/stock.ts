@@ -98,6 +98,16 @@ export function mensajeSaborQuedan(quedan: number, saborNombre: string): string 
   return quedan <= 0 ? `Ya no quedan ${saborNombre}` : `Solo quedan ${quedan} de ${saborNombre}`;
 }
 
+/** Aviso cariñoso de un exceso de stock (producto agotado o con menos de lo pedido). */
+export function mensajeExceso(e: ExcesoStock, enCarrito = false): string {
+  if (e.saborId) return mensajeSaborQuedan(e.quedan, e.saborNombre ?? 'este sabor');
+  return e.quedan <= 0
+    ? `Se nos acabó ${e.nombre} por hoy 🍩💛: quítalo de tu pedido para poder enviarlo`
+    : enCarrito
+      ? `Solo quedan ${e.quedan}: quita unidades de este producto`
+      : `Solo quedan ${e.quedan} de ${e.nombre}`;
+}
+
 /**
  * Franja llamativa: «¡Última dona!», «¡Últimas 2!» o «¡Quedan solo 3, ya se acaban!» (hasta el umbral de franja).
  * `nombre` es el producto (para «¡Última dona!»). Null con 0, más unidades, o sin control.
@@ -149,15 +159,19 @@ export function excesosDeStock(lineas: LineaCarrito[], inventario: InventarioCar
       const usadas = saboresEnCarrito(lineas, id);
       for (const [saborId, pedidas] of Object.entries(usadas)) {
         const sabor = info.sabores[saborId];
-        if (sabor && sabor.quedan !== null && pedidas > sabor.quedan) {
-          salida.push({ productoId: id, nombre: l.nombre, pedidas, quedan: sabor.quedan, saborId, saborNombre: sabor.nombre });
+        // un sabor marcado no disponible cuenta como 0 aunque no tenga tope numérico
+        const tope = sabor ? (sabor.disponible ? sabor.quedan : 0) : null;
+        if (sabor && tope !== null && pedidas > tope) {
+          salida.push({ productoId: id, nombre: l.nombre, pedidas, quedan: tope, saborId, saborNombre: sabor.nombre });
         }
       }
       continue;
     }
-    if (!info.controlaStock || info.quedan === null) continue;
+    // agotado a mano (sin conteo) también deja el producto fuera: cuenta como 0
+    const tope = !info.disponible ? 0 : info.controlaStock ? info.quedan : null;
+    if (tope === null) continue;
     const pedidas = unidadesEnCarrito(lineas, id);
-    if (pedidas > info.quedan) salida.push({ productoId: id, nombre: l.nombre, pedidas, quedan: info.quedan });
+    if (pedidas > tope) salida.push({ productoId: id, nombre: l.nombre, pedidas, quedan: tope });
   }
   return salida;
 }

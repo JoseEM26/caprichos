@@ -1,5 +1,6 @@
 import { PieLegal } from './legal';
-import { Fragment, useEffect, useState, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
+import { aplicarDisponibilidad, msHastaProximoCambio, type DisponibilidadCarta } from './enVivo';
 import type { ReactNode } from 'react';
 import { DispositivoForzado } from './useEsMovil';
 import { resolverDisposicion, medidasMomento, anchoNovedad, gridColumnas } from './disposicion';
@@ -174,17 +175,32 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     if (!vistaPrevia) cargarDatos();
   }, []);
 
-  // El estado de apertura se vuelve a pedir al servidor cada 30 s y al volver a la pestaña:
-  // a la hora de abrir la carta se abre sola y a la de cerrar se cierra, sin recargar.
+  // La carta se actualiza sola, sin recargar: cada 30 s y al volver a la pestaña se piden el estado de
+  // apertura y la disponibilidad (stock); además se programa un refresco justo a la hora de abrir o cerrar.
+  const refrescarEnVivo = useCallback(() => {
+    void api.get<EstadoLocalCarta>('/carta/estado').then(setEstadoLocal).catch(() => undefined);
+    void api
+      .get<DisponibilidadCarta>('/carta/disponibilidad')
+      .then((d) => setCategorias((prev) => aplicarDisponibilidad(prev, d)))
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     if (vistaPrevia) return;
-    const refrescar = () =>
-      api.get<EstadoLocalCarta>('/carta/estado').then(setEstadoLocal).catch(() => undefined);
-    const t = setInterval(refrescar, 30000);
-    const alVolver = () => { if (document.visibilityState === 'visible') void refrescar(); };
+    const t = setInterval(refrescarEnVivo, 30000);
+    const alVolver = () => { if (document.visibilityState === 'visible') refrescarEnVivo(); };
     document.addEventListener('visibilitychange', alVolver);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver); };
   }, []);
+
+  // Refresco exacto en el minuto de cierre/apertura (+1 s para no caer antes del cambio en el servidor)
+  useEffect(() => {
+    if (vistaPrevia) return;
+    const ms = msHastaProximoCambio(estadoLocal);
+    if (ms === null) return;
+    const t = setTimeout(refrescarEnVivo, Math.min(ms + 1000, 2_000_000_000));
+    return () => clearTimeout(t);
+  }, [estadoLocal, vistaPrevia]);
 
   // Vista previa: los datos llegan del diseñador (borrador) y se actualizan al cambiar cualquier control
   useEffect(() => {
@@ -967,7 +983,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       {/* Ventana modal de detalle del producto */}
       {productoEnModal && (
         <VentanaProductoCarta
-          producto={productoEnModal}
+          producto={todosLosProductos.find((p) => String(p.id) === String(productoEnModal.id)) ?? productoEnModal}
           esBebida={['FRAPPES', 'ICED', 'FROZEN', 'CALIENTES'].includes(
             (categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre ?? '').toUpperCase(),
           )}

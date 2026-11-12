@@ -6,6 +6,7 @@ import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { AvisoTeFaltaPoco } from './AvisoTeFaltaPoco';
 import {
   excesosDeStock,
+  mensajeExceso,
   lineasSaborIncompletas,
   mensajeSaborQuedan,
   mezclasDisponibles,
@@ -246,7 +247,7 @@ export function CajonCarrito({
               const mensajeStock = exceso
                 ? exceso.saborId
                   ? mensajeSaborQuedan(exceso.quedan, exceso.saborNombre ?? 'este sabor')
-                  : `Solo quedan ${exceso.quedan}: quita unidades de este producto`
+                  : mensajeExceso(exceso, true)
                 : pendiente
                   ? `Elige los sabores: faltan ${(linea.unidadesPorMezcla ?? 1) * linea.cantidad - (linea.sabores ?? []).reduce((a, x) => a + x.cantidad, 0)}`
                   : topeMas && info?.quedan != null

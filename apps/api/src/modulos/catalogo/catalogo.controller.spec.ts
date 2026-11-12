@@ -28,6 +28,7 @@ describe('CatalogoControllers', () => {
   beforeEach(async () => {
     service = {
       obtenerCarta: jest.fn(),
+      obtenerDisponibilidad: jest.fn(),
       listarProductosAdmin: jest.fn(),
       obtenerProductoPorId: jest.fn(),
       crearProducto: jest.fn(),
@@ -79,6 +80,11 @@ describe('CatalogoControllers', () => {
   });
 
   describe('CartaController (Público)', () => {
+    it('debe responder GET /carta/disponibilidad desde el servicio', async () => {
+      service.obtenerDisponibilidad.mockResolvedValue({ productos: [], generadoEn: 'x' });
+      expect(await cartaController.obtenerDisponibilidad()).toEqual({ productos: [], generadoEn: 'x' });
+    });
+
     it('debe responder GET /carta invocando catalogoService.obtenerCarta', async () => {
       service.obtenerCarta.mockResolvedValue([
         {

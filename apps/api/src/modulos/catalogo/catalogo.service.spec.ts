@@ -1202,3 +1202,35 @@ describe('CatalogoService', () => {
     });
   });
 });
+
+describe('proyectarDisponibilidad (stock en vivo de la carta)', () => {
+  const { proyectarDisponibilidad } = require('./catalogo.service');
+  const prod = (extra: any) => ({ id: '1', nombre: 'x', disponible: true, controlaStock: false, quedan: null, sabores: [], saboresConStock: false, ...extra });
+
+  it('mantiene la forma liviana y el mismo valor que la carta', () => {
+    const r = proyectarDisponibilidad(
+      [{ id: 'c', nombre: 'C', productos: [prod({ id: '1', controlaStock: true, quedan: 3 }), prod({ id: '2', disponible: false, controlaStock: true, quedan: 0 }), prod({ id: '3', quedan: 9 })] }],
+      new Date('2026-01-01T00:00:00Z'),
+    );
+    expect(r.generadoEn).toBe('2026-01-01T00:00:00.000Z');
+    expect(r.productos).toEqual([
+      { id: '1', disponible: true, controlaStock: true, quedan: 3 },
+      { id: '2', disponible: false, controlaStock: true, quedan: 0 },
+      { id: '3', disponible: true, controlaStock: false, quedan: null },
+    ]);
+  });
+
+  it('incluye los sabores solo si el producto los vende por sabor', () => {
+    const r = proyectarDisponibilidad([
+      { id: 'c', nombre: 'C', productos: [prod({ controlaStock: true, saboresConStock: true, quedan: 2, sabores: [{ id: 's1', nombre: 'Fresa', activo: true, disponible: false, quedan: 0 }, { id: 's2', nombre: 'Oreo', activo: true, disponible: true, quedan: 2 }] })] },
+    ]);
+    expect(r.productos[0].sabores).toEqual([{ id: 's1', disponible: false, quedan: 0 }, { id: 's2', disponible: true, quedan: 2 }]);
+  });
+
+  it('el servicio la arma desde obtenerCarta', async () => {
+    const s: any = Object.create(CatalogoService.prototype);
+    s.obtenerCarta = jest.fn().mockResolvedValue([{ id: 'c', nombre: 'C', productos: [prod({ id: '7', disponible: false, controlaStock: true, quedan: 0 })] }]);
+    const r = await s.obtenerDisponibilidad();
+    expect(r.productos[0]).toMatchObject({ id: '7', disponible: false, quedan: 0 });
+  });
+});

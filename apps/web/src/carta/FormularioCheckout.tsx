@@ -22,7 +22,7 @@ type ConsultaRuc =
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { SelectorPagoEquipo, type PagoEquipo } from './SelectorPagoEquipo';
 import { guardarPedido } from './seguimiento';
-import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
+import { mensajeExceso, excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
@@ -79,6 +79,8 @@ export function FormularioCheckout({
   const excesos = excesosDeStock(lineas, inventario);
   const pendientesSabor = lineasSaborIncompletas(lineas);
   const enviarBloqueadoPorStock = excesos.length > 0 || pendientesSabor.length > 0;
+  // La carta se actualiza sola: si cierra (o entra en pausa) con el checkout abierto, se avisa y no se deja enviar
+  const localCerrado = Boolean(estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda));
   const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string; saborId?: string } | null>(null);
   useEffect(() => {
     if (!checkoutAbierto) setStockRechazado(null);
@@ -2712,6 +2714,18 @@ export function FormularioCheckout({
                 </div>
               )}
 
+              {localCerrado && (
+                <div
+                  role="alert"
+                  data-testid="aviso-local-cerrado"
+                  style={{ backgroundColor: '#FDECEA', color: 'var(--cp-rust)', border: '1.5px solid var(--cp-rust)', borderRadius: '10px', padding: '8px 12px', fontSize: '13px', fontWeight: 700, lineHeight: '17px' }}
+                >
+                  {estadoLocal?.pausaAltaDemanda
+                    ? 'Por ahora estamos con muchos pedidos y no podemos recibir más 💛. Tu carrito se queda guardado: vuelve en un ratito.'
+                    : `Ya cerramos por hoy 💛 (${estadoLocal?.texto}). Tu carrito se queda guardado para cuando volvamos a abrir.`}
+                </div>
+              )}
+
               {/* Stock: productos por encima de lo que queda, con el ajuste del pedido */}
               {(enviarBloqueadoPorStock || stockRechazado) && (
                 <div
@@ -2732,7 +2746,7 @@ export function FormularioCheckout({
                 >
                   {excesos.map((e) => (
                     <span key={`${e.productoId}-${e.saborId ?? ''}`}>
-                      {e.saborId ? mensajeSaborQuedan(e.quedan, e.saborNombre ?? 'este sabor') : `Solo quedan ${e.quedan} de ${e.nombre}`}
+                      {e.saborId ? mensajeSaborQuedan(e.quedan, e.saborNombre ?? 'este sabor') : mensajeExceso(e)}
                     </span>
                   ))}
                   {pendientesSabor.map((l) => (
@@ -2833,24 +2847,26 @@ export function FormularioCheckout({
                 ) : (
                   <button
                     type="button"
-                    disabled={enviando || enviarBloqueadoPorStock || sinModalidadOferta}
+                    disabled={enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado}
                     onClick={() => void enviarPedido()}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 0,
-                      backgroundColor: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'var(--cp-line)' : 'var(--cp-orange)',
-                      color: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'var(--cp-soft)' : '#FFFFFF',
+                      backgroundColor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'var(--cp-soft)' : '#FFFFFF',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'not-allowed' : 'pointer',
+                      cursor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {enviando
                       ? 'Enviando pedido...'
-                      : enviarBloqueadoPorStock || sinModalidadOferta
+                      : localCerrado
+                        ? 'Local cerrado por ahora'
+                        : enviarBloqueadoPorStock || sinModalidadOferta
                         ? 'Ajusta tu pedido para enviar'
                         : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>
