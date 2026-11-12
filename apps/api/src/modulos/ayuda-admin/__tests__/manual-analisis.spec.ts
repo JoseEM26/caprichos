@@ -21,4 +21,14 @@ describe('Manual de Capri: Analisis', () => {
     expect(texto).toContain('Metas por etapa');
     expect(texto).toContain('analisis/ver');
   });
+
+  it('explica las pestanas Demanda y Ventas: definicion de venta, sin dato y montos solo del Administrador', () => {
+    expect(texto).toContain('pestana Demanda');
+    expect(texto).toContain('Carga de cocina ahora');
+    expect(texto).toContain('Tiempo prometido al cliente');
+    expect(texto).toContain('pestana Ventas');
+    expect(texto).toContain('sin la propina');
+    expect(texto).toContain('canibalizacion');
+    expect(texto).toContain('solo el Administrador');
+  });
 });
