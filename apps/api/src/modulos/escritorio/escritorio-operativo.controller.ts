@@ -20,4 +20,11 @@ export class EscritorioOperativoController {
   cumpleanos(@Query('dias') dias?: string) {
     return this.escritorio.cumpleanos(dias ? Number(dias) : undefined);
   }
+
+  /** Cumpleaños de clientes (sin edad, celular enmascarado): solo con permiso de ver clientes. */
+  @Get('cumpleanos-clientes')
+  @Permiso('clientes', 'ver')
+  cumpleanosClientes(@Req() req: any, @Query('dias') dias?: string) {
+    return this.escritorio.cumpleanosClientes(req.usuario, dias ? Number(dias) : undefined);
+  }
 }

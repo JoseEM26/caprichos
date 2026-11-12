@@ -618,10 +618,23 @@ describe('AuthService', () => {
         roles: ['COCINA'],
         debeCambiar: false,
         permisos: ['cocina/despejar', 'cocina/ver'],
+        cumpleHoy: false,
       });
       expect(prisma.rolPermiso.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { rol: { in: ['COCINA'] } } }),
       );
+    });
+
+    it('cumpleHoy: solo un booleano; la fecha de nacimiento no sale', async () => {
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).split('-').map(Number);
+      prisma.userAccount.findUnique.mockResolvedValue({
+        party_id: 7n, rol: 'MOZO', debe_cambiar: false,
+        party: { persona: { nombres: 'Luis', cumple_dia: hoy[2], cumple_mes: hoy[1] } },
+      });
+      prisma.rolPermiso.findMany.mockResolvedValue([]);
+      const r = await service.yo(7n);
+      expect(r.cumpleHoy).toBe(true);
+      expect(JSON.stringify(r)).not.toMatch(/cumple_|nacimiento/);
     });
 
     it('los permisos extra vigentes se suman a los del rol al refrescar la sesión', async () => {

@@ -24,6 +24,8 @@ export interface ContextoSesion {
   usuario: UsuarioSesion | null;
   permisos: string[];
   debeCambiar: boolean;
+  /** El servidor dice «hoy es tu cumpleaños» (nunca la fecha). */
+  cumpleHoy?: boolean;
   cargando: boolean;
   autenticado: boolean;
   ingresar: (
@@ -71,6 +73,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<string[]>([]);
   const [debeCambiar, setDebeCambiar] = useState<boolean>(false);
+  const [cumpleHoy, setCumpleHoy] = useState<boolean>(false);
   const [cargando, setCargando] = useState<boolean>(true);
 
   const cargarYo = useCallback(async (): Promise<void> => {
@@ -83,6 +86,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
         roles?: string[];
         debeCambiar: boolean;
         permisos: string[];
+        cumpleHoy?: boolean;
       }>('/auth/yo');
 
       setUsuario({
@@ -94,6 +98,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       });
       setPermisos(yo.permisos || []);
       setDebeCambiar(Boolean(yo.debeCambiar));
+      setCumpleHoy(Boolean(yo.cumpleHoy));
     } catch {
       // Si falla /auth/yo no se sobrescriben datos críticos de forma descontrolada
     }
@@ -156,6 +161,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       setUsuario(null);
       setPermisos([]);
       setDebeCambiar(false);
+      setCumpleHoy(false);
     }
   }, []);
 
@@ -215,6 +221,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       usuario,
       permisos,
       debeCambiar,
+      cumpleHoy,
       cargando,
       autenticado: usuario !== null,
       ingresar,
@@ -228,6 +235,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
       usuario,
       permisos,
       debeCambiar,
+      cumpleHoy,
       cargando,
       ingresar,
       salir,
