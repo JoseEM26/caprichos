@@ -316,6 +316,24 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  encuesta_tope_dias: {
+    nombre: 'Días entre encuestas por celular',
+    descripcion: 'Una misma persona recibe como máximo una encuesta de calificación cada tantos días.',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
+  encuesta_hora_desde: {
+    nombre: 'Encuesta: hora desde la que se envía',
+    descripcion: 'Hora (Lima, 0 a 23) desde la que se puede enviar la encuesta.',
+    tipo: 'numero',
+    sufijo: 'h',
+  },
+  encuesta_hora_hasta: {
+    nombre: 'Encuesta: hora hasta la que se envía',
+    descripcion: 'Hora (Lima, 1 a 24) desde la que ya no se envía hasta el día siguiente.',
+    tipo: 'numero',
+    sufijo: 'h',
+  },
   encuesta_puntaje_queja: {
     nombre: 'Umbral de queja en encuesta',
     descripcion: 'Puntajes iguales o menores a este valor (1 a 5) son derivados automáticamente como quejas al módulo de Reclamos, avisan en la campana y por WhatsApp a los administradores.',
@@ -409,7 +427,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   whatsapp_aviso_encuesta_activo: {
     nombre: 'Aviso WhatsApp: Encuesta de satisfacción posventa',
-    descripcion: 'Encendido: se envía una encuesta de satisfacción por plantilla a todo pedido con teléfono, 30 min después de entregado (según «Espera antes de enviar la encuesta»). Requiere la plantilla caprichos_encuesta_posventa aprobada en Meta.',
+    descripcion: 'Encendido: tras la compra (pedido entregado o cobrado, de la carta, WhatsApp, Caja o mozo) se pide la calificación por WhatsApp con la plantilla caprichos_encuesta_posventa, después de «Espera antes de enviar la encuesta», entre las horas configuradas y una vez por celular cada N días. No se envía a pedidos del personal, anulados, números bloqueados ni sin celular. Requiere la plantilla aprobada en Meta; las últimas encuestas y sus motivos se ven en Reclamos > WhatsApp.',
     tipo: 'sino',
   },
   chatbot_pago_recordatorio_activo: {

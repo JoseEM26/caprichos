@@ -13,6 +13,11 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 const mockOutbox: any = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), procesarLote: jest.fn().mockResolvedValue({}), limpiar: jest.fn().mockResolvedValue({}) };
 
 describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
+  // Reloj fijo (12:00 en Lima): el horario de la encuesta no debe volver las pruebas dependientes de la hora
+  const fijarReloj = (iso = '2026-11-12T17:00:00Z') => {
+    beforeEach(() => { jest.useFakeTimers({ now: new Date(iso) }); });
+    afterEach(() => { jest.useRealTimers(); });
+  };
   let planificador: ChatbotPlanificadorService;
   let mockPrisma: any;
   let mockRedisService: any;
@@ -53,7 +58,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       },
       pedidoEstadoHistorial: { create: jest.fn().mockResolvedValue({}) },
       mensajeReparto: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
-      encuestaPosventa: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }) },
+      encuestaPosventa: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }), findFirst: jest.fn().mockResolvedValue(null) },
     };
     // Transacción interactiva: ejecuta el callback con el mismo cliente falso
     mockPrisma.$transaction = jest.fn(async (fn: any) =>
@@ -262,6 +267,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
   });
 
   describe('encuesta posventa en mesa (sin teléfono real no se programa)', () => {
+    fijarReloj();
     const pedidoMesa = (extra: Record<string, unknown> = {}) => ({
       id: BigInt(55),
       codigo: 'CP-M055',
@@ -300,11 +306,13 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       const res = await planificador.ejecutarCiclo();
 
       expect(res.avisosEncuesta).toBe(0);
-      expect(mockPrisma.encuestaPosventa.create).not.toHaveBeenCalled();
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estado: 'OMITIDA', motivo: 'SIN_CELULAR' }) });
       expect(mockOutbox.encolar).not.toHaveBeenCalled();
     });
   });
   describe('encuesta posventa por todos los canales (carta, bot, mozo y caja)', () => {
+    fijarReloj();
     const base = (extra: Record<string, unknown> = {}) => ({
       id: BigInt(70),
       codigo: 'CP-E070',
@@ -328,6 +336,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       const where = encuestas().where;
       expect(where.estado).toEqual({ notIn: ['ANULADO'] });
       expect(where.cliente_telefono).toEqual({ not: null });
+      expect(where.es_personal).toBe(false);
       expect(where.encuestaPosventa).toBeNull();
       expect(where.OR).toHaveLength(4);
       expect(where.OR[0]).toEqual({ entregado_en: expect.any(Object) });
@@ -384,7 +393,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
 
       expect(res.avisosEncuesta).toBe(0);
       expect(mockOutbox.encolar).not.toHaveBeenCalled();
-      expect(mockPrisma.encuestaPosventa.create).not.toHaveBeenCalled();
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estado: 'OMITIDA', motivo: 'SIN_CONSENTIMIENTO' }) });
     });
 
     it('teléfono relleno 999999999 o vacío no se encuesta aunque la consulta lo traiga', async () => {
@@ -405,6 +414,50 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       expect(carga.plantillaClave).toBe('ENCUESTA_POSVENTA');
       expect(carga.variablesPlantilla).toEqual(['Ana', 'CP-E070']);
       expect(carga.botones.map((b: any) => b.id)).toEqual(['encuesta:1', 'encuesta:3', 'encuesta:5']);
+    });
+    it('interruptor apagado: no consulta ni envía', async () => {
+      mockPrisma.parametro.findMany.mockResolvedValue(parametros({ whatsapp_aviso_encuesta_activo: 'no' }));
+      conEncuestas([base({ id: BigInt(80) })]);
+      const res = await planificador.ejecutarCiclo();
+      expect(res.avisosEncuesta).toBe(0);
+      expect(encuestas()).toBeUndefined();
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+    });
+
+    it('de madrugada (fuera del horario de Lima) espera: no envía ni registra omisión', async () => {
+      jest.setSystemTime(new Date('2026-11-13T05:00:00Z')); // 00:00 en Lima
+      conEncuestas([base({ id: BigInt(81) })]);
+      const res = await planificador.ejecutarCiclo();
+      expect(res.avisosEncuesta).toBe(0);
+      expect(encuestas()).toBeUndefined();
+      expect(mockPrisma.encuestaPosventa.create).not.toHaveBeenCalled();
+    });
+
+    it('el horario y la espera salen de los parámetros (con la espera acotada a 5 min como mínimo)', async () => {
+      mockPrisma.parametro.findMany.mockResolvedValue(parametros({ encuesta_hora_desde: 13, encuesta_espera_min: 0 }));
+      conEncuestas([base({ id: BigInt(82) })]);
+      expect((await planificador.ejecutarCiclo()).avisosEncuesta).toBe(0); // 12:00 < 13:00
+      expect((await planificador.obtenerParametros()).encuestaEsperaMin).toBe(5);
+    });
+
+    it('número bloqueado (spam): se omite con motivo y no se encola', async () => {
+      (planificador as any).numeros = { motivoOmision: jest.fn().mockResolvedValue('DESTINO_BLOQUEADO') };
+      conEncuestas([base({ id: BigInt(83) })]);
+      const res = await planificador.ejecutarCiclo();
+      expect(res.avisosEncuesta).toBe(0);
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estado: 'OMITIDA', motivo: 'NUMERO_BLOQUEADO' }) });
+    });
+
+    it('tope por celular: con una encuesta reciente del mismo celular se omite con motivo', async () => {
+      mockPrisma.encuestaPosventa.findFirst.mockResolvedValue({ id: BigInt(9) });
+      conEncuestas([base({ id: BigInt(84) })]);
+      const res = await planificador.ejecutarCiclo();
+      expect(res.avisosEncuesta).toBe(0);
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+      expect(mockPrisma.encuestaPosventa.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estado: 'OMITIDA', motivo: 'TOPE_POR_CELULAR' }) });
+      const where = mockPrisma.encuestaPosventa.findFirst.mock.calls[0][0].where;
+      expect(where.pedido.cliente_telefono.in).toEqual(['987654321', '51987654321']);
     });
   });
 });

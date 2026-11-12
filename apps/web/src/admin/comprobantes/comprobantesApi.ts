@@ -250,6 +250,14 @@ export const comprobantesApi = {
     );
   },
 
+  // Últimas encuestas de calificación (enviadas u omitidas) y plantilla de Meta usada
+  async listarEnviosEncuesta(): Promise<{
+    plantilla: { nombre: string; idioma: string; categoria: string };
+    envios: Array<{ id: string; pedidoCodigo: string; cliente: string | null; telefonoEnmascarado: string | null; estado: string; motivo: string | null; envio: string | null; errorEnvio: string | null; fecha: string }>;
+  }> {
+    return clienteFetch('/admin/reclamos/whatsapp/encuestas-envios');
+  },
+
   // Quejas informales de WhatsApp (Chatbot)
   async listarQuejasWhatsApp(filtros: {
     estado?: string;

@@ -8,6 +8,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
+import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { obtenerNombreMostrar } from '../../mensajes/utilidades/nombre-contacto.util';
 
 @Injectable()
@@ -28,6 +29,41 @@ export class QuejasWhatsappService {
         mensaje: 'El identificador de la queja no es válido',
       });
     }
+  }
+
+  /**
+   * Últimas encuestas de calificación (enviadas u omitidas, con motivo) y el estado real del envío en el outbox.
+   * Un envío FALLIDO con error de plantilla casi siempre es que la plantilla no existe o no está aprobada en Meta.
+   */
+  async listarEnvios(limite = 30) {
+    const filas = await this.prisma.encuestaPosventa.findMany({
+      orderBy: { enviada_en: 'desc' },
+      take: Math.min(100, Math.max(1, Number(limite) || 30)),
+      include: { pedido: { select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true } } },
+    });
+    const salientes = await this.prisma.salienteWhatsapp.findMany({
+      where: { origen: 'ENCUESTA', pedido_id: { in: filas.map((f) => f.pedido_id) } },
+      select: { pedido_id: true, estado: true, ultimo_error: true, motivo_descarte: true },
+    });
+    const porPedido = new Map(salientes.map((x) => [String(x.pedido_id), x]));
+    const plantilla = CATALOGO_PLANTILLAS.ENCUESTA_POSVENTA;
+    return {
+      plantilla: { nombre: plantilla.nombre, idioma: plantilla.idioma, categoria: plantilla.categoria },
+      envios: filas.map((f) => {
+        const out = porPedido.get(String(f.pedido_id));
+        return {
+          id: String(f.id),
+          pedidoCodigo: f.pedido.codigo,
+          cliente: f.pedido.cliente_nombre,
+          telefonoEnmascarado: f.pedido.cliente_telefono ? enmascararTelefono(f.pedido.cliente_telefono) : null,
+          estado: f.estado,
+          motivo: f.motivo ?? out?.motivo_descarte ?? null,
+          envio: out?.estado ?? null,
+          errorEnvio: out?.ultimo_error ?? null,
+          fecha: f.enviada_en.toISOString(),
+        };
+      }),
+    };
   }
 
   /**

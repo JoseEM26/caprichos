@@ -70,7 +70,7 @@ export class EncuestasEstadisticaService {
     const enviadoEn = { gte: inicioDiaLima(desde), lt: inicioDiaLima(sumarDias(hasta, 1)) };
     const relacionPedido = modalidad ? { pedido: { modalidad } } : {};
 
-    const whereEnviadas = { enviada_en: enviadoEn, estado: { not: 'SIMULADA' }, ...relacionPedido };
+    const whereEnviadas = { enviada_en: enviadoEn, estado: { notIn: ['SIMULADA', 'OMITIDA'] }, ...relacionPedido };
     const whereRespondidas = {
       enviada_en: enviadoEn,
       estado: 'RESPONDIDA',

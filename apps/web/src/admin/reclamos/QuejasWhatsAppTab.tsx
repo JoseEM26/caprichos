@@ -9,6 +9,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { Paginacion } from '../../comun/Paginacion';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import { EnviosEncuestaPanel } from './EnviosEncuestaPanel';
 
 export interface QuejasWhatsAppTabProps {
   puedeResponder: boolean;
@@ -548,6 +549,8 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
           </div>
         </>
       )}
+
+      <EnviosEncuestaPanel />
 
       {/* Diálogos de Confirmación Sí/No */}
       <Confirmar
