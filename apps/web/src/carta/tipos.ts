@@ -61,6 +61,11 @@ export interface ProductoCarta {
   quedan?: number | null;
   /** Stock por sabor (donas y galletas por media docena o docena): se elige cuántas de cada sabor. */
   saboresConStock?: boolean;
+  /** «Alcanza para …» (texto corto), si el producto lo trae. */
+  porciones?: string | null;
+  /** Alérgenos del producto; solo se muestran con alergenosConfirmados. */
+  alergenos?: string[];
+  alergenosConfirmados?: boolean;
 }
 
 export interface CategoriaCarta {

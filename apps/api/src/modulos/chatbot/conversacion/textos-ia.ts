@@ -52,7 +52,7 @@ export const TEXTOS_IA = {
    * Texto extraído fielmente del prototipo oficial Chatbot.dc.html.
    */
   invitacionPreguntar: (): string => {
-    return 'Hola, soy Capri. Dime tu consulta y te ayudo.';
+    return '¡Hola! Soy Capri 🥰 Cuéntame tu consulta y te ayudo con todo gusto ✨';
   },
 
   /**
@@ -60,11 +60,11 @@ export const TEXTOS_IA = {
    */
   /** Tema delicado (reclamo, devolución, descuento, anulación): lo ve una persona. */
   temaDelicadoPersona: (): string => {
-    return 'Lamento mucho eso 🙏\nLo vamos a ver con cuidado: te paso con una persona de nuestro equipo para que te ayude.';
+    return 'Lamento mucho eso 🙏💛\nLo vamos a ver con cuidado: te paso con una persona de nuestro equipo para que te ayude.';
   },
 
   errorConsulta: (): string => {
-    return 'Estoy teniendo un problema para ver eso, te paso con una persona.';
+    return 'Uy, estoy teniendo un problemita para ver eso 🙈 Te paso con una persona del equipo que te ayuda enseguida 💛';
   },
 
   /**
@@ -92,7 +92,7 @@ export const TEXTOS_IA = {
    * Mensaje cuando la consulta es muy compleja o requiere confirmación manual.
    */
   dudaComplejaDerivacion: (): string => {
-    return 'Para brindarte una respuesta exacta con respecto a tu consulta, te paso con una persona de nuestro equipo.';
+    return 'Para darte una respuesta exacta 🥰 te paso con una persona de nuestro equipo, que te ayudará con mucho gusto 💛';
   },
 
   /**

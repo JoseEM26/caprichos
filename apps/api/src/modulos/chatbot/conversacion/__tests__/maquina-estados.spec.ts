@@ -217,7 +217,7 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
 
       expect(resultado.nuevoEstado).toBe('MENU');
       if (resultado.acciones[0].tipo === 'enviarLista') {
-        expect(resultado.acciones[0].texto).toContain('¡Hola! ☕ Soy Capri');
+        expect(resultado.acciones[0].texto).toContain('¡Hola! 🥰☕ Soy Capri');
         expect(resultado.acciones[0].texto).not.toContain('Carlos');
       }
     });
@@ -359,7 +359,7 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       expect(resultado.acciones[1].tipo).toBe('enviarTexto');
       if (resultado.acciones[1].tipo === 'enviarTexto') {
         expect(resultado.acciones[1].texto).toContain(
-          'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número',
+          'Te paso con alguien del equipo.\nYa les avisé con tu nombre y tu número',
         );
       }
     });

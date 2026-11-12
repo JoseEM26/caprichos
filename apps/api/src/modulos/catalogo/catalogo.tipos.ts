@@ -54,6 +54,11 @@ export interface ProductoCarta {
   quedan: number | null;
   /** Hay al menos un sabor disponible para elegir. */
   saboresConStock: boolean;
+  /** «Alcanza para …» (opcional). */
+  porciones: string | null;
+  /** Alérgenos que contiene; solo se muestran/afirman si alergenosConfirmados. */
+  alergenos: string[];
+  alergenosConfirmados: boolean;
 }
 
 export interface CategoriaCarta {

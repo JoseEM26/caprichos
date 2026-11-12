@@ -51,7 +51,7 @@ export class IaHerramientasService {
         function: {
           name: 'buscarEnCarta',
           description:
-            'Busca productos en la carta oficial de Caprichos por nombre, palabra clave o categoría. Retorna precios, tamaños, opciones y disponibilidad.',
+            'Busca productos en la carta oficial de Caprichos por nombre, palabra clave o categoría. Retorna precios, tamaños, opciones, disponibilidad, porciones («alcanza para») y alérgenos con su confirmación.',
           parameters: {
             type: 'object',
             properties: {
@@ -309,6 +309,9 @@ export class IaHerramientasService {
             nombre: prod.nombre,
             categoria: cat.nombre,
             descripcion: prod.descripcion || null,
+            porciones: prod.porciones ?? null,
+            alergenos: prod.alergenos ?? [],
+            alergenosConfirmados: prod.alergenosConfirmados ?? false,
             precioBase: Number(prod.precio ?? 0),
             disponible: prod.disponible ?? true,
             tamanos: (prod.tamanos || []).map((t: any) => ({
@@ -699,6 +702,9 @@ export class IaHerramientasService {
             categoria: cat.nombre,
             precioBase: Number(prod.precio ?? 0),
             descripcion: prod.descripcion || null,
+            porciones: prod.porciones ?? null,
+            alergenos: prod.alergenos ?? [],
+            alergenosConfirmados: prod.alergenosConfirmados ?? false,
           });
         }
 

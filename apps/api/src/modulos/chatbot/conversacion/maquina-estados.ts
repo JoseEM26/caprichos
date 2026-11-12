@@ -1727,9 +1727,9 @@ export function transicionarEstado(
       acciones: [
         {
           tipo: 'enviarLista',
-          texto: TEXTOS_BOT.noEntiendoRepregunta(
-            contexto.textosPersonalizados?.chatbot_texto_no_entiendo,
-          ),
+          texto:
+            TEXTOS_BOT.noEntiendoRepregunta(contexto.textosPersonalizados?.chatbot_texto_no_entiendo) +
+            TEXTOS_SOLO_MENUS.lineaCartaNoEntiendo(contexto.cartaUrlPublica || 'https://caprichos.pe'),
           botonTexto: BOTON_LISTA_MENU,
           tituloSeccion: TITULO_SECCION_MENU,
           filas: FILAS_MENU_PRINCIPAL,
@@ -2169,7 +2169,9 @@ function transicionarSoloMenus(
   const noEntendi = respuesta([
     {
       tipo: 'enviarLista',
-      texto: TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo),
+      texto:
+        TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo) +
+        TEXTOS_SOLO_MENUS.lineaCartaNoEntiendo(contexto.cartaUrlPublica || 'https://caprichos.pe'),
       botonTexto: BOTON_LISTA_MENU,
       tituloSeccion: TITULO_SECCION_MENU,
       filas: FILAS_MENU_PRINCIPAL,

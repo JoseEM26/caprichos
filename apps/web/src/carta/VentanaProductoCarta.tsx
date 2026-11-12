@@ -1,3 +1,4 @@
+import { textoAlergenos } from '../comun/alergenos';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { calcularPrecioLinea } from '@caprichos/compartido';
@@ -567,6 +568,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             <div>
               <div style={{ ...titulo, fontWeight: 800, fontSize: 24, lineHeight: '30px' }}>{producto.nombre}</div>
               {producto.descripcion && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>{producto.descripcion}</div>}
+              {producto.porciones && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>Alcanza para {producto.porciones}</div>}
+              {producto.alergenosConfirmados && textoAlergenos(producto.alergenos) && (
+                <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>Contiene: {textoAlergenos(producto.alergenos)}</div>
+              )}
             </div>
             {!movil && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>

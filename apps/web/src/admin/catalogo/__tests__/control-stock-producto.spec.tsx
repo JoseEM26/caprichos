@@ -101,4 +101,20 @@ describe('Productos: casilla «Controlar stock de este producto»', () => {
     fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
     expect(within(d).getByRole('checkbox', { name: CHECK })).toBeChecked();
   });
+
+  it('Editar guarda Alcanza para, alérgenos y la revisión', async () => {
+    vi.spyOn(catalogoApi, 'listarProductos').mockResolvedValue([producto()] as any);
+    const editar = vi.spyOn(catalogoApi, 'editarProducto').mockResolvedValue({} as any);
+    render(<MemoryRouter><ProductosView /></MemoryRouter>);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Editar' }))[0]);
+    const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.change(within(d).getByLabelText('Alcanza para'), { target: { value: '8 a 10 personas' } });
+    fireEvent.click(within(d).getByRole('button', { name: 'maní' }));
+    fireEvent.click(within(d).getByRole('checkbox', { name: 'Revisé los alérgenos de este producto' }));
+    fireEvent.click(within(d).getByRole('button', { name: 'Guardar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, continuar' }));
+    await waitFor(() =>
+      expect(editar).toHaveBeenCalledWith('p1', { porciones: '8 a 10 personas', alergenos: ['MANI'], alergenosConfirmados: true }),
+    );
+  });
 });

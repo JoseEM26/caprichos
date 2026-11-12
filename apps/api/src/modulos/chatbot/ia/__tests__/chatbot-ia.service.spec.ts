@@ -1,3 +1,4 @@
+import { TEXTOS_IA } from '../../conversacion/textos-ia';
 jest.mock('../../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
 import { ChatbotIaService } from '../chatbot-ia.service';
@@ -677,7 +678,7 @@ describe('ChatbotIaService (Ola 3, Agente G - IA para dudas con OpenAI)', () => 
     expect(resultado.exito).toBe(false);
     expect(resultado.necesitaDerivar).toBe(true);
     expect(resultado.respuestaTexto).toBe(
-      'Estoy teniendo un problema para ver eso, te paso con una persona.',
+      TEXTOS_IA.errorConsulta(),
     );
     expect(resultado.resultadoRegistro).toBe('ERROR');
   });

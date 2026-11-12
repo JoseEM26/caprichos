@@ -19,7 +19,7 @@ describe('Bienvenida del bot (fuente única)', () => {
   });
 
   it('sin nombre no deja «¡Hola !» ni coma colgada', () => {
-    expect(armarBienvenida(null, { abierta: true }, { linkCarta: LINK })).toContain('¡Hola! ☕');
+    expect(armarBienvenida(null, { abierta: true }, { linkCarta: LINK })).toContain('¡Hola! 🥰☕');
   });
 
   it('incluye hasta N promociones vigentes ordenadas y omite la sección si no hay', () => {

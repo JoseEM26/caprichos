@@ -173,6 +173,9 @@ export function ProductosView() {
   const [edPrecio, setEdPrecio] = useState('');
   const [edOculto, setEdOculto] = useState(false);
   const [edControlaStock, setEdControlaStock] = useState(false);
+  const [edPorciones, setEdPorciones] = useState('');
+  const [edAlergenos, setEdAlergenos] = useState<string[]>([]);
+  const [edAlergenosConfirmados, setEdAlergenosConfirmados] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
   const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
@@ -422,6 +425,9 @@ export function ProductosView() {
     setEdPrecio(p.precio.toFixed(2));
     setEdOculto(p.oculto === true);
     setEdControlaStock(p.controlaStock === true);
+    setEdPorciones(p.porciones ?? '');
+    setEdAlergenos(p.alergenos ?? []);
+    setEdAlergenosConfirmados(p.alergenosConfirmados === true);
     setEdFotoUrl(p.fotoUrl || null);
     setEdFotoArchivoId(null);
     setEdFotoCambio('SIN_CAMBIO');
@@ -455,6 +461,9 @@ export function ProductosView() {
             ...(precioNum !== o.precio ? { precio: precioNum } : {}),
             ...(edOculto !== (o.oculto === true) ? { oculto: edOculto } : {}),
             ...(edControlaStock !== (o.controlaStock === true) ? { controlaStock: edControlaStock } : {}),
+            ...(edPorciones.trim() !== (o.porciones ?? '') ? { porciones: edPorciones.trim() } : {}),
+            ...(JSON.stringify([...edAlergenos].sort()) !== JSON.stringify([...(o.alergenos ?? [])].sort()) ? { alergenos: edAlergenos } : {}),
+            ...(edAlergenosConfirmados !== (o.alergenosConfirmados === true) ? { alergenosConfirmados: edAlergenosConfirmados } : {}),
             // Sin cambio: no viaja la clave, y el servidor conserva la foto.
             ...(edFotoCambio === 'SIN_CAMBIO'
               ? {}
@@ -1811,6 +1820,9 @@ export function ProductosView() {
           precio={edPrecio} setPrecio={setEdPrecio}
           oculto={edOculto} setOculto={setEdOculto}
           controlaStock={edControlaStock} setControlaStock={setEdControlaStock}
+          porciones={edPorciones} setPorciones={setEdPorciones}
+          alergenos={edAlergenos} setAlergenos={setEdAlergenos}
+          alergenosConfirmados={edAlergenosConfirmados} setAlergenosConfirmados={setEdAlergenosConfirmados}
           fotoUrl={edFotoUrl}
           subiendoFoto={subidaEdFoto.subiendo}
           estadoFoto={subidaEdFoto.estado} errorFoto={subidaEdFoto.error} alReintentarFoto={subidaEdFoto.reintentar}
