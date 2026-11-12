@@ -1,4 +1,4 @@
-import { calcularDescuentoPersonal, descuentoPersonalDeCuenta, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
+import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, trabajadorDeCuentaCliente, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { totalPedido } from '../../comun/total-pedido';
@@ -950,10 +950,17 @@ export class PedidosService {
         pctPersonal,
       );
     }
-    // Carta CON SESIÓN de cliente: si el celular de su cuenta es de un trabajador con usuario activo, recibe su descuento
-    // de personal (solo el descuento: el pedido NO se carga a su crédito). El celular escrito en el pedido no cuenta.
-    if (!origen?.esPersonal && canalPedido === 'CARTA' && origen?.clientePartyId) {
-      const dp = await descuentoPersonalDeCuenta(this.prisma, origen.clientePartyId);
+    // Carta CON SESIÓN de cliente: si su cuenta es de un trabajador con usuario activo, recibe su descuento de personal.
+    // Con pagoEquipo=CREDITO (solo si la cuenta está vinculada al usuario por el ADMIN) el pedido además se carga a su
+    // crédito del personal, como en Caja. Todo se decide por la sesión: el navegador no manda ni el trabajador ni el porcentaje.
+    let creditoEquipo = false;
+    if (!origen?.esPersonal && canalPedido === 'CARTA') {
+      const pideCredito = dto.pagoEquipo === 'CREDITO';
+      const dp = origen?.clientePartyId ? await trabajadorDeCuentaCliente(this.prisma, origen.clientePartyId) : null;
+      if (pideCredito && !(dp?.porVinculo)) {
+        // misma respuesta para cualquiera que no sea del equipo: no revela quién lo es
+        throw new ForbiddenException({ codigo: 'PAGO_EQUIPO_NO_DISPONIBLE', mensaje: 'Esa forma de pago no está disponible para tu cuenta' });
+      }
       if (dp) {
         pctPersonal = dp.pct;
         descuentoPersonal = calcularDescuentoPersonal(
@@ -969,6 +976,14 @@ export class PedidosService {
           desgloseDescuento.detalles as any,
           pctPersonal,
         );
+        if (pideCredito) {
+          if (dto.modalidad === 'DELIVERY') {
+            throw new ForbiddenException({ codigo: 'CREDITO_NO_APLICA_DELIVERY', mensaje: 'El crédito del personal no aplica a pedidos con delivery; elige pagar al contado' });
+          }
+          colaboradorId = dp.partyTrabajadorId;
+          await validarColaborador(this.prisma, colaboradorId); // usuario activo y del personal
+          creditoEquipo = true;
+        }
       }
     }
     const personal = colaboradorId !== null;
@@ -1134,7 +1149,7 @@ export class PedidosService {
 
     // 7.5. Propina opcional: va APARTE de la venta (no suma al total, comprobante ni puntos). Lo que paga el
     // cliente (plan, voucher, efectivo) es total + propina.
-    const propinaPedido = await this.validarPropina(dto.propina, origen?.canal ?? 'CARTA');
+    const propinaPedido = creditoEquipo ? 0 : await this.validarPropina(dto.propina, origen?.canal ?? 'CARTA');
     const aCobrar = Number((totalCalculado + propinaPedido).toFixed(2));
 
     // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
@@ -1163,6 +1178,7 @@ export class PedidosService {
     }
 
     // 8.1. Pedido del personal con «Pagar ahora»: permiso, medio, «con cuánto paga» (efectivo) y caja abierta, antes de crear nada
+    const montoCredito = totalCalculado; // el crédito nunca va con delivery: no hay envío
     const cobroAhora = personal && origen?.pagoPersonal?.modo === 'AHORA' ? await this.validarCobroAhoraPersonal(origen, totalCalculado) : null;
 
     // 9. Comprobante (ya validado arriba) y creación en transacción
@@ -1291,7 +1307,7 @@ export class PedidosService {
             party_id: colaboradorId,
             pedido_id: pedido.id,
             fecha: fechaDiaLima(),
-            monto: new Prisma.Decimal(totalCalculado),
+            monto: new Prisma.Decimal(montoCredito),
             ...(cobroAhora
               ? {
                   pagado_en: new Date(),
@@ -1482,6 +1498,29 @@ export class PedidosService {
         });
       } catch {
         // el cobro ya quedó registrado en el consumo (quién y cuándo); la auditoría no deshace el pedido
+      }
+    }
+
+    if (creditoEquipo) {
+      try {
+        await this.auditoria?.registrar({
+          categoria: 'CAMBIO',
+          modulo: 'creditos',
+          accion: 'CREDITO_PERSONAL_DESDE_CARTA',
+          resultado: 'OK',
+          entidad: 'pedido',
+          entidadId: pedidoCreado.id,
+          partyId: BigInt(origen!.clientePartyId!),
+          despues: {
+            pedido: pedidoCreado.codigo,
+            trabajador: colaboradorId!.toString(),
+            cuentaCliente: String(origen!.clientePartyId),
+            montoACredito: montoCredito,
+            descuentoPersonal,
+          },
+        });
+      } catch {
+        // el consumo ya quedó registrado; la auditoría no deshace el pedido
       }
     }
 

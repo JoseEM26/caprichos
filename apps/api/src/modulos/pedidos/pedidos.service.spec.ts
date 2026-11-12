@@ -578,6 +578,81 @@ describe('PedidosService', () => {
         });
       });
 
+      describe('carta: «Cargar a mi crédito del personal» (pagoEquipo=CREDITO)', () => {
+        const sesion = { canal: 'CARTA' as const, clientePartyId: 2n };
+        const dtoCredito = (extra: any = {}): CrearPedidoDto => ({ ...dtoPersonal, pago: { metodo: 'EFECTIVO' }, pagoEquipo: 'CREDITO', ...extra });
+        const vincular = (usuarioActivo = true) => {
+          prismaMock.customerAccount = { ...(prismaMock.customerAccount ?? {}), findFirst: jest.fn().mockResolvedValue({ telefono: '900000001', usuario_party_id: 9n }) };
+          prismaMock.userAccount = { findFirst: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(usuarioActivo && where.party_id === 9n ? { party_id: 9n } : null)) };
+          prismaMock.contactMechanism = { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) };
+        };
+        beforeEach(() => vincular());
+
+        it('crédito OK: pedido es_personal con 25 %, consumo a la cuenta del trabajador vinculado, sin cobro y con auditoría', async () => {
+          await service.crear(dtoCredito(), 'idemp-credcarta-1', sesion);
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(data.es_personal).toBe(true);
+          expect(data.pago_metodo).toBe('CREDITO_PERSONAL');
+          expect(data.pago_estado).toBe('PAGADO');
+          expect(Number(data.descuento)).toBe(7);
+          expect(Number(data.total)).toBe(21);
+          const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+          expect(c.party_id).toBe(9n);
+          expect(Number(c.monto)).toBe(21);
+          expect(c.pagado_en).toBeUndefined();
+          expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+            expect.objectContaining({ modulo: 'creditos', accion: 'CREDITO_PERSONAL_DESDE_CARTA', partyId: 2n }),
+          );
+        });
+
+        it('CONTADO: pedido normal de cliente con el descuento del equipo, sin crédito', async () => {
+          await service.crear(dtoCredito({ pagoEquipo: 'CONTADO', pago: { metodo: 'EFECTIVO', pagaCon: 50 } }), 'idemp-credcarta-2', sesion);
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(data.es_personal).toBe(false);
+          expect(Number(data.descuento)).toBe(7);
+          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+        });
+
+        it('crédito con delivery: 403 CREDITO_NO_APLICA_DELIVERY y no se crea nada', async () => {
+          await expect(service.crear(dtoCredito({ ...pedidoBaseDto, pagoEquipo: 'CREDITO', pago: { metodo: 'EFECTIVO' } }), 'idemp-credcarta-3', sesion)).rejects.toMatchObject({
+            response: { codigo: 'CREDITO_NO_APLICA_DELIVERY' },
+          });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+        });
+
+        it('usuario inactivo: 403 y no se crea nada', async () => {
+          vincular(false);
+          await expect(service.crear(dtoCredito(), 'idemp-credcarta-4', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGO_EQUIPO_NO_DISPONIBLE' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it('sin sesión: 403', async () => {
+          await expect(service.crear(dtoCredito(), 'idemp-credcarta-5')).rejects.toMatchObject({ response: { codigo: 'PAGO_EQUIPO_NO_DISPONIBLE' } });
+          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+        });
+
+        it('cliente común con pagoEquipo=CREDITO: mismo 403, no revela nada', async () => {
+          prismaMock.customerAccount = { findFirst: jest.fn().mockResolvedValue({ telefono: '911111111', usuario_party_id: null }) };
+          prismaMock.userAccount = { findFirst: jest.fn().mockResolvedValue(null) };
+          prismaMock.contactMechanism = { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) };
+          await expect(service.crear(dtoCredito(), 'idemp-credcarta-6', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGO_EQUIPO_NO_DISPONIBLE' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it('solo por celular (sin vínculo del ADMIN) hay descuento pero NO crédito', async () => {
+          prismaMock.customerAccount = { findFirst: jest.fn().mockResolvedValue({ telefono: '900000001', usuario_party_id: null }) };
+          prismaMock.userAccount = { findFirst: jest.fn().mockResolvedValue(null) };
+          prismaMock.contactMechanism = { findFirst: jest.fn().mockResolvedValue({ party_id: 9n }) };
+          await expect(service.crear(dtoCredito(), 'idemp-credcarta-7', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGO_EQUIPO_NO_DISPONIBLE' } });
+        });
+
+        it('el canal MOZO ignora pagoEquipo (solo vale en la carta)', async () => {
+          await service.crear(dtoCredito(), 'idemp-credcarta-8', { canal: 'MOZO', usuarioPartyId: 5n, clientePartyId: 9n, esPersonal: true });
+          expect(prismaMock.pedido.create.mock.calls[0][0].data.es_personal).toBe(true);
+        });
+      });
+
       it('respeta el porcentaje configurado en el local', async () => {
         prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
           Promise.resolve(where.clave === 'descuento_personal_pct' ? { valor: 20 } : where.clave === 'pedido_minimo' ? { valor: 0 } : null),

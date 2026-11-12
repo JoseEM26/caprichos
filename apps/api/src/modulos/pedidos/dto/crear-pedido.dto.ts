@@ -248,6 +248,11 @@ export class CrearPedidoDto {
   @Type(() => PagoPersonalDto)
   pagoPersonal?: PagoPersonalDto;
 
+  /** Solo carta con sesión de una cuenta vinculada a un usuario activo: CREDITO carga el pedido a su crédito del personal. El servidor decide todo por la sesión. */
+  @IsOptional()
+  @IsIn(['CONTADO', 'CREDITO'])
+  pagoEquipo?: 'CONTADO' | 'CREDITO';
+
   @IsOptional()
   colaboradorPartyId?: number | string;
 

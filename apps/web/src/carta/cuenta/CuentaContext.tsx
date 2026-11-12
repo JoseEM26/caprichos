@@ -29,8 +29,15 @@ export interface DatosPerfil {
   cumpleanos?: string;
 }
 
+/** Solo lo que el servidor dice de la propia sesión: si es del equipo y puede cargar a su crédito del personal. */
+export interface EquipoCuenta {
+  esEquipo: true;
+  puedeCredito: boolean;
+}
+
 interface ContextoCuenta {
   cliente: ClienteCuenta | null;
+  equipo?: EquipoCuenta | null;
   panelAbierto: boolean;
   abrirPanel: () => void;
   cerrarPanel: () => void;
@@ -69,12 +76,14 @@ const Contexto = createContext<ContextoCuenta | null>(null);
  */
 export function CuentaProvider({ children }: { children: ReactNode }) {
   const [cliente, setCliente] = useState<ClienteCuenta | null>(null);
+  const [equipo, setEquipo] = useState<EquipoCuenta | null>(null);
   const [panelAbierto, setPanelAbierto] = useState(false);
 
   const refrescar = useCallback(async () => {
     try {
-      const r = await api.get<{ cliente: ClienteCuenta | null }>('/carta/cuenta/yo');
+      const r = await api.get<{ cliente: ClienteCuenta | null; equipo?: EquipoCuenta }>('/carta/cuenta/yo');
       setCliente(r.cliente ?? null);
+      setEquipo(r.cliente ? (r.equipo ?? null) : null);
       if (!r.cliente) marcar(false);
     } catch {
       setCliente(null);
@@ -98,11 +107,19 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Tras ingresar: el login no trae el dato del equipo; se pide aparte y sin romper si falla
+  const cargarEquipo = useCallback(() => {
+    void Promise.resolve(api.get<{ equipo?: EquipoCuenta }>('/carta/cuenta/yo'))
+      .then((r) => setEquipo(r?.equipo ?? null))
+      .catch(() => setEquipo(null));
+  }, []);
+
   const ingresar = useCallback(async (telefono: string, contrasena: string) => {
     const r = await api.post<{ cliente: ClienteCuenta }>('/carta/cuenta/ingresar', { telefono, contrasena });
     marcar(true);
     setCliente(r.cliente);
-  }, []);
+    cargarEquipo();
+  }, [cargarEquipo]);
 
   const registrar = useCallback(async (datos: DatosRegistro) => {
     const r = await api.post<{ cliente: ClienteCuenta }>('/carta/cuenta/registro', datos);
@@ -140,6 +157,7 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
   const valor = useMemo<ContextoCuenta>(
     () => ({
       cliente,
+      equipo: cliente ? equipo : null,
       panelAbierto,
       abrirPanel: () => setPanelAbierto(true),
       cerrarPanel: () => setPanelAbierto(false),
@@ -151,7 +169,7 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
       salir,
       refrescar,
     }),
-    [cliente, panelAbierto, ingresar, registrar, actualizarPerfil, subirFoto, quitarFoto, salir, refrescar],
+    [cliente, equipo, panelAbierto, ingresar, registrar, actualizarPerfil, subirFoto, quitarFoto, salir, refrescar],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
