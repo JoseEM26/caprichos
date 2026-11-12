@@ -20,6 +20,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   stock: { titulo: "Stock y recetas", subtitulo: "Insumos, recetas y margen por plato." },
   recetas: { titulo: "Recetas", subtitulo: "Qué lleva cada producto, qué insumos descuenta al vender o al preparar por tanda." },
   analisis: { titulo: "Análisis", subtitulo: "Cómo trabaja el local, por temas: empieza por cuánto tarda cada etapa del pedido." },
+  aprendizajes: { titulo: "Aprendizajes", subtitulo: "Lo que el bot propone aprender cada noche de los chats que atendió una persona. Tú decides qué se queda." },
   informes: { titulo: "Informes", subtitulo: "Reportes con los datos del sistema: abre uno para ver sus cifras y descargarlo." },
   mapa: { titulo: "Mapa de entregas", subtitulo: "Dónde se concentran los pedidos con delivery, las zonas de reparto y los radios desde la tienda." },
   indicadores: { titulo: "Indicadores", subtitulo: "Metas del negocio frente a lo medido (datos de ejemplo)." },

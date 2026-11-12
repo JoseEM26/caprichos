@@ -1,0 +1,44 @@
+/* Aprendizajes del bot. Prefijo ap-. Solo variables --cp-*. */
+.ap { min-width: 0; }
+.ap-seccion { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ap-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.ap-tarjeta { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ap-tarjeta h3 { margin: 0; font-family: var(--fuente-titulos); font-size: 16px; font-weight: 800; color: var(--cp-navy); }
+.ap-cab { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
+.ap-meta { margin: 0; font-size: 12px; color: var(--cp-soft); overflow-wrap: anywhere; }
+.ap-pregunta { margin: 0; font-weight: 800; color: var(--cp-navy); overflow-wrap: anywhere; }
+.ap-respuesta { margin: 0; color: var(--cp-navy); overflow-wrap: anywhere; }
+.ap-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.ap-aviso { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--cp-sand); color: var(--cp-navy); font-size: 13px; }
+.ap-etiqueta { font-size: 13px; font-weight: 700; color: var(--cp-navy); }
+.ap-campo { min-height: 44px; width: 100%; box-sizing: border-box; border: 1.5px solid var(--cp-line2); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 14px; background: var(--cp-white); color: var(--cp-navy); }
+.ap-campo:focus-visible, .ap-filtro:focus-visible, .ap-chip button:focus-visible { outline: 3px solid var(--cp-orange); outline-offset: 2px; }
+.ap-form { display: flex; flex-direction: column; gap: 8px; }
+.ap-fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ap-fila .ap-campo { flex: 1 1 180px; width: auto; }
+.ap-chips, .ap-chips-fila { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.ap-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border-radius: 22px; background: var(--cp-sand); color: var(--cp-navy); font-size: 13px; }
+.ap-chip button { min-width: 44px; min-height: 44px; border: 0; background: transparent; font-size: 18px; color: var(--cp-rust); cursor: pointer; }
+.ap-filtro { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid var(--cp-line2); background: var(--cp-white); color: var(--cp-navy); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ap-filtro[aria-pressed='true'] { background: var(--cp-navy); border-color: var(--cp-navy); color: var(--cp-white); }
+.ap-tipo { font-size: 12px; font-weight: 800; padding: 2px 10px; border-radius: 12px; border: 1.5px solid currentColor; }
+.ap-tipo--faq { color: #1f6b3a; background: #e3f4e8; }
+.ap-tipo--frases { color: #7a4d00; background: #fff1d0; }
+.ap-tipo--derivar { color: #a32018; background: #fde6e2; }
+.ap-casos > summary { min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--cp-soft); cursor: pointer; }
+.ap-casos ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--cp-navy); overflow-wrap: anywhere; }
+.ap-estado { font-size: 12px; font-weight: 800; padding: 2px 10px; border-radius: 12px; border: 1.5px solid currentColor; }
+.ap-estado--ok { color: #1f6b3a; background: #e3f4e8; }
+.ap-estado--tope { color: #7a4d00; background: #fff1d0; }
+.ap-estado--error { color: #a32018; background: #fde6e2; }
+.ap-estado--sinia { color: #4b5a63; background: var(--cp-sand); }
+.ap-estado--curso { color: var(--cp-navy); background: #e3eef5; }
+.ap-datos { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.ap-datos dt { font-size: 12px; color: var(--cp-soft); }
+.ap-datos dd { margin: 0; font-weight: 800; color: var(--cp-navy); }
+.ap-barras { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; align-items: flex-end; height: 140px; }
+.ap-barras li { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 10px; color: var(--cp-soft); }
+.ap-barra { width: 70%; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--cp-navy); }
+.ap-barra--tope { background: #c98a00; }
+.ap-barra--error { background: var(--cp-rust); }
+.ap-barra--sinia { background: var(--cp-line2); }
