@@ -657,7 +657,7 @@ export function MisPedidosView() {
           canal="MOZO"
           puedeForzarLiberacion={tiene('mesas/liberar')}
           puedeMesa={tiene('mesas/ver') && tiene('mesas/abrir')}
-          puedePersonal={tiene('creditos/ver')}
+          puedePersonal={tiene('pedidos/crear')}
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
