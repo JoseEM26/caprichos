@@ -524,6 +524,7 @@ export class CierreService {
 
     let pagosSinCobro: string[] = [];
     let entregadosJustificados: string[] = [];
+    let sinTerminarJustificados: string[] = [];
     const cierre = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
@@ -571,6 +572,27 @@ export class CierreService {
           );
         }
         entregadosJustificados = lista.map((p) => `${p.codigo} S/ ${p.total.toFixed(2)}`);
+      }
+
+      // 1b. Ningún pedido sin terminar (ni pagado): todo debe quedar ENTREGADO o ANULADO. Solo el ADMIN justifica.
+      const sinTerminar = await this.pedidosSinTerminar(tx);
+      if (sinTerminar.length > 0) {
+        const esAdminST = tieneRol(usuario, 'ADMIN');
+        const motivoST = (dto.motivoPedidosSinTerminar ?? '').trim();
+        if (!esAdminST || motivoST.length < MOTIVO_SIN_COBRO_MIN) {
+          throw new HttpException(
+            {
+              codigo: 'PEDIDOS_SIN_TERMINAR',
+              mensaje:
+                `No se puede cerrar la caja: hay ${sinTerminar.length} pedido(s) sin terminar (no están entregados ni anulados). Entrégalos o anúlalos.` +
+                (esAdminST ? ' Como administrador puedes cerrar escribiendo un motivo (mínimo 10 letras).' : ''),
+              pedidosSinTerminar: sinTerminar,
+              puedeJustificar: esAdminST,
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+        sinTerminarJustificados = sinTerminar.map((p) => `${p.codigo} ${p.estado} S/ ${p.total.toFixed(2)}`);
       }
 
       // 2. Ningún repartidor con efectivo sin liquidar (RN-CAP-097 / RQ-CIE-02-08)
@@ -717,6 +739,21 @@ export class CierreService {
         entidadId: caja.id,
         despues: { pedidos: entregadosJustificados, forzadoPorAdministrador: true },
         motivo: dto.motivoEntregadosSinCobrar?.trim(),
+        partyId: usuario.partyId,
+        ip,
+      });
+    }
+
+    if (sinTerminarJustificados.length) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'cierre',
+        accion: 'CIERRE_PEDIDOS_SIN_TERMINAR',
+        resultado: 'OK',
+        entidad: 'cierre_caja',
+        entidadId: caja.id,
+        despues: { pedidos: sinTerminarJustificados, forzadoPorAdministrador: true },
+        motivo: dto.motivoPedidosSinTerminar?.trim(),
         partyId: usuario.partyId,
         ip,
       });
@@ -1191,6 +1228,29 @@ export class CierreService {
   /**
    * Pedidos sin cobrar de cualquier día, los mismos que bloquean el cierre (RN-CAP-079).
    */
+  /**
+   * Pedidos de cualquier día que no están en estado final (ENTREGADO o ANULADO), pagados o no.
+   * Bloquean el cierre (PEDIDOS_SIN_TERMINAR). Sin teléfono ni DNI.
+   */
+  async pedidosSinTerminar(db: any = this.prisma) {
+    const pedidos = await db.pedido.findMany({
+      where: { estado: { notIn: ['ENTREGADO', 'ANULADO'] } },
+      orderBy: { creado_en: 'asc' },
+      select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, total: true, creado_en: true, cliente_nombre: true },
+    });
+    return ((pedidos ?? []) as any[]).map((p) => ({
+      id: Number(p.id),
+      codigo: p.codigo as string,
+      canal: p.canal as string,
+      modalidad: p.modalidad as string,
+      estado: p.estado as string,
+      pagoEstado: (p.pago_estado ?? null) as string | null,
+      clienteNombre: (p.cliente_nombre?.trim() || null) as string | null,
+      total: enPesos(aCentimos(p.total)),
+      fecha: p.creado_en as Date,
+    }));
+  }
+
   async listarPendientesDeCobro() {
     const pedidos = await this.prisma.pedido.findMany({
       where: {

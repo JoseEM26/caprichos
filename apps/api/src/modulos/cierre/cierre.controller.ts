@@ -149,6 +149,13 @@ export class CierreController {
     return this.cierreService.listarPendientesDeCobro();
   }
 
+  /** Pedidos sin terminar (ni entregados ni anulados, pagados o no) que bloquean el cierre. */
+  @Get('sin-terminar')
+  @Permiso('caja', 'cerrar')
+  async sinTerminar() {
+    return this.cierreService.pedidosSinTerminar();
+  }
+
   /**
    * Cobra un pedido pendiente en la caja que se cierra (Cobrar ahora desde el cierre).
    */

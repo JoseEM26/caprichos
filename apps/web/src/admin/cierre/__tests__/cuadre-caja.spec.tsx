@@ -280,6 +280,21 @@ describe('Panel «Cuadre de caja»', () => {
     expect(screen.getByText('panel pendientes')).toBeInTheDocument();
   });
 
+  it('pedidos sin terminar bloquean el cierre y muestran su panel; con motivo del ADMIN se habilita y viaja en el cierre', async () => {
+    const { onCerrar, rerender } = montar({ sinTerminarCount: 1, sinTerminarPanel: <div>panel sin terminar</div> });
+    expect(screen.getByTestId('cc-estado')).toHaveTextContent('1 pedido sin terminar');
+    expect(screen.getByText('panel sin terminar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resuelve los pendientes para cerrar' })).toBeDisabled();
+    rerender(
+      <CuadreCaja esperado={esperado} fecha="2026-11-08" cajero="Ana" pendientesCount={0} repartidores={[]} onRecibirRepartidor={vi.fn()}
+        onCerrar={onCerrar} onVolver={vi.fn()} sinTerminarCount={1} motivoSinTerminar="Cliente no contesta" sinTerminarPanel={<div>panel sin terminar</div>} />,
+    );
+    llenarCuentaExacta();
+    fireEvent.click(screen.getByRole('button', { name: /^Cerrar caja/ }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sí, cerrar caja' }));
+    await waitFor(() => expect(onCerrar).toHaveBeenCalledWith(expect.objectContaining({ motivoPedidosSinTerminar: 'Cliente no contesta' })));
+  });
+
   it('repartidores por liquidar bloquean y permiten recibir el efectivo', () => {
     const onRecibirRepartidor = vi.fn();
     const r = { repartidorPartyId: 7, nombre: 'Luis', pedidos: [], totalCobrado: 40, totalLiquidado: 0, pendiente: 40 };

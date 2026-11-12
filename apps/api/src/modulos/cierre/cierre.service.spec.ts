@@ -734,6 +734,61 @@ describe('CierreService', () => {
     });
   });
 
+  describe('7.c pedidos sin terminar (ni entregados ni anulados) impiden cerrar, pagados o no', () => {
+    const cerrarDto = { conteo: { '200': 1 }, medios: { yape: 200 } };
+    const delivery = (estado: string) => ({ id: 8n, codigo: 'CP-0008', canal: 'WHATSAPP', modalidad: 'DELIVERY', estado, pago_estado: 'PAGADO', total: 32, creado_en: new Date('2026-01-01T12:00:00Z'), cliente_nombre: 'Cliente Prueba' });
+
+    it.each(['LISTO', 'EN_CAMINO', 'PREPARANDO', 'COLA'])('409 PEDIDOS_SIN_TERMINAR con un delivery PAGADO en %s', async (estado) => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([delivery(estado)]);
+      const e: any = await service.cerrar(cerrarDto, mockUsuarioCajero).catch((x) => x);
+      expect(e.getStatus()).toBe(HttpStatus.CONFLICT);
+      expect(e.getResponse()).toMatchObject({ codigo: 'PEDIDOS_SIN_TERMINAR', puedeJustificar: false });
+      expect(e.getResponse().pedidosSinTerminar[0]).toMatchObject({ codigo: 'CP-0008', modalidad: 'DELIVERY', estado, pagoEstado: 'PAGADO', total: 32 });
+    });
+
+    it('la consulta excluye ENTREGADO y ANULADO (si no hay pedidos abiertos no bloquea)', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+      await service.cerrar(cerrarDto, mockUsuarioCajero);
+      expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO'] } } }),
+      );
+    });
+
+    it('el cajero no se salta la regla ni con motivo', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([delivery('LISTO')]);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoPedidosSinTerminar: 'Motivo suficientemente largo' }, mockUsuarioCajero).catch((x) => x);
+      expect(e.getResponse().codigo).toBe('PEDIDOS_SIN_TERMINAR');
+    });
+
+    it('el ADMIN sin motivo o con motivo corto recibe 409 con puedeJustificar', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([delivery('LISTO')]);
+      for (const motivoPedidosSinTerminar of [undefined, 'corto']) {
+        const e: any = await service.cerrar({ ...cerrarDto, motivoPedidosSinTerminar }, mockUsuarioAdmin).catch((x) => x);
+        expect(e.getResponse()).toMatchObject({ codigo: 'PEDIDOS_SIN_TERMINAR', puedeJustificar: true });
+      }
+    });
+
+    it('el ADMIN con motivo cierra y deja auditoría CIERRE_PEDIDOS_SIN_TERMINAR', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValueOnce([delivery('LISTO')]);
+      await service.cerrar({ ...cerrarDto, motivoPedidosSinTerminar: 'Cliente no contesta, se entrega mañana' }, mockUsuarioAdmin);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'CIERRE_PEDIDOS_SIN_TERMINAR', motivo: 'Cliente no contesta, se entrega mañana' }),
+      );
+    });
+
+    it('las reglas de cobro previas siguen primero (COBROS_EN_CURSO)', async () => {
+      prismaMock.pedido.count.mockResolvedValue(2);
+      prismaMock.pedido.findMany.mockResolvedValue([delivery('LISTO')]);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoPedidosSinTerminar: 'Motivo suficientemente largo' }, mockUsuarioAdmin).catch((x) => x);
+      expect(e.getResponse().codigo).toBe('COBROS_EN_CURSO');
+    });
+  });
+
   describe('7.b entregados sin cobrar impiden cerrar (salvo justificación del ADMIN)', () => {
     const llevarEntregado = { id: 5n, codigo: 'CP-0005', modalidad: 'LLEVAR', pago_estado: 'PENDIENTE', pago_metodo: null, total: 30, planPago: [] };
     const cerrarDto = { conteo: { '200': 1 }, medios: { yape: 200 } };
