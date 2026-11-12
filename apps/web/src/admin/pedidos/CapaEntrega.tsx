@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { HistorialAuditoria, horaCorta } from './HistorialAuditoria';
 import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
+import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { PlanoMesaResaltada } from '../salon/componentes/PlanoMesaResaltada';
 import { canalLabel } from './PedidosAdminView';
@@ -114,6 +115,16 @@ export function CapaEntrega({ pedido, esDelivery, esMesa, puedeCorregirCliente, 
                   Ubicar en el mapa (falta la ubicación)
                 </button>
               ) : (
+                <>
+                <div data-testid="mapa-entrega-pedido">
+                  <MapaUbicacion
+                    punto={{ lat: Number(lat), lng: Number(lng) }}
+                    soloLectura
+                    altura={240}
+                    ajustarA="punto"
+                    etiqueta={`Mapa de entrega de ${pedido.codigo}`}
+                  />
+                </div>
                 <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <a
                     href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`}
@@ -121,12 +132,13 @@ export function CapaEntrega({ pedido, esDelivery, esMesa, puedeCorregirCliente, 
                     rel="noopener noreferrer"
                     style={{ fontWeight: 800, color: 'var(--cp-teal, #2C6E7F)', textDecoration: 'underline', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                   >
-                    Ver en el mapa
+                    Abrir en mapa grande
                   </a>
                   <button type="button" className="dp-btn" onClick={alUbicar}>
                     Corregir ubicación en el mapa
                   </button>
                 </span>
+                </>
               )}
               <SeccionUbicacionPedido
                 pedidoId={String(pedido.id)}
