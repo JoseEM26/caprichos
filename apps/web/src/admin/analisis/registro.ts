@@ -2,6 +2,8 @@ import type { PestanaAnalisis } from './comun';
 import { pestanaTiempos } from './tiempos';
 import { pestanaDemanda } from './demanda';
 import { pestanaVentas } from './ventas';
+import { pestanaClientes } from './clientes';
+import { pestanaWhatsapp } from './whatsapp';
 
 /**
  * Registro de pestañas de Análisis, en el orden en que se muestran.
@@ -12,4 +14,6 @@ export const PESTANAS_ANALISIS: readonly PestanaAnalisis[] = [
   pestanaTiempos,
   pestanaDemanda,
   pestanaVentas,
+  pestanaClientes,
+  pestanaWhatsapp,
 ];

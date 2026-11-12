@@ -31,4 +31,15 @@ describe('Manual de Capri: Analisis', () => {
     expect(texto).toContain('canibalizacion');
     expect(texto).toContain('solo el Administrador');
   });
+
+  it('explica las pestanas Clientes y WhatsApp con sus definiciones', () => {
+    expect(texto).toContain('Leer la pestana Clientes');
+    expect(texto).toContain('Cada cuanto regresan');
+    expect(texto).toContain('Embudo de la carta');
+    expect(texto).toContain('1 punto igual a 1 sol');
+    expect(texto).toContain('Leer la pestana WhatsApp');
+    expect(texto).toContain('Chats sin respuesta ahora');
+    expect(texto).toContain('Motivos de derivacion');
+    expect(texto).toContain('Sin identificar');
+  });
 });
