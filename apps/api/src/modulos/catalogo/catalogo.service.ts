@@ -223,8 +223,17 @@ export class CatalogoService implements OnApplicationBootstrap {
    * Sale del MISMO cálculo que GET /carta, así nunca discrepa de lo que muestra la carta al cargar.
    * ponytail: recalcula la carta entera; si pesa, cachear unos segundos en memoria.
    */
+  // ponytail: caché en memoria de 10 s por réplica; si hay muchas réplicas o más tráfico, pasarla a Redis
+  private dispCache: { en: number; valor: Promise<DisponibilidadCarta> } | null = null;
+
+  /** Cada visitante la pide cada 30 s: se calcula como mucho una vez cada 10 s y se comparte. */
   async obtenerDisponibilidad(): Promise<DisponibilidadCarta> {
-    return proyectarDisponibilidad(await this.obtenerCarta());
+    const ahora = Date.now();
+    if (this.dispCache && ahora - this.dispCache.en < 10_000) return this.dispCache.valor;
+    const valor = this.obtenerCarta().then(proyectarDisponibilidad);
+    this.dispCache = { en: ahora, valor };
+    valor.catch(() => { if (this.dispCache?.valor === valor) this.dispCache = null; });
+    return valor;
   }
 
   async obtenerCarta(q?: string): Promise<CategoriaCarta[]> {
