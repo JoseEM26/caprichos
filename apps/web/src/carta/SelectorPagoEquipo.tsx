@@ -5,6 +5,8 @@ interface Props {
   alCambiar: (v: PagoEquipo) => void;
   /** Falso = la cuenta es del equipo pero no está vinculada a su usuario: el crédito no se ofrece */
   puedeCredito: boolean;
+  /** El crédito no aplica a pedidos con delivery */
+  esDelivery?: boolean;
 }
 
 const tarjeta = (activa: boolean, deshabilitada: boolean): React.CSSProperties => ({
@@ -21,7 +23,8 @@ const tarjeta = (activa: boolean, deshabilitada: boolean): React.CSSProperties =
 });
 
 /** Solo para el equipo con sesión: pagar al contado o cargar el pedido a su crédito del personal. */
-export function SelectorPagoEquipo({ valor, alCambiar, puedeCredito }: Props) {
+export function SelectorPagoEquipo({ valor, alCambiar, puedeCredito: puedeCreditoCuenta, esDelivery = false }: Props) {
+  const puedeCredito = puedeCreditoCuenta && !esDelivery;
   return (
     <fieldset
       data-testid="selector-pago-equipo"
@@ -47,9 +50,11 @@ export function SelectorPagoEquipo({ valor, alCambiar, puedeCredito }: Props) {
           Cargar a mi crédito del personal
         </span>
         <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-          {puedeCredito
-            ? 'Se descuenta de tu planilla. El delivery, si lo hay, se paga aparte.'
-            : 'No disponible: pide al administrador que vincule tu cuenta con tu usuario.'}
+          {esDelivery
+            ? 'El crédito del personal no aplica a pedidos con delivery; elige pagar al contado.'
+            : puedeCredito
+              ? 'Se descuenta de tu planilla.'
+              : 'No disponible: pide al administrador que vincule tu cuenta con tu usuario.'}
         </span>
       </label>
     </fieldset>

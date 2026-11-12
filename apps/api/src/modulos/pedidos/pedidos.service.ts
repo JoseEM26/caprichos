@@ -977,6 +977,9 @@ export class PedidosService {
           pctPersonal,
         );
         if (pideCredito) {
+          if (dto.modalidad === 'DELIVERY') {
+            throw new ForbiddenException({ codigo: 'CREDITO_NO_APLICA_DELIVERY', mensaje: 'El crédito del personal no aplica a pedidos con delivery; elige pagar al contado' });
+          }
           colaboradorId = dp.partyTrabajadorId;
           await validarColaborador(this.prisma, colaboradorId); // usuario activo y del personal
           creditoEquipo = true;
@@ -1175,9 +1178,7 @@ export class PedidosService {
     }
 
     // 8.1. Pedido del personal con «Pagar ahora»: permiso, medio, «con cuánto paga» (efectivo) y caja abierta, antes de crear nada
-    // Crédito desde la carta: el envío NO se carga a crédito (el delivery se paga siempre): queda por cobrar en efectivo contra entrega
-    const envioPorCobrar = creditoEquipo && dto.modalidad === 'DELIVERY' && (envio === null || envio > 0);
-    const montoCredito = Number((totalCalculado - (creditoEquipo ? (envio ?? 0) : 0)).toFixed(2));
+    const montoCredito = totalCalculado; // el crédito nunca va con delivery: no hay envío
     const cobroAhora = personal && origen?.pagoPersonal?.modo === 'AHORA' ? await this.validarCobroAhoraPersonal(origen, totalCalculado) : null;
 
     // 9. Comprobante (ya validado arriba) y creación en transacción
@@ -1253,9 +1254,9 @@ export class PedidosService {
           entrega_lng: entrega?.lng != null ? new Prisma.Decimal(entrega.lng) : null,
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
-          pago_metodo: envioPorCobrar ? 'EFECTIVO' : personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
-          pago_estado: personal && !envioPorCobrar ? 'PAGADO' : 'PENDIENTE',
-          pago_preferido: envioPorCobrar ? 'EFECTIVO' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
+          pago_metodo: personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
+          pago_estado: personal ? 'PAGADO' : 'PENDIENTE',
+          pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
           subtotal: new Prisma.Decimal(subtotalCalculado),
@@ -1284,8 +1285,6 @@ export class PedidosService {
 
       if (planPago) {
         await this.pagoPlan.guardar(tx, pedido.id, planPago);
-      } else if (envioPorCobrar && envio) {
-        await this.pagoPlan.guardar(tx, pedido.id, [{ medio: 'EFECTIVO', monto: envio }]);
       }
 
       // Lo consumido por el personal se acumula en su cuenta en la misma transacción (el total ya lleva su descuento)
@@ -1517,7 +1516,6 @@ export class PedidosService {
             trabajador: colaboradorId!.toString(),
             cuentaCliente: String(origen!.clientePartyId),
             montoACredito: montoCredito,
-            envioPorCobrar: envioPorCobrar ? envio : 0,
             descuentoPersonal,
           },
         });

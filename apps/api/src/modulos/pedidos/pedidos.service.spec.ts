@@ -613,16 +613,12 @@ describe('PedidosService', () => {
           expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
         });
 
-        it('delivery: a crédito van solo los productos; el envío queda por cobrar en efectivo contra entrega', async () => {
-          await service.crear(dtoCredito({ ...pedidoBaseDto, pagoEquipo: 'CREDITO', pago: { metodo: 'EFECTIVO' } }), 'idemp-credcarta-3', sesion);
-          const data = prismaMock.pedido.create.mock.calls[0][0].data;
-          expect(Number(data.envio)).toBe(5);
-          expect(Number(data.total)).toBe(26);
-          expect(data.pago_estado).toBe('PENDIENTE');
-          expect(Number(prismaMock.consumoPersonal.create.mock.calls[0][0].data.monto)).toBe(21);
-          expect(prismaMock.pedidoPagoPlan.createMany).toHaveBeenCalledWith({
-            data: [expect.objectContaining({ medio: 'EFECTIVO', monto: expect.anything() })],
+        it('crédito con delivery: 403 CREDITO_NO_APLICA_DELIVERY y no se crea nada', async () => {
+          await expect(service.crear(dtoCredito({ ...pedidoBaseDto, pagoEquipo: 'CREDITO', pago: { metodo: 'EFECTIVO' } }), 'idemp-credcarta-3', sesion)).rejects.toMatchObject({
+            response: { codigo: 'CREDITO_NO_APLICA_DELIVERY' },
           });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
         });
 
         it('usuario inactivo: 403 y no se crea nada', async () => {

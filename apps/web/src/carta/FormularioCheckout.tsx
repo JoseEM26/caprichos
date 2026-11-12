@@ -194,7 +194,11 @@ export function FormularioCheckout({
   // Solo el equipo con sesión ve la elección contado / crédito del personal (el servidor vuelve a decidirlo)
   const equipoCuenta = clienteCuenta ? (cuentaCtx?.equipo ?? null) : null;
   const [pagoEquipo, setPagoEquipo] = useState<PagoEquipo>('CONTADO');
-  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO';
+  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO' && modalidad !== 'DELIVERY';
+  // Si cambia a delivery con crédito elegido, vuelve a contado
+  useEffect(() => {
+    if (modalidad === 'DELIVERY') setPagoEquipo('CONTADO');
+  }, [modalidad]);
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
   const pideCumple = cumpleFaltaCuenta;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -1821,7 +1825,7 @@ export function FormularioCheckout({
               {paso === 3 && (
                 <>
                   {equipoCuenta && (
-                    <SelectorPagoEquipo valor={pagoEquipo} alCambiar={setPagoEquipo} puedeCredito={equipoCuenta.puedeCredito} />
+                    <SelectorPagoEquipo valor={pagoEquipo} alCambiar={setPagoEquipo} puedeCredito={equipoCuenta.puedeCredito} esDelivery={modalidad === 'DELIVERY'} />
                   )}
                   {conCredito && (
                     <div
@@ -1829,13 +1833,8 @@ export function FormularioCheckout({
                       style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', fontSize: '13px', lineHeight: '18px' }}
                     >
                       <div>
-                        Se carga a tu crédito: <strong>S/ {Math.max(0, totalCalculado - (costoEnvioEfectivo ?? 0)).toFixed(2)}</strong>
+                        Se carga a tu crédito: <strong>S/ {totalCalculado.toFixed(2)}</strong>
                       </div>
-                      {modalidad === 'DELIVERY' && (costoEnvioEfectivo === null || costoEnvioEfectivo > 0) && (
-                        <div>
-                          Delivery: {costoEnvioEfectivo === null ? 'se confirma por WhatsApp' : `S/ ${costoEnvioEfectivo.toFixed(2)}`} por pagar en efectivo al recibir
-                        </div>
-                      )}
                     </div>
                   )}
                   {!conCredito && (

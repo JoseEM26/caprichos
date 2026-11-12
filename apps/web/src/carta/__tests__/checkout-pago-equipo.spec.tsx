@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { api } from '../../comun/api';
 import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
+import { SelectorPagoEquipo } from '../SelectorPagoEquipo';
 import * as cuentaModulo from '../cuenta/CuentaContext';
 
 vi.mock('../../comun/api', async () => {
@@ -138,5 +139,12 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     expect(cuerpo.pagoEquipo).toBe('CREDITO');
     expect(cuerpo.comprobante).toEqual({ tipo: 'SIMPLE' });
     expect(JSON.stringify(cuerpo)).not.toMatch(/pct|porcentaje|colaborador/i);
+  });
+
+  it('con delivery la opción de crédito sale deshabilitada con su explicación y no queda elegida', () => {
+    const { container } = render(<SelectorPagoEquipo valor="CONTADO" alCambiar={vi.fn()} puedeCredito={true} esDelivery={true} />);
+    expect(within(container).getByRole('radio', { name: /Cargar a mi crédito del personal/i })).toBeDisabled();
+    expect(within(container).getByRole('radio', { name: /^Pagar al contado/i })).toBeChecked();
+    expect(within(container).getByText(/no aplica a pedidos con delivery/i)).toBeInTheDocument();
   });
 });
