@@ -36,7 +36,8 @@ import {
 } from "./horario";
 import { BloqueAlertasWhatsApp } from "./BloqueAlertasWhatsApp";
 import { puedeRecibirAlertasWhatsApp } from "./alertasWhatsappApi";
-import { validarCelularPeruano } from "./alertasWhatsappApi";
+import { limpiarNumeroPeruano, validarCelularPeruano } from "./alertasWhatsappApi";
+import { AvisoVinculoCelular, usePreviaCelular } from "./AvisoVinculoCelular";
 import {
   AUTOCOMPLETAR_CLAVE,
   AVISO_REINGRESO,
@@ -118,6 +119,8 @@ export function EditarUsuarioModal({
   const [correoNuevo, setCorreoNuevo] = useState("");
   const [quitarCorreo, setQuitarCorreo] = useState(false);
   const [celularNuevo, setCelularNuevo] = useState("");
+  const celular9 = esAdmin && validarCelularPeruano(celularNuevo).valido ? limpiarNumeroPeruano(celularNuevo) : null;
+  const previaCel = usePreviaCelular(`/admin/usuarios/${usuario?.id}/celular/previa`, celular9, { nombres: nombres.trim(), apellidos: apellidos.trim() });
   const [avisosCorreo, setAvisosCorreo] = useState(false);
   const [horario247, setHorario247] = useState(false);
   const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
@@ -300,6 +303,8 @@ export function EditarUsuarioModal({
       }
       if (celularNuevo.trim() && !validarCelularPeruano(celularNuevo).valido) {
         nuevosErrores.celular = "Debe ser un celular de 9 dígitos que empiece con 9";
+      } else if (previaCel.falta) {
+        nuevosErrores.celular = "Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de guardar";
       }
       if (
         !quitarCorreo &&
@@ -321,7 +326,7 @@ export function EditarUsuarioModal({
     if (Object.keys(malos).length > 0) {
       // Lleva a la pestaña donde está el primer problema
       setSeccion(
-        ["nombres", "apellidos", "dni", "claveAdmin", "correo", "cumpleanos"].some(
+        ["nombres", "apellidos", "dni", "claveAdmin", "correo", "cumpleanos", "celular"].some(
           (k) => malos[k],
         )
           ? "datos"
@@ -356,7 +361,10 @@ export function EditarUsuarioModal({
           cuerpo.documento = dniNuevo.trim();
           cuerpo.claveAdmin = claveAdminDni;
         }
-        if (celularNuevo.trim()) cuerpo.celular = celularNuevo.trim();
+        if (celularNuevo.trim()) {
+          cuerpo.celular = celularNuevo.trim();
+          if (previaCel.confirmado) cuerpo.confirmaMismaPersona = true;
+        }
         if (quitarCorreo) cuerpo.correo = "";
         else if (correoNuevo.trim()) cuerpo.correo = correoNuevo.trim();
         if (!iguales(otrosRoles, permanentesDe(usuario))) {
@@ -563,6 +571,7 @@ export function EditarUsuarioModal({
             }
             disabled={guardando}
           />
+          <AvisoVinculoCelular previa={previaCel.previa} confirmado={previaCel.confirmado} alConfirmar={previaCel.confirmar} alRechazar={() => setCelularNuevo("")} />
           <Campo
             id="editar-correo"
             etiqueta="Correo (deja vacío para no cambiarlo)"

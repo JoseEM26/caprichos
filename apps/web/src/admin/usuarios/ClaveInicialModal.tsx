@@ -7,6 +7,8 @@ export interface ClaveInicialModalProps {
   claveInicial?: string | null;
   abierto?: boolean;
   nombreUsuario?: string;
+  /** Cuenta de cliente que se vinculó automáticamente por el celular al crear el usuario. */
+  cuentaVinculada?: { nombre: string; celular: string } | null;
   alCerrar: () => void;
 }
 
@@ -15,6 +17,7 @@ export function ClaveInicialModal({
   claveInicial,
   abierto = true,
   nombreUsuario,
+  cuentaVinculada,
   alCerrar,
 }: ClaveInicialModalProps) {
   const [copiado, setCopiado] = useState(false);
@@ -105,6 +108,11 @@ export function ClaveInicialModal({
             {nombreUsuario && (
               <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
                 Para: <b>{nombreUsuario}</b>
+              </div>
+            )}
+            {cuentaVinculada && (
+              <div role="status" style={{ fontSize: '13px', color: 'var(--cp-green)', fontWeight: 700 }}>
+                Cuenta de cliente vinculada: {cuentaVinculada.nombre} ({cuentaVinculada.celular})
               </div>
             )}
           </div>

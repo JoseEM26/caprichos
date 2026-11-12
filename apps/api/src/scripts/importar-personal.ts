@@ -9,6 +9,8 @@
  *           Correspondencia con el Excel del dueño: docs/operacion/importar-personal-columnas.md
  *
  * Por defecto es SIMULACRO: no escribe nada. Imprime por fila «crear», «ya existe» o «error: motivo» con nombre y rol.
+ * Si el celular de una fila ya es de una cuenta de cliente activa (sin usuario), el alta la une a la persona y el resumen
+ * cuenta cuántas («se unirían» en simulacro). Celular de otro usuario o de una cuenta vinculada a otro: error de la fila.
  * Nunca imprime documentos, celulares ni claves.
  * Con --aplicar crea de verdad, una transacción por fila. La clave inicial es el número de documento (debe_cambiar = true).
  * Los documentos que ya existen se omiten sin tocarlos. La auditoría IMPORTAR_PERSONAL queda como sistema.
@@ -276,8 +278,8 @@ export async function ejecutarImportacion(
   const resultado: any = enviables.length
     ? await servicio.importarPersonal(enviables.map((f) => f.fila as any), { simular: !aplicar })
     : { resultados: [] };
-  const porIndice = new Map<number, { estado: string; motivo?: string; avisos?: string[] }>();
-  for (const r of resultado.resultados as Array<{ indice: number; estado: string; motivo?: string; avisos?: string[] }>) {
+  const porIndice = new Map<number, { estado: string; motivo?: string; avisos?: string[]; vincula?: boolean }>();
+  for (const r of resultado.resultados as Array<{ indice: number; estado: string; motivo?: string; avisos?: string[]; vincula?: boolean }>) {
     porIndice.set(r.indice, r);
   }
 
@@ -286,6 +288,7 @@ export async function ejecutarImportacion(
     : { OK: 'crear', YA_EXISTE: 'ya existe', DUPLICADO_EN_ARCHIVO: 'repetida en el archivo' };
   const cuenta: Record<string, number> = {};
   let indiceEnviado = 0;
+  let conCuenta = 0;
   salida(aplicar ? 'APLICADO: se crean las filas marcadas como «creada».' : 'SIMULACRO: no se escribe nada.');
   for (const f of filas) {
     let estado: string;
@@ -302,6 +305,7 @@ export async function ejecutarImportacion(
       estado = r?.estado ?? 'ERROR';
       motivo = r?.motivo;
       avisos = r?.avisos ?? [];
+      if (r?.vincula) conCuenta++;
     }
     cuenta[estado] = (cuenta[estado] ?? 0) + 1;
     const descripcion =
@@ -317,6 +321,7 @@ export async function ejecutarImportacion(
     `repetidas ${cuenta.DUPLICADO_EN_ARCHIVO ?? 0}`,
     `omitidas ${cuenta.OMITIDA ?? 0}`,
     `error ${cuenta.ERROR ?? 0}`,
+    `${aplicar ? 'unidas' : 'se unirían'} a su cuenta de cliente ${conCuenta}`,
   ];
   salida(`Resumen: ${resumen.join(' · ')}`);
   return 0;

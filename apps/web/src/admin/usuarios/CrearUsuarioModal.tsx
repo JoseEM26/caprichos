@@ -19,6 +19,7 @@ import { SelectorOtrosRoles } from './SelectorOtrosRoles';
 
 export { ETIQUETAS_ROLES };
 import { EditorReemplazos } from './EditorReemplazos';
+import { AvisoVinculoCelular, usePreviaCelular } from './AvisoVinculoCelular';
 import {
   DIAS,
   formatoHoras,
@@ -34,7 +35,7 @@ import {
 export interface CrearUsuarioModalProps {
   abierto: boolean;
   alCerrar: () => void;
-  alUsuarioCreado: (usuario: UsuarioItem, claveInicial: string) => void;
+  alUsuarioCreado: (usuario: UsuarioItem, claveInicial: string, cuentaVinculada?: { nombre: string; celular: string }) => void;
 }
 
 
@@ -82,6 +83,7 @@ export function CrearUsuarioModal({
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
   const [celular, setCelular] = useState('');
+  const previaCel = usePreviaCelular('/admin/usuarios/celular/previa', /^9\d{8}$/.test(celular) ? celular : null, { nombres: nombres.trim(), apellidos: apellidos.trim() });
   const [correo, setCorreo] = useState('');
   const [avisosCorreo, setAvisosCorreo] = useState(false);
   const [avisosTocado, setAvisosTocado] = useState(false);
@@ -116,6 +118,7 @@ export function CrearUsuarioModal({
       if (!nombres.trim()) e.nombres = 'Los nombres son requeridos';
       if (!apellidos.trim()) e.apellidos = 'Los apellidos son requeridos';
       if (celular && !/^9\d{8}$/.test(celular)) e.celular = 'El celular debe tener 9 dígitos y empezar en 9';
+      else if (previaCel.falta) e.celular = 'Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de continuar';
       if (correo.trim() && !REGEX_CORREO.test(correo.trim())) e.correo = 'El correo no es válido';
       if (avisosCorreo && !correo.trim()) e.avisosCorreo = 'Para recibir avisos por correo indica el correo';
       if (fechaNacimiento && fechaNacimiento > new Date().toISOString().slice(0, 10)) {
@@ -175,6 +178,7 @@ export function CrearUsuarioModal({
         activo: boolean;
         debeCambiar: boolean;
         claveInicial: string;
+        cuentaClienteVinculada?: { nombre: string; celular: string };
       }>('/admin/usuarios', {
         tipoDocumento: tipoDoc,
         documento: documento.trim(),
@@ -186,6 +190,7 @@ export function CrearUsuarioModal({
         ...(fechaReingreso ? { fechaReingreso } : {}),
         ...(paisNacimiento.trim() ? { paisNacimiento: paisNacimiento.trim() } : {}),
         ...(celular ? { celular } : {}),
+        ...(celular && previaCel.confirmado ? { confirmaMismaPersona: true } : {}),
         ...(correo.trim() ? { correo: correo.trim() } : {}),
         avisosCorreo,
         horario24_7: horario247,
@@ -229,6 +234,7 @@ export function CrearUsuarioModal({
           debeCambiar: respuesta.debeCambiar,
         },
         respuesta.claveInicial,
+        respuesta.cuentaClienteVinculada,
       );
     } catch (err) {
       if (err instanceof ErrorApi) {
@@ -387,6 +393,7 @@ export function CrearUsuarioModal({
                 error={errores.celular}
                 disabled={guardando}
               />
+              <AvisoVinculoCelular previa={previaCel.previa} confirmado={previaCel.confirmado} alConfirmar={previaCel.confirmar} alRechazar={() => setCelular('')} />
               <Campo
                 id="crear-correo"
                 etiqueta="Correo (opcional)"

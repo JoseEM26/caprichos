@@ -74,6 +74,11 @@ export class CrearUsuarioDto extends ConfigurarHorarioDto {
   @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar en 9' })
   celular?: string;
 
+  /** El ADMIN confirma que la cuenta de cliente con ese celular es de esta persona (cuando el nombre no coincide). */
+  @IsOptional()
+  @IsBoolean()
+  confirmaMismaPersona?: boolean;
+
   @IsOptional()
   @IsEmail({}, { message: 'El correo no es válido' })
   correo?: string;

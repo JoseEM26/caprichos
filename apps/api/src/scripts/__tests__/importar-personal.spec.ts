@@ -10,7 +10,7 @@ const CSV = [
   'Eva,Ros,DNI,11223344,,,,,,COCINA,,no',
 ].join('\n');
 
-function servicioFalso(resultados: Array<{ indice: number; estado: string; motivo?: string; avisos?: string[] }>) {
+function servicioFalso(resultados: Array<{ indice: number; estado: string; motivo?: string; avisos?: string[]; vincula?: boolean }>) {
   return { importarPersonal: jest.fn(async () => ({ filas: 0, simulacion: true, resultados })) };
 }
 
@@ -46,6 +46,18 @@ describe('importar-personal (consola)', () => {
 
   it('una cabecera sin columnas obligatorias aborta', () => {
     expect(filasDesdeCsv('nombres,apellidos\nAna,Ruiz').error).toMatch(/documento, rol_principal/);
+  });
+
+  it('el resumen cuenta cuántas filas se unirían a una cuenta de cliente (simulacro) y no cambia el resto', async () => {
+    const servicio = servicioFalso([
+      { indice: 0, estado: 'OK', vincula: true },
+      { indice: 1, estado: 'OK' },
+      { indice: 2, estado: 'ERROR', motivo: 'Ese celular ya lo usa otro usuario del equipo' },
+    ]);
+    const lineas: string[] = [];
+    await ejecutarImportacion(CSV, false, servicio as any, (l) => lineas.push(l));
+    expect(lineas.find((l) => l.startsWith('Resumen:'))).toContain('se unirían a su cuenta de cliente 1');
+    expect(servicio.importarPersonal).toHaveBeenCalledWith(expect.any(Array), { simular: true });
   });
 
   it('simulacro: llama al servicio sin escribir, imprime crear / ya existe / error sin documento ni celular', async () => {

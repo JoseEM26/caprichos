@@ -45,12 +45,16 @@ Ver tambien: [[historial]]
 Ver tambien: [[historial]]
 
 ## Como se hace: agregar el celular de un usuario
-1. En la lista, un usuario activo sin celular muestra el aviso Sin celular: no tendra descuento de personal en la carta.
+1. En la lista, un usuario activo sin celular muestra el aviso Sin celular: no tendra descuento de personal en la carta. Si su cuenta de cliente ya esta vinculada, el aviso no aparece (ya recibe el descuento).
 2. Pulsa Editar, escribe el celular de 9 digitos que empiece con 9 en el campo Celular y guarda con Si, guardar.
-3. Si el celular ya es de otra persona, el sistema lo rechaza. Solo el Administrador puede cambiarlo.
+3. Mientras escribes el celular, debajo del campo aparece un aviso (antes de guardar):
+   - Si el celular es de la cuenta de cliente de la misma persona, dice: Este celular es de la cuenta de cliente de (nombre) (···123). Al guardar, se vinculara a este usuario y recibira su descuento de personal en la carta. Al guardar, el sistema la vincula solo y confirma Cuenta de cliente vinculada. Un cliente y un usuario del equipo pueden compartir el mismo celular.
+   - Si el nombre de esa cuenta no coincide con el del usuario, pide confirmar Si, es la misma persona (o No, que vacia el celular). Es una proteccion por si se escribio el celular de otro cliente; sin confirmar no se guarda.
+   - Si el celular lo usa otro usuario del equipo, o es de una cuenta de cliente ya vinculada a otra persona, o de otra persona, el aviso lo dice en rojo y el sistema no lo guarda.
+   Solo el Administrador puede cambiarlo. Lo mismo ocurre al crear un usuario nuevo. La vinculacion automatica solo da el descuento de personal: la cuenta de cliente nunca gana permisos del panel, y no cambia contrasenas ni sesiones. Si la vinculacion no es la correcta, se deshace con Desvincular (ver abajo).
 
 ## Como se hace: vincular la cuenta de cliente de un usuario
-Sirve cuando el trabajador tambien se registro como cliente en la carta con su celular y por eso el celular no se puede poner en su usuario (ya es de su cuenta de cliente).
+Sirve cuando la cuenta de cliente del trabajador tiene un celular distinto al de su usuario. Si es el mismo celular, no hace falta: al escribirlo en su usuario se vincula solo (ver arriba), y las cuentas que ya coincidian se vincularon con una actualizacion automatica.
 1. Solo el Administrador. Pulsa Editar en el usuario y, en la pestana Datos, busca la seccion Cuenta de cliente (carta).
 2. Escribe el celular de 9 digitos de su cuenta de cliente y pulsa Vincular su cuenta de cliente.
 3. El sistema muestra solo el nombre de la cuenta y el celular con puntos (por ejemplo ···123). Si es la persona correcta, confirma con Si, vincular; si no, pulsa No.

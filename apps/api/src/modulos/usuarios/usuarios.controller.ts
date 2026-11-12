@@ -37,7 +37,7 @@ import { UsuariosAccesosService } from './usuarios-accesos.service';
 import { UsuariosRolesModulosService } from './usuarios-roles-modulos.service';
 import { GuardarRolModulosDto } from './dto/roles-modulos.dto';
 import { UsuariosCuentaClienteService } from './usuarios-cuenta-cliente.service';
-import { VincularCuentaClienteDto } from './dto/vincular-cuenta-cliente.dto';
+import { PreviaCelularUsuarioDto, VincularCuentaClienteDto } from './dto/vincular-cuenta-cliente.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -52,6 +52,20 @@ export class UsuariosController {
     private readonly rolesModulosService: UsuariosRolesModulosService,
     private readonly cuentaClienteService: UsuariosCuentaClienteService,
   ) {}
+
+  /** Antes de guardar un alta: qué pasará con ese celular (solo ADMIN; no escribe nada). */
+  @Post('celular/previa')
+  @Permiso('usuarios', 'administrar_roles')
+  async celularPreviaAlta(@Body() dto: PreviaCelularUsuarioDto, @Req() req: any) {
+    return this.cuentaClienteService.previaCelular(null, dto.celular, dto, req.usuario);
+  }
+
+  /** Antes de guardar la edición: qué pasará con ese celular (solo ADMIN; no escribe nada). */
+  @Post(':id/celular/previa')
+  @Permiso('usuarios', 'administrar_roles')
+  async celularPrevia(@Param('id') id: string, @Body() dto: PreviaCelularUsuarioDto, @Req() req: any) {
+    return this.cuentaClienteService.previaCelular(id, dto.celular, dto, req.usuario);
+  }
 
   /** Cuenta de cliente vinculada a este usuario (solo ADMIN). */
   @Get(':id/cuenta-cliente')
