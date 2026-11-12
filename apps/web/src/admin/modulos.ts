@@ -2,6 +2,7 @@ import React from 'react';
 import { EscritorioView } from './escritorio';
 import { InformesView, IndicadoresView, MapaEntregasView } from './informes';
 import { AnalisisView } from './analisis';
+import { AprendizajesView } from './aprendizajes';
 import { Proximamente } from './Proximamente';
 import { UsuariosView, AuditoriaView } from './usuarios';
 import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
@@ -280,6 +281,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'analisis/ver',
     componente: AnalisisView,
     icono: 'analisis',
+  },
+  {
+    clave: 'aprendizajes',
+    nombre: 'Aprendizajes',
+    grupo: 'Análisis',
+    ruta: '/admin/aprendizajes',
+    permisoMinimo: 'aprendizajes/ver',
+    componente: AprendizajesView,
+    icono: 'aprendizajes',
   },
   {
     clave: 'informes',
