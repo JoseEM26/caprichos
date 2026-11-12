@@ -114,6 +114,7 @@ Ver tambien: [[cierre]]
 3. Pulsar el boton Continuar. No se pide ningun codigo de supervisor.
 4. Si el control de almacen esta encendido y el pedido ya gasto insumos, aparece "Se llego a preparar?". Elegir "Si": los ingredientes quedan como merma (es lo normal si no eliges). Elegir "No, nunca se preparo": los ingredientes vuelven al stock de Cocina. Con el control apagado esta pregunta no aparece.
 5. En la ventana de confirmacion con la pregunta ¿Confirmas anular el pedido?, pulsar Si, anular.
+6. Si el cobro es de una caja que ya se cerro, solo el Administrador puede anularlo: pulsar "Anular de todos modos (caja cerrada)" y escribir un motivo de al menos 10 caracteres. El pedido vuelve a por cobrar y, si el cobro fue en efectivo, se registra un egreso de ajuste en la caja de hoy (que debe estar abierta). La caja cerrada no cambia.
 Ver tambien: [[historial]]
 
 ## Como se hace: Crear un pedido directo en mesa o mostrador

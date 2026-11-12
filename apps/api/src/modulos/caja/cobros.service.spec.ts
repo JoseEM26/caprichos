@@ -88,6 +88,9 @@ describe('CobrosService', () => {
       cobroPago: {
         deleteMany: jest.fn(),
       },
+      movimientoCaja: {
+        create: jest.fn().mockResolvedValue({ id: 55n }),
+      },
       userAccount: {
         findMany: jest.fn(),
       },
@@ -927,6 +930,90 @@ describe('CobrosService', () => {
           motivo: 'Cliente solicitó cambio de medio de pago',
         }),
       );
+    });
+  });
+
+  describe('anularCobroCajaCerrada (solo ADMIN)', () => {
+    const admin = { partyId: 1n, rol: 'ADMIN', roles: ['ADMIN'] };
+    const motivo = 'Cobro mal registrado ayer';
+    const ef = { medio: 'EFECTIVO', monto: new Prisma.Decimal(40), propina: new Prisma.Decimal(2), recibido: null, vuelto: null };
+    const yape = { medio: 'YAPE', monto: new Prisma.Decimal(30), propina: new Prisma.Decimal(0), recibido: null, vuelto: null };
+
+    const preparar = (opts: { hoy?: any; cobro?: any } = {}) => {
+      const hoy = opts.hoy === undefined ? { id: 9n, estado: 'ABIERTA' } : opts.hoy;
+      prismaMock.caja.findUnique.mockImplementation(async ({ where }: any) =>
+        where.fecha ? hoy : where.id === 9n ? hoy : { id: 5n, estado: 'CERRADA' },
+      );
+      prismaMock.cobro.findUnique
+        .mockResolvedValueOnce({ caja_id: 5n })
+        .mockResolvedValueOnce({
+          id: 10n, pedido_id: 100n, caja_id: 5n, anulado_en: null,
+          caja: { estado: 'CERRADA' }, pedido: { codigo: 'CP-0100' }, pagos: [ef, yape],
+          ...opts.cobro,
+        });
+    };
+
+    it('ADMIN anula, crea egreso solo por el efectivo (con propina) en la caja de hoy y audita', async () => {
+      preparar();
+      const res: any = await service.anularCobroCajaCerrada('10', { motivo }, admin);
+      expect(prismaMock.movimientoCaja.create).toHaveBeenCalledWith({
+        data: { caja_id: 9n, tipo: 'EGRESO', monto: new Prisma.Decimal(42), motivo: 'Anulación de cobro de caja cerrada (pedido CP-0100)' },
+        select: { id: true },
+      });
+      expect(res.movimiento_ajuste_id).toBe('55');
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({ where: { id: 100n }, data: { pago_estado: 'PENDIENTE' } });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'ANULAR_COBRO_CAJA_CERRADA',
+          modulo: 'caja',
+          despues: expect.objectContaining({ caja_original_id: '5', movimiento_ajuste_id: '55' }),
+        }),
+      );
+      // bloquea primero la caja de menor id
+      expect(prismaMock.$queryRaw.mock.calls.length).toBe(2);
+    });
+
+    it('sin efectivo no crea egreso', async () => {
+      preparar({ cobro: { pagos: [yape] } });
+      const res: any = await service.anularCobroCajaCerrada('10', { motivo }, admin);
+      expect(prismaMock.movimientoCaja.create).not.toHaveBeenCalled();
+      expect(res.movimiento_ajuste_id).toBeNull();
+    });
+
+    it('no-ADMIN -> 403 SOLO_ADMIN', async () => {
+      await expect(service.anularCobroCajaCerrada('10', { motivo }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'SOLO_ADMIN' },
+        status: HttpStatus.FORBIDDEN,
+      });
+    });
+
+    it('sin caja abierta hoy -> 409 SIN_CAJA_HOY', async () => {
+      preparar({ hoy: null });
+      await expect(service.anularCobroCajaCerrada('10', { motivo }, admin)).rejects.toMatchObject({
+        response: { codigo: 'SIN_CAJA_HOY' },
+        status: HttpStatus.CONFLICT,
+      });
+      expect(prismaMock.movimientoCaja.create).not.toHaveBeenCalled();
+    });
+
+    it('motivo corto -> 400', async () => {
+      await expect(service.anularCobroCajaCerrada('10', { motivo: 'corto' }, admin)).rejects.toMatchObject({
+        response: { codigo: 'MOTIVO_REQUERIDO' },
+      });
+    });
+
+    it('cobro ya anulado -> 409 COBRO_YA_ANULADO', async () => {
+      preparar({ cobro: { anulado_en: new Date() } });
+      await expect(service.anularCobroCajaCerrada('10', { motivo }, admin)).rejects.toMatchObject({
+        response: { codigo: 'COBRO_YA_ANULADO' },
+      });
+    });
+
+    it('caja del cobro abierta -> 409 CAJA_ABIERTA (usar la anulación normal)', async () => {
+      preparar({ cobro: { caja: { estado: 'ABIERTA' } } });
+      await expect(service.anularCobroCajaCerrada('10', { motivo }, admin)).rejects.toMatchObject({
+        response: { codigo: 'CAJA_ABIERTA' },
+      });
     });
   });
 

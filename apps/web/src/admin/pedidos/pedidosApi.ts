@@ -659,6 +659,11 @@ export const pedidosApi = {
     );
   },
 
+  /** Solo ADMIN: anula el cobro de una caja ya cerrada; el efectivo sale como egreso de ajuste en la caja de hoy. */
+  async anularCobroCajaCerrada(id: string | number, motivo: string): Promise<any> {
+    return api.post<any>(`/admin/caja/cobros/${id}/anular-cerrada`, { motivo });
+  },
+
   async listarMovimientos(): Promise<MovimientoCaja[]> {
     return api.get<MovimientoCaja[]>('/admin/caja/movimientos');
   },

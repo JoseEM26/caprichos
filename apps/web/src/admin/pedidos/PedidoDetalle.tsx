@@ -649,6 +649,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           pedidoId={pedido.id}
           codigoPedido={pedido.codigo}
           esCobro={tieneCobroVigente}
+          esAdmin={tieneRolUsuario(usuario, 'ADMIN')}
           cobroId={pedido.cobro_vigente_id ?? undefined}
           alCerrar={() => setAbrirAnular(false)}
           alAnularExitoso={() => {
