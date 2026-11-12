@@ -36,6 +36,9 @@ describe('Manual de Capri: Analisis', () => {
     expect(texto).toContain('Leer la pestana Clientes');
     expect(texto).toContain('Cada cuanto regresan');
     expect(texto).toContain('Embudo de la carta');
+    expect(texto).toContain('Sin datos de visitas antes de');
+    expect(texto).toContain('120 dias');
+    expect(texto).toContain('No rastrear');
     expect(texto).toContain('1 punto igual a 1 sol');
     expect(texto).toContain('Leer la pestana WhatsApp');
     expect(texto).toContain('Chats sin respuesta ahora');

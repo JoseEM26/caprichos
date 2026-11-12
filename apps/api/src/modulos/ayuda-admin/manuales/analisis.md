@@ -10,7 +10,7 @@ sugerencias:
   - Como encuentro los pedidos atascados ahora
   - Como cambio la meta de minutos de una etapa
   - Cuales son los productos mas y menos vendidos
-  - Cuantos clientes nuevos y cuantos recurrentes tuve
+  - Cuantos clientes nuevos tuve y en que paso de la carta se caen antes de pedir
   - Cuanto tarda el equipo en responder por WhatsApp
   - Que chats de WhatsApp estan sin respuesta ahora
   - Cuanto efectivo me deben rendir los repartidores y desde cuando
@@ -48,10 +48,11 @@ Ver tambien: [[cocina]]
 Despues: [[caja]]
 
 ## Como se hace: Leer la pestana Clientes
-1. Elige Clientes y las fechas. Los filtros de modalidad y turno aplican a todo; el canal aplica a la parte de clientes (el embudo es siempre de la carta).
+1. Elige Clientes y las fechas. Los filtros de modalidad y turno aplican a todo; el canal aplica a la parte de clientes (el embudo es siempre de la carta y solo usa las fechas).
 2. Nuevos y recurrentes: un cliente es nuevo si su primer pedido del local cae dentro del rango y recurrente si ya habia pedido antes. Se reconoce por su cuenta o, si pidio como invitado, por su celular. Los pedidos sin cuenta ni celular, los anulados y los del personal no cuentan; los sin cuenta ni celular salen como una cifra aparte.
 3. Cada cuanto regresan: dias entre un pedido y el anterior del mismo cliente. Se muestra la mediana, el 10 por ciento que mas tarda y cuatro tramos (hasta 7, 8 a 14, 15 a 30 y mas de 30 dias).
-4. Embudo de la carta: pedidos creados en la carta, con pago confirmado y entregados, con el porcentaje contra el paso anterior; los anulados salen aparte. Toca un paso para ver que todavia no se guarda: visitas a la carta, carrito sin terminar y abandono del pago. Por eso el embudo empieza en el pedido creado.
+4. Embudo de la carta: de la visita a la entrega. Visito la carta, agrego algo al carrito, abrio el checkout y llego al paso de pago se cuentan por sesion de navegador (anonimas); creo el pedido, pedido pagado y pedido entregado son pedidos de la carta ligados a esa sesion. Cada etapa muestra el total, el porcentaje contra el paso anterior y contra las visitas, cuantos se quedaron en el paso anterior (la caida) y el desglose por movil o escritorio y con o sin sesion iniciada; la tabla alterna trae los mismos numeros. Los anulados y los pedidos que no se pueden ligar a una visita salen aparte. Toca una etapa para ver que se mide y desde cuando.
+   Que se mide y que no: cada navegador recibe un codigo al azar al abrir la carta; no se guarda celular, nombre, IP ni modelo del aparato. Quien activa No rastrear (DNT o GPC) en su navegador no se mide. Una persona que vuelve otro dia cuenta como otra visita. Los eventos se borran solos a los 120 dias. Antes de que se activara la medicion no hay datos de visitas: la pantalla avisa Sin datos de visitas antes de la fecha de inicio.
 5. Puntos: emitidos y canjeados del periodo (netos de reversas y devoluciones), saldo vivo de todas las cuentas y costo. Se cuenta 1 punto igual a 1 sol de descuento: el costo del programa es lo canjeado en el periodo y el pendiente es lo que costaria si todo el saldo se canjeara.
 6. Calificaciones: puntaje promedio de la encuesta de posventa por semana, cuantos respondieron de los que la recibieron, comparacion del puntaje entre pedidos entregados a tiempo y con demora (pasada la espera maxima que se prometio al cliente) y el promedio de las resenas de Google. Las encuestas de prueba no cuentan. Aqui nunca se ven nombres ni comentarios.
 Ver tambien: [[clientes]]
@@ -115,7 +116,7 @@ Ver tambien: [[caja]]
 - Si sale el aviso de que se leyeron solo los pedidos mas recientes, acorta el rango de fechas.
 - Por que Demanda dice Sin dato en el tiempo prometido: solo el delivery guarda el tiempo prometido y lo guarda cuando el repartidor sale; antes de eso no hay con que comparar.
 - Por que no veo montos en Ventas: los montos en soles son solo del Administrador; el Supervisor ve pedidos y unidades.
-- Por que el embudo no muestra las visitas a la carta: el sistema todavia no las guarda, ni el carrito ni el abandono del pago. Falta registrar esos eventos de la carta para completarlo.
+- Por que el embudo no tiene visitas de antes de cierta fecha: la carta empezo a registrar visitas, carrito, checkout y pago desde esa fecha; los dias anteriores solo tienen pedidos. Tambien faltan las visitas de quien activo No rastrear.
 - Por que un cliente no aparece en Nuevos ni en Recurrentes: pidio sin cuenta ni celular, o su pedido fue anulado o del personal.
 - Por que no coincide el total de mensajes enviados con lo que cobra Meta: aqui se cuentan solo los enviados, entregados o leidos; Meta cobra por conversacion y lo suyo manda.
 - Por que el efectivo por rendir no coincide con lo que veo en Cierre: aqui se cuenta lo entregado en los ultimos 92 dias menos lo liquidado, sin importar la caja del dia; el repartidor salda primero lo mas antiguo.

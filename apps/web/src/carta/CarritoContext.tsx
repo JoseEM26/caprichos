@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { calcularSubtotalPedido } from '@caprichos/compartido';
 import { api } from '../comun/api';
+import { emitirEventoCarta } from './eventosCarta';
 import { CategoriaCarta, LineaCarrito, PedidoConfirmado, ProductoCarta, SaborLinea } from './tipos';
 import type { PedidoGuardado } from './seguimiento';
 import { INTERVALO_REFRESCO_STOCK_MS, InfoStock, InventarioCarta, infoStockDe, recortarLineasProducto, recortarSaboresAlTotal } from './stock';
@@ -102,6 +103,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     const lineaCompleta: LineaCarrito = { ...nueva, id };
 
     setLineas((prev) => [...prev, lineaCompleta]);
+    emitirEventoCarta('CARRITO');
 
     // Resumen para el toast
     const detallesPartes: string[] = [];

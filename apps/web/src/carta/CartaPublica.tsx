@@ -45,6 +45,7 @@ import type { BannerCarta } from './PortadaCarta';
 import { FranjaAvisoCarta } from './FranjaAvisoCarta';
 import { useBeneficiosCarta } from './useBeneficiosCarta';
 import { TextoEd, useEdicion } from './edicion';
+import { useEventoCarta } from './eventosCarta';
 import { ModalAvisoEntrada } from './ModalAvisoEntrada';
 import { fijarUmbralesStock } from './umbralesStock';
 
@@ -119,6 +120,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const [pagina, setPagina] = useState<PaginaCarta>(paginaInicial ?? 'carta');
   const movil = useEsMovil();
   const ed = useEdicion();
+  // Embudo anónimo: una visita por sesión; apagado en la vista previa del diseñador y en la edición en sitio
+  useEventoCarta({ activo: !vistaPrevia && !ed, visita: !vistaPrevia && !ed });
   // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
   const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 

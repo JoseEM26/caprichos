@@ -8,9 +8,25 @@ export interface RespuestaClientes {
   semanas: Array<{ semana: string; nuevos: number; recurrentes: number }>;
   regreso: { n: number; medianaDias: number | null; p90Dias: number | null; tramos: Array<{ nombre: string; n: number }> };
   embudo: {
-    pasos: Array<{ id: string; nombre: string; n: number; pctDelAnterior: number | null; pctDeCreados: number | null }>;
+    pasos: Array<{
+      id: string;
+      nombre: string;
+      n: number;
+      pctDelAnterior: number | null;
+      pctDeVisitas: number | null;
+      caida: number | null;
+      pctCaida: number | null;
+      movil: number;
+      escritorio: number;
+      conSesion: number;
+      sinSesion: number;
+    }>;
     anulados: number;
-    noSeGuarda: string[];
+    pedidosSinMedir: number;
+    /** Fecha (AAAA-MM-DD, Lima) desde la que hay eventos de visita; null si aún no hay ninguno. */
+    sinDatosAntesDe: string | null;
+    rangoParcial: boolean;
+    queSeMide: string[];
   };
   puntos: {
     emitidos: number;

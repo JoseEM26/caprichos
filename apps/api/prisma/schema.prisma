@@ -3317,3 +3317,20 @@ model PendienteAlmacen {
   @@index([produccion_id])
   @@map("pendiente_almacen")
 }
+
+/// Evento anónimo de la carta para el embudo de Análisis › Clientes. Sin datos personales: id aleatorio de sesión de navegador, tipo de dispositivo y si había sesión. Se borra a los 120 días.
+model CartaEvento {
+  id          BigInt   @id @default(autoincrement())
+  sesion_id   String?  @db.VarChar(40)
+  /// VISITA, CARRITO, CHECKOUT, PAGO, PEDIDO (este último lo pone el servidor al crear el pedido)
+  evento      String   @db.VarChar(20)
+  creado_en   DateTime @default(now()) @db.Timestamptz
+  /// MOVIL, ESCRITORIO o DESCONOCIDO
+  dispositivo String   @default("DESCONOCIDO") @db.VarChar(12)
+  con_sesion  Boolean  @default(false)
+  pedido_id   BigInt?
+
+  @@index([creado_en])
+  @@index([sesion_id])
+  @@map("carta_evento")
+}
