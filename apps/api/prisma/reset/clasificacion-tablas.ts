@@ -98,6 +98,7 @@ export const CONSERVAR: string[] = [
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'stock_sabor', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'user_account_rol', 'user_account_rol_historial', 'user_account_area', 'user_account_permiso', 'preferencia_usuario', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio', 'correo_aviso_extra', 'aviso_marca', 'cumpleanos_saludo', 'carta_evento',
+  'aprendizaje_noche', 'aprendizaje_propuesto', 'conocimiento_bot',
   'zona_reparto',
 ];
 
@@ -114,6 +115,7 @@ export const FK_PARTY_PERSONAL = [
   'pedido.repartidor_party_id', 'ruta_reparto.repartidor_party_id', 'liquidacion.repartidor_party_id', 'comprobante.emitido_por',
   'reclamo.respondido_por', 'voucher_pago.reemplazado_por', 'pedido_proveedor.proveedor_party_id',
   'compra.proveedor_party_id', 'pedido_interno.avisado_party_id', 'consumo_personal.party_id',
+  'aprendizaje_propuesto.decidido_por', 'conocimiento_bot.aprobado_por', 'conocimiento_bot.retirado_por',
   'reemplazo_dia.party_id', 'reemplazo_dia.reemplaza_party_id',
   'cierre_ajuste_medio.por_party_id', 'cierre_ajuste_medio.autorizado_por_party_id',
   'devolucion_pedido.por_party_id', 'devolucion_pedido.autorizado_por_party_id',
