@@ -568,10 +568,19 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             <div>
               <div style={{ ...titulo, fontWeight: 800, fontSize: 24, lineHeight: '30px' }}>{producto.nombre}</div>
               {producto.descripcion && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>{producto.descripcion}</div>}
-              {producto.porciones && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>Alcanza para {producto.porciones}</div>}
-              {producto.alergenosConfirmados && textoAlergenos(producto.alergenos) && (
-                <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>Contiene: {textoAlergenos(producto.alergenos)}</div>
-              )}
+              {(() => {
+                // Contraído en una línea pequeña; sin datos no aparece nada
+                const alergenos = producto.alergenosConfirmados ? textoAlergenos(producto.alergenos) : '';
+                if (!producto.porciones && !alergenos) return null;
+                const resumen = producto.porciones && alergenos ? 'Porciones y alérgenos' : producto.porciones ? 'Porciones' : 'Alérgenos';
+                return (
+                  <details data-testid="info-producto" style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 700, minHeight: 24, display: 'list-item' }}>{resumen}</summary>
+                    {producto.porciones && <div style={{ marginTop: 2 }}>Alcanza para {producto.porciones}</div>}
+                    {alergenos && <div style={{ marginTop: 2 }}>Contiene: {alergenos}</div>}
+                  </details>
+                );
+              })()}
             </div>
             {!movil && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
