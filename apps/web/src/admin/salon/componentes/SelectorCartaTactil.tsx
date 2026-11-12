@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
 import type { CategoriaCarta, ProductoCarta } from '../../../carta/tipos';
+import { infoStockDe } from '../../../carta/stock';
 
 /** Tira de categorías táctil: el chip activo se centra solo al elegirse. */
 export const BarraCategorias = memo(function BarraCategorias({
@@ -55,6 +56,7 @@ export const TarjetaProducto = memo(function TarjetaProducto({
   conImagenes: boolean;
   alElegir: (p: ProductoCarta) => void;
 }) {
+  const sinStock = infoStockDe(p).quedan === 0;
   return (
     <button type="button" onClick={() => alElegir(p)} className="np-producto">
       {conImagenes && (
@@ -78,6 +80,11 @@ export const TarjetaProducto = memo(function TarjetaProducto({
         <span className="np-producto-precio">
           {(p.tamanos || []).length > 0 ? 'Desde ' : ''}S/ {Number(p.precio || 0).toFixed(2)}
         </span>
+        {sinStock && (
+          <span data-testid="tarjeta-sin-stock" style={{ color: 'var(--cp-rust)', fontWeight: 800, fontSize: '12px' }}>
+            Sin stock hoy
+          </span>
+        )}
       </span>
     </button>
   );

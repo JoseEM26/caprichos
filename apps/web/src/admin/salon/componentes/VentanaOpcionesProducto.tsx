@@ -167,8 +167,14 @@ export function VentanaOpcionesProducto({
   // Con sabores, el tope son las mezclas que caben en lo que queda de cada sabor (ya descontado lo de otras líneas)
   const tamanoSinStock = (unidades: number) => (saborMode ? maximoMezclas(saboresDisp, unidades) === 0 : libres !== null && unidades > libres);
   const tope = saborMode ? maximoMezclas(saboresDisp, unidadesMezcla) : topeTamano(infoStock, enCarrito, unidadesMezcla);
-  const tamanoNoCabe = tamanos.length > 0 && tope === 0;
   const enTopeStock = tope !== null && cantidad >= tope;
+  // Aviso visible: sin él, el botón solo quedaba apagado sin decir por qué
+  const sinStock = tope === 0;
+  const avisoStock = sinStock
+    ? `No hay stock de ${producto.nombre} en la producción de hoy.`
+    : enTopeStock && tope !== null
+      ? `Solo quedan ${tope} con el stock de hoy: no se puede agregar más.`
+      : null;
   const franjaUltimos = infoStock.quedan !== 0 ? etiquetaUltimos(infoStock, producto.nombre, umbrales) : null;
   useEffect(() => {
     if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
@@ -432,6 +438,12 @@ export function VentanaOpcionesProducto({
             ×
           </button>
         </div>
+
+        {avisoStock && (
+          <div role="alert" data-testid="aviso-stock" style={{ background: sinStock ? 'var(--cp-rust)' : '#FFF3C4', color: sinStock ? '#FFFFFF' : 'var(--cp-navy)', fontWeight: 800, fontSize: '14px', borderRadius: '12px', padding: '10px 14px' }}>
+            {avisoStock}
+          </div>
+        )}
 
         {/* Variantes / Tamaños */}
         {franjaUltimos && (
@@ -1086,8 +1098,8 @@ export function VentanaOpcionesProducto({
             <span>
               {comboAgotado
                 ? 'Agotado'
-                : tamanoNoCabe
-                  ? 'No hay stock suficiente'
+                : sinStock
+                  ? 'Sin stock'
                   : saborMode && !saboresListos
                     ? 'Elige los sabores'
                     : libre

@@ -44,11 +44,11 @@ describe('mozo: stock por tamaño', () => {
     expect((screen.getByRole('button', { name: /Agregar al pedido/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('sin unidades libres, Agregar dice «No hay stock suficiente» y no deja agregar', () => {
+  it('sin unidades libres, avisa que no hay stock y Agregar dice «Sin stock» sin dejar agregar', () => {
     renderMozo(producto(4), 4);
-    // dos tamaños y el botón Agregar (el último en el pie)
-    const botones = screen.getAllByRole('button', { name: /No hay stock suficiente/ }) as HTMLButtonElement[];
-    expect(botones).toHaveLength(3);
-    expect(botones[botones.length - 1].disabled).toBe(true);
+    // los dos tamaños marcan que no alcanza
+    expect(screen.getAllByRole('button', { name: /No hay stock suficiente/ })).toHaveLength(2);
+    expect(screen.getByTestId('aviso-stock').textContent).toContain('No hay stock de');
+    expect((screen.getByRole('button', { name: /Sin stock/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
