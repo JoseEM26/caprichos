@@ -18,7 +18,7 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
-import { trabajadorDeCuentaCliente } from '../creditos/descuento-personal';
+import { trabajadorDeCuentaCliente } from '../creditos';
 import { CodigoRegistroService } from './codigo-registro.service';
 import { AvisoCuentaService } from './aviso-cuenta.service';
 import { enmascararDni, validarDni } from '../comprobantes/comprobantes.util';
