@@ -1,4 +1,4 @@
-import { descuentoPersonalDeCuenta, descuentoPersonalPorCelular } from './descuento-personal';
+import { descuentoPersonalDeCuenta, descuentoPersonalPorCelular, trabajadorDeCuentaCliente } from './descuento-personal';
 
 /** BD en memoria mínima: contactos del personal, cuentas de cliente y usuarios. */
 function bd(o: { cuenta?: { telefono: string | null; usuario_party_id?: bigint | null } | null; usuarioActivo?: boolean; vinculadoActivo?: boolean; contactos?: Array<{ party_id: bigint; valor: string }> }) {
@@ -62,5 +62,28 @@ describe('descuento de personal por cuenta de cliente', () => {
   it('vínculo con usuario inactivo, o sin vínculo: no hay descuento', async () => {
     expect(await descuentoPersonalDeCuenta(bd({ cuenta: { telefono: '900000001', usuario_party_id: 7n }, vinculadoActivo: false }), 2n)).toBeNull();
     expect(await descuentoPersonalDeCuenta(bd({ cuenta: { telefono: '900000001', usuario_party_id: null } }), 2n)).toBeNull();
+  });
+});
+
+describe('trabajadorDeCuentaCliente (descuento y crédito desde la carta)', () => {
+  it('misma persona o vínculo del ADMIN con usuario activo: devuelve su party y puede crédito', async () => {
+    expect(await trabajadorDeCuentaCliente(bd({ usuarioActivo: true }), 1n)).toEqual({ partyTrabajadorId: 1n, pct: 25, porVinculo: true });
+    const db = bd({ cuenta: { telefono: '900000001', usuario_party_id: 7n }, vinculadoActivo: true });
+    expect(await trabajadorDeCuentaCliente(db, 2n)).toEqual({ partyTrabajadorId: 7n, pct: 25, porVinculo: true });
+  });
+
+  it('vínculo con usuario inactivo: nada (cae al celular, que tampoco coincide)', async () => {
+    const db = bd({ cuenta: { telefono: '900000001', usuario_party_id: 7n }, vinculadoActivo: false });
+    expect(await trabajadorDeCuentaCliente(db, 2n)).toBeNull();
+  });
+
+  it('solo por celular: reconoce al trabajador pero sin vínculo (sin crédito)', async () => {
+    const db = bd({ contactos: [{ party_id: 9n, valor: '900000001' }] });
+    expect(await trabajadorDeCuentaCliente(db, 2n)).toEqual({ partyTrabajadorId: 9n, pct: 25, porVinculo: false });
+  });
+
+  it('sin cuenta o cliente común: null', async () => {
+    expect(await trabajadorDeCuentaCliente(bd({ cuenta: null }), 2n)).toBeNull();
+    expect(await trabajadorDeCuentaCliente(bd({}), 2n)).toBeNull();
   });
 });

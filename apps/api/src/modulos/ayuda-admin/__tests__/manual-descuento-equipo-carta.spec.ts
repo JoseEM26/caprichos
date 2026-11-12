@@ -11,6 +11,14 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     expect(t).toContain('no suma puntos');
   });
 
+  it('creditos explica la opcion Cargar a mi credito del personal desde la carta', () => {
+    const t = readFileSync(join(__dirname, '..', 'manuales', 'creditos.md'), 'utf8');
+    expect(t).toContain('Cargar a mi credito del personal');
+    expect(t).toContain('VINCULADA');
+    expect(t).toContain('El delivery se paga siempre');
+    expect(t).toContain('Nadie mas ve esta opcion');
+  });
+
   it('usuarios explica como vincular y desvincular la cuenta de cliente', () => {
     const t = readFileSync(join(__dirname, '..', 'manuales', 'usuarios.md'), 'utf8');
     expect(t).toContain('vincular la cuenta de cliente de un usuario');

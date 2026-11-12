@@ -20,6 +20,7 @@ type ConsultaRuc =
   | { estado: 'idle' | 'cargando' | 'invalido' | 'noencontrado' | 'manual' }
   | { estado: 'ok'; datos: DatosRuc };
 import { useCuentaOpcional } from './cuenta/CuentaContext';
+import { SelectorPagoEquipo, type PagoEquipo } from './SelectorPagoEquipo';
 import { guardarPedido } from './seguimiento';
 import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
@@ -190,6 +191,10 @@ export function FormularioCheckout({
   const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
+  // Solo el equipo con sesión ve la elección contado / crédito del personal (el servidor vuelve a decidirlo)
+  const equipoCuenta = clienteCuenta ? (cuentaCtx?.equipo ?? null) : null;
+  const [pagoEquipo, setPagoEquipo] = useState<PagoEquipo>('CONTADO');
+  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO';
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
   const pideCumple = cumpleFaltaCuenta;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -592,6 +597,7 @@ export function FormularioCheckout({
   };
 
   const validarPaso3 = (): string | null => {
+    if (conCredito) return null; // a crédito no hay comprobante, medio de pago ni propina
     if (tipoComprobante === 'FACTURA') {
       const rucLimpio = ruc.trim();
       if (!/^(10|15|17|20)\d{9}$/.test(rucLimpio)) {
@@ -812,12 +818,15 @@ export function FormularioCheckout({
               }
           : undefined,
       lineas: lineasDto,
-      pago: {
+      ...(equipoCuenta ? { pagoEquipo: conCredito ? 'CREDITO' : 'CONTADO' } : {}),
+      pago: conCredito
+        ? { metodo: 'EFECTIVO' as const }
+        : {
         metodo: planDividido.plan ? medioPrincipalCarta(planDividido.plan) : metodoPago,
         pagaCon: efectivoParte > 0 && pagaCon.trim() ? Number(pagaCon) : undefined,
         ...(planDividido.plan ? { plan: planDividido.plan } : {}),
       },
-      comprobante: {
+      comprobante: conCredito ? { tipo: 'SIMPLE' as const } : {
         tipo: tipoComprobante,
         dni: tipoComprobante === 'BOLETA' && dni.trim() ? dni.trim() : undefined,
         ruc: tipoComprobante === 'FACTURA' ? ruc.trim() : undefined,
@@ -826,7 +835,7 @@ export function FormularioCheckout({
       },
       cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
       puntosCanje: !cuponAplicado && puntosAplicados > 0 ? puntosAplicados : undefined,
-      propina: propinaCobrable > 0 ? propinaCobrable : undefined,
+      propina: !conCredito && propinaCobrable > 0 ? propinaCobrable : undefined,
     };
 
     try {
@@ -1811,6 +1820,26 @@ export function FormularioCheckout({
               {/* ================= APARTADO 3: PAGO ================= */}
               {paso === 3 && (
                 <>
+                  {equipoCuenta && (
+                    <SelectorPagoEquipo valor={pagoEquipo} alCambiar={setPagoEquipo} puedeCredito={equipoCuenta.puedeCredito} />
+                  )}
+                  {conCredito && (
+                    <div
+                      data-testid="resumen-credito-equipo"
+                      style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', fontSize: '13px', lineHeight: '18px' }}
+                    >
+                      <div>
+                        Se carga a tu crédito: <strong>S/ {Math.max(0, totalCalculado - (costoEnvioEfectivo ?? 0)).toFixed(2)}</strong>
+                      </div>
+                      {modalidad === 'DELIVERY' && (costoEnvioEfectivo === null || costoEnvioEfectivo > 0) && (
+                        <div>
+                          Delivery: {costoEnvioEfectivo === null ? 'se confirma por WhatsApp' : `S/ ${costoEnvioEfectivo.toFixed(2)}`} por pagar en efectivo al recibir
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!conCredito && (
+                  <>
                   {/* Comprobante Boleta o Factura (DT-77) */}
                   <div
                     style={{
@@ -2305,6 +2334,9 @@ export function FormularioCheckout({
                       Tu pedido pasa directo a cocina. Un asesor te contactará por WhatsApp para coordinar el pago.
                     </div>
                   </div>
+
+                  </>
+                  )}
 
                   {/* Campo de cupón / puntos */}
                   {!cuponAplicado && clienteCuenta && (
