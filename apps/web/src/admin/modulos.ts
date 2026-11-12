@@ -1,6 +1,7 @@
 import React from 'react';
 import { EscritorioView } from './escritorio';
 import { InformesView, IndicadoresView, MapaEntregasView } from './informes';
+import { AnalisisView } from './analisis';
 import { Proximamente } from './Proximamente';
 import { UsuariosView, AuditoriaView } from './usuarios';
 import { ConfiguracionLocalView, ZonasRepartoView } from './configuracion';
@@ -271,6 +272,15 @@ export const MODULOS: DefinicionModulo[] = [
   },
 
   // --- Análisis ---
+  {
+    clave: 'analisis',
+    nombre: 'Análisis',
+    grupo: 'Análisis',
+    ruta: '/admin/analisis',
+    permisoMinimo: 'analisis/ver',
+    componente: AnalisisView,
+    icono: 'analisis',
+  },
   {
     clave: 'informes',
     nombre: 'Informes',

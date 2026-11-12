@@ -232,6 +232,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'escritorio', accion: 'operativo' },
   // Cumpleaños del personal (dato personal, Ley 29733): solo ADMIN y SUPERVISOR
   { modulo: 'escritorio', accion: 'cumpleanos' },
+  // Análisis (pestañas por tema, empezando por Tiempos): solo ADMIN y SUPERVISOR. Sin dinero ni datos personales de clientes
+  { modulo: 'analisis', accion: 'ver' },
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
@@ -474,7 +476,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'MARKETI
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 // Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
 MATRIZ.SUPERVISOR = [
-  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros']),
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',
