@@ -653,7 +653,7 @@ export class UsuariosService {
         if (previa.estado === 'OTRA_PERSONA') return { estado: 'ERROR', motivo: previa.mensaje, tipo: doc.tipo, numero: doc.numero, objeto };
         vincula = previa.estado === 'VINCULARA_CUENTA';
       }
-      return { estado: existe ? 'YA_EXISTE' : 'OK', tipo: doc.tipo, numero: doc.numero, objeto, vincula };
+      return { estado: existe ? 'YA_EXISTE' : 'OK', tipo: doc.tipo, numero: doc.numero, objeto, ...(vincula ? { vincula } : {}) };
     } catch (err) {
       return { estado: 'ERROR', motivo: mensajeDeError(err) };
     }
@@ -697,7 +697,7 @@ export class UsuariosService {
         continue;
       }
       if (opciones.simular) {
-        resultados.push({ indice, estado: 'OK', vincula: r.vincula });
+        resultados.push({ indice, estado: 'OK', ...(r.vincula ? { vincula: true } : {}) });
         continue;
       }
       try {
@@ -710,7 +710,7 @@ export class UsuariosService {
           datosPlanilla(r.objeto!),
         );
         creadas++;
-        resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos, vincula: r.vincula });
+        resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos, ...(r.vincula ? { vincula: true } : {}) });
       } catch (err) {
         resultados.push({ indice, estado: 'ERROR', motivo: mensajeDeError(err) });
       }

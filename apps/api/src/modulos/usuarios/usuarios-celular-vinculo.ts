@@ -1,8 +1,10 @@
 import { ConflictException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { CELULAR_OTRA_PERSONA, TIPOS_CELULAR } from '../clientes/celular-party.util';
 
 type Db = Pick<Prisma.TransactionClient, 'contactMechanism' | 'customerAccount' | 'userAccount' | 'person'>;
+
+// Mismos tipos y mensaje que clientes/celular-party.util (copiados: un módulo no importa los internos de otro)
+const TIPOS_CELULAR = ['TELEFONO', 'WHATSAPP'];
 
 export type MotivoOtraPersona = 'USUARIO' | 'CUENTA_VINCULADA' | 'USUARIO_YA_VINCULADO' | 'VARIAS_CUENTAS' | 'PERSONA';
 
@@ -11,7 +13,7 @@ const MENSAJES: Record<MotivoOtraPersona, string> = {
   CUENTA_VINCULADA: 'Ese celular es de una cuenta de cliente ya vinculada a otra persona',
   USUARIO_YA_VINCULADO: 'Este usuario ya tiene otra cuenta de cliente vinculada. Desvincúlala primero en la sección Cuenta de cliente',
   VARIAS_CUENTAS: 'Ese celular está en varias cuentas de cliente. Vincula la correcta a mano en la sección Cuenta de cliente',
-  PERSONA: CELULAR_OTRA_PERSONA.mensaje,
+  PERSONA: 'Ese celular ya esta registrado en otra persona',
 };
 
 export type ResultadoCelular =
@@ -52,7 +54,7 @@ export async function resolverCelular(
 ): Promise<ResultadoCelular> {
   const variantes = [celular9, `51${celular9}`];
   const contactos = await db.contactMechanism.findMany({
-    where: { tipo: { in: [...TIPOS_CELULAR] }, valor: { in: variantes }, activo: true },
+    where: { tipo: { in: TIPOS_CELULAR }, valor: { in: variantes }, activo: true },
     select: { party_id: true },
   });
   const cuentasTel = await db.customerAccount.findMany({
