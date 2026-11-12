@@ -21,6 +21,12 @@ export class EscritorioOperativoController {
     return this.escritorio.cumpleanos(dias ? Number(dias) : undefined);
   }
 
+  /** Quién cumple años HOY (solo nombre abreviado, sin fecha ni edad): cualquier persona del panel; el ADMIN puede apagarlo. */
+  @Get('cumpleanos-hoy')
+  cumpleanosHoy(@Req() req: any) {
+    return this.escritorio.cumpleanosHoy(req.usuario.partyId);
+  }
+
   /** Cumpleaños de clientes (sin edad, celular enmascarado): solo con permiso de ver clientes. */
   @Get('cumpleanos-clientes')
   @Permiso('clientes', 'ver')

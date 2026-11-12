@@ -194,6 +194,17 @@ describe('ConfiguracionService', () => {
       expect(prismaMock.parametro.upsert).toHaveBeenCalledTimes(4);
     });
 
+    it('cumpleanos_banner_equipo: solo ADMIN y solo si/no', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+      const supervisor = { ...adminAuth, rol: 'SUPERVISOR' } as any;
+      await expect(service.actualizar('cumpleanos_banner_equipo', 'no', supervisor)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('cumpleanos_banner_equipo', 'tal vez', adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      const r: any = await service.actualizar('cumpleanos_banner_equipo', false, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ clave: 'cumpleanos_banner_equipo', valor: 'no' }) }));
+      expect(r).toBeDefined();
+    });
+
     it('avisos de stock: 0–20 enteros, 0 desactiva y la franja nunca pasa del aviso', async () => {
       prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
       prismaMock.parametro.findUnique.mockResolvedValue(null); // el otro vale su defecto (5 y 3)

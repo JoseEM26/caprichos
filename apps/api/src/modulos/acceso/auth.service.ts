@@ -76,6 +76,15 @@ export class AuthService {
     const fotoId = cuenta.party.persona?.foto_archivo_id;
     const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
     const roles = await rolesDeCuenta(this.prisma, cuenta.id, cuenta.rol);
+    // Solo "hoy es tu cumpleaños" (la fecha nunca sale del servidor) y solo si el saludo grande no se mostró ya hoy en ningún dispositivo
+    const hoy = diaCalendarioLima();
+    const esHoy = esCumpleanosHoy(cuenta.party.persona?.cumple_dia, cuenta.party.persona?.cumple_mes, hoy);
+    const yaSaludado = esHoy
+      ? !!(await this.prisma.cumpleanosSaludo.findUnique({
+          where: { usuario_party_id_fecha: { usuario_party_id: partyId, fecha: new Date(`${hoy}T00:00:00Z`) } },
+          select: { usuario_party_id: true },
+        }))
+      : false;
     return {
       partyId: cuenta.party_id.toString(),
       nombres: cuenta.party.persona?.nombres || '',
@@ -84,9 +93,27 @@ export class AuthService {
       roles,
       debeCambiar: cuenta.debe_cambiar,
       permisos: await permisosDeCuenta(this.prisma, cuenta.id, roles),
-      // Solo "hoy es tu cumpleaños": la fecha nunca sale del servidor
-      cumpleHoy: esCumpleanosHoy(cuenta.party.persona?.cumple_dia, cuenta.party.persona?.cumple_mes, diaCalendarioLima()),
+      cumpleHoy: esHoy && !yaSaludado,
     };
+  }
+
+  /**
+   * Registra que el saludo grande ya se mostró hoy (día de Lima). Idempotente (INSERT ... ON CONFLICT DO NOTHING).
+   * Solo guarda si hoy es de verdad su cumpleaños, para que la tabla no acumule filas inútiles.
+   */
+  async cumpleanosVisto(partyId: bigint, ahora: Date = new Date()): Promise<{ ok: true }> {
+    const persona = await this.prisma.person.findUnique({
+      where: { party_id: partyId },
+      select: { cumple_dia: true, cumple_mes: true },
+    });
+    const hoy = diaCalendarioLima(ahora);
+    if (esCumpleanosHoy(persona?.cumple_dia, persona?.cumple_mes, hoy)) {
+      await this.prisma.cumpleanosSaludo.createMany({
+        data: [{ usuario_party_id: partyId, fecha: new Date(`${hoy}T00:00:00Z`) }],
+        skipDuplicates: true,
+      });
+    }
+    return { ok: true };
   }
 
   async ingresar(

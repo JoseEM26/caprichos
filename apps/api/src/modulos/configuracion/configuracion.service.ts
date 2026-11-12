@@ -160,6 +160,8 @@ export const CLAVES_TEXTO = [
   'aviso_chat_sin_responder_activo',
   'ayuda_ia_activo',
   'stock_control_activo',
+  // Aviso «Hoy cumple años …» para todo el equipo en el panel (si/no, nace «si»): solo el ADMIN lo cambia
+  'cumpleanos_banner_equipo',
   // Almacén: descontar insumos de Cocina al preparar (nace «no») y permitir Cocina en negativo con pendiente de emitir (nace «si»)
   'almacen_consumir_al_preparar',
   'almacen_permitir_cocina_negativa',
@@ -294,6 +296,10 @@ export class ConfiguracionService {
       });
     }
 
+    if (clave === 'cumpleanos_banner_equipo' && usuarioActual?.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia el aviso de cumpleaños del equipo' });
+    }
+
     if (clave.startsWith('aviso_pc_impresion_') || clave.startsWith('aviso_chat_sin_responder_')) {
       if (usuarioActual?.rol !== 'ADMIN') {
         throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia los avisos por correo' });
@@ -382,6 +388,7 @@ export class ConfiguracionService {
         clave === 'aviso_chat_sin_responder_activo' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||
+        clave === 'cumpleanos_banner_equipo' ||
         clave === 'almacen_consumir_al_preparar' ||
         clave === 'almacen_permitir_cocina_negativa' ||
         clave === 'carta_invitado_activo' ||

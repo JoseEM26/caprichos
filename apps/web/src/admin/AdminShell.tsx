@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { SaludoCumpleanos } from './SaludoCumpleanos';
+import { BannerCumpleanosEquipo } from './BannerCumpleanosEquipo';
 import { esSoloMarketing } from '../comun/rolesUsuario';
 import { Confirmar } from '../comun/Confirmar';
 import { Icono } from '../comun/Icono';
@@ -857,6 +858,7 @@ export function AdminShell() {
               ← Volver a mis pedidos
             </button>
           )}
+          <BannerCumpleanosEquipo />
           <Outlet />
         </main>
       </div>

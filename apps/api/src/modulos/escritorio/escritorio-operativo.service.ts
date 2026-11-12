@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { horaLimaEntera } from '../../comun/fechas-lima';
+import { esCumpleanosHoy, horaLimaEntera } from '../../comun/fechas-lima';
 import { ROLES } from '../acceso/permisos';
 import { permisosDeCuenta } from '../acceso/roles-usuario';
 import type { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -24,6 +24,7 @@ const DIAS_SEM = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const TOPE_CUMPLES = 6;
 const TOPE_LISTA_CUMPLES = 100;
+const TOPE_BANNER_HOY = 5;
 const VENTANA_POR_DEFECTO = 60;
 
 const esBisiesto = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -222,6 +223,35 @@ export class EscritorioOperativoService {
       conFecha.push({ nombre, rol: ROLES.find((r) => r.codigo === c.rol)?.nombre ?? c.rol, dia: p.cumple_dia, mes: p.cumple_mes });
     }
     return { ventanaDias: ventana, sinFecha, proximos: proximosCumpleanos(conFecha, diaLima(ahora), ventana, TOPE_LISTA_CUMPLES) };
+  }
+
+  /**
+   * Aviso para todo el equipo: quién cumple años HOY (hora Lima; 29/02 se celebra el 28/02 en año no bisiesto).
+   * Privacidad (Ley 29733): solo «Nombre A.» (primer nombre e inicial del primer apellido); nunca fecha, edad, celular, rol
+   * ni próximos. Excluye a la propia persona (a ella le sale el saludo grande). Apagable con `cumpleanos_banner_equipo`.
+   */
+  async cumpleanosHoy(partyId: bigint, ahora: Date = new Date()): Promise<{ nombres: string[] }> {
+    const param = await this.prisma.parametro.findUnique({ where: { clave: 'cumpleanos_banner_equipo' } });
+    const v = typeof param?.valor === 'string' ? param.valor.trim().toLowerCase() : param?.valor;
+    if (v === 'no' || v === false) return { nombres: [] };
+    const hoy = diaLima(ahora);
+    const [y, m, d] = hoy.split('-').map(Number);
+    const dias = m === 2 && d === 28 && !esBisiesto(y) ? [28, 29] : [d];
+    const cuentas = await this.prisma.userAccount.findMany({
+      where: { activo: true, party_id: { not: partyId }, party: { persona: { cumple_mes: m, cumple_dia: { in: dias } } } },
+      select: { party: { select: { persona: { select: { nombres: true, apellidos: true, cumple_dia: true, cumple_mes: true } } } } },
+      take: TOPE_BANNER_HOY * 2,
+    });
+    const nombres: string[] = [];
+    for (const c of cuentas) {
+      const p = c.party?.persona;
+      if (!p || !esCumpleanosHoy(p.cumple_dia, p.cumple_mes, hoy)) continue;
+      const nombre = p.nombres.trim().split(/\s+/)[0];
+      if (!nombre) continue;
+      const inicial = (p.apellidos ?? '').trim().split(/\s+/)[0]?.charAt(0).toUpperCase();
+      nombres.push(inicial ? `${nombre} ${inicial}.` : nombre);
+    }
+    return { nombres: nombres.sort((a, b) => a.localeCompare(b, 'es')).slice(0, TOPE_BANNER_HOY) };
   }
 
   /**

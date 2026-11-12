@@ -305,6 +305,17 @@ model CorreoEnvio {
 }
 
 /// Correos EXTRA que reciben avisos del sistema sin ser usuarios (contador, socio...). Dato personal: se enmascara en logs y auditoría.
+/// Saludo grande de cumpleaños ya mostrado (una vez por usuario y día de Lima, en cualquier dispositivo). Solo guarda quién y qué día.
+model CumpleanosSaludo {
+  usuario_party_id BigInt
+  /// Día de Lima (AAAA-MM-DD) en que se mostró
+  fecha            DateTime @db.Date
+  creado_en        DateTime @default(now()) @db.Timestamptz
+
+  @@id([usuario_party_id, fecha])
+  @@map("cumpleanos_saludo")
+}
+
 model CorreoAvisoExtra {
   id             BigInt   @id @default(autoincrement())
   /// Normalizado en minúsculas; único
