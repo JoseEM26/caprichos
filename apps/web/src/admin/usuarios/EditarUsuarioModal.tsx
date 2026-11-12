@@ -35,6 +35,7 @@ import {
 } from "./horario";
 import { BloqueAlertasWhatsApp } from "./BloqueAlertasWhatsApp";
 import { puedeRecibirAlertasWhatsApp } from "./alertasWhatsappApi";
+import { validarCelularPeruano } from "./alertasWhatsappApi";
 import {
   AUTOCOMPLETAR_CLAVE,
   AVISO_REINGRESO,
@@ -115,6 +116,7 @@ export function EditarUsuarioModal({
   const [cumpleanos, setCumpleanos] = useState("");
   const [correoNuevo, setCorreoNuevo] = useState("");
   const [quitarCorreo, setQuitarCorreo] = useState(false);
+  const [celularNuevo, setCelularNuevo] = useState("");
   const [avisosCorreo, setAvisosCorreo] = useState(false);
   const [horario247, setHorario247] = useState(false);
   const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
@@ -238,6 +240,7 @@ export function EditarUsuarioModal({
       setClaveAdminDni("");
       setCorreoNuevo("");
       setQuitarCorreo(false);
+      setCelularNuevo("");
     }
   }, [usuario]);
 
@@ -255,6 +258,7 @@ export function EditarUsuarioModal({
     horario247 !== Boolean(usuario.horario24_7) ||
     dniNuevo.trim() !== "" ||
     correoNuevo.trim() !== "" ||
+    celularNuevo.trim() !== "" ||
     quitarCorreo ||
     (horarioBase !== "" &&
       JSON.stringify([horario, reemplazos]) !== horarioBase);
@@ -292,6 +296,9 @@ export function EditarUsuarioModal({
       } else if (dniNuevo.trim() && !claveAdminDni) {
         nuevosErrores.claveAdmin =
           "Escribe tu contraseña de administrador para cambiar el DNI";
+      }
+      if (celularNuevo.trim() && !validarCelularPeruano(celularNuevo).valido) {
+        nuevosErrores.celular = "Debe ser un celular de 9 dígitos que empiece con 9";
       }
       if (
         !quitarCorreo &&
@@ -348,6 +355,7 @@ export function EditarUsuarioModal({
           cuerpo.documento = dniNuevo.trim();
           cuerpo.claveAdmin = claveAdminDni;
         }
+        if (celularNuevo.trim()) cuerpo.celular = celularNuevo.trim();
         if (quitarCorreo) cuerpo.correo = "";
         else if (correoNuevo.trim()) cuerpo.correo = correoNuevo.trim();
         if (!iguales(otrosRoles, permanentesDe(usuario))) {
@@ -534,6 +542,26 @@ export function EditarUsuarioModal({
       )}
       {esAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <Campo
+            id="editar-celular"
+            etiqueta="Celular (deja vacío para no cambiarlo)"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="off"
+            value={celularNuevo}
+            onChange={(e) => {
+              setCelularNuevo(e.target.value);
+              if (errores.celular)
+                setErrores((prev) => ({ ...prev, celular: "" }));
+            }}
+            error={errores.celular}
+            ayuda={
+              usuario.activo && usuario.sinCelular
+                ? "Sin celular: no tendrá descuento de personal en la carta"
+                : "Con este celular recibe el descuento de personal en la carta"
+            }
+            disabled={guardando}
+          />
           <Campo
             id="editar-correo"
             etiqueta="Correo (deja vacío para no cambiarlo)"
