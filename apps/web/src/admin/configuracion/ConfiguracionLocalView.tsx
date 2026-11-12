@@ -23,6 +23,7 @@ import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
 import { TarjetaNotificacionesConfiguracion } from './TarjetaNotificacionesConfiguracion';
 import { CorreosAvisoTab } from './CorreosAvisoTab';
+import { TarjetaCumpleanosBannerConfiguracion } from './TarjetaCumpleanosBannerConfiguracion';
 import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespejarConfiguracion';
 import { TarjetaMinutosPreparacionConfiguracion } from './TarjetaMinutosPreparacionConfiguracion';
 import { TarjetaResenasGoogleConfiguracion } from './TarjetaResenasGoogleConfiguracion';
@@ -974,6 +975,7 @@ export function ConfiguracionLocalView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && <TarjetaControlAlmacenConfiguracion />}
               {tabId === 'operacion' && <TarjetaNotificacionesConfiguracion />}
+              {tabId === 'operacion' && <TarjetaCumpleanosBannerConfiguracion />}
               {tabId === 'operacion' && esAdmin && (
                 <div data-testid="atajo-correos-aviso" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px 14px', background: '#FFFFFF' }}>
                   <span style={{ flex: '1 1 240px', fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '18px' }}>

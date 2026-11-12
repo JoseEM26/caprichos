@@ -11,7 +11,7 @@ sugerencias:
   - Por que no veo los graficos de ventas en mi usuario
   - Que veo en el escritorio de cada puesto
   - Por que mi escritorio no muestra dinero
-  - Quien ve los cumpleanos y por que me sale un saludo al entrar
+  - Quien ve los cumpleanos, el aviso Hoy cumple anos y el saludo al entrar
   - Donde veo si algun insumo se esta quedando sin stock
   - Que hago si el escritorio sale vacio
 ---
@@ -47,7 +47,9 @@ Ver tambien: [[caja]], [[cocina]], [[repartos]]
 1. La tarjeta Cumpleanos aparece solo para el Administrador y el Supervisor (pestana Equipo) y para quien puede ver Clientes (pestana Clientes).
 2. Elige Hoy, 7 dias o Este mes. El cumpleanos de hoy sale resaltado. Nunca muestra el ano de nacimiento ni la edad.
 3. En la pestana Clientes el celular sale con puntos. El boton Felicitar por WhatsApp solo aparece si el cliente escribio en las ultimas 24 horas; si no, se avisa para no pagar una plantilla de Meta.
-4. Cuando es tu cumpleanos, al entrar al panel la primera vez ese dia sale un saludo grande. Se cierra con Gracias o con Esc.
+4. Cuando es tu cumpleanos, al entrar al panel sale un saludo grande una sola vez por dia, aunque uses otro dispositivo. Se cierra con Gracias o con Esc.
+5. Todo el equipo, sin importar el puesto, ve arriba un aviso discreto: Hoy cumple anos Maria S. Solo muestra el nombre y la inicial del apellido, nunca la fecha ni la edad, y no incluye tu propio nombre. Se cierra con la X y no vuelve ese dia.
+6. El Administrador lo apaga o enciende en Configuracion > Operacion, en Aviso de cumpleanos para todo el equipo.
 
 ## Errores y dudas comunes
 - Si la fecha inicial es mayor a la final, aparece el aviso La fecha inicial no puede ser despues de la final y no se actualiza la informacion hasta corregirla.
@@ -59,4 +61,4 @@ Ver tambien: [[caja]], [[cocina]], [[repartos]]
 ## Quien puede hacerlo
 - Todos los usuarios activos con puesto operativo pueden ingresar al Escritorio (Marketing y diseno entra directo a sus modulos).
 - Solo el Administrador ve el resumen financiero, los KPIs de ventas y los graficos de dinero.
-- Solo el Administrador y el Supervisor ven los cumpleanos del equipo; los de clientes, quien tiene permiso de ver Clientes.
+- Solo el Administrador y el Supervisor ven la tarjeta con los cumpleanos del equipo; los de clientes, quien tiene permiso de ver Clientes. El aviso Hoy cumple anos lo ve todo el equipo, y solo lo apaga el Administrador.

@@ -57,6 +57,13 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      cumpleanosSaludo: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      person: {
+        findUnique: jest.fn(),
+      },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
       rolPermiso: {
         findMany: jest.fn(),
@@ -637,6 +644,17 @@ describe('AuthService', () => {
       expect(JSON.stringify(r)).not.toMatch(/cumple_|nacimiento/);
     });
 
+    it('cumpleHoy pasa a false si el saludo ya se mostró hoy (en cualquier dispositivo)', async () => {
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).split('-').map(Number);
+      prisma.userAccount.findUnique.mockResolvedValue({
+        party_id: 7n, rol: 'MOZO', debe_cambiar: false,
+        party: { persona: { nombres: 'Luis', cumple_dia: hoy[2], cumple_mes: hoy[1] } },
+      });
+      prisma.rolPermiso.findMany.mockResolvedValue([]);
+      prisma.cumpleanosSaludo.findUnique.mockResolvedValue({ usuario_party_id: 7n });
+      expect((await service.yo(7n)).cumpleHoy).toBe(false);
+    });
+
     it('los permisos extra vigentes se suman a los del rol al refrescar la sesión', async () => {
       prisma.userAccount.findUnique.mockResolvedValue({ id: 3n, party_id: 7n, rol: 'COCINA', debe_cambiar: false, party: { persona: { nombres: 'Luis' } } });
       prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'cocina', accion: 'ver' } }]);
@@ -651,6 +669,32 @@ describe('AuthService', () => {
     it('cuenta que ya no existe -> 401 USUARIO_NO_ENCONTRADO', async () => {
       prisma.userAccount.findUnique.mockResolvedValue(null);
       await expect(service.yo(9n)).rejects.toMatchObject({ status: 401 });
+    });
+  });
+
+  describe('cumpleanosVisto', () => {
+    it('registra el saludo del día de Lima y es idempotente (skipDuplicates = ON CONFLICT DO NOTHING)', async () => {
+      prisma.person.findUnique.mockResolvedValue({ cumple_dia: 12, cumple_mes: 11 });
+      const ahora = new Date('2026-11-13T02:00:00Z'); // en Lima sigue siendo el 12
+      await service.cumpleanosVisto(7n, ahora);
+      await service.cumpleanosVisto(7n, ahora);
+      expect(prisma.cumpleanosSaludo.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.cumpleanosSaludo.createMany).toHaveBeenCalledWith({
+        data: [{ usuario_party_id: 7n, fecha: new Date('2026-11-12T00:00:00Z') }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('29 de febrero: en año no bisiesto se registra el 28', async () => {
+      prisma.person.findUnique.mockResolvedValue({ cumple_dia: 29, cumple_mes: 2 });
+      await service.cumpleanosVisto(7n, new Date('2027-02-28T15:00:00Z'));
+      expect(prisma.cumpleanosSaludo.createMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('si hoy no es su cumpleaños no guarda nada', async () => {
+      prisma.person.findUnique.mockResolvedValue({ cumple_dia: 13, cumple_mes: 11 });
+      await expect(service.cumpleanosVisto(7n, new Date('2026-11-12T15:00:00Z'))).resolves.toEqual({ ok: true });
+      expect(prisma.cumpleanosSaludo.createMany).not.toHaveBeenCalled();
     });
   });
 

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Post,
   Req,
   Res,
@@ -134,6 +135,15 @@ export class AuthController {
   async yo(@Req() req: Request) {
     const usuario = (req as any).usuario as UsuarioAutenticado;
     return this.authService.yo(usuario.partyId);
+  }
+
+  /** El saludo grande de cumpleaños ya se mostró hoy: no vuelve a salir en ningún dispositivo. */
+  @UseGuards(AccesoGuard)
+  @Post('cumpleanos/visto')
+  @HttpCode(200)
+  async cumpleanosVisto(@Req() req: Request) {
+    const usuario = (req as any).usuario as UsuarioAutenticado;
+    return this.authService.cumpleanosVisto(usuario.partyId);
   }
 
   @UseGuards(AccesoGuard)

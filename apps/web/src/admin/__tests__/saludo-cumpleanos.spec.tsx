@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SaludoCumpleanos, hoyLima } from '../SaludoCumpleanos';
 import * as sesionModulo from '../../comun/sesion';
+import { api } from '../../comun/api';
 
 function sesion(extra: Record<string, unknown> = {}) {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
@@ -16,6 +17,32 @@ describe('Saludo grande de cumpleaños al iniciar sesión', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    vi.spyOn(api, 'post').mockResolvedValue({ ok: true } as any);
+  });
+
+  it('avisa al servidor que ya se mostró (una vez por día en cualquier dispositivo)', () => {
+    sesion();
+    render(<SaludoCumpleanos />);
+    expect(api.post).toHaveBeenCalledWith('/auth/cumpleanos/visto', {});
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('si el POST falla igual se muestra y el respaldo local evita repetirlo en este dispositivo', async () => {
+    vi.spyOn(api, 'post').mockRejectedValue(new Error('red'));
+    sesion();
+    const { unmount } = render(<SaludoCumpleanos />);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(window.localStorage.getItem('caprichos_saludo_cumple_7')).toBe(hoyLima());
+    unmount();
+    render(<SaludoCumpleanos />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('si el servidor ya lo registró, cumpleHoy llega en false y no sale', () => {
+    sesion({ cumpleHoy: false });
+    render(<SaludoCumpleanos />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it('aparece con el primer nombre y se cierra con el botón', async () => {

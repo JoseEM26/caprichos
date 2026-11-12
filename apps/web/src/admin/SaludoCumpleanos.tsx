@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { api } from '../comun/api';
 import { useSesion } from '../comun/sesion';
 import { useDialogoAccesible } from '../comun/useDialogoAccesible';
 
@@ -32,7 +33,8 @@ const CSS = `
 /**
  * Saludo grande «¡Feliz cumpleaños!» la primera vez que la persona entra al panel el día de su cumpleaños.
  * El servidor solo dice «cumpleHoy» (sin fecha). Un solo modal: espera a que termine el cambio de clave obligatorio.
- * Se recuerda por navegador (localStorage); en otro dispositivo puede mostrarse una vez más.
+ * Una sola vez por día en cualquier dispositivo: el servidor lo registra (`POST /auth/cumpleanos/visto`) y `cumpleHoy` llega en false;
+ * localStorage queda como respaldo por si el registro falla.
  */
 export function SaludoCumpleanos() {
   const { usuario, cumpleHoy, debeCambiar } = useSesion();
@@ -44,7 +46,13 @@ export function SaludoCumpleanos() {
     if (!cumpleHoy || debeCambiar || !partyId) return;
     const hoy = hoyLima();
     if (yaSaludado(partyId, hoy)) return;
+    // Respaldo local siempre; el servidor lo recuerda para cualquier dispositivo (si el POST falla, solo vale el respaldo)
     marcarSaludado(partyId, hoy);
+    try {
+      Promise.resolve(api.post('/auth/cumpleanos/visto', {})).catch(() => undefined);
+    } catch {
+      // sin red: queda el respaldo local
+    }
     setVisible(true);
   }, [cumpleHoy, debeCambiar, partyId]);
 
