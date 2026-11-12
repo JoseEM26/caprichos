@@ -115,3 +115,13 @@ export {
   marcadoresPendientes,
 } from './utilidades/plantillas-respuesta.js';
 export type { CategoriaPlantilla } from './utilidades/plantillas-respuesta.js';
+
+export {
+  ETAPAS_TIEMPOS,
+  CLAVES_METAS_TIEMPOS,
+  RANGOS_METAS_TIEMPOS,
+  META_TIEMPO_MIN,
+  META_TIEMPO_MAX,
+  semaforoContraMeta,
+} from './utilidades/etapas-tiempos.js';
+export type { CodigoEtapa, EtapaPipeline, SemaforoTiempo } from './utilidades/etapas-tiempos.js';

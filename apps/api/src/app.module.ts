@@ -32,6 +32,7 @@ import { RucModule } from './modulos/ruc/ruc.module';
 import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
 import { EscritorioModule } from './modulos/escritorio/escritorio.module';
+import { AnalisisModule } from './modulos/analisis';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
 import { StockModule } from './modulos/stock/stock.module';
 import { ComprasModule } from './modulos/compras/compras.module';
@@ -91,6 +92,7 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     DireccionesModule,
     NotificacionesModule,
     EscritorioModule,
+    AnalisisModule,
     InformesModule,
     OfertasModule,
     ClientesModule,

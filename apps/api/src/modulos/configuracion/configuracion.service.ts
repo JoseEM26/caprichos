@@ -9,6 +9,8 @@ import {
   TAMANO_ETIQUETA_MAX_MM,
   TAMANO_ETIQUETA_MIN_MM,
   UMBRALES_AVISO_STOCK_DEFECTO,
+  CLAVES_METAS_TIEMPOS,
+  RANGOS_METAS_TIEMPOS,
   medidaEtiquetaValida,
 } from '@caprichos/compartido';
 import { hoyLima } from '../reclamos/textos-legales';
@@ -101,6 +103,8 @@ export const CLAVES_NUMERICAS = [
   'aviso_pc_impresion_minutos_tras_abrir',
   'aviso_pc_impresion_recordatorio_min',
   'aviso_chat_sin_responder_min',
+  // Metas de minutos por etapa de Análisis › Tiempos (catálogo en @caprichos/compartido): solo el ADMIN las cambia
+  ...CLAVES_METAS_TIEMPOS,
 ] as const;
 
 /** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
@@ -130,6 +134,7 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   aviso_pc_impresion_minutos_tras_abrir: [5, 120, true, 'Los minutos tras abrir la caja deben ser un entero entre 5 y 120'],
   aviso_pc_impresion_recordatorio_min: [15, 240, true, 'El recordatorio debe ser un entero entre 15 y 240 minutos'],
   aviso_chat_sin_responder_min: [5, 120, true, 'Los minutos de espera del chat deben ser un entero entre 5 y 120'],
+  ...RANGOS_METAS_TIEMPOS,
 };
 
 /** Rangos válidos (enteros) de los parámetros de protección contra spam y pedidos falsos. */

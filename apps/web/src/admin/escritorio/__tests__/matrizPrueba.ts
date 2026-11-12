@@ -8,6 +8,6 @@ export const MATRIZ_PARA_PRUEBA: Record<string, string[]> = {
   COCINA: ['pedidos/ver', 'cocina/ver', 'stock/ver', 'notificaciones/ver'],
   ALMACEN: ['stock/ver', 'compras/ver', 'notificaciones/ver'],
   REPARTIDOR: ['repartos/ver', 'notificaciones/ver'],
-  SUPERVISOR: [...new Set([...CAJERO, ...MOZO, 'escritorio/operativo', 'escritorio/cumpleanos'])],
+  SUPERVISOR: [...new Set([...CAJERO, ...MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'analisis/ver'])],
   MARKETING: ['novedades/ver', 'carta_diseno/ver', 'notificaciones/ver'],
 };
