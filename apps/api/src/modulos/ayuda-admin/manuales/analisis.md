@@ -13,6 +13,7 @@ sugerencias:
   - Que area de cocina es la mas lenta
   - Por que una etapa dice Sin dato
   - Como veo solo el turno de la noche o solo delivery
+  - Cuales son los productos mas y menos vendidos
 ---
 # Analisis
 
@@ -52,11 +53,29 @@ Despues: [[caja]]
 3. Las metas son parametros de [[mirest]] y mueven el semaforo y la lista de atascados.
 4. El Supervisor ve las metas pero no las cambia.
 
+## Como se hace: Leer la demanda (pestana Demanda)
+1. Carga de cocina ahora: cada area muestra cuantos pedidos tiene esperando y cuanto lleva el mas antiguo, con semaforo contra la meta de cocina. Se actualiza sola cada 30 segundos y tambien con Actualizar. Un area sin pedidos dice Sin cola.
+2. Cuando piden: el mapa de calor cuenta los pedidos por dia de la semana (lunes primero) y hora de Lima. Cada celda escribe su numero; el color solo refuerza. No cuenta anulados ni rechazados.
+3. Tiempo prometido al cliente: de los delivery entregados, que porcentaje llego dentro del maximo que se le prometio al salir el repartidor. Si dice Sin dato es que no hubo delivery con tiempo prometido guardado; mesa y para llevar no guardan ese tiempo.
+4. Pedidos anulados: cantidad, porcentaje de los pedidos, motivos escritos (se agrupan sin importar mayusculas), etapa en que estaba el pedido y cuanto tardo en anularse. Toca Quien anula para ver la lista de personas dentro de la misma pagina.
+Ver tambien: [[cocina]]
+
+## Como se hace: Leer las ventas (pestana Ventas)
+1. Una venta es el total del pedido (productos menos descuentos mas envio), sin la propina, y sin pedidos anulados ni rechazados: la misma definicion de [[informes]]. Las propinas salen aparte.
+2. Productos: elige Mas vendidos, Menos vendidos o Por monto. Las cortesias no cuentan, las partes de un combo no se repiten (el combo cuenta como una sola linea) y las opciones ya van dentro del precio de su producto. El monto es a precio de lista, antes del descuento del pedido.
+3. Canal, modalidad y turno: ventas y ticket promedio de cada uno; el ticket mas alto sale resaltado con palabras. La evolucion es diaria hasta 31 dias y semanal (de lunes a domingo) si el rango es mayor.
+4. Combos y ofertas: cuantos pedidos llevaron combo, cuanto aportan y cuanto descuento dio cada oferta o cupon. Si los combos le quitan ventas a los productos sueltos (canibalizacion) no se puede saber con lo que se guarda: dice Sin dato.
+5. Medios de pago: proporcion de Efectivo, Yape, Plin, tarjeta y transferencia segun lo cobrado en caja (sin propinas, como el [[cierre]]) y su evolucion. Los pedidos sin cobro registrado se cuentan aparte.
+6. El Supervisor ve pedidos y unidades pero no los montos en soles: solo el Administrador los ve.
+Ver tambien: [[informes]]
+
 ## Errores y dudas comunes
 - Por que una etapa dice Sin dato: falta la hora en el sistema, por ejemplo un pedido puesto en Listo a mano no guarda la hora de despacho por linea, o el delivery no registro quien lo tomo. Lo que faltaria guardar se explica en el panel.
 - Los pedidos anulados no cuentan en los promedios: aparecen aparte con su cantidad y cuanto tardaron en anularse.
 - El cobro dura 0 minutos cuando el pedido ya estaba pagado al entregarse.
 - Si sale el aviso de que se leyeron solo los pedidos mas recientes, acorta el rango de fechas.
+- Por que Demanda dice Sin dato en el tiempo prometido: solo el delivery guarda el tiempo prometido y lo guarda cuando el repartidor sale; antes de eso no hay con que comparar.
+- Por que no veo montos en Ventas: los montos en soles son solo del Administrador; el Supervisor ve pedidos y unidades.
 - Si no veo la opcion Analisis: solo la tienen el Administrador y el Supervisor.
 
 ## Quien puede hacerlo
