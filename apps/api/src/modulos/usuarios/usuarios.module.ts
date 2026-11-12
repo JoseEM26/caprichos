@@ -12,11 +12,12 @@ import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
 import { UsuariosActividadService } from './usuarios-actividad.service';
 import { UsuariosAccesosService } from './usuarios-accesos.service';
 import { UsuariosRolesModulosService } from './usuarios-roles-modulos.service';
+import { UsuariosCuentaClienteService } from './usuarios-cuenta-cliente.service';
 
 @Module({
   imports: [forwardRef(() => AvisosInternosModule), ArchivosModule, AuditoriaModule],
   controllers: [UsuariosController, UsuariosAreasController],
-  providers: [UsuariosService, UsuariosAreasService, UsuariosRolesService, UsuariosPermisosService, UsuariosRolesMasivoService, UsuariosActividadService, UsuariosAccesosService, UsuariosRolesModulosService],
+  providers: [UsuariosService, UsuariosAreasService, UsuariosRolesService, UsuariosPermisosService, UsuariosRolesMasivoService, UsuariosActividadService, UsuariosAccesosService, UsuariosRolesModulosService, UsuariosCuentaClienteService],
   exports: [UsuariosService],
 })
 export class UsuariosModule {}

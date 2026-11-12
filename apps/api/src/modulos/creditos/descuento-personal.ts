@@ -95,10 +95,15 @@ export async function descuentoPersonalPorCelular(db: any, celular: string | nul
 export async function descuentoPersonalDeCuenta(db: any, partyId: bigint | string | number | null | undefined): Promise<{ pct: number } | null> {
   if (partyId === null || partyId === undefined || !/^\d+$/.test(String(partyId))) return null;
   const id = BigInt(partyId);
-  const cuenta = await db.customerAccount?.findFirst?.({ where: { party_id: id, activo: true }, select: { telefono: true } });
+  const cuenta = await db.customerAccount?.findFirst?.({ where: { party_id: id, activo: true }, select: { telefono: true, usuario_party_id: true } });
   if (!cuenta) return null;
   const usuario = await db.userAccount?.findFirst?.({ where: { party_id: id, activo: true }, select: { party_id: true } });
   if (usuario) return { pct: await resolverPctPersonal(db, id) };
+  // Vínculo explícito del ADMIN (Usuarios › Vincular su cuenta de cliente): solo si ese usuario sigue activo
+  if (cuenta.usuario_party_id) {
+    const vinculado = await db.userAccount?.findFirst?.({ where: { party_id: cuenta.usuario_party_id, activo: true }, select: { party_id: true } });
+    if (vinculado) return { pct: await resolverPctPersonal(db, cuenta.usuario_party_id) };
+  }
   return descuentoPersonalPorCelular(db, cuenta.telefono);
 }
 

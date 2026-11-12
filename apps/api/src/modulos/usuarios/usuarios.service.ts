@@ -211,6 +211,13 @@ export class UsuariosService {
 
     const conteos = await this.conteosListado();
     const ahora = new Date();
+    // Usuarios con su cuenta de cliente vinculada: ya reciben el descuento de personal aunque no tengan celular propio
+    const vinculados = new Set(
+      ((await this.prisma.customerAccount?.findMany?.({
+        where: { usuario_party_id: { in: usuarios.map((u) => u.party_id) } },
+        select: { usuario_party_id: true },
+      })) ?? []).map((c) => String(c.usuario_party_id)),
+    );
     const elementos = usuarios.map((u) => {
       const dniDoc = u.party?.documentos?.[0]?.numero ?? '';
       return {
@@ -237,7 +244,8 @@ export class UsuariosService {
         correo: u.party?.persona?.correo ?? null,
         activo: u.activo,
         /** Sin celular activo: no recibe el descuento de personal en la carta. */
-        sinCelular: !(u.party as any)?.contactos?.length,
+        sinCelular: !(u.party as any)?.contactos?.length && !vinculados.has(String(u.party_id)),
+        cuentaClienteVinculada: vinculados.has(String(u.party_id)),
         debeCambiar: u.debe_cambiar,
         altaEn: u.alta_en,
       };

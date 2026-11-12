@@ -1647,6 +1647,9 @@ model CustomerAccount {
   telefono          String?   @db.VarChar(9)
   /// Sesiones emitidas antes de esta fecha ya no valen.
   clave_cambiada_en DateTime? @db.Timestamptz
+  /// Party del usuario del panel (trabajador) al que el ADMIN vinculó esta cuenta de cliente. Solo da descuento de personal;
+  /// nunca permisos. Único entre cuentas (índice parcial en la migración). Sin relación Prisma: no se navega desde el party.
+  usuario_party_id  BigInt?
 
   party     Party    @relation(fields: [party_id], references: [id])
 

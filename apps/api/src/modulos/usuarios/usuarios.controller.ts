@@ -36,6 +36,8 @@ import { UsuariosActividadService } from './usuarios-actividad.service';
 import { UsuariosAccesosService } from './usuarios-accesos.service';
 import { UsuariosRolesModulosService } from './usuarios-roles-modulos.service';
 import { GuardarRolModulosDto } from './dto/roles-modulos.dto';
+import { UsuariosCuentaClienteService } from './usuarios-cuenta-cliente.service';
+import { VincularCuentaClienteDto } from './dto/vincular-cuenta-cliente.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -48,7 +50,36 @@ export class UsuariosController {
     private readonly actividadService: UsuariosActividadService,
     private readonly accesosService: UsuariosAccesosService,
     private readonly rolesModulosService: UsuariosRolesModulosService,
+    private readonly cuentaClienteService: UsuariosCuentaClienteService,
   ) {}
+
+  /** Cuenta de cliente vinculada a este usuario (solo ADMIN). */
+  @Get(':id/cuenta-cliente')
+  @Permiso('usuarios', 'administrar_roles')
+  async cuentaClienteEstado(@Param('id') id: string, @Req() req: any) {
+    return this.cuentaClienteService.estado(id, req.usuario);
+  }
+
+  /** Vista previa para confirmar: nombre y celular enmascarado de la cuenta de ese celular (solo ADMIN). */
+  @Post(':id/cuenta-cliente/buscar')
+  @Permiso('usuarios', 'administrar_roles')
+  async cuentaClienteBuscar(@Param('id') id: string, @Body() dto: VincularCuentaClienteDto, @Req() req: any) {
+    return this.cuentaClienteService.buscar(id, dto.celular, req.usuario);
+  }
+
+  @Post(':id/cuenta-cliente')
+  @Permiso('usuarios', 'administrar_roles')
+  async cuentaClienteVincular(@Param('id') id: string, @Body() dto: VincularCuentaClienteDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cuentaClienteService.vincular(id, dto.celular, req.usuario, ip);
+  }
+
+  @Delete(':id/cuenta-cliente')
+  @Permiso('usuarios', 'administrar_roles')
+  async cuentaClienteDesvincular(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cuentaClienteService.desvincular(id, req.usuario, ip);
+  }
 
   /** Módulos que ve cada rol hoy y cuáles son ajuste del dueño (solo ADMIN). */
   @Get('roles-modulos')

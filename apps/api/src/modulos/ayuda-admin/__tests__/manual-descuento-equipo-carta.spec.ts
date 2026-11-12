@@ -10,4 +10,12 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     expect(t).toContain('Sin sesion iniciada no se aplica ni se muestra nada');
     expect(t).toContain('no suma puntos');
   });
+
+  it('usuarios explica como vincular y desvincular la cuenta de cliente', () => {
+    const t = readFileSync(join(__dirname, '..', 'manuales', 'usuarios.md'), 'utf8');
+    expect(t).toContain('vincular la cuenta de cliente de un usuario');
+    expect(t).toContain('Si, vincular');
+    expect(t).toContain('Desvincular');
+    expect(t).toContain('nunca gana permisos');
+  });
 });

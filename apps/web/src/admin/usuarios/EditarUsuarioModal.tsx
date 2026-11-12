@@ -10,6 +10,7 @@ import { useSesion } from "../../comun/sesion";
 import type { UsuarioItem } from "./tipos";
 import { SelectorOtrosRoles } from "./SelectorOtrosRoles";
 import { SeccionPermisosExtra } from "./SeccionPermisosExtra";
+import { SeccionCuentaCliente } from "./SeccionCuentaCliente";
 import { HistorialLaboral } from "./HistorialLaboral";
 import {
   ETIQUETAS_ROLES,
@@ -637,6 +638,7 @@ export function EditarUsuarioModal({
           </label>
         </div>
       )}
+      <SeccionCuentaCliente usuarioId={usuario.id} puedeEditar={esAdmin} usuarioActivo={usuario.activo} />
       {esAdmin && (
         <>
           <FotoUsuarioAdmin usuario={usuario} deshabilitado={guardando} />

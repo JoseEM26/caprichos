@@ -49,6 +49,16 @@ Ver tambien: [[historial]]
 2. Pulsa Editar, escribe el celular de 9 digitos que empiece con 9 en el campo Celular y guarda con Si, guardar.
 3. Si el celular ya es de otra persona, el sistema lo rechaza. Solo el Administrador puede cambiarlo.
 
+## Como se hace: vincular la cuenta de cliente de un usuario
+Sirve cuando el trabajador tambien se registro como cliente en la carta con su celular y por eso el celular no se puede poner en su usuario (ya es de su cuenta de cliente).
+1. Solo el Administrador. Pulsa Editar en el usuario y, en la pestana Datos, busca la seccion Cuenta de cliente (carta).
+2. Escribe el celular de 9 digitos de su cuenta de cliente y pulsa Vincular su cuenta de cliente.
+3. El sistema muestra solo el nombre de la cuenta y el celular con puntos (por ejemplo ···123). Si es la persona correcta, confirma con Si, vincular; si no, pulsa No.
+4. Desde ese momento, al entrar a la carta con esa cuenta recibe el descuento de personal. No se junta ni se borra nada: sus puntos, pedidos y direcciones siguen en su cuenta de cliente, y la cuenta de cliente nunca gana permisos del panel.
+5. Para deshacerlo, pulsa Desvincular y confirma con Si, desvincular. Queda anotado en la auditoria.
+6. Si el celular no es de una cuenta de cliente activa, el sistema avisa que no la encuentra. Una cuenta ya vinculada a otro usuario, o que ya es de un usuario, no se puede vincular. Con el usuario inactivo no hay descuento.
+Ver tambien: [[creditos]]
+
 ## Como se hace: recibir alertas por WhatsApp
 1. En la ficha de un administrador, marcar la casilla Recibir alertas por WhatsApp e ingresar su celular de 9 digitos que empiece con 9.
 2. Pulsar Guardar alertas y confirmar con Si, guardar.
