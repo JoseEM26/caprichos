@@ -38,7 +38,7 @@ const ver = (url = '/admin/analisis') =>
   );
 
 describe('AnalisisView', () => {
-  let get: ReturnType<typeof vi.spyOn>;
+  let get: { mock: { calls: unknown[][] } };
   beforeEach(() => {
     vi.restoreAllMocks();
     get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => (url.includes('/atascados') ? { generadoEn: '', total: 0, items: [] } : vacio));
@@ -71,7 +71,7 @@ describe('AnalisisView', () => {
     expect(screen.getByLabelText('Canal')).toBeInTheDocument();
     expect(screen.getByLabelText('Turno')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Tiempos' })).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(get.mock.calls.some(([u]) => String(u).startsWith('/admin/analisis/tiempos?desde='))).toBe(true));
+    await waitFor(() => expect(get.mock.calls.some(([u]: unknown[]) => String(u).startsWith('/admin/analisis/tiempos?desde='))).toBe(true));
   });
 
   it('cambiar el período y la modalidad vuelve a consultar con esos filtros', async () => {
@@ -81,8 +81,8 @@ describe('AnalisisView', () => {
     fireEvent.click(screen.getByRole('button', { name: '7 días' }));
     fireEvent.change(screen.getByLabelText('Modalidad'), { target: { value: 'DELIVERY' } });
     await waitFor(() => {
-      const urls = get.mock.calls.map(([u]) => String(u));
-      expect(urls.some((u) => /^\/admin\/analisis\/tiempos\?desde=\d{4}-\d{2}-\d{2}&hasta=\d{4}-\d{2}-\d{2}&modalidad=DELIVERY$/.test(u))).toBe(true);
+      const urls = get.mock.calls.map(([u]: unknown[]) => String(u));
+      expect(urls.some((u: string) => /^\/admin\/analisis\/tiempos\?desde=\d{4}-\d{2}-\d{2}&hasta=\d{4}-\d{2}-\d{2}&modalidad=DELIVERY$/.test(u))).toBe(true);
     });
     expect(screen.getByRole('button', { name: '7 días' })).toHaveAttribute('aria-pressed', 'true');
   });
