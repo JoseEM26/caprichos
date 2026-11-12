@@ -36,6 +36,7 @@ describe('CuentaClienteController', () => {
       registro: jest.fn(),
       ingresar: jest.fn(),
       clienteDesdeRequest: jest.fn(),
+      equipoDeCuenta: jest.fn().mockResolvedValue(null),
       notificaciones: jest.fn(),
       guardarCumpleanos: jest.fn(),
       actualizarPerfil: jest.fn(),
@@ -97,6 +98,16 @@ describe('CuentaClienteController', () => {
     const r = await controller.yo(req);
 
     expect(r).toEqual({ cliente: null });
+  });
+
+  it('yo agrega equipo solo si la cuenta es de un trabajador', async () => {
+    clientesServiceMock.clienteDesdeRequest.mockResolvedValue({ partyId: '100', nombre: 'Ana' });
+    expect(await controller.yo({ cookies: {} } as any)).toEqual({ cliente: { partyId: '100', nombre: 'Ana' } });
+    clientesServiceMock.equipoDeCuenta.mockResolvedValue({ esEquipo: true, puedeCredito: true });
+    expect(await controller.yo({ cookies: {} } as any)).toEqual({
+      cliente: { partyId: '100', nombre: 'Ana' },
+      equipo: { esEquipo: true, puedeCredito: true },
+    });
   });
 
   it('PUT perfil actualiza la sesión del cliente y devuelve el cliente', async () => {

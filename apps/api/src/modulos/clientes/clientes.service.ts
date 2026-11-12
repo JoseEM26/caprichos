@@ -18,6 +18,7 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
+import { trabajadorDeCuentaCliente } from '../creditos/descuento-personal';
 import { CodigoRegistroService } from './codigo-registro.service';
 import { AvisoCuentaService } from './aviso-cuenta.service';
 import { enmascararDni, validarDni } from '../comprobantes/comprobantes.util';
@@ -150,6 +151,12 @@ export class ClientesService {
         audience: 'cliente',
       },
     );
+  }
+
+  /** Si la cuenta es de un trabajador, y si puede cargar a su crédito (solo por vínculo explícito; por celular hay solo descuento). */
+  async equipoDeCuenta(partyId: bigint | string): Promise<{ esEquipo: true; puedeCredito: boolean } | null> {
+    const t = await trabajadorDeCuentaCliente(this.prisma, partyId);
+    return t ? { esEquipo: true, puedeCredito: t.porVinculo } : null;
   }
 
   /**

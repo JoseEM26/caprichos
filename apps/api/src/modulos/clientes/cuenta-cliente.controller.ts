@@ -126,7 +126,9 @@ export class CuentaClienteController {
   async yo(@Req() req: Request) {
     // NUNCA 401: el front de la carta ya maneja 401 como sesión administrativa
     const cliente = await this.clientesService.clienteDesdeRequest(req);
-    return { cliente };
+    // Solo con sesión y solo si es del equipo: el carrito muestra el crédito del personal (el servidor vuelve a decidirlo al pedir)
+    const equipo = cliente ? await this.clientesService.equipoDeCuenta(cliente.partyId) : null;
+    return equipo ? { cliente, equipo } : { cliente };
   }
 
   @Post('salir')
