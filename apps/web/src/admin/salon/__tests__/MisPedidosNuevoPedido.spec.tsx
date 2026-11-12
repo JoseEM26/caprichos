@@ -74,13 +74,13 @@ describe('Mis pedidos: Nuevo pedido se ve en Salón y en Lista', () => {
     expect(within(dialogo).getByText('Para llevar')).toBeTruthy();
   });
 
-  it('sin permiso de créditos del personal no ofrece «Pedido del personal»', async () => {
+  it('quien puede crear pedidos (p. ej. el mozo) sí ve «Pedido del personal», sin necesitar créditos/ver', async () => {
     permisos = ['mesas/ver', 'mesas/abrir', 'pedidos/crear'];
     render(<MisPedidosView />);
     await screen.findByRole('tab', { name: 'Salón' });
     abrirNuevo();
     const dialogo = await screen.findByRole('dialog', { name: /Nuevo pedido/ });
-    expect(within(dialogo).queryByText('Pedido del personal')).toBeNull();
+    expect(within(dialogo).getByText('Pedido del personal')).toBeTruthy();
     expect(within(dialogo).getByText('En el local (mesa)')).toBeTruthy();
   });
 
