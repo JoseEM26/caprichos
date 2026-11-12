@@ -27,8 +27,9 @@ export class CreditosController {
     return this.creditosService.obtenerResumen(filtros);
   }
 
+  // Candidatos de «Pedido del personal» (solo partyId, nombre, rol, descuentoPct): lo necesita todo rol que crea pedidos
   @Get('personal-activo')
-  @Permiso('creditos', 'ver')
+  @Permiso([{ modulo: 'creditos', accion: 'ver' }, { modulo: 'pedidos', accion: 'crear' }])
   async listarPersonalActivo() {
     return this.creditosService.listarPersonalActivo();
   }

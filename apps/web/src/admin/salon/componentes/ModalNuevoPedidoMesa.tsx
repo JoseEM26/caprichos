@@ -1,5 +1,5 @@
 import { PagoPersonalBloque, errorPagaConPersonal, textoPagoPersonal } from './PagoPersonalBloque';
-import { useEffect, useId, useRef, useState, useMemo, useDeferredValue } from 'react';
+import { useEffect, useId, useRef, useState, useMemo, useDeferredValue, useCallback } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
 import { VigilaEdicionPedido } from './VigilaEdicionPedido';
 import { Confirmar } from '../../../comun/Confirmar';
@@ -525,13 +525,27 @@ export function ModalNuevoPedidoMesa({
   const [busquedaPersonal, setBusquedaPersonal] = useState('');
   const [staffElegido, setStaffElegido] = useState<PersonalItem | null>(null);
 
+  const [errorPersonal, setErrorPersonal] = useState(false);
+  const cargarPersonal = useCallback(() => {
+    setErrorPersonal(false);
+    listarPersonalActivo()
+      .then((res) => setListaPersonal(Array.isArray(res) ? res : []))
+      .catch(() => {
+        setListaPersonal([]);
+        setErrorPersonal(true);
+      });
+  }, []);
   useEffect(() => {
-    if (paso === 'staff' || pideMode === 'personal' || pideOpen) {
-      listarPersonalActivo()
-        .then((res) => setListaPersonal(Array.isArray(res) ? res : []))
-        .catch(() => setListaPersonal([]));
-    }
-  }, [paso, pideMode, pideOpen]);
+    if (paso === 'staff' || pideMode === 'personal' || pideOpen) cargarPersonal();
+  }, [paso, pideMode, pideOpen, cargarPersonal]);
+  const avisoErrorPersonal = errorPersonal ? (
+    <div role="alert" data-testid="personal-error" style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>No se pudo cargar la lista del personal.</span>
+      <button type="button" onClick={cargarPersonal} style={{ minHeight: '36px', padding: '0 12px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', cursor: 'pointer' }}>
+        Reintentar
+      </button>
+    </div>
+  ) : null;
 
   const personalFiltrado = useMemo(() => {
     const q = busquedaPersonal.toLowerCase().trim();
@@ -2086,6 +2100,7 @@ export function ModalNuevoPedidoMesa({
                   fontSize: '14px',
                 }}
               />
+              {avisoErrorPersonal}
               <div
                 style={{
                   display: 'flex',
@@ -3445,7 +3460,8 @@ export function ModalNuevoPedidoMesa({
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                           {personalFiltrado.length} {personalFiltrado.length === 1 ? 'resultado' : 'resultados'}
                         </div>
-                        {personalFiltrado.length === 0 && (
+                        {avisoErrorPersonal}
+                        {personalFiltrado.length === 0 && !errorPersonal && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
                             Sin resultados
                           </div>
