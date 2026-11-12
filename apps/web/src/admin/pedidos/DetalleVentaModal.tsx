@@ -4,7 +4,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { formatearSoles } from '../comprobantes/utilidades';
-import { pedidosApi, type LineaPedido, type Pedido } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, type LineaPedido, type Pedido } from './pedidosApi';
 import { duracionSegLegible, lineaTiempoApi, type EtapaLineaTiempo, type LineaTiempoPedido } from './lineaTiempoApi';
 import { SeccionComprobantesPedido } from './SeccionComprobantesPedido';
 import { SeccionClientePedido } from './SeccionClientePedido';
@@ -171,7 +171,7 @@ function PestanaPagos({ p }: { p: PedidoExtra }) {
         {efectivo != null && (
           <dl className="dv-grid">
             <Dato t="Efectivo recibido">{formatearSoles(efectivo)}</Dato>
-            <Dato t="Vuelto">{formatearSoles(cm?.vuelto ?? Math.max(0, efectivo - Number(p.total)))}</Dato>
+            <Dato t="Vuelto">{formatearSoles(cm?.vuelto ?? Math.max(0, efectivo - montoPorCobrar(p)))}</Dato>
           </dl>
         )}
         {Number(p.propina ?? 0) > 0 && (
@@ -190,7 +190,7 @@ function PestanaPagos({ p }: { p: PedidoExtra }) {
       )}
       <section className="dv-bloque">
         <h3 className="dv-sec">Vouchers</h3>
-        <SeccionVouchersPedido pedidoId={String(p.id)} total={Number(p.total)} medio={p.pago_metodo ?? p.cobroMozo?.medio} compacto />
+        <SeccionVouchersPedido pedidoId={String(p.id)} total={montoPorCobrar(p)} medio={p.pago_metodo ?? p.cobroMozo?.medio} compacto />
       </section>
       {cobros.length > 0 && (
         <section className="dv-bloque">

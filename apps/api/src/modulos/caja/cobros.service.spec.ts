@@ -435,6 +435,24 @@ describe('CobrosService', () => {
       expect(res.total).toBe(50); // el total de la venta no cambia
     });
 
+    it('crédito del personal + delivery: el cobro es solo el envío (total - monto_credito) y el cobro guarda ese monto', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, total: new Prisma.Decimal(26), monto_credito: new Prisma.Decimal(21) });
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 79n, pedido_id: 100n, caja_id: 10n, total: new Prisma.Decimal(5), credito_personal: false, cobrado_por: 2n, en: new Date(),
+        pagos: [{ id: 1n, medio: 'EFECTIVO', monto: new Prisma.Decimal(5), propina: new Prisma.Decimal(0), recibido: null, vuelto: null }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO' });
+
+      // El total (26) ya no cuadra: solo se cobra el envío
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 26 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'PAGO_NO_CUADRA' } });
+
+      await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 5 }] }, cajeroUsuario);
+      expect(Number(prismaMock.cobro.create.mock.calls[0][0].data.total)).toBe(5);
+    });
+
     it('pago mixto -> asigna MIXTO, calcula vuelto solo sobre el efectivo y procesa la transacción', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({

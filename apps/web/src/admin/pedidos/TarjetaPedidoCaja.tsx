@@ -1,6 +1,6 @@
 import { totalDe } from './resumenDia';
 import { memo } from 'react';
-import type { Pedido } from './pedidosApi';
+import { montoPorCobrar, type Pedido } from './pedidosApi';
 import { InsigniaMesa } from './InsigniaMesa';
 import { PastillaEspera } from './PastillaEspera';
 import { IconoModalidad, IconoCanal, claveCanal, claveModalidad, textoMesa, type ClaveModalidad } from './InsigniaModalidad';
@@ -33,7 +33,10 @@ function chipPago(o: Pedido): { texto: string; clase: string } {
   const pag = String(o.pago_estado || '').toUpperCase();
   // Consumo del personal: se carga al crédito del trabajador, no se cobra en caja
   if (o.es_personal) return { texto: 'Crédito del personal', clase: 'info' };
-  if (pag === 'PAGADO') return { texto: 'Pagado', clase: 'ok' };
+  // Crédito del personal con delivery: los productos van a su crédito y solo el envío se cobra
+  const credito = Number(o.monto_credito || 0);
+  if (credito > 0 && pag !== 'PAGADO') return { texto: `Crédito S/ ${credito.toFixed(2)} · Por cobrar S/ ${montoPorCobrar(o).toFixed(2)}`, clase: 'pend' };
+  if (pag === 'PAGADO') return { texto: Number(o.monto_credito || 0) > 0 ? `Pagado · Crédito S/ ${Number(o.monto_credito).toFixed(2)}` : 'Pagado', clase: 'ok' };
   if (pag === 'COORDINADO') return { texto: 'Pago coordinado', clase: 'info' };
   return { texto: 'Por cobrar', clase: 'pend' };
 }

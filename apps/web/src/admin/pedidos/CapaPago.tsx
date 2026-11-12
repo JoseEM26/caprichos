@@ -9,7 +9,7 @@ import {
   type ValorComprobante,
 } from './SelectorComprobante';
 import { Confirmar } from '../../comun/Confirmar';
-import { pedidosApi, type Pedido } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, type Pedido } from './pedidosApi';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
@@ -34,7 +34,7 @@ function valorDelPedido(pedido: Pedido): ValorComprobante {
 
 /** Efectivo a cobrar (del plan, o todo el total si paga solo en efectivo) y vuelto. Sin efectivo, null. */
 export function calcularVuelto(pedido: Pedido): { efectivo: number; pagaCon: number; vuelto: number } | null {
-  const total = Number(pedido.total || 0);
+  const total = montoPorCobrar(pedido);
   const plan = pedido.planPago ?? [];
   let efectivo = 0;
   if (plan.length > 0) {
@@ -64,7 +64,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
   const { tiene } = useSesion();
   const est = String(pedido.estado || '').toUpperCase();
   const tipoComp = pedido.comprobante_tipo ? etiquetaComprobante(pedido.comprobante_tipo) : 'Sin elegir';
-  const total = Number(pedido.total || 0);
+  const total = montoPorCobrar(pedido);
   const plan = pedido.planPago ?? [];
   const medioTxt = pedido.pago_metodo || pedido.pago_preferido || 'Efectivo';
   const digitales = useMemo(() => digitalesDelPlan(plan), [plan]);
@@ -253,7 +253,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
         <SeccionVouchersPedido
           pedidoId={pedido.id}
           recargarClave={pedido.pago_estado}
-          total={pedido.total}
+          total={montoPorCobrar(pedido)}
           medio={pedido.pago_metodo || pedido.pago_preferido || null}
           alCargar={setVouchers}
           compacto

@@ -15,7 +15,8 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     const t = readFileSync(join(__dirname, '..', 'manuales', 'creditos.md'), 'utf8');
     expect(t).toContain('Cargar a mi credito del personal');
     expect(t).toContain('VINCULADA');
-    expect(t).toContain('El credito NO aplica a pedidos con delivery');
+    expect(t).toContain('el costo del envio NUNCA se carga a credito');
+    expect(t).not.toContain('El credito NO aplica a pedidos con delivery');
     expect(t).toContain('Nadie mas ve esta opcion');
   });
 

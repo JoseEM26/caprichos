@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from './pago-plan.service';
@@ -206,6 +207,7 @@ const SELECCION_SEGUIMIENTO = {
   mesa_nombre: true,
   espera_mesa_desde: true,
   total: true,
+  monto_credito: true,
   propina: true,
   creado_en: true,
   pasa_cocina_en: true,
@@ -323,7 +325,7 @@ export class SeguimientoService {
     const plan = (pedido.planPago ?? []).map((f) => ({ medio: f.medio, monto: Number(f.monto) }));
     const digitales = mediosDigitalesDelPedido(plan, null, 0);
     const montoDigital = digitales.length > 0 ? montoDigitalDePlan(plan) : null;
-    const totalCobrable = Math.round((Number(pedido.total) + Number(pedido.propina ?? 0)) * 100) / 100;
+    const totalCobrable = Math.round((montoACobrar(pedido) + Number(pedido.propina ?? 0)) * 100) / 100;
     const base = {
       ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
       pagoDigital,

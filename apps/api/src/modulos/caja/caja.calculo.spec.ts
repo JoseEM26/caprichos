@@ -33,6 +33,8 @@ describe('caja.calculo', () => {
     // cobrado en caja (con cobro vigente): entra en la caja por su medio, no se liquida aparte
     expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [{ anulado_en: null }] })).toBe(0);
     expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [{ anulado_en: null }] })).toBe(0);
+    // crédito del personal + delivery: el repartidor solo trae el envío
+    expect(efectivoDelRepartidor({ total: 26, monto_credito: 21, pago_metodo: 'EFECTIVO', cobros: [] })).toBe(500);
     // contra entrega en efectivo: lo trae el repartidor y lo liquida
     expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [] })).toBe(4000);
     // cobro anulado: vuelve a ser contra entrega

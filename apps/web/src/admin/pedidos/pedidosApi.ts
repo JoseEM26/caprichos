@@ -221,6 +221,8 @@ export interface Pedido {
   nota?: string | null;
   mesa_nombre?: string | null;
   es_personal?: boolean;
+  /** Parte a crédito del personal (delivery con crédito): no se cobra; se cobra total - monto_credito (el envío) */
+  monto_credito?: string | number | null;
   pago_coordinado_en?: string | null;
   entregado_mesa_en?: string | null;
   entregado_en?: string | null;
@@ -680,3 +682,7 @@ export const pedidosApi = {
     return api.get<PedidoPorCobrar[]>('/admin/caja/por-cobrar');
   },
 };
+
+/** Lo que hay que cobrar de un pedido (sin propina): con crédito del personal + delivery, solo el envío. Igual que el servidor. */
+export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null }): number =>
+  Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100)) / 100;

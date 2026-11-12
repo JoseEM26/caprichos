@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 
 /**
@@ -12,6 +13,7 @@ export async function marcarPagoParaPersona(
     id: bigint;
     codigo: string;
     total?: unknown;
+    monto_credito?: unknown;
     pago_preferido?: string | null;
     pago_metodo?: string | null;
   },
@@ -34,7 +36,7 @@ export async function marcarPagoParaPersona(
           pedidoId: pedido.id.toString(),
           pedidoCodigo: pedido.codigo,
           medio: pedido.pago_preferido || pedido.pago_metodo,
-          monto: Number(pedido.total || 0),
+          monto: montoACobrar({ total: pedido.total, monto_credito: pedido.monto_credito }),
           ...extraPago,
         },
       },
@@ -54,6 +56,7 @@ export async function anotarPagoEnFlujo(
     id: bigint;
     codigo: string;
     total?: unknown;
+    monto_credito?: unknown;
     pago_preferido?: string | null;
     pago_metodo?: string | null;
   },
@@ -71,7 +74,7 @@ export async function anotarPagoEnFlujo(
           pedidoId: pedido.id.toString(),
           pedidoCodigo: pedido.codigo,
           medio: pedido.pago_preferido || pedido.pago_metodo,
-          monto: Number(pedido.total || 0),
+          monto: montoACobrar({ total: pedido.total, monto_credito: pedido.monto_credito }),
           ...extraPago,
         },
       },

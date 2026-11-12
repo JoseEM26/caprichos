@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
 import { ENVIO_GRATIS_MONTO_POR_DEFECTO } from '@caprichos/compartido';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -564,7 +565,7 @@ export class IaHerramientasService {
     );
 
     const p: any = pedido;
-    const totalCobrable = Math.round((Number(p.total) + Number(p.propina ?? 0)) * 100) / 100;
+    const totalCobrable = Math.round((montoACobrar(p) + Number(p.propina ?? 0)) * 100) / 100;
     const cobrado = (p.cobros || []).filter((c: any) => !c.anulado_en).reduce((a: number, c: any) => a + Number(c.total), 0);
     const plan = (p.planPago || []).map((f: any) => ({ medio: f.medio, monto: Number(f.monto) }));
     const vouchers = (p.vouchers || []).filter((v: any) => !v.reemplazado_en && !v.retirado);

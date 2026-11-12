@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
   BadRequestException,
   ConflictException,
@@ -103,6 +104,10 @@ export class UbicarPedidoService {
           zona_id: zona.zonaId,
           envio: new Prisma.Decimal(envio),
           total: new Prisma.Decimal(total),
+          // Crédito del personal + delivery: si el envío de la zona es gratis, no queda nada por cobrar y todo va a su crédito
+          ...(Number(pedido.monto_credito) > 0 && montoACobrar({ total, monto_credito: pedido.monto_credito }) <= 0 && pedido.pago_estado !== 'PAGADO'
+            ? { pago_estado: 'PAGADO', pago_metodo: 'CREDITO_PERSONAL' }
+            : {}),
           ...(dto.direccion?.trim() ? { entrega_direccion: dto.direccion.trim() } : {}),
           ...(dto.referencia?.trim() ? { entrega_referencia: dto.referencia.trim() } : {}),
         },

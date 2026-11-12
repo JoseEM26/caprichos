@@ -57,7 +57,7 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
       orderBy: { creado_en: 'desc' },
       select: {
         id: true, codigo: true, cliente_telefono: true, cliente_party_id: true,
-        entrega_lat: true, entrega_lng: true, zona_id: true,
+        entrega_lat: true, entrega_lng: true, zona_id: true, monto_credito: true,
       },
     });
   }
@@ -81,7 +81,7 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
     try {
       // La dirección escrita por el cliente se conserva: el pin solo aporta las coordenadas
       const r = await this.cambio.aplicarCambio(p.id, { lat: punto.lat, lng: punto.lng }, { origen: 'WHATSAPP_CLIENTE', usuario: null, omitirAvisoCliente: true });
-      const texto = textoUbicacionAsignada({ codigo: p.codigo, envioNuevo: r.envioNuevo, totalNuevo: r.totalNuevo, ajuste: r.ajuste, otros });
+      const texto = textoUbicacionAsignada({ codigo: p.codigo, envioNuevo: r.envioNuevo, totalNuevo: r.totalNuevo, montoCredito: Number(p.monto_credito ?? 0), ajuste: r.ajuste, otros });
       const aviso = await this.responder(telefono, texto, p.id);
       await this.prisma.pedidoCambioUbicacion.update({ where: { id: BigInt(r.cambioId) }, data: { aviso_cliente: aviso } });
       this.eventosGateway?.emitirAdmin('ubicacion:propuesta', { pedidoId: String(p.id), estado: 'APROBADA' });

@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Pedido, Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -143,12 +144,12 @@ export class CambioUbicacionService {
         where: { pedido_id: pedido.id, ajuste_estado: { in: ['COBRADO', 'DEVUELTO'] } },
         select: { ajuste_estado: true, ajuste_monto: true },
       });
-      let pagadoC = aCentimos(cobro ? cobro.total : pedido.total);
+      let pagadoC = aCentimos(cobro ? cobro.total : montoACobrar(pedido));
       for (const r of resueltos) {
         pagadoC += r.ajuste_estado === 'COBRADO' ? aCentimos(r.ajuste_monto) : -aCentimos(r.ajuste_monto);
       }
       montoPagado = enPesos(pagadoC);
-      const a = calcularAjusteCobro(true, pagadoC, aCentimos(totalNuevo));
+      const a = calcularAjusteCobro(true, pagadoC, aCentimos(totalNuevo) - aCentimos(pedido.monto_credito)) // con crédito del personal solo el envío se cobra al contado;
       ajuste = a ? { tipo: a.tipo, monto: enPesos(a.montoC) } : null;
     }
 
@@ -273,6 +274,10 @@ export class CambioUbicacionService {
           envio: new Prisma.Decimal(c.envioNuevo),
           total: new Prisma.Decimal(c.totalNuevo),
           ubicacion_editada_en: ahora,
+          // Crédito del personal + delivery con envío gratis en la zona: nada por cobrar, todo a su crédito
+          ...(Number(actual.monto_credito) > 0 && montoACobrar({ total: c.totalNuevo, monto_credito: actual.monto_credito }) <= 0 && actual.pago_estado !== 'PAGADO'
+            ? { pago_estado: 'PAGADO', pago_metodo: 'CREDITO_PERSONAL' }
+            : {}),
           ...(punto.direccion?.trim() ? { entrega_direccion: punto.direccion.trim() } : {}),
           ...(punto.referencia?.trim() ? { entrega_referencia: punto.referencia.trim() } : {}),
         },

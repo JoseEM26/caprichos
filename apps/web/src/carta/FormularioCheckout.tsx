@@ -202,11 +202,8 @@ export function FormularioCheckout({
   // Solo el equipo con sesión ve la elección contado / crédito del personal (el servidor vuelve a decidirlo)
   const equipoCuenta = clienteCuenta ? (cuentaCtx?.equipo ?? null) : null;
   const [pagoEquipo, setPagoEquipo] = useState<PagoEquipo>('CONTADO');
-  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO' && modalidad !== 'DELIVERY';
-  // Si cambia a delivery con crédito elegido, vuelve a contado
-  useEffect(() => {
-    if (modalidad === 'DELIVERY') setPagoEquipo('CONTADO');
-  }, [modalidad]);
+  // Crédito: cubre los productos. Con delivery el envío NUNCA va a crédito: se paga ahora, al contado
+  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO';
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
   const pideCumple = cumpleFaltaCuenta;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -553,7 +550,14 @@ export function FormularioCheckout({
   const propinaCobrable = propinaActiva && propinaFormatoOk && propinaNum > 0 && propinaNum <= topePropina ? Math.round(propinaNum * 100) / 100 : 0;
   const propinaInvalida = propinaActiva && propinaLimpia !== '' && (!propinaFormatoOk || propinaNum > topePropina);
   // Lo que paga el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
-  const aCobrar = Number((totalCalculado + propinaCobrable).toFixed(2));
+  // Crédito + delivery: los productos van a crédito y se paga ahora solo el envío (si ya se conoce y no es gratis)
+  const creditoConDelivery = conCredito && modalidad === 'DELIVERY';
+  const envioConocido = !!zonaEnvio || envioGratisActivo;
+  const envioAhora = creditoConDelivery && envioConocido ? Math.min(costoEnvioEfectivo ?? 0, totalCalculado) : 0;
+  // Con envío gratis no hay nada que pagar; sin ubicación aún, el envío se confirma y se paga después con el medio elegido
+  const pagaEnvio = creditoConDelivery && (!envioConocido || envioAhora > 0);
+  const productosACredito = creditoConDelivery ? Number((totalCalculado - envioAhora).toFixed(2)) : totalCalculado;
+  const aCobrar = creditoConDelivery ? envioAhora : Number((totalCalculado + (conCredito ? 0 : propinaCobrable)).toFixed(2));
   // Pago dividido: plan válido (o null) y parte en efectivo (lo que cubre «Paga con»)
   const planDividido = dividirPago
     ? armarPlanCarta(metodoPago, monto1Texto, medio2, aCobrar)
@@ -609,8 +613,10 @@ export function FormularioCheckout({
   };
 
   const validarPaso3 = (): string | null => {
-    if (conCredito) return null; // a crédito no hay comprobante, medio de pago ni propina
-    if (tipoComprobante === 'FACTURA') {
+    if (conCredito && !pagaEnvio) return null; // a crédito no hay comprobante, medio de pago ni propina (salvo el medio del envío)
+    if (conCredito) {
+      // solo el medio del envío: sin comprobante ni propina
+    } else if (tipoComprobante === 'FACTURA') {
       const rucLimpio = ruc.trim();
       if (!/^(10|15|17|20)\d{9}$/.test(rucLimpio)) {
         return 'Para factura se exige un RUC válido de 11 dígitos que empiece con 10, 15, 17 o 20 (un RUC de 10 dígitos no se acepta)';
@@ -628,7 +634,7 @@ export function FormularioCheckout({
       }
     }
 
-    if (propinaInvalida) {
+    if (propinaInvalida && !conCredito) {
       return `La propina debe ser un monto entre S/ 0 y S/ ${topePropina.toFixed(2)}, con hasta 2 decimales`;
     }
 
@@ -831,7 +837,7 @@ export function FormularioCheckout({
           : undefined,
       lineas: lineasDto,
       ...(equipoCuenta ? { pagoEquipo: conCredito ? 'CREDITO' : 'CONTADO' } : {}),
-      pago: conCredito
+      pago: conCredito && !pagaEnvio
         ? { metodo: 'EFECTIVO' as const }
         : {
         metodo: planDividido.plan ? medioPrincipalCarta(planDividido.plan) : metodoPago,
@@ -1841,11 +1847,28 @@ export function FormularioCheckout({
                       data-testid="resumen-credito-equipo"
                       style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', fontSize: '13px', lineHeight: '18px' }}
                     >
-                      <div>
-                        Se carga a tu crédito: <strong>S/ {totalCalculado.toFixed(2)}</strong>
-                      </div>
+                      {creditoConDelivery ? (
+                        <>
+                          <div>
+                            A tu crédito del personal: <strong>S/ {productosACredito.toFixed(2)}</strong> (se descuenta a fin de mes)
+                          </div>
+                          <div>
+                            {!envioConocido
+                              ? 'El envío lo pagas ahora, al contado: te confirmamos su costo por WhatsApp.'
+                              : envioAhora > 0
+                                ? <>Pagas ahora el envío: <strong>S/ {envioAhora.toFixed(2)}</strong></>
+                                : 'Tu envío es gratis: no pagas nada ahora.'}
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          Se carga a tu crédito: <strong>S/ {totalCalculado.toFixed(2)}</strong>
+                        </div>
+                      )}
                     </div>
                   )}
+                  {(!conCredito || pagaEnvio) && (
+                  <>
                   {!conCredito && (
                   <>
                   {/* Comprobante Boleta o Factura (DT-77) */}
@@ -2048,6 +2071,9 @@ export function FormularioCheckout({
                       </div>
                     )}
                   </div>
+
+                  </>
+                  )}
 
                   {/* Medio de pago */}
                   <div
@@ -2257,7 +2283,7 @@ export function FormularioCheckout({
                       </div>
                     )}
 
-                    {propinaActiva && (
+                    {propinaActiva && !conCredito && (
                       <div data-testid="propina-carta">
                         <label htmlFor="f-propina" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}>
                           Propina opcional para el equipo (S/)
@@ -2347,7 +2373,7 @@ export function FormularioCheckout({
                   )}
 
                   {/* Campo de cupón / puntos */}
-                  {!cuponAplicado && clienteCuenta && (
+                  {!cuponAplicado && clienteCuenta && !conCredito && (
                     <PuntosCanje
                       totalPedido={Math.max(0, promos.canjeable ?? 0)}
                       puntosAplicados={puntosAplicados}
@@ -2555,7 +2581,14 @@ export function FormularioCheckout({
                       </div>
                     )}
 
-                    {propinaCobrable > 0 && (
+                    {creditoConDelivery && (
+                      <div data-testid="credito-resumen" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span>A tu crédito del personal</span>
+                        <span style={{ fontWeight: 700 }}>S/ {productosACredito.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {propinaCobrable > 0 && !conCredito && (
                       <div data-testid="propina-resumen" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                         <span>Propina (para el equipo)</span>
                         <span style={{ fontWeight: 700 }}>S/ {propinaCobrable.toFixed(2)}</span>

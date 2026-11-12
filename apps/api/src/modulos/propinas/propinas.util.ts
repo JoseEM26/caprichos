@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 /**
  * Propinas (función pura, sin BD). La propina es opcional, va aparte de la venta y se suma por mes
  * (día calendario de Lima) solo de lo cobrado. Lima no tiene horario de verano: UTC-5 fijo.
@@ -144,6 +145,7 @@ export function resumirPropinas(filas: FilaPropina[]) {
 }
 
 /** Lo que el cliente paga por el pedido: total de la venta + propina (lo usan plan, vouchers y efectivo). */
-export function totalCobrable(pedido: { total: unknown; propina?: unknown }): number {
-  return Math.round((Number(pedido.total) + Number(pedido.propina ?? 0)) * 100) / 100;
+export function totalCobrable(pedido: { total: unknown; monto_credito?: unknown; propina?: unknown }): number {
+  // montoACobrar: con crédito del personal + delivery solo se cobra el envío
+  return Math.round((montoACobrar(pedido) + Number(pedido.propina ?? 0)) * 100) / 100;
 }

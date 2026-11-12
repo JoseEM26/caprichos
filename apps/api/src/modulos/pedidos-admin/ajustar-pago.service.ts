@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -133,7 +134,7 @@ export class AjustarPagoService {
       let cierre = false;
       if (cobro) {
         if (caja && caja.estado !== 'ABIERTA') cierre = true;
-        else if (Number(cobro.total) >= Number(p.total)) {
+        else if (Number(cobro.total) >= montoACobrar(p)) {
           const propinas = repartirPropina(planNuevo.map((f) => ({ monto: f.monto })), Number(p.propina ?? 0));
           await tx.cobroPago.deleteMany({ where: { cobro_id: cobro.id } });
           await tx.cobroPago.createMany({

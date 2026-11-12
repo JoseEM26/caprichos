@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { CANALES_CON_ATENDIDO, nombresDePersonas } from './linea-tiempo.service';
 import { totalSegDePedido } from './linea-tiempo.util';
 import { cargarAuditoriaPedido } from './auditoria-pedido';
@@ -1513,7 +1514,7 @@ export class PedidosEstadoService {
       estadoFinal === 'PAGADO' &&
       !!this.cobros &&
       !pedido.es_personal &&
-      Number(pedido.total) > 0 &&
+      montoACobrar(pedido) > 0 &&
       pedido.pago_estado !== 'PAGADO' &&
       !(pedido.cobros ?? []).length &&
       !contraEntrega;
@@ -1521,7 +1522,7 @@ export class PedidosEstadoService {
       // Lo que entrega el cliente: la venta (plan guardado o un solo renglón con el método) más la propina del pedido
       const renglones = plan.length
         ? plan.map((f) => ({ medio: String(f.medio), monto: aCentimos(f.monto) }))
-        : [{ medio: metodoUpper, monto: aCentimos(pedido.total) }];
+        : [{ medio: metodoUpper, monto: aCentimos(montoACobrar(pedido)) }];
       renglones[0].monto += aCentimos(pedido.propina ?? 0);
       await this.cobros!.cobrar(
         {

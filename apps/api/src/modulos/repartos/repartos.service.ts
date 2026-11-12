@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
   BadRequestException,
   ConflictException,
@@ -290,7 +291,8 @@ export class RepartosService {
       config.muyTardeMin,
     );
 
-    const totalNum = Number(p.total);
+    // Con crédito del personal + delivery el repartidor cobra solo el envío (total - monto_credito)
+    const totalNum = montoACobrar(p);
     // Plan de pago (pago dividido o cambio aprobado en la puerta): el efectivo a cobrar es el renglón EFECTIVO
     const planPago: Array<{ medio: string; monto: number }> = Array.isArray(p.planPago)
       ? p.planPago.map((f: any) => ({ medio: f.medio, monto: Number(f.monto) }))
@@ -383,6 +385,8 @@ export class RepartosService {
       minutosEspera,
       color,
       total: totalNum,
+      total_venta: Number(p.total),
+      monto_credito: Number(p.monto_credito ?? 0),
       cobro,
       pago_estado: p.pago_estado,
       pago_metodo: p.pago_metodo,
@@ -1624,7 +1628,7 @@ export class RepartosService {
         ? efectivoDelPedido(
             (pedido as any).planPago?.map((f: any) => ({ medio: f.medio, monto: Number(f.monto) })),
             pedido.pago_metodo,
-            Number(pedido.total),
+            montoACobrar(pedido),
           )
         : 0;
 
@@ -2201,7 +2205,7 @@ export class RepartosService {
         const lockedRows: any[] = await tx.$queryRaw`
           SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
                  p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng,
-                 p.pago_estado, p.pago_metodo, p.es_personal, p.total
+                 p.pago_estado, p.pago_metodo, p.es_personal, p.total, p.monto_credito
           FROM pedido p
           WHERE p.id IN (${Prisma.join(idsOrdenadosAsc)})
           ORDER BY p.id ASC
@@ -2840,7 +2844,7 @@ export class RepartosService {
    * vuelto, capturas (validadas o pendientes) y cortesías. Solo de pedidos propios.
    */
   private async detalleCobro(p: any) {
-    const total = Number(p.total);
+    const total = montoACobrar(p);
     const propina = Number(p.propina ?? 0);
     const totalCobrable = Math.round((total + propina) * 100) / 100;
     const plan: Array<{ medio: string; monto: number }> =

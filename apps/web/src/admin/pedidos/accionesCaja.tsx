@@ -3,7 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { useSesion } from '../../comun/sesion';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { salonApi } from '../salon/api';
-import { pedidosApi, type Pedido } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, type Pedido } from './pedidosApi';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { ModalCobrar } from './ModalCobrar';
 import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
@@ -49,7 +49,7 @@ export function accionDePedido(p: Pedido, tiene: (permiso: string) => boolean): 
   }
   // Para llevar o mesa, ya listo y sin cobrar: lo que falta es cobrar (el delivery se cobra con el reparto)
   if (est === 'LISTO' && mod !== 'DELIVERY' && !pagado && !coordinado && tiene('caja/cobrar')) {
-    return { tipo: 'cobrar', texto: `COBRAR S/ ${Number(p.total || 0).toFixed(2)}`, bg: '#2F7A45', fg: '#FFFFFF' };
+    return { tipo: 'cobrar', texto: `COBRAR S/ ${montoPorCobrar(p).toFixed(2)}`, bg: '#2F7A45', fg: '#FFFFFF' };
   }
   if (!puedeCambiar) return null;
   if (est === 'COLA' || est === 'NUEVO') {

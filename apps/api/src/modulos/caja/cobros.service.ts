@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { PuntosService } from '../clientes/puntos.service';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { repartirPropina } from '../propinas/propinas.util';
@@ -305,7 +306,8 @@ export class CobrosService {
       // Los montos de los pagos son lo que entrega el cliente por cada medio: venta + propina.
       // Deben sumar exactamente lo que se cobra (en céntimos, sin floats).
       const propinaPedido = Number(pedido.propina ?? 0);
-      const totalPedido = aCentimos(pedido.total) + aCentimos(propinaPedido);
+      // Con crédito del personal + delivery, lo que se cobra es solo el envío (total - monto_credito)
+      const totalPedido = aCentimos(montoACobrar(pedido)) + aCentimos(propinaPedido);
       const totalPagos = dto.pagos.reduce((acc, p) => acc + aCentimos(p.monto), 0);
       const diferencia = totalPagos - totalPedido;
       // Propina por renglón, en proporción a lo cobrado por medio (la venta del renglón es monto - propina)
@@ -369,7 +371,7 @@ export class CobrosService {
         data: {
           pedido_id: pedido.id,
           caja_id: caja.id,
-          total: pedido.total,
+          total: new Prisma.Decimal(montoACobrar(pedido)),
           credito_personal: Boolean(pedido.es_personal),
           cobrado_por: BigInt(usuario.partyId),
           pagos: {
@@ -916,7 +918,10 @@ export class CobrosService {
         pago_estado: p.pago_estado,
         pago_preferido: p.pago_preferido,
         pago_metodo: p.pago_metodo,
-        total: Number(p.total),
+        // Lo que hay que cobrar (con crédito del personal + delivery, solo el envío); total_venta es el total del pedido
+        total: montoACobrar(p),
+        total_venta: Number(p.total),
+        monto_credito: Number(p.monto_credito ?? 0),
         // Propina aparte: el cobro pide venta + propina
         propina: Number(p.propina ?? 0),
         cliente_nombre: p.cliente_nombre,

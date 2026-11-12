@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { aCentimos, enPesos } from '../caja/caja.calculo';
@@ -49,15 +50,15 @@ export class ControlCuadreService {
       const plan = p.planPago ?? [];
       const digital = plan.length
         ? plan.filter((f: any) => DIGITALES.includes(f.medio)).reduce((a: number, f: any) => a + aCentimos(f.monto), 0)
-        : DIGITALES.includes(String(p.pago_metodo)) ? aCentimos(p.total) : 0;
+        : DIGITALES.includes(String(p.pago_metodo)) ? aCentimos(montoACobrar(p)) : 0;
       const efectivo = plan.length
         ? plan.filter((f: any) => f.medio === 'EFECTIVO').reduce((a: number, f: any) => a + aCentimos(f.monto), 0)
-        : p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
+        : p.pago_metodo === 'EFECTIVO' ? aCentimos(montoACobrar(p)) : 0;
       return {
         pedido: p.codigo,
         modalidad: p.modalidad,
         medio: p.pago_metodo,
-        total: enPesos(aCentimos(p.total)),
+        total: enPesos(aCentimos(montoACobrar(p))),
         digitalFueraDeCaja: enPesos(digital),
         efectivo: enPesos(efectivo),
         // Un efectivo sin cobro solo llega a caja por la liquidación del repartidor (delivery entregado)

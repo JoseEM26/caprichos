@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { obtenerFechaHoraLima } from '../local/local.util';
@@ -201,6 +202,7 @@ export function cobroVigente<T extends { anulado_en: Date | null }>(
  */
 export function efectivoDelRepartidor(p: {
   total: unknown;
+  monto_credito?: unknown;
   pago_metodo: string | null;
   cobros: { anulado_en: Date | null; total?: unknown }[];
   /** Plan de pago (pago dividido o cambio de cobro aprobado en la puerta): cuenta solo su renglón EFECTIVO */
@@ -209,11 +211,11 @@ export function efectivoDelRepartidor(p: {
   const cobro = cobroVigente(p.cobros);
   // Un cobro que cubre menos que el pedido es solo la parte digital que se asentó al liquidar al repartidor:
   // su efectivo sigue siendo del repartidor (así la liquidación no cambia al asentar ese cobro)
-  if (cobro && !(cobro.total != null && aCentimos(cobro.total) < aCentimos(p.total))) return 0;
+  if (cobro && !(cobro.total != null && aCentimos(cobro.total) < aCentimos(montoACobrar(p)))) return 0;
   if (p.planPago && p.planPago.length > 0) {
     return p.planPago.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + aCentimos(f.monto), 0);
   }
-  return p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
+  return p.pago_metodo === 'EFECTIVO' ? aCentimos(montoACobrar(p)) : 0;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { Pedido } from './pedidosApi';
+import { montoPorCobrar, type Pedido } from './pedidosApi';
 import { MEDIOS_PLAN, nombreMedio } from './planPago';
 
 /** Medios del filtro «Medio de pago» (mismo orden y nombres que el plan de pago). */
@@ -29,7 +29,7 @@ export function enMedios(p: Pedido, medios: readonly string[]): boolean {
 /** Reparte el total de un pedido entre sus medios: con plan dividido usa sus montos; si no, todo al único medio (o al primero). */
 export function montosPorMedio(p: Pedido): Record<string, number> {
   const out: Record<string, number> = {};
-  const total = Number(p.total || 0);
+  const total = montoPorCobrar(p);
   if (p.planPago?.length) {
     for (const x of p.planPago) out[norm(x.medio)] = (out[norm(x.medio)] ?? 0) + Number(x.monto || 0);
     return out;

@@ -188,6 +188,8 @@ export interface TicketPagoDatos {
   total: number;
   /** Propina aparte de la venta: línea propia en el ticket interno; no entra al comprobante */
   propina?: number;
+  /** Delivery con crédito del personal: parte del total a su crédito; solo `cobrar` (el envío) se paga al contado */
+  creditoPersonal?: { monto: number; cobrar: number } | null;
   /** Cambio de dirección con ajuste todavía sin resolver: saldo por cobrar (SALDO) o devolución pendiente (DEVOLUCION) */
   ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null;
   pagos: { medio: string; monto: number; recibido?: number | null; vuelto?: number | null }[];

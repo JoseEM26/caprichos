@@ -182,7 +182,7 @@ export class CambioCobroService {
     const filas = await this.prisma.solicitudCambioCobro.findMany({
       where: { estado: 'PENDIENTE' },
       orderBy: { solicitado_en: 'asc' },
-      include: { pedido: { select: { id: true, codigo: true, cliente_nombre: true, total: true, propina: true, estado: true, pago_estado: true, paga_con: true } } },
+      include: { pedido: { select: { id: true, codigo: true, cliente_nombre: true, total: true, monto_credito: true, propina: true, estado: true, pago_estado: true, paga_con: true } } },
     });
     const nombres = await nombresDePartes(this.prisma, filas.map((f) => f.solicitado_por_party_id));
     return filas.map((f) => ({

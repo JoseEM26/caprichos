@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -161,6 +162,7 @@ export class AvisosPedidoService {
         cliente_telefono: true,
         modalidad: true,
         total: true,
+        monto_credito: true,
         pago_metodo: true,
         pago_preferido: true,
         canal: true,
@@ -282,7 +284,7 @@ export class AvisosPedidoService {
         monto: Number(f.monto),
       }));
       const digital = plan.length > 0 ? montoDigitalDePlan(plan) : 0;
-      const montoNum = digital > 0 ? digital : Number(pedido.total);
+      const montoNum = digital > 0 ? digital : montoACobrar(pedido);
       const tot = montoNum.toFixed(2);
       const resto = digital > 0 ? Math.round((plan.reduce((a, f) => a + f.monto, 0) - digital) * 100) / 100 : 0;
       const lineaResto = resto > 0 ? `\n• Los S/ ${resto.toFixed(2)} restantes los pagas al recibir tu pedido` : '';
@@ -298,7 +300,7 @@ export class AvisosPedidoService {
     const p = await db.pedido.findUnique({
       where: { id: pedidoId },
       select: {
-        modalidad: true, total: true, subtotal: true, descuento: true, descuento_detalle: true, propina: true, envio: true,
+        modalidad: true, total: true, monto_credito: true, subtotal: true, descuento: true, descuento_detalle: true, propina: true, envio: true,
         entrega_lat: true, entrega_lng: true, zona_id: true, entrega_direccion: true, entrega_referencia: true, mesa_nombre: true,
         cliente_nombre: true, cliente_telefono: true, pago_estado: true,
         comprobante_tipo: true, comprobante_doc: true, comprobante_razon: true, eta_min: true, eta_max: true,
@@ -322,7 +324,7 @@ export class AvisosPedidoService {
     const plan = (p.planPago ?? []).map((f) => ({ medio: String(f.medio).toUpperCase(), monto: Number(f.monto) }));
     // Efectivo a cobrar al recibir: la parte en efectivo del plan, o todo el total si paga solo en efectivo
     const planEfectivo = plan.filter((f) => f.medio === 'EFECTIVO').reduce((a, f) => a + f.monto, 0);
-    const aPagarEfectivo = planEfectivo > 0 ? planEfectivo : metodo === 'EFECTIVO' && !plan.length ? Number(p.total) : 0;
+    const aPagarEfectivo = planEfectivo > 0 ? planEfectivo : metodo === 'EFECTIVO' && !plan.length ? montoACobrar(p) : 0;
 
     // Productos con su detalle; las partes de un combo van bajo su combo con sangría
     const detalleLinea = (l: (typeof p.lineas)[number]): string => {
@@ -361,6 +363,7 @@ export class AvisosPedidoService {
       efectivo: aPagarEfectivo > 0 ? { aPagar: aPagarEfectivo, pagaCon: p.paga_con != null ? Number(p.paga_con) : null } : undefined,
       lineas,
       total: Number(p.total),
+      aCredito: Number(p.monto_credito) > 0 ? Number(p.monto_credito) : null,
       medioPago: nombresMedio[metodo] ?? (metodo ? metodo.toLowerCase() : 'por coordinar'),
       envioPorConfirmar: sinUbicar,
       envio: delivery && !sinUbicar && p.envio != null ? Number(p.envio) : null,

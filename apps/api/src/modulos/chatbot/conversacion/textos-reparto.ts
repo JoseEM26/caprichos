@@ -62,6 +62,8 @@ export interface ResumenRecibido {
   /** Nombre de la oferta o cupón que dio el descuento */
   descuentoNombre?: string | null;
   propina?: number | null;
+  /** Parte del total que va al crédito del personal (delivery): solo el resto se paga al contado */
+  aCredito?: number | null;
   /** Pago dividido: monto por medio (solo se muestra con 2 o más). */
   pagos?: { medio: string; monto: number }[];
   /** Hay parte (o todo) en tarjeta: se cobra con POS al recibir. */
@@ -151,6 +153,10 @@ export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenR
   else if (r.envio != null) totales.push(`Envío: ${r.envio === 0 ? 'gratis' : soles(r.envio)}`);
   if (r.propina != null && r.propina > 0) totales.push(`Propina: ${soles(r.propina)} (aparte del total)`);
   totales.push(`*TOTAL: ${soles(r.total)}*${r.envioPorConfirmar ? ' + envío por confirmar' : ''}`);
+  if (r.aCredito != null && r.aCredito > 0) {
+    totales.push(`A tu crédito del personal: ${soles(r.aCredito)}`);
+    totales.push(r.envioPorConfirmar ? '*Pagas ahora: el envío (por confirmar)*' : `*Pagas ahora: ${soles(Math.max(0, r.total - r.aCredito))}*`);
+  }
 
   const dividido = (r.pagos?.length ?? 0) > 1;
   const pago: string[] = ['*Cómo pagas*'];

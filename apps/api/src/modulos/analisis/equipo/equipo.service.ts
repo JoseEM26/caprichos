@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AsistenciaCorreccionesService, AsistenciaService } from '../../asistencia';
@@ -169,12 +170,12 @@ export class EquipoService {
         where: { estado: 'ENTREGADO', pago_estado: { not: 'PAGADO' }, creado_en: { gte: desde }, cobros: { none: { anulado_en: null } } },
         orderBy: { creado_en: 'asc' },
         take: 500,
-        select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, creado_en: true, planPago: { select: { medio: true, monto: true } } },
+        select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, creado_en: true, planPago: { select: { medio: true, monto: true } } },
       }),
     ]);
     const entregadosSinCobrar = entregados
       .filter((p) => pedidoDebeEstarCobrado(p))
-      .map((p) => ({ id: Number(p.id), codigo: p.codigo, canal: p.canal, modalidad: p.modalidad, estado: p.estado, pagoEstado: p.pago_estado, total: Number(p.total), fecha: p.creado_en }));
+      .map((p) => ({ id: Number(p.id), codigo: p.codigo, canal: p.canal, modalidad: p.modalidad, estado: p.estado, pagoEstado: p.pago_estado, total: montoACobrar(p), fecha: p.creado_en }));
     const lista = <T extends { fecha: Date }>(xs: T[]) => ({
       total: xs.length,
       antiguo: xs.length ? xs.reduce((a, x) => (x.fecha < a ? x.fecha : a), xs[0].fecha) : null,

@@ -20,10 +20,12 @@ export function textoUbicacionAsignada(p: {
   codigo: string;
   envioNuevo: number;
   totalNuevo: number;
+  /** Parte a crédito del personal (delivery): los productos no se pagan, solo el envío */
+  montoCredito?: number;
   ajuste: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null;
   otros: string[];
 }): string {
-  let t = `📍 ¡Recibimos tu ubicación para el pedido ${p.codigo}! Tu envío es ${p.envioNuevo === 0 ? 'gratis' : soles(p.envioNuevo)} y el total de tu pedido es ${soles(p.totalNuevo)}.`;
+  let t = `📍 ¡Recibimos tu ubicación para el pedido ${p.codigo}! Tu envío es ${p.envioNuevo === 0 ? 'gratis' : soles(p.envioNuevo)} ${p.montoCredito && p.montoCredito > 0 ? `; el envío lo pagas al contado y tus productos (${soles(p.montoCredito)}) van a tu crédito del personal.` : ` y el total de tu pedido es ${soles(p.totalNuevo)}.`}`;
   if (p.ajuste?.tipo === 'SALDO') t += ` Como ya pagaste, se ajusta ${soles(p.ajuste.monto)} que Caja te indicará cómo completar.`;
   if (p.ajuste?.tipo === 'DEVOLUCION') t += ` Como ya pagaste, se ajusta a tu favor ${soles(p.ajuste.monto)}: Caja te lo devolverá.`;
   if (p.otros.length > 0) {

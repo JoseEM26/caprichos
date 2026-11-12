@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { PlanPagoEditor } from '../salon/componentes/PlanPagoEditor';
 import { MEDIOS_PLAN, aPlan, errorPlan, montoEfectivoPlan, nombreMedio, planInicial, type FilaPlan, type MedioPlan } from './planPago';
-import { pedidosApi, type Pedido } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, type Pedido } from './pedidosApi';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 const esMedio = (m: string): m is MedioPlan => MEDIOS_PLAN.some((x) => x.id === m);
 
 /** Venta + propina: lo que el plan debe sumar (igual que el servidor). */
-export const totalCobrablePedido = (p: Pick<Pedido, 'total' | 'propina'>) => Math.round((Number(p.total || 0) + Number(p.propina ?? 0)) * 100) / 100;
+export const totalCobrablePedido = (p: Pick<Pedido, 'total' | 'propina' | 'monto_credito'>) => Math.round((montoPorCobrar(p) + Number(p.propina ?? 0)) * 100) / 100;
 
 /** Plan que tiene hoy el pedido, como filas editables. Un cobro «MIXTO» sin renglones arranca en Efectivo por el total. */
 function filasActuales(pedido: Pedido, total: number): FilaPlan[] {

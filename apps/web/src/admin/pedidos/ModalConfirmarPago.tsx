@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
-import { pedidosApi, Pedido } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { digitalesDelPlan, esDeliveryContraEntrega, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
@@ -156,7 +156,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   const lineasTexto =
     pedido.lineas && pedido.lineas.length > 0
       ? pedido.lineas.map((l) => `${l.cantidad}× ${l.nombre}`).join('\n')
-      : `Total a cobrar: S/ ${Number(pedido.total).toFixed(2)}`;
+      : `Total a cobrar: S/ ${montoPorCobrar(pedido).toFixed(2)}`;
   const mostrar = (n: number): React.CSSProperties => ({ display: paso === n ? 'flex' : 'none', flexDirection: 'column', gap: 14 });
 
   return (
@@ -270,7 +270,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
               <div style={tarjeta}>
                 <div style={subtitulo}>Pedido</div>
                 <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)', whiteSpace: 'pre-line', maxHeight: 190, overflowY: 'auto' }}>{lineasTexto}</div>
-                <div style={{ fontSize: 13, fontWeight: 800 }}>Total: S/ {Number(pedido.total).toFixed(2)}</div>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>Total: S/ {montoPorCobrar(pedido).toFixed(2)}</div>
               </div>
             </div>
             <button
@@ -336,7 +336,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
             <SeccionVouchersPedido
               pedidoId={pedido.id}
               recargarClave={voucherSubido}
-              total={pedido.total}
+              total={montoPorCobrar(pedido)}
               medio={medio}
               alCargar={setVouchersPedido}
             />
@@ -394,7 +394,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Pedido</dt>
                 <dd style={{ margin: 0, whiteSpace: 'pre-line' }}>{lineasTexto}</dd>
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Total</dt>
-                <dd style={{ margin: 0, fontWeight: 800 }}>S/ {Number(pedido.total).toFixed(2)}</dd>
+                <dd style={{ margin: 0, fontWeight: 800 }}>S/ {montoPorCobrar(pedido).toFixed(2)}</dd>
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Medio de pago</dt>
                 <dd style={{ margin: 0, fontWeight: 700 }}>{medio}</dd>
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Comprobante</dt>

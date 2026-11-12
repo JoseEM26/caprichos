@@ -488,6 +488,7 @@ export function construirTicketPago(
     // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)
     total: num(pedido.total),
     propina: num(pedido.propina ?? 0),
+    ...(num(pedido.monto_credito) > 0 ? { creditoPersonal: { monto: num(pedido.monto_credito), cobrar: Math.max(0, Math.round((num(pedido.total) - num(pedido.monto_credito)) * 100) / 100) } } : {}),
     // Solo si hay ajuste de cambio de dirección pendiente: sin él, el ticket sale igual que antes
     ...(ajusteUbicacion ? { ajusteUbicacion: { tipo: ajusteUbicacion.tipo, monto: num(ajusteUbicacion.monto) } } : {}),
     pagos: (cobro?.pagos || []).map((p: any) => ({

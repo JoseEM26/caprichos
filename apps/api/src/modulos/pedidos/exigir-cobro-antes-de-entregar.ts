@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { tieneRol } from '../acceso/roles-usuario';
@@ -13,6 +14,8 @@ export interface PedidoParaCobro {
   pago_metodo?: string | null;
   es_personal?: boolean | null;
   total: unknown;
+  /** Parte del total a crédito del personal (delivery): no se cobra al contado */
+  monto_credito?: unknown;
   planPago?: Array<{ medio: string; monto: unknown }> | null;
 }
 
@@ -28,12 +31,14 @@ export function pedidoDebeEstarCobrado(p: PedidoParaCobro): boolean {
   if (p.pago_estado === 'PAGADO') return false;
   // Pedido del personal: se carga a su crédito/planilla, se cobra al final.
   if (p.es_personal) return false;
+  // Crédito del personal + delivery: si no queda envío por cobrar (gratis o aún por confirmar), no hay cobro pendiente
+  if (Number(p.monto_credito ?? 0) > 0 && montoACobrar(p) <= 0) return false;
   if (p.modalidad === 'LLEVAR' || p.modalidad === 'RECOGER') return true;
   if (p.modalidad !== 'DELIVERY') return false;
   const plan = (p.planPago ?? []).map((f) => ({ medio: f.medio, monto: Number(f.monto) }));
   // Efectivo y tarjeta (POS en la puerta) se cobran contra entrega: los rinde el repartidor.
   const contraEntrega = plan.some((f) => f.medio === 'TARJETA' && f.monto > 0) || p.pago_metodo === 'TARJETA';
-  return !contraEntrega && efectivoDelPedido(plan, p.pago_metodo, Number(p.total)) <= 0;
+  return !contraEntrega && efectivoDelPedido(plan, p.pago_metodo, montoACobrar(p)) <= 0;
 }
 
 /** Igual que el criterio puro, pero carga el plan de pago del delivery si hace falta. */

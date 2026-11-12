@@ -4,7 +4,7 @@ import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacio
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { pedidosApi, Pedido, PagoItem, CobrarDto } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, Pedido, PagoItem, CobrarDto } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
@@ -51,7 +51,7 @@ export function ModalCobrar({
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
   const propinaPedido = Number(pedido.propina) || 0;
-  const totalPedido = (Number(pedido.total) || 0) + propinaPedido;
+  const totalPedido = montoPorCobrar(pedido) + propinaPedido;
 
   // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
   const [pagos, setPagos] = useState<FilaPago[]>(() =>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
-import { pedidosApi, PedidoPorCobrar } from './pedidosApi';
+import { pedidosApi, montoPorCobrar, PedidoPorCobrar } from './pedidosApi';
 import { medioDigitalVoucher } from './mediosPago';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
@@ -82,7 +82,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
         </div>
 
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-          Medio: <b>{medio || 'sin medio'}</b> · Total S/ {Number(pedido.total).toFixed(2)}
+          Medio: <b>{medio || 'sin medio'}</b> · Total S/ {montoPorCobrar(pedido).toFixed(2)}
         </div>
 
         {sinUbicar && (

@@ -141,10 +141,27 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     expect(JSON.stringify(cuerpo)).not.toMatch(/pct|porcentaje|colaborador/i);
   });
 
-  it('con delivery la opción de crédito sale deshabilitada con su explicación y no queda elegida', () => {
+  it('con delivery la opción de crédito está disponible y explica que el envío se paga aparte', () => {
     const { container } = render(<SelectorPagoEquipo valor="CONTADO" alCambiar={vi.fn()} puedeCredito={true} esDelivery={true} />);
-    expect(within(container).getByRole('radio', { name: /Cargar a mi crédito del personal/i })).toBeDisabled();
-    expect(within(container).getByRole('radio', { name: /^Pagar al contado/i })).toBeChecked();
-    expect(within(container).getByText(/no aplica a pedidos con delivery/i)).toBeInTheDocument();
+    expect(within(container).getByRole('radio', { name: /Cargar a mi crédito del personal/i })).toBeEnabled();
+    expect(within(container).queryByText(/no aplica a pedidos con delivery/i)).not.toBeInTheDocument();
+    expect(within(container).getByText(/el envío lo pagas ahora/i)).toBeInTheDocument();
+  });
+
+  it('crédito + delivery (envío por confirmar): resume lo que va a crédito, SÍ pide medio de pago y no pide comprobante', async () => {
+    abrirPedido({ esEquipo: true, puedeCredito: true });
+    fireEvent.click(screen.getByRole('button', { name: /^Delivery$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
+    fireEvent.change(await screen.findByLabelText(/Dirección/i), { target: { value: 'Av. Las Palmeras 123' } });
+    fireEvent.change(screen.getByLabelText(/Referencia/i), { target: { value: 'Frente al parque' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    await screen.findByRole('button', { name: /Enviar pedido/i });
+    fireEvent.click(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i }));
+    expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/A tu crédito del personal: S\/ \d+\.\d{2}/);
+    expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/El envío lo pagas ahora/);
+    expect(screen.getByText('Medio de pago')).toBeInTheDocument();
+    expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('propina-carta')).not.toBeInTheDocument();
   });
 });

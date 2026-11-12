@@ -90,6 +90,7 @@ export class EditarPedidoService {
       cupon_id: bigint | null;
       cupon_emitido_id: bigint | null;
       puntos_canjeados: unknown;
+      monto_credito?: unknown;
       salio_en: Date | null;
       lineas: Array<{ es_cortesia: boolean }>;
     },
@@ -105,6 +106,7 @@ export class EditarPedidoService {
     }
     if (pedido.cupon_id || pedido.cupon_emitido_id) return 'Este pedido usó un cupón y no se puede editar.';
     if (Number(pedido.puntos_canjeados ?? 0) > 0) return 'Este pedido canjeó puntos y no se puede editar.';
+    if (Number(pedido.monto_credito ?? 0) > 0) return 'Este pedido se cargó al crédito del personal (con delivery) y no se puede editar. Anúlalo y créalo de nuevo.';
     if (pedido.lineas.some((l) => l.es_cortesia)) return 'Este pedido tiene una cortesía y no se puede editar.';
     if (pedido.salio_en) return 'El repartidor ya salió con este pedido y no se puede editar.';
     return null;

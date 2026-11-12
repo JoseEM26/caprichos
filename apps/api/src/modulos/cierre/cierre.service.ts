@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
   HttpException,
   HttpStatus,
@@ -540,11 +541,11 @@ export class CierreService {
         // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
         const entregados = await tx.pedido.findMany({
           where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO' },
-          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, planPago: { select: { medio: true, monto: true } } },
+          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, planPago: { select: { medio: true, monto: true } } },
           orderBy: { creado_en: 'asc' },
         });
         const sinCobrar = entregados.filter((p: any) => pedidoDebeEstarCobrado(p));
-        const lista = sinCobrar.map((p: any) => ({ id: Number(p.id), codigo: p.codigo, modalidad: p.modalidad, pagoEstado: p.pago_estado, total: Number(p.total) }));
+        const lista = sinCobrar.map((p: any) => ({ id: Number(p.id), codigo: p.codigo, modalidad: p.modalidad, pagoEstado: p.pago_estado, total: montoACobrar(p) }));
         if (cobrosEnCurso > sinCobrar.length) {
           throw new HttpException(
             {
@@ -660,12 +661,12 @@ export class CierreService {
           {
             codigo: 'PAGOS_SIN_COBRO',
             mensaje: `Hay ${sinCobro.length} pedido(s) pagados sin cobro en caja (${sinCobro.map((p: any) => p.codigo).join(', ')}). Su dinero no suma en este cierre: escribe una nota para cerrar y avisa al administrador.`,
-            pedidos: sinCobro.map((p: any) => ({ codigo: p.codigo, total: Number(p.total), medio: p.pago_metodo })),
+            pedidos: sinCobro.map((p: any) => ({ codigo: p.codigo, total: montoACobrar(p), medio: p.pago_metodo })),
           },
           HttpStatus.CONFLICT,
         );
       }
-      pagosSinCobro = sinCobro.map((p: any) => `${p.codigo} S/ ${Number(p.total).toFixed(2)} ${p.pago_metodo ?? ''}`.trim());
+      pagosSinCobro = sinCobro.map((p: any) => `${p.codigo} S/ ${montoACobrar(p).toFixed(2)} ${p.pago_metodo ?? ''}`.trim());
 
       const mediosData = [
         { medio: 'EFECTIVO', sistema: montos.esperadoEfectivo, visto: vistos.efectivo, diferencia: comparacion.difEfectivo },
@@ -1266,13 +1267,15 @@ export class CierreService {
         modalidad: true,
         estado: true,
         total: true,
+        monto_credito: true,
         creado_en: true,
         pago_estado: true,
         cliente_nombre: true,
       },
     });
 
-    return pedidos.map((p) => ({
+    // Crédito del personal + delivery sin envío por cobrar (gratis o por confirmar): no hay nada pendiente de cobro
+    return pedidos.filter((p) => !(Number(p.monto_credito) > 0 && montoACobrar(p) <= 0)).map((p) => ({
       id: Number(p.id),
       codigo: p.codigo,
       canal: p.canal,
@@ -1281,7 +1284,7 @@ export class CierreService {
       pagoEstado: p.pago_estado,
       // Solo el nombre para reconocer el pedido; nunca teléfono ni DNI
       clienteNombre: p.cliente_nombre?.trim() || null,
-      total: enPesos(aCentimos(p.total)),
+      total: montoACobrar(p),
       fecha: p.creado_en,
     }));
   }

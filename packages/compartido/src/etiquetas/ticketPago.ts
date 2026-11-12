@@ -138,6 +138,10 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   p(fila('TOTAL', soles(t.total), c), { negrita: true });
   // Propina aparte: línea propia, no es venta ni va en el comprobante
   if (t.propina && t.propina > 0) p(fila('Propina (aparte)', soles(t.propina), c));
+  if (t.creditoPersonal && t.creditoPersonal.monto > 0) {
+    p(fila('A crédito del personal', soles(t.creditoPersonal.monto), c));
+    p(fila('Cobrar (envío)', soles(t.creditoPersonal.cobrar), c), { negrita: true });
+  }
   // Ajuste por cambio de dirección: solo si queda pendiente (no es venta ni va en el comprobante)
   if (t.ajusteUbicacion) {
     const a = t.ajusteUbicacion;

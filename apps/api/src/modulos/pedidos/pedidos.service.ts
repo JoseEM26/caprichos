@@ -977,16 +977,13 @@ export class PedidosService {
           pctPersonal,
         );
         if (pideCredito) {
-          if (dto.modalidad === 'DELIVERY') {
-            throw new ForbiddenException({ codigo: 'CREDITO_NO_APLICA_DELIVERY', mensaje: 'El crédito del personal no aplica a pedidos con delivery; elige pagar al contado' });
-          }
           colaboradorId = dp.partyTrabajadorId;
           await validarColaborador(this.prisma, colaboradorId); // usuario activo y del personal
           creditoEquipo = true;
         }
       }
     }
-    const personal = colaboradorId !== null;
+    const tieneColaborador = colaboradorId !== null;
     const descuentoAplicado = Number((desgloseDescuento.descuentoTotal + descuentoPersonal).toFixed(2));
     const detallesDescuento: any[] = [
       ...(desgloseDescuento.detalles as any[]),
@@ -1100,11 +1097,18 @@ export class PedidosService {
     // Pedido extra: el envío ya se cobró en el original
     if (origen?.pedidoOrigenId !== undefined) envio = 0;
 
+    // Crédito del personal con delivery: el crédito cubre los productos (ya con su descuento) y el ENVÍO se paga aparte, al
+    // contado. Entonces el pedido NO es «del personal»: es de un cliente normal cuyo cobro pendiente es solo el envío
+    // (total - monto_credito). Con envío ya en S/ 0 no hay nada que cobrar: todo a crédito, como un pedido del personal.
+    // Con envío «por confirmar» (null) nace igual: el envío se cobra cuando se ubique el pedido.
+    const creditoConEnvio = creditoEquipo && dto.modalidad === 'DELIVERY' && envio !== 0;
+    const personal = tieneColaborador && !creditoConEnvio;
+
     // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
     let partyCanje: bigint | string | number | null = null;
     if (puntosCanje > 0) {
-      if (personal || descuentoPersonal > 0) {
+      if (tieneColaborador || descuentoPersonal > 0) {
         throw new BadRequestException({ codigo: 'PUNTOS_NO_APLICAN_PERSONAL', mensaje: 'Con el descuento del equipo no se canjean puntos' });
       }
       // Carta/WhatsApp: la cuenta con sesión. Caja/mozo: SOLO la cuenta elegida en este pedido por celular
@@ -1154,11 +1158,15 @@ export class PedidosService {
 
     // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
     // el pedido del personal no se cobra en caja: ni plan de pago ni vuelto
-    const planPago = personal ? null : this.pagoPlan.validar(dto.pago.plan, aCobrar);
+    // Con crédito + delivery lo que se paga al contado es solo el envío (si aún está por confirmar, no hay nada que validar)
+    const montoCredito = creditoConEnvio ? Number((totalCalculado - (envio ?? 0)).toFixed(2)) : totalCalculado; // el crédito nunca incluye el envío
+    const aCobrarAhora = creditoConEnvio ? Number((envio ?? 0).toFixed(2)) : aCobrar;
+    const sinPagoAhora = personal || (creditoConEnvio && aCobrarAhora <= 0);
+    const planPago = sinPagoAhora ? null : this.pagoPlan.validar(dto.pago.plan, aCobrarAhora);
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
-      : dto.pago.metodo === 'EFECTIVO' && !personal
-        ? aCobrar
+      : dto.pago.metodo === 'EFECTIVO' && !sinPagoAhora
+        ? aCobrarAhora
         : 0;
     // «Con cuánto paga» es OBLIGATORIO con efectivo en cualquier canal (carta, Caja, WhatsApp, bot, extra).
     // Exentos: pedido del personal y cortesía total (montoEfectivo = 0), y la MESA abierta por el personal
@@ -1178,7 +1186,6 @@ export class PedidosService {
     }
 
     // 8.1. Pedido del personal con «Pagar ahora»: permiso, medio, «con cuánto paga» (efectivo) y caja abierta, antes de crear nada
-    const montoCredito = totalCalculado; // el crédito nunca va con delivery: no hay envío
     const cobroAhora = personal && origen?.pagoPersonal?.modo === 'AHORA' ? await this.validarCobroAhoraPersonal(origen, totalCalculado) : null;
 
     // 9. Comprobante (ya validado arriba) y creación en transacción
@@ -1278,6 +1285,7 @@ export class PedidosService {
           nota: dto.nota?.trim() || null,
           pedido_origen_id: origen?.pedidoOrigenId !== undefined ? BigInt(origen.pedidoOrigenId) : null,
           es_personal: personal,
+          monto_credito: new Prisma.Decimal(creditoConEnvio ? montoCredito : 0),
           clave_idempotencia: claveIdempotencia,
           pasa_cocina_en: new Date(),
         },
@@ -1516,6 +1524,8 @@ export class PedidosService {
             trabajador: colaboradorId!.toString(),
             cuentaCliente: String(origen!.clientePartyId),
             montoACredito: montoCredito,
+            montoEnvioAlContado: creditoConEnvio ? aCobrarAhora : 0,
+            envioPorConfirmar: creditoConEnvio && envio === null,
             descuentoPersonal,
           },
         });
@@ -1611,6 +1621,8 @@ export class PedidosService {
       total: totalFinal,
       propina: propinaPedido,
       puntosCanjeados: puntosCanje,
+      montoCredito: creditoConEnvio ? montoCredito : 0,
+      aPagarAhora: creditoConEnvio ? aCobrarAhora : aCobrar,
       mensaje:
         origen?.canal === 'MOZO'
           ? 'Pedido enviado a cocina'

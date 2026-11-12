@@ -23,6 +23,13 @@ describe('pedidoDebeEstarCobrado: qué pedidos exigen cobro antes de entregar', 
     expect(pedidoDebeEstarCobrado({ ...base, modalidad, pago_estado, pago_metodo })).toBe(esperado);
   });
 
+  it('crédito del personal + delivery: el envío por Yape exige cobro; sin envío por cobrar (gratis o por confirmar) no', () => {
+    const credito = { ...base, total: 26, modalidad: 'DELIVERY', pago_metodo: 'YAPE', monto_credito: 21 };
+    expect(pedidoDebeEstarCobrado(credito)).toBe(true);
+    expect(pedidoDebeEstarCobrado({ ...credito, total: 21 })).toBe(false);
+    expect(pedidoDebeEstarCobrado({ ...credito, pago_estado: 'PAGADO' })).toBe(false);
+  });
+
   it('pedido del personal: no exige cobro (se carga a su crédito)', () => {
     expect(pedidoDebeEstarCobrado({ ...base, modalidad: 'LLEVAR', es_personal: true })).toBe(false);
     expect(pedidoDebeEstarCobrado({ ...base, modalidad: 'DELIVERY', pago_metodo: 'YAPE', es_personal: true })).toBe(false);

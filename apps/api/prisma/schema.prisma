@@ -683,6 +683,7 @@ model Pedido {
   estado                 String                  @default("COLA")
   party_id               BigInt?
   es_personal            Boolean                 @default(false)
+  monto_credito          Decimal                 @default(0) @db.Decimal(10, 2)
   cliente_nombre         String?
   cliente_telefono       String?
   entrega_direccion      String?

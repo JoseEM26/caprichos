@@ -1,3 +1,4 @@
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
@@ -119,6 +120,7 @@ export class TareaRecordatorioPagoService {
           cliente_nombre: true,
           cliente_telefono: true,
           total: true,
+          monto_credito: true,
           pago_metodo: true,
           creado_en: true,
         },
@@ -179,7 +181,7 @@ export class TareaRecordatorioPagoService {
               const textoMensaje = TEXTOS_PAGO.pagoRecordatorioCliente(
                 p.cliente_nombre || 'Cliente',
                 p.codigo,
-                Number(p.total),
+                montoACobrar(p),
                 p.pago_metodo || 'digital',
               );
 

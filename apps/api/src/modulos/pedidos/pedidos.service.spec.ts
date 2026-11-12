@@ -613,12 +613,64 @@ describe('PedidosService', () => {
           expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
         });
 
-        it('crédito con delivery: 403 CREDITO_NO_APLICA_DELIVERY y no se crea nada', async () => {
-          await expect(service.crear(dtoCredito({ ...pedidoBaseDto, pagoEquipo: 'CREDITO', pago: { metodo: 'EFECTIVO' } }), 'idemp-credcarta-3', sesion)).rejects.toMatchObject({
-            response: { codigo: 'CREDITO_NO_APLICA_DELIVERY' },
+        describe('crédito + delivery: el crédito cubre los productos y el envío se paga al contado', () => {
+          const dtoDelivery = (extra: any = {}): CrearPedidoDto => ({ ...pedidoBaseDto, pagoEquipo: 'CREDITO', pago: { metodo: 'YAPE' }, ...extra });
+
+          it('envío > 0: pedido normal PENDIENTE con monto_credito; el consumo es por los productos; el pago se valida contra el envío', async () => {
+            await service.crear(dtoDelivery(), 'idemp-creddel-1', sesion);
+            const data = prismaMock.pedido.create.mock.calls[0][0].data;
+            expect(data.es_personal).toBe(false);
+            expect(data.pago_estado).toBe('PENDIENTE');
+            expect(data.pago_metodo).toBe('YAPE'); // el medio del envío, no CREDITO_PERSONAL
+            expect(Number(data.total)).toBe(26); // 28 - 25 % + 5 de envío
+            expect(Number(data.envio)).toBe(5);
+            expect(Number(data.monto_credito)).toBe(21);
+            expect(Number(data.propina)).toBe(0);
+            const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+            expect(c.party_id).toBe(9n);
+            expect(Number(c.monto)).toBe(21);
+            expect(c.pagado_en).toBeUndefined();
+            expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+              expect.objectContaining({ accion: 'CREDITO_PERSONAL_DESDE_CARTA', despues: expect.objectContaining({ montoACredito: 21, montoEnvioAlContado: 5 }) }),
+            );
           });
-          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
-          expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+
+          it('efectivo: «paga con» se compara contra el envío, no contra el total', async () => {
+            await expect(service.crear(dtoDelivery({ pago: { metodo: 'EFECTIVO' } }), 'idemp-creddel-2', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+            await expect(service.crear(dtoDelivery({ pago: { metodo: 'EFECTIVO', pagaCon: 3 } }), 'idemp-creddel-3', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_MENOR_AL_TOTAL' } });
+            expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+            await service.crear(dtoDelivery({ pago: { metodo: 'EFECTIVO', pagaCon: 10 } }), 'idemp-creddel-4', sesion);
+            expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.paga_con)).toBe(10);
+          });
+
+          it('envío gratis: todo a crédito, pedido PAGADO del personal (sin nada que cobrar)', async () => {
+            zonasServiceMock.detectar.mockResolvedValue({ zonaId: 2n, codigo: 'Z3', tarifa: 0 });
+            await service.crear(dtoDelivery(), 'idemp-creddel-5', sesion);
+            const data = prismaMock.pedido.create.mock.calls[0][0].data;
+            expect(data.es_personal).toBe(true);
+            expect(data.pago_estado).toBe('PAGADO');
+            expect(data.pago_metodo).toBe('CREDITO_PERSONAL');
+            expect(Number(data.monto_credito)).toBe(0);
+            expect(Number(prismaMock.consumoPersonal.create.mock.calls[0][0].data.monto)).toBe(21);
+          });
+
+          it('cuenta no vinculada: 403 y no se crea nada', async () => {
+            vincular(false);
+            await expect(service.crear(dtoDelivery(), 'idemp-creddel-6', sesion)).rejects.toMatchObject({ response: { codigo: 'PAGO_EQUIPO_NO_DISPONIBLE' } });
+            expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+            expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+          });
+
+          it('sin ubicación (envío por confirmar): nace PENDIENTE con todo el total de productos a crédito', async () => {
+            await service.crear(dtoDelivery({ entrega: { direccion: 'Av. Las Palmeras 123', referencia: 'Frente al parque' } }), 'idemp-creddel-7', sesion);
+            const data = prismaMock.pedido.create.mock.calls[0][0].data;
+            expect(data.es_personal).toBe(false);
+            expect(data.pago_estado).toBe('PENDIENTE');
+            expect(data.envio).toBeNull();
+            expect(Number(data.total)).toBe(21);
+            expect(Number(data.monto_credito)).toBe(21);
+            expect(Number(prismaMock.consumoPersonal.create.mock.calls[0][0].data.monto)).toBe(21);
+          });
         });
 
         it('usuario inactivo: 403 y no se crea nada', async () => {

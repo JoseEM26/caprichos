@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { useSesion } from '../../comun/sesion';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
-import { LineaPedido, Pedido, pedidosApi } from './pedidosApi';
+import { LineaPedido, Pedido, pedidosApi, montoPorCobrar } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { ModalAnular } from './ModalAnular';
@@ -270,6 +270,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const hora = new Date(pedido.creado_en).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
   const pagoChip = pedido.es_personal
     ? { t: 'Crédito del personal · se paga en su cuenta', bg: '#E3EEF8', fg: 'var(--cp-navy, #0B2C3E)' }
+    : Number(pedido.monto_credito || 0) > 0
+    ? { t: estaPagado ? `Pagado · A crédito del personal S/ ${Number(pedido.monto_credito).toFixed(2)}` : `A crédito del personal S/ ${Number(pedido.monto_credito).toFixed(2)} · Por cobrar S/ ${montoPorCobrar(pedido).toFixed(2)}`, bg: estaPagado ? 'var(--cp-greenbg, #DFF3E3)' : '#FFF0E6', fg: estaPagado ? '#1F5C33' : 'var(--cp-rust, #B2500F)' }
     : estaPagado
     ? { t: 'Pagado', bg: 'var(--cp-greenbg, #DFF3E3)', fg: '#1F5C33' }
     : tienePagoCoordinado
