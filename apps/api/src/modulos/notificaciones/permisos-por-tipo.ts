@@ -48,6 +48,7 @@ export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   WHATSAPP_CONSUMO: ['configuracion/ver'],
   REDIS_CAIDO: ['configuracion/ver'],
   REDIS_RECUPERADO: ['configuracion/ver'],
+  APRENDIZAJES_PROPUESTAS: ['aprendizajes/ver'],
   MENSAJE_INTERNO: [LIBRE],
 };
 

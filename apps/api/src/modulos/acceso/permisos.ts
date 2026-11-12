@@ -234,6 +234,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'escritorio', accion: 'cumpleanos' },
   // Análisis (pestañas por tema, empezando por Tiempos): solo ADMIN y SUPERVISOR. Sin dinero ni datos personales de clientes
   { modulo: 'analisis', accion: 'ver' },
+  // Aprendizajes del bot (propuestas de la noche y conocimiento aprobado): solo ADMIN. ver = leer; aprobar = aprobar, descartar, retirar y ejecutar
+  { modulo: 'aprendizajes', accion: 'ver' },
+  { modulo: 'aprendizajes', accion: 'aprobar' },
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },

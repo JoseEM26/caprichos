@@ -59,10 +59,51 @@ MODO CONVERSACIÓN LIBRE (la IA conversa y consulta; las personas deciden lo del
 - Estilo: tono Capri cálido en español peruano, mensajes cortos con saltos de línea y emojis moderados (máx. 2).
 `.trim();
 
-export function construirPromptSistema(primerNombre?: string, modoLibre = false): string {
+export interface ConocimientoPrompt {
+  tipo: string;
+  intencion: string;
+  pregunta: string;
+  respuesta: string;
+  frases?: unknown;
+}
+
+export const CONOCIMIENTO_MAX_ITEMS = 40;
+export const CONOCIMIENTO_MAX_CARACTERES = 6000;
+
+const plano = (t: unknown): string => String(t ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * Sección «Respuestas aprobadas por Caprichos» con el conocimiento vigente (más recientes primero).
+ * Vacío si no hay nada: el prompt queda igual que sin aprendizaje. Tope de 40 ítems y 6000 caracteres.
+ */
+export function construirSeccionConocimiento(items: ConocimientoPrompt[]): string {
+  const lineas: string[] = [];
+  let total = 0;
+  for (const it of items.slice(0, CONOCIMIENTO_MAX_ITEMS)) {
+    const frases = (Array.isArray(it.frases) ? it.frases : []).map(plano).filter(Boolean).slice(0, 6);
+    const linea =
+      it.tipo === 'DERIVAR'
+        ? `- Si el cliente pregunta algo como «${plano(it.pregunta)}», pasa con una persona (pasarAPersona). ${plano(it.respuesta)}`
+        : it.tipo === 'FRASES'
+          ? `- Cuando el cliente diga ${frases.map((f) => `«${f}»`).join(', ') || `«${plano(it.pregunta)}»`}, entiende: ${plano(it.intencion)}. ${plano(it.respuesta)}`
+          : `- Pregunta: ${plano(it.pregunta)} | Respuesta aprobada: ${plano(it.respuesta)}`;
+    // ponytail: se corta por ítems completos (los más recientes primero); si hace falta más, resumir en vez de recortar
+    if (total + linea.length + 1 > CONOCIMIENTO_MAX_CARACTERES) break;
+    lineas.push(linea);
+    total += linea.length + 1;
+  }
+  if (lineas.length === 0) return '';
+  return `RESPUESTAS APROBADAS POR CAPRICHOS (revisadas por el dueño):
+- Úsalas como guía cuando la duda del cliente coincida con alguna, con tu tono de siempre y breve.
+- Precios, stock y horarios NUNCA salen de esta lista. Si una respuesta aprobada contradice los datos del sistema (lo que devuelven las herramientas), mandan SIEMPRE los datos del sistema.
+${lineas.join('\n')}`;
+}
+
+export function construirPromptSistema(primerNombre?: string, modoLibre = false, conocimiento = ''): string {
   const saludoPersonalizado = primerNombre && primerNombre !== 'Cliente'
     ? `\n\nEl primer nombre del cliente es "${primerNombre}". Trátale con cordialidad llamándole por su nombre si resulta natural.`
     : '';
+  const aprendido = conocimiento ? `\n\n${conocimiento}` : '';
 
-  return `${PROMPT_SISTEMA_CAPRI}${modoLibre ? `\n\n${PROMPT_MODO_LIBRE}` : ''}${saludoPersonalizado}`;
+  return `${PROMPT_SISTEMA_CAPRI}${modoLibre ? `\n\n${PROMPT_MODO_LIBRE}` : ''}${aprendido}${saludoPersonalizado}`;
 }

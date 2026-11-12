@@ -4,6 +4,7 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { IaHerramientasService } from './ia-herramientas.service';
 import { IaConsumoService } from './ia-consumo.service';
 import { construirPromptSistema } from './prompt-sistema';
+import { ConocimientoBotService } from './conocimiento-bot.service';
 import {
   enmascararDatosSensibles,
   extraerPrimerNombre,
@@ -48,6 +49,7 @@ export class ChatbotIaService {
     private readonly herramientasService: IaHerramientasService,
     private readonly consumoService: IaConsumoService,
     private readonly redisService: RedisService,
+    @Optional() private readonly conocimiento?: ConocimientoBotService,
   ) {
     this.apiKey = this.configService.get<string>('OPENAI_API_KEY', '').trim();
     this.modelo = this.configService.get<string>('OPENAI_MODEL', 'gpt-4o-mini').trim();
@@ -206,7 +208,7 @@ export class ChatbotIaService {
       };
     }
 
-    const promptSistema = construirPromptSistema(nombreLimpio, modoLibre);
+    const promptSistema = construirPromptSistema(nombreLimpio, modoLibre, (await this.conocimiento?.seccionPrompt()) ?? '');
     const textoUsuarioEnmascarado = enmascararDatosSensibles(textoUsuario);
     const historialEnmascarado = prepararHistorialPrivado(historialReciente || [], modoLibre ? 15 : 6);
 
@@ -462,6 +464,41 @@ export class ChatbotIaService {
       }
 
       return await res.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Pide a OpenAI una respuesta JSON (mismo modelo y clave que la IA de dudas). Para trabajos internos como el
+   * aprendizaje nocturno: no usa herramientas ni toca el consumo del chat. Devuelve el texto y los tokens reales.
+   */
+  async completarJson(
+    mensajes: MensajeOpenAI[],
+    maxTokens = 1500,
+  ): Promise<{ texto: string; tokensEntrada: number; tokensSalida: number }> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
+        body: JSON.stringify({
+          model: this.modelo,
+          messages: mensajes,
+          temperature: 0.2,
+          max_tokens: maxTokens,
+          response_format: { type: 'json_object' },
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`OpenAI API error [${res.status}]`);
+      const j: any = await res.json();
+      return {
+        texto: String(j.choices?.[0]?.message?.content ?? ''),
+        tokensEntrada: Number(j.usage?.prompt_tokens) || 0,
+        tokensSalida: Number(j.usage?.completion_tokens) || 0,
+      };
     } finally {
       clearTimeout(timeoutId);
     }

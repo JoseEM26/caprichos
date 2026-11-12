@@ -29,7 +29,7 @@ export const NOMBRES_MODULO: Record<string, string> = {
   comprobantes: 'Comprobantes', reclamos: 'Reclamos', ofertas: 'Ofertas', cupones: 'Cupones', clientes: 'Clientes', puntos: 'Puntos',
   compras: 'Compras', proveedores: 'Proveedores', pedidos_proveedor: 'Pedidos a proveedor', almacen: 'Almacén', produccion: 'Producción',
   creditos: 'Créditos', iniciativas: 'Iniciativas', mensajes: 'Mensajes de WhatsApp', whatsapp_salientes: 'Avisos de WhatsApp enviados',
-  encuestas: 'Encuestas', analisis: 'Análisis', informes: 'Reportes', indicadores: 'Indicadores', notificaciones: 'Notificaciones', carta_diseno: 'Diseñador de la carta',
+  encuestas: 'Encuestas', analisis: 'Análisis', aprendizajes: 'Aprendizajes del bot', informes: 'Reportes', indicadores: 'Indicadores', notificaciones: 'Notificaciones', carta_diseno: 'Diseñador de la carta',
   novedades: 'Novedades', conocenos: 'Conócenos', paleta: 'Paleta de colores', resenas: 'Reseñas de Google', destacadas: 'Destacadas', mensajes_carta: 'Mensajes de la carta', pantallas: 'Pantallas', escritorio: 'Escritorio',
   vouchers: 'Vouchers', asistencia: 'Asistencia', mascota: 'Mascota', propinas: 'Propinas',
 };

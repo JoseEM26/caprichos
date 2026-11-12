@@ -61,6 +61,7 @@ export const TIPOS_NOTIFICACION: Record<string, string> = {
   VOUCHER_IA_RECUPERADA: 'Lectura de vouchers con IA recuperada',
   VOUCHER_IA_TOPE: 'Tope mensual de IA de vouchers',
   WHATSAPP_CONSUMO: 'Mensajes de WhatsApp del mes',
+  APRENDIZAJES_PROPUESTAS: 'Propuestas del bot',
 };
 
 export const COLORES_NOTIFICACION: Record<string, string> = {

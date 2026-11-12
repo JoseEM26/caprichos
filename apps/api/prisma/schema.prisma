@@ -20,6 +20,9 @@ model ControlSistema {
 // ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
 
 model Party {
+  aprendizajesDecididos AprendizajePropuesto[] @relation("AprendizajeDecididoPor")
+  conocimientosAprobados ConocimientoBot[] @relation("ConocimientoAprobadoPor")
+  conocimientosRetirados ConocimientoBot[] @relation("ConocimientoRetiradoPor")
   cortesiasDadas       Cortesia[] @relation("CortesiaDadaPor")
   cortesiasAutorizadas Cortesia[] @relation("CortesiaAutorizadaPor")
   id                       BigInt                 @id @default(autoincrement())
@@ -3349,4 +3352,75 @@ model CartaEvento {
   @@index([creado_en])
   @@index([sesion_id])
   @@map("carta_evento")
+}
+
+/// «Bot que aprende»: una fila por noche de trabajo (fecha = día de Lima de los chats leídos).
+model AprendizajeNoche {
+  id                     BigInt    @id @default(autoincrement())
+  fecha                  DateTime  @unique @db.Date
+  estado                 String    @default("EN_CURSO") @db.VarChar(12) // OK | TOPE | SIN_IA | ERROR | EN_CURSO
+  chats_leidos           Int       @default(0)
+  descartados_fuera_tema Int       @default(0)
+  propuestas             Int       @default(0)
+  tokens_entrada         Int       @default(0)
+  tokens_salida          Int       @default(0)
+  usd_estimado           Decimal   @default(0) @db.Decimal(10, 4)
+  error                  String?
+  creado_en              DateTime  @default(now()) @db.Timestamptz
+  terminado_en           DateTime? @db.Timestamptz
+
+  items AprendizajePropuesto[]
+
+  @@map("aprendizaje_noche")
+}
+
+model AprendizajePropuesto {
+  id           BigInt    @id @default(autoincrement())
+  noche_id     BigInt
+  tipo         String    @db.VarChar(8) // FAQ | FRASES | DERIVAR
+  intencion    String    @db.VarChar(80)
+  pregunta     String
+  respuesta    String
+  frases       Json      @default("[]")
+  repeticiones Int       @default(1)
+  /// [{conversacionId, extracto}] ya anonimizado, ≤ 300 caracteres
+  evidencia    Json      @default("[]")
+  estado       String    @default("PENDIENTE") @db.VarChar(10) // PENDIENTE | APROBADO | DESCARTADO
+  decidido_por BigInt?
+  decidido_en  DateTime? @db.Timestamptz
+  motivo       String?
+  creado_en    DateTime  @default(now()) @db.Timestamptz
+
+  noche        AprendizajeNoche @relation(fields: [noche_id], references: [id])
+  decididoPor  Party?           @relation("AprendizajeDecididoPor", fields: [decidido_por], references: [id])
+  conocimientos ConocimientoBot[]
+
+  @@index([estado, creado_en])
+  @@index([noche_id])
+  @@map("aprendizaje_propuesto")
+}
+
+/// Lo aprobado por el ADMIN: alimenta la sección «Respuestas aprobadas por Caprichos» del prompt de la IA de dudas.
+model ConocimientoBot {
+  id             BigInt    @id @default(autoincrement())
+  version        Int       @unique
+  tipo           String    @db.VarChar(8)
+  intencion      String    @db.VarChar(80)
+  pregunta       String
+  respuesta      String
+  frases         Json      @default("[]")
+  estado         String    @default("VIGENTE") @db.VarChar(10) // VIGENTE | RETIRADO
+  aprendizaje_id BigInt?
+  aprobado_por   BigInt
+  aprobado_en    DateTime  @default(now()) @db.Timestamptz
+  retirado_por   BigInt?
+  retirado_en    DateTime? @db.Timestamptz
+  motivo_retiro  String?
+
+  aprendizaje AprendizajePropuesto? @relation(fields: [aprendizaje_id], references: [id], onDelete: SetNull)
+  aprobadoPor Party                 @relation("ConocimientoAprobadoPor", fields: [aprobado_por], references: [id])
+  retiradoPor Party?                @relation("ConocimientoRetiradoPor", fields: [retirado_por], references: [id])
+
+  @@index([estado, aprobado_en])
+  @@map("conocimiento_bot")
 }

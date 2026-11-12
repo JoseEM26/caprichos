@@ -6,3 +6,5 @@ export { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto'
 export type { ResultadoEnvioWhatsApp, WhatsAppMensajeriaPuerto } from './puerto/whatsapp-mensajeria.puerto';
 export { ConsumoWhatsappService } from './configuracion/consumo-whatsapp.service';
 export { enmascararTelefono } from './utilidades/enmascarar.util';
+export { ChatbotIaService } from './ia/chatbot-ia.service';
+export { ConocimientoBotService } from './ia/conocimiento-bot.service';

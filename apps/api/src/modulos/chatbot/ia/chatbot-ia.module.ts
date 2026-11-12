@@ -6,6 +6,7 @@ import { LocalModule } from '../../local/local.module';
 import { ZonasModule } from '../../zonas/zonas.module';
 import { IaHerramientasService } from './ia-herramientas.service';
 import { IaConsumoService } from './ia-consumo.service';
+import { ConocimientoBotService } from './conocimiento-bot.service';
 import { ChatbotIaService } from './chatbot-ia.service';
 import { IaConsumoController } from './ia-consumo.controller';
 
@@ -22,11 +23,13 @@ import { IaConsumoController } from './ia-consumo.controller';
     IaHerramientasService,
     IaConsumoService,
     ChatbotIaService,
+    ConocimientoBotService,
   ],
   exports: [
     IaHerramientasService,
     IaConsumoService,
     ChatbotIaService,
+    ConocimientoBotService,
   ],
 })
 export class ChatbotIaModule {}

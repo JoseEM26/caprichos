@@ -33,6 +33,7 @@ import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
 import { EscritorioModule } from './modulos/escritorio/escritorio.module';
 import { AnalisisModule } from './modulos/analisis';
+import { AprendizajesModule } from './modulos/aprendizajes';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
 import { StockModule } from './modulos/stock/stock.module';
 import { ComprasModule } from './modulos/compras/compras.module';
@@ -94,6 +95,7 @@ import { CartaEventosModule } from './modulos/carta-eventos';
     NotificacionesModule,
     EscritorioModule,
     AnalisisModule,
+    AprendizajesModule,
     InformesModule,
     OfertasModule,
     ClientesModule,
