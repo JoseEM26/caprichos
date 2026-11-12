@@ -7,12 +7,14 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { formatearUnidad, qty1 } from './formato';
+import { useSesion } from '../../comun/sesion';
 
 interface RecetasTabProps {
   insumos: InsumoItem[];
 }
 
 export function RecetasTab({ insumos }: RecetasTabProps) {
+  const puedeEditar = useSesion().tiene('recetas/editar');
   const [productos, setProductos] = useState<ProductoRecetaItem[]>([]);
   const [totalProductos, setTotalProductos] = useState(0);
   const [platosSinMargen, setPlatosSinMargen] = useState(0);
@@ -26,6 +28,13 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
   // Receta seleccionada para visualización en vivo
   const [recetaActivaIdx, setRecetaActivaIdx] = useState(0);
   const [detalleActivo, setDetalleActivo] = useState<RecetaProductoDetalle | null>(null);
+
+  // Receta por sabor: null = General
+  const [saborSel, setSaborSel] = useState<string | null>(null);
+  const [ruSaborId, setRuSaborId] = useState<string | null>(null);
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false);
+  const [quitando, setQuitando] = useState(false);
+  const [avisoSabor, setAvisoSabor] = useState('');
 
   // Modal «Editar receta»
   const [modalRuAbierto, setModalRuAbierto] = useState(false);
@@ -67,6 +76,8 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
 
   const seleccionarReceta = async (idx: number) => {
     setRecetaActivaIdx(idx);
+    setSaborSel(null);
+    setAvisoSabor('');
     const prod = productos[idx];
     if (prod) {
       try {
@@ -79,13 +90,43 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
     }
   };
 
-  const abrirModalRu = async (prodId?: string) => {
+  /** Cambia entre «General» y un sabor del producto activo. */
+  const seleccionarSabor = async (saborId: string | null) => {
+    const prod = productos[recetaActivaIdx] || productos[0];
+    if (!prod) return;
+    setSaborSel(saborId);
+    setAvisoSabor('');
+    try {
+      setDetalleActivo(await stockApi.obtenerReceta(prod.id, saborId));
+    } catch (err: any) {
+      setAvisoSabor(err.message || 'No se pudo cargar la receta de este sabor');
+    }
+  };
+
+  const quitarRecetaDelSabor = async () => {
+    const prod = productos[recetaActivaIdx] || productos[0];
+    if (!prod || !saborSel) return;
+    setQuitando(true);
+    try {
+      setDetalleActivo(await stockApi.quitarRecetaSabor(prod.id, saborSel));
+      setConfirmarQuitar(false);
+    } catch (err: any) {
+      setConfirmarQuitar(false);
+      setAvisoSabor(err.message || 'No se pudo quitar la receta del sabor');
+    } finally {
+      setQuitando(false);
+    }
+  };
+
+  const abrirModalRu = async (prodId?: string, saborId: string | null = null) => {
     const targetId = prodId || ruProductoId || productos[0]?.id;
     if (!targetId) return;
     setRuProductoId(targetId);
+    setRuSaborId(saborId);
     setRuMensaje('');
     try {
-      const det = await stockApi.obtenerReceta(targetId);
+      // Con sabor sin receta propia llegan las líneas de la general: sirven de punto de partida
+      const det = await stockApi.obtenerReceta(targetId, saborId);
       const prodItem = productos.find((p) => p.id === targetId);
       const esProd = det.esProduccion ?? prodItem?.esProduccion ?? false;
       const rindeVal = det.rinde ?? prodItem?.rinde ?? 1;
@@ -125,12 +166,18 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
       await stockApi.guardarReceta(ruProductoId, {
         tamano_valor_id: detalleActivo?.tamanos[0]?.tamanoId || null,
         es_produccion: ruEsProduccion,
+        sabor_id: ruSaborId,
         rinde: ruEsProduccion ? (parseFloat(ruRinde) || 1) : undefined,
         lineas: ruLineas.map((l) => ({ insumo_id: l.insumoId, cantidad: l.cantidad })),
       });
       setConfirmarGuardarRu(false);
       setModalRuAbierto(false);
-      await cargarLista();
+      if (ruSaborId) {
+        setSaborSel(ruSaborId);
+        setDetalleActivo(await stockApi.obtenerReceta(ruProductoId, ruSaborId));
+      } else {
+        await cargarLista();
+      }
     } catch (err: any) {
       setRuMensaje(err.message || 'Error al guardar receta');
     } finally {
@@ -253,6 +300,62 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
                 </button>
               ))}
             </div>
+
+            {/* Receta por sabor */}
+            {(detalleActivo?.sabores?.length ?? 0) > 0 && (
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div role="group" aria-label="Receta para" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>Receta para:</span>
+                  {[{ id: null as string | null, nombre: 'General', propia: true, costo: null as number | null }, ...(detalleActivo?.sabores ?? []).map((x) => ({ id: x.id as string | null, nombre: x.nombre, propia: x.tieneRecetaPropia, costo: x.costo }))].map((o) => (
+                    <button
+                      key={o.id ?? 'general'}
+                      type="button"
+                      aria-pressed={saborSel === o.id}
+                      onClick={() => seleccionarSabor(o.id)}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 12px',
+                        borderRadius: 9999,
+                        border: '1.5px solid var(--cp-navy)',
+                        background: saborSel === o.id ? 'var(--cp-navy)' : 'transparent',
+                        color: saborSel === o.id ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {o.nombre}
+                      {o.id && (o.propia ? ' · propia' : ' · general')}
+                      {o.id && o.costo != null ? ` · s/ ${o.costo.toFixed(2)}` : ''}
+                    </button>
+                  ))}
+                </div>
+                {saborSel && detalleActivo?.usaGeneral && (
+                  <div role="status" style={{ fontSize: 13, background: 'var(--cp-sand)', borderRadius: 8, padding: '8px 12px' }}>
+                    Este sabor no tiene receta propia: usa la receta general (lo de abajo es la general).
+                  </div>
+                )}
+                {saborSel && puedeEditar && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {detalleActivo?.usaGeneral ? (
+                      <button type="button" onClick={() => abrirModalRu(undefined, saborSel)} style={{ minHeight: 44, padding: '0 14px', borderRadius: 12, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer' }}>
+                        Crear receta propia para este sabor
+                      </button>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => abrirModalRu(undefined, saborSel)} style={{ minHeight: 44, padding: '0 14px', borderRadius: 12, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer' }}>
+                          Editar receta del sabor
+                        </button>
+                        <button type="button" onClick={() => setConfirmarQuitar(true)} style={{ minHeight: 44, padding: '0 14px', borderRadius: 12, border: '1.5px solid var(--cp-rust)', background: 'transparent', color: 'var(--cp-rust)', fontWeight: 700, cursor: 'pointer' }}>
+                          Quitar receta del sabor (volver a la general)
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {avisoSabor && <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: 13 }}>{avisoSabor}</div>}
+              </div>
+            )}
 
             {/* Identificador de tipo en la receta activa */}
             <div style={{ padding: '8px 16px', background: 'var(--cp-cream)', borderBottom: '1px solid var(--cp-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -494,6 +597,7 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', marginTop: 2 }}>
                   {productos.find((p) => p.id === ruProductoId)?.nombre || 'Producto'}
+                  {ruSaborId ? ` · Sabor ${detalleActivo?.sabores?.find((x) => x.id === ruSaborId)?.nombre ?? ''}` : ''}
                 </div>
               </div>
               <button
@@ -754,6 +858,18 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
             </div>
           </div>
         </>
+      )}
+
+      {confirmarQuitar && (
+        <Confirmar
+          abierto={confirmarQuitar}
+          titulo="¿Quitar la receta de este sabor?"
+          mensaje="El sabor volverá a usar la receta general. Lo ya consumido no cambia."
+          textoConfirmar="Sí, quitar"
+          cargando={quitando}
+          alConfirmar={quitarRecetaDelSabor}
+          alCancelar={() => setConfirmarQuitar(false)}
+        />
       )}
 
       {/* Confirmación Sí/No antes de guardar */}

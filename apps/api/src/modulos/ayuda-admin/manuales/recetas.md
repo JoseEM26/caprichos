@@ -42,6 +42,15 @@ Ver tambien: [[productos]]
 3. Pulsa "Guardar receta" y confirma los cambios seleccionando "Si, continuar".
 Ver tambien: [[stock]]
 
+## Como se hace: Receta propia de un sabor
+1. En la tarjeta de la receta, busca la fila "Receta para:". Si el producto tiene sabores (donas, galletas), veras "General" y un boton por sabor. Cada sabor dice si tiene receta "propia" o usa la "general", con su costo.
+2. Pulsa el sabor. Si usa la general, te lo avisa: lo que ves es la receta general.
+3. Pulsa "Crear receta propia para este sabor". El editor se abre con la receta general como punto de partida: cambia los insumos o cantidades y pulsa "Guardar", luego "Si, guardar receta".
+4. Para editarla despues, entra al sabor y pulsa "Editar receta del sabor".
+5. Para que el sabor vuelva a la receta general, pulsa "Quitar receta del sabor (volver a la general)" y confirma con "Si, quitar". Lo ya consumido no cambia.
+Al marcar "Listo" en [[cocina]], cada sabor descuenta su receta propia; si no tiene, descuenta la general. Si el control de almacen esta apagado, puedes preparar las recetas igual, pero aun no se descuenta stock.
+Ver tambien: [[almacen]]
+
 ## Como se hace: Evaluar el costo de materia prima y margen
 1. Dentro de la ficha tecnica del producto, observa el bloque de calculo de costos en la parte inferior o lateral.
 2. El sistema multiplica la porcion de cada ingrediente por su costo de compra promedio para calcular el "Costo total de insumos".

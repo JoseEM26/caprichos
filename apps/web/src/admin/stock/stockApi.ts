@@ -165,15 +165,20 @@ export const stockApi = {
     }
   },
 
-  obtenerReceta: async (productoId: string): Promise<RecetaProductoDetalle> => {
-    return await api.get<RecetaProductoDetalle>(`/admin/stock/recetas/${productoId}`);
+  obtenerReceta: async (productoId: string, saborId?: string | null): Promise<RecetaProductoDetalle> => {
+    const q = saborId ? `?sabor_id=${encodeURIComponent(saborId)}` : '';
+    return await api.get<RecetaProductoDetalle>(`/admin/stock/recetas/${productoId}${q}`);
   },
+
+  quitarRecetaSabor: (productoId: string, saborId: string) =>
+    api.delete<RecetaProductoDetalle>(`/admin/stock/recetas/${productoId}/sabor/${saborId}`),
 
   guardarReceta: (
     productoId: string,
     data: {
       tamano_valor_id?: string | null;
       es_produccion?: boolean;
+      sabor_id?: string | null;
       rinde?: number;
       lineas: Array<{ insumo_id: string; cantidad: number }>;
     },

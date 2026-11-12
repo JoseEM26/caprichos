@@ -145,8 +145,9 @@ export class RecetasService {
    * GET /admin/recetas/:productoId
    * Ficha completa de la receta de un producto con desglose por tamaño, costo y margen.
    */
-  async obtenerRecetaProducto(productoId: bigint | string | number) {
+  async obtenerRecetaProducto(productoId: bigint | string | number, saborIdEntrada?: bigint | string | number | null) {
     const id = this.parsearId(productoId, 'producto');
+    const saborId = saborIdEntrada ? this.parsearId(saborIdEntrada, 'sabor') : null;
 
     const producto = await this.prisma.producto.findUnique({
       where: { id },
@@ -160,9 +161,8 @@ export class RecetasService {
             tamano_valor_id: 'asc',
           },
         },
-        // La pantalla de recetas sigue trabajando con la receta general; las de sabor se guardan con `sabor_id`
+        // Generales (sabor vacío) y las de sabor; abajo se arma la que aplica al sabor pedido
         recetas: {
-          where: { sabor_id: null },
           include: {
             lineas: {
               include: {
@@ -171,6 +171,7 @@ export class RecetasService {
             },
           },
         },
+        sabores: { where: { activo: true }, orderBy: { nombre: 'asc' } },
       },
     });
 
@@ -180,20 +181,54 @@ export class RecetasService {
         mensaje: 'El producto no existe',
       });
     }
+    if (saborId && !producto.sabores.some((s) => s.id === saborId)) {
+      throw new BadRequestException({ codigo: 'SABOR_INVALIDO', mensaje: 'El sabor no pertenece a este producto' });
+    }
 
-    const tieneReceta = producto.recetas.some((r) => r.lineas.length > 0);
-    const recetaProd = producto.recetas.find((r) => r.es_produccion && r.lineas.length > 0);
-    const recetaVenta = producto.recetas.find((r) => !r.es_produccion && r.lineas.length > 0);
-    const recetaActiva = recetaProd || recetaVenta || producto.recetas[0];
+    const todas = producto.recetas;
+    // Receta que aplica a un sabor: la propia (con líneas) por tamaño; si no, la general (mismo criterio del consumo)
+    const aplicable = (sid: bigint | null) => {
+      const generales = todas.filter((r) => r.sabor_id == null);
+      if (sid == null) return generales;
+      const porTamano = new Map(generales.map((r) => [String(r.tamano_valor_id ?? 'null'), r]));
+      for (const r of todas) if (r.sabor_id === sid && r.lineas.length) porTamano.set(String(r.tamano_valor_id ?? 'null'), r);
+      return [...porTamano.values()];
+    };
+    const costoDe = (r: (typeof todas)[number] | undefined) => {
+      if (!r || r.lineas.length === 0) return null;
+      let suma = 0;
+      for (const l of r.lineas) suma += Number(l.cantidad) * ((Number(l.insumo.costo_unit) || 0) / (Number(l.insumo.factor_receta) || 1));
+      return r.es_produccion && r.rinde && Number(r.rinde) > 0 ? suma / Number(r.rinde) : suma;
+    };
+    const primerTam = producto.tamanos[0]?.tamano_valor_id;
+    const sabores = producto.sabores.map((s) => {
+      const propias = todas.filter((r) => r.sabor_id === s.id && r.lineas.length > 0);
+      const efectiva = aplicable(s.id);
+      const rec = efectiva.find((r) => r.tamano_valor_id === primerTam) ?? efectiva.find((r) => r.tamano_valor_id === null) ?? efectiva[0];
+      const c = costoDe(rec);
+      return {
+        id: s.id.toString(),
+        nombre: s.nombre,
+        tieneRecetaPropia: propias.length > 0,
+        costo: c == null ? null : Math.round(c * 100) / 100,
+      };
+    });
+    const usaGeneral = saborId ? !todas.some((r) => r.sabor_id === saborId && r.lineas.length > 0) : false;
+    const recetasAplicables = aplicable(saborId);
+
+    const tieneReceta = recetasAplicables.some((r) => r.lineas.length > 0);
+    const recetaProd = recetasAplicables.find((r) => r.es_produccion && r.lineas.length > 0);
+    const recetaVenta = recetasAplicables.find((r) => !r.es_produccion && r.lineas.length > 0);
+    const recetaActiva = recetaProd || recetaVenta || recetasAplicables[0];
     const esProduccion = Boolean(recetaProd && (!recetaVenta || recetaProd === recetaActiva));
     const tipoReceta = tieneReceta ? (esProduccion ? 'PRODUCCION' : 'VENTA') : 'NINGUNA';
     const rinde = recetaActiva?.rinde ? Number(recetaActiva.rinde) : null;
 
-    const recetaGeneral = producto.recetas.find((r) => r.tamano_valor_id === null) || producto.recetas[0];
+    const recetaGeneral = recetasAplicables.find((r) => r.tamano_valor_id === null) || recetasAplicables[0];
 
     const tamanos = producto.tamanos.map((pt) => {
       const receta =
-        producto.recetas.find((r) => r.tamano_valor_id === pt.tamano_valor_id) ||
+        recetasAplicables.find((r) => r.tamano_valor_id === pt.tamano_valor_id) ||
         recetaGeneral;
 
       let costoTotal: number | null = null;
@@ -252,7 +287,57 @@ export class RecetasService {
       tipoReceta,
       rinde,
       tamanos,
+      saborId: saborId?.toString() ?? null,
+      usaGeneral,
+      sabores,
     };
+  }
+
+  /**
+   * DELETE /admin/recetas/:productoId/sabor/:saborId
+   * Quita la receta propia del sabor (todas sus variantes de tamaño): el sabor vuelve a usar la general.
+   */
+  async quitarRecetaSabor(
+    productoId: bigint | string | number,
+    saborIdEntrada: bigint | string | number,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const id = this.parsearId(productoId, 'producto');
+    const saborId = this.parsearId(saborIdEntrada, 'sabor');
+    const sabor = await this.prisma.sabor.findUnique({ where: { id: saborId }, select: { producto_id: true } });
+    if (!sabor || sabor.producto_id !== id) {
+      throw new BadRequestException({ codigo: 'SABOR_INVALIDO', mensaje: 'El sabor no pertenece a este producto' });
+    }
+    const previas = await this.prisma.receta.findMany({
+      where: { producto_id: id, sabor_id: saborId },
+      include: { lineas: true },
+    });
+    if (previas.length === 0) {
+      throw new NotFoundException({ codigo: 'RECETA_SABOR_NO_EXISTE', mensaje: 'Este sabor no tiene receta propia' });
+    }
+    const ids = previas.map((r) => r.id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.recetaLinea.deleteMany({ where: { receta_id: { in: ids } } });
+      await tx.receta.deleteMany({ where: { id: { in: ids } } });
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'recetas',
+      accion: 'QUITAR_RECETA_SABOR',
+      resultado: 'OK',
+      entidad: 'receta',
+      entidadId: ids[0],
+      antes: {
+        productoId: id.toString(),
+        saborId: saborId.toString(),
+        lineas: previas.flatMap((r) => r.lineas.map((l) => ({ insumo_id: l.insumo_id.toString(), cantidad: l.cantidad.toString() }))),
+      },
+      despues: null,
+      partyId: usuario.partyId,
+      ip,
+    });
+    return this.obtenerRecetaProducto(id, saborId);
   }
 
   /**
@@ -393,6 +478,7 @@ export class RecetasService {
       despues: {
         productoId: id.toString(),
         tamanoValorId: tamanoValorId?.toString() ?? null,
+        saborId: saborId?.toString() ?? null,
         lineas: dto.lineas.map((l) => ({
           insumo_id: l.insumo_id.toString(),
           cantidad: l.cantidad.toString(),
@@ -402,7 +488,7 @@ export class RecetasService {
       ip,
     });
 
-    return this.obtenerRecetaProducto(id);
+    return this.obtenerRecetaProducto(id, saborId);
   }
 
   /**

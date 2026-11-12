@@ -17,6 +17,7 @@ import { StockController } from './stock.controller';
 import { InsumosService } from './insumos.service';
 import { StockService } from './stock.service';
 import { RecetasService } from './recetas.service';
+import { CLAVE_PERMISO } from '../acceso/permiso.decorator';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
@@ -53,6 +54,7 @@ describe('StockController', () => {
       listarProductosConMargen: jest.fn().mockResolvedValue({ productos: [] }),
       obtenerRecetaProducto: jest.fn().mockResolvedValue({ productoId: '1' }),
       guardarReceta: jest.fn().mockResolvedValue({ productoId: '1' }),
+      quitarRecetaSabor: jest.fn().mockResolvedValue({ productoId: '1' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -72,6 +74,15 @@ describe('StockController', () => {
 
   it('debe estar definido', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('receta por sabor: la lectura pasa sabor_id y quitar exige recetas/editar', async () => {
+    await controller.obtenerReceta('1', '5');
+    expect(recetasService.obtenerRecetaProducto).toHaveBeenCalledWith('1', '5');
+    await controller.quitarRecetaSabor('1', '5', { usuario: { partyId: 1n } });
+    expect(recetasService.quitarRecetaSabor).toHaveBeenCalledWith('1', '5', { partyId: 1n }, undefined);
+    expect(Reflect.getMetadata(CLAVE_PERMISO, StockController.prototype.quitarRecetaSabor)).toEqual({ modulo: 'recetas', accion: 'editar' });
+    expect(Reflect.getMetadata(CLAVE_PERMISO, StockController.prototype.obtenerReceta)).toEqual({ modulo: 'recetas', accion: 'ver' });
   });
 
   it('GET /admin/stock/lugares delega en insumosService.listarLugares', async () => {

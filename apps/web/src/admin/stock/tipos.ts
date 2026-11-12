@@ -102,6 +102,18 @@ export interface RecetaProductoDetalle {
   tipoReceta?: 'VENTA' | 'PRODUCCION' | 'NINGUNA';
   rinde?: number | null;
   tamanos: RecetaTamanoDetalle[];
+  /** Sabor que se está viendo (null = receta general). */
+  saborId?: string | null;
+  /** El sabor visto no tiene receta propia: se muestra (y se consume) la general. */
+  usaGeneral?: boolean;
+  sabores?: RecetaSaborResumen[];
+}
+
+export interface RecetaSaborResumen {
+  id: string;
+  nombre: string;
+  tieneRecetaPropia: boolean;
+  costo: number | null;
 }
 
 export interface ExistenciasMatriz {
