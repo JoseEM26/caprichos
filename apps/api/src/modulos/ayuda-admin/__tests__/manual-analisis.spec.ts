@@ -42,4 +42,11 @@ describe('Manual de Capri: Analisis', () => {
     expect(texto).toContain('Motivos de derivacion');
     expect(texto).toContain('Sin identificar');
   });
+
+  it('explica Reparto, Equipo y Almacen sin exponer datos de personas al supervisor', () => {
+    expect(texto).toContain('Efectivo por rendir');
+    expect(texto).toContain('Huecos ahora');
+    expect(texto).toContain('Control de almacen apagado');
+    expect(texto).toContain('solo lo ve el Administrador');
+  });
 });
