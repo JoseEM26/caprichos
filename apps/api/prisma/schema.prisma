@@ -803,6 +803,7 @@ model Pedido {
   @@index([ruta_reparto_id], map: "pedido_ruta_reparto_id_idx")
   @@index([pedido_origen_id], map: "pedido_pedido_origen_id_idx")
   @@unique([fecha_dia, numero_dia], map: "pedido_fecha_dia_numero_dia_key")
+  @@index([creado_en], map: "pedido_creado_en_idx")
   @@map("pedido")
 }
 
@@ -2260,6 +2261,9 @@ model MensajeChat {
 
   @@index([whatsapp_mensaje_id])
   @@index([conversacion_id, id])
+  @@index([en])
+  // Además existe (solo en la migración 20270221100000: Prisma no declara índices parciales) mensaje_chat_nota_asesor_idx:
+  // (en) WHERE tipo = 'SISTEMA' AND autor = 'BOT', para las derivaciones de Análisis › WhatsApp.
   @@map("mensaje_chat")
 }
 
