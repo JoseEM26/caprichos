@@ -507,6 +507,12 @@ model Producto {
   resaltar_opcion_menos_pedida Boolean @default(false)
   // Stock de producto terminado (donas, galletas): se controla aunque «Control de almacén» (insumos) esté apagado
   controla_stock     Boolean          @default(false)
+  /// «Alcanza para 8 a 10 personas» (texto corto, opcional)
+  porciones          String?          @db.VarChar(60)
+  /// Alérgenos que contiene (MANI, NUECES, LACTEOS, GLUTEN, HUEVO, SOYA, MARISCOS, SESAMO)
+  alergenos          String[]         @default([])
+  /// El admin revisó la lista de alérgenos: solo entonces el bot y la carta la afirman
+  alergenos_confirmados Boolean       @default(false)
   categoria          Categoria        @relation(fields: [categoria_id], references: [id])
   foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
   tamanos            ProductoTamano[]

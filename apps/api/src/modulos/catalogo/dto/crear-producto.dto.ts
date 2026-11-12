@@ -1,6 +1,8 @@
 import {
+  IsIn,
   IsInt,
   IsArray,
+  MaxLength,
   IsBoolean,
   IsNotEmpty,
   IsNumber,
@@ -10,6 +12,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+/** Alérgenos que un producto puede declarar (valores fijos; el CHECK de la base repite esta lista). */
+export const ALERGENOS_PERMITIDOS = ['MANI', 'NUECES', 'LACTEOS', 'GLUTEN', 'HUEVO', 'SOYA', 'MARISCOS', 'SESAMO'] as const;
 
 export class TamanoProductoInputDto {
   @IsNotEmpty({ message: 'El ID del valor de tamaño es requerido' })
@@ -75,6 +80,22 @@ export class CrearProductoDto {
   @IsOptional()
   @IsBoolean()
   controlaStock?: boolean;
+
+  /** «Alcanza para»: texto corto, p. ej. «8 a 10 personas». */
+  @IsOptional()
+  @IsString({ message: 'Alcanza para debe ser un texto' })
+  @MaxLength(60, { message: 'Alcanza para admite hasta 60 caracteres' })
+  porciones?: string;
+
+  @IsOptional()
+  @IsArray({ message: 'Los alérgenos deben ser una lista' })
+  @IsIn(ALERGENOS_PERMITIDOS, { each: true, message: 'Alérgeno no permitido' })
+  alergenos?: string[];
+
+  /** El admin revisó la lista de alérgenos de este producto. */
+  @IsOptional()
+  @IsBoolean()
+  alergenosConfirmados?: boolean;
 
   @IsOptional()
   @IsArray()

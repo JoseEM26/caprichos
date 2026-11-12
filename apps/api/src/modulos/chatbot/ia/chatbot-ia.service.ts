@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { IaHerramientasService } from './ia-herramientas.service';
 import { IaConsumoService } from './ia-consumo.service';
-import { construirPromptSistema } from './prompt-sistema';
+import { construirPromptSistema, conUrlCarta } from './prompt-sistema';
+import { urlPublicaCarta } from '../servicios/carrusel.util';
 import {
   enmascararDatosSensibles,
   extraerPrimerNombre,
@@ -206,7 +207,8 @@ export class ChatbotIaService {
       };
     }
 
-    const promptSistema = construirPromptSistema(nombreLimpio, modoLibre);
+    const urlCarta = urlPublicaCarta((k) => this.configService?.get<string>(k));
+    const promptSistema = conUrlCarta(construirPromptSistema(nombreLimpio, modoLibre), urlCarta);
     const textoUsuarioEnmascarado = enmascararDatosSensibles(textoUsuario);
     const historialEnmascarado = prepararHistorialPrivado(historialReciente || [], modoLibre ? 15 : 6);
 

@@ -1,14 +1,16 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsNumber,
+  MaxLength,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { GrupoProductoInputDto, TamanoProductoInputDto } from './crear-producto.dto';
+import { ALERGENOS_PERMITIDOS, GrupoProductoInputDto, TamanoProductoInputDto } from './crear-producto.dto';
 
 export class SaborInputDto {
   @IsOptional()
@@ -63,6 +65,22 @@ export class EditarProductoDto {
   @IsOptional()
   @IsBoolean()
   controlaStock?: boolean;
+
+  /** «Alcanza para»: texto corto, p. ej. «8 a 10 personas». */
+  @IsOptional()
+  @IsString({ message: 'Alcanza para debe ser un texto' })
+  @MaxLength(60, { message: 'Alcanza para admite hasta 60 caracteres' })
+  porciones?: string | null;
+
+  @IsOptional()
+  @IsArray({ message: 'Los alérgenos deben ser una lista' })
+  @IsIn(ALERGENOS_PERMITIDOS, { each: true, message: 'Alérgeno no permitido' })
+  alergenos?: string[];
+
+  /** El admin revisó la lista de alérgenos de este producto. */
+  @IsOptional()
+  @IsBoolean()
+  alergenosConfirmados?: boolean;
 
   @IsOptional()
   @IsArray()

@@ -8,6 +8,7 @@ import type { CategoriaAdmin, ProductoAdmin, SaborItem } from './catalogoApi';
 import './editor-opciones.css';
 import './editar-producto.css';
 import { textosOrigenAgotado } from './origenAgotado';
+import { ALERGENOS } from '../../comun/alergenos';
 
 export interface EditarProductoModalProps {
   producto: ProductoAdmin;
@@ -17,6 +18,9 @@ export interface EditarProductoModalProps {
   precio: string; setPrecio: (v: string) => void;
   oculto: boolean; setOculto: (v: boolean) => void;
   controlaStock: boolean; setControlaStock: (v: boolean) => void;
+  porciones: string; setPorciones: (v: string) => void;
+  alergenos: string[]; setAlergenos: (v: string[]) => void;
+  alergenosConfirmados: boolean; setAlergenosConfirmados: (v: boolean) => void;
   fotoUrl: string | null;
   subiendoFoto: boolean;
   estadoFoto: any; errorFoto: any; alReintentarFoto: () => void;
@@ -43,8 +47,8 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
   const esCombo = p.producto.esAnfitrionCombo === true;
   const [confirmarSalir, setConfirmarSalir] = useState(false);
   const [confirmarOpciones, setConfirmarOpciones] = useState(false);
-  const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores]));
-  const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores]) !== inicial.current;
+  const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]));
+  const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]) !== inicial.current;
   // Tamaños y opciones reemplaza a este modal (nunca dos a la vez): con cambios sin guardar, se avisa antes.
   const abrirOpciones = () => (sucio ? setConfirmarOpciones(true) : p.alAbrirOpciones());
   const cerrar = () => (sucio ? setConfirmarSalir(true) : p.alCancelar());
@@ -88,6 +92,32 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
             <IndicadorSubida estado={p.estadoFoto} error={p.errorFoto} onReintentar={p.alReintentarFoto} />
           </div>
         </div>
+      </section>
+
+      <section className="ep-sec" aria-label="Alcance y alérgenos">
+        <h3 className="ep-h">Alcance y alérgenos</h3>
+        <label className="ep-campo"><span>Alcanza para</span>
+          <input className="eo-input" type="text" maxLength={60} placeholder="Ej.: 8 a 10 personas" value={p.porciones}
+            disabled={bloqueado} onChange={(e) => p.setPorciones(e.target.value)} />
+        </label>
+        <div className="ep-campo"><span>Alérgenos</span></div>
+        <div className="ep-alergenos" role="group" aria-label="Alérgenos">
+          {ALERGENOS.map((a) => {
+            const marcado = p.alergenos.includes(a.valor);
+            return (
+              <button key={a.valor} type="button" className={`eo-btn${marcado ? ' ep-chip-activo' : ''}`} aria-pressed={marcado} disabled={bloqueado}
+                onClick={() => p.setAlergenos(marcado ? p.alergenos.filter((x) => x !== a.valor) : [...p.alergenos, a.valor])}>
+                {a.etiqueta}
+              </button>
+            );
+          })}
+        </div>
+        <label className="eo-interruptor">
+          <input type="checkbox" checked={p.alergenosConfirmados} disabled={bloqueado} onChange={(e) => p.setAlergenosConfirmados(e.target.checked)} />
+          <span className="eo-pista" aria-hidden="true" />
+          <span className="eo-interruptor-texto">Revisé los alérgenos de este producto</span>
+        </label>
+        <div className="eo-micro">Sin esta casilla, la carta no muestra los alérgenos y el bot no afirma si lleva o no un alérgeno: pasa la duda a una persona.</div>
       </section>
 
       <section className="ep-sec" aria-label="Visibilidad">

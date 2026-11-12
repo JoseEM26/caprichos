@@ -89,6 +89,10 @@ export interface ProductoAdmin {
   /** Motivo corto escrito al agotarlo a mano («se acabó la masa»). */
   agotadoMotivo?: string | null;
   noSumaBeneficios: boolean;
+  /** «Alcanza para» (texto corto) y alérgenos del producto; la lista solo vale con alergenosConfirmados. */
+  porciones?: string | null;
+  alergenos?: string[];
+  alergenosConfirmados?: boolean;
   /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
   resaltarOpcionMenosPedida?: boolean;
   /** Stock propio del producto (donas, galletas): se descuenta al vender y se marca agotado en 0. Necesita conteo de apertura. */
@@ -167,6 +171,9 @@ export const catalogoApi = {
     noSumaBeneficios?: boolean;
     resaltarOpcionMenosPedida?: boolean;
     controlaStock?: boolean;
+    porciones?: string;
+    alergenos?: string[];
+    alergenosConfirmados?: boolean;
     tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
     grupos?: Array<{ grupoId: string | number; orden?: number }>;
     sabores?: string[];
@@ -187,6 +194,9 @@ export const catalogoApi = {
       noSumaBeneficios?: boolean;
       resaltarOpcionMenosPedida?: boolean;
       controlaStock?: boolean;
+      porciones?: string;
+      alergenos?: string[];
+      alergenosConfirmados?: boolean;
       tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
       sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;

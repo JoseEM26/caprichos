@@ -24,7 +24,7 @@ export const LIMITE_CUERPO_TEXTO = 1024;
  * Conservan los emojis oficiales del mockup para WhatsApp.
  */
 export const TEXTOS_BOT_DEFECTO = {
-  chatbot_texto_bienvenida: '¡Hola {nombre}! ☕ Soy Capri, la asistente de {local}. ¿En qué te ayudo?',
+  chatbot_texto_bienvenida: '¡Hola {nombre}! 🥰☕ Soy Capri, la asistente de {local}.\n¡Qué alegría tenerte por aquí! ✨ ¿En qué te ayudo hoy? 🍩',
 
   chatbot_texto_promos_encabezado: '🔥 Hoy tenemos:',
 
@@ -37,19 +37,19 @@ export const TEXTOS_BOT_DEFECTO = {
   chatbot_promos_max: '3',
 
   chatbot_texto_despedida:
-    'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
+    '¡Gracias por escribirnos, de verdad! 🥰 Fue un gusto atenderte ☕\nTe esperamos pronto en Caprichos 🧁💛',
 
   chatbot_texto_pase_persona:
-    'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
+    '¡Claro que sí! 🥰 Te paso con alguien del equipo.\nYa les avisé con tu nombre y tu número; en unos minutos te escriben 💛',
 
   chatbot_texto_fuera_horario:
     'Ahora estamos cerrados. {apertura} No tomamos pedidos fuera de horario; escríbenos cuando abramos.',
 
   chatbot_texto_no_entiendo:
-    'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
+    'Ay, creo que no te entendí bien 🙈 ¿Me cuentas qué necesitas?\nPuedes elegir una opción o escribirme de otra forma 💛',
 
   chatbot_texto_no_entiendo_derivacion:
-    'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
+    'Disculpa, no logro entender bien tu mensaje 🙏 Mejor te paso con una persona del equipo para ayudarte con cariño 💛',
 
   chatbot_texto_indicacion_pago:
     'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',

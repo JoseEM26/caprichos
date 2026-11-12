@@ -284,7 +284,7 @@ export const TEXTOS_BOT = {
   despedida: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
+      '¡Gracias por escribirnos, de verdad! 🥰 Fue un gusto atenderte ☕\nTe esperamos pronto en Caprichos 🧁💛',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -347,7 +347,7 @@ export const TEXTOS_BOT = {
   pasarAPersona: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
+      '¡Claro que sí! 🥰 Te paso con alguien del equipo.\nYa les avisé con tu nombre y tu número; en unos minutos te escriben 💛',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -358,7 +358,7 @@ export const TEXTOS_BOT = {
   noEntiendoRepregunta: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
+      'Ay, creo que no te entendí bien 🙈 ¿Me cuentas qué necesitas?\nPuedes elegir una opción o escribirme de otra forma 💛',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -369,7 +369,7 @@ export const TEXTOS_BOT = {
   noEntiendoDerivacion: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
+      'Disculpa, no logro entender bien tu mensaje 🙏 Mejor te paso con una persona del equipo para ayudarte con cariño 💛',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -1014,7 +1014,7 @@ export const TEXTOS_BOT = {
  */
 export const TEXTOS_SOLO_MENUS = {
   /** Línea breve del saludo que invita a la carta virtual. */
-  lineaCartaSaludo: (url: string): string => `💛 Mira nuestra carta virtual: ${url}`,
+  lineaCartaSaludo: (url: string): string => `💛 Mira nuestra carta virtual con fotos y precios: ${url} ✨`,
 
   /** Línea breve al confirmar un pedido: seguimiento y carta. */
   lineaCartaConfirmacion: (url: string): string => `Sigue tu pedido y mira la carta en: ${url}`,
@@ -1045,13 +1045,17 @@ export const TEXTOS_SOLO_MENUS = {
     return `\nTiempo estimado: *${rango} min*.`;
   },
 
-  acuse: (): string => '¡Con gusto! 💛 Aquí estoy si necesitas algo más.',
+  acuse: (): string => '¡Con mucho gusto! 🥰 Aquí estoy si necesitas algo más 💛',
 
   derivadoPorNoEntender: (): string =>
-    'No logré entenderte, así que avisé a una persona del equipo para que te ayude. Te responde en breve 💛',
+    'Ay, no logré entenderte 🙈 Ya avisé a una persona del equipo para que te ayude con mucho cariño. ¡Te responde en breve! 💛✨',
 
   menuNoEntiendo: (textoPersonalizado?: string | null): string =>
-    textoPersonalizado?.trim() || 'Elige una opción del menú.',
+    textoPersonalizado?.trim() || 'Ay, no te entendí bien 🙈 Elige una opción del menú, por favor 💛',
+
+  /** Línea que invita a la carta virtual cuando el bot no entiende (URL completa, sin acortadores). */
+  lineaCartaNoEntiendo: (url: string): string =>
+    `\nTambién puedes mirar nuestra carta virtual con fotos, precios y más promociones 👉 ${url} ✨`,
 };
 
 export * from './textos-reserva';

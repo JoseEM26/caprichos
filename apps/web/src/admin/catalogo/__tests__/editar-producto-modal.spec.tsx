@@ -15,7 +15,8 @@ function montar(producto: any, props: Partial<EditarProductoModalProps> = {}) {
     fotoUrl: null, subiendoFoto: false, estadoFoto: 'inactivo', errorFoto: null, alReintentarFoto: vi.fn(),
     alSubirFoto: vi.fn(), alQuitarFoto: vi.fn(), sabores: producto.sabores, setSabores: vi.fn(),
     nuevoSabor: '', setNuevoSabor: vi.fn(), error: '', puedeEditar: true, resumenOpciones: '3 tamaños · 7 grupos',
-    alAbrirOpciones: vi.fn(), vistaPrevia: null, guardando: false, alGuardar: vi.fn(), alCancelar: vi.fn(), ...props,
+    alAbrirOpciones: vi.fn(), vistaPrevia: null, guardando: false, alGuardar: vi.fn(), alCancelar: vi.fn(),
+    porciones: '', setPorciones: vi.fn(), alergenos: [], setAlergenos: vi.fn(), alergenosConfirmados: false, setAlergenosConfirmados: vi.fn(), ...props,
   };
   return render(<MemoryRouter><EditarProductoModal {...todo} /></MemoryRouter>);
 }
@@ -75,5 +76,18 @@ describe('EditarProductoModal', () => {
     montar(base(), { alCancelar: cancelar });
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(cancelar).toHaveBeenCalled();
+  });
+
+  it('Alcanza para y alérgenos: edita porciones, marca chips y la casilla de revisión', () => {
+    const setPorciones = vi.fn(); const setAlergenos = vi.fn(); const setConf = vi.fn();
+    montar(base(), { setPorciones, setAlergenos, setAlergenosConfirmados: setConf, alergenos: ['MANI'] });
+    fireEvent.change(screen.getByLabelText('Alcanza para'), { target: { value: '8 a 10 personas' } });
+    expect(setPorciones).toHaveBeenCalledWith('8 a 10 personas');
+    fireEvent.click(screen.getByRole('button', { name: 'lácteos' }));
+    expect(setAlergenos).toHaveBeenCalledWith(['MANI', 'LACTEOS']);
+    fireEvent.click(screen.getByRole('button', { name: 'maní' }));
+    expect(setAlergenos).toHaveBeenCalledWith([]);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Revisé los alérgenos de este producto' }));
+    expect(setConf).toHaveBeenCalledWith(true);
   });
 });
