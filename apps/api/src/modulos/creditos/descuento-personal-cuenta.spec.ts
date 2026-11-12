@@ -1,11 +1,15 @@
 import { descuentoPersonalDeCuenta, descuentoPersonalPorCelular } from './descuento-personal';
 
 /** BD en memoria mínima: contactos del personal, cuentas de cliente y usuarios. */
-function bd(o: { cuenta?: { telefono: string | null } | null; usuarioActivo?: boolean; contactos?: Array<{ party_id: bigint; valor: string }> }) {
+function bd(o: { cuenta?: { telefono: string | null; usuario_party_id?: bigint | null } | null; usuarioActivo?: boolean; vinculadoActivo?: boolean; contactos?: Array<{ party_id: bigint; valor: string }> }) {
   const contactos = o.contactos ?? [];
   return {
     customerAccount: { findFirst: jest.fn().mockResolvedValue(o.cuenta === undefined ? { telefono: '900000001' } : o.cuenta) },
-    userAccount: { findFirst: jest.fn().mockResolvedValue(o.usuarioActivo ? { party_id: 1n } : null) },
+    userAccount: {
+      findFirst: jest.fn().mockImplementation(({ where }: any) =>
+        Promise.resolve(where.party_id === 1n ? (o.usuarioActivo ? { party_id: 1n } : null) : where.party_id === 7n && o.vinculadoActivo ? { party_id: 7n } : null),
+      ),
+    },
     contactMechanism: {
       findFirst: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(contactos.find((c) => where.valor.in.includes(c.valor)) ?? null)),
       findMany: jest.fn().mockResolvedValue(contactos),
@@ -48,5 +52,15 @@ describe('descuento de personal por cuenta de cliente', () => {
 
   it('celular inválido: null', async () => {
     expect(await descuentoPersonalPorCelular(bd({}), '12345')).toBeNull();
+  });
+
+  it('vínculo del ADMIN: la cuenta vinculada a un usuario activo recibe el descuento del personal', async () => {
+    const db = bd({ cuenta: { telefono: '900000001', usuario_party_id: 7n }, vinculadoActivo: true });
+    expect(await descuentoPersonalDeCuenta(db, 2n)).toEqual({ pct: 25 });
+  });
+
+  it('vínculo con usuario inactivo, o sin vínculo: no hay descuento', async () => {
+    expect(await descuentoPersonalDeCuenta(bd({ cuenta: { telefono: '900000001', usuario_party_id: 7n }, vinculadoActivo: false }), 2n)).toBeNull();
+    expect(await descuentoPersonalDeCuenta(bd({ cuenta: { telefono: '900000001', usuario_party_id: null } }), 2n)).toBeNull();
   });
 });

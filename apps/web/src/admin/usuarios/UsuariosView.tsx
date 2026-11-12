@@ -935,7 +935,7 @@ export function UsuariosView() {
                   </div>
                   {esAdmin && u.activo && u.sinCelular && (
                     <div data-testid={`sin-celular-${u.id}`} style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                      Sin celular: no tendrá descuento de personal en la carta. Edítalo para agregarlo.
+                      Sin celular: no tendrá descuento de personal en la carta. Edítalo para agregarlo o vincular su cuenta de cliente.
                     </div>
                   )}
 

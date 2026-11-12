@@ -22,6 +22,8 @@ export interface UsuarioItem {
   activo: boolean;
   /** Sin celular activo: no tendrá descuento de personal en la carta. */
   sinCelular?: boolean;
+  /** Su cuenta de cliente está vinculada: ya recibe el descuento de personal en la carta. */
+  cuentaClienteVinculada?: boolean;
   debeCambiar: boolean;
   altaEn?: string;
 }
