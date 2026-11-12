@@ -933,6 +933,11 @@ export function UsuariosView() {
                       {u.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </div>
+                  {esAdmin && u.activo && u.sinCelular && (
+                    <div data-testid={`sin-celular-${u.id}`} style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                      Sin celular: no tendrá descuento de personal en la carta. Edítalo para agregarlo.
+                    </div>
+                  )}
 
                   {/* DNI con testid */}
                   <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>

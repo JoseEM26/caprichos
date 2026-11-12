@@ -47,6 +47,11 @@ export class EditarUsuarioDto {
   @IsString()
   cumpleanos?: string;
 
+  /** Solo ADMIN. Celular de 9 dígitos (con o sin +51): queda como contacto activo y da el descuento de personal en la carta. */
+  @IsOptional()
+  @IsString()
+  celular?: string;
+
   /** Vacío quita el correo. */
   @IsOptional()
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'El correo no tiene un formato válido' })

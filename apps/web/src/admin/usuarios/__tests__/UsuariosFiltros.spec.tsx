@@ -92,4 +92,11 @@ describe('UsuariosView filtros al servidor', () => {
     expect(screen.queryByText(/Vieja Prueba/)).toBeNull();
     expect(screen.getByText(/Nueva Prueba/)).toBeInTheDocument();
   });
+
+  it('avisa al admin cuando un usuario activo no tiene celular', async () => {
+    montar(async () => resp([{ ...U('2', 'Lucia'), sinCelular: true }, U('3', 'Rosa')]));
+    await screen.findByText(/Lucia Prueba/);
+    expect(screen.getByTestId('sin-celular-2').textContent).toMatch(/Sin celular: no tendrá descuento de personal en la carta/);
+    expect(screen.queryByTestId('sin-celular-3')).toBeNull();
+  });
 });

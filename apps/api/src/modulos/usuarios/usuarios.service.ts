@@ -200,6 +200,7 @@ export class UsuariosService {
               documentos: {
                 where: { tipo: { in: [...TIPOS_DOCUMENTO] } },
               },
+              contactos: { where: { tipo: { in: ['TELEFONO', 'WHATSAPP'] }, activo: true }, select: { id: true } },
             },
           },
           rolesExtra: true,
@@ -235,6 +236,8 @@ export class UsuariosService {
         horario24_7: Boolean(u.party?.persona?.horario_24_7),
         correo: u.party?.persona?.correo ?? null,
         activo: u.activo,
+        /** Sin celular activo: no recibe el descuento de personal en la carta. */
+        sinCelular: !(u.party as any)?.contactos?.length,
         debeCambiar: u.debe_cambiar,
         altaEn: u.alta_en,
       };
@@ -1005,6 +1008,15 @@ export class UsuariosService {
     }
     const avisosCambian = dto.avisosCorreo !== undefined && dto.avisosCorreo !== usuario.avisos_correo;
     const horarioPedido = dto.horario24_7 !== undefined;
+    let celularNuevo: string | null = null;
+    if (dto.celular !== undefined && dto.celular.trim() !== '') {
+      const normCel = normalizarCelularPeru(dto.celular);
+      if (!normCel.valido || !normCel.celular9) {
+        throw new BadRequestException({ codigo: 'CELULAR_INVALIDO', mensaje: 'El celular debe tener 9 dígitos y empezar en 9' });
+      }
+      celularNuevo = normCel.celular9;
+      this.exigirAdmin(usuarioActual);
+    }
 
     if (docPedido || dto.correo !== undefined || rolesCambian || avisosCambian || horarioPedido) this.exigirAdmin(usuarioActual);
     if (dniCambia) {
@@ -1065,6 +1077,9 @@ export class UsuariosService {
           }
         }
 
+        // Celular: queda como contacto activo (409 si es de otra persona); lo reconoce el descuento de personal de la carta
+        if (celularNuevo) await asegurarContactoCelular(tx, usuario.party_id, celularNuevo, 'WHATSAPP');
+
         if (dto.horario24_7 !== undefined) {
           await tx.person.update({ where: { party_id: usuario.party_id }, data: { horario_24_7: dto.horario24_7 } });
         }
@@ -1123,7 +1138,7 @@ export class UsuariosService {
       entidad: 'user_account',
       entidadId: usuario.id,
       antes,
-      despues: { ...despues, correoCambiado: correoCambia, dniCambiado: dniCambia, ...(cumpleNuevo ? { cumpleanosCambiado: true } : {}) },
+      despues: { ...despues, ...(celularNuevo ? { celularCambiado: true } : {}), correoCambiado: correoCambia, dniCambiado: dniCambia, ...(cumpleNuevo ? { cumpleanosCambiado: true } : {}) },
       partyId: usuarioActual?.partyId,
       ip,
     });

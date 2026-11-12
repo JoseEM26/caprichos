@@ -20,6 +20,8 @@ export interface UsuarioItem {
   /** Roles extra con fecha de fin vigente (rol temporal). */
   rolesTemporales?: Array<{ rol: string; nombre: string; venceEn: string | null; motivo: string | null }>;
   activo: boolean;
+  /** Sin celular activo: no tendrá descuento de personal en la carta. */
+  sinCelular?: boolean;
   debeCambiar: boolean;
   altaEn?: string;
 }

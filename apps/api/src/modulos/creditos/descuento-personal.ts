@@ -55,35 +55,51 @@ export async function resolverPctPersonal(db: any, partyId: bigint): Promise<num
   return PCT_DESCUENTO_PERSONAL_DEFECTO;
 }
 
-/**
- * Descuento de personal para quien escribe un celular en la carta pública: solo si ese celular es contacto de un
- * trabajador con usuario ACTIVO. Devuelve únicamente el porcentaje (nunca datos del trabajador). El celular NO está
- * verificado: por eso solo da descuento, jamás crédito. Fuente única del porcentaje: resolverPctPersonal.
- */
-export async function descuentoPersonalPorCelular(db: any, celular: string | null | undefined): Promise<{ pct: number } | null> {
-  const nacional = String(celular ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
-  if (!/^9\d{8}$/.test(nacional)) return null;
-  const contacto = await db.contactMechanism?.findFirst?.({
-    where: {
-      tipo: { in: ['TELEFONO', 'WHATSAPP'] },
-      valor: { in: [nacional, `51${nacional}`] },
-      activo: true,
-      party: { usuario: { is: { activo: true } } },
-    },
-    select: { party_id: true },
-  });
-  if (!contacto) return null;
-  return { pct: await resolverPctPersonal(db, contacto.party_id) };
+/** Celular peruano de 9 dígitos desde cualquier formato (+51, 51, espacios, guiones, paréntesis), o null. */
+function celularNacional(valor: unknown): string | null {
+  const n = String(valor ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+  return /^9\d{8}$/.test(n) ? n : null;
 }
 
 /**
- * Descuento de personal para la cuenta de cliente con sesión iniciada en la carta: el celular sale de la cuenta
- * autenticada (nunca de un campo escrito). Sin cuenta activa o sin celular de trabajador activo: null.
+ * Descuento de personal para un celular: solo si es contacto activo (TELEFONO/WHATSAPP) de un trabajador con usuario
+ * ACTIVO. Devuelve únicamente el porcentaje (nunca datos del trabajador). El celular NO está verificado: por eso solo da
+ * descuento, jamás crédito. Fuente única del porcentaje: resolverPctPersonal.
+ */
+export async function descuentoPersonalPorCelular(db: any, celular: string | null | undefined): Promise<{ pct: number } | null> {
+  const nacional = celularNacional(celular);
+  if (!nacional) return null;
+  const tipo = { in: ['TELEFONO', 'WHATSAPP'] };
+  const party = { usuario: { is: { activo: true } } };
+  // Camino directo: guardado como 9 dígitos o con 51 delante.
+  let partyId: bigint | undefined = (
+    await db.contactMechanism?.findFirst?.({
+      where: { tipo, valor: { in: [nacional, `51${nacional}`] }, activo: true, party },
+      select: { party_id: true },
+    })
+  )?.party_id;
+  // Respaldo: contactos del personal guardados con +51, espacios o guiones (el personal es corto: se compara en memoria).
+  if (partyId === undefined) {
+    const filas: any[] = (await db.contactMechanism?.findMany?.({ where: { tipo, activo: true, party }, select: { party_id: true, valor: true } })) ?? [];
+    partyId = filas.find((f) => celularNacional(f.valor) === nacional)?.party_id;
+  }
+  if (partyId === undefined) return null;
+  return { pct: await resolverPctPersonal(db, partyId) };
+}
+
+/**
+ * Descuento de personal para la cuenta de cliente con sesión iniciada en la carta. Primero por persona (si el party de
+ * la cuenta ya es un trabajador con usuario activo, no hace falta el celular) y luego por el celular de la cuenta
+ * autenticada (nunca de un campo escrito). Sin cuenta activa o sin trabajador activo: null (misma respuesta que un cliente).
  */
 export async function descuentoPersonalDeCuenta(db: any, partyId: bigint | string | number | null | undefined): Promise<{ pct: number } | null> {
   if (partyId === null || partyId === undefined || !/^\d+$/.test(String(partyId))) return null;
-  const cuenta = await db.customerAccount?.findFirst?.({ where: { party_id: BigInt(partyId), activo: true }, select: { telefono: true } });
-  return descuentoPersonalPorCelular(db, cuenta?.telefono);
+  const id = BigInt(partyId);
+  const cuenta = await db.customerAccount?.findFirst?.({ where: { party_id: id, activo: true }, select: { telefono: true } });
+  if (!cuenta) return null;
+  const usuario = await db.userAccount?.findFirst?.({ where: { party_id: id, activo: true }, select: { party_id: true } });
+  if (usuario) return { pct: await resolverPctPersonal(db, id) };
+  return descuentoPersonalPorCelular(db, cuenta.telefono);
 }
 
 /** El crédito es solo para el personal (cuenta activa o rol de empleado), nunca para clientes. */

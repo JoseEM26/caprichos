@@ -44,6 +44,11 @@ Ver tambien: [[historial]]
 4. Para rehabilitar a un colaborador desactivado, pulsa "Reactivar" y confirma la acción en la ventana emergente con "Sí, reactivar".
 Ver tambien: [[historial]]
 
+## Como se hace: agregar el celular de un usuario
+1. En la lista, un usuario activo sin celular muestra el aviso Sin celular: no tendra descuento de personal en la carta.
+2. Pulsa Editar, escribe el celular de 9 digitos que empiece con 9 en el campo Celular y guarda con Si, guardar.
+3. Si el celular ya es de otra persona, el sistema lo rechaza. Solo el Administrador puede cambiarlo.
+
 ## Como se hace: recibir alertas por WhatsApp
 1. En la ficha de un administrador, marcar la casilla Recibir alertas por WhatsApp e ingresar su celular de 9 digitos que empiece con 9.
 2. Pulsar Guardar alertas y confirmar con Si, guardar.
