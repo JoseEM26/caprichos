@@ -18,4 +18,14 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     expect(t).toContain('Desvincular');
     expect(t).toContain('nunca gana permisos');
   });
+
+  it('usuarios explica la vinculacion automatica por celular, sus avisos y la confirmacion', () => {
+    const t = readFileSync(join(__dirname, '..', 'manuales', 'usuarios.md'), 'utf8');
+    expect(t).toContain('Un cliente y un usuario del equipo pueden compartir el mismo celular');
+    expect(t).toContain('Cuenta de cliente vinculada');
+    expect(t).toContain('Si, es la misma persona');
+    expect(t).toContain('lo usa otro usuario del equipo');
+    const c = readFileSync(join(__dirname, '..', 'manuales', 'creditos.md'), 'utf8');
+    expect(c).toContain('se hace solo cuando el Administrador escribe en el usuario el mismo celular');
+  });
 });

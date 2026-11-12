@@ -19,7 +19,9 @@ describe('Alta y edición con horario y reemplazos', () => {
       userAccount: {
         create: jest.fn().mockResolvedValue({ id: 5n, rol: 'MOZO', activo: true, debe_cambiar: true }),
         findMany: jest.fn().mockResolvedValue([{ party_id: 20n }]),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
+      customerAccount: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
       contactMechanism: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
       partyRole: { create: jest.fn() },
       horarioTrabajo: {

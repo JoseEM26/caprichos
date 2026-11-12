@@ -52,6 +52,11 @@ export class EditarUsuarioDto {
   @IsString()
   celular?: string;
 
+  /** El ADMIN confirma que la cuenta de cliente con ese celular es de esta persona (cuando el nombre no coincide). */
+  @IsOptional()
+  @IsBoolean()
+  confirmaMismaPersona?: boolean;
+
   /** Vacío quita el correo. */
   @IsOptional()
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'El correo no tiene un formato válido' })

@@ -131,7 +131,8 @@ export function UsuariosView() {
   // Modales
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioItem | null>(null);
-  const [claveInicialTemporal, setClaveInicialTemporal] = useState<{ clave: string; nombre: string } | null>(null);
+  const [avisoVinculo, setAvisoVinculo] = useState<string | null>(null);
+  const [claveInicialTemporal, setClaveInicialTemporal] = useState<{ clave: string; nombre: string; cuentaVinculada?: { nombre: string; celular: string } | null } | null>(null);
 
   // Confirmar Sí/No
   // Desactivar pide fecha de salida y motivo; reactivar pide fecha de reingreso (Sí/No al final)
@@ -527,6 +528,12 @@ export function UsuariosView() {
           </button>
         )}
       </div>
+
+      {avisoVinculo && (
+        <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-green)' }}>
+          {avisoVinculo}
+        </div>
+      )}
 
       {tabActual === 'accesos' && esAdmin && <CuadroAccesos />}
 
@@ -1476,11 +1483,12 @@ export function UsuariosView() {
         <CrearUsuarioModal
           abierto={modalCrearAbierto}
           alCerrar={() => setModalCrearAbierto(false)}
-          alUsuarioCreado={(nuevo, clave) => {
+          alUsuarioCreado={(nuevo, clave, cuentaVinculada) => {
             setModalCrearAbierto(false);
             setClaveInicialTemporal({
               clave,
               nombre: `${nuevo.nombres} ${nuevo.apellidos}`,
+              cuentaVinculada: cuentaVinculada ?? null,
             });
             cargarUsuarios();
           }}
@@ -1492,7 +1500,8 @@ export function UsuariosView() {
           abierto={!!usuarioEditando}
           usuario={usuarioEditando}
           alCerrar={() => setUsuarioEditando(null)}
-          alUsuarioEditado={() => {
+          alUsuarioEditado={(editado: any) => {
+            setAvisoVinculo(editado?.cuentaClienteVinculada ? `Cuenta de cliente vinculada: ${editado.cuentaClienteVinculada.nombre} (${editado.cuentaClienteVinculada.celular}). Ya recibe el descuento de personal en la carta.` : null);
             setUsuarioEditando(null);
             cargarUsuarios();
           }}
@@ -1527,6 +1536,7 @@ export function UsuariosView() {
           abierto={!!claveInicialTemporal}
           claveInicial={claveInicialTemporal.clave}
           nombreUsuario={claveInicialTemporal.nombre}
+          cuentaVinculada={claveInicialTemporal.cuentaVinculada}
           alCerrar={() => setClaveInicialTemporal(null)}
         />
       )}

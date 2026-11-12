@@ -80,8 +80,8 @@ describe('Asistente Nuevo usuario', () => {
     expect(screen.getByText(/Total por semana: 9 h/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, crear' }));
-    await waitFor(() => expect(api.post).toHaveBeenCalled());
-    const [ruta, cuerpo] = vi.mocked(api.post).mock.calls[0] as [string, any];
+    await waitFor(() => expect(vi.mocked(api.post).mock.calls.some((c) => c[0] === '/admin/usuarios')).toBe(true));
+    const [ruta, cuerpo] = vi.mocked(api.post).mock.calls.find((c) => c[0] === '/admin/usuarios') as [string, any];
     expect(ruta).toBe('/admin/usuarios');
     expect(cuerpo).toMatchObject({
       tipoDocumento: 'DNI',

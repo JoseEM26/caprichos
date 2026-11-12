@@ -54,6 +54,7 @@ import {
   normalizarCelularPeru,
 } from './alertas-whatsapp.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
+import { resolverCelular, excepcionCelular, CONFIRMAR_MISMA_PERSONA } from './usuarios-celular-vinculo';
 import {
   CELULAR_OTRA_PERSONA,
   asegurarContactoCelular,
@@ -393,9 +394,10 @@ export class UsuariosService {
     } else if (celular9) {
       const dueno = await partyDeCelular(this.prisma, celular9);
       if (dueno) {
-        if (await this.tienePartyUsuario(dueno)) {
-          throw new ConflictException(CELULAR_OTRA_PERSONA);
-        }
+        // Otro usuario o cuenta ya vinculada a otro: 409 con mensaje claro; si no, se reutiliza ese party (alta)
+        if (await this.tienePartyUsuario(dueno)) throw excepcionCelular('USUARIO');
+        const previa = await resolverCelular(this.prisma, null, celular9);
+        if (previa.estado === 'OTRA_PERSONA') throw excepcionCelular(previa.motivo);
         reutilizarId = dueno;
       }
     }
@@ -405,6 +407,7 @@ export class UsuariosService {
 
     let nuevo;
     let avisosPlanilla: string[] = [];
+    let cuentaVinculada: { nombre: string; celular: string } | null = null;
     try {
       nuevo = await this.prisma.$transaction(async (tx) => {
         const party = reutilizarId
@@ -451,10 +454,6 @@ export class UsuariosService {
               },
             });
 
-        if (celular9) {
-          await asegurarContactoCelular(tx, party.id, celular9, 'WHATSAPP');
-        }
-
         const partyIdentifier =
           dniExistente ??
           (await tx.partyIdentifier.create({
@@ -478,6 +477,10 @@ export class UsuariosService {
             avisos_correo: avisosCorreo,
           },
         });
+
+        if (celular9) {
+          cuentaVinculada = await this.aplicarCelular(tx, userAccount.id, party.id, celular9, person, usuarioActual, dto.confirmaMismaPersona, ip);
+        }
 
         if (extras.length) {
           await tx.userAccountRol.createMany({
@@ -579,6 +582,7 @@ export class UsuariosService {
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
       avisos: [...avisos, ...avisosPlanilla],
+      ...(cuentaVinculada ? { cuentaClienteVinculada: cuentaVinculada } : {}),
     };
   }
 
@@ -623,6 +627,8 @@ export class UsuariosService {
     tipo?: string;
     numero?: string;
     objeto?: FilaImportarPersonalDto;
+    /** El celular es de una cuenta de cliente activa: el alta la une a la persona (descuento de personal). */
+    vincula?: boolean;
   }> {
     const objeto = plainToInstance(FilaImportarPersonalDto, fila ?? {});
     const erroresFila = await validate(objeto);
@@ -641,7 +647,13 @@ export class UsuariosService {
         where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
         select: { id: true },
       });
-      return { estado: existe ? 'YA_EXISTE' : 'OK', tipo: doc.tipo, numero: doc.numero, objeto };
+      let vincula = false;
+      if (!existe && objeto.celular) {
+        const previa = await resolverCelular(this.prisma, null, objeto.celular);
+        if (previa.estado === 'OTRA_PERSONA') return { estado: 'ERROR', motivo: previa.mensaje, tipo: doc.tipo, numero: doc.numero, objeto };
+        vincula = previa.estado === 'VINCULARA_CUENTA';
+      }
+      return { estado: existe ? 'YA_EXISTE' : 'OK', tipo: doc.tipo, numero: doc.numero, objeto, ...(vincula ? { vincula } : {}) };
     } catch (err) {
       return { estado: 'ERROR', motivo: mensajeDeError(err) };
     }
@@ -666,7 +678,7 @@ export class UsuariosService {
       throw new BadRequestException({ codigo: 'DEMASIADAS_FILAS', mensaje: 'Se importan como máximo 200 filas por vez' });
     }
 
-    const resultados: Array<{ indice: number; estado: string; motivo?: string; avisos?: string[] }> = [];
+    const resultados: Array<{ indice: number; estado: string; motivo?: string; avisos?: string[]; vincula?: boolean }> = [];
     const vistos = new Set<string>();
     let creadas = 0;
 
@@ -685,7 +697,7 @@ export class UsuariosService {
         continue;
       }
       if (opciones.simular) {
-        resultados.push({ indice, estado: 'OK' });
+        resultados.push({ indice, estado: 'OK', ...(r.vincula ? { vincula: true } : {}) });
         continue;
       }
       try {
@@ -698,7 +710,7 @@ export class UsuariosService {
           datosPlanilla(r.objeto!),
         );
         creadas++;
-        resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos });
+        resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos, ...(r.vincula ? { vincula: true } : {}) });
       } catch (err) {
         resultados.push({ indice, estado: 'ERROR', motivo: mensajeDeError(err) });
       }
@@ -890,6 +902,45 @@ export class UsuariosService {
     return despues;
   }
 
+  /**
+   * Celular del usuario dentro de su transacción. Libre → contacto propio. De una cuenta de cliente activa sin usuario ni
+   * vínculo → se VINCULA esa cuenta (usuario_party_id; el celular sigue siendo del party de la cuenta, sin contacto duplicado),
+   * con auditoría origen AUTO_CELULAR. Si el nombre no coincide hace falta `confirma`. Otra persona → 409 con motivo.
+   */
+  private async aplicarCelular(
+    tx: any,
+    usuarioId: bigint,
+    partyId: bigint,
+    celular9: string,
+    persona: { nombres?: string | null; apellidos?: string | null },
+    actor: UsuarioAutenticado | undefined,
+    confirma: boolean | undefined,
+    ip: string | undefined,
+  ): Promise<{ nombre: string; celular: string } | null> {
+    const r = await resolverCelular(tx, partyId, celular9, persona);
+    if (r.estado === 'OTRA_PERSONA') throw excepcionCelular(r.motivo);
+    if (r.estado === 'YA_VINCULADA') return null;
+    if (r.estado === 'LIBRE') {
+      await asegurarContactoCelular(tx, partyId, celular9, 'WHATSAPP');
+      return null;
+    }
+    // Solo un ADMIN autenticado dispara la vinculación; la importación de consola no pasa por aquí (no hay otro party)
+    if (actor?.rol !== 'ADMIN') throw excepcionCelular('PERSONA');
+    if (!r.mismoNombre && !confirma) throw new ConflictException(CONFIRMAR_MISMA_PERSONA);
+    const { count } = await tx.customerAccount.updateMany({ where: { id: r.cuentaId, usuario_party_id: null, activo: true }, data: { usuario_party_id: partyId } });
+    if (count === 0) throw excepcionCelular('CUENTA_VINCULADA');
+    await this.auditoria.registrar(
+      {
+        categoria: 'CAMBIO', modulo: 'usuarios', accion: 'USUARIO_VINCULAR_CUENTA_CLIENTE', resultado: 'OK',
+        entidad: 'customer_account', entidadId: r.cuentaId,
+        despues: { usuarioId: String(usuarioId), usuarioPartyId: String(partyId), cuentaPartyId: String(r.cuentaPartyId), origen: 'AUTO_CELULAR', nombreCoincide: r.mismoNombre },
+        partyId: actor?.partyId, ip,
+      },
+      tx,
+    );
+    return { nombre: r.nombre, celular: r.celularEnmascarado };
+  }
+
   private exigirAdmin(usuarioActual?: UsuarioAutenticado) {
     if (usuarioActual?.rol !== 'ADMIN') {
       throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo un administrador puede hacer esto' });
@@ -1060,6 +1111,7 @@ export class UsuariosService {
       horario24_7: dto.horario24_7 ?? antes.horario24_7,
     };
 
+    let cuentaVinculada: { nombre: string; celular: string } | null = null;
     try {
       await this.prisma.$transaction(async (tx) => {
         if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia || paisNuevo !== undefined || cumpleNuevo !== undefined) {
@@ -1086,7 +1138,13 @@ export class UsuariosService {
         }
 
         // Celular: queda como contacto activo (409 si es de otra persona); lo reconoce el descuento de personal de la carta
-        if (celularNuevo) await asegurarContactoCelular(tx, usuario.party_id, celularNuevo, 'WHATSAPP');
+        if (celularNuevo) {
+          cuentaVinculada = await this.aplicarCelular(
+            tx, usuario.id, usuario.party_id, celularNuevo,
+            { nombres: dto.nombres ?? usuario.party?.persona?.nombres, apellidos: dto.apellidos ?? usuario.party?.persona?.apellidos },
+            usuarioActual, dto.confirmaMismaPersona, ip,
+          );
+        }
 
         if (dto.horario24_7 !== undefined) {
           await tx.person.update({ where: { party_id: usuario.party_id }, data: { horario_24_7: dto.horario24_7 } });
@@ -1178,6 +1236,7 @@ export class UsuariosService {
       activo: usuario.activo,
       debeCambiar: usuario.debe_cambiar,
       reingresar,
+      ...(cuentaVinculada ? { cuentaClienteVinculada: cuentaVinculada } : {}),
     };
   }
 

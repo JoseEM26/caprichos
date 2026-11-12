@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { resolverCelular } from './usuarios-celular-vinculo';
 
 /**
  * Vincula la cuenta de cliente de un trabajador (la que usa en la carta) con su usuario del panel. Es un vínculo
@@ -74,6 +75,28 @@ export class UsuariosCuentaClienteService {
     this.exigirAdmin(actor);
     const { cuenta } = await this.validar(id, celular);
     return this.resumen(cuenta);
+  }
+
+  /**
+   * Vista previa de solo lectura de lo que pasará al guardar este celular en el usuario `id` (o en un alta si id es null):
+   * LIBRE | VINCULARA_CUENTA (con nombre y celular enmascarado de la cuenta) | OTRA_PERSONA (con motivo y mensaje).
+   */
+  async previaCelular(id: bigint | string | number | null, celular: string, persona: { nombres?: string | null; apellidos?: string | null } | undefined, actor?: UsuarioAutenticado) {
+    this.exigirAdmin(actor);
+    let partyId: bigint | null = null;
+    let quien: { nombres?: string | null; apellidos?: string | null } | undefined = persona;
+    if (id !== null) {
+      const u = await this.usuario(id);
+      partyId = u.party_id;
+      const p = await this.prisma.person.findUnique({ where: { party_id: u.party_id }, select: { nombres: true, apellidos: true } });
+      quien = { nombres: persona?.nombres ?? p?.nombres, apellidos: persona?.apellidos ?? p?.apellidos };
+    }
+    const r = await resolverCelular(this.prisma, partyId, celular, quien);
+    if (r.estado === 'VINCULARA_CUENTA') {
+      return { estado: r.estado, cuenta: { nombre: r.nombre, celularEnmascarado: r.celularEnmascarado }, mismoNombre: r.mismoNombre };
+    }
+    if (r.estado === 'OTRA_PERSONA') return { estado: r.estado, motivo: r.motivo, mensaje: r.mensaje };
+    return { estado: 'LIBRE' as const, ...(r.estado === 'YA_VINCULADA' ? { yaVinculada: true } : {}) };
   }
 
   async vincular(id: bigint | string | number, celular: string, actor?: UsuarioAutenticado, ip?: string) {

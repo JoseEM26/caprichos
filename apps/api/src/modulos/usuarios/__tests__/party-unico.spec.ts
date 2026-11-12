@@ -12,10 +12,12 @@ describe('Usuarios: una persona = un party', () => {
   let service: UsuariosService;
   let prisma: any;
   let tx: any;
+  let auditoria: any;
 
   const base = { nombres: 'Ana', apellidos: 'Paz', dni: '12345678', rol: 'MOZO' };
 
   beforeEach(async () => {
+    auditoria = { registrar: jest.fn() };
     tx = {
       party: { create: jest.fn().mockResolvedValue({ id: 10n }) },
       person: {
@@ -27,7 +29,9 @@ describe('Usuarios: una persona = un party', () => {
       userAccount: {
         create: jest.fn().mockResolvedValue({ id: 5n, party_id: 20n, rol: 'MOZO', activo: true, debe_cambiar: true }),
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
+      customerAccount: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
       contactMechanism: {
         create: jest.fn(),
         update: jest.fn(),
@@ -39,7 +43,8 @@ describe('Usuarios: una persona = un party', () => {
     prisma = {
       partyIdentifier: { findFirst: jest.fn().mockResolvedValue(null) },
       contactMechanism: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
-      userAccount: { findUnique: jest.fn().mockResolvedValue(null) },
+      userAccount: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null) },
+      customerAccount: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
       person: { findUnique: jest.fn() },
       $transaction: jest.fn((cb: any) => cb(tx)),
     };
@@ -47,7 +52,7 @@ describe('Usuarios: una persona = un party', () => {
       providers: [
         UsuariosService,
         { provide: PrismaService, useValue: prisma },
-        { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
+        { provide: AuditoriaService, useValue: auditoria },
         { provide: ArchivosService, useValue: { subirArchivo: jest.fn() } },
         { provide: AvisosInternosService, useValue: { enviarPruebaAlertas: jest.fn() } },
       ],
