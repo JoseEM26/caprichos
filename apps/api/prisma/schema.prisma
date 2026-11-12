@@ -2673,7 +2673,8 @@ model EncuestaPosventa {
   respondida_en DateTime? @db.Timestamptz
   puntaje       Int?      @db.SmallInt
   comentario    String?
-  estado        String    @default("ENVIADA") // ENVIADA | RESPONDIDA | EXPIRADA | SIMULADA
+  estado        String    @default("ENVIADA") // ENVIADA | RESPONDIDA | EXPIRADA | SIMULADA | OMITIDA
+  motivo        String?   // solo OMITIDA: SIN_CELULAR | SIN_CONSENTIMIENTO | NUMERO_BLOQUEADO | TOPE_POR_CELULAR
   creado_en     DateTime  @default(now()) @db.Timestamptz
   actualizado_en DateTime @updatedAt @db.Timestamptz
 

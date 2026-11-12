@@ -53,6 +53,13 @@ export class QuejasWhatsappController {
     return this.mensajeria.estaConectado();
   }
 
+  /** Últimas encuestas de calificación enviadas u omitidas, con motivo, y la plantilla de Meta que usan. */
+  @Get('encuestas-envios')
+  @Permiso('reclamos', 'ver')
+  listarEnviosEncuesta() {
+    return this.quejasService.listarEnvios();
+  }
+
   /**
    * Obtiene el detalle de una queja específica de WhatsApp.
    */

@@ -23,6 +23,12 @@ Gestion del Libro de Reclamaciones virtual oficial de Caprichos y control de que
 4. Pulsar sobre el reclamo para abrir el detalle completo (datos del consumidor, tipo de reclamo o queja, producto o servicio contratado y pedido de [[caja]]).
 Ver tambien: [[caja]], [[clientes]]
 
+## Como se hace: Ver las ultimas encuestas de calificacion enviadas u omitidas
+1. En Reclamos, pestana WhatsApp, abrir el panel Ultimas encuestas enviadas.
+2. Arriba aparece la plantilla de Meta que se usa (caprichos_encuesta_posventa). Si no existe o no esta aprobada en Meta, el envio sale FALLIDO y se ve el error en la fila.
+3. Cada fila indica el pedido, el estado (Enviada, Respondida u Omitida) y el motivo de omision: sin celular, sin consentimiento, numero bloqueado o tope por celular.
+Ver tambien: [[mensajes]]
+
 ## Como se hace: Marcar un reclamo en revision
 1. Dentro del detalle del reclamo pendiente, pulsar el boton Pasar a En revision.
 2. Aparecera la ventana de confirmacion: ¿Pasar reclamo a revision?.

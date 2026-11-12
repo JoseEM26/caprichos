@@ -10,6 +10,8 @@ import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
 import { telefonoEnviable } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
+import { horaLimaEntera } from '../../../comun/fechas-lima';
+import { NumerosWhatsappService } from './numeros-whatsapp.service';
 
 export interface ParametrosChatbot {
   avisoSalidaActivo: boolean;
@@ -28,6 +30,11 @@ export interface ParametrosChatbot {
   reprogMaxIntentos: number;
   encuestaEsperaMin: number;
   encuestaPuntajeQueja: number;
+  /** Una encuesta por celular cada N días (1 a 90). */
+  encuestaTopeDias: number;
+  /** Horario de Lima en que se puede enviar: desde (0 a 23) hasta (1 a 24, exclusivo). */
+  encuestaHoraDesde: number;
+  encuestaHoraHasta: number;
   tiempoPrometidoMin: number;
 }
 
@@ -47,6 +54,12 @@ export interface ResumenCicloChatbot {
   avisosEncuesta: number;
   reprogVencidas?: number;
 }
+
+/** Número entero dentro de [min, max]; si falta o no es número, el valor por defecto. */
+const acotar = (v: unknown, defecto: number, min: number, max: number): number => {
+  const n = Number(v);
+  return v == null || !Number.isFinite(n) ? defecto : Math.min(max, Math.max(min, Math.round(n)));
+};
 
 const resumenVacio = (bloqueado: boolean): ResumenCicloChatbot => ({
   bloqueadoPorOtraInstancia: bloqueado,
@@ -80,6 +93,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
     @Optional() private readonly avisos?: AvisosPedidoService,
     @Optional() private readonly reprogramacion?: ReprogramacionService,
     @Optional() private readonly outbox?: OutboxWhatsappService,
+    @Optional() private readonly numeros?: NumerosWhatsappService,
   ) {}
 
   onModuleInit() {
@@ -126,6 +140,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       'reprog_max_intentos',
       'encuesta_espera_min',
       'encuesta_puntaje_queja',
+      'encuesta_tope_dias',
+      'encuesta_hora_desde',
+      'encuesta_hora_hasta',
       'tiempo_prometido_min',
     ];
 
@@ -153,8 +170,11 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       repartoEsperaMaxMin: Number(mapa.get('reparto_espera_max_min') ?? 10),
       reprogRespuestaMin: Number(mapa.get('reprog_respuesta_min') ?? 30),
       reprogMaxIntentos: Number(mapa.get('reprog_max_intentos') ?? 1),
-      encuestaEsperaMin: Number(mapa.get('encuesta_espera_min') ?? 30),
+      encuestaEsperaMin: acotar(mapa.get('encuesta_espera_min'), 30, 5, 1440),
       encuestaPuntajeQueja: Number(mapa.get('encuesta_puntaje_queja') ?? 2),
+      encuestaTopeDias: acotar(mapa.get('encuesta_tope_dias'), 7, 1, 90),
+      encuestaHoraDesde: acotar(mapa.get('encuesta_hora_desde'), 9, 0, 23),
+      encuestaHoraHasta: acotar(mapa.get('encuesta_hora_hasta'), 21, 1, 24),
       tiempoPrometidoMin: Number(mapa.get('tiempo_prometido_min') ?? 30),
     };
   }
@@ -356,7 +376,10 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       // 3. Encuesta posventa tras X minutos de la entrega, para todo pedido con teléfono (carta, bot, mozo y caja).
       //    Delivery y recojo: entregado_en (cocina o reparto). Mesa: entregado en mesa o el cobro.
       //    Para llevar/recoger que quedó LISTO y se cobró sin pasar por cocina (no fija entregado_en): el cobro vigente.
-      if (params.avisoEncuestaActivo) {
+      // Sin escribir de madrugada: fuera del horario (hora de Lima) se espera; lo entregado sigue en la ventana de 24 h
+      const horaLima = horaLimaEntera(ahora);
+      const enHorarioEncuesta = horaLima >= params.encuestaHoraDesde && horaLima < params.encuestaHoraHasta;
+      if (params.avisoEncuestaActivo && enHorarioEncuesta) {
         const limiteEntregado = new Date(ahora.getTime() - params.encuestaEsperaMin * 60000);
         // Solo entregas recientes: sin ventana, activar la encuesta enviaría a todo el historial
         const desde = new Date(ahora.getTime() - VENTANA_REVISION_MS);
@@ -364,8 +387,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         const pedidosParaEncuesta = await this.prisma.pedido.findMany({
           where: {
             estado: { notIn: ['ANULADO'] },
+            es_personal: false, // el pedido del personal no se encuesta
             cliente_telefono: { not: null },
-            encuestaPosventa: null, // Que no tenga encuesta enviada
+            encuestaPosventa: null, // Que no tenga encuesta enviada ni omitida
             OR: [
               { entregado_en: { gte: desde, lte: limiteEntregado } },
               { modalidad: 'MESA', entregado_mesa_en: { gte: desde, lte: limiteEntregado } },
@@ -376,13 +400,35 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
           select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },
         });
 
+        const topeDesde = new Date(ahora.getTime() - params.encuestaTopeDias * 86400000);
         for (const p of pedidosParaEncuesta) {
-          // Sin teléfono real (vacío o el relleno 999999999) no hay a quién encuestar: se omite sin error
-          const telefono = telefonoEnviable(p.cliente_telefono);
-          if (!telefono) continue;
+          // Cada omisión queda registrada con su motivo (y evita revisar el pedido otra vez)
+          const omitir = async (motivo: string) => {
+            await this.prisma.encuestaPosventa.create({
+              data: { pedido_id: p.id, estado: 'OMITIDA', motivo, enviada_en: ahora },
+            });
+            this.logger.log(JSON.stringify({ evento: 'encuesta_omitida', pedido: p.codigo, motivo }));
+          };
 
-          const acepta = await this.ventana24hService.tieneConsentimiento(telefono);
-          if (!acepta) continue;
+          // Sin teléfono real (vacío o el relleno 999999999) no hay a quién encuestar
+          const telefono = telefonoEnviable(p.cliente_telefono);
+          if (!telefono) { await omitir('SIN_CELULAR'); continue; }
+
+          if (!(await this.ventana24hService.tieneConsentimiento(telefono))) { await omitir('SIN_CONSENTIMIENTO'); continue; }
+
+          // Número bloqueado (spam) o del propio negocio
+          if (await this.numeros?.motivoOmision(telefono)) { await omitir('NUMERO_BLOQUEADO'); continue; }
+
+          // Tope por celular: una encuesta cada N días (cuida el costo de mensajes de Meta)
+          const reciente = await this.prisma.encuestaPosventa.findFirst({
+            where: {
+              estado: { in: ['ENVIADA', 'RESPONDIDA', 'EXPIRADA'] },
+              enviada_en: { gte: topeDesde },
+              pedido: { cliente_telefono: { in: [p.cliente_telefono!, telefono] } },
+            },
+            select: { id: true },
+          });
+          if (reciente) { await omitir('TOPE_POR_CELULAR'); continue; }
 
           const nombre = p.cliente_nombre || 'Cliente';
 
