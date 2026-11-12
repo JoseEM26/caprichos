@@ -19,6 +19,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { tieneRol } from '../acceso/roles-usuario';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { enmascararDni } from '../usuarios/usuarios.util';
@@ -641,12 +642,14 @@ export class CobrosService {
     dto: AnularCobroDto,
     usuario: any,
     ip?: string,
+    /** Solo lo pone anularCobroCajaCerrada (ADMIN): el cobro es de una caja cerrada y el efectivo se ajusta en la de hoy. */
+    cajaCerrada = false,
   ) {
     const motivo = dto?.motivo?.trim() || '';
-    if (motivo.length < 5) {
+    if (motivo.length < (cajaCerrada ? 10 : 5)) {
       throw new BadRequestException({
         codigo: 'MOTIVO_REQUERIDO',
-        mensaje: 'El motivo de anulación es obligatorio y debe tener al menos 5 caracteres',
+        mensaje: `El motivo de anulación es obligatorio y debe tener al menos ${cajaCerrada ? 10 : 5} caracteres`,
       });
     }
 
@@ -669,13 +672,26 @@ export class CobrosService {
 
     const ahora = new Date();
 
+    // Caja cerrada: se bloquean la del cobro y la de hoy, siempre de menor a mayor id (sin deadlock)
+    let cajaHoyId: bigint | null = null;
+    if (cajaCerrada) {
+      const { fechaIso } = obtenerFechaHoraLima();
+      const hoy = await this.prisma.caja.findUnique({ where: { fecha: new Date(`${fechaIso}T00:00:00.000Z`) } });
+      if (!hoy || hoy.estado !== 'ABIERTA') throw this.errorSinCajaHoy();
+      cajaHoyId = hoy.id;
+    }
+
     // 2. Con la caja bloqueada: el cobro se revisa y se anula en una sola operación
-    const cobro = await this.prisma.$transaction(async (tx) => {
-      await bloquearCaja(tx, cobroCaja.caja_id);
+    const { cobro, ajuste, efectivo } = await this.prisma.$transaction(async (tx) => {
+      const ids = [cobroCaja.caja_id, ...(cajaHoyId !== null ? [cajaHoyId] : [])]
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      const bloqueadas = new Map<string, any>();
+      for (const cid of ids) bloqueadas.set(String(cid), await bloquearCaja(tx, cid));
 
       const actual = await tx.cobro.findUnique({
         where: { id: cobroId },
-        include: { caja: true, pagos: true },
+        include: { caja: true, pagos: true, pedido: { select: { codigo: true } } },
       });
 
       if (!actual) {
@@ -698,8 +714,16 @@ export class CobrosService {
         );
       }
 
-      // RN-CAP-096: solo con el cobro en la caja abierta
-      if (actual.caja.estado !== 'ABIERTA') {
+      if (cajaCerrada && actual.caja.estado === 'ABIERTA') {
+        throw new HttpException(
+          { codigo: 'CAJA_ABIERTA', mensaje: 'La caja de este cobro sigue abierta: usa la anulación normal.' },
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (cajaCerrada && bloqueadas.get(String(cajaHoyId))?.estado !== 'ABIERTA') throw this.errorSinCajaHoy();
+
+      // RN-CAP-096: solo con el cobro en la caja abierta (el ADMIN usa anularCobroCajaCerrada)
+      if (!cajaCerrada && actual.caja.estado !== 'ABIERTA') {
         throw new HttpException(
           {
             codigo: 'CAJA_CERRADA',
@@ -735,7 +759,26 @@ export class CobrosService {
         },
       });
 
-      return actual;
+      // Caja cerrada: no se toca; el efectivo que ya no entra sale de la caja de hoy como egreso de ajuste
+      let ajuste: { id: bigint } | null = null;
+      const efectivo = enPesos(
+        actual.pagos
+          .filter((p) => (p.medio || '').trim().toUpperCase() === 'EFECTIVO')
+          .reduce((t, p) => t + aCentimos(p.monto) + aCentimos(p.propina), 0),
+      );
+      if (cajaCerrada && efectivo > 0) {
+        ajuste = await tx.movimientoCaja.create({
+          data: {
+            caja_id: cajaHoyId!,
+            tipo: 'EGRESO',
+            monto: new Prisma.Decimal(efectivo),
+            motivo: `Anulación de cobro de caja cerrada (pedido ${actual.pedido?.codigo ?? actual.pedido_id})`,
+          },
+          select: { id: true },
+        });
+      }
+
+      return { cobro: actual, ajuste, efectivo };
     });
 
     // el cobro anulado devuelve el stock de insumos y reversa los puntos; los productos que controlan stock
@@ -772,7 +815,7 @@ export class CobrosService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',
-      accion: 'ANULAR_COBRO',
+      accion: cajaCerrada ? 'ANULAR_COBRO_CAJA_CERRADA' : 'ANULAR_COBRO',
       resultado: 'OK',
       entidad: 'cobro',
       entidadId: cobro.id,
@@ -789,6 +832,13 @@ export class CobrosService {
         motivo: dto.motivo.trim(),
         pago_estado: 'PENDIENTE',
         comprobante_baja: comprobanteBaja,
+        ...(cajaCerrada
+          ? {
+              caja_original_id: cobro.caja_id.toString(),
+              movimiento_ajuste_id: ajuste ? ajuste.id.toString() : null,
+              egreso_efectivo: efectivo,
+            }
+          : {}),
       },
       ip,
     });
@@ -804,6 +854,7 @@ export class CobrosService {
       motivo_anulacion: dto.motivo.trim(),
       pago_estado: 'PENDIENTE',
       comprobante_baja: comprobanteBaja,
+      ...(cajaCerrada ? { movimiento_ajuste_id: ajuste ? ajuste.id.toString() : null, egreso_efectivo: efectivo } : {}),
       // Caja ve qué pasó con la boleta/factura: baja hecha, anulada sin enviar o pendiente de reintento
       aviso_comprobante: comprobanteBaja
         ? comprobanteBaja.estado === 'PENDIENTE_BAJA'
@@ -811,6 +862,27 @@ export class CobrosService {
           : `${comprobanteBaja.comprobante} se dio de baja (${comprobanteBaja.estado}).`
         : null,
     };
+  }
+
+  private errorSinCajaHoy() {
+    return new HttpException(
+      { codigo: 'SIN_CAJA_HOY', mensaje: 'Abre la caja de hoy para registrar el ajuste de efectivo y vuelve a intentar.' },
+      HttpStatus.CONFLICT,
+    );
+  }
+
+  /**
+   * Anula el cobro de una caja ya CERRADA. Solo ADMIN (se autoriza solo, queda auditado), motivo de 10+ caracteres.
+   * La caja cerrada y su cierre no se tocan; el efectivo del cobro sale como egreso de ajuste en la caja abierta de hoy.
+   */
+  async anularCobroCajaCerrada(id: bigint | string | number, dto: AnularCobroDto, usuario: any, ip?: string) {
+    if (!tieneRol(usuario ?? { rol: '' }, 'ADMIN')) {
+      throw new HttpException(
+        { codigo: 'SOLO_ADMIN', mensaje: 'Pide al administrador que lo anule: la caja de este cobro ya está cerrada.' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return this.anularCobro(id, dto, usuario, ip, true);
   }
 
   /**

@@ -14,6 +14,7 @@ import { CobrosService } from './cobros.service';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
+import { AnularCobroCerradaDto } from './dto/anular-cobro-cerrada.dto';
 import { RechazarCobroMozoDto } from './dto/rechazar-cobro-mozo.dto';
 import { CrearMovimientoDto } from './dto/movimiento.dto';
 import { AnularMovimientoDto } from './dto/anular-movimiento.dto';
@@ -62,6 +63,13 @@ export class CajaController {
   async anularCobro(@Param('id') id: string, @Body() dto: AnularCobroDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cobrosService.anularCobro(id, dto, req.usuario, ip);
+  }
+
+  @Post('cobros/:id/anular-cerrada')
+  @Permiso('caja', 'cobrar')
+  async anularCobroCajaCerrada(@Param('id') id: string, @Body() dto: AnularCobroCerradaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cobrosService.anularCobroCajaCerrada(id, dto, req.usuario, ip);
   }
 
   @Post('movimientos')

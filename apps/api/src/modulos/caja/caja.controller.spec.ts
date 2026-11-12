@@ -42,6 +42,7 @@ describe('CajaController', () => {
     cobrosServiceMock = {
       cobrar: jest.fn().mockResolvedValue({ id: '1', total: 50, pago_estado: 'PAGADO' }),
       anularCobro: jest.fn().mockResolvedValue({ id: '1', pago_estado: 'PENDIENTE' }),
+      anularCobroCajaCerrada: jest.fn().mockResolvedValue({ id: '1', pago_estado: 'PENDIENTE' }),
       listarPorCobrar: jest.fn().mockResolvedValue([]),
       marcarCoordinado: jest.fn().mockResolvedValue({ id: '1', pago_estado: 'COORDINADO' }),
     };
@@ -123,6 +124,12 @@ describe('CajaController', () => {
   it('listarMovimientos delega a cajaService.listarMovimientos', async () => {
     await controller.listarMovimientos();
     expect(cajaServiceMock.listarMovimientos).toHaveBeenCalled();
+  });
+
+  it('anularCobroCajaCerrada delega a cobrosService.anularCobroCajaCerrada', async () => {
+    const dto = { motivo: 'Cobro duplicado de ayer' };
+    await controller.anularCobroCajaCerrada('10', dto, { usuario: mockUsuario, ip: '127.0.0.1' });
+    expect(cobrosServiceMock.anularCobroCajaCerrada).toHaveBeenCalledWith('10', dto, mockUsuario, '127.0.0.1');
   });
 
   it('anularMovimiento delega a cajaService.anularMovimiento', async () => {

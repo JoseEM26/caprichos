@@ -21,6 +21,8 @@ export interface ModalAnularProps {
   /** Ya no cambia nada: todo pedido se anula completo (se deja para no romper a quien lo pasa). */
   completo?: boolean;
   cobroId?: string | number;
+  /** Solo el administrador puede anular el cobro de una caja ya cerrada. */
+  esAdmin?: boolean;
   /** Detalle del pedido para el encabezado (cliente, modalidad, estado, total, líneas). Opcional. */
   pedido?: Pedido | null;
   alCerrar: () => void;
@@ -43,6 +45,7 @@ export function ModalAnular({
   codigoPedido,
   esCobro = false,
   cobroId,
+  esAdmin = false,
   pedido,
   alCerrar,
   alAnularExitoso,
@@ -51,6 +54,9 @@ export function ModalAnular({
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
+  // El servidor dijo CAJA_CERRADA: el administrador puede seguir con el ajuste en la caja de hoy
+  const [cajaCerrada, setCajaCerrada] = useState<boolean>(false);
+  const minimoMotivo = cajaCerrada ? 10 : 5;
   // Solo con el Control de almacén encendido y consumo registrado (el API avisa con tieneConsumoAlmacen)
   const [consumoAlmacen, setConsumoAlmacen] = useState<'MERMA' | 'DEVOLVER'>('MERMA');
   const preguntaAlmacen = !esCobro && pedido?.tieneConsumoAlmacen === true;
@@ -60,8 +66,8 @@ export function ModalAnular({
   const validarCampos = (): boolean => {
     setErrorMensaje('');
     const motivoTrim = motivo.trim();
-    if (motivoTrim.length < 5) {
-      setErrorMensaje('El motivo es obligatorio y debe tener al menos 5 caracteres.');
+    if (motivoTrim.length < minimoMotivo) {
+      setErrorMensaje(`El motivo es obligatorio y debe tener al menos ${minimoMotivo} caracteres.`);
       return false;
     }
 
@@ -95,14 +101,22 @@ export function ModalAnular({
       }
 
       if (esCobro && idCobro) {
-        await pedidosApi.anularCobro(idCobro, motivoParaEnviar);
+        if (cajaCerrada) await pedidosApi.anularCobroCajaCerrada(idCobro, motivoParaEnviar);
+        else await pedidosApi.anularCobro(idCobro, motivoParaEnviar);
       } else {
         if (preguntaAlmacen) await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar, undefined, consumoAlmacen);
         else await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar);
       }
       alAnularExitoso();
     } catch (err: any) {
-      if (err instanceof ErrorApi) {
+      if (err instanceof ErrorApi && err.codigo === 'CAJA_CERRADA' && esCobro) {
+        setCajaCerrada(true);
+        setErrorMensaje(
+          esAdmin
+            ? 'La caja de este cobro ya está cerrada. Como administrador puedes anularlo de todos modos.'
+            : 'La caja de este cobro ya está cerrada. Pide al administrador que lo anule.',
+        );
+      } else if (err instanceof ErrorApi) {
         setErrorMensaje(err.message || 'Error al anular');
       } else {
         setErrorMensaje(err?.message || 'Error al procesar la anulación');
@@ -281,6 +295,13 @@ export function ModalAnular({
               {errorMensaje}
             </div>
           )}
+
+          {cajaCerrada && esAdmin && (
+            <div className="ad-aviso" role="note" data-testid="aviso-caja-cerrada">
+              Si sigues, el pedido vuelve a «por cobrar» y se registra un egreso de ajuste por el efectivo de este cobro en la caja de hoy.
+              La caja cerrada no cambia. Necesitas tener la caja de hoy abierta y escribir un motivo de al menos 10 caracteres.
+            </div>
+          )}
         </div>
 
         <div className="ad-pie">
@@ -295,11 +316,11 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < 5}
+            disabled={enviando || motivo.trim().length < minimoMotivo || (cajaCerrada && !esAdmin)}
             onClick={iniciarAnulacion}
             style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
-            Confirmar anulación
+            {cajaCerrada ? 'Anular de todos modos (caja cerrada)' : 'Confirmar anulación'}
           </Boton>
         </div>
       </div>
@@ -312,7 +333,7 @@ export function ModalAnular({
               ? `¿Anular el cobro de ${codigoPedido}?`
               : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.`}
+          mensaje={`${cajaCerrada ? 'La caja ya está cerrada: el pedido vuelve a por cobrar y se registra un egreso de ajuste en la caja de hoy. ' : ''}${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}
