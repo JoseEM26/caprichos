@@ -23,6 +23,7 @@ const horaLima = (d: Date): string =>
 const DIAS_SEM = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const TOPE_CUMPLES = 6;
+const TOPE_LISTA_CUMPLES = 100;
 const VENTANA_POR_DEFECTO = 60;
 
 const esBisiesto = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -220,6 +221,61 @@ export class EscritorioOperativoService {
       const nombre = [p.nombres.trim().split(/\s+/)[0], (p.apellidos ?? '').trim().split(/\s+/)[0]].filter(Boolean).join(' ');
       conFecha.push({ nombre, rol: ROLES.find((r) => r.codigo === c.rol)?.nombre ?? c.rol, dia: p.cumple_dia, mes: p.cumple_mes });
     }
-    return { ventanaDias: ventana, sinFecha, proximos: proximosCumpleanos(conFecha, diaLima(ahora), ventana) };
+    return { ventanaDias: ventana, sinFecha, proximos: proximosCumpleanos(conFecha, diaLima(ahora), ventana, TOPE_LISTA_CUMPLES) };
+  }
+
+  /**
+   * Cumpleaños de CLIENTES (solo con permiso clientes/ver). Sin edad ni fecha completa; celular enmascarado.
+   * «Felicitar» solo se ofrece si ya hay un chat con ventana de 24 h abierta (así no se paga una plantilla de Meta);
+   * el celular completo sale únicamente en ese caso y a quien tiene mensajes/ver, para abrir el chat.
+   */
+  async cumpleanosClientes(usuario: UsuarioAutenticado, dias?: number, ahora: Date = new Date()) {
+    const ventana = Number.isFinite(dias) && (dias as number) >= 1 ? Math.min(Math.floor(dias as number), 60) : 31;
+    const cuenta = await this.prisma.userAccount.findUnique({ where: { party_id: usuario.partyId }, select: { id: true } });
+    const permisos = new Set(cuenta ? await permisosDeCuenta(this.prisma, cuenta.id, usuario.roles ?? [usuario.rol]) : []);
+    const puedeChat = permisos.has('mensajes/ver') || (usuario.roles ?? [usuario.rol]).includes('ADMIN');
+    const roles = await this.prisma.partyRole.findMany({
+      where: { rol: 'CLIENTE', hasta: null, party: { persona: { cumple_dia: { not: null }, cumple_mes: { not: null } } } },
+      select: { party: { select: { persona: { select: { nombres: true, apellidos: true, cumple_dia: true, cumple_mes: true } }, cuentaCliente: { select: { telefono: true } } } } },
+    });
+    const base: { nombre: string; rol: string; dia: number; mes: number }[] = [];
+    const celulares: (string | null)[] = [];
+    for (const r of roles) {
+      const p = r.party.persona;
+      if (!p?.cumple_dia || !p.cumple_mes) continue;
+      const nombre = [p.nombres.trim().split(/\s+/)[0], (p.apellidos ?? '').trim().split(/\s+/)[0]].filter(Boolean).join(' ');
+      base.push({ nombre, rol: String(celulares.length), dia: p.cumple_dia, mes: p.cumple_mes });
+      celulares.push(r.party.cuentaCliente?.telefono ?? null);
+    }
+    const proximos = proximosCumpleanos(base, diaLima(ahora), ventana, TOPE_LISTA_CUMPLES);
+    const tels = proximos.map((c) => celulares[Number(c.rol)]).filter((t): t is string => !!t);
+    const convs = tels.length
+      ? await this.prisma.conversacion.findMany({ where: { telefono: { in: tels.map((t) => `51${t}`) } }, select: { id: true, telefono: true } })
+      : [];
+    const abiertas = convs.length
+      ? await this.prisma.whatsappMensaje.findMany({
+          where: { conversacion_id: { in: convs.map((c) => c.id) }, direccion: 'ENTRANTE', creado_en: { gte: new Date(ahora.getTime() - 24 * 3600000) } },
+          select: { conversacion_id: true },
+          distinct: ['conversacion_id'],
+        })
+      : [];
+    const conVentana = new Set(abiertas.map((m) => m.conversacion_id?.toString()));
+    return {
+      ventanaDias: ventana,
+      proximos: proximos.map((c) => {
+        const tel = celulares[Number(c.rol)];
+        const conv = tel ? convs.find((v) => v.telefono === `51${tel}`) : undefined;
+        const abierta = !!conv && conVentana.has(conv.id.toString());
+        return {
+          nombre: c.nombre,
+          fecha: c.fecha,
+          enDias: c.enDias,
+          etiqueta: c.etiqueta,
+          celular: tel ? `${tel[0]}•• ••• ${tel.slice(-3)}` : null,
+          ventanaAbierta: abierta,
+          chatCelular: abierta && puedeChat ? tel : null,
+        };
+      }),
+    };
   }
 }

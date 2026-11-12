@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
+import { SaludoCumpleanos } from './SaludoCumpleanos';
 import { esSoloMarketing } from '../comun/rolesUsuario';
 import { Confirmar } from '../comun/Confirmar';
 import { Icono } from '../comun/Icono';
@@ -873,6 +874,8 @@ export function AdminShell() {
         </button>
       )}
       {esRepartidorMovil && location.pathname !== '/admin/repartos' && barraInferiorRepartidor}
+
+      <SaludoCumpleanos />
 
       <Confirmar
         abierto={confirmarSalida}

@@ -3,6 +3,7 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
+import { diaCalendarioLima, esCumpleanosHoy } from '../../comun/fechas-lima';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -60,6 +61,7 @@ export class AuthService {
     roles: string[];
     debeCambiar: boolean;
     permisos: string[];
+    cumpleHoy: boolean;
   }> {
     const cuenta = await this.prisma.userAccount.findUnique({
       where: { party_id: partyId },
@@ -82,6 +84,8 @@ export class AuthService {
       roles,
       debeCambiar: cuenta.debe_cambiar,
       permisos: await permisosDeCuenta(this.prisma, cuenta.id, roles),
+      // Solo "hoy es tu cumpleaños": la fecha nunca sale del servidor
+      cumpleHoy: esCumpleanosHoy(cuenta.party.persona?.cumple_dia, cuenta.party.persona?.cumple_mes, diaCalendarioLima()),
     };
   }
 

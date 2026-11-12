@@ -15,3 +15,15 @@ export function sumarDiasIso(fecha: string, dias: number): string {
 /** Hora entera (0 a 23) en Lima de un instante. */
 export const horaLimaEntera = (d: Date): number =>
   Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Lima', hour: 'numeric', hourCycle: 'h23' }).format(d));
+
+/** Día calendario de Lima (AAAA-MM-DD) de un instante. */
+export const diaCalendarioLima = (d: Date = new Date()): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(d);
+
+/** ¿Hoy (AAAA-MM-DD, día de Lima) es el cumpleaños dia/mes? El 29/02 se celebra el 28/02 en años no bisiestos. */
+export function esCumpleanosHoy(dia: number | null | undefined, mes: number | null | undefined, hoy: string): boolean {
+  if (!dia || !mes) return false;
+  const [y, m, d] = hoy.split('-').map(Number);
+  const bisiesto = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const diaCelebra = mes === 2 && dia === 29 && !bisiesto ? 28 : dia;
+  return m === mes && d === diaCelebra;
+}
