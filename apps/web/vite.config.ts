@@ -78,7 +78,7 @@ export default defineConfig({
         // Solo la cáscara de la app: nada de datos de negocio (precios, pedidos, caja) entra en la caché
         globPatterns: ['**/*.{js,css,html}', 'manifest.webmanifest', 'icons/*.png', 'logo.webp', 'favicon.png'],
         // El bundle principal pesa ~2,9 MB (724 kB gzip): por encima del límite de 2 MiB por defecto
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // ponytail: el bundle principal ya pasa de 4 MB; dividirlo por rutas si sigue creciendo
       },
       devOptions: {
         enabled: false,
