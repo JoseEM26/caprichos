@@ -17,6 +17,7 @@ import {
 import { DialogoCorregirMedio, ETIQUETA_MEDIO } from './CorreccionesMedios';
 import { CuadreCaja, type CierrePayload } from './CuadreCaja';
 import { PendientesCobroCierre } from './PendientesCobroCierre';
+import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
@@ -56,6 +57,9 @@ export function CierreView() {
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
   const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
   const [errorPendientes, setErrorPendientes] = useState(false);
+  const [sinTerminar, setSinTerminar] = useState<PendienteCobro[]>([]);
+  const [motivoSinTerminar, setMotivoSinTerminar] = useState('');
+  const sinTerminarHuerfanos = sinTerminar.filter((p) => new Date(p.fecha).toLocaleDateString('en-CA', { timeZone: 'America/Lima' }) < hoyLima()).length;
   const [pedidosCobrados, setPedidosCobrados] = useState<CobroTurno[]>([]);
   // Fecha (AAAA-MM-DD) de la caja que se cierra: la abierta, sea de hoy o de un día anterior
   const [fechaTurno, setFechaTurno] = useState(hoyLima());
@@ -188,6 +192,12 @@ export function CierreView() {
       } catch {
         setPedidosAbiertos([]);
         setErrorPendientes(true);
+      }
+      // 6. Pedidos ni entregados ni anulados (pagados o no): también impiden cerrar (el servidor lo vuelve a validar)
+      try {
+        setSinTerminar((await cierreApi.listarSinTerminar()) ?? []);
+      } catch {
+        setSinTerminar([]);
       }
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los datos de caja y cierre');
@@ -432,6 +442,18 @@ export function CierreView() {
           cajero={cajeroNombre}
           pendientesCount={pedidosAbiertos.length}
           motivoSinCobro={motivoSinCobro}
+          sinTerminarCount={sinTerminar.length}
+          motivoSinTerminar={motivoSinTerminar}
+          sinTerminarPanel={
+            <PedidosSinTerminarCierre
+              pedidos={sinTerminar}
+              setPedidos={setSinTerminar}
+              alCambiar={cargarTurno}
+              esAdmin={esAdmin}
+              motivo={motivoSinTerminar}
+              alJustificar={setMotivoSinTerminar}
+            />
+          }
           pendientesPanel={
             <PendientesCobroCierre
               pendientes={pedidosAbiertos}
@@ -550,6 +572,12 @@ export function CierreView() {
       {/* 2. PESTAÑA: TURNO ACTUAL */}
       {tabActiva === 'turno' && (
         <>
+          {/* Pedidos que quedaron sin terminar en cierres anteriores */}
+          {cajaAbierta && sinTerminarHuerfanos > 0 && (
+            <div role="status" data-testid="aviso-huerfanos" style={{ border: '1.5px solid var(--cp-rust, #B2500F)', borderRadius: 12, padding: '10px 14px', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
+              Hay {sinTerminarHuerfanos} {sinTerminarHuerfanos === 1 ? 'pedido' : 'pedidos'} de días anteriores sin terminar (ni entregados ni anulados). Entrégalos o anúlalos antes de cerrar esta caja.
+            </div>
+          )}
           {/* Tarjeta de estado de caja */}
           <div
             style={{

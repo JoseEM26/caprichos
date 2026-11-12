@@ -25,6 +25,7 @@ Gestion del cierre formal de la caja diaria y cambio de turno. Implementa el pro
 2. Si aparecen pedidos en la lista, la caja no podra cerrarse por regla del sistema.
 3. Para cada pedido pendiente, pulsar Ir a cobrar en [[caja]] o proceder a anularlo si fue cancelado o desistido.
 4. Un pedido ya Entregado que sigue sin cobrar (Para llevar, Recoger o Delivery digital) tambien impide cerrar: cobralo o anulalo. Si no se puede, solo el Administrador puede cerrar justificandolo: en el panel escribe un motivo (minimo 10 letras) y pulsa Justificar y permitir el cierre. El sistema avisa con la lista (ENTREGADOS_SIN_COBRAR) y deja auditado el cierre con el motivo. Si ademas hay pedidos todavia en curso, siguen bloqueando.
+5. Tampoco se puede cerrar si queda algun pedido sin terminar: que no este Entregado ni Anulado, aunque ya este pagado (por ejemplo un delivery Listo o En camino). El panel Pedidos sin terminar lo lista (codigo, cliente, modalidad, estado, pago y total) con Ver pedido, Ir a Repartos (delivery), Entregar y Anular con motivo; el boton de cerrar sigue deshabilitado hasta que la lista quede vacia. El sistema responde PEDIDOS_SIN_TERMINAR. Solo el Administrador puede cerrar justificandolo: escribe un motivo (minimo 10 letras) y pulsa Justificar sin terminar y permitir el cierre; queda auditado como CIERRE_PEDIDOS_SIN_TERMINAR. Si en la caja siguiente quedan pedidos de dias anteriores sin terminar, un aviso en rojo lo recuerda.
 Requiere: [[caja]]
 Antes: [[caja]]
 Ver tambien: [[caja]]
@@ -84,6 +85,7 @@ Ver tambien: [[propinas]]
 - La clasificacion del semaforo de IA en los vouchers es un apoyo para agilizar la deteccion de anomalias o duplicados, pero no reemplaza la auditoria del cajero o administrador al cerrar turno.
 - Los comprobantes en estado Ilegible o Raro exigen verificacion manual obligatoria contra los movimientos de la cuenta receptora antes de autorizar el cierre.
 - El cajero nunca puede ver los montos esperados por el sistema durante el arqueo; este mecanismo ciego protege la integridad de la recaudacion.
+- Un pedido pagado pero sin entregar (Listo o En camino) tambien impide cerrar: entregalo o anulalo desde el panel Pedidos sin terminar.
 - Un cierre no se puede revertir una vez emitido; queda registrado permanentemente en la pestana Historial de cierres.
 - No se puede omitir el arqueo de monedas pequenas; cada denominacion debe contarse fielmente.
 

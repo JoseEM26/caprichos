@@ -41,6 +41,8 @@ export interface CierrePayload {
   nota?: string;
   /** Solo el administrador: justifica cerrar con pedidos entregados sin cobrar */
   motivoEntregadosSinCobrar?: string;
+  /** Solo el administrador: justifica cerrar con pedidos sin terminar */
+  motivoPedidosSinTerminar?: string;
 }
 
 export interface CuadreCajaProps {
@@ -54,6 +56,10 @@ export interface CuadreCajaProps {
   motivoSinCobro?: string;
   /** Panel de pedidos sin cobrar (se abre en la misma pantalla con «resolver») */
   pendientesPanel?: ReactNode;
+  /** Pedidos ni entregados ni anulados (pagados o no): impiden cerrar; el ADMIN los justifica con un motivo */
+  sinTerminarCount?: number;
+  motivoSinTerminar?: string;
+  sinTerminarPanel?: ReactNode;
   repartidores: RepartidorPorLiquidar[];
   onRecibirRepartidor: (r: RepartidorPorLiquidar) => void;
   ajustesMedio?: AjusteMedio[];
@@ -93,6 +99,9 @@ export function CuadreCaja({
   pendientesCount,
   motivoSinCobro,
   pendientesPanel,
+  sinTerminarCount = 0,
+  motivoSinTerminar,
+  sinTerminarPanel,
   repartidores,
   onRecibirRepartidor,
   ajustesMedio = [],
@@ -152,7 +161,8 @@ export function CuadreCaja({
   const estadoTotal = estadoDif(total);
 
   const pendientesRepartidor = repartidores.filter((r) => r.pendiente > 0);
-  const bloqueado = (pendientesCount > 0 && !motivoSinCobro) || pendientesRepartidor.length > 0;
+  const sinTerminarBloquea = sinTerminarCount > 0 && !motivoSinTerminar;
+  const bloqueado = (pendientesCount > 0 && !motivoSinCobro) || sinTerminarBloquea || pendientesRepartidor.length > 0;
 
   // ---------- Acciones del conteo ----------
   const fijarCantidad = (clave: string, valor: string) =>
@@ -188,6 +198,7 @@ export function CuadreCaja({
     }
     const base: CierrePayload = { medios, nota: borrador.nota.trim() || undefined };
     if (motivoSinCobro && pendientesCount > 0) base.motivoEntregadosSinCobrar = motivoSinCobro;
+    if (motivoSinTerminar && sinTerminarCount > 0) base.motivoPedidosSinTerminar = motivoSinTerminar;
     if (borrador.modo === 'total') {
       if (efectivoTocado) base.efectivoTotal = efectivoContado;
     } else {
@@ -253,6 +264,16 @@ export function CuadreCaja({
                 </button>
               </div>
             )}
+            {sinTerminarCount > 0 && (
+              <div className="cc-fila-aviso">
+                <span>
+                  <b>
+                    {sinTerminarCount} {sinTerminarCount === 1 ? 'pedido sin terminar' : 'pedidos sin terminar'}
+                  </b>{' '}
+                  · hay que entregarlos o anularlos para cerrar
+                </span>
+              </div>
+            )}
             {pendientesRepartidor.map((r) => (
               <div key={r.repartidorPartyId} className="cc-fila-aviso">
                 <span>
@@ -272,6 +293,7 @@ export function CuadreCaja({
               : 'Sin pendientes: no hay pedidos sin cobrar ni repartidores por liquidar.'}
           </div>
         )}
+        {sinTerminarCount > 0 && <div className="cc-pendientes">{sinTerminarPanel}</div>}
         {verPendientes && pendientesCount > 0 && <div className="cc-pendientes">{pendientesPanel}</div>}
         {devoluciones.length > 0 && (
           <p className="cc-peq" data-testid="cc-devoluciones">

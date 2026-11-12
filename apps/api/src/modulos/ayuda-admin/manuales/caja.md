@@ -46,6 +46,7 @@ Despues: [[caja]]
 2. Cobrar un pedido y aprobar un pago (Aprobar el pago en Mensajes, confirmar el pago en Pedidos y Marcar coordinado) solo se pueden con la caja de hoy abierta. Con la caja cerrada, el sistema muestra "La caja está cerrada. Abre caja para cobrar y aprobar pagos.".
 3. Mientras la caja este cerrada, una franja roja arriba de Pedidos y caja, Caja y cierres y Mensajes lo recuerda, con el boton Abrir caja (lleva a Caja y cierres). Los pedidos sin cobrar muestran la etiqueta Caja cerrada; el estado del pedido no cambia.
 4. Cada dia, si el local ya abrio hace 15 minutos y la caja no se ha abierto, la campana avisa "Caja sin abrir" una sola vez para Caja. Los dias cerrados o feriados no avisan. Los minutos se cambian con el parametro caja_aviso_apertura_min.
+5. Al cerrar la caja no puede quedar ningun pedido sin terminar: todos deben estar Entregados o Anulados, aunque ya esten pagados (un delivery Listo o En camino bloquea el cierre con PEDIDOS_SIN_TERMINAR). Solo el Administrador puede cerrar con un motivo escrito; ver [[cierre]].
 
 ## Como se hace: mover un voucher al pedido correcto
 1. Si el comprobante de un cliente quedó ligado a otro de sus pedidos (la regla automática toma el pedido pendiente más reciente), abre el pedido en Confirmar pago o el chat en Mensajes.
