@@ -52,6 +52,7 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
 
 import { AvisoComerEnLocal } from './AvisoComerEnLocal';
 import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
+import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
 
 export function FormularioCheckout({
   estadoLocal,
@@ -85,6 +86,13 @@ export function FormularioCheckout({
 
   // Control de apartados (pasos 1, 2, 3)
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const { emitir: emitirEvento } = useEventoCarta();
+  useEffect(() => {
+    if (checkoutAbierto) emitirEvento('CHECKOUT');
+  }, [checkoutAbierto, emitirEvento]);
+  useEffect(() => {
+    if (checkoutAbierto && paso === 3) emitirEvento('PAGO');
+  }, [checkoutAbierto, paso, emitirEvento]);
   const [pasoMaximo, setPasoMaximo] = useState<1 | 2 | 3>(1);
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
   const contenidoRef = useRef<HTMLDivElement>(null);
@@ -846,6 +854,7 @@ export function FormularioCheckout({
       const respuesta = await api.post<any>('/pedidos', payload, {
         headers: {
           'Idempotency-Key': claveIdempotenciaRef.current,
+          ...cabeceraSesionCarta(),
         },
       });
 

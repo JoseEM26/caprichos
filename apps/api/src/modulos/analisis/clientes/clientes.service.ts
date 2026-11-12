@@ -126,41 +126,93 @@ export class ClientesAnalisisService {
   }
 
   /**
-   * Embudo de la carta con lo que SÍ se guarda: no hay visitas ni carrito en el servidor (el carrito vive en el navegador).
-   * Pasos: pedidos creados en la carta → con pago confirmado → entregados. Los anulados salen aparte.
+   * Embudo de la carta: visitó → agregó al carrito → abrió el checkout → llegó al pago (eventos anónimos por sesión de navegador,
+   * tabla carta_evento) → creó el pedido → pagado → entregado (pedidos de la carta enlazados a una sesión medida).
+   * Cada sesión cuenta en la etapa MÁS ALTA que alcanzó y en todas las anteriores, así que el embudo nunca crece hacia abajo.
+   * Solo respeta las fechas (modalidad, canal y turno no aplican a una visita). Sin celulares ni nombres.
    */
   private async embudoCarta(r: RangoAnalisis) {
-    const [f] = await this.prisma.$queryRaw<Fila[]>`
-      SELECT COUNT(*)::int AS creados,
-             COUNT(*) FILTER (WHERE estado <> 'ANULADO' AND pago_estado = 'PAGADO')::int AS pagados,
-             COUNT(*) FILTER (WHERE estado = 'ENTREGADO')::int AS entregados,
-             COUNT(*) FILTER (WHERE estado = 'ANULADO')::int AS anulados
-      FROM pedido
-      WHERE canal = 'CARTA' AND creado_en >= ${r.inicio} AND creado_en < ${r.fin}
-      ${filtrosSql({ ...r, canal: null })}`;
-    const creados = Number(f?.creados ?? 0);
-    const paso = (id: string, nombre: string, n: number) => ({
-      id,
-      nombre,
-      n,
-      pctDelAnterior: null as number | null,
-      pctDeCreados: creados ? r1((n / creados) * 100) : null,
+    const [sesiones, pedidos, [primero]] = await Promise.all([
+      this.prisma.$queryRaw<Fila[]>`
+        WITH s AS (
+          SELECT sesion_id,
+                 MAX(CASE evento WHEN 'VISITA' THEN 1 WHEN 'CARRITO' THEN 2 WHEN 'CHECKOUT' THEN 3 WHEN 'PAGO' THEN 4 END) AS rango,
+                 (array_agg(dispositivo ORDER BY id DESC))[1] AS dispositivo, bool_or(con_sesion) AS con_sesion
+          FROM carta_evento
+          WHERE sesion_id IS NOT NULL AND evento <> 'PEDIDO' AND creado_en >= ${r.inicio} AND creado_en < ${r.fin}
+          GROUP BY sesion_id)
+        SELECT dispositivo, con_sesion, rango, COUNT(*)::int AS n FROM s WHERE rango IS NOT NULL GROUP BY 1, 2, 3`,
+      this.prisma.$queryRaw<Fila[]>`
+        SELECT COALESCE(e.dispositivo, 'DESCONOCIDO') AS dispositivo, COALESCE(e.con_sesion, false) AS con_sesion,
+               (e.sesion_id IS NOT NULL) AS medido, COUNT(*)::int AS creados,
+               COUNT(*) FILTER (WHERE p.estado <> 'ANULADO' AND p.pago_estado = 'PAGADO')::int AS pagados,
+               COUNT(*) FILTER (WHERE p.estado = 'ENTREGADO')::int AS entregados,
+               COUNT(*) FILTER (WHERE p.estado = 'ANULADO')::int AS anulados
+        FROM pedido p LEFT JOIN carta_evento e ON e.pedido_id = p.id AND e.evento = 'PEDIDO'
+        WHERE p.canal = 'CARTA' AND p.creado_en >= ${r.inicio} AND p.creado_en < ${r.fin}
+        GROUP BY 1, 2, 3`,
+      this.prisma.$queryRaw<Fila[]>`SELECT MIN(creado_en) AS primero FROM carta_evento`,
+    ]);
+
+    // matriz[grupo][etapa] con etapas 0..6; los grupos de dispositivo y de sesión se llenan a la vez
+    const GRUPOS = ['total', 'movil', 'escritorio', 'conSesion', 'sinSesion'] as const;
+    const m = Object.fromEntries(GRUPOS.map((g) => [g, Array(7).fill(0)])) as Record<(typeof GRUPOS)[number], number[]>;
+    const sumar = (disp: string, con: boolean, etapa: number, n: number) => {
+      m.total[etapa] += n;
+      if (disp === 'MOVIL') m.movil[etapa] += n;
+      else if (disp === 'ESCRITORIO') m.escritorio[etapa] += n;
+      (con ? m.conSesion : m.sinSesion)[etapa] += n;
+    };
+    for (const f of sesiones) for (let e = 0; e < Number(f.rango); e++) sumar(f.dispositivo, !!f.con_sesion, e, Number(f.n));
+    let sinMedir = 0;
+    let anulados = 0;
+    for (const f of pedidos) {
+      anulados += Number(f.anulados);
+      if (!f.medido) {
+        sinMedir += Number(f.creados);
+        continue;
+      }
+      sumar(f.dispositivo, !!f.con_sesion, 4, Number(f.creados));
+      sumar(f.dispositivo, !!f.con_sesion, 5, Number(f.pagados));
+      sumar(f.dispositivo, !!f.con_sesion, 6, Number(f.entregados));
+    }
+
+    const NOMBRES = ['Visitó la carta', 'Agregó algo al carrito', 'Abrió el checkout', 'Llegó al paso de pago', 'Creó el pedido', 'Pedido pagado', 'Pedido entregado'];
+    const IDS = ['visita', 'carrito', 'checkout', 'pago', 'creado', 'pagado', 'entregado'];
+    const visitas = m.total[0];
+    const pasos = NOMBRES.map((nombre, i) => {
+      const n = m.total[i];
+      const antes = i > 0 ? m.total[i - 1] : null;
+      return {
+        id: IDS[i],
+        nombre,
+        n,
+        pctDelAnterior: antes ? r1((n / antes) * 100) : null,
+        pctDeVisitas: visitas ? r1((n / visitas) * 100) : null,
+        /** Cuántos se quedaron en el paso anterior sin llegar a este. */
+        caida: antes == null ? null : Math.max(antes - n, 0),
+        pctCaida: antes ? r1((Math.max(antes - n, 0) / antes) * 100) : null,
+        movil: m.movil[i],
+        escritorio: m.escritorio[i],
+        conSesion: m.conSesion[i],
+        sinSesion: m.sinSesion[i],
+      };
     });
-    const pasos = [
-      paso('creados', 'Pedidos creados en la carta', creados),
-      paso('pagados', 'Con pago confirmado', Number(f?.pagados ?? 0)),
-      paso('entregados', 'Entregados', Number(f?.entregados ?? 0)),
-    ];
-    pasos.forEach((p, i) => {
-      if (i > 0 && pasos[i - 1].n > 0) p.pctDelAnterior = r1((p.n / pasos[i - 1].n) * 100);
-    });
+    const primeroEn: Date | null = primero?.primero ? new Date(primero.primero) : null;
     return {
       pasos,
-      anulados: Number(f?.anulados ?? 0),
-      noSeGuarda: [
-        'Visitas o aperturas de la carta (la carta no registra eventos de visita).',
-        'Quién agregó un producto al carrito y no terminó (el carrito vive en el navegador).',
-        'Quién llegó a la pantalla de pago y la dejó (no se guarda el abandono del pago).',
+      anulados,
+      /** Pedidos de la carta del rango que no se pueden ligar a una visita (anteriores a la medición, sin sesión de navegador o con «no rastrear»). */
+      pedidosSinMedir: sinMedir,
+      /** Fecha (hora de Lima, AAAA-MM-DD) desde la que existen eventos; null si todavía no hay ninguno. */
+      sinDatosAntesDe: primeroEn ? new Date(primeroEn.getTime() - 5 * 3_600_000).toISOString().slice(0, 10) : null,
+      /** Verdadero si el rango empieza antes de esa fecha: las etapas de visita de esos días están incompletas. */
+      rangoParcial: !primeroEn || primeroEn > r.inicio,
+      queSeMide: [
+        'Cada navegador recibe un código al azar al abrir la carta; no se guarda celular, nombre, IP ni modelo del aparato.',
+        'Cuenta visitas por sesión de navegador (una persona que vuelve otro día cuenta otra vez) y la etapa más alta que alcanzó.',
+        'No se mide a quien activa «no rastrear» (DNT o GPC) en su navegador.',
+        'Los eventos se borran solos a los 120 días. Este embudo solo usa las fechas; modalidad, canal y turno no le aplican.',
       ],
     };
   }

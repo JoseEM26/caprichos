@@ -32,12 +32,21 @@ const clientes = {
   },
   embudo: {
     pasos: [
-      { id: 'creados', nombre: 'Pedidos creados en la carta', n: 20, pctDelAnterior: null, pctDeCreados: 100 },
-      { id: 'pagados', nombre: 'Con pago confirmado', n: 15, pctDelAnterior: 75, pctDeCreados: 75 },
-      { id: 'entregados', nombre: 'Entregados', n: 12, pctDelAnterior: 80, pctDeCreados: 60 },
-    ],
+      ['visita', 'Visitó la carta', 200, null, 100, null, null, 120, 80, 90, 110],
+      ['carrito', 'Agregó algo al carrito', 100, 50, 50, 100, 50, 60, 40, 50, 50],
+      ['checkout', 'Abrió el checkout', 60, 60, 30, 40, 40, 36, 24, 30, 30],
+      ['pago', 'Llegó al paso de pago', 40, 66.7, 20, 20, 33.3, 24, 16, 20, 20],
+      ['creado', 'Creó el pedido', 30, 75, 15, 10, 25, 18, 12, 15, 15],
+      ['pagado', 'Pedido pagado', 24, 80, 12, 6, 20, 14, 10, 12, 12],
+      ['entregado', 'Pedido entregado', 20, 83.3, 10, 4, 16.7, 12, 8, 10, 10],
+    ].map(([id, nombre, n, pctDelAnterior, pctDeVisitas, caida, pctCaida, movil, escritorio, conSesion, sinSesion]) => ({
+      id, nombre, n, pctDelAnterior, pctDeVisitas, caida, pctCaida, movil, escritorio, conSesion, sinSesion,
+    })) as any[],
     anulados: 3,
-    noSeGuarda: ['Visitas o aperturas de la carta (la carta no registra eventos de visita).'],
+    pedidosSinMedir: 5,
+    sinDatosAntesDe: '2026-11-05',
+    rangoParcial: true,
+    queSeMide: ['Cada navegador recibe un código al azar al abrir la carta; no se guarda celular, nombre, IP ni modelo del aparato.'],
   },
   puntos: { emitidos: 500, canjeados: 120, pctCanjeado: 24, saldoVivo: 800, cuentasConSaldo: 40, costoCanjeadoPen: 120, costoPendientePen: 800, semanas: [{ semana: '2026-11-09', emitidos: 300, canjeados: 80 }] },
   calificaciones: {
@@ -126,17 +135,37 @@ describe('Pestaña Clientes', () => {
     expect(screen.getByRole('list', { name: /Puntaje promedio según si hubo demora/ })).toBeInTheDocument();
   });
 
-  it('el embudo abre un detalle inline (no un modal) con lo que todavía no se guarda', async () => {
+  it('el embudo completo: % paso a paso, caída por etapa, tabla accesible y aviso de datos desde cuándo', async () => {
     servidor(clientes);
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
-    const embudo = await screen.findByRole('list', { name: /Pedidos de la carta en cada paso/ });
-    expect(within(embudo).getByText('75 % del paso anterior')).toBeInTheDocument();
-    fireEvent.click(within(embudo).getByRole('button', { name: /Con pago confirmado/ }));
-    const detalle = screen.getByRole('region', { name: /Detalle: Con pago confirmado/ });
-    expect(within(detalle).getByText(/no registra eventos de visita/)).toBeInTheDocument();
+    const embudo = await screen.findByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
+    expect(within(embudo).getByText('Visitó la carta')).toBeInTheDocument();
+    expect(within(embudo).getByText(/50 % del paso anterior · caen 50 %/)).toBeInTheDocument();
+    expect(screen.getByText(/Sin datos de visitas antes de 05\/11\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/que no se pueden ligar a una visita: 5/)).toBeInTheDocument();
+    expect(screen.queryByText(/9\d{8}/)).toBeNull(); // ningún celular
+  });
+
+  it('el embudo abre un detalle inline (no un modal) con qué se mide y desde cuándo', async () => {
+    servidor(clientes);
+    render(<ClientesTab filtros={filtros} esAdmin={false} />);
+    const embudo = await screen.findByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
+    fireEvent.click(within(embudo).getByRole('button', { name: /Abrió el checkout/ }));
+    const detalle = screen.getByRole('region', { name: /Detalle: Abrió el checkout/ });
+    expect(within(detalle).getByText(/no se guarda celular, nombre, IP ni modelo/)).toBeInTheDocument();
+    expect(within(detalle).getByText(/Hay datos de visitas desde el 05\/11\/2026/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(within(detalle).getByRole('button', { name: /Cerrar detalle/ }));
     expect(screen.queryByRole('region', { name: /Detalle:/ })).toBeNull();
+  });
+
+  it('sin ningún evento todavía: lo dice y no inventa visitas', async () => {
+    servidor({
+      ...clientes,
+      embudo: { ...clientes.embudo, pasos: clientes.embudo.pasos.map((p) => ({ ...p, n: 0, pctDelAnterior: null, pctDeVisitas: null, caida: null, pctCaida: null })), sinDatosAntesDe: null, rangoParcial: true, anulados: 0, pedidosSinMedir: 0 },
+    });
+    render(<ClientesTab filtros={filtros} esAdmin={false} />);
+    expect(await screen.findByText(/Aún no hay visitas registradas/)).toBeInTheDocument();
   });
 
   it('sin datos: estados vacíos y «Sin dato», nunca ceros inventados', async () => {
@@ -145,7 +174,7 @@ describe('Pestaña Clientes', () => {
       clientes: { total: 0, nuevos: 0, recurrentes: 0, pctRecurrentes: null, pedidosSinIdentificar: 0 },
       semanas: [],
       regreso: { n: 0, medianaDias: null, p90Dias: null, tramos: [] },
-      embudo: { ...clientes.embudo, pasos: clientes.embudo.pasos.map((p) => ({ ...p, n: 0, pctDelAnterior: null, pctDeCreados: null })), anulados: 0 },
+      embudo: { ...clientes.embudo, pasos: clientes.embudo.pasos.map((p) => ({ ...p, n: 0, pctDelAnterior: null, pctDeVisitas: null, caida: null, pctCaida: null })), anulados: 0, pedidosSinMedir: 0, sinDatosAntesDe: '2026-11-05' },
       puntos: { ...clientes.puntos, emitidos: 0, canjeados: 0, pctCanjeado: null, semanas: [] },
       calificaciones: {
         encuestas: { enviadas: 0, respondidas: 0, pctRespuesta: null, promedio: null, semanas: [], distribucion: [] },
@@ -156,7 +185,7 @@ describe('Pestaña Clientes', () => {
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
     expect(await screen.findByText('No hay pedidos de clientes identificados en este período.')).toBeInTheDocument();
     expect(screen.getByText('Aún nadie repitió pedido')).toBeInTheDocument();
-    expect(screen.getByText('No hubo pedidos de la carta en este período.')).toBeInTheDocument();
+    expect(screen.getByText('No hubo visitas ni pedidos de la carta en este período.')).toBeInTheDocument();
     expect(screen.getByText('Nadie respondió la encuesta en este período.')).toBeInTheDocument();
     expect(screen.getAllByText('Sin dato').length).toBeGreaterThanOrEqual(3);
   });

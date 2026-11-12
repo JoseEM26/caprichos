@@ -45,8 +45,9 @@ describe('ClientesAnalisisService.resumen', () => {
     const r = await s.resumen({}, AHORA);
     expect(r.clientes).toMatchObject({ total: 0, pctRecurrentes: null });
     expect(r.regreso).toMatchObject({ n: 0, medianaDias: null, p90Dias: null });
-    expect(r.embudo.pasos.map((p) => p.n)).toEqual([0, 0, 0]);
+    expect(r.embudo.pasos.map((p) => p.n)).toEqual([0, 0, 0, 0, 0, 0, 0]);
     expect(r.embudo.pasos[1].pctDelAnterior).toBeNull();
+    expect(r.embudo.sinDatosAntesDe).toBeNull();
     expect(r.puntos).toMatchObject({ emitidos: 0, canjeados: 0, pctCanjeado: null, saldoVivo: 0 });
     expect(r.calificaciones.encuestas).toMatchObject({ enviadas: 0, respondidas: 0, promedio: null, pctRespuesta: null });
     expect(r.calificaciones.google).toEqual({ n: 0, promedio: null });
@@ -60,16 +61,42 @@ describe('ClientesAnalisisService.resumen', () => {
     expect(r.clientes.total).toBe(MAX_CLIENTES_ANALISIS);
   });
 
-  it('el embudo de la carta: porcentajes contra el paso anterior y contra los creados, anulados aparte', async () => {
-    const { s } = servicio({ "canal = 'CARTA'": [{ creados: 20, pagados: 15, entregados: 12, anulados: 3 }] });
-    const r = await s.resumen({}, AHORA);
-    expect(r.embudo.pasos).toEqual([
-      expect.objectContaining({ id: 'creados', n: 20, pctDelAnterior: null, pctDeCreados: 100 }),
-      expect.objectContaining({ id: 'pagados', n: 15, pctDelAnterior: 75, pctDeCreados: 75 }),
-      expect.objectContaining({ id: 'entregados', n: 12, pctDelAnterior: 80, pctDeCreados: 60 }),
-    ]);
+  it('el embudo de la carta: cada sesión cuenta en su etapa más alta y en las anteriores, con % y caída por etapa', async () => {
+    const { s } = servicio({
+      array_agg: [
+        { dispositivo: 'MOVIL', con_sesion: false, rango: 1, n: 50 }, // solo visitó
+        { dispositivo: 'MOVIL', con_sesion: true, rango: 2, n: 20 }, // llegó al carrito
+        { dispositivo: 'ESCRITORIO', con_sesion: false, rango: 3, n: 10 },
+        { dispositivo: 'ESCRITORIO', con_sesion: true, rango: 4, n: 20 },
+      ],
+      'LEFT JOIN carta_evento': [
+        { dispositivo: 'MOVIL', con_sesion: true, medido: true, creados: 10, pagados: 8, entregados: 6, anulados: 1 },
+        { dispositivo: 'ESCRITORIO', con_sesion: false, medido: true, creados: 5, pagados: 4, entregados: 4, anulados: 0 },
+        { dispositivo: 'DESCONOCIDO', con_sesion: false, medido: false, creados: 7, pagados: 7, entregados: 7, anulados: 2 },
+      ],
+      'AS primero': [{ primero: new Date('2026-11-05T15:00:00Z') }],
+    });
+    const r = await s.resumen({ desde: '2026-11-02', hasta: '2026-11-11' }, AHORA);
+    expect(r.embudo.pasos.map((p) => p.n)).toEqual([100, 50, 30, 20, 15, 12, 10]);
+    expect(r.embudo.pasos[1]).toMatchObject({ id: 'carrito', pctDelAnterior: 50, pctDeVisitas: 50, caida: 50, pctCaida: 50 });
+    expect(r.embudo.pasos[4]).toMatchObject({ id: 'creado', pctDelAnterior: 75, caida: 5, movil: 10, escritorio: 5, conSesion: 10, sinSesion: 5 });
+    expect(r.embudo.pasos[0]).toMatchObject({ movil: 70, escritorio: 30, conSesion: 40, sinSesion: 60, caida: null, pctCaida: null });
+    expect(r.embudo.pedidosSinMedir).toBe(7);
     expect(r.embudo.anulados).toBe(3);
-    expect(r.embudo.noSeGuarda.length).toBeGreaterThanOrEqual(3);
+    expect(r.embudo.sinDatosAntesDe).toBe('2026-11-05');
+    expect(r.embudo.rangoParcial).toBe(true);
+  });
+
+  it('el embudo no es parcial si todo el rango es posterior al primer evento', async () => {
+    const { s } = servicio({ 'AS primero': [{ primero: new Date('2026-10-01T15:00:00Z') }] });
+    const r = await s.resumen({ desde: '2026-11-02', hasta: '2026-11-11' }, AHORA);
+    expect(r.embudo.rangoParcial).toBe(false);
+  });
+
+  it('el embudo no expone celulares ni ids de sesión', async () => {
+    const { s } = servicio({ array_agg: [{ dispositivo: 'MOVIL', con_sesion: false, rango: 1, n: 1 }] });
+    const r = await s.resumen({}, AHORA);
+    expect(JSON.stringify(r.embudo)).not.toMatch(/telefono|sesion_id/i);
   });
 
   it('puntos: emitidos y canjeados netos de reversas y devoluciones, saldo vivo y costo', async () => {

@@ -9,6 +9,7 @@ const dec = (n: number | null | undefined, d = 1) => (n == null ? 'Sin dato' : n
 const soles = (n: number) => `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (n: number | null) => (n == null ? 'Sin dato' : `${dec(n)} %`);
 const semana = (iso: string) => `${ddmm(iso)} al ${ddmm(sumarDias(iso, 6))}`;
+const fechaLarga = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const dias = (n: number | null) => (n == null ? 'Sin dato' : `${dec(n)} ${n === 1 ? 'día' : 'días'}`);
 
 /** Pestaña «Clientes»: nuevos y recurrentes, embudo de la carta, puntos y calificaciones. Solo agregados. */
@@ -74,35 +75,59 @@ function Contenido({ d, alReintentar }: { d: RespuestaClientes; alReintentar: ()
       <TarjetaAnalisis
         id="an-cli-embudo"
         titulo="Embudo de la carta"
-        subtitulo="Solo pedidos hechos en la carta web. Toca un paso para ver qué falta guardar."
-        estado={d.embudo.pasos[0].n ? 'ok' : 'vacio'}
-        vacio="No hubo pedidos de la carta en este período."
+        subtitulo="De la visita a la entrega. Visitas, carrito, checkout y pago son sesiones de navegador (anónimas); pedido, pago y entrega son pedidos de la carta. Toca una etapa para ver qué se mide."
+        estado={d.embudo.pasos[0].n || d.embudo.pasos[4].n ? 'ok' : 'vacio'}
+        vacio={d.embudo.sinDatosAntesDe ? 'No hubo visitas ni pedidos de la carta en este período.' : 'Aún no hay visitas registradas: se empiezan a contar desde que se activa esta medición.'}
         alReintentar={alReintentar}
         tabla={{
-          cabecera: ['Paso', 'Pedidos', 'Del paso anterior', 'De los creados'],
-          filas: d.embudo.pasos.map((p) => [p.nombre, p.n, pct(p.pctDelAnterior), pct(p.pctDeCreados)]),
+          cabecera: ['Etapa', 'Total', 'Del paso anterior', 'De las visitas', 'Se quedaron en el paso anterior', 'Móvil', 'Escritorio', 'Con sesión', 'Sin sesión'],
+          filas: d.embudo.pasos.map((p) => [
+            p.nombre,
+            p.n,
+            pct(p.pctDelAnterior),
+            pct(p.pctDeVisitas),
+            p.caida == null ? '—' : `${num(p.caida)} (${pct(p.pctCaida)})`,
+            p.movil,
+            p.escritorio,
+            p.conSesion,
+            p.sinSesion,
+          ]),
         }}
       >
+        {d.embudo.sinDatosAntesDe == null ? (
+          <p className="an-error-fechas" role="status">
+            Sin datos de visitas: la medición de la carta todavía no ha registrado ninguna.
+          </p>
+        ) : (
+          d.embudo.rangoParcial && (
+            <p className="an-error-fechas" role="status">
+              Sin datos de visitas antes de {fechaLarga(d.embudo.sinDatosAntesDe)}: las etapas de visita, carrito, checkout y pago de los días anteriores salen incompletas.
+            </p>
+          )
+        )}
         <BarrasHorizontales
-          descripcion="Pedidos de la carta en cada paso"
+          descripcion="Sesiones y pedidos de la carta en cada etapa del embudo"
           alElegir={(id) => setAbierto((a) => (a === id ? null : id))}
           elegida={abierto}
           filas={d.embudo.pasos.map((p) => ({
             id: p.id,
             nombre: p.nombre,
-            detalle: p.pctDelAnterior == null ? undefined : `${pct(p.pctDelAnterior)} del paso anterior`,
+            detalle: p.pctDelAnterior == null ? undefined : `${pct(p.pctDelAnterior)} del paso anterior · caen ${pct(p.pctCaida)}`,
             valor: p.n,
             texto: num(p.n),
           }))}
         />
-        <p className="an-sub">Anulados aparte: {num(d.embudo.anulados)}.</p>
+        <p className="an-sub">
+          Pedidos anulados aparte: {num(d.embudo.anulados)}. Pedidos de la carta que no se pueden ligar a una visita: {num(d.embudo.pedidosSinMedir)}.
+        </p>
         {abierto && (
-          <PanelDetalle titulo={d.embudo.pasos.find((p) => p.id === abierto)?.nombre ?? 'Paso'} alCerrar={() => setAbierto(null)}>
-            <p>Antes de «Pedidos creados» el sistema todavía no guarda:</p>
+          <PanelDetalle titulo={d.embudo.pasos.find((p) => p.id === abierto)?.nombre ?? 'Etapa'} alCerrar={() => setAbierto(null)}>
+            <p>Qué se mide y desde cuándo:</p>
             <ul>
-              {d.embudo.noSeGuarda.map((t) => (
+              {d.embudo.queSeMide.map((t) => (
                 <li key={t}>{t}</li>
               ))}
+              <li>{d.embudo.sinDatosAntesDe ? `Hay datos de visitas desde el ${fechaLarga(d.embudo.sinDatosAntesDe)}; antes de esa fecha no se guardaban.` : 'Todavía no hay datos de visitas.'}</li>
             </ul>
           </PanelDetalle>
         )}
