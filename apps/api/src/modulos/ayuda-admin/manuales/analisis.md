@@ -13,6 +13,7 @@ sugerencias:
   - Que area de cocina es la mas lenta
   - Por que una etapa dice Sin dato
   - Como veo solo el turno de la noche o solo delivery
+  - Cuanto efectivo me deben rendir los repartidores y desde cuando
 ---
 # Analisis
 
@@ -52,14 +53,37 @@ Despues: [[caja]]
 3. Las metas son parametros de [[mirest]] y mueven el semaforo y la lista de atascados.
 4. El Supervisor ve las metas pero no las cambia.
 
+## Como se hace: Mirar el reparto (pestana Reparto)
+1. Entregas por zona: cada zona de reparto muestra cuantos pedidos delivery tuvo, cuantos se entregaron y el promedio de minutos desde que entra el pedido hasta que se entrega, contra la promesa maxima de minutos de la zona. Toca una zona para ver su detalle debajo.
+2. Donde y cuando se pide: tabla de calor de pedidos por zona y turno (manana, tarde, noche). El numero manda, el color solo ayuda.
+3. Productividad de repartidores: entregas por hora marcada en asistencia y minutos por entrega (desde que sale hasta que entrega). Si el repartidor no marco asistencia dice Sin dato.
+4. Efectivo por rendir: suma del efectivo contra entrega de los ultimos 92 dias que los repartidores aun no liquidan en [[cierre]], y desde cuando (la entrega mas antigua sin cubrir). No depende de las fechas del filtro.
+Ver tambien: [[repartos]]
+
+## Como se hace: Revisar al equipo y los huecos (pestana Equipo)
+1. Huecos ahora: tres conteos de cualquier dia, sin filtro de fechas. Pedidos sin cobrar, pedidos sin terminar (estado distinto de entregado o anulado) y entregados sin cobrar. Cada fila tiene un boton para ir a [[cierre]] o [[caja]].
+2. Asistencia y puntualidad: tardanzas y faltas por dia, con el porcentaje de puntualidad. Salen de las mismas marcas de asistencia que la planilla; no se muestran sueldos, documentos, fotos ni ubicaciones.
+3. Mozos y cobros en caja: pedidos, ticket promedio y minutos. Mozo es quien registro el pedido por el canal Mozo; cobro es quien lo cobro en caja.
+4. El detalle por persona solo lo ve el Administrador. El Supervisor ve los totales del equipo.
+Ver tambien: [[cierre]]
+
+## Como se hace: Vigilar el almacen (pestana Almacen)
+1. Cuanto dura cada insumo: stock actual entre el consumo diario del periodo elegido. Primero van los que se acaban antes, con los dias que duran y hasta que fecha. Sin consumo en el periodo dice Sin consumo.
+2. Mermas: cantidad, veces, costo (solo insumos con costo guardado) y el motivo mas repetido.
+3. Productos terminados con pocas unidades: donas, galletas y otros con conteo propio que tienen 5 unidades o menos.
+4. Si sale Control de almacen apagado, vender no descuenta insumos y no hay consumo que analizar: no se muestran la duracion de insumos ni sus mermas de insumo. El Administrador lo enciende en Configuracion. Los productos terminados siguen porque llevan su propio conteo.
+Ver tambien: [[caja]]
+
 ## Errores y dudas comunes
 - Por que una etapa dice Sin dato: falta la hora en el sistema, por ejemplo un pedido puesto en Listo a mano no guarda la hora de despacho por linea, o el delivery no registro quien lo tomo. Lo que faltaria guardar se explica en el panel.
 - Los pedidos anulados no cuentan en los promedios: aparecen aparte con su cantidad y cuanto tardaron en anularse.
 - El cobro dura 0 minutos cuando el pedido ya estaba pagado al entregarse.
 - Si sale el aviso de que se leyeron solo los pedidos mas recientes, acorta el rango de fechas.
+- Por que el efectivo por rendir no coincide con lo que veo en Cierre: aqui se cuenta lo entregado en los ultimos 92 dias menos lo liquidado, sin importar la caja del dia; el repartidor salda primero lo mas antiguo.
+- Por que no veo nombres en Reparto o Equipo: solo el Administrador ve el detalle por persona.
 - Si no veo la opcion Analisis: solo la tienen el Administrador y el Supervisor.
 
 ## Quien puede hacerlo
-- Administrador: ve todas las pestanas y cambia las metas (permiso analisis/ver y configuracion/editar).
-- Supervisor: ve las pestanas y las metas, no las cambia (permiso analisis/ver).
+- Administrador: ve todas las pestanas, el detalle por persona de Reparto y Equipo, y cambia las metas (permiso analisis/ver y configuracion/editar).
+- Supervisor: ve las pestanas con totales (sin detalle por persona) y las metas, no las cambia (permiso analisis/ver).
 - Los demas roles no ven el menu Analisis ni pueden abrir su direccion.
