@@ -1,9 +1,11 @@
 import {
   Body,
+  Delete,
   Controller,
   Get,
   Param,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -43,8 +45,8 @@ export class RecetasController {
 
   @Get(':productoId')
   @Permiso('recetas', 'ver')
-  async obtenerReceta(@Param('productoId') productoId: string) {
-    return this.recetasService.obtenerRecetaProducto(productoId);
+  async obtenerReceta(@Param('productoId') productoId: string, @Query('sabor_id') saborId?: string) {
+    return this.recetasService.obtenerRecetaProducto(productoId, saborId);
   }
 
   @Put(':productoId')
@@ -56,5 +58,16 @@ export class RecetasController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.recetasService.guardarReceta(productoId, dto, req.usuario, ip);
+  }
+
+  @Delete(':productoId/sabor/:saborId')
+  @Permiso('recetas', 'editar')
+  async quitarRecetaSabor(
+    @Param('productoId') productoId: string,
+    @Param('saborId') saborId: string,
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.recetasService.quitarRecetaSabor(productoId, saborId, req.usuario, ip);
   }
 }

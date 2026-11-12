@@ -27,7 +27,10 @@ describe('RecetasService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
       },
+      sabor: { findUnique: jest.fn() },
       receta: {
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -160,6 +163,7 @@ describe('RecetasService', () => {
               ],
             },
           ],
+          sabores: [],
         });
 
       prisma.receta.findFirst
@@ -198,6 +202,96 @@ describe('RecetasService', () => {
           accion: 'GUARDAR_RECETA',
         }),
       );
+    });
+  });
+
+  describe('receta por sabor', () => {
+    const insumo = (costo: number) => ({
+      nombre: 'Harina',
+      unidad_receta: 'G',
+      factor_receta: new Prisma.Decimal(1000),
+      costo_unit: new Prisma.Decimal(costo),
+    });
+    const linea = (cant: number, costo: number) => ({ insumo_id: 1n, cantidad: new Prisma.Decimal(cant), insumo: insumo(costo) });
+    const producto = (recetas: any[]) => ({
+      id: 7n,
+      nombre: 'DONA',
+      categoria: null,
+      tamanos: [{ tamano_valor_id: 1n, tamano_valor: { nombre: 'Unidad' }, precio: new Prisma.Decimal(10) }],
+      recetas,
+      sabores: [
+        { id: 20n, nombre: 'Chocolate' },
+        { id: 21n, nombre: 'Fresa' },
+      ],
+    });
+    const general = { id: 1n, tamano_valor_id: null, sabor_id: null, es_produccion: false, rinde: null, lineas: [linea(100, 10)] };
+    const propia = { id: 2n, tamano_valor_id: null, sabor_id: 20n, es_produccion: false, rinde: null, lineas: [linea(200, 10)] };
+
+    it('sin receta propia el sabor usa la general y lo indica', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce(producto([general]));
+      const r = await service.obtenerRecetaProducto('7', '20');
+      expect(r.usaGeneral).toBe(true);
+      expect(r.tamanos[0].lineas[0].cantidad).toBe(100);
+      expect(r.sabores.map((s) => s.tieneRecetaPropia)).toEqual([false, false]);
+    });
+
+    it('con receta propia la usa, y el resumen da el costo por sabor', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce(producto([general, propia]));
+      const r = await service.obtenerRecetaProducto('7', '20');
+      expect(r.usaGeneral).toBe(false);
+      expect(r.tamanos[0].lineas[0].cantidad).toBe(200);
+      expect(r.sabores).toEqual([
+        { id: '20', nombre: 'Chocolate', tieneRecetaPropia: true, costo: 2 },
+        { id: '21', nombre: 'Fresa', tieneRecetaPropia: false, costo: 1 },
+      ]);
+    });
+
+    it('sin sabor devuelve la general', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce(producto([general, propia]));
+      const r = await service.obtenerRecetaProducto('7');
+      expect(r.saborId).toBeNull();
+      expect(r.tamanos[0].lineas[0].cantidad).toBe(100);
+    });
+
+    it('rechaza un sabor de otro producto', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce(producto([general]));
+      await expect(service.obtenerRecetaProducto('7', '99')).rejects.toMatchObject({ response: { codigo: 'SABOR_INVALIDO' } });
+    });
+
+    it('quitar borra la receta del sabor, audita y vuelve a la general', async () => {
+      prisma.sabor.findUnique.mockResolvedValueOnce({ producto_id: 7n });
+      prisma.receta.findMany.mockResolvedValueOnce([propia]);
+      prisma.producto.findUnique.mockResolvedValueOnce(producto([general]));
+      const r = await service.quitarRecetaSabor('7', '20', mockUsuario);
+      expect(prisma.recetaLinea.deleteMany).toHaveBeenCalledWith({ where: { receta_id: { in: [2n] } } });
+      expect(prisma.receta.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [2n] } } });
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'QUITAR_RECETA_SABOR' }));
+      expect(r.usaGeneral).toBe(true);
+    });
+
+    it('quitar falla si el sabor no es del producto o no tiene receta propia', async () => {
+      prisma.sabor.findUnique.mockResolvedValueOnce({ producto_id: 8n });
+      await expect(service.quitarRecetaSabor('7', '20', mockUsuario)).rejects.toMatchObject({ response: { codigo: 'SABOR_INVALIDO' } });
+      prisma.sabor.findUnique.mockResolvedValueOnce({ producto_id: 7n });
+      prisma.receta.findMany.mockResolvedValueOnce([]);
+      await expect(service.quitarRecetaSabor('7', '20', mockUsuario)).rejects.toMatchObject({ response: { codigo: 'RECETA_SABOR_NO_EXISTE' } });
+      expect(prisma.receta.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('guardar con sabor ajeno se rechaza antes de escribir', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce({ id: 7n });
+      prisma.sabor.findUnique.mockResolvedValueOnce({ producto_id: 8n });
+      await expect(service.guardarReceta('7', { sabor_id: '20', lineas: [] }, mockUsuario)).rejects.toMatchObject({ response: { codigo: 'SABOR_INVALIDO' } });
+      expect(prisma.receta.create).not.toHaveBeenCalled();
+    });
+
+    it('guardar con sabor propio crea la receta con sabor_id', async () => {
+      prisma.producto.findUnique.mockResolvedValueOnce({ id: 7n }).mockResolvedValueOnce(producto([general, propia]));
+      prisma.sabor.findUnique.mockResolvedValueOnce({ producto_id: 7n });
+      prisma.receta.findFirst.mockResolvedValue(null);
+      prisma.receta.create.mockResolvedValueOnce({ id: 2n });
+      await service.guardarReceta('7', { sabor_id: '20', lineas: [{ insumo_id: '1', cantidad: 200 }] }, mockUsuario);
+      expect(prisma.receta.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sabor_id: 20n }) });
     });
   });
 
