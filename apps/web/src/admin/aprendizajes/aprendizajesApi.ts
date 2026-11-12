@@ -48,7 +48,16 @@ export interface Resumen {
   topeUsd: number;
   ultimaNoche: Noche | null;
   noches: { fecha: string; estado: EstadoNoche; usd: number; propuestas: number }[];
+  historico?: { estado: 'NUNCA' | 'EN_CURSO' | 'OK' | 'TOPE' | 'ERROR'; diasProcesados: number; diasTotales: number; usd: number };
 }
+
+export const ESTADO_HISTORICO: Record<string, string> = {
+  NUNCA: 'Todavía no se analizó el historial',
+  EN_CURSO: 'Analizando el historial…',
+  OK: 'Historial analizado',
+  TOPE: 'Se detuvo por el tope de gasto: puedes continuar',
+  ERROR: 'Hubo un error: puedes volver a intentarlo',
+};
 
 const base = '/admin/aprendizajes';
 
@@ -62,6 +71,7 @@ export const aprendizajesApi = {
   retirar: (id: string, motivo: string) => api.post(`${base}/conocimiento/${id}/retirar`, { motivo }),
   resumen: () => api.get<Resumen>(`${base}/resumen`),
   ejecutarAhora: () => api.post<Noche>(`${base}/ejecutar-ahora`),
+  ejecutarHistorico: () => api.post(`${base}/ejecutar-historico`),
 };
 
 export const TIPO_TEXTO: Record<TipoAprendizaje, string> = { FAQ: 'FAQ', FRASES: 'Frases', DERIVAR: 'Siempre a persona' };

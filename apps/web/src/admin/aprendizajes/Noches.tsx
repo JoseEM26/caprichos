@@ -3,7 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
-import { aprendizajesApi, fechaCorta, mensajeError, type EstadoNoche, type Resumen } from './aprendizajesApi';
+import { aprendizajesApi, ESTADO_HISTORICO, fechaCorta, mensajeError, type EstadoNoche, type Resumen } from './aprendizajesApi';
 
 const ESTADO_NOCHE: Record<EstadoNoche, { texto: string; clase: string }> = {
   OK: { texto: 'Todo bien', clase: 'ok' },
@@ -20,6 +20,9 @@ export function Noches({ puedeAprobar, alCambiar }: { puedeAprobar: boolean; alC
   const [confirmando, setConfirmando] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [errorEjecutar, setErrorEjecutar] = useState<string | null>(null);
+  const [confirmHist, setConfirmHist] = useState(false);
+  const [cargandoHist, setCargandoHist] = useState(false);
+  const [errorHist, setErrorHist] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
     setError(null);
@@ -68,11 +71,38 @@ export function Noches({ puedeAprobar, alCambiar }: { puedeAprobar: boolean; alC
         <p className="ap-meta">Tope por noche: {usd(r.topeUsd)}</p>
       </section>
 
+      {r.historico && (
+        <section className="ap-tarjeta" aria-label="Historial completo" data-testid="historico">
+          <h3>Todo el historial</h3>
+          <p className="ap-meta">
+            {ESTADO_HISTORICO[r.historico.estado] ?? r.historico.estado}
+            {r.historico.diasTotales > 0 && ` · ${r.historico.diasProcesados} de ${r.historico.diasTotales} días`}
+            {` · gastado ${usd(r.historico.usd)}`}
+          </p>
+          {r.historico.estado === 'EN_CURSO' && (
+            <Boton type="button" variante="secundario" onClick={() => { cargar(); }}>Actualizar avance</Boton>
+          )}
+        </section>
+      )}
+
       {puedeAprobar && (
         <div className="ap-acciones">
           <Boton type="button" onClick={() => { setErrorEjecutar(null); setConfirmando(true); }}>Analizar ayer ahora</Boton>
+          {r.historico && r.historico.estado !== 'EN_CURSO' && r.historico.estado !== 'OK' && (
+            <Boton type="button" variante="secundario" onClick={() => { setErrorHist(null); setConfirmHist(true); }}>
+              {r.historico.estado === 'NUNCA' ? 'Analizar todo el historial' : 'Continuar el historial'}
+            </Boton>
+          )}
         </div>
       )}
+      <Confirmar abierto={confirmHist} titulo="¿Analizar todo el historial?" mensaje="Se leerán, sin datos personales, todos los chats que atendió una persona desde el inicio. Corre en segundo plano, con tope de gasto propio; las propuestas llegan a «Por revisar»." textoSi="Sí, analizar"
+        cargando={cargandoHist} error={errorHist}
+        alCancelar={() => setConfirmHist(false)}
+        alConfirmar={async () => {
+          setCargandoHist(true); setErrorHist(null);
+          try { await aprendizajesApi.ejecutarHistorico(); setConfirmHist(false); await cargar(); }
+          catch (e) { setErrorHist(mensajeError(e)); } finally { setCargandoHist(false); }
+        }} />
       <Confirmar abierto={confirmando} titulo="¿Analizar ayer ahora?" mensaje="Se leerán los chats de ayer y se gastará de la cuota de IA." textoSi="Sí, analizar"
         cargando={cargando} error={errorEjecutar}
         alCancelar={() => setConfirmando(false)}

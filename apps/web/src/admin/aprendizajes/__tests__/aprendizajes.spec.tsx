@@ -133,4 +133,19 @@ describe('Aprendizajes', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/aprendizajes/ejecutar-ahora'));
     expect(within(document.body).queryByText('¿Analizar ayer ahora?')).toBeNull();
   });
+
+  it('historial: muestra avance y lanza el análisis completo tras confirmar', async () => {
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/resumen')) return resumen({ historico: { estado: 'NUNCA', diasProcesados: 0, diasTotales: 0, usd: 0 } });
+      return { items: [], total: 0 };
+    });
+    sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
+    render(<AprendizajesView />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Noches' }));
+    expect((await screen.findByTestId('historico')).textContent).toContain('Todavía no se analizó el historial');
+    fireEvent.click(screen.getByText('Analizar todo el historial'));
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Sí, analizar'));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/aprendizajes/ejecutar-historico'));
+  });
 });
