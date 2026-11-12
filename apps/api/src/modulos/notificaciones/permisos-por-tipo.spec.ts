@@ -1,3 +1,4 @@
+jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn(), JwtModule: {} }));
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
 import { readdirSync, readFileSync, statSync } from 'fs';

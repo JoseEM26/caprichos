@@ -53,6 +53,7 @@ Despues: [[notificaciones]]
 5. El orden es: primero los no leidos por urgencia (los urgentes primero) y al final los leidos.
 6. Las solicitudes de reserva pendientes (de la carta o de WhatsApp) aparecen como aviso urgente y el menu Reservas parpadea con su contador hasta atenderlas. Ver [[reservas]].
 7. El boton "Marcar todas leidas" solo aparece si el Administrador lo dejo activo; si esta apagado cada aviso se marca aparte.
+8. El sonido respeta tu horario de trabajo (Usuarios > Horarios y turnos): solo suena dentro de tu turno o si cubres a alguien hoy; fuera de horario la campana sigue mostrando los avisos y dice "Sonido en pausa". El Administrador, las personas marcadas 24/7 y quienes no tienen horario cargado suenan siempre.
 Ver tambien: [[reservas]]
 
 ## Errores y dudas comunes

@@ -93,6 +93,7 @@ Ver tambien: [[usuarios]]
 2. En Tipo de documento puedes elegir DNI (8 digitos) u otro documento (carne de extranjeria, cedula, pasaporte, de 7 a 12 letras y numeros). Un documento repetido da DNI_DUPLICADO.
 3. Si el rol es Cocina, marca las Areas que atiende (sin ninguna marcada ve todas). Ver [[cocina]].
 4. Las pestanas de la pantalla son: Personal, Clientes, Horarios y turnos y Que ve cada rol. En Horarios y turnos se cargan los turnos que usa la [[asistencia]] para calcular tardanzas.
+6. Ese horario tambien decide cuando suena la campana de notificaciones: fuera de turno queda en silencio (los avisos se siguen viendo). El Administrador, las personas 24/7 y quienes no tienen horario suenan siempre.
 5. Reemplazos: se indica quien cubre a quien en los dias de descanso o falta.
 
 ## Como se hace: Ver la actividad y el historial laboral de una persona

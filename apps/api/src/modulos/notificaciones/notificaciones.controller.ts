@@ -19,6 +19,12 @@ export class NotificacionesController {
     return this.notificaciones.resumen(req.usuario);
   }
 
+  /** Si la campanita debe sonar ahora según el horario de trabajo de quien llama */
+  @Get('mi-horario-sonido')
+  miHorarioSonido(@Req() req: any) {
+    return this.notificaciones.miHorarioSonido(req.usuario);
+  }
+
   @Get('historial')
   @Permiso('notificaciones', 'ver')
   historial(@Query() filtro: FiltroHistorialDto, @Req() req: any) {

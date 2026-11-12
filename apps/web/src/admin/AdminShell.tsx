@@ -16,6 +16,7 @@ import { CampanaNotificaciones } from './notificaciones/CampanaNotificaciones';
 import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import { AvisosEmergentes, useTituloContador } from './notificaciones/AvisosNotificaciones';
 import { hayQueSonar, useSonidoAvisos } from './notificaciones/sonidoAviso';
+import { useHorarioSonido } from './notificaciones/useHorarioSonido';
 import { AJUSTES_NOTIFICACIONES_DEFECTO } from './notificaciones/notificacionesTipos';
 import './notificaciones/parpadeo-reservas.css';
 
@@ -174,8 +175,9 @@ export function AdminShell() {
   const totalNotif = noLeidasAhora.length;
   // Ajustes del ADMIN (Configuración › Notificaciones): mientras no llegan, valen los de siempre
   const ajustes = { ...AJUSTES_NOTIFICACIONES_DEFECTO, ...(resumen.ajustes ?? {}) };
+  const horarioSonido = useHorarioSonido();
   const sonido = useSonidoAvisos(
-    ajustes.sonidoActivo && hayQueSonar(resumen.notificaciones, ajustes.sonidoAlcance),
+    ajustes.sonidoActivo && horarioSonido.suenaAhora && hayQueSonar(resumen.notificaciones, ajustes.sonidoAlcance),
     ajustes.sonidoIntervaloSeg * 1000,
   );
   // Reservas nuevas sin atender: la entrada «Reservas» y su fila parpadean hasta que alguien las atienda o las marque leídas
@@ -435,6 +437,7 @@ export function AdminShell() {
         onMarcarTodas={marcarTodasLeidas}
         marcarTodasActivo={ajustes.marcarTodasActivo}
         onActivarSonido={() => void sonido.activar()}
+        textoSonidoPausa={horarioSonido.suenaAhora ? null : horarioSonido.texto}
       />
     </div>
   );

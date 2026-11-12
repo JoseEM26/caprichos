@@ -11,6 +11,8 @@ import { AsistenciaCorreccionesService } from '../asistencia/asistencia-correcci
 import { PERMISOS_POR_PREFIJO, PERMISOS_POR_TIPO, tipoVisible } from './permisos-por-tipo';
 import { AjustesNotificaciones, CLAVES_AJUSTES_NOTIF, leerAjustesNotificacion } from './ajustes-notificaciones';
 
+import { minutosDeHora, momentoLima } from '../correo';
+import { SonidoHorario, sonidoPorHorario } from './sonido-horario.util';
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 
 export interface Notificacion {
@@ -235,6 +237,27 @@ export class NotificacionesService {
     });
     // ponytail: una fila por aviso leído; si crece mucho, filtrar por fecha en la consulta
     return new Map(filas.filter((f) => f.clave.startsWith('n:')).map((f) => [f.clave.slice(2), f.leida_en]));
+  }
+
+  /** ¿Debe sonar la campanita ahora para esta persona? (hora de Lima; ver sonido-horario.util) */
+  async miHorarioSonido(usuario: UsuarioAutenticado, ahora: Date = new Date()): Promise<SonidoHorario> {
+    const roles = usuario.roles ?? [usuario.rol];
+    if (roles.includes('ADMIN') || usuario.rol === 'ADMIN') return { suenaAhora: true, texto: null };
+    const momento = momentoLima(ahora);
+    const [persona, horarios, coberturas] = await Promise.all([
+      this.prisma.person.findUnique({ where: { party_id: usuario.partyId }, select: { horario_24_7: true } }),
+      this.prisma.horarioTrabajo.findMany({ where: { party_id: usuario.partyId, activo: true }, select: { dia_semana: true, entrada: true, salida: true } }),
+      this.prisma.coberturaTurno.findMany({
+        where: { fecha: new Date(`${momento.fecha}T00:00:00.000Z`), cubre_party_id: usuario.partyId },
+        select: { desde: true, hasta: true },
+      }),
+    ]);
+    return sonidoPorHorario(momento, {
+      esAdmin: false,
+      h247: Boolean(persona?.horario_24_7),
+      horarios: horarios.map((h) => ({ dia: h.dia_semana, entrada: minutosDeHora(h.entrada), salida: minutosDeHora(h.salida) })),
+      coberturas: coberturas.map((c) => ({ desde: minutosDeHora(c.desde), hasta: minutosDeHora(c.hasta) })),
+    });
   }
 
   async resumen(usuario: UsuarioAutenticado): Promise<ResumenNotificaciones> {

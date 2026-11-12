@@ -15,6 +15,8 @@ interface CampanaNotificacionesProps {
   /** Decisión del ADMIN: si está apagado, no aparece «Marcar todas leídas» (cada aviso se marca aparte) */
   marcarTodasActivo?: boolean;
   onActivarSonido: () => void;
+  /** Línea discreta cuando el sonido está en pausa por el horario de trabajo */
+  textoSonidoPausa?: string | null;
 }
 
 const POR_TANDA = 10;
@@ -39,6 +41,7 @@ export function CampanaNotificaciones({
   onMarcarTodas,
   marcarTodasActivo = true,
   onActivarSonido,
+  textoSonidoPausa = null,
 }: CampanaNotificacionesProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -109,6 +112,7 @@ export function CampanaNotificaciones({
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--cp-sand)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 16 }}>Notificaciones</span>
               <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Lo más urgente primero. Lo que marcas como leído baja al final.</span>
+              {textoSonidoPausa && <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>{textoSonidoPausa}</span>}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {total > 0 && marcarTodasActivo && (
                   <button
