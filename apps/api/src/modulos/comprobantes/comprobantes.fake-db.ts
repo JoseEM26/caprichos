@@ -133,7 +133,14 @@ function cliente(db: Db): any {
     db.secuencia[clave] = (db.secuencia[clave] ?? 0) + 1;
     return [{ ultimo_numero: db.secuencia[clave] }];
   };
-  c.$transaction = async (fn: (tx: any) => Promise<any>) => {
+  // Las transacciones se serializan (como el bloqueo de fila de Postgres sobre secuencia/comprobante)
+  let cola: Promise<unknown> = Promise.resolve();
+  c.$transaction = (fn: (tx: any) => Promise<any>) => {
+    const r = cola.then(() => transaccion(fn));
+    cola = r.catch(() => undefined);
+    return r;
+  };
+  const transaccion = async (fn: (tx: any) => Promise<any>) => {
     // Trabaja sobre una copia: si la función lanza, la copia se descarta (rollback); si no, se confirma
     const borrador = structuredClone(db);
     const resultado = await fn(cliente(borrador));

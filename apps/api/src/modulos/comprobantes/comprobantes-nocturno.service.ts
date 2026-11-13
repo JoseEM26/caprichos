@@ -162,8 +162,8 @@ export class ComprobantesNocturnoService {
     return r;
   }
 
-  /** Aplica un cambio pendiente. true = aplicado; false = descartado (el pedido ya no está cobrado o fue anulado). */
-  private async aplicarCambio(c: any): Promise<boolean> {
+  /** Aplica un cambio pendiente. Devuelve el resultado (truthy) o false si se descartó (el pedido ya no está cobrado o fue anulado). */
+  private async aplicarCambio(c: any): Promise<string | false> {
     const pedidoId: bigint = c.pedido_id;
     const quitar = () => this.prisma.comprobanteCambioPendiente.deleteMany({ where: { pedido_id: pedidoId, solicitado_en: c.solicitado_en } });
     const pedido = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
@@ -202,7 +202,89 @@ export class ComprobantesNocturnoService {
     }
     await quitar();
     await this.auditar('APLICAR_CAMBIO_COMPROBANTE', pedidoId, c.motivo, antes, { tipo: c.tipo, resultado });
-    return true;
+    return resultado;
+  }
+
+  private static readonly TIPOS_E = ['BOLETA', 'FACTURA'];
+
+  private noEspera(): ConflictException {
+    return new ConflictException({ codigo: 'NO_ESTA_ESPERANDO', mensaje: 'Este comprobante ya no espera la noche' });
+  }
+
+  /** Numera y envía una fila que espera la noche y describe el resultado. null = otro la reclamó o ya no corresponde emitirla. */
+  private async emitirYDescribir(id: bigint) {
+    if (!(await this.emitirFila(id))) return null;
+    const f = (await this.prisma.comprobante.findUnique({ where: { id } }))!;
+    const cfg = await this.comprobantes.leerConfigFacturacion();
+    const boleta = f.tipo === 'BOLETA';
+    const nombre = boleta ? 'La boleta' : 'La factura';
+    let mensaje: string;
+    if (boleta) mensaje = `${nombre} ${f.numero_texto} quedó numerada y se reportará a SUNAT en el resumen diario de las ${cfg.horaResumen}`;
+    else if (f.facturacion_estado === 'EMITIDO_SUNAT') mensaje = `${nombre} ${f.numero_texto} se envió ahora y SUNAT la aceptó`;
+    else mensaje = `${nombre} ${f.numero_texto} quedó numerada, pero el envío a SUNAT no se completó (estado ${f.facturacion_estado}); se reintenta sola o con Reintentar`;
+    return { emitido: true, tipo: f.tipo as string, numero_texto: f.numero_texto as string, facturacion_estado: f.facturacion_estado as string, mensaje };
+  }
+
+  /** «Emitir ahora» de UN comprobante que espera la noche: aplica antes su cambio pendiente, numera y envía. */
+  async emitirUno(idRaw: bigint | string, usuario?: UsuarioAutenticado, ip?: string) {
+    let id: bigint;
+    try {
+      id = BigInt(idRaw);
+    } catch {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    const fila = await this.prisma.comprobante.findUnique({ where: { id } });
+    if (!fila || !ComprobantesNocturnoService.TIPOS_E.includes(fila.tipo)) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    if (fila.facturacion_estado !== 'POR_EMITIR_NOCHE' || fila.anulado_en) throw this.noEspera();
+    let objetivo = id;
+    const cambio = await this.prisma.comprobanteCambioPendiente.findUnique({ where: { pedido_id: fila.pedido_id } });
+    if (cambio) {
+      await this.aplicarCambio(cambio);
+      const vigente = await this.prisma.comprobante.findFirst({ where: { pedido_id: fila.pedido_id, anulado_en: null, tipo: { in: ComprobantesNocturnoService.TIPOS_E } } });
+      if (!vigente || vigente.facturacion_estado !== 'POR_EMITIR_NOCHE') {
+        return { emitido: false, motivo: 'CAMBIO_A_SIMPLE', numero_texto: null, facturacion_estado: null, mensaje: 'El cliente pidió cambiar el comprobante: no se emitió esta boleta/factura' };
+      }
+      objetivo = vigente.id;
+    }
+    const r = await this.emitirYDescribir(objetivo);
+    if (!r) throw this.noEspera();
+    await this.auditar('EMITIR_AHORA_UNO', fila.pedido_id, null, { estado: 'POR_EMITIR_NOCHE' }, { tipo: r.tipo, estado: r.facturacion_estado, cambio_aplicado: !!cambio }, usuario, ip);
+    return { emitido: true, numero_texto: r.numero_texto, facturacion_estado: r.facturacion_estado, mensaje: r.mensaje };
+  }
+
+  /** Aplica YA el cambio pendiente del pedido (baja de lo ya emitido si hace falta) y emite al instante el comprobante nuevo. */
+  async aplicarCambioAhora(pedidoIdRaw: string, usuario?: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.id(pedidoIdRaw);
+    const cambio = await this.prisma.comprobanteCambioPendiente.findUnique({ where: { pedido_id: pedidoId } });
+    if (!cambio) throw new NotFoundException({ codigo: 'SIN_CAMBIO_PENDIENTE', mensaje: 'El pedido no tiene un cambio de comprobante pendiente' });
+    const previo = await this.prisma.comprobante.findFirst({ where: { pedido_id: pedidoId, anulado_en: null, tipo: { in: ComprobantesNocturnoService.TIPOS_E } } });
+    const resultado = await this.aplicarCambio(cambio);
+    if (!resultado) {
+      return { aplicado: false, baja: false, mensaje: 'El pedido ya no está cobrado o fue anulado: el cambio se descartó' };
+    }
+    const baja = resultado === 'BAJA_Y_NUEVO';
+    const nombrePrevio = previo ? `${previo.tipo === 'BOLETA' ? 'la boleta' : 'la factura'}${previo.numero_texto ? ' ' + previo.numero_texto : ''}` : null;
+    const parteBaja = baja
+      ? `${nombrePrevio} se dio de baja (SUNAT la recibe en el resumen de esta noche)`
+      : nombrePrevio ? `${nombrePrevio} no había salido, no se anuló nada` : null;
+    let nuevo: { numero_texto: string; facturacion_estado: string } | undefined;
+    let parteNuevo = '';
+    if (cambio.tipo === 'SIMPLE') {
+      parteNuevo = 'el pedido queda con comprobante simple';
+    } else {
+      const fila = await this.prisma.comprobante.findFirst({ where: { pedido_id: pedidoId, anulado_en: null, facturacion_estado: 'POR_EMITIR_NOCHE', tipo: { in: ComprobantesNocturnoService.TIPOS_E } } });
+      const r = fila ? await this.emitirYDescribir(fila.id) : null;
+      if (r) {
+        nuevo = { numero_texto: r.numero_texto, facturacion_estado: r.facturacion_estado };
+        parteNuevo = r.mensaje.charAt(0).toLowerCase() + r.mensaje.slice(1);
+      } else {
+        parteNuevo = 'el comprobante nuevo saldrá en el envío de esta noche';
+      }
+    }
+    await this.auditar('APLICAR_CAMBIO_AHORA', pedidoId, cambio.motivo, { tipo: previo?.tipo ?? null, estado: previo?.facturacion_estado ?? null }, { tipo: cambio.tipo, resultado, baja, estado_nuevo: nuevo?.facturacion_estado ?? null }, usuario, ip);
+    return { aplicado: true, baja, nuevo, mensaje: `Listo: ${parteBaja ? parteBaja + '; ' : ''}${parteNuevo}` };
   }
 
   /** Asigna serie y correlativo (atómico con el reclamo: sin huecos) y envía. true si salió del estado de espera. */
@@ -243,9 +325,9 @@ export class ComprobantesNocturnoService {
     return true;
   }
 
-  private async auditar(accion: string, pedidoId: bigint, motivo: string | null, antes: unknown, despues: unknown) {
+  private async auditar(accion: string, pedidoId: bigint, motivo: string | null, antes: unknown, despues: unknown, usuario?: UsuarioAutenticado, ip?: string) {
     await this.auditoria
-      ?.registrar({ categoria: 'CAMBIO', modulo: 'comprobantes', accion, resultado: 'OK', entidad: 'pedido', entidadId: pedidoId, motivo: motivo ?? undefined, antes: antes as any, despues: despues as any })
+      ?.registrar({ categoria: 'CAMBIO', modulo: 'comprobantes', accion, resultado: 'OK', entidad: 'pedido', entidadId: pedidoId, motivo: motivo ?? undefined, antes: antes as any, despues: despues as any, partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined, ip })
       .catch(() => undefined);
   }
 

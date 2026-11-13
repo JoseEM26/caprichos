@@ -68,4 +68,10 @@ describe('ComprobantesController', () => {
 
     expect(serviceMock.marcarEmitido).toHaveBeenCalledWith('1', dto, mockUsuario, '127.0.0.1');
   });
+
+  it('permisos de emitir-ahora por comprobante y aplicar-ahora del cambio', () => {
+    const meta = (m: string) => Reflect.getMetadataKeys((ComprobantesController.prototype as any)[m]).map((k) => Reflect.getMetadata(k, (ComprobantesController.prototype as any)[m]));
+    expect(JSON.stringify(meta('emitirUno'))).toContain('emitir');
+    expect(JSON.stringify(meta('aplicarCambioAhora'))).toContain('anular');
+  });
 });

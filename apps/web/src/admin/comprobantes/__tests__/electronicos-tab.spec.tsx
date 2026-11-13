@@ -286,4 +286,29 @@ describe('ElectronicosTab', () => {
     expect(panel.textContent).toContain('Rechazo permanente 2335');
     expect(screen.getByRole('button', { name: 'Corregir y reintentar' })).toBeTruthy();
   });
+
+  it('botón Emitir ahora por fila: solo en POR_EMITIR_NOCHE, Sí/No, una llamada y muestra el mensaje', async () => {
+    conRol('ADMIN');
+    const espera = { ...base, id: '8', numero: null, numero_texto: null as any, facturacion_estado: 'POR_EMITIR_NOCHE', enlace_pdf: null, codigo_pedido: 'CP-0042' } as any;
+    vi.spyOn(comprobantesApi, 'listarElectronicos').mockResolvedValue({ total: 2, pagina: 1, limite: 20, totalPaginas: 1, elementos: [base, espera] });
+    const uno = vi.spyOn(comprobantesApi, 'emitirUno').mockResolvedValue({ emitido: true, numero_texto: 'B002-000009', facturacion_estado: 'EMITIDO_SUNAT', mensaje: 'La boleta B002-000009 quedó numerada' });
+    render(<ElectronicosTab />);
+    await screen.findByText('Se emite esta noche');
+    expect(screen.getAllByRole('button', { name: /Emitir ahora (boleta|factura) del pedido/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir ahora boleta del pedido CP-0042' }));
+    expect(uno).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Sí, emitir'));
+    await waitFor(() => expect(uno).toHaveBeenCalledTimes(1));
+    expect(uno).toHaveBeenCalledWith('8');
+    expect(await screen.findByText('La boleta B002-000009 quedó numerada')).toBeTruthy();
+  });
+
+  it('sin permiso comprobantes/emitir no hay botón Emitir ahora por fila', async () => {
+    conRol('CAJERO');
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ usuario: { partyId: '1', nombres: 'T', rol: 'CAJERO' }, permisos: [], tiene: () => false } as any);
+    vi.spyOn(comprobantesApi, 'listarElectronicos').mockResolvedValue({ total: 1, pagina: 1, limite: 20, totalPaginas: 1, elementos: [{ ...base, facturacion_estado: 'POR_EMITIR_NOCHE' } as any] });
+    render(<ElectronicosTab />);
+    await screen.findByText('Se emite esta noche');
+    expect(screen.queryByRole('button', { name: /Emitir ahora (boleta|factura) del pedido/ })).toBeNull();
+  });
 });

@@ -257,6 +257,22 @@ export function ElectronicosTab() {
     }
   };
 
+  const [emitirUnoDe, setEmitirUnoDe] = useState<ComprobanteElectronico | null>(null);
+  const confirmarEmitirUno = async () => {
+    if (!emitirUnoDe) return;
+    setOcupado(true);
+    try {
+      const r = await comprobantesApi.emitirUno(emitirUnoDe.id);
+      await cargar(pagina);
+      setAviso(r.mensaje);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo emitir ahora');
+    } finally {
+      setOcupado(false);
+      setEmitirUnoDe(null);
+    }
+  };
+
   const abrirReintento = (c: ComprobanteElectronico) => {
     setReintentarDe(c);
     setCorrDoc(c.documento ?? '');
@@ -529,6 +545,17 @@ export function ElectronicosTab() {
                       )}
                     </>
                   )}
+                  {c.facturacion_estado === 'POR_EMITIR_NOCHE' && tiene('comprobantes/emitir') && (
+                    <Boton
+                      variante="secundario"
+                      disabled={ocupado}
+                      aria-label={`Emitir ahora ${c.tipo === 'FACTURA' ? 'factura' : 'boleta'} del pedido ${c.codigo_pedido}`}
+                      onClick={() => setEmitirUnoDe(c)}
+                      style={{ minHeight: ALTO_TOQUE }}
+                    >
+                      Emitir ahora
+                    </Boton>
+                  )}
                   {puedeReintentar && (
                     <Boton variante="secundario" onClick={() => abrirReintento(c)} style={{ minHeight: ALTO_TOQUE }}>
                       Reintentar
@@ -618,6 +645,16 @@ export function ElectronicosTab() {
         alCancelar={() => setConfirmarEmitir(false)}
       />
 
+      <Confirmar
+        abierto={emitirUnoDe !== null}
+        titulo="Emitir ahora"
+        mensaje={`Se emite ya ${emitirUnoDe?.tipo === 'FACTURA' ? 'esta factura' : 'esta boleta'} (queda numerada y se envía). ¿Emitir ahora?`}
+        textoSi="Sí, emitir"
+        textoNo="No"
+        cargando={ocupado}
+        alConfirmar={confirmarEmitirUno}
+        alCancelar={() => setEmitirUnoDe(null)}
+      />
       <Confirmar
         abierto={reintentarDe !== null}
         titulo="Reintentar el envío"

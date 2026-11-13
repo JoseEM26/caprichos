@@ -63,4 +63,22 @@ describe('Cambiar comprobante de un pedido cobrado', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deshacer cambio' }));
     await waitFor(() => expect(deshacer).toHaveBeenCalledWith('9'));
   });
+
+  it('Aplicar ahora: Sí/No, llama a la API una vez y muestra el mensaje; sin permiso no aparece', async () => {
+    const cambio = { tipo: 'FACTURA', documento: '20123456789', razon_social: 'X SAC', motivo: 'Pidió factura', solicitado_en: '2026-11-12' };
+    vi.spyOn(comprobantesApi, 'listarPorPedido').mockResolvedValue({ elementos: [fila()] as any, cambio_pendiente: cambio as any });
+    const ahora = vi.spyOn(comprobantesApi, 'aplicarCambioAhora').mockResolvedValue({ aplicado: true, baja: true, nuevo: { numero_texto: 'F002-000001', facturacion_estado: 'EMITIDO_SUNAT' }, mensaje: 'Listo: la boleta B002-000001 se dio de baja' });
+    const { unmount } = render(<SeccionComprobantesPedido pedido={pedido} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Aplicar ahora' }));
+    expect(ahora).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, aplicar' }));
+    await waitFor(() => expect(ahora).toHaveBeenCalledTimes(1));
+    expect(ahora).toHaveBeenCalledWith('9');
+    expect(await screen.findByText(/se dio de baja/)).toBeTruthy();
+    unmount();
+    permisos = ['comprobantes/ver'];
+    render(<SeccionComprobantesPedido pedido={pedido} />);
+    await screen.findByText(/Cambiará a/);
+    expect(screen.queryByRole('button', { name: 'Aplicar ahora' })).toBeNull();
+  });
 });
