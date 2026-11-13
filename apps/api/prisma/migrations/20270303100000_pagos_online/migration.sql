@@ -55,24 +55,19 @@ ON CONFLICT ("clave") DO NOTHING;
 INSERT INTO "parametro" ("clave", "valor") VALUES ('pago_online_espera_min', '15'::jsonb)
 ON CONFLICT ("clave") DO NOTHING;
 
--- Usuario de sistema «Pago en línea»: figura como quien cobra los pagos de Culqi y como quien anula los pedidos
--- sin pago. No puede iniciar sesión (cuenta inactiva y sin contraseña válida) y su rol SISTEMA no tiene permisos.
--- Idempotente: si ya existe una cuenta con rol SISTEMA, no se crea otra.
--- La base restringe los códigos de rol (ck_rol_codigo): se reemplaza con la lista de 20270203100000_rol_marketing más SISTEMA.
-ALTER TABLE "rol" DROP CONSTRAINT IF EXISTS "ck_rol_codigo";
-ALTER TABLE "rol" ADD CONSTRAINT "ck_rol_codigo" CHECK (
-  "codigo" IN ('ADMIN','CAJERO','COCINA','MOZO','CALLCENTER','ALMACEN','REPARTIDOR','SUPERVISOR','APOYO_DELIVERY','MARKETING','SISTEMA'));
-
-INSERT INTO "rol" ("codigo", "nombre") VALUES ('SISTEMA', 'Sistema (pagos en línea)')
-ON CONFLICT ("codigo") DO NOTHING;
+-- Cuenta «Pago en línea»: figura como quien cobra los pagos de Culqi y como quien anula los pedidos sin pago.
+-- Rol ADMIN (no se crea un rol nuevo), INACTIVA y con un hash que no es una contraseña: nadie puede iniciar sesión.
+-- Se reconoce por ese hash y no aparece en Usuarios. Idempotente: si ya existe, no se crea otra.
+-- En una base nueva los roles los siembra la app al arrancar: se asegura ADMIN sin tocar uno existente.
+INSERT INTO "rol" ("codigo", "nombre") VALUES ('ADMIN', 'Administrador') ON CONFLICT ("codigo") DO NOTHING;
 
 DO $$
 DECLARE nuevo BIGINT;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM "user_account" WHERE "rol" = 'SISTEMA') THEN
+  IF NOT EXISTS (SELECT 1 FROM "user_account" WHERE "hash" = '!pago-en-linea-sin-acceso') THEN
     INSERT INTO "party" ("tipo", "estado") VALUES ('PERSONA', 'ACTIVO') RETURNING "id" INTO nuevo;
     INSERT INTO "person" ("party_id", "nombres") VALUES (nuevo, 'Pago en línea');
     INSERT INTO "user_account" ("party_id", "rol", "hash", "debe_cambiar", "activo")
-      VALUES (nuevo, 'SISTEMA', '!sin-acceso', false, false);
+      VALUES (nuevo, 'ADMIN', '!pago-en-linea-sin-acceso', false, false);
   END IF;
 END $$;

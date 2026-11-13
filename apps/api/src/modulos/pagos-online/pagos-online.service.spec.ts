@@ -306,7 +306,7 @@ describe('PagosOnlineService', () => {
 
     it('el cobro lo registra el usuario de sistema «Pago en línea»', async () => {
       const { cobros } = await aprobado();
-      expect(cobros.cobrar.mock.calls[0][1]).toMatchObject({ partyId: '99', rol: 'SISTEMA' });
+      expect(cobros.cobrar.mock.calls[0][1]).toMatchObject({ partyId: '99', rol: 'ADMIN' });
     });
 
     it('devolución parcial: el cobro queda; total: se anula el cobro de Caja una sola vez', async () => {
@@ -409,7 +409,7 @@ describe('PagosOnlineVencimientoService', () => {
     expect(donde).toMatchObject({ estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE' });
     expect(donde.creado_en.lte.toISOString()).toBe('2027-03-03T14:45:00.000Z');
     expect(donde.pagosOnline.none.estado.in).toEqual(['PROCESANDO', 'PENDIENTE', 'APROBADO']);
-    expect(pedidos.cambiarEstado).toHaveBeenCalledWith(1n, expect.objectContaining({ estado: 'ANULADO' }), expect.objectContaining({ rol: 'SISTEMA', partyId: 9n }));
+    expect(pedidos.cambiarEstado).toHaveBeenCalledWith(1n, expect.objectContaining({ estado: 'ANULADO' }), expect.objectContaining({ rol: 'ADMIN', partyId: 9n }));
   });
 
   it('lee pago_online_espera_min y sin vencidos no hace nada', async () => {

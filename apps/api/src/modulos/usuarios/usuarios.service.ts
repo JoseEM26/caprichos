@@ -1,3 +1,4 @@
+import { HASH_CUENTA_PAGO_EN_LINEA } from '../pagos-online/usuario-sistema';
 import {
   ConflictException,
   ForbiddenException,
@@ -186,7 +187,7 @@ export class UsuariosService {
     }
 
     // La cuenta de sistema «Pago en línea» no es personal: no aparece en Usuarios
-    const where: any = { AND: [...and, { rol: { not: 'SISTEMA' } }] };
+    const where: any = { AND: [...and, { hash: { not: HASH_CUENTA_PAGO_EN_LINEA } }] };
 
     const [total, usuarios] = await Promise.all([
       this.prisma.userAccount.count({ where }),
@@ -266,6 +267,7 @@ export class UsuariosService {
   private async conteosListado() {
     const ahora = Date.now();
     const cuentas = await this.prisma.userAccount.findMany({
+      where: { hash: { not: HASH_CUENTA_PAGO_EN_LINEA } },
       select: { rol: true, activo: true, rolesExtra: { select: { rol: true, vence_en: true } } },
     });
     const porRol: Record<string, number> = {};
