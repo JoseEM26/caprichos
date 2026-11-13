@@ -77,6 +77,33 @@ describe('Editar usuario: aviso de vinculación del celular', () => {
     expect(vi.mocked(api.patch).mock.calls[0][1]).toMatchObject({ celular: '900000123', confirmaMismaPersona: true });
   });
 
+  it('invitado: pregunta Sí/No, no guarda sin «Sí» y con «Sí» envía confirmaMismaPersona', async () => {
+    previa({ estado: 'CREARA_CUENTA', cuenta: CUENTA });
+    vi.mocked(api.patch).mockResolvedValue({ ...PERSONA });
+    abrir();
+    fireEvent.change(await screen.findByLabelText('Celular (deja vacío para no cambiarlo)'), { target: { value: '900000123' } });
+    expect(await screen.findByText(/Se creará su cuenta de cliente y quedará vinculada a este trabajador/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText(/Responde Sí o No a la pregunta del celular/)).toBeInTheDocument();
+    expect(api.patch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí' }));
+    expect(await screen.findByText(/se creará su cuenta al guardar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const confirmar = await screen.findByRole('button', { name: /^Sí/ });
+    fireEvent.click(confirmar);
+    await waitFor(() => expect(api.patch).toHaveBeenCalled());
+    expect(vi.mocked(api.patch).mock.calls[0][1]).toMatchObject({ celular: '900000123', confirmaMismaPersona: true });
+  });
+
+  it('invitado: «No» vacía el celular', async () => {
+    previa({ estado: 'CREARA_CUENTA', cuenta: CUENTA });
+    abrir();
+    const campo = await screen.findByLabelText('Celular (deja vacío para no cambiarlo)');
+    fireEvent.change(campo, { target: { value: '900000123' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'No' }));
+    expect(campo).toHaveValue('');
+  });
+
   it('«No» vacía el celular', async () => {
     previa({ estado: 'VINCULARA_CUENTA', cuenta: CUENTA, mismoNombre: false });
     abrir();

@@ -118,7 +118,7 @@ export function CrearUsuarioModal({
       if (!nombres.trim()) e.nombres = 'Los nombres son requeridos';
       if (!apellidos.trim()) e.apellidos = 'Los apellidos son requeridos';
       if (celular && !/^9\d{8}$/.test(celular)) e.celular = 'El celular debe tener 9 dígitos y empezar en 9';
-      else if (previaCel.falta) e.celular = 'Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de continuar';
+      else if (previaCel.falta) e.celular = previaCel.previa?.estado === 'CREARA_CUENTA' ? 'Responde Sí o No a la pregunta del celular antes de continuar' : 'Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de continuar';
       if (correo.trim() && !REGEX_CORREO.test(correo.trim())) e.correo = 'El correo no es válido';
       if (avisosCorreo && !correo.trim()) e.avisosCorreo = 'Para recibir avisos por correo indica el correo';
       if (fechaNacimiento && fechaNacimiento > new Date().toISOString().slice(0, 10)) {

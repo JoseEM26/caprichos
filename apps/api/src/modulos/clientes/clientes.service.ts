@@ -1041,6 +1041,37 @@ export class ClientesService {
     };
   }
 
+  /** Crea la cuenta (sin contraseña) sobre un party invitado: conserva sus pedidos y puntos; solo completa lo que esté vacío. */
+  private async reutilizarInvitado(tx: any, id: bigint, dto: RegistrarMostradorDto, tel: string, cumple: { dia: number; mes: number } | null, versionTexto: string) {
+    const correo = dto.correo?.trim() || null;
+    const persona = await tx.person.findUnique({ where: { party_id: id } });
+    if (persona) {
+      await tx.person.update({
+        where: { party_id: id },
+        data: {
+          ...(!persona.nombres || persona.nombres === 'Cliente' ? { nombres: dto.nombre.trim() } : {}),
+          ...(!persona.correo && correo ? { correo } : {}),
+          ...(cumple && persona.cumple_mes == null ? { cumple_dia: cumple.dia, cumple_mes: cumple.mes } : {}),
+        },
+      });
+    } else {
+      await tx.person.create({ data: { party_id: id, nombres: dto.nombre.trim(), correo, cumple_dia: cumple?.dia ?? null, cumple_mes: cumple?.mes ?? null } });
+    }
+    const rol = await tx.partyRole.findFirst({ where: { party_id: id, rol: 'CLIENTE', hasta: null }, include: { customer_detail: true } });
+    if (!rol) {
+      const nuevo = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+      await tx.customerDetail.create({ data: { party_role_id: nuevo.id, puntos: 0 } });
+    } else if (!rol.customer_detail) {
+      await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+    }
+    await tx.customerAccount.create({ data: { party_id: id, hash: null, telefono: tel, activo: true } });
+    if (correo && !(await tx.contactMechanism.findFirst({ where: { party_id: id, tipo: 'CORREO', valor: correo } }))) {
+      await tx.contactMechanism.create({ data: { party_id: id, tipo: 'CORREO', valor: correo, principal: false } });
+    }
+    await tx.consent.create({ data: { party_id: id, version_texto: versionTexto, canal: 'CAJA' } });
+    return { id };
+  }
+
   /**
    * Registro en mostrador (RQ-CLI-01-06): quien atiende crea el cliente sin contraseña.
    * Una persona se identifica por su celular (sin DNI); solo una empresa lleva RUC.
@@ -1096,12 +1127,24 @@ export class ClientesService {
       });
     }
     // Una persona = un party: el celular no puede estar activo en otro party (aunque no tenga cuenta)
-    if (!esEmpresa && (await partyDeCelular(this.prisma, tel!))) {
-      throw new ConflictException(CELULAR_OTRA_PERSONA);
+    // Si es un invitado (persona sin usuario ni cuenta: pidió o chateó por WhatsApp) se reutiliza su party; si no, 409 claro
+    let invitadoId: bigint | null = null;
+    const dueno = esEmpresa ? null : await partyDeCelular(this.prisma, tel!);
+    if (dueno) {
+      if (await this.prisma.userAccount.findFirst({ where: { party_id: dueno }, select: { id: true } })) {
+        throw new ConflictException({ codigo: 'CELULAR_DE_USUARIO', mensaje: 'Ese celular es de un usuario del equipo: vincúlalo desde Usuarios' });
+      }
+      const conCuenta = await this.prisma.customerAccount.findFirst({ where: { party_id: dueno }, select: { activo: true } });
+      if (conCuenta?.activo) throw new ConflictException({ codigo: 'CLIENTE_YA_EXISTE', mensaje: 'Ya existe un cliente con ese celular' });
+      const party = await this.prisma.party.findUnique({ where: { id: dueno }, select: { tipo: true } });
+      // Cuenta desactivada o no es una persona: no se reactiva sola (igual que en el registro de la carta)
+      if (conCuenta || party?.tipo !== 'PERSONA') throw new ConflictException(CELULAR_OTRA_PERSONA);
+      invitadoId = dueno;
     }
 
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
     const nuevoParty = await this.prisma.$transaction(async (tx) => {
+      if (invitadoId) return this.reutilizarInvitado(tx, invitadoId, dto, tel!, cumple, versionTexto);
       const party = await tx.party.create({
         data: {
           tipo: esEmpresa ? 'ORGANIZACION' : 'PERSONA',
@@ -1190,7 +1233,7 @@ export class ClientesService {
       accion: 'CLIENTE_CREADO_MOSTRADOR',
       entidad: 'party',
       entidadId: nuevoParty.id,
-      despues: { nombre: dto.nombre.trim(), telefono: tel ? enmascararTelefono(tel) : null, ruc: esEmpresa ? enmascararDoc(ruc) : null },
+      despues: { nombre: dto.nombre.trim(), telefono: tel ? enmascararTelefono(tel) : null, ruc: esEmpresa ? enmascararDoc(ruc) : null, ...(invitadoId ? { reutilizaParty: true } : {}) },
       partyId: usuarioId ? BigInt(usuarioId) : undefined,
       ip,
     });

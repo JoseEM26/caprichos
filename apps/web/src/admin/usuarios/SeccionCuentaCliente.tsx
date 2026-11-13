@@ -6,6 +6,8 @@ import { Campo } from '../../comun/Campo';
 interface Cuenta {
   nombre: string;
   celular: string;
+  /** El celular es de un invitado (pedidos o WhatsApp): al confirmar se le crea la cuenta. */
+  creara?: boolean;
 }
 
 export interface SeccionCuentaClienteProps {
@@ -67,11 +69,15 @@ export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: 
     setOcupado(true);
     setError('');
     try {
-      const r = await api.post<{ vinculada: Cuenta }>(base, { celular });
+      const r = await api.post<{ vinculada: Cuenta; creada?: boolean }>(base, { celular });
       setVinculada(r.vinculada);
       setEncontrada(null);
       setCelular('');
-      setMensaje('Listo: esa persona ya recibe el descuento de personal en la carta.');
+      setMensaje(
+        r.creada
+          ? 'Listo: se creó su cuenta de cliente. Para entrar a la carta debe tocar «Crear cuenta» (o «¿Olvidaste tu contraseña?») con ese celular y verificarlo por WhatsApp para poner su contraseña.'
+          : 'Listo: esa persona ya recibe el descuento de personal en la carta.',
+      );
     } catch (e) {
       setError(mensajeDe(e, 'No se pudo vincular la cuenta.'));
       setEncontrada(null);
@@ -156,11 +162,20 @@ export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: 
       {vinculada === null && encontrada && (
         <div role="group" aria-label="Confirmar vínculo" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span data-testid="cuenta-encontrada" style={{ fontSize: 14, color: 'var(--cp-navy)' }}>
-            Encontramos la cuenta de <strong>{encontrada.nombre}</strong> ({encontrada.celular}). ¿Es la cuenta de cliente de esta persona?
+            {encontrada.creara ? (
+              <>
+                Ese celular ya está en el sistema (de pedidos anteriores, a nombre de <strong>{encontrada.nombre}</strong>). Se creará su cuenta de cliente y
+                quedará vinculada a este trabajador para su descuento. ¿Continuar?
+              </>
+            ) : (
+              <>
+                Encontramos la cuenta de <strong>{encontrada.nombre}</strong> ({encontrada.celular}). ¿Es la cuenta de cliente de esta persona?
+              </>
+            )}
           </span>
           <div style={fila}>
             <Boton type="button" onClick={vincular} cargando={ocupado}>
-              Sí, vincular
+              {encontrada.creara ? 'Sí' : 'Sí, vincular'}
             </Boton>
             <Boton type="button" variante="secundario" onClick={() => setEncontrada(null)} deshabilitado={ocupado}>
               No

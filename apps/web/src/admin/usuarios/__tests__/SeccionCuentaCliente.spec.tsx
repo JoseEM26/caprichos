@@ -53,6 +53,22 @@ describe('Vincular su cuenta de cliente', () => {
     expect(api.post).toHaveBeenCalledTimes(1);
   });
 
+  it('celular de un invitado: pide «¿Continuar?» Sí/No y al confirmar explica cómo entra a la carta', async () => {
+    vi.mocked(api.get).mockResolvedValue({ vinculada: null });
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({ nombre: 'Ana Prueba', celular: '···123', creara: true })
+      .mockResolvedValueOnce({ ok: true, creada: true, vinculada: { nombre: 'Ana Prueba', celular: '···123' } });
+    abrir();
+    fireEvent.change(await screen.findByLabelText(/Celular de su cuenta/), { target: { value: '900000123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Vincular su cuenta de cliente' }));
+    const texto = await screen.findByTestId('cuenta-encontrada');
+    expect(texto.textContent).toContain('Se creará su cuenta de cliente y quedará vinculada');
+    expect(api.post).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Sí' }));
+    await waitFor(() => expect(screen.getByTestId('cuenta-vinculada')).toBeTruthy());
+    expect(screen.getByText(/Crear cuenta/)).toBeTruthy();
+  });
+
   it('muestra el error del servidor (404 sin cuenta)', async () => {
     vi.mocked(api.get).mockResolvedValue({ vinculada: null });
     vi.mocked(api.post).mockRejectedValue(new Error('No hay una cuenta de cliente activa con ese celular'));

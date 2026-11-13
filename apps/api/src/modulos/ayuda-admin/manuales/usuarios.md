@@ -50,6 +50,7 @@ Ver tambien: [[historial]]
 3. Mientras escribes el celular, debajo del campo aparece un aviso (antes de guardar):
    - Si el celular es de la cuenta de cliente de la misma persona, dice: Este celular es de la cuenta de cliente de (nombre) (···123). Al guardar, se vinculara a este usuario y recibira su descuento de personal en la carta. Al guardar, el sistema la vincula solo y confirma Cuenta de cliente vinculada. Un cliente y un usuario del equipo pueden compartir el mismo celular.
    - Si el nombre de esa cuenta no coincide con el del usuario, pide confirmar Si, es la misma persona (o No, que vacia el celular). Es una proteccion por si se escribio el celular de otro cliente; sin confirmar no se guarda.
+   - Si el celular ya esta en el sistema por pedidos anteriores o chats de WhatsApp (una persona que nunca creo cuenta), dice: Ese celular ya esta en el sistema (de pedidos anteriores). Se creara su cuenta de cliente y quedara vinculada a este trabajador para su descuento. Continuar? Pulsa Si para continuar (No vacia el celular). Al guardar se crea su cuenta de cliente sin contrasena, con sus pedidos y puntos anteriores, y queda vinculada al trabajador. Para entrar a la carta, el trabajador debe tocar Crear cuenta (o Olvidaste tu contrasena) con ese celular y verificarlo por WhatsApp para poner su contrasena. Al crear un usuario nuevo con ese celular no se pregunta: se reutiliza a esa persona.
    - Si el celular lo usa otro usuario del equipo, o es de una cuenta de cliente ya vinculada a otra persona, o de otra persona, el aviso lo dice en rojo y el sistema no lo guarda.
    Solo el Administrador puede cambiarlo. Lo mismo ocurre al crear un usuario nuevo. La vinculacion automatica solo da el descuento de personal: la cuenta de cliente nunca gana permisos del panel, y no cambia contrasenas ni sesiones. Si la vinculacion no es la correcta, se deshace con Desvincular (ver abajo).
 
@@ -60,7 +61,7 @@ Sirve cuando la cuenta de cliente del trabajador tiene un celular distinto al de
 3. El sistema muestra solo el nombre de la cuenta y el celular con puntos (por ejemplo ···123). Si es la persona correcta, confirma con Si, vincular; si no, pulsa No.
 4. Desde ese momento, al entrar a la carta con esa cuenta recibe el descuento de personal. No se junta ni se borra nada: sus puntos, pedidos y direcciones siguen en su cuenta de cliente, y la cuenta de cliente nunca gana permisos del panel.
 5. Para deshacerlo, pulsa Desvincular y confirma con Si, desvincular. Queda anotado en la auditoria.
-6. Si el celular no es de una cuenta de cliente activa, el sistema avisa que no la encuentra. Una cuenta ya vinculada a otro usuario, o que ya es de un usuario, no se puede vincular. Con el usuario inactivo no hay descuento.
+6. Si el celular es de una persona que solo hizo pedidos o chateo por WhatsApp (sin cuenta), el sistema pregunta Se creara su cuenta de cliente y quedara vinculada a este trabajador. Continuar? y, con Si, la crea y la vincula (el trabajador pone su contrasena desde la carta con Crear cuenta o Olvidaste tu contrasena). Si el celular no es de ninguna persona del sistema, avisa que no encuentra la cuenta. Una cuenta ya vinculada a otro usuario, o que ya es de un usuario, no se puede vincular. Con el usuario inactivo no hay descuento.
 Ver tambien: [[creditos]]
 
 ## Como se hace: recibir alertas por WhatsApp

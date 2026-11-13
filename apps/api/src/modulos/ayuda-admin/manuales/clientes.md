@@ -21,7 +21,7 @@ Directorio centralizado de clientes de Caprichos. Permite registrar nuevos consu
 
 ## Como se hace: Registrar un cliente nuevo desde mostrador o telefono
 1. En la parte superior de la pantalla, pulsar el boton + Nuevo cliente.
-2. Ingresar el Nombre completo y el Celular (9 digitos, empieza con 9). El celular es el usuario de su cuenta; no se pide DNI. Una empresa se registra con su RUC.
+2. Ingresar el Nombre completo y el Celular (9 digitos, empieza con 9). El celular es el usuario de su cuenta; no se pide DNI. Una empresa se registra con su RUC. Si ese celular ya estaba en el sistema por pedidos o chats de WhatsApp (sin cuenta), no da error: se crea la cuenta sobre esa misma persona y conserva sus pedidos y puntos; solo se completan nombre, cumpleanos y correo si estaban vacios. Si el celular es de un usuario del equipo, el sistema dice que se vincule desde Usuarios; si ya es cliente, dice Ya existe un cliente con ese celular.
 3. Completar el Correo electronico y la Fecha de cumpleanos si el cliente lo autoriza.
 4. Marcar la casilla obligatoria de Acepta tratamiento de datos personales.
 5. Pulsar el boton Guardar cliente.

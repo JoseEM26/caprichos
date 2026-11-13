@@ -304,7 +304,7 @@ export function EditarUsuarioModal({
       if (celularNuevo.trim() && !validarCelularPeruano(celularNuevo).valido) {
         nuevosErrores.celular = "Debe ser un celular de 9 dígitos que empiece con 9";
       } else if (previaCel.falta) {
-        nuevosErrores.celular = "Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de guardar";
+        nuevosErrores.celular = previaCel.previa?.estado === 'CREARA_CUENTA' ? 'Responde Sí o No a la pregunta del celular antes de continuar' : "Confirma que la cuenta de cliente es de esta persona (Sí o No) antes de guardar";
       }
       if (
         !quitarCorreo &&
