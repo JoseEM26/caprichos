@@ -58,7 +58,6 @@ import { resolverCelular, excepcionCelular, CONFIRMAR_MISMA_PERSONA, CONFIRMAR_C
 import {
   CELULAR_OTRA_PERSONA,
   asegurarContactoCelular,
-  celularDeOtraPersona,
   partyDeCelular,
 } from '../clientes/celular-party.util';
 
@@ -392,9 +391,14 @@ export class UsuariosService {
       }
       reutilizarId = dniExistente.party_id;
     } else if (celular9) {
-      const dueno = await partyDeCelular(this.prisma, celular9);
+      // Dueño del celular: el contacto activo o, si no lo hay, la cuenta de cliente activa que lo guarda como identidad
+      const dueno =
+        (await partyDeCelular(this.prisma, celular9)) ??
+        (await this.prisma.customerAccount.findFirst({ where: { telefono: { in: [celular9, `51${celular9}`] }, activo: true }, select: { party_id: true } }))?.party_id ??
+        null;
       if (dueno) {
-        // Otro usuario o cuenta ya vinculada a otro: 409 con mensaje claro; si no, se reutiliza ese party (alta)
+        // Otro usuario, cuenta ya vinculada a otro o desactivada: 409 con mensaje claro. Si no, se reutiliza ese party (una sola
+        // persona: conserva su nombre, puntos y pedidos; el descuento de personal lo reconoce por ser el mismo party)
         if (await this.tienePartyUsuario(dueno)) throw excepcionCelular('USUARIO');
         const previa = await resolverCelular(this.prisma, null, celular9);
         if (previa.estado === 'OTRA_PERSONA') throw excepcionCelular(previa.motivo);
@@ -479,7 +483,7 @@ export class UsuariosService {
         });
 
         if (celular9) {
-          cuentaVinculada = await this.aplicarCelular(tx, userAccount.id, party.id, celular9, person, usuarioActual, dto.confirmaMismaPersona, ip, true);
+          cuentaVinculada = await this.aplicarCelular(tx, userAccount.id, party.id, celular9, person, usuarioActual, dto.confirmaMismaPersona, ip);
         }
 
         if (extras.length) {
@@ -916,7 +920,6 @@ export class UsuariosService {
     actor: UsuarioAutenticado | undefined,
     confirma: boolean | undefined,
     ip: string | undefined,
-    desdeAlta = false,
   ): Promise<{ nombre: string; celular: string } | null> {
     const r = await resolverCelular(tx, partyId, celular9, persona);
     if (r.estado === 'OTRA_PERSONA') throw excepcionCelular(r.motivo);
@@ -928,8 +931,6 @@ export class UsuariosService {
     // Solo un ADMIN autenticado dispara la vinculación; la importación de consola no pasa por aquí (no hay otro party)
     if (actor?.rol !== 'ADMIN') throw excepcionCelular('PERSONA');
     if (r.estado === 'CREARA_CUENTA') {
-      // En un alta el invitado ya se reutilizó como party; que aparezca otro aquí es una carrera: se rechaza como antes
-      if (desdeAlta) throw excepcionCelular('PERSONA');
       if (!confirma) throw new ConflictException(CONFIRMAR_CREAR_CUENTA);
       await crearCuentaDeInvitado(tx, this.auditoria, { invitadoPartyId: r.partyGuestId, celular9, usuarioId, usuarioPartyId: partyId, actor, ip, origen: 'AUTO_CELULAR' });
       return { nombre: r.nombre, celular: r.celularEnmascarado };
@@ -1656,7 +1657,9 @@ export class UsuariosService {
     }
 
     const contacto = usuario.party?.contactos?.find((c) => c.principal) || usuario.party?.contactos?.[0];
-    const celularVal = contacto?.valor || null;
+    // Sin contacto propio: el celular puede estar en su cuenta de cliente vinculada
+    const vinculada = contacto ? null : await this.prisma.customerAccount.findFirst({ where: { usuario_party_id: usuario.party_id, activo: true }, select: { telefono: true } });
+    const celularVal = contacto?.valor || vinculada?.telefono || null;
     const norm = celularVal ? normalizarCelularPeru(celularVal) : { valido: false };
 
     const rolPermitido = ROLES_ALERTAS_WHATSAPP.includes(usuario.rol as any);
@@ -1765,14 +1768,24 @@ export class UsuariosService {
     const celExistenteSolo9 = celExistenteVal ? celExistenteVal.replace(/\D/g, '').slice(-9) : null;
     const numeroCambio = Boolean(nuevoCelular9 && celExistenteSolo9 && nuevoCelular9 !== celExistenteSolo9);
 
+    // Mismo criterio que Editar usuario: un celular que ya es de una cuenta de cliente no se escribe aquí (se vincula allá con Sí/No)
+    let soloAlertas = false;
+    if (nuevoCelular9 && nuevoCelular9 !== celExistenteSolo9) {
+      const r = await resolverCelular(this.prisma, usuario.party_id, nuevoCelular9);
+      if (r.estado === 'OTRA_PERSONA') throw excepcionCelular(r.motivo);
+      if (r.estado === 'VINCULARA_CUENTA' || r.estado === 'CREARA_CUENTA') {
+        throw new ConflictException({
+          codigo: 'CELULAR_CON_CUENTA_CLIENTE',
+          mensaje: 'Ese celular ya es de una cuenta de la carta. Guárdalo primero en Editar usuario › Celular (ahí se vincula con Sí/No) y luego activa las alertas',
+        });
+      }
+      soloAlertas = r.estado === 'YA_VINCULADA'; // ya es de su cuenta vinculada: no se duplica el contacto
+    }
+
     try {
       await this.prisma.$transaction(async (tx) => {
-        if (nuevoCelular9) {
+        if (nuevoCelular9 && !soloAlertas) {
           if (contactoExistente) {
-            // Mismo criterio de unicidad que el alta: el celular no puede ser de otra persona
-            if (await celularDeOtraPersona(tx, usuario.party_id, nuevoCelular9)) {
-              throw new ConflictException(CELULAR_OTRA_PERSONA);
-            }
             await tx.contactMechanism.update({
               where: { id: contactoExistente.id },
               data: {

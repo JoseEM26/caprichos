@@ -121,19 +121,19 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
   it('previa: celular de otro usuario del equipo -> OTRA_PERSONA con mensaje claro', async () => {
     usuariosDePartys.add(80n);
     const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
-    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'USUARIO', mensaje: 'Ese celular ya lo usa otro usuario del equipo' });
+    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'USUARIO', mensaje: expect.stringContaining('Ese celular ya lo usa otro usuario del equipo') });
   });
 
   it('previa: cuenta ya vinculada a otro usuario -> OTRA_PERSONA', async () => {
     cuentas[0].usuario_party_id = 55n;
     const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
-    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'CUENTA_VINCULADA', mensaje: 'Ese celular es de una cuenta de cliente ya vinculada a otra persona' });
+    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'CUENTA_VINCULADA', mensaje: expect.stringContaining('ya vinculada a otra persona') });
   });
 
-  it('previa: cuenta inactiva (el celular sigue siendo de un party sin cuenta activa) -> OTRA_PERSONA', async () => {
+  it('previa: cuenta inactiva -> OTRA_PERSONA que dice reactivarla en Clientes', async () => {
     cuentas[0].activo = false;
     const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
-    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'PERSONA' });
+    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'CUENTA_DESACTIVADA', mensaje: expect.stringContaining('Reactívala primero en Clientes') });
   });
 
   // Invitado: party con el celular pero sin usuario ni cuenta de cliente
@@ -215,14 +215,14 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
   it('editar: celular de otro usuario -> 409 «lo usa otro usuario del equipo»', async () => {
     usuariosDePartys.add(80n);
     await expect(service.editar(7n, { celular: CEL } as any, admin)).rejects.toMatchObject({
-      response: { codigo: 'CELULAR_DUPLICADO', mensaje: 'Ese celular ya lo usa otro usuario del equipo' },
+      response: { codigo: 'CELULAR_DUPLICADO', mensaje: expect.stringContaining('Ese celular ya lo usa otro usuario del equipo') },
     });
   });
 
   it('editar: cuenta ya vinculada a otro -> 409 mensaje distinto', async () => {
     cuentas[0].usuario_party_id = 55n;
     await expect(service.editar(7n, { celular: CEL } as any, admin)).rejects.toMatchObject({
-      response: { codigo: 'CELULAR_DUPLICADO', mensaje: 'Ese celular es de una cuenta de cliente ya vinculada a otra persona' },
+      response: { codigo: 'CELULAR_DUPLICADO', mensaje: expect.stringContaining('ya vinculada a otra persona') },
     });
   });
 
@@ -262,7 +262,7 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
 
   it('crear con celular de un usuario existente: 409 «otro usuario del equipo»', async () => {
     usuariosDePartys.add(80n);
-    await expect(service.crear(crearBase as any, admin)).rejects.toMatchObject({ response: { mensaje: 'Ese celular ya lo usa otro usuario del equipo' } });
+    await expect(service.crear(crearBase as any, admin)).rejects.toMatchObject({ response: { mensaje: expect.stringContaining('Ese celular ya lo usa otro usuario del equipo') } });
   });
 
   it('crear con celular de una cuenta ya vinculada a otro usuario: 409 mensaje de cuenta vinculada', async () => {

@@ -8,14 +8,15 @@ type Db = Pick<Prisma.TransactionClient, 'contactMechanism' | 'customerAccount' 
 // Mismos tipos y mensaje que clientes/celular-party.util (copiados: un módulo no importa los internos de otro)
 const TIPOS_CELULAR = ['TELEFONO', 'WHATSAPP'];
 
-export type MotivoOtraPersona = 'USUARIO' | 'CUENTA_VINCULADA' | 'USUARIO_YA_VINCULADO' | 'VARIAS_CUENTAS' | 'PERSONA';
+export type MotivoOtraPersona = 'USUARIO' | 'CUENTA_VINCULADA' | 'USUARIO_YA_VINCULADO' | 'VARIAS_CUENTAS' | 'PERSONA' | 'CUENTA_DESACTIVADA';
 
 const MENSAJES: Record<MotivoOtraPersona, string> = {
-  USUARIO: 'Ese celular ya lo usa otro usuario del equipo',
-  CUENTA_VINCULADA: 'Ese celular es de una cuenta de cliente ya vinculada a otra persona',
-  USUARIO_YA_VINCULADO: 'Este usuario ya tiene otra cuenta de cliente vinculada. Desvincúlala primero en la sección Cuenta de cliente',
-  VARIAS_CUENTAS: 'Ese celular está en varias cuentas de cliente. Vincula la correcta a mano en la sección Cuenta de cliente',
+  USUARIO: 'Ese celular ya lo usa otro usuario del equipo. Escribe otro número o corrige el de esa persona',
+  CUENTA_VINCULADA: 'Ese celular es de una cuenta de cliente ya vinculada a otra persona del equipo. Desvincúlala allí primero o escribe otro número',
+  USUARIO_YA_VINCULADO: 'Este usuario ya tiene otra cuenta de cliente vinculada. Desvincúlala primero en «Cuenta de cliente (carta)» y vuelve a guardar',
+  VARIAS_CUENTAS: 'Ese celular está en varias cuentas de cliente. Deja solo una en Clientes y vuelve a guardar',
   PERSONA: 'Ese celular ya esta registrado en otra persona',
+  CUENTA_DESACTIVADA: 'Ese celular es de una cuenta de cliente desactivada. Reactívala primero en Clientes y vuelve a guardar',
 };
 
 export type ResultadoCelular =
@@ -33,14 +34,26 @@ export const excepcionCelular = (motivo: MotivoOtraPersona) =>
   new ConflictException({ codigo: 'CELULAR_DUPLICADO', mensaje: MENSAJES[motivo], motivo });
 
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-const primero = (s?: string | null) => sinTildes(s ?? '').split(/\s+/)[0] ?? '';
+const palabras = (p: { nombres?: string | null; apellidos?: string | null }) => sinTildes(`${p.nombres ?? ''} ${p.apellidos ?? ''}`).split(/\s+/).filter(Boolean);
+/** Primer apellido: el primero de `apellidos` o, si la carta guardó todo el nombre en `nombres`, su última palabra. */
+const apellido1 = (p: { nombres?: string | null; apellidos?: string | null }) => {
+  const ap = sinTildes(p.apellidos ?? '').split(/\s+/).filter(Boolean);
+  if (ap.length) return ap[0];
+  const todo = palabras(p);
+  return todo.length > 1 ? todo[todo.length - 1] : '';
+};
 
 /**
- * ponytail: «mismo nombre» = primer nombre y primer apellido iguales (sin tildes ni mayúsculas). No es identidad:
- * solo decide si hace falta que el ADMIN confirme «es la misma persona».
+ * ponytail: «mismo nombre» = mismo primer nombre y el primer apellido de cada uno aparece en el nombre del otro (sin tildes ni
+ * mayúsculas; sirve aunque la carta guarde «Ana Prueba» entero en nombres). No es identidad: solo decide si hace falta que el
+ * ADMIN confirme «es la misma persona».
  */
 export function mismoNombre(a: { nombres?: string | null; apellidos?: string | null }, b: { nombres?: string | null; apellidos?: string | null }): boolean {
-  return !!primero(a.nombres) && primero(a.nombres) === primero(b.nombres) && !!primero(a.apellidos) && primero(a.apellidos) === primero(b.apellidos);
+  const pa = palabras(a);
+  const pb = palabras(b);
+  const ap1 = apellido1(a);
+  const ap2 = apellido1(b);
+  return !!pa[0] && pa[0] === pb[0] && !!ap1 && !!ap2 && pb.includes(ap1) && pa.includes(ap2);
 }
 
 /**
@@ -76,23 +89,25 @@ export async function resolverCelular(
 
   const candidatas: Array<{ id: bigint; party_id: bigint }> = [];
   const invitados: bigint[] = [];
+  let propiaPorContacto = false;
   for (const dueno of duenos) {
     if (await db.userAccount.findFirst({ where: { party_id: dueno }, select: { id: true } })) return otra('USUARIO');
     const cuenta = await db.customerAccount.findFirst({ where: { party_id: dueno, activo: true }, select: { id: true, party_id: true, usuario_party_id: true } });
     if (!cuenta) {
-      if (partyId === null) continue; // alta: se reutiliza ese party
-      // Invitado = persona sin ninguna cuenta de cliente (ni desactivada: esa no se reactiva sola)
-      const inactiva = await db.customerAccount.findFirst({ where: { party_id: dueno }, select: { id: true } });
-      if (inactiva) return otra('PERSONA');
+      if (partyId === null && !(await db.customerAccount.findFirst({ where: { party_id: dueno }, select: { id: true } }))) continue; // alta: se reutiliza ese party
+      // Invitado = persona sin ninguna cuenta de cliente. Una desactivada no se reactiva sola: se avisa qué hacer
+      if (await db.customerAccount.findFirst({ where: { party_id: dueno }, select: { id: true } })) return otra('CUENTA_DESACTIVADA');
       const p = await db.party.findUnique({ where: { id: dueno }, select: { tipo: true } });
       if (p?.tipo !== 'PERSONA') return otra('PERSONA');
       invitados.push(dueno);
       continue;
     }
+    // Ya es la cuenta vinculada a ESTE usuario (aunque su telefono no coincida con el contacto): no es «otra persona»
+    if (partyId !== null && cuenta.usuario_party_id === partyId) { propiaPorContacto = true; continue; }
     if (cuenta.usuario_party_id !== null) return otra('CUENTA_VINCULADA');
     candidatas.push(cuenta);
   }
-  if (!candidatas.length && !invitados.length) return { estado: 'LIBRE' };
+  if (!candidatas.length && !invitados.length) return propiaPorContacto ? { estado: 'YA_VINCULADA' } : { estado: 'LIBRE' };
   if (candidatas.length + invitados.length > 1) return otra('VARIAS_CUENTAS');
   if (partyId !== null && (await db.customerAccount.findFirst({ where: { usuario_party_id: partyId }, select: { id: true } }))) {
     return otra('USUARIO_YA_VINCULADO');

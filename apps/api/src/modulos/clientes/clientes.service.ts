@@ -390,17 +390,47 @@ export class ClientesService {
       throw new ConflictException({ codigo: 'TELEFONO_REGISTRADO', mensaje: 'Ese celular ya tiene cuenta.' });
     }
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
+    // Persona que ya tiene ese celular sin cuenta de cliente (invitado de pedidos/WhatsApp o integrante del personal): se reutiliza su party
+    // en vez de crear otra con el mismo celular (el índice único lo rechazaría). Mismo criterio que `registro`.
+    const suelto = await this.prisma.contactMechanism.findFirst({
+      where: {
+        tipo: { in: ['TELEFONO', 'WHATSAPP'] },
+        valor: { in: [tel, `51${tel}`] },
+        activo: true,
+        party: { tipo: 'PERSONA', estado: 'ACTIVO', cuentaCliente: { is: null } },
+      },
+      select: { party_id: true, party: { select: { usuario: { select: { party_id: true } } } } },
+    });
+    const existenteId = suelto?.party_id ?? null;
+    const esPersonal = Boolean(suelto?.party?.usuario);
     let partyId: bigint;
     try {
       partyId = await this.prisma.$transaction(async (tx) => {
-        const party = await tx.party.create({ data: { tipo: 'PERSONA', estado: 'ACTIVO' } });
-        await tx.person.create({ data: { party_id: party.id, nombres: limpio } });
-        const rol = await tx.partyRole.create({ data: { party_id: party.id, rol: 'CLIENTE' } });
-        await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
-        await tx.customerAccount.create({ data: { party_id: party.id, hash: null, telefono: tel, activo: true } });
-        await tx.contactMechanism.create({ data: { party_id: party.id, tipo: 'TELEFONO', valor: tel, principal: true } });
-        await tx.consent.create({ data: { party_id: party.id, version_texto: versionTexto, canal: 'BOT' } });
-        return party.id;
+        let id: bigint;
+        if (existenteId) {
+          id = existenteId;
+          const persona = await tx.person.findUnique({ where: { party_id: id } });
+          if (!persona) await tx.person.create({ data: { party_id: id, nombres: limpio } });
+          else if (!esPersonal) await tx.person.update({ where: { party_id: id }, data: { nombres: limpio } }); // el nombre del personal no se pisa
+          const rol = await tx.partyRole.findFirst({ where: { party_id: id, rol: 'CLIENTE', hasta: null }, include: { customer_detail: true } });
+          if (!rol) {
+            const nuevo = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+            await tx.customerDetail.create({ data: { party_role_id: nuevo.id, puntos: 0 } });
+          } else if (!rol.customer_detail) {
+            await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+          }
+          await tx.customerAccount.create({ data: { party_id: id, hash: null, telefono: tel, activo: true } });
+        } else {
+          const party = await tx.party.create({ data: { tipo: 'PERSONA', estado: 'ACTIVO' } });
+          id = party.id;
+          await tx.person.create({ data: { party_id: id, nombres: limpio } });
+          const rol = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+          await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
+          await tx.customerAccount.create({ data: { party_id: id, hash: null, telefono: tel, activo: true } });
+          await tx.contactMechanism.create({ data: { party_id: id, tipo: 'TELEFONO', valor: tel, principal: true } });
+        }
+        await tx.consent.create({ data: { party_id: id, version_texto: versionTexto, canal: 'BOT' } });
+        return id;
       });
     } catch (err: any) {
       if (err?.code === 'P2002') throw new ConflictException({ codigo: 'TELEFONO_REGISTRADO', mensaje: 'Ese celular ya tiene cuenta.' });
@@ -1277,7 +1307,7 @@ export class ClientesService {
     const dueno = esEmpresa ? null : await partyDeCelular(this.prisma, tel!);
     if (dueno) {
       if (await this.prisma.userAccount.findFirst({ where: { party_id: dueno }, select: { id: true } })) {
-        throw new ConflictException({ codigo: 'CELULAR_DE_USUARIO', mensaje: 'Ese celular es de un usuario del equipo: vincúlalo desde Usuarios' });
+        throw new ConflictException({ codigo: 'CELULAR_DE_USUARIO', mensaje: 'Ese celular es de un usuario del equipo y ya recibe su descuento con él; no hace falta crearlo como cliente. Si quiere su cuenta de la carta, que se registre allí con ese celular' });
       }
       const conCuenta = await this.prisma.customerAccount.findFirst({ where: { party_id: dueno }, select: { activo: true } });
       if (conCuenta?.activo) throw new ConflictException({ codigo: 'CLIENTE_YA_EXISTE', mensaje: 'Ya existe un cliente con ese celular' });

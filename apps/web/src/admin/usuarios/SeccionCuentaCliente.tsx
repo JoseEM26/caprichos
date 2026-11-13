@@ -1,33 +1,27 @@
 import { useEffect, useState } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
-import { Campo } from '../../comun/Campo';
 
 interface Cuenta {
   nombre: string;
   celular: string;
-  /** El celular es de un invitado (pedidos o WhatsApp): al confirmar se le crea la cuenta. */
-  creara?: boolean;
 }
 
 export interface SeccionCuentaClienteProps {
   usuarioId: string;
-  /** Solo el ADMIN vincula; el usuario debe estar activo para vincular. */
+  /** Solo el ADMIN la ve. */
   puedeEditar: boolean;
-  usuarioActivo: boolean;
 }
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi || (e as any)?.message ? ((e as any).message as string) : defecto);
 
 /**
- * Vincula la cuenta de cliente (la de la carta) de un trabajador con su usuario: la carta lo reconoce como del equipo
- * y le da el descuento de personal. No junta ni mueve datos (puntos, pedidos, direcciones siguen en la cuenta) y la cuenta
- * de cliente nunca gana permisos del panel. La confirmación Sí/No reemplaza el contenido de la sección (sin otro modal).
+ * Estado de solo lectura de la cuenta de cliente (la de la carta) del trabajador. NO tiene campo de celular: el único celular es el
+ * del usuario; al guardarlo se vincula sola (o se crea) la cuenta y la carta lo reconoce como del equipo (descuento de personal).
+ * Aquí solo se puede desvincular, con Sí/No. La cuenta de cliente nunca gana permisos del panel.
  */
-export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: SeccionCuentaClienteProps) {
+export function SeccionCuentaCliente({ usuarioId, puedeEditar }: SeccionCuentaClienteProps) {
   const [vinculada, setVinculada] = useState<Cuenta | null | undefined>(undefined);
-  const [celular, setCelular] = useState('');
-  const [encontrada, setEncontrada] = useState<Cuenta | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
@@ -47,44 +41,6 @@ export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: 
   }, [base, puedeEditar]);
 
   if (!puedeEditar) return null;
-
-  const buscar = async () => {
-    setError('');
-    setMensaje('');
-    if (!/^9\d{8}$/.test(celular)) {
-      setError('El celular debe tener 9 dígitos y empezar en 9');
-      return;
-    }
-    setOcupado(true);
-    try {
-      setEncontrada(await api.post<Cuenta>(`${base}/buscar`, { celular }));
-    } catch (e) {
-      setError(mensajeDe(e, 'No se pudo buscar la cuenta de cliente.'));
-    } finally {
-      setOcupado(false);
-    }
-  };
-
-  const vincular = async () => {
-    setOcupado(true);
-    setError('');
-    try {
-      const r = await api.post<{ vinculada: Cuenta; creada?: boolean }>(base, { celular });
-      setVinculada(r.vinculada);
-      setEncontrada(null);
-      setCelular('');
-      setMensaje(
-        r.creada
-          ? 'Listo: se creó su cuenta de cliente. Para entrar a la carta debe tocar «Crear cuenta» (o «¿Olvidaste tu contraseña?») con ese celular y verificarlo por WhatsApp para poner su contraseña.'
-          : 'Listo: esa persona ya recibe el descuento de personal en la carta.',
-      );
-    } catch (e) {
-      setError(mensajeDe(e, 'No se pudo vincular la cuenta.'));
-      setEncontrada(null);
-    } finally {
-      setOcupado(false);
-    }
-  };
 
   const quitar = async () => {
     setOcupado(true);
@@ -113,7 +69,7 @@ export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: 
       {vinculada && !confirmarQuitar && (
         <>
           <div data-testid="cuenta-vinculada" style={{ fontSize: 14, color: 'var(--cp-navy)' }}>
-            Cuenta de cliente vinculada: <strong>{vinculada.nombre}</strong> · {vinculada.celular}
+            Vinculada a <strong>{vinculada.nombre}</strong> ({vinculada.celular}) — recibe el descuento de personal
           </div>
           <div>
             <Boton type="button" variante="secundario" onClick={() => setConfirmarQuitar(true)} deshabilitado={ocupado}>
@@ -135,53 +91,10 @@ export function SeccionCuentaCliente({ usuarioId, puedeEditar, usuarioActivo }: 
           </div>
         </div>
       )}
-      {vinculada === null && !encontrada && (
-        <>
-          <span style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-            Si esta persona también se registró como cliente en la carta, escribe el celular de esa cuenta para que reciba su descuento de personal. No se junta
-            ni se borra nada.
-          </span>
-          <Campo
-            id="vincular-celular"
-            etiqueta="Celular de su cuenta de cliente (9 dígitos)"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="off"
-            value={celular}
-            onChange={(e) => setCelular(e.target.value.replace(/\D/g, '').slice(0, 9))}
-            disabled={ocupado || !usuarioActivo}
-            ayuda={usuarioActivo ? undefined : 'Reactiva al usuario para vincular su cuenta'}
-          />
-          <div>
-            <Boton type="button" variante="secundario" onClick={buscar} cargando={ocupado} deshabilitado={!usuarioActivo || celular.length === 0}>
-              Vincular su cuenta de cliente
-            </Boton>
-          </div>
-        </>
-      )}
-      {vinculada === null && encontrada && (
-        <div role="group" aria-label="Confirmar vínculo" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span data-testid="cuenta-encontrada" style={{ fontSize: 14, color: 'var(--cp-navy)' }}>
-            {encontrada.creara ? (
-              <>
-                Ese celular ya está en el sistema (de pedidos anteriores, a nombre de <strong>{encontrada.nombre}</strong>). Se creará su cuenta de cliente y
-                quedará vinculada a este trabajador para su descuento. ¿Continuar?
-              </>
-            ) : (
-              <>
-                Encontramos la cuenta de <strong>{encontrada.nombre}</strong> ({encontrada.celular}). ¿Es la cuenta de cliente de esta persona?
-              </>
-            )}
-          </span>
-          <div style={fila}>
-            <Boton type="button" onClick={vincular} cargando={ocupado}>
-              {encontrada.creara ? 'Sí' : 'Sí, vincular'}
-            </Boton>
-            <Boton type="button" variante="secundario" onClick={() => setEncontrada(null)} deshabilitado={ocupado}>
-              No
-            </Boton>
-          </div>
-        </div>
+      {vinculada === null && (
+        <span data-testid="cuenta-sin-vincular" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+          Se vincula sola al guardar el celular si esa persona ya tiene cuenta en la carta; si no la tiene, se crea.
+        </span>
       )}
       {error && (
         <div role="alert" style={{ fontSize: 13, color: 'var(--cp-rust)', fontWeight: 600 }}>

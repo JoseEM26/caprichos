@@ -567,7 +567,7 @@ export function EditarUsuarioModal({
             ayuda={
               usuario.activo && usuario.sinCelular
                 ? "Sin celular: no tendrá descuento de personal en la carta"
-                : "Con este celular recibe el descuento de personal en la carta"
+                : "Con este celular recibe el descuento de personal en la carta; si ya tiene cuenta en la carta se vincula sola"
             }
             disabled={guardando}
           />
@@ -647,7 +647,7 @@ export function EditarUsuarioModal({
           </label>
         </div>
       )}
-      <SeccionCuentaCliente usuarioId={usuario.id} puedeEditar={esAdmin} usuarioActivo={usuario.activo} />
+      <SeccionCuentaCliente usuarioId={usuario.id} puedeEditar={esAdmin} />
       {esAdmin && (
         <>
           <FotoUsuarioAdmin usuario={usuario} deshabilitado={guardando} />

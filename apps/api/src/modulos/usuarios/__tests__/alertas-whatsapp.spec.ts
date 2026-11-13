@@ -30,6 +30,7 @@ describe('Alertas WhatsApp en Usuarios (Contrato Caprichos - Sección 1)', () =>
     prismaMock = {
       userAccount: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn(),
       },
       contactMechanism: {
@@ -38,6 +39,9 @@ describe('Alertas WhatsApp en Usuarios (Contrato Caprichos - Sección 1)', () =>
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      customerAccount: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
+      person: { findUnique: jest.fn().mockResolvedValue(null) },
+      party: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn().mockImplementation((cb) => cb(prismaMock)),
     };
 
