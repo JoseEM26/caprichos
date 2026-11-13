@@ -8,6 +8,7 @@ import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import { esAlergenoPersonalizado } from '../../comun/alergenos';
 import './productos-tarjeta.css';
 import {
   catalogoApi,
@@ -176,6 +177,11 @@ export function ProductosView() {
   const [edPorciones, setEdPorciones] = useState('');
   const [edAlergenos, setEdAlergenos] = useState<string[]>([]);
   const [edAlergenosConfirmados, setEdAlergenosConfirmados] = useState(false);
+  // Alérgenos personalizados ya usados en otros productos, para reutilizarlos (sale del mismo listado).
+  const alergenosSugeridos = useMemo(
+    () => [...new Set(productos.flatMap((x) => x.alergenos ?? []).filter(esAlergenoPersonalizado))].sort((a, b) => a.localeCompare(b, 'es')),
+    [productos],
+  );
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
   const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
@@ -1822,6 +1828,7 @@ export function ProductosView() {
           controlaStock={edControlaStock} setControlaStock={setEdControlaStock}
           porciones={edPorciones} setPorciones={setEdPorciones}
           alergenos={edAlergenos} setAlergenos={setEdAlergenos}
+          alergenosSugeridos={alergenosSugeridos}
           alergenosConfirmados={edAlergenosConfirmados} setAlergenosConfirmados={setEdAlergenosConfirmados}
           fotoUrl={edFotoUrl}
           subiendoFoto={subidaEdFoto.subiendo}

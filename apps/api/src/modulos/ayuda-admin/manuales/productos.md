@@ -34,6 +34,7 @@ Ver tambien: [[stock]]
 1. Abre el producto con "Editar" y baja a "Alcance y alergenos".
 2. En "Alcanza para" escribe un texto corto, por ejemplo "8 a 10 personas". La carta lo muestra en la ficha del producto y Capri lo usa para responder "para cuantas personas alcanza".
 3. En "Alergenos" toca los que lleva el producto (mani, nueces, lacteos, gluten, huevo, soya, mariscos, sesamo) y marca "Revise los alergenos de este producto". Sin esa casilla, la carta no muestra los alergenos y Capri no afirma si lleva o no un alergeno: pasa la duda a una persona del equipo.
+4. Si el alergeno no esta en la lista (por ejemplo lucuma, fresa, cacao), escribelo en "Otro alergeno" y toca "Agregar" (o Enter): queda como una etiqueta que se quita con la x, y los que ya usaste en otros productos aparecen para reutilizarlos.
 
 ## Como se hace: Marcar un producto como agotado o disponible
 1. Localiza el producto en la lista utilizando el buscador superior o haciendo clic en la pestana de su categoria.

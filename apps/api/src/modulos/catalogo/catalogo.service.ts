@@ -38,6 +38,7 @@ import {
 } from './dto/lista.dto';
 import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
 import { aperturaHoyProductos, estadoSaborCarta, estadoSaboresHoy, limpiarAgotadosAutomaticosDeProducto, quedanProductos } from '../stock/producto-controlado';
+import { normalizarAlergenos } from './alergenos.util';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -837,7 +838,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           resaltar_opcion_menos_pedida: dto.resaltarOpcionMenosPedida ?? false,
           controla_stock: dto.controlaStock ?? false,
           porciones: dto.porciones?.trim() || null,
-          alergenos: [...new Set(dto.alergenos ?? [])],
+          alergenos: normalizarAlergenos(dto.alergenos ?? []),
           alergenos_confirmados: dto.alergenosConfirmados ?? false,
           oculto: false,
         },
@@ -993,7 +994,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             dto.resaltarOpcionMenosPedida !== undefined ? dto.resaltarOpcionMenosPedida : undefined,
           controla_stock: dto.controlaStock !== undefined ? dto.controlaStock : undefined,
           porciones: dto.porciones !== undefined ? dto.porciones?.trim() || null : undefined,
-          alergenos: dto.alergenos !== undefined ? [...new Set(dto.alergenos)] : undefined,
+          alergenos: dto.alergenos !== undefined ? normalizarAlergenos(dto.alergenos) : undefined,
           alergenos_confirmados: dto.alergenosConfirmados !== undefined ? dto.alergenosConfirmados : undefined,
           foto_archivo_id: fotoArchivoId,
         },
@@ -1121,7 +1122,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         precio: dto.precio ?? Number(actual.precio),
         oculto: dto.oculto ?? actual.oculto,
         porciones: dto.porciones !== undefined ? dto.porciones?.trim() || null : actual.porciones ?? null,
-        alergenos: dto.alergenos !== undefined ? [...new Set(dto.alergenos)] : actual.alergenos ?? [],
+        alergenos: dto.alergenos !== undefined ? normalizarAlergenos(dto.alergenos) : actual.alergenos ?? [],
         alergenosConfirmados: dto.alergenosConfirmados ?? actual.alergenos_confirmados ?? false,
       },
       partyId: usuario?.partyId,

@@ -22,6 +22,10 @@ describe('ficha del producto: porciones y alérgenos', () => {
     expect(screen.getByText('Alcanza para 8 a 10 personas')).toBeTruthy();
     expect(screen.getByText('Contiene: maní, lácteos')).toBeTruthy();
   });
+  it('muestra fijos con etiqueta y personalizados tal cual', () => {
+    ver({ ...base, alergenos: ['lúcuma', 'MANI'], alergenosConfirmados: true });
+    expect(screen.getByText('Contiene: maní, lúcuma')).toBeTruthy();
+  });
   it('sin confirmar no muestra alérgenos; sin porciones no muestra el alcance', () => {
     ver({ ...base, alergenos: ['MANI'], alergenosConfirmados: false });
     expect(screen.queryByText(/Contiene/)).toBeNull();

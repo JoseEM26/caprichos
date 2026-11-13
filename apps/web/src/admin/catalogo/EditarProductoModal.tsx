@@ -8,7 +8,7 @@ import type { CategoriaAdmin, ProductoAdmin, SaborItem } from './catalogoApi';
 import './editor-opciones.css';
 import './editar-producto.css';
 import { textosOrigenAgotado } from './origenAgotado';
-import { ALERGENOS } from '../../comun/alergenos';
+import { ALERGENOS, esAlergenoPersonalizado, normalizarAlergeno } from '../../comun/alergenos';
 
 export interface EditarProductoModalProps {
   producto: ProductoAdmin;
@@ -20,6 +20,8 @@ export interface EditarProductoModalProps {
   controlaStock: boolean; setControlaStock: (v: boolean) => void;
   porciones: string; setPorciones: (v: string) => void;
   alergenos: string[]; setAlergenos: (v: string[]) => void;
+  /** Alérgenos personalizados ya usados en otros productos (para reutilizarlos con un toque). */
+  alergenosSugeridos?: string[];
   alergenosConfirmados: boolean; setAlergenosConfirmados: (v: boolean) => void;
   fotoUrl: string | null;
   subiendoFoto: boolean;
@@ -47,6 +49,12 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
   const esCombo = p.producto.esAnfitrionCombo === true;
   const [confirmarSalir, setConfirmarSalir] = useState(false);
   const [confirmarOpciones, setConfirmarOpciones] = useState(false);
+  const [otroAlergeno, setOtroAlergeno] = useState('');
+  const agregarOtro = () => {
+    const v = normalizarAlergeno(otroAlergeno);
+    if (v && !p.alergenos.includes(v)) p.setAlergenos([...p.alergenos, v]);
+    if (v) setOtroAlergeno('');
+  };
   const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]));
   const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]) !== inicial.current;
   // Tamaños y opciones reemplaza a este modal (nunca dos a la vez): con cambios sin guardar, se avisa antes.
@@ -111,6 +119,24 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
               </button>
             );
           })}
+          {p.alergenos.filter(esAlergenoPersonalizado).map((v) => (
+            <button key={v} type="button" className="eo-btn ep-chip-activo" disabled={bloqueado} aria-label={`Quitar ${v}`}
+              onClick={() => p.setAlergenos(p.alergenos.filter((x) => x !== v))}>
+              {v} ×
+            </button>
+          ))}
+          {(p.alergenosSugeridos ?? []).filter((v) => !p.alergenos.includes(v)).map((v) => (
+            <button key={`s-${v}`} type="button" className="eo-btn" disabled={bloqueado} aria-label={`Agregar ${v}`}
+              onClick={() => p.setAlergenos([...p.alergenos, v])}>
+              + {v}
+            </button>
+          ))}
+        </div>
+        <div className="ep-otro-alergeno">
+          <input className="eo-input" type="text" maxLength={30} placeholder="Otro alérgeno (ej.: lúcuma)" aria-label="Otro alérgeno"
+            value={otroAlergeno} disabled={bloqueado} onChange={(e) => setOtroAlergeno(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarOtro(); } }} />
+          <button type="button" className="eo-btn" disabled={bloqueado || !otroAlergeno.trim()} onClick={agregarOtro}>Agregar</button>
         </div>
         <label className="eo-interruptor">
           <input type="checkbox" checked={p.alergenosConfirmados} disabled={bloqueado} onChange={(e) => p.setAlergenosConfirmados(e.target.checked)} />

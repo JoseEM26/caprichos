@@ -31,3 +31,5 @@
 .eo-pendiente { margin-right: auto; font-size: 13px; font-weight: 700; color: var(--cp-rust); }
 @media (max-width: 640px) { .ep-fila3 { grid-template-columns: 1fr; } .ep-miniatura { width: 96px; height: 96px; } }
 .ep-alergenos{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.ep-chip-activo{background:var(--eo-acento,#7a3b1d);color:#fff}
+
+.ep-otro-alergeno{display:flex;gap:6px;margin:0 0 8px}.ep-otro-alergeno .eo-input{flex:1;min-width:0}
