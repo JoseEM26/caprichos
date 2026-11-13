@@ -62,6 +62,9 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
   comprobante: [
     { columnas: { documento: 'NULL', razon_social: 'NULL' }, donde: `"documento" ~ ${DNI}`, motivo: 'DNI del receptor' },
   ],
+  comprobante_cambio_pendiente: [
+    { columnas: { documento: 'NULL', razon_social: 'NULL' }, donde: `"documento" ~ ${DNI}`, motivo: 'DNI del cambio de comprobante pendiente' },
+  ],
   reclamo: [
     { columnas: { documento: "''" }, donde: `"documento" <> '' AND "documento" !~ '^[0-9]{11}$'`, motivo: 'documento del consumidor (columna obligatoria: se vacía)' },
   ],

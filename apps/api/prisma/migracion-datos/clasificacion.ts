@@ -36,7 +36,7 @@ export const MIGRAR: string[] = [
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_estado_historial', 'secuencia_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cortesia', 'contador_diario',
-    'pedido_mesa', 'comprobante', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
+    'pedido_mesa', 'comprobante', 'comprobante_cambio_pendiente', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'incidente_entrega', 'incidente_entrega_foto', 'ruc_consulta', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto', 'ubicacion_repartidor',
   ]],
   ['caja y cierres: dinero real del día', [
