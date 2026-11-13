@@ -39,7 +39,7 @@ export class AprendizajesService {
     const [filas, total] = await Promise.all([
       this.prisma.aprendizajePropuesto.findMany({
         where,
-        orderBy: [{ repeticiones: 'desc' }, { id: 'desc' }],
+        orderBy: [{ repeticiones: 'desc' }, { creado_en: 'desc' }, { id: 'desc' }],
         skip: (pagina - 1) * limite,
         take: limite,
         include: { noche: { select: { fecha: true } }, decididoPor: { select: { persona: { select: { nombres: true, apellidos: true } } } } },

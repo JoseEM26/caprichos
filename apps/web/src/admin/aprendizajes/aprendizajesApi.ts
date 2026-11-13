@@ -66,6 +66,8 @@ export const aprendizajesApi = {
     api.get<{ items: Propuesta[]; total: number }>(`${base}?estado=${estado}&pagina=${pagina}&limite=${limite}`),
   aprobar: (id: string, cambios: { pregunta?: string; respuesta?: string; frases?: string[] }) =>
     api.post(`${base}/${id}/aprobar`, cambios),
+  mejorar: (b: { pregunta: string; respuesta: string; intencion?: string; tipo?: TipoAprendizaje }) =>
+    api.post<{ respuesta: string; frases?: string[] }>(`${base}/mejorar`, b),
   descartar: (id: string, motivo: string) => api.post(`${base}/${id}/descartar`, { motivo }),
   conocimiento: () => api.get<{ items: Conocimiento[] }>(`${base}/conocimiento`),
   retirar: (id: string, motivo: string) => api.post(`${base}/conocimiento/${id}/retirar`, { motivo }),

@@ -1,13 +1,14 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { AprendizajesMejorarService } from './aprendizajes-mejorar.service';
 import { AprendizajesService, EdicionAprobar } from './aprendizajes.service';
 
 /** Bot que aprende. Solo ADMIN (permisos aprendizajes/ver y aprendizajes/aprobar). */
 @Controller('admin/aprendizajes')
 @UseGuards(AccesoGuard)
 export class AprendizajesController {
-  constructor(private readonly servicio: AprendizajesService) {}
+  constructor(private readonly servicio: AprendizajesService, private readonly mejorador: AprendizajesMejorarService) {}
 
   @Get()
   @Permiso('aprendizajes', 'ver')
@@ -25,6 +26,13 @@ export class AprendizajesController {
   @Permiso('aprendizajes', 'ver')
   resumen() {
     return this.servicio.resumen();
+  }
+
+  /** Reescribe la respuesta con la voz de Capri. No guarda nada. */
+  @Post('mejorar')
+  @Permiso('aprendizajes', 'aprobar')
+  mejorar(@Body() body: { pregunta?: string; respuesta?: string; intencion?: string; tipo?: string }, @Req() req: any) {
+    return this.mejorador.mejorar(body, req.usuario.partyId);
   }
 
   @Post('ejecutar-ahora')

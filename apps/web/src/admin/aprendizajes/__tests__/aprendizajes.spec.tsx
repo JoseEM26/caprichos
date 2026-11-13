@@ -91,6 +91,32 @@ describe('Aprendizajes', () => {
     }));
   });
 
+  it('Mejorar reemplaza la respuesta, suma frases sin duplicar y Deshacer la recupera', async () => {
+    sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
+    post.mockResolvedValue({ respuesta: 'Sí, abrimos desde las 9. 🥰✨', frases: ['abren hoy', 'atienden domingo'] });
+    render(<AprendizajesView />);
+    fireEvent.click(await screen.findByText('Editar y aprobar'));
+    fireEvent.click(screen.getByRole('button', { name: 'Mejorar la respuesta con IA' }));
+    await waitFor(() => expect((screen.getByLabelText('Respuesta del bot') as HTMLTextAreaElement).value).toBe('Sí, abrimos desde las 9. 🥰✨'));
+    expect(post).toHaveBeenCalledWith('/admin/aprendizajes/mejorar', { pregunta: '¿Abren domingo?', respuesta: 'Sí, desde las 9.', intencion: 'horario', tipo: 'FAQ' });
+    const chips = within(screen.getByRole('list', { name: 'Frases' }));
+    expect(chips.getAllByText(/abren hoy/)).toHaveLength(1);
+    expect(chips.getByText(/atienden domingo/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Deshacer'));
+    expect((screen.getByLabelText('Respuesta del bot') as HTMLTextAreaElement).value).toBe('Sí, desde las 9.');
+    expect(screen.queryByText('Deshacer')).toBeNull();
+  });
+
+  it('si Mejorar falla muestra el error y no toca la respuesta', async () => {
+    sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
+    post.mockRejectedValue(new Error('La IA no está configurada'));
+    render(<AprendizajesView />);
+    fireEvent.click(await screen.findByText('Editar y aprobar'));
+    fireEvent.click(screen.getByRole('button', { name: 'Mejorar la respuesta con IA' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('La IA no está configurada');
+    expect((screen.getByLabelText('Respuesta del bot') as HTMLTextAreaElement).value).toBe('Sí, desde las 9.');
+  });
+
   it('descartar exige motivo de 5 letras y confirmación', async () => {
     sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
     render(<AprendizajesView />);

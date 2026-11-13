@@ -18,6 +18,17 @@ const armar = () => {
 };
 
 describe('AprendizajesService', () => {
+  it('listar PENDIENTE ordena por repeticiones DESC, luego creado_en DESC, y filtra por el umbral', async () => {
+    const { svc, prisma } = armar();
+    const findMany = jest.spyOn(prisma.aprendizajePropuesto, 'findMany');
+    const count = jest.spyOn(prisma.aprendizajePropuesto, 'count');
+    await svc.listar({ estado: 'PENDIENTE', pagina: 2, limite: 10 }).catch(() => undefined);
+    const arg = findMany.mock.calls[0][0] as any;
+    expect(arg.orderBy.slice(0, 2)).toEqual([{ repeticiones: 'desc' }, { creado_en: 'desc' }]);
+    expect(arg).toMatchObject({ skip: 10, take: 10, where: { estado: 'PENDIENTE', repeticiones: { gte: 3 } } });
+    expect(count).toHaveBeenCalledWith({ where: arg.where });
+  });
+
   it('aprobar aplica ediciones, crea conocimiento con versión max+1 y audita', async () => {
     const { svc, prisma, auditoria, conocimiento } = armar();
     prisma._conocimientos.push({ id: 9n, version: 7, estado: 'RETIRADO' });
