@@ -6,18 +6,20 @@ import { EstadoError } from '../../comun/EstadoError';
 import { PapelTermico } from '../impresion/facil/PanelVistaPrevia';
 import { cierreApi, DetalleCierreCompleto } from './cierreApi';
 import { ListaCorrecciones } from './CorreccionesMedios';
+import { PorQueNoCuadra } from './PorQueNoCuadra';
 import './detalle-cierre.css';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 const conSigno = (n: number) => `${n > 0.004 ? '+' : n < -0.004 ? '−' : ''}S/ ${Math.abs(n).toFixed(2)}`;
 const claseDif = (n: number) => (Math.abs(n) < 0.005 ? 'dc-ok' : 'dc-mal');
 
-type Pestana = 'resumen' | 'efectivo' | 'medios' | 'movimientos';
+type Pestana = 'resumen' | 'efectivo' | 'medios' | 'movimientos' | 'porque';
 const PESTANAS: Array<[Pestana, string]> = [
   ['resumen', 'Resumen'],
   ['efectivo', 'Efectivo'],
   ['medios', 'Medios de pago'],
   ['movimientos', 'Movimientos'],
+  ['porque', '¿Por qué no cuadra?'],
 ];
 
 const Fila = ({ k, v }: { k: string; v: React.ReactNode }) => (
@@ -230,7 +232,7 @@ export function DetalleCierreModal({ cajaId, detalle, cargando, error, esAdmin, 
     return (
       <>
         <div className="dc-pestanas" role="tablist" aria-label="Secciones del cierre">
-          {PESTANAS.map(([id, texto]) => (
+          {PESTANAS.filter(([id]) => id !== 'porque' || esAdmin).map(([id, texto]) => (
             <button key={id} type="button" role="tab" id={`dc-tab-${id}`} aria-selected={pestana === id} aria-controls="dc-panel" className="dc-tab" onClick={() => setPestana(id)}>
               {texto}
             </button>
@@ -243,6 +245,7 @@ export function DetalleCierreModal({ cajaId, detalle, cargando, error, esAdmin, 
             ? <SeccionMedios t={t} />
             : <p className="dc-aviso" data-testid="aviso-detalle-restringido">El desglose por medio de pago y las diferencias del sistema están reservados para el administrador (cierre ciego).</p>)}
           {pestana === 'movimientos' && <SeccionMovimientos t={t} detalle={detalle} />}
+          {pestana === 'porque' && esAdmin && <PorQueNoCuadra cajaId={cajaId} />}
         </div>
       </>
     );

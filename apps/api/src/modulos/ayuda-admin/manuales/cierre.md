@@ -74,6 +74,16 @@ Ver tambien: [[caja]]
 3. Si la diferencia persiste tras el reconteo, la pantalla exige una Nota explicativa obligatoria. No se pide ningun codigo de supervisor.
 4. Redactar el motivo de la diferencia y pulsar Cerrar caja. El cierre queda auditado con quien lo hizo.
 
+## Como se hace: Saber por que no cuadra un cierre
+1. Quien cierra la caja ve en el cuadre el panel Antes de cerrar, revisa esto: pedidos anulados que ya habian pagado, cobros anulados del dia, ingresos y egresos registrados, pedidos sin cobrar, aviso de propinas y repartidores por liquidar, mas una lista de preguntas (contaste dos veces, el total de Yape es el de la app, el POS es del mismo lote, registraste los gastos, alguien pago por otro medio, devolviste lo anulado, diste vuelto). Esa guia nunca dice cuanto falta o sobra ni en que medio.
+2. Si el arqueo no cuadra, el mismo panel cambia a Algo no cuadra: revisa estos puntos y se abre solo.
+3. El Administrador abre Historial de cierres, entra al Detalle del cierre y pulsa la pestana Por que no cuadra. Solo lectura: no cambia ningun monto.
+4. Arriba esta la tabla por medio (sistema, visto, diferencia y total). Debajo, tarjetas con posibles causas, cada una con su explicacion, los codigos de pedido y los montos (nunca nombres ni documentos de clientes): cobro registrado en un medio y pagado por otro, entro mas dinero del registrado, pedidos anulados con pago, cobros anulados, propinas por medio, ingresos y egresos, delivery sin liquidar, credito del personal, cobros de pedidos de otro dia, diferencia pequena de vuelto o redondeo y conteo de billetes distinto.
+5. En Montos que coinciden, el sistema avisa si un monto listado, o la suma de hasta tres, es igual a la diferencia de un medio (con 10 centimos de margen). Es una pista, no una prueba.
+6. Al final, la Ayuda general explica en palabras simples las causas comunes de sobrante y de faltante en efectivo, Yape o Plin, transferencia y tarjeta.
+Antes: [[caja]]
+Ver tambien: [[informes]]
+
 ## Como se hace: Entender las propinas, cortesias y ajustes en el cierre
 1. Propinas del dia: si hubo propinas, el cierre muestra el bloque Propinas del dia con el total, el efectivo y lo digital. Van aparte de la venta: no son ingreso ni salen en comprobantes. En el efectivo esperado aparece la linea "+ Propinas en efectivo (van aparte de la venta)". Los medios digitales (Yape, Plin, transferencia, tarjeta) ya incluyen la parte de propina digital, pero no se suman al total vendido: el cierre lo aclara. Las devoluciones del dia ya estan descontadas. Ver [[propinas]].
 2. Cortesias: una cortesia es una venta a S/ 0 (por su valor de lista), asi que no suma dinero al cierre ni al total vendido. Se audita aparte en el reporte Cortesias de [[informes]]. Ver [[caja]].

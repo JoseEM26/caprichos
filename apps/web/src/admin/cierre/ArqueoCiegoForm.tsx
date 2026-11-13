@@ -8,6 +8,7 @@ import {
   ArqueoRespuesta,
 } from './cierreApi';
 import { ErrorApi } from '../../comun/api';
+import { GuiaRevision } from './GuiaRevision';
 
 interface ArqueoCiegoFormProps {
   alCerrarCajaExitoso?: () => void;
@@ -522,6 +523,8 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
               </span>
             </div>
           )}
+
+          <GuiaRevision modo={resultadoArqueo?.resultado === 'NO_CUADRA' ? 'no-cuadra' : 'antes'} />
 
           {errorArqueo && (
             <div

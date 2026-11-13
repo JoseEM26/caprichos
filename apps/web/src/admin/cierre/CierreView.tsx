@@ -16,6 +16,7 @@ import {
 } from './cierreApi';
 import { DialogoCorregirMedio, ETIQUETA_MEDIO } from './CorreccionesMedios';
 import { CuadreCaja, type CierrePayload } from './CuadreCaja';
+import { GuiaRevision } from './GuiaRevision';
 import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
@@ -443,6 +444,7 @@ export function CierreView() {
           pendientesCount={pedidosAbiertos.length}
           motivoSinCobro={motivoSinCobro}
           sinTerminarCount={sinTerminar.length}
+          guiaPanel={<GuiaRevision modo="antes" />}
           motivoSinTerminar={motivoSinTerminar}
           sinTerminarPanel={
             <PedidosSinTerminarCierre
