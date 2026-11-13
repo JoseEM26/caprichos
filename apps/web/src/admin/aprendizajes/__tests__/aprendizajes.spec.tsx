@@ -81,7 +81,7 @@ describe('Aprendizajes', () => {
     render(<AprendizajesView />);
     fireEvent.click(await screen.findByText('Editar y aprobar'));
     fireEvent.change(screen.getByLabelText('Respuesta del bot'), { target: { value: 'Sí, desde las 8.' } });
-    fireEvent.change(screen.getByLabelText('Otras formas de preguntar lo mismo'), { target: { value: 'atienden domingo' } });
+    fireEvent.change(screen.getByLabelText(/Otras formas de preguntar lo mismo/), { target: { value: 'atienden domingo' } });
     fireEvent.click(screen.getByText('Agregar frase'));
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }));
     expect(post).not.toHaveBeenCalled();
@@ -105,6 +105,40 @@ describe('Aprendizajes', () => {
     fireEvent.click(screen.getByText('Deshacer'));
     expect((screen.getByLabelText('Respuesta del bot') as HTMLTextAreaElement).value).toBe('Sí, desde las 9.');
     expect(screen.queryByText('Deshacer')).toBeNull();
+  });
+
+  it('las frases nunca pasan de 8 ni de 120 letras: Mejorar suma solo hasta el tope y avisa, y se puede aprobar', async () => {
+    sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
+    items = [prop({ frases: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'x'.repeat(150)] })];
+    post.mockResolvedValue({ respuesta: 'Sí, abrimos desde las 9.', frases: ['nueva uno', 'nueva dos', 'nueva tres'] });
+    render(<AprendizajesView />);
+    fireEvent.click(await screen.findByText('Editar y aprobar'));
+    const lista = () => within(screen.getByRole('list', { name: 'Frases' })).getAllByRole('listitem');
+    expect(lista()).toHaveLength(8);
+    expect(screen.getByText(/\(8\/8, hasta 120 letras/)).toBeTruthy();
+    expect((screen.getByPlaceholderText(/Máximo 8 frases/) as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mejorar la respuesta con IA' }));
+    expect((await screen.findByRole('status')).textContent).toMatch(/quita alguna/);
+    expect(lista()).toHaveLength(8);
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar frase f1' }));
+    expect(lista()).toHaveLength(7);
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }));
+    fireEvent.click(screen.getByText('Sí, aprobar'));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/aprendizajes/p1/aprobar', expect.objectContaining({ frases: expect.any(Array) })));
+    const enviadas = post.mock.calls.find((c: any[]) => String(c[0]).endsWith('/aprobar'))![1].frases as string[];
+    expect(enviadas.length).toBeLessThanOrEqual(8);
+    expect(enviadas.every((x) => x.length <= 120)).toBe(true);
+  });
+
+  it('«Siempre a persona» se aprueba sin respuesta: no manda respuesta vacía', async () => {
+    sesion(['aprendizajes/ver', 'aprendizajes/aprobar']);
+    items = [prop({ tipo: 'DERIVAR', intencion: 'hablar_persona', pregunta: 'Quiero hablar con una persona.', respuesta: '', frases: ['Necesito un asesor.'] })];
+    render(<AprendizajesView />);
+    fireEvent.click(await screen.findByText('Editar y aprobar'));
+    expect(screen.queryByLabelText('Respuesta del bot')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }));
+    fireEvent.click(screen.getByText('Sí, aprobar'));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/aprendizajes/p1/aprobar', { pregunta: 'Quiero hablar con una persona.', frases: ['Necesito un asesor.'] }));
   });
 
   it('si Mejorar falla muestra el error y no toca la respuesta', async () => {

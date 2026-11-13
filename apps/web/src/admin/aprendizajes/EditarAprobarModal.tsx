@@ -4,16 +4,22 @@ import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { aprendizajesApi, mensajeError, type Propuesta } from './aprendizajesApi';
 
+/** Mismos límites que el servidor (aprendizajes.service validarEdicion). */
+export const MAX_FRASES = 8;
+export const MAX_LARGO_FRASE = 120;
+const limpiarFrases = (fs: string[]) => [...new Set(fs.map((f) => f.trim().slice(0, MAX_LARGO_FRASE)).filter(Boolean))].slice(0, MAX_FRASES);
+
 /** Edita pregunta, respuesta y frases de una propuesta y la aprueba tras un Sí/No. */
 export function EditarAprobarModal({ propuesta, alAprobar, alCerrar }: {
   propuesta: Propuesta;
-  alAprobar: (cambios: { pregunta: string; respuesta: string; frases: string[] }) => Promise<void>;
+  alAprobar: (cambios: { pregunta: string; respuesta?: string; frases: string[] }) => Promise<void>;
   alCerrar: () => void;
 }) {
   const id = useId();
   const [pregunta, setPregunta] = useState(propuesta.pregunta);
   const [respuesta, setRespuesta] = useState(propuesta.respuesta);
-  const [frases, setFrases] = useState(propuesta.frases);
+  const [frases, setFrases] = useState(() => limpiarFrases(propuesta.frases));
+  const [avisoFrases, setAvisoFrases] = useState<string | null>(null);
   const [nueva, setNueva] = useState('');
   const [confirmando, setConfirmando] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -25,8 +31,8 @@ export function EditarAprobarModal({ propuesta, alAprobar, alCerrar }: {
   const valido = pregunta.trim().length > 0 && (esDerivar || respuesta.trim().length > 0);
 
   const sumar = () => {
-    const f = nueva.trim();
-    if (f && !frases.includes(f)) setFrases([...frases, f]);
+    const f = nueva.trim().slice(0, MAX_LARGO_FRASE);
+    if (f && !frases.includes(f) && frases.length < MAX_FRASES) setFrases([...frases, f]);
     setNueva('');
   };
 
@@ -36,7 +42,13 @@ export function EditarAprobarModal({ propuesta, alAprobar, alCerrar }: {
       const r = await aprendizajesApi.mejorar({ pregunta, respuesta, intencion: propuesta.intencion, tipo: propuesta.tipo });
       setAnterior(respuesta);
       setRespuesta(r.respuesta);
-      if (r.frases?.length) setFrases((fs) => [...fs, ...r.frases!.filter((f, i, a) => !fs.includes(f) && a.indexOf(f) === i)]);
+      setAvisoFrases(null);
+      if (r.frases?.length) {
+        const nuevas = limpiarFrases(r.frases).filter((f) => !frases.includes(f));
+        const lugar = Math.max(0, MAX_FRASES - frases.length);
+        setFrases([...frases, ...nuevas.slice(0, lugar)]);
+        if (nuevas.length > lugar) setAvisoFrases(`Ya hay ${MAX_FRASES} frases (el máximo): quita alguna para sumar las que sugirió la mejora.`);
+      }
     } catch (e) { setErrorMejorar(mensajeError(e)); } finally { setMejorando(false); }
   };
 
@@ -59,20 +71,21 @@ export function EditarAprobarModal({ propuesta, alAprobar, alCerrar }: {
           {errorMejorar && <p role="alert" className="ap-error">{errorMejorar}</p>}
         </>
       )}
-      <label htmlFor={`${id}-f`} className="ap-etiqueta">Otras formas de preguntar lo mismo</label>
+      <label htmlFor={`${id}-f`} className="ap-etiqueta">Otras formas de preguntar lo mismo ({frases.length}/{MAX_FRASES}, hasta {MAX_LARGO_FRASE} letras cada una)</label>
       <ul className="ap-chips" aria-label="Frases">
         {frases.map((f) => (
           <li key={f} className="ap-chip">
             {f}
-            <button type="button" aria-label={`Quitar frase ${f}`} onClick={() => setFrases(frases.filter((x) => x !== f))}>×</button>
+            <button type="button" aria-label={`Quitar frase ${f}`} onClick={() => { setFrases(frases.filter((x) => x !== f)); setAvisoFrases(null); }}>×</button>
           </li>
         ))}
       </ul>
       <div className="ap-fila">
-        <input id={`${id}-f`} className="ap-campo" value={nueva} placeholder="Escribe una frase" onChange={(e) => setNueva(e.target.value)}
+        <input id={`${id}-f`} className="ap-campo" value={nueva} placeholder={frases.length >= MAX_FRASES ? `Máximo ${MAX_FRASES} frases: quita una para agregar otra` : 'Escribe una frase'} maxLength={MAX_LARGO_FRASE} disabled={frases.length >= MAX_FRASES} onChange={(e) => setNueva(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sumar(); } }} />
-        <Boton type="button" variante="secundario" onClick={sumar} disabled={!nueva.trim()}>Agregar frase</Boton>
+        <Boton type="button" variante="secundario" onClick={sumar} disabled={!nueva.trim() || frases.length >= MAX_FRASES}>Agregar frase</Boton>
       </div>
+      {avisoFrases && <p role="status" className="ap-meta">{avisoFrases}</p>}
     </div>
   );
 
@@ -94,7 +107,7 @@ export function EditarAprobarModal({ propuesta, alAprobar, alCerrar }: {
         alCancelar={() => setConfirmando(false)}
         alConfirmar={async () => {
           setCargando(true); setError(null);
-          try { await alAprobar({ pregunta: pregunta.trim(), respuesta: respuesta.trim(), frases }); alCerrar(); }
+          try { await alAprobar({ pregunta: pregunta.trim(), ...(esDerivar && !respuesta.trim() ? {} : { respuesta: respuesta.trim() }), frases }); alCerrar(); }
           catch (e) { setError(mensajeError(e)); } finally { setCargando(false); }
         }}
       />

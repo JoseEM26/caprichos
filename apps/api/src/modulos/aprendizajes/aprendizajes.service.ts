@@ -73,7 +73,8 @@ export class AprendizajesService {
       if (typeof v !== 'string' || !v.trim() || v.trim().length > max) throw err('TEXTO_INVALIDO', `${campo} es obligatorio y llega hasta ${max} caracteres.`);
     };
     largo(e.pregunta, 'La pregunta', 300);
-    largo(e.respuesta, 'La respuesta', 1000);
+    // Una propuesta «Siempre a persona» (DERIVAR) no lleva respuesta: vacía se acepta aquí y se exige abajo según el tipo
+    if (e.respuesta !== '') largo(e.respuesta, 'La respuesta', 1000);
     if (e.frases !== undefined) {
       if (!Array.isArray(e.frases) || e.frases.length > 8 || e.frases.some((f) => typeof f !== 'string' || !f.trim() || f.trim().length > 120)) {
         throw err('FRASES_INVALIDAS', 'Las frases son hasta 8, de hasta 120 caracteres cada una.');
@@ -89,9 +90,11 @@ export class AprendizajesService {
       const p = await tx.aprendizajePropuesto.findUnique({ where: { id: pid } });
       if (!p) throw new NotFoundException({ codigo: 'PROPUESTA_NO_ENCONTRADA', mensaje: 'La propuesta no existe.' });
       if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_YA_DECIDIDA', mensaje: 'Esta propuesta ya fue decidida.' });
+      const respuesta = e.respuesta === undefined ? p.respuesta : e.respuesta.trim();
+      if (p.tipo !== 'DERIVAR' && !String(respuesta ?? '').trim()) throw err('TEXTO_INVALIDO', 'La respuesta es obligatoria y llega hasta 1000 caracteres.');
       const datos = {
         pregunta: e.pregunta?.trim() ?? p.pregunta,
-        respuesta: e.respuesta?.trim() ?? p.respuesta,
+        respuesta,
         frases: (e.frases ? e.frases.map((f) => f.trim()) : p.frases) as any,
       };
       await tx.aprendizajePropuesto.update({ where: { id: pid }, data: { ...datos, estado: 'APROBADO', decidido_por: partyId, decidido_en: new Date() } });

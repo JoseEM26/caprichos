@@ -52,6 +52,13 @@ describe('AprendizajesService', () => {
     await expect(svc.aprobar('5', { frases: Array(9).fill('a') }, ADMIN)).rejects.toMatchObject({ response: { codigo: 'FRASES_INVALIDAS' } });
   });
 
+  it('una propuesta «Siempre a persona» (DERIVAR) se aprueba sin respuesta; una FAQ con respuesta vacía no', async () => {
+    const { svc, prisma } = armar();
+    prisma._props.push({ id: 6n, estado: 'PENDIENTE', tipo: 'DERIVAR', intencion: 'hablar_persona', pregunta: 'Quiero hablar con una persona.', respuesta: '', frases: ['Necesito un asesor.'], repeticiones: 3, evidencia: [] });
+    expect((await svc.aprobar('6', { pregunta: 'Quiero hablar con una persona.', respuesta: '', frases: ['Necesito un asesor.'] }, ADMIN)).estado).toBe('APROBADO');
+    await expect(svc.aprobar('5', { respuesta: '' }, ADMIN)).rejects.toMatchObject({ response: { codigo: 'TEXTO_INVALIDO' } });
+  });
+
   it('descartar exige un motivo de al menos 5 caracteres', async () => {
     const { svc, prisma, auditoria } = armar();
     await expect(svc.descartar('5', 'no', ADMIN)).rejects.toMatchObject({ response: { codigo: 'MOTIVO_OBLIGATORIO' } });
