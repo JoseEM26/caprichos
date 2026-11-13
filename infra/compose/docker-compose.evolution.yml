@@ -1,0 +1,132 @@
+# ==============================================================================
+# Caprichos — Evolution API (WhatsApp NO oficial, vía Baileys). OPCIONAL.
+# ==============================================================================
+# Proyecto aparte (caprichos-evolution), con SU PROPIA base y SU PROPIO Redis:
+# no comparte nada con los de Caprichos. Se levanta en el mismo VPS.
+#
+#   docker compose -p caprichos-evolution -f infra/compose/docker-compose.evolution.yml \
+#     --env-file /ruta/segura/evolution.env up -d
+#
+# Los secretos van SOLO por variables de entorno (ver evolution.env.example). Nada de esto
+# se usa hasta que un ADMIN cambie el proveedor a Evolution en Configuración.
+# La versión de la imagen es fija: se sube a mano, nunca con «latest».
+# ==============================================================================
+
+name: caprichos-evolution
+
+services:
+  evolution-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${EVOLUTION_DB_USER:?falta EVOLUTION_DB_USER}
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?falta EVOLUTION_DB_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evolucion_interna
+
+  evolution-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${EVOLUTION_REDIS_PASSWORD:?falta EVOLUTION_REDIS_PASSWORD}"]
+    environment:
+      REDIS_PASSWORD: ${EVOLUTION_REDIS_PASSWORD}
+    volumes:
+      - evolution_redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evolucion_interna
+
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    restart: unless-stopped
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_healthy
+    environment:
+      SERVER_URL: http://evolution-api:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?falta EVOLUTION_API_KEY}
+      DATABASE_PROVIDER: postgresql
+      # Se arma con las variables de la base propia de Evolution (sin URI completa en archivos de ejemplo)
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DB_SCHEME:-postgresql}://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-postgres:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://:${EVOLUTION_REDIS_PASSWORD}@evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+      # Webhook global hacia la API de Caprichos (por la red interna). El token viaja en la URL y se valida allá.
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_URL: ${EVOLUTION_WEBHOOK_URL:-http://api:3000/whatsapp/evolution/webhook}?token=${EVOLUTION_WEBHOOK_TOKEN:?falta EVOLUTION_WEBHOOK_TOKEN}
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      WEBHOOK_EVENTS_CONNECTION_UPDATE: "true"
+      WEBHOOK_EVENTS_QRCODE_UPDATED: "false"
+      WEBHOOK_EVENTS_MESSAGES_UPDATE: "false"
+      WEBHOOK_EVENTS_MESSAGES_DELETE: "false"
+      WEBHOOK_EVENTS_SEND_MESSAGE: "false"
+      CONFIG_SESSION_PHONE_CLIENT: Caprichos
+      QRCODE_LIMIT: "5"
+      LOG_LEVEL: ERROR,WARN
+    volumes:
+      - evolution_instances:/evolution/instances
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Sin puertos publicados: solo la API de Caprichos lo alcanza, por la red de su ambiente.
+    networks:
+      - evolucion_interna
+      - evolucion_salida
+      - red_api
+
+networks:
+  # Base y Redis de Evolution: aisladas, sin salida a internet.
+  evolucion_interna:
+    driver: bridge
+    internal: true
+  # Salida a internet (WhatsApp Web) solo para el contenedor de Evolution.
+  evolucion_salida:
+    driver: bridge
+  # Red interna del ambiente de Caprichos (para que la API y Evolution se vean). Ajustar a prod o demo.
+  red_api:
+    name: ${EVOLUTION_RED_API:-caprichos-prod_red_interna}
+    external: true
+
+volumes:
+  evolution_postgres_data:
+    name: caprichos_evolution_postgres_data
+  evolution_redis_data:
+    name: caprichos_evolution_redis_data
+  evolution_instances:
+    name: caprichos_evolution_instances

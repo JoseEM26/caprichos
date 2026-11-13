@@ -8,6 +8,7 @@ import { Insignia } from '../../comun/Insignia';
 import { TarjetaProteccionSpam } from './TarjetaProteccionSpam';
 import { TarjetaNumerosBloqueados } from './TarjetaNumerosBloqueados';
 import { TarjetaConsumoWhatsapp } from './TarjetaConsumoWhatsapp';
+import { TarjetaWhatsappProveedor, useEsAdminSesion } from './TarjetaWhatsappProveedor';
 import { CampoConfig } from './CampoConfig';
 import { CampoAyuda } from './AyudaCampo';
 import { PROMOS_MUESTRA, VARIABLES_MENSAJE, validarMensaje, vistaPreviaMensaje } from './mensajesBot';
@@ -380,6 +381,7 @@ function ChatbotConfiguracionVista({
   puedeVer = true,
   puedeEditar,
 }: ChatbotConfiguracionTabProps) {
+  const eresAdmin = useEsAdminSesion();
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -1123,6 +1125,7 @@ function ChatbotConfiguracionVista({
         descripcion="Anti-spam, pedidos falsos, retención de mensajes y derechos ARCO (Ley 29733)."
       >
       <TarjetaConsumoWhatsapp esAdmin={puedeEditar} />
+      <TarjetaWhatsappProveedor esAdmin={puedeEditar && eresAdmin} />
 
       <CampoConfig id="chatbot-proteccion-spam">
         <TarjetaProteccionSpam esAdmin={puedeEditar} />

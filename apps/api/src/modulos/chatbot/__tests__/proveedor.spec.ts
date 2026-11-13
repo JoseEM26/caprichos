@@ -8,6 +8,8 @@ import { WhatsAppSimuladoAdaptador } from '../adaptadores/whatsapp-simulado.adap
 describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
   const mockMeta = { tipo: 'meta', enviarTexto: jest.fn().mockResolvedValue({ exito: true }) } as unknown as WhatsAppMetaAdaptador;
   const mockSimulado = { tipo: 'simulado', enviarTexto: jest.fn().mockResolvedValue({ exito: true }) } as unknown as WhatsAppSimuladoAdaptador;
+  const mockEvolution = { tipo: 'evolution', enviarTexto: jest.fn().mockResolvedValue({ exito: true }) } as any;
+  const evolutionConfig = (p: string) => ({ proveedor: jest.fn().mockResolvedValue(p), proveedorEnCache: () => p }) as any;
   // El proveedor devuelve el adaptador elegido envuelto por el guardia de salida: se comprueba a quién llama
   const numeros = { motivoOmision: jest.fn().mockResolvedValue(null), logOmitido: jest.fn() };
   const elegido = async (adaptador: any) => {
@@ -27,7 +29,7 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
+    const adaptador = factory(configService, mockMeta, mockSimulado, mockEvolution, evolutionConfig('META'), numeros);
 
     expect(await elegido(adaptador)).toBe(mockMeta);
   });
@@ -42,7 +44,7 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
+    const adaptador = factory(configService, mockMeta, mockSimulado, mockEvolution, evolutionConfig('META'), numeros);
 
     expect(await elegido(adaptador)).toBe(mockSimulado);
   });
@@ -53,9 +55,24 @@ describe('WhatsAppMensajeriaProvider (Selección de Adaptador)', () => {
     } as unknown as ConfigService;
 
     const factory = (WhatsAppMensajeriaProvider as any).useFactory;
-    const adaptador = factory(configService, mockMeta, mockSimulado, numeros);
+    const adaptador = factory(configService, mockMeta, mockSimulado, mockEvolution, evolutionConfig('META'), numeros);
 
     expect(await elegido(adaptador)).toBe(mockSimulado);
+  });
+
+  it('con whatsapp_proveedor = EVOLUTION el envío sale por Evolution aunque Meta tenga credenciales, y vuelve a Meta al conmutar', async () => {
+    const configService = { get: jest.fn((k: string) => (k === 'WHATSAPP_TOKEN' ? 't' : k === 'WHATSAPP_PHONE_ID' ? 'p' : undefined)) } as unknown as ConfigService;
+    const factory = (WhatsAppMensajeriaProvider as any).useFactory;
+    const proveedor = { valor: 'EVOLUTION' };
+    const cfg = { proveedor: jest.fn(async () => proveedor.valor), proveedorEnCache: () => proveedor.valor } as any;
+    const adaptador = factory(configService, mockMeta, mockSimulado, mockEvolution, cfg, numeros);
+    mockEvolution.enviarTexto.mockClear();
+    await adaptador.enviarTexto('51987654321', 'hola');
+    expect(mockEvolution.enviarTexto).toHaveBeenCalledTimes(1);
+    proveedor.valor = 'META';
+    (mockMeta as any).enviarTexto.mockClear();
+    await adaptador.enviarTexto('51987654321', 'hola');
+    expect((mockMeta as any).enviarTexto).toHaveBeenCalledTimes(1);
   });
 
   it('WhatsAppSimuladoAdaptador simula enviarImagen correctamente y persiste mensaje', async () => {

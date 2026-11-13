@@ -75,6 +75,8 @@ import {
   validarDocumento,
 } from '../../../comun/documentos-whatsapp.util';
 
+import { EvolutionApiCliente } from '../evolution/evolution-api.cliente';
+
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 /** Notas de voz y audios: hasta 16 MB (Meta entrega las notas de voz como audio/ogg; codecs=opus). */
 export const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
@@ -123,6 +125,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly direcciones?: DireccionesService,
     @Optional() private readonly moduleRef?: ModuleRef,
     @Optional() private readonly numeros?: NumerosWhatsappService,
+    @Optional() private readonly evolutionApi?: EvolutionApiCliente,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -309,12 +312,22 @@ export class WhatsappWebhookService {
     mimeType: string,
     opciones: { tipos?: string[]; maxBytes?: number } = {},
   ): Promise<Buffer | null> {
+    const maxBytes = opciones.maxBytes ?? MAX_MEDIA_BYTES;
+    // Adjunto recibido por Evolution (id «evo:<mensaje>»): se pide a esa API, mismas validaciones de tipo y tamaño
+    if (mediaId.startsWith('evo:')) {
+      if (!(opciones.tipos ?? TIPOS_MEDIA_PERMITIDOS).includes(mimeType)) {
+        this.logger.warn(`Tipo de medio no permitido: ${mimeType}`);
+        return null;
+      }
+      const m = await this.evolutionApi?.descargarMedia(mediaId.slice(4));
+      if (!m || m.buffer.length > maxBytes) return null;
+      return m.buffer;
+    }
     if (!this.waToken) {
       this.logger.warn('Sin WHATSAPP_TOKEN para descargar archivo adjunto.');
       return null;
     }
 
-    const maxBytes = opciones.maxBytes ?? MAX_MEDIA_BYTES;
     if (!(opciones.tipos ?? TIPOS_MEDIA_PERMITIDOS).includes(mimeType)) {
       this.logger.warn(`Tipo de medio no permitido: ${mimeType}`);
       return null;

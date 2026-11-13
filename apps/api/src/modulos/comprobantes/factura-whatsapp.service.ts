@@ -210,7 +210,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
     const conv = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true, phone_number_id: true } });
     const phoneNumberId = conv?.phone_number_id ?? undefined;
     const opciones = { pedidoId: c.pedido.id, ...(phoneNumberId ? { phoneNumberId } : {}), ...(conv ? { conversacionId: conv.id } : {}) };
-    const mediaId = this.mensajeria.estaConectado().modo === 'meta' ? ((await this.mensajeria.subirMedia?.(pdf.contenido, 'application/pdf', phoneNumberId, nombre)) ?? null) : 'simulado';
+    const mediaId = this.mensajeria.estaConectado().modo !== 'simulado' ? ((await this.mensajeria.subirMedia?.(pdf.contenido, 'application/pdf', phoneNumberId, nombre)) ?? null) : 'simulado';
     if (!mediaId) return this.cerrar(id, 'ERROR', { detalle: 'SUBIDA_MEDIA', reintentar: true }, o);
 
     const enPlantilla = () =>

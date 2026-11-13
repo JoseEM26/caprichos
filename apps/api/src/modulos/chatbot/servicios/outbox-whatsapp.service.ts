@@ -18,6 +18,7 @@ import { mapearErrorWhatsApp } from '../../mensajes/utilidades/error-whatsapp.ut
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
 import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
+import { PoliticaEvolutionService } from '../evolution/politica-evolution.service';
 
 export type TipoSaliente = 'TEXTO' | 'PLANTILLA' | 'INTERACTIVO';
 export type EstadoSaliente = 'PENDIENTE' | 'ENVIANDO' | 'ENVIADO' | 'FALLIDO' | 'DESCARTADO';
@@ -141,6 +142,7 @@ export class OutboxWhatsappService {
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly politica?: PoliticaEvolutionService,
   ) {}
 
   /**
@@ -286,6 +288,30 @@ export class OutboxWhatsappService {
 
   private async enviarFila(fila: FilaSaliente, token: string): Promise<'ENVIADO' | 'REINTENTO' | 'FALLIDO' | 'PERDIDO' | 'OMITIDO'> {
     const carga = (fila.carga ?? {}) as unknown as CargaSaliente;
+    const decision = await this.politica?.evaluar(fila).catch(() => null);
+    if (decision?.accion === 'DESCARTAR') {
+      // Política de Evolution: proactivo no permitido o a un número que nunca escribió. Queda DESCARTADO con su motivo.
+      const r = await this.prisma.salienteWhatsapp.updateMany({
+        where: { id: fila.id, intento_token: token },
+        data: {
+          estado: 'DESCARTADO',
+          ultimo_error: `[${decision.codigo}] ${decision.motivo}`,
+          motivo_descarte: decision.motivo,
+          descartado_en: new Date(),
+          descartado_por: 'Sistema',
+          intento_token: null,
+        },
+      });
+      return r.count === 0 ? 'PERDIDO' : 'OMITIDO';
+    }
+    if (decision?.accion === 'DIFERIR') {
+      // Tope, horario o pausa: no gasta intentos, vuelve a PENDIENTE para más tarde
+      const r = await this.prisma.salienteWhatsapp.updateMany({
+        where: { id: fila.id, intento_token: token },
+        data: { estado: 'PENDIENTE', ultimo_error: decision.motivo, proximo_intento_en: new Date(Date.now() + decision.esperaMs), intento_token: null },
+      });
+      return r.count === 0 ? 'PERDIDO' : 'REINTENTO';
+    }
     let resultado: ResultadoEnvioWhatsApp;
     try {
       resultado = await this.enviarAlPuerto(fila, carga);

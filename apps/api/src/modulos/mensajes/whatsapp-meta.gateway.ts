@@ -212,7 +212,7 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
 
     // Meta: se sube a la Media API y se envía por media id (por link falla con 131000); el simulado no sube nada
     let referencia: string | null = 'simulado';
-    if (estadoConexion.modo === 'meta') {
+    if (estadoConexion.modo !== 'simulado') {
       referencia = (await this.mensajeria.subirMedia?.(documento, mime, phoneNumberId, nombre)) ?? null;
     }
     const resultado = referencia
@@ -268,7 +268,7 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
 
     // Meta: la foto se sube primero y se envía por media id; el simulado no sube nada
     let referencia: string | null = 'simulado';
-    if (estadoConexion.modo === 'meta') {
+    if (estadoConexion.modo !== 'simulado') {
       referencia = (await this.mensajeria.subirMedia?.(imagen, mime, phoneNumberId)) ?? null;
     }
     const resultado = referencia
