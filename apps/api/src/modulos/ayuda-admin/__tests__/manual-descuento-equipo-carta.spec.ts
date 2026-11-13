@@ -20,10 +20,10 @@ describe('Manual de Capri: descuento del equipo en la carta', () => {
     expect(t).toContain('Nadie mas ve esta opcion');
   });
 
-  it('usuarios explica como vincular y desvincular la cuenta de cliente', () => {
+  it('usuarios explica que el celular es uno solo, la vinculacion automatica y como desvincular', () => {
     const t = readFileSync(join(__dirname, '..', 'manuales', 'usuarios.md'), 'utf8');
-    expect(t).toContain('vincular la cuenta de cliente de un usuario');
-    expect(t).toContain('Si, vincular');
+    expect(t).toContain('El celular es uno solo: el del usuario');
+    expect(t).toContain('No hay un segundo campo para la cuenta de cliente');
     expect(t).toContain('Desvincular');
     expect(t).toContain('nunca gana permisos');
   });
