@@ -1,16 +1,19 @@
 import {
   IsArray,
   IsBoolean,
-  IsIn,
   IsNumber,
   MaxLength,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
+  ArrayMaxSize,
+  Length,
+  Matches,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ALERGENOS_PERMITIDOS, GrupoProductoInputDto, TamanoProductoInputDto } from './crear-producto.dto';
+import { Transform, Type } from 'class-transformer';
+import { normalizarAlergenos } from '../alergenos.util';
+import { GrupoProductoInputDto, TamanoProductoInputDto } from './crear-producto.dto';
 
 export class SaborInputDto {
   @IsOptional()
@@ -74,7 +77,11 @@ export class EditarProductoDto {
 
   @IsOptional()
   @IsArray({ message: 'Los alérgenos deben ser una lista' })
-  @IsIn(ALERGENOS_PERMITIDOS, { each: true, message: 'Alérgeno no permitido' })
+  @Transform(({ value }) => normalizarAlergenos(value))
+  @ArrayMaxSize(20, { message: 'Máximo 20 alérgenos' })
+  @IsString({ each: true, message: 'Cada alérgeno debe ser texto' })
+  @Length(1, 30, { each: true, message: 'Cada alérgeno debe tener entre 1 y 30 caracteres' })
+  @Matches(/^[\p{L}]+(?:[ -][\p{L}]+)*$/u, { each: true, message: 'Alérgeno: solo letras, espacios y guiones' })
   alergenos?: string[];
 
   /** El admin revisó la lista de alérgenos de este producto. */

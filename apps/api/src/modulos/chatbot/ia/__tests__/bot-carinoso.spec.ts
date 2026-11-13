@@ -53,15 +53,16 @@ describe('DTO de producto: porciones y alérgenos', () => {
   it('acepta valores permitidos', async () => {
     expect(await val({ porciones: '8 a 10 personas', alergenos: ['MANI', 'SESAMO'], alergenosConfirmados: true })).toHaveLength(0);
   });
-  it('rechaza alérgeno fuera de la lista', async () => {
-    expect((await val({ alergenos: ['MANI', 'POLVO'] })).length).toBeGreaterThan(0);
+  it('acepta personalizado y rechaza símbolos', async () => {
+    expect((await val({ alergenos: ['MANI', 'polvo'] })).length).toBe(0);
+    expect((await val({ alergenos: ['MANI', 'polvo$'] })).length).toBeGreaterThan(0);
   });
   it('rechaza porciones de más de 60 caracteres', async () => {
     expect((await val({ porciones: 'x'.repeat(61) })).length).toBeGreaterThan(0);
     expect(await val({ porciones: 'x'.repeat(60) })).toHaveLength(0);
   });
   it('crear usa las mismas reglas', async () => {
-    const e = await validate(plainToInstance(CrearProductoDto, { nombre: 'a', categoriaId: 1, precio: 1, alergenos: ['X'] }));
+    const e = await validate(plainToInstance(CrearProductoDto, { nombre: 'a', categoriaId: 1, precio: 1, alergenos: ['X1'] }));
     expect(e.length).toBeGreaterThan(0);
   });
 });

@@ -90,4 +90,40 @@ describe('EditarProductoModal', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Revisé los alérgenos de este producto' }));
     expect(setConf).toHaveBeenCalledWith(true);
   });
+
+  describe('otros alérgenos', () => {
+    it('Agregar crea el chip normalizado; «Maní» se mapea a MANI; Enter también agrega', () => {
+      const set = vi.fn();
+      montar(base(), { setAlergenos: set });
+      const campo = screen.getByRole('textbox', { name: 'Otro alérgeno' });
+      fireEvent.change(campo, { target: { value: '  Lúcuma  ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+      expect(set).toHaveBeenLastCalledWith(['lúcuma']);
+      fireEvent.change(campo, { target: { value: 'Fresa' } });
+      fireEvent.keyDown(campo, { key: 'Enter' });
+      expect(set).toHaveBeenLastCalledWith(['fresa']);
+      fireEvent.change(campo, { target: { value: 'Maní' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+      expect(set).toHaveBeenLastCalledWith(['MANI']);
+    });
+    it('no duplica ni acepta símbolos; el chip se quita con ×', () => {
+      const set = vi.fn();
+      montar(base(), { alergenos: ['cacao'], setAlergenos: set });
+      const campo = screen.getByRole('textbox', { name: 'Otro alérgeno' });
+      fireEvent.change(campo, { target: { value: 'CACAO' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+      fireEvent.change(campo, { target: { value: 'fresa!' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+      expect(set).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Quitar cacao' }));
+      expect(set).toHaveBeenCalledWith([]);
+    });
+    it('las sugerencias (usados en otros productos) se agregan con un toque y no aparecen si ya están', () => {
+      const set = vi.fn();
+      montar(base(), { alergenos: ['cacao'], alergenosSugeridos: ['cacao', 'fresa'], setAlergenos: set });
+      expect(screen.queryByRole('button', { name: 'Agregar cacao' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar fresa' }));
+      expect(set).toHaveBeenCalledWith(['cacao', 'fresa']);
+    });
+  });
 });
