@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClienteItem } from './tipos';
 import {
   listarClientes,
@@ -14,7 +14,9 @@ import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { Paginacion } from '../../comun/Paginacion';
 import { useSesion } from '../../comun/sesion';
-import { SorteoEnVivo, type ParticipanteSorteo } from './sorteos/SorteoEnVivo';
+import type { ParticipanteSorteo } from './sorteos/SorteoEnVivo';
+// Pantalla del sorteo en su propio trozo del bundle: solo se descarga al abrirla
+const SorteoEnVivo = lazy(() => import('./sorteos/SorteoEnVivo').then((m) => ({ default: m.SorteoEnVivo })));
 
 type Vista = 'tarjetas' | 'tabla';
 const TAMANOS = [24, 48, 96] as const;
@@ -828,7 +830,11 @@ export function ClientesAdminView() {
         <Paginacion pagina={pagina} totalPaginas={paginas} alCambiarPagina={cambiarPagina} totalRegistros={total} tamanoPagina={limite} />
       )}
 
-      {sorteo && <SorteoEnVivo participantes={sorteo.participantes} filtrosTexto={sorteo.filtrosTexto} alCerrar={() => setSorteo(null)} />}
+      {sorteo && (
+        <Suspense fallback={null}>
+          <SorteoEnVivo participantes={sorteo.participantes} filtrosTexto={sorteo.filtrosTexto} alCerrar={() => setSorteo(null)} />
+        </Suspense>
+      )}
 
       {/* Modales */}
       <ModalNuevoCliente
