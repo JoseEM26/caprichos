@@ -45,7 +45,7 @@ describe('AprendizajesHistoricoService', () => {
 
   it('el umbral de repeticiones suma sobre todo el historial y avisa una sola vez al final', async () => {
     let dia = 0;
-    // cada día aporta 1 prueba de la misma intención: al tercer día llega al mínimo (3)
+    // cada día aporta 1 prueba de la misma intención: suma 3 al tercer día y avisa una sola vez
     const { hist, prisma, redis } = armar(crearIa(100, () => (dia++, [prop('delivery', [0])])));
     // evidencia con ids distintos por día
     prisma.conversacion.findMany.mockImplementation(async () => [chatFalso(100 + dia, [['CLIENTE', 'delivery?'], ['PERSONA', 'si']])]);

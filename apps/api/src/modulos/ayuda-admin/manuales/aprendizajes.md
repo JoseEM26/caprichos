@@ -21,7 +21,7 @@ Cada noche el bot revisa los chats de ayer que una persona tuvo que atender, bus
 ## Como se hace: Revisar y aprobar una propuesta
 1. Entra a Aprendizajes. Cuando hay propuestas nuevas te llega un aviso en la campanita.
 2. En la pestana Pendientes, lee la pregunta, la respuesta propuesta, cuantas veces se repitio y los extractos de chats que la respaldan. Los extractos estan sin nombres, celulares, documentos, correos ni direcciones.
-3. Si hace falta, corrige la pregunta, la respuesta o las frases.
+3. Si hace falta, corrige la pregunta, la respuesta o las frases. El boton Mejorar reescribe la respuesta con la voz carinosa de Capri y puede sugerir frases; revisala antes de aprobar y usa Deshacer para volver a tu texto. Tiene un limite de 30 usos por hora.
 4. Pulsa Aprobar. La respuesta queda vigente y el bot la usa en sus dudas desde ese momento.
 Ver tambien: [[notificaciones]]
 
@@ -39,7 +39,7 @@ Ver tambien: [[notificaciones]]
 ## Reglas importantes
 - Los precios, el stock y los horarios nunca los aprende el bot: si una respuesta aprobada contradice los datos del sistema, mandan los datos del sistema.
 - Nada personal sale hacia la IA: antes de enviarse, el sistema reemplaza celulares, documentos, correos, direcciones y nombres.
-- Una propuesta solo aparece cuando el caso se repitio al menos 3 veces.
+- Aparecen todos los casos, desde 1 repeticion, y primero los mas repetidos. Si prefieres ver solo los que se repiten mas, sube el minimo de repeticiones en los parametros del sistema.
 - El gasto de IA de cada noche tiene un tope de 3 dolares. Si se alcanza, la noche queda en estado Tope y se retoma al dia siguiente.
 - El ajuste de hora, topes y repeticiones esta en los parametros del sistema (la clave de OpenAI esta en [[mirest]]).
 

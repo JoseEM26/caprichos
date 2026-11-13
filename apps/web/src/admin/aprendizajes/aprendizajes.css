@@ -42,3 +42,4 @@
 .ap-barra--tope { background: #c98a00; }
 .ap-barra--error { background: var(--cp-rust); }
 .ap-barra--sinia { background: var(--cp-line2); }
+.ap-error { margin: 0; font-size: 13px; font-weight: 700; color: var(--cp-rust); }

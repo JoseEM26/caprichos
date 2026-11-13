@@ -95,7 +95,7 @@ export class AprendizajesNocheService {
       topeUsd: num(p.aprendizaje_tope_usd_noche, 3, 0, 1000),
       topeHistoricoUsd: num(p.aprendizaje_tope_usd_historico, 10, 0, 10000),
       hora: Math.round(num(p.aprendizaje_hora, 3, 0, 23)),
-      minRepeticiones: Math.round(num(p.aprendizaje_min_repeticiones, 3, 1, 50)),
+      minRepeticiones: Math.round(num(p.aprendizaje_min_repeticiones, 1, 1, 50)),
       usdEntrada: num(p.aprendizaje_usd_por_millon_entrada, 0.15, 0, 1000),
       usdSalida: num(p.aprendizaje_usd_por_millon_salida, 0.6, 0, 1000),
     };

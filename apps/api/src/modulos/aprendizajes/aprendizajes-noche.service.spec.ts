@@ -82,9 +82,15 @@ describe('AprendizajesNocheService', () => {
     expect((await roto.svc.ejecutarNoche(FECHA)).propuestas).toBe(0);
   });
 
-  it('agrupa por intención dentro de la noche y exige el mínimo de repeticiones', async () => {
+  it('por defecto (mínimo 1) toda propuesta con 1 repetición cuenta como nueva', async () => {
+    const { svc, prisma } = armar(crearIa(() => [prop('precio_torta', [0, 1, 2]), prop('delivery', [0])]), cuatroChats());
+    expect((await svc.ejecutarNoche(FECHA)).propuestas).toBe(2);
+    expect(prisma._props.map((p: any) => [p.intencion, p.repeticiones])).toEqual([['precio_torta', 3], ['delivery', 1]]);
+  });
+
+  it('agrupa por intención dentro de la noche y, con mínimo 3 configurado, deja en observación las de menos', async () => {
     // lote de 15: todos los chats caen en el mismo lote → una propuesta con 3 pruebas llega; otra con 2 queda en observación
-    const { svc, prisma } = armar(crearIa(() => [prop('precio_torta', [0, 1, 2]), prop('delivery', [0, 3])]), cuatroChats());
+    const { svc, prisma } = armar(crearIa(() => [prop('precio_torta', [0, 1, 2]), prop('delivery', [0, 3])]), cuatroChats(), { aprendizaje_min_repeticiones: '"3"' });
     const r = await svc.ejecutarNoche(FECHA);
     expect(r.propuestas).toBe(1);
     expect(prisma._props.map((p: any) => [p.intencion, p.repeticiones])).toEqual([['precio_torta', 3], ['delivery', 2]]);
@@ -94,7 +100,7 @@ describe('AprendizajesNocheService', () => {
   });
 
   it('suma a una PENDIENTE previa de la misma intención en vez de duplicar', async () => {
-    const { svc, prisma } = armar(crearIa(() => [prop('Delivery', [2, 3])]), cuatroChats());
+    const { svc, prisma } = armar(crearIa(() => [prop('Delivery', [2, 3])]), cuatroChats(), { aprendizaje_min_repeticiones: '3' });
     prisma._props.push({
       id: 99n, estado: 'PENDIENTE', creado_en: new Date(), intencion: 'delivery', repeticiones: 2,
       evidencia: [{ conversacionId: '7', extracto: 'x' }, { conversacionId: '8', extracto: 'y' }],
@@ -125,7 +131,7 @@ describe('AprendizajesNocheService', () => {
 
   it('el tope por defecto es 3 y el gasto usa las tarifas de los parámetros', async () => {
     const { svc } = armar(crearIa(() => []), []);
-    expect(await svc.parametros()).toMatchObject({ topeUsd: 3, hora: 3, minRepeticiones: 3, usdEntrada: 0.15, usdSalida: 0.6, topeHistoricoUsd: 10 });
+    expect(await svc.parametros()).toMatchObject({ topeUsd: 3, hora: 3, minRepeticiones: 1, usdEntrada: 0.15, usdSalida: 0.6, topeHistoricoUsd: 10 });
   });
 
   it('es idempotente por fecha: una noche OK no se repite; ERROR sí', async () => {

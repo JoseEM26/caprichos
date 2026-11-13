@@ -8,3 +8,6 @@ export { ConsumoWhatsappService } from './configuracion/consumo-whatsapp.service
 export { enmascararTelefono } from './utilidades/enmascarar.util';
 export { ChatbotIaService } from './ia/chatbot-ia.service';
 export { ConocimientoBotService } from './ia/conocimiento-bot.service';
+export { IaConsumoService } from './ia/ia-consumo.service';
+export { conUrlCarta } from './ia/prompt-sistema';
+export { urlPublicaCarta } from './servicios/carrusel.util';
