@@ -1,20 +1,5 @@
-import { CargoHecho, ErrorPasarela, PasarelaPago, PedirCargo, PedirDevolucion } from './pasarela.puerto';
-
-const MENSAJE_GENERICO = 'No pudimos procesar tu pago. Revisa los datos o prueba con otro medio.';
-
-/** Códigos de error de Culqi -> texto simple para el cliente. */
-const MENSAJES: Record<string, string> = {
-  card_declined: 'Tu tarjeta fue rechazada. Prueba con otra tarjeta o con Yape.',
-  insufficient_funds: 'Tu tarjeta no tiene fondos suficientes. Prueba con otra tarjeta o con Yape.',
-  expired_card: 'Tu tarjeta está vencida. Prueba con otra tarjeta.',
-  incorrect_cvv: 'El código de seguridad (CVV) no es correcto.',
-  invalid_cvv: 'El código de seguridad (CVV) no es correcto.',
-  incorrect_number: 'El número de tarjeta no es correcto.',
-  invalid_number: 'El número de tarjeta no es correcto.',
-  stolen_card: 'Tu banco no autorizó este pago. Prueba con otra tarjeta o con Yape.',
-  lost_card: 'Tu banco no autorizó este pago. Prueba con otra tarjeta o con Yape.',
-  processing_error: 'Hubo un problema al procesar el pago. Intenta de nuevo en unos minutos.',
-};
+import { codigoDeError, mensajeDeError } from './culqi.errores';
+import { CargoConsultado, CargoHecho, ErrorPasarela, PasarelaPago, PedirCargo, PedirDevolucion } from './pasarela.puerto';
 
 export interface OpcionesCulqi {
   secretKey: string;
@@ -42,14 +27,14 @@ export class CulqiAdaptador implements PasarelaPago {
     this.fetchFn = o.fetchFn ?? fetch;
   }
 
-  private async llamar(ruta: string, cuerpo: unknown): Promise<{ status: number; json: any }> {
+  private async llamar(ruta: string, cuerpo?: unknown): Promise<{ status: number; json: any }> {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), this.timeoutMs);
     try {
       const r = await this.fetchFn(`${this.apiUrl}${ruta}`, {
-        method: 'POST',
+        method: cuerpo === undefined ? 'GET' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.secretKey}` },
-        body: JSON.stringify(cuerpo),
+        body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
         signal: ctl.signal,
       });
       const json = await r.json().catch(() => null);
@@ -70,11 +55,16 @@ export class CulqiAdaptador implements PasarelaPago {
       source_id: p.token,
       description: p.descripcion.slice(0, 80),
       metadata: p.metadata,
+      ...(p.deviceId ? { antifraud_details: { device_finger_print_id: p.deviceId.slice(0, 200) } } : {}),
+      ...cuerpo3ds(p.autenticacion3ds),
     });
     if (status >= 500 || !json) throw new ErrorPasarela(`Culqi respondió ${status}`);
     if (status >= 400 || json.object === 'error') {
-      const codigo = String(json.code ?? json.decline_code ?? '');
-      return { estado: 'RECHAZADO', cargoId: null, marca: null, ultimos4: null, mensaje: MENSAJES[codigo] ?? MENSAJE_GENERICO };
+      return { estado: 'RECHAZADO', cargoId: null, marca: null, ultimos4: null, codigo: codigoDeError(json) || undefined, mensaje: mensajeDeError(json) };
+    }
+    // 3DS: el primer cargo responde 200 con action_code REVIEW (en vez de 201). No es un rechazo.
+    if (esRevisionDe3ds(status, json)) {
+      return { estado: 'REQUIERE_3DS', cargoId: null, marca: null, ultimos4: null, mensaje: 'Tu banco necesita confirmar que eres tú.' };
     }
     const tarjeta = json.source ?? {};
     const num = String(tarjeta.card_number ?? '');
@@ -86,6 +76,22 @@ export class CulqiAdaptador implements PasarelaPago {
     if (json.outcome?.type === 'venta_exitosa') return { ...base, estado: 'APROBADO', mensaje: 'Pago aprobado.' };
     // 2xx sin venta exitosa (p. ej. en revisión): no se cobra ni se rechaza hasta que llegue el webhook
     return { ...base, estado: 'PENDIENTE', mensaje: 'Estamos confirmando tu pago. Te avisaremos en unos minutos.' };
+  }
+
+  async consultarCargo(cargoId: string): Promise<CargoConsultado | null> {
+    if (!/^[A-Za-z0-9_]{3,80}$/.test(cargoId)) return null;
+    const { status, json } = await this.llamar(`/charges/${cargoId}`);
+    if (status === 404) return null;
+    if (status >= 400 || !json || json.object === 'error') throw new ErrorPasarela(`Culqi respondió ${status}`);
+    const ok = json.outcome?.type === 'venta_exitosa';
+    return {
+      cargoId: String(json.id ?? cargoId),
+      estado: ok ? 'APROBADO' : 'PENDIENTE',
+      montoCentimos: Number(json.amount),
+      moneda: String(json.currency_code ?? ''),
+      metadata: json.metadata && typeof json.metadata === 'object' ? json.metadata : {},
+      devueltoCentimos: Number(json.amount_refunded ?? 0) || 0,
+    };
   }
 
   async devolver(p: PedirDevolucion): Promise<{ devolucionId: string }> {
@@ -100,4 +106,24 @@ export class CulqiAdaptador implements PasarelaPago {
     }
     return { devolucionId: json.id };
   }
+}
+
+/**
+ * DUDA 3DS (aislado aquí): verificado en los demos oficiales culqi-python-demo-checkoutv4-culqi3ds y
+ * culqi-java-demo-checkoutv4-culqi3ds: el primer POST /charges responde HTTP 200 con action_code === 'REVIEW' cuando
+ * pide 3DS (201 = cargo hecho). El reintento lleva `authentication_3DS` con lo que entrega Culqi3DS
+ * (parameters3DS: cavv, directoryServerTransactionId, eci, protocolVersion, xid; DTO Authentication3DS del demo Java).
+ * Falta confirmar con una prueba en integración si Culqi agrega otros campos.
+ */
+function esRevisionDe3ds(status: number, json: any): boolean {
+  return status === 200 && json?.action_code === 'REVIEW';
+}
+
+const CAMPOS_3DS = ['cavv', 'directoryServerTransactionId', 'eci', 'protocolVersion', 'xid'];
+
+function cuerpo3ds(a?: Record<string, unknown>): { authentication_3DS?: Record<string, string> } {
+  if (!a || typeof a !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const k of CAMPOS_3DS) if (typeof a[k] === 'string' && (a[k] as string).length <= 200) out[k] = a[k] as string;
+  return Object.keys(out).length ? { authentication_3DS: out } : {};
 }

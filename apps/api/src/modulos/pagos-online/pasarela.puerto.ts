@@ -2,7 +2,7 @@
 export const PASARELA_PAGO = Symbol('PASARELA_PAGO');
 
 export type MedioPagoOnline = 'TARJETA' | 'YAPE';
-export type ResultadoCargo = 'APROBADO' | 'RECHAZADO' | 'PENDIENTE';
+export type ResultadoCargo = 'APROBADO' | 'RECHAZADO' | 'PENDIENTE' | 'REQUIERE_3DS';
 
 export interface PedirCargo {
   montoCentimos: number;
@@ -13,6 +13,20 @@ export interface PedirCargo {
   email: string;
   descripcion: string;
   metadata: Record<string, string>;
+  /** Huella del dispositivo (Culqi3DS.generateDevice()), va en antifraud_details */
+  deviceId?: string;
+  /** Parámetros que entrega Culqi3DS tras autenticar (segundo cargo del mismo intento) */
+  autenticacion3ds?: Record<string, unknown>;
+}
+
+/** Cargo tal como lo informa la API de Culqi (GET /charges/{id}); lo único que el webhook toma como verdad. */
+export interface CargoConsultado {
+  cargoId: string;
+  estado: 'APROBADO' | 'RECHAZADO' | 'PENDIENTE';
+  montoCentimos: number;
+  moneda: string;
+  metadata: Record<string, unknown>;
+  devueltoCentimos: number;
 }
 
 export interface CargoHecho {
@@ -20,6 +34,8 @@ export interface CargoHecho {
   cargoId: string | null;
   marca: string | null;
   ultimos4: string | null;
+  /** Código de error de Culqi cuando es RECHAZADO (insufficient_funds, incorrect_cvv...) */
+  codigo?: string;
   /** Texto para el cliente, en español simple */
   mensaje: string;
 }
@@ -36,6 +52,8 @@ export interface PasarelaPago {
   readonly publicKey: string | null;
   /** Lanza ErrorPasarela si no se pudo saber el resultado (red, tiempo agotado): el cargo queda PENDIENTE */
   cargar(p: PedirCargo): Promise<CargoHecho>;
+  /** null si el cargo no existe. Lanza ErrorPasarela si no hay respuesta. */
+  consultarCargo(cargoId: string): Promise<CargoConsultado | null>;
   devolver(p: PedirDevolucion): Promise<{ devolucionId: string }>;
 }
 

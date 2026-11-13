@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsObject, IsEmail, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class IntentoDto {
   @IsNotEmpty({ message: 'El pedido es requerido' })
@@ -27,6 +27,17 @@ export class CargoDto {
   @IsOptional()
   @IsEmail({}, { message: 'El correo no es válido' })
   email?: string;
+
+  /** Huella del dispositivo de Culqi3DS.generateDevice() */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  deviceId?: string;
+
+  /** Segundo cargo tras REQUIERE_3DS: lo que entregó Culqi3DS (parameters3DS) */
+  @IsOptional()
+  @IsObject()
+  autenticacion3ds?: Record<string, unknown>;
 }
 
 export class DevolverDto {

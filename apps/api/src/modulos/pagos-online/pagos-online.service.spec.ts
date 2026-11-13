@@ -2,7 +2,7 @@ jest.mock('../pedidos-admin/pedidos-estado.service', () => ({ PedidosEstadoServi
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { createHmac } from 'crypto';
 import { PagosOnlineService } from './pagos-online.service';
-import { SimuladoAdaptador } from './simulado.adaptador';
+import { SimuladoAdaptador, TOKEN_3DS } from './simulado.adaptador';
 import { CulqiAdaptador } from './culqi.adaptador';
 import { crearPasarela } from './pasarela.fabrica';
 import { PasarelaPago } from './pasarela.puerto';
@@ -200,12 +200,29 @@ describe('PagosOnlineService', () => {
     expect(espia).not.toHaveBeenCalled();
   });
 
+  it('3DS: el primer cargo da REQUIERE_3DS sin rechazar; el segundo con autenticacion3ds aprueba una sola vez', async () => {
+    const { s, acceso, cobros, intentos } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    const r1 = await s.cargar({ intentoId, token: TOKEN_3DS, medio: 'TARJETA' });
+    expect(r1).toMatchObject({ estado: 'REQUIERE_3DS', datos3ds: { montoCentimos: 5250, moneda: 'PEN' } });
+    expect(intentos[0].estado).toBe('CREADO');
+    expect(cobros.cobrar).not.toHaveBeenCalled();
+    const r2 = await s.cargar({ intentoId, token: TOKEN_3DS, medio: 'TARJETA', autenticacion3ds: { cavv: 'x', eci: '05' } });
+    expect(r2.estado).toBe('APROBADO');
+    await s.cargar({ intentoId, token: TOKEN_3DS, medio: 'TARJETA', autenticacion3ds: { cavv: 'x' } });
+    expect(cobros.cobrar).toHaveBeenCalledTimes(1);
+  });
+
   describe('webhook', () => {
     const evento = (id: string, tipo: string, data: any) => ({ id, type: tipo, data: JSON.stringify(data) });
 
+    const sembrar = (pasarela: any, intentoId: string, id: string, extra: Partial<any> = {}) =>
+      pasarela.sembrarCargo({ cargoId: id, estado: 'APROBADO', montoCentimos: 5250, moneda: 'PEN', metadata: { intento: intentoId }, devueltoCentimos: 0, ...extra });
+
     it('evento duplicado: se procesa una sola vez', async () => {
-      const { s, acceso, cobros, intentos } = armar();
+      const { s, acceso, cobros, intentos, pasarela } = armar();
       const { intentoId } = await s.crearIntento('7', acceso);
+      sembrar(pasarela, intentoId, 'chr_x1');
       intentos[0].estado = 'PENDIENTE';
       intentos[0].medio = 'YAPE';
       const ev = evento('evt_1', 'charge.creation.succeeded', { id: 'chr_x1', amount: 5250, metadata: { intento: intentoId } });
@@ -215,9 +232,24 @@ describe('PagosOnlineService', () => {
       expect(intentos[0]).toMatchObject({ estado: 'APROBADO', culqi_cargo_id: 'chr_x1' });
     });
 
-    it('un monto distinto al del servidor no aprueba', async () => {
-      const { s, acceso, intentos, eventos, cobros } = armar();
+    it('el cuerpo no aprueba: si Culqi no conoce el cargo o dice otro monto, no se cobra', async () => {
+      const { s, acceso, intentos, eventos, cobros, pasarela } = armar();
       const { intentoId } = await s.crearIntento('7', acceso);
+      intentos[0].estado = 'PENDIENTE';
+      // el cuerpo dice 5250 pero la consulta no encuentra el cargo
+      expect((await s.recibirWebhook(evento('evt_0', 'charge.creation.succeeded', { id: 'chr_inexistente', amount: 5250, metadata: { intento: intentoId } }))).recibido).toBe(true);
+      expect(eventos[0].estado).toBe('IGNORADO');
+      expect(cobros.cobrar).not.toHaveBeenCalled();
+      // el cuerpo dice 5250 pero la API dice 100
+      sembrar(pasarela, intentoId, 'chr_x2', { montoCentimos: 100 });
+      await expect(s.recibirWebhook(evento('evt_2b', 'charge.creation.succeeded', { id: 'chr_x2', amount: 5250, metadata: { intento: intentoId } }))).rejects.toThrow();
+      expect(cobros.cobrar).not.toHaveBeenCalled();
+    });
+
+    it('un monto distinto al del servidor no aprueba', async () => {
+      const { s, acceso, intentos, eventos, cobros, pasarela } = armar();
+      const { intentoId } = await s.crearIntento('7', acceso);
+      sembrar(pasarela, intentoId, 'chr_x2', { montoCentimos: 100 });
       intentos[0].estado = 'PENDIENTE';
       await expect(s.recibirWebhook(evento('evt_2', 'charge.creation.succeeded', { id: 'chr_x2', amount: 100, metadata: { intento: intentoId } }))).rejects.toThrow();
       expect(eventos[0].estado).toBe('ERROR');
@@ -225,8 +257,9 @@ describe('PagosOnlineService', () => {
     });
 
     it('webhook aprobado de un pedido ya anulado: no lo revive, queda para devolver y avisa al ADMIN', async () => {
-      const { s, acceso, cobros, pedido, intentos, prisma } = armar();
+      const { s, acceso, cobros, pedido, intentos, prisma, pasarela } = armar();
       const { intentoId } = await s.crearIntento('7', acceso);
+      sembrar(pasarela, intentoId, 'chr_x9');
       intentos[0].estado = 'PENDIENTE';
       pedido.estado = 'ANULADO';
       await s.recibirWebhook(evento('evt_9', 'charge.creation.succeeded', { id: 'chr_x9', amount: 5250, metadata: { intento: intentoId } }));
@@ -237,7 +270,7 @@ describe('PagosOnlineService', () => {
       expect((await s.listar({})).items[0]).toMatchObject({ requiereDevolucion: true, cobroPendiente: false });
     });
 
-    it('autenticidad: simulado acepta; real exige firma o secreto', () => {
+    it('autenticidad: simulado acepta; real exige secreto, Basic o (opcional) HMAC', () => {
       const sim = armar().s;
       expect(() => sim.verificarWebhook(Buffer.from('{}'), {})).not.toThrow();
       const real = armar({ pasarela: new CulqiAdaptador({ secretKey: 'sk_test_x', publicKey: 'pk_test_x', fetchFn: jest.fn() as any }) }).s;
@@ -249,10 +282,19 @@ describe('PagosOnlineService', () => {
         expect(() => real.verificarWebhook(raw, { 'x-webhook-secret': 'secreto_de_prueba' })).not.toThrow();
         expect(() => real.verificarWebhook(raw, { 'x-culqi-signature': 'a'.repeat(64) })).toThrow();
         expect(() => real.verificarWebhook(raw, {})).toThrow();
+        expect(() => real.verificarWebhook(raw, {}, 'secreto_de_prueba')).not.toThrow();
+        process.env.CULQI_WEBHOOK_USUARIO = 'u';
+        process.env.CULQI_WEBHOOK_CLAVE = 'c';
+        expect(() => real.verificarWebhook(raw, { authorization: 'Basic ' + Buffer.from('u:c').toString('base64') })).not.toThrow();
+        expect(() => real.verificarWebhook(raw, { authorization: 'Basic ' + Buffer.from('u:mala').toString('base64') })).toThrow();
         delete process.env.CULQI_WEBHOOK_SECRET;
+        delete process.env.CULQI_WEBHOOK_USUARIO;
+        delete process.env.CULQI_WEBHOOK_CLAVE;
         expect(() => real.verificarWebhook(raw, { 'x-webhook-secret': 'x' })).toThrow();
       } finally {
         delete process.env.CULQI_WEBHOOK_SECRET;
+        delete process.env.CULQI_WEBHOOK_USUARIO;
+        delete process.env.CULQI_WEBHOOK_CLAVE;
       }
     });
   });
@@ -383,8 +425,42 @@ describe('adaptadores', () => {
     const base = { montoCentimos: 5250, moneda: 'PEN', token: 'tkn_x', medio: 'TARJETA' as const, email: 'a@b.pe', descripcion: 'x', metadata: {} };
     expect(await c.cargar(base)).toMatchObject({ estado: 'APROBADO', cargoId: 'chr_t1', marca: 'Visa', ultimos4: '1111' });
     expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toMatchObject({ amount: 5250, currency_code: 'PEN', source_id: 'tkn_x' });
-    expect((await c.cargar(base)).mensaje).toMatch(/fondos/);
+    expect((await c.cargar(base)).mensaje).toMatch(/ondos/);
     await expect(c.cargar(base)).rejects.toThrow(/^Sin respuesta de Culqi$/);
+  });
+
+  it('Culqi 3DS: 200 con action_code REVIEW pide 3DS; el reintento manda authentication_3DS; consulta con GET', async () => {
+    const fetchFn = jest.fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ action_code: 'REVIEW' }) })
+      .mockResolvedValueOnce({ status: 201, json: async () => ({ object: 'charge', id: 'chr_t3', outcome: { type: 'venta_exitosa' } }) })
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ object: 'charge', id: 'chr_t3', amount: 5250, currency_code: 'PEN', outcome: { type: 'venta_exitosa' }, metadata: { intento: 'k' }, amount_refunded: 0 }) });
+    const c = new CulqiAdaptador({ secretKey: 'sk_test_secreta', publicKey: 'pk_test_x', fetchFn: fetchFn as any });
+    const base = { montoCentimos: 5250, moneda: 'PEN', token: 'tkn_x', medio: 'TARJETA' as const, email: 'a@b.pe', descripcion: 'x', metadata: {} };
+    expect(await c.cargar({ ...base, deviceId: 'dev1' })).toMatchObject({ estado: 'REQUIERE_3DS', cargoId: null });
+    expect(await c.cargar({ ...base, autenticacion3ds: { cavv: 'c', eci: '05', xid: 'x', protocolVersion: '2.2.0', directoryServerTransactionId: 'd', otro: 'no' } })).toMatchObject({ estado: 'APROBADO' });
+    const b1 = JSON.parse(fetchFn.mock.calls[0][1].body);
+    const b2 = JSON.parse(fetchFn.mock.calls[1][1].body);
+    expect(b1.antifraud_details).toEqual({ device_finger_print_id: 'dev1' });
+    expect(b2.authentication_3DS).toEqual({ cavv: 'c', eci: '05', xid: 'x', protocolVersion: '2.2.0', directoryServerTransactionId: 'd' });
+    expect(await c.consultarCargo('chr_t3')).toMatchObject({ estado: 'APROBADO', montoCentimos: 5250, moneda: 'PEN' });
+    expect(fetchFn.mock.calls[2][1].method).toBe('GET');
+    expect(fetchFn.mock.calls[2][0]).toMatch(/\/charges\/chr_t3$/);
+  });
+
+  it('mensajes de error simples, sin hablar de fraude', () => {
+    const { mensajeDeError } = require('./culqi.errores');
+    const m = (x: any) => mensajeDeError(x);
+    expect(m({ decline_code: 'insufficient_funds' })).toMatch(/Fondos insuficientes/);
+    expect(m({ code: 'incorrect_cvv' })).toMatch(/código de seguridad/);
+    for (const c of ['stolen_card', 'lost_card', 'fraudulent', 'issuer_decline_operation', 'PREV0009', 'DNGE0087']) {
+      const txt = m({ decline_code: c, code: 'card_declined' }) + m({ code: c, merchant_message: c });
+      expect(txt).toMatch(/Tu banco no autorizó el pago/);
+      expect(txt.toLowerCase()).not.toMatch(/fraud|rob|perd|sospech/);
+    }
+    expect(m({ merchant_message: 'Error CULQ0001 interno' })).toMatch(/Intenta de nuevo/);
+    expect(m({ code: 'contact_issuer' })).toMatch(/banco/);
+    expect(m({ code: 'invalid_card' })).toMatch(/tarjeta/);
+    expect(m({})).toMatch(/No pudimos procesar/);
   });
 });
 

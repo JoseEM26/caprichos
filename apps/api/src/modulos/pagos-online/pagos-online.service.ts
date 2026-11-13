@@ -176,7 +176,7 @@ export class PagosOnlineService {
     return { estado, mensaje, pedidoCodigo };
   }
 
-  async cargar(dto: { intentoId: string; token: string; medio: string; email?: string }) {
+  async cargar(dto: { intentoId: string; token: string; medio: string; email?: string; deviceId?: string; autenticacion3ds?: Record<string, unknown> }) {
     await this.exigirActivo();
     const medio = String(dto.medio ?? '').toUpperCase() as MedioPagoOnline;
     if (!MEDIOS_ONLINE.includes(medio)) throw error(400, 'MEDIO_INVALIDO', 'Elige tarjeta o Yape');
@@ -219,12 +219,20 @@ export class PagosOnlineService {
         email: this.correo(dto.email),
         descripcion: `Pedido ${codigo} - Caprichos`,
         metadata: { intento: intento.clave, pedido: codigo },
+        deviceId: dto.deviceId,
+        autenticacion3ds: dto.autenticacion3ds,
       });
     } catch (e) {
       // Resultado desconocido (red o tiempo agotado): puede haberse cobrado. NO se rechaza: el webhook lo concilia.
       this.logger.warn(`Cargo sin respuesta del proveedor (intento ${intento.id}): ${e instanceof ErrorPasarela ? 'sin respuesta' : 'error interno'}`);
       await this.prisma.pagoOnlineIntento.update({ where: { id: intento.id }, data: { estado: 'PENDIENTE', mensaje: MSG_PENDIENTE } });
       return { estado: 'PENDIENTE' as const, mensaje: MSG_PENDIENTE, pedidoCodigo: codigo };
+    }
+
+    if (cargo.estado === 'REQUIERE_3DS') {
+      // No es rechazo ni cobro: el intento vuelve a CREADO para un segundo /cargo con autenticacion3ds (mismo token)
+      await this.prisma.pagoOnlineIntento.update({ where: { id: intento.id }, data: { estado: 'CREADO', medio, mensaje: cargo.mensaje } });
+      return { estado: 'REQUIERE_3DS' as const, mensaje: cargo.mensaje, pedidoCodigo: codigo, datos3ds: { montoCentimos: intento.monto_centimos, moneda: 'PEN', email: this.correo(dto.email), publicKey: this.pasarela.publicKey } };
     }
 
     const actualizado = await this.prisma.pagoOnlineIntento.update({
@@ -240,7 +248,8 @@ export class PagosOnlineService {
     });
     if (cargo.estado === 'APROBADO') await this.cobrarPedido(actualizado.id);
     const final = await this.prisma.pagoOnlineIntento.findUnique({ where: { id: intento.id } });
-    return this.resultado(final ?? actualizado, codigo);
+    const res = this.resultado(final ?? actualizado, codigo);
+    return cargo.estado === 'RECHAZADO' && cargo.codigo ? { ...res, codigo: cargo.codigo } : res;
   }
 
   private correo(e?: string): string {
@@ -332,17 +341,30 @@ export class PagosOnlineService {
 
   // ---------------------------------------------------------------- webhook
 
-  /** Autenticidad: firma HMAC-SHA256 del cuerpo o secreto compartido. En simulado (sin llaves) se acepta. */
+  /**
+   * Origen del aviso. Culqi NO firma sus avisos, así que esto solo filtra quién llama; el cuerpo nunca aprueba nada
+   * (la conciliación consulta el cargo a la API). Acepta: secreto compartido (x-webhook-secret o ?secreto=),
+   * Basic auth (CULQI_WEBHOOK_USUARIO y CULQI_WEBHOOK_CLAVE) y, opcional y NO oficial, HMAC-SHA256 en x-culqi-signature.
+   * En simulado se acepta (no hay llamadas de red).
+   */
   verificarWebhook(raw: Buffer | undefined, cab: Record<string, string | string[] | undefined>, secretoQuery?: string): void {
     if (this.pasarela.modo === 'SIMULADO') return;
     const secreto = process.env.CULQI_WEBHOOK_SECRET;
-    if (!secreto) throw new UnauthorizedException({ codigo: 'WEBHOOK_SIN_SECRETO', mensaje: 'Webhook no configurado' });
+    const usuario = process.env.CULQI_WEBHOOK_USUARIO;
+    const clave = process.env.CULQI_WEBHOOK_CLAVE;
+    if (!secreto && !(usuario && clave)) throw new UnauthorizedException({ codigo: 'WEBHOOK_SIN_SECRETO', mensaje: 'Webhook no configurado' });
     const igual = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-    const firma = String(cab['x-culqi-signature'] ?? '').replace(/^sha256=/, '');
-    if (firma && raw && igual(firma, createHmac('sha256', secreto).update(raw).digest('hex'))) return;
-    const compartido = String(cab['x-webhook-secret'] ?? secretoQuery ?? '');
-    if (compartido && igual(compartido, secreto)) return;
-    throw new UnauthorizedException({ codigo: 'WEBHOOK_INVALIDO', mensaje: 'Firma no válida' });
+    if (secreto) {
+      const compartido = String(cab['x-webhook-secret'] ?? secretoQuery ?? '');
+      if (compartido && igual(compartido, secreto)) return;
+      const firma = String(cab['x-culqi-signature'] ?? '').replace(/^sha256=/, '');
+      if (firma && raw && igual(firma, createHmac('sha256', secreto).update(raw).digest('hex'))) return;
+    }
+    if (usuario && clave) {
+      const m = /^Basic\s+(.+)$/i.exec(String(cab['authorization'] ?? ''));
+      if (m && igual(m[1].trim(), Buffer.from(`${usuario}:${clave}`).toString('base64'))) return;
+    }
+    throw new UnauthorizedException({ codigo: 'WEBHOOK_INVALIDO', mensaje: 'Origen no válido' });
   }
 
   async recibirWebhook(evento: any): Promise<{ recibido: true; duplicado?: boolean }> {
@@ -374,25 +396,28 @@ export class PagosOnlineService {
     }
     if (!d || typeof d !== 'object') return 'IGNORADO';
 
+    // El cuerpo solo sirve para ubicar el intento. Estado, monto y moneda salen de GET /charges/{id}.
     if (tipo.startsWith('charge.')) {
       const clave = d.metadata?.intento;
       const intento = await this.prisma.pagoOnlineIntento.findFirst({
         where: { OR: [...(typeof d.id === 'string' ? [{ culqi_cargo_id: d.id }] : []), ...(typeof clave === 'string' ? [{ clave }] : [])] },
       });
-      if (!intento) return 'IGNORADO';
-      if (tipo === 'charge.creation.succeeded') {
-        if (intento.estado === 'APROBADO' || intento.estado === 'DEVUELTO') return 'PROCESADO';
-        if (!['PROCESANDO', 'PENDIENTE', 'CREADO'].includes(intento.estado)) return 'IGNORADO';
-        // Nunca se aprueba por el webhook un monto distinto del que fijó el servidor
-        if (typeof d.amount === 'number' && d.amount !== intento.monto_centimos) throw new Error('Monto del evento distinto al del intento');
+      if (!intento || typeof d.id !== 'string') return 'IGNORADO';
+      if (intento.estado === 'APROBADO' || intento.estado === 'DEVUELTO') return 'PROCESADO';
+      if (!['PROCESANDO', 'PENDIENTE', 'CREADO'].includes(intento.estado)) return 'IGNORADO';
+      const c = await this.pasarela.consultarCargo(d.id); // ErrorPasarela -> 500 y Culqi reintenta
+      if (!c || c.metadata?.intento !== intento.clave) return 'IGNORADO';
+      if (c.estado === 'APROBADO') {
+        // Nunca se aprueba un monto o moneda distintos de los que fijó el servidor
+        if (c.montoCentimos !== intento.monto_centimos || c.moneda !== intento.moneda) throw new Error('Monto o moneda del cargo distintos a los del intento');
         await this.prisma.pagoOnlineIntento.update({
           where: { id: intento.id },
-          data: { estado: 'APROBADO', culqi_cargo_id: intento.culqi_cargo_id ?? (typeof d.id === 'string' ? d.id : null), medio: intento.medio ?? 'TARJETA', aprobado_en: new Date(), mensaje: 'Pago aprobado.' },
+          data: { estado: 'APROBADO', culqi_cargo_id: intento.culqi_cargo_id ?? c.cargoId, medio: intento.medio ?? 'TARJETA', aprobado_en: new Date(), mensaje: 'Pago aprobado.' },
         });
         await this.cobrarPedido(intento.id);
         return 'PROCESADO';
       }
-      if (tipo === 'charge.creation.failed' && ['PROCESANDO', 'PENDIENTE'].includes(intento.estado)) {
+      if (c.estado === 'RECHAZADO' && ['PROCESANDO', 'PENDIENTE'].includes(intento.estado)) {
         await this.prisma.pagoOnlineIntento.update({ where: { id: intento.id }, data: { estado: 'RECHAZADO', mensaje: 'No pudimos procesar tu pago. Prueba con otro medio.' } });
         return 'PROCESADO';
       }
@@ -404,7 +429,10 @@ export class PagosOnlineService {
       if (!intento) return 'IGNORADO';
       const lista = (intento.devoluciones as unknown as Devolucion[]) ?? [];
       if (lista.some((x) => x.id === d.id)) return 'PROCESADO';
-      const monto = Number(d.amount);
+      const c = await this.pasarela.consultarCargo(d.charge_id);
+      if (!c || c.metadata?.intento !== intento.clave) return 'IGNORADO';
+      // Lo devuelto lo confirma la API: el monto del aviso nunca pasa de lo que Culqi dice tener devuelto
+      const monto = Math.min(Number(d.amount), c.devueltoCentimos);
       if (!Number.isInteger(monto) || monto <= 0) return 'IGNORADO';
       const nueva = [...lista, { id: d.id, monto_centimos: monto, en: new Date().toISOString(), motivo: 'Devolución hecha en Culqi', origen: 'WEBHOOK' as const, medio: 'CULQI' }];
       // max(): si la devolución la hizo este sistema, el monto ya estaba reservado y no se cuenta dos veces
