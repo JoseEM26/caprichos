@@ -96,7 +96,7 @@ describe('SincronizadorPermisosService', () => {
     const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
     await servicio.sincronizar();
     expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({
-      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY'] } },
+      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY', 'SISTEMA'] } },
     });
   });
 

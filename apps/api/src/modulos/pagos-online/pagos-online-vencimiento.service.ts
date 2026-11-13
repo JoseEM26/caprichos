@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { adquirirCandado } from '../../comun/redis/candado.util';
+import { usuarioSistema } from './usuario-sistema';
 import { PedidosEstadoService } from '../pedidos-admin/pedidos-estado.service';
 
 export const ESPERA_PAGO_DEFECTO_MIN = 15;
@@ -60,12 +61,13 @@ export class PagosOnlineVencimientoService implements OnModuleInit, OnModuleDest
       take: 100,
     });
     if (!vencidos.length) return 0;
-    const admin = await this.prisma.userAccount.findFirst({ where: { rol: 'ADMIN', activo: true }, select: { party_id: true }, orderBy: { id: 'asc' } });
-    if (!admin) {
-      this.logger.error('No hay un ADMIN activo para anular pedidos sin pago en línea');
+    let usuario: any;
+    try {
+      usuario = await usuarioSistema(this.prisma);
+    } catch (e: any) {
+      this.logger.error(e?.message);
       return 0;
     }
-    const usuario: any = { partyId: admin.party_id, rol: 'ADMIN', roles: ['ADMIN'] };
     let n = 0;
     for (const p of vencidos) {
       try {

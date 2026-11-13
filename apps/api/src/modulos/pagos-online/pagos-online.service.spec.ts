@@ -36,6 +36,7 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
     pedidoEstadoHistorial: { create: jest.fn().mockResolvedValue({}) },
     $transaction: jest.fn(async (fn: any) => fn({ caja: { findUnique: jest.fn().mockResolvedValue({ id: 1n, estado: 'ABIERTA' }) }, $queryRaw: jest.fn().mockResolvedValue([{ id: 1n, estado: 'ABIERTA' }]), movimientoCaja: { create: jest.fn().mockResolvedValue({ id: 55n }) } })),
     userAccount: { findFirst: jest.fn().mockResolvedValue({ party_id: 99n }) },
+    cobro: { findFirst: jest.fn().mockResolvedValue({ id: 31n, caja: { estado: 'ABIERTA' } }) },
     notificacion: { create: jest.fn().mockResolvedValue({}) },
     pagoOnlineIntento: {
       findUnique: jest.fn(async ({ where }: any) => {
@@ -70,7 +71,7 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
       update: jest.fn(async ({ where, data }: any) => Object.assign(eventos.find((e) => e.evento_id === where.evento_id), data)),
     },
   };
-  const cobros = { cobrar: jest.fn().mockResolvedValue({}) };
+  const cobros = { cobrar: jest.fn().mockResolvedValue({}), anularCobro: jest.fn().mockResolvedValue({}), anularCobroCajaCerrada: jest.fn().mockResolvedValue({}) };
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const pasarela = opts.pasarela ?? new SimuladoAdaptador();
   const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela);
@@ -303,6 +304,45 @@ describe('PagosOnlineService', () => {
       await expect(s.devolver(id, { motivo: 'cliente pidió', medio: 'EFECTIVO', confirmar: true }, { partyId: '2', rol: 'CAJERO', roles: ['CAJERO'] })).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
     });
 
+    it('el cobro lo registra el usuario de sistema «Pago en línea»', async () => {
+      const { cobros } = await aprobado();
+      expect(cobros.cobrar.mock.calls[0][1]).toMatchObject({ partyId: '99', rol: 'SISTEMA' });
+    });
+
+    it('devolución parcial: el cobro queda; total: se anula el cobro de Caja una sola vez', async () => {
+      const { s, id, cobros } = await aprobado();
+      await s.devolver(id, { monto: 10, motivo: 'cliente pidió', confirmar: true }, admin);
+      expect(cobros.anularCobro).not.toHaveBeenCalled();
+      const fin = await s.devolver(id, { motivo: 'cliente pidió', confirmar: true }, admin);
+      expect(cobros.anularCobro).toHaveBeenCalledTimes(1);
+      expect(cobros.anularCobro).toHaveBeenCalledWith(31n, { motivo: expect.stringContaining('Devolución total') }, admin, undefined);
+      expect(fin.cobroAnulado).toBe(true);
+    });
+
+    it('total en efectivo: un solo egreso de caja y el cobro digital se anula', async () => {
+      const { s, id, cobros, prisma } = await aprobado();
+      await s.devolver(id, { medio: 'EFECTIVO', motivo: 'devuelto en el local', confirmar: true }, admin);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(cobros.anularCobro).toHaveBeenCalledTimes(1);
+    });
+
+    it('cobro en caja ya cerrada: usa la anulación de caja cerrada', async () => {
+      const { s, id, cobros, prisma } = await aprobado();
+      prisma.cobro.findFirst.mockResolvedValue({ id: 31n, caja: { estado: 'CERRADA' } });
+      await s.devolver(id, { motivo: 'cliente pidió', confirmar: true }, admin);
+      expect(cobros.anularCobroCajaCerrada).toHaveBeenCalledTimes(1);
+      expect(cobros.anularCobro).not.toHaveBeenCalled();
+    });
+
+    it('si no se puede anular el cobro, la devolución se conserva y se explica', async () => {
+      const { s, id, cobros, intentos } = await aprobado();
+      cobros.anularCobro.mockRejectedValue({ response: { mensaje: 'caja cerrada' } });
+      const r = await s.devolver(id, { motivo: 'cliente pidió', confirmar: true }, admin);
+      expect(r).toMatchObject({ cobroAnulado: false, restante: 0 });
+      expect(r.avisoCobro).toMatch(/no se pudo anular/);
+      expect(intentos[0].estado).toBe('DEVUELTO');
+    });
+
     it('pedido anulado: devuelve sin confirmar', async () => {
       const { s, id, pedido } = await aprobado();
       pedido.estado = 'ANULADO';
@@ -369,7 +409,7 @@ describe('PagosOnlineVencimientoService', () => {
     expect(donde).toMatchObject({ estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE' });
     expect(donde.creado_en.lte.toISOString()).toBe('2027-03-03T14:45:00.000Z');
     expect(donde.pagosOnline.none.estado.in).toEqual(['PROCESANDO', 'PENDIENTE', 'APROBADO']);
-    expect(pedidos.cambiarEstado).toHaveBeenCalledWith(1n, expect.objectContaining({ estado: 'ANULADO' }), expect.objectContaining({ rol: 'ADMIN' }));
+    expect(pedidos.cambiarEstado).toHaveBeenCalledWith(1n, expect.objectContaining({ estado: 'ANULADO' }), expect.objectContaining({ rol: 'SISTEMA', partyId: 9n }));
   });
 
   it('lee pago_online_espera_min y sin vencidos no hace nada', async () => {

@@ -54,3 +54,20 @@ ON CONFLICT ("clave") DO NOTHING;
 -- Minutos que un pedido con «Tarjeta / Yape en línea» espera el pago antes de anularse solo
 INSERT INTO "parametro" ("clave", "valor") VALUES ('pago_online_espera_min', '15'::jsonb)
 ON CONFLICT ("clave") DO NOTHING;
+
+-- Usuario de sistema «Pago en línea»: figura como quien cobra los pagos de Culqi y como quien anula los pedidos
+-- sin pago. No puede iniciar sesión (cuenta inactiva y sin contraseña válida) y su rol SISTEMA no tiene permisos.
+-- Idempotente: si ya existe una cuenta con rol SISTEMA, no se crea otra.
+INSERT INTO "rol" ("codigo", "nombre") VALUES ('SISTEMA', 'Sistema (pagos en línea)')
+ON CONFLICT ("codigo") DO NOTHING;
+
+DO $$
+DECLARE nuevo BIGINT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM "user_account" WHERE "rol" = 'SISTEMA') THEN
+    INSERT INTO "party" ("tipo", "estado") VALUES ('PERSONA', 'ACTIVO') RETURNING "id" INTO nuevo;
+    INSERT INTO "person" ("party_id", "nombres") VALUES (nuevo, 'Pago en línea');
+    INSERT INTO "user_account" ("party_id", "rol", "hash", "debe_cambiar", "activo")
+      VALUES (nuevo, 'SISTEMA', '!sin-acceso', false, false);
+  END IF;
+END $$;

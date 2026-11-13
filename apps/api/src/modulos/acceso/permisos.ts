@@ -27,7 +27,7 @@ export const ROLES: readonly DefinicionRol[] = [
 export const ROLES_ELIMINADOS: readonly string[] = ['CALLCENTER'];
 
 /** Roles que anulan pedidos (todos los de personal con acceso a pedidos; ALMACEN no); el sincronizador quita pedidos/anular a cualquier otro rol. */
-export const ROLES_ANULAN_PEDIDOS: readonly string[] = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY'];
+export const ROLES_ANULAN_PEDIDOS: readonly string[] = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'COCINA', 'MOZO', 'REPARTIDOR', 'APOYO_DELIVERY', 'SISTEMA'];
 
 /** Permisos retirados (modulo/accion): el sincronizador los borra de la base y de todos los roles. */
 export const PERMISOS_RETIRADOS: readonly string[] = ['supervisor/ver_codigo', 'supervisor/gestionar_codigo'];
@@ -263,6 +263,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
+  // Cuenta de sistema «Pago en línea» (sin login): solo anula los pedidos que no se pagaron a tiempo
+  SISTEMA: ['pedidos/anular'],
   ADMIN: PERMISOS.map((p) => `${p.modulo}/${p.accion}`),
   // Caja y cobro, anular pedidos (junto con ADMIN, los únicos), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [

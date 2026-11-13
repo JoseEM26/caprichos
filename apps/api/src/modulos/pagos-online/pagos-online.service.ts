@@ -12,6 +12,7 @@ import { esComprobanteElegible, validarDocumentoComprobante } from '../comproban
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { verificarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
 import { tieneRol } from '../acceso/roles-usuario';
+import { usuarioSistema } from './usuario-sistema';
 import { ErrorPasarela, MedioPagoOnline, PASARELA_PAGO, PasarelaPago, ResultadoCargo } from './pasarela.puerto';
 
 export const MEDIOS_ONLINE: MedioPagoOnline[] = ['TARJETA', 'YAPE'];
@@ -270,12 +271,11 @@ export class PagosOnlineService {
         await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_PEDIDO_ANULADO', resultado: 'OK', entidad: 'pedido', entidadId: pedido.id, despues: { cargo: intento.culqi_cargo_id, monto_centimos: intento.monto_centimos } });
         return;
       }
-      const partyId = pedido.cliente_party_id ?? pedido.party_id ?? (await this.partyAdmin());
-      if (partyId == null) throw new Error('Sin persona a quien atribuir el cobro');
-      const usuario = { partyId: partyId.toString(), rol: 'SISTEMA', roles: ['SISTEMA'] };
+      const usuario = await usuarioSistema(this.prisma);
+      const partyId = usuario.partyId;
       await this.cobros.cobrar(
         { pedidoId: pedido.id.toString(), pagos: [{ medio: intento.medio!, monto: enPesos(intento.monto_centimos) }] } as any,
-        usuario,
+        { ...usuario, partyId: usuario.partyId.toString() },
       );
       const ahora = new Date();
       await this.prisma.pedido.update({
@@ -328,11 +328,6 @@ export class PagosOnlineService {
         })
         .catch(() => undefined);
     }
-  }
-
-  private async partyAdmin(): Promise<bigint | null> {
-    const a = await this.prisma.userAccount.findFirst({ where: { rol: 'ADMIN', activo: true }, select: { party_id: true }, orderBy: { id: 'asc' } });
-    return a?.party_id ?? null;
   }
 
   // ---------------------------------------------------------------- webhook
@@ -516,12 +511,39 @@ export class PagosOnlineService {
       where: { id: intento.id },
       data: { devoluciones: nueva as unknown as Prisma.InputJsonValue, estado: actual.devuelto_centimos >= actual.monto_centimos ? 'DEVUELTO' : actual.estado },
     });
+    // Devolución TOTAL: se anula también el cobro de Caja (y con él la boleta o factura se da de baja) por el mismo
+    // camino de «anular cobro». Parcial: el cobro queda. El efectivo no se resta dos veces: el cobro es TARJETA o YAPE
+    // (sin efectivo), así que anularlo no mueve el efectivo; solo el egreso de esta devolución lo baja.
+    let cobroAnulado: { anulado: boolean; aviso: string | null } = { anulado: false, aviso: null };
+    if (actual.devuelto_centimos >= actual.monto_centimos) cobroAnulado = await this.anularCobroDeCaja(intento.pedido_id, motivo, usuario, ip);
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'DEVOLUCION_PAGO_ONLINE', resultado: 'OK',
       entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip,
       antes: { devuelto_centimos: intento.devuelto_centimos },
-      despues: { devuelto_centimos: actual.devuelto_centimos, devolucion: devolucionId, medio, movimiento_caja_id: movimientoCajaId ?? null, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
+      despues: {
+        cobro_anulado: cobroAnulado.anulado, aviso_cobro: cobroAnulado.aviso, devuelto_centimos: actual.devuelto_centimos, devolucion: devolucionId, medio, movimiento_caja_id: movimientoCajaId ?? null, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
     });
-    return { id: intento.id.toString(), devolucionId, medio, montoDevuelto: enPesos(monto), totalDevuelto: enPesos(actual.devuelto_centimos), restante: enPesos(actual.monto_centimos - actual.devuelto_centimos) };
+    return { id: intento.id.toString(), devolucionId, medio, cobroAnulado: cobroAnulado.anulado, avisoCobro: cobroAnulado.aviso, montoDevuelto: enPesos(monto), totalDevuelto: enPesos(actual.devuelto_centimos), restante: enPesos(actual.monto_centimos - actual.devuelto_centimos) };
+  }
+
+  /**
+   * Anula el cobro vigente del pedido con el flujo de Caja. Caja del cobro abierta: anulación normal. Caja ya cerrada:
+   * anulación de caja cerrada (solo ADMIN, motivo de 10+ caracteres; necesita la caja de hoy abierta). Si no se puede,
+   * la devolución ya hecha se conserva y se explica por qué quedó el cobro: se resuelve a mano en Caja.
+   */
+  private async anularCobroDeCaja(pedidoId: bigint, motivo: string, usuario: any, ip?: string): Promise<{ anulado: boolean; aviso: string | null }> {
+    const cobro = await this.prisma.cobro.findFirst({ where: { pedido_id: pedidoId, anulado_en: null }, select: { id: true, caja: { select: { estado: true } } } });
+    if (!cobro) return { anulado: false, aviso: null }; // ya anulado (p. ej. al anular el pedido)
+    const dto = { motivo: `Devolución total del pago en línea: ${motivo}`.slice(0, 250) };
+    try {
+      if (cobro.caja.estado === 'ABIERTA') await this.cobros.anularCobro(cobro.id, dto, usuario, ip);
+      else await this.cobros.anularCobroCajaCerrada(cobro.id, dto, usuario, ip);
+      return { anulado: true, aviso: null };
+    } catch (e: any) {
+      const aviso = `El dinero se devolvió, pero el cobro en Caja no se pudo anular (${String(e?.response?.mensaje ?? e?.message ?? 'sin detalle').slice(0, 150)}). Anúlalo en Caja.`;
+      this.logger.warn(`Devolución total sin anular el cobro (pedido ${pedidoId}): ${aviso}`);
+      return { anulado: false, aviso };
+    }
   }
 }
