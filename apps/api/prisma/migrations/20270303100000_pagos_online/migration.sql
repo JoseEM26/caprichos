@@ -58,6 +58,11 @@ ON CONFLICT ("clave") DO NOTHING;
 -- Usuario de sistema «Pago en línea»: figura como quien cobra los pagos de Culqi y como quien anula los pedidos
 -- sin pago. No puede iniciar sesión (cuenta inactiva y sin contraseña válida) y su rol SISTEMA no tiene permisos.
 -- Idempotente: si ya existe una cuenta con rol SISTEMA, no se crea otra.
+-- La base restringe los códigos de rol (ck_rol_codigo): se reemplaza con la lista de 20270203100000_rol_marketing más SISTEMA.
+ALTER TABLE "rol" DROP CONSTRAINT IF EXISTS "ck_rol_codigo";
+ALTER TABLE "rol" ADD CONSTRAINT "ck_rol_codigo" CHECK (
+  "codigo" IN ('ADMIN','CAJERO','COCINA','MOZO','CALLCENTER','ALMACEN','REPARTIDOR','SUPERVISOR','APOYO_DELIVERY','MARKETING','SISTEMA'));
+
 INSERT INTO "rol" ("codigo", "nombre") VALUES ('SISTEMA', 'Sistema (pagos en línea)')
 ON CONFLICT ("codigo") DO NOTHING;
 

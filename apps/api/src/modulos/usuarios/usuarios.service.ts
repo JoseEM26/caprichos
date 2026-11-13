@@ -123,7 +123,8 @@ export class UsuariosService {
     const y = (n: number) => new Date(`${sumarDiasIso(hoy, n)}T00:00:00.000Z`); // alta_en es DATE
     const y0 = (f: string) => new Date(`${f}T00:00:00.000Z`);
 
-    const and: any[] = [];
+    // La cuenta de sistema «Pago en línea» no es personal: no aparece en Usuarios
+    const and: any[] = [{ rol: { not: 'SISTEMA' } }];
 
     if (filtros.rol) {
       // «Producción» es un cargo de la pantalla que agrupa a Cocina; el resto son códigos reales.
