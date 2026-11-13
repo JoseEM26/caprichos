@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
+import { PrismaService } from '../../../comun/prisma/prisma.service';
+import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmascarar.util';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { aTextoNumerado } from '../evolution/menu-numerado.util';
 import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
@@ -40,6 +42,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     private readonly api: EvolutionApiCliente,
     private readonly config: EvolutionConfigService,
     private readonly menus: MenuNumeradoStore,
+    private readonly prisma: PrismaService,
   ) {}
 
   estaConectado(): EstadoConexionWhatsApp {
@@ -82,7 +85,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     return { exito: false, estado: 'FALLIDO', errorCodigo: codigo, errorDetalle: detalle.slice(0, 300) };
   }
 
-  private async post(ruta: string, cuerpo: Record<string, unknown>, tel: string, resumen: string, esperaTipeo = 0): Promise<ResultadoEnvioWhatsApp> {
+  private async post(ruta: string, cuerpo: Record<string, unknown>, tel: string, resumen: string, esperaTipeo = 0, opciones?: OpcionesEnvio, tipo = 'TEXTO'): Promise<ResultadoEnvioWhatsApp> {
     if (!this.api.configurado()) {
       this.logger.log(`[EVOLUTION SIMULADO] ${resumen} a ${enmascararTelefono(tel)}`);
       return { exito: true, estado: 'SIMULADO', waMessageId: `wamid.simulado.evo.${randomUUID()}` };
@@ -96,43 +99,70 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
       cfg.evolution_pausa_min_seg,
       cfg.evolution_pausa_max_seg,
     );
-    if (r.ok) return { exito: true, estado: 'ENVIADO', waMessageId: r.data?.key?.id ?? r.data?.id ?? undefined };
+    if (r.ok) {
+      const waMessageId: string | undefined = r.data?.key?.id ?? r.data?.id ?? undefined;
+      await this.registrar(tel, tipo, waMessageId, opciones);
+      return { exito: true, estado: 'ENVIADO', waMessageId };
+    }
     if (r.red) return { exito: false, estado: 'FALLIDO', errorCodigo: 'EVOLUTION_NO_DISPONIBLE', errorDetalle: 'Evolution no respondió' };
     return this.fallo('ERROR_EVOLUTION', `HTTP ${r.status}: ${JSON.stringify(r.data?.response?.message ?? r.data?.message ?? r.data ?? '')}`);
   }
 
-  async enviarTexto(telefono: string, texto: string, _opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+  /**
+   * Deja el envío en whatsapp_mensaje para que el contador de consumo de WhatsApp lo cuente (no hay campo de proveedor:
+   * cuenta igual que los de Meta). Un fallo al registrar no afecta al envío.
+   */
+  private async registrar(tel: string, tipo: string, waMessageId: string | undefined, o?: OpcionesEnvio): Promise<void> {
+    try {
+      await this.prisma.whatsappMensaje.create({
+        data: {
+          direccion: 'SALIENTE',
+          wa_message_id: waMessageId ?? null,
+          telefono_enmascarado: mascara(tel),
+          telefono_hash: hashTelefono(tel),
+          tipo,
+          estado: 'ENVIADO',
+          pedido_id: o?.pedidoId ? BigInt(o.pedidoId) : null,
+          conversacion_id: o?.conversacionId ? BigInt(o.conversacionId) : null,
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`No se pudo registrar el envío para el consumo: ${err?.message}`);
+    }
+  }
+
+  async enviarTexto(telefono: string, texto: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const cfg = await this.config.obtener();
     const final = this.variar(limitarEnlaces(texto, cfg.evolution_max_enlaces), cfg.evolution_max_texto_identico);
     await this.menus.borrar(telefono);
-    return this.post('/message/sendText', { text: final }, telefono, `texto (${final.length} caracteres)`, escribiendoMs(final, cfg.evolution_escribiendo_ms_por_caracter));
+    return this.post('/message/sendText', { text: final }, telefono, `texto (${final.length} caracteres)`, escribiendoMs(final, cfg.evolution_escribiendo_ms_por_caracter), opciones);
   }
 
-  private async enviarMenu(telefono: string, texto: string, items: Array<BotonAccion | FilaLista>, tipo: 'boton' | 'lista'): Promise<ResultadoEnvioWhatsApp> {
+  private async enviarMenu(telefono: string, texto: string, items: Array<BotonAccion | FilaLista>, tipo: 'boton' | 'lista', opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const cfg = await this.config.obtener();
     const { texto: cuerpo, menu } = aTextoNumerado(texto, items, tipo);
     const final = limitarEnlaces(cuerpo, cfg.evolution_max_enlaces);
     // Se guarda antes de enviar: el cliente puede contestar muy rápido
     await this.menus.guardar(telefono, menu);
-    const r = await this.post('/message/sendText', { text: final }, telefono, `menú numerado de ${items.length} opciones`, escribiendoMs(final, cfg.evolution_escribiendo_ms_por_caracter));
+    const r = await this.post('/message/sendText', { text: final }, telefono, `menú numerado de ${items.length} opciones`, escribiendoMs(final, cfg.evolution_escribiendo_ms_por_caracter), opciones, 'BOTON');
     if (!r.exito) await this.menus.borrar(telefono);
     return r;
   }
 
-  enviarBotones(telefono: string, texto: string, botones: BotonAccion[]): Promise<ResultadoEnvioWhatsApp> {
-    return this.enviarMenu(telefono, texto, botones, 'boton');
+  enviarBotones(telefono: string, texto: string, botones: BotonAccion[], o?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    return this.enviarMenu(telefono, texto, botones, 'boton', o);
   }
 
-  enviarLista(telefono: string, texto: string, _botonTexto: string, filas: FilaLista[]): Promise<ResultadoEnvioWhatsApp> {
-    return this.enviarMenu(telefono, texto, filas, 'lista');
+  enviarLista(telefono: string, texto: string, _botonTexto: string, filas: FilaLista[], o?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    return this.enviarMenu(telefono, texto, filas, 'lista', o);
   }
 
   /** Carrusel: sin imágenes por tarjeta; sale la lista de respaldo si la hay, o una lista con los nombres de las tarjetas. */
-  enviarCarrusel(telefono: string, carga: CargaCarrusel): Promise<ResultadoEnvioWhatsApp> {
+  enviarCarrusel(telefono: string, carga: CargaCarrusel, o?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const rp = carga.respaldo;
-    if (rp?.filas?.length) return this.enviarMenu(telefono, rp.texto, rp.filas.slice(0, 10), 'lista');
-    if (rp?.botones?.length) return this.enviarMenu(telefono, rp.texto, rp.botones.slice(0, 3), 'boton');
-    return this.enviarMenu(telefono, carga.cuerpo, carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })), 'lista');
+    if (rp?.filas?.length) return this.enviarMenu(telefono, rp.texto, rp.filas.slice(0, 10), 'lista', o);
+    if (rp?.botones?.length) return this.enviarMenu(telefono, rp.texto, rp.botones.slice(0, 3), 'boton', o);
+    return this.enviarMenu(telefono, carga.cuerpo, carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })), 'lista', o);
   }
 
   /** Plantilla = su texto libre equivalente del catálogo, con las variables puestas. */
@@ -142,7 +172,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     const valores = Array.isArray(variables) ? variables : Object.values(variables ?? {});
     const texto = def.texto.replace(/\{\{(\d+)\}\}/g, (_m, i) => String(valores[Number(i) - 1] ?? ''));
     if (def.botones?.length && opciones?.botonesRespuesta?.length) {
-      return this.enviarBotones(telefono, texto, opciones.botonesRespuesta.map((id, i) => ({ id, titulo: def.botones![i] ?? id })));
+      return this.enviarBotones(telefono, texto, opciones.botonesRespuesta.map((id, i) => ({ id, titulo: def.botones![i] ?? id })), opciones);
     }
     return this.enviarTexto(telefono, texto, opciones);
   }
@@ -164,16 +194,16 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     return /^https?:\/\//i.test(referencia) ? { media: referencia } : null;
   }
 
-  async enviarImagen(telefono: string, urlOArchivo: string, caption?: string): Promise<ResultadoEnvioWhatsApp> {
+  async enviarImagen(telefono: string, urlOArchivo: string, caption?: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const c = this.contenidoMedia(urlOArchivo);
     if (!c && this.api.configurado()) return { exito: false, estado: 'FALLIDO', errorCodigo: 'MEDIA_NO_DISPONIBLE', errorDetalle: 'La imagen ya no está disponible para enviar' };
-    return this.post('/message/sendMedia', { mediatype: 'image', mimetype: c?.mime ?? 'image/jpeg', media: c?.media ?? urlOArchivo, caption: caption ?? '', fileName: 'imagen.jpg' }, telefono, 'imagen');
+    return this.post('/message/sendMedia', { mediatype: 'image', mimetype: c?.mime ?? 'image/jpeg', media: c?.media ?? urlOArchivo, caption: caption ?? '', fileName: 'imagen.jpg' }, telefono, 'imagen', 0, opciones, 'IMAGEN');
   }
 
-  async enviarDocumento(telefono: string, mediaId: string, nombreArchivo: string, caption?: string): Promise<ResultadoEnvioWhatsApp> {
+  async enviarDocumento(telefono: string, mediaId: string, nombreArchivo: string, caption?: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const c = this.contenidoMedia(mediaId);
     if (!c && this.api.configurado()) return { exito: false, estado: 'FALLIDO', errorCodigo: 'MEDIA_NO_DISPONIBLE', errorDetalle: 'El documento ya no está disponible para enviar' };
-    return this.post('/message/sendMedia', { mediatype: 'document', mimetype: c?.mime ?? 'application/pdf', media: c?.media ?? mediaId, caption: caption ?? '', fileName: nombreArchivo }, telefono, 'documento');
+    return this.post('/message/sendMedia', { mediatype: 'document', mimetype: c?.mime ?? 'application/pdf', media: c?.media ?? mediaId, caption: caption ?? '', fileName: nombreArchivo }, telefono, 'documento', 0, opciones, 'DOCUMENTO');
   }
 
   /** Evolution marca como leído por su cuenta al recibir; no se pide nada más. */

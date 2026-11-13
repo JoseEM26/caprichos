@@ -20,7 +20,8 @@ function prismaFalso(params: Record<string, unknown> = {}) {
       upsert: jest.fn(async ({ where, create }: any) => { guardados[where.clave] = create.valor; }),
     },
     notificacion: { create: jest.fn(async () => ({ id: 1n })) },
-    whatsappMensaje: { count: jest.fn(async () => 1) },
+    whatsappMensaje: { count: jest.fn(async () => 1), create: jest.fn(async () => ({})) },
+    pedido: { count: jest.fn(async () => 0) },
     salienteWhatsapp: { count: jest.fn(async () => 0), updateMany: jest.fn(async () => ({ count: 1 })) },
   } as any;
 }
@@ -81,7 +82,7 @@ describe('política de envío con Evolution', () => {
   });
   it('bloquea los proactivos que no son aviso del pedido ni encuesta', async () => {
     const { politica } = crear();
-    for (const origen of ['RECORDATORIO_RESERVA', 'AVISO_CUENTA', 'ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'ESPERA', 'CODIGO_CUENTA']) {
+    for (const origen of ['RECORDATORIO_RESERVA', 'ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'ESPERA', 'RECORDATORIO_PAGO']) {
       expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'PROACTIVO_BLOQUEADO' });
     }
   });
@@ -94,6 +95,15 @@ describe('política de envío con Evolution', () => {
   it('nunca escribe primero a un número que jamás escribió', async () => {
     const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
     expect(await politica.evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'SIN_CONTACTO_PREVIO' });
+  });
+  it('un aviso del pedido a quien pidió por la web en las últimas 24 h sí sale; otros proactivos siguen exigiendo contacto', async () => {
+    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) }, pedido: { count: jest.fn(async () => 1) } });
+    expect(await politica.evaluar(aviso, DENTRO)).toEqual({ accion: 'ENVIAR' });
+    expect(await politica.evaluar({ ...aviso, origen: 'ENCUESTA' }, DENTRO)).toMatchObject({ codigo: 'SIN_CONTACTO_PREVIO' });
+  });
+  it('código de cuenta, reserva y cuenta creada no exigen contacto previo (los pidió el cliente)', async () => {
+    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
+    for (const origen of ['CODIGO_CUENTA', 'RESERVA', 'AVISO_CUENTA']) expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toEqual({ accion: 'ENVIAR' });
   });
   it('fuera de horario espera, no se descarta', async () => {
     const { politica } = crear();
@@ -207,7 +217,7 @@ describe('adaptador y enrutador', () => {
     const api = { configurado: () => configurado, instancia: 'prueba', llamar: jest.fn(async () => ({ ok: true, status: 201, data: { key: { id: 'WA1' } } })) } as any;
     const config = new EvolutionConfigService(prisma);
     const store = new MenuNumeradoStore();
-    return { api, config, store, ad: new WhatsAppEvolutionAdaptador(api, config, store) };
+    return { api, config, store, prisma, ad: new WhatsAppEvolutionAdaptador(api, config, store, prisma) };
   };
 
   it('sin credenciales: éxito simulado, sin tocar la red', async () => {
@@ -218,7 +228,7 @@ describe('adaptador y enrutador', () => {
     expect(ad.estaConectado().modo).toBe('simulado');
   });
   it('botones salen como texto numerado, con «escribiendo…», y se guarda el menú', async () => {
-    const { ad, api, store } = montarAdaptador(true);
+    const { ad, api, store, prisma } = montarAdaptador(true);
     const r = await ad.enviarBotones('51900000001', 'Elige', [{ id: 'a', titulo: 'Uno' }, { id: 'b', titulo: 'Dos' }]);
     expect(r).toMatchObject({ exito: true, estado: 'ENVIADO', waMessageId: 'WA1' });
     const [metodo, ruta, cuerpo] = api.llamar.mock.calls[0];
@@ -228,6 +238,7 @@ describe('adaptador y enrutador', () => {
     expect(cuerpo.text).toContain('Responde 1 o 2.');
     expect(cuerpo.delay).toBeGreaterThanOrEqual(1000);
     expect((await store.obtener('51900000001'))?.opciones.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(prisma.whatsappMensaje.create).toHaveBeenCalledWith({ data: expect.objectContaining({ direccion: 'SALIENTE', estado: 'ENVIADO', tipo: 'BOTON', wa_message_id: 'WA1' }) });
   });
   it('un texto normal posterior borra el menú viejo', async () => {
     const { ad, store } = montarAdaptador(true);

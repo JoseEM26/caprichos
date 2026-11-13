@@ -8,6 +8,10 @@ import { EvolutionConfigService } from './evolution-config.service';
 /** Orígenes del outbox que son respuesta a algo que el cliente acaba de escribir: siempre se permiten. */
 export const ORIGENES_RESPUESTA = new Set(['VOUCHER', 'BOT_ERROR', 'TOPE_SIN_PAGAR', ORIGEN_NO_COMPATIBLE]);
 
+/** Los pidió el propio cliente (código, reserva, cuenta creada): no exigen que haya escrito antes por WhatsApp. */
+export const ORIGENES_PEDIDOS_POR_EL_CLIENTE = new Set(['CODIGO_CUENTA', 'RESERVA', 'AVISO_CUENTA']);
+const HORAS_PEDIDO_RECIENTE = 24;
+
 export type DecisionEnvio =
   | { accion: 'ENVIAR' }
   | { accion: 'DESCARTAR'; codigo: string; motivo: string }
@@ -41,13 +45,15 @@ export class PoliticaEvolutionService {
       };
     }
 
-    if (String(cfg.evolution_exigir_contacto_previo).toLowerCase() === 'si') {
+    if (String(cfg.evolution_exigir_contacto_previo).toLowerCase() === 'si' && !ORIGENES_PEDIDOS_POR_EL_CLIENTE.has(fila.origen)) {
       const previo = await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hashTelefono(fila.telefono_destino), direccion: 'ENTRANTE' } });
-      if (previo === 0) {
+      // Un aviso del pedido también vale si ese celular hizo un pedido en las últimas 24 h (p. ej. por la carta web)
+      const pidioHace = previo === 0 && fila.origen === 'AVISO_PEDIDO' ? await this.pidioRecientemente(fila.telefono_destino, ahora) : false;
+      if (previo === 0 && !pidioHace) {
         return {
           accion: 'DESCARTAR',
           codigo: 'SIN_CONTACTO_PREVIO',
-          motivo: 'Bloqueado: este número nunca escribió al negocio y no se le escribe primero por WhatsApp no oficial.',
+          motivo: 'Bloqueado: este número nunca escribió al negocio ni tiene un pedido reciente; no se le escribe primero por WhatsApp no oficial.',
         };
       }
     }
@@ -72,5 +78,14 @@ export class PoliticaEvolutionService {
       if (enviados >= tope) return { accion: 'DIFERIR', esperaMs, motivo: `Tope de mensajes ${nombre} alcanzado (${tope}); se reintenta luego` };
     }
     return { accion: 'ENVIAR' };
+  }
+
+  private async pidioRecientemente(tel: string, ahora: Date): Promise<boolean> {
+    const solo = tel.replace(/\D/g, '');
+    const variantes = [solo, solo.replace(/^51/, ''), `+${solo}`];
+    const n = await this.prisma.pedido.count({
+      where: { cliente_telefono: { in: variantes }, creado_en: { gte: new Date(ahora.getTime() - HORAS_PEDIDO_RECIENTE * 3_600_000) } },
+    });
+    return n > 0;
   }
 }

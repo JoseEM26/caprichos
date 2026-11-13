@@ -19,7 +19,7 @@ export const DEFECTOS_EVOLUTION = {
   evolution_exigir_contacto_previo: 'si',
   evolution_max_enlaces: 1,
   evolution_max_texto_identico: 2,
-  evolution_origenes_permitidos: 'AVISO_PEDIDO,ENCUESTA',
+  evolution_origenes_permitidos: 'AVISO_PEDIDO,ENCUESTA,CODIGO_CUENTA,RESERVA,AVISO_CUENTA',
   evolution_pausado: 'no',
 } as const;
 

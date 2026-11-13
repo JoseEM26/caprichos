@@ -10,8 +10,8 @@ Evolution API es un servidor que se conecta a WhatsApp Web (librería Baileys) c
 ## 1. Qué cambia para el cliente con Evolution
 - Menús en texto numerado. No hay botones, listas ni carruseles: el bot manda «1. Ver carta / 2. Pedir / Responde 1 o 2» y la respuesta «2» se convierte en el mismo botón que habría pulsado. Un texto normal posterior del bot cierra el menú (un «2» suelto después ya no se toma como opción). El menú dura 30 minutos.
 - Sin plantillas ni ventana de 24 h: las plantillas salen como su texto libre equivalente del catálogo.
-- Mensajes que el número manda por su cuenta (sin que el cliente acabe de escribir): SOLO avisos del pedido (recibido, listo, salió, llegó, entregado...) y la encuesta posventa. Todo lo demás (puntos ganados, bienvenida de puntos, cumpleaños, recordatorios de reserva y de pago, campañas, alertas al personal, códigos de cuenta) se bloquea: queda DESCARTADO en Mensajes › Salientes con el motivo «Bloqueado: ...». Las respuestas del bot a un mensaje del cliente siempre salen.
-- Nunca se escribe primero a un número que jamás escribió al negocio (queda DESCARTADO, «sin contacto previo»).
+- Mensajes que el número manda por su cuenta (sin que el cliente acabe de escribir): SOLO avisos del pedido (recibido, listo, salió, llegó, entregado...), la encuesta posventa y lo que el propio cliente pidió (código de cuenta o de recuperar contraseña, confirmación de reserva, aviso de cuenta creada). Todo lo demás (puntos ganados, bienvenida de puntos, cumpleaños, recordatorios de reserva y de pago, campañas, alertas al personal) se bloquea: queda DESCARTADO en Mensajes › Salientes con el motivo «Bloqueado: ...». Las respuestas del bot a un mensaje del cliente siempre salen.
+- Nunca se escribe primero a un número que jamás escribió al negocio (queda DESCARTADO, «sin contacto previo»). Excepciones: los avisos del pedido también salen si ese celular hizo un pedido en las últimas 24 h (p. ej. por la carta web), y el código, la reserva y la cuenta creada no lo exigen (los pidió el cliente).
 
 ## 2. Variables de entorno
 En el `.env` de la API de Caprichos (nunca en Git; en producción por los secretos del ambiente):
@@ -65,7 +65,7 @@ Todas se editan en la misma pantalla (solo ADMIN, auditado) o en `parametro`. «
 | `evolution_exigir_contacto_previo` | si | No se escribe primero a quien nunca escribió. |
 | `evolution_max_enlaces` | 1 | Enlaces por mensaje; los demás se reemplazan por «(enlace omitido)». |
 | `evolution_max_texto_identico` | 2 | Si el mismo texto se repite más de esto en una hora, se cambia el saludo. |
-| `evolution_origenes_permitidos` | `AVISO_PEDIDO,ENCUESTA` | Orígenes del outbox que pueden salir como proactivos. Agregar uno a esta lista es asumir más riesgo. |
+| `evolution_origenes_permitidos` | `AVISO_PEDIDO,ENCUESTA,CODIGO_CUENTA,RESERVA,AVISO_CUENTA` | Orígenes del outbox que pueden salir como proactivos. Agregar uno a esta lista es asumir más riesgo. |
 | `evolution_pausado` | no | Pausa manual del envío (botón «Pausar envío»). |
 
 Pausa automática: si Evolution reporta `connection.update` con cierre y el motivo es baneo o sesión revocada (401, 403, `banned`, `logged_out`), o un envío falla con un error de bloqueo, `evolution_pausado` pasa a `si`. Con el número desconectado, los proactivos esperan. En cada desconexión (solo en el cambio de estado) se crea una notificación para los ADMIN en la campanita: «WhatsApp: número desconectado».
@@ -78,6 +78,7 @@ Pausa automática: si Evolution reporta `connection.update` con cierre y el moti
 
 ## 8. Qué no hace Evolution
 - No hay carruseles ni imágenes por tarjeta: el carrusel sale como lista numerada.
+- El contador de consumo de WhatsApp cuenta también los envíos de Evolution (se registran en `whatsapp_mensaje`, sin campo de proveedor).
 - No hay estados de entrega (entregado/leído) de Evolution en el panel; un mensaje figura «Enviado» cuando Evolution lo aceptó.
 - Si WhatsApp entrega un mensaje con identificador interno (`@lid`) y sin número visible, se ignora (no hay a quién responder).
 - Los adjuntos (voucher, nota de voz, documento) se descargan desde Evolution con la misma validación de tipo y tamaño que con Meta.

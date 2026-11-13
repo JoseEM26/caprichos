@@ -15,5 +15,5 @@ INSERT INTO "parametro" ("clave", "valor") VALUES
   ('evolution_exigir_contacto_previo', '"si"'::jsonb),
   ('evolution_max_enlaces', '1'::jsonb),
   ('evolution_max_texto_identico', '2'::jsonb),
-  ('evolution_origenes_permitidos', '"AVISO_PEDIDO,ENCUESTA"'::jsonb)
+  ('evolution_origenes_permitidos', '"AVISO_PEDIDO,ENCUESTA,CODIGO_CUENTA,RESERVA,AVISO_CUENTA"'::jsonb)
 ON CONFLICT ("clave") DO NOTHING;
