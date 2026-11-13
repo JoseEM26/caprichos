@@ -69,6 +69,9 @@ Ver tambien: [[creditos]]
 4. Las alertas son vouchers sin revisar, chats en espera, pedidos demorados y calificaciones bajas de la encuesta posventa. Cada administrador recibe su propio mensaje: WhatsApp no envia a grupos.
 Ver tambien: [[mensajes]], [[reclamos]]
 
+## Como se hace: sugerir el celular del usuario como celular de pago
+En Editar usuario, seccion Sueldo (planilla), debajo de Celular de pago (Yape / Plin) aparece el boton Usar el celular del usuario (···123) cuando el usuario tiene celular y el campo esta vacio o es distinto; al pulsarlo se copia el numero al campo, que sigue editable y solo se guarda con Guardar sueldo. Si escribiste un celular nuevo en el campo Celular del mismo formulario (sin guardar), se sugiere ese.
+
 ## Como se hace: restablecer contraseña
 1. Si un colaborador olvidó su contraseña, pulsa "Restablecer contraseña" en su fila. Aparecerá la ventana de confirmación "¿Restablecer contraseña de este usuario?". Confirma con "Sí, restablecer". El sistema generará una nueva clave provisoria para que pueda ingresar.
 Ver tambien: [[usuarios]]
