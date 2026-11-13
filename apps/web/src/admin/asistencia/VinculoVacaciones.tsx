@@ -3,7 +3,6 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
 import {
-  AVISO_CONTRATO_TEMPORAL,
   ETIQUETA_VINCULO,
   MAX_CONTRATO_BYTES,
   TipoMovimiento,
@@ -137,7 +136,6 @@ export function PanelVinculo({ partyId, deshabilitado, hook }: { partyId: number
           </label>
         )}
       </div>
-      {tipo === 'CONTRATO_TEMPORAL' && <div role="note" className="as-aviso as-aviso--alerta">{AVISO_CONTRATO_TEMPORAL}.</div>}
       <label style={{ fontSize: 12, fontWeight: 700 }}>
         Notas (opcional)
         <textarea value={notas} maxLength={500} rows={2} disabled={bloqueado} onChange={(e) => setNotas(e.target.value)} style={{ ...ENTRADA, padding: 8, minHeight: 60 }} />

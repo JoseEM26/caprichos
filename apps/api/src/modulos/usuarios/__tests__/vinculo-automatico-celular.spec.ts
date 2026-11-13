@@ -34,6 +34,12 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
       findFirst: jest.fn(async ({ where }: any) =>
         cuentas.find((c) => (where.party_id === undefined || c.party_id === where.party_id) && (where.activo === undefined || c.activo === where.activo) && (where.usuario_party_id === undefined || c.usuario_party_id === where.usuario_party_id)) ?? null,
       ),
+      create: jest.fn(async ({ data }: any) => {
+        if (cuentas.some((c) => c.party_id === data.party_id)) throw { code: 'P2002' };
+        const n = { id: 50n, ...data };
+        cuentas.push(n);
+        return n;
+      }),
       updateMany: jest.fn(async ({ where, data }: any) => {
         const c = cuentas.find((x) => x.id === where.id && x.usuario_party_id === null && x.activo);
         if (c) c.usuario_party_id = data.usuario_party_id;
@@ -60,9 +66,10 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
         create: jest.fn().mockResolvedValue({ nombres: 'Ana', apellidos: 'Prueba' }),
         update: jest.fn().mockResolvedValue({ nombres: 'Ana', apellidos: 'Prueba' }),
       },
-      party: { create: jest.fn().mockResolvedValue({ id: 10n }) },
+      party: { create: jest.fn().mockResolvedValue({ id: 10n }), findUnique: jest.fn(async () => ({ tipo: 'PERSONA' })) },
       partyIdentifier: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1n }) },
-      partyRole: { create: jest.fn() },
+      partyRole: { create: jest.fn().mockResolvedValue({ id: 70n }), findFirst: jest.fn().mockResolvedValue(null) },
+      customerDetail: { create: jest.fn() },
       userAccountRol: { findMany: jest.fn().mockResolvedValue([]) },
     };
     tx = base;
@@ -127,6 +134,62 @@ describe('Vinculación automática del celular del usuario con su cuenta de clie
     cuentas[0].activo = false;
     const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
     expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'PERSONA' });
+  });
+
+  // Invitado: party con el celular pero sin usuario ni cuenta de cliente
+  const invitado = () => {
+    cuentas = [];
+    contactos = [{ party_id: 80n }];
+  };
+
+  it('previa: celular de un invitado -> CREARA_CUENTA con nombre y celular enmascarado, sin escribir', async () => {
+    invitado();
+    const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
+    expect(r).toEqual({ estado: 'CREARA_CUENTA', cuenta: { nombre: 'Ana Prueba', celularEnmascarado: '···123' } });
+    expect(cuentas).toHaveLength(0);
+  });
+
+  it('previa de alta (sin id): el invitado se reutiliza -> LIBRE', async () => {
+    invitado();
+    await expect(cuentaSvc.previaCelular(null, CEL, undefined, admin)).resolves.toEqual({ estado: 'LIBRE' });
+  });
+
+  it('previa: invitado y el usuario ya tiene otra cuenta vinculada -> USUARIO_YA_VINCULADO', async () => {
+    invitado();
+    cuentas = [{ id: 3n, party_id: 31n, telefono: '900000999', usuario_party_id: 20n, activo: true }];
+    const r: any = await cuentaSvc.previaCelular(7n, CEL, undefined, admin);
+    expect(r).toMatchObject({ estado: 'OTRA_PERSONA', motivo: 'USUARIO_YA_VINCULADO' });
+  });
+
+  it('editar: invitado sin confirmar -> 409 CONFIRMAR_CREAR_CUENTA y no crea nada', async () => {
+    invitado();
+    await expect(service.editar(7n, { celular: CEL } as any, admin, '1.1.1.1')).rejects.toMatchObject({ response: { codigo: 'CONFIRMAR_CREAR_CUENTA' } });
+    expect(cuentas).toHaveLength(0);
+  });
+
+  it('editar: invitado confirmado -> crea la cuenta en el party invitado, vinculada al usuario, sin contacto nuevo y auditada', async () => {
+    invitado();
+    await service.editar(7n, { celular: CEL, confirmaMismaPersona: true } as any, admin, '1.1.1.1');
+    expect(cuentas).toEqual([expect.objectContaining({ party_id: 80n, hash: null, telefono: CEL, activo: true, usuario_party_id: 20n })]);
+    expect(tx.contactMechanism.create).not.toHaveBeenCalled();
+    expect(tx.partyRole.create).toHaveBeenCalled();
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'USUARIO_CREAR_CUENTA_CLIENTE', despues: expect.objectContaining({ cuentaPartyId: '80', usuarioPartyId: '20' }) }), tx);
+  });
+
+  it('sección Cuenta de cliente: buscar y vincular con un invitado crean la cuenta (en vez de «no hay cuenta»)', async () => {
+    invitado();
+    prismaMock.userAccount.findUnique.mockImplementation(async () => ({ id: 7n, party_id: 20n, activo: true }));
+    await expect(cuentaSvc.buscar(7n, CEL, admin)).resolves.toEqual({ nombre: 'Ana Prueba', celular: '···123', creara: true });
+    expect(cuentas).toHaveLength(0);
+    const r: any = await cuentaSvc.vincular(7n, CEL, admin, '1.1.1.1');
+    expect(r).toMatchObject({ ok: true, creada: true });
+    expect(cuentas[0]).toMatchObject({ party_id: 80n, usuario_party_id: 20n, hash: null });
+  });
+
+  it('editar: dos peticiones a la vez (la cuenta del invitado ya existe) -> 409, nunca 500', async () => {
+    invitado();
+    tx.customerAccount.create.mockRejectedValueOnce({ code: 'P2002' });
+    await expect(service.editar(7n, { celular: CEL, confirmaMismaPersona: true } as any, admin)).rejects.toMatchObject({ response: { codigo: 'CELULAR_DUPLICADO' } });
   });
 
   it('editar: vincula la cuenta (updateMany condicionado), audita con origen AUTO_CELULAR y NO crea un contacto duplicado', async () => {

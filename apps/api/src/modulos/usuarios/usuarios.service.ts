@@ -54,7 +54,7 @@ import {
   normalizarCelularPeru,
 } from './alertas-whatsapp.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
-import { resolverCelular, excepcionCelular, CONFIRMAR_MISMA_PERSONA } from './usuarios-celular-vinculo';
+import { resolverCelular, excepcionCelular, CONFIRMAR_MISMA_PERSONA, CONFIRMAR_CREAR_CUENTA, crearCuentaDeInvitado } from './usuarios-celular-vinculo';
 import {
   CELULAR_OTRA_PERSONA,
   asegurarContactoCelular,
@@ -479,7 +479,7 @@ export class UsuariosService {
         });
 
         if (celular9) {
-          cuentaVinculada = await this.aplicarCelular(tx, userAccount.id, party.id, celular9, person, usuarioActual, dto.confirmaMismaPersona, ip);
+          cuentaVinculada = await this.aplicarCelular(tx, userAccount.id, party.id, celular9, person, usuarioActual, dto.confirmaMismaPersona, ip, true);
         }
 
         if (extras.length) {
@@ -916,6 +916,7 @@ export class UsuariosService {
     actor: UsuarioAutenticado | undefined,
     confirma: boolean | undefined,
     ip: string | undefined,
+    desdeAlta = false,
   ): Promise<{ nombre: string; celular: string } | null> {
     const r = await resolverCelular(tx, partyId, celular9, persona);
     if (r.estado === 'OTRA_PERSONA') throw excepcionCelular(r.motivo);
@@ -926,6 +927,13 @@ export class UsuariosService {
     }
     // Solo un ADMIN autenticado dispara la vinculación; la importación de consola no pasa por aquí (no hay otro party)
     if (actor?.rol !== 'ADMIN') throw excepcionCelular('PERSONA');
+    if (r.estado === 'CREARA_CUENTA') {
+      // En un alta el invitado ya se reutilizó como party; que aparezca otro aquí es una carrera: se rechaza como antes
+      if (desdeAlta) throw excepcionCelular('PERSONA');
+      if (!confirma) throw new ConflictException(CONFIRMAR_CREAR_CUENTA);
+      await crearCuentaDeInvitado(tx, this.auditoria, { invitadoPartyId: r.partyGuestId, celular9, usuarioId, usuarioPartyId: partyId, actor, ip, origen: 'AUTO_CELULAR' });
+      return { nombre: r.nombre, celular: r.celularEnmascarado };
+    }
     if (!r.mismoNombre && !confirma) throw new ConflictException(CONFIRMAR_MISMA_PERSONA);
     const { count } = await tx.customerAccount.updateMany({ where: { id: r.cuentaId, usuario_party_id: null, activo: true }, data: { usuario_party_id: partyId } });
     if (count === 0) throw excepcionCelular('CUENTA_VINCULADA');

@@ -19,7 +19,7 @@ describe('Usuarios: una persona = un party', () => {
   beforeEach(async () => {
     auditoria = { registrar: jest.fn() };
     tx = {
-      party: { create: jest.fn().mockResolvedValue({ id: 10n }) },
+      party: { create: jest.fn().mockResolvedValue({ id: 10n }), findUnique: jest.fn().mockResolvedValue({ tipo: 'PERSONA' }) },
       person: {
         create: jest.fn().mockResolvedValue({ nombres: 'Ana', apellidos: 'Paz' }),
         findUnique: jest.fn().mockResolvedValue(null),

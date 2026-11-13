@@ -4,8 +4,6 @@ export type TipoVinculo = 'PLANILLA' | 'CONTRATO_TEMPORAL';
 export type TipoMovimiento = 'TOMADAS' | 'PAGADAS' | 'AJUSTE';
 
 export const ETIQUETA_VINCULO: Record<TipoVinculo, string> = { PLANILLA: 'En planilla', CONTRATO_TEMPORAL: 'Contrato temporal' };
-export const AVISO_CONTRATO_TEMPORAL =
-  'Un contrato sin subordinación no es compatible con horario fijo y asistencia obligatoria; valídalo con tu contador o abogado';
 export const MAX_CONTRATO_BYTES = 5 * 1024 * 1024;
 
 export interface Vinculo {

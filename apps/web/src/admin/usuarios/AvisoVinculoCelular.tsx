@@ -5,6 +5,7 @@ import { Boton } from '../../comun/Boton';
 export type PreviaCelular =
   | { estado: 'LIBRE'; yaVinculada?: boolean }
   | { estado: 'VINCULARA_CUENTA'; cuenta: { nombre: string; celularEnmascarado: string }; mismoNombre: boolean }
+  | { estado: 'CREARA_CUENTA'; cuenta: { nombre: string; celularEnmascarado: string } }
   | { estado: 'OTRA_PERSONA'; motivo: string; mensaje: string };
 
 /**
@@ -34,7 +35,7 @@ export function usePreviaCelular(url: string, celular9: string | null, persona?:
   }, [url, celular9, nombres, apellidos]);
 
   /** Hay que confirmar «es la misma persona» y aún no se hizo (el servidor también lo exige). */
-  const falta = previa?.estado === 'VINCULARA_CUENTA' && !previa.mismoNombre && !confirmado;
+  const falta = ((previa?.estado === 'VINCULARA_CUENTA' && !previa.mismoNombre) || previa?.estado === 'CREARA_CUENTA') && !confirmado;
   return { previa, confirmado, confirmar: () => setConfirmado(true), falta };
 }
 
@@ -77,6 +78,28 @@ export function AvisoVinculoCelular({ previa, confirmado, alConfirmar, alRechaza
             </span>
           )}
         </>
+      )}
+      {previa?.estado === 'CREARA_CUENTA' && (
+        <div role="group" aria-label="Confirmar crear su cuenta de cliente" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 13, color: 'var(--cp-navy)', lineHeight: '18px' }}>
+            Ese celular ya está en el sistema (de pedidos anteriores). Se creará su cuenta de cliente y quedará vinculada a este trabajador para su descuento.
+            ¿Continuar?
+          </span>
+          {!confirmado ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Boton type="button" onClick={alConfirmar}>
+                Sí
+              </Boton>
+              <Boton type="button" variante="secundario" onClick={alRechazar}>
+                No
+              </Boton>
+            </div>
+          ) : (
+            <span role="status" style={{ fontSize: 13, color: 'var(--cp-green)', fontWeight: 700 }}>
+              Confirmado: se creará su cuenta al guardar.
+            </span>
+          )}
+        </div>
       )}
       {previa?.estado === 'OTRA_PERSONA' && (
         <div role="alert" style={{ fontSize: 13, color: 'var(--cp-rust)', fontWeight: 600 }}>

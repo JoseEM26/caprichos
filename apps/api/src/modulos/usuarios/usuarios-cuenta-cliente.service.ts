@@ -2,7 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { resolverCelular } from './usuarios-celular-vinculo';
+import { resolverCelular, excepcionCelular, crearCuentaDeInvitado } from './usuarios-celular-vinculo';
 
 /**
  * Vincula la cuenta de cliente de un trabajador (la que usa en la carta) con su usuario del panel. Es un vínculo
@@ -55,6 +55,10 @@ export class UsuariosCuentaClienteService {
       select: { id: true, party_id: true, telefono: true, usuario_party_id: true },
     });
     if (!cuenta) {
+      // Sin cuenta activa: si el celular es de un invitado (pedidos o WhatsApp sin cuenta), se le crea la cuenta al vincular
+      const r = await resolverCelular(this.prisma, u.party_id, celular);
+      if (r.estado === 'CREARA_CUENTA') return { u, cuenta: null, crea: r };
+      if (r.estado === 'OTRA_PERSONA') throw excepcionCelular(r.motivo);
       throw new NotFoundException({ codigo: 'CUENTA_CLIENTE_NO_ENCONTRADA', mensaje: 'No hay una cuenta de cliente activa con ese celular' });
     }
     if (cuenta.party_id === u.party_id || (await this.prisma.userAccount.findFirst({ where: { party_id: cuenta.party_id }, select: { id: true } }))) {
@@ -67,14 +71,15 @@ export class UsuariosCuentaClienteService {
     if (propia) {
       throw new ConflictException({ codigo: 'USUARIO_YA_VINCULADO', mensaje: 'Este usuario ya tiene una cuenta de cliente vinculada. Desvincúlala primero' });
     }
-    return { u, cuenta };
+    return { u, cuenta, crea: null };
   }
 
   /** Vista previa para confirmar: solo nombre y celular enmascarado de la cuenta encontrada. */
   async buscar(id: bigint | string | number, celular: string, actor?: UsuarioAutenticado) {
     this.exigirAdmin(actor);
-    const { cuenta } = await this.validar(id, celular);
-    return this.resumen(cuenta);
+    const { cuenta, crea } = await this.validar(id, celular);
+    if (crea) return { nombre: crea.nombre, celular: crea.celularEnmascarado, creara: true as const };
+    return this.resumen(cuenta!);
   }
 
   /**
@@ -95,20 +100,27 @@ export class UsuariosCuentaClienteService {
     if (r.estado === 'VINCULARA_CUENTA') {
       return { estado: r.estado, cuenta: { nombre: r.nombre, celularEnmascarado: r.celularEnmascarado }, mismoNombre: r.mismoNombre };
     }
+    if (r.estado === 'CREARA_CUENTA') return { estado: r.estado, cuenta: { nombre: r.nombre, celularEnmascarado: r.celularEnmascarado } };
     if (r.estado === 'OTRA_PERSONA') return { estado: r.estado, motivo: r.motivo, mensaje: r.mensaje };
     return { estado: 'LIBRE' as const, ...(r.estado === 'YA_VINCULADA' ? { yaVinculada: true } : {}) };
   }
 
   async vincular(id: bigint | string | number, celular: string, actor?: UsuarioAutenticado, ip?: string) {
     this.exigirAdmin(actor);
-    const { u, cuenta } = await this.validar(id, celular);
+    const { u, cuenta, crea } = await this.validar(id, celular);
+    if (crea) {
+      await this.prisma.$transaction((tx) =>
+        crearCuentaDeInvitado(tx, this.auditoria, { invitadoPartyId: crea.partyGuestId, celular9: celular, usuarioId: u.id, usuarioPartyId: u.party_id, actor, ip, origen: 'SECCION_CUENTA' }),
+      );
+      return { ok: true, vinculada: { nombre: crea.nombre, celular: crea.celularEnmascarado }, creada: true };
+    }
     try {
       await this.prisma.$transaction(async (tx) => {
         // Condicionado: si otra petición la vinculó entre tanto, no se pisa
-        const { count } = await tx.customerAccount.updateMany({ where: { id: cuenta.id, usuario_party_id: null, activo: true }, data: { usuario_party_id: u.party_id } });
+        const { count } = await tx.customerAccount.updateMany({ where: { id: cuenta!.id, usuario_party_id: null, activo: true }, data: { usuario_party_id: u.party_id } });
         if (count === 0) throw new ConflictException({ codigo: 'CUENTA_YA_VINCULADA', mensaje: 'Esa cuenta de cliente ya está vinculada a un usuario' });
         await this.auditoria.registrar(
-          { categoria: 'CAMBIO', modulo: 'usuarios', accion: 'USUARIO_VINCULAR_CUENTA_CLIENTE', resultado: 'OK', entidad: 'customer_account', entidadId: cuenta.id, despues: { usuarioId: String(u.id), usuarioPartyId: String(u.party_id), cuentaPartyId: String(cuenta.party_id) }, partyId: actor?.partyId, ip },
+          { categoria: 'CAMBIO', modulo: 'usuarios', accion: 'USUARIO_VINCULAR_CUENTA_CLIENTE', resultado: 'OK', entidad: 'customer_account', entidadId: cuenta!.id, despues: { usuarioId: String(u.id), usuarioPartyId: String(u.party_id), cuentaPartyId: String(cuenta!.party_id) }, partyId: actor?.partyId, ip },
           tx,
         );
       });
@@ -116,7 +128,7 @@ export class UsuariosCuentaClienteService {
       if (e?.code === 'P2002') throw new ConflictException({ codigo: 'USUARIO_YA_VINCULADO', mensaje: 'Este usuario ya tiene una cuenta de cliente vinculada. Desvincúlala primero' });
       throw e;
     }
-    return { ok: true, vinculada: await this.resumen(cuenta) };
+    return { ok: true, vinculada: await this.resumen(cuenta!) };
   }
 
   async desvincular(id: bigint | string | number, actor?: UsuarioAutenticado, ip?: string) {

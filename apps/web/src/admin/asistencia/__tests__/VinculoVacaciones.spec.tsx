@@ -42,12 +42,11 @@ describe('Vínculo y vacaciones', () => {
     expect(await screen.findByText('Movimiento registrado.')).toBeInTheDocument();
   });
 
-  it('al elegir contrato temporal avisa (sin bloquear) y oculta el régimen de vacaciones', async () => {
+  it('al elegir contrato temporal oculta el régimen de vacaciones', async () => {
     obtener.mockResolvedValue(planilla);
     render(<PestanaVinculoVacaciones partyId={7} />);
     await screen.findByText('13 día(s)');
     fireEvent.change(screen.getByLabelText('Tipo de vínculo'), { target: { value: 'CONTRATO_TEMPORAL' } });
-    expect(screen.getByRole('note')).toHaveTextContent('Un contrato sin subordinación no es compatible con horario fijo y asistencia obligatoria; valídalo con tu contador o abogado');
     expect(screen.queryByLabelText('Vacaciones al año')).toBeNull();
     expect(screen.getByRole('button', { name: 'Guardar vínculo' })).toBeEnabled();
   });

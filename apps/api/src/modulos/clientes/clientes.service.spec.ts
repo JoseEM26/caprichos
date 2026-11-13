@@ -923,6 +923,59 @@ describe('ClientesService', () => {
       ).rejects.toMatchObject({ response: { codigo: 'CLIENTE_YA_EXISTE' } });
     });
 
+    describe('celular de un invitado (party sin usuario ni cuenta)', () => {
+      const dto = { nombre: 'Pedro Local', telefono: '912345678', cumpleanos: '1990-10-15', correo: 'pedro@prueba.test', aceptaDatos: true };
+      beforeEach(() => {
+        prismaMock.userAccount = { findFirst: jest.fn().mockResolvedValue(null) };
+        prismaMock.contactMechanism.findFirst.mockResolvedValue({ party_id: 80n, party: { cuentaCliente: null } });
+        prismaMock.party.findUnique.mockResolvedValue({ tipo: 'PERSONA' });
+        prismaMock.person.findUnique = jest.fn().mockResolvedValue({ nombres: 'Cliente', correo: null, cumple_mes: null });
+        prismaMock.partyRole.findFirst.mockResolvedValue({ id: 3n, customer_detail: { party_role_id: 3n } });
+      });
+
+      it('reutiliza ese party: crea la cuenta (hash null) sobre él, completa lo vacío, no crea otro party y audita sin datos personales', async () => {
+        const res = await service.crearEnMostrador(dto);
+        expect(res.id).toBe('80');
+        expect(prismaMock.party.create).not.toHaveBeenCalled();
+        expect(prismaMock.customerAccount.create).toHaveBeenCalledWith({ data: { party_id: 80n, hash: null, telefono: '912345678', activo: true } });
+        expect(prismaMock.person.update).toHaveBeenCalledWith({ where: { party_id: 80n }, data: expect.objectContaining({ nombres: 'Pedro Local', correo: 'pedro@prueba.test', cumple_mes: 10 }) });
+        expect(prismaMock.contactMechanism.create).not.toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'TELEFONO' }) }); // el celular ya estaba
+        const aud = auditoriaMock.registrar.mock.calls.at(-1)[0];
+        expect(aud.despues).toMatchObject({ reutilizaParty: true });
+        expect(JSON.stringify(aud.despues)).not.toContain('912345678');
+      });
+
+      it('no pisa el nombre, correo ni cumpleaños que ya tenía', async () => {
+        prismaMock.person.findUnique.mockResolvedValue({ nombres: 'Rosa', correo: 'r@prueba.test', cumple_mes: 3 });
+        await service.crearEnMostrador(dto);
+        expect(prismaMock.person.update).toHaveBeenCalledWith({ where: { party_id: 80n }, data: {} });
+      });
+
+      it('si el party es de un usuario del equipo: 409 con el mensaje de vincular desde Usuarios', async () => {
+        prismaMock.userAccount.findFirst.mockResolvedValue({ id: 1n });
+        await expect(service.crearEnMostrador(dto)).rejects.toMatchObject({ response: { codigo: 'CELULAR_DE_USUARIO', mensaje: 'Ese celular es de un usuario del equipo: vincúlalo desde Usuarios' } });
+        expect(prismaMock.customerAccount.create).not.toHaveBeenCalled();
+      });
+
+      it('si ya tiene cuenta activa: 409 «Ya existe un cliente con ese celular»', async () => {
+        prismaMock.customerAccount.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ activo: true });
+        await expect(service.crearEnMostrador(dto)).rejects.toMatchObject({ response: { codigo: 'CLIENTE_YA_EXISTE', mensaje: 'Ya existe un cliente con ese celular' } });
+      });
+
+      it('cuenta desactivada: no se reactiva sola (409 de siempre)', async () => {
+        prismaMock.customerAccount.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ activo: false });
+        await expect(service.crearEnMostrador(dto)).rejects.toMatchObject({ response: { codigo: 'CELULAR_DUPLICADO' } });
+        expect(prismaMock.customerAccount.create).not.toHaveBeenCalled();
+      });
+
+      it('una cuenta creada así y vinculada a un trabajador activo: la carta lo reconoce como equipo', async () => {
+        prismaMock.customerAccount.findFirst = jest.fn().mockResolvedValue({ telefono: '912345678', usuario_party_id: 7n });
+        prismaMock.userAccount.findFirst.mockImplementation(({ where }: any) => Promise.resolve(where.party_id === 7n ? { party_id: 7n } : null));
+        prismaMock.parametro.findUnique = jest.fn().mockResolvedValue(null);
+        await expect(service.equipoDeCuenta(80n)).resolves.toEqual({ esEquipo: true, puedeCredito: true });
+      });
+    });
+
     it('una empresa lleva RUC y no exige celular', async () => {
       prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
       await service.crearEnMostrador({ nombre: 'Empresa SAC', ruc: '20601234567', aceptaDatos: true });

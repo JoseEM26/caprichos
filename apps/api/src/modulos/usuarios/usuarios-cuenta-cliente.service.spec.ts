@@ -10,6 +10,7 @@ function montar(o: { usuario?: any; cuenta?: any; cuentaEsUsuario?: boolean; pro
   const customerAccount = {
     // busca por celular (telefono) o por usuario vinculado (usuario_party_id)
     findFirst: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(where.telefono ? (o.cuenta ?? null) : (o.propia ?? null))),
+    findMany: jest.fn().mockResolvedValue([]),
     updateMany: jest.fn().mockResolvedValue({ count: o.updateCount ?? 1 }),
     update: jest.fn().mockResolvedValue({}),
   };
@@ -19,6 +20,7 @@ function montar(o: { usuario?: any; cuenta?: any; cuentaEsUsuario?: boolean; pro
       findFirst: jest.fn().mockResolvedValue(o.cuentaEsUsuario ? { id: 1n } : null),
     },
     person: { findUnique: jest.fn().mockResolvedValue({ nombres: 'Ana', apellidos: 'Prueba' }) },
+    contactMechanism: { findMany: jest.fn().mockResolvedValue([]) },
     customerAccount,
   };
   prisma.$transaction = jest.fn().mockImplementation((fn: any) => fn(prisma));
