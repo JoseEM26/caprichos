@@ -15,7 +15,7 @@ const abrir = (esAdmin: boolean) =>
 const analisis = {
   cajaId: 5, cerrada: true, totalDiferencia: 99.2,
   medios: [{ medio: 'EFECTIVO', sistema: 621.9, visto: 643.5, diferencia: 21.6 }, { medio: 'YAPE', sistema: 1604.2, visto: 1637.8, diferencia: 33.6 }],
-  patrones: [{ codigo: 'ANULADOS_CON_PAGO', titulo: 'Pedidos anulados que tenían pago', explicacion: 'Posible causa de sobrante.', pedidos: [{ codigo: 'P-001', monto: 32, detalle: 'Yape · pedido anulado' }] }],
+  patrones: [{ codigo: 'CREDITO_PERSONAL', titulo: 'Pedidos con crédito del personal', explicacion: 'No afecta la caja.', informativo: true, montoRelacionado: 34.5, pedidos: [{ codigo: 'P-009', monto: 34.5, detalle: 'Crédito del personal' }] }, { codigo: 'ANULADOS_CON_PAGO', titulo: 'Pedidos anulados que tenían pago', explicacion: 'Posible causa de sobrante.', pedidos: [{ codigo: 'P-001', monto: 32, detalle: 'Yape · pedido anulado' }] }],
   sugerencias: [{ medio: 'YAPE', diferencia: 33.6, coincideCon: ['x'], texto: 'La diferencia de Yape coincide con P-001.' }],
   ayudaGeneral: [{ medio: 'EFECTIVO', sobrante: ['Vuelto que no se entregó'], faltante: ['Gasto sin registrar'] }],
 };
@@ -31,6 +31,9 @@ describe('¿Por qué no cuadra? (administrador)', () => {
     expect(screen.getByTestId('porque-medios')).toHaveTextContent('+S/ 99.20');
     expect(screen.getByTestId('patron-ANULADOS_CON_PAGO')).toHaveTextContent('P-001');
     expect(screen.getByTestId('patron-ANULADOS_CON_PAGO')).toHaveTextContent('Posible causa');
+    // El crédito del personal no es dinero: no se presenta como causa posible
+    expect(screen.getByTestId('patron-CREDITO_PERSONAL')).toHaveTextContent('No afecta la caja');
+    expect(screen.getByTestId('patron-CREDITO_PERSONAL')).not.toHaveTextContent('Posible causa');
     expect(screen.getByTestId('sugerencias')).toHaveTextContent('coincide con P-001');
     expect(screen.getByTestId('ayuda-general')).toHaveTextContent('Vuelto que no se entregó');
     expect(cierreApi.obtenerAnalisis).toHaveBeenCalledWith(5);

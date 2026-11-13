@@ -31,7 +31,7 @@ export interface DatosAnalisis {
 }
 
 export interface PedidoHallazgo { codigo: string; monto: number; detalle: string }
-export interface Patron { codigo: string; titulo: string; explicacion: string; montoRelacionado?: number; pedidos?: PedidoHallazgo[] }
+export interface Patron { codigo: string; titulo: string; explicacion: string; montoRelacionado?: number; pedidos?: PedidoHallazgo[]; /** true = no explica ninguna diferencia: se muestra solo para descartarlo */ informativo?: boolean }
 export interface Sugerencia { medio: string; diferencia: number; coincideCon: string[]; texto: string }
 
 const NOMBRE: Record<string, string> = { EFECTIVO: 'Efectivo', YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia', TARJETA: 'Tarjeta' };
@@ -177,7 +177,8 @@ export function analizarCaja(d: DatosAnalisis) {
     patrones.push({
       codigo: 'CREDITO_PERSONAL',
       titulo: 'Pedidos con crédito del personal',
-      explicacion: 'El crédito del personal no es dinero: no debe estar en el efectivo. Está aquí para que lo descartes como causa.',
+      explicacion: 'No afecta la caja. El crédito del personal no se cobra en el momento: lo paga el trabajador al cerrar la semana o el mes, por eso no entra ni al efectivo esperado ni al efectivo contado. Si el pedido llevaba delivery, solo el envío se cobra en caja. Está aquí únicamente para que lo descartes como causa.',
+      informativo: true,
       montoRelacionado: enPesos(d.credito.reduce((a, p) => a + aCentimos(p.monto), 0)),
       pedidos: d.credito.slice(0, TOPE_PEDIDOS).map((p) => ({ codigo: p.codigo, monto: p.monto, detalle: 'Crédito del personal' })),
     });

@@ -290,6 +290,8 @@ export interface PatronCierre {
   explicacion: string;
   montoRelacionado?: number;
   pedidos?: Array<{ codigo: string; monto: number; detalle: string }>;
+  /** true = no explica ninguna diferencia (p. ej. crédito del personal): se muestra para descartarlo */
+  informativo?: boolean;
 }
 export interface AnalisisCierre {
   cajaId: number;

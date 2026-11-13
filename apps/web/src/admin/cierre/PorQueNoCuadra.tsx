@@ -53,10 +53,10 @@ export function PorQueNoCuadra({ cajaId }: { cajaId: number }) {
         <section key={p.codigo} className="dc-card" data-testid={`patron-${p.codigo}`}>
           <h4>
             {p.titulo}{' '}
-            <Insignia variante="aviso">Posible causa</Insignia>
+            {p.informativo ? <Insignia variante="neutro">No afecta la caja</Insignia> : <Insignia variante="aviso">Posible causa</Insignia>}
           </h4>
           <p>{p.explicacion}</p>
-          {p.montoRelacionado !== undefined && <p className="dc-peq">Monto relacionado: {soles(p.montoRelacionado)}</p>}
+          {p.montoRelacionado !== undefined && <p className="dc-peq">{p.informativo ? 'Total a cobrar después' : 'Monto relacionado'}: {soles(p.montoRelacionado)}</p>}
           {p.pedidos && p.pedidos.length > 0 && (
             <ul className="dc-items">
               {p.pedidos.map((x, i) => (

@@ -79,6 +79,11 @@ describe('analizarCaja: detectores', () => {
       cobros: [{ pedidoCodigo: 'V-1', pedidoCreadoEn: new Date('2026-10-19T12:00:00Z'), en: new Date('2026-10-20T15:00:00Z'), anuladoEn: null, pagos: [{ medio: 'EFECTIVO', monto: 8, propina: 0 }] }],
     });
     expect(codigos(d)).toEqual(expect.arrayContaining(['DELIVERY', 'CREDITO_PERSONAL', 'CORTE_DE_HORA', 'VUELTO_REDONDEO', 'CONTEO_DISTINTO']));
+    // El crédito del personal no es dinero: se marca informativo y jamás entra a las sugerencias de montos que coinciden
+    const r = analizarCaja(d);
+    expect(r.patrones.find((p) => p.codigo === 'CREDITO_PERSONAL')?.informativo).toBe(true);
+    expect(r.patrones.filter((p) => p.codigo !== 'CREDITO_PERSONAL').every((p) => !p.informativo)).toBe(true);
+    expect(r.sugerencias.some((g) => g.coincideCon.some((c) => c.includes('C-1')))).toBe(false);
   });
   it('pedido anulado sin pago ni cobro no se acusa', () => {
     expect(codigos(base({ anuladosPagados: [{ codigo: 'A-1', pagoEstado: 'PENDIENTE', pagoMetodo: null, total: 10, cobros: [] }] }))).not.toContain('ANULADOS_CON_PAGO');
