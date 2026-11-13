@@ -5,6 +5,7 @@ import { ModalConPestanas } from '../comun/ModalConPestanas';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { EstadoSeguimiento, PasoSeguimiento, PedidoGuardado } from './seguimiento';
 import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
+import { PagarEnLinea } from './pagos/PagarEnLinea';
 import { EstadoVoucherPedido } from './EstadoVoucherPedido';
 import { avancePedido, etapaCliente, firmasPestanas, NOMBRE_MEDIO, NOMBRE_MODALIDAD, textoPagoMedio } from './seguimiento-textos';
 import type { EtapaCliente } from './seguimiento-textos';
@@ -118,7 +119,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'pago',
       etiqueta: 'Pago',
       insignia: marca('pago'),
-      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} />,
+      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id} />,
     },
   ];
   const cambiosTexto = [...cambiadas].map((id) => ({ estado: 'Estado', pedido: 'Mi pedido', pago: 'Pago' })[id]).join(', ');
@@ -360,8 +361,9 @@ function PanelPedido({
 }
 
 function PanelPago({
-  pedido, estado, total, onSubida,
+  pedido, estado, total, onSubida, pedidoId,
 }: {
+  pedidoId?: string;
   pedido: PedidoGuardado;
   estado: EstadoSeguimiento | null;
   total: number | undefined;
@@ -379,6 +381,9 @@ function PanelPago({
 
   return (
     <>
+      {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
+        <PagarEnLinea pedidoId={String(pedidoId)} alPagado={onSubida} />
+      )}
       {resumen && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">
           <div className="sg-fila" data-testid="resumen-pagado">
