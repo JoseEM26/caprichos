@@ -128,6 +128,18 @@ describe('ElectronicosTab', () => {
     await waitFor(() => expect(anular).toHaveBeenCalledWith('5', 'Cobro duplicado'));
   });
 
+  it('anular una boleta ya aceptada avisa que SUNAT la recibe en el resumen diario, no al instante', async () => {
+    conRol('ADMIN');
+    vi.spyOn(comprobantesApi, 'anularElectronico').mockResolvedValue({ id: '5', baja_estado: 'PENDIENTE_RESUMEN' });
+    render(<ElectronicosTab />);
+    await screen.findByText('Emitido SUNAT');
+    fireEvent.click(screen.getByRole('button', { name: 'Anular' }));
+    await screen.findByRole('dialog', { name: 'Anular comprobante' });
+    fireEvent.change(screen.getByRole('textbox', { name: /Motivo/ }), { target: { value: 'Cobro duplicado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, anular' }));
+    expect(await screen.findByText(/quedó anulada\. SUNAT la recibe en el resumen diario/)).toBeTruthy();
+  });
+
   it('Emitir real: solo en filas Simulado, pide confirmación explícita y llama a la API', async () => {
     conRol('ADMIN');
     const simulado: ComprobanteElectronico = { ...base, id: '11', numero_texto: 'B002-000011', simulado: true, emisor: 'SIMULADO', enlace_pdf: null };

@@ -324,8 +324,15 @@ export function ElectronicosTab() {
     }
     setOcupado(true);
     try {
-      await comprobantesApi.anularElectronico(anularDe.id, motivo.trim());
-      setAviso(`Se envió la baja de ${anularDe.numero_texto}`);
+      const r = await comprobantesApi.anularElectronico(anularDe.id, motivo.trim());
+      const n = anularDe.numero_texto;
+      setAviso(
+        r.baja_estado === 'PENDIENTE_RESUMEN'
+          ? `${n} quedó anulada. SUNAT la recibe en el resumen diario de boletas (esta noche a las ${config?.hora_resumen ?? '23:30'}, o ya mismo con «Emitir ahora»)`
+          : r.baja_estado === 'ACEPTADA'
+            ? `${n} quedó anulada`
+            : `Se envió la baja de ${n}: SUNAT la confirma en unos minutos`,
+      );
       setAnularDe(null);
       setMotivo('');
       await cargar(pagina);
