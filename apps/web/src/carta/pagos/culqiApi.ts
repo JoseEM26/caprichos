@@ -35,7 +35,7 @@ export interface ResultadoCargo {
   /** Código de Culqi (p. ej. insufficient_funds) cuando se rechaza. */
   codigo?: string;
   /** Datos para autenticar 3DS (el nombre exacto lo confirma el backend). */
-  datos3ds?: { montoCentimos?: number; email?: string };
+  datos3ds?: { montoCentimos?: number; moneda?: string; email?: string; publicKey?: string };
 }
 
 export interface PagoOnline {
@@ -66,7 +66,7 @@ export const culqiApi = {
   config: () => api.get<ConfigCulqi>('/carta/pagos/culqi/config'),
   intento: (pedidoId: string, seguimientoToken?: string) =>
     api.post<IntentoCulqi>('/carta/pagos/culqi/intento', { pedidoId, ...(seguimientoToken ? { seguimientoToken } : {}) }),
-  cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string; autenticacion3ds?: unknown }) =>
+  cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string; autenticacion3ds?: unknown; deviceId?: string }) =>
     api.post<ResultadoCargo>('/carta/pagos/culqi/cargo', cuerpo),
   listar: (f: FiltrosPagosOnline) => {
     const q = new URLSearchParams();

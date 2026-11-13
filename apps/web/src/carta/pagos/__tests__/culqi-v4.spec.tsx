@@ -34,16 +34,29 @@ describe('Culqi Checkout V4', () => {
 });
 
 describe('3DS', () => {
+  it('autenticar3ds entrega solo los campos de parameters3DS', async () => {
+    const lib = { generateDevice: vi.fn().mockResolvedValue('dev_9'), initAuthentication: vi.fn(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { parameters3DS: { cavv: 'c', eci: '05', xid: 'x', protocolVersion: '2', directoryServerTransactionId: 'd', otro: 'no' } } }))) };
+    (window as any).Culqi3DS = lib;
+    const s = document.createElement('script'); s.src = tres.URL_CULQI_3DS; document.head.appendChild(s);
+    const p = tres.autenticar3ds('pk', 'tkn', { montoCentimos: 100 });
+    s.dispatchEvent(new Event('load'));
+    for (const el of Array.from(document.head.querySelectorAll('script'))) el.dispatchEvent(new Event('load'));
+    expect(await p).toEqual({ cavv: 'c', eci: '05', xid: 'x', protocolVersion: '2', directoryServerTransactionId: 'd' });
+    expect(await tres.obtenerDeviceId()).toBe('dev_9');
+    delete (window as any).Culqi3DS;
+  });
   it('autentica y reenvía el cargo con autenticacion3ds', async () => {
     vi.spyOn(tres, 'autenticar3ds').mockResolvedValue({ eci: '05' });
+    vi.spyOn(tres, 'obtenerDeviceId').mockResolvedValue('dev_1');
     const cargo = vi.spyOn(culqiApi, 'cargo')
-      .mockResolvedValueOnce({ estado: 'REQUIERE_3DS', mensaje: '', pedidoCodigo: 'A1' })
+      .mockResolvedValueOnce({ estado: 'REQUIERE_3DS', mensaje: '', pedidoCodigo: 'A1', datos3ds: { montoCentimos: 2500, moneda: 'PEN', email: 'a@b.pe', publicKey: 'pk_test_x' } })
       .mockResolvedValueOnce({ estado: 'APROBADO', mensaje: '', pedidoCodigo: 'A1' });
     render(<PagarEnLinea pedidoId="p1" />);
     fireEvent.click(await screen.findByText('Probar tarjeta aprobada'));
     await screen.findByTestId('pago-aprobado');
     expect(cargo).toHaveBeenCalledTimes(2);
-    expect(cargo.mock.calls[1][0]).toMatchObject({ autenticacion3ds: { eci: '05' } });
+    expect(cargo.mock.calls[1][0]).toMatchObject({ autenticacion3ds: { eci: '05' }, deviceId: 'dev_1' });
   });
   it('si la verificación falla muestra el error y deja reintentar', async () => {
     vi.spyOn(tres, 'autenticar3ds').mockRejectedValue(new Error('Tu banco no pudo verificar la tarjeta.'));

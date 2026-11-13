@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
-import { autenticar3ds } from './culqi3ds';
+import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
 import { abrirCulqi, culqiApi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
@@ -38,15 +38,21 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     const it = ya ?? intento;
     if (!it) return;
     try {
-      const base = { intentoId: it.intentoId, token, medio, ...(email ? { email } : {}) };
+      // huella del dispositivo para el banco (solo con Culqi real; sin ella el cargo sigue)
+      let deviceId: string | undefined;
+      if (it.modo !== 'SIMULADO') deviceId = await obtenerDeviceId().catch(() => undefined);
+      const base = { intentoId: it.intentoId, token, medio, ...(email ? { email } : {}), ...(deviceId ? { deviceId } : {}) };
       let r = await culqiApi.cargo(base);
       if (r.estado === ESTADO_3DS) {
         // el banco pide verificar la tarjeta (3DS); el cargo se reenvía con el resultado
-        const auth = await autenticar3ds(it.publicKey ?? config?.publicKey ?? '', token, {
-          montoCentimos: r.datos3ds?.montoCentimos ?? it.montoCentimos,
-          email: r.datos3ds?.email ?? email,
+        const d = r.datos3ds;
+        deviceId ??= await obtenerDeviceId().catch(() => undefined);
+        const auth = await autenticar3ds(d?.publicKey ?? it.publicKey ?? config?.publicKey ?? '', token, {
+          montoCentimos: d?.montoCentimos ?? it.montoCentimos,
+          moneda: d?.moneda ?? it.moneda,
+          email: d?.email ?? email,
         });
-        r = await culqiApi.cargo({ ...base, autenticacion3ds: auth });
+        r = await culqiApi.cargo({ ...base, ...(deviceId ? { deviceId } : {}), autenticacion3ds: auth });
       }
       setMensaje(r.estado === 'RECHAZADO' ? mensajeRechazo(r.codigo, r.mensaje) : r.mensaje);
       if (r.estado === 'APROBADO') {
