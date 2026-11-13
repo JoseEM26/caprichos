@@ -9,6 +9,9 @@ import { fechaIsoLima } from './sunat/sunat.util';
 import { horaMinutoLima } from './comprobantes-sunat.service';
 import { minutosDelDia } from './facturacion/facturacion.config';
 
+/** Aborta la transacción de emitirFila cuando otro reclamó la fila: revierte el correlativo tomado. */
+class ReclamoPerdido extends Error {}
+
 export interface CambioComprobanteEntrada {
   tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA';
   doc?: string | null;
@@ -120,14 +123,14 @@ export class ComprobantesNocturnoService {
    * un cambio aplicado se borra. Lo que falla queda para la siguiente pasada o en «reintentar» como cualquier comprobante.
    * forzar = botón «Emitir ahora»: no espera la hora configurada.
    */
-  async emitirLote(ahora = new Date(), forzar = false): Promise<{ cambios: number; emitidos: number; descartados: number }> {
+  async emitirLote(ahora = new Date(), forzar = false): Promise<{ cambios: number; emitidos: number; descartados: number; fallidos: number }> {
     const cfg = await this.comprobantes.leerConfigFacturacion();
     const { h, m } = horaMinutoLima(ahora);
     const hoy = fechaIsoLima(ahora);
     const llegoLaHora = forzar || h * 60 + m >= minutosDelDia(cfg.horaEnvio);
     // Toca desde la hora configurada; lo de días anteriores (si el servidor estuvo caído) sale en cuanto se pueda
     const debido = (f: Date) => llegoLaHora || fechaIsoLima(f) < hoy;
-    const r = { cambios: 0, emitidos: 0, descartados: 0 };
+    const r = { cambios: 0, emitidos: 0, descartados: 0, fallidos: 0 };
 
     const cambios = await this.prisma.comprobanteCambioPendiente.findMany({ orderBy: { solicitado_en: 'asc' }, take: 200 });
     for (const c of cambios) {
@@ -136,6 +139,7 @@ export class ComprobantesNocturnoService {
         if (await this.aplicarCambio(c)) r.cambios++;
         else r.descartados++;
       } catch (e: any) {
+        r.fallidos++;
         this.logger.error(`Cambio de comprobante del pedido ${c.pedido_id}: ${e?.message ?? e}`);
       }
     }
@@ -151,6 +155,7 @@ export class ComprobantesNocturnoService {
       try {
         if (await this.emitirFila(f.id)) r.emitidos++;
       } catch (e: any) {
+        r.fallidos++;
         this.logger.error(`Emisión nocturna del comprobante ${f.id}: ${e?.message ?? e}`);
       }
     }
@@ -215,19 +220,22 @@ export class ComprobantesNocturnoService {
     const cfg = await this.comprobantes.leerConfigFacturacion();
     const proveedor = this.comprobantes.proveedorEfectivo(cfg.proveedor);
     const serie = fila.tipo === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
-    const asignado = await this.prisma.$transaction(async (tx: any) => {
-      const reclamo = await tx.comprobante.updateMany({
-        where: { id, facturacion_estado: 'POR_EMITIR_NOCHE', anulado_en: null },
-        data: { facturacion_estado: 'PENDIENTE_ENVIO' },
+    // Reclamo y número en UN solo UPDATE: ck_comprobante_numero_asignado exige serie/número en cuanto sale de POR_EMITIR_NOCHE.
+    // Si otro ya la reclamó (o se anuló), se aborta la transacción y el correlativo consumido se revierte (sin huecos).
+    const asignado = await this.prisma
+      .$transaction(async (tx: any) => {
+        const numero = await siguienteCorrelativo(tx, serie);
+        const reclamo = await tx.comprobante.updateMany({
+          where: { id, facturacion_estado: 'POR_EMITIR_NOCHE', anulado_en: null },
+          data: { facturacion_estado: 'PENDIENTE_ENVIO', serie, numero, numero_texto: formatearCorrelativo(serie, numero), emisor: proveedor, simulado: proveedor === 'SIMULADO' },
+        });
+        if (reclamo.count === 0) throw new ReclamoPerdido();
+        return true;
+      })
+      .catch((e: unknown) => {
+        if (e instanceof ReclamoPerdido) return false;
+        throw e;
       });
-      if (reclamo.count === 0) return false;
-      const numero = await siguienteCorrelativo(tx, serie);
-      await tx.comprobante.update({
-        where: { id },
-        data: { serie, numero, numero_texto: formatearCorrelativo(serie, numero), emisor: proveedor, simulado: proveedor === 'SIMULADO' },
-      });
-      return true;
-    });
     if (!asignado) return false;
     await this.auditar('EMITIR_NOCTURNO', fila.pedido_id, null, { estado: 'POR_EMITIR_NOCHE' }, { tipo: fila.tipo, serie });
     // El número ya es suyo: si el envío falla queda PENDIENTE_ENVIO y el worker de reintentos lo reenvía

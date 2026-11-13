@@ -194,4 +194,19 @@ describe('envío nocturno de boletas y facturas', () => {
     expect(representacionDe(m.db.comprobante[0]).titulo).toBe('Boleta: se emite hoy por la noche');
     expect(representacionDe({ tipo: 'FACTURA', facturacion_estado: 'POR_EMITIR_NOCHE' }).titulo).toContain('te llega por WhatsApp');
   });
+
+  it('si una fila no se puede emitir, cuenta fallidos y no la deja a medias', async () => {
+    const m = montar([boleta(1n)]);
+    await cobrar(m, 1n);
+    jest.spyOn(m.comprobantes, 'leerConfigFacturacion').mockResolvedValueOnce(await m.comprobantes.leerConfigFacturacion()).mockRejectedValue(new Error('boom'));
+    const r = await m.nocturno.emitirLote(NOCHE, true);
+    expect(r).toMatchObject({ emitidos: 0, fallidos: 1 });
+    expect(m.db.comprobante[0]).toMatchObject({ facturacion_estado: 'POR_EMITIR_NOCHE', serie: null });
+  });
+
+  it('el mock aplica el CHECK: pasar a PENDIENTE_ENVIO sin número falla', async () => {
+    const m = montar([boleta(1n)]);
+    await cobrar(m, 1n);
+    await expect(m.prisma.comprobante.updateMany({ where: { id: 1n }, data: { facturacion_estado: 'PENDIENTE_ENVIO' } })).rejects.toThrow(/ck_comprobante_numero_asignado/);
+  });
 });

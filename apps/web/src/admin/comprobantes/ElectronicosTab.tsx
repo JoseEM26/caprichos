@@ -242,9 +242,13 @@ export function ElectronicosTab() {
       const partes = [`${r.emitidos} comprobante(s) emitido(s)`];
       if (r.cambios > 0) partes.push(`${r.cambios} cambio(s) aplicado(s)`);
       if (r.boletas > 0) partes.push(`${r.boletas} boleta(s) en el resumen`);
-      setAviso(r.emitidos + r.cambios + r.boletas > 0 ? `Listo: ${partes.join(', ')}` : 'No había nada pendiente de emitir');
+      const fallidos = r.fallidos ?? 0;
+      const algo = r.emitidos + r.cambios + r.boletas > 0;
+      if (fallidos === 0) setAviso(algo ? `Listo: ${partes.join(', ')}` : 'No había nada pendiente de emitir');
       await cargar(pagina);
       void cargarProblemas();
+      // Después de recargar (cargar limpia el error)
+      if (fallidos > 0) setError(`${fallidos} comprobante(s) no se pudieron emitir, revisa el detalle o inténtalo de nuevo${algo ? ` (${partes.join(', ')})` : ''}`);
     } catch (err: any) {
       setError(err?.message || 'No se pudo emitir ahora');
     } finally {

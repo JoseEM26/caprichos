@@ -40,6 +40,13 @@ function coincide(db: Db, fila: Fila, where: any = {}): boolean {
   return true;
 }
 
+/** Misma regla que ck_comprobante_numero_asignado: solo POR_EMITIR_NOCHE puede no tener serie/número. */
+function verificarComprobante(nombre: string, f: Fila) {
+  if (nombre === 'comprobante' && f.facturacion_estado !== 'POR_EMITIR_NOCHE' && (f.serie == null || f.numero == null || f.numero_texto == null)) {
+    throw new Error('viola ck_comprobante_numero_asignado: serie/numero/numero_texto NULL fuera de POR_EMITIR_NOCHE');
+  }
+}
+
 function aplicar(fila: Fila, data: any) {
   for (const [k, v] of Object.entries<any>(data ?? {})) {
     if (v && typeof v === 'object' && 'increment' in v) fila[k] = (fila[k] ?? 0) + v.increment;
@@ -70,6 +77,7 @@ function tabla(db: Db, nombre: string) {
     count: async ({ where = {} }: any = {}) => buscar(where).length,
     create: async ({ data }: any) => {
       const fila: Fila = { id: BigInt(filas().length + 1), creado_en: new Date(), anulado_en: null, copias_impresas: 0, facturacion_intentos: 0, ...data };
+      verificarComprobante(nombre, fila);
       filas().push(fila);
       return { ...fila };
     },
@@ -77,11 +85,15 @@ function tabla(db: Db, nombre: string) {
       const fila = filas().find((f) => coincide(db, f, where));
       if (!fila) throw new Error(`${nombre}: no existe`);
       aplicar(fila, data);
+      verificarComprobante(nombre, fila);
       return { ...fila };
     },
     updateMany: async ({ where, data }: any) => {
       const r = buscar(where);
-      r.forEach((f) => aplicar(f, data));
+      r.forEach((f) => {
+        aplicar(f, data);
+        verificarComprobante(nombre, f);
+      });
       return { count: r.length };
     },
     deleteMany: async ({ where = {} }: any = {}) => {

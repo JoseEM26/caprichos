@@ -98,6 +98,17 @@ describe('ElectronicosTab', () => {
     await waitFor(() => expect(guardar).toHaveBeenCalledWith(expect.objectContaining({ envioNocturno: 'si', horaEnvio: '22:45', horaResumen: '23:15' })));
   });
 
+  it('Emitir ahora avisa claro cuando hubo fallidos y no dice que no había nada', async () => {
+    conRol('ADMIN');
+    vi.spyOn(comprobantesApi, 'emitirAhora').mockResolvedValue({ emitidos: 0, cambios: 0, descartados: 0, fallidos: 2, resumenes: 0, boletas: 0 });
+    render(<ElectronicosTab />);
+    await screen.findByText('Emitido SUNAT');
+    fireEvent.click(screen.getByText('Emitir ahora'));
+    fireEvent.click(screen.getByText('Sí, emitir'));
+    expect(await screen.findByText(/2 comprobante\(s\) no se pudieron emitir, revisa el detalle o inténtalo de nuevo/)).toBeTruthy();
+    expect(screen.queryByText(/No había nada pendiente/)).toBeNull();
+  });
+
   it('anular pide motivo y confirmación Sí/No antes de llamar a la API', async () => {
     conRol('ADMIN');
     const anular = vi.spyOn(comprobantesApi, 'anularElectronico').mockResolvedValue({ id: '5', baja_estado: 'ACEPTADA' });

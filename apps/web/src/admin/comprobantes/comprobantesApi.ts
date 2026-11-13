@@ -152,7 +152,7 @@ export const comprobantesApi = {
   },
 
   /** Emite ya lo que espera la noche (boletas, facturas y cambios pendientes) y envía el resumen de boletas. */
-  async emitirAhora(): Promise<{ emitidos: number; cambios: number; descartados: number; resumenes: number; boletas: number }> {
+  async emitirAhora(): Promise<{ emitidos: number; cambios: number; descartados: number; fallidos?: number; resumenes: number; boletas: number }> {
     return clienteFetch('/admin/comprobantes/sunat/emitir-ahora', { method: 'POST' });
   },
 
