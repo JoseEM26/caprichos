@@ -11,6 +11,13 @@ La carta web puede cobrar el pedido con **tarjeta** o **Yape** a través de Culq
 
 Requisito: la **caja de hoy debe estar abierta** (el cobro entra a ella). Sin caja abierta no se ofrece el cobro en línea ni se cobra al cliente.
 
+## Medio «Tarjeta / Yape en línea» y espera de pago
+
+- En la carta es un medio más: al crear el pedido se manda `pago.metodo = 'CULQI'` (solo carta web y con `pago_online_activo = si`). El pedido nace en estado `POR_PAGAR` con pago `PENDIENTE_ONLINE`: no llega a cocina ni aparece en Caja por cobrar. Pasa a `COLA` (cocina) cuando el cargo sale APROBADO.
+- Si no paga, **se anula solo** a los `pago_online_espera_min` minutos (15 por defecto, Configuración › Parámetros). Una tarea cada minuto lo hace; no anula si hay un cargo en curso o aprobado.
+- Si llega un pago aprobado de un pedido ya anulado, **no se revive**: queda marcado `requiereDevolucion` y se avisa al ADMIN (notificación «Pago en línea de un pedido anulado: devolver»).
+- El cliente puede pagar desde «Mi pedido» cualquier pedido suyo en `POR_PAGAR` con `/carta/pagos/culqi/intento` (con su `seguimientoToken` o su sesión).
+
 ## Variables de entorno (en el `.env` del servidor / secretos de GitHub)
 
 | Variable | Para qué |
@@ -45,8 +52,9 @@ El webhook acepta cualquier evento. Las devoluciones también se simulan. Nunca 
 ## Ver pagos y devolver
 
 - **Ver**: `GET /admin/pagos-online?desde=AAAA-MM-DD&hasta=AAAA-MM-DD&estado=&pagina=1` (ADMIN, SUPERVISOR y CAJERO). Un pago `APROBADO` con `cobroPendiente: true` es dinero cobrado por Culqi cuyo cobro no se registró en Caja: revísalo (también sale una notificación) y regístralo a mano o devuélvelo.
-- **Devolver**: `POST /admin/pagos-online/:id/devolver` con `{ monto?, motivo, confirmar? }`. **Solo ADMIN**. Sin `monto` devuelve todo lo que falta; el monto es en soles. Si el pedido no está anulado hay que mandar `confirmar: true`. Queda auditado (quién, cuánto, por qué).
-- La devolución en Culqi **no anula el cobro en Caja** ni el comprobante: eso sigue siendo un paso aparte de Caja.
+- **Devolver**: `POST /admin/pagos-online/:id/devolver` con `{ monto?, motivo, medio?, confirmar? }`. **Solo ADMIN**. `medio` es `CULQI` (por defecto: llama al reembolso de Culqi) o `EFECTIVO`, `YAPE`, `PLIN`, `TRANSFERENCIA` (devuelto por fuera: solo se registra, sin llamar a Culqi). En `EFECTIVO` se registra un egreso en la caja de hoy (debe estar abierta) para que el cierre cuadre. Sin `monto` devuelve todo lo que falta; el monto es en soles. Si el pedido no está anulado hay que mandar `confirmar: true`. Queda auditado (quién, cuánto, por qué).
+- La suma devuelta nunca supera lo cobrado. El listado trae `montoDevuelto` y `devoluciones:[{monto, medio, en}]`.
+- La devolución **no anula el cobro en Caja** ni el comprobante: eso sigue siendo un paso aparte de Caja.
 
 ## Seguridad
 

@@ -289,6 +289,28 @@ describe('PedidosService', () => {
       );
     });
 
+    describe('Tarjeta / Yape en línea (CULQI)', () => {
+      const conCulqi = () => ({ ...pedidoBaseDto, pago: { metodo: 'CULQI' } }) as any;
+
+      it('encendido: el pedido nace POR_PAGAR, PENDIENTE_ONLINE y sin pasar a cocina', async () => {
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+        prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'POR_PAGAR', subtotal: 28, envio: 5, total: 33 });
+        await service.crear(conCulqi(), 'idemp-culqi-1');
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data).toMatchObject({ estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE', pago_preferido: 'CULQI', pasa_cocina_en: null });
+      });
+
+      it('apagado (por defecto): se rechaza antes de crear el pedido', async () => {
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'no' });
+        await expect(service.crear(conCulqi(), 'idemp-culqi-2')).rejects.toMatchObject({ response: { codigo: 'PAGO_ONLINE_APAGADO' } });
+      });
+
+      it('fuera de la carta (mozo): no aplica', async () => {
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+        await expect(service.crear(conCulqi(), 'idemp-culqi-3', { canal: 'MOZO' } as any)).rejects.toMatchObject({ response: { codigo: 'PAGO_ONLINE_NO_APLICA' } });
+      });
+    });
+
     describe('pedido extra (pedidoOrigenId)', () => {
       it('delivery con zona: envío 0 (no vuelve a cobrar), total = subtotal y queda enlazado al original', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: 28.0, envio: 0, total: 28.0 });

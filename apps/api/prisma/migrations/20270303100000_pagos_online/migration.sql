@@ -50,3 +50,7 @@ CREATE UNIQUE INDEX "pago_online_evento_evento_id_key" ON "pago_online_evento"("
 -- Función apagada por defecto; si ya existía la clave, no se toca
 INSERT INTO "parametro" ("clave", "valor") VALUES ('pago_online_activo', '"no"'::jsonb)
 ON CONFLICT ("clave") DO NOTHING;
+
+-- Minutos que un pedido con «Tarjeta / Yape en línea» espera el pago antes de anularse solo
+INSERT INTO "parametro" ("clave", "valor") VALUES ('pago_online_espera_min', '15'::jsonb)
+ON CONFLICT ("clave") DO NOTHING;

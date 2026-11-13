@@ -1,3 +1,4 @@
+jest.mock('../pedidos-admin/pedidos-estado.service', () => ({ PedidosEstadoService: class {} }));
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { createHmac } from 'crypto';
 import { PagosOnlineService } from './pagos-online.service';
@@ -10,7 +11,7 @@ import { generarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
 // Datos sintéticos: nada real
 function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Partial<any>; cajaAbierta?: boolean } = {}) {
   const pedido: any = {
-    id: 7n, codigo: 'P-0007', canal: 'CARTA', estado: 'COLA', pago_estado: 'PENDIENTE', es_personal: false,
+    id: 7n, codigo: 'P-0007', canal: 'CARTA', estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE', es_personal: false,
     total: 50.5, monto_credito: 0, propina: 2, planPago: [], cobros: [], modalidad: 'RECOGER',
     comprobante_tipo: 'SIMPLE', comprobante_doc: null, comprobante_razon: null, cliente_party_id: null, party_id: null,
     pasa_cocina_en: null, pago_coordinado_en: null, ...opts.pedido,
@@ -32,6 +33,8 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
       findUniqueOrThrow: jest.fn(async () => pedido),
       update: jest.fn(async ({ data }: any) => Object.assign(pedido, data)),
     },
+    pedidoEstadoHistorial: { create: jest.fn().mockResolvedValue({}) },
+    $transaction: jest.fn(async (fn: any) => fn({ caja: { findUnique: jest.fn().mockResolvedValue({ id: 1n, estado: 'ABIERTA' }) }, $queryRaw: jest.fn().mockResolvedValue([{ id: 1n, estado: 'ABIERTA' }]), movimientoCaja: { create: jest.fn().mockResolvedValue({ id: 55n }) } })),
     userAccount: { findFirst: jest.fn().mockResolvedValue({ party_id: 99n }) },
     notificacion: { create: jest.fn().mockResolvedValue({}) },
     pagoOnlineIntento: {
@@ -40,6 +43,8 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
         return i ? { ...i, pedido: { id: pedido.id, codigo: pedido.codigo, estado: pedido.estado } } : null;
       }),
       findUniqueOrThrow: jest.fn(async ({ where }: any) => intentos.find((x) => x.id === where.id)),
+      count: jest.fn(async () => intentos.length),
+      findMany: jest.fn(async () => intentos.map((i) => ({ ...i, pedido: { codigo: pedido.codigo, estado: pedido.estado } }))),
       findFirst: jest.fn(async ({ where }: any) => intentos.find((x) => cumple(x, where)) ?? null),
       create: jest.fn(async ({ data }: any) => {
         if (intentos.some((x) => x.pedido_id === data.pedido_id && ['CREADO', 'PROCESANDO', 'PENDIENTE', 'APROBADO'].includes(x.estado))) throw { code: 'P2002' };
@@ -114,6 +119,7 @@ describe('PagosOnlineService', () => {
     expect(dto.pagos).toEqual([{ medio: 'TARJETA', monto: 52.5 }]);
     expect(pedido.pago_coordinado_en).toBeInstanceOf(Date);
     expect(pedido.pasa_cocina_en).toBeInstanceOf(Date);
+    expect(pedido.estado).toBe('COLA');
     expect(intentos[0]).toMatchObject({ estado: 'APROBADO', ultimos4: '1111' });
     expect(intentos[0].cobrado_en).toBeInstanceOf(Date);
   });
@@ -133,6 +139,7 @@ describe('PagosOnlineService', () => {
     expect(r.mensaje).toMatch(/tarjeta fue rechazada/);
     expect(cobros.cobrar).not.toHaveBeenCalled();
     expect(pedido.pago_coordinado_en).toBeNull();
+    expect(pedido.estado).toBe('POR_PAGAR');
     const otro = armar();
     const i2 = await otro.s.crearIntento('7', otro.acceso);
     expect((await otro.s.cargar({ intentoId: i2.intentoId, token: 'cualquiera_123', medio: 'TARJETA' })).estado).toBe('RECHAZADO');
@@ -216,6 +223,19 @@ describe('PagosOnlineService', () => {
       expect(cobros.cobrar).not.toHaveBeenCalled();
     });
 
+    it('webhook aprobado de un pedido ya anulado: no lo revive, queda para devolver y avisa al ADMIN', async () => {
+      const { s, acceso, cobros, pedido, intentos, prisma } = armar();
+      const { intentoId } = await s.crearIntento('7', acceso);
+      intentos[0].estado = 'PENDIENTE';
+      pedido.estado = 'ANULADO';
+      await s.recibirWebhook(evento('evt_9', 'charge.creation.succeeded', { id: 'chr_x9', amount: 5250, metadata: { intento: intentoId } }));
+      expect(cobros.cobrar).not.toHaveBeenCalled();
+      expect(pedido.estado).toBe('ANULADO');
+      expect(intentos[0].cobro_error).toMatch(/^PEDIDO_ANULADO_DEVOLVER/);
+      expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'PAGO_ONLINE_A_DEVOLVER', rol_destino: 'ADMIN' }) });
+      expect((await s.listar({})).items[0]).toMatchObject({ requiereDevolucion: true, cobroPendiente: false });
+    });
+
     it('autenticidad: simulado acepta; real exige firma o secreto', () => {
       const sim = armar().s;
       expect(() => sim.verificarWebhook(Buffer.from('{}'), {})).not.toThrow();
@@ -261,6 +281,28 @@ describe('PagosOnlineService', () => {
       expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'DEVOLUCION_PAGO_ONLINE', partyId: '1' }));
     });
 
+    it('devolución por otro medio: no llama a Culqi; efectivo registra egreso de caja; nunca pasa de lo cobrado', async () => {
+      const { s, id, pasarela, intentos, prisma } = await aprobado();
+      const espia = jest.spyOn(pasarela, 'devolver');
+      const r1 = await s.devolver(id, { monto: 20, medio: 'EFECTIVO', motivo: 'devuelto en el local', confirmar: true }, admin);
+      expect(r1.medio).toBe('EFECTIVO');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      await s.devolver(id, { monto: 12.5, medio: 'YAPE', motivo: 'devuelto por Yape', confirmar: true }, admin);
+      expect(espia).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      await expect(s.devolver(id, { monto: 30, medio: 'PLIN', motivo: 'de más ya no cabe', confirmar: true }, admin)).rejects.toMatchObject({ response: { codigo: 'MONTO_EXCEDE' } });
+      expect(intentos[0].devoluciones.map((d: any) => d.medio)).toEqual(['EFECTIVO', 'YAPE']);
+      expect(intentos[0].devuelto_centimos).toBe(3250);
+      const lista = await s.listar({});
+      expect(lista.items[0]).toMatchObject({ montoDevuelto: 32.5, devoluciones: [{ monto: 20, medio: 'EFECTIVO' }, { monto: 12.5, medio: 'YAPE' }] });
+    });
+
+    it('medio de devolución inválido y no-ADMIN con otro medio', async () => {
+      const { s, id } = await aprobado();
+      await expect(s.devolver(id, { motivo: 'cliente pidió', medio: 'BITCOIN', confirmar: true }, admin)).rejects.toMatchObject({ response: { codigo: 'MEDIO_INVALIDO' } });
+      await expect(s.devolver(id, { motivo: 'cliente pidió', medio: 'EFECTIVO', confirmar: true }, { partyId: '2', rol: 'CAJERO', roles: ['CAJERO'] })).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+    });
+
     it('pedido anulado: devuelve sin confirmar', async () => {
       const { s, id, pedido } = await aprobado();
       pedido.estado = 'ANULADO';
@@ -303,5 +345,43 @@ describe('adaptadores', () => {
     expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toMatchObject({ amount: 5250, currency_code: 'PEN', source_id: 'tkn_x' });
     expect((await c.cargar(base)).mensaje).toMatch(/fondos/);
     await expect(c.cargar(base)).rejects.toThrow(/^Sin respuesta de Culqi$/);
+  });
+});
+
+describe('PagosOnlineVencimientoService', () => {
+  const { PagosOnlineVencimientoService } = require('./pagos-online-vencimiento.service');
+  function armarV(valor: any, vencidos: any[]) {
+    const prisma: any = {
+      parametro: { findUnique: jest.fn().mockResolvedValue(valor === undefined ? null : { valor }) },
+      pedido: { findMany: jest.fn().mockResolvedValue(vencidos) },
+      userAccount: { findFirst: jest.fn().mockResolvedValue({ party_id: 9n }) },
+      pagoOnlineIntento: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const pedidos = { cambiarEstado: jest.fn().mockResolvedValue({}) };
+    return { v: new PagosOnlineVencimientoService(prisma, {} as any, pedidos as any), prisma, pedidos };
+  }
+
+  it('espera 15 min por defecto y anula solo los POR_PAGAR sin cargo en curso', async () => {
+    const { v, prisma, pedidos } = armarV(undefined, [{ id: 1n }, { id: 2n }]);
+    const ahora = new Date('2027-03-03T15:00:00Z');
+    expect(await v.anularVencidos(ahora)).toBe(2);
+    const donde = prisma.pedido.findMany.mock.calls[0][0].where;
+    expect(donde).toMatchObject({ estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE' });
+    expect(donde.creado_en.lte.toISOString()).toBe('2027-03-03T14:45:00.000Z');
+    expect(donde.pagosOnline.none.estado.in).toEqual(['PROCESANDO', 'PENDIENTE', 'APROBADO']);
+    expect(pedidos.cambiarEstado).toHaveBeenCalledWith(1n, expect.objectContaining({ estado: 'ANULADO' }), expect.objectContaining({ rol: 'ADMIN' }));
+  });
+
+  it('lee pago_online_espera_min y sin vencidos no hace nada', async () => {
+    const { v, pedidos } = armarV(30, []);
+    expect(await v.minutosEspera()).toBe(30);
+    expect(await v.anularVencidos(new Date())).toBe(0);
+    expect(pedidos.cambiarEstado).not.toHaveBeenCalled();
+  });
+
+  it('si anular falla en uno, sigue con los demás', async () => {
+    const { v, pedidos } = armarV(15, [{ id: 1n }, { id: 2n }]);
+    pedidos.cambiarEstado.mockRejectedValueOnce(new Error('x'));
+    expect(await v.anularVencidos(new Date())).toBe(1);
   });
 });

@@ -42,6 +42,11 @@ export class DevolverDto {
   @MaxLength(200)
   motivo!: string;
 
+  /** CULQI (por la pasarela) o el medio con que se devolvió por fuera; por defecto CULQI */
+  @IsOptional()
+  @IsIn(['CULQI', 'EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'], { message: 'El medio de devolución no es válido' })
+  medio?: 'CULQI' | 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
   /** Hace falta si el pedido no está anulado */
   @IsOptional()
   @IsBoolean()

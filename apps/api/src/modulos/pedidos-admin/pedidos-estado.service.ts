@@ -1098,7 +1098,7 @@ export class PedidosEstadoService {
       // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
       // (FT-CIE-02: un pedido que no se cobró no puede quedar pendiente y bloquear el cierre)
       const entregadoSinCobro = estadoAnterior === 'ENTREGADO';
-      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
+      if (!['COLA', 'PREPARANDO', 'LISTO', 'POR_PAGAR'].includes(estadoAnterior) && !entregadoSinCobro) {
         throw new ConflictException({
           codigo: 'TRANSICION_INVALIDA',
           mensaje: `No se puede anular un pedido en estado ${estadoAnterior}`,

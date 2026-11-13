@@ -7,7 +7,7 @@ import { inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
-import { aCentimos, enPesos, exigirCajaAbiertaHoy } from '../caja/caja.calculo';
+import { aCentimos, enPesos, exigirCajaAbiertaHoy, registrarEgresoDevolucionCajaHoy } from '../caja/caja.calculo';
 import { esComprobanteElegible, validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { verificarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
@@ -26,7 +26,12 @@ export interface Devolucion {
   en: string;
   motivo: string;
   origen: 'SISTEMA' | 'WEBHOOK';
+  /** CULQI (reembolso por la pasarela) o el medio con que se devolvió por fuera */
+  medio?: string;
+  movimiento_caja_id?: string;
 }
+
+export const MEDIOS_DEVOLUCION = ['CULQI', 'EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 function error(status: number, codigo: string, mensaje: string): HttpException {
   return new HttpException({ codigo, mensaje }, status);
@@ -81,7 +86,7 @@ export class PagosOnlineService {
     if (pedido.es_personal || (pedido.planPago ?? []).length > 1) {
       throw error(409, 'PEDIDO_NO_APLICA', 'Este pedido no se puede pagar en línea');
     }
-    if (pedido.pago_estado !== 'PENDIENTE' || (pedido.cobros ?? []).length) {
+    if (pedido.pago_estado !== 'PENDIENTE_ONLINE' || (pedido.cobros ?? []).length) {
       throw error(409, 'YA_PAGADO', 'Este pedido ya tiene su pago registrado');
     }
     const montoCentimos = aCentimos(montoACobrar(pedido)) + aCentimos(pedido.propina ?? 0);
@@ -157,7 +162,9 @@ export class PagosOnlineService {
     let mensaje: string;
     if (i.estado === 'APROBADO' || i.estado === 'DEVUELTO') {
       estado = i.cobro_error ? 'PENDIENTE' : 'APROBADO';
-      mensaje = i.cobro_error ? MSG_COBRO_PENDIENTE : 'Pago aprobado. Tu pedido ya pasó a cocina.';
+      mensaje = i.cobro_error?.startsWith('PEDIDO_ANULADO_DEVOLVER')
+        ? 'Tu pedido ya se había anulado por falta de pago a tiempo. Te devolveremos el dinero.'
+        : i.cobro_error ? MSG_COBRO_PENDIENTE : 'Pago aprobado. Tu pedido ya pasó a cocina.';
     } else if (i.estado === 'RECHAZADO' || i.estado === 'FALLIDO') {
       estado = 'RECHAZADO';
       mensaje = i.mensaje || 'No pudimos procesar tu pago. Prueba con otro medio.';
@@ -253,6 +260,16 @@ export class PagosOnlineService {
     const intento = await this.prisma.pagoOnlineIntento.findUniqueOrThrow({ where: { id: intentoId } });
     try {
       const pedido = await this.prisma.pedido.findUniqueOrThrow({ where: { id: intento.pedido_id } });
+      if (pedido.estado === 'ANULADO') {
+        // Pagó cuando el pedido ya se había anulado (p. ej. por tiempo): no se revive; queda marcado para devolver y se avisa al ADMIN
+        const motivo = 'PEDIDO_ANULADO_DEVOLVER: el cliente pagó con el pedido ya anulado';
+        await this.prisma.pagoOnlineIntento.update({ where: { id: intentoId }, data: { cobro_error: motivo } });
+        await this.prisma.notificacion
+          .create({ data: { tipo: 'PAGO_ONLINE_A_DEVOLVER', rol_destino: 'ADMIN', titulo: 'Pago en línea de un pedido anulado: devolver', mensaje: `El pedido ${pedido.codigo} ya estaba anulado y el cliente pagó S/ ${enPesos(intento.monto_centimos).toFixed(2)}. Devuélvelo en Pagos en línea.`, enlace: '/admin/pagos-online' } })
+          .catch(() => undefined);
+        await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_PEDIDO_ANULADO', resultado: 'OK', entidad: 'pedido', entidadId: pedido.id, despues: { cargo: intento.culqi_cargo_id, monto_centimos: intento.monto_centimos } });
+        return;
+      }
       const partyId = pedido.cliente_party_id ?? pedido.party_id ?? (await this.partyAdmin());
       if (partyId == null) throw new Error('Sin persona a quien atribuir el cobro');
       const usuario = { partyId: partyId.toString(), rol: 'SISTEMA', roles: ['SISTEMA'] };
@@ -263,8 +280,27 @@ export class PagosOnlineService {
       const ahora = new Date();
       await this.prisma.pedido.update({
         where: { id: pedido.id },
-        data: { pago_coordinado_en: ahora, pago_coordinado_por: BigInt(partyId), pasa_cocina_en: pedido.pasa_cocina_en ?? ahora },
+        data: {
+          pago_coordinado_en: ahora,
+          pago_coordinado_por: BigInt(partyId),
+          pasa_cocina_en: pedido.pasa_cocina_en ?? ahora,
+          // Recién ahora el pedido entra a cocina (la sincronización de comandas lo toma como a cualquier pedido en cola)
+          ...(pedido.estado === 'POR_PAGAR' ? { estado: 'COLA' } : {}),
+        },
       });
+      if (pedido.estado === 'POR_PAGAR') {
+        await this.prisma.pedidoEstadoHistorial
+          .create({ data: { pedido_id: pedido.id, estado_anterior: 'POR_PAGAR', estado_nuevo: 'COLA', motivo: 'Pago en línea aprobado', por_party_id: BigInt(partyId) } })
+          .catch(() => undefined);
+        await this.prisma.notificacion
+          .create({ data: { tipo: 'PEDIDO_NUEVO', rol_destino: null, titulo: `Pedido nuevo ${pedido.codigo}`, mensaje: `CARTA · pagado en línea · S/ ${enPesos(intento.monto_centimos).toFixed(2)}`, enlace: `/admin/caja?pedido=${pedido.id}` } })
+          .catch(() => undefined);
+        try {
+          this.eventos?.emitirAdmin('pedido:estado', { id: pedido.id.toString(), codigo: pedido.codigo, estado: 'COLA' });
+        } catch {
+          // accesorio
+        }
+      }
       await this.prisma.pagoOnlineIntento.update({ where: { id: intentoId }, data: { cobrado_en: ahora, cobro_error: null } });
       await this.auditoria.registrar({
         categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_APROBADO', resultado: 'OK',
@@ -375,7 +411,7 @@ export class PagosOnlineService {
       if (lista.some((x) => x.id === d.id)) return 'PROCESADO';
       const monto = Number(d.amount);
       if (!Number.isInteger(monto) || monto <= 0) return 'IGNORADO';
-      const nueva = [...lista, { id: d.id, monto_centimos: monto, en: new Date().toISOString(), motivo: 'Devolución hecha en Culqi', origen: 'WEBHOOK' as const }];
+      const nueva = [...lista, { id: d.id, monto_centimos: monto, en: new Date().toISOString(), motivo: 'Devolución hecha en Culqi', origen: 'WEBHOOK' as const, medio: 'CULQI' }];
       // max(): si la devolución la hizo este sistema, el monto ya estaba reservado y no se cuenta dos veces
       const total = Math.min(intento.monto_centimos, Math.max(intento.devuelto_centimos, nueva.reduce((s, x) => s + x.monto_centimos, 0)));
       await this.prisma.pagoOnlineIntento.update({
@@ -420,13 +456,15 @@ export class PagosOnlineService {
         creadoEn: f.creado_en,
         devuelto: f.devuelto_centimos > 0,
         montoDevuelto: enPesos(f.devuelto_centimos),
-        cobroPendiente: f.estado === 'APROBADO' && f.cobrado_en == null,
+        cobroPendiente: f.estado === 'APROBADO' && f.cobrado_en == null && !f.cobro_error?.startsWith('PEDIDO_ANULADO_DEVOLVER'),
+        requiereDevolucion: f.cobro_error?.startsWith('PEDIDO_ANULADO_DEVOLVER') ?? false,
+        devoluciones: ((f.devoluciones as unknown as Devolucion[]) ?? []).map((d) => ({ monto: enPesos(d.monto_centimos), medio: d.medio ?? 'CULQI', en: d.en })),
         modo: f.modo,
       })),
     };
   }
 
-  async devolver(id: string, dto: { monto?: number; motivo: string; confirmar?: boolean }, usuario: any, ip?: string) {
+  async devolver(id: string, dto: { monto?: number; motivo: string; medio?: string; confirmar?: boolean }, usuario: any, ip?: string) {
     if (!tieneRol(usuario, 'ADMIN')) throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede devolver un pago' });
     const motivo = String(dto?.motivo ?? '').trim();
     if (motivo.length < 5) throw error(400, 'MOTIVO_REQUERIDO', 'El motivo debe tener al menos 5 caracteres');
@@ -434,7 +472,9 @@ export class PagosOnlineService {
     try { intentoId = BigInt(id); } catch { throw error(400, 'ID_INVALIDO', 'El identificador no es válido'); }
     const intento = await this.prisma.pagoOnlineIntento.findUnique({ where: { id: intentoId }, include: { pedido: { select: { codigo: true, estado: true } } } });
     if (!intento) throw new NotFoundException({ codigo: 'PAGO_NO_ENCONTRADO', mensaje: 'El pago no existe' });
-    if (!['APROBADO', 'DEVUELTO'].includes(intento.estado) || !intento.culqi_cargo_id) throw error(409, 'PAGO_NO_APROBADO', 'Solo se devuelven pagos aprobados');
+    const medio = String(dto.medio ?? 'CULQI').toUpperCase();
+    if (!MEDIOS_DEVOLUCION.includes(medio)) throw error(400, 'MEDIO_INVALIDO', 'El medio de devolución no es válido');
+    if (!['APROBADO', 'DEVUELTO'].includes(intento.estado) || (medio === 'CULQI' && !intento.culqi_cargo_id)) throw error(409, 'PAGO_NO_APROBADO', 'Solo se devuelven pagos aprobados');
     // Pedido no anulado: el ADMIN debe confirmarlo de forma explícita
     if (intento.pedido.estado !== 'ANULADO' && dto.confirmar !== true) {
       throw error(409, 'CONFIRMAR_DEVOLUCION', 'El pedido no está anulado. Confirma que quieres devolver el dinero igual.');
@@ -451,16 +491,27 @@ export class PagosOnlineService {
     });
     if (reserva.count === 0) throw error(409, 'DEVOLUCION_EN_CURSO', 'Hay otra devolución en curso. Intenta de nuevo.');
     let devolucionId: string;
+    let movimientoCajaId: string | undefined;
     try {
-      ({ devolucionId } = await this.pasarela.devolver({ cargoId: intento.culqi_cargo_id, montoCentimos: monto, motivo }));
+      if (medio === 'CULQI') {
+        ({ devolucionId } = await this.pasarela.devolver({ cargoId: intento.culqi_cargo_id!, montoCentimos: monto, motivo }));
+      } else {
+        // Devuelta por fuera de Culqi: solo se registra. En efectivo sale de la caja de hoy (egreso) para que el cierre cuadre.
+        devolucionId = `${medio.toLowerCase()}_${intento.id}_${Date.now()}`;
+        if (medio === 'EFECTIVO') {
+          const mov = await this.prisma.$transaction((tx) => registrarEgresoDevolucionCajaHoy(tx, enPesos(monto), `Devolución pago en línea ${intento.pedido.codigo}`));
+          movimientoCajaId = mov.id.toString();
+        }
+      }
     } catch (e: any) {
       await this.prisma.pagoOnlineIntento.updateMany({ where: { id: intento.id }, data: { devuelto_centimos: { decrement: monto } } });
-      await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'DEVOLUCION_FALLIDA', resultado: 'RECHAZADO', entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip });
+      await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'DEVOLUCION_FALLIDA', resultado: 'RECHAZADO', entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip, despues: { medio } });
+      if (medio !== 'CULQI') throw e;
       throw error(502, 'DEVOLUCION_RECHAZADA', `Culqi no aceptó la devolución: ${String(e?.message ?? 'sin detalle').slice(0, 150)}`);
     }
     const actual = await this.prisma.pagoOnlineIntento.findUniqueOrThrow({ where: { id: intento.id } });
     const lista = (actual.devoluciones as unknown as Devolucion[]) ?? [];
-    const nueva = lista.some((x) => x.id === devolucionId) ? lista : [...lista, { id: devolucionId, monto_centimos: monto, en: new Date().toISOString(), motivo, origen: 'SISTEMA' as const }];
+    const nueva = lista.some((x) => x.id === devolucionId) ? lista : [...lista, { id: devolucionId, monto_centimos: monto, en: new Date().toISOString(), motivo, origen: 'SISTEMA' as const, medio, ...(movimientoCajaId ? { movimiento_caja_id: movimientoCajaId } : {}) }];
     await this.prisma.pagoOnlineIntento.update({
       where: { id: intento.id },
       data: { devoluciones: nueva as unknown as Prisma.InputJsonValue, estado: actual.devuelto_centimos >= actual.monto_centimos ? 'DEVUELTO' : actual.estado },
@@ -469,8 +520,8 @@ export class PagosOnlineService {
       categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'DEVOLUCION_PAGO_ONLINE', resultado: 'OK',
       entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip,
       antes: { devuelto_centimos: intento.devuelto_centimos },
-      despues: { devuelto_centimos: actual.devuelto_centimos, devolucion: devolucionId, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
+      despues: { devuelto_centimos: actual.devuelto_centimos, devolucion: devolucionId, medio, movimiento_caja_id: movimientoCajaId ?? null, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
     });
-    return { id: intento.id.toString(), devolucionId, montoDevuelto: enPesos(monto), totalDevuelto: enPesos(actual.devuelto_centimos), restante: enPesos(actual.monto_centimos - actual.devuelto_centimos) };
+    return { id: intento.id.toString(), devolucionId, medio, montoDevuelto: enPesos(monto), totalDevuelto: enPesos(actual.devuelto_centimos), restante: enPesos(actual.monto_centimos - actual.devuelto_centimos) };
   }
 }
