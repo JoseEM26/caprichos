@@ -28,6 +28,24 @@ Directorio centralizado de clientes de Caprichos. Permite registrar nuevos consu
 Despues: [[caja]]
 Ver tambien: [[mensajes]]
 
+## Como se hace: Filtrar y ordenar la lista de clientes
+1. Debajo del buscador hay botones rapidos. Para ver cuantas veces compran: Todos, Nuevos (1 pedido), Recurrentes (2 o mas) y Frecuentes (5 o mas). Para elegir las fechas: Hoy, Esta semana, Este mes o Desde siempre. Los pedidos y el consumo que se muestran son los pedidos cobrados dentro de esas fechas (no cuentan los anulados).
+2. Pulsar Mas filtros para afinar: Tipo, Registro, Verificacion, Puntos (con o sin), Canal (Carta, WhatsApp, Caja o Mozo), rangos de Pedidos, Consumo (S/) y Puntos (desde y hasta), fechas propias (Compraron desde y hasta), Sin comprar hace mas de N dias (clientes dormidos) y Cumplen anos este mes. Todos se pueden combinar.
+3. Los filtros puestos aparecen como botones con una X: tocar uno lo quita. Limpiar filtros quita todos.
+4. Ordenar por Mas nuevos, Mas compras, Mas consumo, Mas puntos, Ultima compra o Nombre. Por pagina se elige 24, 48 o 96.
+5. Los botones Tarjetas y Tabla cambian la vista. La tabla muestra nombre, celular, pedidos, consumo, puntos, ultima compra y si esta verificado; tocar una fila abre la ficha. El sistema recuerda la vista y el tamano elegidos en ese equipo.
+Ver tambien: [[caja]]
+
+## Como se hace: Descargar la lista en Excel
+1. Poner los filtros que se quieran (la descarga trae toda la lista filtrada, no solo la pagina que se ve; hasta 10.000 clientes).
+2. Pulsar Descargar Excel. Solo el Administrador ve este boton, porque el archivo lleva el celular completo.
+3. Cada descarga queda en la auditoria con los filtros y la cantidad de filas, sin datos de personas.
+
+## Como se hace: Sortear entre los clientes filtrados
+1. Poner los filtros (por ejemplo Recurrentes y Este mes).
+2. Pulsar Sorteo en vivo. Entran todos los clientes activos de la lista que tienen celular (hasta 5.000).
+3. En pantalla solo se ven el nombre con la inicial del apellido (Maria G.) y los 3 ultimos digitos del celular, para poder mostrarlo en publico. El boton esta apagado si no hay resultados.
+
 ## Como se hace: Consultar la ficha y compras de un cliente
 1. En el buscador superior, escribir el nombre o el celular del cliente.
 2. Hacer clic sobre la fila del cliente en la tabla de resultados.

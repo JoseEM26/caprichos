@@ -10,6 +10,10 @@ jest.mock('@nestjs/jwt', () => ({
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
+import { ForbiddenException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
+import { FiltrosClientesDto } from './clientes-filtros';
 import { ClientesAdminController } from './clientes-admin.controller';
 import { ClientesService } from './clientes.service';
 import { PuntosService } from './puntos.service';
@@ -55,27 +59,49 @@ describe('ClientesAdminController', () => {
     controller = module.get<ClientesAdminController>(ClientesAdminController);
   });
 
-  it('listar delega a clientesService.listarAdmin', async () => {
+  it('listar delega a clientesService.listarAdmin con los filtros y la IP', async () => {
     const req: any = { usuario: { rol: 'ADMIN' }, ip: '127.0.0.1' };
-    await controller.listar('ana', 'Persona', 'Activos', undefined, undefined, undefined, '1', '6', req);
-
-    expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(
-      expect.objectContaining({ q: 'ana', tipo: 'Persona', estado: 'Activos' }),
-      req.usuario,
-      '127.0.0.1',
-    );
+    const filtros: any = { q: 'ana', tipo: 'Persona', estado: 'Activos', pedidosMin: 2 };
+    await controller.listar(filtros, req);
+    expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(filtros, req.usuario, '127.0.0.1');
   });
 
-  it('listar pasa los filtros de verificación y rechaza valores inválidos', async () => {
-    const req: any = { usuario: { rol: 'ADMIN' }, ip: '127.0.0.1' };
-    await controller.listar(undefined, undefined, undefined, undefined, 'verificados', 'si', '1', '6', req);
-    expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(
-      expect.objectContaining({ verificacion: 'verificados', gastaPuntos: 'si' }),
-      req.usuario,
-      '127.0.0.1',
-    );
-    await expect(controller.listar(undefined, undefined, undefined, undefined, 'raro', undefined, '1', '6', req)).rejects.toThrow();
-    await expect(controller.listar(undefined, undefined, undefined, undefined, undefined, 'x', '1', '6', req)).rejects.toThrow();
+  it('exportar: manda el .xlsx con su cabecera de descarga', async () => {
+    clientesServiceMock.exportarAdmin = jest.fn().mockResolvedValue({ archivo: new Uint8Array([80, 75]), nombre: 'clientes-2026-11-13.xlsx', filas: 2 });
+    const res: any = { setHeader: jest.fn(), send: jest.fn() };
+    const req: any = { usuario: { rol: 'ADMIN', partyId: 1n }, ip: '9.9.9.9' };
+    await controller.exportar({ pedidosMin: 2 } as any, req, res);
+    expect(clientesServiceMock.exportarAdmin).toHaveBeenCalledWith({ pedidosMin: 2 }, req.usuario, '9.9.9.9');
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="clientes-2026-11-13.xlsx"');
+    expect(Buffer.isBuffer(res.send.mock.calls[0][0])).toBe(true);
+  });
+
+  it('exportar: si no es ADMIN el servicio lo rechaza y no se envía nada', async () => {
+    clientesServiceMock.exportarAdmin = jest.fn().mockRejectedValue(new ForbiddenException({ codigo: 'SOLO_ADMIN' }));
+    const res: any = { setHeader: jest.fn(), send: jest.fn() };
+    await expect(controller.exportar({} as any, { usuario: { rol: 'CAJERO' } } as any, res)).rejects.toThrow();
+    expect(res.send).not.toHaveBeenCalled();
+  });
+
+  it('participantes delega con los mismos filtros', async () => {
+    clientesServiceMock.participantesSorteo = jest.fn().mockResolvedValue({ total: 1, participantes: [{ id: '1', nombre: 'Ana G.', detalle: '···123' }] });
+    expect(await controller.participantes({ cumpleMes: 'si' } as any)).toMatchObject({ total: 1 });
+    expect(clientesServiceMock.participantesSorteo).toHaveBeenCalledWith({ cumpleMes: 'si' });
+  });
+
+  describe('FiltrosClientesDto (validación en el borde)', () => {
+    const validar = (o: any) => validateSync(plainToInstance(FiltrosClientesDto, o));
+    it('convierte números y acepta combinaciones válidas', () => {
+      const dto = plainToInstance(FiltrosClientesDto, { pedidosMin: '2', consumoMin: '50.5', desde: '2026-11-01', periodo: 'mes', orden: 'consumo', limite: '48' });
+      expect(dto).toMatchObject({ pedidosMin: 2, consumoMin: 50.5, limite: 48 });
+      expect(validateSync(dto)).toEqual([]);
+    });
+    it('rechaza valores raros', () => {
+      for (const malo of [{ pedidosMin: 'x' }, { pedidosMin: '-1' }, { desde: '01/11/2026' }, { periodo: 'ayer' }, { orden: 'raro' }, { canal: 'TV' }, { limite: '5000' }, { sinCompraDias: '0' }]) {
+        expect(validar(malo).length).toBeGreaterThan(0);
+      }
+    });
   });
 
   it('ajustarPuntos delega a puntosService.ajustarManual', async () => {

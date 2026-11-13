@@ -9,14 +9,17 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ClientesService } from './clientes.service';
 import { FacturacionClienteService } from './facturacion-cliente.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { PuntosService } from './puntos.service';
+import { FiltrosClientesDto } from './clientes-filtros';
 import {
   AjustarPuntosDto,
   EditarClienteAdminDto,
@@ -63,38 +66,28 @@ export class ClientesAdminController {
 
   @Get()
   @Permiso('clientes', 'ver')
-  async listar(
-    @Query('q') q?: string,
-    @Query('tipo') tipo?: string,
-    @Query('estado') estado?: string,
-    @Query('creditoPersonal') creditoPersonal?: string,
-    @Query('verificacion') verificacion?: string,
-    @Query('gastaPuntos') gastaPuntos?: string,
-    @Query('pagina') pagina?: string,
-    @Query('limite') limite?: string,
-    @Req() req?: any,
-  ) {
+  async listar(@Query() filtros: FiltrosClientesDto, @Req() req?: any) {
     const ip = (req?.ip || req?.headers?.['x-forwarded-for']) as string | undefined;
-    if (verificacion && !['verificados', 'sin_verificar', 'todos'].includes(verificacion)) {
-      throw new BadRequestException({ codigo: 'FILTRO_INVALIDO', mensaje: 'verificacion: verificados, sin_verificar o todos.' });
-    }
-    if (gastaPuntos && !['si', 'no'].includes(gastaPuntos)) {
-      throw new BadRequestException({ codigo: 'FILTRO_INVALIDO', mensaje: 'gastaPuntos: si.' });
-    }
-    return this.clientesService.listarAdmin(
-      {
-        q,
-        tipo,
-        estado,
-        creditoPersonal,
-        verificacion: verificacion as any,
-        gastaPuntos: gastaPuntos === 'si' ? 'si' : undefined,
-        pagina: pagina ? parseInt(pagina, 10) : 1,
-        limite: limite ? parseInt(limite, 10) : 6,
-      },
-      req?.usuario,
-      ip,
-    );
+    return this.clientesService.listarAdmin(filtros, req?.usuario, ip);
+  }
+
+  /** Excel con todos los clientes del filtro actual (hasta 10.000). Solo ADMIN: lleva el celular completo. */
+  @Get('exportar')
+  @Permiso('clientes', 'ver')
+  async exportar(@Query() filtros: FiltrosClientesDto, @Req() req: any, @Res() res: Response) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const r = await this.clientesService.exportarAdmin(filtros, req.usuario, ip);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${r.nombre}"`);
+    res.setHeader('X-Filas', String(r.filas));
+    res.send(Buffer.from(r.archivo));
+  }
+
+  /** Participantes de un sorteo en vivo con los mismos filtros: solo «María G.» y «···123» (se muestra en público). */
+  @Get('participantes')
+  @Permiso('clientes', 'ver')
+  async participantes(@Query() filtros: FiltrosClientesDto) {
+    return this.clientesService.participantesSorteo(filtros);
   }
 
   @Get(':id')

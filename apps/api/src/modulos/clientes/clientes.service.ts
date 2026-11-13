@@ -26,6 +26,9 @@ import { versionConsentimiento, versionesLegales } from '../reclamos/textos-lega
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 import { CELULAR_OTRA_PERSONA, partyDeCelular } from './celular-party.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
+import { generarXlsx } from '../../comun/xlsx-simple';
+import { hoyLimaIso } from '../../comun/fechas-lima';
+import { detalleCelularSorteo, mesLima, nombreParaSorteo, rangoPedidos, type FiltrosClientes } from './clientes-filtros';
 import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
 import { estadoVerificacionCliente } from './estado-verificacion-cliente';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
@@ -43,6 +46,8 @@ import {
 } from './clientes.tipos';
 
 const FOTO_MAX_BYTES = 2 * 1024 * 1024;
+export const LIMITE_EXPORTAR_CLIENTES = 10000;
+export const LIMITE_PARTICIPANTES_SORTEO = 5000;
 
 /** Tipo real de la imagen según sus primeros bytes (no la extensión ni el Content-Type que manda el cliente). */
 export function tipoImagenPorBytes(buf: Buffer): string | null {
@@ -790,38 +795,66 @@ export class ClientesService {
   // ========================================================
 
   /**
-   * Lista de clientes para el administrativo con filtros y búsqueda.
+   * Pedidos cobrados por cliente (una sola consulta agrupada por cada forma de enlazar el pedido, sin N+1):
+   * cuántos, cuánto suman y la fecha del último. Misma regla de siempre: cliente_party_id, o carta/WhatsApp/bot
+   * sin ese campo (en MOZO/CAJA party_id es el personal, no cuenta). No cuenta lo anulado.
    */
-  async listarAdmin(
-    filtros: {
-      q?: string;
-      tipo?: string;
-      estado?: string;
-      creditoPersonal?: string;
-      verificacion?: 'verificados' | 'sin_verificar' | 'todos';
-      gastaPuntos?: 'si';
-      pagina?: number;
-      limite?: number;
-    },
-    usuarioAutenticado: any,
-    ip?: string,
-  ): Promise<{
-    items: ClienteAdminListItem[];
-    total: number;
-    pagina: number;
-    paginas: number;
-    contadores: { verificados: number; sinVerificar: number; gastanPuntos: number };
-  }> {
+  private async resumenPedidosPorCliente(
+    rango: { desde?: Date; hasta?: Date },
+    canal?: string,
+  ): Promise<Map<string, { n: number; total: number; ultima: Date | null }>> {
+    const canales = canal === 'WHATSAPP' ? ['WHATSAPP', 'BOT'] : canal ? [canal] : undefined;
+    const base: Prisma.PedidoWhereInput = {
+      pago_estado: 'PAGADO',
+      estado: { not: 'ANULADO' },
+      ...(rango.desde || rango.hasta
+        ? { creado_en: { ...(rango.desde ? { gte: rango.desde } : {}), ...(rango.hasta ? { lte: rango.hasta } : {}) } }
+        : {}),
+    };
+    const [conCliente, enParty] = await Promise.all([
+      this.prisma.pedido.groupBy({
+        by: ['cliente_party_id'],
+        where: { ...base, cliente_party_id: { not: null }, ...(canales ? { canal: { in: canales } } : {}) },
+        _count: { _all: true },
+        _sum: { total: true },
+        _max: { creado_en: true },
+      }),
+      this.prisma.pedido.groupBy({
+        by: ['party_id'],
+        where: { ...base, cliente_party_id: null, party_id: { not: null }, canal: { in: canales ?? CANALES_CLIENTE_EN_PARTY } },
+        _count: { _all: true },
+        _sum: { total: true },
+        _max: { creado_en: true },
+      }),
+    ]);
+    const mapa = new Map<string, { n: number; total: number; ultima: Date | null }>();
+    const sumar = (id: bigint | null, g: any) => {
+      if (id === null) return;
+      const k = id.toString();
+      const prev = mapa.get(k) ?? { n: 0, total: 0, ultima: null };
+      const ult: Date | null = g._max?.creado_en ?? null;
+      mapa.set(k, {
+        n: prev.n + (g._count?._all ?? 0),
+        total: prev.total + Number(g._sum?.total ?? 0),
+        ultima: ult && (!prev.ultima || ult > prev.ultima) ? ult : prev.ultima,
+      });
+    };
+    conCliente.forEach((g: any) => sumar(g.cliente_party_id, g));
+    enParty.forEach((g: any) => sumar(g.party_id, g));
+    return mapa;
+  }
+
+  /**
+   * Clientes que cumplen los filtros, ya ordenados (sin paginar). Lo comparten el listado, la exportación y los
+   * participantes del sorteo, así los tres ven exactamente lo mismo.
+   */
+  private async filtrarAdmin(filtros: FiltrosClientes) {
     const q = filtros.q?.trim();
-    // Obtener todas las partes que tienen rol CLIENTE
+    const estado = (filtros.estado ?? '').toLowerCase();
     const roles = await this.prisma.partyRole.findMany({
       where: {
         rol: 'CLIENTE',
-        ...(filtros.estado === 'Desactivados'
-          ? { hasta: { not: null } }
-          : filtros.estado === 'Activos'
-          ? { hasta: null }
-          : {}),
+        ...(estado === 'desactivados' || estado === 'inactivos' ? { hasta: { not: null } } : estado === 'activos' ? { hasta: null } : {}),
       },
       include: {
         party: {
@@ -829,16 +862,6 @@ export class ClientesService {
             persona: true,
             documentos: { where: { tipo: 'RUC' } },
             contactos: true,
-            // Pedidos pagados del cliente: los que lo tienen en cliente_party_id, y los de carta/WhatsApp/bot
-            // sin ese campo (su party_id es el cliente). En MOZO/CAJA party_id es el personal: no cuenta.
-            pedidosComoCliente: {
-              where: { pago_estado: 'PAGADO' },
-              select: { id: true },
-            },
-            pedidos: {
-              where: { pago_estado: 'PAGADO', canal: { in: CANALES_CLIENTE_EN_PARTY }, cliente_party_id: null },
-              select: { id: true },
-            },
             usuario: {
               select: { rol: true },
             },
@@ -852,7 +875,17 @@ export class ClientesService {
       orderBy: { id: 'desc' },
     });
 
-    let items: ClienteAdminListItem[] = roles.map((r) => {
+    const rango = rangoPedidos(filtros);
+    const hayRango = Boolean(rango.desde || rango.hasta);
+    const [enRango, historico] = await Promise.all([
+      this.resumenPedidosPorCliente(rango, filtros.canal),
+      hayRango ? this.resumenPedidosPorCliente({}, filtros.canal) : Promise.resolve(null),
+    ]);
+    const mesActual = mesLima();
+    const ahoraMs = Date.now();
+
+    type Fila = { item: ClienteAdminListItem; apellidos: string | null; ultimaCompra: Date | null; cumpleMes: number | null };
+    let filas: Fila[] = roles.map((r) => {
       const p = r.party;
       // Solo el RUC sirve para reconocer una empresa; el DNI de un cliente no se lee ni se devuelve
       const docNum = p.documentos.find((d: any) => d.tipo === 'RUC')?.numero || '';
@@ -885,61 +918,173 @@ export class ClientesService {
         claveCambiadaEn: cuenta?.clave_cambiada_en ?? null,
       });
 
+      const id = p.id.toString();
+      const res = enRango.get(id);
+      const hist = (historico ?? enRango).get(id);
       return {
-        id: p.id.toString(),
-        nombre: p.persona?.nombres || 'Sin nombre',
-        tipo,
-        telefono: tel,
-        correo,
-        cumpleanos: cumple,
-        pedidos: p.pedidosComoCliente.length + p.pedidos.length,
-        puntos,
-        creditoPersonal: tipo === 'Personal',
-        envioFijo,
-        descuentoEnvio: descEnvio,
-        activo: r.hasta === null && p.estado === 'ACTIVO',
-        ...camposVerificacion(verif),
+        apellidos: p.persona?.apellidos ?? null,
+        ultimaCompra: hist?.ultima ?? null,
+        cumpleMes: p.persona?.cumple_mes ?? null,
+        item: {
+          id,
+          nombre: p.persona?.nombres || 'Sin nombre',
+          tipo,
+          telefono: tel,
+          correo,
+          cumpleanos: cumple,
+          pedidos: res?.n ?? 0,
+          consumo: Math.round((res?.total ?? 0) * 100) / 100,
+          ultimaCompra: hist?.ultima ? hist.ultima.toISOString() : null,
+          puntos,
+          creditoPersonal: tipo === 'Personal',
+          envioFijo,
+          descuentoEnvio: descEnvio,
+          activo: r.hasta === null && p.estado === 'ACTIVO',
+          ...camposVerificacion(verif),
+        },
       };
     });
 
     // Filtros de memoria (rápidos y homogéneos con la maqueta)
     if (filtros.tipo && filtros.tipo !== 'Todos') {
-      items = items.filter((it) => it.tipo === filtros.tipo);
+      filas = filas.filter((f) => f.item.tipo === filtros.tipo);
     }
     if (filtros.creditoPersonal && filtros.creditoPersonal !== 'Todos') {
-      const quiereCred = filtros.creditoPersonal === 'Sí';
-      items = items.filter((it) => it.creditoPersonal === quiereCred);
+      const quiereCred = ['sí', 'si', 'true'].includes(filtros.creditoPersonal.toLowerCase());
+      filas = filas.filter((f) => f.item.creditoPersonal === quiereCred);
     }
     if (q) {
       const digitos = q.replace(/\D/g, '');
-      items = items.filter(
-        (it) => coincideTexto(q, it.nombre) || (digitos.length >= 3 && it.telefono.includes(digitos)),
+      filas = filas.filter(
+        (f) => coincideTexto(q, f.item.nombre) || (digitos.length >= 3 && f.item.telefono.includes(digitos)),
       );
     }
 
     // Los contadores respetan los demás filtros (tipo, búsqueda...), no los de verificación
     const contadores = {
-      verificados: items.filter((it) => it.verificado).length,
-      sinVerificar: items.filter((it) => !it.verificado).length,
-      gastanPuntos: items.filter((it) => it.puedeGastarPuntos).length,
+      verificados: filas.filter((f) => f.item.verificado).length,
+      sinVerificar: filas.filter((f) => !f.item.verificado).length,
+      gastanPuntos: filas.filter((f) => f.item.puedeGastarPuntos).length,
     };
-    if (filtros.verificacion === 'verificados') items = items.filter((it) => it.verificado);
-    else if (filtros.verificacion === 'sin_verificar') items = items.filter((it) => !it.verificado);
-    if (filtros.gastaPuntos === 'si') items = items.filter((it) => it.puedeGastarPuntos);
+    if (filtros.verificacion === 'verificados') filas = filas.filter((f) => f.item.verificado);
+    else if (filtros.verificacion === 'sin_verificar') filas = filas.filter((f) => !f.item.verificado);
+    if (filtros.gastaPuntos === 'si') filas = filas.filter((f) => f.item.puedeGastarPuntos);
+    else if (filtros.gastaPuntos === 'no') filas = filas.filter((f) => !f.item.puedeGastarPuntos);
 
-    const total = items.length;
-    const limite = Math.max(1, filtros.limite || 6);
+    // Recurrencia, consumo y puntos (los pedidos y el consumo son los del rango elegido)
+    const { pedidosMin, pedidosMax, consumoMin, consumoMax, puntosMin, puntosMax } = filtros;
+    if (pedidosMin !== undefined) filas = filas.filter((f) => f.item.pedidos >= pedidosMin);
+    if (pedidosMax !== undefined) filas = filas.filter((f) => f.item.pedidos <= pedidosMax);
+    if (consumoMin !== undefined) filas = filas.filter((f) => (f.item.consumo ?? 0) >= consumoMin);
+    if (consumoMax !== undefined) filas = filas.filter((f) => (f.item.consumo ?? 0) <= consumoMax);
+    if (puntosMin !== undefined) filas = filas.filter((f) => f.item.puntos >= puntosMin);
+    if (puntosMax !== undefined) filas = filas.filter((f) => f.item.puntos <= puntosMax);
+    if (filtros.conPuntos === 'si') filas = filas.filter((f) => f.item.puntos > 0);
+    else if (filtros.conPuntos === 'no') filas = filas.filter((f) => f.item.puntos <= 0);
+    if (filtros.sinCompraDias !== undefined) {
+      const corte = ahoraMs - filtros.sinCompraDias * 86400000;
+      filas = filas.filter((f) => f.ultimaCompra !== null && f.ultimaCompra.getTime() < corte);
+    }
+    if (filtros.cumpleMes === 'si') filas = filas.filter((f) => f.cumpleMes === mesActual);
+    // Con un canal elegido, solo quienes compraron por ese canal en el rango
+    if (filtros.canal) filas = filas.filter((f) => f.item.pedidos > 0);
+
+    const orden = filtros.orden;
+    if (orden && orden !== 'reciente') {
+      const ult = (f: Fila) => f.ultimaCompra?.getTime() ?? 0;
+      filas.sort((a, b) =>
+        orden === 'nombre'
+          ? a.item.nombre.localeCompare(b.item.nombre, 'es')
+          : orden === 'pedidos'
+          ? b.item.pedidos - a.item.pedidos
+          : orden === 'consumo'
+          ? (b.item.consumo ?? 0) - (a.item.consumo ?? 0)
+          : orden === 'puntos'
+          ? b.item.puntos - a.item.puntos
+          : ult(b) - ult(a),
+      );
+    }
+    return { filas, contadores };
+  }
+
+  /**
+   * Lista de clientes para el administrativo con filtros y búsqueda.
+   */
+  async listarAdmin(
+    filtros: FiltrosClientes,
+    usuarioAutenticado: any,
+    ip?: string,
+  ): Promise<{
+    items: ClienteAdminListItem[];
+    total: number;
+    pagina: number;
+    paginas: number;
+    contadores: { verificados: number; sinVerificar: number; gastanPuntos: number };
+  }> {
+    const { filas, contadores } = await this.filtrarAdmin(filtros);
+    const total = filas.length;
+    const limite = Math.max(1, filtros.limite || 24);
     const pagina = Math.max(1, filtros.pagina || 1);
     const paginas = Math.max(1, Math.ceil(total / limite));
     const inicio = (pagina - 1) * limite;
-    const itemsPaginados = items.slice(inicio, inicio + limite);
+    return { items: filas.slice(inicio, inicio + limite).map((f) => f.item), total, pagina, paginas, contadores };
+  }
 
+  /**
+   * Excel con TODOS los clientes del filtro actual (hasta 10.000). Solo ADMIN: lleva el celular completo.
+   * La auditoría guarda los filtros y la cantidad de filas, nunca datos de personas.
+   */
+  async exportarAdmin(filtros: FiltrosClientes, usuarioAutenticado: any, ip?: string): Promise<{ archivo: Uint8Array; nombre: string; filas: number }> {
+    if (usuarioAutenticado?.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede descargar la lista de clientes.' });
+    }
+    const { filas } = await this.filtrarAdmin(filtros);
+    const lote = filas.slice(0, LIMITE_EXPORTAR_CLIENTES);
+    const fecha = (d: string | null) => (d ? new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', dateStyle: 'short' }).format(new Date(d)) : '');
+    const archivo = generarXlsx(
+      'Clientes',
+      ['Nombre', 'Tipo', 'Celular', 'Correo', 'Cumpleaños', 'Pedidos', 'Consumo (S/)', 'Puntos', 'Última compra', 'Verificado', 'Activo'],
+      lote.map(({ item: i }) => [
+        i.nombre,
+        i.tipo,
+        i.telefono === '—' ? '' : i.telefono,
+        i.correo === 'sin correo' ? '' : i.correo,
+        i.cumpleanos === '—' ? '' : i.cumpleanos,
+        i.pedidos,
+        i.consumo ?? 0,
+        i.puntos,
+        fecha(i.ultimaCompra ?? null),
+        i.verificado ? 'Sí' : 'No',
+        i.activo ? 'Sí' : 'No',
+      ]),
+      [28, 10, 14, 28, 12, 9, 13, 9, 14, 11, 8],
+    );
+    const { pagina: _p, limite: _l, ...sinPagina } = filtros;
+    await this.auditoria.registrar({
+      categoria: 'ACCESO',
+      modulo: 'clientes',
+      accion: 'EXPORTAR_CLIENTES',
+      despues: { filtros: sinPagina, filas: lote.length, truncado: filas.length > lote.length },
+      partyId: usuarioAutenticado?.partyId,
+      ip,
+    });
+    return { archivo, nombre: `clientes-${hoyLimaIso()}.xlsx`, filas: lote.length };
+  }
+
+  /**
+   * Participantes de un sorteo en vivo (se muestra en pantalla pública): solo nombre + inicial del apellido y
+   * los 3 últimos dígitos del celular. Sin celular no hay forma de avisar al ganador, así que esos no entran.
+   */
+  async participantesSorteo(filtros: FiltrosClientes): Promise<{ total: number; participantes: Array<{ id: string; nombre: string; detalle: string }> }> {
+    const { filas } = await this.filtrarAdmin(filtros);
+    const elegibles = filas.filter((f) => f.item.activo && f.item.telefono.replace(/\D/g, '').length >= 9);
     return {
-      items: itemsPaginados,
-      total,
-      pagina,
-      paginas,
-      contadores,
+      total: elegibles.length,
+      participantes: elegibles.slice(0, LIMITE_PARTICIPANTES_SORTEO).map((f) => ({
+        id: f.item.id,
+        nombre: nombreParaSorteo(f.item.nombre, f.apellidos),
+        detalle: detalleCelularSorteo(f.item.telefono),
+      })),
     };
   }
 

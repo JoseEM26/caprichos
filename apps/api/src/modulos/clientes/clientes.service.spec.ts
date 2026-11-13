@@ -55,6 +55,7 @@ describe('ClientesService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      pedido: { groupBy: jest.fn().mockResolvedValue([]) },
       partyRole: {
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -199,27 +200,126 @@ describe('ClientesService', () => {
       expect(res.items.map((i) => i.nombre)).toEqual(['Luis']);
     });
 
-    it('cuenta los pedidos pagados por cliente_party_id y los de carta sin ese campo, no los de mozo ni los no pagados', async () => {
-      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
-        {
-          ...rol(1, 'Ana', '912345678'),
-          party: {
-            ...rol(1, 'Ana', '912345678').party,
-            pedidosComoCliente: [{ id: 10n }, { id: 11n }],
-            pedidos: [{ id: 12n }],
-          },
-        },
-      ]);
+    it('cuenta los pedidos cobrados por cliente_party_id y los de carta sin ese campo, no los de mozo ni anulados', async () => {
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([rol(1, 'Ana', '912345678')]);
+      prismaMock.pedido.groupBy = jest.fn(async (a: any) =>
+        a.by[0] === 'cliente_party_id'
+          ? [{ cliente_party_id: 1n, _count: { _all: 2 }, _sum: { total: 30.5 }, _max: { creado_en: new Date('2026-11-01T15:00:00Z') } }]
+          : [{ party_id: 1n, _count: { _all: 1 }, _sum: { total: 10 }, _max: { creado_en: new Date('2026-11-10T15:00:00Z') } }],
+      );
 
       const res = await service.listarAdmin({}, { rol: 'ADMIN' });
 
-      expect(res.items[0].pedidos).toBe(3);
-      const where = prismaMock.partyRole.findMany.mock.calls[0][0].include.party.include;
-      expect(where.pedidosComoCliente.where).toEqual({ pago_estado: 'PAGADO' });
-      expect(where.pedidos.where).toEqual({
-        pago_estado: 'PAGADO',
-        canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] },
-        cliente_party_id: null,
+      expect(res.items[0]).toMatchObject({ pedidos: 3, consumo: 40.5, ultimaCompra: '2026-11-10T15:00:00.000Z' });
+      const [conCliente, enParty] = prismaMock.pedido.groupBy.mock.calls.map((c: any) => c[0].where);
+      expect(conCliente).toMatchObject({ pago_estado: 'PAGADO', estado: { not: 'ANULADO' }, cliente_party_id: { not: null } });
+      expect(enParty).toMatchObject({ pago_estado: 'PAGADO', estado: { not: 'ANULADO' }, canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] }, cliente_party_id: null });
+    });
+
+    describe('filtros de compra, consumo, puntos, fechas y orden', () => {
+      const dia = (n: number) => new Date(Date.now() - n * 86400000);
+      beforeEach(() => {
+        const p = (id: number, nombre: string, puntos: number, cumpleMes: number | null) => {
+          const r: any = rol(id, nombre, `90000000${id}`);
+          r.customer_detail.puntos = puntos;
+          r.party.persona.cumple_mes = cumpleMes;
+          r.party.persona.cumple_dia = cumpleMes ? 5 : null;
+          return r;
+        };
+        // Nuevo: 1 pedido S/20 · Recurrente: 3 pedidos S/150 · Frecuente: 6 pedidos S/600 hace 90 días · Sin: ninguno
+        const mesActual = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).slice(5, 7));
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+          p(1, 'Nuevo', 0, null), p(2, 'Recurrente', 40, mesActual), p(3, 'Frecuente', 500, null), p(4, 'Sin', 10, null),
+        ]);
+        prismaMock.pedido.groupBy = jest.fn(async (a: any) =>
+          a.by[0] === 'cliente_party_id'
+            ? [
+                { cliente_party_id: 1n, _count: { _all: 1 }, _sum: { total: 20 }, _max: { creado_en: dia(2) } },
+                { cliente_party_id: 2n, _count: { _all: 3 }, _sum: { total: 150 }, _max: { creado_en: dia(10) } },
+                { cliente_party_id: 3n, _count: { _all: 6 }, _sum: { total: 600 }, _max: { creado_en: dia(90) } },
+              ]
+            : [],
+        );
+      });
+      const nombres = async (f: any) => (await service.listarAdmin({ limite: 50, ...f }, { rol: 'ADMIN' })).items.map((i) => i.nombre);
+
+      it('recurrencia: nuevos (1), recurrentes (2+) y frecuentes (5+)', async () => {
+        expect(await nombres({ pedidosMin: 1, pedidosMax: 1 })).toEqual(['Nuevo']);
+        expect(await nombres({ pedidosMin: 2 })).toEqual(['Recurrente', 'Frecuente']);
+        expect(await nombres({ pedidosMin: 5 })).toEqual(['Frecuente']);
+        expect(await nombres({ pedidosMax: 0 })).toEqual(['Sin']);
+      });
+      it('consumo y puntos con mínimo y máximo', async () => {
+        expect(await nombres({ consumoMin: 100, consumoMax: 200 })).toEqual(['Recurrente']);
+        expect(await nombres({ puntosMin: 40 })).toEqual(['Recurrente', 'Frecuente']);
+        expect(await nombres({ puntosMax: 10 })).toEqual(['Nuevo', 'Sin']);
+        expect(await nombres({ conPuntos: 'no' })).toEqual(['Nuevo']);
+        expect(await nombres({ conPuntos: 'si' })).toEqual(['Recurrente', 'Frecuente', 'Sin']);
+      });
+      it('dormidos: compraron alguna vez y su última compra fue hace más de N días', async () => {
+        expect(await nombres({ sinCompraDias: 30 })).toEqual(['Frecuente']);
+        expect(await nombres({ sinCompraDias: 5 })).toEqual(['Recurrente', 'Frecuente']);
+      });
+      it('cumpleaños este mes (Lima)', async () => {
+        expect(await nombres({ cumpleMes: 'si' })).toEqual(['Recurrente']);
+      });
+      it('ordena por más compras, consumo, puntos, última compra y nombre', async () => {
+        expect(await nombres({ orden: 'pedidos' })).toEqual(['Frecuente', 'Recurrente', 'Nuevo', 'Sin']);
+        expect(await nombres({ orden: 'consumo' })).toEqual(['Frecuente', 'Recurrente', 'Nuevo', 'Sin']);
+        expect(await nombres({ orden: 'puntos' })).toEqual(['Frecuente', 'Recurrente', 'Sin', 'Nuevo']);
+        expect(await nombres({ orden: 'ultima' })).toEqual(['Nuevo', 'Recurrente', 'Frecuente', 'Sin']);
+        expect(await nombres({ orden: 'nombre' })).toEqual(['Frecuente', 'Nuevo', 'Recurrente', 'Sin']);
+      });
+      it('con rango, filtra los pedidos por fecha de Lima y la última compra sigue siendo la de siempre', async () => {
+        await service.listarAdmin({ desde: '2026-11-01', hasta: '2026-11-30' }, { rol: 'ADMIN' });
+        const w = prismaMock.pedido.groupBy.mock.calls[0][0].where;
+        expect(w.creado_en).toEqual({ gte: new Date('2026-11-01T05:00:00.000Z'), lte: new Date('2026-12-01T04:59:59.999Z') });
+        // segunda pareja de consultas = historial sin rango
+        expect(prismaMock.pedido.groupBy.mock.calls[2][0].where.creado_en).toBeUndefined();
+      });
+      it('canal: solo cuentan los pedidos de ese canal (WhatsApp incluye al bot)', async () => {
+        await service.listarAdmin({ canal: 'WHATSAPP' }, { rol: 'ADMIN' });
+        const [a, b] = prismaMock.pedido.groupBy.mock.calls.map((c: any) => c[0].where);
+        expect(a.canal).toEqual({ in: ['WHATSAPP', 'BOT'] });
+        expect(b.canal).toEqual({ in: ['WHATSAPP', 'BOT'] });
+      });
+      it('paginación: 24 por defecto', async () => {
+        const r = await service.listarAdmin({}, { rol: 'ADMIN' });
+        expect(r).toMatchObject({ total: 4, pagina: 1, paginas: 1 });
+        const r2 = await service.listarAdmin({ limite: 2, pagina: 2 }, { rol: 'ADMIN' });
+        expect(r2.items).toHaveLength(2);
+        expect(r2.paginas).toBe(2);
+      });
+    });
+
+    describe('exportar y sorteo', () => {
+      beforeEach(() => {
+        const r: any = rol(1, 'María García López', '987654321');
+        r.party.persona.apellidos = null;
+        const sinCel: any = rol(2, 'Sin Celular', '—');
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([r, sinCel]);
+      });
+      it('exportar: solo ADMIN, devuelve un .xlsx real y audita filtros y cantidad sin datos personales', async () => {
+        await expect(service.exportarAdmin({}, { rol: 'CAJERO' })).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+        expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+        const r = await service.exportarAdmin({ pedidosMin: 0, pagina: 3, limite: 24 }, { rol: 'ADMIN', partyId: 7n }, '1.1.1.1');
+        expect(Buffer.from(r.archivo.slice(0, 2)).toString()).toBe('PK');
+        expect(r.nombre).toMatch(/^clientes-\d{4}-\d{2}-\d{2}\.xlsx$/);
+        expect(r.filas).toBe(2);
+        const reg = auditoriaMock.registrar.mock.calls[0][0];
+        expect(reg).toMatchObject({ modulo: 'clientes', accion: 'EXPORTAR_CLIENTES', despues: { filtros: { pedidosMin: 0 }, filas: 2 } });
+        expect(JSON.stringify(reg, (_k, v) => (typeof v === 'bigint' ? String(v) : v))).not.toMatch(/987654321|María|García/);
+      });
+      it('participantes: «María G.» y «···321»; nunca nombre completo ni celular; sin celular no entran', async () => {
+        const r = await service.participantesSorteo({});
+        expect(r).toEqual({ total: 1, participantes: [{ id: '1', nombre: 'María G.', detalle: '···321' }] });
+        expect(JSON.stringify(r)).not.toMatch(/987654321|López|Test/);
+      });
+      it('participantes: con apellidos separados toma la inicial del primer apellido', async () => {
+        const r2: any = rol(3, 'Ana', '911222333');
+        r2.party.persona.apellidos = 'Quispe Rojas';
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([r2]);
+        expect((await service.participantesSorteo({})).participantes[0].nombre).toBe('Ana Q.');
       });
     });
 

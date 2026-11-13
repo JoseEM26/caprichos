@@ -1,4 +1,4 @@
-import { api } from '../../comun/api';
+import { api, obtenerBlobAutenticado } from '../../comun/api';
 import type {
   ClienteItem,
   FichaCliente,
@@ -12,8 +12,31 @@ export interface FiltrosClientes {
   creditoPersonal?: string;
   verificacion?: 'verificados' | 'sin_verificar' | 'todos';
   gastaPuntos?: boolean;
+  /** Rango de los pedidos que se cuentan: hoy, semana, mes o siempre (sin rango) */
+  periodo?: 'hoy' | 'semana' | 'mes' | 'siempre';
+  /** Rango propio, AAAA-MM-DD (día de Lima); manda sobre «periodo» */
+  desde?: string;
+  hasta?: string;
+  pedidosMin?: number;
+  pedidosMax?: number;
+  consumoMin?: number;
+  consumoMax?: number;
+  puntosMin?: number;
+  puntosMax?: number;
+  conPuntos?: 'si' | 'no';
+  /** Clientes dormidos: última compra hace más de N días */
+  sinCompraDias?: number;
+  cumpleMes?: boolean;
+  canal?: 'CARTA' | 'WHATSAPP' | 'CAJA' | 'MOZO';
+  orden?: 'reciente' | 'pedidos' | 'consumo' | 'puntos' | 'ultima' | 'nombre';
   pagina?: number;
   limite?: number;
+}
+
+export interface ParticipanteSorteoApi {
+  id: string;
+  nombre: string;
+  detalle: string;
 }
 
 export interface RespuestaListaClientes {
@@ -50,7 +73,8 @@ export interface AjustarPuntosDto {
   tipo?: 'SUMA' | 'REVERSA' | 'CANJE';
 }
 
-export async function listarClientes(filtros: FiltrosClientes = {}): Promise<RespuestaListaClientes> {
+/** Los mismos parámetros para el listado, la exportación a Excel y los participantes del sorteo. */
+export function paramsClientes(filtros: FiltrosClientes = {}): URLSearchParams {
   const params = new URLSearchParams();
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.tipo && filtros.tipo !== 'Todos') params.set('tipo', filtros.tipo);
@@ -64,9 +88,35 @@ export async function listarClientes(filtros: FiltrosClientes = {}): Promise<Res
   if (filtros.gastaPuntos) params.set('gastaPuntos', 'si');
   if (filtros.pagina) params.set('pagina', String(filtros.pagina));
   if (filtros.limite) params.set('limite', String(filtros.limite));
+  if (filtros.periodo && filtros.periodo !== 'siempre' && !filtros.desde && !filtros.hasta) params.set('periodo', filtros.periodo);
+  if (filtros.desde) params.set('desde', filtros.desde);
+  if (filtros.hasta) params.set('hasta', filtros.hasta);
+  const numeros = ['pedidosMin', 'pedidosMax', 'consumoMin', 'consumoMax', 'puntosMin', 'puntosMax', 'sinCompraDias'] as const;
+  for (const k of numeros) if (filtros[k] !== undefined && Number.isFinite(filtros[k])) params.set(k, String(filtros[k]));
+  if (filtros.conPuntos) params.set('conPuntos', filtros.conPuntos);
+  if (filtros.cumpleMes) params.set('cumpleMes', 'si');
+  if (filtros.canal) params.set('canal', filtros.canal);
+  if (filtros.orden && filtros.orden !== 'reciente') params.set('orden', filtros.orden);
+  return params;
+}
 
-  const query = params.toString();
+export async function listarClientes(filtros: FiltrosClientes = {}): Promise<RespuestaListaClientes> {
+  const query = paramsClientes(filtros).toString();
   return api.get<RespuestaListaClientes>(`/admin/clientes${query ? `?${query}` : ''}`);
+}
+
+/** Participantes del sorteo en vivo: todos los que cumplen los filtros (sin paginar), solo nombre corto y 3 dígitos. */
+export async function listarParticipantesSorteo(filtros: FiltrosClientes = {}): Promise<{ total: number; participantes: ParticipanteSorteoApi[] }> {
+  const p = paramsClientes({ ...filtros, pagina: undefined, limite: undefined });
+  const query = p.toString();
+  return api.get(`/admin/clientes/participantes${query ? `?${query}` : ''}`);
+}
+
+/** Descarga el Excel de TODA la lista filtrada (solo ADMIN). Devuelve un enlace temporal al archivo. */
+export async function exportarClientesExcel(filtros: FiltrosClientes = {}): Promise<string> {
+  const p = paramsClientes({ ...filtros, pagina: undefined, limite: undefined });
+  p.set('_t', String(Date.now())); // que no se reutilice una descarga anterior
+  return obtenerBlobAutenticado(`/admin/clientes/exportar?${p.toString()}`);
 }
 
 export async function obtenerFichaCliente(id: string): Promise<FichaCliente> {

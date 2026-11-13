@@ -54,7 +54,12 @@ export interface ClienteAdminListItem {
   telefono: string;
   correo: string;
   cumpleanos: string;
+  /** Pedidos cobrados dentro del rango elegido (sin rango, todos) */
   pedidos: number;
+  /** Suma de esos pedidos en soles */
+  consumo?: number;
+  /** Última compra cobrada (ISO) */
+  ultimaCompra?: string | null;
   puntos: number;
   creditoPersonal: boolean;
   envioFijo: number | null;
