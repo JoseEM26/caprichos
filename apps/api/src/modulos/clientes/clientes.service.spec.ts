@@ -953,7 +953,7 @@ describe('ClientesService', () => {
 
       it('si el party es de un usuario del equipo: 409 con el mensaje de vincular desde Usuarios', async () => {
         prismaMock.userAccount.findFirst.mockResolvedValue({ id: 1n });
-        await expect(service.crearEnMostrador(dto)).rejects.toMatchObject({ response: { codigo: 'CELULAR_DE_USUARIO', mensaje: 'Ese celular es de un usuario del equipo: vincúlalo desde Usuarios' } });
+        await expect(service.crearEnMostrador(dto)).rejects.toMatchObject({ response: { codigo: 'CELULAR_DE_USUARIO', mensaje: expect.stringContaining('usuario del equipo') } });
         expect(prismaMock.customerAccount.create).not.toHaveBeenCalled();
       });
 

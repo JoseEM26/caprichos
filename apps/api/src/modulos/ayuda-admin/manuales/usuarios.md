@@ -54,14 +54,12 @@ Ver tambien: [[historial]]
    - Si el celular lo usa otro usuario del equipo, o es de una cuenta de cliente ya vinculada a otra persona, o de otra persona, el aviso lo dice en rojo y el sistema no lo guarda.
    Solo el Administrador puede cambiarlo. Lo mismo ocurre al crear un usuario nuevo. La vinculacion automatica solo da el descuento de personal: la cuenta de cliente nunca gana permisos del panel, y no cambia contrasenas ni sesiones. Si la vinculacion no es la correcta, se deshace con Desvincular (ver abajo).
 
-## Como se hace: vincular la cuenta de cliente de un usuario
-Sirve cuando la cuenta de cliente del trabajador tiene un celular distinto al de su usuario. Si es el mismo celular, no hace falta: al escribirlo en su usuario se vincula solo (ver arriba), y las cuentas que ya coincidian se vincularon con una actualizacion automatica.
-1. Solo el Administrador. Pulsa Editar en el usuario y, en la pestana Datos, busca la seccion Cuenta de cliente (carta).
-2. Escribe el celular de 9 digitos de su cuenta de cliente y pulsa Vincular su cuenta de cliente.
-3. El sistema muestra solo el nombre de la cuenta y el celular con puntos (por ejemplo ···123). Si es la persona correcta, confirma con Si, vincular; si no, pulsa No.
-4. Desde ese momento, al entrar a la carta con esa cuenta recibe el descuento de personal. No se junta ni se borra nada: sus puntos, pedidos y direcciones siguen en su cuenta de cliente, y la cuenta de cliente nunca gana permisos del panel.
-5. Para deshacerlo, pulsa Desvincular y confirma con Si, desvincular. Queda anotado en la auditoria.
-6. Si el celular es de una persona que solo hizo pedidos o chateo por WhatsApp (sin cuenta), el sistema pregunta Se creara su cuenta de cliente y quedara vinculada a este trabajador. Continuar? y, con Si, la crea y la vincula (el trabajador pone su contrasena desde la carta con Crear cuenta o Olvidaste tu contrasena). Si el celular no es de ninguna persona del sistema, avisa que no encuentra la cuenta. Una cuenta ya vinculada a otro usuario, o que ya es de un usuario, no se puede vincular. Con el usuario inactivo no hay descuento.
+## Como se hace: ver o quitar la cuenta de cliente de un usuario
+El celular es uno solo: el del usuario. No hay un segundo campo para la cuenta de cliente. Al guardar el celular el sistema decide solo: si esa persona ya tiene cuenta en la carta se vincula (con Si/No cuando el nombre no coincide o hay que crear su cuenta), y si no la tiene queda solo como celular del usuario. Si el celular ya era de un cliente, al crear el usuario se reutiliza a esa misma persona (conserva su nombre, puntos y pedidos). Con la cuenta desactivada aparece el aviso Reactivala primero en Clientes y vuelve a guardar. Si cambias el celular de un trabajador ya vinculado, la vinculacion se mantiene (no se quita sola); para quitarla usa Desvincular.
+1. Solo el Administrador. Pulsa Editar en el usuario y, en la pestana Datos, mira la seccion Cuenta de cliente (carta). Es solo lectura.
+2. Si esta vinculada dice Vinculada a (nombre) (···123) — recibe el descuento de personal. Si no, explica que se vincula sola al guardar el celular.
+3. No se junta ni se borra nada: sus puntos, pedidos y direcciones siguen en su cuenta de cliente, y la cuenta de cliente nunca gana permisos del panel.
+4. Para deshacerlo, pulsa Desvincular y confirma con Si, desvincular. Queda anotado en la auditoria. Con el usuario inactivo no hay descuento.
 Ver tambien: [[creditos]]
 
 ## Como se hace: recibir alertas por WhatsApp

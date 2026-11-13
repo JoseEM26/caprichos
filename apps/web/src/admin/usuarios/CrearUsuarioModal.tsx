@@ -391,6 +391,7 @@ export function CrearUsuarioModal({
                   limpiarError('celular');
                 }}
                 error={errores.celular}
+                ayuda="Con este celular recibe el descuento de personal en la carta; si ya tiene cuenta en la carta se vincula sola"
                 disabled={guardando}
               />
               <AvisoVinculoCelular previa={previaCel.previa} confirmado={previaCel.confirmado} alConfirmar={previaCel.confirmar} alRechazar={() => setCelular('')} />
