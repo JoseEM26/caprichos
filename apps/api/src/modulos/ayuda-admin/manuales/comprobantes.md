@@ -12,6 +12,8 @@ sugerencias:
   - Que datos necesito para emitir una factura
   - Que es el comprobante simple y se envia a SUNAT
   - Como se envia la factura por WhatsApp al cliente
+  - A que hora se envian las boletas y facturas a SUNAT
+  - Como corrijo la boleta o factura despues del cobro
 ---
 # Comprobantes
 
@@ -44,8 +46,27 @@ Ver tambien: [[cierre]]
 3. En Boleta y en Factura hay un solo campo: DNI o RUC. Escribe 8 digitos y es un DNI (boleta); escribe 11 y es un RUC (factura, y pasa sola a Factura si estabas en Boleta). Al completar los digitos el sistema busca el nombre o la razon social y la direccion fiscal; puedes corregirlos. Si dice "No encontramos" o "el servicio no esta disponible", escribe los datos a mano. La boleta lleva el DNI opcional hasta S/ 700 y obligatorio por encima. La factura exige RUC de 11 digitos y razon social. En boleta el nombre del DNI solo se muestra para que confirmes que es la persona correcta; no se guarda.
 4. El DNI de la boleta se guarda solo en el pedido y en el comprobante, nunca en la cuenta del cliente. El RUC de la factura si se guarda en la cuenta del cliente (por su celular), la primera vez que pide factura. Si la cuenta ya tiene un RUC y el cliente escribe otro, ese pedido usa el que escribio y la cuenta conserva el guardado.
 4b. La proxima vez que pida factura, al poner su celular el RUC, la razon social y la direccion fiscal salen puestos y se pueden corregir. En la carta el RUC guardado solo aparece si el cliente inicio sesion. En el bot de WhatsApp el cliente escribe SI para usar su RUC guardado.
-5. Antes de cobrar, en el detalle del pedido pulsa Cambiar comprobante para pasar de uno a otro. Con un comprobante ya emitido hay que anularlo antes.
+5. Antes de cobrar, en el detalle del pedido pulsa Cambiar comprobante para pasar de uno a otro. Ya cobrado, mira el apartado Corregir la boleta o factura despues del cobro.
 6. Solo la boleta y la factura se emiten a SUNAT y aparecen en Electronicos SUNAT; el simple no deja nada pendiente de envio.
+Antes: [[caja]]
+Ver tambien: [[cierre]]
+
+## Como se hace: Envio de boletas y facturas a SUNAT en la noche
+1. Al cobrar, la boleta o la factura NO sale al instante: queda con el estado Se emite esta noche, todavia sin serie ni numero. El ticket del cobro lo dice: Boleta o Factura, se emite hoy por la noche. La factura le llega al cliente por WhatsApp cuando SUNAT la acepta.
+2. Desde la hora configurada (por defecto las 22:00, hora de Lima) el sistema pone serie y numero a cada una, las firma y las envia. Las boletas entran al resumen diario de SUNAT de las 22:30 y las facturas se envian directo.
+3. Asi un cambio del mismo dia no deja huecos de numeracion ni numeros gastados, y no hace falta anular nada.
+4. El Administrador puede cambiar la hora (facturacion_hora_envio, de 0 a 23; para que las boletas entren al resumen de esa misma noche debe ser antes de las 22:30) o volver al envio al instante con facturacion_envio_nocturno en no, desde la configuracion de facturacion.
+5. Un pedido anulado antes de la noche no se emite. Si algo falla al enviar, queda en Electronicos SUNAT con su estado y el boton Reintentar, como siempre.
+6. En Electronicos SUNAT los pendientes de la noche aparecen con la insignia Se emite esta noche.
+Antes: [[caja]]
+Ver tambien: [[cierre]]
+
+## Como se hace: Corregir la boleta o factura despues del cobro
+1. Abre el detalle del pedido, seccion Comprobantes, y pulsa Cambiar comprobante. Lo pueden hacer el Administrador y el Cajero.
+2. Elige simple, boleta o factura, escribe el DNI o el RUC (el sistema busca el nombre o la razon social) y el motivo, de al menos 5 letras. Confirma con Si.
+3. No se emite en ese momento: el pedido muestra Cambiara a Factura RUC (o a lo que elegiste) esta noche. Hasta entonces puedes pulsar Deshacer, o volver a cambiar: el ultimo cambio del dia reemplaza al anterior.
+4. En el envio de la noche se aplica el cambio antes de enviar. Si el comprobante original todavia no habia salido a SUNAT, se reemplaza sin enviar nada. Si ya habia salido (comprobantes de antes del envio nocturno), se da de baja una sola vez y se emite el nuevo.
+5. Cada cambio queda en la auditoria con quien lo pidio y el motivo. Un pedido anulado no se cambia ni se emite.
 Antes: [[caja]]
 Ver tambien: [[cierre]]
 
@@ -61,7 +82,8 @@ Antes: [[caja]]
 Ver tambien: [[mensajes]]
 
 ## Errores y dudas comunes
-- Un pedido con Comprobante simple no tiene boleta ni factura: no sale en Por emitir ni en Electronicos SUNAT. Si el cliente la pide despues, usa Cambiar comprobante antes de cobrar.
+- Un pedido con Comprobante simple no tiene boleta ni factura: no sale en Por emitir ni en Electronicos SUNAT. Si el cliente la pide despues, usa Cambiar comprobante (aunque ya este cobrado: se emite esa noche).
+- Una boleta o factura sin numero que dice Se emite esta noche es normal: el numero se asigna al enviarla. Si pasada la hora sigue asi, avisa al Administrador.
 - Para emitir una factura, es requisito obligatorio contar con un RUC valido de 11 digitos que inicie con 10, 15, 17 o 20 y su correspondiente razon social.
 - En la carta, el cliente que pide factura solo escribe el RUC: la razon social y la direccion fiscal salen de SUNAT (se guardan en el sistema 30 dias) y no se pueden editar. Si SUNAT no responde, el cliente escribe la razon social a mano y queda sin verificar: revisala antes de emitir. Al crear o cambiar un comprobante en Caja, al completar el RUC la razon social se rellena sola y la puedes corregir.
 - La factura por WhatsApp no se manda con la ventana de 24 horas cerrada si no hay plantilla aprobada en Meta: la etiqueta dice Sin ventana de WhatsApp. Pide al cliente que escriba al bot y vuelve a pulsar Reenviar por WhatsApp.

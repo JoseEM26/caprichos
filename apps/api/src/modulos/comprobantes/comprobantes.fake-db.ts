@@ -7,7 +7,7 @@
 type Fila = Record<string, any>;
 type Db = Record<string, any>;
 
-const TABLAS = ['comprobante', 'comprobanteArchivo', 'pedido', 'cobro', 'parametro', 'notificacion', 'auditoria', 'sunatResumen'];
+const TABLAS = ['comprobante', 'comprobanteArchivo', 'pedido', 'cobro', 'parametro', 'notificacion', 'auditoria', 'sunatResumen', 'comprobanteCambioPendiente'];
 /** Relaciones que el código consulta con some/none: tabla hija y clave que apunta al padre. */
 const RELACIONES: Record<string, [string, string]> = { cobros: ['cobro', 'pedido_id'], comprobante: ['comprobante', 'pedido_id'] };
 
@@ -84,6 +84,11 @@ function tabla(db: Db, nombre: string) {
       r.forEach((f) => aplicar(f, data));
       return { count: r.length };
     },
+    deleteMany: async ({ where = {} }: any = {}) => {
+      const borrar = buscar(where);
+      db[nombre] = filas().filter((f) => !borrar.includes(f));
+      return { count: borrar.length };
+    },
     upsert: async ({ where, update, create }: any) => {
       const fila = filas().find((f) => coincide(db, f, where));
       if (fila) {
@@ -130,6 +135,8 @@ function cliente(db: Db): any {
 export function crearBaseFalsa(datos: Partial<Record<string, Fila[]>> = {}) {
   const db: Db = { secuencia: {} };
   for (const t of TABLAS) db[t] = [...(datos[t] ?? [])];
+  // Por defecto, como antes del envío nocturno (emitir al cobrar); las pruebas del lote nocturno lo encienden
+  if (!db.parametro.some((p: Fila) => p.clave === 'facturacion_envio_nocturno')) db.parametro.push({ clave: 'facturacion_envio_nocturno', valor: 'no' });
   return { db, prisma: cliente(db) };
 }
 

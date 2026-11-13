@@ -3,6 +3,7 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { adquirirCandado, liberarCandado } from '../../comun/redis/candado.util';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesSaludService } from './comprobantes-salud.service';
+import { ComprobantesNocturnoService } from './comprobantes-nocturno.service';
 
 /** Cada 5 minutos se reenvían las boletas/facturas pendientes (sin respuesta de SUNAT). */
 export const REINTENTO_FACTURACION_MS = 5 * 60 * 1000;
@@ -21,6 +22,7 @@ export class ComprobantesReintentosService implements OnModuleInit, OnModuleDest
     private readonly comprobantes: ComprobantesService,
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly salud?: ComprobantesSaludService,
+    @Optional() private readonly nocturno?: ComprobantesNocturnoService,
   ) {}
 
   onModuleInit() {
@@ -42,6 +44,8 @@ export class ComprobantesReintentosService implements OnModuleInit, OnModuleDest
     try {
       // 1) barrido de cobros sin comprobante (solo después del corte); 2) reenvío de pendientes; 3) avisos
       await this.comprobantes.barrerPedidosSinComprobante();
+      // Lote de la noche: cambios pendientes y emisión con número (antes del resumen diario de las 22:30)
+      await this.nocturno?.emitirLote().catch((e: any) => this.logger.error(`Lote nocturno: ${e?.message ?? e}`));
       const resultado = await this.comprobantes.reintentarPendientes();
       await this.salud?.revisarAlertas();
       return resultado;

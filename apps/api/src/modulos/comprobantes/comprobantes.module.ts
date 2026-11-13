@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesReintentosService } from './comprobantes-reintentos.service';
+import { ComprobantesNocturnoService } from './comprobantes-nocturno.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
 import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { ComprobanteDefectoService } from './comprobante-defecto.service';
@@ -19,6 +20,7 @@ import { ComprobantesCertificadoAvisoService } from './comprobantes-certificado-
     ComprobantesService,
     ComprobantesReintentosService,
     ComprobantesSunatService,
+    ComprobantesNocturnoService,
     ComprobantesSaludService,
     ComprobanteDefectoService,
     ComprobantesCertificadoAvisoService,

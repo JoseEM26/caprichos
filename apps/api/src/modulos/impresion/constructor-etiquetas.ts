@@ -505,7 +505,7 @@ export function construirTicketPago(
     comprobante: comprobante && !esPersonal
       ? {
           tipo: comprobante.tipo,
-          numero: comprobante.numero_texto,
+          numero: comprobante.numero_texto ?? '',
           // Boleta/factura electrónica: hash y QR en cuanto el XML está firmado; si SUNAT rechazó, se avisa
           ...(comprobante.tipo === 'BOLETA' || comprobante.tipo === 'FACTURA'
             ? (() => {

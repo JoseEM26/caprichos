@@ -7,7 +7,8 @@ import { comprobantesApi } from '../comprobantes/comprobantesApi';
 import { estadoDe } from '../comprobantes/ElectronicosTab';
 import { EnvioWhatsappFactura } from '../comprobantes/EnvioWhatsappFactura';
 import { formatearSoles } from '../comprobantes/utilidades';
-import type { ComprobantePedido } from '../comprobantes/tipos';
+import type { CambioComprobantePendiente, ComprobantePedido } from '../comprobantes/tipos';
+import { CambioComprobanteCobrado } from './CambioComprobanteCobrado';
 import './comprobantes-pedido.css';
 
 export interface SeccionComprobantesPedidoProps {
@@ -27,6 +28,7 @@ const esElectronico = (t: string) => t === 'BOLETA' || t === 'FACTURA';
 /** Estado que ve la persona: lo de SUNAT para boletas y facturas; «Interna» para la nota de venta. */
 export function estadoComprobante(c: ComprobantePedido): { texto: string; variante: VarianteInsignia } {
   if (!esElectronico(c.tipo)) return c.anulado_en ? { texto: 'Anulado', variante: 'neutro' } : { texto: 'Interna (no va a SUNAT)', variante: 'neutro' };
+  if (c.anulado_en && !c.baja_estado && c.facturacion_estado === 'POR_EMITIR_NOCHE') return { texto: 'Anulado (no se emitió)', variante: 'neutro' };
   if (c.anulado_en && !c.baja_estado) return { texto: 'Anulado (no llegó a SUNAT)', variante: 'neutro' };
   return estadoDe(c);
 }
@@ -37,6 +39,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
   const puede = tiene('comprobantes/ver');
   const id = String(pedido.id);
   const [lista, setLista] = useState<ComprobantePedido[] | null>(null);
+  const [cambio, setCambio] = useState<CambioComprobantePendiente | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(puede);
@@ -47,7 +50,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
     setError(null);
     comprobantesApi
       .listarPorPedido(id)
-      .then((r) => setLista(r.elementos ?? []), (e) => setError(e instanceof Error && e.message ? e.message : 'No se pudieron cargar los comprobantes'))
+      .then((r) => { setLista(r.elementos ?? []); setCambio(r.cambio_pendiente ?? null); }, (e) => setError(e instanceof Error && e.message ? e.message : 'No se pudieron cargar los comprobantes'))
       .finally(() => setCargando(false));
   }, [id, puede]);
   useEffect(cargar, [cargar]);
@@ -75,6 +78,10 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
   };
 
   const cobrado = String(pedido.pago_estado ?? '').toUpperCase() === 'PAGADO';
+  // Cobrado: el cambio no emite, queda para el envío de la noche (Caja y ADMIN)
+  const cambioCobrado = cobrado && (
+    <CambioComprobanteCobrado pedidoId={id} total={lista?.[0]?.total} cambio={cambio} puede={tiene('comprobantes/anular')} alCambiar={cargar} />
+  );
   const enlaceNota = puede && cobrado && (
     <a className="cpd-enlace" href={`/admin/comprobantes?tab=nota&pedidoId=${encodeURIComponent(id)}`} target="_blank" rel="noopener noreferrer">
       Ver nota de venta térmica
@@ -89,6 +96,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
         <Insignia variante="neutro">{cobrado ? 'Interna (no va a SUNAT)' : 'Aún sin cobrar'}</Insignia>
       </div>
       {enlaceNota && <div className="cpd-acciones">{enlaceNota}</div>}
+      {cambioCobrado}
     </div>
   );
 
@@ -108,9 +116,9 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
         const electronico = esElectronico(tipo);
         const cdrPosible = c.tiene_cdr;
         return (
-          <article key={c.id} className={`cpd-tarjeta${c.anulado_en ? ' cpd-anulado' : ''}`} data-testid={`comprobante-${c.numero_texto}`} aria-label={`${tipoTexto(tipo)} ${c.numero_texto}`}>
+          <article key={c.id} className={`cpd-tarjeta${c.anulado_en ? ' cpd-anulado' : ''}`} data-testid={`comprobante-${c.numero_texto ?? `pedido-${c.pedido_id}`}`} aria-label={`${tipoTexto(tipo)} ${c.numero_texto ?? 'sin número'}`}>
             <div className="cpd-cab">
-              <strong>{tipoTexto(tipo)} {c.numero_texto}</strong>
+              <strong>{tipoTexto(tipo)} {c.numero_texto ?? '(el número sale en la noche)'}</strong>
               <Insignia variante={est.variante}>{est.texto}</Insignia>
             </div>
             <dl className="cpd-datos">
@@ -139,6 +147,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
           </article>
         );
       })}
+      {cambioCobrado}
       {/* Con boleta o factura, la nota de venta térmica sigue disponible aparte */}
       {enlaceNota && filas.some((c) => esElectronico(String(c.tipo).toUpperCase())) && <div className="cpd-acciones">{enlaceNota}</div>}
     </div>

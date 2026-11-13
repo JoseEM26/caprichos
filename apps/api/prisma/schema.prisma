@@ -800,6 +800,7 @@ model Pedido {
   mesas                  PedidoMesa[]
   reservas               Reserva[]
   comprobante            Comprobante[]
+  cambioComprobante      ComprobanteCambioPendiente?
   reclamos               Reclamo[]
   cuponesEmitidosOrigen  CuponEmitido[]          @relation("CuponesEmitidosOrigen")
   cuponesEmitidosCanje   CuponEmitido[]          @relation("CuponesEmitidosCanje")
@@ -1522,9 +1523,10 @@ model Comprobante {
   // Una sola vigente por pedido (índice parcial en la migración); la anulada se conserva
   pedido_id          BigInt
   tipo               String    // NOTA_VENTA | BOLETA | FACTURA
-  serie              String
-  numero             Int
-  numero_texto       String    @unique
+  // Nulos solo mientras espera el envío de la noche (facturacion_estado POR_EMITIR_NOCHE)
+  serie              String?
+  numero             Int?
+  numero_texto       String?   @unique
   documento          String?
   razon_social       String?
   emision            String    @default("POR_EMITIR") // INTERNA | POR_EMITIR | EMITIDO
@@ -1567,6 +1569,22 @@ model Comprobante {
 
   @@unique([serie, numero])
   @@map("comprobante")
+}
+
+/// Cambio de comprobante pedido sobre un pedido ya cobrado: se aplica en el envío de la noche. Uno por pedido.
+model ComprobanteCambioPendiente {
+  pedido_id      BigInt   @id
+  tipo           String   // SIMPLE | BOLETA | FACTURA
+  documento      String?
+  razon_social   String?
+  direccion      String?
+  motivo         String
+  solicitado_por BigInt?
+  solicitado_en  DateTime @default(now()) @db.Timestamptz
+
+  pedido Pedido @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
+
+  @@map("comprobante_cambio_pendiente")
 }
 
 /// Envío automático de la FACTURA aceptada por SUNAT al WhatsApp del cliente. Una fila por comprobante (la clave única

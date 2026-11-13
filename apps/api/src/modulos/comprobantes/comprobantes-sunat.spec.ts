@@ -222,7 +222,7 @@ describe('proveedor elegido y resumen diario de boletas (sin red)', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       pedido: { findUnique: jest.fn().mockResolvedValue(pedidoBase()) },
-      parametro: { findUnique: jest.fn(async ({ where }: any) => (where.clave === 'facturacion_proveedor' ? { valor: 'SUNAT' } : null)), upsert: jest.fn() },
+      parametro: { findUnique: jest.fn(async ({ where }: any) => (where.clave === 'facturacion_proveedor' ? { valor: 'SUNAT' } : where.clave === 'facturacion_envio_nocturno' ? { valor: 'no' } : null)), upsert: jest.fn() },
       comprobanteArchivo: { create: jest.fn(), findFirst: jest.fn() },
     };
     const auditoria: any = { registrar: jest.fn() };

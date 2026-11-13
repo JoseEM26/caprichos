@@ -8,9 +8,9 @@ export interface ComprobantePorEmitir {
   codigo?: string;
   codigo_pedido?: string;
   tipo: TipoComprobante | string;
-  serie: string;
-  numero: number;
-  numero_texto: string;
+  serie: string | null;
+  numero: number | null;
+  numero_texto: string | null;
   documento: string | null;
   razon_social: string | null;
   total: number;
@@ -225,7 +225,7 @@ export interface EstadoConexionWhatsAppInfo {
 }
 
 /** Estado de la BOLETA/FACTURA ante SUNAT (la lista de «Electrónicos»): PENDIENTE_RESUMEN y ENVIADA_RESUMEN son de la boleta (resumen diario). */
-export type EstadoFacturacion = 'EMITIDO_SUNAT' | 'RECHAZADO' | 'PENDIENTE_ENVIO' | 'PENDIENTE_RESUMEN' | 'ENVIADA_RESUMEN' | 'REVISION_MANUAL';
+export type EstadoFacturacion = 'EMITIDO_SUNAT' | 'RECHAZADO' | 'PENDIENTE_ENVIO' | 'PENDIENTE_RESUMEN' | 'ENVIADA_RESUMEN' | 'REVISION_MANUAL' | 'POR_EMITIR_NOCHE';
 
 /** Proveedor de facturación electrónica (parámetro facturacion_proveedor). */
 export type ProveedorFacturacion = 'SIMULADO' | 'SUNAT';
@@ -252,9 +252,10 @@ export interface ComprobanteElectronico {
   pedido_id: string;
   codigo_pedido: string;
   tipo: 'BOLETA' | 'FACTURA' | string;
-  serie: string;
-  numero: number;
-  numero_texto: string;
+  /** Nulos mientras espera el envío de la noche (facturacion_estado POR_EMITIR_NOCHE) */
+  serie: string | null;
+  numero: number | null;
+  numero_texto: string | null;
   documento: string | null;
   razon_social: string | null;
   total: number;
@@ -284,6 +285,15 @@ export interface ComprobantePedido extends ComprobanteElectronico {
   anulado_motivo: string | null;
   tiene_xml: boolean;
   tiene_cdr: boolean;
+}
+
+/** Cambio de comprobante pedido sobre un pedido cobrado: se aplica en el envío de la noche. */
+export interface CambioComprobantePendiente {
+  tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA';
+  documento: string | null;
+  razon_social: string | null;
+  motivo: string;
+  solicitado_en: string;
 }
 
 export interface RespuestaListarElectronicos {

@@ -206,7 +206,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
 
     // El PDF se genera una vez y viaja a Meta por la Media API (nunca por link: da 131000)
     const pdf = await this.comprobantes.pdfParaEnvio(id);
-    const nombre = nombreArchivoFactura(c.numero_texto);
+    const nombre = nombreArchivoFactura(c.numero_texto as string);
     const conv = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true, phone_number_id: true } });
     const phoneNumberId = conv?.phone_number_id ?? undefined;
     const opciones = { pedidoId: c.pedido.id, ...(phoneNumberId ? { phoneNumberId } : {}), ...(conv ? { conversacionId: conv.id } : {}) };
@@ -214,10 +214,10 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
     if (!mediaId) return this.cerrar(id, 'ERROR', { detalle: 'SUBIDA_MEDIA', reintentar: true }, o);
 
     const enPlantilla = () =>
-      this.mensajeria.enviarPlantilla(telefono, cfg.plantilla, IDIOMA_PLANTILLA_FACTURA, [c.numero_texto], { ...opciones, documentoCabecera: { mediaId, nombre } });
+      this.mensajeria.enviarPlantilla(telefono, cfg.plantilla, IDIOMA_PLANTILLA_FACTURA, [c.numero_texto as string], { ...opciones, documentoCabecera: { mediaId, nombre } });
     let via: 'DOCUMENTO' | 'PLANTILLA' = abierta ? 'DOCUMENTO' : 'PLANTILLA';
     let r: ResultadoEnvioWhatsApp = abierta
-      ? await this.mensajeria.enviarDocumento(telefono, mediaId, nombre, textoFactura(c.numero_texto), opciones)
+      ? await this.mensajeria.enviarDocumento(telefono, mediaId, nombre, textoFactura(c.numero_texto as string), opciones)
       : await enPlantilla();
     // La ventana se cerró entre la consulta y el envío (o Meta la cuenta por otro número): una sola vez con la plantilla
     if (!r.exito && abierta && cfg.plantilla && esErrorVentana(r.errorCodigo, r.errorDetalle)) {

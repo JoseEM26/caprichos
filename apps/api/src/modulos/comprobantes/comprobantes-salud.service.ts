@@ -257,7 +257,7 @@ export class ComprobantesSaludService {
         where: { serie, tipo: { in: ['BOLETA', 'FACTURA'] } },
         select: { numero: true },
       });
-      for (const h of huecosDeNumeracion(numeros.map((n) => n.numero))) {
+      for (const h of huecosDeNumeracion(numeros.map((n) => n.numero as number))) {
         const ok = await this.avisar({
           clave: `hueco:${serie}:${h.desde}-${h.hasta}`,
           titulo: `Hueco en la numeración ${serie}: faltan del ${h.desde} al ${h.hasta}`,

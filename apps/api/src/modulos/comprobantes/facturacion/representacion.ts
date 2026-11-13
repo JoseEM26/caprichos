@@ -33,6 +33,11 @@ export function representacionDe(
   if (estado && ESTADOS_REGULARIZAR.includes(estado)) {
     return { situacion: 'REGULARIZAR', titulo: 'PENDIENTE DE REGULARIZAR: SUNAT no aceptó este comprobante', hash: null, cadenaQr: null, prueba };
   }
+  // Envío nocturno: aún sin serie, número ni firma; se emite en la noche
+  if (estado === 'POR_EMITIR_NOCHE') {
+    const aviso = c.tipo === 'FACTURA' ? 'Factura: se emite hoy por la noche y te llega por WhatsApp' : 'Boleta: se emite hoy por la noche';
+    return { situacion: 'EN_PROCESO', titulo: aviso, hash: null, cadenaQr: null, prueba };
+  }
   if (!c.facturacion_hash || !estado || !ESTADOS_CON_FIRMA.includes(estado)) {
     return { situacion: 'EN_PROCESO', titulo: 'Comprobante electrónico en proceso de envío a SUNAT', hash: null, cadenaQr: null, prueba };
   }

@@ -14,6 +14,7 @@ import type {
   RespuestaListarElectronicos,
   ConfigFacturacion,
   ComprobantePedido,
+  CambioComprobantePendiente,
   ProveedorFacturacion,
   SaludFacturacion,
   ConfigFacturaWhatsapp,
@@ -46,10 +47,25 @@ export const comprobantesApi = {
   },
 
   /** Todos los comprobantes de un pedido y sus extras (solo lectura), vigentes primero. */
-  async listarPorPedido(pedidoId: string): Promise<{ elementos: ComprobantePedido[] }> {
-    return clienteFetch<{ elementos: ComprobantePedido[] }>(
+  async listarPorPedido(pedidoId: string): Promise<{ elementos: ComprobantePedido[]; cambio_pendiente?: CambioComprobantePendiente | null }> {
+    return clienteFetch<{ elementos: ComprobantePedido[]; cambio_pendiente?: CambioComprobantePendiente | null }>(
       `/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}/lista`,
     );
+  },
+
+  /** Pide cambiar el comprobante de un pedido cobrado: se aplica en el envío de la noche. */
+  async cambiarComprobanteCobrado(
+    pedidoId: string,
+    dto: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string; motivo: string },
+  ): Promise<CambioComprobantePendiente | null> {
+    return clienteFetch<CambioComprobantePendiente | null>(`/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}/cambio`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async deshacerCambioComprobante(pedidoId: string): Promise<{ ok: boolean }> {
+    return clienteFetch<{ ok: boolean }>(`/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}/cambio`, { method: 'DELETE' });
   },
 
   async reimprimirNotaVenta(pedidoId: string): Promise<NotaVentaDatos> {

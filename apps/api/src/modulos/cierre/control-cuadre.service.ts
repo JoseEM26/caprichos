@@ -135,12 +135,12 @@ export class ControlCuadreService {
       cobrosDescuadrados,
       anuladosSinDevolucion: anulados.map((a) => ({ pedido: a.codigo, total: Number(a.total) })),
       comprobantesDeMas: comprobantesDeMas.map((c) => ({
-        comprobante: c.numero_texto,
+        comprobante: c.numero_texto ?? 'por emitir esta noche',
         pedido: c.pedido.codigo,
         estadoPedido: c.pedido.estado,
         total: Number(c.pedido.total),
       })),
-      bajasPendientes: bajasPendientes.map((c) => ({ comprobante: c.numero_texto, pedido: c.pedido.codigo })),
+      bajasPendientes: bajasPendientes.map((c) => ({ comprobante: c.numero_texto ?? 'por emitir esta noche', pedido: c.pedido.codigo })),
       alertas,
       cuadra: alertas.length === 0,
     };

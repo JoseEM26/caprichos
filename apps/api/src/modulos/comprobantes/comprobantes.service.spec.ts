@@ -79,8 +79,9 @@ describe('ComprobantesService', () => {
       pedido: {
         findUnique: jest.fn(),
       },
+      // Estas pruebas cubren el camino «emitir al cobrar» (envío nocturno apagado)
       parametro: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn(async ({ where }: any) => (where.clave === 'facturacion_envio_nocturno' ? { valor: 'no' } : null)),
       },
     };
 

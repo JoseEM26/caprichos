@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -17,9 +18,10 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
+import { ComprobantesNocturnoService } from './comprobantes-nocturno.service';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
-import { AnularComprobanteDto, BoletaPorDefectoDto, ConfigFacturacionDto, ReintentarComprobanteDto } from './dto/facturacion.dto';
+import { AnularComprobanteDto, BoletaPorDefectoDto, CambiarComprobanteCobradoDto, ConfigFacturacionDto, ReintentarComprobanteDto } from './dto/facturacion.dto';
 import { ComprobanteDefectoService } from './comprobante-defecto.service';
 
 @Controller('admin/comprobantes')
@@ -30,6 +32,7 @@ export class ComprobantesController {
     private readonly sunatService: ComprobantesSunatService,
     private readonly comprobantesSalud: ComprobantesSaludService,
     private readonly boletaDefecto: ComprobanteDefectoService,
+    private readonly nocturno: ComprobantesNocturnoService,
   ) {}
 
   /**
@@ -194,6 +197,22 @@ export class ComprobantesController {
   async anular(@Param('id') id: string, @Body() dto: AnularComprobanteDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.comprobantesService.anularElectronico(id, dto?.motivo ?? '', req.usuario, ip);
+  }
+
+  /** POST /admin/comprobantes/pedido/:pedidoId/cambio : pide cambiar el comprobante de un pedido cobrado; se aplica en la noche. */
+  @Post('pedido/:pedidoId/cambio')
+  @Permiso('comprobantes', 'anular')
+  async cambiar(@Param('pedidoId') pedidoId: string, @Body() dto: CambiarComprobanteCobradoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.nocturno.solicitarCambio(pedidoId, dto, req.usuario, ip);
+  }
+
+  /** DELETE /admin/comprobantes/pedido/:pedidoId/cambio : deshace el cambio pendiente. */
+  @Delete('pedido/:pedidoId/cambio')
+  @Permiso('comprobantes', 'anular')
+  async deshacerCambio(@Param('pedidoId') pedidoId: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.nocturno.deshacerCambio(pedidoId, req.usuario, ip);
   }
 
   /** POST /admin/comprobantes/:id/emitir-real : reemplaza un comprobante Simulado por uno real a SUNAT. */

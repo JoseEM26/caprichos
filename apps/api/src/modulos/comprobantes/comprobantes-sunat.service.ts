@@ -100,8 +100,8 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
       for (let i = 0; i < grupo.length; i += MAX_LINEAS_RESUMEN) {
         const trozo = grupo.slice(i, i + MAX_LINEAS_RESUMEN);
         const lineas: LineaResumen[] = trozo.map((b) => ({
-          serie: b.serie,
-          numero: b.numero,
+          serie: b.serie as string,
+          numero: b.numero as number,
           documento: b.documento && /^\d{8}$/.test(b.documento) ? b.documento : null,
           totalCents: b.sunat_total_cents ?? 0,
           igvCents: b.sunat_igv_cents ?? 0,

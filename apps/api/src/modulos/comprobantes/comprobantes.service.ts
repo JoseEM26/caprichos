@@ -221,6 +221,9 @@ export class ComprobantesService {
         HttpStatus.CONFLICT,
       );
     }
+    if (c.facturacion_estado === 'POR_EMITIR_NOCHE') {
+      throw new HttpException({ codigo: 'COMPROBANTE_POR_EMITIR_NOCHE', mensaje: 'Se emite esta noche: el PDF con su número sale entonces' }, HttpStatus.CONFLICT);
+    }
     const local = ((await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }))?.valor ?? {}) as Record<string, unknown>;
     const datos = armarDatosPdf(c, c.pedido, local, {
       esAdmin,
@@ -355,9 +358,12 @@ export class ComprobantesService {
     // 4. Serie y correlativo propio de la serie (atómico)
     const cfg = await this.leerConfigFacturacion(db);
     const proveedor: Proveedor = this.proveedorEfectivo(cfg.proveedor);
-    const serie = tipoFinal === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
-    const numero = await siguienteCorrelativo(db, serie);
-    const numeroTexto = formatearCorrelativo(serie, numero);
+    // Envío nocturno: el comprobante espera la noche SIN serie ni número (se asignan al emitirlo, así un cambio del día
+    // no deja huecos). El ticket del cobro sale como nota de venta con el aviso «se emite hoy por la noche».
+    const nocturno = cfg.envioNocturno;
+    const serie = nocturno ? null : tipoFinal === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
+    const numero = serie ? await siguienteCorrelativo(db, serie) : null;
+    const numeroTexto = serie && numero ? formatearCorrelativo(serie, numero) : null;
 
     // 5. Crear fila de comprobante (BOLETA/FACTURA quedan PENDIENTE_ENVIO hasta que SUNAT responda)
     const nuevo = await db.comprobante.create({
@@ -371,7 +377,7 @@ export class ComprobantesService {
         razon_social: razonFinal,
         emision: emisionFinal,
         copias_impresas: 0,
-        facturacion_estado: 'PENDIENTE_ENVIO',
+        facturacion_estado: nocturno ? 'POR_EMITIR_NOCHE' : 'PENDIENTE_ENVIO',
         emisor: proveedor,
         simulado: proveedor === 'SIMULADO',
       },
@@ -401,7 +407,7 @@ export class ComprobantesService {
     // 7. Envío a SUNAT. Con tx no hay red: la fila PENDIENTE_ENVIO es el outbox y el envío lo hace el worker
     // (o el envío post-commit de Caja). Sin tx, se envía al momento.
     let enviado: any = nuevo;
-    if (!tx) {
+    if (!tx && !nocturno) {
       try {
         enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip, automatico: true, interactivo: !!usuario });
       } catch {
@@ -817,7 +823,7 @@ export class ComprobantesService {
       });
       for (const f of filas) {
         try {
-          const r = await this.sunatEmisor.consultar({ tipo: 'FACTURA', serie: f.serie, numero: f.numero, timeoutMs: TIMEOUT_SUNAT_MS });
+          const r = await this.sunatEmisor.consultar({ tipo: 'FACTURA', serie: f.serie as string, numero: f.numero as number, timeoutMs: TIMEOUT_SUNAT_MS });
           if (!r) continue;
           await this.guardarArchivos(f.id, r.archivos ?? []);
           const respuesta = textoRespuesta(r.respuesta);
@@ -913,8 +919,8 @@ export class ComprobantesService {
       const res = await this.sunatEmisor.firmarComprobante({
         id: c.id,
         tipo: c.tipo as 'BOLETA' | 'FACTURA',
-        serie: c.serie,
-        numero: c.numero,
+        serie: c.serie as string,
+        numero: c.numero as number,
         intentos: c.facturacion_intentos ?? 0,
         datos,
       });
@@ -1229,7 +1235,7 @@ export class ComprobantesService {
     });
     if (!c) return null;
     const motivo = (motivoRaw || '').trim().length >= 5 ? motivoRaw.trim() : 'Cobro anulado en caja';
-    const sinSalir = c.facturacion_estado === 'RECHAZADO' || (c.facturacion_estado === 'PENDIENTE_ENVIO' && !((c.facturacion_intentos ?? 0) > 0));
+    const sinSalir = c.facturacion_estado === 'RECHAZADO' || c.facturacion_estado === 'POR_EMITIR_NOCHE' || (c.facturacion_estado === 'PENDIENTE_ENVIO' && !((c.facturacion_intentos ?? 0) > 0));
     let estado: string;
     if (sinSalir) {
       estado = 'ANULADO_SIN_ENVIAR';
@@ -1260,7 +1266,7 @@ export class ComprobantesService {
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     });
-    return { comprobante: c.numero_texto, estado };
+    return { comprobante: c.numero_texto ?? 'sin número', estado };
   }
 
   /** Repite las bajas que SUNAT no recibió (PENDIENTE_BAJA). Una pasada del barrido; nunca lanza. */
@@ -1341,7 +1347,7 @@ export class ComprobantesService {
     });
     const porId = new Map<string, { codigo: string; total: number }>(pedidos.map((p: any) => [p.id.toString(), { codigo: p.codigo, total: Number(p.total) }]));
     const ids = pedidos.map((p: any) => p.id);
-    if (ids.length === 0) return { elementos: [] };
+    if (ids.length === 0) return { elementos: [], cambio_pendiente: null };
     const filas = await this.prisma.comprobante.findMany({ where: { pedido_id: { in: ids } } });
     const archivos = filas.length
       ? await this.prisma.comprobanteArchivo.findMany({ where: { comprobante_id: { in: filas.map((c: any) => c.id) } }, select: { comprobante_id: true, tipo: true } })
@@ -1367,7 +1373,12 @@ export class ComprobantesService {
           tiene_cdr: tiene(c.id, 'CDR'),
         };
       });
-    return { elementos };
+    // Cambio pendiente de este pedido (se aplica en la noche), con el documento enmascarado salvo para ADMIN
+    const cambio = await this.prisma.comprobanteCambioPendiente.findUnique({ where: { pedido_id: pedidoId } }).catch(() => null);
+    const cambio_pendiente = cambio
+      ? { tipo: cambio.tipo, documento: esAdmin ? cambio.documento : cambio.documento ? enmascararDni(cambio.documento) : null, razon_social: cambio.razon_social, motivo: cambio.motivo, solicitado_en: cambio.solicitado_en }
+      : null;
+    return { elementos, cambio_pendiente };
   }
 
   /**
@@ -1435,6 +1446,8 @@ export class ComprobantesService {
     const aceptadoSunat = comprobante.facturacion_estado === 'EMITIDO_SUNAT';
     const aviso = !esBoletaOFactura || aceptadoSunat
       ? null
+      : comprobante.facturacion_estado === 'POR_EMITIR_NOCHE'
+        ? `${comprobante.tipo === 'FACTURA' ? 'Factura' : 'Boleta'}: se emite hoy por la noche${comprobante.tipo === 'FACTURA' ? ' y te llega por WhatsApp' : ''}`
       : comprobante.facturacion_estado === 'RECHAZADO'
         ? 'Rechazado por SUNAT: revisar en Comprobantes'
         : comprobante.facturacion_estado === 'PENDIENTE_ENVIO'
@@ -1450,7 +1463,8 @@ export class ComprobantesService {
       razon_social: comprobante.razon_social ?? pedido.comprobante_razon ?? null,
     };
 
-    const numeroTexto = comprobante.numero_texto;
+    // Sin número SUNAT todavía (se asigna en la noche): el ticket lleva el código del pedido
+    const numeroTexto = comprobante.numero_texto ?? pedido.codigo;
     const nombreDocumento = aceptadoSunat
       ? comprobante.tipo === 'FACTURA' ? 'Factura electrónica' : 'Boleta de venta electrónica'
       : 'Nota de venta';
@@ -1803,6 +1817,12 @@ export class ComprobantesService {
     }
 
     // Con envío pendiente, emitirlo a mano en el facturador duplicaría el comprobante al reenviarse
+    if (comprobante.facturacion_estado === 'POR_EMITIR_NOCHE') {
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_POR_EMITIR_NOCHE', mensaje: 'Se emite esta noche por el envío automático: no se marca a mano' },
+        HttpStatus.CONFLICT,
+      );
+    }
     if (comprobante.facturacion_estado === 'PENDIENTE_ENVIO' || comprobante.facturacion_estado === 'REVISION_MANUAL') {
       throw new HttpException(
         {
@@ -1880,6 +1900,8 @@ export class ComprobantesService {
       serieFactura: cfg.serieFactura,
       proveedor: cfg.proveedor,
       proveedor_efectivo: this.proveedorEfectivo(cfg.proveedor),
+      envio_nocturno: cfg.envioNocturno ? 'si' : 'no',
+      hora_envio: cfg.horaEnvio,
       sunat: {
         ambiente: sunat ? sunat.config().ambiente : ambienteSunat(),
         credenciales: sunat?.disponible() ?? false,
@@ -1896,12 +1918,16 @@ export class ComprobantesService {
       [CLAVES_FACTURACION.serieBoleta]: dto.serieBoleta,
       [CLAVES_FACTURACION.serieFactura]: dto.serieFactura,
       [CLAVES_FACTURACION.proveedor]: dto.proveedor ?? antes.proveedor,
+      [CLAVES_FACTURACION.envioNocturno]: dto.envioNocturno ?? (antes.envioNocturno ? 'si' : 'no'),
+      [CLAVES_FACTURACION.horaEnvio]: dto.horaEnvio ?? antes.horaEnvio,
     });
     const valores: Array<[string, unknown]> = [
       [CLAVES_FACTURACION.igv, nueva.igvPct],
       [CLAVES_FACTURACION.serieBoleta, nueva.serieBoleta],
       [CLAVES_FACTURACION.serieFactura, nueva.serieFactura],
       [CLAVES_FACTURACION.proveedor, nueva.proveedor],
+      [CLAVES_FACTURACION.envioNocturno, nueva.envioNocturno ? 'si' : 'no'],
+      [CLAVES_FACTURACION.horaEnvio, nueva.horaEnvio],
     ];
     for (const [clave, valor] of valores) {
       await this.prisma.parametro.upsert({ where: { clave }, update: { valor: valor as any }, create: { clave, valor: valor as any } });

@@ -22,6 +22,7 @@ export function estadoDe(c: Pick<ComprobanteElectronico, 'baja_estado' | 'factur
   if (c.baja_estado === 'SOLICITADA') return { texto: 'Baja solicitada', variante: 'aviso' };
   if (c.baja_estado === 'PENDIENTE_RESUMEN') return { texto: 'Baja en el resumen diario', variante: 'aviso' };
   if (c.facturacion_estado === 'EMITIDO_SUNAT') return c.simulado ? { texto: 'Simulado', variante: 'aviso' } : { texto: 'Emitido SUNAT', variante: 'exito' };
+  if (c.facturacion_estado === 'POR_EMITIR_NOCHE') return { texto: 'Se emite esta noche', variante: 'acento' };
   if (c.facturacion_estado === 'PENDIENTE_ENVIO') return { texto: 'Pendiente de envío', variante: 'aviso' };
   if (c.facturacion_estado === 'PENDIENTE_RESUMEN') return { texto: 'Pendiente de resumen diario', variante: 'aviso' };
   if (c.facturacion_estado === 'ENVIADA_RESUMEN') return { texto: 'En resumen diario (espera a SUNAT)', variante: 'aviso' };
@@ -464,9 +465,11 @@ export function ElectronicosTab() {
                 {c.baja_estado === 'RECHAZADA' && <div style={{ fontSize: 12, marginTop: 4, color: 'var(--cp-red, #b00020)' }}>SUNAT rechazó la baja: revise la respuesta</div>}
                 <EnvioWhatsappFactura comprobante={c} puedeReenviar={tiene('comprobantes/emitir') && !c.baja_estado} alCambiar={() => void cargar(pagina)} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                  <Boton variante="secundario" onClick={() => verPdf(c)} style={{ minHeight: ALTO_TOQUE }}>
-                    Ver PDF
-                  </Boton>
+                  {c.facturacion_estado !== 'POR_EMITIR_NOCHE' && (
+                    <Boton variante="secundario" onClick={() => verPdf(c)} style={{ minHeight: ALTO_TOQUE }}>
+                      Ver PDF
+                    </Boton>
+                  )}
                   {c.enlace_pdf && (
                     <a href={c.enlace_pdf} target="_blank" rel="noopener noreferrer" style={{ minHeight: ALTO_TOQUE, display: 'inline-flex', alignItems: 'center', padding: '0 14px', fontWeight: 700 }}>
                       Ver PDF
@@ -478,7 +481,7 @@ export function ElectronicosTab() {
                         XML firmado
                       </Boton>
                       {/* La constancia (CDR) existe solo cuando SUNAT ya respondió: en espera de resumen no hay nada que bajar */}
-                      {!['PENDIENTE_ENVIO', 'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN'].includes(String(c.facturacion_estado)) && (
+                      {!['POR_EMITIR_NOCHE', 'PENDIENTE_ENVIO', 'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN'].includes(String(c.facturacion_estado)) && (
                         <Boton variante="secundario" onClick={() => descargar(c, 'CDR')} style={{ minHeight: ALTO_TOQUE }}>
                           CDR SUNAT
                         </Boton>

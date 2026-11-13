@@ -21,6 +21,27 @@ export class AnularComprobanteDto {
   motivo!: string;
 }
 
+/** Cambio de comprobante de un pedido ya cobrado: se aplica en el envío de la noche. */
+export class CambiarComprobanteCobradoDto {
+  @IsIn(['SIMPLE', 'BOLETA', 'FACTURA'], { message: 'Elige comprobante simple, boleta o factura' })
+  tipo!: 'SIMPLE' | 'BOLETA' | 'FACTURA';
+
+  @IsOptional()
+  @IsString()
+  doc?: string;
+
+  @IsOptional()
+  @IsString()
+  razon?: string;
+
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @IsString({ message: 'El motivo es obligatorio' })
+  motivo!: string;
+}
+
 /** Parámetros de facturación electrónica editables por ADMIN (Configuración). */
 export class ConfigFacturacionDto {
   @Type(() => Number)
@@ -41,6 +62,19 @@ export class ConfigFacturacionDto {
   @IsOptional()
   @IsIn(['SIMULADO', 'SUNAT'], { message: 'El proveedor debe ser SIMULADO o SUNAT' })
   proveedor?: 'SIMULADO' | 'SUNAT';
+
+  /** si = boletas y facturas se emiten en la noche; no = al cobrar. Sin valor no cambia. */
+  @IsOptional()
+  @IsIn(['si', 'no'], { message: 'El envío nocturno es si o no' })
+  envioNocturno?: 'si' | 'no';
+
+  /** Hora Lima (0 a 23) desde la que corre el lote de la noche. Sin valor no cambia. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 }, { message: 'La hora debe ser un entero' })
+  @Min(0)
+  @Max(23)
+  horaEnvio?: number;
 }
 
 
