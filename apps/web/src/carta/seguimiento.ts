@@ -13,6 +13,10 @@ const EVENTO_CAMBIO = 'caprichos:pedidos-cambio';
 const MODALIDADES: ModalidadEntrega[] = ['DELIVERY', 'RECOGER', 'COMER_LOCAL'];
 
 export interface PedidoGuardado {
+  /** Id del pedido (para pagar en línea desde «Mi pedido») */
+  id?: string;
+  /** Se pidió con «Tarjeta / Yape en línea» */
+  enLinea?: boolean;
   codigo: string;
   token: string;
   modalidad: ModalidadEntrega;

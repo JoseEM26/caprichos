@@ -1,6 +1,11 @@
 import { api } from '../../comun/api';
 
 export type MedioCulqi = 'TARJETA' | 'YAPE';
+/** Nombre del medio en pago.metodo al crear el pedido (lo acepta el backend). */
+export const METODO_CULQI = 'CULQI' as const;
+
+export type MedioDevolucion = 'CULQI' | 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+
 export type ModoCulqi = 'SIMULADO' | 'REAL';
 
 export interface ConfigCulqi {
@@ -35,6 +40,12 @@ export interface PagoOnline {
   culqiId: string | null;
   creadoEn: string;
   devuelto: boolean;
+  pedidoEstado?: string;
+  montoDevuelto?: number;
+  devoluciones?: { monto: number; medio: string; en: string }[];
+  /** Cobrado en Culqi pero aún sin registrar en Caja. */
+  cobroPendiente?: boolean;
+  modo?: ModoCulqi;
 }
 
 export interface FiltrosPagosOnline {
@@ -46,7 +57,8 @@ export interface FiltrosPagosOnline {
 
 export const culqiApi = {
   config: () => api.get<ConfigCulqi>('/carta/pagos/culqi/config'),
-  intento: (pedidoId: string) => api.post<IntentoCulqi>('/carta/pagos/culqi/intento', { pedidoId }),
+  intento: (pedidoId: string, seguimientoToken?: string) =>
+    api.post<IntentoCulqi>('/carta/pagos/culqi/intento', { pedidoId, ...(seguimientoToken ? { seguimientoToken } : {}) }),
   cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string }) =>
     api.post<ResultadoCargo>('/carta/pagos/culqi/cargo', cuerpo),
   listar: (f: FiltrosPagosOnline) => {
@@ -55,7 +67,7 @@ export const culqiApi = {
     q.set('pagina', String(f.pagina ?? 1));
     return api.get<{ items: PagoOnline[]; total: number }>(`/admin/pagos-online?${q}`);
   },
-  devolver: (id: string, cuerpo: { monto?: number; motivo: string }) =>
+  devolver: (id: string, cuerpo: { monto?: number; motivo: string; medio: MedioDevolucion; confirmar?: boolean }) =>
     api.post(`/admin/pagos-online/${encodeURIComponent(id)}/devolver`, cuerpo),
 };
 

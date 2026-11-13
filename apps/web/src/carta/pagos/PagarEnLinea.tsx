@@ -4,7 +4,8 @@ import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { abrirCulqi, culqiApi, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
-type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'error';
+type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
+export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
 const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
@@ -14,7 +15,7 @@ const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
 ];
 
 /** «Pagar ahora con tarjeta o Yape» (Culqi). No pinta nada si la pasarela no está activa. */
-export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagado?: () => void }) {
+export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado }: { pedidoId: string; token?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void }) {
   const [config, setConfig] = useState<ConfigCulqi | null>(null);
   const [fase, setFase] = useState<Fase>('cargando');
   const [mensaje, setMensaje] = useState('');
@@ -32,8 +33,6 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
     };
   }, []);
 
-  if (!config?.activo) return null;
-
   const cobrar = async (token: string, medio: MedioCulqi, email?: string, ya?: IntentoCulqi) => {
     const it = ya ?? intento;
     if (!it) return;
@@ -46,8 +45,9 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
       } else if (r.estado === 'RECHAZADO') {
         setFase('rechazado');
       } else {
-        setFase('rechazado');
-        setMensaje(r.mensaje || 'Tu pago está pendiente. Si te descontaron, avísanos.');
+        // PENDIENTE: no se ofrece reintentar; el seguimiento se refresca
+        setFase('pendiente');
+        alPagado?.();
       }
     } catch (e) {
       setMensaje(e instanceof ErrorApi ? e.message : 'No pudimos conectar. Revisa tu internet y reintenta.');
@@ -61,7 +61,7 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
     setFase('pagando');
     setMensaje('');
     try {
-      const it = await culqiApi.intento(pedidoId);
+      const it = await culqiApi.intento(pedidoId, tokenSeguimiento); // cada intento es nuevo: uno rechazado no se reutiliza
       setIntento(it);
       if (it.modo === 'SIMULADO') {
         if (token && medio) await cobrar(token, medio, undefined, it);
@@ -72,6 +72,10 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
         else await cobrar(res.token, res.medio, res.email, it);
       }
     } catch (e) {
+      if (e instanceof ErrorApi && e.codigo === 'PAGO_ONLINE_APAGADO') {
+        setConfig(null);
+        return;
+      }
       setMensaje(e instanceof ErrorApi ? e.message : e instanceof Error ? e.message : 'No pudimos conectar. Reintenta.');
       setFase('error');
     } finally {
@@ -79,6 +83,16 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
     }
   };
 
+  const iniciado = useRef(false);
+  useEffect(() => {
+    if (auto && config?.activo && config.modo === 'REAL' && !iniciado.current) {
+      iniciado.current = true;
+      void pagar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, config]);
+
+  if (!config?.activo) return null;
   if (fase === 'cargando') return <Cargando />;
 
   const simulado = config.modo === 'SIMULADO';
@@ -86,7 +100,11 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
 
   return (
     <section className="sg-tarjeta" aria-label="Pagar en línea" data-testid="pagar-en-linea">
-      {fase === 'aprobado' ? (
+      {fase === 'pendiente' ? (
+        <p role="status" data-testid="pago-pendiente" style={{ margin: 0, fontWeight: 700 }}>
+          Estamos confirmando tu pago, no vuelvas a pagar.
+        </p>
+      ) : fase === 'aprobado' ? (
         <p role="status" data-testid="pago-aprobado" style={{ margin: 0, color: 'var(--cp-green)', fontWeight: 700 }}>
           Pago aprobado, tu pedido ya está en cocina. {mensaje}
         </p>
@@ -94,7 +112,7 @@ export function PagarEnLinea({ pedidoId, alPagado }: { pedidoId: string; alPagad
         <>
           <strong style={{ color: 'var(--cp-navy)' }}>Pagar ahora con tarjeta o Yape</strong>
           <p className="sg-detalle" style={{ margin: '4px 0 8px' }}>
-            Pagas el total del pedido, sin recargo. Al aprobarse, tu pedido pasa a cocina.
+            Pagas el total del pedido, sin recargo. {AVISO_PAGO_EN_LINEA}
           </p>
           {fase === 'rechazado' && (
             <p role="alert" data-testid="pago-rechazado" style={{ color: 'var(--cp-rust)', margin: '0 0 8px' }}>

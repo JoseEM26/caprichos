@@ -55,3 +55,38 @@ describe('PagarEnLinea', () => {
     expect(await screen.findByTestId('pago-error')).toBeTruthy();
   });
 });
+
+describe('PagarEnLinea (ajustes)', () => {
+  it('manda el token de seguimiento al pedir el intento', async () => {
+    vi.spyOn(culqiApi, 'cargo').mockResolvedValue({ estado: 'APROBADO', mensaje: '', pedidoCodigo: 'A1' });
+    render(<PagarEnLinea pedidoId="p1" token="seg1" />);
+    fireEvent.click(await screen.findByText('Probar tarjeta aprobada'));
+    await screen.findByTestId('pago-aprobado');
+    expect(culqiApi.intento).toHaveBeenCalledWith('p1', 'seg1');
+  });
+
+  it('PENDIENTE no ofrece reintentar', async () => {
+    vi.spyOn(culqiApi, 'cargo').mockResolvedValue({ estado: 'PENDIENTE', mensaje: '', pedidoCodigo: 'A1' });
+    render(<PagarEnLinea pedidoId="p1" />);
+    fireEvent.click(await screen.findByText('Probar tarjeta aprobada'));
+    expect((await screen.findByTestId('pago-pendiente')).textContent).toMatch(/no vuelvas a pagar/);
+    expect(screen.queryByText('Probar tarjeta aprobada')).toBeNull();
+  });
+
+  it('tras un rechazo pide un intento nuevo', async () => {
+    vi.spyOn(culqiApi, 'cargo').mockResolvedValue({ estado: 'RECHAZADO', mensaje: 'x', pedidoCodigo: 'A1' });
+    render(<PagarEnLinea pedidoId="p1" />);
+    fireEvent.click(await screen.findByText('Probar tarjeta rechazada'));
+    await screen.findByTestId('pago-rechazado');
+    fireEvent.click(screen.getByText('Probar Yape aprobado'));
+    await waitFor(() => expect(culqiApi.intento).toHaveBeenCalledTimes(2));
+  });
+
+  it('PAGO_ONLINE_APAGADO oculta el pago', async () => {
+    const { ErrorApi } = await import('../../../comun/api');
+    vi.spyOn(culqiApi, 'intento').mockRejectedValue(new ErrorApi('PAGO_ONLINE_APAGADO', 'apagado', 403));
+    const { container } = render(<PagarEnLinea pedidoId="p1" />);
+    fireEvent.click(await screen.findByText('Probar tarjeta aprobada'));
+    await waitFor(() => expect(container.textContent).toBe(''));
+  });
+});

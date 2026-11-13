@@ -89,7 +89,7 @@ function useCambiosPorPestana(activa: IdPestana, estado: EstadoSeguimiento | nul
 
 function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: TarjetaSeguimientoProps) {
   const { estado, error, refrescar } = useSeguimientoPedido(pedido.codigo, pedido.token);
-  const [activa, setActiva] = useState<IdPestana>('estado');
+  const [activa, setActiva] = useState<IdPestana>(creacion && pedido.enLinea ? 'pago' : 'estado');
   const cambiadas = useCambiosPorPestana(activa, estado);
   const anulado = estado?.anulado === true;
   // Lo que paga el cliente: la venta más la propina (si dejó)
@@ -119,7 +119,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'pago',
       etiqueta: 'Pago',
       insignia: marca('pago'),
-      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id} />,
+      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} />,
     },
   ];
   const cambiosTexto = [...cambiadas].map((id) => ({ estado: 'Estado', pedido: 'Mi pedido', pago: 'Pago' })[id]).join(', ');
@@ -361,9 +361,11 @@ function PanelPedido({
 }
 
 function PanelPago({
-  pedido, estado, total, onSubida, pedidoId,
+  pedido, estado, total, onSubida, pedidoId, token, auto,
 }: {
   pedidoId?: string;
+  token?: string;
+  auto?: boolean;
   pedido: PedidoGuardado;
   estado: EstadoSeguimiento | null;
   total: number | undefined;
@@ -382,7 +384,7 @@ function PanelPago({
   return (
     <>
       {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
-        <PagarEnLinea pedidoId={String(pedidoId)} alPagado={onSubida} />
+        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} alPagado={onSubida} />
       )}
       {resumen && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">

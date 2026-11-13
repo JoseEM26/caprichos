@@ -26,6 +26,8 @@ import { mensajeExceso, excesosDeStock, lineasSaborIncompletas, mensajeSaborQued
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
+import { culqiApi, METODO_CULQI } from './pagos/culqiApi';
+import { AVISO_PAGO_EN_LINEA } from './pagos/PagarEnLinea';
 import { armarPlanCarta, medioPrincipalCarta } from './pagoDividido';
 import {
   ConsultaEnvioRespuesta,
@@ -176,6 +178,12 @@ export function FormularioCheckout({
   const [pagaCon, setPagaCon] = useState('');
   // Pago dividido: dos medios; el primero lleva el monto y el segundo, el resto
   const [dividirPago, setDividirPago] = useState(false);
+  const [culqiActivo, setCulqiActivo] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    culqiApi.config().then((c) => vivo && setCulqiActivo(Boolean(c.activo))).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
   const [monto1Texto, setMonto1Texto] = useState('');
   const [medio2, setMedio2] = useState<MetodoPago | null>(null);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
@@ -870,6 +878,8 @@ export function FormularioCheckout({
       cerrarCheckout();
       void cuentaCtx?.refrescar();
       guardarPedido({
+        id: respuesta.id,
+        enLinea: metodoPago === METODO_CULQI,
         codigo: respuesta.codigo,
         token: respuesta.seguimientoToken,
         modalidad,
@@ -2136,10 +2146,35 @@ export function FormularioCheckout({
                           );
                         },
                       )}
+                      {culqiActivo && (
+                        <button
+                          type="button"
+                          data-testid="medio-culqi"
+                          aria-pressed={metodoPago === METODO_CULQI}
+                          onClick={() => { setMetodoPago(METODO_CULQI); setDividirPago(false); setMedio2(null); setMonto1Texto(''); }}
+                          style={{
+                            minHeight: '44px',
+                            padding: '0 14px',
+                            borderRadius: '10px',
+                            border: metodoPago === METODO_CULQI ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)',
+                            backgroundColor: metodoPago === METODO_CULQI ? 'var(--cp-sand)' : 'var(--cp-white)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                          }}
+                        >
+                          Tarjeta / Yape en línea
+                        </button>
+                      )}
                     </div>
+                    {metodoPago === METODO_CULQI && (
+                      <div data-testid="aviso-culqi" style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Pagas el total ahora, sin recargo, con tarjeta o Yape. {AVISO_PAGO_EN_LINEA}
+                      </div>
+                    )}
 
                     {/* Pago dividido: dos medios (p. ej. Yape S/ 38 y el resto en efectivo al recibir) */}
-                    <button
+                    {metodoPago !== METODO_CULQI && <button
                       type="button"
                       data-testid="alternar-pago-dividido"
                       aria-pressed={dividirPago}
@@ -2151,7 +2186,7 @@ export function FormularioCheckout({
                       style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px dashed var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
                     >
                       {dividirPago ? 'Pagar con un solo medio' : 'Pagar con 2 medios'}
-                    </button>
+                    </button>}
 
                     {dividirPago && (
                       <div data-testid="pago-dividido" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
