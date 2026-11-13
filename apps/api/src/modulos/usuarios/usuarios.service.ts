@@ -1093,7 +1093,8 @@ export class UsuariosService {
         where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
       });
       if (otro && otro.id !== docAnterior?.id) {
-        throw new ConflictException({ codigo: 'DNI_DUPLICADO', mensaje: 'El DNI ya se encuentra registrado en el sistema' });
+        const esEquipo = await this.prisma.userAccount.findFirst({ where: { party_id: otro.party_id }, select: { id: true } });
+        throw new ConflictException({ codigo: 'DNI_DUPLICADO', mensaje: `Ese documento ya es de ${esEquipo ? 'otro usuario' : 'un cliente'}. Revísalo en la vista previa` });
       }
     }
     const reingresar = dniCambia && esPropia;

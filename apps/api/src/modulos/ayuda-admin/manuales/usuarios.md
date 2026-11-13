@@ -90,6 +90,14 @@ Ver tambien: [[usuarios]]
 ## Como se hace: Registrar un usuario por pasos y con otros documentos
 1. En Personal pulsa + Nuevo usuario. El formulario va por pasos: Datos personales, Puesto, Horario y Reemplazos, y termina con un Resumen final.
 2. En Tipo de documento puedes elegir DNI (8 digitos) u otro documento (carne de extranjeria, cedula, pasaporte, de 7 a 12 letras y numeros). Un documento repetido da DNI_DUPLICADO.
+
+## Como se hace: Cambiar el documento de un usuario y revisar de quien es
+1. Editar usuario, pestana Datos: elige el Tipo de documento y escribe el Nuevo numero de documento (vacio para no cambiarlo). En cuanto el numero tiene el largo valido, el sistema revisa de quien es antes de guardar; no escribe nada.
+2. Documento libre: sale "Documento libre: se puede usar" y sigues con tu contrasena de administrador.
+3. Si ya es de otra persona del equipo, sale en rojo su nombre de pila y su rol, y no se puede guardar ese numero.
+4. Si ya es de un cliente, sale su ficha: nombre, cliente desde, sus puntos, pedidos pagados, ultimo pedido, celular terminado en 3 digitos y si su cuenta esta activa. El documento del usuario NO cambia ni se fusionan personas. Pregunta "Es la misma persona?": con "Si, vincular su cuenta de cliente" (y un Si/No) esa cuenta queda vinculada al trabajador y recibe el descuento de personal; si los nombres no coinciden pide confirmar que es la misma persona. Con "No, es otra persona" se borra el numero escrito.
+5. Si el numero tiene 9 digitos y empieza en 9 y no es DNI, avisa que parece un celular y pregunta si es el documento correcto.
+6. Si aun asi se intenta guardar un documento ajeno, da DNI_DUPLICADO: "Ese documento ya es de otro usuario / un cliente. Revisalo en la vista previa".
 3. Si el rol es Cocina, marca las Areas que atiende (sin ninguna marcada ve todas). Ver [[cocina]].
 4. Las pestanas de la pantalla son: Personal, Clientes, Horarios y turnos y Que ve cada rol. En Horarios y turnos se cargan los turnos que usa la [[asistencia]] para calcular tardanzas.
 6. Ese horario tambien decide cuando suena la campana de notificaciones: fuera de turno queda en silencio (los avisos se siguen viendo). El Administrador, las personas 24/7 y quienes no tienen horario suenan siempre.

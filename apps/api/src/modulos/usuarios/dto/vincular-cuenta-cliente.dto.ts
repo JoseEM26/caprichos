@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class VincularCuentaClienteDto {
   /** Celular de 9 dígitos de la cuenta de cliente de esa persona. */
@@ -17,4 +17,19 @@ export class PreviaCelularUsuarioDto extends VincularCuentaClienteDto {
   @IsString()
   @MaxLength(120)
   apellidos?: string;
+}
+
+/** Documento a revisar (o por el que vincular la cuenta de cliente). El servidor valida tipo y formato. */
+export class DocumentoUsuarioDto {
+  @IsString()
+  @MaxLength(10)
+  tipoDocumento!: string;
+
+  @IsString()
+  @MaxLength(20)
+  documento!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmaMismaPersona?: boolean;
 }

@@ -37,7 +37,7 @@ import { UsuariosAccesosService } from './usuarios-accesos.service';
 import { UsuariosRolesModulosService } from './usuarios-roles-modulos.service';
 import { GuardarRolModulosDto } from './dto/roles-modulos.dto';
 import { UsuariosCuentaClienteService } from './usuarios-cuenta-cliente.service';
-import { PreviaCelularUsuarioDto, VincularCuentaClienteDto } from './dto/vincular-cuenta-cliente.dto';
+import { DocumentoUsuarioDto, PreviaCelularUsuarioDto, VincularCuentaClienteDto } from './dto/vincular-cuenta-cliente.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -65,6 +65,21 @@ export class UsuariosController {
   @Permiso('usuarios', 'administrar_roles')
   async celularPrevia(@Param('id') id: string, @Body() dto: PreviaCelularUsuarioDto, @Req() req: any) {
     return this.cuentaClienteService.previaCelular(id, dto.celular, dto, req.usuario);
+  }
+
+  /** Antes de guardar un documento nuevo: quién lo tiene hoy (solo ADMIN; no escribe nada). */
+  @Post(':id/previa-documento')
+  @Permiso('usuarios', 'administrar_roles')
+  async previaDocumento(@Param('id') id: string, @Body() dto: DocumentoUsuarioDto, @Req() req: any) {
+    return this.cuentaClienteService.previaDocumento(id, dto.tipoDocumento, dto.documento, req.usuario);
+  }
+
+  /** Vincula la cuenta de cliente dueña de ese documento a este usuario; el documento del usuario no cambia (solo ADMIN). */
+  @Post(':id/cuenta-cliente/vincular-por-documento')
+  @Permiso('usuarios', 'administrar_roles')
+  async vincularPorDocumento(@Param('id') id: string, @Body() dto: DocumentoUsuarioDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cuentaClienteService.vincularPorDocumento(id, dto.tipoDocumento, dto.documento, dto.confirmaMismaPersona, req.usuario, ip);
   }
 
   /** Cuenta de cliente vinculada a este usuario (solo ADMIN). */

@@ -37,6 +37,7 @@ import {
 import { BloqueAlertasWhatsApp } from "./BloqueAlertasWhatsApp";
 import { puedeRecibirAlertasWhatsApp } from "./alertasWhatsappApi";
 import { limpiarNumeroPeruano, validarCelularPeruano } from "./alertasWhatsappApi";
+import { PreviaDocumentoUsuario } from "./PreviaDocumentoUsuario";
 import { AvisoVinculoCelular, usePreviaCelular } from "./AvisoVinculoCelular";
 import {
   AUTOCOMPLETAR_CLAVE,
@@ -113,6 +114,7 @@ export function EditarUsuarioModal({
   const [dniNuevo, setDniNuevo] = useState("");
   const [tipoDocNuevo, setTipoDocNuevo] = useState("DNI");
   const [claveAdminDni, setClaveAdminDni] = useState("");
+  const [docBloqueado, setDocBloqueado] = useState<string | null>(null);
   const [otrosRoles, setOtrosRoles] = useState<string[]>([]);
   const [paisNacimiento, setPaisNacimiento] = useState("");
   const [cumpleanos, setCumpleanos] = useState("");
@@ -297,6 +299,8 @@ export function EditarUsuarioModal({
       }
       if (dniNuevo.trim() && !documentoValido(tipoDocNuevo, dniNuevo.trim())) {
         nuevosErrores.dni = mensajeDocumento(tipoDocNuevo);
+      } else if (dniNuevo.trim() && docBloqueado) {
+        nuevosErrores.dni = docBloqueado;
       } else if (dniNuevo.trim() && !claveAdminDni) {
         nuevosErrores.claveAdmin =
           "Escribe tu contraseña de administrador para cambiar el DNI";
@@ -472,10 +476,17 @@ export function EditarUsuarioModal({
             error={errores.dni}
             ayuda={
               tipoDocNuevo === "DNI"
-                ? "Es el usuario con el que la persona entra. Debe tener 8 dígitos."
-                : "Es el usuario con el que la persona entra. De 7 a 12 letras o números."
+                ? "Es el usuario con el que la persona entra. Debe tener 8 dígitos. Antes de guardar verás si ya es de alguien."
+                : "Es el usuario con el que la persona entra. De 7 a 12 letras o números. Antes de guardar verás si ya es de alguien."
             }
             disabled={guardando}
+          />
+          <PreviaDocumentoUsuario
+            usuarioId={usuario.id}
+            tipo={tipoDocNuevo}
+            numero={documentoValido(tipoDocNuevo, dniNuevo.trim()) ? dniNuevo.trim() : null}
+            alRechazar={() => setDniNuevo("")}
+            alCambiarBloqueo={setDocBloqueado}
           />
         </>
       )}

@@ -60,6 +60,7 @@ describe('Administración de cuenta por el ADMIN (DNI, correo, foto, clave)', ()
   beforeEach(async () => {
     prismaMock = {
       userAccount: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn(async ({ where }: any) => {
           if (where.party_id !== undefined) return where.party_id === 1n ? cuentaAdmin() : null;
           if (where.id === 1n) return cuentaAdmin();
