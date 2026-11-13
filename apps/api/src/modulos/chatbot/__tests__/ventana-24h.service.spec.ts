@@ -103,6 +103,22 @@ describe('Ventana24hService', () => {
     expect(mockMensajeria.enviarTexto).not.toHaveBeenCalled();
   });
 
+  it('encuesta con la ventana abierta: sale la lista 1 a 5, no los 3 botones', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue({ creado_en: new Date() }); // Ventana abierta
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });
+    const filas = [1, 2, 3, 4, 5].map((n) => ({ id: `encuesta:${n}`, titulo: `${n}` }));
+    mockMensajeria.enviarLista = jest.fn().mockResolvedValue({ exito: true, estado: 'ENVIADO' });
+
+    await servicio.enviarMensajeNegocio('987654321', {
+      textoLibre: 'Califica',
+      botones: [{ id: 'encuesta:1', titulo: '1' }],
+      lista: { boton: 'Calificar', filas },
+    });
+
+    expect(mockMensajeria.enviarLista).toHaveBeenCalledWith('987654321', 'Califica', 'Calificar', filas, undefined);
+    expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
+  });
+
   it('ENCUESTA_POSVENTA fuera de la ventana: la plantilla lleva los payloads de sus 3 botones 1/3/5', async () => {
     mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null); // Ventana cerrada
     mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });

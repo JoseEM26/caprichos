@@ -33,6 +33,8 @@ export interface CargaSaliente extends PayloadMensajeNegocio {
   etapa?: string;
   /** Solo tipo INTERACTIVO: botones (máx. 3) o lista (máx. 10 filas). textoLibre lleva el mismo cuerpo. */
   interactivo?: CargaInteractivo;
+  /** TEXTO con ventana abierta: lista en vez de botones (ver Ventana24hService). */
+  lista?: { boton: string; filas: { id: string; titulo: string; descripcion?: string }[] };
 }
 
 export interface DatosEncolar {

@@ -1,9 +1,10 @@
 /**
  * Palabras de la escala de la encuesta posventa y el puntaje que les corresponde.
- * Las opciones que se ofrecen en la lista son «1 Malo», «3 Regular» y «5 Excelente»; «bueno» y «muy bueno» son el 4.
+ * Las opciones que se ofrecen en la lista son «1 Malo», «2 Pobre», «3 Regular», «4 Bueno» y «5 Excelente» (la plantilla fuera de ventana solo trae 1, 3 y 5); «bueno» y «muy bueno» son el 4.
  */
 const PALABRAS_ESCALA = new Map<string, number>([
   ['malo', 1],
+  ['pobre', 2],
   ['regular', 3],
   ['bueno', 4],
   ['muy bueno', 4],

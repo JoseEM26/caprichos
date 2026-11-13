@@ -3,6 +3,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import {
   BotonAccion,
+  FilaLista,
   OpcionesEnvio,
   ResultadoEnvioWhatsApp,
   WHATSAPP_MENSAJERIA_PUERTO,
@@ -22,6 +23,8 @@ export interface PayloadMensajeNegocio {
   plantillaClave?: keyof typeof CATALOGO_PLANTILLAS;
   variablesPlantilla?: Record<string, string> | string[];
   botones?: BotonAccion[];
+  /** Con la ventana abierta se manda esta lista en vez de los botones (la plantilla de Meta solo admite 3 botones). */
+  lista?: { boton: string; filas: FilaLista[] };
   /** Plantilla a probar una sola vez si Meta rechaza la principal (p. ej. aún no aprobada). */
   plantillaRespaldo?: { plantillaClave: keyof typeof CATALOGO_PLANTILLAS; variablesPlantilla: string[] };
 }
@@ -145,6 +148,9 @@ export class Ventana24hService {
     if (ventanaAbierta) {
       this.logger.log(`Ventana de 24h ABIERTA para ${telMask}. Enviando texto libre o interactivo.`);
 
+      if (payload.lista?.filas.length) {
+        return this.mensajeria.enviarLista(telefono, payload.textoLibre, payload.lista.boton, payload.lista.filas, opciones);
+      }
       if (payload.botones && payload.botones.length > 0) {
         return this.mensajeria.enviarBotones(
           telefono,

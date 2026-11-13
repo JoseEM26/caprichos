@@ -458,6 +458,17 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
                     { id: 'encuesta:3', titulo: '3 Regular' },
                     { id: 'encuesta:5', titulo: '5 Excelente' },
                   ],
+                  // Con la ventana abierta sale la escala completa; la plantilla de Meta solo trae 1, 3 y 5
+                  lista: {
+                    boton: 'Calificar',
+                    filas: [
+                      { id: 'encuesta:1', titulo: '1 Malo' },
+                      { id: 'encuesta:2', titulo: '2 Pobre' },
+                      { id: 'encuesta:3', titulo: '3 Regular' },
+                      { id: 'encuesta:4', titulo: '4 Bueno' },
+                      { id: 'encuesta:5', titulo: '5 Excelente' },
+                    ],
+                  },
                   autor: 'BOT',
                   nombre,
                   pedidoCodigo: p.codigo,
