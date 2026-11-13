@@ -232,10 +232,22 @@ export function resolverTurno(
   const dia = diaSemana(jornada);
   const cob = ctx.coberturas.find((c) => c.fecha === jornada && c.cubreId === partyId);
   if (cob) return { turno: turnoDe(cob.desde, cob.hasta) };
-  if (ctx.coberturas.some((c) => c.fecha === jornada && c.reemplazaId === partyId)) {
-    return { turno: null, motivoDescanso: 'Cubierto por otra persona' };
-  }
   const propio = ctx.horarios.find((h) => h.partyId === partyId && h.dia === dia);
+  const cubiertas = ctx.coberturas.filter((c) => c.fecha === jornada && c.reemplazaId === partyId);
+  if (cubiertas.length) {
+    if (!propio) return { turno: null, motivoDescanso: 'Cubierto por otra persona' };
+    // Cobertura parcial (solo el inicio o el final): a la persona le queda el resto de su turno
+    let { entrada, salida, almuerzoIni, almuerzoFin } = turnoDe(propio.entrada, propio.salida, propio.almuerzoIni, propio.almuerzoFin);
+    for (const c of cubiertas) {
+      const w = turnoDe(c.desde, c.hasta);
+      if (w.entrada <= entrada) entrada = Math.max(entrada, w.salida);
+      else if (w.salida >= salida) salida = Math.min(salida, w.entrada);
+      else return { turno: null, motivoDescanso: 'Cubierto por otra persona' }; // cobertura en el medio: se mantiene el criterio anterior (todo el día cubierto)
+    }
+    if (entrada >= salida) return { turno: null, motivoDescanso: 'Cubierto por otra persona' };
+    const conAlm = almuerzoIni !== undefined && almuerzoFin !== undefined && almuerzoIni > entrada && almuerzoFin < salida;
+    return { turno: turnoDe(entrada, salida, conAlm ? almuerzoIni : null, conAlm ? almuerzoFin : null) };
+  }
   if (propio) return { turno: turnoDe(propio.entrada, propio.salida, propio.almuerzoIni, propio.almuerzoFin) };
   const rem = ctx.reemplazos.find((r) => r.partyId === partyId && r.dia === dia);
   if (rem) return { turno: null, motivoDescanso: 'Reemplazado ese día' };

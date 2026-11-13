@@ -245,6 +245,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'asistencia', accion: 'marcar' },
   { modulo: 'asistencia', accion: 'administrar' },
   { modulo: 'asistencia', accion: 'pantalla' },
+  // Aprobar o rechazar reemplazos y cambios de turno que pide el personal: ADMIN y SUPERVISOR
+  { modulo: 'asistencia', accion: 'aprobar_reemplazos' },
   // Planilla del personal (sueldos, pagos, adelantos, descuentos): solo ADMIN
   { modulo: 'planilla', accion: 'ver' },
   { modulo: 'planilla', accion: 'administrar' },
@@ -479,7 +481,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'MARKETI
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 // Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
 MATRIZ.SUPERVISOR = [
-  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver']),
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver', 'asistencia/aprobar_reemplazos']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',

@@ -14,11 +14,14 @@ import { PrestamosService } from './prestamos.service';
 import { AsistenciaService } from './asistencia.service';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
 import { AsistenciaSelfiesTarea } from './asistencia-selfies.tarea';
+import { AsistenciaTurnosService } from './asistencia-turnos.service';
+import { AsistenciaTurnosTarea } from './asistencia-turnos.tarea';
+import { MisTurnosController, TurnosAprobacionController } from './asistencia-turnos.controller';
 
 @Module({
   imports: [ArchivosModule],
-  controllers: [AsistenciaController, MiAsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, MiPlanillaController, FeriadosController, VinculoController],
-  providers: [AsistenciaService, AsistenciaCalendarioService, AsistenciaCorreccionesService, PlanillaService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea],
+  controllers: [AsistenciaController, MiAsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, MiPlanillaController, FeriadosController, VinculoController, MisTurnosController, TurnosAprobacionController],
+  providers: [AsistenciaService, AsistenciaCalendarioService, AsistenciaCorreccionesService, PlanillaService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea, AsistenciaTurnosService, AsistenciaTurnosTarea],
   exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, VacacionesService],
 })
 export class AsistenciaModule {}

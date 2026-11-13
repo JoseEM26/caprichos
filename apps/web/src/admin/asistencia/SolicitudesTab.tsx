@@ -7,6 +7,7 @@ import { Insignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
 import { Bandeja, ETIQUETA_ROL, ResultadoLote, bandejaCorrecciones, loteCorrecciones } from './correccionesApi';
 import { jornadaActual } from './jornada';
+import { PorAprobarTurnos } from './PorAprobarTurnos';
 import './cronograma.css';
 
 type Avisar = (m: string | null) => void;
@@ -134,6 +135,7 @@ export function SolicitudesTab({ onError, onOk, alCambiar }: { onError: Avisar; 
   if (!bandeja) return <Cargando mensaje="Cargando solicitudes" />;
   return (
     <div className="cr-vista">
+      <PorAprobarTurnos />
       <Tarjeta titulo="Solicitudes de corrección y marcas por revisar" subtitulo="Compara con las cámaras y aprueba o rechaza varias de una vez. Una solicitud no cuenta hasta que la apruebas.">
         <div className="cr-filtros" role="group" aria-label="Filtros">
           <label className="as-campo">Tipo
