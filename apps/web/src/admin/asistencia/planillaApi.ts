@@ -210,7 +210,7 @@ export const detallePlanilla = (partyId: number, fecha: string, excluir: string[
   api.get<DetallePlanilla>(
     `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}${incluirAnteriores.length ? `&incluirAnteriores=${incluirAnteriores.join(',')}` : ''}`,
   );
-export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null }>(`/admin/planilla/sueldo/${partyId}`);
+export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string }>(`/admin/planilla/sueldo/${partyId}`);
 export interface DatosSueldoExtra {
   metodo?: MetodoValorHora;
   diasMes?: number | null;

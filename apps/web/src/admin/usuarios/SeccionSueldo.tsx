@@ -5,7 +5,7 @@ import { ETIQUETA_METODO, guardarSueldo, MEDIOS_PAGO, MetodoValorHora, Modalidad
 const ENTRADA = { minHeight: 44, width: '100%', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' } as const;
 
 /** Sueldo de la persona (solo ADMIN): modalidad, monto, cómo se calcula el valor hora y a dónde se le paga. */
-export function SeccionSueldo({ partyId, deshabilitado }: { partyId: string; deshabilitado?: boolean }) {
+export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { partyId: string; deshabilitado?: boolean; /** Celular (9 dígitos) que el admin acaba de escribir en el modal y aún no guarda; tiene prioridad sobre el guardado. */ celularSugerido?: string | null }) {
   const [modalidad, setModalidad] = useState<Modalidad>('MENSUAL');
   const [monto, setMonto] = useState('');
   const [metodo, setMetodo] = useState<MetodoValorHora>('DIAS_HORAS');
@@ -14,6 +14,7 @@ export function SeccionSueldo({ partyId, deshabilitado }: { partyId: string; des
   const [tarifa, setTarifa] = useState('');
   const [pagoCelular, setPagoCelular] = useState('');
   const [pagoMedio, setPagoMedio] = useState('');
+  const [celularGuardado, setCelularGuardado] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -21,7 +22,9 @@ export function SeccionSueldo({ partyId, deshabilitado }: { partyId: string; des
     let vivo = true;
     obtenerSueldo(Number(partyId))
       .then((r) => {
-        if (!vivo || !r.sueldo) return;
+        if (!vivo) return;
+        setCelularGuardado(r.celularUsuario ?? '');
+        if (!r.sueldo) return;
         setMetodo(r.sueldo.metodo ?? 'PROGRAMADAS');
         setDiasMes(r.sueldo.diasMes ? String(r.sueldo.diasMes) : '');
         setHorasDia(r.sueldo.horasDia ? String(r.sueldo.horasDia) : '');
@@ -34,6 +37,9 @@ export function SeccionSueldo({ partyId, deshabilitado }: { partyId: string; des
       .catch(() => undefined);
     return () => { vivo = false; };
   }, [partyId]);
+
+  const sugerido = (celularSugerido || celularGuardado || '').replace(/\D/g, '');
+  const mostrarSugerencia = sugerido.length === 9 && pagoCelular.replace(/\D/g, '') !== sugerido;
 
   const porHora = metodo === 'TARIFA_HORA';
   const n = porHora ? 0 : Number(monto);
@@ -120,6 +126,17 @@ export function SeccionSueldo({ partyId, deshabilitado }: { partyId: string; des
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <label style={{ flex: '1 1 140px', fontSize: 12, fontWeight: 700 }}>Celular de pago (Yape / Plin)
           <input type="tel" inputMode="tel" maxLength={20} autoComplete="off" value={pagoCelular} disabled={deshabilitado || guardando} onChange={(e) => setPagoCelular(e.target.value)} style={ENTRADA} />
+          {mostrarSugerencia && (
+            <button
+              type="button"
+              aria-label="Usar el celular del usuario como celular de pago"
+              disabled={deshabilitado || guardando}
+              onClick={() => setPagoCelular(sugerido)}
+              style={{ marginTop: 4, minHeight: 44, width: '100%', borderRadius: 8, border: '1.5px dashed var(--cp-line)', background: 'transparent', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Usar el celular del usuario (···{sugerido.slice(-3)})
+            </button>
+          )}
         </label>
         <label style={{ flex: '1 1 140px', fontSize: 12, fontWeight: 700 }}>Medio de pago
           <select value={pagoMedio} disabled={deshabilitado || guardando} onChange={(e) => setPagoMedio(e.target.value)} style={ENTRADA}>

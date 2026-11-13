@@ -86,7 +86,15 @@ export class PlanillaService {
 
   async obtenerSueldo(partyId: number) {
     const s = await this.prisma.sueldoPersonal.findUnique({ where: { party_id: BigInt(partyId) } });
-    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null };
+    // Sugerencia para «Celular de pago»: el celular activo de la persona (9 dígitos). Dato personal: solo aquí, nunca en listas ni en auditoría.
+    const c = await this.prisma.contactMechanism.findFirst({
+      where: { party_id: BigInt(partyId), tipo: { in: ['TELEFONO', 'WHATSAPP'] }, activo: true },
+      orderBy: [{ principal: 'desc' }, { id: 'asc' }],
+      select: { valor: true },
+    });
+    const digitos = (c?.valor ?? '').replace(/\D/g, '');
+    const celularUsuario = digitos.length >= 9 ? digitos.slice(-9) : null;
+    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null, ...(celularUsuario ? { celularUsuario } : {}) };
   }
 
   async guardarSueldo(

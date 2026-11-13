@@ -820,7 +820,7 @@ export function EditarUsuarioModal({
       />
       {esAdmin && (rol || usuario.rol) !== "ADMIN" && (
         <>
-          <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} />
+          <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} celularSugerido={celular9} />
           <PanelVinculo partyId={Number(usuario.partyId)} deshabilitado={guardando} />
         </>
       )}

@@ -14,7 +14,7 @@ const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[] } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null } = {}) {
   const sueldoFila = () => ({ party_id: LUIS, modalidad: 'MENSUAL', monto_semanal: 230.77, monto_mensual: 1000, ...opts.sueldo });
   const prestamos: Fila[] = [];
   const cuotas: Fila[] = [];
@@ -47,6 +47,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       upsert: async () => ({}),
     },
     person: { findUnique: async () => ({ nombres: 'Luis', apellidos: 'Pérez' }), findMany: async () => [{ party_id: LUIS, nombres: 'Luis', apellidos: 'Pérez' }] },
+    contactMechanism: { findFirst: async () => opts.contacto ?? null },
     planillaExtraAprobada: { findMany: async () => [] },
     feriado: { findMany: async () => opts.feriados ?? [] },
     vinculoPersonal: { findMany: async () => (opts.vinculo ? [opts.vinculo] : []) },
@@ -103,6 +104,13 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
 }
 
 describe('PlanillaService', () => {
+  it('obtenerSueldo sugiere el celular activo normalizado a 9 dígitos y lo omite si no hay', async () => {
+    const con = montar({ contacto: { valor: '+51 987-654-123' } });
+    expect(await con.svc.obtenerSueldo(7)).toMatchObject({ celularUsuario: '987654123' });
+    const sin = await montar().svc.obtenerSueldo(7);
+    expect('celularUsuario' in sin).toBe(false);
+  });
+
   it('calcula el ejemplo del dueño: 1000 mensual, 50 h programadas, 30 h trabajadas = 600 y resta consumos', async () => {
     const { svc } = montar();
     const r = await svc.detalle(7, '2026-11-15', [], AHORA);
