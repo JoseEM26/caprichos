@@ -284,7 +284,7 @@ describe('proveedor elegido y resumen diario de boletas (sin red)', () => {
     expect(prisma.sunatResumen.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'ENVIADO', ticket: 'T1' }) }));
   });
 
-  it('la tarea solo corre el resumen en la ventana de 22:30 a 22:39 (Lima)', () => {
+  it('la tarea solo corre el resumen en la ventana de 23:30 a 23:39 (Lima)', () => {
     expect(horaMinutoLima(new Date('2026-11-02T03:30:00Z'))).toEqual({ h: 22, m: 30 });
     expect(horaMinutoLima(new Date('2026-11-02T14:00:00Z'))).toEqual({ h: 9, m: 0 });
   });

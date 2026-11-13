@@ -20,7 +20,7 @@ export interface CambioComprobanteEntrada {
  * Envío nocturno de boletas y facturas y cambio de comprobante de un pedido ya cobrado.
  *
  * Al cobrar, la boleta/factura queda POR_EMITIR_NOCHE sin serie ni número. El lote de la noche (desde facturacion_hora_envio,
- * hora de Lima, antes del resumen diario de boletas de las 22:30) aplica el cambio pendiente, asigna serie y correlativo y
+ * hora de Lima, antes del resumen diario de boletas de las 23:30) aplica el cambio pendiente, asigna serie y correlativo y
  * la manda por el camino de siempre (boleta: firmada y al resumen diario; factura: sendBill). Así un cambio del mismo día
  * no deja huecos de numeración ni números quemados.
  * Supuesto (a confirmar con el contador): emitir en la misma noche cumple el envío dentro del día; la fecha de emisión es la de la venta.

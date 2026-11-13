@@ -11,14 +11,14 @@ import { bytes, fechaIsoLima, yyyymmddLima } from './sunat/sunat.util';
 import { siguienteCorrelativo } from './secuencia';
 import { CLAVES_FACTURACION, interpretarConfig } from './facturacion/facturacion.config';
 
-/** Cada 2 minutos: reenvía resúmenes sin respuesta, consulta tickets pendientes y, de 22:30 a 22:39 (Lima), envía el resumen diario. */
+/** Cada 2 minutos: reenvía resúmenes sin respuesta, consulta tickets pendientes y, de 23:30 a 23:39 (Lima; el local cierra 22:30), envía el resumen diario. */
 export const INTERVALO_SUNAT_MS = 2 * 60 * 1000;
 /** Máximo de boletas por resumen diario (SUNAT). */
 export const MAX_LINEAS_RESUMEN = 500;
 
 const TTL_CANDADO_MS = 280000;
 
-/** Hora y minuto en Lima (para la ventana de 22:30). */
+/** Hora y minuto en Lima (para la ventana de 23:30). */
 export function horaMinutoLima(fecha: Date): { h: number; m: number } {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(fecha);
   return { h: Number(p.find((x) => x.type === 'hour')?.value), m: Number(p.find((x) => x.type === 'minute')?.value) };
@@ -51,7 +51,7 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Una pasada con candado: reenvíos, tickets y, en la ventana de 22:30, el resumen diario. */
+  /** Una pasada con candado: reenvíos, tickets y, en la ventana de 23:30, el resumen diario. */
   async tick(ahora = new Date()): Promise<{ motivo?: string }> {
     if (!this.sunat || !this.sunat.disponible()) return { motivo: 'SIN_CONFIGURAR' };
     if (await this.salud?.circuitoAbierto(ahora)) return { motivo: 'CIRCUITO_ABIERTO' };
@@ -63,7 +63,7 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
       await this.reenviarPendientes();
       await this.consultarTickets();
       const { h, m } = horaMinutoLima(ahora);
-      if (h === 22 && m >= 30 && m < 40) await this.resumenDiario(ahora);
+      if (h === 23 && m >= 30 && m < 40) await this.resumenDiario(ahora);
     } finally {
       await liberarCandado(cliente, clave, candado.token).catch(() => {});
     }

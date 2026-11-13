@@ -4,8 +4,8 @@ import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesNocturnoService } from './comprobantes-nocturno.service';
 import { crearBaseFalsa, pedidoDePrueba } from './comprobantes.fake-db';
 
-// 22:10 en Lima del 1/3/2027 (UTC-5) y 15:00 del mismo día
-const NOCHE = new Date('2027-03-02T03:10:00Z');
+// 23:10 en Lima del 1/3/2027 (UTC-5) y 15:00 del mismo día
+const NOCHE = new Date('2027-03-02T04:10:00Z');
 const TARDE = new Date('2027-03-01T20:00:00Z');
 const hoy = new Date('2027-03-01T15:00:00Z');
 

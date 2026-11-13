@@ -14,8 +14,8 @@ export const CLAVES_FACTURACION = {
 
 export const SERIE_BOLETA_DEFECTO = 'B002';
 export const SERIE_FACTURA_DEFECTO = 'F002';
-/** Hora (Lima) desde la que el lote de la noche emite. Antes de las 22:30, hora del resumen diario de boletas. */
-export const HORA_ENVIO_DEFECTO = 22;
+/** Hora (Lima) desde la que el lote de la noche emite. Antes de las 23:30, hora del resumen diario de boletas (el local cierra 22:30). */
+export const HORA_ENVIO_DEFECTO = 23;
 
 export interface ConfigFacturacion {
   igvPct: number;
