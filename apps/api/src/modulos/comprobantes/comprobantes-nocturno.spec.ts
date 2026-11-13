@@ -67,6 +67,20 @@ describe('envío nocturno de boletas y facturas', () => {
     expect((await m.nocturno.emitirLote(new Date('2027-03-01T21:30:00Z'))).emitidos).toBe(1); // 16:30
   });
 
+  it('la hora acepta minutos (HH:MM)', async () => {
+    const m = montar([boleta(1n)], {}, [{ clave: 'facturacion_hora_envio', valor: '16:45' }, { clave: 'facturacion_hora_resumen', valor: '17:30' }]);
+    await cobrar(m, 1n);
+    expect((await m.nocturno.emitirLote(new Date('2027-03-01T21:30:00Z'))).emitidos).toBe(0); // 16:30
+    expect((await m.nocturno.emitirLote(new Date('2027-03-01T21:50:00Z'))).emitidos).toBe(1); // 16:50
+  });
+
+  it('«Emitir ahora» no espera la hora', async () => {
+    const m = montar([boleta(1n)]);
+    await cobrar(m, 1n);
+    expect((await m.nocturno.emitirLote(TARDE, true)).emitidos).toBe(1);
+    expect(m.db.comprobante[0].numero_texto).toBe('B002-000001');
+  });
+
   it('cambio boleta a factura el mismo día: reemplaza sin enviar nada ni anular, y el número sale en la noche', async () => {
     const m = montar([boleta(1n)]);
     await cobrar(m, 1n);

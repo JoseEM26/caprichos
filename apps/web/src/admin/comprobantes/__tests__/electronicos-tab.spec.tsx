@@ -78,6 +78,26 @@ describe('ElectronicosTab', () => {
     expect(screen.getByRole('link', { name: 'Ver PDF' }).getAttribute('href')).toBe('https://sunat.test/pdf/1');
   });
 
+  it('Emitir ahora pide Sí/No y las horas se guardan con la configuración', async () => {
+    conRol('ADMIN');
+    const emitir = vi.spyOn(comprobantesApi, 'emitirAhora').mockResolvedValue({ emitidos: 2, cambios: 0, descartados: 0, resumenes: 1, boletas: 1 });
+    const guardar = vi.spyOn(comprobantesApi, 'guardarFacturacion').mockImplementation(async (c: any) => ({ igvPct: 10.5, serieBoleta: 'B002', serieFactura: 'F002', proveedor: 'SIMULADO', proveedor_efectivo: 'SIMULADO', sunat: { ambiente: 'beta', credenciales: false, vence_certificado: null }, envio_nocturno: 'si', hora_envio: c.horaEnvio, hora_resumen: c.horaResumen }));
+    render(<ElectronicosTab />);
+    expect((await screen.findByTestId('horas-envio')).textContent).toContain('23:00');
+
+    fireEvent.click(screen.getByText('Emitir ahora'));
+    expect(emitir).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Sí, emitir'));
+    await waitFor(() => expect(emitir).toHaveBeenCalled());
+    expect(await screen.findByText(/2 comprobante\(s\) emitido\(s\)/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Hora de boletas y facturas'), { target: { value: '22:45' } });
+    fireEvent.change(screen.getByLabelText('Hora del resumen de boletas'), { target: { value: '23:15' } });
+    fireEvent.click(screen.getByText('Guardar configuración'));
+    fireEvent.click(screen.getByText('Sí, guardar'));
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith(expect.objectContaining({ envioNocturno: 'si', horaEnvio: '22:45', horaResumen: '23:15' })));
+  });
+
   it('anular pide motivo y confirmación Sí/No antes de llamar a la API', async () => {
     conRol('ADMIN');
     const anular = vi.spyOn(comprobantesApi, 'anularElectronico').mockResolvedValue({ id: '5', baja_estado: 'ACEPTADA' });

@@ -88,8 +88,12 @@ export function ElectronicosTab() {
   const [formSerieB, setFormSerieB] = useState('');
   const [formSerieF, setFormSerieF] = useState('');
   const [formProveedor, setFormProveedor] = useState<ProveedorFacturacion>('SIMULADO');
+  const [formNocturno, setFormNocturno] = useState<'si' | 'no'>('si');
+  const [formHoraEnvio, setFormHoraEnvio] = useState('23:00');
+  const [formHoraResumen, setFormHoraResumen] = useState('23:30');
   const [confirmarConfig, setConfirmarConfig] = useState(false);
-  const [enviandoResumen, setEnviandoResumen] = useState(false);
+  const [confirmarEmitir, setConfirmarEmitir] = useState(false);
+  const [emitiendo, setEmitiendo] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [errorConfig, setErrorConfig] = useState<string | null>(null);
   // Boleta por defecto: valor propuesto (Sí/No) pendiente de confirmar
@@ -150,6 +154,9 @@ export function ElectronicosTab() {
         setFormSerieB(c.serieBoleta);
         setFormSerieF(c.serieFactura);
         setFormProveedor(c.proveedor ?? 'SIMULADO');
+        setFormNocturno(c.envio_nocturno ?? 'si');
+        setFormHoraEnvio(c.hora_envio ?? '23:00');
+        setFormHoraResumen(c.hora_resumen ?? '23:30');
       })
       .catch(() => setConfig(null));
   }, [cargar]);
@@ -184,6 +191,9 @@ export function ElectronicosTab() {
         serieBoleta: formSerieB.trim().toUpperCase(),
         serieFactura: formSerieF.trim().toUpperCase(),
         proveedor: formProveedor,
+        envioNocturno: formNocturno,
+        horaEnvio: formHoraEnvio,
+        horaResumen: formHoraResumen,
       });
       setConfig(c);
       setConfirmarConfig(false);
@@ -225,16 +235,21 @@ export function ElectronicosTab() {
     }
   };
 
-  const enviarResumen = async () => {
-    setEnviandoResumen(true);
+  const emitirAhora = async () => {
+    setEmitiendo(true);
     try {
-      const r = await comprobantesApi.enviarResumenSunat();
-      setAviso(r.boletas > 0 ? `Resumen diario enviado: ${r.boletas} boleta(s) en ${r.resumenes} resumen(es)` : 'No hay boletas pendientes de resumen');
+      const r = await comprobantesApi.emitirAhora();
+      const partes = [`${r.emitidos} comprobante(s) emitido(s)`];
+      if (r.cambios > 0) partes.push(`${r.cambios} cambio(s) aplicado(s)`);
+      if (r.boletas > 0) partes.push(`${r.boletas} boleta(s) en el resumen`);
+      setAviso(r.emitidos + r.cambios + r.boletas > 0 ? `Listo: ${partes.join(', ')}` : 'No había nada pendiente de emitir');
       await cargar(pagina);
+      void cargarProblemas();
     } catch (err: any) {
-      setError(err?.message || 'No se pudo enviar el resumen diario');
+      setError(err?.message || 'No se pudo emitir ahora');
     } finally {
-      setEnviandoResumen(false);
+      setEmitiendo(false);
+      setConfirmarEmitir(false);
     }
   };
 
@@ -328,6 +343,11 @@ export function ElectronicosTab() {
         {config && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 10, fontSize: 13 }}>
             <span>Proveedor elegido: <strong>{NOMBRE_PROVEEDOR[config.proveedor ?? 'SIMULADO']}</strong></span>
+            <span data-testid="horas-envio">
+              {config.envio_nocturno === 'no'
+                ? <>Boletas y facturas: <strong>al cobrar</strong></>
+                : <>Boletas y facturas: <strong>{config.hora_envio ?? '23:00'}</strong> · Resumen de boletas: <strong>{config.hora_resumen ?? '23:30'}</strong></>}
+            </span>
             {config.facturacion_desde && (
               <span>Facturación desde: <strong>{fechaHoraCorta(config.facturacion_desde)}</strong> (pedidos cobrados antes no se emiten)</span>
             )}
@@ -373,15 +393,32 @@ export function ElectronicosTab() {
               Serie de factura
               <input type="text" maxLength={4} value={formSerieF} onChange={(e) => setFormSerieF(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
             </label>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>
+              Cuándo se emiten
+              <select value={formNocturno} onChange={(e) => setFormNocturno(e.target.value as 'si' | 'no')} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }}>
+                <option value="si">En la noche (todas juntas)</option>
+                <option value="no">Al cobrar</option>
+              </select>
+            </label>
+            {formNocturno === 'si' && (
+              <>
+                <label style={{ fontWeight: 700, fontSize: 13 }}>
+                  Hora de boletas y facturas
+                  <input type="time" value={formHoraEnvio} onChange={(e) => setFormHoraEnvio(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
+                </label>
+                <label style={{ fontWeight: 700, fontSize: 13 }}>
+                  Hora del resumen de boletas
+                  <input type="time" value={formHoraResumen} onChange={(e) => setFormHoraResumen(e.target.value)} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }} />
+                </label>
+              </>
+            )}
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
               <Boton variante="oscuro" onClick={() => setConfirmarConfig(true)} style={{ minHeight: ALTO_TOQUE, flex: 1 }}>
                 Guardar configuración
               </Boton>
-              {config.proveedor === 'SUNAT' && (
-                <Boton variante="secundario" onClick={enviarResumen} cargando={enviandoResumen} style={{ minHeight: ALTO_TOQUE, flex: 1 }}>
-                  Enviar resumen de boletas
-                </Boton>
-              )}
+              <Boton variante="secundario" onClick={() => setConfirmarEmitir(true)} cargando={emitiendo} style={{ minHeight: ALTO_TOQUE, flex: 1 }}>
+                Emitir ahora
+              </Boton>
             </div>
           </div>
         )}
@@ -559,12 +596,22 @@ export function ElectronicosTab() {
       <Confirmar
         abierto={confirmarConfig}
         titulo="Guardar configuración de facturación"
-        mensaje={`¿Guardar proveedor ${NOMBRE_PROVEEDOR[formProveedor]}, IGV ${formIgv}%, serie de boleta ${formSerieB.toUpperCase()} y serie de factura ${formSerieF.toUpperCase()}? Los comprobantes nuevos usarán estos datos.${formProveedor === 'SUNAT' && config?.proveedor !== 'SUNAT' && !config?.facturacion_desde ? ' Al pasar a SUNAT se fija la fecha de corte: los pedidos cobrados antes no se emiten.' : ''}`}
+        mensaje={`¿Guardar proveedor ${NOMBRE_PROVEEDOR[formProveedor]}, IGV ${formIgv}%, serie de boleta ${formSerieB.toUpperCase()} y serie de factura ${formSerieF.toUpperCase()}, ${formNocturno === 'si' ? `boletas y facturas a las ${formHoraEnvio} y resumen de boletas a las ${formHoraResumen}` : 'emisión al cobrar'}? Los comprobantes nuevos usarán estos datos.${formProveedor === 'SUNAT' && config?.proveedor !== 'SUNAT' && !config?.facturacion_desde ? ' Al pasar a SUNAT se fija la fecha de corte: los pedidos cobrados antes no se emiten.' : ''}`}
         textoSi="Sí, guardar"
         textoNo="No"
         cargando={guardandoConfig}
         alConfirmar={guardarConfig}
         alCancelar={() => setConfirmarConfig(false)}
+      />
+      <Confirmar
+        abierto={confirmarEmitir}
+        titulo="Emitir ahora"
+        mensaje="Se emiten ya todas las boletas y facturas que esperan la noche y se envía el resumen de boletas. Si después cambian el comprobante de uno de esos pedidos, se hará con una baja. Lo que se cobre más tarde sale en la noche como siempre. ¿Emitir ahora?"
+        textoSi="Sí, emitir"
+        textoNo="No"
+        cargando={emitiendo}
+        alConfirmar={emitirAhora}
+        alCancelar={() => setConfirmarEmitir(false)}
       />
 
       <Confirmar

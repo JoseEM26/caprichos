@@ -9,16 +9,16 @@ import { SunatEmisor } from './sunat/sunat.emisor';
 import { EmisorXml, LineaResumen, armarResumenDiarioXml } from './sunat/sunat.xml';
 import { bytes, fechaIsoLima, yyyymmddLima } from './sunat/sunat.util';
 import { siguienteCorrelativo } from './secuencia';
-import { CLAVES_FACTURACION, interpretarConfig } from './facturacion/facturacion.config';
+import { CLAVES_FACTURACION, VENTANA_RESUMEN_MIN, interpretarConfig, minutosDelDia } from './facturacion/facturacion.config';
 
-/** Cada 2 minutos: reenvía resúmenes sin respuesta, consulta tickets pendientes y, de 23:30 a 23:39 (Lima; el local cierra 22:30), envía el resumen diario. */
+/** Cada 2 minutos: reenvía resúmenes sin respuesta, consulta tickets pendientes y, en los 10 minutos desde facturacion_hora_resumen (Lima, 23:30 por defecto), envía el resumen diario. */
 export const INTERVALO_SUNAT_MS = 2 * 60 * 1000;
 /** Máximo de boletas por resumen diario (SUNAT). */
 export const MAX_LINEAS_RESUMEN = 500;
 
 const TTL_CANDADO_MS = 280000;
 
-/** Hora y minuto en Lima (para la ventana de 23:30). */
+/** Hora y minuto en Lima (para la ventana del resumen). */
 export function horaMinutoLima(fecha: Date): { h: number; m: number } {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(fecha);
   return { h: Number(p.find((x) => x.type === 'hour')?.value), m: Number(p.find((x) => x.type === 'minute')?.value) };
@@ -51,7 +51,7 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Una pasada con candado: reenvíos, tickets y, en la ventana de 23:30, el resumen diario. */
+  /** Una pasada con candado: reenvíos, tickets y, en la ventana de la hora del resumen, el resumen diario. */
   async tick(ahora = new Date()): Promise<{ motivo?: string }> {
     if (!this.sunat || !this.sunat.disponible()) return { motivo: 'SIN_CONFIGURAR' };
     if (await this.salud?.circuitoAbierto(ahora)) return { motivo: 'CIRCUITO_ABIERTO' };
@@ -63,7 +63,9 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
       await this.reenviarPendientes();
       await this.consultarTickets();
       const { h, m } = horaMinutoLima(ahora);
-      if (h === 23 && m >= 30 && m < 40) await this.resumenDiario(ahora);
+      const desde = minutosDelDia((await this.config()).horaResumen);
+      const minuto = h * 60 + m;
+      if (minuto >= desde && minuto < desde + VENTANA_RESUMEN_MIN) await this.resumenDiario(ahora);
     } finally {
       await liberarCandado(cliente, clave, candado.token).catch(() => {});
     }
@@ -144,14 +146,19 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
     return { resumenes, boletas: filas.length };
   }
 
-  /** Porcentaje de IGV vigente (parámetro facturacion_igv_pct). */
-  private async igvPct(): Promise<number> {
+  /** Configuración de facturación vigente (IGV, hora del resumen). */
+  private async config() {
     const filas = await this.prisma.parametro.findMany({
-      where: { clave: CLAVES_FACTURACION.igv },
+      where: { clave: { in: Object.values(CLAVES_FACTURACION) } },
     });
     const valores: Record<string, unknown> = {};
     for (const f of filas) valores[f.clave] = f.valor;
-    return interpretarConfig(valores).igvPct;
+    return interpretarConfig(valores);
+  }
+
+  /** Porcentaje de IGV vigente (parámetro facturacion_igv_pct). */
+  private async igvPct(): Promise<number> {
+    return (await this.config()).igvPct;
   }
 
   /**

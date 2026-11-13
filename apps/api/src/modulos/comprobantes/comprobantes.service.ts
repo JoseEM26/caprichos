@@ -27,7 +27,7 @@ import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
 import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { ConfigFacturacionDto } from './dto/facturacion.dto';
-import { CLAVES_FACTURACION, ConfigFacturacion, interpretarConfig } from './facturacion/facturacion.config';
+import { CLAVES_FACTURACION, ConfigFacturacion, interpretarConfig, validarHorasEnvio } from './facturacion/facturacion.config';
 import { aCentimos } from './facturacion/facturacion.calculo';
 import { ArchivoEmision, ComprobanteEmision, DatosEmision, EmisorElectronico, ErrorCredencialesEmisor, ErrorRedEmisor, Proveedor, ResultadoBaja, ResultadoEmision } from './emisor/emisor.tipos';
 import { proveedorDe } from './emisor/proveedor';
@@ -1902,6 +1902,7 @@ export class ComprobantesService {
       proveedor_efectivo: this.proveedorEfectivo(cfg.proveedor),
       envio_nocturno: cfg.envioNocturno ? 'si' : 'no',
       hora_envio: cfg.horaEnvio,
+      hora_resumen: cfg.horaResumen,
       sunat: {
         ambiente: sunat ? sunat.config().ambiente : ambienteSunat(),
         credenciales: sunat?.disponible() ?? false,
@@ -1913,13 +1914,18 @@ export class ComprobantesService {
   /** Guarda IGV, series y proveedor (ADMIN, con Sí/No en la web). Audita el cambio; nada se borra. */
   async guardarConfigFacturacion(dto: ConfigFacturacionDto, usuario?: UsuarioAutenticado, ip?: string) {
     const antes = await this.leerConfigFacturacion();
+    const horaEnvio = dto.horaEnvio ?? antes.horaEnvio;
+    const horaResumen = dto.horaResumen ?? antes.horaResumen;
+    const errorHoras = validarHorasEnvio(horaEnvio, horaResumen);
+    if (errorHoras) throw new BadRequestException({ codigo: 'HORAS_ENVIO_INVALIDAS', mensaje: errorHoras });
     const nueva = interpretarConfig({
       [CLAVES_FACTURACION.igv]: dto.igvPct,
       [CLAVES_FACTURACION.serieBoleta]: dto.serieBoleta,
       [CLAVES_FACTURACION.serieFactura]: dto.serieFactura,
       [CLAVES_FACTURACION.proveedor]: dto.proveedor ?? antes.proveedor,
       [CLAVES_FACTURACION.envioNocturno]: dto.envioNocturno ?? (antes.envioNocturno ? 'si' : 'no'),
-      [CLAVES_FACTURACION.horaEnvio]: dto.horaEnvio ?? antes.horaEnvio,
+      [CLAVES_FACTURACION.horaEnvio]: horaEnvio,
+      [CLAVES_FACTURACION.horaResumen]: horaResumen,
     });
     const valores: Array<[string, unknown]> = [
       [CLAVES_FACTURACION.igv, nueva.igvPct],
@@ -1928,6 +1934,7 @@ export class ComprobantesService {
       [CLAVES_FACTURACION.proveedor, nueva.proveedor],
       [CLAVES_FACTURACION.envioNocturno, nueva.envioNocturno ? 'si' : 'no'],
       [CLAVES_FACTURACION.horaEnvio, nueva.horaEnvio],
+      [CLAVES_FACTURACION.horaResumen, nueva.horaResumen],
     ];
     for (const [clave, valor] of valores) {
       await this.prisma.parametro.upsert({ where: { clave }, update: { valor: valor as any }, create: { clave, valor: valor as any } });

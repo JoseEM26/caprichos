@@ -315,6 +315,12 @@ export interface ConfigFacturacion {
   sunat: { ambiente: 'beta' | 'prod'; credenciales: boolean; vence_certificado: string | null };
   /** Fecha de corte (ISO): los pedidos cobrados antes no se emiten a SUNAT. Null si aún no se fijó. */
   facturacion_desde?: string | null;
+  /** si = boletas y facturas salen en el lote de la noche; no = al cobrar. */
+  envio_nocturno?: 'si' | 'no';
+  /** Hora Lima HH:MM del lote de boletas y facturas. */
+  hora_envio?: string;
+  /** Hora Lima HH:MM del resumen diario de boletas. */
+  hora_resumen?: string;
 }
 
 /** Conteos de salud de la facturación (solo ADMIN; sin datos personales). */

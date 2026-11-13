@@ -148,6 +148,18 @@ export class ComprobantesController {
     return this.sunatService.resumenDiario();
   }
 
+  /**
+   * POST /admin/comprobantes/sunat/emitir-ahora : emite ya las boletas y facturas que esperan la noche (y aplica los cambios
+   * pendientes) y luego envía el resumen de boletas. Lo que se cobre después sale en el lote de la noche como siempre.
+   */
+  @Post('sunat/emitir-ahora')
+  @Permiso('comprobantes', 'emitir')
+  async emitirAhora() {
+    const lote = await this.nocturno.emitirLote(new Date(), true);
+    const resumen = await this.sunatService.resumenDiario();
+    return { ...lote, resumenes: resumen.resumenes, boletas: resumen.boletas };
+  }
+
   /** GET /admin/comprobantes/facturacion: IGV, series, proveedor y estado de credenciales (sin valores). */
   @Get('facturacion')
   @Permiso('comprobantes', 'ver')

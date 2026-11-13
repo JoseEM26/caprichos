@@ -151,6 +151,11 @@ export const comprobantesApi = {
     return clienteFetch('/admin/comprobantes/sunat/resumen', { method: 'POST' });
   },
 
+  /** Emite ya lo que espera la noche (boletas, facturas y cambios pendientes) y envía el resumen de boletas. */
+  async emitirAhora(): Promise<{ emitidos: number; cambios: number; descartados: number; resumenes: number; boletas: number }> {
+    return clienteFetch('/admin/comprobantes/sunat/emitir-ahora', { method: 'POST' });
+  },
+
   /** URL (blob) del XML firmado, ZIP o CDR de un comprobante, con la sesión del usuario. */
   async urlArchivoElectronico(id: string, tipo: 'XML' | 'CDR' | 'ZIP'): Promise<string> {
     return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/archivos/${tipo}`);
@@ -166,6 +171,9 @@ export const comprobantesApi = {
     serieBoleta: string;
     serieFactura: string;
     proveedor: ProveedorFacturacion;
+    envioNocturno?: 'si' | 'no';
+    horaEnvio?: string;
+    horaResumen?: string;
   }): Promise<ConfigFacturacion> {
     return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion', {
       method: 'PUT',

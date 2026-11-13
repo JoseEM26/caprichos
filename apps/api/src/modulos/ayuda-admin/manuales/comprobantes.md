@@ -53,11 +53,12 @@ Ver tambien: [[cierre]]
 
 ## Como se hace: Envio de boletas y facturas a SUNAT en la noche
 1. Al cobrar, la boleta o la factura NO sale al instante: queda con el estado Se emite esta noche, todavia sin serie ni numero. El ticket del cobro lo dice: Boleta o Factura, se emite hoy por la noche. La factura le llega al cliente por WhatsApp cuando SUNAT la acepta.
-2. Desde la hora configurada (por defecto las 23:00, hora de Lima, despues del cierre) el sistema pone serie y numero a cada una, las firma y las envia. Las boletas entran al resumen diario de SUNAT de las 23:30 y las facturas se envian directo.
+2. Desde la hora configurada (por defecto las 23:00, hora de Lima, despues del cierre) el sistema pone serie y numero a cada una, las firma y las envia. Las boletas entran al resumen diario de SUNAT (por defecto 23:30) y las facturas se envian directo.
 3. Asi un cambio del mismo dia no deja huecos de numeracion ni numeros gastados, y no hace falta anular nada.
-4. El Administrador puede cambiar la hora (facturacion_hora_envio, de 0 a 23; para que las boletas entren al resumen de esa misma noche debe ser antes de las 23:30; por defecto 23:00, despues del cierre del local) o volver al envio al instante con facturacion_envio_nocturno en no, desde la configuracion de facturacion.
-5. Un pedido anulado antes de la noche no se emite. Si algo falla al enviar, queda en Electronicos SUNAT con su estado y el boton Reintentar, como siempre.
-6. En Electronicos SUNAT los pendientes de la noche aparecen con la insignia Se emite esta noche.
+4. El Administrador cambia las horas en Comprobantes > Electronicos SUNAT > Facturacion electronica: «Hora de boletas y facturas» (por defecto 23:00) y «Hora del resumen de boletas» (por defecto 23:30; debe ser al menos 15 minutos despues y a mas tardar 23:50). En «Cuando se emiten» puede volver a «Al cobrar». Se guarda con «Guardar configuracion» y un Si/No.
+5. Boton «Emitir ahora»: emite en ese momento todo lo que espera la noche (boletas, facturas y cambios de comprobante pendientes) y envia el resumen de boletas. Lo que se cobre despues sale en la noche como siempre. Si luego se cambia el comprobante de un pedido ya emitido, se hace con una baja.
+6. Un pedido anulado antes de la noche no se emite. Si algo falla al enviar, queda en Electronicos SUNAT con su estado y el boton Reintentar, como siempre.
+7. En Electronicos SUNAT los pendientes de la noche aparecen con la insignia Se emite esta noche.
 Antes: [[caja]]
 Ver tambien: [[cierre]]
 

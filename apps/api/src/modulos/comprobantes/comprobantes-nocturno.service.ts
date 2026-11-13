@@ -7,6 +7,7 @@ import { enmascararDni, formatearCorrelativo, validarDocumentoComprobante } from
 import { siguienteCorrelativo } from './secuencia';
 import { fechaIsoLima } from './sunat/sunat.util';
 import { horaMinutoLima } from './comprobantes-sunat.service';
+import { minutosDelDia } from './facturacion/facturacion.config';
 
 export interface CambioComprobanteEntrada {
   tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA';
@@ -117,13 +118,15 @@ export class ComprobantesNocturnoService {
   /**
    * Una pasada del lote. Idempotente: lo ya emitido no vuelve a salir (el reclamo es un UPDATE condicionado al estado) y
    * un cambio aplicado se borra. Lo que falla queda para la siguiente pasada o en «reintentar» como cualquier comprobante.
+   * forzar = botón «Emitir ahora»: no espera la hora configurada.
    */
-  async emitirLote(ahora = new Date()): Promise<{ cambios: number; emitidos: number; descartados: number }> {
+  async emitirLote(ahora = new Date(), forzar = false): Promise<{ cambios: number; emitidos: number; descartados: number }> {
     const cfg = await this.comprobantes.leerConfigFacturacion();
-    const { h } = horaMinutoLima(ahora);
+    const { h, m } = horaMinutoLima(ahora);
     const hoy = fechaIsoLima(ahora);
+    const llegoLaHora = forzar || h * 60 + m >= minutosDelDia(cfg.horaEnvio);
     // Toca desde la hora configurada; lo de días anteriores (si el servidor estuvo caído) sale en cuanto se pueda
-    const debido = (f: Date) => h >= cfg.horaEnvio || fechaIsoLima(f) < hoy;
+    const debido = (f: Date) => llegoLaHora || fechaIsoLima(f) < hoy;
     const r = { cambios: 0, emitidos: 0, descartados: 0 };
 
     const cambios = await this.prisma.comprobanteCambioPendiente.findMany({ orderBy: { solicitado_en: 'asc' }, take: 200 });

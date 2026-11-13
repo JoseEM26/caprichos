@@ -68,13 +68,15 @@ export class ConfigFacturacionDto {
   @IsIn(['si', 'no'], { message: 'El envío nocturno es si o no' })
   envioNocturno?: 'si' | 'no';
 
-  /** Hora Lima (0 a 23) desde la que corre el lote de la noche. Sin valor no cambia. */
+  /** Hora Lima (HH:MM) desde la que corre el lote de la noche. Sin valor no cambia. */
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 0 }, { message: 'La hora debe ser un entero' })
-  @Min(0)
-  @Max(23)
-  horaEnvio?: number;
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'La hora de envío va como HH:MM (ej. 23:00)' })
+  horaEnvio?: string;
+
+  /** Hora Lima (HH:MM) del resumen diario de boletas. Sin valor no cambia. */
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'La hora del resumen va como HH:MM (ej. 23:30)' })
+  horaResumen?: string;
 }
 
 

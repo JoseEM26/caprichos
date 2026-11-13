@@ -288,4 +288,16 @@ describe('proveedor elegido y resumen diario de boletas (sin red)', () => {
     expect(horaMinutoLima(new Date('2026-11-02T03:30:00Z'))).toEqual({ h: 22, m: 30 });
     expect(horaMinutoLima(new Date('2026-11-02T14:00:00Z'))).toEqual({ h: 9, m: 0 });
   });
+
+  it('el resumen corre en los 10 minutos desde facturacion_hora_resumen', async () => {
+    const prisma: any = { parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'facturacion_hora_resumen', valor: '23:45' }]) } };
+    const job = new ComprobantesSunatService(prisma, { disponible: () => true } as any);
+    const resumen = jest.spyOn(job, 'resumenDiario').mockResolvedValue({ resumenes: 0, boletas: 0 });
+    jest.spyOn(job as any, 'reenviarPendientes').mockResolvedValue(undefined);
+    jest.spyOn(job as any, 'consultarTickets').mockResolvedValue(undefined);
+    await job.tick(new Date('2026-11-03T04:35:00Z')); // 23:35 Lima
+    expect(resumen).not.toHaveBeenCalled();
+    await job.tick(new Date('2026-11-03T04:47:00Z')); // 23:47 Lima
+    expect(resumen).toHaveBeenCalledTimes(1);
+  });
 });
