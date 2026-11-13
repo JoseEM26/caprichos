@@ -49,6 +49,11 @@ export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   REDIS_CAIDO: ['configuracion/ver'],
   REDIS_RECUPERADO: ['configuracion/ver'],
   APRENDIZAJES_PROPUESTAS: ['aprendizajes/ver'],
+  // Reemplazos y cambios de turno: a Supervisión (rol_destino) y, por party_destino, al reemplazo y al solicitante
+  TURNO_PEDIDO: ['asistencia/marcar'],
+  TURNO_POR_APROBAR: ['asistencia/aprobar_reemplazos'],
+  TURNO_RESUELTO: ['asistencia/marcar'],
+  TURNO_SIN_MARCA: ['asistencia/aprobar_reemplazos'],
   MENSAJE_INTERNO: [LIBRE],
 };
 

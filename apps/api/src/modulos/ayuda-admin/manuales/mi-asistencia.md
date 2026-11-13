@@ -66,6 +66,14 @@ Marcar el almuerzo es opcional: el almuerzo se paga igual y no se descuenta de t
 3. Pestana Pagos: lo que se te suma, lo que se te descuenta, tus prestamos y el neto estimado. Si no carga, pulsa Reintentar.
 Ver tambien: [[propinas]]
 
+## Como se hace: Pedir un reemplazo o un cambio de turno
+Pestana Calendario, seccion Reemplazos y cambios de turno. Sirve cuando no puedes ir a tu turno (reemplazo) o quieres hacer el turno de otra persona y que ella haga el tuyo (cambio).
+1. Pulsa Pedir reemplazo o cambio de turno. Paso 1: elige que necesitas, el dia, las horas (por defecto tu turno de ese dia; puedes pedir solo el inicio o el final) y el motivo.
+2. Paso 2: elige a la persona. Solo salen las que pueden cubrirte: comparten tu rol (en cocina, al menos un area) y estan libres todo ese horario. Si nadie sale, la pantalla dice por que. En un cambio, elige tambien el turno suyo que tu haras.
+3. Paso 3: revisa el resumen y pulsa Enviar pedido; confirma con Si.
+4. La otra persona recibe el aviso en la campanita y debe Aceptar o Rechazar. Si acepta, Supervision o el Administrador lo aprueba o lo rechaza (con motivo). Solo al aprobarse cuenta: el reemplazo pasa a tener ese turno y tu no. Puedes Cancelar pedido mientras no este aprobado. Si el turno empieza antes de la aprobacion, el pedido vence.
+5. Si te piden cubrir a ti, lo ves en Te piden cubrir con el dia, las horas y quien lo pide. Si apruebas cubrir y no marcas a tiempo (pasada la tolerancia), la falta es tuya y no se te paga ese turno; el pedido queda como No marco y se avisa a Supervision y a quien lo pidio.
+
 ## Errores y dudas
 - "El local todavia no tiene ubicacion configurada. Avisa al administrador.": el administrador debe fijar el punto del local en [[asistencia]], pestana Configuracion.
 - "Estas a N m del local. Debes estar a X m o menos para marcar.": estas fuera del radio (hoy 10 m por defecto). Acercate al lugar de la pantalla y vuelve a intentar. El administrador puede ampliar el radio.

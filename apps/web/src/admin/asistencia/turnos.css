@@ -1,0 +1,18 @@
+/* Reemplazos y cambios de turno (Mi asistencia y bandeja de Supervisión) */
+.tu-seccion { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tu-vacio { margin: 0; color: var(--cp-soft); font-size: 14px; }
+.tu-card { gap: 6px; }
+.tu-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tu-chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.tu-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.tu-acciones > * { flex: 1 1 140px; }
+.tu-form { display: flex; flex-direction: column; gap: 12px; }
+.tu-horas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tu-opciones { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; }
+.tu-opcion { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 8px 12px; border: 1.5px solid var(--cp-line); border-radius: 12px; background: var(--cp-white); cursor: pointer; }
+.tu-opcion:has(input:checked) { border-color: var(--cp-navy); box-shadow: 0 0 0 2px var(--cp-navy); }
+.tu-opcion input { margin-top: 3px; width: 20px; height: 20px; flex: 0 0 auto; }
+.tu-opcion span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tu-resumen { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.tu-resumen dt { color: var(--cp-soft); }
+.tu-resumen dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }

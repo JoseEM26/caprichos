@@ -64,7 +64,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'sesion',
   ]],
   ['asistencia del personal: marcas, selfies, dispositivos y consentimientos (datos personales e historial de la base de origen)', [
-    'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento', 'asistencia_solicitud',
+    'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento', 'asistencia_solicitud', 'solicitud_turno',
   ]],
   ['reparto de propinas: montos pagados a cada persona por mes (dinero real, historial propio de cada base)', [
     'propina_reparto', 'propina_reparto_detalle',

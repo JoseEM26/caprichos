@@ -12,6 +12,8 @@ import { CorreccionesAsistencia, type PedidoCorreccion } from './CorreccionesAsi
 import { MiVacaciones } from './MiVacaciones';
 import { MiCalendario } from './MiCalendario';
 import { MisPagos } from './MisPagos';
+import { Plegable } from './Plegable';
+import { ReemplazosTurno } from './ReemplazosTurno';
 import { MarcarAsistente } from './MarcarAsistente';
 import { miInconsistencias } from './correccionesApi';
 import { ETIQUETA_ACCION, ETIQUETA_LINEA, horasMin, normalizarTipo, sugerirSiguiente, type TipoMarcaElegido } from './tiposMarca';
@@ -235,6 +237,7 @@ export function MiAsistenciaView() {
         <>
           <CorreccionesAsistencia pedido={pedido} alAbrir={setPedido} alCerrar={() => setPedido(null)} />
           <MiCalendario alPedirCorreccion={(jornada) => setPedido({ jornada })} />
+          <Plegable titulo="Reemplazos y cambios de turno" perezoso><ReemplazosTurno /></Plegable>
         </>
       ),
     },

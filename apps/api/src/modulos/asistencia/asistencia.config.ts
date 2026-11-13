@@ -41,6 +41,10 @@ export const CONFIG_ASISTENCIA_DEFECTO: ConfigAsistencia = {
 
 export const CLAVE_CONFIG_ASISTENCIA = 'asistencia.config';
 
+/** Reemplazos y cambios de turno: hasta cuántos días adelante se puede pedir y cuántos pedidos por persona al día. */
+export const TURNOS_DIAS_ADELANTO_MAX = 30;
+export const TURNOS_MAX_PEDIDOS_DIA = 10;
+
 const numeroEn = (v: unknown, def: number, min: number, max: number): number => {
   const n = typeof v === 'number' && Number.isFinite(v) ? v : def;
   return Math.min(max, Math.max(min, n));

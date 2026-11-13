@@ -3021,6 +3021,36 @@ model AsistenciaSolicitud {
   @@map("asistencia_solicitud")
 }
 
+/// Pedido de reemplazo o cambio de turno del personal. Solo al aprobarse crea CoberturaTurno (cobertura_ids).
+/// Sin relaciones Prisma: las personas son party_id planos (como reemplazo_dia).
+model SolicitudTurno {
+  id                   BigInt    @id @default(autoincrement())
+  tipo                 String    @db.VarChar(12) // REEMPLAZO | CAMBIO_TURNO
+  solicitante_party_id BigInt
+  reemplazo_party_id   BigInt
+  fecha                DateTime  @db.Date
+  desde                DateTime  @db.Time
+  hasta                DateTime  @db.Time
+  /// Solo CAMBIO_TURNO: el solicitante cubre el turno del reemplazo en esta fecha y horas.
+  fecha_devolucion     DateTime? @db.Date
+  desde_devolucion     DateTime? @db.Time
+  hasta_devolucion     DateTime? @db.Time
+  motivo               String
+  estado               String    @default("PENDIENTE_ACEPTA") @db.VarChar(18) // PENDIENTE_ACEPTA | PENDIENTE_APRUEBA | APROBADA | RECHAZADA | CANCELADA | VENCIDA | SIN_MARCA
+  aceptada_en          DateTime? @db.Timestamptz
+  resuelta_por         BigInt?
+  resuelta_en          DateTime? @db.Timestamptz
+  motivo_resolucion    String?
+  cobertura_ids        Json?
+  sin_marca_en         DateTime? @db.Timestamptz
+  creada_en            DateTime  @default(now()) @db.Timestamptz
+
+  @@index([reemplazo_party_id, estado])
+  @@index([solicitante_party_id, fecha])
+  @@index([estado, fecha])
+  @@map("solicitud_turno")
+}
+
 model AsistenciaSelfie {
   marca_id   BigInt   @id
   contenido  Bytes    @db.ByteA
