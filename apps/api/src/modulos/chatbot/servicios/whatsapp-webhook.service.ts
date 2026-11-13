@@ -46,7 +46,7 @@ import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
 import { ModuleRef } from '@nestjs/core';
 import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
 import { DireccionesService } from '../../direcciones/direcciones.service';
-import { atenderMensajeVerificacion, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
+import { atenderMensajeVerificacion, esMensajeVerificacion, RESPUESTA_SIN_NUMERO, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
 import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
 import {
@@ -754,8 +754,19 @@ export class WhatsappWebhookService {
 
     // Verificación del celular (modo WHATSAPP_ENTRANTE): «Mi código: TOKEN» verifica el número que escribe.
     // Va ANTES del menú del bot: ese mensaje no recibe menú ni cuenta como conversación normal.
-    if (clasificacion.clase === 'TEXTO' && telefonoNorm && !(await this.spamBloqueado(identificador))) {
-      if (await this.atenderVerificacionCelular(telefonoNorm, texto)) return true;
+    // Sin bloqueo por spam: verificar es de un solo uso y ya tiene su propio límite de intentos.
+    // Sin número visible (cuenta con usuario de WhatsApp): se explica, no se manda al bot ni se escala a una persona.
+    if (clasificacion.clase === 'TEXTO' && esMensajeVerificacion(texto)) {
+      if (telefonoNorm) {
+        if (await this.atenderVerificacionCelular(telefonoNorm, texto)) return true;
+      } else {
+        try {
+          await this.mensajeria.enviarTexto(identificador, RESPUESTA_SIN_NUMERO);
+        } catch (err: any) {
+          this.logger.warn(`No se pudo avisar que falta el número para verificar: ${err.message}`);
+        }
+        return true;
+      }
     }
 
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
