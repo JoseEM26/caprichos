@@ -257,6 +257,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'propinas', accion: 'ver' },
   // Reparto mensual de propinas por horas (cálculo, aprobación, pago y anulación): solo ADMIN
   { modulo: 'propinas', accion: 'repartir' },
+  // Pagos en línea (Culqi): ver la lista (ADMIN, SUPERVISOR y CAJERO) y devolver dinero al cliente (solo ADMIN)
+  { modulo: 'pagos_online', accion: 'ver' },
+  { modulo: 'pagos_online', accion: 'devolver' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -293,6 +296,7 @@ export const MATRIZ: Record<string, string[]> = {
     'caja/movimientos',
     'caja/cerrar',
     'caja/ver',
+    'pagos_online/ver',
     'propinas/ver',
     'cocina/ver',
     'cocina/despacho',

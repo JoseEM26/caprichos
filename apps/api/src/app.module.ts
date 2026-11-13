@@ -56,6 +56,7 @@ import { MascotaModule } from './modulos/mascota/mascota.module';
 import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
 import { ResenasModule } from './modulos/resenas/resenas.module';
 import { CartaEventosModule } from './modulos/carta-eventos';
+import { PagosOnlineModule } from './modulos/pagos-online';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -115,6 +116,7 @@ import { CartaEventosModule } from './modulos/carta-eventos';
     PantallaIngresoModule,
     ResenasModule,
     CartaEventosModule,
+    PagosOnlineModule,
   ],
   providers: [
     PinoLoggerService,

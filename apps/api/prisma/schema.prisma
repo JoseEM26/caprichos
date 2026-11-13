@@ -793,6 +793,7 @@ model Pedido {
   lineas                 PedidoLinea[]
   historial              PedidoEstadoHistorial[]
   cobros                 Cobro[]
+  pagosOnline            PagoOnlineIntento[]
   incidentes             IncidenteEntrega[]
   mensajesReparto        MensajeReparto[]
   comandas               ComandaArea[]
@@ -1030,6 +1031,59 @@ model CobroPago {
   cobro    Cobro    @relation(fields: [cobro_id], references: [id])
 
   @@map("cobro_pago")
+}
+
+/// Pago en línea de un pedido de la carta (Culqi: tarjeta o Yape). El monto lo fija el servidor desde el pedido.
+/// Nunca guarda datos de tarjeta: solo el id del cargo, la marca y los últimos 4. Un solo intento vivo por pedido
+/// (índice único parcial pago_online_intento_vivo_key, creado en la migración 20270303100000_pagos_online).
+model PagoOnlineIntento {
+  id               BigInt    @id @default(autoincrement())
+  /// Identificador público (aleatorio) que viaja a la carta como intentoId
+  clave            String    @unique
+  pedido_id        BigInt
+  proveedor        String    @default("CULQI")
+  /// SIMULADO | REAL
+  modo             String
+  monto_centimos   Int
+  moneda           String    @default("PEN")
+  /// TARJETA | YAPE (se fija al cobrar)
+  medio            String?
+  /// CREADO | PROCESANDO | PENDIENTE | APROBADO | RECHAZADO | FALLIDO | DEVUELTO
+  estado           String    @default("CREADO")
+  mensaje          String?
+  culqi_cargo_id   String?   @unique
+  marca            String?
+  ultimos4         String?
+  /// Cuándo quedó el pedido cobrado en Caja (null = aprobado por Culqi pero sin cobro registrado: revisar)
+  cobrado_en       DateTime? @db.Timestamptz
+  cobro_error      String?
+  devuelto_centimos Int      @default(0)
+  /// [{id, monto_centimos, en, motivo, origen}]
+  devoluciones     Json      @default("[]")
+  creado_en        DateTime  @default(now()) @db.Timestamptz
+  actualizado_en   DateTime  @default(now()) @updatedAt @db.Timestamptz
+  aprobado_en      DateTime? @db.Timestamptz
+
+  pedido           Pedido    @relation(fields: [pedido_id], references: [id])
+
+  @@index([pedido_id], map: "ix_pago_online_intento_pedido")
+  @@index([creado_en], map: "ix_pago_online_intento_creado")
+  @@map("pago_online_intento")
+}
+
+/// Bandeja (inbox) de eventos del webhook de Culqi: idempotente por id de evento.
+model PagoOnlineEvento {
+  id            BigInt    @id @default(autoincrement())
+  evento_id     String    @unique
+  tipo          String
+  payload       Json
+  /// RECIBIDO | PROCESADO | IGNORADO | ERROR
+  estado        String    @default("RECIBIDO")
+  error         String?
+  recibido_en   DateTime  @default(now()) @db.Timestamptz
+  procesado_en  DateTime? @db.Timestamptz
+
+  @@map("pago_online_evento")
 }
 
 model MovimientoCaja {
