@@ -80,7 +80,7 @@ export function SeccionComprobantesPedido({ pedido }: SeccionComprobantesPedidoP
   const cobrado = String(pedido.pago_estado ?? '').toUpperCase() === 'PAGADO';
   // Cobrado: el cambio no emite, queda para el envío de la noche (Caja y ADMIN)
   const cambioCobrado = cobrado && (
-    <CambioComprobanteCobrado pedidoId={id} total={lista?.[0]?.total} cambio={cambio} puede={tiene('comprobantes/anular')} alCambiar={cargar} />
+    <CambioComprobanteCobrado pedidoId={id} total={lista?.[0]?.total} cambio={cambio} puede={tiene('comprobantes/anular')} alCambiar={(m) => { cargar(); if (m) setAviso(m); }} />
   );
   const enlaceNota = puede && cobrado && (
     <a className="cpd-enlace" href={`/admin/comprobantes?tab=nota&pedidoId=${encodeURIComponent(id)}`} target="_blank" rel="noopener noreferrer">

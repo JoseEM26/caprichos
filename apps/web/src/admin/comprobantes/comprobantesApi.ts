@@ -156,6 +156,16 @@ export const comprobantesApi = {
     return clienteFetch('/admin/comprobantes/sunat/emitir-ahora', { method: 'POST' });
   },
 
+  /** Emite YA un comprobante que espera la noche (aplica antes su cambio pendiente). */
+  async emitirUno(id: string): Promise<{ emitido: boolean; numero_texto: string | null; facturacion_estado: string | null; mensaje: string; motivo?: string }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/emitir-ahora`, { method: 'POST' });
+  },
+
+  /** Aplica YA el cambio pendiente del pedido y emite el comprobante nuevo al instante. */
+  async aplicarCambioAhora(pedidoId: string): Promise<{ aplicado: boolean; baja: boolean; nuevo?: { numero_texto: string; facturacion_estado: string }; mensaje: string }> {
+    return clienteFetch(`/admin/comprobantes/pedido/${encodeURIComponent(pedidoId)}/cambio/aplicar-ahora`, { method: 'POST' });
+  },
+
   /** URL (blob) del XML firmado, ZIP o CDR de un comprobante, con la sesión del usuario. */
   async urlArchivoElectronico(id: string, tipo: 'XML' | 'CDR' | 'ZIP'): Promise<string> {
     return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/archivos/${tipo}`);

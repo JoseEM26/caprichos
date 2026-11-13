@@ -16,7 +16,8 @@ export interface CambioComprobanteCobradoProps {
   cambio: CambioComprobantePendiente | null;
   /** Caja y ADMIN (permiso comprobantes/anular) */
   puede: boolean;
-  alCambiar: () => void;
+  /** Con mensaje cuando «Aplicar ahora» terminó (el padre lo muestra: al recargar este bloque se remonta) */
+  alCambiar: (mensaje?: string) => void;
 }
 
 /**
@@ -30,6 +31,22 @@ export function CambioComprobanteCobrado({ pedidoId, total, cambio, puede, alCam
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [deshaciendo, setDeshaciendo] = useState(false);
+  const [confirmarAhora, setConfirmarAhora] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
+
+  const aplicarAhora = async () => {
+    setAplicando(true);
+    setError(null);
+    try {
+      const r = await comprobantesApi.aplicarCambioAhora(pedidoId);
+      alCambiar(r.mensaje);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : 'No se pudo aplicar el cambio ahora');
+    } finally {
+      setAplicando(false);
+      setConfirmarAhora(false);
+    }
+  };
 
   const errorForm = errorValorComprobante(valor)?.mensaje ?? (motivo.trim().length < 5 ? 'Escribe el motivo (al menos 5 letras)' : null);
 
@@ -76,12 +93,27 @@ export function CambioComprobanteCobrado({ pedidoId, total, cambio, puede, alCam
             Cambiar comprobante
           </button>
           {cambio && (
+            <button type="button" className="cpd-btn" onClick={() => setConfirmarAhora(true)} disabled={aplicando}>
+              Aplicar ahora
+            </button>
+          )}
+          {cambio && (
             <button type="button" className="cpd-btn" onClick={deshacer} disabled={deshaciendo}>
               Deshacer cambio
             </button>
           )}
         </div>
       )}
+      <Confirmar
+        abierto={confirmarAhora}
+        titulo="Aplicar ahora"
+        mensaje="Se hará ya: si la boleta ya salió a SUNAT se da de baja y se emite la factura nueva ahora. ¿Aplicar ahora?"
+        textoSi="Sí, aplicar"
+        textoNo="No"
+        cargando={aplicando}
+        alConfirmar={aplicarAhora}
+        alCancelar={() => setConfirmarAhora(false)}
+      />
       <Confirmar
         abierto={abierto}
         titulo="Cambiar comprobante"

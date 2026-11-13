@@ -209,4 +209,94 @@ describe('envío nocturno de boletas y facturas', () => {
     await cobrar(m, 1n);
     await expect(m.prisma.comprobante.updateMany({ where: { id: 1n }, data: { facturacion_estado: 'PENDIENTE_ENVIO' } })).rejects.toThrow(/ck_comprobante_numero_asignado/);
   });
+
+  describe('emitirUno («Emitir ahora» por comprobante)', () => {
+    it('boleta y factura: números consecutivos sin huecos, mensaje y auditoría', async () => {
+      const m = montar([boleta(1n), boleta(3n), pedidoDePrueba({ id: 2n })]);
+      for (const id of [1n, 2n, 3n]) await cobrar(m, id);
+      const ids = m.db.comprobante.map((c: any) => String(c.id));
+      const b1 = await m.nocturno.emitirUno(ids[0]);
+      const f = await m.nocturno.emitirUno(ids[1]);
+      const b2 = await m.nocturno.emitirUno(ids[2]);
+      expect(b1).toMatchObject({ emitido: true, numero_texto: 'B002-000001' });
+      expect(b1.mensaje).toMatch(/resumen diario/);
+      expect(b2.numero_texto).toBe('B002-000002');
+      expect(f).toMatchObject({ numero_texto: 'F002-000001', facturacion_estado: 'EMITIDO_SUNAT' });
+      expect(m.auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'EMITIR_AHORA_UNO' }));
+    });
+
+    it('409 si ya no espera la noche y 404 si no existe', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      const id = String(m.db.comprobante[0].id);
+      await m.nocturno.emitirUno(id);
+      await expect(m.nocturno.emitirUno(id)).rejects.toMatchObject({ response: { codigo: 'NO_ESTA_ESPERANDO' } });
+      await expect(m.nocturno.emitirUno('999')).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('doble llamada simultánea emite una sola vez', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      const id = String(m.db.comprobante[0].id);
+      const r = await Promise.allSettled([m.nocturno.emitirUno(id), m.nocturno.emitirUno(id)]);
+      expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+      expect(m.db.secuencia).toEqual({ B002: 1 });
+    });
+
+    it('aplica antes el cambio pendiente: BOLETA a FACTURA y a SIMPLE', async () => {
+      const m = montar([boleta(1n), boleta(2n)]);
+      await cobrar(m, 1n);
+      await cobrar(m, 2n);
+      await m.nocturno.solicitarCambio('1', { tipo: 'FACTURA', doc: '20601234567', razon: 'Inversiones Aybar S.A.C.', motivo: 'Pidió factura' });
+      await m.nocturno.solicitarCambio('2', { tipo: 'SIMPLE', motivo: 'Mejor simple' });
+      const id1 = String(m.db.comprobante.find((c: any) => c.pedido_id === 1n).id);
+      const id2 = String(m.db.comprobante.find((c: any) => c.pedido_id === 2n).id);
+      const r1 = await m.nocturno.emitirUno(id1);
+      expect(r1).toMatchObject({ emitido: true, numero_texto: 'F002-000001' });
+      const r2 = await m.nocturno.emitirUno(id2);
+      expect(r2).toMatchObject({ emitido: false, motivo: 'CAMBIO_A_SIMPLE' });
+      expect(m.db.secuencia).toEqual({ F002: 1 });
+    });
+  });
+
+  describe('aplicarCambioAhora', () => {
+    it('sin cambio pendiente: 404', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      await expect(m.nocturno.aplicarCambioAhora('1')).rejects.toMatchObject({ response: { codigo: 'SIN_CAMBIO_PENDIENTE' } });
+    });
+
+    it('boleta que no había salido: se reemplaza y la factura sale ya, sin baja', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      await m.nocturno.solicitarCambio('1', { tipo: 'FACTURA', doc: '20601234567', razon: 'Inversiones Aybar S.A.C.', motivo: 'Pidió factura' });
+      const r = await m.nocturno.aplicarCambioAhora('1');
+      expect(r).toMatchObject({ aplicado: true, baja: false, nuevo: { numero_texto: 'F002-000001' } });
+      expect(r.mensaje).toMatch(/no había salido/);
+      expect(m.db.secuencia).toEqual({ F002: 1 });
+      expect(m.db.comprobanteCambioPendiente).toHaveLength(0);
+      expect(m.auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'APLICAR_CAMBIO_AHORA' }));
+    });
+
+    it('boleta ya emitida: una baja y la factura nueva sale ya', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      await m.nocturno.emitirUno(String(m.db.comprobante[0].id));
+      await m.nocturno.solicitarCambio('1', { tipo: 'FACTURA', doc: '20601234567', razon: 'Inversiones Aybar S.A.C.', motivo: 'Pidió factura' });
+      const r = await m.nocturno.aplicarCambioAhora('1');
+      expect(r).toMatchObject({ aplicado: true, baja: true, nuevo: { numero_texto: 'F002-000001' } });
+      expect(r.mensaje).toMatch(/B002-000001 se dio de baja/);
+      expect(m.db.comprobante.filter((c: any) => c.baja_estado || c.anulado_en)).toHaveLength(1);
+    });
+
+    it('a SIMPLE: sin comprobante nuevo', async () => {
+      const m = montar([boleta(1n)]);
+      await cobrar(m, 1n);
+      await m.nocturno.solicitarCambio('1', { tipo: 'SIMPLE', motivo: 'Mejor simple' });
+      const r = await m.nocturno.aplicarCambioAhora('1');
+      expect(r).toMatchObject({ aplicado: true, baja: false });
+      expect(r.nuevo).toBeUndefined();
+      expect(m.db.secuencia).toEqual({});
+    });
+  });
 });

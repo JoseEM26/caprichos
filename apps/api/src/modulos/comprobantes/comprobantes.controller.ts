@@ -227,6 +227,22 @@ export class ComprobantesController {
     return this.nocturno.deshacerCambio(pedidoId, req.usuario, ip);
   }
 
+  /** POST /admin/comprobantes/pedido/:pedidoId/cambio/aplicar-ahora : aplica YA el cambio pendiente y emite el nuevo al instante. */
+  @Post('pedido/:pedidoId/cambio/aplicar-ahora')
+  @Permiso('comprobantes', 'anular')
+  async aplicarCambioAhora(@Param('pedidoId') pedidoId: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.nocturno.aplicarCambioAhora(pedidoId, req.usuario, ip);
+  }
+
+  /** POST /admin/comprobantes/:id/emitir-ahora : emite YA este comprobante que espera la noche (aplica antes su cambio pendiente). */
+  @Post(':id/emitir-ahora')
+  @Permiso('comprobantes', 'emitir')
+  async emitirUno(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.nocturno.emitirUno(id, req.usuario, ip);
+  }
+
   /** POST /admin/comprobantes/:id/emitir-real : reemplaza un comprobante Simulado por uno real a SUNAT. */
   @Post(':id/emitir-real')
   @Permiso('comprobantes', 'emitir')

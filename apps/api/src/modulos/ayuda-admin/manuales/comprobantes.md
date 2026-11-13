@@ -57,6 +57,8 @@ Ver tambien: [[cierre]]
 3. Asi un cambio del mismo dia no deja huecos de numeracion ni numeros gastados, y no hace falta anular nada.
 4. El Administrador cambia las horas en Comprobantes > Electronicos SUNAT > Facturacion electronica: «Hora de boletas y facturas» (por defecto 23:00) y «Hora del resumen de boletas» (por defecto 23:30; debe ser al menos 15 minutos despues y a mas tardar 23:50). En «Cuando se emiten» puede volver a «Al cobrar». Se guarda con «Guardar configuracion» y un Si/No.
 5. Boton «Emitir ahora»: emite en ese momento todo lo que espera la noche (boletas, facturas y cambios de comprobante pendientes) y envia el resumen de boletas. Lo que se cobre despues sale en la noche como siempre. Si luego se cambia el comprobante de un pedido ya emitido, se hace con una baja.
+   Para emitir UNA sola, cada fila con la insignia Se emite esta noche tiene su propio boton «Emitir ahora» (con Si/No): numera y envia solo esa. Si el pedido tenia un cambio de comprobante pendiente, se aplica antes.
+   Caso «pidio boleta y luego factura»: en el detalle del pedido pulsa Cambiar comprobante, elige Factura, escribe el RUC y el motivo (Si). Luego pulsa «Aplicar ahora» (Si/No): si la boleta aun no habia salido a SUNAT se reemplaza sin anular nada; si ya habia salido se da de baja (SUNAT la recibe en el resumen de esta noche) y la factura se emite en ese momento. El mensaje al terminar dice que se hizo.
 6. Un pedido anulado antes de la noche no se emite. Si algo falla al enviar, queda en Electronicos SUNAT con su estado y el boton Reintentar, como siempre.
 7. En Electronicos SUNAT los pendientes de la noche aparecen con la insignia Se emite esta noche.
 Antes: [[caja]]
