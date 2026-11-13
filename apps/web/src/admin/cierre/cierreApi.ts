@@ -283,7 +283,41 @@ export function calcularTotalEfectivo(conteo: Record<string, number | string | u
   return Math.round(suma * 100) / 100;
 }
 
+/** «¿Por qué no cuadra?» (solo administrador). Sin nombres ni documentos de clientes. */
+export interface PatronCierre {
+  codigo: string;
+  titulo: string;
+  explicacion: string;
+  montoRelacionado?: number;
+  pedidos?: Array<{ codigo: string; monto: number; detalle: string }>;
+}
+export interface AnalisisCierre {
+  cajaId: number;
+  cerrada: boolean;
+  medios: Array<{ medio: string; sistema: number; visto: number | null; diferencia: number | null }>;
+  totalDiferencia: number;
+  patrones: PatronCierre[];
+  sugerencias: Array<{ medio: string; diferencia: number; coincideCon: string[]; texto: string }>;
+  ayudaGeneral: Array<{ medio: string; sobrante: string[]; faltante: string[] }>;
+}
+
+/** Guía para quien cierra: operaciones propias, sin esperado ni diferencias (DT-61). */
+export interface GuiaRevision {
+  cajaId: number;
+  anuladosConPago: Array<{ codigo: string; medio: string | null; monto: number }>;
+  cobrosAnulados: Array<{ codigo: string; medio: string | null; monto: number; hora: string }>;
+  movimientos: Array<{ tipo: string; monto: number; motivo: string; anulado: boolean }>;
+  pendientesDeCobro: Array<{ codigo: string; estado: string; total: number }>;
+  propinasPorMedio: Array<{ medio: string; cantidad: number }>;
+  repartidoresPorLiquidar: Array<{ nombre: string; pedidos: number }>;
+  lista: string[];
+}
+
 export const cierreApi = {
+  obtenerAnalisis: (id: string | number) => api.get<AnalisisCierre>(`/admin/cierre/${id}/analisis`),
+
+  obtenerGuiaRevision: () => api.get<GuiaRevision>('/admin/cierre/guia-revision'),
+
   obtenerEsperado: () =>
     api.get<MontosEsperados>('/admin/cierre/esperado'),
 

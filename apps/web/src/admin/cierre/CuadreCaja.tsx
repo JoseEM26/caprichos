@@ -60,6 +60,8 @@ export interface CuadreCajaProps {
   sinTerminarCount?: number;
   motivoSinTerminar?: string;
   sinTerminarPanel?: ReactNode;
+  /** «Antes de cerrar, revisa esto» (ayuda sin montos de diferencia) */
+  guiaPanel?: ReactNode;
   repartidores: RepartidorPorLiquidar[];
   onRecibirRepartidor: (r: RepartidorPorLiquidar) => void;
   ajustesMedio?: AjusteMedio[];
@@ -102,6 +104,7 @@ export function CuadreCaja({
   sinTerminarCount = 0,
   motivoSinTerminar,
   sinTerminarPanel,
+  guiaPanel,
   repartidores,
   onRecibirRepartidor,
   ajustesMedio = [],
@@ -246,6 +249,8 @@ export function CuadreCaja({
           Volver
         </button>
       </header>
+
+      {guiaPanel}
 
       {/* Estado de la caja y pendientes (lo único que de verdad bloquea el cierre) */}
       <section className="cc-card" aria-label="Estado de la caja" data-testid="cc-estado">

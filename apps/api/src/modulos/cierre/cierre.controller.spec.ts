@@ -16,6 +16,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CierreController } from './cierre.controller';
 import { CierreService } from './cierre.service';
 import { ControlCuadreService } from './control-cuadre.service';
+import { AnalisisCierreService } from './analisis-cierre.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -52,6 +53,7 @@ describe('CierreController', () => {
       providers: [
         { provide: CierreService, useValue: serviceMock },
         { provide: ControlCuadreService, useValue: {} },
+        { provide: AnalisisCierreService, useValue: {} },
         { provide: PrismaService, useValue: {} },
         { provide: AuditoriaService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => 'secret' } },

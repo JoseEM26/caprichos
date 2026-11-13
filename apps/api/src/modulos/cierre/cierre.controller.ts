@@ -14,6 +14,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { CierreService } from './cierre.service';
 import { ControlCuadreService } from './control-cuadre.service';
+import { AnalisisCierreService } from './analisis-cierre.service';
 import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { ArqueoDto } from './dto/arqueo.dto';
@@ -28,6 +29,7 @@ export class CierreController {
   constructor(
     private readonly cierreService: CierreService,
     private readonly controlCuadre: ControlCuadreService,
+    private readonly analisis: AnalisisCierreService,
   ) {}
 
   /**
@@ -122,6 +124,16 @@ export class CierreController {
   }
 
   /**
+   * Guía para quien cierra: operaciones propias del día (anulados con pago, cobros anulados, movimientos, pendientes)
+   * y una lista fija. Nunca entrega esperado, sistema, visto ni diferencias (DT-61).
+   */
+  @Get('guia-revision')
+  @Permiso('caja', 'cerrar')
+  async guiaRevision() {
+    return this.analisis.guiaRevision();
+  }
+
+  /**
    * Historial de cierres de caja con paginación y filtros de fecha.
    */
   @Get('historial')
@@ -189,6 +201,13 @@ export class CierreController {
   async imprimir(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cierreService.imprimirCierre(id, req.usuario, ip);
+  }
+
+  /** «¿Por qué no cuadra?»: análisis de solo lectura de una caja. Solo administrador. */
+  @Get(':id/analisis')
+  @Permiso('caja', 'ver')
+  async analizar(@Param('id') id: string, @Req() req: any) {
+    return this.analisis.analizar(id, req.usuario);
   }
 
   /**

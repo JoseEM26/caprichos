@@ -36,4 +36,8 @@
 .dc-btn { flex: 1; min-height: 44px; border: 1.5px solid var(--cp-navy, #0B2C3E); border-radius: 12px; background: transparent; color: var(--cp-navy, #0B2C3E); font: 800 14px inherit; cursor: pointer; }
 .dc-btn-fuerte { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); }
 .dc-btn[disabled] { opacity: 0.6; cursor: default; }
+.dc-card { background: #fff; border: 1px solid var(--cp-line, #E3D6C6); border-radius: 12px; padding: 4px 12px 10px; min-width: 0; overflow-wrap: anywhere; }
+.dc-card h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dc-card p { margin: 4px 0; font-size: 13px; }
+.dc-peq { font-size: 12px; color: var(--cp-soft, #2C4C5D); }
 .dc-tab:focus-visible, .dc-btn:focus-visible, .dc-x:focus-visible, .dc-intento summary:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
