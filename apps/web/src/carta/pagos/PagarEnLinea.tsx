@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
-import { abrirCulqi, culqiApi, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { autenticar3ds } from './culqi3ds';
+import { abrirCulqi, culqiApi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
@@ -37,8 +38,17 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     const it = ya ?? intento;
     if (!it) return;
     try {
-      const r = await culqiApi.cargo({ intentoId: it.intentoId, token, medio, ...(email ? { email } : {}) });
-      setMensaje(r.mensaje);
+      const base = { intentoId: it.intentoId, token, medio, ...(email ? { email } : {}) };
+      let r = await culqiApi.cargo(base);
+      if (r.estado === ESTADO_3DS) {
+        // el banco pide verificar la tarjeta (3DS); el cargo se reenvía con el resultado
+        const auth = await autenticar3ds(it.publicKey ?? config?.publicKey ?? '', token, {
+          montoCentimos: r.datos3ds?.montoCentimos ?? it.montoCentimos,
+          email: r.datos3ds?.email ?? email,
+        });
+        r = await culqiApi.cargo({ ...base, autenticacion3ds: auth });
+      }
+      setMensaje(r.estado === 'RECHAZADO' ? mensajeRechazo(r.codigo, r.mensaje) : r.mensaje);
       if (r.estado === 'APROBADO') {
         setFase('aprobado');
         alPagado?.();
@@ -50,7 +60,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
         alPagado?.();
       }
     } catch (e) {
-      setMensaje(e instanceof ErrorApi ? e.message : 'No pudimos conectar. Revisa tu internet y reintenta.');
+      setMensaje(e instanceof Error ? e.message : 'No pudimos conectar. Revisa tu internet y reintenta.');
       setFase('error');
     }
   };
@@ -116,7 +126,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
           </p>
           {fase === 'rechazado' && (
             <p role="alert" data-testid="pago-rechazado" style={{ color: 'var(--cp-rust)', margin: '0 0 8px' }}>
-              No se pudo cobrar. {mensaje} Puedes reintentar u otro medio de pago.
+              {mensaje} Puedes reintentar u otro medio de pago.
             </p>
           )}
           {fase === 'error' && (

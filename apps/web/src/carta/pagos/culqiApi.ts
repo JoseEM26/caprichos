@@ -1,5 +1,8 @@
 import { api } from '../../comun/api';
 
+/** Estado del cargo que pide autenticación 3DS (nombre acordado con el backend). */
+export const ESTADO_3DS = 'REQUIERE_3DS' as const;
+
 export type MedioCulqi = 'TARJETA' | 'YAPE';
 /** Nombre del medio en pago.metodo al crear el pedido (lo acepta el backend). */
 export const METODO_CULQI = 'CULQI' as const;
@@ -26,9 +29,13 @@ export interface IntentoCulqi {
 }
 
 export interface ResultadoCargo {
-  estado: 'APROBADO' | 'RECHAZADO' | 'PENDIENTE';
+  estado: 'APROBADO' | 'RECHAZADO' | 'PENDIENTE' | typeof ESTADO_3DS;
   mensaje: string;
   pedidoCodigo: string;
+  /** Código de Culqi (p. ej. insufficient_funds) cuando se rechaza. */
+  codigo?: string;
+  /** Datos para autenticar 3DS (el nombre exacto lo confirma el backend). */
+  datos3ds?: { montoCentimos?: number; email?: string };
 }
 
 export interface PagoOnline {
@@ -59,7 +66,7 @@ export const culqiApi = {
   config: () => api.get<ConfigCulqi>('/carta/pagos/culqi/config'),
   intento: (pedidoId: string, seguimientoToken?: string) =>
     api.post<IntentoCulqi>('/carta/pagos/culqi/intento', { pedidoId, ...(seguimientoToken ? { seguimientoToken } : {}) }),
-  cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string }) =>
+  cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string; autenticacion3ds?: unknown }) =>
     api.post<ResultadoCargo>('/carta/pagos/culqi/cargo', cuerpo),
   listar: (f: FiltrosPagosOnline) => {
     const q = new URLSearchParams();
@@ -71,41 +78,93 @@ export const culqiApi = {
     api.post(`/admin/pagos-online/${encodeURIComponent(id)}/devolver`, cuerpo),
 };
 
-const URL_CULQI = 'https://js.culqi.com/checkout-js';
-let promesaScript: Promise<void> | null = null;
+export const URL_CULQI = 'https://checkout.culqi.com/js/v4';
+const COLOR_AZUL = '#0B2C3E';
+const COLOR_NARANJA = '#E67929';
 
-/** Carga el script oficial de Culqi solo cuando se pide (modo REAL). */
-export function cargarScriptCulqi(): Promise<void> {
-  if (promesaScript) return promesaScript;
-  promesaScript = new Promise<void>((ok, fallo) => {
+/** Carga un script externo una sola vez y bajo demanda. */
+export function cargarScript(url: string, memo?: { p: Promise<void> | null }): Promise<void> {
+  const m = memo ?? { p: null };
+  if (m.p) return m.p;
+  m.p = new Promise<void>((ok, fallo) => {
     const s = document.createElement('script');
-    s.src = URL_CULQI;
+    s.src = url;
     s.async = true;
     s.onload = () => ok();
     s.onerror = () => {
-      promesaScript = null;
+      m.p = null;
       s.remove();
       fallo(new Error('No se pudo cargar el pago. Revisa tu conexión.'));
     };
     document.head.appendChild(s);
   });
-  return promesaScript;
+  return m.p;
+}
+const memoCulqi = { p: null as Promise<void> | null };
+export const cargarScriptCulqi = () => cargarScript(URL_CULQI, memoCulqi);
+
+/** Opciones de Culqi Checkout V4: solo tarjeta y Yape; los medios con orden quedan apagados. */
+export function opcionesCulqi(medios: MedioCulqi[]) {
+  return {
+    lang: 'auto',
+    paymentMethods: {
+      tarjeta: medios.includes('TARJETA'),
+      yape: medios.includes('YAPE'),
+      bancaMovil: false,
+      agente: false,
+      billetera: false,
+      cuotealo: false,
+    },
+    style: {
+      logo: `${window.location.origin}/logo.webp`,
+      bannerColor: COLOR_AZUL,
+      buttonBackground: COLOR_NARANJA,
+      menuColor: COLOR_AZUL,
+      linksColor: COLOR_NARANJA,
+      buttonText: 'Pagar',
+      buttonTextColor: COLOR_AZUL,
+      priceColor: COLOR_NARANJA,
+    },
+  };
 }
 
-/** Abre Culqi Checkout y devuelve el token (o null si el cliente cierra sin pagar). */
+const MENSAJES_ERROR: Record<string, string> = {
+  insufficient_funds: 'fondos insuficientes',
+  incorrect_cvv: 'el código de seguridad (CVV) no es correcto',
+  stolen_card: 'la tarjeta está bloqueada',
+  lost_card: 'la tarjeta está bloqueada',
+  fraudulent: 'el banco no autorizó esta compra',
+  issuer_decline_operation: 'el banco no autorizó esta operación',
+  processing_error: 'hubo un error al procesar la tarjeta, intenta de nuevo',
+  invalid_card: 'la tarjeta no es válida',
+  contact_issuer: 'comunícate con tu banco',
+  issuer_not_available: 'tu banco no responde ahora, intenta en unos minutos',
+};
+
+/** Mensaje simple para el cliente según el código de Culqi; si no se conoce, el del servidor. */
+export function mensajeRechazo(codigo?: string, mensajeServidor?: string): string {
+  const m = codigo ? MENSAJES_ERROR[codigo] : undefined;
+  if (m) return `Tu banco rechazó el pago: ${m}.`;
+  return mensajeServidor || 'No se pudo cobrar el pago.';
+}
+
+/** Abre Culqi Checkout V4 y devuelve el token (o null si el cliente cierra sin pagar). */
 export async function abrirCulqi(intento: IntentoCulqi): Promise<{ token: string; medio: MedioCulqi; email?: string } | null> {
   await cargarScriptCulqi();
   const C = (window as any).Culqi;
   if (!C) throw new Error('No se pudo cargar el pago. Intenta de nuevo.');
-  return new Promise((resolver) => {
+  return new Promise((resolver, rechazar) => {
     C.publicKey = intento.publicKey;
     C.settings({ title: 'Caprichos', currency: intento.moneda, amount: intento.montoCentimos });
-    C.options({ paymentMethods: { tarjeta: intento.medios.includes('TARJETA'), yape: intento.medios.includes('YAPE') } });
+    C.options(opcionesCulqi(intento.medios));
     (window as any).culqi = () => {
       if (C.token?.id) {
         const tk = C.token;
         C.close();
         resolver({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
+      } else if (C.error) {
+        C.close();
+        rechazar(new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
       } else {
         C.close();
         resolver(null);
