@@ -123,8 +123,7 @@ export class UsuariosService {
     const y = (n: number) => new Date(`${sumarDiasIso(hoy, n)}T00:00:00.000Z`); // alta_en es DATE
     const y0 = (f: string) => new Date(`${f}T00:00:00.000Z`);
 
-    // La cuenta de sistema «Pago en línea» no es personal: no aparece en Usuarios
-    const and: any[] = [{ rol: { not: 'SISTEMA' } }];
+    const and: any[] = [];
 
     if (filtros.rol) {
       // «Producción» es un cargo de la pantalla que agrupa a Cocina; el resto son códigos reales.
@@ -186,7 +185,8 @@ export class UsuariosService {
       and.push({ id: { in: ids } });
     }
 
-    const where: any = and.length ? { AND: and } : {};
+    // La cuenta de sistema «Pago en línea» no es personal: no aparece en Usuarios
+    const where: any = { AND: [...and, { rol: { not: 'SISTEMA' } }] };
 
     const [total, usuarios] = await Promise.all([
       this.prisma.userAccount.count({ where }),
