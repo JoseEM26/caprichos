@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 1100px;
+  max-width: 1280px;
   min-width: 0;
 }
 
@@ -31,7 +31,7 @@
 
 .ap-ayuda {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-soft);
 }
 
@@ -43,7 +43,7 @@
 }
 
 .ap-buscar {
-  flex: 1 1 220px;
+  flex: 1 1 260px;
   min-width: 0;
   min-height: 44px;
   box-sizing: border-box;
@@ -89,12 +89,9 @@
 
 /* ── Tabla ─────────────────────────────────────────────────────────────── */
 
-.ap-tabla-wrap {
-  min-width: 0;
-}
-
 .ap-tabla {
   width: 100%;
+  box-sizing: border-box;
   border-collapse: separate;
   border-spacing: 0;
   background: var(--cp-white);
@@ -390,7 +387,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(380px, calc(100% - 24px));
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   overflow-y: auto;
   box-sizing: border-box;
   background: var(--cp-white);
@@ -434,184 +431,182 @@
   margin-top: 0;
 }
 
-/* ── Celular y tablet angosta: cada producto es una tarjeta densa en cuadrícula ───────── */
+/* ── Responsive por ANCHO DE LA CAJA (no de la ventana: el admin tiene menú lateral) ──
+   < 700 px: cada producto es una tarjeta compacta (nombre / ayer+hoy / estado+total+acciones)
+   700–959 px: tarjeta en una sola fila
+   ≥ 960 px: tabla real. Nunca hay scroll horizontal de la página. */
 
-@media (max-width: 1023px) {
-  .ap-vista {
-    gap: 8px;
-  }
-
-  .ap-ayuda {
-    display: none;
-  }
-
-  .ap-buscar {
-    flex: 1 1 100%;
-  }
-
-  .ap-filtros {
-    gap: 0 14px;
-  }
-
-  .ap-check,
-  .ap-boton-texto {
-    min-height: 40px;
-  }
-
-  .ap-tabla thead {
-    display: none;
-  }
-
-  .ap-tabla,
-  .ap-tabla tbody,
-  .ap-tabla th,
-  .ap-tabla td {
-    display: block;
-    width: 100%;
-  }
-
-  .ap-tabla tbody tr {
-    display: grid;
-    grid-template-columns: max-content max-content 1fr;
-    align-items: start;
-    gap: 2px 8px;
-    padding: 8px 10px;
-    border-top: 1px solid var(--cp-line);
-  }
-
-  .ap-tabla tbody tr.ap-grupo-titulo {
-    display: block;
-    padding: 0;
-  }
-
-  .ap-tabla td,
-  .ap-tabla th {
-    border: none;
-    padding: 0;
-    width: auto;
-    min-width: 0;
-  }
-
-  .ap-tabla .ap-grupo-titulo th {
-    padding: 6px 10px;
-    width: 100%;
-  }
-
-  .ap-tabla .ap-celda-nombre {
-    grid-column: 1 / -1;
-    min-width: 0;
-    padding: 0;
-  }
-
-  .ap-tabla .ap-sabor .ap-celda-nombre {
-    padding-top: 0;
-  }
-
-  .ap-tabla td[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 2px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--cp-soft);
-  }
-
-  .ap-tabla td[data-label='Total'] {
-    text-align: center;
-    align-self: center;
-    min-width: 44px;
-  }
-
-  .ap-tabla td[data-label='Estado'] {
-    grid-column: 1 / 3;
-    align-self: center;
-  }
-
-  .ap-tabla td[data-label='Estado']::before,
-  .ap-tabla td[data-label='Botar a merma']::before {
-    display: none;
-  }
-
-  .ap-tabla .ap-estado {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2px 8px;
-  }
-
-  .ap-tabla .ap-celda-merma {
-    grid-column: 3;
-    width: auto;
-    text-align: right;
-    padding: 0;
-  }
-
-  .ap-tabla .ap-acciones-fila {
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-  }
-
-  .ap-tabla .ap-celda-merma:empty {
-    display: none;
-  }
-
-  .ap-tabla .ap-nombre-sabor,
-  .ap-tabla .ap-saldo--sabor {
-    padding-left: 0;
-    display: inline;
-  }
-  .ap-tabla .ap-sabor .ap-saldo {
-    display: inline;
-    margin-left: 8px;
-  }
-  .ap-tabla .ap-sabor td {
-    background: transparent;
-  }
-  .ap-tabla tbody tr.ap-sabor {
-    background: #fcf9f4;
-    margin-left: 0;
-  }
-  .ap-tabla tbody tr.ap-sabor--atenuado {
-    background: var(--cp-sand);
-  }
-
-  /* Táctil de 44 px, con campos angostos para que «ayer» y «hoy» quepan lado a lado */
-  .ap-paso {
-    width: 44px;
-    min-width: 44px;
-    min-height: 44px;
-  }
-  .ap-tabla .ap-cantidad {
-    gap: 4px;
-  }
-  .ap-tabla .ap-campo {
-    width: 56px;
-    min-width: 0;
-    min-height: 44px;
-  }
-  .ap-tabla td[data-label='Produje hoy (+)'] .ap-campo {
-    width: 72px;
-  }
-  .ap-merma-icono {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-  }
+.ap-tabla-wrap {
+  container: ap / inline-size;
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* Tablet y PC: columnas de la tabla más apretadas */
-@media (min-width: 1024px) {
+.ap-tabla thead {
+  display: none;
+}
+
+.ap-tabla,
+.ap-tabla tbody,
+.ap-tabla th,
+.ap-tabla td {
+  display: block;
+  width: 100%;
+}
+
+.ap-tabla tbody tr {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+  gap: 6px 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--cp-line);
+}
+
+.ap-tabla tbody tr.ap-grupo-titulo {
+  display: block;
+  padding: 0;
+}
+
+.ap-tabla td,
+.ap-tabla th {
+  border: none;
+  padding: 0;
+  width: auto;
+  min-width: 0;
+}
+
+.ap-tabla .ap-grupo-titulo th {
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.ap-tabla .ap-celda-nombre {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.ap-tabla .ap-sabor .ap-celda-nombre {
+  padding-top: 0;
+}
+
+.ap-tabla td[data-label]::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cp-soft);
+}
+
+/* ayer 3/5, hoy 2/5; abajo estado 2, total 1, acciones 2 */
+.ap-tabla td[data-label='Quedaron de ayer'] { grid-column: span 3; }
+.ap-tabla td[data-label='Produje hoy (+)'] { grid-column: span 2; }
+.ap-tabla td[data-label='Estado'] { grid-column: span 2; align-self: center; }
+.ap-tabla td[data-label='Total'] { grid-column: span 1; text-align: center; align-self: center; }
+.ap-tabla .ap-celda-merma { grid-column: span 2; width: auto; text-align: right; align-self: center; }
+.ap-tabla td[data-label='Estado']::before,
+.ap-tabla td[data-label='Botar a merma']::before { display: none; }
+.ap-tabla .ap-celda-merma:empty { display: none; }
+
+.ap-tabla .ap-estado {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+
+.ap-tabla .ap-acciones-fila {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.ap-tabla .ap-nombre-sabor,
+.ap-tabla .ap-saldo--sabor {
+  padding-left: 0;
+  display: inline;
+}
+.ap-tabla .ap-sabor .ap-saldo {
+  display: inline;
+  margin-left: 8px;
+}
+.ap-tabla .ap-sabor td {
+  background: transparent;
+}
+.ap-tabla tbody tr.ap-sabor {
+  background: #fcf9f4;
+}
+.ap-tabla tbody tr.ap-sabor--atenuado {
+  background: var(--cp-sand);
+}
+
+/* Táctil de 44 px; los campos se estiran dentro de su celda */
+.ap-paso {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.ap-campo {
+  min-height: 44px;
+}
+.ap-tabla .ap-cantidad {
+  gap: 4px;
+}
+.ap-tabla .ap-cantidad .ap-campo {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 40px;
+}
+.ap-tabla td[data-label='Produje hoy (+)'] .ap-campo {
+  width: 100%;
+}
+.ap-merma-icono {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+/* Tarjeta en una sola fila (celular grande apaisado, tablet) */
+@container ap (min-width: 700px) {
+  .ap-tabla tbody tr {
+    grid-template-columns: minmax(0, 1fr) 160px 96px 52px minmax(0, 110px) auto;
+    align-items: center;
+  }
+  .ap-tabla .ap-celda-nombre,
+  .ap-tabla td[data-label='Quedaron de ayer'],
+  .ap-tabla td[data-label='Produje hoy (+)'],
+  .ap-tabla td[data-label='Estado'],
+  .ap-tabla td[data-label='Total'],
+  .ap-tabla .ap-celda-merma {
+    grid-column: auto;
+  }
+  .ap-tabla .ap-celda-merma { text-align: right; }
+}
+
+/* PC: tabla real, con scroll horizontal solo dentro de su caja si faltara espacio */
+@container ap (min-width: 960px) {
+  .ap-tabla { display: table; table-layout: auto; }
+  .ap-tabla thead { display: table-header-group; }
+  .ap-tabla tbody { display: table-row-group; width: auto; }
+  .ap-tabla tbody tr,
+  .ap-tabla tbody tr.ap-grupo-titulo { display: table-row; padding: 0; }
   .ap-tabla th,
-  .ap-tabla td {
-    padding: 6px 8px;
-  }
-  .ap-celda-merma {
-    width: 170px;
-  }
-  .ap-acciones-fila {
-    flex-wrap: nowrap;
-  }
+  .ap-tabla td { display: table-cell; width: auto; padding: 8px 10px; border-top: 1px solid var(--cp-line); }
+  .ap-tabla thead th { border-top: none; }
+  .ap-tabla .ap-grupo-titulo th { padding: 8px 10px; }
+  .ap-tabla td[data-label]::before { display: none; }
+  .ap-tabla td[data-label='Total'] { text-align: left; }
+  .ap-tabla .ap-celda-nombre { min-width: 200px; }
+  .ap-tabla .ap-cantidad .ap-campo { flex: 0 0 auto; width: 72px; }
+  .ap-tabla td[data-label='Produje hoy (+)'] .ap-campo { width: 84px; }
+  .ap-tabla .ap-celda-merma { width: 140px; text-align: center; }
+  .ap-tabla .ap-acciones-fila { justify-content: center; }
+  .ap-tabla .ap-sabor .ap-nombre-sabor { display: block; padding-left: 26px; }
+  .ap-tabla .ap-sabor .ap-saldo { display: block; margin-left: 0; padding-left: 26px; }
+  .ap-tabla tbody tr.ap-sabor td { background: #fcf9f4; }
+  .ap-tabla tbody tr.ap-sabor--atenuado td { background: var(--cp-sand); }
+  .ap-tabla .ap-estado { flex-direction: column; align-items: flex-start; }
 }
 
 /* ── Merma por bajar el conteo ──────────────────────────────────────────── */
@@ -713,4 +708,20 @@
   .hp-evento { grid-template-columns: 54px 1fr; }
   .hp-numeros { grid-column: 2; text-align: left; display: flex; gap: 12px; align-items: baseline; }
   .hp-hora { font-size: 18px; }
+}
+
+/* ── Cabecera, filtros y pie ordenados por tamaño ───────────────────────── */
+.ap-pie button { max-width: 420px; }
+.ap-pie { display: flex; flex-direction: column; gap: 4px; }
+@media (min-width: 900px) {
+  .ap-cabecera { flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .ap-ayuda { max-width: 380px; text-align: right; }
+  .ap-pie { flex-direction: row; align-items: center; gap: 16px; }
+  .ap-pie .ap-pie-nota { margin-top: 0; }
+  .ap-mermas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+}
+@media (max-width: 480px) {
+  .ap-filtros { gap: 0 12px; }
+  .ap-buscar { flex-basis: 100%; }
+  .ap-merma-fila { flex-wrap: wrap; }
 }

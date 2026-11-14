@@ -37,6 +37,17 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     expect(screen.getByText(/05\/11\/2026/)).toBeInTheDocument();
   });
 
+  it('renderiza la estructura principal: cabecera, filtros, tabla, pie de guardado', async () => {
+    const { container } = render(<AperturaDiaView />);
+    await screen.findByText('DONA CHOCOLATE');
+    expect(container.querySelector('.ap-cabecera')).toBeInTheDocument();
+    expect(container.querySelector('.ap-filtros')).toBeInTheDocument();
+    expect(container.querySelector('.ap-tabla-wrap .ap-tabla')).toBeInTheDocument();
+    expect(screen.getByTestId('indicador-en-vivo')).toBeInTheDocument();
+    expect(container.querySelector('.ap-pie')).toContainElement(screen.getByRole('button', { name: /Guardar apertura/ }));
+    expect(screen.getAllByTestId('apertura-fila')).toHaveLength(2);
+  });
+
   it('muestra la miniatura del producto con carga diferida y un marcador si no hay foto', async () => {
     vi.spyOn(almacenApi, 'obtenerApertura').mockResolvedValue({
       fecha: '2026-11-05',
