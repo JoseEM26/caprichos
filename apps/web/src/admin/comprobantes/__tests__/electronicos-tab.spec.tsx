@@ -91,6 +91,8 @@ describe('ElectronicosTab', () => {
     await waitFor(() => expect(emitir).toHaveBeenCalled());
     expect(await screen.findByText(/2 comprobante\(s\) emitido\(s\)/)).toBeTruthy();
 
+    // Por defecto es al instante: las horas aparecen al elegir «En la noche»
+    fireEvent.change(screen.getByLabelText('Cuándo se emiten'), { target: { value: 'si' } });
     fireEvent.change(screen.getByLabelText('Hora de boletas y facturas'), { target: { value: '22:45' } });
     fireEvent.change(screen.getByLabelText('Hora del resumen de boletas'), { target: { value: '23:15' } });
     fireEvent.click(screen.getByText('Guardar configuración'));

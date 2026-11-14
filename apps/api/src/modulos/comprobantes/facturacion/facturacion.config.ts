@@ -55,7 +55,7 @@ export interface ConfigFacturacion {
   serieFactura: string;
   /** Proveedor elegido (SIMULADO por defecto). El efectivo puede caer a SIMULADO si falta su configuración. */
   proveedor: Proveedor;
-  /** true (defecto): boletas y facturas se emiten en la noche, no al cobrar. false: como antes, al cobrar. */
+  /** true: boletas y facturas se emiten en la noche. false (defecto): al instante, al cobrar. */
   envioNocturno: boolean;
   /** Hora Lima (HH:MM) desde la que corre el lote de la noche. */
   horaEnvio: string;
@@ -82,7 +82,8 @@ export function interpretarConfig(valores: Record<string, unknown>): ConfigFactu
     serieBoleta: serieValida(serieB, 'B') ? (serieB as string) : SERIE_BOLETA_DEFECTO,
     serieFactura: serieValida(serieF, 'F') ? (serieF as string) : SERIE_FACTURA_DEFECTO,
     proveedor: proveedorDe(valores[CLAVES_FACTURACION.proveedor]),
-    envioNocturno: !['no', 'NO', false, 'false'].includes(valores[CLAVES_FACTURACION.envioNocturno] as any),
+    // Por defecto AL INSTANTE (decisión del dueño 14/11): solo «si» explícito activa el envío de la noche
+    envioNocturno: ['si', 'SI', true, 'true'].includes(valores[CLAVES_FACTURACION.envioNocturno] as any),
     horaEnvio,
     horaResumen,
   };

@@ -88,7 +88,7 @@ export function ElectronicosTab() {
   const [formSerieB, setFormSerieB] = useState('');
   const [formSerieF, setFormSerieF] = useState('');
   const [formProveedor, setFormProveedor] = useState<ProveedorFacturacion>('SIMULADO');
-  const [formNocturno, setFormNocturno] = useState<'si' | 'no'>('si');
+  const [formNocturno, setFormNocturno] = useState<'si' | 'no'>('no');
   const [formHoraEnvio, setFormHoraEnvio] = useState('23:00');
   const [formHoraResumen, setFormHoraResumen] = useState('23:30');
   const [confirmarConfig, setConfirmarConfig] = useState(false);
@@ -154,7 +154,7 @@ export function ElectronicosTab() {
         setFormSerieB(c.serieBoleta);
         setFormSerieF(c.serieFactura);
         setFormProveedor(c.proveedor ?? 'SIMULADO');
-        setFormNocturno(c.envio_nocturno ?? 'si');
+        setFormNocturno(c.envio_nocturno ?? 'no');
         setFormHoraEnvio(c.hora_envio ?? '23:00');
         setFormHoraResumen(c.hora_resumen ?? '23:30');
       })
@@ -372,7 +372,7 @@ export function ElectronicosTab() {
             <span>Proveedor elegido: <strong>{NOMBRE_PROVEEDOR[config.proveedor ?? 'SIMULADO']}</strong></span>
             <span data-testid="horas-envio">
               {config.envio_nocturno === 'no'
-                ? <>Boletas y facturas: <strong>al cobrar</strong></>
+                ? <>Boletas y facturas: <strong>al instante, al cobrar</strong></>
                 : <>Boletas y facturas: <strong>{config.hora_envio ?? '23:00'}</strong> · Resumen de boletas: <strong>{config.hora_resumen ?? '23:30'}</strong></>}
             </span>
             {config.facturacion_desde && (
@@ -423,8 +423,8 @@ export function ElectronicosTab() {
             <label style={{ fontWeight: 700, fontSize: 13 }}>
               Cuándo se emiten
               <select value={formNocturno} onChange={(e) => setFormNocturno(e.target.value as 'si' | 'no')} style={{ display: 'block', width: '100%', minHeight: ALTO_TOQUE, marginTop: 4, fontWeight: 400 }}>
+                <option value="no">Al instante, al cobrar (recomendado)</option>
                 <option value="si">En la noche (todas juntas)</option>
-                <option value="no">Al cobrar</option>
               </select>
             </label>
             {formNocturno === 'si' && (
