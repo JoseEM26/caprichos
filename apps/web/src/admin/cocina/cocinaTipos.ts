@@ -84,6 +84,8 @@ export interface Comanda {
   numeroDia?: number | null;
   /** Pedido extra: código del pedido original («EXTRA de CP-W045») */
   extraDe?: string | null;
+  /** Pedido extra: id del pedido original (raíz de la cuenta). */
+  pedidoOrigenId?: string | null;
   /** Hora del servidor al responder (ISO): el navegador cuenta el tiempo con su desfase. */
   ahoraServidor?: string;
   /** Umbrales de color vigentes en el servidor. */

@@ -495,6 +495,7 @@ export class ComandasService {
         // Lista de espera: pedido de mesa que todavía no tiene mesa
         enEsperaMesa: Boolean((p as any).espera_mesa_desde),
         extraDe: (p as any).pedidoOrigen?.codigo ?? null,
+        pedidoOrigenId: p.pedido_origen_id != null ? p.pedido_origen_id.toString() : null,
         nota: p.nota ?? null,
         minutos,
         minutosEspera: minutos,

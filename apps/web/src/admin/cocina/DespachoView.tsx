@@ -9,6 +9,8 @@ import { TiempoEspera } from './TiempoEspera';
 import { InsigniaMesa, textoMesa } from './InsigniaMesa';
 import { detalleLinea, textoSabores } from './cocinaTipos';
 import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
+import { agruparPorCuenta, etiquetaParte } from './cuentaExtras';
+import type { GrupoCuenta } from './cuentaExtras';
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
@@ -150,31 +152,14 @@ function Areas({
   );
 }
 
-export interface GrupoDespacho {
-  clave: string;
-  /** El pedido original (o, si no está a la vista, el primer extra). */
-  principal: PedidoDespacho;
-  /** Original primero y luego sus extras por hora. */
-  partes: PedidoDespacho[];
-}
+export type GrupoDespacho = GrupoCuenta<PedidoDespacho>;
 
 const todoListoGrupo = (g: GrupoDespacho) => {
   const pend = g.partes.filter((x) => !x.despachado);
   return pend.length > 0 && pend.every((x) => x.completo);
 };
 
-/** Une cada pedido extra con su original por pedidoOrigenId (raíz de la cuenta). Sin extras: un grupo por pedido. */
-export function agruparDespacho(pedidos: PedidoDespacho[]): GrupoDespacho[] {
-  const porClave = new Map<string, PedidoDespacho[]>();
-  for (const p of pedidos) {
-    const k = p.pedidoOrigenId ?? p.pedidoId;
-    porClave.set(k, [...(porClave.get(k) ?? []).filter((x) => x.pedidoId !== p.pedidoId), p]);
-  }
-  return [...porClave.entries()].map(([clave, ps]) => {
-    const partes = ps.sort((a, b) => Number(!!a.pedidoOrigenId) - Number(!!b.pedidoOrigenId) || new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime());
-    return { clave, principal: partes[0], partes };
-  });
-}
+export const agruparDespacho = (pedidos: PedidoDespacho[]): GrupoDespacho[] => agruparPorCuenta(pedidos);
 
 type Pendiente = { tipo: 'parcial'; p: PedidoDespacho } | { tipo: 'devolver'; p: PedidoDespacho; area: AreaDespacho };
 
@@ -371,7 +356,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
               {g.partes.map((x, i) => {
                 const faltan = x.areas.filter((a) => !a.listo);
                 const algoListo = x.areas.some((a) => a.listo && !a.despachada);
-                const etiqueta = x.pedidoOrigenId ? `Extra ${i}` : 'Pedido original';
+                const etiqueta = etiquetaParte(x, i);
                 return (
                   <section
                     key={x.pedidoId}
