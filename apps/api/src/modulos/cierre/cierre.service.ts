@@ -526,53 +526,71 @@ export class CierreService {
     let pagosSinCobro: string[] = [];
     let entregadosJustificados: string[] = [];
     let sinTerminarJustificados: string[] = [];
+    let cobrosEnCursoJustificados = 0;
     const cierre = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
-      // 1. No puede haber cobros en curso ni pedidos pendientes de confirmación
+      // 1. No puede haber cobros en curso ni pedidos pendientes de confirmación.
+      // Un entregado sin cobrar ya justificado por el ADMIN (sin_cobro_justificado_en) no vuelve a bloquear.
       const cobrosEnCurso = await tx.pedido.count({
         where: {
           pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
           estado: { not: 'ANULADO' },
+          sin_cobro_justificado_en: null,
         },
       });
 
       if (cobrosEnCurso > 0) {
         // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
         const entregados = await tx.pedido.findMany({
-          where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO' },
+          where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO', sin_cobro_justificado_en: null },
           select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, planPago: { select: { medio: true, monto: true } } },
           orderBy: { creado_en: 'asc' },
         });
         const sinCobrar = entregados.filter((p: any) => pedidoDebeEstarCobrado(p));
         const lista = sinCobrar.map((p: any) => ({ id: Number(p.id), codigo: p.codigo, modalidad: p.modalidad, pagoEstado: p.pago_estado, total: montoACobrar(p) }));
-        if (cobrosEnCurso > sinCobrar.length) {
-          throw new HttpException(
-            {
-              codigo: 'COBROS_EN_CURSO',
-              mensaje: `No se puede cerrar la caja: hay ${cobrosEnCurso} pedido(s) con cobro en curso o por confirmar.`,
-              ...(lista.length ? { entregadosSinCobrar: lista } : {}),
-            },
-            HttpStatus.CONFLICT,
-          );
-        }
-        // Solo quedan entregados sin cobrar: el ADMIN puede cerrar con un motivo (queda auditado)
         const esAdmin = tieneRol(usuario, 'ADMIN');
-        const motivo = (dto.motivoEntregadosSinCobrar ?? '').trim();
-        if (!esAdmin || motivo.length < MOTIVO_SIN_COBRO_MIN) {
-          throw new HttpException(
-            {
-              codigo: 'ENTREGADOS_SIN_COBRAR',
-              mensaje:
-                `No se puede cerrar la caja: hay ${lista.length} pedido(s) entregados sin cobrar. Cóbralos o anúlalos.` +
-                (esAdmin ? ' Como administrador puedes cerrar escribiendo un motivo (mínimo 10 letras).' : ''),
-              entregadosSinCobrar: lista,
-              puedeJustificar: esAdmin,
-            },
-            HttpStatus.CONFLICT,
-          );
+        const enCurso = cobrosEnCurso - sinCobrar.length;
+        if (enCurso > 0) {
+          // Cobros en curso (pedido vivo sin entregar): solo el ADMIN cierra igual, con un motivo que queda en auditoría y en el cierre
+          const motivoCurso = (dto.motivoCobrosEnCurso ?? '').trim();
+          if (!esAdmin || motivoCurso.length < MOTIVO_SIN_COBRO_MIN) {
+            throw new HttpException(
+              {
+                codigo: 'COBROS_EN_CURSO',
+                mensaje:
+                  `No se puede cerrar la caja: hay ${enCurso} pedido(s) con cobro en curso o por confirmar.` +
+                  (esAdmin
+                    ? ' Como administrador puedes cerrar escribiendo un motivo (mínimo 10 letras).'
+                    : ' Solo el administrador puede cerrar con cobros en curso, escribiendo un motivo.'),
+                ...(lista.length ? { entregadosSinCobrar: lista } : {}),
+                puedeJustificar: esAdmin,
+              },
+              HttpStatus.CONFLICT,
+            );
+          }
+          cobrosEnCursoJustificados = enCurso;
         }
-        entregadosJustificados = lista.map((p) => `${p.codigo} S/ ${p.total.toFixed(2)}`);
+        if (lista.length > 0) {
+          // Solo el ADMIN puede cerrar con entregados sin cobrar, con un motivo (queda auditado)
+          const motivo = (dto.motivoEntregadosSinCobrar ?? '').trim();
+          if (!esAdmin || motivo.length < MOTIVO_SIN_COBRO_MIN) {
+            throw new HttpException(
+              {
+                codigo: 'ENTREGADOS_SIN_COBRAR',
+                mensaje:
+                  `No se puede cerrar la caja: hay ${lista.length} pedido(s) entregados sin cobrar. Cóbralos o anúlalos.` +
+                  (esAdmin ? ' Como administrador puedes cerrar escribiendo un motivo (mínimo 10 letras).' : ''),
+                entregadosSinCobrar: lista,
+                puedeJustificar: esAdmin,
+              },
+              HttpStatus.CONFLICT,
+            );
+          }
+          entregadosJustificados = lista.map((p) => `${p.codigo} S/ ${p.total.toFixed(2)}`);
+          // Justificado una vez: queda marcado y sigue visible en «Justificados pendientes» hasta cobrarlo o anularlo
+          await tx.pedido.updateMany({ where: { id: { in: lista.map((p) => BigInt(p.id)) } }, data: { sin_cobro_justificado_en: new Date() } });
+        }
       }
 
       // 1b. Ningún pedido sin terminar (ni pagado): todo debe quedar ENTREGADO o ANULADO. Solo el ADMIN justifica.
@@ -681,7 +699,9 @@ export class CierreService {
           caja_id: caja.id,
           conteo: conteo as any,
           resultado,
-          nota: dto.nota?.trim() || null,
+          nota: [dto.nota?.trim(), cobrosEnCursoJustificados > 0 ? `Cerrado con ${cobrosEnCursoJustificados} cobro(s) en curso. Motivo del administrador: ${dto.motivoCobrosEnCurso?.trim()}` : '']
+            .filter(Boolean)
+            .join(' | ') || null,
           // La BD exige quién respondió por un cierre NO_CUADRA (ck_cierre_caja_aprobacion): aquí es quien cierra,
           // no una aprobación de supervisor (el cierre con diferencia ya no pide aprobación).
           aprobado_por: resultado === 'NO_CUADRA' ? usuario.partyId : null,
@@ -740,6 +760,21 @@ export class CierreService {
         entidadId: caja.id,
         despues: { pedidos: entregadosJustificados, forzadoPorAdministrador: true },
         motivo: dto.motivoEntregadosSinCobrar?.trim(),
+        partyId: usuario.partyId,
+        ip,
+      });
+    }
+
+    if (cobrosEnCursoJustificados > 0) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'cierre',
+        accion: 'CIERRE_COBROS_EN_CURSO',
+        resultado: 'OK',
+        entidad: 'cierre_caja',
+        entidadId: caja.id,
+        despues: { pedidos: cobrosEnCursoJustificados, forzadoPorAdministrador: true },
+        motivo: dto.motivoCobrosEnCurso?.trim(),
         partyId: usuario.partyId,
         ip,
       });
@@ -1152,6 +1187,8 @@ export class CierreService {
       // Si siguieran PENDIENTE o COORDINADO (p. ej. pago dividido con Yape validado y efectivo contraentrega)
       // bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
       const pedidosIds = (info?.pedidos ?? []).map((p) => BigInt(p.id));
+      // Marca liquidado: en una caja posterior no vuelve a contar (el contra entrega de otro día se liquida una sola vez)
+      await tx.pedido.updateMany({ where: { id: { in: pedidosIds }, liquidado_en: null }, data: { liquidado_en: new Date() } });
       // Pago dividido (p. ej. Yape 38 + efectivo 2): el efectivo entra por esta liquidación y la parte digital, que
       // ya validó Caja, se asienta como Cobro digital en esta caja. Sin él el pedido quedaría PAGADO con parte del
       // dinero fuera de caja y ya no se podría cobrar. La liquidación no cambia (ver efectivoDelRepartidor).
@@ -1252,12 +1289,14 @@ export class CierreService {
     }));
   }
 
-  async listarPendientesDeCobro() {
+  /** `justificados`: la lista aparte de los entregados sin cobrar que el ADMIN ya justificó (no bloquean el cierre). */
+  async listarPendientesDeCobro(justificados = false) {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
         estado: { not: 'ANULADO' },
         cobros: { none: { anulado_en: null } },
+        sin_cobro_justificado_en: justificados ? { not: null } : null,
       },
       orderBy: { creado_en: 'asc' },
       select: {
@@ -1323,7 +1362,7 @@ export class CierreService {
    */
   private async repartidoresConEfectivo(cliente: ClienteCaja, caja: { id: bigint; fecha: Date }) {
     const fechaIso = new Date(caja.fecha).toISOString().slice(0, 10);
-    const pedidos = await pedidosRepartoDelDia(cliente, fechaIso);
+    const pedidos = await pedidosRepartoDelDia(cliente, fechaIso, true);
 
     const porRepartidor = new Map<
       string,

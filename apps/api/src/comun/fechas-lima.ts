@@ -27,3 +27,9 @@ export function esCumpleanosHoy(dia: number | null | undefined, mes: number | nu
   const diaCelebra = mes === 2 && dia === 29 && !bisiesto ? 28 : dia;
   return m === mes && d === diaCelebra;
 }
+
+/**
+ * «Pedido vivo de hoy»: filtro Prisma único para los tableros de hoy (cocina, despacho, alertas, contadores).
+ * Un pedido de días anteriores sin terminar NO se ve en esos tableros: queda en la lista de «sin terminar» del cierre.
+ */
+export const pedidoVivoDeHoy = (ahora: Date = new Date()) => ({ creado_en: { gte: inicioDiaLimaIso(hoyLimaIso(ahora)) } });

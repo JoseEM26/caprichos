@@ -183,10 +183,10 @@ export function VerificarMovimientos(p: Props) {
               </div>
               {p.movimientos.map((m) => (
                 <div className="vm-fila vm-fila-3" role="row" key={m.id}>
-                  <span role="cell"><b>{m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}</b></span>
+                  <span role="cell"><b>{m.tipo === 'INGRESO' ? 'Ingreso' : m.tipo === 'INFORMATIVO' ? 'Informativo' : 'Egreso'}</b></span>
                   <span role="cell">{m.motivo}</span>
                   <span role="cell" className={`vm-der vm-monto ${m.tipo === 'INGRESO' ? 'vm-ing' : 'vm-egr'}`}>
-                    {m.tipo === 'INGRESO' ? '+ ' : '− '}{soles(m.monto)}
+                    {m.tipo === 'INGRESO' ? '+ ' : m.tipo === 'INFORMATIVO' ? '' : '− '}{soles(m.monto)}
                   </span>
                 </div>
               ))}

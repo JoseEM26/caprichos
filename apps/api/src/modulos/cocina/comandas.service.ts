@@ -1,3 +1,4 @@
+import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { SalonService } from '../salon/salon.service';
 import { pedidoDebeEstarCobrado } from '../pedidos';
 import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
@@ -284,6 +285,7 @@ export class ComandasService {
   async sincronizarPendientes(): Promise<void> {
     const pedidosSinComandas = await this.prisma.pedido.findMany({
       where: {
+        ...pedidoVivoDeHoy(),
         estado: { in: ['COLA', 'PREPARANDO'] },
         comandas: { none: {} },
         // Delivery sin ubicación (punto o zona): no llega a cocina
@@ -345,6 +347,7 @@ export class ComandasService {
             area_id: area.id,
             estado: 'EN_COCINA',
             pedido: {
+              ...pedidoVivoDeHoy(),
               estado: { notIn: ESTADOS_FUERA_DE_COCINA },
             },
           },
@@ -409,6 +412,7 @@ export class ComandasService {
       where: {
         area_id: area.id,
         pedido: {
+          ...pedidoVivoDeHoy(ahora),
           estado: { notIn: ESTADOS_FUERA_DE_COCINA },
           NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
         },

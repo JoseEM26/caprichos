@@ -786,6 +786,8 @@ describe('RepartosService', () => {
       expect(items[0].cobro_pendiente_efectivo).toBe(true);
       expect(items[0].paga_con).toBe(100);
       expect(items[0].color).toBe('VERDE');
+      // D: solo LISTO de hoy; el de días anteriores no se ofrece a repartidores
+      expect(prismaMock.pedido.findMany.mock.calls.at(-1)![0].where.creado_en.gte).toBeInstanceOf(Date);
     });
 
     it('GET mios retorna los pedidos asignados con orden, paso y ruta', async () => {

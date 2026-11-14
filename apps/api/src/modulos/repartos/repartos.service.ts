@@ -1,3 +1,4 @@
+import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
   BadRequestException,
@@ -422,6 +423,7 @@ export class RepartosService {
     const config = await this.obtenerParametrosReparto();
     const pedidos = await this.prisma.pedido.findMany({
       where: {
+        ...pedidoVivoDeHoy(),
         modalidad: 'DELIVERY',
         estado: 'LISTO',
         repartidor_party_id: null,
@@ -510,6 +512,7 @@ export class RepartosService {
 
     const pedidosDisponibles = await this.prisma.pedido.findMany({
       where: {
+        ...pedidoVivoDeHoy(),
         modalidad: 'DELIVERY',
         estado: 'LISTO',
         repartidor_party_id: null,
@@ -1006,6 +1009,7 @@ export class RepartosService {
     const config = await this.obtenerParametrosReparto();
     const pedidos = await this.prisma.pedido.findMany({
       where: {
+        ...pedidoVivoDeHoy(),
         modalidad: 'DELIVERY',
         estado: 'LISTO',
         repartidor_party_id: null,
@@ -1044,7 +1048,7 @@ export class RepartosService {
     const { inicio } = limitesDiaLima(hoyLima(), hoyLima());
     const [vivos, entregadosHoy] = await Promise.all([
       this.prisma.pedido.findMany({
-        where: { modalidad: 'DELIVERY', estado: { in: ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'] }, motivo_falla: null },
+        where: { ...pedidoVivoDeHoy(), modalidad: 'DELIVERY', estado: { in: ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'] }, motivo_falla: null },
         select: { estado: true, repartidor_party_id: true },
       }),
       this.prisma.pedido.count({ where: { modalidad: 'DELIVERY', estado: 'ENTREGADO', entregado_en: { gte: inicio } } }),

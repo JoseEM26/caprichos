@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { controlAlmacenActivo } from '../stock/control-almacen';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { inicioDiaLimaIso, finDiaLimaIso, horaLimaEntera } from '../../comun/fechas-lima';
+import { inicioDiaLimaIso, finDiaLimaIso, horaLimaEntera, pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
@@ -213,7 +213,7 @@ export class InformesService {
     const [, porConfirmarCount, enCocinaCount, repartosActivosCount, insumosBajoMinimo] = await Promise.all([
       comparar(),
       this.prisma.pedido.count({ where: { estado: 'NUEVO' } }),
-      this.prisma.pedido.count({ where: { estado: { in: ['COLA', 'PREPARANDO'] } } }),
+      this.prisma.pedido.count({ where: { ...pedidoVivoDeHoy(), estado: { in: ['COLA', 'PREPARANDO'] } } }),
       this.prisma.pedido.count({ where: { estado: 'EN_CAMINO' } }),
       stockActivo ? this.prisma.stock.count({ where: { insumo: { activo: true }, cantidad: { lt: 10 } } }) : Promise.resolve(0),
     ]);

@@ -512,6 +512,25 @@ describe('VouchersService', () => {
       expect(res.faltanRevisar).toBe(1);
     });
 
+    it('F: «pendientes» y «faltan revisar» excluyen vouchers de pedidos ANULADO o PAGADO (los huérfanos se mantienen)', async () => {
+      prismaMock.voucherPago.findMany.mockResolvedValue([]);
+      prismaMock.voucherPago.count.mockResolvedValue(0);
+      await service.listar({ fecha: '2026-10-27', estado: 'pendientes' });
+      const filtro = {
+        OR: [
+          { pedido_id: null },
+          { pedido: { estado: { not: 'ANULADO' }, OR: [{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }] } },
+        ],
+      };
+      const listado = prismaMock.voucherPago.findMany.mock.calls.at(-1)![0].where;
+      expect(listado.AND).toEqual([filtro]);
+      const conteo = prismaMock.voucherPago.count.mock.calls.at(-1)![0].where;
+      expect(conteo.AND).toEqual([filtro]);
+      // «todos» no filtra: el historial sigue completo
+      await service.listar({ estado: 'todos' });
+      expect(prismaMock.voucherPago.findMany.mock.calls.at(-1)![0].where.AND).toBeUndefined();
+    });
+
     it('listar trae pedido, cliente y conversación en UNA consulta; huérfano toma el teléfono del chat', async () => {
       prismaMock.person = { findMany: jest.fn().mockResolvedValue([{ party_id: 101n, nombres: 'Juan', apellidos: 'Mozo' }]) };
       const base = {

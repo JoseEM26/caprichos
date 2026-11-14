@@ -67,7 +67,7 @@ export class AnalisisCierreService {
         select: { codigo: true, total: true, monto_credito: true },
         take: TOPE,
       }),
-      pedidosRepartoDelDia(this.prisma, new Date(caja.fecha).toISOString().slice(0, 10)),
+      pedidosRepartoDelDia(this.prisma, new Date(caja.fecha).toISOString().slice(0, 10), caja.estado === 'ABIERTA'),
       this.prisma.conteoCierre.findFirst({ where: { caja_id: cajaId }, orderBy: { intento: 'desc' } }),
     ]);
 

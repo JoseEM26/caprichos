@@ -1,3 +1,4 @@
+import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { createHash } from 'crypto';
 import { coincideTexto } from '../../comun/normalizar-busqueda';
 import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
@@ -398,7 +399,7 @@ export class NotificacionesService {
 
     if (puede('cocina/ver')) {
       const enCocina = await this.prisma.pedido.findMany({
-        where: { estado: { in: ['COLA', 'PREPARANDO'] } },
+        where: { ...pedidoVivoDeHoy(), estado: { in: ['COLA', 'PREPARANDO'] } },
         select: { id: true, creado_en: true },
         orderBy: { creado_en: 'asc' },
       });

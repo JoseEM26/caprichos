@@ -24,6 +24,7 @@ import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
 import { controlAlmacenActivo } from '../../stock/control-almacen';
 import { LocalService } from '../../local/local.service';
+import { pedidoVivoDeHoy } from '../../../comun/fechas-lima';
 import { MarcaEscalado, TEXTOS_ESCALADO } from '../conversacion/escalado-ia.util';
 
 export interface UmbralesAlertasEspera {
@@ -493,14 +494,26 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       // =========================================================================
       // 4) SECCIÓN 2.c: Pedido nuevo sin confirmar en Caja por más de 5 minutos
       // =========================================================================
-      const hace24h = new Date(ahora.getTime() - 24 * 60 * 60 * 1000);
-      const pedidosSinConfirmar = await this.prisma.pedido.findMany({
-        where: {
-          estado: 'COLA',
-          pago_estado: 'PENDIENTE',
-          creado_en: { gte: hace24h },
-        },
-      });
+      // Solo pedidos de hoy de canales digitales (CARTA/BOT/CHATBOT/WHATSAPP) con pago digital pendiente, como listarPorCobrar:
+      // los de MESA se cobran al final y los de ayer ya no se atienden. Fuera del horario del local no se avisa.
+      let localAbierto = true;
+      try {
+        const e: any = await this.localService?.obtenerEstadoCarta(ahora);
+        if (e) localAbierto = e.abierta !== false;
+      } catch {
+        /* sin dato de horario: se asume abierto */
+      }
+      const pedidosSinConfirmar = localAbierto
+        ? await this.prisma.pedido.findMany({
+            where: {
+              ...pedidoVivoDeHoy(ahora),
+              canal: { in: ['CARTA', 'BOT', 'CHATBOT', 'WHATSAPP'] },
+              estado: 'COLA',
+              pago_estado: 'PENDIENTE',
+              pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
+            },
+          })
+        : [];
 
       for (const ped of pedidosSinConfirmar) {
         const minutosCreado = Math.floor((ahora.getTime() - new Date(ped.creado_en).getTime()) / (60 * 1000));

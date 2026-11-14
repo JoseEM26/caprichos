@@ -161,6 +161,13 @@ export class CierreController {
     return this.cierreService.listarPendientesDeCobro();
   }
 
+  /** «Justificados pendientes»: entregados sin cobrar que el ADMIN justificó; no bloquean el cierre, se cobran o se anulan. */
+  @Get('justificados')
+  @Permiso('caja', 'cerrar')
+  async justificadosPendientes() {
+    return this.cierreService.listarPendientesDeCobro(true);
+  }
+
   /** Pedidos sin terminar (ni entregados ni anulados, pagados o no) que bloquean el cierre. */
   @Get('sin-terminar')
   @Permiso('caja', 'cerrar')

@@ -206,6 +206,9 @@ describe('InformesService', () => {
       await service.obtenerResumen({}, ADMIN);
       const estados = prisma.pedido.count.mock.calls.map(([a]: any) => JSON.stringify(a.where.estado));
       expect(estados).toContain(JSON.stringify({ in: ['COLA', 'PREPARANDO'] }));
+      // D: «En cocina» cuenta solo pedidos de hoy
+      const cocina = prisma.pedido.count.mock.calls.find(([a]: any) => a.where.estado?.in?.includes('PREPARANDO'));
+      expect(cocina![0].where.creado_en.gte).toBeInstanceOf(Date);
       expect(estados).toContain(JSON.stringify('EN_CAMINO'));
     });
 

@@ -485,6 +485,22 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       );
     });
 
+    it('E: la alerta de Caja solo mira canales digitales con pago digital pendiente de hoy (no MESA ni ayer)', async () => {
+      await service.ejecutarCiclo(new Date('2026-10-27T17:00:00Z'));
+      const donde = prismaMock.pedido.findMany.mock.calls.map(([a]: any) => a.where).find((w: any) => w?.pago_estado === 'PENDIENTE' && w?.estado === 'COLA');
+      expect(donde.canal).toEqual({ in: ['CARTA', 'BOT', 'CHATBOT', 'WHATSAPP'] });
+      expect(donde.pago_metodo).toEqual({ in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] });
+      expect(donde.creado_en.gte.toISOString()).toBe('2026-10-27T05:00:00.000Z');
+    });
+
+    it('G: con el local cerrado no se alerta ni se consulta nada', async () => {
+      const cerrado = { obtenerEstadoCarta: jest.fn().mockResolvedValue({ abierta: false }) };
+      (service as any).localService = cerrado;
+      await service.ejecutarCiclo(new Date('2026-10-27T17:00:00Z'));
+      expect(prismaMock.pedido.findMany.mock.calls.some(([a]: any) => a.where?.pago_estado === 'PENDIENTE' && a.where?.estado === 'COLA')).toBe(false);
+      expect(avisosInternosMock.enviarAvisoAdmin).not.toHaveBeenCalled();
+    });
+
     it('2.d: con el control de almacén apagado no hay alerta de stock (ni se consultan insumos)', async () => {
       const ahora = new Date('2026-10-27T12:00:00Z');
       prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>

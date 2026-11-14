@@ -26,7 +26,7 @@ describe('Cierre: justificar entregados sin cobrar (solo ADMIN)', () => {
 
   it('el cajero no ve la justificación', () => {
     montar([pendiente(1)], { esAdmin: false, alJustificar: vi.fn() });
-    expect(screen.queryByLabelText('Justificar entregados sin cobrar')).toBeNull();
+    expect(screen.queryByLabelText('Justificar pedidos sin cobrar')).toBeNull();
   });
 
   it('administrador: pide motivo de 10 letras y entrega el texto al padre', () => {
@@ -50,8 +50,15 @@ describe('Cierre: justificar entregados sin cobrar (solo ADMIN)', () => {
     expect(alJustificar).toHaveBeenCalledWith('');
   });
 
-  it('si queda un pedido aún en curso (no entregado) no se ofrece justificar', () => {
+  it('con un pedido aún en curso el ADMIN también puede justificar (cierra con cobros en curso)', () => {
     montar([pendiente(1), pendiente(2, 'PREPARANDO')], { esAdmin: true, alJustificar: vi.fn() });
-    expect(screen.queryByLabelText('Justificar entregados sin cobrar')).toBeNull();
+    expect(screen.getByLabelText('Justificar pedidos sin cobrar')).toBeTruthy();
+  });
+
+  it('la lista «Justificados pendientes» no ofrece justificar y se titula aparte', () => {
+    render(<PendientesCobroCierre justificados pendientes={[pendiente(1)]} setPendientes={() => {}} alCambiarTurno={() => {}} esAdmin alJustificar={vi.fn()} />);
+    expect(screen.getByText(/Justificados pendientes/)).toBeTruthy();
+    expect(screen.queryByLabelText('Justificar pedidos sin cobrar')).toBeNull();
+    expect(screen.getByText('Cobrar ahora')).toBeTruthy();
   });
 });

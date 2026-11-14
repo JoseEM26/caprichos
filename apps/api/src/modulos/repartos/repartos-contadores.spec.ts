@@ -55,6 +55,13 @@ describe('Contadores del delivery (GET /admin/repartos/contadores)', () => {
     expect(cuenta.entregado_en.gte).toBeInstanceOf(Date);
   });
 
+  it('D: los vivos del tablero son solo de hoy (un LISTO de ayer no cuenta)', async () => {
+    prisma.pedido.findMany.mockResolvedValue([]);
+    prisma.pedido.count.mockResolvedValue(0);
+    await service.contadoresDelivery({ partyId: 1n, rol: 'ADMIN', debeCambiar: false });
+    expect(prisma.pedido.findMany.mock.calls[0][0].where.creado_en.gte).toBeInstanceOf(Date);
+  });
+
   it('el repartidor no los ve', async () => {
     await expect(service.contadoresDelivery({ partyId: 9n, rol: 'REPARTIDOR', debeCambiar: false })).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.pedido.findMany).not.toHaveBeenCalled();

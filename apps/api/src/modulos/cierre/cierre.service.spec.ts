@@ -833,6 +833,82 @@ describe('CierreService', () => {
     });
   });
 
+  describe('7.d huecos del cierre: A (cobros en curso), B (liquidación de otro día), C (justificados)', () => {
+    const cerrarDto = { conteo: { '200': 1 }, medios: { yape: 200 } };
+    const llevar = { id: 5n, codigo: 'CP-0005', modalidad: 'LLEVAR', pago_estado: 'PENDIENTE', pago_metodo: null, total: 30, planPago: [] };
+
+    it('A: cobro en curso (pedido en cocina): el cajero sigue bloqueado y el mensaje explica que solo el ADMIN cierra con motivo', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      const e: any = await service.cerrar({ ...cerrarDto, motivoCobrosEnCurso: 'Motivo suficientemente largo' }, mockUsuarioCajero).catch((x) => x);
+      expect(e.getResponse()).toMatchObject({ codigo: 'COBROS_EN_CURSO', puedeJustificar: false });
+      expect(e.getResponse().mensaje).toContain('Solo el administrador');
+    });
+
+    it('A: el ADMIN sin motivo o con motivo corto sigue bloqueado y se le explica cómo cerrar', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      for (const motivoCobrosEnCurso of [undefined, 'corto']) {
+        const e: any = await service.cerrar({ ...cerrarDto, motivoCobrosEnCurso }, mockUsuarioAdmin).catch((x) => x);
+        expect(e.getResponse()).toMatchObject({ codigo: 'COBROS_EN_CURSO', puedeJustificar: true });
+        expect(e.getResponse().mensaje).toContain('mínimo 10 letras');
+      }
+    });
+
+    it('A: el ADMIN con motivo cierra; queda en la nota del cierre y en la auditoría', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      await service.cerrar({ ...cerrarDto, motivoCobrosEnCurso: 'Pedido de evento, se cobra mañana' }, mockUsuarioAdmin);
+      expect(prismaMock.cierreCaja.create.mock.calls[0][0].data.nota).toContain('Pedido de evento, se cobra mañana');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'CIERRE_COBROS_EN_CURSO', motivo: 'Pedido de evento, se cobra mañana' }),
+      );
+    });
+
+    it('C: el ADMIN justifica un entregado sin cobrar y queda marcado para no volver a bloquear', async () => {
+      prismaMock.pedido.count.mockResolvedValue(1);
+      prismaMock.pedido.findMany.mockResolvedValueOnce([llevar]);
+      await service.cerrar({ ...cerrarDto, motivoEntregadosSinCobrar: 'Se cobra al cliente mañana' }, mockUsuarioAdmin);
+      expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [5n] } },
+        data: { sin_cobro_justificado_en: expect.any(Date) },
+      });
+    });
+
+    it('C: la consulta del bloqueo ignora los ya justificados (ni el conteo ni la lista los traen)', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      await service.cerrar(cerrarDto, mockUsuarioCajero);
+      expect(prismaMock.pedido.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ sin_cobro_justificado_en: null }),
+      });
+    });
+
+    it('C: «Justificados pendientes» lista solo los justificados; la lista que bloquea, solo los no justificados', async () => {
+      await service.listarPendientesDeCobro(true);
+      expect(prismaMock.pedido.findMany.mock.calls.at(-1)![0].where.sin_cobro_justificado_en).toEqual({ not: null });
+      await service.listarPendientesDeCobro();
+      expect(prismaMock.pedido.findMany.mock.calls.at(-1)![0].where.sin_cobro_justificado_en).toBeNull();
+    });
+
+    it('B: al liquidar se marca liquidado_en en sus pedidos (no cuentan en la caja siguiente)', async () => {
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue([
+        { repartidorPartyId: '55', nombre: 'Marcos Ruta', pedidos: [{ id: 701 }, { id: 702 }], cobradoCentimos: 5000, liquidadoCentimos: 0, pendienteCentimos: 5000 },
+      ]);
+      await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 50 }, mockUsuarioCajero);
+      expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [701n, 702n] }, liquidado_en: null },
+        data: { liquidado_en: expect.any(Date) },
+      });
+    });
+
+    it('B: repartidoresConEfectivo pide los entregados de otro día aún no liquidados (ejemplo: S/ 30 de ayer + S/ 20 de hoy = S/ 50)', async () => {
+      const pedido = (id: number, total: number) => ({ id: BigInt(id), codigo: `CP-${id}`, total, monto_credito: 0, pago_metodo: 'EFECTIVO', cobros: [], planPago: [], repartidor_party_id: 55n, repartidor: { persona: { nombres: 'Marcos', apellidos: 'Ruta' } }, entregado_en: new Date() });
+      prismaMock.pedido.findMany.mockResolvedValue([pedido(1, 30), pedido(2, 20)]);
+      prismaMock.liquidacion.findMany.mockResolvedValue([]);
+      const r = await (service as any).repartidoresConEfectivo(prismaMock, mockCajaAbierta);
+      expect(r[0]).toMatchObject({ cobradoCentimos: 5000, pendienteCentimos: 5000 });
+      const where = prismaMock.pedido.findMany.mock.calls.at(-1)![0].where;
+      expect(where.OR).toEqual(expect.arrayContaining([{ liquidado_en: null }]));
+    });
+  });
+
   // -------------------------------------------------------------------------
   // 8. Montos esperados del sistema (solo ADMIN)
   // -------------------------------------------------------------------------

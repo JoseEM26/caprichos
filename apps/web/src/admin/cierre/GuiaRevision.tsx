@@ -27,7 +27,7 @@ export function GuiaRevision({ modo }: { modo: 'antes' | 'no-cuadra' }) {
     ? [
         { clave: 'anulados', titulo: 'Pedidos anulados que ya habían pagado: ¿se devolvió el dinero?', lineas: g.anuladosConPago.map((p) => `${p.codigo} · ${p.medio ?? 'sin medio'} · ${soles(p.monto)}`) },
         { clave: 'cobros', titulo: 'Cobros anulados hoy', lineas: g.cobrosAnulados.map((c) => `${c.codigo} · ${c.medio ?? 'sin medio'} · ${soles(c.monto)} · ${c.hora}`) },
-        { clave: 'mov', titulo: 'Ingresos y egresos que registraste', lineas: g.movimientos.map((m) => `${m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'} ${soles(m.monto)} · ${m.motivo}${m.anulado ? ' (anulado)' : ''}`) },
+        { clave: 'mov', titulo: 'Ingresos y egresos que registraste', lineas: g.movimientos.map((m) => `${m.tipo === 'INGRESO' ? 'Ingreso' : m.tipo === 'INFORMATIVO' ? 'Informativo' : 'Egreso'} ${soles(m.monto)} · ${m.motivo}${m.anulado ? ' (anulado)' : ''}`) },
         { clave: 'pend', titulo: 'Pedidos sin cobrar', lineas: g.pendientesDeCobro.map((p) => `${p.codigo} · ${p.estado} · ${soles(p.total)}`) },
         { clave: 'prop', titulo: 'Hubo propinas en estos medios (las apps y el POS las incluyen en su total)', lineas: g.propinasPorMedio.map((p) => `${p.medio}: ${p.cantidad} ${p.cantidad === 1 ? 'cobro con propina' : 'cobros con propina'}`) },
         { clave: 'rep', titulo: 'Repartidores por liquidar', lineas: g.repartidoresPorLiquidar.map((r) => `${r.nombre} · ${r.pedidos} ${r.pedidos === 1 ? 'pedido' : 'pedidos'}`) },
