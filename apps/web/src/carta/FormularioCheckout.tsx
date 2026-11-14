@@ -19,6 +19,7 @@ type DatosRuc = { ruc: string; razon_social: string; estado: string | null; cond
 type ConsultaRuc =
   | { estado: 'idle' | 'cargando' | 'invalido' | 'noencontrado' | 'manual' }
   | { estado: 'ok'; datos: DatosRuc };
+import { AvisoSinCelular, tieneCelularReal } from '../comun/AvisoSinCelular';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { SelectorPagoEquipo, type PagoEquipo } from './SelectorPagoEquipo';
 import { guardarPedido } from './seguimiento';
@@ -1500,8 +1501,9 @@ export function FormularioCheckout({
                             ? 'Tu celular es obligatorio: sumas puntos con tu número, sin contraseña.'
                             : telefono.trim()
                               ? 'Sumas puntos con tu número, sin contraseña.'
-                              : 'Sin celular no se suman puntos.'}
+                              : 'Escribe tu celular para sumar puntos y recibir tu boleta.'}
                         </div>
+                        {!telefono.trim() && modalidad !== 'DELIVERY' && <div style={{ marginTop: 6 }}><AvisoSinCelular /></div>}
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
                           Te enviaremos una breve encuesta de satisfacción por WhatsApp
                         </div>
@@ -2504,6 +2506,7 @@ export function FormularioCheckout({
                   )}
 
                   {/* Resumen de totales */}
+                  {!tieneCelularReal(telefono) && !tieneCelularReal(clienteCuenta?.telefono) && <AvisoSinCelular />}
                   {!tarjetasPago && (
                   <div
                     style={{

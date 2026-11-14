@@ -136,7 +136,7 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     abrirPedido(false);
     fireEvent.click(screen.getByRole('button', { name: /Recoger/i }));
     expect(screen.getByLabelText(/Teléfono celular/i)).not.toBeRequired();
-    expect(screen.getByText('Sin celular no se suman puntos.')).toBeInTheDocument();
+    expect(screen.getAllByText('Sin celular no recibirá su boleta por WhatsApp ni sumará puntos')[0]).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 2: /)).toBeInTheDocument();

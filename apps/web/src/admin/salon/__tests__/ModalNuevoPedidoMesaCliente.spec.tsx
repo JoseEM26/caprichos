@@ -105,7 +105,7 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
 
     expect(botonContinuar().disabled).toBe(false);
-    expect(screen.getByText('Sin celular no se suman puntos')).toBeInTheDocument();
+    expect(screen.getAllByText('Sin celular no recibirá su boleta por WhatsApp ni sumará puntos').length).toBeGreaterThan(0);
     enviarDesdePago();
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     expect(vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][0].cliente).toMatchObject({ nombre: 'Lucía', telefono: undefined });

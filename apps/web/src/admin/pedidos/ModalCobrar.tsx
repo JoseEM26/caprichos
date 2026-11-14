@@ -13,6 +13,7 @@ import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
+import { AvisoSinCelular, tieneCelularReal, TEXTO_SIN_CELULAR_PEDIDO } from '../../comun/AvisoSinCelular';
 
 const MEDIOS_PAGO = [
   'Efectivo',
@@ -378,6 +379,10 @@ export function ModalCobrar({
           <span>Total a cobrar</span>
           <span>S/ {totalPedido.toFixed(2)}</span>
         </div>
+
+        {!tieneCelularReal(pedido.cliente_telefono) && !pedido.es_personal && (
+          <AvisoSinCelular texto={`${TEXTO_SIN_CELULAR_PEDIDO}. Puedes agregar el celular en «Corregir cliente» del detalle.`} />
+        )}
 
         {puedeEscribirPropina && (
           <div data-testid="cobro-propina-escribir" style={{ marginTop: -6, marginBottom: 6 }}>

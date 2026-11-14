@@ -16,6 +16,7 @@ import { CuadriculaPlano } from './CuadriculaPlano';
 import { SelectorMesasCroquis } from './SelectorMesasCroquis';
 import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
+import { AvisoSinCelular } from '../../../comun/AvisoSinCelular';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { unidadesDeLinea } from '../../../carta/stock';
 import { agruparUnidadesIguales } from '../../../carta/unidadesPorBebida';
@@ -2654,9 +2655,7 @@ export function ModalNuevoPedidoMesa({
                   />
                 </div>
                 {avisoCuentaCelular}
-                {telCli === '' && modalidad !== 'delivery' && (
-                  <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>Sin celular no se suman puntos</span>
-                )}
+                {telCli === '' && modalidad !== 'delivery' && !cuenta && <AvisoSinCelular />}
                 <div>
                   <label htmlFor="cli-nombre" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
                     Nombre *
@@ -3201,12 +3200,13 @@ export function ModalNuevoPedidoMesa({
                             fontSize: '14px',
                           }}
                         />
+                        {telefonoMesa === '' && !enEspera && pideMode === 'anon' && !cuenta && <AvisoSinCelular />}
                         {telefonoMesaValido || (telefonoMesa === '' && !intentoEnvio) ? (
                           cuenta || buscandoCuenta || errorCuenta ? (
                             avisoCuentaCelular
                           ) : (
                             <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                              {telefonoMesa === '' ? 'Sin celular no se suman puntos' : 'Le enviamos una encuesta por WhatsApp al terminar'}
+                              {telefonoMesa === '' ? '' : 'Le enviamos una encuesta por WhatsApp al terminar'}
                             </span>
                           )
                         ) : (
@@ -3903,6 +3903,7 @@ export function ModalNuevoPedidoMesa({
             setLineaEnCambio(null);
           }}
           alAgregar={handleAgregarProductoConfigurado}
+          nombreCliente={nombreMesa}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
           categoriaNombre={categorias.find((c) => (c.productos || []).some((x) => String(x.id) === String(productoSeleccionado.id)))?.nombre}
           enCarrito={lineas

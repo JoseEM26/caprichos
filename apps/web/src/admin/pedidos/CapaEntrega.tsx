@@ -1,3 +1,4 @@
+import { AvisoSinCelular, tieneCelularReal, TEXTO_SIN_CELULAR_PEDIDO } from '../../comun/AvisoSinCelular';
 import { useState } from 'react';
 import { HistorialAuditoria, horaCorta } from './HistorialAuditoria';
 import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
@@ -71,6 +72,15 @@ export function CapaEntrega({ pedido, esDelivery, esMesa, puedeCorregirCliente, 
               </button>
             )}
           </div>
+          {!tieneCelularReal(pedido.cliente_telefono) && !pedido.es_personal && (
+            <AvisoSinCelular texto={TEXTO_SIN_CELULAR_PEDIDO}>
+              {puedeCorregirCliente && (
+                <button type="button" className="dp-btn" onClick={alCorregirCliente}>
+                  Agregar celular
+                </button>
+              )}
+            </AvisoSinCelular>
+          )}
           {copiado && (
             <span role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
               {copiado}
