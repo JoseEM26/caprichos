@@ -21,6 +21,7 @@ export interface ItemEncuesta {
   fecha: string;
   puntaje: number;
   comentario?: string;
+  motivo?: string | null;
   pedidoCodigo: string;
   clienteNombre: string;
   modalidad: string;
@@ -41,6 +42,7 @@ export interface RespuestaEncuestas {
   distribucion: DistribucionPuntaje[];
   tendencia: PuntoTendencia[];
   porModalidad: FilaModalidadStat[];
+  porMotivo?: { codigo: string; motivo: string; cantidad: number }[];
   items: ItemEncuesta[];
   total: number;
   pagina: number;
@@ -221,7 +223,7 @@ export function SeccionEncuestas() {
         pag += 1;
       } while (pag <= totalPaginas && pag <= MAX_PAGINAS_CSV);
 
-      const cols = ['Fecha', 'Puntaje', 'Cliente', 'Pedido', 'Modalidad', 'Canal', 'Comentario', 'Queja'];
+      const cols = ['Fecha', 'Puntaje', 'Cliente', 'Pedido', 'Modalidad', 'Canal', 'Motivo', 'Comentario', 'Queja'];
       const lineas = [
         cols,
         ...filas.map((i) => [
@@ -231,6 +233,7 @@ export function SeccionEncuestas() {
           i.pedidoCodigo,
           ETIQUETA_MODALIDAD[i.modalidad] ?? i.modalidad,
           ETIQUETA_CANAL[i.canal] ?? i.canal,
+          i.motivo ?? '',
           i.comentario ?? '',
           i.quejaId ? 'Sí' : 'No',
         ]),
@@ -364,6 +367,17 @@ export function SeccionEncuestas() {
               <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Promedio por modalidad</div>
               <BarrasModalidad filas={datos.porModalidad} />
             </div>
+            <div style={tarjeta}>
+              <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Motivos de notas 1 a 3</div>
+              <ul aria-label="Motivos de calificación baja" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6, fontSize: 13 }}>
+                {(datos.porMotivo ?? []).map((m) => (
+                  <li key={m.codigo} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{m.motivo}</span>
+                    <strong>{m.cantidad}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Lista */}
@@ -413,6 +427,11 @@ export function SeccionEncuestas() {
                     <span>{ETIQUETA_MODALIDAD[it.modalidad] ?? it.modalidad}</span>
                     <span style={{ color: 'var(--cp-soft)' }}>{ETIQUETA_CANAL[it.canal] ?? it.canal}</span>
                   </div>
+                  {it.motivo && (
+                    <div style={{ marginTop: 8, fontSize: 13 }}>
+                      <strong>Motivo:</strong> {it.motivo}
+                    </div>
+                  )}
                   {it.comentario && (
                     <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: '19px', overflowWrap: 'anywhere', fontStyle: 'italic' }}>
                       «{it.comentario}»

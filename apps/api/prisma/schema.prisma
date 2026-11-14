@@ -2763,11 +2763,17 @@ model EncuestaPosventa {
   comentario    String?
   estado        String    @default("ENVIADA") // ENVIADA | RESPONDIDA | EXPIRADA | SIMULADA | OMITIDA
   motivo        String?   // solo OMITIDA: SIN_CELULAR | SIN_CONSENTIMIENTO | NUMERO_BLOQUEADO | TOPE_POR_CELULAR
+  // Por qué calificó 1-3: motivo_codigo (DEMORA | MAL_ESTADO | INCOMPLETO | ATENCION | PRECIO | OTRO), motivo_texto (solo OTRO, texto libre).
+  // motivo_preguntado_en marca que se preguntó; con codigo OTRO y sin texto se espera lo que escriba el cliente (vence a las 24 h).
+  motivo_codigo String?
+  motivo_texto  String?
+  motivo_preguntado_en DateTime? @db.Timestamptz
   creado_en     DateTime  @default(now()) @db.Timestamptz
   actualizado_en DateTime @updatedAt @db.Timestamptz
 
   pedido        Pedido    @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
 
+  @@index([motivo_preguntado_en])
   @@map("encuesta_posventa")
 }
 
@@ -2779,6 +2785,7 @@ model QuejaWhatsapp {
   telefono_hash String?
   puntaje       Int?      @db.SmallInt
   texto         String
+  motivo        String?   // motivo que dio el cliente en la encuesta (etiqueta legible)
   estado        String    @default("NUEVA") // NUEVA | EN_REVISION | RESUELTA
   atendida_por  String?
   resolucion    String?

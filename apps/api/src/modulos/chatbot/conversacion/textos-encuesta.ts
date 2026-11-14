@@ -1,4 +1,20 @@
 import type { PayloadMensajeNegocio } from '../servicios/ventana-24h.service';
+import { MOTIVOS_ENCUESTA } from '../servicios/encuesta-motivo.util';
+
+/** Pregunta del porqué cuando calificó 1, 2 o 3: primero esta pregunta, el agradecimiento va después de la respuesta. */
+export function textoPreguntaMotivo(nombre: string, codigo: string): PayloadMensajeNegocio {
+  return {
+    textoLibre: `Gracias por calificarnos, ${nombre} 🙏 Nos importa tu opinión sobre el pedido ${codigo}. ¿Qué fue lo que no salió bien?`,
+    lista: { boton: 'Elegir motivo', filas: MOTIVOS_ENCUESTA.map((m) => ({
+        id: `motivo:${m.codigo}`,
+        // WhatsApp corta el título de la fila a 24 caracteres: el texto completo va de descripción
+        titulo: 'corto' in m ? m.corto : m.titulo,
+        ...('corto' in m ? { descripcion: m.titulo } : {}),
+      })) },
+  };
+}
+
+export const TEXTO_PIDE_MOTIVO_LIBRE = 'Cuéntanos en pocas palabras qué ocurrió y lo leerá nuestro equipo.';
 
 /**
  * Agradecimiento al cliente después de calificar la encuesta posventa. Un texto por nivel:
@@ -16,7 +32,7 @@ export function textoGraciasEncuesta(
 
   if (puntaje <= umbralQueja) {
     return {
-      textoLibre: `Gracias por contarnos, ${nombre} 💛 Lamentamos mucho que tu experiencia con el pedido ${codigo} no haya sido la que esperabas. Ya avisamos a nuestro equipo y una persona te escribirá por este chat para entender qué pasó y ayudarte a resolverlo. Si quieres, ya puedes contarnos aquí qué ocurrió.`,
+      textoLibre: `Gracias por contarnos, ${nombre} 💛 Lamentamos mucho que tu experiencia con el pedido ${codigo} no haya sido la que esperabas. Ya avisamos a nuestro equipo y una persona te escribirá por este chat para entender qué pasó y ayudarte a resolverlo.`,
       plantillaClave,
       variablesPlantilla,
     };
@@ -24,7 +40,7 @@ export function textoGraciasEncuesta(
 
   if (puntaje < 4) {
     return {
-      textoLibre: `¡Gracias por tu calificación, ${nombre}! 😊 Tu opinión sobre el pedido ${codigo} nos ayuda a mejorar. Si algo podemos hacer mejor, cuéntanoslo por aquí, te leemos con gusto. 🙏`,
+      textoLibre: `¡Gracias por tu calificación, ${nombre}! 😊 Tu opinión sobre el pedido ${codigo} nos ayuda a mejorar. 🙏`,
       plantillaClave,
       variablesPlantilla,
     };

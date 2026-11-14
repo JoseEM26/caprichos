@@ -20,6 +20,7 @@ describe('Admin - Quejas de WhatsApp y Configuración Chatbot', () => {
         telefonoEnmascarado: '+51 9*** ***21',
         puntaje: 1,
         texto: 'La comida llego fria y demoro mas de 45 minutos.',
+        motivo: 'Demora',
         estado: 'NUEVA',
         atendidaPor: null,
         resolucion: null,
@@ -118,6 +119,7 @@ describe('Admin - Quejas de WhatsApp y Configuración Chatbot', () => {
       expect(screen.getByText(/15 encuestas respondidas/i)).toBeInTheDocument();
       expect(screen.getByText('Carlos Mendoza')).toBeInTheDocument();
       expect(screen.getByText('Maria Lopez')).toBeInTheDocument();
+      expect(screen.getByText('Motivo: Demora')).toBeInTheDocument();
       expect(screen.getByText(/\+51 9\*\*\* \*\*\*21/i)).toBeInTheDocument();
     });
   });

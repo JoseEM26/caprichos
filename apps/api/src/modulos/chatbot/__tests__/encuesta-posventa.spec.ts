@@ -16,6 +16,9 @@ type EncuestaFila = {
   estado: string;
   enviada_en: Date;
   puntaje: number | null;
+  motivo_codigo?: string | null;
+  motivo_texto?: string | null;
+  motivo_preguntado_en?: Date | null;
   pedido: { id: bigint; codigo: string; cliente_nombre: string; cliente_telefono: string };
 };
 
@@ -106,6 +109,8 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
     if (!where) return true;
     if (where.estado && e.estado !== where.estado) return false;
     if (where.enviada_en?.gte && e.enviada_en < where.enviada_en.gte) return false;
+    if (where.motivo_preguntado_en?.gte && !(e.motivo_preguntado_en && e.motivo_preguntado_en >= where.motivo_preguntado_en.gte)) return false;
+    if (where.OR && !where.OR.some((o: any) => Object.entries(o).every(([k, v]) => ((e as any)[k] ?? null) === v))) return false;
     if (where.pedido?.cliente_telefono && !coincide(e.pedido.cliente_telefono, where.pedido.cliente_telefono)) return false;
     return true;
   };
@@ -171,7 +176,13 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
           return lista[0] ?? null;
         }),
         updateMany: jest.fn(async ({ where, data }: any) => {
-          const e = encuestas.find((x) => x.id === where.id && (!where.estado || x.estado === where.estado));
+          const e = encuestas.find(
+            (x) =>
+              x.id === where.id &&
+              (!where.estado || x.estado === where.estado) &&
+              (where.motivo_codigo === undefined || (x.motivo_codigo ?? null) === where.motivo_codigo) &&
+              (!where.OR || where.OR.some((o: any) => Object.entries(o).every(([k, v]) => ((x as any)[k] ?? null) === v))),
+          );
           if (!e) return { count: 0 };
           Object.assign(e, data);
           return { count: 1 };
@@ -187,6 +198,11 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
           const fila = { id: BigInt(quejas.length + 1), ...data };
           quejas.push(fila);
           return fila;
+        }),
+        updateMany: jest.fn(async ({ where, data }: any) => {
+          const m = quejas.filter((q) => q.pedido_id === where.pedido_id && q.origen === where.origen);
+          m.forEach((q) => Object.assign(q, data));
+          return { count: m.length };
         }),
       },
       notificacion: {
@@ -266,21 +282,19 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
     expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
   });
 
-  it('calificación baja: el agradecimiento va por el outbox con clave idempotente, con nombre y código', async () => {
+  it('calificación baja: primero va la pregunta del motivo (lista) por el outbox con clave idempotente', async () => {
     await recibir(payloadTexto('1 Malo'));
 
     expect(outbox.encolar).toHaveBeenCalledTimes(1);
     const [datos] = outbox.encolar.mock.calls[0];
-    expect(datos).toMatchObject({
-      telefono: TEL,
-      tipo: 'TEXTO',
-      clave: 'encuesta-1-GRACIAS',
-      origen: 'ENCUESTA',
-      pedidoId: 10n,
-    });
+    expect(datos).toMatchObject({ telefono: TEL, tipo: 'TEXTO', clave: 'encuesta-1-MOTIVO', origen: 'ENCUESTA', pedidoId: 10n });
     expect(datos.carga.textoLibre).toContain('José Ángel');
     expect(datos.carga.textoLibre).toContain('CP-W100');
-    expect(datos.carga.textoLibre).toMatch(/persona/);
+    expect(datos.carga.lista.filas.map((f: any) => f.id)).toEqual([
+      'motivo:DEMORA', 'motivo:MAL_ESTADO', 'motivo:INCOMPLETO', 'motivo:ATENCION', 'motivo:PRECIO', 'motivo:OTRO',
+    ]);
+    expect(datos.carga.lista.filas.every((f: any) => f.titulo.length <= 24)).toBe(true);
+    expect(encuestas[0].motivo_preguntado_en).toBeInstanceOf(Date);
     expect(outbox.despertar).toHaveBeenCalled();
   });
 
@@ -347,13 +361,14 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 
-  it('"3" y "3 Regular" son calificación media, con un agradecimiento distinto', async () => {
+  it('"3" y "3 Regular" son calificación media: pregunta el motivo sin queja ni derivación', async () => {
     await recibir(payloadTexto('3'));
     expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 3 });
     expect(quejas).toHaveLength(0);
-    const medio = outbox.encolar.mock.calls[0][0].carga.textoLibre;
-    expect(medio).not.toMatch(/persona te escribir/);
-    expect(medio).toContain('CP-W100');
+    expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-MOTIVO');
+    expect(notificaciones).toHaveLength(0);
+    expect(avisos.avisarCalificacionBaja).not.toHaveBeenCalled();
+    expect(conversacion.duenio).toBe('BOT');
   });
 
   // La encuesta pendiente es del pedido más reciente: así el reconocimiento laxo se ve en acción
@@ -432,5 +447,84 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
     expect(prisma.mensajeChat.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ direccion: 'ENTRA', autor: 'CLIENTE' }) }),
     );
+  });
+
+  describe('motivo de la calificación baja', () => {
+    const responder = async (nota: string) => {
+      await recibir(payloadTexto(nota));
+      outbox.encolar.mockClear();
+      motor.procesarMensajeEntrante.mockClear();
+    };
+    const lista = (id: string, titulo: string) => ({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: {
+        contacts: [{ wa_id: TEL, profile: { name: 'José Ángel' } }],
+        messages: [{ id: `wamid.${Math.random()}`, from: TEL, type: 'interactive', interactive: { type: 'list_reply', list_reply: { id, title: titulo } } }],
+      } }] }],
+    });
+
+    it('nota 3: el motivo se registra en la encuesta, sin queja, y luego se agradece', async () => {
+      await responder('3');
+      await recibir(lista('motivo:DEMORA', 'Demora'));
+
+      expect(encuestas[0]).toMatchObject({ motivo_codigo: 'DEMORA', motivo_texto: null });
+      expect(quejas).toHaveLength(0);
+      expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-GRACIAS');
+      expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    });
+
+    it('nota 1: el motivo queda en la encuesta y en la queja, y el agradecimiento promete a una persona', async () => {
+      await responder('1');
+      await recibir(lista('motivo:MAL_ESTADO', 'Mal estado o frío'));
+
+      expect(encuestas[0].motivo_codigo).toBe('MAL_ESTADO');
+      expect(quejas[0].motivo).toBe('Producto en mal estado o frío');
+      expect(quejas[0].texto).toContain('Motivo: Producto en mal estado o frío');
+      expect(conversacion.motivo_derivacion).toBe('CALIFICACION_BAJA');
+      expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toMatch(/persona te escribir/);
+      expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    });
+
+    it('«Otro» pide el texto y lo que escribe queda como motivo (máx. 300), sin pasar por el bot', async () => {
+      await responder('2');
+      await recibir(lista('motivo:OTRO', 'Otro (escríbelo)'));
+      expect(encuestas[0].motivo_codigo).toBe('OTRO');
+      expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-MOTIVO-LIBRE');
+      outbox.encolar.mockClear();
+
+      await recibir(payloadTexto('x'.repeat(400)));
+      expect(encuestas[0].motivo_texto).toHaveLength(300);
+      expect(quejas[0].motivo).toHaveLength(300);
+      expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-GRACIAS');
+      expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+
+      // ya contestado: otro texto sigue su camino normal
+      await recibir(payloadTexto('quiero una dona'));
+      expect(encuestas[0].motivo_texto).toHaveLength(300);
+    });
+
+    it('un texto suelto sin haber elegido «Otro» no se toma como motivo: va al bot y no se insiste', async () => {
+      await responder('3');
+      await recibir(payloadTexto('quiero pedir una dona'));
+
+      expect(encuestas[0].motivo_codigo ?? null).toBeNull();
+      expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
+      expect(outbox.encolar).not.toHaveBeenCalled();
+    });
+
+    it('la pregunta vence a las 24 h: la respuesta tardía ya no se registra', async () => {
+      await responder('3');
+      encuestas[0].motivo_preguntado_en = new Date(Date.now() - 25 * 3600_000);
+      await recibir(lista('motivo:PRECIO', 'Precio'));
+
+      expect(encuestas[0].motivo_codigo ?? null).toBeNull();
+      expect(outbox.encolar).not.toHaveBeenCalled();
+    });
+
+    it('nota 4-5: sin pregunta de motivo, agradece como siempre', async () => {
+      await recibir(payloadTexto('4'));
+      expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-GRACIAS');
+      expect(encuestas[0].motivo_preguntado_en ?? null).toBeNull();
+    });
   });
 });

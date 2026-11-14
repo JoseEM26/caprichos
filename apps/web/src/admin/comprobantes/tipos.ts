@@ -192,6 +192,8 @@ export interface QuejaWhatsAppItem {
   telefonoEnmascarado: string;
   puntaje: number | null;
   texto: string;
+  /** Motivo que dio el cliente en la encuesta (nota 1-3), si lo dio. */
+  motivo?: string | null;
   estado: 'NUEVA' | 'EN_REVISION' | 'RESUELTA';
   atendidaPor: string | null;
   resolucion: string | null;

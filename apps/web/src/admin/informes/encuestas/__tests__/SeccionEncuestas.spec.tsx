@@ -19,12 +19,17 @@ const respuesta = (over: Partial<RespuestaEncuestas> = {}): RespuestaEncuestas =
     { dia: '2026-10-29', promedio: null, respondidas: 0 },
   ],
   porModalidad: [{ modalidad: 'DELIVERY', promedio: 2.5, respondidas: 4 }],
+  porMotivo: [
+    { codigo: 'DEMORA', motivo: 'Demora', cantidad: 2 },
+    { codigo: 'PRECIO', motivo: 'Precio', cantidad: 0 },
+  ],
   items: [
     {
       id: '7',
       fecha: '2026-10-28T16:00:00.000Z',
       puntaje: 1,
       comentario: 'Llegó frío',
+      motivo: 'Demora',
       pedidoCodigo: 'CP-7',
       clienteNombre: 'Ana',
       modalidad: 'DELIVERY',
@@ -86,6 +91,10 @@ describe('SeccionEncuestas', () => {
     expect(within(tarjetas[0]).getByText(/Pedido CP-7/)).toBeInTheDocument();
     expect(within(tarjetas[0]).getByText(/Llegó frío/)).toBeInTheDocument();
     expect(within(tarjetas[0]).getByRole('link', { name: /Derivó en queja/ })).toHaveAttribute('href', '/admin/reclamos');
+    expect(within(tarjetas[0]).getByText('Demora')).toBeInTheDocument();
+    expect(within(tarjetas[1]).queryByText(/Motivo:/)).toBeNull();
+    const motivos = screen.getByRole('list', { name: /Motivos de calificación baja/ });
+    expect(within(motivos).getByText('Demora').nextSibling).toHaveTextContent('2');
     expect(within(tarjetas[1]).queryByRole('link')).toBeNull();
   });
 

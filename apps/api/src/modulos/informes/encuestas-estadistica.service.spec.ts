@@ -9,11 +9,18 @@ describe('EncuestasEstadisticaService', () => {
     prisma = {
       encuestaPosventa: {
         count: jest.fn().mockResolvedValue(10),
-        groupBy: jest.fn().mockResolvedValue([
-          { puntaje: 5, _count: { _all: 3 } },
-          { puntaje: 4, _count: { _all: 1 } },
-          { puntaje: 1, _count: { _all: 2 } },
-        ]),
+        groupBy: jest.fn(async ({ by }: any) =>
+          by[0] === 'motivo_codigo'
+            ? [
+                { motivo_codigo: 'DEMORA', _count: { _all: 2 } },
+                { motivo_codigo: 'OTRO', _count: { _all: 1 } },
+              ]
+            : [
+                { puntaje: 5, _count: { _all: 3 } },
+                { puntaje: 4, _count: { _all: 1 } },
+                { puntaje: 1, _count: { _all: 2 } },
+              ],
+        ),
         findMany: jest.fn().mockResolvedValue([
           {
             id: BigInt(7),
@@ -22,6 +29,8 @@ describe('EncuestasEstadisticaService', () => {
             respondida_en: new Date('2026-10-20T16:00:00Z'),
             puntaje: 1,
             comentario: 'Llegó frío',
+            motivo_codigo: 'OTRO',
+            motivo_texto: 'Llegó frío',
             pedido: { codigo: 'CP-7', cliente_nombre: 'Ana', modalidad: 'DELIVERY', canal: 'WHATSAPP' },
           },
         ]),
@@ -72,7 +81,7 @@ describe('EncuestasEstadisticaService', () => {
   it('aplica el filtro de puntaje a la lista, no a la distribución', async () => {
     await service.obtenerEstadisticas({ desde: '2026-10-01', hasta: '2026-10-29', puntaje: 1 });
     const argsLista = prisma.encuestaPosventa.findMany.mock.calls[0][0];
-    const argsGroup = prisma.encuestaPosventa.groupBy.mock.calls[0][0];
+    const argsGroup = prisma.encuestaPosventa.groupBy.mock.calls.find((c: any) => c[0].by[0] === 'puntaje')[0];
     expect(argsLista.where.puntaje).toBe(1);
     expect(argsGroup.where.puntaje).toEqual({ not: null });
   });
@@ -87,6 +96,7 @@ describe('EncuestasEstadisticaService', () => {
       fecha: '2026-10-20T16:00:00.000Z',
       puntaje: 1,
       comentario: 'Llegó frío',
+      motivo: 'Llegó frío',
       pedidoCodigo: 'CP-7',
       clienteNombre: 'Ana',
       modalidad: 'DELIVERY',
@@ -101,7 +111,14 @@ describe('EncuestasEstadisticaService', () => {
     const r = await service.obtenerEstadisticas({ desde: '2026-10-01', hasta: '2026-10-29' });
     expect(r.porModalidad.map((m) => m.modalidad)).toEqual(['MESA', 'DELIVERY']);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
-    expect(prisma.encuestaPosventa.groupBy).toHaveBeenCalledTimes(1);
+    expect(prisma.encuestaPosventa.groupBy).toHaveBeenCalledTimes(2); // puntajes y motivos
+  });
+
+  it('cuenta por motivo (siempre las seis filas)', async () => {
+    const r = await service.obtenerEstadisticas({ desde: '2026-10-01', hasta: '2026-10-29' });
+    expect(r.porMotivo.map((m) => [m.codigo, m.cantidad])).toEqual([
+      ['DEMORA', 2], ['MAL_ESTADO', 0], ['INCOMPLETO', 0], ['ATENCION', 0], ['PRECIO', 0], ['OTRO', 1],
+    ]);
   });
 
   it('rechaza rangos invertidos y fechas inválidas', async () => {

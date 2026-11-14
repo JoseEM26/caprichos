@@ -35,6 +35,7 @@ describe('Webhook: ignora entrantes del número propio y de bloqueados', () => {
   beforeEach(() => {
     prisma = {
       whatsappMensaje: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      encuestaPosventa: { findFirst: jest.fn().mockResolvedValue(null) },
       clienteWhatsappConsentimiento: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
       pedido: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue(null) },
       conversacion: {

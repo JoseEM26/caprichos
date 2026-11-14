@@ -74,6 +74,7 @@ describe('Mensajes no compatibles en el webhook', () => {
 
     prisma = {
       whatsappMensaje: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      encuestaPosventa: { findFirst: jest.fn().mockResolvedValue(null) },
       clienteWhatsappConsentimiento: { findUnique: jest.fn(async () => consentimiento), upsert: jest.fn() },
       pedido: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue(null) },
       conversacion: {

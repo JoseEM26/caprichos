@@ -94,7 +94,7 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
         update: jest.fn(async ({ data }: any) => ({ id: 42n, duenio: 'BOT', ...data })),
       },
       mensajeChat: { create: jest.fn().mockResolvedValue({ id: 99n }) },
-      encuestaPosventa: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn() },
+      encuestaPosventa: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() },
       notificacion: { create: jest.fn(async ({ data }: any) => ({ id: 7n, ...data })) },
       parametro: {
         findUnique: jest.fn(async ({ where }: any) =>

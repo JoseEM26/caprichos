@@ -47,7 +47,8 @@ import { ModuleRef } from '@nestjs/core';
 import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
 import { DireccionesService } from '../../direcciones/direcciones.service';
 import { atenderMensajeVerificacion, esMensajeVerificacion, RESPUESTA_SIN_NUMERO, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
-import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
+import { textoGraciasEncuesta, textoPreguntaMotivo, TEXTO_PIDE_MOTIVO_LIBRE } from '../conversacion/textos-encuesta';
+import { etiquetaMotivo, interpretarMotivoEncuesta, MOTIVO_TEXTO_MAX, MOTIVO_VENCE_MS } from './encuesta-motivo.util';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
 import {
   ClasificacionMensajeEntrante,
@@ -1420,6 +1421,9 @@ export class WhatsappWebhookService {
     telefonoNorm: string | null,
     conversacion: any,
   ): Promise<boolean> {
+    if (telefonoNorm && (await this.procesarMotivoEncuesta(telMask, texto, buttonPayload, telefonoNorm, conversacion))) {
+      return true;
+    }
     const puntaje = interpretarPuntajeEncuesta(buttonPayload) ?? interpretarPuntajeEncuesta(texto);
     if (puntaje === null || !telefonoNorm) return false;
 
@@ -1437,6 +1441,7 @@ export class WhatsappWebhookService {
 
     const umbralQueja = await leerParametroNumerico(this.prisma, 'encuesta_puntaje_queja', 2);
     const esBaja = puntaje <= umbralQueja;
+    const preguntaMotivo = puntaje <= 3;
     const { pedido } = encuesta;
     const nombreCliente =
       (conversacion ? obtenerNombreMostrar(conversacion) : null) || pedido.cliente_nombre || telMask;
@@ -1447,7 +1452,13 @@ export class WhatsappWebhookService {
     const aplicada = await this.prisma.$transaction(async (tx) => {
       const r = await tx.encuestaPosventa.updateMany({
         where: { id: encuesta.id, estado: 'ENVIADA' },
-        data: { puntaje, respondida_en: new Date(), estado: 'RESPONDIDA' },
+        data: {
+          puntaje,
+          respondida_en: new Date(),
+          estado: 'RESPONDIDA',
+          // 1-3: se pregunta el porqué; el agradecimiento sale después de la respuesta
+          ...(preguntaMotivo ? { motivo_preguntado_en: new Date() } : {}),
+        },
       });
       if (r.count === 0) return null;
 
@@ -1497,11 +1508,13 @@ export class WhatsappWebhookService {
           {
             telefono: telefonoNorm,
             tipo: 'TEXTO',
-            clave: `encuesta-${encuesta.id}-GRACIAS`,
+            clave: `encuesta-${encuesta.id}-${preguntaMotivo ? 'MOTIVO' : 'GRACIAS'}`,
             origen: 'ENCUESTA',
             pedidoId: pedido.id,
             carga: {
-              ...textoGraciasEncuesta(puntaje, umbralQueja, nombreCliente, pedido.codigo),
+              ...(preguntaMotivo
+                ? textoPreguntaMotivo(nombreCliente, pedido.codigo)
+                : textoGraciasEncuesta(puntaje, umbralQueja, nombreCliente, pedido.codigo)),
               autor: 'BOT',
               nombre: nombreCliente,
               pedidoCodigo: pedido.codigo,
@@ -1539,6 +1552,105 @@ export class WhatsappWebhookService {
       }
     }
 
+    return true;
+  }
+
+  /**
+   * Respuesta al «¿qué fue lo que no salió bien?» de una calificación 1-3: fila de la lista («motivo:CODIGO») o,
+   * tras elegir «Otro», el texto libre. Vale 24 h desde la pregunta; sin respuesta no se insiste. El mensaje queda
+   * consumido (no es pedido ni nota). Un texto suelto sin haber elegido «Otro» sigue su camino normal.
+   */
+  private async procesarMotivoEncuesta(
+    telMask: string,
+    texto: string,
+    buttonPayload: string | null,
+    telefonoNorm: string,
+    conversacion: any,
+  ): Promise<boolean> {
+    const encuesta = await this.prisma.encuestaPosventa.findFirst({
+      where: {
+        estado: 'RESPONDIDA',
+        motivo_preguntado_en: { gte: new Date(Date.now() - MOTIVO_VENCE_MS) },
+        OR: [{ motivo_codigo: null }, { motivo_codigo: 'OTRO', motivo_texto: null }],
+        pedido: { cliente_telefono: { contains: telefonoNorm.slice(-8) } },
+      },
+      orderBy: { motivo_preguntado_en: 'desc' },
+      include: { pedido: { select: { id: true, codigo: true, cliente_nombre: true } } },
+    });
+    if (!encuesta || encuesta.puntaje == null) return false;
+
+    const elegido = interpretarMotivoEncuesta(buttonPayload);
+    const esperaTexto = encuesta.motivo_codigo === 'OTRO';
+    const libre = !buttonPayload ? texto.trim().slice(0, MOTIVO_TEXTO_MAX) : '';
+    if (!elegido && !(esperaTexto && libre)) return false;
+
+    const { pedido } = encuesta;
+    const nombreCliente =
+      (conversacion ? obtenerNombreMostrar(conversacion) : null) || pedido.cliente_nombre || telMask;
+    const sinMotivoAun = { id: encuesta.id, OR: [{ motivo_codigo: null }, { motivo_codigo: 'OTRO', motivo_texto: null }] };
+
+    // «Otro»: falta lo que escriba el cliente
+    if (elegido === 'OTRO') {
+      if (encuesta.motivo_codigo === 'OTRO') return true; // ya se le pidió el texto
+      await this.prisma.$transaction(async (tx) => {
+        const r = await tx.encuestaPosventa.updateMany({
+          where: { id: encuesta.id, motivo_codigo: null },
+          data: { motivo_codigo: 'OTRO' },
+        });
+        if (r.count === 0 || !this.outbox) return;
+        await this.outbox.encolar(
+          {
+            telefono: telefonoNorm,
+            tipo: 'TEXTO',
+            clave: `encuesta-${encuesta.id}-MOTIVO-LIBRE`,
+            origen: 'ENCUESTA',
+            pedidoId: pedido.id,
+            carga: { textoLibre: TEXTO_PIDE_MOTIVO_LIBRE, autor: 'BOT', nombre: nombreCliente, pedidoCodigo: pedido.codigo, etapa: 'ENCUESTA' },
+          },
+          tx,
+        );
+      });
+      this.outbox?.despertar();
+      return true;
+    }
+
+    const codigo = elegido ?? 'OTRO';
+    const motivoTexto = elegido ? null : libre;
+    const etiqueta = etiquetaMotivo(codigo, motivoTexto) ?? codigo;
+    const umbralQueja = await leerParametroNumerico(this.prisma, 'encuesta_puntaje_queja', 2);
+
+    await this.prisma.$transaction(async (tx) => {
+      const r = await tx.encuestaPosventa.updateMany({
+        where: sinMotivoAun,
+        data: { motivo_codigo: codigo, motivo_texto: motivoTexto },
+      });
+      if (r.count === 0) return;
+      // Con queja (nota ≤ umbral) el equipo ve el motivo también ahí
+      if (encuesta.puntaje! <= umbralQueja) {
+        await tx.quejaWhatsapp.updateMany({
+          where: { pedido_id: pedido.id, origen: 'ENCUESTA' },
+          data: { motivo: etiqueta, texto: `Calificación baja en encuesta posventa (${encuesta.puntaje}/5). Motivo: ${etiqueta}` },
+        });
+      }
+      await this.outbox?.encolar(
+        {
+          telefono: telefonoNorm,
+          tipo: 'TEXTO',
+          clave: `encuesta-${encuesta.id}-GRACIAS`,
+          origen: 'ENCUESTA',
+          pedidoId: pedido.id,
+          carga: {
+            ...textoGraciasEncuesta(encuesta.puntaje!, umbralQueja, nombreCliente, pedido.codigo),
+            autor: 'BOT',
+            nombre: nombreCliente,
+            pedidoCodigo: pedido.codigo,
+            etapa: 'ENCUESTA',
+          },
+        },
+        tx,
+      );
+    });
+    this.outbox?.despertar();
     return true;
   }
 

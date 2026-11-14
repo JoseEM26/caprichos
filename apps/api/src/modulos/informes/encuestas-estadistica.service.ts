@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { etiquetaMotivo, MOTIVOS_ENCUESTA } from '../chatbot/servicios/encuesta-motivo.util';
 import { FiltroEncuestasDto } from './dto/filtro-encuestas.dto';
 
 const DIAS_RANGO_DEFECTO = 30;
@@ -83,7 +84,7 @@ export class EncuestasEstadisticaService {
     const filtroSqlRango = Prisma.sql`e.estado = 'RESPONDIDA' AND e.puntaje IS NOT NULL
       AND e.enviada_en >= ${enviadoEn.gte} AND e.enviada_en < ${enviadoEn.lt}`;
 
-    const [enviadas, porPuntaje, tendenciaRows, modalidadRows, items, total] = await Promise.all([
+    const [enviadas, porPuntaje, tendenciaRows, modalidadRows, items, total, porMotivoRows] = await Promise.all([
       this.prisma.encuestaPosventa.count({ where: whereEnviadas }),
       this.prisma.encuestaPosventa.groupBy({
         by: ['puntaje'],
@@ -114,6 +115,11 @@ export class EncuestasEstadisticaService {
         include: { pedido: { select: { codigo: true, cliente_nombre: true, modalidad: true, canal: true } } },
       }),
       this.prisma.encuestaPosventa.count({ where: whereLista }),
+      this.prisma.encuestaPosventa.groupBy({
+        by: ['motivo_codigo'],
+        where: { ...whereRespondidas, motivo_codigo: { not: null } },
+        _count: { _all: true },
+      }),
     ]);
 
     // Distribución 1..5 (siempre las cinco filas, aunque sean cero)
@@ -146,6 +152,14 @@ export class EncuestasEstadisticaService {
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.modalidad.localeCompare(b.modalidad);
       });
 
+    // Motivos de las notas 1-3 (siempre las seis filas, aunque sean cero)
+    const motivoConteo = new Map(porMotivoRows.map((f) => [f.motivo_codigo, f._count._all]));
+    const porMotivo = MOTIVOS_ENCUESTA.map((m) => ({
+      codigo: m.codigo,
+      motivo: m.titulo,
+      cantidad: motivoConteo.get(m.codigo) ?? 0,
+    }));
+
     // Quejas enlazadas a los pedidos de la página (una sola consulta)
     const pedidoIds = items.map((e) => e.pedido_id);
     const quejas = pedidoIds.length
@@ -175,11 +189,13 @@ export class EncuestasEstadisticaService {
       distribucion,
       tendencia,
       porModalidad,
+      porMotivo,
       items: items.map((e) => ({
         id: e.id.toString(),
         fecha: (e.respondida_en ?? e.enviada_en).toISOString(),
         puntaje: e.puntaje,
         ...(e.comentario ? { comentario: e.comentario } : {}),
+        motivo: etiquetaMotivo(e.motivo_codigo, e.motivo_texto),
         pedidoCodigo: e.pedido.codigo,
         clienteNombre: e.pedido.cliente_nombre || 'Cliente',
         modalidad: e.pedido.modalidad,

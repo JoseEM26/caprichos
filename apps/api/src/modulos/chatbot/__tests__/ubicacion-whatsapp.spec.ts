@@ -42,6 +42,7 @@ describe('Ubicación del cliente en el webhook', () => {
     const conv = { id: 42n, telefono: TEL, duenio: 'BOT', estado: 'ABIERTA', tomado_por: null, flujo: {}, nombre_contacto: 'Ana', nombre_editado: false, identificador_tipo: 'TELEFONO' };
     prisma = {
       whatsappMensaje: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      encuestaPosventa: { findFirst: jest.fn().mockResolvedValue(null) },
       clienteWhatsappConsentimiento: { findUnique: jest.fn(), upsert: jest.fn() },
       pedido: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue(null) },
       conversacion: { findUnique: jest.fn(async () => conv), create: jest.fn(), update: jest.fn(async ({ data }: any) => ({ ...conv, ...data })) },

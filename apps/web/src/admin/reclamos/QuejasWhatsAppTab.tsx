@@ -357,6 +357,9 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
                         Puntaje: {q.puntaje}/5
                       </span>
                     )}
+                    {q.motivo && (
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-navy)' }}>Motivo: {q.motivo}</span>
+                    )}
                   </div>
 
                   <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--cp-navy)', fontStyle: 'italic' }}>
@@ -469,6 +472,7 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
               {quejaSeleccionada.puntaje && (
                 <div><b>Calificación:</b> {quejaSeleccionada.puntaje} / 5</div>
               )}
+              {quejaSeleccionada.motivo && <div><b>Motivo:</b> {quejaSeleccionada.motivo}</div>}
               <div><b>Estado actual:</b> {quejaSeleccionada.estado}</div>
               <div><b>Mensaje del cliente:</b></div>
               <div

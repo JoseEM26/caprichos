@@ -53,11 +53,10 @@ describe('textoGraciasEncuesta: un texto distinto por nivel', () => {
   const media = textoGraciasEncuesta(3, 2, 'José Ángel', 'CP-W114').textoLibre;
   const alta = textoGraciasEncuesta(5, 2, 'José Ángel', 'CP-W114').textoLibre;
 
-  it('la calificación baja lleva nombre, código, la promesa de una persona y la invitación a contar', () => {
+  it('la calificación baja lleva nombre, código, la promesa de una persona', () => {
     expect(baja).toContain('Gracias por contarnos, José Ángel');
     expect(baja).toContain('pedido CP-W114');
     expect(baja).toContain('una persona te escribirá por este chat');
-    expect(baja).toContain('Si quieres, ya puedes contarnos aquí qué ocurrió.');
   });
 
   it('la calificación media y la alta son agradecimientos sin prometer que una persona escribe', () => {

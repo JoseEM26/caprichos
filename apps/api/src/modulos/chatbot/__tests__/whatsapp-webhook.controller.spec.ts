@@ -55,6 +55,7 @@ describe('WhatsappWebhookController y Service', () => {
       },
       encuestaPosventa: {
         findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ id: BigInt(1) }),
       },
       quejaWhatsapp: {
