@@ -1,6 +1,8 @@
 import { api, obtenerBlobAutenticado } from '../../comun/api';
 import type {
   ClienteItem,
+  DetalleCompraCliente,
+  PedidoCliente,
   FichaCliente,
   MovimientoPuntosItem,
 } from './tipos';
@@ -141,4 +143,14 @@ export async function ajustarPuntos(id: string, dto: AjustarPuntosDto): Promise<
 
 export async function listarHistorialPuntos(id: string): Promise<MovimientoPuntosItem[]> {
   return api.get<MovimientoPuntosItem[]>(`/admin/clientes/${id}/puntos-historial`);
+}
+
+/** Compras del cliente, paginadas (la ficha trae la primera página de 20). */
+export async function listarComprasCliente(id: string, pagina: number, limite = 20): Promise<{ pagina: number; hayMas: boolean; pedidos: PedidoCliente[] }> {
+  return api.get(`/admin/clientes/${id}/pedidos?pagina=${pagina}&limite=${limite}`);
+}
+
+/** Qué pidió en una compra: líneas, descuentos, envío, propina, pago y comprobante. */
+export async function obtenerDetalleCompra(id: string, pedidoId: string): Promise<DetalleCompraCliente> {
+  return api.get<DetalleCompraCliente>(`/admin/clientes/${id}/pedidos/${pedidoId}`);
 }

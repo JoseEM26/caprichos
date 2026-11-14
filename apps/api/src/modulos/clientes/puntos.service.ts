@@ -488,52 +488,41 @@ export class PuntosService {
       });
     }
 
-    const rolCliente = await this.prisma.partyRole.findFirst({
-      where: { party_id: id, rol: 'CLIENTE', hasta: null },
-      include: { customer_detail: true },
-    });
-
-    if (!rolCliente) {
-      throw new NotFoundException({
-        codigo: 'CLIENTE_NO_ENCONTRADO',
-        mensaje: 'No se encontró el rol de cliente para esta persona',
-      });
-    }
-
-    const saldoActual = Number(rolCliente.customer_detail?.puntos || 0);
-    if ((tipo === 'REVERSA' || tipo === 'CANJE') && valorPuntos > saldoActual) {
-      throw new BadRequestException({
-        codigo: 'PUNTOS_INSUFICIENTES',
-        mensaje: `No se puede restar ${valorPuntos} puntos porque el saldo actual es ${saldoActual}`,
-      });
-    }
-
-    let nuevoSaldo = saldoActual;
+    let saldoAntes = 0;
+    let nuevoSaldo = 0;
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.movimientoPuntos.create({
-        data: {
-          party_id: id,
-          tipo,
-          puntos: valorPuntos,
-          motivo: datos.motivo.trim(),
-        },
-      });
-
-      if (tipo === 'SUMA') {
-        const up = await tx.customerDetail.upsert({
-          where: { party_role_id: rolCliente.id },
-          create: { party_role_id: rolCliente.id, puntos: valorPuntos },
-          update: { puntos: { increment: valorPuntos } },
-        });
-        nuevoSaldo = Number(up.puntos);
-      } else {
-        const up = await tx.customerDetail.update({
-          where: { party_role_id: rolCliente.id },
-          data: { puntos: { decrement: valorPuntos } },
-        });
-        nuevoSaldo = Number(up.puntos);
+      // La lista de clientes trae también a los desactivados (rol con `hasta`) y a quien aún no tiene rol/detalle:
+      // se usa el rol CLIENTE más reciente (activo primero) y, si falta, se crea aquí mismo.
+      const party = await tx.party.findUnique({ where: { id }, select: { id: true } });
+      if (!party) {
+        throw new NotFoundException({ codigo: 'CLIENTE_NO_ENCONTRADO', mensaje: 'No se encontró al cliente' });
       }
+      let rol = await tx.partyRole.findFirst({
+        where: { party_id: id, rol: 'CLIENTE' },
+        orderBy: [{ hasta: { sort: 'asc', nulls: 'first' } }, { id: 'desc' }],
+      });
+      if (!rol) rol = await tx.partyRole.create({ data: { party_id: id, rol: 'CLIENTE' } });
+      const detalle = await tx.customerDetail.upsert({
+        where: { party_role_id: rol.id },
+        create: { party_role_id: rol.id, puntos: 0 },
+        update: {},
+      });
+      saldoAntes = Number(detalle.puntos || 0);
+      if ((tipo === 'REVERSA' || tipo === 'CANJE') && valorPuntos > saldoAntes) {
+        throw new BadRequestException({
+          codigo: 'PUNTOS_INSUFICIENTES',
+          mensaje: `No se puede restar ${valorPuntos} puntos porque el saldo actual es ${saldoAntes}`,
+        });
+      }
+      await tx.movimientoPuntos.create({
+        data: { party_id: id, tipo, puntos: valorPuntos, motivo: datos.motivo.trim() },
+      });
+      const up = await tx.customerDetail.update({
+        where: { party_role_id: rol.id },
+        data: { puntos: tipo === 'SUMA' ? { increment: valorPuntos } : { decrement: valorPuntos } },
+      });
+      nuevoSaldo = Number(up.puntos);
     });
 
     // Auditoría
@@ -544,6 +533,7 @@ export class PuntosService {
       entidad: 'movimiento_puntos',
       entidadId: id,
       motivo: datos.motivo.trim(),
+      antes: { saldo: saldoAntes },
       despues: {
         tipo,
         puntos: valorPuntos,

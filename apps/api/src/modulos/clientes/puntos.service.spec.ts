@@ -31,6 +31,10 @@ describe('PuntosService', () => {
       },
       partyRole: {
         findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      party: {
+        findUnique: jest.fn().mockResolvedValue({ id: 200n }),
       },
       parametro: {
         findUnique: jest.fn(),
@@ -555,35 +559,50 @@ describe('PuntosService', () => {
   });
 
   describe('ajustarManual', () => {
-    it('debe ajustar puntos manualmente con motivo y registrar auditoría', async () => {
-      prismaMock.partyRole.findFirst.mockResolvedValue({
-        id: 50n,
-        party_id: 200n,
-        customer_detail: { party_role_id: 50n, puntos: '10.00' },
-      });
-      prismaMock.customerDetail.upsert.mockResolvedValue({ puntos: '15.00' });
+    it('suma con motivo de 4+ letras, deja antes/después en la auditoría', async () => {
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n, hasta: null });
+      prismaMock.customerDetail.upsert.mockResolvedValue({ puntos: '10.00' });
+      prismaMock.customerDetail.update.mockResolvedValue({ puntos: '15.00' });
 
-      const res = await service.ajustarManual(
-        200n,
-        { puntos: 5, tipo: 'SUMA', motivo: 'Cortesía por fidelidad' },
-        1n,
-        '127.0.0.1',
-      );
+      const res = await service.ajustarManual(200n, { puntos: 5, tipo: 'SUMA', motivo: 'Cortesía por fidelidad' }, 1n, '127.0.0.1');
 
       expect(res.nuevoSaldo).toBe(15);
-      expect(res.motivo).toBe('Cortesía por fidelidad');
+      expect(prismaMock.movimientoPuntos.create).toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
-          categoria: 'CAMBIO',
           accion: 'PUNTOS_AJUSTE_MANUAL',
+          antes: { saldo: 10 },
+          despues: expect.objectContaining({ nuevoSaldo: 15 }),
         }),
       );
     });
 
-    it('exige motivo obligatorio', async () => {
-      await expect(
-        service.ajustarManual(200n, { puntos: 5, motivo: '' }),
-      ).rejects.toThrow(BadRequestException);
+    it('cliente sin rol CLIENTE (o desactivado) se ajusta creando el rol y el detalle', async () => {
+      prismaMock.partyRole.findFirst.mockResolvedValue(null);
+      prismaMock.partyRole.create.mockResolvedValue({ id: 77n, party_id: 200n });
+      prismaMock.customerDetail.upsert.mockResolvedValue({ puntos: '0' });
+      prismaMock.customerDetail.update.mockResolvedValue({ puntos: '8.00' });
+
+      const res = await service.ajustarManual(200n, { puntos: 8, motivo: 'Premio manual' }, 1n);
+
+      expect(prismaMock.partyRole.create).toHaveBeenCalledWith({ data: { party_id: 200n, rol: 'CLIENTE' } });
+      expect(prismaMock.partyRole.findFirst.mock.calls[0][0].where).toEqual({ party_id: 200n, rol: 'CLIENTE' });
+      expect(res.nuevoSaldo).toBe(8);
+    });
+
+    it('restar más que el saldo: PUNTOS_INSUFICIENTES y no registra movimiento', async () => {
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 50n, party_id: 200n });
+      prismaMock.customerDetail.upsert.mockResolvedValue({ puntos: '3' });
+      await expect(service.ajustarManual(200n, { puntos: 5, tipo: 'REVERSA', motivo: 'Corrección' })).rejects.toMatchObject({
+        response: { codigo: 'PUNTOS_INSUFICIENTES' },
+      });
+      expect(prismaMock.movimientoPuntos.create).not.toHaveBeenCalled();
+    });
+
+    it('motivo de 3 letras o vacío: MOTIVO_REQUERIDO (mínimo 4)', async () => {
+      for (const motivo of ['', 'abc']) {
+        await expect(service.ajustarManual(200n, { puntos: 5, motivo })).rejects.toMatchObject({ response: { codigo: 'MOTIVO_REQUERIDO' } });
+      }
     });
   });
 });
