@@ -1850,7 +1850,7 @@ await this.anotarResaltadas(pedido);
         );
       }
       // Doble clic: la misma opción del mismo pedido dos veces en 15 s no se duplica salvo «Imprimir otra copia igual»
-      const claveIdentica = `${k}|${dto.tipo}|${dto.tipo === 'stickers' ? (dto.sub ?? 'todos') : ''}|${[...(dto.claves ?? [])].sort().join(',')}`;
+      const claveIdentica = `${k}|${dto.tipo}|${dto.tipo === 'stickers' ? (dto.sub ?? 'todos') : ''}${dto.claves?.length ? `|${[...dto.claves].sort().join(',')}` : ''}`;
       const ultima = this.reimpresionIdentica.get(claveIdentica);
       if (!dto.otra_copia && ultima !== undefined && ahora - ultima < VENTANA_REIMPRESION_IDENTICA_MS) {
         const hace = Math.max(1, Math.round((ahora - ultima) / 1000));
