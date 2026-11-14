@@ -26,6 +26,8 @@ import { MisPedidosQueryDto } from './dto/mis-pedidos-query.dto';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 import { CorregirClienteService } from './corregir-cliente.service';
+import { RevertirAnulacionService } from './revertir-anulacion.service';
+import { RevertirAnulacionDto } from './dto/revertir-anulacion.dto';
 import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { ReabrirPedidoDto } from './dto/reabrir-pedido.dto';
 import { CorregirClienteDto } from './dto/corregir-cliente.dto';
@@ -57,6 +59,7 @@ export class PedidosAdminController {
     @Optional() private readonly ajustarPagoService?: AjustarPagoService,
     @Optional() private readonly lineaTiempoService?: LineaTiempoService,
     @Optional() private readonly historialCajaService?: HistorialCajaPedidoService,
+    @Optional() private readonly revertirAnulacion?: RevertirAnulacionService,
   ) {}
 
   @Post()
@@ -164,6 +167,14 @@ export class PedidosAdminController {
   async reabrir(@Param('id') id: string, @Body() dto: ReabrirPedidoDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.reabrirPedido!.reabrir(id, dto?.motivo, req.usuario, ip);
+  }
+
+  /** Revertir un pedido anulado (solo ADMIN y SUPERVISOR: lo valida el servicio; motivo obligatorio). */
+  @Post(':id/revertir-anulacion')
+  @Permiso('pedidos', 'anular')
+  async revertirAnulacionPedido(@Param('id') id: string, @Body() dto: RevertirAnulacionDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.revertirAnulacion!.revertir(id, dto?.motivo, req.usuario, ip);
   }
 
   /** Datos para la devolución de un pedido cancelado por no recibir y pagado (monto sugerido, medio, comprobante). */

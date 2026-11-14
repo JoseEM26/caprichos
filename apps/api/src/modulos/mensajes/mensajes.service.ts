@@ -1,3 +1,5 @@
+import { CambiarEstadoDto } from '../pedidos-admin/dto/cambiar-estado.dto';
+import { PedidosEstadoService } from '../pedidos-admin/pedidos-estado.service';
 import { textoTiempoPedido } from '../repartos/eta-entrega';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { pedidoEsperandoVoucher } from '../chatbot/servicios/pedido-esperando-voucher.util';
@@ -31,7 +33,6 @@ import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ArchivosService } from '../archivos/archivos.service';
 import { StockService } from '../stock/stock.service';
 import { PuntosService } from '../clientes/puntos.service';
-import { cerrarRutaTrasAnular } from '../repartos/rutas-reparto';
 import sharp from 'sharp';
 import {
   MAX_DOCUMENTO_ENVIO_BYTES,
@@ -157,6 +158,7 @@ export class MensajesService {
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() private readonly numeros?: NumerosWhatsappService,
     @Optional() private readonly cola?: EnvioEncoladoService,
+    @Optional() private readonly pedidosEstado?: PedidosEstadoService,
   ) {}
 
   /** Escribir a mano al número del negocio o a uno bloqueado no se permite: los bots se contestarían entre sí. */
@@ -1691,7 +1693,7 @@ export class MensajesService {
    * Permiso: mensajes/enviar.
    * Reglas: actualiza pedido (dirección/zona o anulación), audita y notifica al cliente por WhatsApp.
    */
-  async aplicarCambio(id: string, usuario: UsuarioAutenticado, ip?: string) {
+  async aplicarCambio(id: string, usuario: UsuarioAutenticado, ip?: string, destino?: Pick<CambiarEstadoDto, 'destinoDinero' | 'devolucionMedio' | 'devolucionMonto' | 'devolucionCodigo'>) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para decidir tú.');
     const d = await this.pedidoDelChat(c);
@@ -1772,17 +1774,17 @@ export class MensajesService {
         detalle: solicitud.detalle,
       }, ip);
     } else if (solicitud.tipo === 'CANCELAR') {
-      await this.prisma.pedido.update({
-        where: { id: pedidoId },
-        data: {
-          estado: 'ANULADO',
-          anulado_en: ahora,
-          anulado_por: usuario.partyId,
-          motivo_anulacion: solicitud.detalle || 'Cancelado por el cliente desde WhatsApp',
-        },
-      });
-      // Un pedido anulado devuelve su stock y reversa sus puntos (idempotentes). Antes quedaba vendido para siempre.
-      await this.devolverAlCancelar(pedidoId);
+      // Misma anulación que Pedidos/Caja: valida el estado, anula el cobro, libera mesas, deja historial y devuelve
+      // stock y puntos. Si el pedido está pagado exige elegir qué pasa con el dinero (400 DESTINO_DINERO_REQUERIDO).
+      if (!this.pedidosEstado) throw error(HttpStatus.CONFLICT, 'ANULACION_NO_DISPONIBLE', 'No se pudo anular el pedido desde aquí');
+      const r: any = await this.pedidosEstado.cambiarEstado(
+        pedidoId,
+        { estado: 'ANULADO', motivo: (solicitud.detalle ?? '').trim().length >= 5 ? (solicitud.detalle ?? '').trim() : 'Cancelado por el cliente desde WhatsApp', ...destino },
+        usuario,
+        ip,
+      );
+      // «Se reprograma»: el pedido no se anula, la solicitud de cancelar sigue pendiente (se decide con el cliente)
+      if (r?.reprogramado) return { ok: true, reprogramado: true };
 
       await this.prisma.solicitudCambio.update({
         where: { id: solicitud.id },
@@ -1796,12 +1798,6 @@ export class MensajesService {
       const textoCliente = TEXTOS_CAMBIOS.cancelacionAplicadaCliente(pedidoActual.codigo);
       await this.gateway.enviarTexto(c.id, c.telefono, textoCliente, 'PERSONA');
 
-      this.eventos?.emitirAdmin('pedido:estado', {
-        id: Number(pedidoActual.id),
-        codigo: pedidoActual.codigo,
-        estado: 'ANULADO',
-      });
-      await cerrarRutaTrasAnular(this.prisma, pedidoActual.repartidor_party_id, this.eventos, this.logger);
 
       await this.auditar(usuario, 'APLICAR_CANCELACION_PEDIDO', c.id, {
         pedido: pedidoActual.codigo,
@@ -1811,20 +1807,6 @@ export class MensajesService {
 
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: c.id.toString() });
     return { ok: true };
-  }
-
-  /** Devuelve stock y puntos del pedido cancelado; si algo falla no deshace la cancelación (queda en el log para revisar). */
-  private async devolverAlCancelar(pedidoId: bigint) {
-    for (const [que, paso] of [
-      ['los puntos', () => this.puntosService?.reversarPorPedido(pedidoId)],
-      ['el stock', () => this.stockService?.revertirPorPedido(pedidoId)],
-    ] as Array<[string, () => Promise<unknown> | undefined]>) {
-      try {
-        await paso();
-      } catch (e) {
-        this.logger.error(`Cancelado por WhatsApp, pero no se pudo devolver ${que} del pedido ${pedidoId}: ${String(e)}`);
-      }
-    }
   }
 
   /**

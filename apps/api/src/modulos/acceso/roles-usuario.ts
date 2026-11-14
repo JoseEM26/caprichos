@@ -80,6 +80,11 @@ export function puedeVolverAtrasPedidos(usuario: { rol: string; roles?: string[]
   return rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'CAJERO');
 }
 
+/** Revertir una anulación y asignar/cerrar un reparto por el repartidor: solo ADMIN y SUPERVISOR (con varios roles basta uno). */
+export function esAdminOSupervisor(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+  return rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR');
+}
+
 /** Roles que anulan cualquier pedido que ven (el REPARTIDOR queda acotado a los suyos antes, en el servicio). */
 const ROLES_ANULAN_CUALQUIER_PEDIDO = ['ADMIN', 'CAJERO', 'SUPERVISOR', 'MOZO', 'COCINA', 'APOYO_DELIVERY', 'REPARTIDOR'];
 

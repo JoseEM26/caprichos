@@ -1163,6 +1163,49 @@ export class StockService {
   }
 
   /**
+   * Deshace lo que devolvió una anulación (revertir un pedido anulado): por cada movimiento ANULACION del pedido desde
+   * `desde` vuelve a descontar el stock y deja un VENTA nuevo (que una futura anulación sí revierte). Idempotente: cada
+   * ANULACION se reaplica una sola vez (marca `reversion-anulacion:<id>` en la nota). El saldo puede quedar negativo.
+   */
+  async reaplicarPorPedido(pedidoId: bigint | string | number, desde: Date, porUsuarioId?: bigint | string | number) {
+    const id = this.parsearId(pedidoId, 'pedido');
+    const porId = porUsuarioId ? this.parsearId(porUsuarioId, 'usuario') : BigInt(1);
+    const anulaciones: any[] = await this.prisma.movimientoStock.findMany({
+      where: { pedido_id: id, tipo: 'ANULACION', en: { gte: desde } },
+    });
+    let reaplicados = 0;
+    await this.prisma.$transaction(async (db: any) => {
+      await this.bloquearPedido(db, id);
+      for (const a of anulaciones) {
+        const marca = `reversion-anulacion:${a.id}`;
+        if (await db.movimientoStock.findFirst({ where: { pedido_id: id, tipo: 'VENTA', nota: marca }, select: { id: true } })) continue;
+        if (a.insumo_id) {
+          await db.stock.updateMany({ where: { insumo_id: a.insumo_id, lugar_id: a.lugar_id }, data: { cantidad: { decrement: a.cantidad } } });
+        } else if (a.sabor_id) {
+          await db.stockSabor.updateMany({ where: { sabor_id: a.sabor_id }, data: { cantidad: { decrement: a.cantidad } } });
+        } else if (a.producto_id) {
+          await db.stock.updateMany({ where: { producto_id: a.producto_id, lugar_id: a.lugar_id }, data: { cantidad: { decrement: a.cantidad } } });
+        } else continue;
+        await db.movimientoStock.create({
+          data: {
+            tipo: 'VENTA',
+            insumo_id: a.insumo_id ?? null,
+            producto_id: a.producto_id ?? null,
+            sabor_id: a.sabor_id ?? null,
+            lugar_id: a.lugar_id,
+            cantidad: a.cantidad,
+            pedido_id: id,
+            por: porId,
+            nota: marca,
+          },
+        });
+        reaplicados++;
+      }
+    });
+    return { ok: true, movimientosReaplicados: reaplicados };
+  }
+
+  /**
    * Agotado AUTOMATICO por saldo 0 (insumo o producto terminado por tanda). Si ya está agotado (a mano o por
    * stock) no se toca: un agotado MANUAL conserva su origen y no se duplica la fila de historial.
    */

@@ -18,7 +18,7 @@ function crearPrisma(opts: { pendiente?: boolean; pago?: string; actualizados?: 
     },
     pedido: {
       updateMany: jest.fn().mockResolvedValue({ count: opts.actualizados ?? 1 }),
-      findUnique: jest.fn().mockResolvedValue({ codigo: 'CP-R1', pago_estado: opts.pago ?? 'PENDIENTE' }),
+      findUnique: jest.fn().mockResolvedValue({ codigo: 'CP-R1', estado: 'LISTO', pago_estado: opts.pago ?? 'PENDIENTE', cobros: [] }),
     },
     incidenteEntrega: {
       findFirst: jest.fn().mockResolvedValue({ id: BigInt(9) }),
@@ -99,12 +99,13 @@ describe('ReprogramacionService (retiro -> SI / NO / sin respuesta)', () => {
     expect(avisos.avisar).toHaveBeenCalledWith(PEDIDO, 'REPROG_CANCELADA', {}, expect.anything());
   });
 
-  it('pedido pagado que se cancela: avisa a Caja para revisar devolución', async () => {
+  it('pedido pagado: NO se anula solo; avisa a Caja para que una persona elija devolver o reprogramar', async () => {
     const prisma = crearPrisma({ pago: 'PAGADO' });
     const { servicio } = crear(prisma);
 
-    await servicio.cancelar(PEDIDO, 'NO');
+    expect(await servicio.cancelar(PEDIDO, 'NO')).toBe(false);
 
+    expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
     expect(prisma.notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ tipo: 'REVISAR_DEVOLUCION', rol_destino: 'CAJERO' }) }),
     );

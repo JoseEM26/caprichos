@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CambiarEstadoDto {
   @IsString()
@@ -23,4 +23,22 @@ export class CambiarEstadoDto {
   @IsOptional()
   @IsIn(['MERMA', 'DEVOLVER'])
   consumoAlmacen?: 'MERMA' | 'DEVOLVER';
+
+  /** Anular un pedido ya pagado: obliga a elegir qué pasa con el dinero (DEVOLVER lo devuelve al cliente; REPROGRAMAR no anula). */
+  @IsOptional()
+  @IsIn(['DEVOLVER', 'REPROGRAMAR'])
+  destinoDinero?: 'DEVOLVER' | 'REPROGRAMAR';
+
+  /** Con DEVOLVER: medio de la devolución, monto devuelto y código de operación (no efectivo). */
+  @IsOptional()
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'])
+  devolucionMedio?: string;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  devolucionMonto?: number;
+
+  @IsOptional()
+  @IsString()
+  devolucionCodigo?: string;
 }

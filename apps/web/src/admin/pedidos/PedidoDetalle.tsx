@@ -9,6 +9,7 @@ import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { ModalAnular } from './ModalAnular';
 import { ModalVolverAtras } from './ModalVolverAtras';
+import { ModalRevertirAnulacion } from './ModalRevertirAnulacion';
 import { fechaLima } from '../../comun/agotadoTiempo';
 import { ModalCortesia } from '../cortesias/ModalCortesia';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
@@ -112,6 +113,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const [abrirCobrar, setAbrirCobrar] = useState(false);
   const [abrirAnular, setAbrirAnular] = useState(false);
   const [abrirVolverAtras, setAbrirVolverAtras] = useState(false);
+  const [abrirRevertir, setAbrirRevertir] = useState(false);
+  const [abrirAnularPedido, setAbrirAnularPedido] = useState(false);
   const [abrirUbicar, setAbrirUbicar] = useState(false);
   const [abrirCorregirCliente, setAbrirCorregirCliente] = useState(false);
   const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
@@ -198,6 +201,10 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const sinUbicar = deliverySinUbicacion(pedido) && !['ANULADO', 'RECHAZADO', 'ENTREGADO'].includes(String(pedido.estado || '').toUpperCase());
   // Volver atrás: solo Caja y Administrador, un pedido entregado; deshabilitado con el motivo si ya no aplica (el servidor lo valida igual)
   const puedeVolverAtras = est === 'ENTREGADO' && tiene('pedidos/anular') && (tieneRolUsuario(usuario, 'ADMIN') || tieneRolUsuario(usuario, 'CAJERO'));
+  // Revertir una anulación: solo ADMIN y SUPERVISOR (el servidor responde 403 al resto)
+  const puedeRevertirAnulacion = est === 'ANULADO' && tiene('pedidos/anular') && (tieneRolUsuario(usuario, 'ADMIN') || tieneRolUsuario(usuario, 'SUPERVISOR'));
+  // Pedido pagado todavía sin entregar: además de «Anular cobro», se puede anular el pedido eligiendo qué pasa con el dinero
+  const puedeAnularPedidoPagado = tieneCobroVigente && ['COLA', 'PREPARANDO', 'LISTO'].includes(est) && tiene('pedidos/anular');
   const motivoNoVolverAtras =
     cajaAbierta === false
       ? 'Ya cerró la caja del día'
@@ -542,9 +549,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   {motivoNoVolverAtras && <span style={{ fontSize: 12, fontWeight: 700, color: '#B2500F' }}>{motivoNoVolverAtras}</span>}
                 </div>
               )}
-              {(est === 'ANULADO' || est === 'RECHAZADO') && (
+              {puedeRevertirAnulacion && (
+                <button type="button" className="dp-ico" style={{ minHeight: 44 }} aria-label={`Revertir la anulación del pedido ${pedido.codigo}`} disabled={procesando} onClick={() => setAbrirRevertir(true)}>
+                  ↩ Revertir anulación
+                </button>
+              )}
+              {(est === 'ANULADO' || est === 'RECHAZADO') && !puedeRevertirAnulacion && (
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#2C4C5D' }}>
-                  Un pedido anulado no se puede reabrir: crea uno nuevo (botón Repetir).
+                  Un pedido anulado no se puede reabrir: crea uno nuevo (botón Repetir). Si fue un error, pide al administrador o supervisor que revierta la anulación.
                 </span>
               )}
               {esMesa && (est === 'PREPARANDO' || (est === 'LISTO' && !pedido.entregado_mesa_en)) && (
@@ -589,6 +601,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               {esMesa && <BotonIcono n="precuenta" texto="Precuenta" etiqueta="Sacar precuenta (el cajero cobra)" alClic={() => setAbrirPrecuenta(true)} />}
               <BotonIcono n="imprimir" texto="Imprimir" etiqueta="Imprimir etiquetas y ticket" alClic={() => setAbrirImpresion(true)} />
               <ReimprimirPedido pedido={pedido} variante="detalle" />
+              {puedeAnularPedidoPagado && !esPorConfirmar && (
+                <BotonIcono n="anular" peligro texto="Anular pedido" etiqueta="Anular pedido pagado" alClic={() => setAbrirAnularPedido(true)} />
+              )}
               {est !== 'ANULADO' && (esPorConfirmar || tiene('pedidos/anular')) && (
                 <BotonIcono
                   n="anular"
@@ -655,6 +670,33 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
         />
       )}
 
+      {abrirRevertir && (
+        <ModalRevertirAnulacion
+          pedido={pedido}
+          alCerrar={() => setAbrirRevertir(false)}
+          alExito={(r) => {
+            setAbrirRevertir(false);
+            setMensajeExito(`${pedido.codigo} volvió a ${r.estado}${r.avisoCobro ? `. ${r.avisoCobro}` : ''}`);
+            alActualizar();
+          }}
+        />
+      )}
+
+      {abrirAnularPedido && (
+        <ModalAnular
+          pedidoId={pedido.id}
+          codigoPedido={pedido.codigo}
+          esCobro={false}
+          pedido={pedido}
+          esAdmin={tieneRolUsuario(usuario, 'ADMIN')}
+          alCerrar={() => setAbrirAnularPedido(false)}
+          alAnularExitoso={() => {
+            setAbrirAnularPedido(false);
+            alActualizar();
+          }}
+        />
+      )}
+
       {abrirAnular && (
         <ModalAnular
           pedidoId={pedido.id}
@@ -662,6 +704,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           esCobro={tieneCobroVigente}
           esAdmin={tieneRolUsuario(usuario, 'ADMIN')}
           cobroId={pedido.cobro_vigente_id ?? undefined}
+          pedido={pedido}
           alCerrar={() => setAbrirAnular(false)}
           alAnularExitoso={() => {
             setAbrirAnular(false);

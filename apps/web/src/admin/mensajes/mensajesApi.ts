@@ -1,3 +1,4 @@
+import type { DestinoDineroAnulacion } from '../pedidos/pedidosApi';
 import { api, clienteFetch } from '../../comun/api';
 import {
   RespuestaFilaChat,
@@ -179,8 +180,8 @@ export async function rechazarPagoChat(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/rechazar-pago`, {});
 }
 
-export async function aplicarCambioChat(id: string): Promise<{ ok: boolean }> {
-  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/aplicar-cambio`, {});
+export async function aplicarCambioChat(id: string, dinero?: DestinoDineroAnulacion): Promise<{ ok: boolean; reprogramado?: boolean }> {
+  return api.post<{ ok: boolean; reprogramado?: boolean }>(`/admin/mensajes/conversaciones/${id}/aplicar-cambio`, dinero ?? {});
 }
 
 export async function rechazarCambioChat(id: string, motivo: string): Promise<{ ok: boolean }> {

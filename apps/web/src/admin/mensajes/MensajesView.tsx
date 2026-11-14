@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ModalDestinoDinero } from './ModalDestinoDinero';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
 import {
@@ -159,6 +160,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
   const [textoPulido, setTextoPulido] = useState<string | null>(null);
   const [pulirError, setPulirError] = useState<string | null>(null);
+  const [destinoDinero, setDestinoDinero] = useState<{ codigoPedido: string; enviando: boolean; error: string | null } | null>(null);
   const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
 
   // Diálogos de confirmación
@@ -860,6 +862,11 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           await cargarDetalle(chatSeleccionadoId);
           await cargarLista(true);
         } catch (err: any) {
+          // Pedido ya pagado: antes de cancelar hay que decidir qué pasa con el dinero
+          if (err?.codigo === 'DESTINO_DINERO_REQUERIDO') {
+            setDestinoDinero({ codigoPedido: sol.pedido, enviando: false, error: null });
+            return;
+          }
           setPulirError(err?.message || 'Error al aplicar el cambio');
         }
       },
@@ -1106,6 +1113,27 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           </button>
         </div>
       )}
+      {destinoDinero && (
+        <ModalDestinoDinero
+          codigoPedido={destinoDinero.codigoPedido}
+          enviando={destinoDinero.enviando}
+          error={destinoDinero.error}
+          alCerrar={() => setDestinoDinero(null)}
+          alElegir={async (d) => {
+            if (!chatSeleccionadoId) return;
+            setDestinoDinero({ ...destinoDinero, enviando: true, error: null });
+            try {
+              await aplicarCambioChat(chatSeleccionadoId, d);
+              setDestinoDinero(null);
+              await cargarDetalle(chatSeleccionadoId);
+              await cargarLista(true);
+            } catch (err: any) {
+              setDestinoDinero({ ...destinoDinero, enviando: false, error: err?.message || 'No se pudo aplicar la cancelación' });
+            }
+          }}
+        />
+      )}
+
       {confirmarAccion && (
         <Confirmar
           abierto={true}

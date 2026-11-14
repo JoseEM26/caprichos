@@ -24,6 +24,7 @@ import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto'
 import { SinCobroDto } from './dto/sin-cobro.dto';
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
+import { CerrarPorRepartidorDto } from './dto/cerrar-por-repartidor.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
 import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
 import { TomarRutaDto } from './dto/tomar-ruta.dto';
@@ -241,6 +242,14 @@ export class RepartosController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.repartosService.reasignarPedido(id, dto, req.usuario, ip);
+  }
+
+  /** ADMIN y SUPERVISOR: asigna el repartidor (si hace falta) y cierra el reparto por él; el repartidor figura como quien entregó. */
+  @Post(':id/cerrar-por-repartidor')
+  @Permiso('repartos', 'liquidar')
+  async cerrarPorRepartidor(@Param('id') id: string, @Body() dto: CerrarPorRepartidorDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.cerrarPorRepartidor(id, dto, req.usuario, ip);
   }
 
   @Post(':id/salir')

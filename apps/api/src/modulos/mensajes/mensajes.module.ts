@@ -8,12 +8,13 @@ import { MensajesController } from './mensajes.controller';
 import { MensajesService } from './mensajes.service';
 import { PlantillasRespuestaService } from './plantillas-respuesta.service';
 import { EnvioEncoladoService } from './envio-encolado.service';
+import { PedidosAdminModule } from '../pedidos-admin/pedidos-admin.module';
 import { WHATSAPP_GATEWAY } from './whatsapp.gateway';
 import { WhatsAppMetaGateway } from './whatsapp-meta.gateway';
 import { WhatsAppLocalGateway } from './whatsapp-local.gateway';
 
 @Module({
-  imports: [ComunModule, ChatbotModule, ArchivosModule, StockModule, ClientesModule],
+  imports: [ComunModule, ChatbotModule, ArchivosModule, StockModule, ClientesModule, PedidosAdminModule],
   controllers: [MensajesController],
   providers: [
     MensajesService,

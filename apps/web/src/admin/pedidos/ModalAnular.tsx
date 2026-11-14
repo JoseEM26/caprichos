@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { pedidosApi, Pedido } from './pedidosApi';
+import { pedidosApi, Pedido, DestinoDineroAnulacion } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import '../cierre/pendientes-cierre.css';
 
@@ -28,6 +28,14 @@ export interface ModalAnularProps {
   alCerrar: () => void;
   alAnularExitoso: () => void;
 }
+
+const MEDIOS_DEVOLUCION = [
+  ['EFECTIVO', 'Efectivo'],
+  ['YAPE', 'Yape'],
+  ['PLIN', 'Plin'],
+  ['TRANSFERENCIA', 'Transferencia'],
+  ['TARJETA', 'Tarjeta'],
+] as const;
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   COLA: 'En cola',
@@ -60,6 +68,31 @@ export function ModalAnular({
   // Solo con el Control de almacén encendido y consumo registrado (el API avisa con tieneConsumoAlmacen)
   const [consumoAlmacen, setConsumoAlmacen] = useState<'MERMA' | 'DEVOLVER'>('MERMA');
   const preguntaAlmacen = !esCobro && pedido?.tieneConsumoAlmacen === true;
+  // Pedido ya pagado: no se anula sin decidir qué pasa con el dinero (el servidor también lo exige: 400 DESTINO_DINERO_REQUERIDO)
+  const [pideDinero, setPideDinero] = useState<boolean>(false);
+  const [destino, setDestino] = useState<'' | 'DEVOLVER' | 'REPROGRAMAR'>('');
+  const [medioDev, setMedioDev] = useState<string>('');
+  const [montoDev, setMontoDev] = useState<string>(pedido?.total != null ? String(pedido.total) : '');
+  const [codigoDev, setCodigoDev] = useState<string>('');
+  const pagadoConocido =
+    !esCobro && !!pedido && (!!pedido.cobro_vigente_id || ['PAGADO', 'COORDINADO'].includes(String(pedido.pago_estado || '').toUpperCase()));
+  const mostrarDinero = !esCobro && (pagadoConocido || pideDinero);
+  const puedeReprogramar = !pedido || String(pedido.modalidad || '').toUpperCase() === 'DELIVERY';
+  const montoNum = Number(montoDev.replace(',', '.'));
+  const dineroCompleto =
+    !mostrarDinero ||
+    destino === 'REPROGRAMAR' ||
+    (destino === 'DEVOLVER' && medioDev !== '' && montoNum > 0 && (medioDev === 'EFECTIVO' || codigoDev.trim().length > 0));
+  const dineroParaEnviar = (): DestinoDineroAnulacion | undefined => {
+    if (!mostrarDinero || !destino) return undefined;
+    if (destino === 'REPROGRAMAR') return { destinoDinero: 'REPROGRAMAR' };
+    return {
+      destinoDinero: 'DEVOLVER',
+      devolucionMedio: medioDev,
+      devolucionMonto: Math.round(montoNum * 100) / 100,
+      ...(medioDev !== 'EFECTIVO' ? { devolucionCodigo: codigoDev.trim() } : {}),
+    };
+  };
   // Todos los roles anulan el pedido completo con la misma advertencia; anular un cobro es aparte
   const pedidoCompleto = !esCobro;
 
@@ -68,6 +101,10 @@ export function ModalAnular({
     const motivoTrim = motivo.trim();
     if (motivoTrim.length < minimoMotivo) {
       setErrorMensaje(`El motivo es obligatorio y debe tener al menos ${minimoMotivo} caracteres.`);
+      return false;
+    }
+    if (!dineroCompleto) {
+      setErrorMensaje('Elige qué pasa con el dinero y completa los datos de la devolución.');
       return false;
     }
 
@@ -104,7 +141,9 @@ export function ModalAnular({
         if (cajaCerrada) await pedidosApi.anularCobroCajaCerrada(idCobro, motivoParaEnviar);
         else await pedidosApi.anularCobro(idCobro, motivoParaEnviar);
       } else {
-        if (preguntaAlmacen) await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar, undefined, consumoAlmacen);
+        const dinero = dineroParaEnviar();
+        if (dinero) await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar, undefined, preguntaAlmacen ? consumoAlmacen : undefined, undefined, dinero);
+        else if (preguntaAlmacen) await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar, undefined, consumoAlmacen);
         else await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar);
       }
       alAnularExitoso();
@@ -116,6 +155,9 @@ export function ModalAnular({
             ? 'La caja de este cobro ya está cerrada. Como administrador puedes anularlo de todos modos.'
             : 'La caja de este cobro ya está cerrada. Pide al administrador que lo anule.',
         );
+      } else if (err instanceof ErrorApi && err.codigo === 'DESTINO_DINERO_REQUERIDO') {
+        setPideDinero(true);
+        setErrorMensaje('Este pedido ya está pagado: elige qué pasa con el dinero.');
       } else if (err instanceof ErrorApi) {
         setErrorMensaje(err.message || 'Error al anular');
       } else {
@@ -290,6 +332,46 @@ export function ModalAnular({
             </fieldset>
           )}
 
+          {mostrarDinero && (
+            <fieldset data-testid="destino-dinero" style={{ border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: 10, padding: 10, margin: 0 }}>
+              <legend style={{ fontWeight: 700, fontSize: 13 }}>¿Qué pasa con el dinero?</legend>
+              <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center', fontSize: 13 }}>
+                <input type="radio" name="destino-dinero" checked={destino === 'DEVOLVER'} onChange={() => setDestino('DEVOLVER')} />
+                Se devuelve al cliente
+              </label>
+              {destino === 'DEVOLVER' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>
+                    Medio de la devolución
+                    <select value={medioDev} onChange={(e) => setMedioDev(e.target.value)} style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 4 }}>
+                      <option value="">Elige el medio…</option>
+                      {MEDIOS_DEVOLUCION.map(([v, t]) => (
+                        <option key={v} value={v}>{t}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 13, fontWeight: 700 }}>
+                    Monto devuelto (S/)
+                    <input type="text" inputMode="decimal" value={montoDev} onChange={(e) => setMontoDev(e.target.value)} style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44, marginTop: 4 }} />
+                  </label>
+                  {medioDev !== '' && medioDev !== 'EFECTIVO' && (
+                    <label style={{ fontSize: 13, fontWeight: 700 }}>
+                      Código de operación
+                      <input type="text" value={codigoDev} onChange={(e) => setCodigoDev(e.target.value)} style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44, marginTop: 4 }} />
+                    </label>
+                  )}
+                  {medioDev === 'EFECTIVO' && <span style={{ fontSize: 12 }}>La devolución en efectivo queda en la caja de hoy (debe estar abierta).</span>}
+                </div>
+              )}
+              {puedeReprogramar && (
+                <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center', fontSize: 13 }}>
+                  <input type="radio" name="destino-dinero" checked={destino === 'REPROGRAMAR'} onChange={() => setDestino('REPROGRAMAR')} />
+                  Se reprograma el pedido (no se anula; vuelve a reparto con el pago intacto)
+                </label>
+              )}
+            </fieldset>
+          )}
+
           {errorMensaje && (
             <div role="alert" className="ad-error">
               {errorMensaje}
@@ -316,7 +398,7 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < minimoMotivo || (cajaCerrada && !esAdmin)}
+            disabled={enviando || motivo.trim().length < minimoMotivo || (cajaCerrada && !esAdmin) || !dineroCompleto}
             onClick={iniciarAnulacion}
             style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
@@ -331,9 +413,11 @@ export function ModalAnular({
           titulo={
             esCobro
               ? `¿Anular el cobro de ${codigoPedido}?`
-              : `¿Anular el pedido ${codigoPedido}?`
+              : destino === 'REPROGRAMAR'
+                ? `¿Reprogramar el pedido ${codigoPedido}? (no se anula)`
+                : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`${cajaCerrada ? 'La caja ya está cerrada: el pedido vuelve a por cobrar y se registra un egreso de ajuste en la caja de hoy. ' : ''}${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.`}
+          mensaje={`${cajaCerrada ? 'La caja ya está cerrada: el pedido vuelve a por cobrar y se registra un egreso de ajuste en la caja de hoy. ' : ''}${pedidoCompleto && destino !== 'REPROGRAMAR' ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}

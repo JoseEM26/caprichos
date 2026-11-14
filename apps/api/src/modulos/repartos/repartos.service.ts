@@ -13,6 +13,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { esAdminOSupervisor } from '../acceso/roles-usuario';
 import {
   COORDENADAS_LOCAL_DEFAULT,
   Coordenadas,
@@ -86,6 +87,12 @@ export interface ParametrosReparto {
   tomadoSinSalirMin: number;
   esperaMaxMin: number;
   insistenciaMin: number;
+}
+
+/** Quien figura como autor del paso cuando ADMIN/SUPERVISOR cierra el reparto por el repartidor. */
+export interface PorRepartidor {
+  partyId: bigint;
+  cerradoPor: string;
 }
 
 @Injectable()
@@ -1361,7 +1368,7 @@ export class RepartosService {
    * LISTO -> EN_CAMINO, salio_en = ahora.
    * Registra aviso 1 «En camino» en mensaje_reparto como PENDIENTE.
    */
-  async salir(id: string | bigint, usuario: UsuarioAutenticado, ip?: string, sinCobro?: { forzarSinCobro?: boolean; motivo?: string }) {
+  async salir(id: string | bigint, usuario: UsuarioAutenticado, ip?: string, sinCobro?: { forzarSinCobro?: boolean; motivo?: string }, porRepartidor?: PorRepartidor) {
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
     const config = await this.obtenerParametrosReparto();
@@ -1421,8 +1428,8 @@ export class RepartosService {
           pedido_id: pedidoId,
           estado_anterior: 'LISTO',
           estado_nuevo: 'EN_CAMINO',
-          motivo: 'En camino',
-          por_party_id: partyId,
+          motivo: porRepartidor ? `En camino (cerrado por ${porRepartidor.cerradoPor})` : 'En camino',
+          por_party_id: porRepartidor?.partyId ?? partyId,
           en: ahora,
         },
       });
@@ -1574,6 +1581,7 @@ export class RepartosService {
     usuario: UsuarioAutenticado,
     ip?: string,
     sinCobro?: { forzarSinCobro?: boolean; motivo?: string },
+    porRepartidor?: PorRepartidor,
   ) {
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
@@ -1651,8 +1659,8 @@ export class RepartosService {
           pedido_id: pedidoId,
           estado_anterior: 'EN_CAMINO',
           estado_nuevo: 'ENTREGADO',
-          motivo: 'Entregado',
-          por_party_id: partyId,
+          motivo: porRepartidor ? `Entregado (cerrado por ${porRepartidor.cerradoPor})` : 'Entregado',
+          por_party_id: porRepartidor?.partyId ?? partyId,
           en: ahora,
         },
       });
@@ -1672,6 +1680,7 @@ export class RepartosService {
       resultado: 'OK',
       entidad: 'pedido',
       entidadId: pedidoId,
+      ...(porRepartidor ? { motivo: `cerrado por ${porRepartidor.cerradoPor}`, despues: { repartidor: String(porRepartidor.partyId), cerradoPor: porRepartidor.cerradoPor } } : {}),
       partyId,
       ip,
     });
@@ -2042,6 +2051,18 @@ export class RepartosService {
 
     const ahora = new Date();
     const cierre = dto.cierre ?? 'REPROGRAMADO';
+
+    // «Devuelto» anula el pedido: si ya está pagado, el dinero necesita destino (se elige al anular en Pedidos/Caja)
+    if (cierre === 'DEVUELTO') {
+      const cobros = await this.prisma.cobro.findMany({ where: { pedido_id: pedidoId, anulado_en: null }, select: { credito_personal: true } });
+      const conDinero = cobros.length > 0 ? cobros.some((c) => !c.credito_personal) : ['PAGADO', 'COORDINADO'].includes(String(pedido.pago_estado));
+      if (conDinero) {
+        throw new ConflictException({
+          codigo: 'PEDIDO_PAGADO',
+          mensaje: 'El pedido ya está pagado: anúlalo desde Pedidos o Caja eligiendo qué pasa con el dinero (devolverlo o reprogramar).',
+        });
+      }
+    }
 
     const ultimoIncidente = await this.prisma.incidenteEntrega.findFirst({
       where: { pedido_id: pedidoId },
@@ -2673,6 +2694,46 @@ export class RepartosService {
   }
 
   /**
+   * POST /admin/repartos/:id/cerrar-por-repartidor (solo ADMIN y SUPERVISOR): asigna el pedido al repartidor elegido
+   * (si no es suyo ya) y lo cierra por él: sale y se entrega. El REPARTIDOR figura como quien entregó (su reparto,
+   * su ruta y su pago de reparto cuentan); la auditoría y el historial anotan «cerrado por <nombre>».
+   * Mantiene la regla de cobro: un delivery digital sin cobrar no se entrega (solo el ADMIN lo fuerza con motivo).
+   */
+  async cerrarPorRepartidor(
+    id: string | bigint,
+    dto: { repartidorPartyId?: string; motivo?: string; forzarSinCobro?: boolean },
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    if (!esAdminOSupervisor(usuario)) {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN_SUPERVISOR', mensaje: 'Cerrar un reparto por el repartidor es solo para administración y supervisión' });
+    }
+    const motivo = (dto?.motivo ?? '').trim();
+    if (motivo.length < 5) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo (al menos 5 letras)' });
+    }
+    const pedidoId = this.parsearId(id);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (pedido.modalidad !== 'DELIVERY' || !['LISTO', 'EN_CAMINO'].includes(pedido.estado)) {
+      throw new ConflictException({ codigo: 'ESTADO_INVALIDO', mensaje: `Solo se cierra un delivery listo o en camino (estado actual: ${pedido.estado})` });
+    }
+    const repartidorId = dto?.repartidorPartyId ? this.parsearId(dto.repartidorPartyId) : pedido.repartidor_party_id;
+    if (repartidorId == null) {
+      throw new BadRequestException({ codigo: 'REPARTIDOR_REQUERIDO', mensaje: 'Elige el repartidor que entregó el pedido' });
+    }
+    if (pedido.repartidor_party_id == null || BigInt(pedido.repartidor_party_id) !== repartidorId) {
+      await this.reasignarPedido(pedidoId, { repartidorPartyId: String(repartidorId), motivo: `Asignado para cerrar por él: ${motivo}` }, usuario, ip);
+    }
+    const persona = await this.prisma.party.findUnique({ where: { id: BigInt(usuario.partyId) }, include: { persona: true } });
+    const cerradoPor = `${persona?.persona?.nombres ?? ''} ${persona?.persona?.apellidos ?? ''}`.trim() || `Usuario #${usuario.partyId}`;
+    const por: PorRepartidor = { partyId: repartidorId, cerradoPor };
+    const sinCobro = { forzarSinCobro: dto?.forzarSinCobro === true, motivo };
+    if (pedido.estado === 'LISTO') await this.salir(pedidoId, usuario, ip, sinCobro, por);
+    return this.entregar(pedidoId, usuario, ip, sinCobro, por);
+  }
+
+  /**
    * POST /admin/repartos/:id/reasignar (repartos/liquidar - Caja/Admin)
    * Reasigna un pedido a otro repartidor activo que tenga cupo disponible.
    */
@@ -2682,7 +2743,8 @@ export class RepartosService {
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
-    this.exigirCajaOAdmin(usuario);
+    // ADMIN y SUPERVISOR asignan directo a cualquier repartidor; Caja también reasigna
+    if (!esAdminOSupervisor(usuario)) this.exigirCajaOAdmin(usuario);
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
     const nuevoRepartidorPartyId = this.parsearId(dto.repartidorPartyId);
