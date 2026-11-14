@@ -303,6 +303,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
 
+    fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
     const btnEnviar = screen.getByRole('button', { name: /Enviar pedido/i });
 
     // Dos toques rápidos consecutivos
@@ -374,7 +375,8 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
 
-    // Seleccionar Factura en paso 3
+    // Seleccionar Factura en paso 3 (tras elegir el medio)
+    fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Factura' }));
 
     // Ingresar RUC inválido de 10 dígitos
@@ -662,6 +664,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
 
     // Escribir dirección y referencia
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     fireEvent.change(screen.getByLabelText(/Dirección escrita/i), { target: { value: 'Calle Los Robles 450' } });
     fireEvent.change(screen.getByLabelText(/Referencia/i), { target: { value: 'Casa con reja negra' } });
 

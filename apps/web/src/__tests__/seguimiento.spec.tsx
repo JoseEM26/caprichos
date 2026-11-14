@@ -159,6 +159,7 @@ describe('seguimiento del pedido en la carta', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
     // Avanzar de paso 2 a 3
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
 
     await waitFor(() => {

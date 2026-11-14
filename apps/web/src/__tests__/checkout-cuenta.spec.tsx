@@ -159,6 +159,7 @@ describe('Pago con puntos y resumen de precios', () => {
     fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
     // la vista previa llega en asíncrono: se espera a que el resumen tenga las promociones del servidor
     if (vista === vistaConPromo) await screen.findByText('Promociones y descuentos');
     else await screen.findByLabelText(/¿Cuántos puntos deseas usar\?/i);
@@ -217,6 +218,7 @@ describe('Pago con puntos y resumen de precios', () => {
     fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Yape$/i }));
     await screen.findByLabelText(/¿Cuántos puntos deseas usar\?/i);
 
     const campoCupon = document.getElementById('f-cup') as HTMLInputElement;
