@@ -3,12 +3,26 @@ import { api } from '../../comun/api';
 import type { PlanPagoItem } from './planPago';
 
 export type EstadoPedido =
+  | 'PROGRAMADO'
   | 'COLA'
   | 'PREPARANDO'
   | 'LISTO'
   | 'EN_CAMINO'
   | 'ENTREGADO'
   | 'ANULADO';
+
+export interface PedidoProgramado {
+  id: string;
+  codigo: string;
+  canal: string;
+  modalidad: string;
+  clienteNombre: string | null;
+  total: number;
+  adelanto: number;
+  saldo: number;
+  programadoPara: string;
+  pagoEstado: string | null;
+}
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -156,6 +170,9 @@ export interface Pedido {
   modalidad: string;
   repartidor_party_id?: string | number | null;
   estado: EstadoPedido | string;
+  /** Pedido programado: fecha y hora pactadas (ISO) y lo adelantado (ya entró a la caja del día en que se recibió) */
+  programado_para?: string | null;
+  adelanto_total?: number | string | null;
   cliente_nombre?: string | null;
   cliente_telefono?: string | null;
   entrega_direccion?: string | null;
@@ -557,6 +574,16 @@ export const pedidosApi = {
     await api.post(`/admin/pedidos/${id}/editando`, { activo });
   },
 
+  /** Pedidos programados (para otro día), del más próximo al más lejano. */
+  async listarProgramados(): Promise<PedidoProgramado[]> {
+    return api.get<PedidoProgramado[]>('/admin/pedidos/programados');
+  },
+
+  /** Adelanto en efectivo o tarjeta de un pedido programado: entra a la caja de hoy. */
+  async registrarAdelanto(id: string | number, dto: { medio: 'EFECTIVO' | 'TARJETA'; monto: number; pagaCon?: number }): Promise<{ adelantoId: string; adelantoTotal: number; saldo: number }> {
+    return api.post(`/admin/pedidos/${id}/adelanto`, dto);
+  },
+
   async crearPedidoAdmin(
     dto: {
       modalidad: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
@@ -604,6 +631,10 @@ export const pedidosApi = {
       esPersonal?: boolean;
       colaboradorPartyId?: string | number;
       canal?: 'MOZO' | 'CAJA';
+      /** Programar para otra fecha (ISO). Solo Caja y mozo */
+      programadoPara?: string;
+      /** Adelanto de hoy al programar (efectivo o tarjeta) */
+      adelanto?: { medio: 'EFECTIVO' | 'TARJETA'; monto: number; pagaCon?: number };
     },
     idempotencyKey?: string,
   ): Promise<any> {
@@ -684,5 +715,5 @@ export const pedidosApi = {
 };
 
 /** Lo que hay que cobrar de un pedido (sin propina): con crédito del personal + delivery, solo el envío. Igual que el servidor. */
-export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null }): number =>
-  Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100)) / 100;
+export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null; adelanto_total?: string | number | null }): number =>
+  Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100) - Math.round(Number(p.adelanto_total || 0) * 100)) / 100;

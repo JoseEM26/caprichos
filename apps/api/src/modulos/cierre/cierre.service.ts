@@ -533,7 +533,9 @@ export class CierreService {
       const cobrosEnCurso = await tx.pedido.count({
         where: {
           pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
-          estado: { not: 'ANULADO' },
+          // Un pedido PROGRAMADO (para otro día) aún no es venta del día: no bloquea ni descuadra el cierre.
+          // Lo ya adelantado entra por pedido_adelanto en la caja del día en que se recibió.
+          estado: { notIn: ['ANULADO', 'PROGRAMADO'] },
         },
       });
 
@@ -541,7 +543,7 @@ export class CierreService {
         // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
         const entregados = await tx.pedido.findMany({
           where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO' },
-          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, planPago: { select: { medio: true, monto: true } } },
+          select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, adelanto_total: true, planPago: { select: { medio: true, monto: true } } },
           orderBy: { creado_en: 'asc' },
         });
         const sinCobrar = entregados.filter((p: any) => pedidoDebeEstarCobrado(p));
@@ -1235,7 +1237,7 @@ export class CierreService {
    */
   async pedidosSinTerminar(db: any = this.prisma) {
     const pedidos = await db.pedido.findMany({
-      where: { estado: { notIn: ['ENTREGADO', 'ANULADO'] } },
+      where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] } },
       orderBy: { creado_en: 'asc' },
       select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, total: true, creado_en: true, cliente_nombre: true },
     });
@@ -1256,7 +1258,7 @@ export class CierreService {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
-        estado: { not: 'ANULADO' },
+        estado: { notIn: ['ANULADO', 'PROGRAMADO'] },
         cobros: { none: { anulado_en: null } },
       },
       orderBy: { creado_en: 'asc' },
@@ -1267,7 +1269,7 @@ export class CierreService {
         modalidad: true,
         estado: true,
         total: true,
-        monto_credito: true,
+        monto_credito: true, adelanto_total: true,
         creado_en: true,
         pago_estado: true,
         cliente_nombre: true,

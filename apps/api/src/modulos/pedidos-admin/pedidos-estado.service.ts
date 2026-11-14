@@ -268,7 +268,7 @@ export class PedidosEstadoService {
     if (filtros.pendientes === '1') {
       // Días anteriores (hoy en Lima excluido) que siguen en curso o con pago pendiente
       where.creado_en = { lt: obtenerInicioDiaLima() };
-      where.estado = { notIn: ['ANULADO', 'RECHAZADO'] };
+      where.estado = { notIn: ['ANULADO', 'RECHAZADO', 'PROGRAMADO'] };
       where.AND = [
         {
           OR: [
@@ -1098,10 +1098,18 @@ export class PedidosEstadoService {
       // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
       // (FT-CIE-02: un pedido que no se cobró no puede quedar pendiente y bloquear el cierre)
       const entregadoSinCobro = estadoAnterior === 'ENTREGADO';
-      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
+      if (!['PROGRAMADO', 'COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
         throw new ConflictException({
           codigo: 'TRANSICION_INVALIDA',
           mensaje: `No se puede anular un pedido en estado ${estadoAnterior}`,
+        });
+      }
+
+      // Un programado con adelanto: el dinero ya entró a una caja; se devuelve primero (anular el adelanto) y luego se anula el pedido
+      if (estadoAnterior === 'PROGRAMADO' && Number(pedido.adelanto_total ?? 0) > 0) {
+        throw new ConflictException({
+          codigo: 'PEDIDO_CON_ADELANTO',
+          mensaje: 'El pedido tiene un adelanto recibido. Devuélvelo primero (anular el adelanto) y luego anula el pedido.',
         });
       }
 
@@ -1248,7 +1256,12 @@ export class PedidosEstadoService {
     // 2. Transiciones válidas normales: COLA -> PREPARANDO -> LISTO -> EN_CAMINO -> ENTREGADO
     let esTransicionValida = false;
 
-    if (estadoAnterior === 'COLA') {
+    if (estadoAnterior === 'PROGRAMADO') {
+      // «Pasar a cocina ahora» (el cliente llegó antes de la hora pactada); lo normal es el paso automático
+      if (nuevoEstado === 'COLA') {
+        esTransicionValida = true;
+      }
+    } else if (estadoAnterior === 'COLA') {
       // Cocina puede empezar a preparar o despejar directo a LISTO (DT-58)
       if (nuevoEstado === 'PREPARANDO' || nuevoEstado === 'LISTO') {
         esTransicionValida = true;
@@ -1319,7 +1332,9 @@ export class PedidosEstadoService {
       estado: nuevoEstado,
     };
 
-    if (nuevoEstado === 'PREPARANDO' && !pedido.pasa_cocina_en) {
+    if (nuevoEstado === 'COLA') {
+      datosActualizacion.pasa_cocina_en = ahora;
+    } else if (nuevoEstado === 'PREPARANDO' && !pedido.pasa_cocina_en) {
       datosActualizacion.pasa_cocina_en = ahora;
     } else if (nuevoEstado === 'LISTO') {
       datosActualizacion.listo_en = ahora;

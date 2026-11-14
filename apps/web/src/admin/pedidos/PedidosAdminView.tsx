@@ -17,6 +17,7 @@ import { PedidoDetalle } from './PedidoDetalle';
 import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
 import { PanelNoEntregados } from './PanelNoEntregados';
+import { PanelProgramados } from './PanelProgramados';
 import { coincideTexto } from '../../comun/normalizarBusqueda';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
@@ -123,7 +124,7 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
 }
 
 /** Grupo «Estado» del panel de Filtros: activos (por defecto), cerrados o los delivery no entregados. */
-export type GrupoEstadoCaja = 'act' | 'cer' | 'todos' | 'noent';
+export type GrupoEstadoCaja = 'act' | 'cer' | 'todos' | 'noent' | 'prog';
 
 /** Enlaces viejos: ?estado=todos o ?vista=todo abren la lista viendo todo (activos y cerrados). */
 function grupoInicialDeUrl(): GrupoEstadoCaja {
@@ -154,6 +155,7 @@ const ESTADO_OPCIONES = [
   { id: 'cer', n: 'Cerrados' },
   { id: 'todos', n: 'Todos (activos y cerrados)' },
   { id: 'noent', n: 'No entregados' },
+  { id: 'prog', n: 'Programados' },
 ];
 
 const ETAPA_OPCIONES = [
@@ -816,7 +818,8 @@ export function PedidosAdminView() {
     );
   }
 
-  const enNoEntregados = grupoEstado === 'noent';
+  const enProgramados = grupoEstado === 'prog';
+  const enNoEntregados = grupoEstado === 'noent' || enProgramados;
   const totalNoEntregados = noEntregados?.total ?? 0;
   const puedeCortesia = tiene('cortesias/dar');
 
@@ -1040,10 +1043,11 @@ export function PedidosAdminView() {
                     { valor: 'cer', etiqueta: 'Cerrados' },
                     { valor: 'todos', etiqueta: 'Todos (activos y cerrados)' },
                     { valor: 'noent', etiqueta: 'No entregados', cantidad: totalNoEntregados },
+                    { valor: 'prog', etiqueta: 'Programados' },
                   ]}
                   alCambiar={(v) => {
                     cambiarGrupoEstado(v as GrupoEstadoCaja);
-                    if (v === 'noent') setFcOpen(false);
+                    if (v === 'noent' || v === 'prog') setFcOpen(false);
                   }}
                 />
                 <FiltroCombo
@@ -1103,7 +1107,11 @@ export function PedidosAdminView() {
     {enNoEntregados && filtrosActivos}
     </div>
 
-    {enNoEntregados ? (
+    {enProgramados ? (
+      <div className="cj-right cj2-noentregados">
+        <PanelProgramados puedePasar={tiene('pedidos/cambiar_estado')} alActualizar={() => void cargarDatos()} />
+      </div>
+    ) : enNoEntregados ? (
       <div className="cj-right cj2-noentregados">
         <PanelNoEntregados
           datos={noEntregados}

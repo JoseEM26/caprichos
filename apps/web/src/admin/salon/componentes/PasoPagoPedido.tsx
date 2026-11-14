@@ -45,6 +45,8 @@ export interface PasoPagoPedidoProps {
   mostrarErrores: boolean;
   /** Pedido del personal: su propio bloque de pago reemplaza al de métodos. */
   bloquePersonal?: ReactNode;
+  /** «¿Para cuándo?» (Caja y mozo): programar el pedido para otro día. Va arriba del pago. */
+  bloqueProgramar?: ReactNode;
   /** Selector de comprobante (simple, boleta o factura). */
   comprobante: ReactNode;
 }
@@ -78,6 +80,7 @@ export function PasoPagoPedido({
   errorPropina,
   mostrarErrores,
   bloquePersonal,
+  bloqueProgramar,
   comprobante,
 }: PasoPagoPedidoProps) {
   const conDetalle = bloquePersonal ? false : cuandoPaga !== 'final';
@@ -119,6 +122,8 @@ export function PasoPagoPedido({
   return (
     <section className="np2-pago" aria-label="Pago del pedido" data-testid="paso-pago">
       <div className="np2-resumen-linea">{resumen}</div>
+
+      {bloqueProgramar}
 
       {onCuandoPaga && !bloquePersonal && (
         <fieldset className="np2-cuando">

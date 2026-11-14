@@ -39,6 +39,8 @@ import { ModalCapturasPedido } from './ModalCapturasPedido';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import { digitalesDelPlan } from '../../pedidos/mediosPago';
 import '../paso-pago-pedido.css';
+import { SelectorParaCuando, type MedioAdelanto } from './SelectorParaCuando';
+import { PARA_CUANDO_AHORA, errorParaCuando, programadoParaIso, type ParaCuando } from './paraCuando';
 import {
   SelectorComprobante,
   VALOR_COMPROBANTE_VACIO,
@@ -743,6 +745,10 @@ export function ModalNuevoPedidoMesa({
   const [fase, setFase] = useState<'pedido' | 'pago'>('pedido');
   // Mesa de local: «Pagar ahora» registra el pago al enviar; «Pagar al final» se cobra al cerrar la cuenta
   const [cuandoPaga, setCuandoPaga] = useState<CuandoPaga>('final');
+  // «¿Para cuándo?»: Ahora (como siempre), Mañana u otra fecha. Un programado no sale a cocina hoy; puede llevar un adelanto de hoy
+  const [paraCuando, setParaCuando] = useState<ParaCuando>(PARA_CUANDO_AHORA);
+  const [adelantoTexto, setAdelantoTexto] = useState('');
+  const [medioAdelanto, setMedioAdelanto] = useState<MedioAdelanto>('EFECTIVO');
   // Propina de monto libre (texto) y qué canales la tienen encendida en Configuración › Propinas
   const [propinaTexto, setPropinaTexto] = useState('');
   const [cfgPropina, setCfgPropina] = useState<{ mozo: boolean; caja: boolean; tope: number }>({ mozo: false, caja: false, tope: 200 });
@@ -1141,9 +1147,13 @@ export function ModalNuevoPedidoMesa({
 
   // ¿Se declara el pago en este pedido? Mesa de local solo con «Pagar ahora»; llevar, delivery y extra siempre.
   const personalPide = pideMode === 'personal' && !extra;
-  const pagaAhora = !personalPide && (extra ? true : modalidad !== 'local' || cuandoPaga === 'ahora');
+  // Programado (Caja y mozo): no declara pago ahora; solo un adelanto opcional. El resto se cobra el día que paguen
+  const puedeProgramar = !extra && !edicion && !pedidoBase && pideMode !== 'personal';
+  const programando = puedeProgramar && paraCuando.modo !== 'AHORA';
+  const adelantoNum = Math.round(Number(adelantoTexto.replace(',', '.') || 0) * 100) / 100;
+  const pagaAhora = !personalPide && !programando && (extra ? true : modalidad !== 'local' || cuandoPaga === 'ahora');
   // Propina (monto libre, aparte de la venta): solo si el canal la tiene encendida y el cliente paga ahora
-  const propinaApagada = !(canalActual === 'CAJA' ? cfgPropina.caja : cfgPropina.mozo) || !!extra || personalPide;
+  const propinaApagada = !(canalActual === 'CAJA' ? cfgPropina.caja : cfgPropina.mozo) || !!extra || personalPide || programando;
   const propinaLimpia = propinaTexto.trim().replace(',', '.');
   const propinaFormatoOk = propinaLimpia === '' || /^\d+(\.\d{1,2})?$/.test(propinaLimpia);
   const propinaMostrada = !propinaApagada && pagaAhora;
@@ -1254,7 +1264,7 @@ export function ModalNuevoPedidoMesa({
   const errorComprobanteCaja = errorValorComprobante(valorComp);
   // «Con cuánto paga» es obligatorio con efectivo, salvo mesa (se pide al cobrar en la precuenta) y pedido del personal
   // En la mesa solo se exime con «Pagar al final»: con «Pagar ahora» el efectivo se registra y hace falta el billete
-  const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local' && cuandoPaga !== 'ahora') || pideMode === 'personal';
+  const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local' && cuandoPaga !== 'ahora') || pideMode === 'personal' || programando;
   // Pedido del personal: su propio bloque de pago reemplaza al genérico (plan, medios, con cuánto paga)
   const errorPagaConPers = personalPide ? errorPagaConPersonal(pagoPersonal, medioPersonal, total, cliPagaCon) : null;
   const errorPagaCon =
@@ -1266,7 +1276,7 @@ export function ModalNuevoPedidoMesa({
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
   if (pideMode === 'personal' && !staffElegido)
     erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
-  if (modalidad === 'local' && !extra && !enEspera && mesasSeleccionadas.length === 0)
+  if (modalidad === 'local' && !extra && !enEspera && !programando && mesasSeleccionadas.length === 0)
     erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
   if (modalidad === 'local' && !extra && errorNombreMesa)
     erroresEnvio.push({ campo: 'nombre', mensaje: errorNombreMesa, foco: ['#np-nombre-mesa'] });
@@ -1282,6 +1292,12 @@ export function ModalNuevoPedidoMesa({
       mensaje: mensajeTelefonoMesa,
       foco: ['#np-telefono-mesa'],
     });
+  if (programando) {
+    const errFecha = errorParaCuando(paraCuando);
+    if (errFecha) erroresEnvio.push({ campo: 'paraCuando', mensaje: errFecha, foco: [], paso: 'pago' });
+    if (adelantoNum < 0 || (adelantoTexto.trim() !== '' && !(adelantoNum > 0)) || adelantoNum >= total)
+      erroresEnvio.push({ campo: 'adelanto', mensaje: 'El adelanto debe ser mayor a 0 y menor al total del pedido.', foco: [], paso: 'pago' });
+  }
   if (errorPlanAhora && pagaAhora)
     erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'], paso: 'pago' });
   if (errorPagaCon && pagaAhora) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'], paso: 'pago' });
@@ -1371,7 +1387,7 @@ export function ModalNuevoPedidoMesa({
   const handleEnviarPedido = async () => {
     if (enviando) return; // anti doble envío
     setErrorExtra(null);
-    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
+    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && !programando && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
       return;
@@ -1419,7 +1435,7 @@ export function ModalNuevoPedidoMesa({
           },
           idempotencyKey,
         );
-      } else if (modalidad === 'local') {
+      } else if (modalidad === 'local' && !programando) {
         res = await salonApi.abrirPedidoMesa(
           {
             mesas: enEspera ? [] : mesasSeleccionadas,
@@ -1463,20 +1479,29 @@ export function ModalNuevoPedidoMesa({
         const telefonoFinal = /^9\d{8}$/.test(telDigitos) && telDigitos !== '999999999' ? telDigitos : undefined;
         res = await pedidosApi.crearPedidoAdmin(
           {
-            modalidad: modalidad === 'delivery' ? 'DELIVERY' : 'RECOGER',
+            // Comer en local programado: va como pedido de mesa sin mesa asignada (como reserva); la mesa se da el día pactado
+            modalidad: modalidad === 'delivery' ? 'DELIVERY' : modalidad === 'local' ? 'MESA' : 'RECOGER',
             cliente: {
               nombre:
-                cliNombre.trim() ||
+                (modalidad === 'local' ? nombreMesa : cliNombre.trim()) ||
                 (staffElegido ? `${staffElegido.nombre} (personal)` : 'Cliente'),
-              telefono: telefonoFinal,
+              telefono: modalidad === 'local' ? (telefonoMesaValido && telefonoMesa ? telefonoMesa : telefonoFinal) : telefonoFinal,
             },
             lineas: payloadLineas,
             // El pedido del personal paga con su propio bloque (pagoPersonal): no usa el plan, y un plan vacío lo rechaza el servidor
-            pago: {
-              metodo: metodoPrincipalAhora,
-              pagaCon: pagaConValido(),
-              ...(planAhora.length > 0 ? { plan: planAhora } : {}),
-            },
+            pago: programando
+              ? { metodo: 'EFECTIVO' as const }
+              : {
+                  metodo: metodoPrincipalAhora,
+                  pagaCon: pagaConValido(),
+                  ...(planAhora.length > 0 ? { plan: planAhora } : {}),
+                },
+            ...(programando
+              ? {
+                  programadoPara: programadoParaIso(paraCuando) ?? undefined,
+                  ...(adelantoNum > 0 ? { adelanto: { medio: medioAdelanto, monto: adelantoNum } } : {}),
+                }
+              : {}),
             ...(propinaCobrable > 0 ? { propina: propinaCobrable } : {}),
             entrega:
               modalidad === 'delivery'
@@ -1511,7 +1536,7 @@ export function ModalNuevoPedidoMesa({
       const planPago: PlanPagoItem[] = pagaAhora ? planAhora : [];
       const digitales = digitalesDelPlan(planPago);
       // «Pagar ahora» en la mesa: el pedido ya salió a cocina; aquí se deja pagado (Caja) o «pagado por mozo, por verificar» (mozo)
-      const cobrarAhora = !extra && modalidad === 'local' && cuandoPaga === 'ahora' && !personalPide && pedidoNuevo !== null;
+      const cobrarAhora = !extra && !programando && modalidad === 'local' && cuandoPaga === 'ahora' && !personalPide && pedidoNuevo !== null;
       if (cobrarAhora && pedidoNuevo) {
         const abrirCapturas = (errorInicial?: string) =>
           setCapturasPago({ pedido: pedidoNuevo, plan: planPago, res, registrar: true, pagaCon: pagaConValido(), errorInicial });
@@ -1758,7 +1783,7 @@ export function ModalNuevoPedidoMesa({
   }, [paso, modalidad, pisosActivos, pisoActual, textoMesas, cliNombre]);
 
   // Botón final del paso 2: «Enviar a cocina · S/ total» (+ propina si hay)
-  const etiquetaEnviar = `${extra ? 'Registrar extra' : 'Enviar a cocina'} · S/ ${total.toFixed(2)}${
+  const etiquetaEnviar = `${extra ? 'Registrar extra' : programando ? 'Programar pedido' : 'Enviar a cocina'} · S/ ${total.toFixed(2)}${
     propinaCobrable > 0 ? ` + propina S/ ${propinaCobrable.toFixed(2)}` : ''
   }${personalPide ? ` · ${textoPagoPersonal(pagoPersonal, medioPersonal)}` : ''}`;
 
@@ -2949,8 +2974,8 @@ export function ModalNuevoPedidoMesa({
                         ? 'Delivery'
                         : 'Para llevar'
                 } · ${(nombreMesa || cliNombre).trim() || 'Cliente'} · ${lineas.reduce((n, l) => n + l.cantidad, 0)} productos`}
-                cuandoPaga={modalidad === 'local' && !extra && !personalPide ? cuandoPaga : undefined}
-                onCuandoPaga={modalidad === 'local' && !extra && !personalPide ? setCuandoPaga : undefined}
+                cuandoPaga={modalidad === 'local' && !extra && !personalPide && !programando ? cuandoPaga : undefined}
+                onCuandoPaga={modalidad === 'local' && !extra && !personalPide && !programando ? setCuandoPaga : undefined}
                 avisoPagarAhora={
                   canalActual === 'CAJA'
                     ? 'Se cobra aquí mismo: el pedido sale a cocina ya pagado y con su comprobante.'
@@ -2968,7 +2993,9 @@ export function ModalNuevoPedidoMesa({
                 errorPropina={errorPropina}
                 mostrarErrores={intentoEnvio}
                 bloquePersonal={
-                  personalPide ? (
+                  programando ? (
+                    <></>
+                  ) : personalPide ? (
                     <PagoPersonalBloque
                       modo={pagoPersonal}
                       onModo={setPagoPersonal}
@@ -2981,6 +3008,11 @@ export function ModalNuevoPedidoMesa({
                       error={errorPagaConPers}
                       mostrarError={intentoEnvio}
                     />
+                  ) : undefined
+                }
+                bloqueProgramar={
+                  puedeProgramar ? (
+                    <SelectorParaCuando valor={paraCuando} onChange={setParaCuando} adelanto={adelantoTexto} onAdelanto={setAdelantoTexto} medioAdelanto={medioAdelanto} onMedioAdelanto={setMedioAdelanto} mostrarErrores={intentoEnvio} />
                   ) : undefined
                 }
                 comprobante={<SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} guardada={cuenta?.facturacion ?? null} />}

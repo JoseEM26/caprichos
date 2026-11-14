@@ -289,6 +289,72 @@ describe('PedidosService', () => {
       );
     });
 
+    describe('pedido programado (solo Caja y mozo)', () => {
+      const manana = () => new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const dtoRecoger: CrearPedidoDto = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 } };
+      const creado = (estado: string) => ({ id: 300n, codigo: 'CP-W300', estado, subtotal: 28.0, envio: null, total: 28.0, programado_para: manana(), canal: 'CAJA', modalidad: 'RECOGER' });
+
+      it('Caja lo crea PROGRAMADO: no entra a cocina hoy (sin pasa_cocina_en) y guarda la fecha pactada', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        const fecha = manana();
+        const res = await service.crear(dtoRecoger, 'prog-1', { canal: 'CAJA', usuarioPartyId: 7n, programadoPara: fecha });
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data.estado).toBe('PROGRAMADO');
+        expect(data.pasa_cocina_en).toBeNull();
+        expect(data.programado_para).toEqual(fecha);
+        expect(res.estado).toBe('PROGRAMADO');
+        expect(prismaMock.pedidoEstadoHistorial.create.mock.calls.at(-1)[0].data.estado_nuevo).toBe('PROGRAMADO');
+      });
+
+      it('sin programadoPara nace COLA y llega a cocina de inmediato (como siempre)', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado('COLA'));
+        await service.crear(dtoRecoger, 'prog-2', { canal: 'CAJA', usuarioPartyId: 7n });
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data.estado).toBe('COLA');
+        expect(data.pasa_cocina_en).toBeInstanceOf(Date);
+        expect(data.programado_para).toBeNull();
+      });
+
+      it('carta, WhatsApp y bot no pueden programar: 403 y no se crea nada', async () => {
+        for (const canal of ['CARTA', 'WHATSAPP', 'BOT'] as const) {
+          await expect(service.crear(dtoRecoger, `prog-${canal}`, { canal, programadoPara: manana() })).rejects.toMatchObject({
+            response: { codigo: 'PROGRAMAR_SIN_PERMISO' },
+          });
+        }
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('rechaza una fecha pasada o más lejos del tope (7 días por defecto)', async () => {
+        await expect(service.crear(dtoRecoger, 'prog-3', { canal: 'CAJA', programadoPara: new Date(Date.now() - 60_000) })).rejects.toMatchObject({ response: { codigo: 'PROGRAMADO_EN_EL_PASADO' } });
+        await expect(service.crear(dtoRecoger, 'prog-4', { canal: 'CAJA', programadoPara: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000) })).rejects.toMatchObject({ response: { codigo: 'PROGRAMADO_MUY_LEJOS' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('el adelanto entra a la caja de HOY en la misma transacción y borra el plan declarado', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        prismaMock.caja = { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'ABIERTA' }) };
+        prismaMock.pedidoAdelanto = { create: jest.fn().mockResolvedValue({ id: 1n, medio: 'EFECTIVO' }) };
+        prismaMock.pedidoPagoPlan.deleteMany = jest.fn();
+        prismaMock.pedido.findUnique.mockResolvedValueOnce(null).mockResolvedValue({ id: 300n, estado: 'PROGRAMADO', total: 28, monto_credito: 0, adelanto_total: 0 });
+        await service.crear(dtoRecoger, 'prog-5', { canal: 'CAJA', usuarioPartyId: 7n, programadoPara: manana(), adelanto: { medio: 'EFECTIVO', monto: 10, pagaCon: 20 } });
+        expect(prismaMock.pedidoAdelanto.create.mock.calls[0][0].data).toMatchObject({ caja_id: 5n, medio: 'EFECTIVO', por_party_id: 7n });
+        expect(Number(prismaMock.pedidoAdelanto.create.mock.calls[0][0].data.vuelto)).toBe(10);
+        expect(prismaMock.pedidoPagoPlan.deleteMany).toHaveBeenCalled();
+      });
+
+      it('con la caja de hoy cerrada el adelanto falla (409) y el pedido no queda', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        prismaMock.caja = { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'CERRADA' }), findFirst: jest.fn().mockResolvedValue(null) };
+        prismaMock.pedidoAdelanto = { create: jest.fn() };
+        await expect(service.crear(dtoRecoger, 'prog-6', { canal: 'CAJA', programadoPara: manana(), adelanto: { medio: 'EFECTIVO', monto: 10 } })).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
+        expect(prismaMock.pedidoAdelanto.create).not.toHaveBeenCalled();
+      });
+
+      it('un adelanto sin programar se rechaza', async () => {
+        await expect(service.crear(dtoRecoger, 'prog-7', { canal: 'CAJA', adelanto: { medio: 'EFECTIVO', monto: 10 } })).rejects.toMatchObject({ response: { codigo: 'ADELANTO_SOLO_PROGRAMADO' } });
+      });
+    });
+
     describe('pedido extra (pedidoOrigenId)', () => {
       it('delivery con zona: envío 0 (no vuelve a cobrar), total = subtotal y queda enlazado al original', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: 28.0, envio: 0, total: 28.0 });

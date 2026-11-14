@@ -747,13 +747,22 @@ describe('CierreService', () => {
       expect(e.getResponse().pedidosSinTerminar[0]).toMatchObject({ codigo: 'CP-0008', modalidad: 'DELIVERY', estado, pagoEstado: 'PAGADO', total: 32 });
     });
 
-    it('la consulta excluye ENTREGADO y ANULADO (si no hay pedidos abiertos no bloquea)', async () => {
+    it('la consulta excluye ENTREGADO, ANULADO y PROGRAMADO (si no hay pedidos abiertos no bloquea)', async () => {
       prismaMock.pedido.count.mockResolvedValue(0);
       prismaMock.pedido.findMany.mockResolvedValue([]);
       await service.cerrar(cerrarDto, mockUsuarioCajero);
       expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO'] } } }),
+        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] } } }),
       );
+    });
+
+    it('un pedido PROGRAMADO (para otro día, aunque no esté cobrado) no cuenta como cobro en curso ni sin terminar: el cierre de hoy pasa', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+      await service.cerrar(cerrarDto, mockUsuarioCajero);
+      const whereCount = prismaMock.pedido.count.mock.calls.at(-1)[0].where;
+      expect(whereCount.pago_estado).toEqual({ in: ['PENDIENTE', 'COORDINADO'] });
+      expect(whereCount.estado).toEqual({ notIn: ['ANULADO', 'PROGRAMADO'] });
     });
 
     it('el cajero no se salta la regla ni con motivo', async () => {
@@ -1174,7 +1183,8 @@ describe('CierreService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
-            estado: { not: 'ANULADO' },
+            // un PROGRAMADO (para otro día) no es pendiente de cobro del cierre
+            estado: { notIn: ['ANULADO', 'PROGRAMADO'] },
           }),
         }),
       );

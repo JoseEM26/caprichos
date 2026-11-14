@@ -47,6 +47,8 @@ import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarS
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
+import { AdelantoEntrada, registrarAdelantoTx } from './adelanto.util';
+import { leerConfigProgramados, validarProgramadoPara } from './programado.util';
 
 /** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
 function validarCortesiaLinea(l: { ofertaId?: unknown; cortesia?: { motivo: string; nota?: string } }, origen?: OrigenPedido) {
@@ -118,6 +120,10 @@ export interface OrigenPedido {
   /** Pedido extra: id del pedido original al que se enlaza. El envío del extra siempre es 0 (ya se cobró en el original). */
   pedidoOrigenId?: bigint | string | number;
   enTransaccion?: (tx: Prisma.TransactionClient, pedido: any) => Promise<void>;
+  /** Pedido programado (solo Caja y mozo: lo fija el controlador del panel tras validar el rol). Nace PROGRAMADO y no entra a cocina hasta su hora de aviso. */
+  programadoPara?: Date | string;
+  /** Adelanto recibido hoy al programar (efectivo o tarjeta); entra a la caja de hoy. */
+  adelanto?: AdelantoEntrada;
 }
 
 @Injectable()
@@ -736,6 +742,22 @@ export class PedidosService {
       };
     }
 
+    // 1b. Pedido programado: solo lo fija el panel de Caja/mozo (origen.programadoPara); la fecha se valida aquí.
+    let programadoPara: Date | null = null;
+    if (origen?.programadoPara) {
+      if (!(origen.canal === 'MOZO' || origen.canal === 'CAJA')) {
+        throw new ForbiddenException({ codigo: 'PROGRAMAR_SIN_PERMISO', mensaje: 'Solo Caja y mozo pueden programar pedidos' });
+      }
+      if (origen.esPersonal) {
+        throw new BadRequestException({ codigo: 'PROGRAMADO_NO_PERSONAL', mensaje: 'Un pedido del personal no se programa' });
+      }
+      const cfg = await leerConfigProgramados(this.prisma);
+      programadoPara = validarProgramadoPara(origen.programadoPara, new Date(), cfg.diasMax);
+    }
+    if (origen?.adelanto && !programadoPara) {
+      throw new BadRequestException({ codigo: 'ADELANTO_SOLO_PROGRAMADO', mensaje: 'Solo un pedido programado recibe adelantos' });
+    }
+
     // 2. Horario: el guard único. Solo el personal (Mozo/Caja o pedido del panel) puede saltarlo;
     // carta, WhatsApp, bot e IA jamás, aunque alguien pase omitirChequeoCarta.
     const canalCliente = !origen?.canal || origen.canal === 'CARTA' || origen.canal === 'WHATSAPP' || origen.canal === 'BOT';
@@ -1248,7 +1270,8 @@ export class PedidosService {
           codigo,
           canal: origen?.canal || 'CARTA',
           modalidad: dto.modalidad,
-          estado: 'COLA',
+          estado: programadoPara ? 'PROGRAMADO' : 'COLA',
+          programado_para: programadoPara,
           party_id: mozoPartyId ?? (origen?.clientePartyId ? BigInt(origen.clientePartyId) : null),
           cliente_party_id: clienteFinal,
           cliente_nombre: clienteNombre,
@@ -1287,7 +1310,7 @@ export class PedidosService {
           es_personal: personal,
           monto_credito: new Prisma.Decimal(creditoConEnvio ? montoCredito : 0),
           clave_idempotencia: claveIdempotencia,
-          pasa_cocina_en: new Date(),
+          pasa_cocina_en: programadoPara ? null : new Date(),
         },
       });
 
@@ -1352,6 +1375,11 @@ export class PedidosService {
 
       await this.escribirLineasPedido(tx, pedido.id, lineasCalculadas, clienteNombre, origen);
 
+      // Adelanto de un pedido programado: entra a la caja de HOY en esta misma transacción (si la caja está cerrada, no se crea nada)
+      if (origen?.adelanto && programadoPara) {
+        await registrarAdelantoTx(tx, pedido.id, origen.adelanto, mozoPartyId ?? BigInt(1));
+      }
+
       // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
       const ventaProductos = await this.descontarStockLineas(tx, pedido.id, pedido.party_id ?? BigInt(1), lineasCalculadas);
       agotadosPorVenta = ventaProductos.agotados;
@@ -1362,9 +1390,11 @@ export class PedidosService {
         data: {
           pedido_id: pedido.id,
           estado_anterior: null,
-          estado_nuevo: 'COLA',
+          estado_nuevo: programadoPara ? 'PROGRAMADO' : 'COLA',
           motivo:
-            origen?.pedidoOrigenId !== undefined
+            programadoPara
+              ? `Pedido programado para ${programadoPara.toISOString()}`
+              : origen?.pedidoOrigenId !== undefined
               ? 'Pedido extra enlazado a otro pedido'
               : origen?.canal === 'MOZO'
               ? 'Pedido abierto por el mozo'
@@ -1439,7 +1469,7 @@ export class PedidosService {
         await this.avisosPedidoService.avisar(pedido.id, 'RECIBIDO', {}, tx);
       }
       // Aviso al equipo (nuevo pedido): también encolado en la transacción del pedido
-      if (this.avisosInternosService) {
+      if (this.avisosInternosService && !programadoPara) {
         await this.avisosInternosService.notificarNuevoPedido(pedido.id, tx);
       }
 
@@ -1588,7 +1618,7 @@ export class PedidosService {
         data: {
           tipo: 'PEDIDO_NUEVO',
           rol_destino: null,
-          titulo: `Pedido nuevo ${pedidoCreado.codigo}`,
+          titulo: pedidoCreado.estado === 'PROGRAMADO' ? `Pedido programado ${pedidoCreado.codigo}` : `Pedido nuevo ${pedidoCreado.codigo}`,
           mensaje: `${pedidoCreado.canal} · ${pedidoCreado.modalidad} · S/ ${Number(pedidoCreado.total).toFixed(2)}`,
           enlace: `/admin/caja?pedido=${pedidoCreado.id}`,
         },
@@ -1623,8 +1653,11 @@ export class PedidosService {
       puntosCanjeados: puntosCanje,
       montoCredito: creditoConEnvio ? montoCredito : 0,
       aPagarAhora: creditoConEnvio ? aCobrarAhora : aCobrar,
+      programadoPara: pedidoCreado.programado_para ? pedidoCreado.programado_para.toISOString() : null,
       mensaje:
-        origen?.canal === 'MOZO'
+        pedidoCreado.estado === 'PROGRAMADO'
+          ? 'Pedido programado: pasará a cocina el día pactado'
+          : origen?.canal === 'MOZO'
           ? 'Pedido enviado a cocina'
           : origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT'
             ? 'Pedido enviado a cocina'

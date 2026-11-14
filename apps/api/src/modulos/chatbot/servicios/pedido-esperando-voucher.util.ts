@@ -25,7 +25,7 @@ export async function pedidoEsperandoVoucher(
     codigo: true,
     estado: true,
     total: true,
-    monto_credito: true,
+    monto_credito: true, adelanto_total: true,
     pago_estado: true,
     pago_metodo: true,
     pago_preferido: true,

@@ -51,6 +51,10 @@ export function accionDePedido(p: Pedido, tiene: (permiso: string) => boolean): 
   if (est === 'LISTO' && mod !== 'DELIVERY' && !pagado && !coordinado && tiene('caja/cobrar')) {
     return { tipo: 'cobrar', texto: `COBRAR S/ ${montoPorCobrar(p).toFixed(2)}`, bg: '#2F7A45', fg: '#FFFFFF' };
   }
+  // Programado sin pagar: se puede cobrar hoy completo (entra a la caja de hoy); si no, espera su día sin botón
+  if (est === 'PROGRAMADO') {
+    return !pagado && tiene('caja/cobrar') ? { tipo: 'cobrar', texto: `COBRAR S/ ${montoPorCobrar(p).toFixed(2)}`, bg: '#2F7A45', fg: '#FFFFFF' } : null;
+  }
   if (!puedeCambiar) return null;
   if (est === 'COLA' || est === 'NUEVO') {
     return { tipo: 'estado', texto: 'PREPARAR', nuevoEstado: 'PREPARANDO', bg: v.bg, fg: v.fg };

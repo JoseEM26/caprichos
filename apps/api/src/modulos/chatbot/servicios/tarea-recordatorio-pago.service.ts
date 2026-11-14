@@ -120,7 +120,7 @@ export class TareaRecordatorioPagoService {
           cliente_nombre: true,
           cliente_telefono: true,
           total: true,
-          monto_credito: true,
+          monto_credito: true, adelanto_total: true,
           pago_metodo: true,
           creado_en: true,
         },

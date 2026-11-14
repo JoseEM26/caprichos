@@ -184,6 +184,21 @@ export class ComprobantePedidoDto {
   direccion?: string;
 }
 
+/** Adelanto al programar un pedido (efectivo o tarjeta); entra a la caja de hoy. */
+export class AdelantoPedidoDto {
+  @IsIn(['EFECTIVO', 'TARJETA'], { message: 'El adelanto es en efectivo o con tarjeta' })
+  medio!: 'EFECTIVO' | 'TARJETA';
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  monto!: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  pagaCon?: number;
+}
+
 export class CrearPedidoDto {
   @ValidateNested()
   @Type(() => ClienteDto)
@@ -270,4 +285,14 @@ export class CrearPedidoDto {
   @IsOptional()
   @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
   clientePartyId?: string;
+
+  /** Programar para otra fecha (ISO). Solo lo atiende el panel de Caja y mozo; en carta y WhatsApp se ignora. */
+  @IsOptional()
+  @IsString()
+  programadoPara?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdelantoPedidoDto)
+  adelanto?: AdelantoPedidoDto;
 }
