@@ -85,8 +85,8 @@ async function irAPago() {
   expect(await alEnvio()).toBeInTheDocument();
 }
 
-const botonDelDividido = (texto: string) =>
-  Array.from(screen.getByTestId('pago-dividido').querySelectorAll('button')).find((b) => b.textContent === texto)!;
+const elegirMedio = (n: number, medio: string) => fireEvent.change(screen.getByLabelText(`Medio ${n}`), { target: { value: medio } });
+const enviar = () => fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
 
 describe('Checkout de la carta ▸ pago dividido', () => {
   beforeEach(() => {
@@ -98,21 +98,36 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     });
   });
 
-  it('Yape S/ 38 + el resto en efectivo: manda pago.plan con los dos montos y no deja enviar si falta algo', async () => {
+  it('la tarjeta «Pagar con 2 o 3 medios» está en «¿Cómo pagas?» junto a los medios', async () => {
+    vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
+    abrirPedido();
+    fireEvent.click(screen.getByRole('button', { name: /Recoger en el local/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    const grupo = await screen.findByTestId('tarjetas-medio-pago');
+    expect(grupo).toHaveTextContent('Pagar con 2 o 3 medios');
+    expect(grupo).toHaveTextContent('Divide el pago');
+  });
+
+  it('Yape S/ 38 + el resto en efectivo: manda pago.plan y no deja enviar si falta algo', async () => {
     vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
     abrirPedido();
     await irAPago();
-    fireEvent.click(screen.getByTestId('alternar-pago-dividido'));
-    // sin segundo medio ni monto: avisa y no envía
-    fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
-    expect((await screen.findAllByText(/Elige el segundo medio de pago/)).length).toBeGreaterThan(0);
+    cambiarMedio('Pagar con 2 o 3 medios');
+    elegirMedio(2, 'EFECTIVO');
+    // sin monto en el primero: avisa y no envía
+    enviar();
+    expect((await screen.findAllByText(/Escribe cuánto pagas con YAPE/)).length).toBeGreaterThan(0);
     expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
 
-    fireEvent.change(screen.getByLabelText(/¿Cuánto pagas con YAPE\?/i), { target: { value: '38' } });
-    fireEvent.click(botonDelDividido('EFECTIVO'));
-    expect(screen.getByTestId('pago-dividido')).toHaveTextContent('YAPE S/ 38.00 + EFECTIVO S/ 2.00');
+    fireEvent.change(screen.getByLabelText('Monto de Yape'), { target: { value: '38' } });
+    expect(screen.getByLabelText('Monto de Efectivo')).toHaveTextContent('S/ 2.00');
+    expect(screen.getByTestId('resumen-dividido')).toHaveTextContent('El pago cubre el total');
     fireEvent.change(screen.getByLabelText(/Paga con/i), { target: { value: '5' } });
-    fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+    enviar();
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
@@ -125,20 +140,60 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     );
   });
 
+  it('3 medios: Agregar otro medio (máx. 3), Quitar, autocompleta el último y manda los 3 renglones', async () => {
+    vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
+    abrirPedido();
+    await irAPago();
+    cambiarMedio('Pagar con 2 o 3 medios');
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio' }));
+    expect(screen.queryByRole('button', { name: 'Agregar otro medio' })).toBeNull(); // tope de 3
+    elegirMedio(3, 'EFECTIVO');
+    fireEvent.change(screen.getByLabelText('Monto de Yape'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Monto de Plin'), { target: { value: '15' } });
+    expect(screen.getByLabelText('Monto de Efectivo')).toHaveTextContent('S/ 5.00');
+    // no se repite un medio ya usado
+    expect((screen.getByLabelText('Medio 2').querySelector('option[value="YAPE"]') as HTMLOptionElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Paga con/i), { target: { value: '10' } });
+    enviar();
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/pedidos',
+        expect.objectContaining({
+          pago: { metodo: 'YAPE', pagaCon: 10, plan: [{ medio: 'YAPE', monto: 20 }, { medio: 'PLIN', monto: 15 }, { medio: 'EFECTIVO', monto: 5 }] },
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  it('Quitar deja 2 renglones; los montos que pasan del total muestran «Sobra» y no envían', async () => {
+    abrirPedido();
+    await irAPago();
+    cambiarMedio('Pagar con 2 o 3 medios');
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Plin' }));
+    expect(screen.queryByRole('button', { name: /Quitar/ })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Monto de Yape'), { target: { value: '45' } });
+    expect(screen.getByTestId('resumen-dividido')).toHaveTextContent('Sobra S/ 5.00');
+    enviar();
+    expect((await screen.findAllByText(/Sobra S\/ 5\.00/)).length).toBeGreaterThan(0);
+    expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
+  });
+
   it('con propina (monto libre): el plan dividido suma venta + propina y la propina viaja aparte', async () => {
     datos.propina!.carta = true;
     try {
       vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
       abrirPedido();
       await irAPago();
+      cambiarMedio('Pagar con 2 o 3 medios');
       fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '5' } });
-      fireEvent.click(screen.getByTestId('alternar-pago-dividido'));
-      fireEvent.change(screen.getByLabelText(/¿Cuánto pagas con YAPE\?/i), { target: { value: '38' } });
-      fireEvent.click(botonDelDividido('EFECTIVO'));
+      elegirMedio(2, 'EFECTIVO');
+      fireEvent.change(screen.getByLabelText('Monto de Yape'), { target: { value: '38' } });
       // venta 40 + propina 5 = 45: a Yape 38, el resto (7) en efectivo
-      expect(screen.getByTestId('pago-dividido')).toHaveTextContent('YAPE S/ 38.00 + EFECTIVO S/ 7.00');
+      expect(screen.getByLabelText('Monto de Efectivo')).toHaveTextContent('S/ 7.00');
       fireEvent.change(screen.getByLabelText(/Paga con/i), { target: { value: '10' } });
-      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      enviar();
       await waitFor(() =>
         expect(api.post).toHaveBeenCalledWith(
           '/pedidos',
@@ -154,16 +209,6 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     }
   });
 
-  it('un monto igual o mayor al total no es un pago dividido', async () => {
-    abrirPedido();
-    await irAPago();
-    fireEvent.click(screen.getByTestId('alternar-pago-dividido'));
-    fireEvent.change(screen.getByLabelText(/¿Cuánto pagas con YAPE\?/i), { target: { value: '40' } });
-    fireEvent.click(botonDelDividido('EFECTIVO'));
-    fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
-    expect((await screen.findAllByText(/El primer monto debe ser menor a S\/ 40\.00/)).length).toBeGreaterThan(0);
-    expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
-  });
   it('efectivo sin «paga con» no envía; «Pago exacto» lo llena y manda pagaCon', async () => {
     vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
     abrirPedido();

@@ -96,3 +96,38 @@ describe('PagoPlanService', () => {
     expect(montoEsperadoVoucher([{ medio: 'EFECTIVO', monto: 35 }], 35)).toBeNull();
   });
 });
+
+describe('PagoPlanService: hasta 3 medios', () => {
+  const servicio = new PagoPlanService();
+  const cod = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (e) {
+      return (e as any).response?.codigo;
+    }
+  };
+
+  it('acepta 3 medios que suman el total', () => {
+    const plan = servicio.validar([{ medio: 'YAPE', monto: 10 }, { medio: 'PLIN', monto: 5.5 }, { medio: 'EFECTIVO', monto: 4.5 }], 20)!;
+    expect(plan).toHaveLength(3);
+  });
+
+  it('rechaza 4 renglones aunque sumen y no se repitan', () => {
+    const cuatro = [
+      { medio: 'YAPE', monto: 5 },
+      { medio: 'PLIN', monto: 5 },
+      { medio: 'EFECTIVO', monto: 5 },
+      { medio: 'TARJETA', monto: 5 },
+    ];
+    expect(cod(() => servicio.validar(cuatro, 20))).toBe('PLAN_PAGO_DEMASIADOS_MEDIOS');
+  });
+
+  it('rechaza más de 2 decimales y la suma que no cuadra con 3 medios', () => {
+    expect(cod(() => servicio.validar([{ medio: 'YAPE', monto: 10.005 }, { medio: 'EFECTIVO', monto: 9.995 }], 20))).toBe('PLAN_PAGO_MONTO_INVALIDO');
+    expect(cod(() => servicio.validar([{ medio: 'YAPE', monto: 10 }, { medio: 'PLIN', monto: 5 }, { medio: 'EFECTIVO', monto: 4 }], 20))).toBe('PLAN_PAGO_NO_CUADRA');
+  });
+
+  it('rechaza repetidos entre 3 renglones', () => {
+    expect(cod(() => servicio.validar([{ medio: 'YAPE', monto: 10 }, { medio: 'PLIN', monto: 5 }, { medio: 'YAPE', monto: 5 }], 20))).toBe('PLAN_PAGO_MEDIO_REPETIDO');
+  });
+});

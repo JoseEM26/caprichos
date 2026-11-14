@@ -328,6 +328,25 @@ describe('CobrosService', () => {
       );
     });
 
+    it('4 medios -> 400 DEMASIADOS_MEDIOS y medio repetido -> 400 MEDIO_REPETIDO (antes de tocar la base)', async () => {
+      const cuatro = [
+        { medio: 'EFECTIVO', monto: 10 },
+        { medio: 'YAPE', monto: 10 },
+        { medio: 'PLIN', monto: 10 },
+        { medio: 'TARJETA', monto: 20 },
+      ];
+      await expect(service.cobrar({ pedidoId: '100', pagos: cuatro }, cajeroUsuario)).rejects.toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ codigo: 'DEMASIADOS_MEDIOS' }) }),
+      );
+      const repetido = [
+        { medio: 'YAPE', monto: 25 },
+        { medio: 'yape', monto: 25 },
+      ];
+      await expect(service.cobrar({ pedidoId: '100', pagos: repetido }, cajeroUsuario)).rejects.toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ codigo: 'MEDIO_REPETIDO' }) }),
+      );
+    });
+
     it('efectivo insuficiente -> 400 EFECTIVO_INSUFICIENTE si recibido < monto', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock); // total = 50

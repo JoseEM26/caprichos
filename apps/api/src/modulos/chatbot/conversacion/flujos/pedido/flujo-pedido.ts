@@ -654,6 +654,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_PAGO_DIV_MEDIO1':
       case 'PEDIDO_PAGO_DIV_MEDIO2':
+      case 'PEDIDO_PAGO_DIV_MEDIO3':
         return this.pasoDivMedio(estado, flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_PAGO_DIV_MONTO':
@@ -1991,7 +1992,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    if (entrada.id === 'ped_pago_dividir' || entrada.texto.includes('2 medios')) {
+    if (entrada.id === 'ped_pago_dividir' || entrada.texto.includes('2 medios') || entrada.texto.includes('dividir')) {
       return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, { ...pedido, pago: undefined }, contexto);
     }
     const metodo = this.medioDesdeEntrada(entrada);
@@ -2087,24 +2088,32 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   // -------------------------------------------------------------------------
-  // Pago dividido (2 medios): mismo plan que carta y mozo (pago.plan)
+  // Pago dividido (2 o 3 medios): mismo plan que carta y mozo (pago.plan)
   // -------------------------------------------------------------------------
   private mostrarMediosDivididos(
-    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2',
+    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2' | 'PEDIDO_PAGO_DIV_MEDIO3',
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const primero = pedido.pagoDiv?.medio1;
+    const d = pedido.pagoDiv;
+    const usados = [d?.medio1, estado === 'PEDIDO_PAGO_DIV_MEDIO3' ? d?.medio2 : undefined];
     const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
-    const resto = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
-    const medios = mediosActivos(contexto.datosLocalPublicos)
-      .filter((m) => m !== primero)
+    const resto = Number((total - (d?.monto1 ?? 0) - (estado === 'PEDIDO_PAGO_DIV_MEDIO3' ? (d?.monto2 ?? 0) : 0)).toFixed(2));
+    const activos = mediosActivos(contexto.datosLocalPublicos);
+    const medios = activos
+      .filter((m) => !usados.includes(m))
       .map((m) => ({ id: m === 'TRANSFERENCIA' ? 'ped_pago_transf' : `ped_pago_${m.toLowerCase()}`, titulo: NOMBRE_MEDIO[m] }));
+    // La segunda parte puede ser la última (2 medios) o dejar un resto para un tercero (3 medios)
+    if (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && !d?.tres && activos.length >= 3) medios.push({ id: 'ped_div_tres', titulo: 'Usar 3 medios' });
     const texto =
       estado === 'PEDIDO_PAGO_DIV_MEDIO1'
-        ? `Vas a pagar con 2 medios. El total es S/ ${total.toFixed(2)}. ¿Con qué medio pagas la primera parte?`
-        : `Te quedan S/ ${resto.toFixed(2)} por pagar. ¿Con qué medio pagas el resto?`;
+        ? `Vas a pagar con 2 o 3 medios. El total es S/ ${total.toFixed(2)}. ¿Con qué medio pagas la primera parte?`
+        : estado === 'PEDIDO_PAGO_DIV_MEDIO2'
+          ? d?.tres
+            ? `Te quedan S/ ${resto.toFixed(2)}. ¿Con qué medio pagas la segunda parte?`
+            : `Te quedan S/ ${resto.toFixed(2)} por pagar. ¿Con qué medio pagas el resto?`
+          : `Te quedan S/ ${resto.toFixed(2)} por pagar. ¿Con qué medio pagas el resto (tercera parte)?`;
     const op = opcionesMedios(medios);
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, estadoInterno: estado };
     return {
@@ -2119,15 +2128,20 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   private pasoDivMedio(
-    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2',
+    estado: 'PEDIDO_PAGO_DIV_MEDIO1' | 'PEDIDO_PAGO_DIV_MEDIO2' | 'PEDIDO_PAGO_DIV_MEDIO3',
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
+    const d = pedido.pagoDiv;
+    if (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && !d?.tres && (entrada.id === 'ped_div_tres' || entrada.texto.includes('3 medios'))) {
+      return this.mostrarMediosDivididos(estado, flujo, { ...pedido, pagoDiv: { ...d, tres: true } }, contexto);
+    }
     const medio = this.medioDesdeEntrada(entrada);
     const activos = mediosActivos(contexto.datosLocalPublicos);
-    if (!medio || !activos.includes(medio) || (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && medio === pedido.pagoDiv?.medio1)) {
+    const repetido = (estado !== 'PEDIDO_PAGO_DIV_MEDIO1' && medio === d?.medio1) || (estado === 'PEDIDO_PAGO_DIV_MEDIO3' && medio === d?.medio2);
+    if (!medio || !activos.includes(medio) || repetido) {
       return this.mostrarMediosDivididos(estado, flujo, pedido, contexto);
     }
     const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
@@ -2151,12 +2165,34 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // Segundo medio: el resto se calcula solo
-    const monto1 = pedido.pagoDiv!.monto1!;
-    const plan = [
-      { medio: pedido.pagoDiv!.medio1!, monto: monto1 },
-      { medio, monto: Number((total - monto1).toFixed(2)) },
-    ];
+    // 3 medios: la segunda parte lleva su propio monto y el tercero se queda con el resto
+    if (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && d?.tres) {
+      const resto = Number((total - (d.monto1 ?? 0)).toFixed(2));
+      const nuevoPedido: EstadoCarritoPedido = {
+        ...pedido,
+        estadoInterno: 'PEDIDO_PAGO_DIV_MONTO',
+        pagoDiv: { ...d, medio2: medio },
+      };
+      return {
+        nuevoEstado: 'PEDIDO_PAGO_DIV_MONTO',
+        acciones: [{ tipo: 'enviarTexto', texto: `¿Cuánto pagas con ${NOMBRE_MEDIO[medio]}? Escribe un monto menor a S/ ${resto.toFixed(2)}.` }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_PAGO_DIV_MONTO', pedido: nuevoPedido },
+      };
+    }
+
+    // Último medio: el resto se calcula solo
+    const monto1 = d!.monto1!;
+    const plan: Array<{ medio: MedioPagoBot; monto: number }> =
+      estado === 'PEDIDO_PAGO_DIV_MEDIO3'
+        ? [
+            { medio: d!.medio1!, monto: monto1 },
+            { medio: d!.medio2!, monto: d!.monto2! },
+            { medio, monto: Number((total - monto1 - d!.monto2!).toFixed(2)) },
+          ]
+        : [
+            { medio: d!.medio1!, monto: monto1 },
+            { medio, monto: Number((total - monto1).toFixed(2)) },
+          ];
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       pagoDiv: undefined,
@@ -2186,6 +2222,30 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const medio1 = pedido.pagoDiv?.medio1;
     if (!medio1) return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, pedido, contexto);
+    // Tercer medio: este monto es el de la segunda parte (debe dejar algo para la tercera)
+    const medio2 = pedido.pagoDiv?.medio2;
+    if (medio2) {
+      const tope = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
+      const monto2 = parsearMonto(entrada.textoOriginal);
+      if (monto2 === null || monto2 <= 0 || monto2 >= tope) {
+        return {
+          nuevoEstado: 'PEDIDO_PAGO_DIV_MONTO',
+          acciones: [
+            {
+              tipo: 'enviarTexto',
+              texto: `El monto con ${NOMBRE_MEDIO[medio2]} debe ser mayor a 0 y menor a S/ ${tope.toFixed(2)}. ¿Cuánto pagas con ${NOMBRE_MEDIO[medio2]}?`,
+            },
+          ],
+          nuevoFlujo: flujo,
+        };
+      }
+      return this.mostrarMediosDivididos(
+        'PEDIDO_PAGO_DIV_MEDIO3',
+        flujo,
+        { ...pedido, pagoDiv: { ...pedido.pagoDiv, monto2: Number(monto2.toFixed(2)) } },
+        contexto,
+      );
+    }
     const monto =
       entrada.id === 'ped_div_mitad' ? Math.floor((total / 2) * 100) / 100 : parsearMonto(entrada.textoOriginal);
     if (monto === null || monto <= 0 || monto >= total) {
@@ -2874,7 +2934,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       titulo: m === 'TARJETA' ? 'Tarjeta (POS)' : NOMBRE_MEDIO[m],
     }));
     if (opciones.length === 0) opciones.push({ id: 'ped_pago_efectivo', titulo: 'Efectivo' });
-    if (opciones.length >= 2) opciones.push({ id: 'ped_pago_dividir', titulo: 'Pagar con 2 medios' });
+    if (opciones.length >= 2) opciones.push({ id: 'ped_pago_dividir', titulo: 'Dividir el pago' });
 
     const op = opcionesMedios(opciones);
     const nuevoPedido: EstadoCarritoPedido = {

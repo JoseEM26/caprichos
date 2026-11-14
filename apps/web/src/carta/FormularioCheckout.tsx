@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
   aplicaEnvioGratis,
@@ -27,7 +27,8 @@ import { mensajeExceso, excesosDeStock, lineasSaborIncompletas, mensajeSaborQued
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
-import { armarPlanCarta, medioPrincipalCarta } from './pagoDividido';
+import { armarPlanCarta, medioPrincipalCarta, type FilaDiv } from './pagoDividido';
+import { PagoDivididoCarta } from './PagoDivididoCarta';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -183,10 +184,9 @@ export function FormularioCheckout({
   // Ubicación en dos momentos: null = se deduce de lo escrito; 'elegir' = vuelve a las tarjetas
   const [formaUbic, setFormaUbic] = useState<FormaUbicacion | 'elegir' | null>(null);
   const [pagaCon, setPagaCon] = useState('');
-  // Pago dividido: dos medios; el primero lleva el monto y el segundo, el resto
+  // Pago dividido: 2 o 3 medios; el último renglón lleva lo que falta
   const [dividirPago, setDividirPago] = useState(false);
-  const [monto1Texto, setMonto1Texto] = useState('');
-  const [medio2, setMedio2] = useState<MetodoPago | null>(null);
+  const [filasDiv, setFilasDiv] = useState<FilaDiv[]>([]);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -586,9 +586,21 @@ export function FormularioCheckout({
   };
   const productosACredito = creditoConDelivery ? Number((totalCalculado - envioAhora).toFixed(2)) : totalCalculado;
   const aCobrar = creditoConDelivery ? envioAhora : Number((totalCalculado + (conCredito ? 0 : propinaCobrable)).toFixed(2));
+  const mediosPagoDisponibles = datosLocal?.mediosPago || {
+    yape: { activo: true, numero: '123456789' },
+    plin: { activo: true, numero: '123456789' },
+    efectivo: { activo: true },
+    tarjeta: { activo: true },
+  };
+  const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
+    (m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false,
+  );
+  // Medios con datos para copiar (Yape, Plin, cuenta): el elegido, o los digitales del plan dividido
+  const mediosDatos: MetodoPago[] = dividirPago ? filasDiv.map((f) => f.medio) : [metodoPago];
+  const tituloPago = dividirPago ? 'Pagar con 2 o 3 medios' : `Pagar con ${nombreMedio(metodoPago)}`;
   // Pago dividido: plan válido (o null) y parte en efectivo (lo que cubre «Paga con»)
   const planDividido = dividirPago
-    ? armarPlanCarta(metodoPago, monto1Texto, medio2, aCobrar)
+    ? armarPlanCarta(filasDiv, aCobrar, mediosDisponibles)
     : ({ plan: null, error: null } as const);
   const efectivoParte = planDividido.plan
     ? (planDividido.plan.find((f) => f.medio === 'EFECTIVO')?.monto ?? 0)
@@ -964,15 +976,6 @@ export function FormularioCheckout({
   const puntosEstimados = estimarPuntos({ canjeable: promos.canjeable, porcentaje: pctPuntos, puntosAplicados, conCupon: !!cuponAplicado, delServidor: promos.puntosEstimados });
   const textoPuntos = `Con tu cuenta ganas el ${pctPuntos} % de lo que pagas en puntos, y no vencen. Los usas como descuento en tus próximos pedidos, solo en productos sin promoción ni descuento.`;
 
-  const mediosPagoDisponibles = datosLocal?.mediosPago || {
-    yape: { activo: true, numero: '123456789' },
-    plin: { activo: true, numero: '123456789' },
-    efectivo: { activo: true },
-    tarjeta: { activo: true },
-  };
-  const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
-    (m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false,
-  );
 
   return (
     <>
@@ -1186,7 +1189,7 @@ export function FormularioCheckout({
                       : 'Ubicación'
                     : tarjetasPago
                       ? '¿Cómo pagas?'
-                      : `Pagar con ${nombreMedio(metodoPago)}`
+                      : tituloPago
               }`}
             </div>
           </div>
@@ -1926,7 +1929,14 @@ export function FormularioCheckout({
                         medios={mediosDisponibles}
                         seleccionado={null}
                         alElegir={(m) => {
+                          setDividirPago(false);
                           setMetodoPago(m);
+                          setVistaPago('detalle');
+                        }}
+                        alDividir={() => {
+                          setDividirPago(true);
+                          if (filasDiv.length < 2) setFilasDiv(mediosDisponibles.slice(0, 2).map((medio) => ({ medio, monto: '' })));
+                          setMetodoPago(filasDiv[0]?.medio ?? mediosDisponibles[0]);
                           setVistaPago('detalle');
                         }}
                       />
@@ -1934,7 +1944,7 @@ export function FormularioCheckout({
                   )}
                   {!tarjetasPago && (!conCredito || pagaEnvio) && (
                   <>
-                  <EncabezadoDetalle titulo={`Pagar con ${nombreMedio(metodoPago)}`} textoCambiar="Cambiar" alCambiar={() => setVistaPago('medios')} />
+                  <EncabezadoDetalle titulo={tituloPago} textoCambiar="Cambiar" alCambiar={() => setVistaPago('medios')} />
                   {!conCredito && (
                   <>
                   {/* Comprobante Boleta o Factura (DT-77) */}
@@ -2153,63 +2163,12 @@ export function FormularioCheckout({
                       gap: '12px',
                     }}
                   >
-                    {/* Pago dividido: dos medios (p. ej. Yape S/ 38 y el resto en efectivo al recibir) */}
-                    <button
-                      type="button"
-                      data-testid="alternar-pago-dividido"
-                      aria-pressed={dividirPago}
-                      onClick={() => {
-                        setDividirPago((v) => !v);
-                        setMedio2(null);
-                        setMonto1Texto('');
-                      }}
-                      style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px dashed var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-                    >
-                      {dividirPago ? 'Pagar con un solo medio' : 'Pagar con 2 medios'}
-                    </button>
+                    {dividirPago && <PagoDivididoCarta filas={filasDiv} aCobrar={aCobrar} medios={mediosDisponibles} alCambiar={setFilasDiv} />}
 
-                    {dividirPago && (
-                      <div data-testid="pago-dividido" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label htmlFor="f-monto1" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
-                          ¿Cuánto pagas con {metodoPago}? (S/)
-                        </label>
-                        <input
-                          id="f-monto1"
-                          type="number"
-                          step="0.10"
-                          min="0.01"
-                          value={monto1Texto}
-                          onChange={(e) => setMonto1Texto(e.target.value)}
-                          placeholder={`Menor a ${aCobrar.toFixed(2)}`}
-                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '14px' }}
-                        />
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>El resto lo pagas con</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[])
-                            .filter((m) => m !== metodoPago)
-                            .filter((m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false)
-                            .map((m) => (
-                              <button
-                                key={m}
-                                type="button"
-                                onClick={() => setMedio2(m)}
-                                aria-pressed={medio2 === m}
-                                style={{ minHeight: '44px', padding: '0 14px', borderRadius: '10px', border: medio2 === m ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)', backgroundColor: medio2 === m ? 'var(--cp-sand)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px' }}
-                              >
-                                {m}
-                              </button>
-                            ))}
-                        </div>
-                        <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: planDividido.error ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
-                          {planDividido.plan
-                            ? planDividido.plan.map((f) => `${f.medio} S/ ${f.monto.toFixed(2)}`).join(' + ')
-                            : planDividido.error}
-                        </div>
-                      </div>
-                    )}
-
+                    {mediosDatos.map((mp) => (
+                      <Fragment key={mp}>
                     {/* Datos copiables del medio de pago */}
-                    {(metodoPago === 'YAPE' || metodoPago === 'PLIN') && (
+                    {(mp === 'YAPE' || mp === 'PLIN') && (
                       <div
                         style={{
                           backgroundColor: 'var(--cp-sand)',
@@ -2223,8 +2182,8 @@ export function FormularioCheckout({
                       >
                         <div>
                           <div style={{ fontWeight: 700 }}>
-                            {metodoPago}:{' '}
-                            {mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
+                            {mp}:{' '}
+                            {mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
                               datosLocal?.telefono ||
                               '123456789'}
                           </div>
@@ -2236,7 +2195,7 @@ export function FormularioCheckout({
                           type="button"
                           onClick={() =>
                             copiarTexto(
-                              mediosPagoDisponibles[metodoPago.toLowerCase()]?.numero ||
+                              mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
                                 datosLocal?.telefono ||
                                 '123456789',
                               'pago-tel',
@@ -2257,7 +2216,7 @@ export function FormularioCheckout({
                       </div>
                     )}
 
-                    {metodoPago === 'TRANSFERENCIA' && (
+                    {mp === 'TRANSFERENCIA' && (
                       <div
                         style={{
                           backgroundColor: 'var(--cp-sand)',
@@ -2299,6 +2258,9 @@ export function FormularioCheckout({
                         </button>
                       </div>
                     )}
+
+                      </Fragment>
+                    ))}
 
                     {propinaActiva && !conCredito && (
                       <div data-testid="propina-carta">

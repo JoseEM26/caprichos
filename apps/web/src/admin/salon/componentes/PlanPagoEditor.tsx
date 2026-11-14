@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import {
+  MAX_MEDIOS_PLAN,
   MEDIOS_PLAN,
   ajustarPlan,
   aPlan,
@@ -196,7 +197,7 @@ export function PlanPagoEditor({
         </div>
       ))}
 
-      {vista.length < MEDIOS_PLAN.length && total > 0 && (
+      {vista.length < MAX_MEDIOS_PLAN && total > 0 && (
         <button
           type="button"
           onClick={agregarMedio}

@@ -106,7 +106,7 @@ describe('Checkout ▸ pago en dos momentos', () => {
     abrirPedido();
     await aPaso(/Recoger en el local/i, 3);
     expect(screen.getByTestId('pasos-subtitulo')).toHaveTextContent('Paso 3 de 3 · ¿Cómo pagas?');
-    for (const m of ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia']) expect(tarjeta(m)).toBeInTheDocument();
+    for (const m of ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia', 'Pagar con 2 o 3 medios']) expect(tarjeta(m)).toBeInTheDocument();
     expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Elige cómo pagas/i })).toBeDisabled();
   });
@@ -117,7 +117,6 @@ describe('Checkout ▸ pago en dos momentos', () => {
     fireEvent.click(tarjeta('Efectivo'));
     expect(screen.getByText('Pagar con Efectivo')).toBeInTheDocument();
     expect(screen.queryByTestId('tarjetas-medio-pago')).not.toBeInTheDocument();
-    expect(screen.getByTestId('alternar-pago-dividido')).toHaveTextContent('Pagar con 2 medios');
     fireEvent.change(screen.getByLabelText(/Paga con/i), { target: { value: '50' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
