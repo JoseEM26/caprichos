@@ -660,7 +660,9 @@ export class ComprobantesService {
     });
 
     // Boleta o factura aceptada por SUNAT con su CDR (no simulada): el WhatsApp al cliente sale aparte, sin esperar ni afectar la emisión
-    if (aceptado && (c.tipo === 'FACTURA' || c.tipo === 'BOLETA') && !data.simulado && !res.yaRegistrado) {
+    // La boleta sale al cliente apenas queda firmada (PENDIENTE_RESUMEN), no recién con el resumen de la noche
+    const listaParaCliente = aceptado || (c.tipo === 'BOLETA' && estado === 'PENDIENTE_RESUMEN');
+    if (listaParaCliente && (c.tipo === 'FACTURA' || c.tipo === 'BOLETA') && !data.simulado && !res.yaRegistrado) {
       try {
         this.alAceptarFactura?.(c.id);
       } catch (e: any) {

@@ -13,6 +13,7 @@ import {
   IDIOMA_PLANTILLA_FACTURA,
   celularParaFactura,
   esComprobanteEnviable,
+  estadoEnviable,
   esErrorVentana,
   esperaReintento,
   nombreArchivoFactura,
@@ -116,7 +117,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
 
   async iniciar(comprobanteId: bigint): Promise<ResultadoProcesoFactura | null> {
     const c = await this.prisma.comprobante.findUnique({ where: { id: comprobanteId }, select: { tipo: true, facturacion_estado: true, simulado: true } });
-    if (!c || !esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return null;
+    if (!c || !esComprobanteEnviable(c.tipo) || !estadoEnviable(c.tipo, c.facturacion_estado) || c.simulado) return null;
     const r = await this.prisma.facturaWhatsappEnvio.createMany({
       data: [{ comprobante_id: comprobanteId, estado: 'PENDIENTE', proximo_intento_en: new Date(Date.now() + ARRENDAMIENTO_MS) }],
       skipDuplicates: true,
@@ -135,7 +136,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
     }
     const c = await this.prisma.comprobante.findUnique({ where: { id }, select: { tipo: true, facturacion_estado: true, simulado: true, anulado_en: true } });
     if (!c) throw new HttpException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' }, HttpStatus.NOT_FOUND);
-    if (!esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado || c.anulado_en) {
+    if (!esComprobanteEnviable(c.tipo) || !estadoEnviable(c.tipo, c.facturacion_estado) || c.simulado || c.anulado_en) {
       throw new HttpException({ codigo: 'FACTURA_NO_ENVIABLE', mensaje: 'Solo se envía por WhatsApp una boleta o factura real aceptada por SUNAT y vigente' }, HttpStatus.CONFLICT);
     }
     if (!(await this.leerConfig()).activo) {
@@ -194,7 +195,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
       where: { id },
       include: { pedido: { select: { id: true, cliente_telefono: true, es_personal: true } } },
     });
-    if (!c || !esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return this.cerrar(id, 'OMITIDO', { detalle: 'NO_ENVIABLE' }, o);
+    if (!c || !esComprobanteEnviable(c.tipo) || !estadoEnviable(c.tipo, c.facturacion_estado) || c.simulado) return this.cerrar(id, 'OMITIDO', { detalle: 'NO_ENVIABLE' }, o);
     if (c.anulado_en || c.baja_estado) return this.cerrar(id, 'OMITIDO', { detalle: 'ANULADA' }, o);
     if (c.pedido.es_personal) return this.cerrar(id, 'OMITIDO', { detalle: 'PERSONAL' }, o);
 

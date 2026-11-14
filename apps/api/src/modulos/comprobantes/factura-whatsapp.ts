@@ -33,6 +33,12 @@ export const textoFactura = (numeroTexto: string, tipo: string = 'FACTURA'): str
 
 /** Boleta o factura: lo que se envía por WhatsApp al emitirse (la nota de venta simple no es electrónica). */
 export const esComprobanteEnviable = (tipo: string | null | undefined): boolean => tipo === 'FACTURA' || tipo === 'BOLETA';
+/**
+ * Ya se puede mandar al cliente: factura aceptada por SUNAT, o boleta firmada (al cobrar queda PENDIENTE_RESUMEN:
+ * es válida y SUNAT la recibe en el resumen diario; esperar al resumen de la noche la mandaría tarde).
+ */
+export const estadoEnviable = (tipo: string | null | undefined, estado: string | null | undefined): boolean =>
+  estado === 'EMITIDO_SUNAT' || (tipo === 'BOLETA' && estado === 'PENDIENTE_RESUMEN');
 
 /** Nombre de plantilla válido de Meta (minúsculas, números y guion bajo), o '' si no sirve. */
 export function plantillaValida(v: unknown): string {
