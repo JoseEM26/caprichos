@@ -45,6 +45,7 @@ import { CapaEntrega } from './CapaEntrega';
 import { PanelImpresion } from './PanelImpresion';
 import { ReimprimirPedido } from './ReimprimirPedido';
 import { ImpresionesDelPedido } from './ImpresionesDelPedido';
+import { HistorialPedidoModal } from './HistorialPedidoModal';
 import './detalle-pedido.css';
 
 export interface PedidoDetalleProps {
@@ -105,6 +106,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const [lineaCortesia, setLineaCortesia] = useState<LineaPedido | null>(null);
   const [capa, setCapa] = useState<Capa>('productos');
   const [abrirImpresion, setAbrirImpresion] = useState(false);
+  const [abrirHistorial, setAbrirHistorial] = useState(false);
 
   // Modales
   const [abrirCobrar, setAbrirCobrar] = useState(false);
@@ -445,6 +447,13 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
             />
           )}
           {tiene('pedidos/ver') && <ImpresionesDelPedido pedidoId={String(pedido.id)} />}
+          {/* Solo ADMIN y SUPERVISOR (permiso caja/auditoria_pedido) */}
+          {tiene('caja/auditoria_pedido') && (
+            <button type="button" className="dp-ico" style={{ minHeight: 44 }} onClick={() => setAbrirHistorial(true)}>
+              Historial del pedido
+            </button>
+          )}
+          {abrirHistorial && <HistorialPedidoModal pedidoId={String(pedido.id)} codigo={pedido.codigo} alCerrar={() => setAbrirHistorial(false)} />}
         </div>
 
         {/* BARRA DE ACCIONES FIJA */}

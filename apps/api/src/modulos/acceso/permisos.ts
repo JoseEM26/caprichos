@@ -69,6 +69,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'reimprimir_ticket' },
   // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'extra' },
+  // Historial completo de un pedido en Caja (quién hizo qué y cuándo, con antes/después): solo ADMIN y SUPERVISOR
+  { modulo: 'caja', accion: 'auditoria_pedido' },
   { modulo: 'zonas', accion: 'ver' },
   { modulo: 'zonas', accion: 'editar' },
   // Caja y Repartos (Ola 4)
@@ -481,7 +483,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'MARKETI
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 // Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
 MATRIZ.SUPERVISOR = [
-  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver', 'asistencia/aprobar_reemplazos']),
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver', 'asistencia/aprobar_reemplazos', 'caja/auditoria_pedido']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',
