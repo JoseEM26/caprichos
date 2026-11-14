@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+sessionStorage.setItem('caprichos.nombreInvitado', 'Invitado'); // el invitado ya dijo su nombre (si no, la carta lo pide primero)
 import { render, screen, fireEvent } from '@testing-library/react';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { agruparUnidadesIguales } from '../unidadesPorBebida';

@@ -6,6 +6,7 @@ import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
+import { guardarNombreInvitado, leerNombreInvitado } from './nombreInvitado';
 import { alternarEleccion } from './eleccionGrupo';
 import { useUmbralesStock } from './umbralesStock';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
@@ -353,7 +354,18 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   // Vasos sin nombre: cada vaso de una bebida suelta (cantidad) o de las bebidas de un combo (cantidad × bebidas)
   const totalVasos = nB > 0 ? cantidad * nB : esBebida && !esCombo ? cantidad : 0;
   const indicesSinNombre = (): number[] => Array.from({ length: totalVasos }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
-  const nombreCuenta = (cuentaCtx?.cliente?.nombre ?? '').trim();
+  const [nombreInvitado, setNombreInvitado] = useState(leerNombreInvitado);
+  const [borradorInvitado, setBorradorInvitado] = useState('');
+  // Con sesión, el nombre de la cuenta; sin ella, el que el invitado escribió al primer vaso
+  const nombreCuenta = (cuentaCtx?.cliente?.nombre ?? '').trim() || nombreInvitado;
+  const pideNombreInvitado = totalVasos > 0 && !nombreCuenta && !soloLectura;
+  const borradorValido = borradorInvitado.trim().length >= 2;
+  const confirmarNombreInvitado = () => {
+    if (!borradorValido) return;
+    const n = borradorInvitado.trim().slice(0, 30);
+    guardarNombreInvitado(n);
+    setNombreInvitado(n);
+  };
   const usarNombreCliente = () => setNombres(Array.from({ length: totalVasos }, (_, i) => ((nombres[i] ?? '').trim() ? nombres[i] : nombreCuenta.slice(0, 30))));
   const textoFaltaNombre = (i: number): string => (nB > 0 || cantidad > 1 ? `Escribe el nombre del vaso de la Bebida ${(nB > 0 ? i % nB : i) + 1}` : 'Escribe el nombre del vaso de la bebida');
 
@@ -361,6 +373,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     if (!puedeAgregar) return;
     // en las bebidas (sueltas o de un combo) el nombre de cada vaso es obligatorio: va en la etiqueta
     const faltan = indicesSinNombre();
+    if (pideNombreInvitado) {
+      document.getElementById('nombre-invitado')?.focus();
+      return;
+    }
     if (faltan.length > 0) {
       setAvisoNombres(true);
       setNombresAbierto(true);
@@ -854,7 +870,23 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </>
             )}
 
-            {nB > 0 && (
+            {pideNombreInvitado && (
+              <div data-testid="pedir-nombre-invitado" className="ca-tarjeta" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label htmlFor="nombre-invitado" style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>¿Cuál es tu nombre?</label>
+                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Lo usamos para tus vasos y tu pedido</div>
+                <input
+                  id="nombre-invitado" autoFocus required minLength={2} maxLength={30} autoComplete="given-name" placeholder="Ej.: Lucía"
+                  value={borradorInvitado} onChange={(e) => setBorradorInvitado(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarNombreInvitado(); } }}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 16 }}
+                />
+                <button type="button" disabled={!borradorValido} onClick={confirmarNombreInvitado} style={{ alignSelf: 'flex-start', minHeight: 44, borderRadius: 10, border: 0, background: 'var(--cp-navy)', color: 'var(--cp-white)', padding: '0 16px', fontSize: 14, fontWeight: 700, cursor: borradorValido ? 'pointer' : 'not-allowed', opacity: borradorValido ? 1 : 0.5 }}>
+                  Continuar
+                </button>
+              </div>
+            )}
+
+            {nB > 0 && !pideNombreInvitado && (
               <div data-testid="nombre-envase" data-plegable="" className="ca-tarjeta">
                 <button type="button" className="ca-cab" aria-expanded={nombresAbierto} aria-controls="cuerpo-nombres-envase" onClick={() => setNombresAbierto((v) => !v)}>
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -911,7 +943,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </div>
             )}
 
-            {esBebida && !esCombo && (
+            {esBebida && !esCombo && !pideNombreInvitado && (
               <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>¿Para quién es?</div>
                 {Array.from({ length: cantidad }, (_, i) => (

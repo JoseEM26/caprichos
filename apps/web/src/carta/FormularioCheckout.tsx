@@ -39,6 +39,7 @@ import {
 } from './tipos';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { EncabezadoDetalle } from './ElegirEnTarjetas';
+import { leerNombreInvitado } from './nombreInvitado';
 import { nombreMedio, TarjetasMedioPago } from './MediosPago';
 import { TarjetasFormaUbicacion, tituloForma, type FormaUbicacion } from './FormasUbicacion';
 
@@ -112,7 +113,7 @@ export function FormularioCheckout({
   const [modalidad, setModalidad] = useState<ModalidadEntrega>('DELIVERY');
 
   // Cliente
-  const [nombre, setNombre] = useState('');
+  const [nombre, setNombre] = useState(leerNombreInvitado); // invitado: el que dio al primer vaso, editable
   const [telefono, setTelefono] = useState('');
   // Cumpleaños: solo lo pide quien tiene cuenta y aún no lo tiene (el pedido sin cuenta no lo pide)
   const [cumpleCliente, setCumpleCliente] = useState('');
