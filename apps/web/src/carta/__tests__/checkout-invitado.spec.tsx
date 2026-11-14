@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -79,7 +80,7 @@ async function irAEnviar() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+  fireEvent.click(await alEnvio());
 }
 
 describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
@@ -215,7 +216,7 @@ describe('Checkout ▸ dirección del último pedido del celular (sin cuenta)', 
     expect(screen.queryByLabelText(/Dirección escrita/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+    fireEvent.click(await alEnvio());
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything()));
     const payload = vi.mocked(api.post).mock.calls.find((c) => c[0] === '/pedidos')![1] as any;
     expect(payload.entrega).toEqual({ reutilizarUltimaDireccion: true });
@@ -227,6 +228,7 @@ describe('Checkout ▸ dirección del último pedido del celular (sin cuenta)', 
     await llegarUbicacionConPista();
     fireEvent.click(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i }));
     fireEvent.click(screen.getByRole('button', { name: /Usar otra dirección/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     expect(screen.getByLabelText(/Dirección escrita/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i })).toBeInTheDocument();
   });
@@ -237,6 +239,7 @@ describe('Checkout ▸ dirección del último pedido del celular (sin cuenta)', 
     await llegarUbicacion();
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos/pista-direccion', { telefono: '912345678' }));
     expect(screen.queryByRole('button', { name: /Usar la dirección de mi último pedido/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     expect(screen.getByLabelText(/Dirección escrita/i)).toBeInTheDocument();
   });
 

@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio, cambiarMedio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -83,7 +84,7 @@ async function irAPago() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  expect(await screen.findByRole('button', { name: /Enviar pedido/i })).toBeInTheDocument();
+  expect(await alEnvio()).toBeInTheDocument();
 }
 
 describe('Checkout de la carta ▸ propina opcional', () => {
@@ -115,7 +116,7 @@ describe('Checkout de la carta ▸ propina opcional', () => {
   it.each(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'])('con %s la propina (monto libre) se ofrece igual y suma al total a pagar', async (medio) => {
     abrirPedido(true);
     await irAPago();
-    fireEvent.click(screen.getByRole('button', { name: medio }));
+    cambiarMedio(medio);
     expect(screen.getByTestId('propina-carta')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '3' } });
     expect(screen.getByRole('button', { name: /Enviar pedido/i })).toHaveTextContent('Enviar pedido · S/ 17.50');

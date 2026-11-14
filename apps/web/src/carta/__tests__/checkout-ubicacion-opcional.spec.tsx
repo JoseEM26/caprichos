@@ -66,11 +66,13 @@ describe('Checkout delivery con ubicación opcional', () => {
     await irAUbicacion();
     expect(screen.getByRole('button', { name: /Marcar en el mapa/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Usar mi ubicación actual/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     expect(screen.getByTestId('aviso-envio-por-confirmar').textContent).toMatch(/Envío por confirmar/);
   });
 
   it('sin ubicación, dirección y referencia son obligatorias para seguir', async () => {
     await irAUbicacion();
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     expect(document.getElementById('f-referencia')).toBeRequired();
 
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
@@ -83,6 +85,7 @@ describe('Checkout delivery con ubicación opcional', () => {
     fireEvent.change(document.getElementById('f-referencia') as HTMLInputElement, { target: { value: 'Frente al parque' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 3/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Yape' }));
     expect(screen.getAllByText(/Envío por confirmar: se calcula al recibir tu ubicación/).length).toBeGreaterThan(0);
   });
 

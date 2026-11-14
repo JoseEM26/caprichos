@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -113,7 +114,7 @@ describe('Checkout ▸ Comer en el local', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+    fireEvent.click(await alEnvio());
 
     await waitFor(() => expect(pedidosEnviados()).toHaveLength(1));
     const payload = pedidosEnviados()[0][1] as any;

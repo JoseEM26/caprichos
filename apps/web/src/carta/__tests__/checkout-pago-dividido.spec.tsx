@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio, cambiarMedio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -81,7 +82,7 @@ async function irAPago() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  expect(await screen.findByRole('button', { name: /Enviar pedido/i })).toBeInTheDocument();
+  expect(await alEnvio()).toBeInTheDocument();
 }
 
 const botonDelDividido = (texto: string) =>
@@ -138,7 +139,7 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
     abrirPedido();
     await irAPago();
-    fireEvent.click(screen.getByRole('button', { name: /^EFECTIVO$/i }));
+    cambiarMedio('EFECTIVO');
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
     expect((await screen.findAllByText(/Escribe con cuánto pagas en efectivo/)).length).toBeGreaterThan(0);
     expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());

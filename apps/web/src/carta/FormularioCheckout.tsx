@@ -37,6 +37,9 @@ import {
   TipoComprobante,
 } from './tipos';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
+import { EncabezadoDetalle } from './ElegirEnTarjetas';
+import { nombreMedio, TarjetasMedioPago } from './MediosPago';
+import { TarjetasFormaUbicacion, tituloForma, type FormaUbicacion } from './FormasUbicacion';
 
 interface FormularioCheckoutProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -173,6 +176,10 @@ export function FormularioCheckout({
 
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
+  // Pago en dos momentos: tarjetas «¿Cómo pagas?» y luego el detalle del medio elegido
+  const [vistaPago, setVistaPago] = useState<'medios' | 'detalle'>('medios');
+  // Ubicación en dos momentos: null = se deduce de lo escrito; 'elegir' = vuelve a las tarjetas
+  const [formaUbic, setFormaUbic] = useState<FormaUbicacion | 'elegir' | null>(null);
   const [pagaCon, setPagaCon] = useState('');
   // Pago dividido: dos medios; el primero lleva el monto y el segundo, el resto
   const [dividirPago, setDividirPago] = useState(false);
@@ -558,6 +565,23 @@ export function FormularioCheckout({
   const envioAhora = creditoConDelivery && envioConocido ? Math.min(costoEnvioEfectivo ?? 0, totalCalculado) : 0;
   // Con envío gratis no hay nada que pagar; sin ubicación aún, el envío se confirma y se paga después con el medio elegido
   const pagaEnvio = creditoConDelivery && (!envioConocido || envioAhora > 0);
+  const tarjetasPago = (!conCredito || pagaEnvio) && vistaPago === 'medios';
+  const formaDeducida: FormaUbicacion | null = coordenadas ? (origenPunto === 'GPS' ? 'gps' : 'mapa') : direccion.trim() ? 'escribir' : null;
+  const formaActual: FormaUbicacion | null = formaUbic === 'elegir' ? null : (formaUbic ?? formaDeducida);
+  // Quita el punto (zona y envío) para escribir la dirección a mano
+  const limpiarPunto = () => {
+    setCoordenadas(null);
+    setZonaEnvio(null);
+    setTarifaZona(null);
+    setUbicacionConfirmada(false);
+    setMensajeGps(null);
+  };
+  const elegirForma = (f: FormaUbicacion) => {
+    setFormaUbic(f);
+    if (f === 'gps') obtenerUbicacionGps();
+    else if (f === 'mapa') setMapaCompletoAbierto(true);
+    else if (coordenadas) limpiarPunto();
+  };
   const productosACredito = creditoConDelivery ? Number((totalCalculado - envioAhora).toFixed(2)) : totalCalculado;
   const aCobrar = creditoConDelivery ? envioAhora : Number((totalCalculado + (conCredito ? 0 : propinaCobrable)).toFixed(2));
   // Pago dividido: plan válido (o null) y parte en efectivo (lo que cubre «Paga con»)
@@ -617,6 +641,7 @@ export function FormularioCheckout({
 
   const validarPaso3 = (): string | null => {
     if (conCredito && !pagaEnvio) return null; // a crédito no hay comprobante, medio de pago ni propina (salvo el medio del envío)
+    if (tarjetasPago) return 'Elige cómo pagas';
     if (conCredito) {
       // solo el medio del envío: sin comprobante ni propina
     } else if (tipoComprobante === 'FACTURA') {
@@ -943,6 +968,9 @@ export function FormularioCheckout({
     efectivo: { activo: true },
     tarjeta: { activo: true },
   };
+  const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
+    (m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false,
+  );
 
   return (
     <>
@@ -1145,6 +1173,19 @@ export function FormularioCheckout({
                   </button>
                 );
               })}
+            </div>
+            <div data-testid="pasos-subtitulo" aria-live="polite" style={{ marginTop: '8px', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+              {`Paso ${paso} de 3 · ${
+                paso === 1
+                  ? 'Tus datos'
+                  : paso === 2
+                    ? modalidad === 'DELIVERY' && !pideEleccionDireccion && !usarUltimaDireccion && !formaActual
+                      ? '¿Dónde te lo llevamos?'
+                      : 'Ubicación'
+                    : tarjetasPago
+                      ? '¿Cómo pagas?'
+                      : `Pagar con ${nombreMedio(metodoPago)}`
+              }`}
             </div>
           </div>
 
@@ -1522,12 +1563,10 @@ export function FormularioCheckout({
                         ocupado={eligiendoDireccion}
                         aviso={avisoDireccion}
                         alElegir={(d) => void elegirDireccionAnterior(d)}
-                        alNueva={elegirDireccionNueva}
-                        alUbicacionActual={() => {
+                        alForma={(f) => {
                           elegirDireccionNueva();
-                          obtenerUbicacionGps();
+                          elegirForma(f);
                         }}
-                        cargandoUbicacion={cargandoGps}
                       />
                     )}
                     {!clienteCuenta && pistaDireccion && (
@@ -1572,7 +1611,24 @@ export function FormularioCheckout({
                         )}
                       </div>
                     )}
-                    {!pideEleccionDireccion && !usarUltimaDireccion && (
+                    {!pideEleccionDireccion && !usarUltimaDireccion && !formaActual && (
+                      <div
+                        style={{ backgroundColor: 'var(--cp-white)', padding: '16px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                      >
+                        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px' }}>¿Dónde te lo llevamos?</div>
+                        <TarjetasFormaUbicacion alElegir={elegirForma} />
+                        {clienteCuenta && direccionesAnteriores && direccionesAnteriores.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setOpcionDireccion(null)}
+                            style={{ alignSelf: 'flex-start', minHeight: '44px', background: 'none', border: 'none', padding: '0 4px', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                          >
+                            Elegir otra dirección guardada
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {!pideEleccionDireccion && !usarUltimaDireccion && formaActual && (
                     <div
                       style={{
                         backgroundColor: 'var(--cp-white)',
@@ -1584,27 +1640,9 @@ export function FormularioCheckout({
                         gap: '12px',
                       }}
                     >
-                      <div
-                        style={{
-                          fontFamily: 'var(--fuente-titulos)',
-                          fontWeight: 700,
-                          fontSize: '14px',
-                        }}
-                      >
-                        Ubicación para delivery
-                      </div>
+                      <EncabezadoDetalle titulo={tituloForma[formaActual]} textoCambiar="Cambiar forma" alCambiar={() => setFormaUbic('elegir')} />
 
-                      {clienteCuenta && direccionesAnteriores && direccionesAnteriores.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setOpcionDireccion(null)}
-                          style={{ alignSelf: 'flex-start', minHeight: '44px', background: 'none', border: 'none', padding: '0 4px', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
-                        >
-                          Elegir otra dirección guardada
-                        </button>
-                      )}
-
-                      {!(coordenadas && origenPunto === 'GPS') && (
+                      {formaActual !== 'gps' && (
                         <div>
                           <label
                             htmlFor="f-direccion"
@@ -1674,6 +1712,7 @@ export function FormularioCheckout({
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {formaActual === 'gps' && (
                           <button
                             type="button"
                             onClick={obtenerUbicacionGps}
@@ -1691,6 +1730,8 @@ export function FormularioCheckout({
                           >
                             {cargandoGps ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
                           </button>
+                          )}
+                          {formaActual === 'mapa' && (
                           <button
                             type="button"
                             onClick={() => setMapaCompletoAbierto(true)}
@@ -1705,8 +1746,9 @@ export function FormularioCheckout({
                               fontSize: '13px',
                             }}
                           >
-                            Marcar en el mapa
+                            {coordenadas ? 'Cambiar el punto en el mapa' : 'Marcar en el mapa'}
                           </button>
+                          )}
                         </div>
 
                         {coordenadas && (
@@ -1779,7 +1821,7 @@ export function FormularioCheckout({
                           </div>
                         )}
 
-                        {!coordenadas && (
+                        {!coordenadas && formaActual === 'escribir' && (
                           <div
                             data-testid="aviso-envio-por-confirmar"
                             style={{
@@ -1874,8 +1916,22 @@ export function FormularioCheckout({
                       )}
                     </div>
                   )}
-                  {(!conCredito || pagaEnvio) && (
+                  {tarjetasPago && (
+                    <div style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>¿Cómo pagas?</div>
+                      <TarjetasMedioPago
+                        medios={mediosDisponibles}
+                        seleccionado={null}
+                        alElegir={(m) => {
+                          setMetodoPago(m);
+                          setVistaPago('detalle');
+                        }}
+                      />
+                    </div>
+                  )}
+                  {!tarjetasPago && (!conCredito || pagaEnvio) && (
                   <>
+                  <EncabezadoDetalle titulo={`Pagar con ${nombreMedio(metodoPago)}`} textoCambiar="Cambiar" alCambiar={() => setVistaPago('medios')} />
                   {!conCredito && (
                   <>
                   {/* Comprobante Boleta o Factura (DT-77) */}
@@ -2094,55 +2150,6 @@ export function FormularioCheckout({
                       gap: '12px',
                     }}
                   >
-                    <div
-                      style={{
-                        fontFamily: 'var(--fuente-titulos)',
-                        fontWeight: 700,
-                        fontSize: '14px',
-                      }}
-                    >
-                      Medio de pago
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).map(
-                        (m) => {
-                          const claveConfig = m.toLowerCase();
-                          const estaConfigurado =
-                            claveConfig === 'efectivo' ||
-                            claveConfig === 'tarjeta' ||
-                            mediosPagoDisponibles[claveConfig]?.activo !== false;
-
-                          if (!estaConfigurado) return null;
-
-                          const seleccionado = metodoPago === m;
-                          return (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setMetodoPago(m)}
-                              style={{
-                                minHeight: '44px',
-                                padding: '0 14px',
-                                borderRadius: '10px',
-                                border: seleccionado
-                                  ? '2px solid var(--cp-orange)'
-                                  : '1.5px solid var(--cp-line)',
-                                backgroundColor: seleccionado
-                                  ? 'var(--cp-sand)'
-                                  : 'var(--cp-white)',
-                                color: 'var(--cp-navy)',
-                                fontWeight: 700,
-                                fontSize: '13px',
-                              }}
-                            >
-                              {m}
-                            </button>
-                          );
-                        },
-                      )}
-                    </div>
-
                     {/* Pago dividido: dos medios (p. ej. Yape S/ 38 y el resto en efectivo al recibir) */}
                     <button
                       type="button"
@@ -2380,7 +2387,7 @@ export function FormularioCheckout({
                   )}
 
                   {/* Campo de cupón / puntos */}
-                  {!cuponAplicado && clienteCuenta && !conCredito && (
+                  {!tarjetasPago && !cuponAplicado && clienteCuenta && !conCredito && (
                     <PuntosCanje
                       totalPedido={Math.max(0, promos.canjeable ?? 0)}
                       puntosAplicados={puntosAplicados}
@@ -2389,7 +2396,7 @@ export function FormularioCheckout({
                     />
                   )}
 
-                  {puntosAplicados === 0 && (
+                  {!tarjetasPago && puntosAplicados === 0 && (
                     <div
                       style={{
                         border: '1px solid var(--cp-line)',
@@ -2497,6 +2504,7 @@ export function FormularioCheckout({
                   )}
 
                   {/* Resumen de totales */}
+                  {!tarjetasPago && (
                   <div
                     style={{
                       backgroundColor: 'var(--cp-white)',
@@ -2630,6 +2638,7 @@ export function FormularioCheckout({
                       </div>
                     )}
                   </div>
+                  )}
                 </>
               )}
             </div>
@@ -2852,25 +2861,27 @@ export function FormularioCheckout({
                 ) : (
                   <button
                     type="button"
-                    disabled={enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado}
+                    disabled={enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado || tarjetasPago}
                     onClick={() => void enviarPedido()}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 0,
-                      backgroundColor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'var(--cp-line)' : 'var(--cp-orange)',
-                      color: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'var(--cp-soft)' : '#FFFFFF',
+                      backgroundColor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado || tarjetasPago ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado || tarjetasPago ? 'var(--cp-soft)' : '#FFFFFF',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado ? 'not-allowed' : 'pointer',
+                      cursor: enviando || enviarBloqueadoPorStock || sinModalidadOferta || localCerrado || tarjetasPago ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {enviando
                       ? 'Enviando pedido...'
                       : localCerrado
                         ? 'Local cerrado por ahora'
+                        : tarjetasPago
+                        ? 'Elige cómo pagas'
                         : enviarBloqueadoPorStock || sinModalidadOferta
                         ? 'Ajusta tu pedido para enviar'
                         : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}

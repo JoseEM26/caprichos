@@ -6,6 +6,7 @@ import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import { SelectorPagoEquipo } from '../SelectorPagoEquipo';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -88,7 +89,7 @@ async function irAlPago(equipo: { esEquipo: true; puedeCredito: boolean } | null
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  await screen.findByRole('button', { name: /Enviar pedido/i });
+  await alEnvio();
 }
 
 describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () => {
@@ -111,14 +112,14 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     await irAlPago({ esEquipo: true, puedeCredito: true });
     expect(screen.getByRole('radio', { name: /Pagar al contado/i })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i })).toBeEnabled();
-    expect(screen.getByText('Medio de pago')).toBeInTheDocument();
+    expect(screen.getByText('Pagar con Yape')).toBeInTheDocument();
     expect(screen.getByText('Comprobante de pago')).toBeInTheDocument();
   });
 
   it('crédito: oculta medio de pago y comprobante y muestra el resumen', async () => {
     await irAlPago({ esEquipo: true, puedeCredito: true });
     fireEvent.click(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i }));
-    expect(screen.queryByText('Medio de pago')).not.toBeInTheDocument();
+    expect(screen.queryByText('¿Cómo pagas?')).not.toBeInTheDocument();
     expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/Se carga a tu crédito: S\/ \d+\.\d{2}/);
   });
@@ -153,14 +154,15 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     fireEvent.click(screen.getByRole('button', { name: /^Delivery$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
+    fireEvent.click(await screen.findByRole('button', { name: 'Escribir la dirección' }));
     fireEvent.change(await screen.findByLabelText(/Dirección/i), { target: { value: 'Av. Las Palmeras 123' } });
     fireEvent.change(screen.getByLabelText(/Referencia/i), { target: { value: 'Frente al parque' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    await screen.findByRole('button', { name: /Enviar pedido/i });
+    await alEnvio();
     fireEvent.click(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i }));
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/A tu crédito del personal: S\/ \d+\.\d{2}/);
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/El envío lo pagas ahora/);
-    expect(screen.getByText('Medio de pago')).toBeInTheDocument();
+    expect(screen.getByText('Pagar con Yape')).toBeInTheDocument();
     expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
     expect(screen.queryByTestId('propina-carta')).not.toBeInTheDocument();
   });

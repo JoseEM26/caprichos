@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -116,7 +117,7 @@ describe('Checkout ▸ pedido mínimo solo para delivery', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+    fireEvent.click(await alEnvio());
 
     await waitFor(() => expect(pedidosEnviados()).toHaveLength(1));
     expect((pedidosEnviados()[0][1] as any).modalidad).toBe('RECOGER');
@@ -149,12 +150,13 @@ describe('Checkout ▸ pedido mínimo solo para delivery', () => {
     // Delivery con dirección escrita (sin mínimo local, el servidor es quien decide)
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     fireEvent.change(document.getElementById('f-direccion') as HTMLInputElement, {
       target: { value: 'Av. Los Olivos 123' },
     });
     fireEvent.change(document.getElementById('f-referencia') as HTMLInputElement, { target: { value: 'Frente al parque' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+    fireEvent.click(await alEnvio());
 
     expect(await screen.findByText('El pedido mínimo para delivery es S/ 30.00; te faltan S/ 15.50')).toBeInTheDocument();
     expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
