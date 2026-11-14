@@ -461,6 +461,15 @@ export const impresionApi = {
     return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo, clave });
   },
 
+  /** Reencola solo las etiquetas elegidas (claves GENERAL, AREA:<nombre>, BEBIDA:<indice>). */
+  reimprimirElegidas: async (
+    pedidoId: string,
+    tipo: 'TODAS' | 'general' | 'area' | 'bebida',
+    claves: string[],
+  ): Promise<{ ok: boolean; mensaje: string; cantidad?: number; omitidas?: number }> => {
+    return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo, claves });
+  },
+
   /** Reencola todas las etiquetas del pedido que no estén ya en cola. */
   reimprimirTodas: async (
     pedidoId: string,

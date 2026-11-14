@@ -58,6 +58,8 @@ type Accion =
   | { tipo: 'todas' }
   | { tipo: 'grupo'; grupo: 'general' | 'area' | 'bebida' };
 
+const PREFIJO_GRUPO: Record<'general' | 'area' | 'bebida', string> = { general: 'GENERAL', area: 'AREA:', bebida: 'BEBIDA:' };
+
 const TITULO_GRUPO: Record<'general' | 'area' | 'bebida', string> = {
   general: '¿Reimprimir etiqueta general?',
   area: '¿Reimprimir etiquetas por área?',
@@ -77,6 +79,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   const [procesando, setProcesando] = useState(false);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [mensajeError, setMensajeError] = useState<string | null>(null);
+  const [elegidas, setElegidas] = useState<string[]>([]);
 
   const cargar = useCallback(async () => {
     try {
@@ -93,6 +96,21 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
     return () => clearInterval(cada);
   }, [cargar]);
 
+  // Grupo con 2 o más stickers: se elige cuáles salen (nunca se imprime de más)
+  const candidatas = (a: Accion | null): EtiquetaEstado[] => {
+    if (!a || a.tipo === 'uno') return [];
+    if (a.tipo === 'todas') return etiquetas.filter((e) => e.tipo !== 'TICKET_PAGO');
+    return etiquetas.filter((e) => e.clave.startsWith(PREFIJO_GRUPO[a.grupo]));
+  };
+  const abrirAccion = (a: Accion) => {
+    setElegidas([]);
+    setAccion(a);
+  };
+  const etiquetaLista = (e: EtiquetaEstado) => {
+    const b = resumen.bebidas.find((x) => `BEBIDA:${x.bebidaIndex}` === e.clave);
+    return b ? ['Vaso ' + b.bebidaIndex, b.bebidaNombre, b.persona].filter(Boolean).join(' · ') : [e.titulo, e.detalle].filter(Boolean).join(' · ');
+  };
+
   const ejecutarAccion = async () => {
     if (!accion) return;
     setProcesando(true);
@@ -102,6 +120,9 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
       let res: { mensaje?: string } | undefined;
       if (accion.tipo === 'uno') {
         res = await impresionApi.reimprimirEtiqueta(pedidoId, accion.etiqueta.clave);
+      } else if (eligiendo) {
+        if (accion.tipo === 'grupo') onReimprimir?.(accion.grupo);
+        res = await impresionApi.reimprimirElegidas(pedidoId, accion.tipo === 'todas' ? 'TODAS' : accion.grupo, elegidas);
       } else if (accion.tipo === 'todas') {
         res = await impresionApi.reimprimirTodas(pedidoId);
       } else {
@@ -213,7 +234,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
             type="button"
             disabled={enCola}
             title={enCola ? 'Ya está en cola de impresión' : undefined}
-            onClick={() => setAccion({ tipo: 'uno', etiqueta: e })}
+            onClick={() => abrirAccion({ tipo: 'uno', etiqueta: e })}
             style={{ ...BOTON_SECUNDARIO, opacity: enCola ? 0.5 : 1, cursor: enCola ? 'not-allowed' : 'pointer' }}
           >
             Reimprimir
@@ -269,6 +290,8 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   const grupo = (prefijo: string) => etiquetas.filter((e) => e.clave.startsWith(prefijo));
   const ticket = porClave.get('TICKET_PAGO') ?? null;
   const r = estado?.resumen;
+  const lista = candidatas(accion);
+  const eligiendo = lista.length >= 2;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, width: '100%', minWidth: 0 }}>
@@ -335,7 +358,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         </div>
         <button
           type="button"
-          onClick={() => setAccion({ tipo: 'todas' })}
+          onClick={() => abrirAccion({ tipo: 'todas' })}
           disabled={!r || r.total === 0}
           style={{
             ...BOTON_SECUNDARIO,
@@ -402,7 +425,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
           ] as const
         ).filter(([grupo]) => grupo !== 'general' || llevaGeneral).map(([grupo, texto]) => (
           <div key={grupo} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-            <button type="button" onClick={() => setAccion({ tipo: 'grupo', grupo })} style={BOTON_SECUNDARIO}>
+            <button type="button" onClick={() => abrirAccion({ tipo: 'grupo', grupo })} style={BOTON_SECUNDARIO}>
               {texto}
             </button>
             <span style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', lineHeight: '15px' }}>{AYUDA_REIMPRIMIR}</span>
@@ -414,14 +437,36 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
       {accion !== null && (
         <Confirmar
           abierto
-          titulo={textoAccion(accion).titulo}
-          mensaje={textoAccion(accion).mensaje}
+          titulo={eligiendo ? '¿Cuáles reimprimes?' : textoAccion(accion).titulo}
+          mensaje={eligiendo ? 'Marca los stickers que quieres volver a imprimir. Los que ya están en cola no se duplican.' : textoAccion(accion).mensaje}
           textoSi="Sí, reimprimir"
+          textoConfirmar={eligiendo ? `Reimprimir ${elegidas.length}` : undefined}
+          deshabilitarConfirmar={eligiendo && elegidas.length === 0}
           textoNo="No, cancelar"
           cargando={procesando}
           alConfirmar={ejecutarAccion}
           alCancelar={() => setAccion(null)}
-        />
+        >
+          {eligiendo && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" style={BOTON_SECUNDARIO} onClick={() => setElegidas(lista.map((e) => e.clave))}>Marcar todos</button>
+                <button type="button" style={BOTON_SECUNDARIO} onClick={() => setElegidas([])}>Marcar ninguno</button>
+              </div>
+              {lista.map((e) => (
+                <label key={e.clave} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  <input
+                    type="checkbox"
+                    checked={elegidas.includes(e.clave)}
+                    onChange={(ev) => setElegidas((p) => (ev.target.checked ? [...p, e.clave] : p.filter((c) => c !== e.clave)))}
+                  />
+                  <span style={{ flex: 1, minWidth: 0 }}>{etiquetaLista(e)}</span>
+                  {(e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO') && <span style={{ fontSize: 11, fontWeight: 600 }}>ya en cola</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </Confirmar>
       )}
     </div>
   );

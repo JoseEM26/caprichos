@@ -23,6 +23,7 @@ vi.mock('../../impresion/impresionApi', () => ({
     reimprimirEtiqueta: vi.fn(),
     reimprimirTodas: vi.fn(),
     reimprimirEtiquetas: vi.fn(),
+    reimprimirElegidas: vi.fn(),
   },
 }));
 
@@ -98,16 +99,16 @@ describe('Etiquetas: una tarjeta por sticker con estado real', () => {
     expect(within(barra).getByRole('button', { name: 'Reimprimir' })).toBeDisabled();
   });
 
-  it('Reimprimir todas pide confirmación y encola todo', async () => {
+  it('Reimprimir todas (3 stickers) deja elegir cuáles y manda solo los marcados', async () => {
+    vi.mocked(impresionApi.reimprimirElegidas).mockResolvedValue({ ok: true, mensaje: 'Se encoló 1 etiqueta' });
     render(<EtiquetasPedido pedido={pedido} />);
     await screen.findByText('3 etiquetas: 1 impresas, 1 en cola, 1 fallidas');
-
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir todas' }));
-    expect(screen.getByText('¿Reimprimir todas las etiquetas?')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Sí, reimprimir/i }));
-
-    await waitFor(() => expect(impresionApi.reimprimirTodas).toHaveBeenCalledWith('ped-9'));
-    expect(await screen.findByText('Se encolaron 2 etiquetas')).toBeInTheDocument();
+    expect(screen.getByText('¿Cuáles reimprimes?')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('checkbox')[2]);
+    fireEvent.click(screen.getByRole('button', { name: 'Reimprimir 1' }));
+    await waitFor(() => expect(impresionApi.reimprimirElegidas).toHaveBeenCalledWith('ped-9', 'TODAS', ['AREA:COCINA']));
+    expect(impresionApi.reimprimirTodas).not.toHaveBeenCalled();
   });
 
   it('si la consulta de estado falla, las etiquetas siguen visibles con su vista previa', async () => {

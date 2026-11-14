@@ -21,6 +21,13 @@ export class ReimprimirDto {
   @IsString()
   clave?: string;
 
+  /** Varias etiquetas elegidas del pedido (mismas claves que `clave`); se validan contra las que el pedido tiene. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  claves?: string[];
+
   /** Salta las reglas de modalidad y activos (decisión explícita; por defecto la reimpresión las respeta). */
   @IsOptional()
   @IsBoolean({ message: 'forzar debe ser verdadero o falso' })

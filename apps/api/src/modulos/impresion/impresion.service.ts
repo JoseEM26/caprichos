@@ -1644,7 +1644,16 @@ await this.anotarResaltadas(pedido);
         });
       }
     }
-    const pedidas0 = dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
+    // `claves`: solo las elegidas; una que el pedido no tiene se rechaza (no se imprime a medias)
+    if (dto.claves?.length) {
+      const tiene = new Set(seleccion.map((s) => s.clave));
+      const mala = dto.claves.find((c) => !tiene.has(c));
+      if (mala !== undefined) {
+        throw new BadRequestException({ codigo: 'ETIQUETA_INEXISTENTE', mensaje: `El pedido no tiene la etiqueta ${mala}` });
+      }
+    }
+    const elegidas = dto.claves?.length ? new Set(dto.claves) : null;
+    const pedidas0 = elegidas ? seleccion.filter((s) => elegidas.has(s.clave)) : dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
     await this.anotarCategorias(pedidas0.filter((s) => s.tipo === 'ETIQUETA_BEBIDA').map((s) => s.payload));
     // Por defecto se respetan las reglas (modalidad y activos); solo `forzar` las salta, a propósito
     const reglas = await leerReglasImpresion(this.prisma);
@@ -1681,6 +1690,18 @@ await this.anotarResaltadas(pedido);
     }
 
     const omitidas = aplicables.length - nuevas.length;
+    if (elegidas && this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'REIMPRIMIR_PEDIDO',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        partyId: usuario.partyId,
+        despues: { pedido: pedido.codigo, tipo: dto.tipo, clavesPedidas: [...elegidas], encoladas: nuevas.map((s) => s.clave), omitidas, trabajoIds: trabajosCreados.map((t) => t.id.toString()) },
+        ip,
+      });
+    }
     return {
       ok: true,
       mensaje: nuevas.length > 0
