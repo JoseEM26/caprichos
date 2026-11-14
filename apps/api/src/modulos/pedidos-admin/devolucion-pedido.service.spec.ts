@@ -198,4 +198,31 @@ describe('DevolucionPedidoService', () => {
       );
     });
   });
+
+  describe('No corresponde devolver', () => {
+    const conUpdate = (c: ReturnType<typeof construir>, count = 1) => {
+      (c.prisma.pedido as any).updateMany = jest.fn().mockResolvedValue({ count });
+      return c;
+    };
+    it('solo ADMIN o SUPERVISOR', async () => {
+      const { servicio } = conUpdate(construir());
+      await expect(servicio.descartar('7', 'la caja ya cuadró con este pago', usuario)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN_SUPERVISOR' } });
+    });
+    it('exige motivo de 10 letras', async () => {
+      const { servicio } = conUpdate(construir());
+      await expect(servicio.descartar('7', 'corto', { partyId: '1', rol: 'ADMIN' } as any)).rejects.toMatchObject({ response: { codigo: 'MOTIVO_REQUERIDO' } });
+    });
+    it('marca el pedido sin mover dinero ni caja y lo audita', async () => {
+      const c = conUpdate(construir());
+      await c.servicio.descartar('7', 'la caja ya cuadró con este pago', { partyId: '1', rol: 'SUPERVISOR' } as any);
+      expect((c.prisma.pedido as any).updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 7n, devolucion_descartada_en: null } }));
+      expect(c.prisma.$transaction).not.toHaveBeenCalled();
+      expect(c.comprobantes.anularElectronico).not.toHaveBeenCalled();
+      expect(c.auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'DEVOLUCION_NO_CORRESPONDE' }));
+    });
+    it('si ya tiene devolución registrada, no se descarta', async () => {
+      const { servicio } = conUpdate(construir({ devolucion: { id: 1n } as any }));
+      await expect(servicio.descartar('7', 'la caja ya cuadró con este pago', { partyId: '1', rol: 'ADMIN' } as any)).rejects.toMatchObject({ response: { codigo: 'DEVOLUCION_YA_REGISTRADA' } });
+    });
+  });
 });

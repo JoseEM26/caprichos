@@ -238,6 +238,14 @@ export class PedidosAdminController {
     return this.devolucionPedido!.registrar(id, dto, req.usuario, BigInt(req.usuario.partyId), ip);
   }
 
+  /** «No corresponde devolver»: saca el pedido de las devoluciones pendientes sin mover dinero (solo ADMIN/SUPERVISOR). */
+  @Post(':id/devolucion/no-corresponde')
+  @Permiso('pedidos', 'cambiar_estado')
+  async devolucionNoCorresponde(@Param('id') id: string, @Body() body: { motivo?: string }, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.devolucionPedido!.descartar(id, String(body?.motivo ?? ''), req.usuario, ip);
+  }
+
   /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
   /** PATCH /admin/pedidos/:id/comprobante: cambia el comprobante antes de cobrar (Caja). */
   @Patch(':id/comprobante')

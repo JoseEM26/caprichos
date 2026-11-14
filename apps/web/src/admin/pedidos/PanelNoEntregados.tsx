@@ -3,6 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { repartosApi } from '../repartos/repartosApi';
 import type { DevolucionRegistrada, NoEntregado, PreguntaNoEntregado, RegistroDevolucion, RespuestaNoEntregados } from './pedidosApi';
 import { ModalDevolucion } from './ModalDevolucion';
+import { pedidosApi } from './pedidosApi';
 import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 
 export interface PanelNoEntregadosProps {
@@ -13,6 +14,8 @@ export interface PanelNoEntregadosProps {
   puedeLiquidar: boolean;
   /** Permiso de cambiar pedidos (pedidos/cambiar_estado): sin él no hay botón de devolución. */
   puedeDevolver?: boolean;
+  /** ADMIN o SUPERVISOR: «No corresponde devolver» (lo saca de la lista sin mover dinero). */
+  puedeDescartar?: boolean;
   alActualizar: () => void;
 }
 
@@ -75,12 +78,35 @@ const estiloBoton = {
   alignSelf: 'flex-start' as const,
 };
 
-export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puedeDevolver = false, alActualizar }: PanelNoEntregadosProps) {
+export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puedeDevolver = false, puedeDescartar = false, alActualizar }: PanelNoEntregadosProps) {
   const [confirmar, setConfirmar] = useState<NoEntregado | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [devolviendo, setDevolviendo] = useState<NoEntregado | null>(null);
   const [avisoDevolucion, setAvisoDevolucion] = useState<string | null>(null);
+  const [descartando, setDescartando] = useState<NoEntregado | null>(null);
+  const [motivoDescarte, setMotivoDescarte] = useState('');
+  const [errorDescarte, setErrorDescarte] = useState<string | null>(null);
+
+  const descartar = async () => {
+    if (!descartando) return;
+    if (motivoDescarte.trim().length < 10) {
+      setErrorDescarte('Explica por qué no corresponde devolver (mínimo 10 letras).');
+      return;
+    }
+    setProcesando(true);
+    setErrorDescarte(null);
+    try {
+      await pedidosApi.devolucionNoCorresponde(descartando.id, motivoDescarte.trim());
+      setDescartando(null);
+      setMotivoDescarte('');
+      alActualizar();
+    } catch (e: any) {
+      setErrorDescarte(e?.message || 'No se pudo guardar. Intenta de nuevo.');
+    } finally {
+      setProcesando(false);
+    }
+  };
 
   const alDevolver = (resultado: RegistroDevolucion) => {
     setDevolviendo(null);
@@ -211,6 +237,38 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
           >
             Gestionar devolución
           </button>
+        )}
+
+        {grupo === 'cancelados' && p.revisar_devolucion && !p.devolucion && puedeDescartar && descartando?.id !== p.id && (
+          <button
+            type="button"
+            data-testid={`no-corresponde-${p.codigo}`}
+            style={estiloBoton}
+            onClick={() => { setDescartando(p); setMotivoDescarte(''); setErrorDescarte(null); }}
+          >
+            No corresponde devolver
+          </button>
+        )}
+
+        {descartando?.id === p.id && (
+          <div role="group" aria-label={`No corresponde devolver ${p.codigo}`} style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 13 }}>Lo saca de esta lista sin mover dinero ni caja. Queda registrado con tu nombre.</div>
+            <label style={{ fontSize: 13, fontWeight: 700 }}>
+              ¿Por qué no corresponde devolver?
+              <textarea
+                value={motivoDescarte}
+                onChange={(e) => setMotivoDescarte(e.target.value)}
+                rows={2}
+                placeholder="Ej.: la caja ya cuadró con este pago / al final sí se entregó"
+                style={{ display: 'block', width: '100%', marginTop: 4, fontWeight: 400 }}
+              />
+            </label>
+            {errorDescarte && <div role="alert" style={{ color: '#B3261E', fontSize: 13 }}>{errorDescarte}</div>}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" style={estiloBoton} disabled={procesando} onClick={() => setDescartando(null)}>Cancelar</button>
+              <button type="button" style={estiloBoton} disabled={procesando} onClick={descartar}>Confirmar</button>
+            </div>
+          </div>
         )}
 
         {puedeReenviar && (

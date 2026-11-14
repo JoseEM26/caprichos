@@ -489,7 +489,7 @@ export class PedidosEstadoService {
         where: {
           AND: [
             FILTRO_CANCELADO_NO_RECIBIR,
-            { OR: [{ anulado_en: { gte: inicioHoyLima() } }, { pago_estado: { in: PAGOS_DEVOLVIBLES }, devolucion: { is: null } }] },
+            { OR: [{ anulado_en: { gte: inicioHoyLima() } }, { pago_estado: { in: PAGOS_DEVOLVIBLES }, devolucion: { is: null }, devolucion_descartada_en: null }] },
           ],
         },
         include: { ...incluir, devolucion: true },
@@ -520,7 +520,7 @@ export class PedidosEstadoService {
         retirado_en: p.incidentes?.[0]?.en ?? null,
         pregunta: PREGUNTA_REPROG_VISTA[pregunta ?? ''] ?? 'SIN_PREGUNTA',
         pago_estado: p.pago_estado ?? null,
-        revisar_devolucion: !enLista && PAGOS_DEVOLVIBLES.includes(pago) && !devolucion,
+        revisar_devolucion: !enLista && PAGOS_DEVOLVIBLES.includes(pago) && !devolucion && !p.devolucion_descartada_en,
         de_dias_anteriores: !enLista && !!p.anulado_en && new Date(p.anulado_en) < inicioHoyLima(),
         devolucion,
       };

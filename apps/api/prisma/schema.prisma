@@ -829,6 +829,10 @@ model Pedido {
   planPago               PedidoPagoPlan[]
   solicitudesCambioCobro SolicitudCambioCobro[]
   devolucion             DevolucionPedido?
+  /// «No corresponde devolver»: sale de las devoluciones pendientes sin mover dinero (ADMIN/SUPERVISOR, con motivo)
+  devolucion_descartada_en     DateTime? @db.Timestamptz
+  devolucion_descartada_por    BigInt?
+  devolucion_descartada_motivo String?
   cambiosUbicacion       PedidoCambioUbicacion[]
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 

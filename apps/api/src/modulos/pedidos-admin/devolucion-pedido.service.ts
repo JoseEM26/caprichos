@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { esAdminOSupervisor } from '../acceso/roles-usuario';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
 import { aCentimos, enPesos, esCentimosValidos, registrarEgresoDevolucionCajaHoy } from '../caja/caja.calculo';
@@ -223,5 +225,41 @@ export class DevolucionPedidoService {
       const fila = await this.prisma.comprobante.findUnique({ where: { id: comprobanteId }, select: { baja_estado: true } });
       return fila?.baja_estado ?? 'NO_ANULADO';
     }
+  }
+
+  /**
+   * «No corresponde devolver»: el pedido sale de las devoluciones pendientes sin mover dinero ni caja
+   * (la caja ya cuadró, o al final sí se entregó). Solo ADMIN o SUPERVISOR, motivo de 10+ letras, auditado.
+   */
+  async descartar(idRaw: string, motivoRaw: string, usuario: UsuarioAutenticado, ip?: string) {
+    if (!esAdminOSupervisor(usuario)) {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN_SUPERVISOR', mensaje: 'Solo el administrador o el supervisor pueden hacerlo' });
+    }
+    const motivo = String(motivoRaw ?? '').trim();
+    if (motivo.length < 10) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Explica por qué no corresponde devolver (mínimo 10 letras)' });
+    }
+    const p = await this.pedidoDevolvible(idRaw);
+    if ((p as any).devolucion) {
+      throw new ConflictException({ codigo: 'DEVOLUCION_YA_REGISTRADA', mensaje: 'Este pedido ya tiene una devolución registrada' });
+    }
+    const r = await this.prisma.pedido.updateMany({
+      where: { id: p.id, devolucion_descartada_en: null },
+      data: { devolucion_descartada_en: new Date(), devolucion_descartada_por: BigInt(usuario.partyId), devolucion_descartada_motivo: motivo },
+    });
+    if (r.count === 0) return { ok: true, yaEstaba: true };
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'pedidos',
+      accion: 'DEVOLUCION_NO_CORRESPONDE',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: p.id,
+      despues: { codigo: p.codigo, total: Number(p.total), motivo },
+      motivo,
+      partyId: BigInt(usuario.partyId),
+      ip,
+    });
+    return { ok: true };
   }
 }

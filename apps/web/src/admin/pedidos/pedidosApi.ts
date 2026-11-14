@@ -515,6 +515,11 @@ export const pedidosApi = {
     return api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos);
   },
 
+  /** «No corresponde devolver»: saca el pedido de las devoluciones pendientes sin mover dinero (ADMIN/SUPERVISOR). */
+  async devolucionNoCorresponde(id: string | number, motivo: string): Promise<{ ok: boolean }> {
+    return api.post<{ ok: boolean }>(`/admin/pedidos/${id}/devolucion/no-corresponde`, { motivo });
+  },
+
   /** `forzar`: solo el administrador, con motivo, cuando Cocina aún no despejó el pedido. */
   async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER', forzarSinCobro?: boolean, dinero?: DestinoDineroAnulacion): Promise<Pedido> {
     const cuerpo: Record<string, unknown> = forzar ? { estado, motivo, forzar: true } : { estado, motivo };

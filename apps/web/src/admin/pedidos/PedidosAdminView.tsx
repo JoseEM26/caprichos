@@ -20,6 +20,7 @@ import { PanelNoEntregados } from './PanelNoEntregados';
 import { PanelProgramados } from './PanelProgramados';
 import { coincideTexto } from '../../comun/normalizarBusqueda';
 import { useSesion } from '../../comun/sesion';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
 import { AccesoListaEsperaCaja } from '../salon/componentes/AccesoListaEsperaCaja';
 import { RegistrarCortesiaModal } from '../cortesias/RegistrarCortesiaModal';
@@ -1119,6 +1120,7 @@ export function PedidosAdminView() {
           error={errorNoEntregados}
           puedeLiquidar={puedeLiquidar}
           puedeDevolver={tiene('pedidos/cambiar_estado')}
+          puedeDescartar={tiene('pedidos/cambiar_estado') && (tieneRolUsuario(usuario, 'ADMIN') || tieneRolUsuario(usuario, 'SUPERVISOR'))}
           alActualizar={() => {
             void cargarNoEntregados();
             void cargarDatos();

@@ -49,7 +49,7 @@ describe('PedidosEstadoService.listarNoEntregados', () => {
     expect(where.estado).toBe('ANULADO');
     // Hoy, o de días anteriores solo si estaban pagados y falta registrar la devolución
     expect(alcance.OR[0].anulado_en.gte).toBeInstanceOf(Date);
-    expect(alcance.OR[1]).toEqual({ pago_estado: { in: ['PAGADO', 'COORDINADO'] }, devolucion: { is: null } });
+    expect(alcance.OR[1]).toEqual({ pago_estado: { in: ['PAGADO', 'COORDINADO'] }, devolucion: { is: null }, devolucion_descartada_en: null });
     expect(where.mensajesReparto.some.numero).toBe(5);
     expect(where.mensajesReparto.some.estado.in).toEqual(['NO_REPROGRAMAR', 'SIN_RESPUESTA', 'TOPE_ALCANZADO']);
   });
