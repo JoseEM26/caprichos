@@ -31,6 +31,8 @@ export async function autenticar3ds(
     const escuchar = (ev: MessageEvent) => {
       if (!ev.data || (ev.data.parameters3DS === undefined && ev.data.error === undefined)) return;
       window.removeEventListener('message', escuchar);
+      // Como el demo oficial (culqi-python-demo-checkoutv4-culqi3ds): se limpia la librería al terminar
+      try { C3.reset?.(); } catch { /* sin efecto */ }
       if (ev.data.parameters3DS) ok(Object.fromEntries(CAMPOS_3DS.map((k) => [k, ev.data.parameters3DS[k]]).filter(([, v]) => v !== undefined)));
       else fallo(new Error('Tu banco no pudo verificar la tarjeta. Prueba con otra o con otro medio.'));
     };
