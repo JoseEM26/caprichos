@@ -517,11 +517,14 @@ export interface PeticionReimpresionPedido {
   sub?: 'todos' | 'general' | 'area' | 'bebida';
   vista_previa?: boolean;
   confirmar_anulado?: boolean;
+  /** Solo stickers: claves elegidas (las del papel.clave de la vista previa). */
+  claves?: string[];
   /** «Imprimir otra copia igual»: anula el aviso de reimpresión repetida en 15 s. */
   otra_copia?: boolean;
 }
 export interface PapelReimpresion {
   tipo: string;
+  clave?: string;
   etiqueta: string;
   equipoId: string;
   equipo: string;

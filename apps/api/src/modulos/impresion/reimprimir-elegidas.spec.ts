@@ -30,6 +30,7 @@ describe('reimprimir etiquetas: solo las elegidas', () => {
       areaCocina: { findMany: jest.fn().mockResolvedValue([{ id: 7n, nombre: 'Bebidas' }]) },
       deviceKey: { findMany: jest.fn().mockResolvedValue([{ id: 1n, nombre: 'Caja' }]), findFirst: jest.fn().mockResolvedValue(null) },
       parametro: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
       comprobante: { findFirst: jest.fn().mockResolvedValue(null) },
       cuponEmitido: { findFirst: jest.fn().mockResolvedValue(null) },
     };
@@ -62,10 +63,32 @@ describe('reimprimir etiquetas: solo las elegidas', () => {
     expect(creados()).toEqual([1, 2]);
   });
 
-  it('en combos las claves de las bebidas son únicas', () => {
-    const p: any = { ...pedido(), lineas: [{ ...combo, cantidad: 2, opcionesElegidas: [] }] };
+  it('en combos reales (2 bebidas elegidas por unidad) las claves son únicas y se elige una', async () => {
+    const op = (grupo: string, nombre: string) => ({ grupo_nombre: grupo, opcion_nombre: nombre });
+    const linea = { ...combo, cantidad: 2, nombres_persona: ['Ana', 'Beto', 'Caro', 'Dani'], opcionesElegidas: [op('Paso 2 · Bebida 1', 'Frappe Fresa'), op('Paso 3 · Bebida 2', 'Café')] };
+    const p: any = { ...pedido(), lineas: [linea] };
     const bs = construirEtiquetasBebida(p);
-    expect(new Set(bs.map((b) => b.bebidaIndex)).size).toBe(bs.length);
-    expect(bs.every((b) => b.bebidaIndex > 0)).toBe(true);
+    expect(bs.map((b) => b.bebidaIndex)).toEqual([1, 2, 3, 4]);
+    prisma.pedido.findUnique.mockResolvedValue(p);
+    await service.reimprimirEtiqueta('9', { tipo: 'bebida', claves: ['BEBIDA:3'] } as any);
+    expect(prisma.printJob.create.mock.calls.map((c: any) => c[0].data.payload.persona)).toEqual(['Caro']);
+  });
+
+  describe('reimprimirPedido (diálogo rápido de Caja)', () => {
+    it('con claves imprime solo esos vasos y audita clavesPedidas', async () => {
+      const r: any = await service.reimprimirPedido(9, { tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:1'] }, { partyId: '3' } as any, '1.1.1.1');
+      expect(creados()).toEqual([1]);
+      expect(r.papeles[0].clave).toBe('BEBIDA:1');
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REIMPRIMIR_PEDIDO', despues: expect.objectContaining({ clavesPedidas: ['BEBIDA:1'], stickers: 1 }) }));
+    });
+    it('clave inexistente: 400 y no encola', async () => {
+      await expect(service.reimprimirPedido(9, { tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:7'] })).rejects.toThrow(BadRequestException);
+      expect(prisma.printJob.create).not.toHaveBeenCalled();
+    });
+    it('lo que ya está en cola no se duplica', async () => {
+      prisma.printJob.findMany.mockResolvedValue([{ tipo: 'ETIQUETA_BEBIDA', payload: { bebidaIndex: 2 } }]);
+      await service.reimprimirPedido(9, { tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:1', 'BEBIDA:2'] });
+      expect(creados()).toEqual([1]);
+    });
   });
 });

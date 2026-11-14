@@ -1850,7 +1850,7 @@ await this.anotarResaltadas(pedido);
         );
       }
       // Doble clic: la misma opción del mismo pedido dos veces en 15 s no se duplica salvo «Imprimir otra copia igual»
-      const claveIdentica = `${k}|${dto.tipo}|${dto.tipo === 'stickers' ? (dto.sub ?? 'todos') : ''}`;
+      const claveIdentica = `${k}|${dto.tipo}|${dto.tipo === 'stickers' ? (dto.sub ?? 'todos') : ''}|${[...(dto.claves ?? [])].sort().join(',')}`;
       const ultima = this.reimpresionIdentica.get(claveIdentica);
       if (!dto.otra_copia && ultima !== undefined && ahora - ultima < VENTANA_REIMPRESION_IDENTICA_MS) {
         const hace = Math.max(1, Math.round((ahora - ultima) / 1000));
@@ -1873,7 +1873,17 @@ await this.anotarResaltadas(pedido);
       : null;
     const reglas = await leerReglasImpresion(this.prisma);
     const ctx = await this.contextoRuteo();
-    const { items, omitidos } = planReimpresion(pedido, dto.tipo, dto.sub ?? 'todos', reglas, ticket, marca);
+    let { items, omitidos } = planReimpresion(pedido, dto.tipo, dto.sub ?? 'todos', reglas, ticket, marca);
+    // `claves`: solo los stickers elegidos; una clave que el pedido no tiene se rechaza sin imprimir nada
+    const clavesPedidas = dto.claves?.length ? new Set(dto.claves) : null;
+    if (clavesPedidas) {
+      const tiene = new Set(planReimpresion(pedido, 'stickers', 'todos', reglas, ticket, marca).items.map((i) => i.clave));
+      const mala = [...clavesPedidas].find((c) => !tiene.has(c));
+      if (mala !== undefined) {
+        throw new BadRequestException({ codigo: 'ETIQUETA_INEXISTENTE', mensaje: `El pedido no tiene la etiqueta ${mala}` });
+      }
+      items = items.filter((i) => clavesPedidas.has(i.clave));
+    }
     await this.anotarCategorias(items.filter((i) => i.tipo === 'ETIQUETA_BEBIDA').map((i) => i.payload));
 
     const enCola = await this.prisma.printJob.findMany({
@@ -1974,6 +1984,7 @@ await this.anotarResaltadas(pedido);
       porMaquina: [...porMaquina.values()],
       papeles: aEncolar.map((i) => ({
         tipo: i.tipo,
+        clave: i.clave,
         etiqueta: i.etiqueta,
         equipoId: String(i.destino.destino_equipo_id),
         equipo: i.equipo,
@@ -2005,7 +2016,7 @@ await this.anotarResaltadas(pedido);
         entidad: 'pedido',
         entidadId: pedido.id,
         partyId: usuario.partyId,
-        despues: { pedido: pedido.codigo, tipo: dto.tipo, sub: dto.sub ?? null, estadoPedido: pedido.estado, stickers, tickets, omitidos: omitidos.length, yaEnCola: yaEnCola.length, trabajoIds },
+        despues: { pedido: pedido.codigo, tipo: dto.tipo, sub: dto.sub ?? null, ...(clavesPedidas ? { clavesPedidas: [...clavesPedidas] } : {}), estadoPedido: pedido.estado, stickers, tickets, omitidos: omitidos.length, yaEnCola: yaEnCola.length, trabajoIds },
         ip,
       });
     }

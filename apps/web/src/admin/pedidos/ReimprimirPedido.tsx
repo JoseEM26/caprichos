@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { impresionApi, type DestinoReimpresion, type PeticionReimpresionPedido, type ResultadoReimpresionPedido } from '../impresion/impresionApi';
+import { SelectorEtiquetas } from './SelectorEtiquetas';
 import { VistaPreviaReimpresion } from './VistaPreviaReimpresion';
 import type { Pedido } from './pedidosApi';
 
@@ -21,6 +22,15 @@ const OPCIONES: Opcion[] = [
   { id: 'ticket_cocina', texto: 'Solo ticket de cocina (comanda)', peticion: { tipo: 'ticket_cocina' } },
   { id: 'ticket_pago', texto: 'Solo ticket de pago / boleta', peticion: { tipo: 'ticket_pago' } },
 ];
+
+/** Stickers de la vista previa entre los que se puede elegir (solo en «Solo stickers», con 2 o más). */
+const elegibles = (v: ResultadoReimpresionPedido) =>
+  v.papeles
+    .filter((p) => p.tipo.startsWith('ETIQUETA') && p.clave)
+    .map((p) => ({
+      clave: p.clave as string,
+      texto: p.tipo === 'ETIQUETA_BEBIDA' && p.payload ? ['Vaso ' + p.payload.bebidaIndex, p.payload.bebidaNombre, p.payload.persona].filter(Boolean).join(' · ') : p.etiqueta,
+    }));
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
@@ -65,6 +75,7 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
   const [destinos, setDestinos] = useState<DestinoReimpresion[] | null>(null);
   const [cargandoDestinos, setCargandoDestinos] = useState(false);
   const [verPrevia, setVerPrevia] = useState(false);
+  const [elegidas, setElegidas] = useState<string[]>([]);
   // Un ref y no solo estado: dos clics en el mismo instante ven el mismo estado, el ref se marca al primero
   const enviando = useRef(false);
 
@@ -91,6 +102,7 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
       if (vista.cantidad === 0) setAviso({ tono: 'mal', resultado: vista });
       else {
         setVerPrevia(false);
+        setElegidas([]);
         setPendiente({ opcion, vista });
       }
     } catch (e) {
@@ -109,6 +121,7 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
       const r = await impresionApi.reimprimirPedido(pedido.id, {
         ...alt.opcion.peticion,
         confirmar_anulado: alt.vista.exigeConfirmacionAnulado,
+        ...(alt.opcion.peticion.tipo === 'stickers' && elegibles(alt.vista).length >= 2 ? { claves: elegidas } : {}),
         ...(otraCopia ? { otra_copia: true } : {}),
       });
       setPendiente(null);
@@ -130,7 +143,11 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
   };
 
   const v = pendiente?.vista;
-  const mensajeConfirmar = v
+  const lista = v && pendiente?.opcion.peticion.tipo === 'stickers' ? elegibles(v) : [];
+  const eligiendo = lista.length >= 2;
+  const mensajeConfirmar = eligiendo
+    ? 'Marca los stickers que quieres volver a imprimir.'
+    : v
     ? `¿Seguro? Se imprimirá ${plural(v.cantidad, 'papel', 'papeles')} (${plural(v.stickers, 'sticker', 'stickers')} y ${plural(v.tickets, 'ticket', 'tickets')}) en ${dondeVa(v)}.` +
       (v.exigeConfirmacionAnulado
         ? ` Este pedido está ${v.pedido.estado === 'ANULADO' ? 'ANULADO' : 'RECHAZADO'}: los tickets saldrán con la marca ANULADO; los stickers no llevan marca.`
@@ -197,15 +214,16 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
 
       <Confirmar
         abierto={Boolean(pendiente)}
-        titulo={v?.exigeConfirmacionAnulado ? 'Reimprimir un pedido anulado' : 'Reimprimir'}
+        titulo={eligiendo ? '¿Cuáles reimprimes?' : v?.exigeConfirmacionAnulado ? 'Reimprimir un pedido anulado' : 'Reimprimir'}
         mensaje={mensajeConfirmar}
-        textoConfirmar={cargando ? 'Enviando…' : 'Sí, reimprimir'}
+        textoConfirmar={cargando ? 'Enviando…' : eligiendo ? `Reimprimir ${elegidas.length}` : 'Sí, reimprimir'}
         textoNo="No"
         peligro={Boolean(v?.exigeConfirmacionAnulado)}
-        deshabilitarConfirmar={cargando}
+        deshabilitarConfirmar={cargando || (eligiendo && elegidas.length === 0)}
         alConfirmar={confirmar}
         alCancelar={() => setPendiente(null)}
       >
+        {eligiendo && <SelectorEtiquetas items={lista} elegidas={elegidas} alCambiar={setElegidas} />}
         {v && v.papeles.length > 0 && (
           <>
             <button type="button" className="rp-previa-btn" aria-expanded={verPrevia} onClick={() => setVerPrevia((x) => !x)}>

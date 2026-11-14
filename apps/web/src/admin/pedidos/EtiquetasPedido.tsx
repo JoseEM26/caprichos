@@ -5,6 +5,7 @@ import {
   armarTicketPago,
 } from './etiquetasPedido';
 import { Confirmar } from '../../comun/Confirmar';
+import { SelectorEtiquetas } from './SelectorEtiquetas';
 import { EtiquetaGeneral, EtiquetaArea, EtiquetaBebida, TicketPagoPrevia } from './EtiquetaPrevia';
 import { impresionApi, EtiquetaEstado, EstadoEtiquetasPedido, EstadoEtiqueta } from '../impresion/impresionApi';
 
@@ -448,23 +449,11 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
           alCancelar={() => setAccion(null)}
         >
           {eligiendo && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" style={BOTON_SECUNDARIO} onClick={() => setElegidas(lista.map((e) => e.clave))}>Marcar todos</button>
-                <button type="button" style={BOTON_SECUNDARIO} onClick={() => setElegidas([])}>Marcar ninguno</button>
-              </div>
-              {lista.map((e) => (
-                <label key={e.clave} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                  <input
-                    type="checkbox"
-                    checked={elegidas.includes(e.clave)}
-                    onChange={(ev) => setElegidas((p) => (ev.target.checked ? [...p, e.clave] : p.filter((c) => c !== e.clave)))}
-                  />
-                  <span style={{ flex: 1, minWidth: 0 }}>{etiquetaLista(e)}</span>
-                  {(e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO') && <span style={{ fontSize: 11, fontWeight: 600 }}>ya en cola</span>}
-                </label>
-              ))}
-            </div>
+            <SelectorEtiquetas
+              items={lista.map((e) => ({ clave: e.clave, texto: etiquetaLista(e), enCola: e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO' }))}
+              elegidas={elegidas}
+              alCambiar={setElegidas}
+            />
           )}
         </Confirmar>
       )}

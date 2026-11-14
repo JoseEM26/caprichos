@@ -54,6 +54,13 @@ export class ReimprimirPedidoDto {
   @IsBoolean()
   confirmar_anulado?: boolean;
 
+  /** Solo con stickers: claves elegidas (GENERAL, AREA:<nombre>, BEBIDA:<n>), validadas contra las del pedido. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  claves?: string[];
+
   /** Anula conscientemente el aviso de «ya se envió hace N s» (reimpresión idéntica repetida en 15 s). */
   @IsOptional()
   @IsBoolean()
