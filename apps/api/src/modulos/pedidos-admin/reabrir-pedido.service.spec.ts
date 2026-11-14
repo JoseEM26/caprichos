@@ -31,7 +31,7 @@ describe('ReabrirPedidoService', () => {
   it('ENTREGADO vuelve a LISTO, deja historial, auditoría y evento', async () => {
     const r = await service.reabrir('10', 'Me confundí', cajero, '1.1.1.1');
     expect(r.estado).toBe('LISTO');
-    expect(prisma.pedido.updateMany).toHaveBeenCalledWith({ where: { id: 10n, estado: 'ENTREGADO' }, data: { estado: 'LISTO', entregado_en: null } });
+    expect(prisma.pedido.updateMany).toHaveBeenCalledWith({ where: { id: 10n, estado: 'ENTREGADO' }, data: { estado: 'LISTO', entregado_en: null, llego_en: null } });
     expect(prisma.pedidoEstadoHistorial.create.mock.calls[0][0].data).toMatchObject({ estado_anterior: 'ENTREGADO', estado_nuevo: 'LISTO' });
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REABRIR_PEDIDO', motivo: 'Me confundí', ip: '1.1.1.1' }));
     expect(eventos.emitirAdmin).toHaveBeenCalledWith('pedido:estado', { id: 10, codigo: 'CP-W110', estado: 'LISTO' });

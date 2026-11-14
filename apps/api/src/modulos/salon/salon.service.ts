@@ -580,10 +580,10 @@ export class SalonService {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
     if (comerLocal) this.exigirComerLocalMovible(pedido);
-    else if (pedido.estado === 'ANULADO' || !pedido.espera_mesa_desde) {
+    else if (pedido.estado === 'ANULADO' || pedido.estado === 'ENTREGADO' || !pedido.espera_mesa_desde) {
       throw new ConflictException({
         codigo: 'PEDIDO_NO_EN_ESPERA',
-        mensaje: 'Este pedido ya no está en la lista de espera (se asignó a una mesa o se anuló)',
+        mensaje: 'Este pedido ya no está en la lista de espera (se asignó a una mesa, se entregó o se anuló)',
       });
     }
     const destino = await this.prisma.elementoPlano.findUnique({ where: { id: destinoId } });

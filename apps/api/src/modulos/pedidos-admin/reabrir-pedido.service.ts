@@ -82,7 +82,9 @@ export class ReabrirPedidoService {
       // Condición en el UPDATE: dos clics a la vez no lo reabren dos veces
       const r = await tx.pedido.updateMany({
         where: { id, estado: 'ENTREGADO' },
-        data: { estado: destino, entregado_en: null },
+        // llego_en vuelve a null: si no, el planificador cree que el repartidor sigue en la puerta y dispara
+        // «espera agotada», retira la movilidad y hasta puede anular el pedido.
+        data: { estado: destino, entregado_en: null, llego_en: null },
       });
       if (r.count === 0) throw new ConflictException({ codigo: 'TRANSICION_INVALIDA', mensaje: 'El pedido ya no está entregado' });
       await tx.pedidoEstadoHistorial.create({
