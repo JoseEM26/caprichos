@@ -1,5 +1,6 @@
 import { VistaPreviaPedidoBot } from '../../tipos-conversacion';
 import { EstadoCarritoPedido, MedioPagoBot } from './tipos-pedido';
+import { medioActivo } from '@caprichos/compartido';
 import { BotonAccion, FilaLista } from '../../../puerto/whatsapp-mensajeria.puerto';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -47,11 +48,27 @@ const CLAVES: Array<[MedioPagoBot, string]> = [
  */
 export function mediosActivos(datosLocalPublicos: any): MedioPagoBot[] {
   const cfg = datosLocalPublicos?.mediosPago ?? datosLocalPublicos?.mediosPagoVisibles ?? {};
-  if (Object.keys(cfg).length === 0) return CLAVES.map(([m]) => m);
-  return CLAVES.filter(([m, k]) => {
-    const c = cfg[k] ?? (m === 'TARJETA' ? cfg.pos : undefined);
-    return Boolean(c) && c.activo !== false;
-  }).map(([m]) => m);
+  const delLocal =
+    Object.keys(cfg).length === 0
+      ? CLAVES.map(([m]) => m)
+      : CLAVES.filter(([m, k]) => {
+          const c = cfg[k] ?? (m === 'TARJETA' ? cfg.pos : undefined);
+          return Boolean(c) && c.activo !== false;
+        }).map(([m]) => m);
+  // Interruptor medio × canal de Configuración (canal BOT): apagado es apagado. Sin dato = como siempre.
+  const canal = datosLocalPublicos?.mediosPagoCanal;
+  return canal ? delLocal.filter((m) => medioActivo(canal, m, 'BOT')) : delLocal;
+}
+
+/** «Efectivo, Yape y Plin» */
+export function listaMediosTexto(medios: MedioPagoBot[]): string {
+  const n = medios.map((m) => NOMBRE_MEDIO[m]);
+  return n.length <= 1 ? n.join('') : `${n.slice(0, -1).join(', ')} y ${n[n.length - 1]}`;
+}
+
+/** Respuesta amable cuando el cliente pide un medio que está apagado en el bot. */
+export function textoMedioNoDisponible(medio: MedioPagoBot, activos: MedioPagoBot[]): string {
+  return `${NOMBRE_MEDIO[medio]} no está disponible por ahora. Puedes pagar con ${listaMediosTexto(activos)}.`;
 }
 
 /** Medios que llevan voucher (los mismos que el servidor). */

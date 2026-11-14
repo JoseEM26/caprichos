@@ -12,6 +12,7 @@ import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { useMediosEncendidos } from './mediosCanal';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 
 const MEDIOS_PAGO = [
@@ -47,6 +48,7 @@ export function ModalCobrar({
   cobrar = pedidosApi.cobrar,
   alActualizarPedido,
 }: ModalCobrarProps) {
+  const encendidos = useMediosEncendidos('CAJA');
   const sinUbicar = deliverySinUbicacion(pedido);
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
@@ -409,7 +411,7 @@ export function ModalCobrar({
 
               {/* Botones de medio de pago */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {MEDIOS_PAGO.map((m) => {
+                {MEDIOS_PAGO.filter((m) => encendidos.includes(m.toUpperCase())).map((m) => {
                   const seleccionado = mismoMedio(fila.medio, m);
                   return (
                     <button

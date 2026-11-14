@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
+import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
 import {
-  MEDIOS_PLAN,
   ajustarPlan,
   aPlan,
   errorPlan,
@@ -22,6 +22,8 @@ export interface PlanPagoEditorProps {
   pagaConObligatorio?: boolean;
   /** Marca el campo «¿Con cuánto paga?» en rojo (lo usa el alta de mesa tras un intento de enviar). */
   pagaConInvalido?: boolean;
+  /** Canal que decide qué medios están encendidos (mozo por defecto; Caja en «Cambiar pago»). */
+  canal?: CanalPersonal;
 }
 
 const ALTO_TOQUE = '44px';
@@ -40,7 +42,9 @@ export function PlanPagoEditor({
   onPagaCon,
   pagaConObligatorio = false,
   pagaConInvalido = false,
+  canal = 'MOZO',
 }: PlanPagoEditorProps) {
+  const MEDIOS_PLAN = mediosPlanEncendidos(useMediosEncendidos(canal));
   // La vista siempre sale de ajustarPlan (no depende de que el padre ya haya aplicado el ajuste)
   const vista = ajustarPlan(total, filas);
 

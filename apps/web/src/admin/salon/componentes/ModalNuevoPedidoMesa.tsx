@@ -2935,6 +2935,7 @@ export function ModalNuevoPedidoMesa({
           {paso === 'items' && !edicion && fase === 'pago' && (
             <div className="np2-contenedor">
               <PasoPagoPedido
+                canal={canalActual}
                 total={total}
                 puntosCanje={puntosCanje}
                 aPagar={aPagar}
@@ -2970,6 +2971,7 @@ export function ModalNuevoPedidoMesa({
                 bloquePersonal={
                   personalPide ? (
                     <PagoPersonalBloque
+                      canal={canalActual}
                       modo={pagoPersonal}
                       onModo={setPagoPersonal}
                       medio={medioPersonal}

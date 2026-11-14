@@ -831,8 +831,23 @@ describe('CobrosService', () => {
       sinFoto();
       const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario);
       expect(res.id).toBe('77');
-      expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.parametro.findUnique).not.toHaveBeenCalledWith({ where: { clave: 'voucher_mozo_obligatorio' } });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', partyId: 3n }));
+    });
+  });
+
+  describe('medios de pago apagados en Caja', () => {
+    it('cobrar con un medio apagado en CAJA se rechaza (400) sin tocar el pedido; encendido pasa', async () => {
+      const cajaSinPlin = { CAJA: { PLIN: false } };
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'medios_pago_canal', valor: cajaSinPlin });
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'PLIN', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Plin no está disponible ahora' },
+      });
+      // pago dividido: un solo medio apagado rechaza todo el cobro
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 5 }, { medio: 'PLIN', monto: 5 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
   });
 

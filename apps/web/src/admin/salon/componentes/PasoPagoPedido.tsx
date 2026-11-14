@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
 import {
-  MEDIOS_PLAN,
   aPlan,
   montoEfectivoPlan,
   nombreMedio,
@@ -47,6 +47,8 @@ export interface PasoPagoPedidoProps {
   bloquePersonal?: ReactNode;
   /** Selector de comprobante (simple, boleta o factura). */
   comprobante: ReactNode;
+  /** Canal que decide qué medios están encendidos (Configuración › Pagos). */
+  canal?: CanalPersonal;
 }
 
 function dinero(n: number): string {
@@ -79,7 +81,9 @@ export function PasoPagoPedido({
   mostrarErrores,
   bloquePersonal,
   comprobante,
+  canal = 'MOZO',
 }: PasoPagoPedidoProps) {
+  const MEDIOS_PLAN = mediosPlanEncendidos(useMediosEncendidos(canal));
   const conDetalle = bloquePersonal ? false : cuandoPaga !== 'final';
   const propinaNum = Math.max(0, Math.round((aPagar - total) * 100) / 100);
 

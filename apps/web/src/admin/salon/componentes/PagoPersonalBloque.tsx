@@ -1,3 +1,4 @@
+import { useMediosEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
 /** Cómo paga el trabajador su pedido del personal: a su crédito (por defecto) o «Pagar ahora» con medio. */
 export type ModoPagoPersonal = 'credito' | 'ahora';
 export const MEDIOS_PAGO_PERSONAL = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] as const;
@@ -17,6 +18,7 @@ export function textoPagoPersonal(modo: ModoPagoPersonal, medio: string): string
 }
 
 interface Props {
+  canal?: CanalPersonal;
   modo: ModoPagoPersonal;
   onModo: (m: ModoPagoPersonal) => void;
   medio: string;
@@ -44,7 +46,8 @@ const tarjeta = (activa: boolean): React.CSSProperties => ({
   fontSize: 12,
 });
 
-export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCon, onPagaCon, puedeCobrarAhora, error, mostrarError }: Props) {
+export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCon, onPagaCon, puedeCobrarAhora, error, mostrarError, canal = 'MOZO' }: Props) {
+  const encendidos = useMediosEncendidos(canal);
   const vuelto = Number(pagaCon) - total;
   return (
     <div id="np-pago-personal" data-testid="pago-personal" role="group" aria-label="¿Cómo lo paga el trabajador?" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -64,7 +67,7 @@ export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCo
       {modo === 'ahora' && puedeCobrarAhora && (
         <>
           <div role="radiogroup" aria-label="Medio de pago" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {MEDIOS_PAGO_PERSONAL.map((m) => (
+            {MEDIOS_PAGO_PERSONAL.filter((m) => encendidos.includes(m)).map((m) => (
               <button
                 key={m}
                 type="button"

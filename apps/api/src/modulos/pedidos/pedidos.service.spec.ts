@@ -410,6 +410,30 @@ describe('PedidosService', () => {
         expect(Number(data.paga_con)).toBe(20);
       });
 
+      it('medio apagado en el canal del pedido: 400 y no se crea; en el pago dividido basta uno apagado', async () => {
+        const base = prismaMock.parametro.findUnique.getMockImplementation();
+        const apagar = (canal: string, medio: string) =>
+          prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+            where.clave === 'medios_pago_canal' ? Promise.resolve({ clave: where.clave, valor: { [canal]: { [medio]: false } } }) : base!({ where }),
+          );
+        apagar('CARTA', 'YAPE');
+        await expect(
+          service.crear(conPlan([{ medio: 'EFECTIVO', monto: 13 }, { medio: 'YAPE', monto: 20 }], { pagaCon: 20 }), 'idemp-ap-1'),
+        ).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Yape no está disponible ahora' } });
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-2')).rejects.toMatchObject({
+          response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        // Apagado en MOZO no afecta a la carta
+        apagar('MOZO', 'YAPE');
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-3')).resolves.toBeDefined();
+        // En el canal MOZO sí se rechaza
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-4', { canal: 'MOZO' } as any)).rejects.toMatchObject({
+          response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+        });
+        prismaMock.parametro.findUnique.mockImplementation(base!);
+      });
+
       it('rechaza un plan cuya suma no iguala el total y no crea el pedido', async () => {
         await expect(
           service.crear(

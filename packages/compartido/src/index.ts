@@ -125,3 +125,15 @@ export {
   semaforoContraMeta,
 } from './utilidades/etapas-tiempos.js';
 export type { CodigoEtapa, EtapaPipeline, SemaforoTiempo } from './utilidades/etapas-tiempos.js';
+export {
+  MEDIOS_PAGO_CANAL,
+  CANALES_MEDIO_PAGO,
+  NOMBRE_MEDIO_PAGO,
+  CLAVE_MEDIOS_PAGO_CANAL,
+  mediosPagoPorDefecto,
+  canalMedioPago,
+  normalizarMediosPagoCanal,
+  medioActivo,
+  mediosActivos as mediosPagoActivosCanal,
+} from './mediosPago.js';
+export type { MedioPagoCanal, CanalMedioPago, MediosPagoPorCanal } from './mediosPago.js';

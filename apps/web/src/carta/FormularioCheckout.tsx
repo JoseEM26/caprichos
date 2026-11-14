@@ -1,3 +1,4 @@
+import { medioActivo } from '@caprichos/compartido';
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -173,11 +174,18 @@ export function FormularioCheckout({
 
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
+  // Medios apagados para la carta (Configuración › Pagos): no se muestran; el servidor además los rechaza
+  const medioOk = (m: MetodoPago) => medioActivo(datosLocal?.mediosPagoCanal, m, 'CARTA');
   const [pagaCon, setPagaCon] = useState('');
   // Pago dividido: dos medios; el primero lleva el monto y el segundo, el resto
   const [dividirPago, setDividirPago] = useState(false);
   const [monto1Texto, setMonto1Texto] = useState('');
   const [medio2, setMedio2] = useState<MetodoPago | null>(null);
+  const primerMedioActivo = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).find(medioOk);
+  useEffect(() => {
+    if (primerMedioActivo && !medioOk(metodoPago)) setMetodoPago(primerMedioActivo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datosLocal?.mediosPagoCanal]);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -2099,6 +2107,11 @@ export function FormularioCheckout({
                       Medio de pago
                     </div>
 
+                    {!primerMedioActivo && (
+                      <div role="status" data-testid="sin-medios-pago" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                        Por ahora no podemos recibir pagos desde la carta. Escríbenos por WhatsApp y te ayudamos.
+                      </div>
+                    )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).map(
                         (m) => {
@@ -2108,7 +2121,7 @@ export function FormularioCheckout({
                             claveConfig === 'tarjeta' ||
                             mediosPagoDisponibles[claveConfig]?.activo !== false;
 
-                          if (!estaConfigurado) return null;
+                          if (!estaConfigurado || !medioOk(m)) return null;
 
                           const seleccionado = metodoPago === m;
                           return (
@@ -2172,6 +2185,7 @@ export function FormularioCheckout({
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[])
                             .filter((m) => m !== metodoPago)
+                            .filter(medioOk)
                             .filter((m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false)
                             .map((m) => (
                               <button

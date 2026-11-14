@@ -16,6 +16,9 @@ import {
   EstadoPagoFlujo,
   MAX_CAPTURAS_VOUCHER,
 } from './tipos-pago';
+import { textoMedioNoDisponible, listaMediosTexto, NOMBRE_MEDIO } from '../pedido/pago-bot.util';
+import type { MedioPagoBot } from '../pedido/tipos-pedido';
+import { medioActivo } from '@caprichos/compartido';
 import { BOTON_HABLAR_PERSONA, TEXTOS_BOT } from '../../textos-bot';
 
 const PALABRAS_PERSONA = ['persona', 'humano', 'asesor', 'atencion', 'ayuda', 'operador'];
@@ -24,6 +27,20 @@ const PALABRAS_MENU = ['menu', 'volver', 'inicio', 'cancelar'];
 function coincidePalabra(texto: string, lista: string[]): boolean {
   if (!texto) return false;
   return lista.some((p) => texto.includes(p));
+}
+
+/** Medios que el interruptor medio × canal deja encendidos en el bot (sin interruptor = todos). */
+function mediosActivos(datosLocalPublicos: any): MedioPagoBot[] {
+  return (Object.keys(NOMBRE_MEDIO) as MedioPagoBot[]).filter((m) => medioActivo(datosLocalPublicos?.mediosPagoCanal, m, 'BOT'));
+}
+
+/** Botones de «cambiar medio» solo con lo que está encendido en el bot (Yape y Plin comparten botón). */
+function botonesCambioActivos(activos: MedioPagoBot[]) {
+  return BOTONES_PAGO_MEDIOS_CAMBIO.filter((b) =>
+    b.id === 'pago_medio_efectivo' ? activos.includes('EFECTIVO')
+    : b.id === 'pago_medio_tarjeta' ? activos.includes('TARJETA')
+    : activos.includes('YAPE') || activos.includes('PLIN'),
+  );
 }
 
 export class FlujoPagoSubFlujo implements SubFlujoConversacion {
@@ -142,13 +159,24 @@ export class FlujoPagoSubFlujo implements SubFlujoConversacion {
 
     // 4. Cambiar medio de pago
     if (entrada.id === 'pago_cambiar_medio') {
+      const activos = mediosActivos(contexto.datosLocalPublicos).filter((m) => m !== 'TRANSFERENCIA');
+      if (activos.length === 0) {
+        return {
+          nuevoEstado: 'ATENCION_PERSONA',
+          acciones: [
+            { tipo: 'pasarAPersona', motivo: 'SIN_MEDIOS_DE_PAGO_BOT', mensajeCliente: entrada.textoOriginal },
+            { tipo: 'enviarTexto', texto: 'Por ahora no puedo cambiar el medio de pago por aquí. Una persona del equipo te ayuda enseguida.' },
+          ],
+          nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA' },
+        };
+      }
       return {
         nuevoEstado: 'PAGO_CAMBIAR_MEDIO',
         acciones: [
           {
             tipo: 'enviarBotones',
             texto: TEXTOS_PAGO.elegirNuevoMedio(),
-            botones: BOTONES_PAGO_MEDIOS_CAMBIO,
+            botones: botonesCambioActivos(activos),
           },
         ],
         nuevoFlujo: {
@@ -164,6 +192,26 @@ export class FlujoPagoSubFlujo implements SubFlujoConversacion {
       estadoPago === 'PAGO_CAMBIAR_MEDIO' || entrada.id?.startsWith('pago_medio_');
 
     if (esCambioMedio) {
+      // Medio apagado en el bot: no se acepta; respuesta amable con lo que sí hay
+      const activos = mediosActivos(contexto.datosLocalPublicos);
+      const pedido: MedioPagoBot | null =
+        entrada.id === 'pago_medio_efectivo' || entrada.texto === 'efectivo' ? 'EFECTIVO'
+        : entrada.id === 'pago_medio_tarjeta' || entrada.texto === 'tarjeta' || /\bpos\b/.test(entrada.texto) ? 'TARJETA'
+        : entrada.texto === 'plin' ? 'PLIN'
+        : entrada.texto === 'yape' ? 'YAPE'
+        : entrada.id === 'pago_medio_yape_plin' ? (activos.includes('YAPE') ? 'YAPE' : 'PLIN')
+        : null;
+      if (pedido && !activos.includes(pedido)) {
+        const permitidos = activos.filter((m) => m !== 'TRANSFERENCIA');
+        return {
+          nuevoEstado: 'PAGO_CAMBIAR_MEDIO',
+          acciones: [
+            { tipo: 'enviarTexto', texto: textoMedioNoDisponible(pedido, permitidos) },
+            { tipo: 'enviarBotones', texto: `Elige cómo pagas: ${listaMediosTexto(permitidos)}.`, botones: botonesCambioActivos(permitidos) },
+          ],
+          nuevoFlujo: { ...flujo, estado: 'PAGO_CAMBIAR_MEDIO', pago: pagoActual },
+        };
+      }
       if (entrada.id === 'pago_medio_efectivo' || entrada.texto === 'efectivo') {
         const total = pagoActual.monto || Number(contexto.pedidoActivo?.total || 0);
         const modalidad = contexto.pedidoActivo?.modalidad || 'DELIVERY';
@@ -230,7 +278,7 @@ export class FlujoPagoSubFlujo implements SubFlujoConversacion {
         const textoDatos = TEXTOS_PAGO.datosPagoMensaje({
           codigo,
           total,
-          metodo: 'YAPE',
+          metodo: pedido === 'PLIN' ? 'PLIN' : 'YAPE',
           datosLocalPagos: datosPagos,
         });
 
@@ -247,7 +295,7 @@ export class FlujoPagoSubFlujo implements SubFlujoConversacion {
             estado: 'PAGO_ESPERANDO_VOUCHER',
             pago: {
               ...pagoActual,
-              medio: 'YAPE',
+              medio: pedido === 'PLIN' ? 'PLIN' : 'YAPE',
             },
           },
         };

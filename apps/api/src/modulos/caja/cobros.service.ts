@@ -1,3 +1,4 @@
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { PuntosService } from '../clientes/puntos.service';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
@@ -108,6 +109,7 @@ export class CobrosService {
     }
 
     this.validarPagos(dto);
+    await exigirMediosActivos(this.prisma, dto.pagos.map((p) => p.medio), 'CAJA');
 
     const { fechaDate } = this.obtenerFechaHoyLima();
     const cajaHoy = await this.prisma.caja.findUnique({
@@ -123,6 +125,7 @@ export class CobrosService {
    */
   async cobrarEnCierre(cajaId: bigint, dto: CobrarDto, usuario: any, ip?: string) {
     this.validarPagos(dto);
+    await exigirMediosActivos(this.prisma, dto.pagos.map((p) => p.medio), 'CAJA');
     return this.registrarCobro(dto, usuario, ip, cajaId, true);
   }
 

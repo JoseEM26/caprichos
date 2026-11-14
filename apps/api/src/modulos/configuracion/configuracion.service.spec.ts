@@ -151,6 +151,27 @@ describe('ConfiguracionService', () => {
       await expect(service.actualizar('propina_activa', true, adminAuth)).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('medios_pago_canal: solo ADMIN, se guarda completo, rechaza formas raras y no deja Caja sin medios; queda auditado', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'medios_pago_canal', valor: {} });
+
+      await expect(service.actualizar('medios_pago_canal', { CARTA: { PLIN: false } }, { ...adminAuth, rol: 'SUPERVISOR' } as any)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('medios_pago_canal', { CARTA: { PLIN: 'no' } }, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await expect(service.actualizar('medios_pago_canal', { CARTA: { BITCOIN: true } }, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      const todoApagado = { EFECTIVO: false, YAPE: false, PLIN: false, TARJETA: false, TRANSFERENCIA: false, PAGO_EN_LINEA: false };
+      await expect(service.actualizar('medios_pago_canal', { CAJA: todoApagado }, adminAuth)).rejects.toMatchObject({ response: { codigo: 'CAJA_SIN_MEDIOS' } });
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+
+      // En los otros canales sí se puede apagar todo
+      await service.actualizar('medios_pago_canal', { CARTA: todoApagado, BOT: { PLIN: false } }, adminAuth);
+      const guardado = prismaMock.parametro.upsert.mock.calls[0][0].create.valor;
+      expect(guardado.CARTA).toEqual(todoApagado);
+      expect(guardado.BOT.PLIN).toBe(false);
+      expect(guardado.BOT.YAPE).toBe(true);
+      expect(guardado.CAJA.EFECTIVO).toBe(true);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'configuracion', accion: 'PARAMETRO', despues: expect.objectContaining({ clave: 'medios_pago_canal' }) }));
+    });
+
     it('propina_tope: entre S/ 1 y S/ 1000', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue(null);
       prismaMock.parametro.upsert.mockResolvedValue({ clave: 'propina_tope', valor: 50 });

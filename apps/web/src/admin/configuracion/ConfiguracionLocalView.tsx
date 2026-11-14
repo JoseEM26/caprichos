@@ -5,6 +5,7 @@ import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
 import { PagosTab } from './PagosTab';
+import { TarjetaMediosPagoCanal } from './TarjetaMediosPagoCanal';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
 import { SeccionAltaDemanda } from './SeccionAltaDemanda';
@@ -922,7 +923,12 @@ export function ConfiguracionLocalView() {
           {tabId === 'zonas' && <ZonasRepartoView />}
 
           {/* Subcaso: MEDIOS DE PAGO (parámetro local_pagos en el servidor; lo leen carta y bot) */}
-          {tabId === 'pagos' && <PagosTab puedeEditar={puedeEditar} />}
+          {tabId === 'pagos' && (
+            <>
+              <PagosTab puedeEditar={puedeEditar} />
+              <TarjetaMediosPagoCanal />
+            </>
+          )}
 
           {/* Subcaso: ALTA DEMANDA Y PAUSA DE PEDIDOS */}
           {tabId === 'cocina' && <TarjetaConfirmarDespejarConfiguracion />}

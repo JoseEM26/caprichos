@@ -206,6 +206,6 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
 
     const res = await service.cobrar(dtoCobroDigitalYape, mozoUsuario);
     expect(res.id).toBe('500');
-    expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.parametro.findUnique).not.toHaveBeenCalledWith({ where: { clave: 'voucher_mozo_obligatorio' } });
   });
 });

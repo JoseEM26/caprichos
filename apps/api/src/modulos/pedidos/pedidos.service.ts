@@ -1,4 +1,5 @@
 import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, trabajadorDeCuentaCliente, validarColaborador } from '../creditos/descuento-personal';
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { totalPedido } from '../../comun/total-pedido';
@@ -207,6 +208,7 @@ export class PedidosService {
     if (!['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'].includes(medio)) {
       throw new BadRequestException({ codigo: 'MEDIO_REQUERIDO', mensaje: 'Elige con qué paga el trabajador' });
     }
+    await exigirMediosActivos(this.prisma, [medio], origen.canal ?? 'CARTA');
     const pagaCon = Number(origen.pagoPersonal?.pagaCon ?? 0);
     if (medio === 'EFECTIVO' && total > 0) {
       if (!(pagaCon > 0)) {
@@ -1163,6 +1165,10 @@ export class PedidosService {
     const aCobrarAhora = creditoConEnvio ? Number((envio ?? 0).toFixed(2)) : aCobrar;
     const sinPagoAhora = personal || (creditoConEnvio && aCobrarAhora <= 0);
     const planPago = sinPagoAhora ? null : this.pagoPlan.validar(dto.pago.plan, aCobrarAhora);
+    // «Apagado es apagado»: el medio (o todos los del pago dividido) debe estar encendido en el canal del pedido
+    if (!sinPagoAhora) {
+      await exigirMediosActivos(this.prisma, planPago ? planPago.map((f) => f.medio) : [dto.pago.metodo], origen?.canal ?? 'CARTA');
+    }
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
       : dto.pago.metodo === 'EFECTIVO' && !sinPagoAhora

@@ -1,4 +1,5 @@
 import { esSoloMozo, rolEfectivoMozo } from '../acceso/roles-usuario';
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { totalCobrable } from '../propinas/propinas.util';
 import {
   BadRequestException,
@@ -719,6 +720,8 @@ export class VouchersService {
 
     // Pago dividido: el plan debe sumar el total del pedido (lo valida PagoPlanService)
     const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido)) : null;
+    // «Apagado es apagado» en el mozo: el medio (o todos los del pago dividido) debe estar encendido en MOZO
+    await exigirMediosActivos(this.prisma, planValidado ? planValidado.map((f) => f.medio) : [medioNormalizado], 'MOZO');
     const desglose = planValidado
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
@@ -1154,6 +1157,7 @@ export class VouchersService {
     if (!planValidado) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago no es válido' });
     }
+    await exigirMediosActivos(this.prisma, planValidado.map((f) => f.medio), 'MOZO');
     const medioPrincipal = this.pagoPlan.pagoPrincipal(planValidado);
     await this.prisma.$transaction(async (tx) => {
       await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: id } });
