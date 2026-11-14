@@ -1438,8 +1438,9 @@ export class PedidosService {
         });
       }
 
-      // Aviso al cliente de la carta virtual: se encola en la misma transacción que el pedido
-      if ((origen?.canal ?? 'CARTA') === 'CARTA' && this.avisosPedidoService) {
+      // Aviso «pedido recibido» al cliente (todos los canales; sin celular real o del personal no sale nada):
+      // se encola en la misma transacción que el pedido
+      if (!origen?.esPersonal && this.avisosPedidoService) {
         await this.avisosPedidoService.avisar(pedido.id, 'RECIBIDO', {}, tx);
       }
       // Aviso al equipo (nuevo pedido): también encolado en la transacción del pedido

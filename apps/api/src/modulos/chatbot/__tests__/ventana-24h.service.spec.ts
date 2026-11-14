@@ -1,5 +1,5 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
-import { Ventana24hService } from '../servicios/ventana-24h.service';
+import { esDescarteSilencioso, Ventana24hService } from '../servicios/ventana-24h.service';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { WhatsAppMensajeriaPuerto } from '../puerto/whatsapp-mensajeria.puerto';
@@ -184,7 +184,7 @@ describe('Ventana24hService', () => {
     );
   });
 
-  it('si la plantilla no existe en el catálogo, registra fallo y avisa a Caja por la campana', async () => {
+  it('ventana cerrada y sin plantilla en el catálogo: se omite en silencio (sin registro de error ni campana)', async () => {
     mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null); // Ventana cerrada
     mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });
 
@@ -194,19 +194,36 @@ describe('Ventana24hService', () => {
     });
 
     expect(resultado.exito).toBe(false);
+    expect(resultado.estado).toBe('OMITIDO');
     expect(resultado.errorCodigo).toBe('PLANTILLA_NO_CONFIGURADA');
-    expect(mockPrisma.notificacion.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          rol_destino: 'CAJERO',
-          titulo: expect.stringContaining('plantilla'),
-        }),
-      }),
-    );
-    expect(mockEventos.emitirAdmin).toHaveBeenCalledWith(
-      'notificaciones:nueva',
-      expect.any(Object),
-    );
+    expect(mockPrisma.whatsappMensaje.create).not.toHaveBeenCalled();
+    expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
+    expect(mockEventos.emitirAdmin).not.toHaveBeenCalled();
+    expect(mockMensajeria.enviarPlantilla).not.toHaveBeenCalled();
+  });
+
+  it('Meta rechaza la plantilla (no aprobada): una sola llamada, sin campana', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null);
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue(null);
+    mockMensajeria.enviarPlantilla.mockResolvedValue({ exito: false, estado: 'FALLIDO', errorCodigo: 'PLANTILLA_NO_APROBADA', errorDetalle: 'x' });
+
+    const r = await servicio.enviarMensajeNegocio('51987654321', { textoLibre: 'x', plantillaClave: 'PAGO_CONFIRMADO', variablesPlantilla: ['Ana', 'CP-1'] });
+
+    expect(r.exito).toBe(false);
+    expect(esDescarteSilencioso(r.errorCodigo)).toBe(true);
+    expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
+  });
+
+  it('un error que no es de plantilla (número inválido) sigue avisando a Caja', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null);
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue(null);
+    mockMensajeria.enviarPlantilla.mockResolvedValue({ exito: false, estado: 'FALLIDO', errorCodigo: 'NUMERO_INVALIDO', errorDetalle: 'x' });
+
+    const r = await servicio.enviarMensajeNegocio('51987654321', { textoLibre: 'x', plantillaClave: 'PAGO_CONFIRMADO', variablesPlantilla: ['Ana', 'CP-1'] });
+
+    expect(esDescarteSilencioso(r.errorCodigo)).toBe(false);
+    expect(mockPrisma.notificacion.create).toHaveBeenCalledTimes(1);
   });
 
   it('si el cliente solicitó BAJA, bloquea el envío comercial/informativo', async () => {

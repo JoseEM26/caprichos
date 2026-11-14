@@ -15,7 +15,7 @@ import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catal
 import { enmascararTelefono, ORIGEN_CODIGO_CUENTA, textoParaPersonal } from '../utilidades/enmascarar.util';
 import { codigoInternoDeMeta, CODIGOS_PLANTILLA_PERMANENTES, separarDetalleTecnico } from '../utilidades/meta-errores.util';
 import { mapearErrorWhatsApp } from '../../mensajes/utilidades/error-whatsapp.util';
-import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
+import { esDescarteSilencioso, PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
 import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
 
@@ -315,9 +315,14 @@ export class OutboxWhatsappService {
       return 'ENVIADO';
     }
 
-    if (resultado.estado === 'OMITIDO') {
-      // Guardia de salida: número propio o bloqueado. No es un fallo ni se reintenta: queda DESCARTADO con su motivo.
-      const motivo = TEXTO_OMISION[resultado.errorCodigo as MotivoOmision] ?? 'Omitido por el guardia de salida';
+    if (resultado.estado === 'OMITIDO' || esDescarteSilencioso(resultado.errorCodigo)) {
+      // Guardia de salida (número propio o bloqueado) o ventana de 24 h cerrada sin plantilla aprobada / plantilla
+      // rechazada por Meta: no es un fallo ni se reintenta. Queda DESCARTADO con su motivo, sin chat de error ni campana.
+      const motivo =
+        TEXTO_OMISION[resultado.errorCodigo as MotivoOmision] ??
+        (esDescarteSilencioso(resultado.errorCodigo)
+          ? `Descartado sin aviso: ventana de 24 h cerrada y no hay plantilla aprobada (${resultado.errorCodigo}). ${resultado.errorDetalle ?? ''}`.trim().slice(0, 500)
+          : 'Omitido por el guardia de salida');
       const r = await this.prisma.salienteWhatsapp.updateMany({
         where: { id: fila.id, intento_token: token },
         data: {

@@ -150,6 +150,27 @@ describe('OutboxWhatsappService (salientes de WhatsApp)', () => {
       expect(prisma.notificacion.create).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['ventana cerrada sin plantilla', { exito: false, estado: 'OMITIDO', errorCodigo: 'PLANTILLA_NO_CONFIGURADA', errorDetalle: 'sin plantilla' }],
+      ['Meta rechaza la plantilla', { exito: false, estado: 'FALLIDO', errorCodigo: 'PLANTILLA_NO_APROBADA', errorDetalle: 'no aprobada' }],
+      ['Meta rechaza por 24 h', { exito: false, estado: 'FALLIDO', errorCodigo: 'FUERA_DE_VENTANA_24H', errorDetalle: '131047' }],
+    ])('%s: DESCARTADO en silencio, sin reintento, sin burbuja en el chat y sin campana', async (_n, resultado) => {
+      ventana.enviarMensajeNegocio.mockResolvedValueOnce(resultado);
+      const r = await servicio.procesarLote();
+      expect(r).toMatchObject({ enviados: 0, reintentos: 0, fallidos: 0 });
+      expect(prisma.salienteWhatsapp.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            estado: 'DESCARTADO',
+            motivo_descarte: expect.stringContaining('ventana de 24 h cerrada'),
+            descartado_por: 'Sistema',
+          }),
+        }),
+      );
+      expect(prisma.mensajeChat.create).not.toHaveBeenCalled();
+      expect(prisma.notificacion.create).not.toHaveBeenCalled();
+    });
+
     it('cliente en BAJA: FALLIDO pero sin aviso (es un resultado esperado)', async () => {
       ventana.enviarMensajeNegocio.mockResolvedValueOnce({ exito: false, estado: 'FALLIDO', errorCodigo: 'CLIENTE_BAJA', errorDetalle: 'BAJA' });
       await servicio.procesarLote();

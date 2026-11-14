@@ -311,6 +311,51 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       expect(mockOutbox.encolar).not.toHaveBeenCalled();
     });
   });
+  describe('pago confirmado y entregado en pedidos que no son delivery (carta, Caja, mozo, bot)', () => {
+    fijarReloj();
+    const local = (extra: Record<string, unknown> = {}) => ({
+      id: BigInt(90), estado: 'COLA', pago_estado: 'PENDIENTE', entregado_en: null, entregado_mesa_en: null, ...extra,
+    });
+    const conLocales = (filas: unknown[]) => {
+      mockPrisma.pedido.findMany.mockImplementation(async (args: any) => (args?.where?.modalidad?.not === 'DELIVERY' ? filas : []));
+    };
+
+    it('la consulta excluye delivery, personal, anulados, sin celular y lo ya avisado (mensaje_reparto 6 y 8)', async () => {
+      conLocales([]);
+      await planificador.ejecutarCiclo();
+      const where = mockPrisma.pedido.findMany.mock.calls.map((c: any[]) => c[0].where).find((w: any) => w?.modalidad?.not === 'DELIVERY');
+      expect(where).toMatchObject({ estado: { notIn: ['ANULADO'] }, es_personal: false, cliente_telefono: { not: null } });
+      expect(JSON.stringify(where.AND)).toContain('"numero":6');
+      expect(JSON.stringify(where.AND)).toContain('"numero":8');
+    });
+
+    it('pedido pagado: aviso de pago confirmado (ACEPTADO) y, si no está entregado, ningún ENTREGADO', async () => {
+      conLocales([local({ pago_estado: 'PAGADO' })]);
+      const res = await planificador.ejecutarCiclo();
+      expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(90), 'ACEPTADO');
+      expect(mockAvisos.avisar).not.toHaveBeenCalledWith(BigInt(90), 'ENTREGADO');
+      expect(res.avisosAceptado).toBe(1);
+    });
+
+    it.each([
+      ['estado ENTREGADO', { estado: 'ENTREGADO' }],
+      ['entregado_en', { entregado_en: new Date() }],
+      ['mesa servida', { entregado_mesa_en: new Date() }],
+    ])('entregado (%s): aviso ENTREGADO una vez por pedido (no por línea)', async (_n, extra) => {
+      conLocales([local(extra)]);
+      await planificador.ejecutarCiclo();
+      expect(mockAvisos.avisar.mock.calls.filter((c: any[]) => c[1] === 'ENTREGADO')).toEqual([[BigInt(90), 'ENTREGADO']]);
+    });
+
+    it('interruptor de pago confirmado apagado: no avisa el pago pero sí la entrega', async () => {
+      mockPrisma.parametro.findMany.mockResolvedValue(parametros({ whatsapp_aviso_pago_confirmado_activo: 'no' }));
+      conLocales([local({ pago_estado: 'PAGADO', estado: 'ENTREGADO' })]);
+      await planificador.ejecutarCiclo();
+      expect(mockAvisos.avisar).not.toHaveBeenCalledWith(BigInt(90), 'ACEPTADO');
+      expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(90), 'ENTREGADO');
+    });
+  });
+
   describe('encuesta posventa por todos los canales (carta, bot, mozo y caja)', () => {
     fijarReloj();
     const base = (extra: Record<string, unknown> = {}) => ({

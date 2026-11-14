@@ -373,6 +373,41 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         }
       }
 
+      // 2b. Pedidos que no son delivery (carta, Caja, mozo, bot): «pago confirmado» (ACEPTADO) y «entregado» por
+      //     pedido, una sola vez (mensaje_reparto). El servicio de avisos respeta los interruptores, el consentimiento
+      //     y los pedidos sin celular real o del personal.
+      const desdeLocal = new Date(ahora.getTime() - VENTANA_REVISION_MS);
+      const pedidosLocal = await this.prisma.pedido.findMany({
+        where: {
+          modalidad: { not: 'DELIVERY' },
+          estado: { notIn: ['ANULADO'] },
+          es_personal: false,
+          cliente_telefono: { not: null },
+          creado_en: { gte: desdeLocal },
+          AND: [
+            {
+              OR: [
+                { pago_estado: 'PAGADO', mensajesReparto: { none: { numero: 6 } } },
+                { mensajesReparto: { none: { numero: 8 } }, OR: [{ estado: 'ENTREGADO' }, { entregado_en: { not: null } }, { entregado_mesa_en: { not: null } }] },
+              ],
+            },
+          ],
+        },
+        select: { id: true, estado: true, pago_estado: true, entregado_en: true, entregado_mesa_en: true },
+        take: 100,
+      });
+      for (const p of pedidosLocal) {
+        try {
+          if (params.avisoPagoConfirmadoActivo && p.pago_estado === 'PAGADO') {
+            const r = await this.avisos?.avisar(p.id, 'ACEPTADO');
+            if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') resumen.avisosAceptado++;
+          }
+          if (p.estado === 'ENTREGADO' || p.entregado_en || p.entregado_mesa_en) await this.avisos?.avisar(p.id, 'ENTREGADO');
+        } catch (err: any) {
+          this.logger.error(`Error en avisos del pedido ${p.id}: ${err.message}`);
+        }
+      }
+
       // 3. Encuesta posventa tras X minutos de la entrega, para todo pedido con teléfono (carta, bot, mozo y caja).
       //    Delivery y recojo: entregado_en (cocina o reparto). Mesa: entregado en mesa o el cobro.
       //    Para llevar/recoger que quedó LISTO y se cobró sin pasar por cocina (no fija entregado_en): el cobro vigente.

@@ -31,9 +31,9 @@ export const ETAPAS_AVISO: Record<
   INSISTENCIA: { numero: 3, parametro: 'whatsapp_aviso_llegada_activo' },
   ESPERA_AGOTADA: { numero: 4, parametro: 'whatsapp_aviso_espera_activo' },
   RETIRO: { numero: 5, parametro: 'whatsapp_aviso_espera_activo' },
-  ACEPTADO: { numero: 6, parametro: 'whatsapp_aviso_pago_confirmado_activo' },
+  ACEPTADO: { numero: 6, parametro: 'whatsapp_aviso_pago_confirmado_activo', cualquierModalidad: true },
   LISTO: { numero: 7, parametro: 'whatsapp_aviso_listo_activo' },
-  ENTREGADO: { numero: 8, parametro: 'whatsapp_aviso_entregado_activo' },
+  ENTREGADO: { numero: 8, parametro: 'whatsapp_aviso_entregado_activo', cualquierModalidad: true },
   // Pedido de la carta virtual recién creado: vale para cualquier modalidad
   RECIBIDO: { numero: 9, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
   // Reprogramación tras el retiro: el reenvío y los cierres comparten la activación de espera/retiro
@@ -91,6 +91,8 @@ export interface DatosAviso {
   plantillaSeguimiento?: boolean;
   /** RECIBIDO delivery sin ubicación: usar las plantillas que piden la ubicación (parámetro whatsapp_plantilla_delivery_ubicacion_activa). */
   plantillaUbicacion?: boolean;
+  /** ACEPTADO de un pedido que no es delivery: «recibimos tu pago» (plantilla caprichos_pago_confirmado). */
+  pagoConfirmado?: boolean | 'SIMPLE';
   /** RECIBIDO: productos, total, medio y estado del envío (se arma al avisar). */
   resumen?: ResumenRecibido | null;
   /** RECIBIDO con pago digital: bloque «número, titular y monto» (se arma al avisar). */
@@ -170,9 +172,15 @@ export class AvisosPedidoService {
         cliente_party_id: true,
         puntos_ganados: true,
         repartidor_party_id: true,
+        es_personal: true,
+        estado: true,
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
+    // Pedido del bot o de WhatsApp: el bot ya confirmó el pedido en la conversación, no se manda un «recibido» extra
+    if (etapa === 'RECIBIDO' && (pedido.canal === 'BOT' || pedido.canal === 'WHATSAPP')) return { estado: 'OMITIDO', motivo: 'LO_CONFIRMA_EL_BOT' };
+    // El pedido del personal nunca se avisa
+    if (pedido.es_personal) return { estado: 'OMITIDO', motivo: 'PEDIDO_PERSONAL' };
     // «Comer en el local»: se le llama en voz alta por su nombre, nunca se avisa por WhatsApp que está listo
     if (pedido.modalidad === 'COMER_LOCAL' && etapa === 'LISTO_RECOJO') return { estado: 'OMITIDO', motivo: 'COMER_EN_LOCAL' };
     if (pedido.modalidad !== 'DELIVERY' && !cfg.cualquierModalidad) return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
@@ -190,6 +198,15 @@ export class AvisosPedidoService {
     const telefono = telefonoEnviable(pedido.cliente_telefono);
     if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
 
+    // Ampliación a todos los pedidos (Caja, mozo, bot, recojo, mesa): interruptor general, encendido por defecto.
+    // No rige para lo que ya salía: RECIBIDO de la carta y los avisos del delivery de la carta.
+    const ampliado =
+      (etapa === 'RECIBIDO' || etapa === 'ACEPTADO' || etapa === 'ENTREGADO') &&
+      !(pedido.canal === 'CARTA' && (etapa === 'RECIBIDO' || pedido.modalidad === 'DELIVERY'));
+    if (ampliado) {
+      const todos = await db.parametro.findUnique({ where: { clave: 'whatsapp_aviso_todos_pedidos_activo' } });
+      if (!parametroActivoConDefecto(todos?.valor, true)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
+    }
     const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });
     // ASIGNADO viene encendido si el parámetro aún no existe; el resto exige «Sí» explícito
     if (!parametroActivoConDefecto(flag?.valor, etapa === 'ASIGNADO')) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
@@ -199,6 +216,7 @@ export class AvisosPedidoService {
       datos = { ...datos, repartidorNombre: (persona?.nombres ?? '').trim().split(/\s+/)[0] || 'nuestro repartidor' };
     }
 
+    if (etapa === 'ACEPTADO' && pedido.modalidad !== 'DELIVERY') datos = { ...datos, pagoConfirmado: pedido.modalidad === 'MESA' || pedido.estado === 'ENTREGADO' ? 'SIMPLE' : true };
     const nombre = pedido.cliente_nombre || 'Cliente';
     const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
     if (etapa === 'RECIBIDO') {
@@ -523,7 +541,7 @@ export class AvisosPedidoService {
           ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento, datos.resumen, datos.datosPago)
           : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento, datos.resumen);
       case 'ACEPTADO':
-        return TEXTOS_REPARTO.aceptado(nombre, codigo);
+        return datos.pagoConfirmado ? TEXTOS_REPARTO.pagoConfirmado(nombre, codigo, datos.pagoConfirmado === 'SIMPLE') : TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':
         return TEXTOS_REPARTO.listo(nombre, codigo);
       case 'LISTO_RECOJO':

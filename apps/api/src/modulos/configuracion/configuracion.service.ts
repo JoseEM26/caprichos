@@ -203,6 +203,7 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_listo_activo',
   'whatsapp_aviso_entregado_activo',
   'whatsapp_aviso_recibido_activo',
+  'whatsapp_aviso_todos_pedidos_activo',
   'whatsapp_aviso_encuesta_activo',
   'whatsapp_aviso_voucher_recordatorio_activo',
   'whatsapp_plantilla_recibido_seguimiento_activa',

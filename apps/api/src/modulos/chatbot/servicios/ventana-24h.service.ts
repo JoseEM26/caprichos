@@ -16,6 +16,12 @@ import { enmascararTelefono, hashTelefono } from '../utilidades/enmascarar.util'
 const esFalloDePlantilla = (codigo?: string | null): boolean =>
   !!codigo && (codigo === 'PLANTILLA_NO_CONFIGURADA' || CODIGOS_PLANTILLA_PERMANENTES.includes(codigo));
 
+/**
+ * Mensaje que no se puede entregar y se descarta en silencio (sin burbuja de error, sin campana): la ventana de
+ * 24 h está cerrada y no hay plantilla aprobada (no configurada, o Meta la rechazó por plantilla / por ventana).
+ */
+export const esDescarteSilencioso = (codigo?: string | null): boolean => esFalloDePlantilla(codigo) || codigo === 'FUERA_DE_VENTANA_24H';
+
 export const DURACION_VENTANA_24H_MS = 24 * 60 * 60 * 1000;
 
 export interface PayloadMensajeNegocio {
@@ -120,7 +126,7 @@ export class Ventana24hService {
    * Envía un mensaje iniciado por el negocio respetando la política estricta de 24 horas de Meta:
    * - Si la ventana está abierta: envía texto libre o interactivo con botones.
    * - Si la ventana está cerrada: OBLIGA al uso de plantilla aprobada.
-   * - Si falta la plantilla o Meta la rechaza: registra el fallo y avisa a Caja por la campana.
+   * - Si falta la plantilla o Meta la rechaza por plantilla: descarte silencioso (sin chat de error ni campana).
    */
   async enviarMensajeNegocio(
     telefono: string,
@@ -128,7 +134,6 @@ export class Ventana24hService {
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
     const telMask = enmascararTelefono(telefono);
-    const telHash = hashTelefono(telefono);
 
     // 1. Verificar consentimiento (Ley 29733)
     const acepta = await this.tieneConsentimiento(telefono);
@@ -168,35 +173,13 @@ export class Ventana24hService {
 
     const definicion = payload.plantillaClave ? CATALOGO_PLANTILLAS[payload.plantillaClave] : undefined;
     if (!definicion) {
-      const errorDetalle = `No existe plantilla configurada para la clave '${String(payload.plantillaClave)}'`;
-      this.logger.error(`Fallo de plantilla: ${errorDetalle}`);
-
-      await this.prisma.whatsappMensaje.create({
-        data: {
-          direccion: 'SALIENTE',
-          telefono_enmascarado: telMask,
-          telefono_hash: telHash,
-          tipo: 'PLANTILLA',
-          plantilla: String(payload.plantillaClave),
-          estado: 'FALLIDO',
-          error_codigo: 'PLANTILLA_NO_CONFIGURADA',
-          error_detalle: errorDetalle,
-          pedido_id: opciones?.pedidoId ? BigInt(opciones.pedidoId) : null,
-          conversacion_id: opciones?.conversacionId ? BigInt(opciones.conversacionId) : null,
-        },
-      });
-
-      await this.notificarFalloACaja(
-        'WhatsApp: Aviso no enviado por falta de plantilla',
-        `No se pudo enviar aviso al cliente ${telMask}. Ventana de 24h cerrada y plantilla no configurada.`,
-        opciones?.pedidoId,
-      );
-
+      // Sin plantilla para ese mensaje: se descarta en silencio (el outbox lo deja DESCARTADO con su motivo)
+      this.logger.warn(`Sin plantilla '${String(payload.plantillaClave)}' y ventana cerrada para ${telMask}: descartado`);
       return {
         exito: false,
-        estado: 'FALLIDO',
+        estado: 'OMITIDO',
         errorCodigo: 'PLANTILLA_NO_CONFIGURADA',
-        errorDetalle,
+        errorDetalle: `Ventana de 24 h cerrada y no hay plantilla aprobada para '${String(payload.plantillaClave)}'`,
       };
     }
 
@@ -228,7 +211,10 @@ export class Ventana24hService {
       }
     }
 
-    if (!resultadoPlantilla.exito && resultadoPlantilla.estado !== 'OMITIDO') {
+    if (!resultadoPlantilla.exito && esDescarteSilencioso(resultadoPlantilla.errorCodigo)) {
+      // Meta rechazó la plantilla (no aprobada, pausada, etc.): sin aviso a Caja ni reintentos
+      this.logger.warn(`Plantilla '${definicion.nombre}' rechazada para ${telMask} (${resultadoPlantilla.errorCodigo}): descartado en silencio`);
+    } else if (!resultadoPlantilla.exito && resultadoPlantilla.estado !== 'OMITIDO') {
       this.logger.warn(
         `Fallo al enviar plantilla '${definicion.nombre}' a ${telMask}: ${resultadoPlantilla.errorDetalle}`,
       );
