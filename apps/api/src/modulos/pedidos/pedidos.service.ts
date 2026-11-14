@@ -516,19 +516,31 @@ export class PedidosService {
       const esBebida = esBebidaPorNombres(prodDb.categoria?.nombre, prodDb.categoria?.area?.nombre);
 
       const personasAsignadas: string[] = [];
-      if (esBebida) {
+      const nombresDe = (l.personas ?? []).map((p) => String(p ?? '').trim());
+      const exigirNombre = (indice: number, numero: number) => {
+        if (!nombresDe[indice]) {
+          throw new BadRequestException({
+            codigo: 'NOMBRE_VASO_REQUERIDO',
+            mensaje: `Escribe el nombre del vaso de la Bebida ${numero}`,
+          });
+        }
+      };
+      if (combo.partes.length > 0) {
+        // Combo: cada vaso de sus bebidas lleva nombre (en orden de bebida)
+        let k = 0;
+        for (const parte of combo.partes as ParteResueltaCombo[]) {
+          if (!esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined)) continue;
+          for (let u = 0; u < parte.cantidad; u++, k++) exigirNombre(k, u + 1);
+        }
+        personasAsignadas.push(...nombresDe);
+      } else if (esBebida) {
+        // Bebida suelta: un nombre por vaso, obligatorio
         for (let unit = 0; unit < cantidad; unit++) {
-          const personaIngresada = l.personas?.[unit]?.trim();
-          personasAsignadas.push(
-            personaIngresada && personaIngresada.length > 0
-              ? personaIngresada
-              : (clienteNombre || 'Mesa'),
-          );
+          exigirNombre(unit, unit + 1);
+          personasAsignadas.push(nombresDe[unit]);
         }
       } else {
-        if (Array.isArray(l.personas)) {
-          personasAsignadas.push(...l.personas.map((p) => p.trim()));
-        }
+        personasAsignadas.push(...nombresDe);
       }
 
       const contenedora = combo.partes.length > 0;

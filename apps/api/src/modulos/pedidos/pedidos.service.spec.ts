@@ -38,6 +38,7 @@ describe('PedidosService', () => {
   let redisMock: any;
   let auditoriaMock: any;
   let facturacionMock: any;
+  let crearSinRelleno: PedidosService['crear'];
 
   const mockProductoCafe = {
     id: 1n,
@@ -247,6 +248,11 @@ describe('PedidosService', () => {
     }).compile();
 
     service = module.get<PedidosService>(PedidosService);
+    // Los nombres de vaso son obligatorios: las pruebas ajenas a ese tema los rellenan; las de nombres usan crearSinRelleno
+    const crearReal = service.crear.bind(service);
+    crearSinRelleno = crearReal;
+    service.crear = ((dto: any, ...resto: any[]) =>
+      crearReal({ ...dto, lineas: (dto.lineas ?? []).map((l: any) => ({ ...l, personas: [...(l.personas ?? []), ...Array.from({ length: 20 }, () => 'Ana')] })) }, ...(resto as [any, any]))) as any;
   });
 
   describe('crear', () => {
@@ -1496,12 +1502,21 @@ describe('PedidosService', () => {
         prismaMock.producto.findUnique = jest.fn().mockResolvedValue({ agotado_hasta: null });
       });
 
+      it('combo con bebida: sin nombre de vaso -> 400 NOMBRE_VASO_REQUERIDO; con nombre se acepta', async () => {
+        const err = await crearSinRelleno(dtoCajita(), 'key-cajita-sin-nombre', { canal: 'MOZO' }).catch((e: any) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'NOMBRE_VASO_REQUERIDO', mensaje: 'Escribe el nombre del vaso de la Bebida 1' });
+        const dto = dtoCajita();
+        dto.lineas[0].personas = ['Lucía'];
+        await crearSinRelleno(dto, 'key-cajita-con-nombre', { canal: 'MOZO' });
+        expect(prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data)[1].nombres_persona).toEqual(['Lucía']);
+      });
+
       it('la madre no lleva producto ni área; cada parte es una línea hija con su área y sin cobro', async () => {
         await service.crear(dtoCajita(), 'key-cajita-lineas', { canal: 'MOZO' });
         const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
         expect(creadas).toHaveLength(3);
         expect(creadas[0]).toMatchObject({ producto_id: null, area_id: null });
-        expect(creadas[1]).toMatchObject({ producto_id: 1n, linea_combo_id: 50n, nombre: 'FRAPPE OREO', tamano: 'Regular 12 oz', cantidad: 1, area_id: 1n, subtotal: expect.anything(), nombres_persona: ['Juan Perez'] });
+        expect(creadas[1]).toMatchObject({ producto_id: 1n, linea_combo_id: 50n, nombre: 'FRAPPE OREO', tamano: 'Regular 12 oz', cantidad: 1, area_id: 1n, subtotal: expect.anything(), nombres_persona: ['Ana'] });
         expect(creadas[2]).toMatchObject({ producto_id: 20n, linea_combo_id: 50n, nombre: 'Burbujas', cantidad: 2, area_id: 2n, nombres_persona: [] });
         expect(Number(creadas[1].precio_unit)).toBe(0);
         expect(Number(creadas[2].subtotal)).toBe(0);
@@ -2648,6 +2663,24 @@ describe('PedidosService', () => {
           .crear(dtoMozo({ nombre: 'Ana' }), 'idemp-extra', { canal: 'MOZO', pedidoOrigenId: 9n, mesaNombre: 'Mesa 2' })
           .catch((e) => e);
         expect(err?.getResponse?.()?.codigo).not.toBe('CELULAR_REQUERIDO');
+      });
+
+      describe('nombre de cada vaso obligatorio (bebida con nombre)', () => {
+        const conPersonas = (personas?: string[]) => dtoMozo({ nombre: 'Ana', telefono: '987654321' }, { lineas: [{ productoId: 1, tamanoId: 10, cantidad: 2, opciones: [200], ...(personas ? { personas } : {}) }] });
+        it.each(canales)('%s: bebida sin nombre de vaso -> 400 NOMBRE_VASO_REQUERIDO', async (_n, origen) => {
+          const err = await crearSinRelleno(conPersonas(), 'idemp-v-' + _n, origen).catch((e: any) => e);
+          expect(err.getResponse()).toMatchObject({ codigo: 'NOMBRE_VASO_REQUERIDO', mensaje: 'Escribe el nombre del vaso de la Bebida 1' });
+        });
+        it.each(canales)('%s: falta el nombre del segundo vaso -> dice cuál', async (_n, origen) => {
+          const err = await crearSinRelleno(conPersonas(['Lucía', '  ']), 'idemp-v2-' + _n, origen).catch((e: any) => e);
+          expect(err.getResponse()).toMatchObject({ codigo: 'NOMBRE_VASO_REQUERIDO', mensaje: 'Escribe el nombre del vaso de la Bebida 2' });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+        it.each(canales)('%s: con un nombre por vaso se acepta', async (_n, origen) => {
+          crearCapturado();
+          const res = await crearSinRelleno(conPersonas(['Lucía', 'Marco']), 'idemp-v3-' + _n, origen);
+          expect(res.codigo).toBe('CP-W310');
+        });
       });
     });
 
