@@ -58,6 +58,14 @@ describe('medios de pago por canal', () => {
       await expect(exigirMediosActivos(conVouchers([{ medio: null }]), ['YAPE'], 'CAJA', 5n)).resolves.toBeUndefined();
       await expect(exigirMediosActivos(conVouchers([{ medio: null }]), ['EFECTIVO'], 'CAJA', 5n)).rejects.toBeDefined();
     });
+    it('solo cuenta un voucher vigente, no retirado y no ILEGIBLE (se filtra en la consulta)', async () => {
+      const db = conVouchers([{ medio: 'YAPE' }]);
+      await exigirMediosActivos(db, ['YAPE'], 'CAJA', 5n);
+      expect(db.voucherPago.findMany).toHaveBeenCalledWith({
+        where: { pedido_id: 5n, reemplazado_en: null, retirado: false, semaforo: { not: 'ILEGIBLE' } },
+        select: { medio: true },
+      });
+    });
     it('sin pedido (pedido nuevo) no hay excepción', async () => {
       await expect(exigirMediosActivos(conVouchers([{ medio: 'YAPE' }]), ['YAPE'], 'CAJA')).rejects.toBeDefined();
     });

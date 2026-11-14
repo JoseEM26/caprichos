@@ -27,7 +27,7 @@ export async function leerMediosPagoCanal(db: DbParametro): Promise<MediosPagoPo
 /**
  * «Apagado es apagado»: lanza 400 si algún medio está apagado en el canal (para nadie, ni ADMIN).
  * Canal sin interruptor (repartidor, etc.): no filtra. Sirve para un medio o para todos los del plan dividido.
- * Con `pedidoId`, lo YA PAGADO se confirma aunque el medio se haya apagado: si el pedido tiene un comprobante (voucher vigente)
+ * Con `pedidoId`, lo YA PAGADO se confirma aunque el medio se haya apagado: si el pedido tiene un comprobante (voucher vigente y legible: un ILEGIBLE o retirado no cuenta)
  * de ese medio, ese medio no se rechaza. El interruptor frena solo pagos NUEVOS, sin evidencia previa.
  */
 export async function exigirMediosActivos(
@@ -45,7 +45,7 @@ export async function exigirMediosActivos(
     if (!medioActivo(config, m, canal)) {
       if (pedidoId != null && MEDIOS_CON_VOUCHER.includes(m)) {
         if (!conEvidencia) {
-          const v = (await db.voucherPago?.findMany?.({ where: { pedido_id: pedidoId, reemplazado_en: null }, select: { medio: true } })) ?? [];
+          const v = (await db.voucherPago?.findMany?.({ where: { pedido_id: pedidoId, reemplazado_en: null, retirado: false, semaforo: { not: 'ILEGIBLE' } }, select: { medio: true } })) ?? [];
           conEvidencia = new Set(v.flatMap((x) => (x.medio ? [String(x.medio).toUpperCase()] : MEDIOS_CON_VOUCHER)));
         }
         if (conEvidencia.has(m)) continue;
