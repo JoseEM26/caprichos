@@ -47,7 +47,7 @@ export function DetalleCompra({ clienteId, pedidoId }: { clienteId: string; pedi
         {d.envio != null && d.envio > 0 && <Fila t="Envío" v={soles(d.envio)} />}
         {d.propina > 0 && <Fila t="Propina" v={soles(d.propina)} />}
         <Fila t={<b>Total</b>} v={<b>{soles(d.total)}</b>} />
-        <Fila t="Pago" v={`${d.medioPago ?? 'Sin medio'} · ${d.pagoEstado === 'PAGADO' ? 'Cobrado' : 'Sin cobrar'}`} />
+        <Fila t="Pago" v={`${d.pagos && d.pagos.length > 0 ? d.pagos.map((x) => `${x.medio} ${soles(x.monto)}`).join(' · ') : (d.medioPago ?? 'Sin medio')} · ${d.pagoEstado === 'PAGADO' ? 'Cobrado' : 'Sin cobrar'}`} />
         <Fila t="Comprobante" v={d.comprobante === 'SIMPLE' || !d.comprobante ? 'Ticket' : d.comprobante} />
         <Fila t="Estado" v={d.estado} />
         {d.nota && <Fila t="Nota del pedido" v={d.nota} />}

@@ -43,7 +43,7 @@ describe('Ficha del cliente ▸ ajuste de puntos e historial', () => {
       id: '55', codigo: 'CP-55', fecha: '', modalidad: 'DELIVERY', estado: 'ENTREGADO',
       lineas: [{ id: '1', cantidad: 2, nombre: 'Frappé', tamano: 'Grande', opciones: ['Leche de almendra'], sabores: [], nombresPersona: ['Ana', 'Luis'], nota: null, cortesia: false, precioUnit: 12, subtotal: 24 }],
       subtotal: 24, descuento: 4, descuentos: [{ tipo: 'OFERTA', nombre: 'Promo 2x', monto: 4 }], puntosCanjeados: 0, envio: 6, propina: 2, total: 28,
-      pagoEstado: 'PAGADO', medioPago: 'YAPE', comprobante: 'BOLETA', nota: null,
+      pagoEstado: 'PAGADO', medioPago: 'YAPE', pagos: [{ medio: 'YAPE', monto: 18 }, { medio: 'EFECTIVO', monto: 10 }], comprobante: 'BOLETA', nota: null,
     });
     montar();
     fireEvent.click(await screen.findByText('Ver detalle'));
@@ -53,7 +53,7 @@ describe('Ficha del cliente ▸ ajuste de puntos e historial', () => {
     expect(d).toHaveTextContent('Descuento · Promo 2x');
     expect(d).toHaveTextContent('Envío');
     expect(d).toHaveTextContent('Propina');
-    expect(d).toHaveTextContent('YAPE · Cobrado');
+    expect(d).toHaveTextContent('YAPE S/ 18.00 · EFECTIVO S/ 10.00 · Cobrado');
     expect(d).toHaveTextContent('BOLETA');
   });
 

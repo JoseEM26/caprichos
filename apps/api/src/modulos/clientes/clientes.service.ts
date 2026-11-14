@@ -1253,7 +1253,11 @@ export class ClientesService {
     const id = BigInt(partyId);
     const p = await this.prisma.pedido.findFirst({
       where: { AND: [{ id: BigInt(pedidoId) }, this.pedidosDelCliente(id)] },
-      include: { lineas: { orderBy: { id: 'asc' }, include: { opcionesElegidas: true, sabores: true } } },
+      include: {
+        lineas: { orderBy: { id: 'asc' }, include: { opcionesElegidas: true, sabores: true } },
+        planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' } },
+        cobros: { where: { anulado_en: null }, select: { pagos: { select: { medio: true, monto: true } } } },
+      },
     });
     if (!p) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Ese pedido no es de este cliente' });
@@ -1294,6 +1298,8 @@ export class ClientesService {
       total: Number(p.total),
       pagoEstado: p.pago_estado,
       medioPago: p.pago_metodo,
+      // Desglose por medio: el plan del pedido o, si no hay, los pagos del cobro vigente
+      pagos: (p.planPago.length ? p.planPago : p.cobros.flatMap((c) => c.pagos)).map((x) => ({ medio: x.medio, monto: Number(x.monto) })),
       comprobante: p.comprobante_tipo,
       nota: p.nota,
     };

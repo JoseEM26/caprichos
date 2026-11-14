@@ -100,6 +100,8 @@ export interface DetalleCompraCliente {
   total: number;
   pagoEstado: string | null;
   medioPago: string | null;
+  /** Desglose por medio (pago dividido); vacío si no hay */
+  pagos?: Array<{ medio: string; monto: number }>;
   comprobante: string | null;
   nota: string | null;
 }
