@@ -1234,3 +1234,25 @@ describe('proyectarDisponibilidad (stock en vivo de la carta)', () => {
     expect(r.productos[0]).toMatchObject({ id: '7', disponible: false, quedan: 0 });
   });
 });
+
+describe('CatalogoService: anfitrión de combo agotado', () => {
+  it('el producto anfitrión sale no disponible cuando su combo está agotado', async () => {
+    const prisma: any = {
+      conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
+      opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
+      producto: { findMany: jest.fn().mockResolvedValue([]) },
+      categoria: {
+        findMany: jest.fn().mockResolvedValue([{
+          id: 1n, nombre: 'Kids', orden: 1, oculta: false,
+          productos: [{
+            id: 19n, nombre: 'CAJA', descripcion: null, precio: 27, oculto: false, agotado_hasta: null, no_suma_beneficios: false,
+            foto_archivo: null, tamanos: [], sabores: [], grupos: [], ofertasAlcance: [{ id: 4n, combosParte: [] }],
+          }],
+        }]),
+      },
+    };
+    const s = new CatalogoService(prisma, { registrar: jest.fn() } as any, undefined, { anfitrionesAgotados: async () => new Set(['19']) } as any);
+    const carta = await s.obtenerCarta();
+    expect(carta[0].productos[0].disponible).toBe(false);
+  });
+});

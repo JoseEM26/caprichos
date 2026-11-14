@@ -306,6 +306,12 @@ function generarPastillasPartes(
         label = 'opción';
       }
 
+      // Con las opciones reales: «2 × producto a elección: Burbujas (agotado), Squishy»
+      const ops = cp.opcionesDetalle ?? [];
+      if (ops.length > 0) {
+        return `${cant} × ${label} a elección: ${ops.map((o: any) => (o.disponible === false ? `${o.nombre} (agotado)` : o.nombre)).join(', ')}`;
+      }
+
       let numOpciones = 0;
       matchedCats.forEach((c) => {
         numOpciones += (c.productos || []).length;

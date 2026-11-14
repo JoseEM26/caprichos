@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { CartaController, CatalogoController } from './catalogo.controller';
 import { CatalogoService } from './catalogo.service';
 import { AgotadosVencidosTarea } from './agotados-vencidos.tarea';
+import { OfertasModule } from '../ofertas/ofertas.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 
 @Module({
-  imports: [AuditoriaModule],
+  imports: [AuditoriaModule, OfertasModule],
   controllers: [CartaController, CatalogoController],
   providers: [CatalogoService, AgotadosVencidosTarea],
   exports: [CatalogoService],

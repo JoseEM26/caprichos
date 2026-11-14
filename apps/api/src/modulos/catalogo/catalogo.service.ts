@@ -1,12 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
   OnApplicationBootstrap,
   Optional,
 } from '@nestjs/common';
 import { jpegProductoWhatsApp } from './imagen-whatsapp';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { anfitrionBloqueadoPorPaso, opcionesSinStock, pasoOpcionalOcultoPorStock } from '../stock/opcion-requiere';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -136,6 +139,7 @@ export class CatalogoService implements OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() @Inject(forwardRef(() => OfertasService)) private readonly ofertas?: OfertasService,
   ) {}
 
   /** Al arrancar deja listas las imágenes JPEG de WhatsApp: Meta espera la imagen al enviar el carrusel. */
@@ -296,6 +300,9 @@ export class CatalogoService implements OnApplicationBootstrap {
       categorias.flatMap((c) => c.productos.flatMap((p) => p.sabores.map((s) => s.id))),
     );
 
+    // Combo agotado (pieza fija sin stock o elección sin opciones): su producto anfitrión sale agotado, igual que en el panel
+    const combosAgotados = (await this.ofertas?.anfitrionesAgotados()) ?? new Set<string>();
+
     const terminosBusqueda = q && q.trim() ? normalizarTexto(q).split(/\s+/).filter(Boolean) : [];
 
     const resultado: CategoriaCarta[] = [];
@@ -385,7 +392,8 @@ export class CatalogoService implements OnApplicationBootstrap {
         const disponible = (porSabor
           ? estaDisponible(p.agotado_hasta) && saboresConStock
           : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0))
-          && !(esAnfitrionCombo && anfitrionBloqueadoPorPaso(pasosStock.map((x) => x.paso), esAnfitrionConAlternativas));
+          && !(esAnfitrionCombo && anfitrionBloqueadoPorPaso(pasosStock.map((x) => x.paso), esAnfitrionConAlternativas))
+          && !combosAgotados.has(p.id.toString());
         const agotadoHasta =
           p.agotado_hasta && !disponible
             ? p.agotado_hasta.toISOString()

@@ -2705,6 +2705,12 @@ export class OfertasService {
     return bloqueados;
   }
 
+  /** Productos anfitrión (Dúo, Cajita) cuyo combo está agotado por la regla única de conDisponibilidad: la carta, el bot y el pedido los tratan como agotados. */
+  async anfitrionesAgotados(): Promise<Set<string>> {
+    const items = await this.listarOfertas('COMBO', true, undefined, true);
+    return new Set(items.filter((o) => o.alcanceProductoId && o.disponible === false).map((o) => String(o.alcanceProductoId)));
+  }
+
   /** Agrega `disponible`, `motivoAgotado` y por parte `opcionesDisponibles` a los combos (tiempo real, no toca `activo`). */
   private async conDisponibilidad(items: OfertaItem[]): Promise<OfertaItem[]> {
     // Nombres de las categorías del alcance (una consulta); categoriaNombre las junta para los textos

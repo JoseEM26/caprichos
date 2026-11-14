@@ -211,6 +211,7 @@ describe('PedidosService', () => {
       }),
       emitirCuponesParaPedido: jest.fn().mockResolvedValue([]),
       resolverPartesCombo: jest.fn().mockResolvedValue({ nota: '', partes: [] }),
+      obtenerOfertaPorId: jest.fn().mockResolvedValue({ nombre: "Combo", disponible: true }),
     };
 
     direccionesMock = {
@@ -3067,6 +3068,14 @@ describe('PedidosService', () => {
         ]);
         await service.crear(dtoOpciones([411, 412]), 'key-donas-acumula', { canal: 'CARTA' });
         expect(decrementos()).toEqual([{ sabor: 501n, n: 2 }]);
+      });
+
+      it('combo agotado: el anfitrión pedido sin ofertaId se rechaza con 409 y mensaje simple', async () => {
+        preparar({ '501': 3, '502': 1 }, []);
+        ofertasServiceMock.obtenerOfertaPorId.mockResolvedValueOnce({ nombre: 'Dúo', disponible: false });
+        const err: any = await service.crear(dtoOpciones([411]), 'key-combo-agotado', { canal: 'CARTA' }).catch((e) => e);
+        expect(err.getStatus()).toBe(409);
+        expect(err.getResponse()).toMatchObject({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'Dúo está agotado por ahora' });
       });
 
       it('no cuenta dos veces si una parte de combo ya descuenta el mismo producto', async () => {

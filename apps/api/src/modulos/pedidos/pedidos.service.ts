@@ -469,6 +469,13 @@ export class PedidosService {
       const combo: { nota: string; partes: ParteResueltaCombo[]; conBebidas?: boolean; recargoPorCombo?: number } = l.ofertaId
         ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA', tamanoValorIdLinea, modalidad)
         : { nota: '', partes: [] };
+      // Producto anfitrión pedido sin ofertaId: igual no se vende si su combo está agotado
+      if (!l.ofertaId && prodDb.ofertasAlcance?.[0]) {
+        const o = await this.ofertasService.obtenerOfertaPorId(prodDb.ofertasAlcance[0].id);
+        if (o.disponible === false) {
+          throw new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: `${o.nombre} está agotado por ahora` });
+        }
+      }
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
       for (const grupo of gruposActivos) {
         // Combo con bebidas por categoría: las bebidas se eligen en esa parte; los grupos «Bebida N · Sabor» del anfitrión no se exigen

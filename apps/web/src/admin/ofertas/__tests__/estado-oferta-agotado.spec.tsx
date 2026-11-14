@@ -60,3 +60,16 @@ describe('piezas bloqueadas (solo panel)', () => {
     expect(aviso.querySelector('a')?.getAttribute('href')).toBe('/admin/productos');
   });
 });
+
+describe('tarjeta del combo: piezas a elección con sus opciones', () => {
+  it('lista los nombres de las opciones y marca las agotadas', async () => {
+    const parte = { id: '2', tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: ['1', '2', '3'], alternativas: [], opcionesDetalle: [
+      { id: '1', nombre: 'Burbujas', disponible: false, sinStock: true },
+      { id: '2', nombre: 'Pistola de burbujas', disponible: true },
+      { id: '3', nombre: 'Squishy', disponible: true },
+    ] };
+    (api.get as any).mockImplementation((url: string) => (url === '/admin/ofertas' ? Promise.resolve([{ ...combo, disponible: true, combosParte: [parte] }]) : Promise.resolve([])));
+    render(<OfertasAdminView />);
+    expect(await screen.findByText(/2 × producto a elección: Burbujas \(agotado\), Pistola de burbujas, Squishy/)).toBeTruthy();
+  });
+});
