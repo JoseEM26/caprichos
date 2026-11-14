@@ -509,8 +509,15 @@ export class SalonService {
    */
   async listarEspera(usuario?: UsuarioAutenticado) {
     const verCompleto = rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'CAJERO');
+    // Solo pedidos en curso de HOY (Lima): uno entregado, anulado o de otro día ya no espera mesa,
+    // aunque nunca pasó por «Asignar mesa» (antes quedaba en la lista para siempre, incluso con la caja cerrada).
+    const { inicio: inicioHoy } = obtenerRangoHoyLima();
     const filas = await this.prisma.pedido.findMany({
-      where: { modalidad: 'MESA', espera_mesa_desde: { not: null }, estado: { not: 'ANULADO' } },
+      where: {
+        modalidad: 'MESA',
+        espera_mesa_desde: { gte: inicioHoy },
+        estado: { notIn: ['ANULADO', 'ENTREGADO'] },
+      },
       orderBy: [{ espera_mesa_desde: 'asc' }, { id: 'asc' }],
       select: {
         id: true,

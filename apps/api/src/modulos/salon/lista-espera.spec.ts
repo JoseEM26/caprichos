@@ -115,6 +115,14 @@ describe('Lista de espera de mesa', () => {
       const m: any = await service.listarEspera(mozo);
       expect(m.items[0].celular).toBe('******321');
     });
+    it('solo pedidos en curso de hoy: excluye entregados, anulados y los de otro día', async () => {
+      prisma.pedido.findMany.mockResolvedValue([]);
+      await service.listarEspera(caja);
+      const where = prisma.pedido.findMany.mock.calls[0][0].where;
+      expect(where.estado).toEqual({ notIn: ['ANULADO', 'ENTREGADO'] });
+      expect(where.espera_mesa_desde.gte).toBeInstanceOf(Date);
+      expect(Date.now() - where.espera_mesa_desde.gte.getTime()).toBeLessThan(24 * 3600 * 1000);
+    });
   });
 
   describe('asignarEspera', () => {
