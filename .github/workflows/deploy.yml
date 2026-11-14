@@ -48,6 +48,7 @@ on:
           - probar-restauracion-externa
           - instalar-monitor
           - ver-estado-servidor
+          - revisar-efectivo-sin-liquidar
           - clonar-prod-a-demo
           - consultar-pedido
           - programar-respaldos
@@ -283,6 +284,13 @@ jobs:
             fi
             if [ "${IN_APLICAR_CLON}" = "true" ] && [ "$IN_CONFIRMACION" != "CLONAR" ]; then
               echo "::error::Para aplicar el clon escriba exactamente 'CLONAR' en confirmacion."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "revisar-efectivo-sin-liquidar" ]; then
+            ACCION="revisar-efectivo-sin-liquidar"
+            if [ "$REF_NAME" != "main" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::revisar-efectivo-sin-liquidar se lanza desde main (prod) o preprod (demo). Es solo lectura."
               exit 1
             fi
           fi
@@ -2081,6 +2089,68 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
             "/opt/caprichos/scripts/diagnostico-servidor.sh" 2>&1 | tee estado.log
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+
+  # Lista (solo lectura) los deliveries en efectivo entregados despues del cierre o en un dia sin caja.
+  revisar-efectivo-sin-liquidar:
+    name: Revisar efectivo de delivery sin liquidar (solo lectura)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'revisar-efectivo-sin-liquidar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: revisar-efectivo-sin-liquidar
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Subir scripts al VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Diagnóstico (solo lectura)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/efectivo-sin-liquidar.sh $AMBIENTE 60" 2>&1 | tee efectivo.log
 
       - name: Borrar la llave del ejecutor
         if: always()
