@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsObject, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class FiltroHistorialDto {
   @IsOptional()
@@ -71,4 +71,10 @@ export class CrearMensajeInternoDto {
   @IsNotEmpty()
   @IsString()
   mensaje!: string;
+}
+
+export class GuardarAvisosPorRolDto {
+  /** { tipo de aviso: roles que lo ven }; el servicio valida tipos y roles */
+  @IsObject()
+  matriz!: Record<string, string[]>;
 }

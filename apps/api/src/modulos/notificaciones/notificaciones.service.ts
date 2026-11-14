@@ -8,7 +8,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { AsistenciaCorreccionesService } from '../asistencia/asistencia-correcciones.service';
-import { PERMISOS_POR_PREFIJO, PERMISOS_POR_TIPO, tipoVisible } from './permisos-por-tipo';
+import { AvisosPorRol, CATALOGO_AVISOS, CLAVE_AVISOS_POR_ROL, ROLES_AVISO, defectoAvisos, leerAvisosGuardados, rolesPorDefecto } from './avisos-por-rol';
 import { AjustesNotificaciones, CLAVES_AJUSTES_NOTIF, leerAjustesNotificacion } from './ajustes-notificaciones';
 
 import { minutosDeHora, momentoLima } from '../correo';
@@ -126,27 +126,38 @@ const prioridadDeTipo = (tipo: string): Prioridad => PRIORIDAD_POR_TIPO[tipo] ??
 
 /**
  * Condición de Prisma de lo que ESTE usuario puede ver de las guardadas (una sola regla para resumen, historial,
- * contadores, marcar leída y marcar todas):
+ * contadores, marcar leída y marcar todas). `claves` = tipos del catálogo «Avisos por rol» que alguno de sus roles
+ * tiene marcados:
  *  - dirigido a una persona (party_destino): solo esa persona (ni siquiera el ADMIN: es un aviso personal);
- *  - ADMIN: todo lo no dirigido a otra persona, de cualquier tipo (también los no mapeados);
- *  - resto: lo de su rol (o de todos) Y de un tipo cuyo permiso tiene (tipo no mapeado = nadie).
+ *  - lo demás (sin persona): solo de los tipos marcados para sus roles; un tipo fuera del catálogo solo lo ve el ADMIN;
+ *  - MENSAJE_INTERNO además respeta su rol_destino (el ADMIN lo ve siempre).
  */
 export const visibleA = (
   usuario: UsuarioAutenticado,
-  puede: (permiso: string) => boolean,
+  claves: string[],
   condicion: Prisma.NotificacionWhereInput = {},
 ): Prisma.NotificacionWhereInput => {
-  const propio: Prisma.NotificacionWhereInput = { party_destino: usuario.partyId };
-  if (usuario.rol === 'ADMIN') return { AND: [{ OR: [{ party_destino: null }, propio] }, condicion] };
-  const tipos = Object.keys(PERMISOS_POR_TIPO).filter((t) => tipoVisible(t, puede));
-  const prefijos = Object.keys(PERMISOS_POR_PREFIJO).filter((p) => PERMISOS_POR_PREFIJO[p].some(puede));
-  const porTipo: Prisma.NotificacionWhereInput = {
-    OR: [{ tipo: { in: tipos } }, ...prefijos.map((p) => ({ tipo: { startsWith: p } }))],
-  };
+  const roles = usuario.roles ?? [usuario.rol];
+  const esAdmin = roles.includes('ADMIN') || usuario.rol === 'ADMIN';
+  const prefijos = claves.filter((c) => c.endsWith(':'));
+  const tipos = claves.filter((c) => !c.endsWith(':'));
+  const interno = tipos.includes('MENSAJE_INTERNO');
   const porRol: Prisma.NotificacionWhereInput = {
-    OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.roles ?? [usuario.rol]) } }],
+    OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(roles) } }],
   };
-  return { AND: [{ OR: [propio, { party_destino: null, AND: [porRol, porTipo] }] }, condicion] };
+  const porTipo: Prisma.NotificacionWhereInput[] = [
+    { tipo: { in: tipos.filter((t) => t !== 'MENSAJE_INTERNO') } },
+    ...prefijos.map((p) => ({ tipo: { startsWith: p } })),
+  ];
+  if (interno) porTipo.push(esAdmin ? { tipo: 'MENSAJE_INTERNO' } : { tipo: 'MENSAJE_INTERNO', AND: [porRol] });
+  if (esAdmin) {
+    // tipo nuevo sin configurar (fuera del catálogo): lo ve el ADMIN
+    porTipo.push({
+      tipo: { notIn: CATALOGO_AVISOS.filter((a) => !a.tipo.endsWith(':')).map((a) => a.tipo) },
+      NOT: { OR: CATALOGO_AVISOS.filter((a) => a.tipo.endsWith(':')).map((a) => ({ tipo: { startsWith: a.tipo } })) },
+    });
+  }
+  return { AND: [{ OR: [{ party_destino: usuario.partyId }, { party_destino: null, OR: porTipo }] }, condicion] };
 };
 
 const ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -233,6 +244,79 @@ export class NotificacionesService {
     return (p) => modulos.has(p);
   }
 
+  /** Tipos del catálogo «Avisos por rol» que ven los roles de este usuario (unión); lo no guardado vale el defecto de siempre. */
+  private async clavesVisibles(usuario: UsuarioAutenticado, puede: (m: string) => boolean): Promise<string[]> {
+    const roles = usuario.roles ?? [usuario.rol];
+    const fila = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_AVISOS_POR_ROL } });
+    const guardado = leerAvisosGuardados(fila?.valor);
+    return CATALOGO_AVISOS.filter((a) => {
+      const marcados = guardado[a.tipo] ?? rolesPorDefecto(a.tipo, (r, p) => roles.includes(r) && puede(p));
+      return marcados.some((r) => roles.includes(r));
+    }).map((a) => a.tipo);
+  }
+
+  private soloAdmin(usuario: UsuarioAutenticado) {
+    if (!(usuario.roles ?? [usuario.rol]).includes('ADMIN') && usuario.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia los avisos por rol' });
+    }
+  }
+
+  /** Matriz vigente: lo guardado y, donde falte un tipo, el valor por defecto según los permisos actuales de cada rol. */
+  private async matrizVigente(): Promise<AvisosPorRol> {
+    const fila = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_AVISOS_POR_ROL } });
+    const guardado = leerAvisosGuardados(fila?.valor);
+    if (CATALOGO_AVISOS.every((a) => guardado[a.tipo])) return guardado;
+    const filas = await this.prisma.rolPermiso.findMany({ include: { permiso: true } });
+    const tiene = new Set(filas.map((f) => `${f.rol}|${f.permiso.modulo}/${f.permiso.accion}`));
+    return { ...defectoAvisos((rol, p) => tiene.has(`${rol}|${p}`)), ...guardado };
+  }
+
+  /** Tabla de Configuración › Avisos por rol (solo ADMIN). */
+  async avisosPorRol(usuario: UsuarioAutenticado) {
+    this.soloAdmin(usuario);
+    const matriz = await this.matrizVigente();
+    return {
+      roles: [...ROLES_AVISO],
+      avisos: CATALOGO_AVISOS.map((a) => ({ ...a, roles: matriz[a.tipo] })),
+    };
+  }
+
+  /** Guarda la tabla completa (solo ADMIN), con auditoría de antes y después. */
+  async guardarAvisosPorRol(matriz: Record<string, unknown>, usuario: UsuarioAutenticado, ip?: string) {
+    this.soloAdmin(usuario);
+    const invalido = (mensaje: string) =>
+      new HttpException({ codigo: 'DATOS_INVALIDOS', mensaje }, HttpStatus.BAD_REQUEST);
+    if (!matriz || typeof matriz !== 'object' || Array.isArray(matriz)) throw invalido('La tabla de avisos no es válida');
+    const nueva: AvisosPorRol = {};
+    for (const a of CATALOGO_AVISOS) {
+      const v = matriz[a.tipo];
+      if (!Array.isArray(v) || v.some((r) => !(ROLES_AVISO as readonly string[]).includes(String(r)))) {
+        throw invalido(`Faltan o sobran roles en el aviso «${a.nombre}»`);
+      }
+      nueva[a.tipo] = ROLES_AVISO.filter((r) => v.includes(r));
+    }
+    const antes = await this.matrizVigente();
+    await this.prisma.parametro.upsert({
+      where: { clave: CLAVE_AVISOS_POR_ROL },
+      update: { valor: nueva as unknown as Prisma.InputJsonValue },
+      create: { clave: CLAVE_AVISOS_POR_ROL, valor: nueva as unknown as Prisma.InputJsonValue },
+    });
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'configuracion',
+      accion: 'AVISOS_POR_ROL',
+      resultado: 'OK',
+      entidad: 'parametro',
+      antes: { clave: CLAVE_AVISOS_POR_ROL, valor: antes },
+      despues: { clave: CLAVE_AVISOS_POR_ROL, valor: nueva },
+      partyId: usuario.partyId,
+      ip,
+    });
+    // cada panel vuelve a pedir su lista con la regla nueva
+    this.eventos?.emitirAdmin('notificaciones:nueva', {});
+    return { ok: true };
+  }
+
   /** Estado de lectura de las guardadas para ESTE usuario: id -> leída en (null = no leída explícitamente). */
   private async lecturasGuardadas(partyId: bigint): Promise<Map<string, Date | null>> {
     const filas = await this.prisma.notificacionLectura.findMany({
@@ -266,6 +350,7 @@ export class NotificacionesService {
 
   async resumen(usuario: UsuarioAutenticado): Promise<ResumenNotificaciones> {
     const puede = await this.permisosDe(usuario);
+    const avisosVisibles = await this.clavesVisibles(usuario, puede);
     const ahora = Date.now();
     const ahoraIso = new Date(ahora).toISOString();
     const conteos: Record<string, number> = {};
@@ -493,7 +578,7 @@ export class NotificacionesService {
 
     // Guardadas no leídas: sin lectura propia y sin marca global (datos anteriores), o marcadas no leídas a mano
     const noLeidas = await this.prisma.notificacion.findMany({
-      where: visibleA(usuario, puede, {
+      where: visibleA(usuario, avisosVisibles, {
         AND: [{ id: { notIn: idsLeidos } }, { OR: [{ leida_en: null }, { id: { in: idsNoLeidosExplicito } }] }],
       }),
       orderBy: { en: 'desc' },
@@ -501,7 +586,7 @@ export class NotificacionesService {
     });
     // Guardadas leídas en las últimas 24 h: por lectura propia (o la marca global de datos anteriores)
     const leidas = await this.prisma.notificacion.findMany({
-      where: visibleA(usuario, puede, { OR: [{ id: { in: idsLeidosRecientes } }, { leida_en: { gte: desdeVentana } }] }),
+      where: visibleA(usuario, avisosVisibles, { OR: [{ id: { in: idsLeidosRecientes } }, { leida_en: { gte: desdeVentana } }] }),
       orderBy: { en: 'desc' },
       take: MAX_GUARDADAS_LEIDAS,
     });
@@ -573,9 +658,9 @@ export class NotificacionesService {
     usuario: UsuarioAutenticado,
   ) {
     // 1. Obtener todas las notificaciones visibles para el usuario o su rol
-    const puede = await this.permisosDe(usuario);
+    const avisosVisibles = await this.clavesVisibles(usuario, await this.permisosDe(usuario));
     const todas = await this.prisma.notificacion.findMany({
-      where: visibleA(usuario, puede),
+      where: visibleA(usuario, avisosVisibles),
       orderBy: { en: 'desc' },
     });
     const lecturas = await this.lecturasGuardadas(usuario.partyId);
@@ -697,9 +782,9 @@ export class NotificacionesService {
     if (!CLAVE_VALIDA.test(clave)) throw noEncontrada;
 
     if (clave.startsWith('n:')) {
-      const puede = await this.permisosDe(usuario);
+      const avisosVisibles = await this.clavesVisibles(usuario, await this.permisosDe(usuario));
       const id = BigInt(clave.slice(2));
-      const existe = await this.prisma.notificacion.findFirst({ where: visibleA(usuario, puede, { id }), select: { id: true } });
+      const existe = await this.prisma.notificacion.findFirst({ where: visibleA(usuario, avisosVisibles, { id }), select: { id: true } });
       if (!existe) throw noEncontrada;
     }
 
@@ -739,9 +824,9 @@ export class NotificacionesService {
         throw new NotFoundException({ codigo: 'NOTIFICACION_NO_ENCONTRADA', mensaje: 'Notificación no encontrada' });
       }
       // solo las que este usuario puede ver: no se marca (ni se «descubre») lo ajeno
-      const puede = await this.permisosDe(usuario);
+      const avisosVisibles = await this.clavesVisibles(usuario, await this.permisosDe(usuario));
       const visibles = await this.prisma.notificacion.findMany({
-        where: visibleA(usuario, puede, { id: { in: ids.map((i) => BigInt(i)) } }),
+        where: visibleA(usuario, avisosVisibles, { id: { in: ids.map((i) => BigInt(i)) } }),
         select: { id: true },
       });
       claves = visibles.map((n) => `n:${n.id}`);
@@ -749,12 +834,12 @@ export class NotificacionesService {
       // Calculadas pendientes + TODAS las guardadas sin leer que ve este usuario (el resumen solo muestra las últimas 100)
       const res = await this.resumen(usuario);
       const calculadas = res.notificaciones.filter((n) => !n.leida && n.clave.startsWith('c:')).map((n) => n.clave);
-      const puede = await this.permisosDe(usuario);
+      const avisosVisibles = await this.clavesVisibles(usuario, await this.permisosDe(usuario));
       const lecturas = await this.lecturasGuardadas(usuario.partyId);
       const leidos = [...lecturas].filter(([, en]) => en !== null).map(([id]) => BigInt(id));
       const explicitas = [...lecturas].filter(([, en]) => en === null).map(([id]) => BigInt(id));
       const pendientes = await this.prisma.notificacion.findMany({
-        where: visibleA(usuario, puede, { AND: [{ id: { notIn: leidos } }, { OR: [{ leida_en: null }, { id: { in: explicitas } }] }] }),
+        where: visibleA(usuario, avisosVisibles, { AND: [{ id: { notIn: leidos } }, { OR: [{ leida_en: null }, { id: { in: explicitas } }] }] }),
         select: { id: true },
       });
       claves = [...calculadas, ...pendientes.map((n) => `n:${n.id}`)];

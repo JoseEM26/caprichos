@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { visibleA } from './notificaciones.service';
 import { PERMISOS_POR_TIPO, permisosDeTipo, tipoVisible } from './permisos-por-tipo';
+import { CATALOGO_AVISOS, rolesPorDefecto } from './avisos-por-rol';
 import { TIPO_CAJA_CERRADA_APERTURA } from '../caja/caja-aviso-apertura.service';
 
 const cumple = (fila: any, where: any): boolean => {
@@ -12,6 +13,10 @@ const cumple = (fila: any, where: any): boolean => {
   for (const [k, cond] of Object.entries(where)) {
     if (k === 'AND') {
       if (!(cond as any[]).every((c) => cumple(fila, c))) return false;
+      continue;
+    }
+    if (k === 'NOT') {
+      if (cumple(fila, cond)) return false;
       continue;
     }
     if (k === 'OR') {
@@ -26,6 +31,7 @@ const cumple = (fila: any, where: any): boolean => {
     if (typeof cond === 'object' && typeof cond !== 'bigint') {
       if ('startsWith' in (cond as any) && !String(v).startsWith((cond as any).startsWith)) return false;
       if ('in' in (cond as any) && !(cond as any).in.includes(v)) return false;
+      if ('notIn' in (cond as any) && (cond as any).notIn.includes(v)) return false;
       continue;
     }
     if (v !== cond) return false;
@@ -46,7 +52,8 @@ const PERMISOS: Record<string, string[]> = {
 const usuario = (rol: string, partyId: bigint) => ({ partyId, rol, roles: [rol], debeCambiar: false });
 const ve = (rol: string, fila: any, partyId = 100n): boolean => {
   const puede = (p: string) => rol === 'ADMIN' || PERMISOS[rol].includes(p);
-  return cumple({ party_destino: null, rol_destino: null, ...fila }, visibleA(usuario(rol, partyId), puede));
+  const claves = CATALOGO_AVISOS.filter((a) => rolesPorDefecto(a.tipo, (r, p) => r === rol && puede(p)).includes(rol)).map((a) => a.tipo);
+  return cumple({ party_destino: null, rol_destino: null, ...fila }, visibleA(usuario(rol, partyId), claves));
 };
 
 describe('avisos: quién ve qué (denegar por defecto)', () => {
@@ -56,12 +63,15 @@ describe('avisos: quién ve qué (denegar por defecto)', () => {
       matriz[rol] = Object.keys(PERMISOS_POR_TIPO).filter((tipo) => ve(rol, { tipo }));
     }
     expect(matriz.ADMIN).toHaveLength(Object.keys(PERMISOS_POR_TIPO).length);
+    expect(CATALOGO_AVISOS.map((a) => a.tipo).sort()).toEqual([...Object.keys(PERMISOS_POR_TIPO), 'FACTURACION:'].sort());
     expect(matriz.COCINA).toEqual(['MENSAJE_INTERNO']);
     expect(matriz.APOYO_DELIVERY).toEqual(['MENSAJE_INTERNO']);
     expect(matriz.MOZO).toEqual(['MESA_LISTA', 'MENSAJE_INTERNO']);
     expect(matriz.REPARTIDOR).toEqual(
-      expect.arrayContaining(['DELIVERY_POR_CONFIRMAR', 'REPROGRAMACION_DELIVERY', 'MENSAJE_INTERNO']),
+      expect.arrayContaining(['DELIVERY_POR_CONFIRMAR', 'MENSAJE_INTERNO']),
     );
+    // la reprogramación se crea para Caja: el repartidor no la veía antes (solo por party_destino)
+    expect(matriz.REPARTIDOR).not.toContain('REPROGRAMACION_DELIVERY');
     expect(matriz.REPARTIDOR).not.toContain('PEDIDO_NUEVO');
     expect(matriz.CAJERO).toEqual(expect.arrayContaining(['PEDIDO_NUEVO', 'VOUCHER_PENDIENTE_MOZO', 'ATENCION_WHATSAPP']));
     expect(matriz.CAJERO).not.toEqual(expect.arrayContaining(['WHATSAPP_CONSUMO']));
@@ -76,11 +86,12 @@ describe('avisos: quién ve qué (denegar por defecto)', () => {
     }
   });
 
-  it('rol_destino: respeta el rol y el SUPERVISOR hereda lo del CAJERO', () => {
-    expect(ve('CAJERO', { tipo: 'PEDIDO_NUEVO', rol_destino: 'ADMIN' })).toBe(false);
-    expect(ve('CAJERO', { tipo: 'PEDIDO_NUEVO', rol_destino: 'CAJERO' })).toBe(true);
-    expect(ve('SUPERVISOR', { tipo: 'PEDIDO_NUEVO', rol_destino: 'CAJERO' })).toBe(true);
+  it('rol_destino ya no decide (lo decide la tabla); solo los mensajes internos respetan su rol', () => {
+    expect(ve('CAJERO', { tipo: 'PEDIDO_NUEVO', rol_destino: 'ADMIN' })).toBe(true);
     expect(ve('MOZO', { tipo: 'MENSAJE_INTERNO', rol_destino: 'CAJERO' })).toBe(false);
+    expect(ve('CAJERO', { tipo: 'MENSAJE_INTERNO', rol_destino: 'CAJERO' })).toBe(true);
+    expect(ve('SUPERVISOR', { tipo: 'MENSAJE_INTERNO', rol_destino: 'CAJERO' })).toBe(true);
+    expect(ve('ADMIN', { tipo: 'MENSAJE_INTERNO', rol_destino: 'CAJERO' })).toBe(true);
   });
 
   it('party_destino: solo esa persona, aunque el tipo o el rol dejarían verlo a otros (ADMIN incluido)', () => {
@@ -96,7 +107,9 @@ describe('avisos: quién ve qué (denegar por defecto)', () => {
 
   it('FACTURACION:* se resuelve por prefijo', () => {
     expect(permisosDeTipo('FACTURACION:cert_vence')).toEqual(['comprobantes/ver']);
-    expect(ve('CAJERO', { tipo: 'FACTURACION:cert_vence' })).toBe(true);
+    // se crean para el ADMIN (rol_destino ADMIN): Caja no los ve por defecto
+    expect(ve('ADMIN', { tipo: 'FACTURACION:cert_vence' })).toBe(true);
+    expect(ve('CAJERO', { tipo: 'FACTURACION:cert_vence' })).toBe(false);
     expect(ve('MOZO', { tipo: 'FACTURACION:cert_vence' })).toBe(false);
     expect(tipoVisible('FACTURACION:x', () => false)).toBe(false);
   });
