@@ -207,6 +207,13 @@ export const TEXTOS_REPARTO = {
     variablesPlantilla: [nombre, codigo],
   }),
 
+  /** Pedido de recojo, local o mesa con el pago confirmado (plantilla caprichos_pago_confirmado). */
+  pagoConfirmado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `Hola ${nombre}, recibimos tu pago. Tu pedido ${codigo} esta en preparacion.`,
+    plantillaClave: 'PAGO_CONFIRMADO',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
   listo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
     textoLibre: `¡Hola ${nombre}! 🎉 Tu pedido ${codigo} ya está listo. Pronto sale con nuestro repartidor. 🛵`,
     plantillaClave: 'DELIVERY_LISTO',

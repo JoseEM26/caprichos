@@ -28,6 +28,7 @@ export const TEXTO_VENTANA_24H =
 export const esErrorVentana24h = (codigo?: string | null, detalle?: string | null): boolean =>
   codigo === 'VENTANA_CERRADA' ||
   codigo === 'FUERA_DE_VENTANA_24H' ||
+  !!causaPorCodigoPlantilla(codigo ?? '') ||
   /131047|24 hours|24-hour/i.test(detalle ?? '');
 
 export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | null): string {

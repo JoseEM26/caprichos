@@ -1980,18 +1980,12 @@ describe('PedidosService', () => {
       expect(avisar).toHaveBeenCalledWith(100n, 'RECIBIDO', {}, expect.anything());
     });
 
-    it('pedido de mozo no dispara el aviso de la carta', async () => {
-      await service.crear(pedidoBaseDto, 'idemp-recibido-mozo', { canal: 'MOZO' });
+    it.each(['MOZO', 'CAJA', 'WHATSAPP', 'BOT'] as const)('pedido del canal %s también dispara el aviso RECIBIDO (el servicio de avisos decide por celular y consentimiento)', async (canal) => {
+      await service.crear(pedidoBaseDto, `idemp-recibido-${canal}`, { canal });
 
       await esperarFondo();
-      expect(avisar).not.toHaveBeenCalled();
-    });
-
-    it('pedido del chatbot (canal WHATSAPP) no dispara el aviso de la carta', async () => {
-      await service.crear(pedidoBaseDto, 'idemp-recibido-wa', { canal: 'WHATSAPP' });
-
-      await esperarFondo();
-      expect(avisar).not.toHaveBeenCalled();
+      expect(avisar).toHaveBeenCalledTimes(1);
+      expect(avisar).toHaveBeenCalledWith(100n, 'RECIBIDO', {}, expect.anything());
     });
 
     it('el aviso va dentro de la transacción del pedido: si no se puede encolar, el pedido no se crea', async () => {
