@@ -737,6 +737,10 @@ model Pedido {
   pasa_cocina_en         DateTime?               @db.Timestamptz
   listo_en               DateTime?               @db.Timestamptz
   entregado_en           DateTime?               @db.Timestamptz
+  // Cierre: el ADMIN justificó este entregado sin cobrar; ya no bloquea el cierre (queda en «Justificados pendientes»)
+  sin_cobro_justificado_en DateTime?             @db.Timestamptz
+  // Delivery en efectivo: cuándo se liquidó con su repartidor (null = aún por liquidar, sea del día que sea)
+  liquidado_en           DateTime?               @db.Timestamptz
   anulado_en             DateTime?               @db.Timestamptz
   anulado_por            BigInt?
   motivo_anulacion       String?

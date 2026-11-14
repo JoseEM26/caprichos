@@ -43,6 +43,7 @@ export interface CierrePayload {
   motivoEntregadosSinCobrar?: string;
   /** Solo el administrador: justifica cerrar con pedidos sin terminar */
   motivoPedidosSinTerminar?: string;
+  motivoCobrosEnCurso?: string;
 }
 
 export interface CuadreCajaProps {
@@ -200,7 +201,11 @@ export function CuadreCaja({
       if (v !== null) medios[m.clave] = v;
     }
     const base: CierrePayload = { medios, nota: borrador.nota.trim() || undefined };
-    if (motivoSinCobro && pendientesCount > 0) base.motivoEntregadosSinCobrar = motivoSinCobro;
+    // El mismo motivo del ADMIN cubre entregados sin cobrar y cobros en curso; el servidor usa el que corresponda
+    if (motivoSinCobro && pendientesCount > 0) {
+      base.motivoEntregadosSinCobrar = motivoSinCobro;
+      base.motivoCobrosEnCurso = motivoSinCobro;
+    }
     if (motivoSinTerminar && sinTerminarCount > 0) base.motivoPedidosSinTerminar = motivoSinTerminar;
     if (borrador.modo === 'total') {
       if (efectivoTocado) base.efectivoTotal = efectivoContado;
@@ -294,7 +299,7 @@ export function CuadreCaja({
           <div className="cc-aviso cc-aviso-ok" role="status">
             <span aria-hidden="true">✓</span>{' '}
             {motivoSinCobro && pendientesCount > 0
-              ? 'Cierre con pedidos entregados sin cobrar justificados por el administrador.'
+              ? 'Cierre con pedidos sin cobrar justificados por el administrador.'
               : 'Sin pendientes: no hay pedidos sin cobrar ni repartidores por liquidar.'}
           </div>
         )}
@@ -345,6 +350,12 @@ export function CuadreCaja({
               <ListaMovimientos movs={movVigentes.filter((m) => m.tipo === 'EGRESO')} vacio="No hay egresos." />
             </LineaDesglose>
           </ul>
+          {movVigentes.some((m) => m.tipo === 'INFORMATIVO') && (
+            <div className="cc-peq" data-testid="cc-informativos">
+              <b>Informativos (no cambian el efectivo):</b>
+              <ListaMovimientos movs={movVigentes.filter((m) => m.tipo === 'INFORMATIVO')} vacio="" />
+            </div>
+          )}
           <div className="cc-total-fila">
             <span>= Total que debería haber</span>
             <b>{soles(deberia)}</b>

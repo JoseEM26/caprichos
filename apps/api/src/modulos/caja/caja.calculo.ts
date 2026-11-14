@@ -167,16 +167,22 @@ export async function registrarEgresoDevolucionCajaHoy(
  * Pedidos delivery entregados el día de la caja (hora de Lima). Son los que el repartidor
  * cobró en efectivo y entrega en la liquidación (RN-CAP-088).
  */
-export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string) {
+export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string, incluirSinLiquidar = false) {
   const inicio = new Date(`${fechaIso}T05:00:00.000Z`);
   const fin = new Date(inicio.getTime() + MS_DIA);
+  // Caja abierta: además de lo entregado hoy, TODO lo entregado de otro día que aún no se liquidó (entra en esta caja)
+  // y lo que se liquidó hoy. Un pedido liquidado (liquidado_en) no vuelve a contar en una caja posterior.
+  const entregadoHoy = { entregado_en: { gte: inicio, lt: fin } };
+  const cuando = incluirSinLiquidar
+    ? { OR: [entregadoHoy, { liquidado_en: null }, { liquidado_en: { gte: inicio, lt: fin } }] }
+    : entregadoHoy;
 
   return cliente.pedido.findMany({
     where: {
       modalidad: 'DELIVERY',
       estado: 'ENTREGADO',
       repartidor_party_id: { not: null },
-      entregado_en: { gte: inicio, lt: fin },
+      ...cuando,
     },
     include: {
       repartidor: { include: { persona: true } },

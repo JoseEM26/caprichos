@@ -58,6 +58,8 @@ export interface CerrarCajaDto {
   nota?: string;
   /** Solo el administrador: justifica cerrar con pedidos entregados sin cobrar (mínimo 10 letras) */
   motivoEntregadosSinCobrar?: string;
+  /** Solo el administrador: justifica cerrar con cobros en curso (pedido vivo con pago pendiente) */
+  motivoCobrosEnCurso?: string;
   /** Solo el administrador: justifica cerrar con pedidos sin terminar (mínimo 10 letras) */
   motivoPedidosSinTerminar?: string;
 }
@@ -329,6 +331,8 @@ export const cierreApi = {
 
   // Pedidos sin cobrar que bloquean el cierre: los ve todo el que cierra la caja.
   listarPendientesDeCobro: () => api.get<PendienteCobro[]>('/admin/cierre/pendientes'),
+  /** «Justificados pendientes»: entregados sin cobrar que el ADMIN justificó; ya no bloquean el cierre */
+  listarJustificados: () => api.get<PendienteCobro[]>('/admin/cierre/justificados'),
   /** Pedidos ni entregados ni anulados (pagados o no): impiden cerrar */
   listarSinTerminar: () => api.get<PendienteCobro[]>('/admin/cierre/sin-terminar'),
 

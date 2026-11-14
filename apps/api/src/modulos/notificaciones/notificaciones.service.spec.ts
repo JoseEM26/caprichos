@@ -145,6 +145,12 @@ describe('NotificacionesService', () => {
     expect(r.notificaciones.find((n) => n.clave === 'n:2')).toMatchObject({ leida: true });
   });
 
+  it('D: «atrasados en cocina» solo mira pedidos de hoy', async () => {
+    await service.resumen(ADMIN);
+    const llamada = prisma.pedido.findMany.mock.calls.find(([a]: any) => a.where.estado?.in?.length === 2 && a.where.estado.in.includes('PREPARANDO'));
+    expect(llamada![0].where.creado_en.gte).toBeInstanceOf(Date);
+  });
+
   it('un rol sin permisos no recibe avisos calculados, solo los guardados que le tocan', async () => {
     const r = await service.resumen(MOZO);
     expect(r.conteos).toEqual({});

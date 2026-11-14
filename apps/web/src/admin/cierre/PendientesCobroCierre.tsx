@@ -31,6 +31,8 @@ export interface PendientesCobroCierreProps {
   esAdmin?: boolean;
   motivoSinCobro?: string;
   alJustificar?: (motivo: string) => void;
+  /** Lista aparte «Justificados pendientes»: ya no bloquean el cierre, se cobran o se anulan cuando se pueda */
+  justificados?: boolean;
 }
 
 export const MOTIVO_SIN_COBRO_MIN = 10;
@@ -150,6 +152,7 @@ export function PendientesCobroCierre({
   esAdmin = false,
   motivoSinCobro = '',
   alJustificar,
+  justificados = false,
 }: PendientesCobroCierreProps) {
   const [borradorMotivo, setBorradorMotivo] = useState('');
   const [error, setError] = useState('');
@@ -277,7 +280,9 @@ export function PendientesCobroCierre({
 
   return envolver(
     <>
-      <div className="pdc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
+      <div className="pdc-titulo">
+        {justificados ? 'Justificados pendientes: no bloquean el cierre, cóbralos o anúlalos cuando se pueda' : 'Pedidos sin cobrar: impiden cerrar la caja'}
+      </div>
 
       <div className="pdc-resumen">
         <div className="pdc-tarjeta">
@@ -335,8 +340,8 @@ export function PendientesCobroCierre({
         />
       </BarraFiltros>
 
-      {esAdmin && alJustificar && pendientes.every((p) => p.estado === 'ENTREGADO') && (
-        <div className="pdc-justificar" role="group" aria-label="Justificar entregados sin cobrar">
+      {esAdmin && alJustificar && !justificados && (
+        <div className="pdc-justificar" role="group" aria-label="Justificar pedidos sin cobrar">
           {motivoSinCobro ? (
             <>
               <span>Justificación para cerrar: <b>{motivoSinCobro}</b></span>

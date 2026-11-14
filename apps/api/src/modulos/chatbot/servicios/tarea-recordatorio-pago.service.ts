@@ -11,6 +11,8 @@ import {
 import { TEXTOS_PAGO } from '../conversacion/flujos/pago/textos-pago';
 import { enmascararTelefono, hashTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
+import { LocalService } from '../../local/local.service';
+import { pedidoVivoDeHoy } from '../../../comun/fechas-lima';
 
 export interface ParametrosRecordatorioPago {
   recordatorioActivo: boolean;
@@ -32,6 +34,7 @@ export class TareaRecordatorioPagoService {
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria?: WhatsAppMensajeriaPuerto,
     @Optional() private readonly outbox?: OutboxWhatsappService,
+    @Optional() private readonly localService?: LocalService,
   ) {}
 
   /**
@@ -105,14 +108,21 @@ export class TareaRecordatorioPagoService {
     try {
       const params = await this.obtenerParametros();
 
-      // Consultar pedidos pendientes con medio de pago digital de las últimas 24 horas
-      const hace24h = new Date(ahora.getTime() - 24 * 60 * 60 * 1000);
+      // Fuera del horario del local no se envían recordatorios ni alertas
+      try {
+        const e: any = await this.localService?.obtenerEstadoCarta(ahora);
+        if (e && e.abierta === false) return { recordatoriosEnviados: 0, alertasCajaEnviadas: 0 };
+      } catch {
+        /* sin dato de horario: se asume abierto */
+      }
+
+      // Consultar pedidos pendientes con medio de pago digital de HOY (los de días anteriores no se recuerdan)
       const pedidosPendientes = await this.prisma.pedido.findMany({
         where: {
           pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
           pago_estado: 'PENDIENTE',
           estado: { notIn: ['ANULADO', 'ENTREGADO'] },
-          creado_en: { gte: hace24h },
+          ...pedidoVivoDeHoy(ahora),
         },
         select: {
           id: true,

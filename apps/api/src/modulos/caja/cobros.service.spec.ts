@@ -991,10 +991,21 @@ describe('CobrosService', () => {
       expect(prismaMock.$queryRaw.mock.calls.length).toBe(2);
     });
 
-    it('sin efectivo no crea egreso', async () => {
+    it('H: el digital anulado deja un movimiento INFORMATIVO en la caja de hoy (no es egreso)', async () => {
+      preparar();
+      await service.anularCobroCajaCerrada('10', { motivo }, admin);
+      const tipos = prismaMock.movimientoCaja.create.mock.calls.map(([a]: any) => a.data.tipo);
+      expect(tipos).toEqual(['EGRESO', 'INFORMATIVO']);
+      expect(prismaMock.movimientoCaja.create).toHaveBeenCalledWith({
+        data: { caja_id: 9n, tipo: 'INFORMATIVO', monto: new Prisma.Decimal(30), motivo: expect.stringContaining('cobro digital anulado de caja cerrada (pedido CP-0100) S/ 30.00') },
+        select: { id: true },
+      });
+    });
+
+    it('sin efectivo no crea egreso (solo el informativo del digital)', async () => {
       preparar({ cobro: { pagos: [yape] } });
       const res: any = await service.anularCobroCajaCerrada('10', { motivo }, admin);
-      expect(prismaMock.movimientoCaja.create).not.toHaveBeenCalled();
+      expect(prismaMock.movimientoCaja.create.mock.calls.map(([a]: any) => a.data.tipo)).toEqual(['INFORMATIVO']);
       expect(res.movimiento_ajuste_id).toBeNull();
     });
 

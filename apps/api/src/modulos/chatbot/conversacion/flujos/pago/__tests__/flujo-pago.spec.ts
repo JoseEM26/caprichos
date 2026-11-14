@@ -508,6 +508,19 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
       );
     });
 
+    it('G: con el local cerrado no recordatorios ni alertas; abierto, solo pedidos de hoy', async () => {
+      const ahora = new Date('2026-11-13T17:00:00Z');
+      const local: any = { obtenerEstadoCarta: jest.fn().mockResolvedValue({ abierta: false }) };
+      const t = new TareaRecordatorioPagoService(mockPrisma, mockRedis, mockVentana24h, mockEventos, undefined, mockOutboxPago, local);
+      mockPrisma.pedido.findMany.mockClear();
+      expect(await t.ejecutarCiclo(ahora)).toEqual({ recordatoriosEnviados: 0, alertasCajaEnviadas: 0 });
+      expect(mockPrisma.pedido.findMany).not.toHaveBeenCalled();
+      local.obtenerEstadoCarta.mockResolvedValue({ abierta: true });
+      mockPrisma.pedido.findMany.mockResolvedValue([]);
+      await t.ejecutarCiclo(ahora);
+      expect(mockPrisma.pedido.findMany.mock.calls[0][0].where.creado_en.gte.toISOString()).toBe('2026-11-13T05:00:00.000Z');
+    });
+
     it('envía recordatorio de pago una sola vez (idempotente en Redis)', async () => {
       const ahora = new Date();
       const creadoHace15m = new Date(ahora.getTime() - 15 * 60 * 1000);

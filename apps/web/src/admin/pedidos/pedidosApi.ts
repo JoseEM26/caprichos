@@ -374,7 +374,7 @@ export interface CajaActualRespuesta {
 export interface MovimientoCaja {
   id: string;
   caja_id: string;
-  tipo: 'INGRESO' | 'EGRESO';
+  tipo: 'INGRESO' | 'EGRESO' | 'INFORMATIVO';
   monto: number;
   motivo: string;
   anulado_en: string | null;

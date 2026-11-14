@@ -780,6 +780,25 @@ export class CobrosService {
         });
       }
 
+      // Cobro digital (Yape, Plin, transferencia, tarjeta) de una caja cerrada: no hay efectivo que ajustar, pero el cierre
+      // de hoy debe dejar rastro. Movimiento INFORMATIVO: no suma ni resta del efectivo esperado.
+      const digital = enPesos(
+        actual.pagos
+          .filter((p) => (p.medio || '').trim().toUpperCase() !== 'EFECTIVO')
+          .reduce((t, p) => t + aCentimos(p.monto) + aCentimos(p.propina), 0),
+      );
+      if (cajaCerrada && digital > 0) {
+        await tx.movimientoCaja.create({
+          data: {
+            caja_id: cajaHoyId!,
+            tipo: 'INFORMATIVO',
+            monto: new Prisma.Decimal(digital),
+            motivo: `Informativo: cobro digital anulado de caja cerrada (pedido ${actual.pedido?.codigo ?? actual.pedido_id}) S/ ${digital.toFixed(2)}`.slice(0, 250),
+          },
+          select: { id: true },
+        });
+      }
+
       return { cobro: actual, ajuste, efectivo };
     });
 

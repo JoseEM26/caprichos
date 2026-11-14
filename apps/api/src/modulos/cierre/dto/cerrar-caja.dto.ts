@@ -30,6 +30,11 @@ export class CerrarCajaDto {
   @IsString()
   motivoEntregadosSinCobrar?: string;
 
+  /** Solo el administrador: cierra con cobros en curso (pedido vivo con pago pendiente), justificándolos (mínimo 10 caracteres). */
+  @IsOptional()
+  @IsString()
+  motivoCobrosEnCurso?: string;
+
   /** Solo el administrador: cierra con pedidos sin terminar (ni entregados ni anulados), justificándolos (mínimo 10 caracteres). */
   @IsOptional()
   @IsString()

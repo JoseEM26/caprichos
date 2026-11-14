@@ -147,7 +147,8 @@ export function analizarCaja(d: DatosAnalisis) {
 
   // 6) Movimientos de caja
   if (d.movimientos.length) {
-    const vig = d.movimientos.filter((m) => !m.anulado);
+    // INFORMATIVO (rastro de anulaciones digitales) no mueve el efectivo: no entra en este patrón
+    const vig = d.movimientos.filter((m) => !m.anulado && m.tipo !== 'INFORMATIVO');
     for (const m of vig) candidatos.push({ etiqueta: `${m.tipo === 'INGRESO' ? 'el ingreso' : 'el egreso'} «${m.motivo}» (${soles(aCentimos(m.monto))})`, c: aCentimos(m.monto), medio: 'EFECTIVO' });
     patrones.push({
       codigo: 'MOVIMIENTOS',

@@ -68,6 +68,14 @@ const NOMBRE_MEDIO_CAJA: Record<string, string> = {
   TRANSFERENCIA: 'Transferencia',
 };
 
+/** Excluye vouchers de pedidos ANULADO o PAGADO; los que no tienen pedido (huérfanos del chat) se mantienen. */
+export const VOUCHER_DE_PEDIDO_VIVO = {
+  OR: [
+    { pedido_id: null },
+    { pedido: { estado: { not: 'ANULADO' }, OR: [{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }] } },
+  ],
+};
+
 @Injectable()
 export class VouchersService {
   private readonly logger = new Logger(VouchersService.name);
@@ -558,6 +566,8 @@ export class VouchersService {
 
     if (filtros.estado === 'pendientes') {
       where.revisado_en = null;
+      // Un voucher de un pedido ya cobrado o anulado no está pendiente de revisar (los huérfanos sí)
+      where.AND = [VOUCHER_DE_PEDIDO_VIVO];
     }
 
     const vouchers = await this.prisma.voucherPago.findMany({
@@ -594,6 +604,7 @@ export class VouchersService {
             lte: new Date(`${f}T23:59:59.999Z`),
           },
           revisado_en: null,
+          AND: [VOUCHER_DE_PEDIDO_VIVO],
         },
       });
     }

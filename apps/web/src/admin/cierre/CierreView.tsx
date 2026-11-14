@@ -58,6 +58,7 @@ export function CierreView() {
   const [repartidores, setRepartidores] = useState<RepartidorPorLiquidar[]>([]);
   const [pedidosAbiertos, setPedidosAbiertos] = useState<PendienteCobro[]>([]);
   const [errorPendientes, setErrorPendientes] = useState(false);
+  const [justificados, setJustificados] = useState<PendienteCobro[]>([]);
   const [sinTerminar, setSinTerminar] = useState<PendienteCobro[]>([]);
   const [motivoSinTerminar, setMotivoSinTerminar] = useState('');
   const sinTerminarHuerfanos = sinTerminar.filter((p) => new Date(p.fecha).toLocaleDateString('en-CA', { timeZone: 'America/Lima' }) < hoyLima()).length;
@@ -193,6 +194,12 @@ export function CierreView() {
       } catch {
         setPedidosAbiertos([]);
         setErrorPendientes(true);
+      }
+      // 5b. Entregados sin cobrar ya justificados por el ADMIN: no bloquean, se cobran o se anulan cuando se pueda
+      try {
+        setJustificados((await cierreApi.listarJustificados()) ?? []);
+      } catch {
+        setJustificados([]);
       }
       // 6. Pedidos ni entregados ni anulados (pagados o no): también impiden cerrar (el servidor lo vuelve a validar)
       try {
@@ -580,6 +587,17 @@ export function CierreView() {
               Hay {sinTerminarHuerfanos} {sinTerminarHuerfanos === 1 ? 'pedido' : 'pedidos'} de días anteriores sin terminar (ni entregados ni anulados). Entrégalos o anúlalos antes de cerrar esta caja.
             </div>
           )}
+          {cajaAbierta && justificados.length > 0 && (
+            <div data-testid="justificados-pendientes">
+              <PendientesCobroCierre
+                justificados
+                pendientes={justificados}
+                setPendientes={setJustificados}
+                alCambiarTurno={cargarTurno}
+                fechaCaja={fechaTurno}
+              />
+            </div>
+          )}
           {/* Tarjeta de estado de caja */}
           <div
             style={{
@@ -908,7 +926,7 @@ export function CierreView() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                         <div>
-                          <b>{m.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}</b> · {m.motivo}
+                          <b>{m.tipo === 'INGRESO' ? 'Ingreso' : m.tipo === 'INFORMATIVO' ? 'Informativo' : 'Egreso'}</b> · {m.motivo}
                           {m.anulado_en && (
                             <div style={{ fontSize: 12, color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
                               Anulado{m.motivo_anulacion ? `: ${m.motivo_anulacion}` : ''}
@@ -927,7 +945,7 @@ export function CierreView() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {m.tipo === 'INGRESO' ? '+ ' : '− '}s/ {Number(m.monto || 0).toFixed(2)}
+                          {m.tipo === 'INGRESO' ? '+ ' : m.tipo === 'INFORMATIVO' ? '' : '− '}s/ {Number(m.monto || 0).toFixed(2)}
                         </div>
                       </div>
                       {!m.anulado_en && tiene('caja/movimientos') &&
