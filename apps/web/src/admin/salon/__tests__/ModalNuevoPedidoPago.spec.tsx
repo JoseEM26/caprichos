@@ -115,7 +115,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     fireEvent.click(await screen.findByText('Café Americano'));
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Ana' } });
     irAlPago();
     expect(screen.queryByRole('group', { name: '¿Cómo paga?' })).toBeNull();

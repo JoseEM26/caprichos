@@ -184,12 +184,19 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     expect(screen.queryByText(/Cliente registrado/)).toBeNull();
   });
 
-  it('Celular sin cuenta: el nombre se escribe a mano y el celular es obligatorio', async () => {
+  it('Delivery sin celular: no deja continuar; para llevar sí es opcional (sin puntos)', async () => {
+    abrirPaso('Delivery');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
+    expect(screen.getByText(/Escribe el celular del cliente/)).toBeInTheDocument();
+  });
+
+  it('Celular sin cuenta: el nombre se escribe a mano', async () => {
     respuestaCuenta = { encontrado: false };
     abrirPaso('Para llevar');
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
-    expect(screen.getByText(/Escribe el celular del cliente/)).toBeInTheDocument();
+    expect(screen.queryByText(/Escribe el celular del cliente/)).toBeNull();
+    expect(screen.getByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeInTheDocument();
 
     await escribirCelular('955512345');
     expect(await screen.findByText(/Celular sin cuenta/)).toBeInTheDocument();

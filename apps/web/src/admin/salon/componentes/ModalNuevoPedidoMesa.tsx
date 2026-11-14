@@ -473,11 +473,11 @@ export function ModalNuevoPedidoMesa({
   };
 
   // Datos del cliente (para llevar / delivery). «Continuar» no se deshabilita: al tocarlo muestra qué falta
-  // y lleva el foco al campo (ver intentarContinuarCli). Hace falta celular válido y nombre de 2+ letras.
+  // y lleva el foco al campo (ver intentarContinuarCli). El celular es obligatorio solo en delivery (sin él no suma puntos). Hace falta nombre de 2+ letras.
   // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva.
   const errorDatosCli =
-    !/^9\d{8}$/.test(telCli) || telCli === '999999999'
-      ? { mensaje: 'Escribe el celular del cliente: 9 dígitos que empiecen con 9', foco: ['#cli-cel'] }
+    (telCli !== '' || modalidad === 'delivery') && (!/^9\d{8}$/.test(telCli) || telCli === '999999999')
+      ? { mensaje: telCli === '' ? 'Escribe el celular del cliente: 9 dígitos que empiecen con 9' : 'El celular debe tener 9 dígitos y empezar con 9', foco: ['#cli-cel'] }
       : cliNombre.trim().length < 2
         ? { mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)', foco: ['#cli-nombre'] }
         : modalidad === 'delivery' && cliDireccion.trim().length === 0 && cliPuntoMapa === null
@@ -1239,14 +1239,13 @@ export function ModalNuevoPedidoMesa({
         : 'Escribe el nombre del cliente (mínimo 2 letras)';
   const telefonoMesa = cliTelefono.replace(/\D/g, '');
   const celularReal = /^9\d{8}$/.test(telefonoMesa) && telefonoMesa !== '999999999';
-  const telefonoMesaValido = pideMode === 'personal' ? telefonoMesa === '' || celularReal : celularReal;
+  // El celular es opcional en mesa (sin él no suma puntos); si se escribe, debe ser real
+  const telefonoMesaValido = telefonoMesa === '' || celularReal;
   // En la lista de espera el celular es obligatorio siempre (con cuenta sale de ella)
   const telefonoEspera = (pideMode === 'cliente' ? (clienteEncontrado?.telefono ?? '') : telefonoMesa).replace(/\D/g, '');
   const telefonoEsperaValido = /^9\d{8}$/.test(telefonoEspera) && telefonoEspera !== '999999999';
   const mensajeTelefonoMesa =
-    telefonoMesa === ''
-      ? 'Escribe el celular del cliente: 9 dígitos que empiecen con 9'
-      : 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
+    'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
@@ -2601,7 +2600,7 @@ export function ModalNuevoPedidoMesa({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div>
                   <label htmlFor="cli-cel" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                    Celular del cliente (9 dígitos) *
+                    Celular del cliente (9 dígitos){modalidad === 'delivery' ? ' *' : ' (opcional)'}
                   </label>
                   <input
                     id="cli-cel"
@@ -2625,6 +2624,9 @@ export function ModalNuevoPedidoMesa({
                   />
                 </div>
                 {avisoCuentaCelular}
+                {telCli === '' && modalidad !== 'delivery' && (
+                  <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>Sin celular no se suman puntos</span>
+                )}
                 <div>
                   <label htmlFor="cli-nombre" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
                     Nombre *
@@ -3141,7 +3143,7 @@ export function ModalNuevoPedidoMesa({
                     {pideMode !== 'cliente' && (
                       <>
                         <label htmlFor="np-telefono-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
-                          {pideMode === 'personal' ? 'Teléfono (opcional)' : 'Celular del cliente *'}
+                          {pideMode === 'personal' ? 'Teléfono (opcional)' : enEspera ? 'Celular del cliente *' : 'Celular del cliente (opcional)'}
                         </label>
                         <input
                           id="np-telefono-mesa"
@@ -3167,7 +3169,7 @@ export function ModalNuevoPedidoMesa({
                             avisoCuentaCelular
                           ) : (
                             <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                              Le enviamos una encuesta por WhatsApp al terminar
+                              {telefonoMesa === '' ? 'Sin celular no se suman puntos' : 'Le enviamos una encuesta por WhatsApp al terminar'}
                             </span>
                           )
                         ) : (

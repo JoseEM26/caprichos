@@ -54,7 +54,7 @@ async function pedirEnMesa1(personas: string) {
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Mario' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
   fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
-  fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+  fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
   const boleta = screen.queryByTestId('comprobante-BOLETA');
   if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
   continuarYEnviar();

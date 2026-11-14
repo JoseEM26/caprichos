@@ -131,6 +131,17 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   });
 
+  it('fuera de delivery el celular es opcional: sin celular avisa que no suma puntos y deja continuar', async () => {
+    abrirPedido(false);
+    fireEvent.click(screen.getByRole('button', { name: /Recoger/i }));
+    expect(screen.getByLabelText(/Teléfono celular/i)).not.toBeRequired();
+    expect(screen.getByText('Sin celular no se suman puntos.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByLabelText(/Paso 2: /)).toBeInTheDocument();
+    expect(screen.queryByText('Escribe tu celular: 9 dígitos que empiecen con 9')).not.toBeInTheDocument();
+  });
+
   it('apagado: si el servidor responde CELULAR_REQUERIDO, el pedido no se envía y se muestra el mensaje claro', async () => {
     abrirPedido(false);
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });

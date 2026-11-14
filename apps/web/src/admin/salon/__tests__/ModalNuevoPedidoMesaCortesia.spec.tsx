@@ -58,7 +58,7 @@ async function pedirCafeEnMesa() {
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
   fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
-  fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+  fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
   // Una segunda línea sin cortesía: el pedido cobra algo (solo cortesías no se envía)
   fireEvent.click(screen.getByText('Té Negro'));
   // Es de la categoría Bebidas: también pide el nombre del vaso

@@ -88,9 +88,9 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     expect(screen.getByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeInTheDocument();
     fireEvent.change(nombre, { target: { value: 'Lucía' } });
     expect(screen.queryByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeNull();
-    // Falta el celular
-    expect(botonContinuar().disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    // El celular es opcional en mesa: ya se puede continuar
+    expect(botonContinuar().disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
     expect(botonContinuar().disabled).toBe(false);
 
     enviarDesdePago();
@@ -99,16 +99,23 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: '987654321' });
   });
 
-  it('sin celular no deja continuar con aviso claro, y 999999999 tampoco vale', async () => {
+  it('sin celular deja continuar (no suma puntos) y envía sin teléfono; 999999999 no vale', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
 
-    expect(botonContinuar().disabled).toBe(true);
-    expect(screen.getByText('Escribe el celular del cliente: 9 dígitos que empiecen con 9')).toBeInTheDocument();
-    expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
+    expect(botonContinuar().disabled).toBe(false);
+    expect(screen.getByText('Sin celular no se suman puntos')).toBeInTheDocument();
+    enviarDesdePago();
+    await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][0].cliente).toMatchObject({ nombre: 'Lucía', telefono: undefined });
+  });
 
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '999999999' } });
+  it('999999999 no vale como celular', async () => {
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
+    await agregarCafe();
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '999999999' } });
     expect(botonContinuar().disabled).toBe(true);
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
@@ -118,7 +125,7 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
 
-    const tel = screen.getByLabelText('Celular del cliente *');
+    const tel = screen.getByLabelText('Celular del cliente (opcional)');
     fireEvent.change(tel, { target: { value: '12345' } });
     expect(screen.getAllByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real').length).toBeGreaterThan(0);
     expect(botonContinuar().disabled).toBe(true);
@@ -150,7 +157,7 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));
 
     expect(screen.queryByLabelText('Nombre del cliente *')).toBeNull();
-    expect(screen.queryByLabelText('Celular del cliente *')).toBeNull();
+    expect(screen.queryByLabelText('Celular del cliente (opcional)')).toBeNull();
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
     expect(botonContinuar().disabled).toBe(false);
 
@@ -178,7 +185,7 @@ describe('Pedido de mesa: celular primero con autocompletado del nombre', () => 
   it('el celular va antes del nombre y al escribir 9 dígitos rellena el nombre (editable), con una sola búsqueda', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
-    const tel = await screen.findByLabelText('Celular del cliente *');
+    const tel = await screen.findByLabelText('Celular del cliente (opcional)');
     const nombre = screen.getByLabelText('Nombre del cliente *') as HTMLInputElement;
     expect(tel.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
