@@ -114,6 +114,12 @@ export interface CobroMozoVista {
   pide: 'BOLETA' | 'FACTURA' | null;
 }
 
+/** 00:00 de hoy en Lima (UTC-5, sin horario de verano). */
+function inicioHoyLima(ahora: Date = new Date()): Date {
+  const d = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(ahora);
+  return new Date(`${d}T00:00:00.000-05:00`);
+}
+
 @Injectable()
 export class PedidosEstadoService {
   private readonly logger = new Logger(PedidosEstadoService.name);
@@ -477,8 +483,15 @@ export class PedidosEstadoService {
         orderBy: { creado_en: 'desc' },
         take: 200,
       }),
+      // Cancelados de HOY, y de días anteriores solo si estaban pagados y falta registrar la devolución
+      // (antes salían todos, de cualquier día, aunque ya no hubiera nada que hacer).
       this.prisma.pedido.findMany({
-        where: FILTRO_CANCELADO_NO_RECIBIR,
+        where: {
+          AND: [
+            FILTRO_CANCELADO_NO_RECIBIR,
+            { OR: [{ anulado_en: { gte: inicioHoyLima() } }, { pago_estado: { in: PAGOS_DEVOLVIBLES }, devolucion: { is: null } }] },
+          ],
+        },
         include: { ...incluir, devolucion: true },
         orderBy: { anulado_en: 'desc' },
         take: 200,
@@ -508,6 +521,7 @@ export class PedidosEstadoService {
         pregunta: PREGUNTA_REPROG_VISTA[pregunta ?? ''] ?? 'SIN_PREGUNTA',
         pago_estado: p.pago_estado ?? null,
         revisar_devolucion: !enLista && PAGOS_DEVOLVIBLES.includes(pago) && !devolucion,
+        de_dias_anteriores: !enLista && !!p.anulado_en && new Date(p.anulado_en) < inicioHoyLima(),
         devolucion,
       };
     };

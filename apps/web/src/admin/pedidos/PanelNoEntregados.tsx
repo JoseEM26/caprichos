@@ -145,6 +145,7 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
         <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
           <div>{p.motivo}</div>
           <div>{horaRetiro(p.retirado_en)}</div>
+          {p.de_dias_anteriores && <div style={{ fontWeight: 700, color: '#8A4B00' }}>De días anteriores · falta registrar la devolución</div>}
         </div>
 
         <PruebaEntregaFallida prueba={p.prueba_entrega} />

@@ -44,8 +44,12 @@ describe('PedidosEstadoService.listarNoEntregados', () => {
 
     await service.listarNoEntregados();
 
-    const where = prisma.pedido.findMany.mock.calls[1][0].where;
+    const [filtro, alcance] = prisma.pedido.findMany.mock.calls[1][0].where.AND;
+    const where = filtro;
     expect(where.estado).toBe('ANULADO');
+    // Hoy, o de días anteriores solo si estaban pagados y falta registrar la devolución
+    expect(alcance.OR[0].anulado_en.gte).toBeInstanceOf(Date);
+    expect(alcance.OR[1]).toEqual({ pago_estado: { in: ['PAGADO', 'COORDINADO'] }, devolucion: { is: null } });
     expect(where.mensajesReparto.some.numero).toBe(5);
     expect(where.mensajesReparto.some.estado.in).toEqual(['NO_REPROGRAMAR', 'SIN_RESPUESTA', 'TOPE_ALCANZADO']);
   });

@@ -329,6 +329,8 @@ export interface NoEntregado {
   pregunta: PreguntaNoEntregado;
   pago_estado: string | null;
   revisar_devolucion: boolean;
+  /** Cancelado otro día: sigue aquí solo porque falta registrar la devolución. */
+  de_dias_anteriores?: boolean;
   devolucion?: DevolucionRegistrada | null;
   prueba_entrega?: PruebaEntregaFallida | null;
 }
