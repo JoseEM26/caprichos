@@ -169,11 +169,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       entrada = normalizarEntrada({ buttonPayload: 'ped_nombre_si' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
-      // 12. Teléfono del chat: se ofrece usarlo -> Elegir Medio de Pago
-      expect(resultado.nuevoEstado).toBe('PEDIDO_INGRESAR_TELEFONO');
-      entrada = normalizarEntrada({ buttonPayload: 'ped_tel_mismo' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
-      expect(resultado.nuevoFlujo.pedido?.cliente?.telefono).toBe('987654321');
+      // 12. Recojo: no se pide celular (solo delivery); va directo al medio de pago
       expect(resultado.nuevoEstado).toBe('PEDIDO_MEDIO_PAGO');
       entrada = normalizarEntrada({ buttonPayload: 'ped_pago_efectivo' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);

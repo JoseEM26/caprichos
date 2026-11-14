@@ -2522,8 +2522,17 @@ describe('PedidosService', () => {
         const err = await service.crear(dtoMozo({ nombre: ' ', telefono: '987654321' }), 'idemp-n-' + _n, origen).catch((e) => e);
         expect(err.getResponse()).toMatchObject({ codigo: 'CLIENTE_NOMBRE_REQUERIDO' });
       });
-      it.each(canales)('%s: sin celular -> 400 CELULAR_REQUERIDO', async (_n, origen) => {
-        const err = await service.crear(dtoMozo({ nombre: 'Ana' }), 'idemp-c-' + _n, origen).catch((e) => e);
+      it.each(canales)('%s: sin celular (mesa) -> se crea y no suma puntos', async (_n, origen) => {
+        const capturado = crearCapturado();
+        partyPuntosMock.resolverOCrear.mockClear();
+        const res = await service.crear(dtoMozo({ nombre: 'Ana' }), 'idemp-c-' + _n, { ...origen, telefonoRemitente: undefined }); // WhatsApp sin número (BSUID)
+        expect(res.codigo).toBe('CP-W310');
+        expect(capturado.data.cliente_telefono ?? null).toBeNull();
+        expect(capturado.data.cliente_party_id ?? null).toBeNull();
+        expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
+      });
+      it.each(canales)('%s: delivery sin celular -> 400 CELULAR_REQUERIDO', async (_n, origen) => {
+        const err = await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-cd-' + _n, origen).catch((e) => e);
         expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
       });
       it.each(canales)('%s: con 999999999 -> 400 TELEFONO_INVALIDO', async (_n, origen) => {
@@ -2591,10 +2600,13 @@ describe('PedidosService', () => {
         expect(err.getResponse()).toMatchObject({ codigo: 'CLIENTE_NOMBRE_REQUERIDO' });
       });
 
-      it('sin celular: 400 CELULAR_REQUERIDO', async () => {
-        const err = await service.crear(dtoLocal({ nombre: 'Miguel' }), 'idemp-local-c', { canal: 'CARTA' }).catch((e) => e);
-        expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
-        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      it('sin celular: se crea y no suma puntos', async () => {
+        const capturado = crearCapturado();
+        partyPuntosMock.resolverOCrear.mockClear();
+        const res = await service.crear(dtoLocal({ nombre: 'Miguel' }), 'idemp-local-c', { canal: 'CARTA' });
+        expect(res.codigo).toBe('CP-W310');
+        expect(capturado.data.cliente_party_id ?? null).toBeNull();
+        expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
       });
     });
   });

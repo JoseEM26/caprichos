@@ -587,8 +587,9 @@ export function FormularioCheckout({
       return 'Escribe tu nombre (mínimo 2 letras)';
     }
     const telLimpio = telefono.trim();
-    if (!telLimpio) return 'Escribe tu celular: 9 dígitos que empiecen con 9';
-    if (!/^9\d{8}$/.test(telLimpio) || telLimpio === '999999999') {
+    // El celular solo es obligatorio en delivery; si se escribe, debe ser real
+    if (!telLimpio && modalidad === 'DELIVERY') return 'Escribe tu celular: 9 dígitos que empiecen con 9';
+    if (telLimpio && (!/^9\d{8}$/.test(telLimpio) || telLimpio === '999999999')) {
       return 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
     }
     return null;
@@ -1357,7 +1358,7 @@ export function FormularioCheckout({
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
                           {invitadoPermitido
                             ? 'Sigues como invitado: necesitamos tu nombre y tu celular.'
-                            : 'Tus puntos se suman con tu celular, sin contraseña. Solo necesitamos tu nombre y tu celular. ¿Quieres verlos?'}{' '}
+                            : 'Tus puntos se suman con tu celular, sin contraseña. Solo necesitamos tu nombre (y tu celular si quieres sumar puntos). ¿Quieres verlos?'}{' '}
                           <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
                             Ver mis puntos
                           </button>{' '}
@@ -1431,7 +1432,7 @@ export function FormularioCheckout({
                             marginBottom: '4px',
                           }}
                         >
-                          Teléfono celular (9 dígitos)
+                          Teléfono celular (9 dígitos){modalidad === 'DELIVERY' ? '' : ' · opcional'}
                         </label>
                         <input
                           id="f-tel"
@@ -1441,7 +1442,7 @@ export function FormularioCheckout({
                           value={telefono}
                           onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
                           placeholder="Ej.: 987654321"
-                          required
+                          required={modalidad === 'DELIVERY'}
                           style={{
                             width: '100%',
                             minHeight: '44px',
@@ -1454,7 +1455,11 @@ export function FormularioCheckout({
                           }}
                         />
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
-                          Tu celular es obligatorio: sumas puntos con tu número, sin contraseña.
+                          {modalidad === 'DELIVERY'
+                            ? 'Tu celular es obligatorio: sumas puntos con tu número, sin contraseña.'
+                            : telefono.trim()
+                              ? 'Sumas puntos con tu número, sin contraseña.'
+                              : 'Sin celular no se suman puntos.'}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
                           Te enviaremos una breve encuesta de satisfacción por WhatsApp

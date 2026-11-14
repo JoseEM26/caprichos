@@ -61,7 +61,7 @@ async function mesaConCafe(canal: 'MOZO' | 'CAJA' = 'MOZO', extra: Record<string
   fireEvent.click(await screen.findByText('Café Americano'));
   fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
   fireEvent.click(screen.getByText('Agregar al pedido'));
-  fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+  fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
   fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Ana' } });
 }
 
@@ -97,7 +97,7 @@ describe('Nuevo pedido en 2 pasos: Pedido y Pago', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
     expect(boton).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Ana' } });
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
     expect(boton).toBeEnabled();
     expect(boton).toHaveTextContent('S/ 40.00');
   });
@@ -113,7 +113,7 @@ describe('Nuevo pedido en 2 pasos: Pedido y Pago', () => {
     fireEvent.click(screen.getByRole('button', { name: /Atrás/ }));
     expect(screen.queryByTestId('paso-pago')).toBeNull();
     expect(screen.getByLabelText('Nombre del cliente *')).toHaveValue('Ana');
-    expect(screen.getByLabelText('Celular del cliente *')).toHaveValue('987654321');
+    expect(screen.getByLabelText('Celular del cliente (opcional)')).toHaveValue('987654321');
     expect(screen.getAllByText(/1 x Café Americano/).length).toBeGreaterThan(0);
 
     // Al volver al pago, la elección de «Pagar ahora» y el medio siguen ahí

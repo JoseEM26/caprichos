@@ -781,7 +781,9 @@ export class PedidosService {
       telefonoLimpio = dto.cliente?.telefono?.trim() || null;
       const celularValido = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
       const esCartaSinSesion = (origen?.canal ?? 'CARTA') === 'CARTA' && !origen?.clientePartyId && !origen?.sinCuentaCliente;
-      if (!celularValido) {
+      // El celular solo es obligatorio en delivery (el repartidor llama); si viene, debe ser real.
+      // Sin celular el pedido se crea pero no suma puntos ni recibe avisos de WhatsApp.
+      if (!celularValido && (dto.modalidad === 'DELIVERY' || telefonoLimpio)) {
         throw new BadRequestException({
           codigo: telefonoLimpio ? 'TELEFONO_INVALIDO' : 'CELULAR_REQUERIDO',
           mensaje: 'El celular es obligatorio: 9 dígitos que empiecen con 9 (no vale 999999999)',
@@ -886,7 +888,9 @@ export class PedidosService {
           mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)',
         });
       }
-      if (!telefonoLimpio || !/^9\d{8}$/.test(telefonoLimpio) || telefonoLimpio === TELEFONO_PLACEHOLDER) {
+      const celularReal = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
+      // Solo delivery exige celular; en mesa/llevar es opcional (sin él no suma puntos), pero si viene debe ser real
+      if (!celularReal && (dto.modalidad === 'DELIVERY' || telefonoLimpio)) {
         throw new BadRequestException({
           codigo: telefonoLimpio ? 'TELEFONO_INVALIDO' : 'CELULAR_REQUERIDO',
           mensaje: 'El celular es obligatorio: 9 dígitos que empiecen con 9 (no vale 999999999)',

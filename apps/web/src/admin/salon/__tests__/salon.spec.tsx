@@ -401,7 +401,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
 
     // La mesa sin cuenta pide el nombre del cliente
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
 
     // Paso 1 → Continuar; paso 2 → Enviar a cocina
     const botonContinuar = screen.getByRole('button', { name: 'Continuar' });
@@ -772,7 +772,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     fireEvent.change(screen.getByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
-    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente (opcional)'), { target: { value: '987654321' } });
     elegirBoleta();
     continuarYEnviar();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));

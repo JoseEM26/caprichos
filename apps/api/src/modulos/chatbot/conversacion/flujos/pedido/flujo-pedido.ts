@@ -2453,10 +2453,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       contexto.nombreCliente ||
       'Cliente WhatsApp';
 
-    const clienteTelefono =
-      pedido.cliente?.telefono ||
-      contexto.telefonoCliente ||
-      '';
+    // Celular real de 9 dígitos (el del chat llega como 51XXXXXXXXX); si no hay (p. ej. usuario sin número), el pedido va sin celular
+    const telCrudo = String(pedido.cliente?.telefono || contexto.telefonoCliente || '')
+      .replace(/\D/g, '')
+      .replace(/^51(?=9\d{8}$)/, '');
+    const clienteTelefono = /^9\d{8}$/.test(telCrudo) && telCrudo !== '999999999' ? telCrudo : '';
 
     const dto: any = {
       cliente: {
@@ -2702,7 +2703,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         ? telDigitos
         : '';
 
-    if (!pedido.cliente?.telefono) {
+    // Solo delivery pide el celular (el repartidor llama); en otras modalidades se usa el del chat si es real, o ninguno
+    if (pedido.modalidad === 'DELIVERY' && !pedido.cliente?.telefono) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
         telefonoSugerido: telExistente || undefined,
