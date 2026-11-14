@@ -9,6 +9,9 @@ export const MEDIOS_PLAN: ReadonlyArray<{ id: MedioPlan; nombre: string }> = [
   { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
 ];
 
+/** Máximo de medios en un mismo pago (igual que el API). */
+export const MAX_MEDIOS_PLAN = 3;
+
 const MEDIOS_DIGITALES: ReadonlyArray<MedioPlan> = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 /** Fila editable: el monto va como texto mientras el mozo escribe. */
@@ -47,9 +50,11 @@ export function restantePlan(total: number, filas: FilaPlan[]): number {
 /** Mensaje de error del plan o null si el plan es válido para el total. */
 export function errorPlan(total: number, filas: FilaPlan[]): string | null {
   if (filas.length === 0) return 'Elige cómo paga';
+  if (filas.length > MAX_MEDIOS_PLAN) return `Se puede pagar con hasta ${MAX_MEDIOS_PLAN} medios`;
   const medios = filas.map((f) => f.medio);
   if (new Set(medios).size !== medios.length) return 'Cada medio solo puede ir una vez';
   if (filas.some((f) => !(centimos(f.monto) > 0))) return 'Indica el monto de cada medio';
+  if (filas.some((f) => Math.abs(Number(f.monto) * 100 - centimos(f.monto)) > 1e-6)) return 'Cada monto admite hasta 2 decimales';
   const restante = restantePlan(total, filas);
   if (Math.abs(restante) >= 0.005) {
     return restante > 0

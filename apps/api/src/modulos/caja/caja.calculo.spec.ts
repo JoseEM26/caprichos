@@ -171,6 +171,18 @@ describe('caja.calculo', () => {
     expect(montos.esperadoEfectivo).toBe(11);
   });
 
+  it('cobro con 3 medios (Yape 20 + Plin 15 + efectivo 5): cada parte suma en su medio en el cierre', async () => {
+    const m = (monto: number, medio: string) => ({ medio, monto: new Prisma.Decimal(monto), propina: new Prisma.Decimal(0) });
+    const cliente: any = {
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      cobro: { findMany: jest.fn().mockResolvedValue([{ id: 1n, anulado_en: null, pagos: [m(20, 'YAPE'), m(15, 'PLIN'), m(5, 'EFECTIVO')] }]) },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const montos = await calcularMontosCaja(cliente, { id: 10n, fecha: new Date('2026-11-06T00:00:00.000Z'), apertura: new Prisma.Decimal(0) });
+    expect([montos.sistemaYape, montos.sistemaPlin, montos.ventasEfectivo, montos.sistemaTransferencia, montos.sistemaTarjeta]).toEqual([20, 15, 5, 0, 0]);
+  });
+
   it('el cobro anulado (conservado, RNF-CAP-014) no cuenta en lo esperado: solo los vigentes de la caja', async () => {
     const cobros = [
       { id: 1n, caja_id: 10n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(30) }] },

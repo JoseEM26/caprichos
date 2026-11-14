@@ -163,7 +163,7 @@ describe('PlanPagoEditor', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('cinco medios: no duplica (los ya usados quedan deshabilitados en las demás filas), no ofrece más y tiene scroll propio', () => {
+  it('tres medios (el máximo): no duplica (los ya usados quedan deshabilitados en las demás filas), no ofrece más y tiene scroll propio', () => {
     render(
       <PlanPagoEditor
         total={40}
@@ -171,8 +171,6 @@ describe('PlanPagoEditor', () => {
           { medio: 'EFECTIVO', monto: '' },
           { medio: 'YAPE', monto: '10' },
           { medio: 'PLIN', monto: '10' },
-          { medio: 'TARJETA', monto: '5' },
-          { medio: 'TRANSFERENCIA', monto: '5' },
         ]}
         onChange={vi.fn()}
         pagaCon=""
@@ -186,11 +184,11 @@ describe('PlanPagoEditor', () => {
 
     expect(screen.queryByRole('button', { name: 'Agregar otro medio de pago' })).toBeNull();
     const filas = screen.getAllByRole('group').filter((g) => g.getAttribute('aria-label')?.startsWith('Medio') || g.getAttribute('aria-label') === '¿Cómo paga?');
-    expect(filas).toHaveLength(5);
+    expect(filas).toHaveLength(3);
         // En cada fila, el medio elegido está activo y los de las otras filas no se pueden repetir
     const primera = within(filas[0]);
     expect(primera.getByRole('button', { name: 'Yape' })).toBeDisabled();
-    expect(primera.getByRole('button', { name: 'Tarjeta' })).toBeDisabled();
+    expect(primera.getByRole('button', { name: 'Plin' })).toBeDisabled();
     expect(primera.getByRole('button', { name: 'Efectivo' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(filas[1]).getByRole('button', { name: 'Yape' })).toHaveAttribute('aria-pressed', 'true');
   });

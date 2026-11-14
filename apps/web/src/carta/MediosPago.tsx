@@ -12,15 +12,36 @@ export const MEDIOS_PAGO: (OpcionTarjeta & { id: MetodoPago })[] = [
 
 export const nombreMedio = (m: string) => MEDIOS_PAGO.find((x) => x.id === m)?.nombre ?? m;
 
-/** «¿Cómo pagas?»: una tarjeta grande por medio disponible. */
-export function TarjetasMedioPago({ medios, seleccionado, alElegir }: { medios: MetodoPago[]; seleccionado: MetodoPago | null; alElegir: (m: MetodoPago) => void }) {
+/** Tarjeta que abre el pago con 2 o 3 medios. */
+const OPCION_DIVIDIDO: OpcionTarjeta = {
+  id: 'DIVIDIDO',
+  nombre: 'Pagar con 2 o 3 medios',
+  linea: 'Divide el pago',
+  icono: iconos.dividido,
+  etiqueta: 'Pagar con 2 o 3 medios',
+};
+
+/** «¿Cómo pagas?»: una tarjeta grande por medio disponible y, con 2 o más medios, la de pago dividido. */
+export function TarjetasMedioPago({
+  medios,
+  seleccionado,
+  alElegir,
+  alDividir,
+}: {
+  medios: MetodoPago[];
+  seleccionado: MetodoPago | null;
+  alElegir: (m: MetodoPago) => void;
+  alDividir?: () => void;
+}) {
+  const opciones: OpcionTarjeta[] = MEDIOS_PAGO.filter((m) => medios.includes(m.id)).map((m) => ({ ...m, etiqueta: m.nombre }));
+  if (alDividir && medios.length >= 2) opciones.push(OPCION_DIVIDIDO);
   return (
     <ElegirEnTarjetas
       titulo="¿Cómo pagas?"
       testId="tarjetas-medio-pago"
-      opciones={MEDIOS_PAGO.filter((m) => medios.includes(m.id)).map((m) => ({ ...m, etiqueta: m.nombre }))}
+      opciones={opciones}
       seleccionado={seleccionado}
-      alElegir={(id) => alElegir(id as MetodoPago)}
+      alElegir={(id) => (id === 'DIVIDIDO' ? alDividir?.() : alElegir(id as MetodoPago))}
     />
   );
 }

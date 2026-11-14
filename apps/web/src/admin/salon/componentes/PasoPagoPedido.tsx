@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import {
+  MAX_MEDIOS_PLAN,
   MEDIOS_PLAN,
   aPlan,
   montoEfectivoPlan,
@@ -12,7 +13,7 @@ import { digitalesDelPlan } from '../../pedidos/mediosPago';
 import '../paso-pago-pedido.css';
 
 /** Máximo de métodos en un pago mixto. */
-export const MAX_METODOS_PAGO = 3;
+export const MAX_METODOS_PAGO = MAX_MEDIOS_PLAN;
 
 export type CuandoPaga = 'ahora' | 'final';
 

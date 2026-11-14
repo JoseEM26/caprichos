@@ -206,6 +206,47 @@ describe('Pagos del bot', () => {
       expect(new PagoPlanService().validar(accion.dto.pago.plan, 62.5)).not.toBeNull();
     });
 
+    it('3 medios: Yape 30 + Plin 20 + resto 12.50 en efectivo; mismo plan y reglas que el servidor', () => {
+      let r = iniciar();
+      r = paso(r.nuevoFlujo, { texto: '30', textoOriginal: '30' });
+      expect((r.acciones[0] as any).filas.map((x: any) => x.id)).toContain('ped_div_tres');
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_div_tres' });
+      expect(r.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MEDIO2');
+      expect(textos(r)).toContain('segunda parte');
+      expect((r.acciones[0] as any).filas.map((x: any) => x.id)).not.toContain('ped_div_tres');
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_pago_plin' });
+      expect(r.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MONTO');
+      expect(textos(r)).toContain('menor a S/ 32.50');
+      r = paso(r.nuevoFlujo, { texto: '20', textoOriginal: '20' });
+      expect(r.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MEDIO3');
+      expect(textos(r)).toContain('Te quedan S/ 12.50');
+      const ids = ((r.acciones[0] as any).filas ?? (r.acciones[0] as any).botones).map((x: any) => x.id);
+      expect(ids).not.toContain('ped_pago_yape');
+      expect(ids).not.toContain('ped_pago_plin');
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_pago_efectivo' });
+      r = paso(r.nuevoFlujo, { buttonPayload: 'ped_paga_exacto' });
+      const accion: any = paso(r.nuevoFlujo, { buttonPayload: 'ped_confirmar' }).acciones.find((a: any) => a.tipo === 'crearPedido');
+      expect(accion.dto.pago.plan).toEqual([{ medio: 'YAPE', monto: 30 }, { medio: 'PLIN', monto: 20 }, { medio: 'EFECTIVO', monto: 12.5 }]);
+      expect(new PagoPlanService().validar(accion.dto.pago.plan, 62.5)).toHaveLength(3);
+    });
+
+    it('3 medios: el monto de la segunda parte debe dejar algo (menor al resto) y no se repite un medio', () => {
+      let r = iniciar();
+      r = paso(r.nuevoFlujo, { texto: '30', textoOriginal: '30' });
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_div_tres' });
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_pago_plin' });
+      for (const txt of ['32.50', '40', '0', 'abc']) {
+        const x = paso(r.nuevoFlujo, { texto: txt, textoOriginal: txt });
+        expect(x.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MONTO');
+        expect(textos(x)).toContain('menor a S/ 32.50');
+      }
+      let t = paso(r.nuevoFlujo, { texto: '10', textoOriginal: '10' });
+      // elegir otra vez Yape o Plin como tercero: repregunta
+      t = paso(t.nuevoFlujo, { listRowId: 'ped_pago_plin' });
+      expect(t.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MEDIO3');
+      expect((t.nuevoFlujo.pedido as any).pago).toBeUndefined();
+    });
+
     it('mensaje de confirmación pide una captura por medio digital con su monto', () => {
       const t = TEXTOS_BOT.pedidoConfirmadoExito({
         codigo: 'CP-1', tiempoMin: 25, tiempoMax: 35, esPagoDigital: true,

@@ -92,6 +92,7 @@ export const iconos = {
   efectivo: <Svg><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" /></Svg>,
   tarjeta: <Svg><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></Svg>,
   transferencia: <Svg><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18" /></Svg>,
+  dividido: <Svg><path d="M12 3v6M12 9L5 21M12 9l7 12" /></Svg>,
   gps: <Svg><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" /></Svg>,
   mapa: <Svg><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></Svg>,
   escribir: <Svg><path d="M4 20h4L19 9l-4-4L4 16v4z" /></Svg>,

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { PlanPagoEditor } from '../salon/componentes/PlanPagoEditor';
-import { MEDIOS_PLAN, aPlan, errorPlan, montoEfectivoPlan, nombreMedio, planInicial, type FilaPlan, type MedioPlan } from './planPago';
+import { MAX_MEDIOS_PLAN, MEDIOS_PLAN, aPlan, errorPlan, montoEfectivoPlan, nombreMedio, planInicial, type FilaPlan, type MedioPlan } from './planPago';
 import { pedidosApi, montoPorCobrar, type Pedido } from './pedidosApi';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -59,7 +59,7 @@ export function BotonCambiarPago({
     const actual = filasActuales(pedido, total);
     const usados = new Set(actual.map((f) => f.medio));
     const libre = MEDIOS_PLAN.find((x) => !usados.has(x.id))?.id ?? 'YAPE';
-    setFilas(m === 'agregar' && actual.length < MEDIOS_PLAN.length ? [...actual, { medio: libre, monto: '' }] : actual);
+    setFilas(m === 'agregar' && actual.length < MAX_MEDIOS_PLAN ? [...actual, { medio: libre, monto: '' }] : actual);
     setPagaCon(pedido.paga_con != null ? String(pedido.paga_con) : '');
     setMotivo('');
     setError('');

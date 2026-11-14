@@ -28,6 +28,7 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_PAGO_DIV_MEDIO1'
   | 'PEDIDO_PAGO_DIV_MONTO'
   | 'PEDIDO_PAGO_DIV_MEDIO2'
+  | 'PEDIDO_PAGO_DIV_MEDIO3'
   | 'PEDIDO_COMPROBANTE_TIPO'
   | 'PEDIDO_COMPROBANTE_DNI'
   | 'PEDIDO_COMPROBANTE_RUC'
@@ -195,8 +196,15 @@ export interface DatosComprobanteBot {
  */
 export interface EstadoCarritoPedido {
   estadoInterno: EstadoPedidoFlujo;
-  /** Pago dividido en curso: primer medio y su monto mientras se elige el segundo. */
-  pagoDiv?: { medio1?: MedioPagoBot; monto1?: number };
+  /** Pago dividido en curso (2 o 3 medios): lo ya elegido mientras se completa el plan. */
+  pagoDiv?: {
+    medio1?: MedioPagoBot;
+    monto1?: number;
+    /** Reparto en 3 medios: el cliente lo pidió al elegir la segunda parte. */
+    tres?: boolean;
+    medio2?: MedioPagoBot;
+    monto2?: number;
+  };
   /** Propina opcional en soles (aparte de la venta). undefined = aún no se preguntó. */
   propina?: number;
   modalidad?: 'DELIVERY' | 'RECOGER';

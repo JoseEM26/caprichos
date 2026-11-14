@@ -1,4 +1,5 @@
 import { montoACobrar } from '../../comun/monto-a-cobrar';
+import { MAX_MEDIOS_PLAN } from '../pedidos/pago-plan.service';
 import { PuntosService } from '../clientes/puntos.service';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { normalizarPropina, propinaActivaParaCanal, repartirPropina } from '../propinas/propinas.util';
@@ -132,6 +133,20 @@ export class CobrosService {
       throw new BadRequestException({
         codigo: 'PAGOS_REQUERIDOS',
         mensaje: 'Debe ingresar al menos un pago',
+      });
+    }
+
+    if (dto.pagos.length > MAX_MEDIOS_PLAN) {
+      throw new BadRequestException({
+        codigo: 'DEMASIADOS_MEDIOS',
+        mensaje: `Se puede cobrar con hasta ${MAX_MEDIOS_PLAN} medios de pago`,
+      });
+    }
+    const usados = dto.pagos.map((p) => String(p.medio || '').toUpperCase());
+    if (new Set(usados).size !== usados.length) {
+      throw new BadRequestException({
+        codigo: 'MEDIO_REPETIDO',
+        mensaje: 'Cada medio de pago solo puede ir una vez en el cobro',
       });
     }
 

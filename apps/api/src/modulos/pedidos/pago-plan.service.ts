@@ -11,6 +11,8 @@ export interface PlanPagoItem {
 }
 
 const TOLERANCIA = 0.01;
+/** Máximo de medios en un mismo pago (1 = normal; 2 o 3 = dividido). */
+export const MAX_MEDIOS_PLAN = 3;
 
 /**
  * Monto contra el que se compara un voucher: la parte digital del plan si el pedido lo tiene,
@@ -80,6 +82,12 @@ export class PagoPlanService {
    */
   validar(plan: PlanPagoItem[] | null | undefined, total: number): PlanPagoItem[] | null {
     if (!plan || plan.length === 0) return null;
+    if (plan.length > MAX_MEDIOS_PLAN) {
+      throw new BadRequestException({
+        codigo: 'PLAN_PAGO_DEMASIADOS_MEDIOS',
+        mensaje: `Se puede pagar con hasta ${MAX_MEDIOS_PLAN} medios; el plan trae ${plan.length}`,
+      });
+    }
 
     const vistos = new Set<string>();
     const filas = plan.map((fila) => {
@@ -98,6 +106,12 @@ export class PagoPlanService {
       }
       vistos.add(medio);
       const monto = Math.round(Number(fila.monto) * 100) / 100;
+      if (Number.isFinite(monto) && Math.abs(Number(fila.monto) - monto) > 1e-9) {
+        throw new BadRequestException({
+          codigo: 'PLAN_PAGO_MONTO_INVALIDO',
+          mensaje: 'Cada monto del plan de pago admite hasta 2 decimales',
+        });
+      }
       if (!Number.isFinite(monto) || monto <= 0) {
         throw new BadRequestException({
           codigo: 'PLAN_PAGO_MONTO_INVALIDO',

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -157,6 +158,7 @@ export class PagoPedidoDto {
   @IsOptional()
   @IsArray({ message: 'El plan de pago debe ser una lista' })
   @ArrayMinSize(1, { message: 'El plan de pago necesita al menos un medio' })
+  @ArrayMaxSize(3, { message: 'Se puede pagar con hasta 3 medios' })
   @ValidateNested({ each: true })
   @Type(() => PlanPagoItemDto)
   plan?: PlanPagoItemDto[];
