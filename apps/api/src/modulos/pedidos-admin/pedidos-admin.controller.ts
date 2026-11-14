@@ -76,7 +76,7 @@ export class PedidosAdminController {
       dto.canal || (req.usuario && esSoloMozo(req.usuario) ? 'MOZO' : 'CAJA');
     // Programado: solo roles de Caja o mozo (el servidor lo exige; la pantalla solo lo oculta)
     if (dto.programadoPara || dto.adelanto) exigirPuedeProgramar(rolesDelUsuario(req.usuario));
-    const res = await this.pedidosService!.crear(dto, key, {
+    const origenPedido = {
       programadoPara: dto.programadoPara,
       adelanto: dto.adelanto,
       canal,
@@ -87,7 +87,11 @@ export class PedidosAdminController {
       puedeCobrarAhora: puedeCobrarAhoraPersonal(req.usuario),
       omitirChequeoCarta: true,
       puedeCortesia: puedeDarCortesia(req.usuario),
-    });
+    };
+    const ipCrear = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const res = dto.programadoPara
+      ? await this.programados!.crearProgramado(dto, key, origenPedido, req.usuario, ipCrear)
+      : await this.pedidosService!.crear(dto, key, origenPedido);
     // Un programado imprime sus etiquetas cuando pasa a cocina, no hoy
     if (res?.id && res.estado !== 'PROGRAMADO' && this.impresionService) {
       try {
@@ -127,7 +131,16 @@ export class PedidosAdminController {
     return this.programados!.agregarAdelanto(id, dto, req.usuario, ip);
   }
 
-  /** Devuelve (anula) un adelanto mientras su caja siga abierta. */
+  /** Mueve la fecha y hora de un programado (con reserva de mesa, mueve también la reserva). */
+  @Post(':id/reprogramar')
+  @Permiso('pedidos', 'crear')
+  async reprogramar(@Param('id') id: string, @Body() body: { programadoPara?: string }, @Req() req: any) {
+    exigirPuedeProgramar(rolesDelUsuario(req.usuario));
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.programados!.reprogramar(id, body?.programadoPara ?? '', req.usuario, ip);
+  }
+
+  /** Devuelve un adelanto (egreso de la caja de hoy si es efectivo y su caja ya cerró). */
   @Post('adelantos/:adelantoId/anular')
   @Permiso('pedidos', 'crear')
   async anularAdelanto(@Param('adelantoId') adelantoId: string, @Body() body: { motivo?: string }, @Req() req: any) {

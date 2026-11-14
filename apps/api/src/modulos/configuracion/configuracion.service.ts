@@ -92,6 +92,9 @@ export const CLAVES_NUMERICAS = [
   'eta_base_sin_zona_min',
   'reserva_tolerancia_min',
   'reserva_recordatorio_min',
+  // Pedidos programados de Caja y mozo: tope de días hacia adelante y minutos de aviso antes de pasar a cocina
+  'programado_dias_max',
+  'programado_aviso_min',
   // Reservas desde la carta web: cuántas pendientes por celular, días de anticipación y personas máximas
   'reserva_web_max_pendientes',
   'reserva_web_dias_max',
@@ -122,6 +125,8 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   notif_sonido_intervalo_seg: [5, 600, true, 'El intervalo del sonido debe ser un entero entre 5 y 600 segundos'],
   eta_paso_min: [1, 30, true, 'El redondeo debe ser un entero entre 1 y 30 minutos'],
   eta_base_sin_zona_min: [0.5, 60, false, 'Los minutos de puerta sin zona deben estar entre 0.5 y 60'],
+  programado_dias_max: [1, 60, true, 'El tope de días para programar debe ser un entero entre 1 y 60'],
+  programado_aviso_min: [0, 480, true, 'Los minutos de aviso deben ser un entero entre 0 y 480'],
   reserva_tolerancia_min: [1, 180, true, 'La tolerancia de reserva debe ser un entero entre 1 y 180 minutos'],
   reserva_recordatorio_min: [5, 240, true, 'El recordatorio de reserva debe ser un entero entre 5 y 240 minutos antes'],
   reserva_web_max_pendientes: [1, 10, true, 'Las solicitudes pendientes por celular deben ser un entero entre 1 y 10'],

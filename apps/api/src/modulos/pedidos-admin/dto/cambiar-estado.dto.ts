@@ -23,4 +23,9 @@ export class CambiarEstadoDto {
   @IsOptional()
   @IsIn(['MERMA', 'DEVOLVER'])
   consumoAlmacen?: 'MERMA' | 'DEVOLVER';
+
+  /** Al anular un pedido programado con adelanto: DEVUELVE (egreso de la caja de hoy si es efectivo, o registro del medio). Para reprogramar se usa POST :id/reprogramar. */
+  @IsOptional()
+  @IsIn(['DEVUELVE'])
+  adelanto?: 'DEVUELVE';
 }

@@ -580,8 +580,18 @@ export const pedidosApi = {
   },
 
   /** Adelanto en efectivo o tarjeta de un pedido programado: entra a la caja de hoy. */
-  async registrarAdelanto(id: string | number, dto: { medio: 'EFECTIVO' | 'TARJETA'; monto: number; pagaCon?: number }): Promise<{ adelantoId: string; adelantoTotal: number; saldo: number }> {
+  async registrarAdelanto(id: string | number, dto: { medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; monto: number; pagaCon?: number; voucherId?: string | number }): Promise<{ adelantoId: string; adelantoTotal: number; saldo: number }> {
     return api.post(`/admin/pedidos/${id}/adelanto`, dto);
+  },
+
+  /** Anula un programado; con adelanto, «se devuelve» (egreso de la caja de hoy si es efectivo y su caja ya cerró). */
+  async anularProgramado(id: string | number, motivo: string, devuelveAdelanto: boolean): Promise<unknown> {
+    return api.post(`/admin/pedidos/${id}/estado`, { estado: 'ANULADO', motivo, ...(devuelveAdelanto ? { adelanto: 'DEVUELVE' } : {}) });
+  },
+
+  /** «Se reprograma»: cambia la fecha y hora de un programado (mueve también su reserva de mesa). */
+  async reprogramar(id: string | number, programadoPara: string): Promise<{ id: string; programadoPara: string }> {
+    return api.post(`/admin/pedidos/${id}/reprogramar`, { programadoPara });
   },
 
   async crearPedidoAdmin(
@@ -634,7 +644,9 @@ export const pedidosApi = {
       /** Programar para otra fecha (ISO). Solo Caja y mozo */
       programadoPara?: string;
       /** Adelanto de hoy al programar (efectivo o tarjeta) */
-      adelanto?: { medio: 'EFECTIVO' | 'TARJETA'; monto: number; pagaCon?: number };
+      adelanto?: { medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; monto: number; pagaCon?: number; voucherId?: string | number };
+      /** Solo MESA programada: reserva de mesa que se crea con el pedido */
+      reserva?: { mesas: string[]; personas: number; confirmarCapacidad?: boolean };
     },
     idempotencyKey?: string,
   ): Promise<any> {

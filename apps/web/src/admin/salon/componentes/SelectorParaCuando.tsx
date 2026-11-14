@@ -1,6 +1,6 @@
 import { DIAS_MAX_PROGRAMADO, errorParaCuando, hoyLima, sumarDias, type ParaCuando } from './paraCuando';
 
-export type MedioAdelanto = 'EFECTIVO' | 'TARJETA';
+export type MedioAdelanto = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
 export interface SelectorParaCuandoProps {
   valor: ParaCuando;
@@ -89,6 +89,9 @@ export function SelectorParaCuando({ valor, onChange, adelanto, onAdelanto, medi
           </label>{' '}
           <select aria-label="Medio del adelanto" value={medioAdelanto} onChange={(e) => onMedioAdelanto(e.target.value as MedioAdelanto)}>
             <option value="EFECTIVO">Efectivo</option>
+            <option value="YAPE">Yape</option>
+            <option value="PLIN">Plin</option>
+            <option value="TRANSFERENCIA">Transferencia</option>
             <option value="TARJETA">Tarjeta</option>
           </select>
         </div>

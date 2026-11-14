@@ -4,7 +4,10 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { AdelantoEntrada, anularAdelantoTx, registrarAdelantoTx } from '../pedidos/adelanto.util';
-import { leerConfigProgramados } from '../pedidos/programado.util';
+import { leerConfigProgramados, validarProgramadoPara } from '../pedidos/programado.util';
+import { OrigenPedido, PedidosService } from '../pedidos/pedidos.service';
+import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
+import { ReservasService } from '../reservas/reservas.service';
 
 /** Pedidos programados: paso automático a cocina o a la cola de reparto, y adelantos. */
 @Injectable()
@@ -14,6 +17,8 @@ export class PedidosProgramadosService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly impresion?: ImpresionService,
+    @Optional() private readonly pedidos?: PedidosService,
+    @Optional() private readonly reservas?: ReservasService,
   ) {}
 
   /**
@@ -53,6 +58,62 @@ export class PedidosProgramadosService {
       this.eventos?.emitirAdmin('pedido:nuevo', { id: p.id.toString(), codigo: p.codigo, estado: 'COLA' });
     }
     return pasados;
+  }
+
+  /**
+   * Crea un pedido programado. Si es de MESA, crea primero la RESERVA de mesa (aparece en Reservas y en el plano a su hora y
+   * aparta la mesa) y la deja enlazada al pedido (reserva.pedido_id); si el pedido falla, la reserva se cancela.
+   * La reserva se sienta con el flujo de siempre cuando el cliente llega; al pasar a cola el pedido ya lleva su mesa.
+   */
+  async crearProgramado(dto: CrearPedidoDto, clave: string, origen: OrigenPedido, usuario: any, ip?: string) {
+    if (dto.modalidad !== 'MESA') return this.pedidos!.crear(dto, clave, origen);
+    if (!dto.reserva) {
+      throw new BadRequestException({ codigo: 'RESERVA_REQUERIDA', mensaje: 'Un pedido de mesa programado necesita mesa y número de personas' });
+    }
+    const telefono = dto.cliente?.telefono?.trim() || dto.clienteTelefono;
+    if (!telefono) {
+      throw new BadRequestException({ codigo: 'TELEFONO_REQUERIDO', mensaje: 'La reserva de mesa necesita el celular del cliente' });
+    }
+    // Un reintento con la misma clave no vuelve a reservar
+    const existente = await this.prisma.pedido.findUnique({ where: { clave_idempotencia: clave.trim() }, select: { id: true } });
+    if (existente) return this.pedidos!.crear(dto, clave, origen);
+    const cfg = await leerConfigProgramados(this.prisma);
+    const fecha = validarProgramadoPara(origen.programadoPara, new Date(), cfg.diasMax);
+    const reserva = await this.reservas!.crear(
+      { nombre: dto.cliente?.nombre?.trim() || 'Cliente', telefono, personas: dto.reserva.personas, hora: fecha.toISOString(), mesas: dto.reserva.mesas, confirmarCapacidad: dto.reserva.confirmarCapacidad },
+      usuario,
+      ip,
+    );
+    const mesaNombre = reserva.mesas.map((m: any) => m.nombre || (m.numero != null ? `Mesa ${m.numero}` : 'Mesa')).join(' + ');
+    let res: any;
+    try {
+      res = await this.pedidos!.crear(dto, clave, { ...origen, mesaNombre });
+    } catch (e) {
+      await this.reservas!.cancelar(reserva.id, { motivo: 'El pedido programado no se pudo crear' } as any, usuario, ip).catch(() => undefined);
+      throw e;
+    }
+    await this.prisma.reserva.update({ where: { id: BigInt(reserva.id) }, data: { pedido_id: BigInt(res.id) } });
+    return { ...res, reservaId: reserva.id };
+  }
+
+  /** Cambia la fecha y hora de un programado (alternativa a devolver el adelanto). Con reserva de mesa, mueve también la reserva. */
+  async reprogramar(pedidoId: string, programadoPara: string, usuario: any, ip?: string) {
+    const id = this.parsearId(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id }, select: { id: true, estado: true, codigo: true, programado_para: true } });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    if (pedido.estado !== 'PROGRAMADO') {
+      throw new ConflictException({ codigo: 'REPROGRAMAR_SOLO_PROGRAMADO', mensaje: 'Solo se reprograma un pedido que sigue programado' });
+    }
+    const cfg = await leerConfigProgramados(this.prisma);
+    const nueva = validarProgramadoPara(programadoPara, new Date(), cfg.diasMax);
+    const reserva = await this.prisma.reserva.findFirst({ where: { pedido_id: id, estado: 'ACTIVA' }, select: { id: true } });
+    if (reserva) await this.reservas!.actualizar(reserva.id, { hora: nueva.toISOString() } as any, usuario, ip);
+    await this.prisma.pedido.update({ where: { id }, data: { programado_para: nueva } });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'pedidos', accion: 'REPROGRAMAR_PEDIDO', resultado: 'OK', entidad: 'pedido', entidadId: id,
+      antes: { programadoPara: pedido.programado_para }, despues: { programadoPara: nueva }, partyId: BigInt(usuario.partyId), ip,
+    });
+    return { id: id.toString(), programadoPara: nueva.toISOString() };
   }
 
   /** Adelanto sobre un pedido ya programado (el de la creación va dentro de la transacción del pedido). */

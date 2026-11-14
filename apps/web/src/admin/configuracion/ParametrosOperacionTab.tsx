@@ -157,6 +157,18 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'S/',
   },
+  programado_dias_max: {
+    nombre: 'Días máximos para programar un pedido',
+    descripcion: 'Hasta cuántos días adelante pueden programar un pedido Caja y mozo (la carta virtual y el bot no programan).',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
+  programado_aviso_min: {
+    nombre: 'Aviso antes de la hora pactada (pedido programado)',
+    descripcion: 'Minutos antes de la hora pactada en que el pedido programado pasa solo a cocina o a la cola de reparto.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
   reserva_tolerancia_min: {
     nombre: 'Tolerancia de reserva',
     descripcion: 'Minutos de espera de cortesía antes de liberar una mesa reservada.',

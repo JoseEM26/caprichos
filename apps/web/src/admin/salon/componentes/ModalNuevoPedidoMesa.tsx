@@ -1260,7 +1260,7 @@ export function ModalNuevoPedidoMesa({
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
-  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante' | 'propina'; mensaje: string; foco: string[]; paso?: 'pago' };
+  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante' | 'propina' | 'personas' | 'paraCuando' | 'adelanto'; mensaje: string; foco: string[]; paso?: 'pago' };
   const errorComprobanteCaja = errorValorComprobante(valorComp);
   // «Con cuánto paga» es obligatorio con efectivo, salvo mesa (se pide al cobrar en la precuenta) y pedido del personal
   // En la mesa solo se exime con «Pagar al final»: con «Pagar ahora» el efectivo se registra y hace falta el billete
@@ -1276,7 +1276,7 @@ export function ModalNuevoPedidoMesa({
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
   if (pideMode === 'personal' && !staffElegido)
     erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
-  if (modalidad === 'local' && !extra && !enEspera && !programando && mesasSeleccionadas.length === 0)
+  if (modalidad === 'local' && !extra && !enEspera && mesasSeleccionadas.length === 0)
     erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
   if (modalidad === 'local' && !extra && errorNombreMesa)
     erroresEnvio.push({ campo: 'nombre', mensaje: errorNombreMesa, foco: ['#np-nombre-mesa'] });
@@ -1292,6 +1292,10 @@ export function ModalNuevoPedidoMesa({
       mensaje: mensajeTelefonoMesa,
       foco: ['#np-telefono-mesa'],
     });
+  if (programando && modalidad === 'local' && !personasNum)
+    erroresEnvio.push({ campo: 'personas', mensaje: 'Indica cuántas personas vienen para reservar la mesa.', foco: [] });
+  if (programando && modalidad === 'local' && enEspera)
+    erroresEnvio.push({ campo: 'mesa', mensaje: 'Un pedido programado reserva una mesa: elige la mesa en lugar de lista de espera.', foco: [] });
   if (programando) {
     const errFecha = errorParaCuando(paraCuando);
     if (errFecha) erroresEnvio.push({ campo: 'paraCuando', mensaje: errFecha, foco: [], paso: 'pago' });
@@ -1387,7 +1391,7 @@ export function ModalNuevoPedidoMesa({
   const handleEnviarPedido = async () => {
     if (enviando) return; // anti doble envío
     setErrorExtra(null);
-    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && !programando && mesasSeleccionadas.length === 0)) {
+    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
       return;
@@ -1499,6 +1503,7 @@ export function ModalNuevoPedidoMesa({
             ...(programando
               ? {
                   programadoPara: programadoParaIso(paraCuando) ?? undefined,
+                  ...(modalidad === 'local' ? { reserva: { mesas: mesasSeleccionadas, personas: personasNum as number, ...(capacidadAceptada ? { confirmarCapacidad: true } : {}) } } : {}),
                   ...(adelantoNum > 0 ? { adelanto: { medio: medioAdelanto, monto: adelantoNum } } : {}),
                 }
               : {}),

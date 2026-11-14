@@ -32,6 +32,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'entrega', titulo: 'Tiempo prometido de entrega', claves: ['tiempo_prometido_min', 'tiempo_max_min', 'eta_factor_urbano', 'eta_productos_desde', 'eta_extra_por_producto_min', 'eta_parada_min', 'eta_margen_min', 'eta_paso_min', 'eta_base_sin_zona_min'] },
   { id: 'envio', titulo: 'Envío gratis y pedido mínimo', claves: ['envio_gratis_monto', 'envio_gratis_modo', 'pedido_minimo'] },
   { id: 'caja', titulo: 'Caja', claves: ['caja_monto_inicial'] },
+  { id: 'programados', titulo: 'Pedidos programados (Caja y mozo)', claves: ['programado_dias_max', 'programado_aviso_min'] },
   { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_recordatorio_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
   { id: 'stock', titulo: 'Avisos de «se está acabando» (stock de productos)', claves: ['aviso_stock_quedan_desde', 'aviso_stock_ultimas_desde'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
@@ -162,6 +163,20 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 25 %: un consumo de S/ 40 del personal queda en S/ 30.',
     efecto: 'Cambia el monto de los créditos nuevos del personal; los ya registrados no se recalculan.',
     porDefecto: '25', unidad: '%', rango: '0 o más', palabras: ['personal', 'trabajadores', 'empleados', 'credito', 'descuento personal', 'consumo del personal'], peligro: 'alto',
+  },
+  programado_dias_max: {
+    grupo: 'programados', titulo: 'Días máximos para programar un pedido',
+    descripcion: 'Hasta cuántos días adelante pueden programar un pedido Caja y mozo. Un pedido programado no entra a cocina ni a reparto hasta su día.',
+    ejemplo: 'Con 7: hoy se puede programar hasta dentro de una semana; el día 8 se rechaza.',
+    efecto: 'Solo cambia lo que se puede programar desde ahora; lo ya programado no se mueve.',
+    porDefecto: '7', unidad: 'días', rango: 'entero de 1 a 60', palabras: ['programar', 'pedido para mañana', 'pedido programado', 'adelantado', 'dias', 'tope'], peligro: 'medio',
+  },
+  programado_aviso_min: {
+    grupo: 'programados', titulo: 'Aviso antes de la hora pactada (minutos)',
+    descripcion: 'Cuántos minutos antes de la hora pactada el pedido programado pasa solo a cocina o a la cola de reparto.',
+    ejemplo: 'Con 30: un pedido para las 8:00 llega a cocina a las 7:30.',
+    efecto: 'Subirlo adelanta la llegada a cocina; con 0 llega justo a la hora pactada. Aplica también a lo ya programado.',
+    porDefecto: '30', unidad: 'minutos', rango: 'entero de 0 a 480', palabras: ['programar', 'pedido programado', 'pasa a cocina', 'anticipacion', 'aviso', 'minutos antes'], peligro: 'medio',
   },
   reserva_tolerancia_min: {
     grupo: 'clientes', titulo: 'Tolerancia de reservas',

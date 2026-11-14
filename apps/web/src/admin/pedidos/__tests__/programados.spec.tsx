@@ -40,6 +40,43 @@ describe('lista Programados', () => {
     expect(screen.queryByRole('button', { name: 'Pasar a cocina ahora' })).toBeNull();
   });
 
+  it('anular con adelanto avisa que se devuelve y manda adelanto=DEVUELVE; el motivo es obligatorio', async () => {
+    const anular = vi.spyOn(pedidosApi, 'anularProgramado').mockResolvedValue({});
+    render(<PanelProgramados puedePasar alActualizar={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Anular' }));
+    expect(screen.getByText(/Tiene un adelanto de S\/ 30.00/)).toBeInTheDocument();
+    const boton = screen.getByRole('button', { name: 'Anular y devolver adelanto' });
+    expect(boton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Motivo de la anulación'), { target: { value: 'Cliente desistió' } });
+    fireEvent.click(boton);
+    await waitFor(() => expect(anular).toHaveBeenCalledWith('7', 'Cliente desistió', true));
+  });
+
+  it('reprogramar pide fecha y hora válidas y llama al servidor con la nueva hora', async () => {
+    const repro = vi.spyOn(pedidosApi, 'reprogramar').mockResolvedValue({ id: '7', programadoPara: '' });
+    render(<PanelProgramados puedePasar alActualizar={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reprogramar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar nueva fecha' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(repro).not.toHaveBeenCalled();
+    const d = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(d);
+    fireEvent.change(screen.getByLabelText('Nueva fecha'), { target: { value: fecha } });
+    fireEvent.change(screen.getByLabelText('Nueva hora'), { target: { value: '09:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar nueva fecha' }));
+    await waitFor(() => expect(repro).toHaveBeenCalledWith('7', new Date(`${fecha}T09:00:00-05:00`).toISOString()));
+  });
+
+  it('registrar un adelanto acepta cualquier medio (Yape) sin captura', async () => {
+    const adel = vi.spyOn(pedidosApi, 'registrarAdelanto').mockResolvedValue({ adelantoId: '1', adelantoTotal: 40, saldo: 20 });
+    render(<PanelProgramados puedePasar alActualizar={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Adelanto' }));
+    fireEvent.change(screen.getByLabelText('Monto del adelanto'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Medio del adelanto'), { target: { value: 'YAPE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar adelanto' }));
+    await waitFor(() => expect(adel).toHaveBeenCalledWith('7', { medio: 'YAPE', monto: 10 }));
+  });
+
   it('lista vacía', async () => {
     vi.spyOn(pedidosApi, 'listarProgramados').mockResolvedValue([]);
     render(<PanelProgramados puedePasar alActualizar={() => {}} />);

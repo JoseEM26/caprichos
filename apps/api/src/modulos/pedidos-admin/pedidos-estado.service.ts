@@ -70,6 +70,7 @@ import {
 import { ConsumoRecetaService } from '../almacen';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ajustesPendientesUbicacion } from './cambio-ubicacion.util';
+import { devolverAdelantosTx } from '../pedidos/adelanto.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -1106,11 +1107,18 @@ export class PedidosEstadoService {
       }
 
       // Un programado con adelanto: el dinero ya entró a una caja; se devuelve primero (anular el adelanto) y luego se anula el pedido
+      const motivoAnular = dto.motivo?.trim() || '';
       if (estadoAnterior === 'PROGRAMADO' && Number(pedido.adelanto_total ?? 0) > 0) {
-        throw new ConflictException({
-          codigo: 'PEDIDO_CON_ADELANTO',
-          mensaje: 'El pedido tiene un adelanto recibido. Devuélvelo primero (anular el adelanto) y luego anula el pedido.',
-        });
+        if (dto.adelanto !== 'DEVUELVE') {
+          throw new ConflictException({
+            codigo: 'PEDIDO_CON_ADELANTO',
+            mensaje: 'El pedido tiene un adelanto recibido: elige «se devuelve» (egreso de la caja de hoy si es efectivo) o «se reprograma» (cambia la fecha).',
+            adelanto: Number(pedido.adelanto_total),
+          });
+        }
+        if (motivoAnular.length >= 5) {
+          await this.prisma.$transaction((tx) => devolverAdelantosTx(tx, pedido.id, `Pedido anulado: ${motivoAnular}`, BigInt(usuarioActual.partyId), pedido.codigo));
+        }
       }
 
       if (entregadoSinCobro) {
@@ -1193,6 +1201,14 @@ export class PedidosEstadoService {
           anulacion_aprobada_por: aprobadoPor,
         },
       });
+
+      // Un programado de mesa libera su reserva (la mesa vuelve a estar disponible)
+      if (estadoAnterior === 'PROGRAMADO') {
+        await this.prisma.reserva.updateMany({
+          where: { pedido_id: pedido.id, estado: 'ACTIVA' },
+          data: { estado: 'CANCELADA', motivo_cancelacion: `Pedido anulado: ${motivo}`.slice(0, 250) },
+        });
+      }
 
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
       await this.devolverAlAnular(pedido.id, pedido.codigo, usuarioActual?.partyId, ip);

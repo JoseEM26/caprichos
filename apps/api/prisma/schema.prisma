@@ -1018,6 +1018,9 @@ model PedidoAdelanto {
   anulado_en       DateTime? @db.Timestamptz
   anulado_por      BigInt?
   motivo_anulacion String?
+  /// Devolución con la caja del adelanto ya cerrada: egreso (solo efectivo) y caja de hoy en que se registró la devolución
+  devuelto_movimiento_id BigInt?
+  devuelto_en_caja_id    BigInt?
 
   pedido           Pedido    @relation(fields: [pedido_id], references: [id])
   caja             Caja      @relation(fields: [caja_id], references: [id])

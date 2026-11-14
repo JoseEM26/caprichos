@@ -61,21 +61,41 @@ describe('adelantos de pedidos programados y caja del día', () => {
       expect(t.pedido.update.mock.calls[0][0].data.adelanto_total.increment.toString()).toBe('30');
     });
 
-    it('no admite medios digitales (llevan voucher), montos que cubren todo, pedidos no programados ni caja cerrada', async () => {
-      await expect(registrarAdelantoTx(tx(), 9n, { medio: 'YAPE', monto: 10 }, 7n)).rejects.toMatchObject({ response: { codigo: 'ADELANTO_MEDIO_INVALIDO' } });
+    it('acepta cualquier medio (Yape sin captura) pero no un medio inventado; rechaza montos que cubren todo, pedidos no programados y caja cerrada', async () => {
+      const yape = tx();
+      await registrarAdelantoTx(yape, 9n, { medio: 'YAPE', monto: 10 }, 7n);
+      expect(yape.pedidoAdelanto.create.mock.calls[0][0].data.medio).toBe('YAPE');
+      await expect(registrarAdelantoTx(tx(), 9n, { medio: 'CHEQUE', monto: 10 }, 7n)).rejects.toMatchObject({ response: { codigo: 'ADELANTO_MEDIO_INVALIDO' } });
       await expect(registrarAdelantoTx(tx(), 9n, { medio: 'EFECTIVO', monto: 60 }, 7n)).rejects.toMatchObject({ response: { codigo: 'ADELANTO_CUBRE_TODO' } });
       await expect(registrarAdelantoTx(tx({ pedido: { findUnique: jest.fn().mockResolvedValue({ estado: 'COLA', total: 60 }) } }), 9n, { medio: 'EFECTIVO', monto: 10 }, 7n)).rejects.toMatchObject({ response: { codigo: 'ADELANTO_SOLO_PROGRAMADO' } });
       await expect(registrarAdelantoTx(tx({ caja: { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'CERRADA' }), findFirst: jest.fn().mockResolvedValue(null) } }), 9n, { medio: 'EFECTIVO', monto: 10 }, 7n)).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
     });
 
-    it('anular un adelanto de una caja ya cerrada se rechaza; de una abierta lo resta', async () => {
-      const previo = { id: 1n, pedido_id: 9n, caja_id: 5n, monto: 30, anulado_en: null };
-      const cerrada = tx({ pedidoAdelanto: { findUnique: jest.fn().mockResolvedValue(previo), update: jest.fn() }, caja: { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'CERRADA' }) } });
-      await expect(anularAdelantoTx(cerrada, 1n, 'cliente cancela', 7n)).rejects.toMatchObject({ response: { codigo: 'ADELANTO_CAJA_CERRADA' } });
-      const abierta = tx({ pedidoAdelanto: { findUnique: jest.fn().mockResolvedValue(previo), update: jest.fn() }, caja: { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'ABIERTA' }) } });
+    it('anular un adelanto de una caja abierta lo resta de ese cierre, sin egreso', async () => {
+      const previo = { id: 1n, pedido_id: 9n, caja_id: 5n, medio: 'EFECTIVO', monto: 30, anulado_en: null };
+      const abierta = tx({ pedidoAdelanto: { findUnique: jest.fn().mockResolvedValue(previo), update: jest.fn() }, movimientoCaja: { create: jest.fn() }, caja: { findUnique: jest.fn().mockResolvedValue({ id: 5n, estado: 'ABIERTA' }) } });
       await anularAdelantoTx(abierta, 1n, 'cliente cancela', 7n);
       expect(abierta.pedidoAdelanto.update).toHaveBeenCalled();
-      expect(abierta.pedido.update.mock.calls[0][0].data.adelanto_total.decrement).toBe(30);
+      expect(abierta.movimientoCaja.create).not.toHaveBeenCalled();
+      expect(abierta.pedido.update.mock.calls[0][0].data.adelanto_total.decrement.toString()).toBe('30');
+    });
+
+    it('con la caja del adelanto cerrada: el efectivo sale como egreso de hoy (si hoy está cerrada, 409) y un medio digital solo se registra', async () => {
+      const cajas: Record<string, any> = { '5': { id: 5n, estado: 'CERRADA' }, '6': { id: 6n, estado: 'ABIERTA' } };
+      const montar = (medio: string, hoy: any) =>
+        tx({
+          pedidoAdelanto: { findUnique: jest.fn().mockResolvedValue({ id: 1n, pedido_id: 9n, caja_id: 5n, medio, monto: 30, anulado_en: null }), update: jest.fn() },
+          movimientoCaja: { create: jest.fn().mockResolvedValue({ id: 8n }) },
+          caja: { findUnique: jest.fn(({ where }: any) => Promise.resolve(where.id ? (String(where.id) === '6' ? hoy : cajas[String(where.id)]) : hoy)) },
+        });
+      const efectivo = montar('EFECTIVO', cajas['6']);
+      await anularAdelantoTx(efectivo, 1n, 'cliente cancela', 7n);
+      expect(efectivo.movimientoCaja.create.mock.calls[0][0].data).toMatchObject({ caja_id: 6n, tipo: 'EGRESO' });
+      await expect(anularAdelantoTx(montar('EFECTIVO', { id: 6n, estado: 'CERRADA' }), 1n, 'cliente cancela', 7n)).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
+      const yape = montar('YAPE', cajas['6']);
+      await anularAdelantoTx(yape, 1n, 'cliente cancela', 7n);
+      expect(yape.movimientoCaja.create).not.toHaveBeenCalled();
+      expect(yape.pedidoAdelanto.update.mock.calls[0][0].data).toMatchObject({ devuelto_en_caja_id: 6n });
     });
   });
 });
