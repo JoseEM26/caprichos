@@ -1,4 +1,4 @@
-import { medioActivo } from '@caprichos/compartido';
+import { medioActivo, NOMBRE_MEDIO_PAGO } from '@caprichos/compartido';
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -200,13 +200,15 @@ export function FormularioCheckout({
     codigo: string;
     descripcion: string;
     descuentoCalculado: number;
+    /** Medios con los que vale el cupón (vacío = cualquiera) */
+    mediosPago?: string[];
     tipo: string;
     valor: number;
     envioGratis?: boolean;
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[]; ahorros: { medio: string; ahorro: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [], ahorros: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   // Solo el equipo con sesión ve la elección contado / crédito del personal (el servidor vuelve a decidirlo)
@@ -295,15 +297,15 @@ export function FormularioCheckout({
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[]; ahorrosPorMedio?: { medio: string; ahorro: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
         // Las promociones valen según el tipo de pedido: al cambiarlo se recalcula sin perder el carrito
         modalidad,
         medios: mediosPromo,
       })
-      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
-      .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));
+      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [], ahorros: Array.isArray(r?.ahorrosPorMedio) ? r.ahorrosPorMedio : [] }))
+      .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [], ahorros: [] }));
     return () => {
       vigente = false;
     };
@@ -381,7 +383,9 @@ export function FormularioCheckout({
         ? `Zona ${zonaEnvio} · envío gratis`
         : textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
       : null;
-  const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  // Cupón por medio de pago: vale solo si todo el pago va con medios de su lista
+  const cuponValeConMedio = !cuponAplicado || (cuponAplicado.mediosPago ?? []).length === 0 || mediosPromo.every((m) => cuponAplicado.mediosPago!.includes(m));
+  const descuentoCupon = cuponAplicado && cuponValeConMedio ? cuponAplicado.descuentoCalculado : 0;
   // Descuentos del servidor (promociones + cupón). El cupón se muestra aparte; lo demás son promociones.
   const descuentosServidor = promos.total > 0 ? promos.total : descuentoCupon;
   const promoMonto = Math.max(0, Math.round((descuentosServidor - descuentoCupon) * 100) / 100);
@@ -2110,6 +2114,11 @@ export function FormularioCheckout({
                       Medio de pago
                     </div>
 
+                    {promos.ahorros.map((a) => (
+                      <div key={a.medio} data-testid="ahorro-por-medio" role="status" style={{ fontSize: '13px', fontWeight: 700, color: '#92400E' }}>
+                        Ahorras S/ {a.ahorro.toFixed(2)} si pagas con {NOMBRE_MEDIO_PAGO[a.medio as keyof typeof NOMBRE_MEDIO_PAGO] ?? a.medio}
+                      </div>
+                    ))}
                     {!primerMedioActivo && (
                       <div role="status" data-testid="sin-medios-pago" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
                         Por ahora no podemos recibir pagos desde la carta. Escríbenos por WhatsApp y te ayudamos.

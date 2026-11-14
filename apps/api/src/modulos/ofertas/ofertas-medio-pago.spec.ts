@@ -112,6 +112,73 @@ describe('promoción por medio de pago', () => {
   });
 });
 
+describe('«Ahorras S/ X si pagas con Yape» y cupón por medio', () => {
+  let service: OfertasService;
+  let prisma: any;
+  beforeEach(async () => {
+    prisma = {
+      oferta: { findMany: jest.fn().mockResolvedValue([promo()]), findUnique: jest.fn(), update: jest.fn() },
+      producto: { findMany: jest.fn().mockResolvedValue([]) },
+      reglaAcumulacion: { upsert: jest.fn().mockResolvedValue({ id: 1, cupon_con_descuento: false, promo_con_descuento: false }) },
+      parametro: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn(),
+    };
+    const modulo: TestingModule = await Test.createTestingModule({
+      providers: [
+        OfertasService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RedisService, useValue: { obtenerCliente: () => ({}) } },
+        { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
+        { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
+      ],
+    }).compile();
+    service = modulo.get(OfertasService);
+  });
+  const base = { subtotal: 100, lineas: [linea], canal: 'CARTA' };
+
+  it('antes de elegir medio muestra el ahorro del medio de la promo sin aplicarlo; con ese medio ya no avisa', async () => {
+    const sin = await service.calcularDescuentosParaPedido({ ...base, medios: [] });
+    expect(sin.descuentoTotal).toBe(0);
+    expect(await service.ahorrosPorMedio(base, sin, [])).toEqual([{ medio: 'YAPE', ahorro: 10, nombre: '10 % con Yape' }]);
+    // eligió efectivo: sigue avisando que con Yape ahorra
+    expect((await service.ahorrosPorMedio(base, sin, ['EFECTIVO']))[0]).toMatchObject({ medio: 'YAPE', ahorro: 10 });
+    const con = await service.calcularDescuentosParaPedido({ ...base, medios: ['YAPE'] });
+    expect(await service.ahorrosPorMedio(base, con, ['YAPE'])).toEqual([]);
+  });
+
+  it('no avisa de un medio apagado en el canal', async () => {
+    prisma.parametro.findUnique.mockResolvedValue({ valor: { CARTA: { YAPE: false } } });
+    const sin = await service.calcularDescuentosParaPedido({ ...base, medios: [] });
+    expect(await service.ahorrosPorMedio(base, sin, [])).toEqual([]);
+  });
+
+  describe('cupón limitado por medio de pago', () => {
+    const cuponVal = (mediosPago: string[]) => ({
+      cupon: { id: '3', emitidoId: null, codigoBase: 'PROMO5', tipo: 'MONTO', valor: 5, descuentoCalculado: 5, envioGratis: false, canales: ['CARTA'], mediosPago },
+    });
+    beforeEach(() => prisma.oferta.findMany.mockResolvedValue([]));
+
+    it('aplica solo si TODO el pago va con medios de su lista; si no, no se aplica y se avisa cuáles', async () => {
+      jest.spyOn(service, 'validarCuponParaCarta').mockResolvedValue(cuponVal(['YAPE']) as any);
+      const ok = await service.calcularDescuentosParaPedido({ ...base, cuponCodigo: 'PROMO5', medios: ['YAPE'] });
+      expect(ok.descuentoTotal).toBe(5);
+      const otro = await service.calcularDescuentosParaPedido({ ...base, cuponCodigo: 'PROMO5', medios: ['EFECTIVO'] });
+      expect(otro.descuentoTotal).toBe(0);
+      expect(otro.cuponId).toBeNull();
+      expect(otro.cuponMediosRequeridos).toEqual(['YAPE']);
+      const dividido = await service.calcularDescuentosParaPedido({ ...base, cuponCodigo: 'PROMO5', medios: ['YAPE', 'EFECTIVO'] });
+      expect(dividido.descuentoTotal).toBe(0);
+      // y el aviso de ahorro lo recoge
+      expect(await service.ahorrosPorMedio({ ...base, cuponCodigo: 'PROMO5' }, otro, ['EFECTIVO'])).toEqual([expect.objectContaining({ medio: 'YAPE', ahorro: 5 })]);
+    });
+
+    it('un cupón sin medios vale con cualquiera', async () => {
+      jest.spyOn(service, 'validarCuponParaCarta').mockResolvedValue(cuponVal([]) as any);
+      expect((await service.calcularDescuentosParaPedido({ ...base, cuponCodigo: 'PROMO5', medios: ['EFECTIVO'] })).descuentoTotal).toBe(5);
+    });
+  });
+});
+
 describe('cambio de medio al cobrar: el descuento se quita y el total sube', () => {
   const pedido = (extra: object = {}) => ({
     id: 5n, oferta_id: 7n, subtotal: 100, descuento: 10, envio: 0, puntos_canjeados: 0, total: 90,
@@ -140,6 +207,32 @@ describe('cambio de medio al cobrar: el descuento se quita y el total sube', () 
     const p = pedido({ descuento: 15, puntos_canjeados: 5, total: 80, descuento_detalle: [{ tipo: 'DESCUENTO', id: '7', montoDescontado: 10 }, { tipo: 'PERSONAL', id: 'x', montoDescontado: 5 }] });
     const q = await evaluarQuitaPromoMedio(db(['YAPE']), p, ['TARJETA']);
     expect(q).toMatchObject({ descuento: 10, totalAnterior: 80, totalNuevo: 90 });
+  });
+
+  it('cupón por medio: al cobrar con otro medio se quita el cupón (aviso conjunto) y el cupón emitido vuelve a VIGENTE', async () => {
+    const p = {
+      ...pedido({ oferta_id: null, descuento: 5, total: 95, descuento_detalle: [{ tipo: 'CUPON', id: '3', montoDescontado: 5 }] }),
+      cupon_id: 3n, cupon_emitido_id: 40n,
+    };
+    const dbC: any = { oferta: { findUnique: jest.fn() }, cupon: { findUnique: jest.fn().mockResolvedValue({ id: 3n, codigo_base: 'PROMO5', medios_pago: ['YAPE'] }) } };
+    expect(await evaluarQuitaPromoMedio(dbC, p, ['YAPE'])).toBeNull();
+    const q = (await evaluarQuitaPromoMedio(dbC, p, ['EFECTIVO']))!;
+    expect(q).toMatchObject({ nombre: 'Cupón PROMO5', descuento: 5, totalAnterior: 95, totalNuevo: 100 });
+    const tx: any = { pedido: { update: jest.fn() }, oferta: { update: jest.fn() }, cuponEmitido: { update: jest.fn() }, pedidoPagoPlan: { deleteMany: jest.fn() } };
+    await aplicarQuitaPromoMedio(tx, p, q);
+    expect(tx.pedido.update).toHaveBeenCalledWith({ where: { id: 5n }, data: expect.objectContaining({ descuento: 0, total: 100, cupon_id: null, cupon_emitido_id: null, descuento_detalle: [] }) });
+    expect(tx.cuponEmitido.update).toHaveBeenCalledWith({ where: { id: 40n }, data: { estado: 'VIGENTE', canjeado_en: null, pedido_canje_id: null } });
+  });
+
+  it('promo y cupón por medio a la vez: se quitan los dos con un solo aviso', async () => {
+    const p = {
+      ...pedido({ descuento: 15, total: 85, descuento_detalle: [{ tipo: 'DESCUENTO', id: '7', montoDescontado: 10 }, { tipo: 'CUPON', id: '3', montoDescontado: 5 }] }),
+      cupon_id: 3n,
+    };
+    const dbC: any = { ...db(['YAPE']), cupon: { findUnique: jest.fn().mockResolvedValue({ id: 3n, codigo_base: 'PROMO5', medios_pago: ['YAPE'] }) } };
+    const q = (await evaluarQuitaPromoMedio(dbC, p, ['TARJETA']))!;
+    expect(q).toMatchObject({ descuento: 15, totalNuevo: 100 });
+    expect(q.nombre).toBe('10 % con Yape y Cupón PROMO5');
   });
 
   it('aplicar: sube el total, saca la promo del detalle, devuelve el uso y borra el plan viejo', async () => {

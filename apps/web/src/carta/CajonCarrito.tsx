@@ -50,6 +50,7 @@ export function CajonCarrito({
     codigo: string;
     descripcion: string;
     descuentoCalculado: number;
+    mediosPago?: string[];
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export function CajonCarrito({
           codigo: res.cupon.codigoBase || cuponCodigo.trim().toUpperCase(),
           descripcion: res.cupon.descripcion || 'Descuento aplicado',
           descuentoCalculado: Number(res.cupon.descuentoCalculado || 0),
+          mediosPago: Array.isArray(res.cupon.mediosPago) ? res.cupon.mediosPago : [],
         });
         setMensajeCupon(`Cupón aplicado: ${res.cupon.descripcion || ''}.`);
       }

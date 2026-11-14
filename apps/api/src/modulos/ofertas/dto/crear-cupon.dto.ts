@@ -46,6 +46,12 @@ export class CrearCuponDto {
   @IsArray()
   canales?: string[];
 
+  /** Medios de pago con los que vale el cupón; vacío = cualquier medio */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'PAGO_EN_LINEA'], { each: true, message: 'Medio de pago no válido' })
+  mediosPago?: string[] | null;
+
   @IsOptional()
   @IsArray({ message: 'dias debe ser un arreglo de números (1..7)' })
   dias?: number[];

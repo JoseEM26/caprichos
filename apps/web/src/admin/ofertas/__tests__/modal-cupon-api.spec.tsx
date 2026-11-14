@@ -45,6 +45,19 @@ describe('ModalCupon envía los nombres de la API (CrearCuponDto)', () => {
     expect(cuerpo).not.toHaveProperty('canal');
   });
 
+  it('cupón por medio de pago: manda mediosPago con los medios marcados (vacío = cualquiera)', async () => {
+    const onGuardar = abrir();
+    fireEvent.change(document.getElementById('cp-c')!, { target: { value: 'yape5' } });
+    fireEvent.change(document.getElementById('cp-d')!, { target: { value: 'S/ 5 con Yape' } });
+    fireEvent.change(document.getElementById('cp-v')!, { target: { value: '5' } });
+    fireEvent.click(screen.getAllByRole('radio')[1]);
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
+    fireEvent.click(document.getElementById('cupon-canal-medio-YAPE')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cupón' }));
+    await waitFor(() => expect(onGuardar).toHaveBeenCalledTimes(1));
+    expect(onGuardar.mock.calls[0][0]).toMatchObject({ mediosPago: ['YAPE'] });
+  });
+
   it('crea un cupón de envío gratis con horario: ENVIO_GRATIS, valor 0, días y horas', async () => {
     const onGuardar = abrir();
     fireEvent.change(document.getElementById('cp-c')!, { target: { value: 'envio2a6' } });

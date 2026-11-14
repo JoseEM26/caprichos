@@ -125,3 +125,38 @@ describe('Checkout de la carta ▸ medios de pago por canal', () => {
     expect(screen.getByTestId('sin-medios-pago')).toBeInTheDocument();
   });
 });
+
+describe('Checkout de la carta ▸ promo por medio de pago', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockImplementation(async (ruta: string) => {
+      throw new Error(`ruta no esperada: ${ruta}`);
+    });
+    vi.mocked(api.post).mockImplementation(async (ruta: string, cuerpo?: any) => {
+      if (ruta === '/carta/descuentos/vista-previa') {
+        const conYape = (cuerpo?.medios ?? []).includes('YAPE');
+        return conYape
+          ? { descuentoTotal: 4, detalles: [{ nombre: '10 % con Yape', monto: 4 }] }
+          : { descuentoTotal: 0, detalles: [], ahorrosPorMedio: [{ medio: 'YAPE', ahorro: 4 }] };
+      }
+      throw new ErrorApi('TEST', 'cortado a propósito', 400);
+    });
+    datos = baseDatos;
+  });
+
+  it('con otro medio muestra «Ahorras S/ 4.00 si pagas con Yape» sin aplicarlo; al elegir Yape pide el total con ese medio', async () => {
+    abrirPedido();
+    await irAPago();
+    // el medio inicial es Yape: la vista previa ya va con Yape y no avisa
+    await screen.findByText(/10 % con Yape/);
+    expect(screen.queryByTestId('ahorro-por-medio')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'EFECTIVO' }));
+    const aviso = await screen.findByTestId('ahorro-por-medio');
+    expect(aviso.textContent).toBe('Ahorras S/ 4.00 si pagas con Yape');
+    expect(screen.queryByText(/10 % con Yape/)).toBeNull();
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/carta/descuentos/vista-previa', expect.objectContaining({ medios: ['YAPE'] }));
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/carta/descuentos/vista-previa', expect.objectContaining({ medios: ['EFECTIVO'] }));
+  });
+});

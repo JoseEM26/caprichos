@@ -50,6 +50,7 @@ Debajo de los medios del local hay la tabla «Medios de pago por canal»: filas 
 - De fábrica todo está encendido, menos Pago en línea (la pasarela llega después).
 - Caja siempre debe tener al menos un medio encendido. En los otros canales puedes apagar todo: la carta, el mozo o el bot lo dicen de forma simple.
 - El pago dividido solo usa medios encendidos en ese canal.
+- Pagos ya hechos: si el cliente ya pagó con un medio que luego apagas (el pedido tiene su comprobante), Caja y el mozo pueden confirmar ese cobro igual. El interruptor frena solo pagos nuevos, sin comprobante previo. Cambiar la forma de pago (Caja o repartidor) también respeta los interruptores de Caja para medios nuevos.
 - Lo ya registrado no cambia: pedidos y cobros hechos con un medio que luego apagas se siguen viendo, anulando y cerrando igual (cierre de caja, reportes y devoluciones).
 - En WhatsApp: si queda un solo medio, el bot no pregunta; si no queda ninguno, pasa el pedido a una persona.
 

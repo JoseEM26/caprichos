@@ -256,7 +256,7 @@ export function SelectorCanales({ id, tipo, valor, onChange, bloqueado }: Select
         {bloqueado ? 'Solo en la carta web.' : ayudaCanales(tipo, botNoDisponible ? { ...valor, bot: false } : valor)}
       </span>
       {tipo !== 'CUPON' && !bloqueado && <SelectorModalidades id={id} tipo={tipo} valor={valor} onChange={onChange} />}
-      {(tipo === 'DESCUENTO' || tipo === 'LLEVA_PAGA') && !bloqueado && <SelectorMediosPago id={id} valor={valor} onChange={onChange} />}
+      {(tipo === 'DESCUENTO' || tipo === 'LLEVA_PAGA' || tipo === 'CUPON') && !bloqueado && <SelectorMediosPago id={id} valor={valor} onChange={onChange} />}
     </fieldset>
   );
 }

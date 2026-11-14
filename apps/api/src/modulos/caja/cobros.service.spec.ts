@@ -878,6 +878,20 @@ describe('CobrosService', () => {
   });
 
   describe('medios de pago apagados en Caja', () => {
+    it('lo ya pagado se confirma: con el voucher de Yape el cobro no se frena aunque Yape esté apagado en Caja; sin voucher sí', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'medios_pago_canal', valor: { CAJA: { YAPE: false } } });
+      prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([{ medio: 'YAPE' }]);
+      // pasa el interruptor y se detiene más adelante (caja cerrada) en vez de MEDIO_NO_DISPONIBLE
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: expect.not.stringMatching(/MEDIO_NO_DISPONIBLE/) },
+      });
+      prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([]);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+      });
+    });
+
     it('cobrar con un medio apagado en CAJA se rechaza (400) sin tocar el pedido; encendido pasa', async () => {
       const cajaSinPlin = { CAJA: { PLIN: false } };
       prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'medios_pago_canal', valor: cajaSinPlin });

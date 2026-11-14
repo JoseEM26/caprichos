@@ -43,4 +43,23 @@ describe('medios de pago por canal', () => {
     await expect(exigirMediosActivos(dbCon(config({ CAJA: { YAPE: false } })), ['YAPE'], 'REPARTIDOR')).resolves.toBeUndefined();
     expect((await leerMediosPagoCanal({})).CAJA.EFECTIVO).toBe(true);
   });
+
+  describe('lo YA PAGADO se confirma aunque el medio esté apagado (solo frena pagos nuevos)', () => {
+    const conVouchers = (vouchers: Array<{ medio: string | null }>) => ({
+      ...dbCon(config({ CAJA: { YAPE: false, EFECTIVO: false } })),
+      voucherPago: { findMany: jest.fn().mockResolvedValue(vouchers) },
+    });
+    it('con voucher vigente de ese medio pasa; sin voucher o de otro medio, no', async () => {
+      await expect(exigirMediosActivos(conVouchers([{ medio: 'YAPE' }]), ['YAPE'], 'CAJA', 5n)).resolves.toBeUndefined();
+      await expect(exigirMediosActivos(conVouchers([]), ['YAPE'], 'CAJA', 5n)).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+      await expect(exigirMediosActivos(conVouchers([{ medio: 'PLIN' }]), ['YAPE'], 'CAJA', 5n)).rejects.toBeDefined();
+    });
+    it('un voucher sin medio cubre cualquier medio digital, pero el efectivo nunca tiene comprobante', async () => {
+      await expect(exigirMediosActivos(conVouchers([{ medio: null }]), ['YAPE'], 'CAJA', 5n)).resolves.toBeUndefined();
+      await expect(exigirMediosActivos(conVouchers([{ medio: null }]), ['EFECTIVO'], 'CAJA', 5n)).rejects.toBeDefined();
+    });
+    it('sin pedido (pedido nuevo) no hay excepción', async () => {
+      await expect(exigirMediosActivos(conVouchers([{ medio: 'YAPE' }]), ['YAPE'], 'CAJA')).rejects.toBeDefined();
+    });
+  });
 });

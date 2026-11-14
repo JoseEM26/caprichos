@@ -713,6 +713,8 @@ export class VouchersService {
         comprobante_razon: true,
         comprobante_direccion: true,
         oferta_id: true,
+        cupon_id: true,
+        cupon_emitido_id: true,
         descuento_detalle: true,
         subtotal: true,
         descuento: true,
@@ -739,7 +741,7 @@ export class VouchersService {
     // Pago dividido: el plan debe sumar el total del pedido (lo valida PagoPlanService)
     const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido)) : null;
     // «Apagado es apagado» en el mozo: el medio (o todos los del pago dividido) debe estar encendido en MOZO
-    await exigirMediosActivos(this.prisma, planValidado ? planValidado.map((f) => f.medio) : [medioNormalizado], 'MOZO');
+    await exigirMediosActivos(this.prisma, planValidado ? planValidado.map((f) => f.medio) : [medioNormalizado], 'MOZO', id);
     const desglose = planValidado
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
@@ -1153,7 +1155,7 @@ export class VouchersService {
    * Sin `confirma` (el mozo vio «Sin descuento <promo>: total S/ X») lanza 409 y no cambia nada. Deja `pedido` actualizado.
    */
   private async aplicarPromoPorMedio(
-    pedido: { id: bigint; oferta_id?: bigint | null; descuento_detalle?: unknown; subtotal?: unknown; descuento?: unknown; envio?: unknown; puntos_canjeados?: unknown; total?: unknown },
+    pedido: { id: bigint; oferta_id?: bigint | null; cupon_id?: bigint | null; cupon_emitido_id?: bigint | null; descuento_detalle?: unknown; subtotal?: unknown; descuento?: unknown; envio?: unknown; puntos_canjeados?: unknown; total?: unknown },
     medios: string[],
     confirma: boolean,
     usuario: UsuarioAutenticado,
@@ -1182,7 +1184,7 @@ export class VouchersService {
     const lista = Array.isArray(medios) ? medios.map((m) => String(m ?? '')) : [];
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: this.parsearId(pedidoId) },
-      select: { id: true, oferta_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true, total: true },
+      select: { id: true, oferta_id: true, cupon_id: true, cupon_emitido_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true, total: true },
     });
     if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
     return { quita: await evaluarQuitaPromoMedio(this.prisma, pedido, lista) };
@@ -1200,7 +1202,7 @@ export class VouchersService {
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, oferta_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true },
+      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, oferta_id: true, cupon_id: true, cupon_emitido_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -1216,7 +1218,7 @@ export class VouchersService {
     if (!planValidado) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago no es válido' });
     }
-    await exigirMediosActivos(this.prisma, planValidado.map((f) => f.medio), 'MOZO');
+    await exigirMediosActivos(this.prisma, planValidado.map((f) => f.medio), 'MOZO', id);
     const medioPrincipal = this.pagoPlan.pagoPrincipal(planValidado);
     await this.prisma.$transaction(async (tx) => {
       await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: id } });

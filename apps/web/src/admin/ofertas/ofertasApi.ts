@@ -186,6 +186,8 @@ export interface CuponItem {
   diasValidez?: number | null;
   canal?: string;
   canales?: string[];
+  /** Medios de pago con los que vale el cupón (vacío = cualquiera) */
+  mediosPago?: string[];
   requiereCuenta?: boolean;
   orden: number;
   activo: boolean;

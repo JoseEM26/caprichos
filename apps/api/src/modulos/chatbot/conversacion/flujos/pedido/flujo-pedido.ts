@@ -56,6 +56,7 @@ import {
   botonesEfectivo,
   calcularTotales,
   mediosActivos,
+  lineasAhorroPorMedio,
   textoMedioNoDisponible,
   medioPrincipal,
   opcionesMedios,
@@ -2930,7 +2931,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
-    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta, ahorrosPorMedio } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido, contexto);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
@@ -2950,7 +2951,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       `${envioTxt}\n` +
       (pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0 ? `${TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)}\n` : '') +
       (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
-      `*TOTAL: S/ ${total.toFixed(2)}*`
+      `*TOTAL: S/ ${total.toFixed(2)}*` +
+      (ahorrosPorMedio.length ? `\n${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
     );
   }
 

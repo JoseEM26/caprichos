@@ -30,6 +30,7 @@ import {
   CuponEmitidoItem,
   CuponItem,
   DesgloseDescuentosPedido,
+  AhorroPorMedio,
   DetalleDescuentoAplicado,
   OfertaItem,
   OpcionDetalleCombo,
@@ -61,6 +62,7 @@ import {
   ofertaIncluyeCanal,
   ofertaAplicaA,
   ofertaIncluyeLocal,
+  ofertaIncluyeMedios,
   ofertaIncluyeModalidad,
   formatearFecha,
   formatearHora,
@@ -982,6 +984,7 @@ export class OfertasService {
         categoria_id: dto.categoriaId ? BigInt(dto.categoriaId) : null,
         producto_id: dto.productoId ? BigInt(dto.productoId) : null,
         canales: dto.canales ?? ['CARTA', 'CAJA', 'MOZO'],
+        medios_pago: dto.mediosPago ?? [],
         dias: dto.dias ?? [],
         hora_desde: horaCupon(dto.horaDesde),
         hora_hasta: horaCupon(dto.horaHasta),
@@ -1075,6 +1078,7 @@ export class OfertasService {
       data.producto = dto.productoId ? { connect: { id: BigInt(dto.productoId) } } : { disconnect: true };
     }
     if (dto.canales !== undefined) data.canales = dto.canales ?? [];
+    if (dto.mediosPago !== undefined) data.medios_pago = dto.mediosPago ?? [];
     if (dto.requiereCuenta !== undefined) data.requiere_cuenta = dto.requiereCuenta;
     if (dto.diasValidez !== undefined) data.dias_validez = dto.diasValidez;
     if (dto.topeUsos !== undefined) data.tope_usos = dto.topeUsos;
@@ -1488,6 +1492,7 @@ export class OfertasService {
           descuentoCalculado: 0,
           envioGratis: true,
           canales: (cupon.canales ?? []) as string[],
+          mediosPago: (cupon.medios_pago ?? []) as string[],
         },
       };
     }
@@ -1537,6 +1542,7 @@ export class OfertasService {
         descuentoCalculado: Number(descuentoMonto.toFixed(2)),
         envioGratis: false,
         canales: (cupon.canales ?? []) as string[],
+        mediosPago: (cupon.medios_pago ?? []) as string[],
       },
     };
   }
@@ -1774,7 +1780,7 @@ export class OfertasService {
     modalidad?: string,
     colaboradorPartyId?: string,
     medios?: string[] | null,
-  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number }> {
+  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number; ahorrosPorMedio?: AhorroPorMedio[] }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
     const validas = (lineas || []).filter((l) => /^\d+$/.test(String(l.productoId)) && Number(l.cantidad) > 0);
@@ -1809,6 +1815,13 @@ export class OfertasService {
       // igual que al crear el pedido: la primera compra solo cuenta con sesión en la carta
       clienteConSesion: canal === 'CARTA' && !!clientePartyId,
     });
+    // «Ahorras S/ X si pagas con Yape»: promos o cupón por medio que todavía no aplican porque falta elegir ese medio
+    // Es un aviso extra: si falla, la vista previa sigue con el total de siempre
+    const ahorrosPorMedio = await this.ahorrosPorMedio(
+      { subtotal, lineas: lineasCalc, canal, modalidad, cuponCodigo: cuponCodigo || null, clientePartyId: clientePartyId || null, clienteConSesion: canal === 'CARTA' && !!clientePartyId },
+      desglose,
+      medios,
+    ).catch(() => [] as AhorroPorMedio[]);
     const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
     const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);
     // Pedido del personal: mismo cálculo y criterios que PedidosService.crear (porcentaje sobre lo elegible)
@@ -1847,6 +1860,7 @@ export class OfertasService {
         ? { descuentoPersonal, totalDescuentos: Number((desglose.descuentoTotal + descuentoPersonal.monto).toFixed(2)) }
         : {}),
       envioGratisCupon: desglose.envioGratisCupon ?? false,
+      ...(ahorrosPorMedio.length ? { ahorrosPorMedio } : {}),
       descuentoTotal: descuentoTotalVista,
       montoCanjeable: montoCanjeableVista,
       // con cupón no se suman puntos (DT-56); misma base y porcentaje que PuntosService.acumularPorPedido
@@ -1854,6 +1868,36 @@ export class OfertasService {
       puntosPorcentaje,
       detalles: detallesVista,
     };
+  }
+
+  /**
+   * Por cada medio de pago (encendido en el canal) con el que el descuento sería MAYOR que el actual, cuánto se ahorraría.
+   * Sirve para mostrar «Ahorras S/ X si pagas con Yape» sin aplicarlo al total.
+   */
+  async ahorrosPorMedio(
+    base: Parameters<OfertasService['calcularDescuentosParaPedido']>[0],
+    actual: DesgloseDescuentosPedido,
+    mediosActuales?: string[] | null,
+  ): Promise<AhorroPorMedio[]> {
+    const canal = base.canal;
+    const encendidos: string[] = mediosPagoActivosCanal(await leerMediosPagoCanal(this.prisma), canal);
+    const ofertas = await this.prisma.oferta.findMany({ where: { tipo: { in: ['DESCUENTO', 'LLEVA_PAGA'] }, activo: true } });
+    const candidatos = new Set<string>();
+    for (const o of ofertas) {
+      if (!(o.medios_pago ?? []).length) continue;
+      if (!ofertaAplicaA(o, { canal, modalidad: base.modalidad, mediosActivos: encendidos })) continue;
+      for (const m of o.medios_pago) if (encendidos.includes(m)) candidatos.add(m);
+    }
+    for (const m of actual.cuponMediosRequeridos ?? []) if (encendidos.includes(m)) candidatos.add(m);
+    const usados = (mediosActuales ?? []).map((m) => String(m).toUpperCase());
+    const salida: AhorroPorMedio[] = [];
+    for (const medio of candidatos) {
+      if (usados.length === 1 && usados[0] === medio) continue;
+      const r = await this.calcularDescuentosParaPedido({ ...base, medios: [medio] });
+      const ahorro = Number((r.descuentoTotal - actual.descuentoTotal).toFixed(2));
+      if (ahorro > 0) salida.push({ medio, ahorro, nombre: r.detalles.map((d) => d.nombre).join(' + ') });
+    }
+    return salida.sort((a, b) => b.ahorro - a.ahorro);
   }
 
   async calcularDescuentosParaPedido(params: {
@@ -2062,6 +2106,7 @@ export class OfertasService {
       detalles: DetalleDescuentoAplicado;
     } | null = null;
     // Cupón de envío gratis: va aparte, no compite con los descuentos automáticos
+    let cuponMediosRequeridos: string[] | undefined;
     let cuponEnvio: { cuponId: string; cuponEmitidoId: string | null; detalles: DetalleDescuentoAplicado } | null = null;
 
     if (cuponCodigo && cuponCodigo.trim().length > 0) {
@@ -2078,6 +2123,10 @@ export class OfertasService {
           clientePartyId,
         });
 
+        // Cupón por medio de pago: vale solo si TODO el pedido se paga con medios de su lista; si no, no se aplica todavía
+        if (!ofertaIncluyeMedios(val.cupon.mediosPago, medios, mediosEncendidos)) {
+          cuponMediosRequeridos = val.cupon.mediosPago ?? [];
+        } else {
         cuponEvaluado = {
           cuponId: val.cupon.id,
           cuponEmitidoId: val.cupon.emitidoId,
@@ -2109,6 +2158,7 @@ export class OfertasService {
             detalles: { ...cuponEvaluado.detalles, descuentoTipo: 'ENVIO_GRATIS', descuentoValor: 0, montoDescontado: 0 },
           };
           cuponEvaluado = null;
+        }
         }
       } catch (err: any) {
         this.logger.warn(`Cupón ${cuponCodigo} no aplicó: ${err.message}`);
@@ -2171,6 +2221,7 @@ export class OfertasService {
       cuponEmitidoId: cuponEmitidoIdFinal,
       detalles: detallesFinales,
       envioGratisCupon: cuponEnvio !== null,
+      ...(cuponMediosRequeridos?.length ? { cuponMediosRequeridos } : {}),
     };
   }
 
@@ -3021,6 +3072,7 @@ export class OfertasService {
       categoriaId: c.categoria_id ? c.categoria_id.toString() : null,
       productoId: c.producto_id ? c.producto_id.toString() : null,
       canales: c.canales || [],
+      mediosPago: c.medios_pago || [],
       requiereCuenta: c.requiere_cuenta,
       diasValidez: c.dias_validez,
       topeUsos: c.tope_usos,

@@ -1888,6 +1888,8 @@ model Cupon {
   categoria_id       BigInt?
   producto_id        BigInt?
   canales            String[]                @default(["CARTA", "CAJA", "MOZO", "BOT"])
+  // Medios de pago con los que vale el cupón. Vacío = cualquier medio
+  medios_pago        String[]                @default([])
   // Horario opcional (vacío = todo el tiempo): días 1..7, hora desde inclusiva y hasta exclusiva, fechas inclusivas
   dias               Int[]                   @default([])
   hora_desde         DateTime?               @db.Time

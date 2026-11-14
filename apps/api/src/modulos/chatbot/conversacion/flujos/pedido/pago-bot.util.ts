@@ -16,14 +16,14 @@ export function calcularTotales(pedido: EstadoCarritoPedido, vista?: VistaPrevia
     const total = Math.max(0, r2(vista.subtotal - vista.descuento + (vista.envio ?? 0)));
     return {
       subtotal: vista.subtotal, descuento: vista.descuento, descuentoNombre: vista.descuentoNombre, envio: vista.envio,
-      envioPromoNombre: vista.envioPromoNombre ?? null, envioGratisFalta: vista.envioGratisFalta ?? null,
+      envioPromoNombre: vista.envioPromoNombre ?? null, envioGratisFalta: vista.envioGratisFalta ?? null, ahorrosPorMedio: vista.ahorrosPorMedio ?? [],
       total, propina, aCobrar: r2(total + propina),
     };
   }
   const subtotal = r2(pedido.items.reduce((s, i) => s + i.subtotal, 0));
   const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
   const total = Math.max(0, r2(subtotal + (envio || 0)));
-  return { subtotal, descuento: 0, descuentoNombre: null, envio, envioPromoNombre: null, envioGratisFalta: null, total, propina, aCobrar: r2(total + propina) };
+  return { ahorrosPorMedio: [] as Array<{ medio: string; ahorro: number; nombre: string }>, subtotal, descuento: 0, descuentoNombre: null, envio, envioPromoNombre: null, envioGratisFalta: null, total, propina, aCobrar: r2(total + propina) };
 }
 
 export const NOMBRE_MEDIO: Record<MedioPagoBot, string> = {
@@ -69,6 +69,13 @@ export function listaMediosTexto(medios: MedioPagoBot[]): string {
 /** Respuesta amable cuando el cliente pide un medio que está apagado en el bot. */
 export function textoMedioNoDisponible(medio: MedioPagoBot, activos: MedioPagoBot[]): string {
   return `${NOMBRE_MEDIO[medio]} no está disponible por ahora. Puedes pagar con ${listaMediosTexto(activos)}.`;
+}
+
+/** «💡 Ahorras S/ 5.00 si pagas con Yape» (una línea por medio); vacío si no hay promos por medio pendientes. */
+export function lineasAhorroPorMedio(ahorros: Array<{ medio: string; ahorro: number }> | undefined): string {
+  return (ahorros ?? [])
+    .map((a) => `💡 Ahorras S/ ${a.ahorro.toFixed(2)} si pagas con ${NOMBRE_MEDIO[a.medio as MedioPagoBot] ?? a.medio}\n`)
+    .join('');
 }
 
 /** Medios que llevan voucher (los mismos que el servidor). */

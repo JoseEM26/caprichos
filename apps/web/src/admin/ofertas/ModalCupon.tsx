@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CuponItem } from './ofertasApi';
-import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales } from './canalesPromo';
+import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales, mediosPagoDesdeEstado } from './canalesPromo';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 
@@ -102,7 +102,7 @@ export function ModalCupon({
       }
       setTituloImpreso(cuponAEditar.tituloImpreso || 'En tu siguiente compra');
       setValidezDias(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso ? String(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso) : String(validezReglasDefecto));
-      setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false });
+      setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false, medios: cuponAEditar.mediosPago ?? [] });
       setRequiereCuenta(Boolean(cuponAEditar.requiereCuenta));
       setMensajeError('');
       setPestana('datos');
@@ -204,6 +204,7 @@ export function ModalCupon({
         categoriaId: aplica === 'cat' && categoriaObj ? categoriaObj.id : undefined,
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
         canales: canalesDesdeEstado(canales),
+        mediosPago: mediosPagoDesdeEstado(canales),
         requiereCuenta,
         diasValidez: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
         topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,
