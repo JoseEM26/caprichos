@@ -43,6 +43,7 @@ export class DespachoService {
       },
       include: {
         comandas: { include: { area: true } },
+        pedidoOrigen: { select: { codigo: true } },
         planPago: true,
         lineas: {
           include: {
@@ -81,6 +82,9 @@ export class DespachoService {
         cliente: p.cliente_nombre ?? null,
         mesa,
         enEsperaMesa: Boolean((p as any).espera_mesa_desde),
+        // Pedido extra: id (raíz) y código del original; la pantalla junta original y extras en una tarjeta
+        pedidoOrigenId: p.pedido_origen_id != null ? p.pedido_origen_id.toString() : null,
+        extraDe: (p as any).pedidoOrigen?.codigo ?? null,
         nota: p.nota ?? null,
         creado_en: p.creado_en,
         minutos: Math.max(0, Math.floor((ahora.getTime() - new Date(p.creado_en).getTime()) / 60000)),

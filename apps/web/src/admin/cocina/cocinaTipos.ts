@@ -231,6 +231,9 @@ export interface PedidoDespacho {
   /** Lista de espera de mesa: el pedido aún no tiene mesa. */
   enEsperaMesa?: boolean;
   nota: string | null;
+  /** Pedido extra: id del pedido original (raíz de la cuenta) y su código. */
+  pedidoOrigenId?: string | null;
+  extraDe?: string | null;
   creado_en: string;
   minutos: number;
   direccion: string | null;
