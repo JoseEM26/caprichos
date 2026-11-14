@@ -786,6 +786,11 @@ model Pedido {
   version                Int                    @default(0)
   // «Pedido extra»: pedido nuevo enlazado al original (mismo cliente y modalidad, envío 0, pago y comprobante propios)
   pedido_origen_id       BigInt?
+  /// Pedido programado (solo Caja y mozo): fecha y hora pactadas. Con estado PROGRAMADO no entra a cocina ni a reparto hasta la hora de aviso.
+  programado_para        DateTime?               @db.Timestamptz
+  /// Suma de adelantos vigentes (ya entraron a la caja del día en que se recibieron); el cobro final es total menos esto.
+  adelanto_total         Decimal                 @default(0) @db.Decimal(12, 2)
+  adelantos              PedidoAdelanto[]
 
   pedidoOrigen           Pedido?                 @relation("PedidoExtra", fields: [pedido_origen_id], references: [id], onDelete: SetNull)
   extras                 Pedido[]                @relation("PedidoExtra")
@@ -993,6 +998,7 @@ model Caja {
   cerrada_en  DateTime?   @db.Timestamptz
 
   cobros        Cobro[]
+  adelantos     PedidoAdelanto[]
   movimientos   MovimientoCaja[]
   liquidaciones Liquidacion[]
   cierre        CierreCaja?
@@ -1000,6 +1006,32 @@ model Caja {
   ajustesMedio  CierreAjusteMedio[]
 
   @@map("caja")
+}
+
+/// Adelanto de un pedido programado: dinero que entra a la caja del día en que se recibe (efectivo o tarjeta, sin voucher).
+model PedidoAdelanto {
+  id               BigInt    @id @default(autoincrement())
+  pedido_id        BigInt
+  caja_id          BigInt
+  medio            String    @db.VarChar(20)
+  monto            Decimal   @db.Decimal(12, 2)
+  recibido         Decimal?  @db.Decimal(12, 2)
+  vuelto           Decimal?  @db.Decimal(12, 2)
+  por_party_id     BigInt
+  en               DateTime  @default(now()) @db.Timestamptz
+  anulado_en       DateTime? @db.Timestamptz
+  anulado_por      BigInt?
+  motivo_anulacion String?
+  /// Devolución con la caja del adelanto ya cerrada: egreso (solo efectivo) y caja de hoy en que se registró la devolución
+  devuelto_movimiento_id BigInt?
+  devuelto_en_caja_id    BigInt?
+
+  pedido           Pedido    @relation(fields: [pedido_id], references: [id])
+  caja             Caja      @relation(fields: [caja_id], references: [id])
+
+  @@index([caja_id])
+  @@index([pedido_id])
+  @@map("pedido_adelanto")
 }
 
 model Cobro {

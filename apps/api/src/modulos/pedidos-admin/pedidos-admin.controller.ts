@@ -1,4 +1,5 @@
-import { esSoloMozo } from '../acceso/roles-usuario';
+import { esSoloMozo, rolesDelUsuario } from '../acceso/roles-usuario';
+import { exigirPuedeProgramar } from '../pedidos/programado.util';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import {
@@ -32,7 +33,7 @@ import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { ReabrirPedidoDto } from './dto/reabrir-pedido.dto';
 import { CorregirClienteDto } from './dto/corregir-cliente.dto';
 import { PedidosService } from '../pedidos/pedidos.service';
-import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
+import { AdelantoPedidoDto, CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { ReimprimirDto, ReimprimirPedidoDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
@@ -40,6 +41,7 @@ import { LineaTiempoService } from './linea-tiempo.service';
 import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
+import { PedidosProgramadosService } from './pedidos-programados.service';
 import { DevolucionPedidoService } from './devolucion-pedido.service';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 
@@ -60,6 +62,7 @@ export class PedidosAdminController {
     @Optional() private readonly lineaTiempoService?: LineaTiempoService,
     @Optional() private readonly historialCajaService?: HistorialCajaPedidoService,
     @Optional() private readonly revertirAnulacion?: RevertirAnulacionService,
+    @Optional() private readonly programados?: PedidosProgramadosService,
   ) {}
 
   @Post()
@@ -74,7 +77,11 @@ export class PedidosAdminController {
       `adm-${req.usuario?.partyId ?? 'anon'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const canal =
       dto.canal || (req.usuario && esSoloMozo(req.usuario) ? 'MOZO' : 'CAJA');
-    const res = await this.pedidosService!.crear(dto, key, {
+    // Programado: solo roles de Caja o mozo (el servidor lo exige; la pantalla solo lo oculta)
+    if (dto.programadoPara || dto.adelanto) exigirPuedeProgramar(rolesDelUsuario(req.usuario));
+    const origenPedido = {
+      programadoPara: dto.programadoPara,
+      adelanto: dto.adelanto,
       canal,
       usuarioPartyId: req.usuario?.partyId,
       clientePartyId: dto.colaboradorPartyId,
@@ -83,8 +90,13 @@ export class PedidosAdminController {
       puedeCobrarAhora: puedeCobrarAhoraPersonal(req.usuario),
       omitirChequeoCarta: true,
       puedeCortesia: puedeDarCortesia(req.usuario),
-    });
-    if (res?.id && this.impresionService) {
+    };
+    const ipCrear = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const res = dto.programadoPara
+      ? await this.programados!.crearProgramado(dto, key, origenPedido, req.usuario, ipCrear)
+      : await this.pedidosService!.crear(dto, key, origenPedido);
+    // Un programado imprime sus etiquetas cuando pasa a cocina, no hoy
+    if (res?.id && res.estado !== 'PROGRAMADO' && this.impresionService) {
       try {
         await this.impresionService.encolarEtiquetasPedido(res.id);
       } catch {
@@ -104,6 +116,40 @@ export class PedidosAdminController {
   @Permiso('pedidos', 'ver')
   async listarCocina(@Query() query: CocinaQueryDto, @Req() req: any) {
     return this.pedidosEstadoService.listarCocina(query.historial, req.usuario);
+  }
+
+  /** Lista «Programados» (pedidos para otro día, aún fuera de cocina). Antes de GET ':id'. */
+  @Get('programados')
+  @Permiso('pedidos', 'ver')
+  async listarProgramados() {
+    return this.programados!.listarProgramados();
+  }
+
+  /** Adelanto en efectivo o tarjeta de un pedido programado: entra a la caja de hoy. */
+  @Post(':id/adelanto')
+  @Permiso('pedidos', 'crear')
+  async adelanto(@Param('id') id: string, @Body() dto: AdelantoPedidoDto, @Req() req: any) {
+    exigirPuedeProgramar(rolesDelUsuario(req.usuario));
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.programados!.agregarAdelanto(id, dto, req.usuario, ip);
+  }
+
+  /** Mueve la fecha y hora de un programado (con reserva de mesa, mueve también la reserva). */
+  @Post(':id/reprogramar')
+  @Permiso('pedidos', 'crear')
+  async reprogramar(@Param('id') id: string, @Body() body: { programadoPara?: string }, @Req() req: any) {
+    exigirPuedeProgramar(rolesDelUsuario(req.usuario));
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.programados!.reprogramar(id, body?.programadoPara ?? '', req.usuario, ip);
+  }
+
+  /** Devuelve un adelanto (egreso de la caja de hoy si es efectivo y su caja ya cerró). */
+  @Post('adelantos/:adelantoId/anular')
+  @Permiso('pedidos', 'crear')
+  async anularAdelanto(@Param('adelantoId') adelantoId: string, @Body() body: { motivo?: string }, @Req() req: any) {
+    exigirPuedeProgramar(rolesDelUsuario(req.usuario));
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.programados!.anularAdelanto(adelantoId, body?.motivo ?? '', req.usuario, ip);
   }
 
   @Get('no-entregados')

@@ -59,7 +59,7 @@ describe('PedidosEstadoService.listar: filtro de días en hora de Lima', () => {
 
     const where = whereListado();
     expect(where.creado_en).toEqual({ lt: new Date('2026-10-29T05:00:00Z') });
-    expect(where.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
+    expect(where.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO', 'PROGRAMADO'] });
     expect(where.AND).toEqual([
       {
         OR: [

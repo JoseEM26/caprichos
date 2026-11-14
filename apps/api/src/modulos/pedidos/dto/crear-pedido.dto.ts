@@ -184,6 +184,41 @@ export class ComprobantePedidoDto {
   direccion?: string;
 }
 
+/** Adelanto al programar un pedido (cualquier medio; la captura es opcional); entra a la caja de hoy. */
+export class AdelantoPedidoDto {
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'], { message: 'Medio de pago del adelanto no válido' })
+  medio!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+
+  /** Captura ya subida del pago digital (opcional). */
+  @IsOptional()
+  voucherId?: string | number;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  monto!: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  pagaCon?: number;
+}
+
+/** Pedido de mesa programado: reserva de mesa que se crea junto con él. */
+export class ReservaPedidoDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Elige al menos una mesa' })
+  mesas!: (number | string)[];
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  personas!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmarCapacidad?: boolean;
+}
+
 export class CrearPedidoDto {
   @ValidateNested()
   @Type(() => ClienteDto)
@@ -270,4 +305,20 @@ export class CrearPedidoDto {
   @IsOptional()
   @Matches(/^\d+$/, { message: 'clientePartyId debe ser un id numérico' })
   clientePartyId?: string;
+
+  /** Programar para otra fecha (ISO). Solo lo atiende el panel de Caja y mozo; en carta y WhatsApp se ignora. */
+  @IsOptional()
+  @IsString()
+  programadoPara?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdelantoPedidoDto)
+  adelanto?: AdelantoPedidoDto;
+
+  /** Solo MESA programada: mesas y personas de la reserva que se crea con el pedido. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ReservaPedidoDto)
+  reserva?: ReservaPedidoDto;
 }

@@ -3,12 +3,26 @@ import { api } from '../../comun/api';
 import type { PlanPagoItem } from './planPago';
 
 export type EstadoPedido =
+  | 'PROGRAMADO'
   | 'COLA'
   | 'PREPARANDO'
   | 'LISTO'
   | 'EN_CAMINO'
   | 'ENTREGADO'
   | 'ANULADO';
+
+export interface PedidoProgramado {
+  id: string;
+  codigo: string;
+  canal: string;
+  modalidad: string;
+  clienteNombre: string | null;
+  total: number;
+  adelanto: number;
+  saldo: number;
+  programadoPara: string;
+  pagoEstado: string | null;
+}
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -156,6 +170,9 @@ export interface Pedido {
   modalidad: string;
   repartidor_party_id?: string | number | null;
   estado: EstadoPedido | string;
+  /** Pedido programado: fecha y hora pactadas (ISO) y lo adelantado (ya entró a la caja del día en que se recibió) */
+  programado_para?: string | null;
+  adelanto_total?: number | string | null;
   cliente_nombre?: string | null;
   cliente_telefono?: string | null;
   entrega_direccion?: string | null;
@@ -580,6 +597,26 @@ export const pedidosApi = {
     await api.post(`/admin/pedidos/${id}/editando`, { activo });
   },
 
+  /** Pedidos programados (para otro día), del más próximo al más lejano. */
+  async listarProgramados(): Promise<PedidoProgramado[]> {
+    return api.get<PedidoProgramado[]>('/admin/pedidos/programados');
+  },
+
+  /** Adelanto en efectivo o tarjeta de un pedido programado: entra a la caja de hoy. */
+  async registrarAdelanto(id: string | number, dto: { medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; monto: number; pagaCon?: number; voucherId?: string | number }): Promise<{ adelantoId: string; adelantoTotal: number; saldo: number }> {
+    return api.post(`/admin/pedidos/${id}/adelanto`, dto);
+  },
+
+  /** Anula un programado; con adelanto, «se devuelve» (egreso de la caja de hoy si es efectivo y su caja ya cerró). */
+  async anularProgramado(id: string | number, motivo: string, devuelveAdelanto: boolean): Promise<unknown> {
+    return api.post(`/admin/pedidos/${id}/estado`, { estado: 'ANULADO', motivo, ...(devuelveAdelanto ? { adelanto: 'DEVUELVE' } : {}) });
+  },
+
+  /** «Se reprograma»: cambia la fecha y hora de un programado (mueve también su reserva de mesa). */
+  async reprogramar(id: string | number, programadoPara: string): Promise<{ id: string; programadoPara: string }> {
+    return api.post(`/admin/pedidos/${id}/reprogramar`, { programadoPara });
+  },
+
   async crearPedidoAdmin(
     dto: {
       modalidad: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
@@ -627,6 +664,12 @@ export const pedidosApi = {
       esPersonal?: boolean;
       colaboradorPartyId?: string | number;
       canal?: 'MOZO' | 'CAJA';
+      /** Programar para otra fecha (ISO). Solo Caja y mozo */
+      programadoPara?: string;
+      /** Adelanto de hoy al programar (efectivo o tarjeta) */
+      adelanto?: { medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; monto: number; pagaCon?: number; voucherId?: string | number };
+      /** Solo MESA programada: reserva de mesa que se crea con el pedido */
+      reserva?: { mesas: string[]; personas: number; confirmarCapacidad?: boolean };
     },
     idempotencyKey?: string,
   ): Promise<any> {
@@ -707,5 +750,5 @@ export const pedidosApi = {
 };
 
 /** Lo que hay que cobrar de un pedido (sin propina): con crédito del personal + delivery, solo el envío. Igual que el servidor. */
-export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null }): number =>
-  Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100)) / 100;
+export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null; adelanto_total?: string | number | null }): number =>
+  Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100) - Math.round(Number(p.adelanto_total || 0) * 100)) / 100;

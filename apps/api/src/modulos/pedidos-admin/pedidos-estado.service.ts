@@ -71,6 +71,7 @@ import {
 import { ConsumoRecetaService } from '../almacen';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ajustesPendientesUbicacion } from './cambio-ubicacion.util';
+import { devolverAdelantosTx } from '../pedidos/adelanto.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -270,7 +271,7 @@ export class PedidosEstadoService {
     if (filtros.pendientes === '1') {
       // Días anteriores (hoy en Lima excluido) que siguen en curso o con pago pendiente
       where.creado_en = { lt: obtenerInicioDiaLima() };
-      where.estado = { notIn: ['ANULADO', 'RECHAZADO'] };
+      where.estado = { notIn: ['ANULADO', 'RECHAZADO', 'PROGRAMADO'] };
       where.AND = [
         {
           OR: [
@@ -1100,11 +1101,26 @@ export class PedidosEstadoService {
       // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
       // (FT-CIE-02: un pedido que no se cobró no puede quedar pendiente y bloquear el cierre)
       const entregadoSinCobro = estadoAnterior === 'ENTREGADO';
-      if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
+      if (!['PROGRAMADO', 'COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior) && !entregadoSinCobro) {
         throw new ConflictException({
           codigo: 'TRANSICION_INVALIDA',
           mensaje: `No se puede anular un pedido en estado ${estadoAnterior}`,
         });
+      }
+
+      // Un programado con adelanto: el dinero ya entró a una caja; se devuelve primero (anular el adelanto) y luego se anula el pedido
+      const motivoAnular = dto.motivo?.trim() || '';
+      if (estadoAnterior === 'PROGRAMADO' && Number(pedido.adelanto_total ?? 0) > 0) {
+        if (dto.adelanto !== 'DEVUELVE') {
+          throw new ConflictException({
+            codigo: 'PEDIDO_CON_ADELANTO',
+            mensaje: 'El pedido tiene un adelanto recibido: elige «se devuelve» (egreso de la caja de hoy si es efectivo) o «se reprograma» (cambia la fecha).',
+            adelanto: Number(pedido.adelanto_total),
+          });
+        }
+        if (motivoAnular.length >= 5) {
+          await this.prisma.$transaction((tx) => devolverAdelantosTx(tx, pedido.id, `Pedido anulado: ${motivoAnular}`, BigInt(usuarioActual.partyId), pedido.codigo));
+        }
       }
 
       if (entregadoSinCobro) {
@@ -1196,6 +1212,14 @@ export class PedidosEstadoService {
         },
       });
 
+      // Un programado de mesa libera su reserva (la mesa vuelve a estar disponible)
+      if (estadoAnterior === 'PROGRAMADO') {
+        await this.prisma.reserva.updateMany({
+          where: { pedido_id: pedido.id, estado: 'ACTIVA' },
+          data: { estado: 'CANCELADA', motivo_cancelacion: `Pedido anulado: ${motivo}`.slice(0, 250) },
+        });
+      }
+
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
       await this.devolverAlAnular(pedido.id, pedido.codigo, usuarioActual?.partyId, ip);
       // Control de almacén encendido y pedido con consumo: «se llegó a preparar» (merma, por defecto) o «nunca» (devolver). Apagado: no hace nada.
@@ -1258,7 +1282,12 @@ export class PedidosEstadoService {
     // 2. Transiciones válidas normales: COLA -> PREPARANDO -> LISTO -> EN_CAMINO -> ENTREGADO
     let esTransicionValida = false;
 
-    if (estadoAnterior === 'COLA') {
+    if (estadoAnterior === 'PROGRAMADO') {
+      // «Pasar a cocina ahora» (el cliente llegó antes de la hora pactada); lo normal es el paso automático
+      if (nuevoEstado === 'COLA') {
+        esTransicionValida = true;
+      }
+    } else if (estadoAnterior === 'COLA') {
       // Cocina puede empezar a preparar o despejar directo a LISTO (DT-58)
       if (nuevoEstado === 'PREPARANDO' || nuevoEstado === 'LISTO') {
         esTransicionValida = true;
@@ -1329,7 +1358,9 @@ export class PedidosEstadoService {
       estado: nuevoEstado,
     };
 
-    if (nuevoEstado === 'PREPARANDO' && !pedido.pasa_cocina_en) {
+    if (nuevoEstado === 'COLA') {
+      datosActualizacion.pasa_cocina_en = ahora;
+    } else if (nuevoEstado === 'PREPARANDO' && !pedido.pasa_cocina_en) {
       datosActualizacion.pasa_cocina_en = ahora;
     } else if (nuevoEstado === 'LISTO') {
       datosActualizacion.listo_en = ahora;

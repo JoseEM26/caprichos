@@ -37,9 +37,12 @@ import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { LineaTiempoService } from './linea-tiempo.service';
 import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoExtraController } from './pedido-extra.controller';
+import { ReservasModule } from '../reservas/reservas.module';
+import { PedidosProgramadosService } from './pedidos-programados.service';
+import { PedidosProgramadosTarea } from './pedidos-programados.tarea';
 
 @Module({
-  imports: [ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule],
+  imports: [ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule, ReservasModule],
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,
@@ -60,6 +63,8 @@ import { PedidoExtraController } from './pedido-extra.controller';
     AjustarPagoService,
     EditarPedidoService,
     PedidoExtraService,
+    PedidosProgramadosService,
+    PedidosProgramadosTarea,
     // Sin estado ni dependencias; PedidosModule no lo exporta
     PagoPlanService,
     UbicacionWhatsappPedidoService,

@@ -41,4 +41,9 @@ export class CambiarEstadoDto {
   @IsOptional()
   @IsString()
   devolucionCodigo?: string;
+
+  /** Al anular un pedido programado con adelanto: DEVUELVE (egreso de la caja de hoy si es efectivo, o registro del medio). Para reprogramar se usa POST :id/reprogramar. */
+  @IsOptional()
+  @IsIn(['DEVUELVE'])
+  adelanto?: 'DEVUELVE';
 }

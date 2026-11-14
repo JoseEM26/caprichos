@@ -28,7 +28,8 @@ export interface MontosSistema {
 export type ClienteCaja = Pick<
   Prisma.TransactionClient,
   'cobro' | 'movimientoCaja' | 'liquidacion' | 'pedido'
->;
+> &
+  Partial<Pick<Prisma.TransactionClient, 'pedidoAdelanto'>>;
 
 /** Pesos a céntimos enteros: los montos se suman en enteros, nunca en floats. */
 export function aCentimos(valor: unknown): number {
@@ -270,6 +271,14 @@ export async function calcularMontosCaja(
         propinasDigitales += propina;
       }
     }
+  }
+
+  // Adelantos de pedidos programados recibidos en esta caja (efectivo o tarjeta): entran el día en que se reciben,
+  // aunque el pedido se cobre o se entregue otro día. El cobro final es solo el saldo, así que no se cuenta dos veces.
+  const adelantos = (await cliente.pedidoAdelanto?.findMany({ where: { caja_id: caja.id, anulado_en: null } })) ?? [];
+  for (const a of adelantos) {
+    if ((a.medio || '').toUpperCase() === 'EFECTIVO') ventasEfectivo += aCentimos(a.monto);
+    else sistemaTarjeta += aCentimos(a.monto);
   }
 
   // Devoluciones del día de la caja: la propina del pedido devuelto sale ese día (por el medio de su cobro).

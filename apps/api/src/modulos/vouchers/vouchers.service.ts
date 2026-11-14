@@ -167,7 +167,7 @@ export class VouchersService {
           id: true,
           codigo: true,
           total: true,
-          monto_credito: true,
+          monto_credito: true, adelanto_total: true,
           pago_preferido: true,
           pago_metodo: true,
           estado: true,
@@ -710,7 +710,7 @@ export class VouchersService {
         id: true,
         codigo: true,
         total: true,
-        monto_credito: true,
+        monto_credito: true, adelanto_total: true,
         propina: true,
         pago_estado: true,
         canal: true,
@@ -1150,7 +1150,7 @@ export class VouchersService {
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
+      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, adelanto_total: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -1209,7 +1209,7 @@ export class VouchersService {
     const pedido = voucher.pedido_id
       ? await this.prisma.pedido.findUnique({
           where: { id: voucher.pedido_id },
-          select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true, monto_credito: true, propina: true },
+          select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true, monto_credito: true, adelanto_total: true, propina: true },
         })
       : null;
     if (esSoloMozo(usuario) && (!pedido || pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {

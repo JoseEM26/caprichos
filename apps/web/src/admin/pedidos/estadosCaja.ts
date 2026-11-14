@@ -33,6 +33,7 @@ export function esPagoPorCoordinar(p: Pedido): boolean {
     !tieneCoordinado(p) &&
     !ESTADOS_CERRADOS.includes(e) &&
     e !== 'COLA' &&
+    e !== 'PROGRAMADO' &&
     e !== 'NUEVO'
   );
 }
@@ -65,7 +66,7 @@ export function enEtapaCaja(p: Pedido, etapa: EtapaCaja): boolean {
   return true;
 }
 
-export type ClaveVisual = 'pendiente' | 'prep' | 'listo' | 'camino' | 'entregado' | 'anulado' | 'otro';
+export type ClaveVisual = 'pendiente' | 'prep' | 'listo' | 'camino' | 'entregado' | 'anulado' | 'programado' | 'otro';
 
 export interface EstadoVisual {
   clave: ClaveVisual;
@@ -86,6 +87,8 @@ export function estadoVisual(p: Pedido): EstadoVisual {
     case 'COLA':
     case 'NUEVO':
       return { clave: 'pendiente', l: 'Pendiente', bg: 'var(--cp-orange, #E67929)', fg: 'var(--cp-navy, #0B2C3E)', barra: '#E67929' };
+    case 'PROGRAMADO':
+      return { clave: 'programado', l: 'Programado', bg: 'var(--cp-sand, #EDE1D1)', fg: 'var(--cp-navy, #0B2C3E)', barra: '#7C8EA3' };
     case 'PREPARANDO':
     case 'PREP':
       return { clave: 'prep', l: 'En preparación', bg: 'var(--cp-gold, #D99E39)', fg: 'var(--cp-navy, #0B2C3E)', barra: '#D99E39' };
