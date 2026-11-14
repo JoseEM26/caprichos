@@ -119,7 +119,8 @@ export function VentasTurno({ cobrados, ventas, fecha }: VentasTurnoProps) {
   const todas = useMemo(() => unir(cobrados, ventas), [cobrados, ventas]);
   const filtradas = useMemo(() => filtrarVentas(todas, elegidos, busqueda), [todas, elegidos, busqueda]);
   const visibles = useMemo(() => ordenarVentas(filtradas, orden), [filtradas, orden]);
-  const totales = useMemo(() => totalesVentas(filtradas), [filtradas]);
+  const mediosFiltrados = useMemo(() => elegidos.medio ?? [], [elegidos]);
+  const totales = useMemo(() => totalesVentas(filtradas, mediosFiltrados), [filtradas, mediosFiltrados]);
   const mediosTotal = MEDIOS_FILTRO.filter((m) => totales.porMedio[m.id] != null);
   const filtrado = hayFiltros(elegidos, busqueda);
   const nFiltros = Object.values(elegidos).filter((v) => v.length > 0).length;
@@ -217,7 +218,10 @@ export function VentasTurno({ cobrados, ventas, fecha }: VentasTurnoProps) {
           <div className="vt-resumen" data-testid="totales-ventas" role="status">
             {filtrado && <span className="vt-fil">Filtrado: {totales.n} de {todas.length}</span>}
             <span><b>{totales.n}</b> {totales.n === 1 ? 'venta' : 'ventas'}</span>
-            <span data-testid="vt-total">Total <b>{soles(totales.total)}</b></span>
+            <span data-testid="vt-total">
+              {mediosFiltrados.length ? `Total en ${mediosFiltrados.map(nombreMedio).join(' + ')} ` : 'Total '}
+              <b>{soles(totales.total)}</b>
+            </span>
             {totales.propina > 0 && <span>Propinas <b>{soles(totales.propina)}</b></span>}
             {mediosTotal.map((m) => (
               <span key={m.id} data-testid={`vt-medio-${m.id}`}>{m.n} <b>{soles(totales.porMedio[m.id])}</b></span>

@@ -63,6 +63,14 @@ describe('ventasTurno: lógica pura', () => {
     expect(totalesVentas(unir(cobrados)).total).toBe(150);
   });
 
+  it('con filtro de medio, el total suma solo la parte de ese medio (los pagos divididos siguen en la lista)', () => {
+    const conEfectivo = filtrarVentas(filas, { medio: ['EFECTIVO'] }, '');
+    const t = totalesVentas(conEfectivo, ['EFECTIVO']);
+    expect(t.total).toBe(60);
+    expect(t.porMedio).toEqual({ EFECTIVO: 60 });
+    expect(t.total).toBeLessThan(conEfectivo.reduce((a, f) => a + f.total, 0) + 0.001);
+  });
+
   it('filtra por varios criterios a la vez, busca por código o cliente y ordena', () => {
     expect(filtrarVentas(filas, { categoria: ['Donas'] }, '').map((f) => f.codigo)).toEqual(['CP-001', 'CP-002']);
     expect(filtrarVentas(filas, { categoria: ['Donas'], medio: ['YAPE'] }, '').map((f) => f.codigo)).toEqual(['CP-002']);

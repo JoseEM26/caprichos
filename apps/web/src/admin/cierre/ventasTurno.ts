@@ -184,17 +184,24 @@ export interface TotalesVentas {
 }
 
 /** Totales de lo que se ve: ventas (suma del total de cada cobro), propinas y monto por medio (con pagos divididos, cada parte). */
-export function totalesVentas(filas: VentaFila[]): TotalesVentas {
+// Con filtro de medio (p. ej. Efectivo), un pago dividido Efectivo + Tarjeta sigue en la lista pero el total
+// suma solo su parte en los medios filtrados: así el total cuadra directo con lo contado de ese medio.
+export function totalesVentas(filas: VentaFila[], soloMedios: string[] = []): TotalesVentas {
   const t: TotalesVentas = { n: filas.length, total: 0, propina: 0, porMedio: {} };
+  const filtraMedio = soloMedios.length > 0;
   const cent = (v: number) => Math.round(v * 100);
   let total = 0;
   let propina = 0;
   const medios: Record<string, number> = {};
   for (const f of filas) {
-    total += cent(f.total);
     propina += cent(f.propina);
     const partes = f.pagos.length ? f.pagos : f.medios.length === 1 ? [{ medio: f.medios[0], monto: f.total }] : [];
-    for (const p of partes) medios[p.medio] = (medios[p.medio] ?? 0) + cent(p.monto);
+    if (!filtraMedio) total += cent(f.total);
+    for (const p of partes) {
+      if (filtraMedio && !soloMedios.includes(p.medio)) continue;
+      medios[p.medio] = (medios[p.medio] ?? 0) + cent(p.monto);
+      if (filtraMedio) total += cent(p.monto);
+    }
   }
   t.total = total / 100;
   t.propina = propina / 100;
