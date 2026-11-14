@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RegistroAuditoria } from './auditoria.tipos';
-import { inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
+import { Prisma } from '@prisma/client';
+import { inicioDiaLimaIso, sumarDiasIso, hoyLimaIso } from '../../comun/fechas-lima';
+
+/** Máximo de días que se miran al buscar dentro del JSON (pedido/producto): no hay índice para eso. */
+export const MAX_DIAS_BUSQUEDA_JSON = 31;
+const TOPE_IDS_JSON = 5000;
+const escaparLike = (t: string) => t.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 export interface FiltrosAuditoria {
   modulo?: string;
@@ -13,6 +19,12 @@ export interface FiltrosAuditoria {
   categoria?: string;
   resultado?: string;
   busqueda?: string;
+  /** Texto libre solo en el motivo. */
+  motivo?: string;
+  /** Código (CP-W422) o id del pedido: trae el pedido y lo relacionado que lo nombra. */
+  pedido?: string;
+  /** Nombre o id del producto. */
+  producto?: string;
   pagina?: number | string;
   limite?: number | string;
 }
@@ -99,6 +111,8 @@ export class AuditoriaService {
         else where.en.lte = hasta;
       }
     }
+    const m = filtros.motivo?.trim();
+    if (m) where.motivo = { contains: m, mode: 'insensitive' };
     const q = filtros.busqueda?.trim();
     if (q) {
       const texto = (campo: string) => ({ [campo]: { contains: q, mode: 'insensitive' } });
@@ -109,6 +123,109 @@ export class AuditoriaService {
     return where;
   }
 
+  /** Rango de la búsqueda dentro del JSON: el pedido por defecto 31 días y nunca más de 31. */
+  private rangoJson(filtros: FiltrosAuditoria): { desde: Date; hasta: Date; recortado: boolean } {
+    const hoy = hoyLimaIso();
+    const hastaIso = typeof filtros.hasta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(filtros.hasta) ? filtros.hasta : hoy;
+    const hasta = this.limite(hastaIso, true)!; // exclusivo: inicio del día siguiente
+    let desde = filtros.desde ? this.limite(filtros.desde, false) : undefined;
+    const minimo = inicioDiaLimaIso(sumarDiasIso(hastaIso, -(MAX_DIAS_BUSQUEDA_JSON - 1)));
+    let recortado = false;
+    if (!desde || desde < minimo) {
+      recortado = true;
+      desde = minimo;
+    }
+    return { desde, hasta, recortado };
+  }
+
+  /** Ids de auditoría que mencionan el pedido o el producto (búsqueda en JSON, siempre con rango). */
+  private async idsPorJson(filtros: FiltrosAuditoria): Promise<{ ids: bigint[]; aviso?: string } | undefined> {
+    const pedido = filtros.pedido?.trim();
+    const producto = filtros.producto?.trim();
+    if (!pedido && !producto) return undefined;
+    if (pedido && producto) {
+      // los dos a la vez: intersección de ids
+      const a = await this.idsPorJson({ ...filtros, producto: undefined });
+      const b = await this.idsPorJson({ ...filtros, pedido: undefined });
+      const set = new Set((b?.ids ?? []).map(String));
+      return { ids: (a?.ids ?? []).filter((i) => set.has(i.toString())), aviso: a?.aviso };
+    }
+    const { desde, hasta, recortado } = this.rangoJson(filtros);
+    const cond: Prisma.Sql[] = [];
+
+    if (pedido) {
+      const esId = /^\d{1,15}$/.test(pedido);
+      const p = await this.prisma.pedido.findFirst({
+        where: esId ? { id: BigInt(pedido) } : { codigo: pedido.toUpperCase() },
+        select: { id: true, codigo: true },
+      });
+      const idTxt = p ? p.id.toString() : '';
+      const codigo = p ? p.codigo : pedido.toUpperCase();
+      const quoted = `%"${escaparLike(codigo)}"%`;
+      cond.push(Prisma.sql`(entidad = 'pedido' AND entidad_id = ${p ? p.id : -1n})`);
+      if (p) {
+        cond.push(Prisma.sql`(despues->>'pedidoId' = ${idTxt} OR antes->>'pedidoId' = ${idTxt} OR despues->>'pedido_id' = ${idTxt} OR antes->>'pedido_id' = ${idTxt})`);
+      }
+      if (!esId) cond.push(Prisma.sql`(despues::text LIKE ${quoted} OR antes::text LIKE ${quoted})`);
+    }
+
+    if (producto) {
+      const esId = /^\d{1,15}$/.test(producto);
+      const idsProd = esId ? [BigInt(producto)] : [];
+      if (!esId) {
+        const hallados = await this.prisma.producto.findMany({
+          where: { nombre: { contains: producto, mode: 'insensitive' } },
+          select: { id: true },
+          take: 20,
+        });
+        idsProd.push(...hallados.map((h) => h.id));
+      }
+      if (idsProd.length) {
+        cond.push(Prisma.sql`(entidad = 'producto' AND entidad_id IN (${Prisma.join(idsProd)}))`);
+        const txt = idsProd.map(String);
+        cond.push(Prisma.sql`(despues->>'productoId' IN (${Prisma.join(txt)}) OR antes->>'productoId' IN (${Prisma.join(txt)}) OR despues->>'producto_id' IN (${Prisma.join(txt)}))`);
+      }
+      if (!esId) {
+        const like = `%${escaparLike(producto)}%`;
+        cond.push(Prisma.sql`(despues::text ILIKE ${like} OR antes::text ILIKE ${like})`);
+      }
+    }
+
+    if (!cond.length) return { ids: [] };
+
+    const filas = await this.prisma.$queryRaw<Array<{ id: bigint }>>(
+      Prisma.sql`SELECT id FROM auditoria WHERE en >= ${desde} AND en < ${hasta} AND (${Prisma.join(cond, ' OR ')}) ORDER BY en DESC LIMIT ${TOPE_IDS_JSON}`,
+    );
+    return {
+      ids: filas.map((f) => f.id),
+      aviso: recortado
+        ? `Para buscar por pedido o producto se revisan como máximo ${MAX_DIAS_BUSQUEDA_JSON} días (por defecto, los últimos ${MAX_DIAS_BUSQUEDA_JSON}). Elige otras fechas para ver otro tramo.`
+        : undefined,
+    };
+  }
+
+  /** Valores que existen, para los selectores de módulo y acción. */
+  async opciones() {
+    const [modulos, acciones] = await Promise.all([
+      this.prisma.auditoria.groupBy({ by: ['modulo'], _count: { _all: true }, orderBy: { modulo: 'asc' } }),
+      this.prisma.auditoria.groupBy({ by: ['accion'], _count: { _all: true }, orderBy: { accion: 'asc' } }),
+    ]);
+    return { modulos: modulos.map((m) => m.modulo), acciones: acciones.map((a) => a.accion) };
+  }
+
+  /** Buscador de personas por nombre (para filtrar quién hizo la acción). */
+  async personas(q: string) {
+    const t = q.trim();
+    if (t.length < 2) return [];
+    const filas = await this.prisma.person.findMany({
+      where: { OR: [{ nombres: { contains: t, mode: 'insensitive' } }, { apellidos: { contains: t, mode: 'insensitive' } }] },
+      select: { party_id: true, nombres: true, apellidos: true },
+      orderBy: { nombres: 'asc' },
+      take: 10,
+    });
+    return filas.map((f) => ({ id: f.party_id.toString(), nombre: `${f.nombres} ${f.apellidos ?? ''}`.trim() }));
+  }
+
   /**
    * Lista los eventos de auditoría según filtros y paginación en orden cronológico descendente.
    */
@@ -117,9 +234,11 @@ export class AuditoriaService {
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
     const skip = (pagina - 1) * limite;
 
-    const base = this.armarWhere(filtros);
-    const catWhere = this.armarWhere(filtros, ['categoria']);
-    const resWhere = this.armarWhere(filtros, ['resultado']);
+    const json = await this.idsPorJson(filtros);
+    const conIds = (w: any) => (json ? { ...w, id: { in: json.ids } } : w);
+    const base = conIds(this.armarWhere(filtros));
+    const catWhere = conIds(this.armarWhere(filtros, ['categoria']));
+    const resWhere = conIds(this.armarWhere(filtros, ['resultado']));
 
     const [total, registros, porCategoria, porResultado] = await Promise.all([
       this.prisma.auditoria.count({ where: base }),
@@ -167,6 +286,7 @@ export class AuditoriaService {
       paginas: Math.ceil(total / limite),
       datos,
       conteos,
+      aviso: json?.aviso,
     };
   }
 

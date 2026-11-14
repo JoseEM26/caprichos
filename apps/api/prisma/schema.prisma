@@ -369,6 +369,8 @@ model Auditoria {
 
   @@index([en(sort: Desc), modulo, party_id], map: "ix_auditoria_busqueda")
   @@index([entidad, entidad_id], map: "ix_auditoria_entidad")
+  @@index([accion, en(sort: Desc)], map: "ix_auditoria_accion")
+  @@index([party_id, en(sort: Desc)], map: "ix_auditoria_persona")
   @@map("auditoria")
 }
 

@@ -72,6 +72,7 @@ export interface RespuestaListarAuditoria {
   paginas: number;
   datos: RegistroAuditoriaItem[];
   conteos?: { categoria: Record<string, number>; resultado: Record<string, number> };
+  aviso?: string;
 }
 
 export interface ResultadoVerificacionCadena {

@@ -20,6 +20,9 @@ export class AuditoriaController {
     @Query('categoria') categoria?: string,
     @Query('resultado') resultado?: string,
     @Query('busqueda') busqueda?: string,
+    @Query('motivo') motivo?: string,
+    @Query('pedido') pedido?: string,
+    @Query('producto') producto?: string,
     @Query('pagina') pagina?: string,
     @Query('limite') limite?: string,
   ) {
@@ -33,10 +36,25 @@ export class AuditoriaController {
       categoria,
       resultado,
       busqueda,
+      motivo,
+      pedido,
+      producto,
       pagina: pagina ? parseInt(pagina, 10) : undefined,
       limite: limite ? parseInt(limite, 10) : undefined,
     };
     return this.auditoriaService.listar(filtros);
+  }
+
+  @Get('opciones')
+  @Permiso('auditoria', 'ver')
+  async opciones() {
+    return this.auditoriaService.opciones();
+  }
+
+  @Get('personas')
+  @Permiso('auditoria', 'ver')
+  async personas(@Query('q') q?: string) {
+    return this.auditoriaService.personas(q ?? '');
   }
 
   @Get('verificar')

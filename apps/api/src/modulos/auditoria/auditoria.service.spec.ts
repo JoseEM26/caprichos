@@ -11,6 +11,9 @@ describe('AuditoriaService', () => {
       count: jest.Mock;
       groupBy: jest.Mock;
     };
+    pedido: { findFirst: jest.Mock };
+    producto: { findMany: jest.Mock };
+    person: { findMany: jest.Mock };
     $queryRaw: jest.Mock;
   };
 
@@ -22,6 +25,9 @@ describe('AuditoriaService', () => {
         count: jest.fn(),
         groupBy: jest.fn().mockResolvedValue([]),
       },
+      pedido: { findFirst: jest.fn() },
+      producto: { findMany: jest.fn() },
+      person: { findMany: jest.fn() },
       $queryRaw: jest.fn(),
     };
 
@@ -211,6 +217,99 @@ describe('AuditoriaService', () => {
         skip: 0,
         take: 20,
       });
+    });
+  });
+
+  describe('filtros nuevos', () => {
+    beforeEach(() => {
+      prisma.auditoria.count.mockResolvedValue(0);
+      prisma.auditoria.findMany.mockResolvedValue([]);
+    });
+    const dondeUsado = () => prisma.auditoria.findMany.mock.calls[0][0].where;
+    const sqlUsado = () => {
+      const q = prisma.$queryRaw.mock.calls[0][0];
+      return { texto: q.sql as string, valores: q.values as unknown[] };
+    };
+
+    it('motivo busca solo en el motivo', async () => {
+      await service.listar({ motivo: 'error caja' });
+      expect(dondeUsado()).toEqual({ motivo: { contains: 'error caja', mode: 'insensitive' } });
+    });
+
+    it('modulo, accion y persona (id) arman su condicion', async () => {
+      await service.listar({ modulo: 'caja', accion: 'ANULAR', partyId: '7' });
+      expect(dondeUsado()).toEqual({ modulo: 'caja', accion: 'ANULAR', party_id: 7n });
+    });
+
+    it('pedido por codigo: resuelve el id, busca en JSON con rango y filtra por ids', async () => {
+      prisma.pedido.findFirst.mockResolvedValue({ id: 55n, codigo: 'CP-W422' });
+      prisma.$queryRaw.mockResolvedValue([{ id: 9n }, { id: 8n }]);
+      const r = await service.listar({ pedido: 'cp-w422' });
+      expect(prisma.pedido.findFirst).toHaveBeenCalledWith({ where: { codigo: 'CP-W422' }, select: { id: true, codigo: true } });
+      const { texto, valores } = sqlUsado();
+      expect(texto).toContain("entidad = 'pedido'");
+      expect(texto).toContain("'pedidoId'");
+      expect(valores).toContain('%"CP-W422"%');
+      expect(valores).toContain('55');
+      expect(dondeUsado()).toEqual({ id: { in: [9n, 8n] } });
+      expect(r.aviso).toContain('31 días');
+    });
+
+    it('pedido por id numerico busca el pedido por id', async () => {
+      prisma.pedido.findFirst.mockResolvedValue({ id: 55n, codigo: 'CP-W422' });
+      prisma.$queryRaw.mockResolvedValue([]);
+      await service.listar({ pedido: '55' });
+      expect(prisma.pedido.findFirst).toHaveBeenCalledWith({ where: { id: 55n }, select: { id: true, codigo: true } });
+      expect(dondeUsado()).toEqual({ id: { in: [] } });
+    });
+
+    it('el rango en JSON nunca pasa de 31 dias', async () => {
+      prisma.pedido.findFirst.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([]);
+      await service.listar({ pedido: 'CP-X', desde: '2026-01-01', hasta: '2026-03-31' });
+      const [desde, hasta] = sqlUsado().valores.filter((v) => v instanceof Date) as Date[];
+      expect((hasta.getTime() - desde.getTime()) / 86400000).toBe(31);
+    });
+
+    it('un rango corto elegido no se recorta ni avisa', async () => {
+      prisma.pedido.findFirst.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([]);
+      const r = await service.listar({ pedido: 'CP-X', desde: '2026-03-01', hasta: '2026-03-05' });
+      expect(r.aviso).toBeUndefined();
+    });
+
+    it('producto por nombre: busca ids del catalogo y el texto en JSON', async () => {
+      prisma.producto.findMany.mockResolvedValue([{ id: 3n }]);
+      prisma.$queryRaw.mockResolvedValue([{ id: 1n }]);
+      await service.listar({ producto: 'torta' });
+      const { texto, valores } = sqlUsado();
+      expect(texto).toContain("entidad = 'producto'");
+      expect(valores).toContain('%torta%');
+      expect(valores).toContain(3n);
+      expect(dondeUsado()).toEqual({ id: { in: [1n] } });
+    });
+
+    it('producto sin coincidencias en catalogo y numerico ausente: no consulta mas de la cuenta', async () => {
+      prisma.producto.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
+      await service.listar({ producto: 'zzz' });
+      expect(dondeUsado()).toEqual({ id: { in: [] } });
+    });
+
+    it('pedido y producto juntos: interseccion', async () => {
+      prisma.pedido.findFirst.mockResolvedValue({ id: 1n, codigo: 'CP-A' });
+      prisma.producto.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 1n }, { id: 2n }]).mockResolvedValueOnce([{ id: 2n }, { id: 3n }]);
+      await service.listar({ pedido: 'CP-A', producto: 'torta' });
+      expect(dondeUsado()).toEqual({ id: { in: [2n] } });
+    });
+
+    it('opciones y personas', async () => {
+      prisma.auditoria.groupBy.mockResolvedValueOnce([{ modulo: 'caja' }]).mockResolvedValueOnce([{ accion: 'ANULAR' }]);
+      expect(await service.opciones()).toEqual({ modulos: ['caja'], acciones: ['ANULAR'] });
+      prisma.person.findMany.mockResolvedValue([{ party_id: 4n, nombres: 'Ana', apellidos: 'Paz' }]);
+      expect(await service.personas('an')).toEqual([{ id: '4', nombre: 'Ana Paz' }]);
+      expect(await service.personas('a')).toEqual([]);
     });
   });
 

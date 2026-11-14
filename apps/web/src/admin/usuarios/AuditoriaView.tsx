@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Insignia } from '../../comun/Insignia';
@@ -12,20 +13,26 @@ import type {
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { HistorialImpresiones } from './HistorialImpresiones';
 
-const OPCIONES_MODULOS = [
-  { id: '', n: 'Todos' },
-  { id: 'usuarios', n: 'Usuarios' },
-  { id: 'acceso', n: 'Acceso' },
-  { id: 'caja', n: 'Caja' },
-  { id: 'pedidos', n: 'Pedidos' },
-  { id: 'cocina', n: 'Cocina' },
-  { id: 'repartos', n: 'Reparto' },
-  { id: 'auditoria', n: 'Auditoría' },
-  { id: 'local', n: 'Configuración' },
-  { id: 'catalogo', n: 'Carta' },
-  { id: 'ofertas', n: 'Ofertas' },
-  { id: 'iniciativas', n: 'Iniciativas' },
-];
+function useRetardo<T>(valor: T, ms = 400): T {
+  const [v, setV] = useState(valor);
+  useEffect(() => {
+    const t = setTimeout(() => setV(valor), ms);
+    return () => clearTimeout(t);
+  }, [valor, ms]);
+  return v;
+}
+
+const estiloCampo = {
+  width: '100%',
+  boxSizing: 'border-box' as const,
+  minHeight: '44px',
+  borderRadius: '12px',
+  border: '1.5px solid var(--cp-line)',
+  padding: '0 12px',
+  fontSize: '14px',
+  background: 'var(--cp-white)',
+  color: 'var(--cp-navy)',
+};
 
 function hoyLima(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -42,6 +49,7 @@ function rangoPreset(preset: string): { desde: string; hasta: string } | null {
   if (preset === 'hoy') return { desde: hoy, hasta: hoy };
   if (preset === 'ayer') return { desde: sumarDias(hoy, -1), hasta: sumarDias(hoy, -1) };
   if (preset === '7') return { desde: sumarDias(hoy, -6), hasta: hoy };
+  if (preset === 'mes') return { desde: `${hoy.slice(0, 8)}01`, hasta: hoy };
   return null;
 }
 
@@ -51,17 +59,31 @@ function AccionesAuditoria() {
   const { tiene } = useSesion();
   const puedeVer = tiene('auditoria/ver');
 
-  // Filtros
-  const [busqueda, setBusqueda] = useState('');
-  const [busquedaAplicada, setBusquedaAplicada] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('todos');
-  const [filtroModulo, setFiltroModulo] = useState('');
-  const [filtroResultado, setFiltroResultado] = useState('todos');
-  const [filtroFecha, setFiltroFecha] = useState('todos');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
-  const [persona, setPersona] = useState('');
-  const [pagina, setPagina] = useState(1);
+  // Filtros (se guardan en la URL para compartir o volver)
+  const [params, setParams] = useSearchParams();
+  const p = (k: string, d = '') => params.get(k) ?? d;
+  const [busqueda, setBusqueda] = useState(p('q'));
+  const [busquedaAplicada, setBusquedaAplicada] = useState(p('q'));
+  const [filtroTipo, setFiltroTipo] = useState(p('tipo', 'todos'));
+  const [filtroModulo, setFiltroModulo] = useState(p('modulo'));
+  const [filtroAccion, setFiltroAccion] = useState(p('accion'));
+  const [filtroResultado, setFiltroResultado] = useState(p('res', 'todos'));
+  const [filtroFecha, setFiltroFecha] = useState(p('fecha', 'todos'));
+  const [desde, setDesde] = useState(p('desde'));
+  const [hasta, setHasta] = useState(p('hasta'));
+  const [persona, setPersona] = useState(p('persona'));
+  const [personaNombre, setPersonaNombre] = useState(p('personaNombre'));
+  const [buscaPersona, setBuscaPersona] = useState('');
+  const [sugeridas, setSugeridas] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [pedido, setPedido] = useState(p('pedido'));
+  const [producto, setProducto] = useState(p('producto'));
+  const [motivo, setMotivo] = useState(p('motivo'));
+  const pedidoA = useRetardo(pedido.trim());
+  const productoA = useRetardo(producto.trim());
+  const motivoA = useRetardo(motivo.trim());
+  const [opciones, setOpciones] = useState<{ modulos: string[]; acciones: string[] }>({ modulos: [], acciones: [] });
+  const [aviso, setAviso] = useState('');
+  const [pagina, setPagina] = useState(Number(p('pag', '1')) || 1);
   const limite = 20;
 
   // Datos
@@ -86,6 +108,42 @@ function AccionesAuditoria() {
     setExpandidos((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  useEffect(() => {
+    const n = new URLSearchParams();
+    const poner = (k: string, v: string, def = '') => v && v !== def && n.set(k, v);
+    poner('q', busquedaAplicada.trim());
+    poner('tipo', filtroTipo, 'todos');
+    poner('modulo', filtroModulo);
+    poner('accion', filtroAccion);
+    poner('res', filtroResultado, 'todos');
+    poner('fecha', filtroFecha, 'todos');
+    poner('desde', desde);
+    poner('hasta', hasta);
+    poner('persona', persona);
+    poner('personaNombre', personaNombre);
+    poner('pedido', pedidoA);
+    poner('producto', productoA);
+    poner('motivo', motivoA);
+    poner('pag', String(pagina), '1');
+    setParams(n, { replace: true });
+  }, [busquedaAplicada, filtroTipo, filtroModulo, filtroAccion, filtroResultado, filtroFecha, desde, hasta, persona, personaNombre, pedidoA, productoA, motivoA, pagina, setParams]);
+
+  useEffect(() => {
+    if (!puedeVer) return;
+    api.get<{ modulos: string[]; acciones: string[] }>('/admin/auditoria/opciones').then((o) => setOpciones({ modulos: o?.modulos ?? [], acciones: o?.acciones ?? [] })).catch(() => {});
+  }, [puedeVer]);
+
+  const buscaPersonaA = useRetardo(buscaPersona.trim(), 300);
+  useEffect(() => {
+    if (buscaPersonaA.length < 2) {
+      setSugeridas([]);
+      return;
+    }
+    api.get<Array<{ id: string; nombre: string }>>(`/admin/auditoria/personas?q=${encodeURIComponent(buscaPersonaA)}`)
+      .then((r) => setSugeridas(Array.isArray(r) ? r : []))
+      .catch(() => setSugeridas([]));
+  }, [buscaPersonaA]);
+
   const cargarAuditoria = useCallback(async () => {
     if (!puedeVer) return;
 
@@ -98,6 +156,10 @@ function AccionesAuditoria() {
       params.set('limite', limite.toString());
 
       if (filtroModulo) params.set('modulo', filtroModulo);
+      if (filtroAccion) params.set('accion', filtroAccion);
+      if (pedidoA) params.set('pedido', pedidoA);
+      if (productoA) params.set('producto', productoA);
+      if (motivoA) params.set('motivo', motivoA);
       if (filtroTipo !== 'todos') params.set('categoria', CATEGORIA_API[filtroTipo] ?? filtroTipo.toUpperCase());
       if (filtroResultado === 'correctos') params.set('resultado', 'OK');
       if (filtroResultado === 'rechazados') params.set('resultado', 'RECHAZADO');
@@ -113,6 +175,7 @@ function AccionesAuditoria() {
         `/admin/auditoria?${params.toString()}`,
       );
       if (solicitud !== solicitudRef.current) return; // respuesta tardía
+      setAviso(data.aviso ?? '');
       setRegistros(data.datos || []);
       setConteos(data.conteos ?? { categoria: {}, resultado: {} });
       setTotal(data.total || 0);
@@ -127,7 +190,7 @@ function AccionesAuditoria() {
     } finally {
       if (solicitud === solicitudRef.current) setCargando(false);
     }
-  }, [puedeVer, pagina, limite, filtroModulo, filtroTipo, filtroResultado, filtroFecha, persona, desde, hasta, busquedaAplicada]);
+  }, [puedeVer, pagina, limite, filtroModulo, filtroAccion, pedidoA, productoA, motivoA, filtroTipo, filtroResultado, filtroFecha, persona, desde, hasta, busquedaAplicada]);
 
   // Debounce de la búsqueda de texto
   useEffect(() => {
@@ -162,6 +225,12 @@ function AccionesAuditoria() {
     setBusquedaAplicada('');
     setFiltroTipo('todos');
     setFiltroModulo('');
+    setFiltroAccion('');
+    setPedido('');
+    setProducto('');
+    setMotivo('');
+    setPersonaNombre('');
+    setBuscaPersona('');
     setFiltroResultado('todos');
     setFiltroFecha('todos');
     setDesde('');
@@ -379,34 +448,64 @@ function AccionesAuditoria() {
               }}
             />
           </div>
-          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-            <label htmlFor="au-p" style={{ position: 'absolute', left: '-9999px' }}>Persona</label>
-            <select
-              id="au-p"
-              value={persona}
-              onChange={(e) => {
-                setPersona(e.target.value);
-                setPagina(1);
-              }}
-              style={{
-                width: '100%',
-                minHeight: '48px',
-                borderRadius: '12px',
-                border: '1.5px solid var(--cp-line)',
-                padding: '0 12px',
-                fontSize: '14px',
-                background: 'var(--cp-white)',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              <option value="">Todas las personas</option>
-              <option value="1">Admin Principal (1)</option>
-              <option value="2">Lucia Prueba (2)</option>
-              <option value="3">Mateo Gómez (3)</option>
-              <option value="4">Marcos Cocina (4)</option>
-            </select>
+          <div style={{ flex: '1 1 180px', minWidth: 0, position: 'relative' }}>
+            <label htmlFor="au-p" style={{ position: 'absolute', left: '-9999px' }}>Persona que hizo la acción</label>
+            {persona ? (
+              <button
+                type="button"
+                onClick={() => { setPersona(''); setPersonaNombre(''); setPagina(1); }}
+                style={{ ...estiloCampo, textAlign: 'left', cursor: 'pointer' }}
+                aria-label="Quitar persona"
+              >
+                {personaNombre || `Persona ${persona}`} ✕
+              </button>
+            ) : (
+              <input
+                id="au-p"
+                type="search"
+                value={buscaPersona}
+                onChange={(e) => setBuscaPersona(e.target.value)}
+                placeholder="Persona (nombre)…"
+                style={estiloCampo}
+              />
+            )}
+            {!persona && sugeridas.length > 0 && (
+              <ul style={{ position: 'absolute', zIndex: 5, left: 0, right: 0, margin: '4px 0 0', padding: 0, listStyle: 'none', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px' }}>
+                {sugeridas.map((x) => (
+                  <li key={x.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setPersona(x.id); setPersonaNombre(x.nombre); setBuscaPersona(''); setSugeridas([]); setPagina(1); }}
+                      style={{ width: '100%', minHeight: '44px', textAlign: 'left', border: 0, background: 'transparent', padding: '0 12px', fontSize: '14px', cursor: 'pointer' }}
+                    >
+                      {x.nombre}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </BarraFiltros>
+
+        <BarraFiltros>
+          <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+            <label htmlFor="au-ped" style={{ position: 'absolute', left: '-9999px' }}>Pedido (código o número)</label>
+            <input id="au-ped" type="search" value={pedido} onChange={(e) => { setPedido(e.target.value); setPagina(1); }} placeholder="Pedido: CP-W422…" style={estiloCampo} />
+          </div>
+          <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+            <label htmlFor="au-prod" style={{ position: 'absolute', left: '-9999px' }}>Producto (nombre o número)</label>
+            <input id="au-prod" type="search" value={producto} onChange={(e) => { setProducto(e.target.value); setPagina(1); }} placeholder="Producto: nombre o número…" style={estiloCampo} />
+          </div>
+          <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+            <label htmlFor="au-mot" style={{ position: 'absolute', left: '-9999px' }}>Texto del motivo</label>
+            <input id="au-mot" type="search" value={motivo} onChange={(e) => { setMotivo(e.target.value); setPagina(1); }} placeholder="Texto en el motivo…" style={estiloCampo} />
+          </div>
+        </BarraFiltros>
+        {(pedidoA || productoA) && (
+          <div role="note" style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '17px' }}>
+            {aviso || 'Buscar por pedido o producto revisa como máximo 31 días.'}
+          </div>
+        )}
 
         {/* Filtros en combo: tipo, módulo, resultado y fecha */}
         <BarraFiltros>
@@ -430,9 +529,19 @@ function AccionesAuditoria() {
           <FiltroCombo
             etiqueta="Módulo"
             valor={filtroModulo}
-            opciones={OPCIONES_MODULOS.map((m) => ({ valor: m.id, etiqueta: m.n }))}
+            opciones={[{ valor: '', etiqueta: 'Todos' }, ...opciones.modulos.map((m) => ({ valor: m, etiqueta: m }))]}
             alCambiar={(v) => {
               setFiltroModulo(v);
+              setPagina(1);
+            }}
+          />
+
+          <FiltroCombo
+            etiqueta="Acción"
+            valor={filtroAccion}
+            opciones={[{ valor: '', etiqueta: 'Todas' }, ...opciones.acciones.map((a) => ({ valor: a, etiqueta: a }))]}
+            alCambiar={(v) => {
+              setFiltroAccion(v);
               setPagina(1);
             }}
           />
@@ -461,6 +570,7 @@ function AccionesAuditoria() {
               { valor: 'hoy', etiqueta: 'Hoy' },
               { valor: 'ayer', etiqueta: 'Ayer' },
               { valor: '7', etiqueta: 'Últimos 7 días' },
+              { valor: 'mes', etiqueta: 'Este mes' },
             ]}
             alCambiar={(v) => {
               setFiltroFecha(v);
