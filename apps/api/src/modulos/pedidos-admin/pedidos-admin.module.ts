@@ -33,6 +33,7 @@ import { PedidoExtraService } from './pedido-extra.service';
 import { CorregirClienteService } from './corregir-cliente.service';
 import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { LineaTiempoService } from './linea-tiempo.service';
+import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
@@ -43,6 +44,7 @@ import { PedidoExtraController } from './pedido-extra.controller';
     // Sin estado: se usa para despejar las comandas al forzar un pedido (importar CocinaModule arrastraría sus controladores)
     ComandasService,
     LineaTiempoService,
+    HistorialCajaPedidoService,
     UbicarPedidoService,
     CorregirClienteService,
     ReabrirPedidoService,

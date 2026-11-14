@@ -35,6 +35,7 @@ import { ImpresionService } from '../impresion/impresion.service';
 import { ReimprimirDto, ReimprimirPedidoDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
 import { LineaTiempoService } from './linea-tiempo.service';
+import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
 import { DevolucionPedidoService } from './devolucion-pedido.service';
@@ -55,6 +56,7 @@ export class PedidosAdminController {
     @Optional() private readonly devolucionPedido?: DevolucionPedidoService,
     @Optional() private readonly ajustarPagoService?: AjustarPagoService,
     @Optional() private readonly lineaTiempoService?: LineaTiempoService,
+    @Optional() private readonly historialCajaService?: HistorialCajaPedidoService,
   ) {}
 
   @Post()
@@ -129,6 +131,13 @@ export class PedidosAdminController {
   @Permiso('pedidos', 'ver')
   async lineaTiempo(@Param('id') id: string, @Req() req: any) {
     return this.lineaTiempoService!.obtener(id, req.usuario);
+  }
+
+  /** Historial completo del pedido para Caja (quién hizo qué y cuándo): solo ADMIN y SUPERVISOR. Antes de GET ':id'. */
+  @Get(':id/historial-caja')
+  @Permiso('caja', 'auditoria_pedido')
+  async historialCaja(@Param('id') id: string) {
+    return this.historialCajaService!.obtener(id);
   }
 
   @Get(':id')
