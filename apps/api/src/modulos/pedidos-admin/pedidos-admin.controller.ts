@@ -183,9 +183,9 @@ export class PedidosAdminController {
 
   @Post(':id/plan-pago')
   @Permiso('pedidos', 'crear')
-  async guardarPlanPago(@Param('id') id: string, @Body('plan') plan: unknown, @Req() req: any) {
+  async guardarPlanPago(@Param('id') id: string, @Body('plan') plan: unknown, @Body('confirmaSinDescuento') confirmaSinDescuento: unknown, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.vouchersService?.guardarPlanMozo(id, plan, req.usuario, ip);
+    return this.vouchersService?.guardarPlanMozo(id, plan, req.usuario, ip, confirmaSinDescuento === true);
   }
 
   @Post(':id/pago')

@@ -48,12 +48,14 @@ Ver tambien: [[cocina]]
 
 ## Como se hace: Armar una promocion "Llevas mas, pagas menos" (2x1, 3x2)
 1. En Promociones pulsa + Armar oferta y elige Llevas mas, pagas menos.
-2. Elige los productos, la cantidad que lleva y paga, donde aplica (Carta web, En el local y WhatsApp (bot)), los dias y la vigencia.
+2. Elige los productos, la cantidad que lleva y paga, donde aplica (Carta web, Caja, Mozo y WhatsApp (bot)), los dias y la vigencia.
 3. Pulsa guardar y confirma con "Si, continuar".
 Antes: [[productos]]
 
 ## Como se hace: Elegir donde aplica una oferta (carta web, local y WhatsApp)
-1. En el editor de cada oferta (combo, 2x1, descuento, envio gratis) busca "¿Dónde aplica?" y marca las casillas: "Carta web", "En el local (caja y mozo)" y "WhatsApp (bot)". Hay que dejar al menos una marcada.
+1. En el editor de cada oferta (combo, 2x1, descuento, envio gratis) busca "¿Dónde aplica?" y marca las casillas: "Carta web", "Caja", "Mozo" y "WhatsApp (bot)". Caja y Mozo son lugares distintos: una oferta puede valer en uno y no en el otro. Hay que dejar al menos una marcada.
+- Solo en Descuento y Lleva y paga: en "¿Con qué medio de pago vale?" marca Yape, Plin, Efectivo, etc. si quieres una promo como "10 % pagando con Yape". Sin ninguna marcada vale con cualquier medio. Con pago dividido (2 o 3 medios) la promo solo aplica si TODOS los medios del pedido están en la lista. Si el medio de la promo está apagado en un lugar (Configuración, Pagos), la promo no se ofrece ahí.
+- Si el cliente pidió con el medio de la promo pero al final Caja o el mozo cobran con otro, el descuento se quita y el total sube: Caja y el mozo ven "Sin descuento (nombre de la promo): total S/ X" antes de confirmar y no se cobra hasta que lo vean. La carta y el bot muestran la condición ("10 % pagando con Yape") y la carta recalcula el total al elegir el medio.
 2. El texto de ayuda debajo cambia segun lo marcado: dice en que canales aplica y, si WhatsApp esta apagado, que el bot no la aplica ni la ofrece.
 3. Con WhatsApp marcado: el descuento y el 2x1 se aplican al total del pedido del bot y salen en su resumen; el envio gratis deja el delivery en S/ 0 dentro del horario, dias, fechas, compra minima y limite de pedidos, y el resumen dice "Envio gratis por «nombre»" (si aun no hay ubicacion tambien queda gratis al ubicar el pedido; si falta compra minima el bot avisa cuanto falta); el combo se ofrece en las promociones del bot con su precio por tamano y se vende alli mismo (ver "Vender combos por WhatsApp"). Ese texto del resumen se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
 4. Una oferta nueva viene con carta y local marcados; WhatsApp viene marcado en descuento, 2x1, envio gratis y combos (el cupon no lo lleva). Las ofertas que ya existian conservan lo que tenian.
@@ -62,7 +64,7 @@ Antes: [[productos]]
 7. Los cambios de canal quedan en la auditoria como "cambiar_canales". El servidor no aplica desde el bot una oferta con WhatsApp apagado, aunque llegue su numero.
 
 ## Como se hace: Vender combos por WhatsApp
-1. Abre el combo (Promociones, Combos), busca "¿Dónde aplica?" y marca "WhatsApp (bot)". Un combo nuevo ya viene con carta, local y WhatsApp marcados; si lo quieres solo en la carta o solo en el local, desmarca los otros. Un combo solo para WhatsApp no sale en la carta web ni en caja y mozo, y uno de solo carta o solo local nunca se ofrece ni se vende por el bot. Los combos que ya existian conservan lo que tenian: activa WhatsApp a mano en cada uno.
+1. Abre el combo (Promociones, Combos), busca "¿Dónde aplica?" y marca "WhatsApp (bot)". Un combo nuevo ya viene con carta, Caja, mozo y WhatsApp marcados; si lo quieres solo en la carta o solo en el local, desmarca los otros. Un combo solo para WhatsApp no sale en la carta web ni en caja y mozo, y uno de solo carta o solo local nunca se ofrece ni se vende por el bot. Los combos que ya existian conservan lo que tenian: activa WhatsApp a mano en cada uno.
 2. El cliente ve el combo en las promociones del bot (con el precio de cada tamaño) y en la lista de su categoria. Al elegirlo, el bot dice que incluye y le pregunta tamaño, las opciones del combo (bebidas, complemento, sabores) y, si el combo tiene partes con lista de productos (por ejemplo los juguetes de la Cajita), le pide cada eleccion una por una: 1 de 2, 2 de 2. Las opciones agotadas no se muestran.
 3. Si una parte fija se agoto y el combo tiene plan B, el bot avisa "Hoy no hay Club Sandwich, ¿lo cambiamos por Empanada o Croissant?" con las alternativas; el precio del combo no cambia. El texto se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
 4. Antes de agregarlo, el bot muestra el resumen con el total y pregunta si lo agrega o quiere cambiar. En cualquier momento el cliente puede escribir "atras" para corregir o "cancelar". Despues sigue el flujo normal de entrega y pago.

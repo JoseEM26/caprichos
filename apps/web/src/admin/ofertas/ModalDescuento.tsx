@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, errorModalidades, estadoDesdeOferta, modalidadesDesdeEstado } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, errorModalidades, estadoDesdeOferta, modalidadesDesdeEstado, mediosPagoDesdeEstado } from './canalesPromo';
 import { useState, useEffect, useMemo } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -395,7 +395,7 @@ export function ModalDescuento({
     if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
-    if (!canales.carta && !canales.local && !canales.bot && !soloPrimeraCompra) return ERROR_SIN_CANALES;
+    if (!canales.carta && !canales.caja && !canales.mozo && !canales.bot && !soloPrimeraCompra) return ERROR_SIN_CANALES;
     { const errMod = soloPrimeraCompra ? null : errorModalidades('DESCUENTO', canales); if (errMod) return errMod; }
     return null;
   };
@@ -432,7 +432,7 @@ export function ModalDescuento({
 
   const ejecutarGuardar = async () => {
     setConfirmarGuardar(false);
-    if (!canales.carta && !canales.local && !canales.bot && !soloPrimeraCompra) {
+    if (!canales.carta && !canales.caja && !canales.mozo && !canales.bot && !soloPrimeraCompra) {
       setMensajeError(ERROR_SIN_CANALES);
       return;
     }
@@ -475,6 +475,7 @@ export function ModalDescuento({
         // La primera compra solo se canjea en la carta web
         canales: soloPrimeraCompra ? ['CARTA'] : canalesDesdeEstado(canales),
         modalidades: soloPrimeraCompra ? [] : modalidadesDesdeEstado(canales.modalidades),
+        mediosPago: soloPrimeraCompra ? [] : mediosPagoDesdeEstado(canales),
         mostrarEnSaludoBot: mostrarEnSaludo,
         soloPrimeraCompra,
         imagenArchivoId: fotoArchivoId,
@@ -511,6 +512,7 @@ export function ModalDescuento({
     fechaHasta: fechaHasta || null,
     canales: canalesDesdeEstado(canales),
     modalidades: modalidadesDesdeEstado(canales.modalidades),
+    mediosPago: mediosPagoDesdeEstado(canales),
     activo: true,
   };
 

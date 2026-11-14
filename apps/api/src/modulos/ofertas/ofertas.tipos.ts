@@ -94,6 +94,8 @@ export interface OfertaItem {
   fechaDesde: string | null;
   fechaHasta: string | null;
   canales: string[];
+  /** Medios de pago con los que vale (promo por medio). Vacío = cualquier medio. */
+  mediosPago: string[];
   /** Tipos de pedido donde vale (COMER_LOCAL, LLEVAR, RECOGER, DELIVERY). Vacío = todos. */
   modalidades: string[];
   limiteUsos: number | null;

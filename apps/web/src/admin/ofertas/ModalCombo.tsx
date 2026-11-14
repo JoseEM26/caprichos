@@ -313,7 +313,7 @@ export function ModalCombo({
     if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
-    if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    if (!canales.carta && !canales.caja && !canales.mozo && !canales.bot) return ERROR_SIN_CANALES;
     { const errMod = errorModalidades('COMBO', canales); if (errMod) return errMod; }
     return null;
   };
@@ -345,7 +345,7 @@ export function ModalCombo({
 
   const ejecutarGuardar = async () => {
     setConfirmarGuardar(false);
-    if (!canales.carta && !canales.local && !canales.bot) {
+    if (!canales.carta && !canales.caja && !canales.mozo && !canales.bot) {
       setMensajeError(ERROR_SIN_CANALES);
       return;
     }

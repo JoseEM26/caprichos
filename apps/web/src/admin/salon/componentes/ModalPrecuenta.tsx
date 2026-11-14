@@ -5,6 +5,7 @@ import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { impresionApi, type ResultadoReimpresionPedido } from '../../impresion/impresionApi';
+import { pedidosApi, type QuitaPromoMedio } from '../../pedidos/pedidosApi';
 import { vouchersApi, type EnvioCajaExtra } from '../../vouchers/vouchersApi';
 import type { PlanPagoItem } from '../../pedidos/planPago';
 import {
@@ -152,7 +153,7 @@ export function ModalPrecuenta({
   alCerrar,
   mesa,
   lineas,
-  total,
+  total: totalProp,
   subtotal,
   descuento = 0,
   descuentos,
@@ -169,6 +170,9 @@ export function ModalPrecuenta({
   comprobantePedido,
   alCambiarMesa,
 }: ModalPrecuentaProps) {
+  // Promo por medio de pago: si el mozo elige otro medio, el descuento se quita y el total sube (lo ve antes de enviar)
+  const [quita, setQuita] = useState<QuitaPromoMedio | null>(null);
+  const total = Math.round((totalProp + (quita?.descuento ?? 0)) * 100) / 100;
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [copiasLocales, setCopiasLocales] = useState(copias);
@@ -215,6 +219,23 @@ export function ModalPrecuenta({
 
   const planConMonto = (plan ?? []).filter((f) => Number(f.monto) > 0);
   const filasVigentes = ajustarPlan(total, filas);
+  const mediosKey = filasVigentes.map((f) => f.medio).join(',');
+  useEffect(() => {
+    if (pedidoId === undefined || !(descuento > 0 || (descuentos?.length ?? 0) > 0)) return;
+    let vigente = true;
+    (async () => {
+      try {
+        const r = await pedidosApi.promoPorMedio(pedidoId, mediosKey.split(','));
+        if (vigente) setQuita(r?.quita ?? null);
+      } catch {
+        /* sin vista previa: el servidor igual pide confirmar */
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediosKey, pedidoId]);
   const planEnvio = aPlan(filasVigentes);
   const errorPlanEnvio = total > 0 ? errorPlan(total, filasVigentes) : 'El pedido no tiene total';
   const planListo = errorPlanEnvio === null;
@@ -245,7 +266,7 @@ export function ModalPrecuenta({
   const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
   // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
   const guardarPlan = async () => {
-    if (pedidoId !== undefined) await vouchersApi.guardarPlanPago(pedidoId, planEnvio as PlanPagoItem[]);
+    if (pedidoId !== undefined) await vouchersApi.guardarPlanPago(pedidoId, planEnvio as PlanPagoItem[], quita !== null);
   };
   const desgloseEnvio = planEnvio.map((f) => `${nombreMedio(f.medio)} S/ ${f.monto.toFixed(2)}`).join(' · ');
 
@@ -280,6 +301,7 @@ export function ModalPrecuenta({
       ...(efectivoPlan > 0 ? { recibido: pagaConNum } : {}),
       comprobante: aPayloadComprobante(valorComp),
       ...(sinCapturaValida ? { confirmaSinCaptura: true } : {}),
+      ...(quita ? { confirmaSinDescuento: true } : {}),
     };
     try {
       setEnviando(true);
@@ -365,6 +387,11 @@ export function ModalPrecuenta({
                     </div>
                   )}
                 </>
+              )}
+              {quita && (
+                <div role="alert" data-testid="aviso-sin-descuento" className="pc-fila" style={{ fontWeight: 700, color: '#92400E' }}>
+                  Sin descuento {quita.nombre}: total {soles(total)}
+                </div>
               )}
               <div className="pc-total">
                 <span>TOTAL</span>

@@ -60,7 +60,7 @@ describe('Modales de Ofertas: pestañas', () => {
     await waitFor(() => expect(onGuardar).toHaveBeenCalledTimes(1));
     expect(onGuardar.mock.calls[0][0]).toMatchObject({
       nombre: 'Happy hour', tipo: 'DESCUENTO', aplicaA: 'TODA_LA_CARTA', descuentoTipo: 'PORCENTAJE', descuentoValor: 15,
-      compraMinima: 30, canales: ['CARTA', 'ADMIN', 'BOT'], soloPrimeraCompra: false, mostrarEnSaludoBot: false,
+      compraMinima: 30, canales: ['CARTA', 'CAJA', 'MOZO', 'BOT'], soloPrimeraCompra: false, mostrarEnSaludoBot: false,
     });
   });
 

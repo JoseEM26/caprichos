@@ -12,6 +12,7 @@ import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import type { QuitaPromoMedio } from './pedidosApi';
 import { useMediosEncendidos } from './mediosCanal';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 
@@ -53,7 +54,10 @@ export function ModalCobrar({
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
   const propinaPedido = Number(pedido.propina) || 0;
-  const totalPedido = montoPorCobrar(pedido) + propinaPedido;
+  const totalBase = montoPorCobrar(pedido) + propinaPedido;
+  // Promo por medio de pago: si se cobra con otro medio, el descuento se quita y el total sube (se ve antes de cobrar)
+  const [quita, setQuita] = useState<QuitaPromoMedio | null>(null);
+  const totalPedido = Math.round((totalBase + (quita?.descuento ?? 0)) * 100) / 100;
 
   // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
   const [pagos, setPagos] = useState<FilaPago[]>(() =>
@@ -73,6 +77,29 @@ export function ModalCobrar({
   );
 
   const [errorMensaje, setErrorMensaje] = useState<string>('');
+
+  const mediosKey = pagos.map((p) => p.medio.toUpperCase()).join(',');
+  useEffect(() => {
+    if (!(Number(pedido.descuento) > 0)) return;
+    let vigente = true;
+    (async () => {
+      try {
+        const r = await pedidosApi.promoPorMedio(pedido.id, mediosKey.split(','));
+        if (vigente) setQuita(r?.quita ?? null);
+      } catch {
+        /* sin vista previa: el servidor igual pide confirmar si se quita el descuento */
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediosKey, pedido.id]);
+  // Con un solo medio el monto sigue al total (sin el descuento quitado, o con él de vuelta)
+  useEffect(() => {
+    setPagos((prev) => (prev.length === 1 && prev[0].monto !== totalPedido.toFixed(2) ? [{ ...prev[0], monto: totalPedido.toFixed(2) }] : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPedido]);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
 
@@ -239,6 +266,7 @@ export function ModalCobrar({
         pedidoId: pedido.id,
         pagos: itemsDto,
         ...comprobante,
+        ...(quita ? { confirmaSinDescuento: true } : {}),
       });
       alCobrarExitoso();
     } catch (err: any) {
@@ -700,6 +728,15 @@ export function ModalCobrar({
           />
         )}
 
+        {quita && (
+          <div role="alert" data-testid="aviso-sin-descuento" style={{ background: '#FEF3C7', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '10px 12px', fontSize: 14, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+            Sin descuento {quita.nombre}: total S/ {totalPedido.toFixed(2)}
+            <div style={{ fontWeight: 500, fontSize: 12.5, marginTop: 2 }}>
+              El descuento era solo con otro medio de pago. Antes pagaba S/ {(totalPedido - quita.descuento).toFixed(2)}.
+            </div>
+          </div>
+        )}
+
         {/* Acciones */}
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <Boton
@@ -739,7 +776,7 @@ export function ModalCobrar({
         <Confirmar
           abierto={mostrarConfirmar}
           titulo={`Registrar el cobro de ${pedido.codigo}`}
-          mensaje={`Queda cobrado por S/ ${totalPedido.toFixed(2)} con ${pagos
+          mensaje={`${quita ? `Sin descuento ${quita.nombre}. ` : ''}Queda cobrado por S/ ${totalPedido.toFixed(2)} con ${pagos
             .map((p) => `${p.medio} S/ ${parseFloat(p.monto).toFixed(2)}`)
             .join(' + ')}.`}
           textoSi="Cobrar"

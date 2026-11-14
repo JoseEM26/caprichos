@@ -288,7 +288,9 @@ export function FormularioCheckout({
   const tieneSesion = Boolean(clienteCuenta);
   const detalleEquipo = promos.detalles.find((d) => d.tipo === 'PERSONAL');
   const pctEquipo = detalleEquipo?.nombre.match(/\((\d+(?:[.,]\d+)?) %\)/)?.[1];
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad]);
+  // Promos por medio de pago («10 % pagando con Yape»): el total se recalcula al elegir el medio (o los dos del pago dividido)
+  const mediosPromo = dividirPago && medio2 ? [metodoPago, medio2] : [metodoPago];
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad, mediosPromo]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
@@ -298,6 +300,7 @@ export function FormularioCheckout({
         cuponCodigo: cuponAplicado?.codigo,
         // Las promociones valen según el tipo de pedido: al cambiarlo se recalcula sin perder el carrito
         modalidad,
+        medios: mediosPromo,
       })
       .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
       .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));

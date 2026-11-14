@@ -105,27 +105,58 @@ export function formatearFecha(val: Date | string | null | undefined): string | 
   return m ? m[1] : str;
 }
 
-/** Canal de oferta que le toca a un pedido o consulta: carta web, local (caja, mozo, personal) o bot de WhatsApp. */
-export type CanalOferta = 'CARTA' | 'ADMIN' | 'BOT';
+/**
+ * Canal de oferta que le toca a un pedido o consulta: carta web, Caja, mozo o bot de WhatsApp.
+ * ADMIN (caja y mozo juntos) es el valor histórico: al leer cuenta como CAJA y MOZO.
+ */
+export type CanalOferta = 'CARTA' | 'CAJA' | 'MOZO' | 'BOT';
 
 export function canalOferta(canal: string): CanalOferta {
   const c = (canal ?? '').toUpperCase();
   if (c === 'CARTA' || c === 'WEB') return 'CARTA';
   if (c === 'WHATSAPP' || c === 'BOT') return 'BOT';
-  return 'ADMIN';
+  if (c === 'MOZO') return 'MOZO';
+  return 'CAJA';
 }
 
 /**
  * ¿Los canales guardados de una oferta (o cupón) incluyen este canal? Acepta los valores históricos:
- * CAJA/MOZO/LOCAL = ADMIN, WEB = CARTA, WHATSAPP = BOT. Vacío vale en carta y local, nunca en el bot.
+ * ADMIN/LOCAL = CAJA y MOZO, WEB = CARTA, WHATSAPP = BOT. Vacío vale en carta, Caja y mozo, nunca en el bot.
  */
 export function ofertaIncluyeCanal(canales: string[] | null | undefined, canal: CanalOferta): boolean {
   const norm = (canales ?? []).map((c) => c.toUpperCase());
   if (norm.length === 0) return canal !== 'BOT';
   if (canal === 'BOT') return norm.includes('BOT') || norm.includes('WHATSAPP');
   if (norm.includes('TODOS')) return true;
-  const alias = canal === 'CARTA' ? ['CARTA', 'WEB'] : ['ADMIN', 'CAJA', 'MOZO', 'LOCAL'];
+  const alias = canal === 'CARTA' ? ['CARTA', 'WEB'] : canal === 'CAJA' ? ['CAJA', 'ADMIN', 'LOCAL'] : ['MOZO', 'ADMIN', 'LOCAL'];
   return norm.some((c) => alias.includes(c));
+}
+
+/** ¿Vale en el local (Caja o mozo)? Para listas que no distinguen entre los dos. */
+export function ofertaIncluyeLocal(canales: string[] | null | undefined): boolean {
+  return ofertaIncluyeCanal(canales, 'CAJA') || ofertaIncluyeCanal(canales, 'MOZO');
+}
+
+/** Medios de pago de las promociones por medio (EFECTIVO, YAPE, PLIN, TARJETA, TRANSFERENCIA, PAGO_EN_LINEA). */
+export const MEDIOS_OFERTA = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'PAGO_EN_LINEA'] as const;
+
+/**
+ * Condición de medio de pago de una oferta. `medios_pago` vacío = cualquier medio.
+ * - `medios` sin definir: no se filtra (listas y vistas que aún no conocen el medio).
+ * - `medios` definido: el pedido solo califica si TODOS sus medios (pago dividido) están en la lista; sin medios no califica.
+ * - `mediosActivos` (los encendidos del canal): la promo cuyo medio está apagado en ese canal no se ofrece ahí.
+ */
+export function ofertaIncluyeMedios(
+  mediosPago: string[] | null | undefined,
+  medios?: string[] | null,
+  mediosActivos?: string[] | null,
+): boolean {
+  const cond = (mediosPago ?? []).map((m) => m.toUpperCase());
+  if (cond.length === 0) return true;
+  if (mediosActivos && !cond.some((m) => mediosActivos.includes(m))) return false;
+  if (!medios) return true;
+  const usados = medios.map((m) => String(m).toUpperCase());
+  return usados.length > 0 && usados.every((m) => cond.includes(m));
 }
 
 /** Tipo de pedido al que puede limitarse una oferta (vacío = todos). Un pedido RECOGER/LLEVAR cuenta como «llevar». */
@@ -154,7 +185,7 @@ export function ofertaIncluyeModalidad(modalidades: string[] | null | undefined,
 /** Alta de oferta nueva: carta y local siempre; WhatsApp en los tipos que el bot aplica o arma (combos incluidos; cupones no). */
 export const TIPOS_OFERTA_BOT_APLICA = ['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS', 'COMBO'] as const;
 export function canalesPorDefecto(tipo: string): string[] {
-  return (TIPOS_OFERTA_BOT_APLICA as readonly string[]).includes(tipo) ? ['CARTA', 'ADMIN', 'BOT'] : ['CARTA', 'ADMIN'];
+  return (TIPOS_OFERTA_BOT_APLICA as readonly string[]).includes(tipo) ? ['CARTA', 'CAJA', 'MOZO', 'BOT'] : ['CARTA', 'CAJA', 'MOZO'];
 }
 
 /**
@@ -175,6 +206,7 @@ export function estaVigente(
     fecha_hasta?: Date | string | null;
     canales?: string[] | null;
     modalidades?: string[] | null;
+    medios_pago?: string[] | null;
     limite_usos?: number | null;
     usos_actuales?: number | null;
   },
@@ -241,9 +273,9 @@ export function estaVigente(
 /** UNA sola función de aplicabilidad: activa, usos, canal, modalidad, días, horas y fechas. */
 export function ofertaAplicaA(
   oferta: Parameters<typeof estaVigente>[0],
-  ctx: { canal?: string; modalidad?: string | null; fecha?: Date } = {},
+  ctx: { canal?: string; modalidad?: string | null; fecha?: Date; medios?: string[] | null; mediosActivos?: string[] | null } = {},
 ): boolean {
-  return estaVigente(oferta, ctx.canal, ctx.fecha, ctx.modalidad);
+  return estaVigente(oferta, ctx.canal, ctx.fecha, ctx.modalidad) && ofertaIncluyeMedios(oferta.medios_pago, ctx.medios, ctx.mediosActivos);
 }
 
 /**

@@ -11,6 +11,8 @@ export interface EnvioCajaExtra {
   recibido?: number;
   /** Casilla única «ya hablé con el cliente y pagó» (sin captura) */
   confirmaSinCaptura?: boolean;
+  /** El mozo vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma enviar así. */
+  confirmaSinDescuento?: boolean;
   comprobante?: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string };
 }
 
@@ -66,8 +68,8 @@ export const vouchersApi = {
     api.post(`/admin/vouchers/${id}/quitar`, motivo ? { motivo } : {}),
 
   /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
-  guardarPlanPago: (pedidoId: string | number, plan: PlanPagoItem[]) =>
-    api.post(`/admin/pedidos/${pedidoId}/plan-pago`, { plan }),
+  guardarPlanPago: (pedidoId: string | number, plan: PlanPagoItem[], confirmaSinDescuento?: boolean) =>
+    api.post(`/admin/pedidos/${pedidoId}/plan-pago`, { plan, ...(confirmaSinDescuento ? { confirmaSinDescuento: true } : {}) }),
 
   /**
    * Sube una foto de voucher para análisis con IA (POST /admin/vouchers).
@@ -149,6 +151,7 @@ export const vouchersApi = {
       ...(extra?.recibido !== undefined ? { recibido: extra.recibido } : {}),
       ...(extra?.comprobante ? { comprobante: extra.comprobante } : {}),
       ...(extra?.confirmaSinCaptura ? { confirmaSinCaptura: true } : {}),
+      ...(extra?.confirmaSinDescuento ? { confirmaSinDescuento: true } : {}),
     });
   },
 

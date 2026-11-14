@@ -5,39 +5,42 @@ import { ModalDescuento } from '../ModalDescuento';
 import { ModalEnvioGratis } from '../ModalEnvioGratis';
 import { ModalCupon } from '../ModalCupon';
 
-describe('canales de las ofertas (tres casillas: carta, local, WhatsApp)', () => {
-  it('guarda CARTA, ADMIN y BOT según las casillas', () => {
-    expect(canalesDesdeEstado({ carta: true, local: true, bot: false })).toEqual(['CARTA', 'ADMIN']);
-    expect(canalesDesdeEstado({ carta: true, local: true, bot: true })).toEqual(['CARTA', 'ADMIN', 'BOT']);
-    expect(canalesDesdeEstado({ carta: false, local: false, bot: true })).toEqual(['BOT']);
-    expect(canalesDesdeEstado({ carta: true, local: true, bot: false }, 'CAJA')).toEqual(['CARTA', 'CAJA']);
+describe('canales de las ofertas (cuatro casillas: carta, Caja, Mozo, WhatsApp)', () => {
+  it('guarda CARTA, CAJA, MOZO y BOT según las casillas', () => {
+    expect(canalesDesdeEstado({ carta: true, caja: true, mozo: true, bot: false })).toEqual(['CARTA', 'CAJA', 'MOZO']);
+    expect(canalesDesdeEstado({ carta: true, caja: true, mozo: true, bot: true })).toEqual(['CARTA', 'CAJA', 'MOZO', 'BOT']);
+    expect(canalesDesdeEstado({ carta: false, caja: false, mozo: false, bot: true })).toEqual(['BOT']);
+    expect(canalesDesdeEstado({ carta: false, caja: true, mozo: false, bot: false })).toEqual(['CAJA']);
+    expect(canalesDesdeEstado({ carta: false, caja: false, mozo: true, bot: false })).toEqual(['MOZO']);
   });
 
-  it('lee el estado real guardado, incluidos TODOS, WHATSAPP y CAJA de datos viejos', () => {
-    expect(estadoDesdeCanales(['CARTA', 'ADMIN'])).toEqual({ carta: true, local: true, bot: false });
-    expect(estadoDesdeCanales(['CARTA', 'ADMIN', 'BOT'])).toEqual({ carta: true, local: true, bot: true });
-    expect(estadoDesdeCanales(['CARTA'])).toEqual({ carta: true, local: false, bot: false });
-    expect(estadoDesdeCanales(['WHATSAPP'])).toEqual({ carta: false, local: false, bot: true });
-    expect(estadoDesdeCanales(['TODOS'])).toEqual({ carta: true, local: true, bot: false });
-    expect(estadoDesdeCanales(['CARTA', 'CAJA'])).toEqual({ carta: true, local: true, bot: false });
+  it('lee el estado real guardado, incluidos ADMIN (caja y mozo juntos), TODOS y WHATSAPP de datos viejos', () => {
+    expect(estadoDesdeCanales(['CARTA', 'ADMIN'])).toEqual({ carta: true, caja: true, mozo: true, bot: false });
+    expect(estadoDesdeCanales(['CARTA', 'ADMIN', 'BOT'])).toEqual({ carta: true, caja: true, mozo: true, bot: true });
+    expect(estadoDesdeCanales(['CARTA'])).toEqual({ carta: true, caja: false, mozo: false, bot: false });
+    expect(estadoDesdeCanales(['WHATSAPP'])).toEqual({ carta: false, caja: false, mozo: false, bot: true });
+    expect(estadoDesdeCanales(['TODOS'])).toEqual({ carta: true, caja: true, mozo: true, bot: false });
+    expect(estadoDesdeCanales(['CARTA', 'CAJA'])).toEqual({ carta: true, caja: true, mozo: false, bot: false });
+    expect(estadoDesdeCanales(['MOZO'])).toEqual({ carta: false, caja: false, mozo: true, bot: false });
   });
 
   it('valores por defecto: WhatsApp encendido solo donde el bot ya aplica el tipo', () => {
-    expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual({ carta: true, local: true, bot: true });
+    expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual({ carta: true, caja: true, mozo: true, bot: true, medios: [] });
     expect(canalesPorDefecto('DESCUENTO').bot).toBe(true);
     expect(canalesPorDefecto('LLEVA_PAGA').bot).toBe(true);
-    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, local: true, bot: true });
+    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, caja: true, mozo: true, bot: true, medios: [] });
     expect(canalesPorDefecto('CUPON').bot).toBe(false);
   });
 
   it('el texto de ayuda cambia con el estado y nunca dice «no la aplica» cuando WhatsApp está encendido', () => {
-    const con = ayudaCanales('ENVIO_GRATIS', { carta: true, local: true, bot: true });
-    const sin = ayudaCanales('ENVIO_GRATIS', { carta: true, local: true, bot: false });
+    const t = { carta: true, caja: true, mozo: true };
+    const con = ayudaCanales('ENVIO_GRATIS', { ...t, bot: true });
+    const sin = ayudaCanales('ENVIO_GRATIS', { ...t, bot: false });
     expect(con).toMatch(/WhatsApp/);
     expect(con).not.toMatch(/no la aplica/);
     expect(sin).toMatch(/no la aplica ni la ofrece/);
-    expect(ayudaCanales('DESCUENTO', { carta: true, local: false, bot: false })).toMatch(/Aplica en la carta web\./);
-    expect(ayudaCanales('CUPON', { carta: true, local: true, bot: false })).toMatch(/no pide códigos/);
+    expect(ayudaCanales('DESCUENTO', { carta: true, caja: false, mozo: false, bot: false })).toMatch(/Aplica en la carta web\./);
+    expect(ayudaCanales('CUPON', { ...t, bot: false })).toMatch(/no pide códigos/);
   });
 });
 
@@ -53,7 +56,8 @@ async function irAlPasoDeCanales(props: Record<string, unknown>) {
   await waitFor(() => expect(document.getElementById('desc-canal-bot')).not.toBeNull());
   return {
     carta: document.getElementById('desc-canal-carta') as HTMLInputElement,
-    local: document.getElementById('desc-canal-local') as HTMLInputElement,
+    caja: document.getElementById('desc-canal-caja') as HTMLInputElement,
+    mozo: document.getElementById('desc-canal-mozo') as HTMLInputElement,
     bot: document.getElementById('desc-canal-bot') as HTMLInputElement,
   };
 }
@@ -61,7 +65,7 @@ async function irAlPasoDeCanales(props: Record<string, unknown>) {
 describe('ModalDescuento: ¿Dónde aplica?', () => {
   it('en alta: carta y local marcados y WhatsApp encendido (el bot ya aplica descuentos)', async () => {
     const c = await irAlPasoDeCanales({ descuentoAEditar: null });
-    expect([c.carta.checked, c.local.checked, c.bot.checked]).toEqual([true, true, true]);
+    expect([c.carta.checked, c.caja.checked, c.mozo.checked, c.bot.checked]).toEqual([true, true, true, true]);
   });
 
   it('al editar refleja el estado real: con BOT marcada, sin BOT desmarcada', async () => {
@@ -79,7 +83,7 @@ describe('ModalDescuento: ¿Dónde aplica?', () => {
 
   it('dato viejo «Solo WhatsApp»: solo WhatsApp marcado', async () => {
     const c = await irAlPasoDeCanales({ descuentoAEditar: { ...descuentoBase, canales: ['WHATSAPP'] } });
-    expect([c.carta.checked, c.local.checked, c.bot.checked]).toEqual([false, false, true]);
+    expect([c.carta.checked, c.caja.checked, c.mozo.checked, c.bot.checked]).toEqual([false, false, false, true]);
   });
 });
 
@@ -148,15 +152,15 @@ describe('ModalEnvioGratis: ¿Dónde aplica?', () => {
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Envío gratis' } });
     fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
-    for (const n of ['Carta web', 'En el local (caja y mozo)', 'WhatsApp (bot)']) fireEvent.click(screen.getByLabelText(n));
+    for (const n of ['Carta web', 'Caja', 'Mozo', 'WhatsApp (bot)']) fireEvent.click(screen.getByLabelText(n));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     expect(screen.getByRole('alert').textContent).toMatch(/al menos un lugar/);
     expect(onGuardar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText('En el local (caja y mozo)'));
+    fireEvent.click(screen.getByLabelText('Caja'));
     fireEvent.click(screen.getByLabelText('WhatsApp (bot)'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(onGuardar).toHaveBeenCalled());
-    expect(onGuardar.mock.calls[0][0].canales).toEqual(['ADMIN', 'BOT']);
+    expect(onGuardar.mock.calls[0][0].canales).toEqual(['CAJA', 'BOT']);
   });
 });
 
@@ -168,5 +172,23 @@ describe('ModalCupon: ¿Dónde aplica?', () => {
     expect(bot.checked).toBe(false);
     expect(bot.disabled).toBe(true);
     expect(within(screen.getByTestId('cupon-canal-canales')).getByTestId('cupon-canal-ayuda').textContent).toMatch(/no pide códigos/);
+  });
+});
+
+describe('promoción por medio de pago (panel de ofertas)', () => {
+  it('sin medios marcados vale con cualquiera; con Yape marcado lo guarda y explica que el descuento se quita con otro medio', async () => {
+    const onGuardar = vi.fn().mockResolvedValue(undefined);
+    await irAlPasoDeCanales({ onGuardar });
+    expect(screen.getByTestId('desc-canal-resumen-medios').textContent).toBe('Vale con cualquier medio de pago.');
+    fireEvent.click(document.getElementById('desc-canal-medio-YAPE')!);
+    expect(screen.getByTestId('desc-canal-resumen-medios').textContent).toMatch(/Solo si TODO el pedido se paga con Yape.*se quita/);
+    fireEvent.click(document.getElementById('desc-canal-medio-PLIN')!);
+    expect(screen.getByTestId('desc-canal-resumen-medios').textContent).toMatch(/Yape o Plin/);
+  });
+
+  it('una oferta guardada con medios_pago los muestra marcados al editar', async () => {
+    await irAlPasoDeCanales({ descuentoAEditar: { ...descuentoBase, mediosPago: ['YAPE'] } });
+    expect((document.getElementById('desc-canal-medio-YAPE') as HTMLInputElement).checked).toBe(true);
+    expect((document.getElementById('desc-canal-medio-EFECTIVO') as HTMLInputElement).checked).toBe(false);
   });
 });

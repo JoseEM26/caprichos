@@ -250,6 +250,12 @@ export class CrearOfertaDto {
   @IsArray()
   canales?: string[];
 
+  /** Medios de pago con los que vale (solo Descuento y Lleva y paga); vacío = cualquier medio */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'PAGO_EN_LINEA'], { each: true, message: 'Medio de pago no válido' })
+  mediosPago?: string[];
+
   /** Tipos de pedido donde vale; vacío = todos */
   @IsOptional()
   @IsArray()

@@ -911,6 +911,8 @@ export class PedidosService {
       })),
       canal: canalPedido,
       modalidad: dto.modalidad,
+      // Promos por medio de pago: valen solo si TODO el pedido se paga con medios de la promo
+      medios: dto.pago?.plan?.length ? dto.pago.plan.map((f) => f.medio) : dto.pago?.metodo ? [dto.pago.metodo] : [],
       cuponCodigo: dto.cuponCodigo,
       clientePartyId: clienteFinal,
       // Solo la carta con sesión iniciada (no WhatsApp, mozo ni celular suelto)

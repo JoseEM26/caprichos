@@ -60,6 +60,7 @@ import {
   estaVigente,
   ofertaIncluyeCanal,
   ofertaAplicaA,
+  ofertaIncluyeLocal,
   ofertaIncluyeModalidad,
   formatearFecha,
   formatearHora,
@@ -69,6 +70,8 @@ import {
   obtenerAhoraLima,
 } from './ofertas.util';
 import { urlPublicaCarta } from '../chatbot/servicios/carrusel.util';
+import { mediosPagoActivosCanal } from '@caprichos/compartido';
+import { leerMediosPagoCanal } from '../../comun/medios-pago-canal';
 import { canalOfertaParaEnvio, CAMPOS_BENEFICIO_ENVIO } from './envio-gratis-promo';
 
 /** Si la promoción (DESCUENTO o LLEVA_PAGA) alcanza a esta línea según su alcance: categoría, producto o toda la carta. */
@@ -229,14 +232,15 @@ export class OfertasService {
       },
     });
 
-    let items = ofertasDb.map((o) => this.mapearOferta(o, canal, modalidad));
+    const mediosEncendidos = canal ? mediosPagoActivosCanal(await leerMediosPagoCanal(this.prisma), canal) : undefined;
+    let items = ofertasDb.map((o) => this.mapearOferta(o, canal, modalidad, mediosEncendidos));
     // Con modalidad conocida (caja, mozo, carta ya elegida) solo salen las ofertas que valen para ella
     if (modalidad) items = items.filter((o) => ofertaIncluyeModalidad(o.modalidades, modalidad));
     // Bot de WhatsApp: solo lista lo que vale por WhatsApp (casilla «WhatsApp (bot)»); no ofrece lo que hoy no se puede armar
     const esBot = !!canal && canalOferta(canal) === 'BOT';
     if (esBot) items = items.filter((o) => ofertaIncluyeCanal(o.canales, 'BOT'));
     // Carta web y local comparten esta lista: un combo solo para WhatsApp no aparece en ninguna de las dos
-    if (paraCarta) items = items.filter((o) => o.tipo !== 'COMBO' || ofertaIncluyeCanal(o.canales, 'CARTA') || ofertaIncluyeCanal(o.canales, 'ADMIN'));
+    if (paraCarta) items = items.filter((o) => o.tipo !== 'COMBO' || ofertaIncluyeCanal(o.canales, 'CARTA') || ofertaIncluyeLocal(o.canales));
     items = await this.conDisponibilidad(items);
     // La carta pública solo sabe si está agotado, no por qué: el motivo es del panel del dueño
     if (paraCarta) for (const o of items) { delete o.motivoAgotado; delete o.piezasBloqueadas; }
@@ -365,6 +369,7 @@ export class OfertasService {
     const soloPrimeraCompra = dto.soloPrimeraCompra ?? false;
     this.validarPrimeraCompra({ tipo: tipoFinal, soloPrimeraCompra, fechaDesde: fechaDesdeDate, fechaHasta: fechaHastaDate });
     this.validarModalidadesEnvio(tipoFinal, dto.modalidades);
+    this.validarMediosPromo(tipoFinal, dto.mediosPago);
 
     const creada = await this.prisma.$transaction(async (tx) => {
       const oferta = await tx.oferta.create({
@@ -393,6 +398,7 @@ export class OfertasService {
           // Por defecto no vale por WhatsApp (casilla desmarcada); el envío gratis sí sale marcado
           canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? canalesPorDefecto(tipoFinal),
           modalidades: dto.modalidades ?? [],
+          medios_pago: dto.mediosPago ?? [],
           limite_usos: dto.limiteUsos ?? null,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           mostrar_en_saludo_bot: dto.mostrarEnSaludoBot ?? false,
@@ -619,6 +625,10 @@ export class OfertasService {
     }
     if (dto.canales !== undefined) data.canales = dto.canales ?? [];
     if (dto.modalidades !== undefined) data.modalidades = dto.modalidades ?? [];
+    if (dto.mediosPago !== undefined) {
+      this.validarMediosPromo(ofertaExistente.tipo, dto.mediosPago);
+      data.medios_pago = dto.mediosPago ?? [];
+    }
     this.validarModalidadesEnvio(ofertaExistente.tipo, (data.modalidades as string[] | undefined) ?? ofertaExistente.modalidades);
     if (dto.limiteUsos !== undefined) data.limite_usos = dto.limiteUsos;
     if (dto.noSumaBeneficios !== undefined) data.no_suma_beneficios = dto.noSumaBeneficios;
@@ -971,7 +981,7 @@ export class OfertasService {
         compra_minima: dto.compraMinima !== undefined && dto.compraMinima !== null ? new Prisma.Decimal(dto.compraMinima) : null,
         categoria_id: dto.categoriaId ? BigInt(dto.categoriaId) : null,
         producto_id: dto.productoId ? BigInt(dto.productoId) : null,
-        canales: dto.canales ?? ['CARTA', 'CAJA'],
+        canales: dto.canales ?? ['CARTA', 'CAJA', 'MOZO'],
         dias: dto.dias ?? [],
         hora_desde: horaCupon(dto.horaDesde),
         hora_hasta: horaCupon(dto.horaHasta),
@@ -1763,6 +1773,7 @@ export class OfertasService {
     canal: string = 'CARTA',
     modalidad?: string,
     colaboradorPartyId?: string,
+    medios?: string[] | null,
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean; descuentoPersonal?: { pct: number; monto: number }; totalDescuentos?: number }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1794,6 +1805,7 @@ export class OfertasService {
       modalidad,
       cuponCodigo: cuponCodigo || null,
       clientePartyId: clientePartyId || null,
+      medios,
       // igual que al crear el pedido: la primera compra solo cuenta con sesión en la carta
       clienteConSesion: canal === 'CARTA' && !!clientePartyId,
     });
@@ -1861,6 +1873,8 @@ export class OfertasService {
     clientePartyId?: bigint | string | number | null;
     /** true solo si el cliente tiene sesión iniciada en la carta (cuenta con celular verificado) */
     clienteConSesion?: boolean;
+    /** Medios con que se paga TODO el pedido (uno, o los del pago dividido). Sin ellos, las promos por medio no aplican. */
+    medios?: string[] | null;
   }): Promise<DesgloseDescuentosPedido> {
     const { subtotal, lineas, canal, clientePartyId, clienteConSesion } = params;
 
@@ -1887,7 +1901,13 @@ export class OfertasService {
       include: { categoria: true, producto: true },
     });
 
-    const descuentosVigentes = descuentosCandidatos.filter((d) => ofertaAplicaA(d, { canal, fecha: ahora, modalidad: params.modalidad }));
+    // Promos por medio de pago («10 % pagando con Yape»): solo con TODO el pedido en medios de la lista; sin medio elegido no aplican,
+    // y una promo cuyo medio está apagado en este canal no se ofrece
+    const medios = (params.medios ?? []).map((m) => String(m).trim().toUpperCase()).filter(Boolean);
+    const mediosEncendidos = mediosPagoActivosCanal(await leerMediosPagoCanal(this.prisma), canal);
+    const descuentosVigentes = descuentosCandidatos.filter((d) =>
+      ofertaAplicaA(d, { canal, fecha: ahora, modalidad: params.modalidad, medios, mediosActivos: mediosEncendidos }),
+    );
 
     // Primera compra: solo sobre líneas que no estén en otra promoción automática vigente (no se acumulan)
     const promosAutomaticas = descuentosVigentes.filter((d) => !d.solo_primera_compra);
@@ -2829,6 +2849,13 @@ export class OfertasService {
 
   /** Reglas de la promoción de primera compra: solo descuentos, solo carta web y como máximo un mes de vigencia. */
   /** El envío gratis solo existe en delivery: si se limita por modalidad, Delivery tiene que estar. */
+  /** La condición «pagando con…» solo existe en Descuento y Lleva y paga (las demás no la evalúan). */
+  private validarMediosPromo(tipo: string, medios?: string[] | null): void {
+    if (medios?.length && tipo !== 'DESCUENTO' && tipo !== 'LLEVA_PAGA') {
+      throw new BadRequestException({ codigo: 'MEDIOS_NO_APLICA', mensaje: 'Elegir medios de pago solo vale en Descuento y Lleva y paga' });
+    }
+  }
+
   private validarModalidadesEnvio(tipo: string, modalidades?: string[] | null): void {
     if (tipo === 'ENVIO_GRATIS' && modalidades?.length && !modalidades.includes('DELIVERY')) {
       throw new BadRequestException({ codigo: 'ENVIO_GRATIS_SIN_DELIVERY', mensaje: 'El envío gratis solo vale en delivery: marca Delivery' });
@@ -2905,7 +2932,7 @@ export class OfertasService {
     return { titulo: oferta.nombre, texto, enlaceCarta: origen.replace(/\/$/, '') };
   }
 
-  private mapearOferta(o: any, canal?: string, modalidad?: string): OfertaItem {
+  private mapearOferta(o: any, canal?: string, modalidad?: string, mediosActivos?: string[]): OfertaItem {
     return {
       id: o.id.toString(),
       tipo: o.tipo,
@@ -2925,6 +2952,7 @@ export class OfertasService {
       fechaDesde: formatearFecha(o.fecha_desde),
       fechaHasta: formatearFecha(o.fecha_hasta),
       canales: o.canales || [],
+      mediosPago: o.medios_pago || [],
       modalidades: o.modalidades || [],
       limiteUsos: o.limite_usos,
       usosActuales: o.usos_actuales,
@@ -2937,7 +2965,7 @@ export class OfertasService {
       creadoEn: o.creado_en.toISOString(),
       categoriaNombre: o.categoria?.nombre || null,
       productoNombre: o.producto?.nombre || null,
-      vigenteAhora: ofertaAplicaA(o, { canal, modalidad }),
+      vigenteAhora: ofertaAplicaA(o, { canal, modalidad, mediosActivos }),
       imagenArchivoId: o.imagen_archivo_id ? o.imagen_archivo_id.toString() : null,
       imagenUrl: o.imagen_archivo
         ? o.imagen_archivo.ruta.startsWith('http')

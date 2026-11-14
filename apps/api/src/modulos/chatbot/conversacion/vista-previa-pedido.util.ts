@@ -46,7 +46,7 @@ export async function vistaPreviaPedidoBot(
       precioUnitario: i.precioUnitario,
       noSumaBeneficios: i.noSumaBeneficios,
     }));
-    const desglose = await deps.ofertasService.calcularDescuentosParaPedido({ subtotal, lineas, canal: 'WHATSAPP', modalidad: pedido.modalidad });
+    const desglose = await deps.ofertasService.calcularDescuentosParaPedido({ subtotal, lineas, canal: 'WHATSAPP', modalidad: pedido.modalidad, medios: pedido.pago?.plan?.length ? pedido.pago.plan.map((f) => f.medio) : pedido.pago?.metodo ? [pedido.pago.metodo] : [] });
     descuento = desglose.descuentoTotal;
     descuentoNombre = desglose.detalles[0]?.nombre ?? null;
   }

@@ -1,4 +1,5 @@
 import { exigirMediosActivos } from '../../comun/medios-pago-canal';
+import { type QuitaPromoMedio, evaluarQuitaPromoMedio, errorPromoSeQuita, aplicarQuitaPromoMedio } from '../ofertas/promo-medio.util';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { PuntosService } from '../clientes/puntos.service';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
@@ -212,6 +213,7 @@ export class CobrosService {
     cajaId: bigint | null,
     enCierre: boolean,
   ) {
+    let quitaAplicada: QuitaPromoMedio | null = null;
     // La caja se bloquea antes de leer el pedido: dos cobros no pasan a la vez y no se cobra en una caja que se cierra
     const { cobro, pedidoActualizado, pedidoCodigo, pagoMetodo, sinVoucherAutorizado } = await this.prisma.$transaction(async (tx) => {
       const caja = cajaId ? await bloquearCaja(tx, cajaId) : null;
@@ -276,6 +278,16 @@ export class CobrosService {
           },
           HttpStatus.CONFLICT,
         );
+      }
+
+      // Promo por medio de pago: si se cobra con un medio que no es el de la promo, el descuento se quita y el total sube.
+      // Caja debe haberlo visto (confirmaSinDescuento); sin confirmar, no se cobra.
+      const quitaPromo = await evaluarQuitaPromoMedio(tx, pedido, dto.pagos.map((p) => p.medio));
+      if (quitaPromo) {
+        if (dto.confirmaSinDescuento !== true) throw errorPromoSeQuita(quitaPromo);
+        Object.assign(pedido, await aplicarQuitaPromoMedio(tx, pedido, quitaPromo));
+        pedido.planPago = [];
+        quitaAplicada = quitaPromo;
       }
 
       // Boleta o factura obligatoria (pedidos históricos sin ella: hay que elegirla antes de cobrar)
@@ -473,6 +485,21 @@ export class CobrosService {
     }
 
     // 8. Auditar
+    if (quitaAplicada) {
+      const q: QuitaPromoMedio = quitaAplicada;
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'caja',
+        accion: 'QUITAR_PROMO_POR_MEDIO',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: cobro.pedido_id,
+        antes: { promo: q.nombre, descuento: q.descuento, total: q.totalAnterior },
+        despues: { total: q.totalNuevo, medios: dto.pagos.map((p) => p.medio) },
+        partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+        ip,
+      });
+    }
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'caja',

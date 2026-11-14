@@ -1,3 +1,4 @@
+import { textoCondicionMedios } from '@caprichos/compartido';
 import { useMemo } from 'react';
 import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { CategoriaCarta, ProductoCarta } from './tipos';
@@ -102,6 +103,8 @@ export function TarjetaOferta({
   const sinPedir = agotado || noDisponible;
   // Restringida a un tipo de pedido: se dice cuál (el cliente elige comer aquí, recoger o delivery al pedir)
   const soloModalidad = etiquetaModalidades(oferta.modalidades);
+  // Promo por medio de pago: «pagando con Yape»
+  const condicionMedios = textoCondicionMedios(oferta.mediosPago);
 
   const cardDir = movil ? 'row' : 'column';
   const imgW = movil ? '100px' : '100%';
@@ -310,6 +313,14 @@ export function TarjetaOferta({
           >
             {textoBadge}
           </span>
+          {condicionMedios && (
+            <span
+              data-testid="etiqueta-medios-pago"
+              style={{ fontSize: '11px', fontWeight: 700, background: 'var(--cp-sand)', color: 'var(--cp-navy)', borderRadius: '9999px', padding: '2px 8px' }}
+            >
+              {condicionMedios}
+            </span>
+          )}
           {soloModalidad && (
             <span
               data-testid="etiqueta-modalidad"

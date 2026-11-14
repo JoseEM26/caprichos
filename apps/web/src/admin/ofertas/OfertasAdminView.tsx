@@ -244,8 +244,8 @@ function formatearHorarioOferta(o: {
       ? ` · ${fDesde ? `desde ${fDesde}` : ''}${fHasta ? ` hasta ${fHasta}` : ''}`
       : '';
 
-  const ce = estadoDesdeCanales(o.canales && o.canales.length > 0 ? o.canales : ['CARTA', 'ADMIN']);
-  const canalesTxt = [ce.carta && 'Carta web', ce.local && 'En el local', ce.bot && 'WhatsApp'].filter(Boolean).join(' + ') || 'Sin canal';
+  const ce = estadoDesdeCanales(o.canales && o.canales.length > 0 ? o.canales : ['CARTA', 'CAJA', 'MOZO']);
+  const canalesTxt = [ce.carta && 'Carta web', ce.caja && 'Caja', ce.mozo && 'Mozo', ce.bot && 'WhatsApp'].filter(Boolean).join(' + ') || 'Sin canal';
 
   return `${diasTxt} · ${horasTxt}${fechasTxt} · ${canalesTxt}`;
 }

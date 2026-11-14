@@ -152,7 +152,7 @@ export function TarjetaMediosPagoCanal({ esAdmin: esAdminProp }: { esAdmin?: boo
       {esAdmin ? (
         <div>
           <Boton variante="primario" onClick={() => setConfirmar(true)} disabled={!hayCambios || cajaSinMedios || guardando}>
-            Guardar medios de pago
+            Guardar medios por canal
           </Boton>
         </div>
       ) : (
@@ -161,7 +161,7 @@ export function TarjetaMediosPagoCanal({ esAdmin: esAdminProp }: { esAdmin?: boo
 
       <Confirmar
         abierto={confirmar}
-        titulo="Guardar medios de pago"
+        titulo="Guardar medios por canal"
         mensaje="Desde ahora los medios apagados no se mostrarán ni se aceptarán en ese canal. Lo ya cobrado no cambia. ¿Guardar?"
         textoSi="Sí, guardar"
         textoNo="No, cancelar"

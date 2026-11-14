@@ -33,12 +33,13 @@ const prismaCon = (ofertas: unknown[]) =>
 
 describe('canal de oferta: una sola regla para carta, local y bot', () => {
   it('normaliza el canal del pedido', () => {
-    expect(['CARTA', 'WEB', 'MOZO', 'CAJA', 'ADMIN', 'WHATSAPP', 'BOT'].map(canalOferta)).toEqual(['CARTA', 'CARTA', 'ADMIN', 'ADMIN', 'ADMIN', 'BOT', 'BOT']);
+    expect(['CARTA', 'WEB', 'MOZO', 'CAJA', 'ADMIN', 'WHATSAPP', 'BOT'].map(canalOferta)).toEqual(['CARTA', 'CARTA', 'MOZO', 'CAJA', 'CAJA', 'BOT', 'BOT']);
   });
 
   it('cada canal solo vale si su casilla está marcada (TODOS y vacío nunca incluyen el bot)', () => {
     expect(ofertaIncluyeCanal(['CARTA'], 'CARTA')).toBe(true);
-    expect(ofertaIncluyeCanal(['CARTA'], 'ADMIN')).toBe(false);
+    expect(ofertaIncluyeCanal(['CARTA'], 'CAJA')).toBe(false);
+    expect(ofertaIncluyeCanal(['CARTA'], 'MOZO')).toBe(false);
     expect(ofertaIncluyeCanal(['CARTA'], 'BOT')).toBe(false);
     expect(ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'BOT')).toBe(false);
     expect(ofertaIncluyeCanal(['TODOS'], 'BOT')).toBe(false);
@@ -49,29 +50,36 @@ describe('canal de oferta: una sola regla para carta, local y bot', () => {
 
   it('acepta valores históricos: WHATSAPP = BOT, CAJA/MOZO = local', () => {
     expect(ofertaIncluyeCanal(['WHATSAPP'], 'BOT')).toBe(true);
-    expect(ofertaIncluyeCanal(['CARTA', 'CAJA'], 'ADMIN')).toBe(true);
+    expect(ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'CAJA') && ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'MOZO')).toBe(true);
+    // CAJA y MOZO ya son canales distintos
+    expect(ofertaIncluyeCanal(['CAJA'], 'MOZO')).toBe(false);
+    expect(ofertaIncluyeCanal(['MOZO'], 'CAJA')).toBe(false);
+    expect(ofertaIncluyeCanal(['MOZO'], 'MOZO')).toBe(true);
   });
 
   it.each(['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS', 'COMBO'])('estaVigente de %s respeta el canal de pedido (mozo y caja cuentan como local)', () => {
     const o = { activo: true, canales: ['ADMIN'] };
     expect(estaVigente(o, 'MOZO')).toBe(true);
     expect(estaVigente(o, 'CAJA')).toBe(true);
+    // Canales ya separados: solo MOZO no vale en Caja y al revés
+    expect(estaVigente({ activo: true, canales: ['MOZO'] }, 'CAJA')).toBe(false);
+    expect(estaVigente({ activo: true, canales: ['CAJA'] }, 'MOZO')).toBe(false);
     expect(estaVigente(o, 'CARTA')).toBe(false);
     expect(estaVigente(o, 'WHATSAPP')).toBe(false);
     expect(estaVigente({ activo: true, canales: ['BOT'] }, 'WHATSAPP')).toBe(true);
   });
 
   it('valores por defecto de una oferta nueva: WhatsApp solo donde el bot ya aplica el tipo', () => {
-    expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual(['CARTA', 'ADMIN', 'BOT']);
-    expect(canalesPorDefecto('DESCUENTO')).toEqual(['CARTA', 'ADMIN', 'BOT']);
-    expect(canalesPorDefecto('LLEVA_PAGA')).toEqual(['CARTA', 'ADMIN', 'BOT']);
-    expect(canalesPorDefecto('COMBO')).toEqual(['CARTA', 'ADMIN', 'BOT']);
+    expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual(['CARTA', 'CAJA', 'MOZO', 'BOT']);
+    expect(canalesPorDefecto('DESCUENTO')).toEqual(['CARTA', 'CAJA', 'MOZO', 'BOT']);
+    expect(canalesPorDefecto('LLEVA_PAGA')).toEqual(['CARTA', 'CAJA', 'MOZO', 'BOT']);
+    expect(canalesPorDefecto('COMBO')).toEqual(['CARTA', 'CAJA', 'MOZO', 'BOT']);
   });
 
   it('los datos existentes siguen igual: lo que tenía BOT lo conserva, lo que no, no', () => {
     expect(ofertaIncluyeCanal(['CARTA', 'ADMIN', 'BOT'], 'BOT')).toBe(true);
     expect(ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'BOT')).toBe(false);
-    expect(ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'CARTA') && ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'ADMIN')).toBe(true);
+    expect(ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'CARTA') && ofertaIncluyeCanal(['CARTA', 'ADMIN'], 'CAJA')).toBe(true);
   });
 });
 

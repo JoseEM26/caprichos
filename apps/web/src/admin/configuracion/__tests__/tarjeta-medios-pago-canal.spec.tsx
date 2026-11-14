@@ -20,7 +20,7 @@ describe('Medios de pago por canal (Configuración)', () => {
     const put = vi.spyOn(api, 'put').mockResolvedValue({ ok: true });
     render(<TarjetaMediosPagoCanal esAdmin />);
     fireEvent.click(await screen.findByRole('switch', { name: 'Plin en Mozo' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar medios de pago' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar medios por canal' }));
     expect(put).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, guardar' }));
     await waitFor(() => expect(put).toHaveBeenCalled());
@@ -36,18 +36,18 @@ describe('Medios de pago por canal (Configuración)', () => {
     for (const m of ['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']) {
       fireEvent.click(await screen.findByRole('switch', { name: `${m} en Carta web` }));
     }
-    expect((screen.getByRole('button', { name: 'Guardar medios de pago' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Guardar medios por canal' }) as HTMLButtonElement).disabled).toBe(false);
     for (const m of ['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']) {
       fireEvent.click(screen.getByRole('switch', { name: `${m} en Caja` }));
     }
     expect(screen.getByText('Caja necesita al menos un medio de pago encendido.')).toBeInTheDocument();
-    expect((screen.getByRole('button', { name: 'Guardar medios de pago' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Guardar medios por canal' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('quien no es ADMIN ve la tabla sin poder cambiarla', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({ canales: undefined });
     render(<TarjetaMediosPagoCanal esAdmin={false} />);
     expect((await screen.findByRole('switch', { name: 'Yape en Caja' }) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.queryByRole('button', { name: 'Guardar medios de pago' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Guardar medios por canal' })).toBeNull();
   });
 });

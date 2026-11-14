@@ -85,10 +85,10 @@ describe('promo ENVIO_GRATIS: vigencia por horario, días, fechas, canal y lími
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['CARTA', 'BOT'] })]), 'WHATSAPP', MIERCOLES_14H)).not.toBeNull();
   });
 
-  it('la carta web usa el canal CARTA y los pedidos de local usan ADMIN', async () => {
+  it('la carta web usa el canal CARTA y Caja y mozo usan su propio canal', async () => {
     expect(canalOfertaParaEnvio('CARTA')).toBe('CARTA');
-    expect(canalOfertaParaEnvio('MOZO')).toBe('ADMIN');
-    expect(canalOfertaParaEnvio('CAJA')).toBe('ADMIN');
+    expect(canalOfertaParaEnvio('MOZO')).toBe('MOZO');
+    expect(canalOfertaParaEnvio('CAJA')).toBe('CAJA');
     expect(canalOfertaParaEnvio('BOT')).toBe('BOT');
     expect(canalOfertaParaEnvio('WHATSAPP')).toBe('BOT');
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['ADMIN'] })]), 'CARTA', MIERCOLES_14H)).toBeNull();

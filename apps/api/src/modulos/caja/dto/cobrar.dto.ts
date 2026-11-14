@@ -60,4 +60,9 @@ export class CobrarDto {
   @IsOptional()
   @IsBoolean()
   confirmaSinCaptura?: boolean;
+
+  /** Caja vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma cobrar así. */
+  @IsOptional()
+  @IsBoolean()
+  confirmaSinDescuento?: boolean;
 }

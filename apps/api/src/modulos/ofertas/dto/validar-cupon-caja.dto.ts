@@ -61,4 +61,10 @@ export class VistaPreviaDescuentosCajaDto {
   @IsOptional()
   @IsString()
   colaboradorPartyId?: string;
+
+  /** Medios con que se pagará todo el pedido (para promos por medio). Sin medio, esas promos no aplican. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  medios?: string[];
 }

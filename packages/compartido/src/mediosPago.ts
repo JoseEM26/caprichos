@@ -68,3 +68,11 @@ export function mediosActivos(config: unknown, canal: string | null | undefined)
   const n = normalizarMediosPagoCanal(config)[c];
   return MEDIOS_PAGO_CANAL.filter((m) => n[m]);
 }
+
+/** «pagando con Yape» / «pagando con Yape o Plin» / «pagando con Efectivo, Yape o Plin»; '' si la promo vale con cualquier medio. */
+export function textoCondicionMedios(medios: ReadonlyArray<string> | null | undefined): string {
+  const n = (medios ?? []).map((m) => NOMBRE_MEDIO_PAGO[String(m).toUpperCase() as MedioPagoCanal] ?? m);
+  if (n.length === 0) return '';
+  const lista = n.length === 1 ? n[0] : `${n.slice(0, -1).join(', ')} o ${n[n.length - 1]}`;
+  return `pagando con ${lista}`;
+}

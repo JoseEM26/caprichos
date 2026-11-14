@@ -32,7 +32,7 @@ describe('ModalCupon envía los nombres de la API (CrearCuponDto)', () => {
       modo: 'COMPARTIDO',
       descuentoTipo: 'PORCENTAJE',
       descuentoValor: 10,
-      canales: ['CARTA', 'CAJA'],
+      canales: ['CARTA', 'CAJA', 'MOZO'],
       dias: [],
       horaDesde: null,
       horaHasta: null,

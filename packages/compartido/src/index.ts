@@ -135,5 +135,6 @@ export {
   normalizarMediosPagoCanal,
   medioActivo,
   mediosActivos as mediosPagoActivosCanal,
+  textoCondicionMedios,
 } from './mediosPago.js';
 export type { MedioPagoCanal, CanalMedioPago, MediosPagoPorCanal } from './mediosPago.js';

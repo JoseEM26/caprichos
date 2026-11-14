@@ -1773,7 +1773,9 @@ model Oferta {
   hora_hasta           DateTime?      @db.Time
   fecha_desde          DateTime?      @db.Date
   fecha_hasta          DateTime?      @db.Date
-  canales              String[]       @default(["CARTA", "ADMIN", "BOT"])
+  canales              String[]       @default(["CARTA", "CAJA", "MOZO", "BOT"])
+  // Medios de pago con los que vale (EFECTIVO, YAPE, PLIN, TARJETA, TRANSFERENCIA, PAGO_EN_LINEA). Vacío = cualquier medio
+  medios_pago          String[]       @default([])
   // Tipos de pedido donde vale: COMER_LOCAL | LLEVAR | RECOGER | DELIVERY. Vacío = todos
   modalidades          String[]       @default([])
   limite_usos          Int?
@@ -1885,7 +1887,7 @@ model Cupon {
   compra_minima      Decimal?                @db.Decimal(12, 2)
   categoria_id       BigInt?
   producto_id        BigInt?
-  canales            String[]                @default(["CARTA", "CAJA", "BOT"])
+  canales            String[]                @default(["CARTA", "CAJA", "MOZO", "BOT"])
   // Horario opcional (vacío = todo el tiempo): días 1..7, hora desde inclusiva y hasta exclusiva, fechas inclusivas
   dias               Int[]                   @default([])
   hora_desde         DateTime?               @db.Time
