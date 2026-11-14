@@ -187,7 +187,7 @@ describe('Checkout de la carta ▸ pago dividido', () => {
       abrirPedido();
       await irAPago();
       cambiarMedio('Pagar con 2 o 3 medios');
-      fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '5' } });
+      fireEvent.change(screen.getByLabelText(/^Propina \(S\/\)/i), { target: { value: '5' } });
       elegirMedio(2, 'EFECTIVO');
       fireEvent.change(screen.getByLabelText('Monto de Yape'), { target: { value: '38' } });
       // venta 40 + propina 5 = 45: a Yape 38, el resto (7) en efectivo

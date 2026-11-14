@@ -107,7 +107,7 @@ describe('Checkout de la carta ▸ propina opcional', () => {
   it('con la carta encendida pide la propina opcional, aparte de la venta, y suma al total a pagar', async () => {
     abrirPedido(true);
     await irAPago();
-    fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/^Propina \(S\/\)/i), { target: { value: '5' } });
     expect(screen.getByTestId('propina-resumen')).toHaveTextContent('S/ 5.00');
     // venta 14.50 + propina 5.00 = lo que paga el cliente
     expect(screen.getByRole('button', { name: /Enviar pedido/i })).toHaveTextContent('Enviar pedido · S/ 19.50');
@@ -118,7 +118,7 @@ describe('Checkout de la carta ▸ propina opcional', () => {
     await irAPago();
     cambiarMedio(medio);
     expect(screen.getByTestId('propina-carta')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText(/^Propina \(S\/\)/i), { target: { value: '3' } });
     expect(screen.getByRole('button', { name: /Enviar pedido/i })).toHaveTextContent('Enviar pedido · S/ 17.50');
   });
 
@@ -126,7 +126,7 @@ describe('Checkout de la carta ▸ propina opcional', () => {
     vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
     abrirPedido(true);
     await irAPago();
-    fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '2,50' } });
+    fireEvent.change(screen.getByLabelText(/^Propina \(S\/\)/i), { target: { value: '2,50' } });
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.objectContaining({ propina: 2.5 }), expect.anything()));
@@ -135,7 +135,7 @@ describe('Checkout de la carta ▸ propina opcional', () => {
   it('una propina sobre el tope no deja enviar y avisa con el máximo', async () => {
     abrirPedido(true);
     await irAPago();
-    fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '60' } });
+    fireEvent.change(screen.getByLabelText(/^Propina \(S\/\)/i), { target: { value: '60' } });
     fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
     expect(await screen.findByText(/La propina debe ser un monto entre S\/ 0 y S\/ 50\.00/)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());

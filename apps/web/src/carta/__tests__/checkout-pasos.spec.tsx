@@ -107,7 +107,7 @@ describe('Checkout ▸ pago en dos momentos', () => {
     await aPaso(/Recoger en el local/i, 3);
     expect(screen.getByTestId('pasos-subtitulo')).toHaveTextContent('Paso 3 de 3 · ¿Cómo pagas?');
     for (const m of ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia', 'Pagar con 2 o 3 medios']) expect(tarjeta(m)).toBeInTheDocument();
-    expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
+    expect(screen.queryByText('Comprobante')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Elige cómo pagas/i })).toBeDisabled();
   });
 

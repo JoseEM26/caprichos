@@ -113,14 +113,14 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     expect(screen.getByRole('radio', { name: /Pagar al contado/i })).toBeChecked();
     expect(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i })).toBeEnabled();
     expect(screen.getByText('Pagar con Yape')).toBeInTheDocument();
-    expect(screen.getByText('Comprobante de pago')).toBeInTheDocument();
+    expect(screen.getByText('Comprobante')).toBeInTheDocument();
   });
 
   it('crédito: oculta medio de pago y comprobante y muestra el resumen', async () => {
     await irAlPago({ esEquipo: true, puedeCredito: true });
     fireEvent.click(screen.getByRole('radio', { name: /Cargar a mi crédito del personal/i }));
     expect(screen.queryByText('¿Cómo pagas?')).not.toBeInTheDocument();
-    expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
+    expect(screen.queryByText('Comprobante')).not.toBeInTheDocument();
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/Se carga a tu crédito: S\/ \d+\.\d{2}/);
   });
 
@@ -163,7 +163,7 @@ describe('Checkout ▸ pago del equipo (contado o crédito del personal)', () =>
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/A tu crédito del personal: S\/ \d+\.\d{2}/);
     expect(screen.getByTestId('resumen-credito-equipo').textContent).toMatch(/El envío lo pagas ahora/);
     expect(screen.getByText('Pagar con Yape')).toBeInTheDocument();
-    expect(screen.queryByText('Comprobante de pago')).not.toBeInTheDocument();
+    expect(screen.queryByText('Comprobante')).not.toBeInTheDocument();
     expect(screen.queryByTestId('propina-carta')).not.toBeInTheDocument();
   });
 });

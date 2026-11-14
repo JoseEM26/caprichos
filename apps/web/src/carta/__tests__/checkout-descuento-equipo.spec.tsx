@@ -103,10 +103,10 @@ describe('Checkout ▸ descuento del equipo (solo con sesión)', () => {
   it('con sesión y descuento del equipo: mensaje, línea del resumen, sin «ganarás N puntos», y no manda celular ni porcentaje', async () => {
     vi.mocked(api.post).mockResolvedValue(respuestaEquipo);
     await irAlResumen(true);
-    expect(await screen.findByText(/Tienes 25 % de descuento por ser parte del equipo Caprichos/)).toBeInTheDocument();
+    expect(await screen.findByText(/Descuento del equipo: 25 %/)).toBeInTheDocument();
     expect(screen.getAllByText(/Descuento por ser del equipo \(25 %\)/).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/no suma puntos/);
-    expect(screen.getByTestId('puntos-estimados').textContent).not.toMatch(/ganarás/);
+    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/No suma puntos/);
+    expect(screen.getByTestId('puntos-estimados').textContent).not.toMatch(/sumas/);
     const llamada = vi.mocked(api.post).mock.calls.filter(([r]) => r === '/carta/descuentos/vista-previa').pop()!;
     expect(JSON.stringify(llamada[1])).not.toMatch(/celular|pct|porcentaje|telefono/i);
   });
@@ -114,13 +114,13 @@ describe('Checkout ▸ descuento del equipo (solo con sesión)', () => {
   it('sin sesión no se muestra nada del equipo aunque el servidor lo devolviera', async () => {
     vi.mocked(api.post).mockResolvedValue(respuestaEquipo);
     await irAlResumen(false);
-    expect(screen.queryByText(/parte del equipo Caprichos/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Descuento del equipo/)).not.toBeInTheDocument();
   });
 
   it('con sesión pero sin descuento del equipo: no se muestra nada y sí «ganarás»', async () => {
     vi.mocked(api.post).mockResolvedValue({ descuentoTotal: 0, detalles: [] });
     await irAlResumen(true);
-    expect(screen.queryByText(/parte del equipo Caprichos/)).not.toBeInTheDocument();
-    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/ganarás/);
+    expect(screen.queryByText(/Descuento del equipo/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('puntos-estimados').textContent).toMatch(/sumas/);
   });
 });

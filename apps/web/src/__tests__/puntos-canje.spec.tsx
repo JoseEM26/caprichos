@@ -52,7 +52,7 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     render(<PuntosCanje totalPedido={50} puntosAplicados={0} alAplicar={vi.fn()} />);
 
     expect(texto()).toContain(
-      'Tienes 0.50 puntos. Se pueden usar desde 1 punto, en productos sin promoción ni descuento.',
+      'Tienes 0.50 puntos (= S/ 0.50)Te faltan 0.50 puntos para usarlos (mínimo 1).',
     );
     expect(screen.queryByLabelText(/¿Cuántos puntos deseas usar\?/i)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aplicar' })).toBeNull();
@@ -124,7 +124,7 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     mockCuenta(30.5);
     render(<PuntosCanje totalPedido={100} puntosAplicados={0} alAplicar={vi.fn()} />);
 
-    expect(texto()).toContain('Tienes 30.50 puntos. Puedes usar hasta 30, en números enteros.');
+    expect(texto()).toContain('Tienes 30.50 puntos (= S/ 30.50)');
 
     fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '10' } });
 
