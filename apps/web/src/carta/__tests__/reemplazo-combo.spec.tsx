@@ -127,7 +127,7 @@ describe('Combo con bebidas pide nombre por envase', () => {
       ],
     } as unknown as ProductoCarta;
     render(<VentanaProductoCarta producto={duo} esBebida={false} onCerrar={() => {}} />);
-    const campos = screen.getAllByLabelText(/Nombre para el envase \(opcional/i);
+    const campos = screen.getAllByLabelText(/Nombre para el envase \(obligatorio/i);
     expect(campos).toHaveLength(2);
     expect(screen.getByText("Bebida 1 · Frappe Moca")).toBeInTheDocument();
     fireEvent.change(campos[0], { target: { value: 'Lucía' } });

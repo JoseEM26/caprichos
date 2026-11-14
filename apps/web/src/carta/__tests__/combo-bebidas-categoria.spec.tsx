@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 import { GrupoOpcionesCarta, ProductoCarta } from '../tipos';
+import { nombrarVasos } from './nombrarVasos';
 
 const agregarLinea = vi.fn();
 const botonAgregar = () => screen.getByRole('button', { name: /Agregar al pedido|Falta elegir|Elige las opciones obligatorias/ });
@@ -84,6 +85,7 @@ describe('Combo Dúo con bebidas por categoría', () => {
     fireEvent.click(paso(2).getByRole('button', { name: /CAPUCCINO/ }));
     expect(botonAgregar()).toBeEnabled();
 
+    nombrarVasos();
     fireEvent.click(botonAgregar());
     const linea = agregarLinea.mock.calls[0][0];
     expect(linea.ofertaId).toBe('4');
@@ -107,6 +109,7 @@ describe('Combo Dúo con bebidas por categoría', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(paso(1).getByRole('button', { name: /ICED COFFE/ }));
     fireEvent.click(paso(2).getByRole('button', { name: /^ICED COFFE$/ }));
+    nombrarVasos();
     fireEvent.click(botonAgregar());
     expect(agregarLinea.mock.calls[0][0].comboElecciones.filter((e: { parteId: string }) => e.parteId === '1')).toEqual([
       { parteId: '1', productoId: '102' },

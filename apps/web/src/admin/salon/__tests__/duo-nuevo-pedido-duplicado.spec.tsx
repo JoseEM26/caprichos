@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { VentanaOpcionesProducto } from '../componentes/VentanaOpcionesProducto';
 import { ProductoCarta } from '../../../carta/tipos';
 import { OfertaItem } from '../../ofertas/ofertasApi';
+import { nombrarVasos } from '../../../carta/__tests__/nombrarVasos';
 
 const bebidas = ['ICED COFFE', 'LATTE COFFE', 'ICED CHOCOLATE'];
 const grupo = (id: string, nombre: string, ops: string[]) => ({
@@ -39,6 +40,7 @@ describe('Nuevo pedido: Dúo sin bebidas duplicadas', () => {
     expect(boton().textContent).toMatch(/Falta elegir: Bebida 2/);
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /LATTE COFFE/ }));
     expect(boton()).toBeEnabled();
+    nombrarVasos();
     fireEvent.click(boton());
     const linea = alAgregar.mock.calls[0][0];
     expect(linea.comboElecciones).toEqual([{ parteId: '1', productoId: '101' }, { parteId: '1', productoId: '102' }]);

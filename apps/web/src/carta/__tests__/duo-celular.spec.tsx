@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 import { GrupoOpcionesCarta, ProductoCarta } from '../tipos';
+import { nombrarVasos } from './nombrarVasos';
 
 const agregarLinea = vi.fn();
 vi.mock('../CarritoContext', () => ({
@@ -51,13 +52,18 @@ describe('Dúo en celular', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /ICED COFFE/ })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[0]);
     expect(botonAgregar().disabled).toBe(false);
+    // sin nombres de vaso no agrega y dice cuál falta
+    fireEvent.click(botonAgregar());
+    expect(agregarLinea).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
+    nombrarVasos();
     fireEvent.click(botonAgregar());
     expect(agregarLinea).toHaveBeenCalledTimes(1);
   });
 
   it('el campo de nombre del vaso aparece con el motivo aunque el combo use grupos «Bebida N · Sabor» (antes desaparecía)', () => {
     abrir(producto(), null);
-    expect(screen.getByTestId('nombre-envase')).toHaveTextContent(/Para escribir tu nombre en el vaso/);
+    expect(screen.getByTestId('nombre-envase')).toHaveTextContent(/Obligatorio: el nombre de cada vaso/);
     expect(screen.getAllByLabelText(/Nombre para el envase/)).toHaveLength(2);
   });
 

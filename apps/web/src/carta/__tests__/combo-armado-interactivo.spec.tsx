@@ -138,7 +138,7 @@ describe('Armado interactivo del combo', () => {
 
   it('los nombres y la nota son plegables (cerrados al inicio) con contador de letras', () => {
     abrir();
-    const cab = screen.getByRole('button', { name: /Nombres para el vaso \(opcional\)/ });
+    const cab = screen.getByRole('button', { name: /Nombres para el vaso/ });
     expect(cab).toHaveAttribute('aria-expanded', 'false');
     expect(cab).toHaveAttribute('aria-controls', 'cuerpo-nombres-envase');
     fireEvent.click(cab);
@@ -158,12 +158,13 @@ describe('Armado interactivo del combo', () => {
     expect(screen.getByTestId('resumen-combo')).toHaveTextContent('Tu combo: Regular 12 oz · FRAPPE OREO + CAPUCCINO · 1 Fresa + 1 Manjar');
     fireEvent.click(screen.getByRole('button', { name: /Nombres para el vaso/ }));
     fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
+    fireEvent.change(document.getElementById('nombre-bebida-1') as HTMLInputElement, { target: { value: 'Pedro' } });
     fireEvent.click(screen.getByRole('button', { name: /Nota para cocina/ }));
     fireEvent.change(screen.getByLabelText(/Nota para cocina/, { selector: 'input' }), { target: { value: 'sin hielo' } });
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     const l = agregarLinea.mock.calls[0][0];
     expect(l.cantidad).toBe(1);
-    expect(l.personas).toEqual(['Lucía', '']);
+    expect(l.personas).toEqual(['Lucía', 'Pedro']);
     expect(l.nota).toBe('sin hielo');
     expect(l.ofertaId).toBe('4');
     expect(l.comboElecciones).toEqual([

@@ -662,7 +662,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     // Sin nombre: no agrega, muestra el aviso y enfoca el campo vacío
     fireEvent.change(campo, { target: { value: '' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
-    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre de quien tomará cada bebida');
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre del vaso de la bebida');
     expect(document.activeElement).toBe(campo);
     expect(screen.queryByText('Aún no agregas productos.', { exact: false })).toBeInTheDocument();
   });

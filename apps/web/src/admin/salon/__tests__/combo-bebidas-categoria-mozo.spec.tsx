@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { VentanaOpcionesProducto } from '../componentes/VentanaOpcionesProducto';
 import { ProductoCarta } from '../../../carta/tipos';
 import { OfertaItem } from '../../ofertas/ofertasApi';
+import { nombrarVasos } from '../../../carta/__tests__/nombrarVasos';
 
 const grupo = (id: string, nombre: string, opciones: string[]) => ({
   id, nombre, obligatorio: true, minimo: 1, maximo: 1,
@@ -39,6 +40,7 @@ describe('Mozo/caja: combo con bebidas por categoría', () => {
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 1' })).getByRole('button', { name: /FRAPPE OREO/ }));
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /ICED COFFE/ }));
     expect(agregar()).toBeEnabled();
+    nombrarVasos();
     fireEvent.click(agregar());
     expect(alAgregar.mock.calls[0][0].comboElecciones).toEqual([
       { parteId: '1', productoId: '101' },

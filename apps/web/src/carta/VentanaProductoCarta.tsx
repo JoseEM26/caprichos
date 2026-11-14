@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { calcularPrecioLinea } from '@caprichos/compartido';
 import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
+import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
 import { useUmbralesStock } from './umbralesStock';
@@ -84,6 +85,7 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  */
 export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null, numerarPreguntas = false, destacarGrupoId = null }: Props) {
   const { agregarLinea, inventario, lineas } = useCarrito();
+  const cuentaCtx = useCuentaOpcional();
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
 
@@ -229,7 +231,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         const gs = secciones.mapa[k];
         pasos.push({ clave: `sec-${k}`, texto: k, hecho: gs.every((g) => (sel[g.id] ?? []).length >= g.minimo), selector: `[data-grupo="${gs[0].id}"]`, seccion: k });
       }
-    if (nB > 0) pasos.push({ clave: 'nombres', texto: 'Nombres', hecho: nombres.some((n) => (n ?? '').trim()) ? true : null, selector: '[data-testid="nombre-envase"]' });
+    if (nB > 0) pasos.push({ clave: 'nombres', texto: 'Nombres', hecho: Array.from({ length: cantidad * nB }, (_, i) => nombres[i] ?? '').every((n) => n.trim()) ? true : null, selector: '[data-testid="nombre-envase"]' });
   }
   // Mini-resumen de lo armado: «Regular 12 oz · Frappe Oreo + Caramel · 1 Fresa + 1 Manjar»
   const resumenCombo = oferta
@@ -348,18 +350,26 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     if (faltantes[0]) irA(faltantes[0]);
   };
 
+  // Vasos sin nombre: cada vaso de una bebida suelta (cantidad) o de las bebidas de un combo (cantidad × bebidas)
+  const totalVasos = nB > 0 ? cantidad * nB : esBebida && !esCombo ? cantidad : 0;
+  const indicesSinNombre = (): number[] => Array.from({ length: totalVasos }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
+  const nombreCuenta = (cuentaCtx?.cliente?.nombre ?? '').trim();
+  const usarNombreCliente = () => setNombres(Array.from({ length: totalVasos }, (_, i) => ((nombres[i] ?? '').trim() ? nombres[i] : nombreCuenta.slice(0, 30))));
+  const textoFaltaNombre = (i: number): string => (nB > 0 || cantidad > 1 ? `Escribe el nombre del vaso de la Bebida ${(nB > 0 ? i % nB : i) + 1}` : 'Escribe el nombre del vaso de la bebida');
+
   const agregar = () => {
     if (!puedeAgregar) return;
-    // en las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
-    if (esBebida && !esCombo) {
-      const faltan = Array.from({ length: cantidad }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
-      if (faltan.length > 0) {
-        setAvisoNombres(true);
+    // en las bebidas (sueltas o de un combo) el nombre de cada vaso es obligatorio: va en la etiqueta
+    const faltan = indicesSinNombre();
+    if (faltan.length > 0) {
+      setAvisoNombres(true);
+      setNombresAbierto(true);
+      setTimeout(() => {
         const campo = document.getElementById(`nombre-bebida-${faltan[0]}`);
         campo?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
         campo?.focus();
-        return;
-      }
+      }, 0);
+      return;
     }
     const personas =
       nB > 0
@@ -848,15 +858,20 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               <div data-testid="nombre-envase" data-plegable="" className="ca-tarjeta">
                 <button type="button" className="ca-cab" aria-expanded={nombresAbierto} aria-controls="cuerpo-nombres-envase" onClick={() => setNombresAbierto((v) => !v)}>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ ...titulo, display: 'block', fontWeight: 800, fontSize: 14 }}>Nombres para el vaso (opcional)</span>
+                    <span style={{ ...titulo, display: 'block', fontWeight: 800, fontSize: 14 }}>Nombres para el vaso</span>
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {nombres.filter((n) => (n ?? '').trim()).join(' · ') || 'Máx. 14 letras se ven completas en el vaso'}
+                      {nombres.filter((n) => (n ?? '').trim()).join(' · ') || 'Obligatorio · máx. 14 letras se ven completas en el vaso'}
                     </span>
                   </span>
                   <span aria-hidden="true" style={{ flex: 'none', fontSize: 16, color: 'var(--cp-soft)' }}>{nombresAbierto ? '▴' : '▾'}</span>
                 </button>
                 <div id="cuerpo-nombres-envase" className="ca-cuerpo" hidden={!nombresAbierto}>
-                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Para escribir tu nombre en el vaso. Se ven completas hasta 14 letras.</div>
+                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Obligatorio: el nombre de cada vaso. Se ven completas hasta 14 letras.</div>
+                {nombreCuenta && (
+                  <button type="button" onClick={usarNombreCliente} style={{ alignSelf: 'flex-start', minHeight: 36, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    Usar el nombre del cliente
+                  </button>
+                )}
                 {Array.from({ length: cantidad * nB }, (_, i) => {
                   const g = gruposBebida[i % nB];
                   const bebida = g ? (g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g)) : (envases[i] ?? `Bebida ${i + 1}`);
@@ -867,7 +882,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                         <span style={{ color: (nombres[i] ?? '').trim().length > 14 ? 'var(--cp-rust)' : 'var(--cp-soft)' }}>{`${(nombres[i] ?? '').trim().length}/14`}</span>
                       </span>
                       <input
-                        aria-label={`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
+                        aria-label={`${bebida} · Nombre para el envase (obligatorio, máx. 14 letras se ven completas)`}
+                        required
+                        aria-invalid={avisoNombres && !(nombres[i] ?? '').trim()}
                         type="text"
                         value={nombres[i] ?? ''}
                         onChange={(e) =>
@@ -885,6 +902,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                     </label>
                   );
                 })}
+                {avisoNombres && indicesSinNombre().length > 0 && (
+                  <div role="alert" style={{ fontSize: 12, lineHeight: '16px', fontWeight: 700, color: 'var(--cp-rust)', background: 'var(--cp-sand)', borderRadius: 8, padding: '8px 10px' }}>
+                    {textoFaltaNombre(indicesSinNombre()[0])}
+                  </div>
+                )}
                 </div>
               </div>
             )}
@@ -929,12 +951,17 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                     </div>
                   </div>
                 ))}
-                {avisoNombres && Array.from({ length: cantidad }, (_, i) => i).some((i) => !(nombres[i] ?? '').trim()) ? (
+                {avisoNombres && indicesSinNombre().length > 0 ? (
                   <div role="alert" style={{ fontSize: 12, lineHeight: '16px', fontWeight: 700, color: 'var(--cp-rust)', background: 'var(--cp-sand)', borderRadius: 8, padding: '8px 10px' }}>
-                    Escribe el nombre de quien tomará cada bebida. Va en la etiqueta del vaso.
+                    {textoFaltaNombre(indicesSinNombre()[0])}
                   </div>
                 ) : (
                   <div style={{ fontSize: 11, lineHeight: '14px', color: 'var(--cp-soft)' }}>Obligatorio: el nombre va en la etiqueta del vaso.</div>
+                )}
+                {nombreCuenta && (
+                  <button type="button" onClick={usarNombreCliente} style={{ alignSelf: 'flex-start', minHeight: 36, borderRadius: 10, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    Usar el nombre del cliente
+                  </button>
                 )}
               </div>
             )}
