@@ -30,7 +30,8 @@ import {
 import { BannerIngresoCocina, ControlSonidoCocina, MarcoNuevo, useIngresoCocina } from './AvisoIngresoCocina';
 import type { AjustesCocina } from './cocinaApi';
 import { RejillaComandas } from './RejillaComandas';
-import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
+import { ComandaGrupo, ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
+import { agruparPorCuenta } from './cuentaExtras';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
@@ -520,6 +521,31 @@ export function CocinaAdminView() {
       ? tarjetasDelServidor.map((c) => (c.id === enSalida.comanda.id ? enSalida.comanda : c))
       : [enSalida.comanda, ...tarjetasDelServidor]
     : tarjetasDelServidor;
+
+  const pintarUna = (c: Comanda, enGrupo?: string) => (
+    <ComandaTarjeta
+      key={enTodas ? c.pedidoId : c.id}
+      comanda={c}
+      enGrupo={enGrupo}
+      mostrarArea={enTodas}
+      soloArea={!enTodas}
+      soloLectura={enTodas}
+      onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
+      despejando={despejando}
+      alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
+      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
+      puedeDespachar={puedeDespachar && enTodas}
+      alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
+      alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
+    />
+  );
+  // Todas: original + extras (pedidoOrigenId) en una sola tarjeta; por área cada comanda sigue suelta
+  const pintarTarjetas = () =>
+    (enTodas ? agruparPorCuenta(tarjetas) : tarjetas.map((c) => ({ clave: c.id, principal: c, partes: [c] }))).map((g) => (
+      <MarcoNuevo key={g.clave} activo={g.partes.some((c) => idsNuevos.has(String(c.pedidoId)))}>
+        {g.partes.length > 1 ? <ComandaGrupo grupo={g} pintarParte={pintarUna} /> : pintarUna(g.principal)}
+      </MarcoNuevo>
+    ));
 
   if (!puedeVer) {
     return (
@@ -1079,24 +1105,7 @@ export function CocinaAdminView() {
             </div>
           ) : (
             <RejillaComandas>
-              {tarjetas.map((c) => (
-                <MarcoNuevo activo={idsNuevos.has(String(c.pedidoId))}>
-                <ComandaTarjeta
-                  key={enTodas ? c.pedidoId : c.id}
-                  comanda={c}
-                  mostrarArea={enTodas}
-                  soloArea={!enTodas}
-                  soloLectura={enTodas}
-                  onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
-                  despejando={despejando}
-                  alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
-                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
-                  puedeDespachar={puedeDespachar && enTodas}
-                  alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
-                  alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                />
-                </MarcoNuevo>
-              ))}
+              {pintarTarjetas()}
             </RejillaComandas>
           )}
         </div>
@@ -1320,24 +1329,7 @@ export function CocinaAdminView() {
                 </div>
               ) : (
                 <RejillaComandas>
-                  {tarjetas.map((c) => (
-                    <MarcoNuevo activo={idsNuevos.has(String(c.pedidoId))}>
-                    <ComandaTarjeta
-                      key={enTodas ? c.pedidoId : c.id}
-                      comanda={c}
-                      mostrarArea={enTodas}
-                      soloArea={!enTodas}
-                      soloLectura={enTodas}
-                      onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
-                      despejando={despejando}
-                      alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
-                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
-                      puedeDespachar={puedeDespachar && enTodas}
-                      alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
-                      alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                    />
-                    </MarcoNuevo>
-                  ))}
+                  {pintarTarjetas()}
                 </RejillaComandas>
               )}
                 </>

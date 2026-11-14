@@ -5,6 +5,8 @@ import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
 import { colorPorMinutos } from './tiempoEnVivo';
 import { NumeroDia, TiempoEspera } from './TiempoEspera';
 import { InsigniaMesa } from './InsigniaMesa';
+import { etiquetaParte } from './cuentaExtras';
+import type { GrupoCuenta } from './cuentaExtras';
 
 /** Tiempo para deshacer un «completa» (la línea vuelve a 0) antes de que el botón desaparezca. */
 export const SEGUNDOS_DESHACER = 5;
@@ -25,6 +27,8 @@ export interface ComandaTarjetaProps {
   alDespacharTodo?: (comanda: Comanda) => void;
   /** La última unidad acaba de despejar el área: la tarjeta queda en verde con «Deshacer» un rato. */
   alDeshacerSalida?: () => void;
+  /** Dentro de una tarjeta de cuenta (original + extras): etiqueta de la sección; oculta cliente, mesa y modalidad (van en la cabecera única). */
+  enGrupo?: string;
 }
 
 /** Color por minutos con los umbrales por defecto (la tarjeta usa los del servidor). */
@@ -540,6 +544,7 @@ export function ComandaTarjeta({
   alDespacharLinea,
   alDespacharTodo,
   alDeshacerSalida,
+  enGrupo,
 }: ComandaTarjetaProps) {
   // Última línea que se completó: se puede deshacer unos segundos (vuelve a su cantidad anterior)
   const [deshacer, setDeshacer] = useState<{ linea: LineaComanda; previas: number } | null>(null);
@@ -592,6 +597,16 @@ export function ComandaTarjeta({
         width: '100%',
       }}
     >
+      {enGrupo ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <strong data-testid="comanda-etiqueta-parte" style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', color: comanda.extraDe ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>{enGrupo}</strong>
+          <span data-testid="comanda-codigo" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>{comanda.ticket || comanda.codigo}</span>
+          <span style={{ marginLeft: 'auto' }}>
+            <TiempoEspera desde={comanda.creado_en} minutosRespaldo={comanda.minutos ?? 0} umbrales={comanda.umbrales} />
+          </span>
+        </div>
+      ) : (
+        <>
       <div
         style={{
           display: 'flex',
@@ -660,6 +675,9 @@ export function ComandaTarjeta({
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
         {modalName} · {canalTxt} · {whoTxt}
       </div>
+
+        </>
+      )}
 
       {despejada && (
         <div
@@ -838,6 +856,32 @@ export function ComandaTarjeta({
           Listo
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Cocina «Todas»: el pedido original y sus extras en UNA tarjeta. Cabecera única (cliente, código del original,
+ * «+ N extras», mesa y modalidad) y una sección por pedido; cada sección es una ComandaTarjeta normal (mismas acciones por línea).
+ */
+export function ComandaGrupo({ grupo, pintarParte }: { grupo: GrupoCuenta<Comanda>; pintarParte: (c: Comanda, etiqueta: string) => ReactNode }) {
+  const c = grupo.principal;
+  const nExtras = grupo.partes.length - 1;
+  return (
+    <div
+      data-testid={`cuenta-${c.pedidoId}`}
+      aria-label={`Pedido ${c.codigo} con ${nExtras} ${nExtras === 1 ? 'extra' : 'extras'}`}
+      style={{ background: 'var(--cp-cream)', border: '2px solid var(--cp-navy)', borderRadius: '14px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box', fontFamily: 'Montserrat, system-ui, sans-serif' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <strong data-testid="cuenta-codigo" style={{ fontSize: '18px', fontWeight: 900, color: 'var(--cp-navy)' }}>{c.cliente || c.codigo}</strong>
+        {c.cliente && <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>{c.codigo}</span>}
+        <span data-testid="cuenta-extras" style={{ fontSize: '13px', fontWeight: 800, padding: '3px 10px', borderRadius: '9999px', background: '#FFE08A', border: '2px solid #D99E39', color: 'var(--cp-navy)' }}>
+          + {nExtras} {nExtras === 1 ? 'extra' : 'extras'}
+        </span>
+      </div>
+      <InsigniaMesa modalidad={c.modalidad} mesa={c.mesa} enEsperaMesa={c.enEsperaMesa} />
+      {grupo.partes.map((x, i) => pintarParte(x, etiquetaParte(x, i)))}
     </div>
   );
 }
