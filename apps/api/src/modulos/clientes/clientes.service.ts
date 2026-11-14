@@ -126,6 +126,18 @@ export function telefonoDeContactos(contactos: { tipo: string; valor: string }[]
   return telefono?.valor ?? null;
 }
 
+function resumenPedidoCliente(p: { id: bigint; codigo: string | null; modalidad: string; estado: string; total: any; pago_estado: string | null; creado_en: Date }) {
+  return {
+    pedidoId: p.id.toString(),
+    id: p.codigo || p.id.toString(),
+    modalidad: p.modalidad === 'DELIVERY' ? 'Delivery' : p.modalidad === 'LLEVAR' ? 'Para llevar' : 'En el local',
+    estado: p.estado,
+    total: `s/ ${Number(p.total).toFixed(2)}`,
+    pago: p.pago_estado === 'PAGADO' ? 'Cobrado' : 'Sin cobrar',
+    fecha: p.creado_en.toISOString(),
+  };
+}
+
 @Injectable()
 export class ClientesService {
   constructor(
@@ -1144,12 +1156,7 @@ export class ClientesService {
 
     // Pedidos del cliente con la misma regla que el listado: cliente_party_id, o carta/WhatsApp/bot sin ese campo.
     // En MOZO/CAJA party_id es el personal que tomó el pedido, nunca el cliente.
-    const delCliente = {
-      OR: [
-        { cliente_party_id: id },
-        { party_id: id, canal: { in: CANALES_CLIENTE_EN_PARTY }, cliente_party_id: null },
-      ],
-    };
+    const delCliente = this.pedidosDelCliente(id);
     const [pedidos, pagados] = await Promise.all([
       this.prisma.pedido.findMany({
         where: delCliente,
@@ -1206,13 +1213,89 @@ export class ClientesService {
       totalGastado: Math.round(Number(pagados._sum.total ?? 0) * 100) / 100,
       pedidos: pedidos.map((p) => ({
         puntos: puntosPedidos.get(String(p.id)) ?? null,
-        id: p.codigo || p.id.toString(),
-        modalidad: p.modalidad === 'DELIVERY' ? 'Delivery' : p.modalidad === 'LLEVAR' ? 'Para llevar' : 'En el local',
-        estado: p.estado,
-        total: `s/ ${Number(p.total).toFixed(2)}`,
-        pago: p.pago_estado === 'PAGADO' ? 'Cobrado' : 'Sin cobrar',
-        fecha: p.creado_en.toISOString(),
+        ...resumenPedidoCliente(p),
       })),
+    };
+  }
+
+  /** Pedidos del cliente: cliente_party_id, o carta/WhatsApp/bot sin ese campo (en MOZO/CAJA party_id es el personal). */
+  private pedidosDelCliente(id: bigint) {
+    return {
+      OR: [
+        { cliente_party_id: id },
+        { party_id: id, canal: { in: CANALES_CLIENTE_EN_PARTY }, cliente_party_id: null },
+      ],
+    };
+  }
+
+  /** Historial de compras paginado (más recientes primero). */
+  async listarPedidosCliente(partyId: string, pagina = 1, limite = 10) {
+    const id = BigInt(partyId);
+    const lim = Math.min(50, Math.max(1, limite));
+    const pag = Math.max(1, pagina);
+    const filas = await this.prisma.pedido.findMany({
+      where: this.pedidosDelCliente(id),
+      orderBy: { creado_en: 'desc' },
+      skip: (pag - 1) * lim,
+      take: lim + 1,
+      select: { id: true, codigo: true, modalidad: true, estado: true, total: true, pago_estado: true, creado_en: true },
+    });
+    const puntosPedidos = await explicarPedidosPorId(this.prisma, filas.slice(0, lim).map((p) => p.id)).catch(() => new Map<string, ExplicacionPuntos>());
+    return {
+      pagina: pag,
+      hayMas: filas.length > lim,
+      pedidos: filas.slice(0, lim).map((p) => ({ puntos: puntosPedidos.get(String(p.id)) ?? null, ...resumenPedidoCliente(p) })),
+    };
+  }
+
+  /** Qué pidió el cliente en una compra: líneas, descuentos, envío, propina, pago y comprobante (sin datos de contacto ni dirección). */
+  async detallePedidoCliente(partyId: string, pedidoId: string) {
+    const id = BigInt(partyId);
+    const p = await this.prisma.pedido.findFirst({
+      where: { AND: [{ id: BigInt(pedidoId) }, this.pedidosDelCliente(id)] },
+      include: { lineas: { orderBy: { id: 'asc' }, include: { opcionesElegidas: true, sabores: true } } },
+    });
+    if (!p) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Ese pedido no es de este cliente' });
+    }
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const descuentos = (Array.isArray(p.descuento_detalle) ? (p.descuento_detalle as any[]) : []).map((d) => ({
+      tipo: String(d?.tipo ?? ''),
+      nombre: String(d?.nombre ?? d?.codigo ?? d?.tipo ?? 'Descuento'),
+      monto: Number(d?.monto ?? 0),
+    }));
+    return {
+      id: p.id.toString(),
+      codigo: p.codigo,
+      fecha: p.creado_en.toISOString(),
+      modalidad: p.modalidad,
+      estado: p.estado,
+      lineas: p.lineas.map((l) => ({
+        id: l.id.toString(),
+        cantidad: l.cantidad,
+        nombre: l.nombre,
+        tamano: l.tamano,
+        opciones: l.opcionesElegidas.length
+          ? l.opcionesElegidas.map((o) => o.opcion_nombre)
+          : Array.isArray(l.opciones) ? (l.opciones as any[]).map((o) => String(o?.nombre ?? o)) : [],
+        sabores: l.sabores.map((x) => ({ nombre: x.sabor_nombre, cantidad: x.cantidad })),
+        nombresPersona: l.nombres_persona ?? [],
+        nota: l.nota,
+        cortesia: l.es_cortesia,
+        precioUnit: Number(l.precio_unit),
+        subtotal: n(l.subtotal) ?? Number(l.precio_unit) * l.cantidad,
+      })),
+      subtotal: Number(p.subtotal),
+      descuento: Number(p.descuento),
+      descuentos,
+      puntosCanjeados: Number(p.puntos_canjeados ?? 0),
+      envio: n(p.envio),
+      propina: Number(p.propina ?? 0),
+      total: Number(p.total),
+      pagoEstado: p.pago_estado,
+      medioPago: p.pago_metodo,
+      comprobante: p.comprobante_tipo,
+      nota: p.nota,
     };
   }
 

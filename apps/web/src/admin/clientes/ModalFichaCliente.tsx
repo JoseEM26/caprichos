@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
-import type { ClienteItem, FichaCliente, MovimientoPuntosItem } from './tipos';
-import { obtenerFichaCliente, listarHistorialPuntos } from './clientesApi';
+import type { ClienteItem, FichaCliente, MovimientoPuntosItem, PedidoCliente } from './tipos';
+import { obtenerFichaCliente, listarHistorialPuntos, listarComprasCliente } from './clientesApi';
+import { DetalleCompra } from './DetalleCompra';
+import { useSesion } from '../../comun/sesion';
 import { ModalAjustarPuntos } from './ModalAjustarPuntos';
 
 interface PropsModalFichaCliente {
@@ -9,6 +11,15 @@ interface PropsModalFichaCliente {
   cliente: ClienteItem | null;
   alCerrar: () => void;
   alPuntosActualizados: () => void;
+}
+
+function useEsAdmin(): boolean {
+  try {
+    const { usuario } = useSesion();
+    return usuario?.rol?.toUpperCase() === 'ADMIN';
+  } catch {
+    return false;
+  }
 }
 
 export function ModalFichaCliente({
@@ -20,7 +31,12 @@ export function ModalFichaCliente({
   const [ficha, setFicha] = useState<FichaCliente | null>(null);
   const [movimientos, setMovimientos] = useState<MovimientoPuntosItem[]>([]);
   const [cargando, setCargando] = useState(false);
+  const esAdmin = useEsAdmin();
   const [abrirAjuste, setAbrirAjuste] = useState(false);
+  const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
+  const [masCompras, setMasCompras] = useState<PedidoCliente[]>([]);
+  const [hayMas, setHayMas] = useState(false);
+  const [paginaCompras, setPaginaCompras] = useState(1);
   const [saldoPuntos, setSaldoPuntos] = useState(cliente?.puntos ?? 0);
 
   useEffect(() => {
@@ -34,6 +50,10 @@ export function ModalFichaCliente({
       .then(([f, movs]) => {
         if (f) {
           setFicha(f);
+          setHayMas(f.pedidos.length >= 20);
+          setMasCompras([]);
+          setPaginaCompras(1);
+          setAbiertas({});
           setSaldoPuntos(f.puntos);
         }
         setMovimientos(movs || []);
@@ -47,7 +67,14 @@ export function ModalFichaCliente({
   const pedidosCount = ficha?.pedidos?.length ?? cliente.pedidos;
   const info = `${cliente.tipo}${ficha?.ruc ? ` · RUC ${ficha.ruc}` : ''}${ficha?.telefono ? ` · Cel. ${ficha.telefono}` : ''} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
 
-  const pedidos = ficha?.pedidos || [];
+  const pedidos = [...(ficha?.pedidos || []), ...masCompras];
+  const verMas = async () => {
+    const r = await listarComprasCliente(cliente.id, paginaCompras + 1).catch(() => null);
+    if (!r) return;
+    setMasCompras((a) => [...a, ...r.pedidos]);
+    setPaginaCompras(r.pagina);
+    setHayMas(r.hayMas);
+  };
   const verif = ficha && ficha.verificado !== undefined ? ficha : cliente;
 
   return (
@@ -116,7 +143,7 @@ export function ModalFichaCliente({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{info}</div>
-          <button
+          {esAdmin && <button
             type="button"
             onClick={() => setAbrirAjuste(true)}
             style={{
@@ -132,10 +159,10 @@ export function ModalFichaCliente({
             }}
           >
             Ajustar puntos
-          </button>
+          </button>}
         </div>
 
-        <div style={{ fontWeight: 800, marginTop: 4 }}>Pedidos de este turno</div>
+        <div style={{ fontWeight: 800, marginTop: 4 }}>Historial de compras</div>
 
         {cargando && (
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>Cargando historial...</div>
@@ -143,36 +170,46 @@ export function ModalFichaCliente({
 
         {!cargando && pedidos.length === 0 && (
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-            Sin pedidos hoy. El historial completo de pedidos pasados llega con la base de datos real.
+            Este cliente aún no tiene compras.
           </div>
         )}
 
         {!cargando && pedidos.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {pedidos.map((o) => (
-              <div
-                key={o.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '90px 1fr 80px 100px',
-                  gap: 6,
-                  fontSize: 13,
-                  borderTop: '1px solid var(--cp-line)',
-                  padding: '6px 0',
-                }}
-              >
-                <b>{o.id}</b>
-                <span>{o.modalidad} · {o.estado}</span>
-                <span>{o.total}</span>
-                <span style={{ color: 'var(--cp-soft)' }}>{o.pago}</span>
+              <div key={o.id} style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--cp-line)', padding: '6px 0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 80px 100px', gap: 6, fontSize: 13 }}>
+                  <b>{o.id}</b>
+                  <span>{o.modalidad} · {o.estado}</span>
+                  <span>{o.total}</span>
+                  <span style={{ color: 'var(--cp-soft)' }}>{o.pago}</span>
+                </div>
                 {o.puntos && (
-                  <span data-testid="puntos-pedido" style={{ gridColumn: '1 / -1', fontSize: 12, color: o.puntos.estado === 'NO_SUMA' ? 'var(--cp-rust)' : 'var(--cp-green)' }}>
+                  <span data-testid="puntos-pedido" style={{ fontSize: 12, color: o.puntos.estado === 'NO_SUMA' ? 'var(--cp-rust)' : 'var(--cp-green)' }}>
                     Puntos: {o.puntos.estado === 'SUMADO' ? `+${(o.puntos.puntos ?? 0).toFixed(2)} · ` : ''}
                     {o.puntos.texto}
                   </span>
                 )}
+                {o.pedidoId && (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={Boolean(abiertas[o.pedidoId])}
+                      onClick={() => setAbiertas((a) => ({ ...a, [o.pedidoId!]: !a[o.pedidoId!] }))}
+                      style={{ alignSelf: 'flex-start', minHeight: 32, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                    >
+                      {abiertas[o.pedidoId] ? 'Ocultar detalle' : 'Ver detalle'}
+                    </button>
+                    {abiertas[o.pedidoId] && <DetalleCompra clienteId={cliente.id} pedidoId={o.pedidoId} />}
+                  </>
+                )}
               </div>
             ))}
+            {hayMas && (
+              <button type="button" onClick={verMas} style={{ minHeight: 36, border: '1.5px solid var(--cp-navy)', borderRadius: 9999, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer', marginTop: 6 }}>
+                Ver más compras
+              </button>
+            )}
           </div>
         )}
 
@@ -216,7 +253,7 @@ export function ModalFichaCliente({
         )}
       </div>
 
-      <ModalAjustarPuntos
+      {esAdmin && <ModalAjustarPuntos
         abierto={abrirAjuste}
         clienteId={cliente.id}
         clienteNombre={nombre}
@@ -227,7 +264,7 @@ export function ModalFichaCliente({
           alPuntosActualizados();
           listarHistorialPuntos(cliente.id).then((movs) => setMovimientos(movs || []));
         }}
-      />
+      />}
     </>
   );
 }

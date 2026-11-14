@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   GoneException,
   Get,
   Param,
@@ -97,6 +98,20 @@ export class ClientesAdminController {
     return this.clientesService.obtenerFichaAdmin(id, req.usuario, ip);
   }
 
+  /** Historial de compras del cliente, paginado. */
+  @Get(':id/pedidos')
+  @Permiso('clientes', 'ver')
+  async pedidosDelCliente(@Param('id') id: string, @Query('pagina') pagina?: string, @Query('limite') limite?: string) {
+    return this.clientesService.listarPedidosCliente(id, Number(pagina) || 1, Number(limite) || 10);
+  }
+
+  /** Qué pidió en una compra (líneas, descuentos, envío, propina, pago, comprobante). */
+  @Get(':id/pedidos/:pedidoId')
+  @Permiso('clientes', 'ver')
+  async detallePedido(@Param('id') id: string, @Param('pedidoId') pedidoId: string) {
+    return this.clientesService.detallePedidoCliente(id, pedidoId);
+  }
+
   @Post()
   @Permiso('clientes', 'editar')
   async crearEnMostrador(@Body() dto: RegistrarMostradorDto, @Req() req: any) {
@@ -133,6 +148,9 @@ export class ClientesAdminController {
     @Body() dto: AjustarPuntosDto,
     @Req() req: any,
   ) {
+    if (String(req.usuario?.rol ?? '').toUpperCase() !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede ajustar puntos.' });
+    }
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.puntosService.ajustarManual(
       id,

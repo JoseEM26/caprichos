@@ -29,6 +29,8 @@ export interface ClienteItem extends VerificacionCliente {
 }
 
 export interface PedidoCliente {
+  /** Id numérico para pedir el detalle (id es el código visible) */
+  pedidoId?: string;
   id: string;
   modalidad: string;
   estado: string;
@@ -66,4 +68,38 @@ export interface FichaCliente extends VerificacionCliente {
   cumpleMes?: number;
   puntos: number;
   pedidos: PedidoCliente[];
+}
+
+export interface LineaCompraCliente {
+  id: string;
+  cantidad: number;
+  nombre: string;
+  tamano: string | null;
+  opciones: string[];
+  sabores: Array<{ nombre: string; cantidad: number }>;
+  nombresPersona: string[];
+  nota: string | null;
+  cortesia: boolean;
+  precioUnit: number;
+  subtotal: number;
+}
+
+export interface DetalleCompraCliente {
+  id: string;
+  codigo: string;
+  fecha: string;
+  modalidad: string;
+  estado: string;
+  lineas: LineaCompraCliente[];
+  subtotal: number;
+  descuento: number;
+  descuentos: Array<{ tipo: string; nombre: string; monto: number }>;
+  puntosCanjeados: number;
+  envio: number | null;
+  propina: number;
+  total: number;
+  pagoEstado: string | null;
+  medioPago: string | null;
+  comprobante: string | null;
+  nota: string | null;
 }

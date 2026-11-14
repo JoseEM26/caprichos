@@ -29,6 +29,8 @@ describe('ClientesAdminController', () => {
 
   beforeEach(async () => {
     clientesServiceMock = {
+      detallePedidoCliente: jest.fn().mockResolvedValue({ lineas: [] }),
+      listarPedidosCliente: jest.fn().mockResolvedValue({ pedidos: [], hayMas: false }),
       listarAdmin: jest.fn().mockResolvedValue({ items: [], total: 0, pagina: 1, paginas: 1 }),
       obtenerFichaAdmin: jest.fn().mockResolvedValue({ id: '100', nombre: 'Ana' }),
       crearEnMostrador: jest.fn().mockResolvedValue({ id: '100', nombre: 'Ana' }),
@@ -114,6 +116,23 @@ describe('ClientesAdminController', () => {
       1n,
       '127.0.0.1',
     );
+  });
+
+  it('ajustarPuntos: quien no es ADMIN recibe 403 y no se ajusta nada', async () => {
+    puntosServiceMock.ajustarManual.mockClear();
+    for (const rol of ['CAJERO', 'SUPERVISOR', undefined]) {
+      await expect(
+        controller.ajustarPuntos('100', { puntos: 10, motivo: 'Premio por fidelidad' }, { usuario: { partyId: 2n, rol } } as any),
+      ).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+    }
+    expect(puntosServiceMock.ajustarManual).not.toHaveBeenCalled();
+  });
+
+  it('historial de compras: detalle y página delegan al servicio (permiso clientes/ver)', async () => {
+    await controller.detallePedido('9', '55');
+    expect(clientesServiceMock.detallePedidoCliente).toHaveBeenCalledWith('9', '55');
+    await controller.pedidosDelCliente('9', '2', '20');
+    expect(clientesServiceMock.listarPedidosCliente).toHaveBeenCalledWith('9', 2, 20);
   });
 
   describe('GET por-telefono/:telefono', () => {

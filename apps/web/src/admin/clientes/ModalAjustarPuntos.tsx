@@ -39,8 +39,8 @@ export function ModalAjustarPuntos({
       setErrorMsg(`No se puede restar más puntos del saldo actual (${saldoActual.toFixed(2)} pts).`);
       return;
     }
-    if (motivo.trim().length < 3) {
-      setErrorMsg('Escribe el motivo del ajuste (mínimo 3 caracteres).');
+    if (motivo.trim().length < 4) {
+      setErrorMsg('Escribe el motivo del ajuste (mínimo 4 caracteres).');
       return;
     }
 
