@@ -125,6 +125,35 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     );
   });
 
+  it('con propina (monto libre): el plan dividido suma venta + propina y la propina viaja aparte', async () => {
+    datos.propina!.carta = true;
+    try {
+      vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
+      abrirPedido();
+      await irAPago();
+      fireEvent.change(screen.getByLabelText(/Propina opcional para el equipo/i), { target: { value: '5' } });
+      fireEvent.click(screen.getByTestId('alternar-pago-dividido'));
+      fireEvent.change(screen.getByLabelText(/¿Cuánto pagas con YAPE\?/i), { target: { value: '38' } });
+      fireEvent.click(botonDelDividido('EFECTIVO'));
+      // venta 40 + propina 5 = 45: a Yape 38, el resto (7) en efectivo
+      expect(screen.getByTestId('pago-dividido')).toHaveTextContent('YAPE S/ 38.00 + EFECTIVO S/ 7.00');
+      fireEvent.change(screen.getByLabelText(/Paga con/i), { target: { value: '10' } });
+      fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith(
+          '/pedidos',
+          expect.objectContaining({
+            propina: 5,
+            pago: { metodo: 'YAPE', pagaCon: 10, plan: [{ medio: 'YAPE', monto: 38 }, { medio: 'EFECTIVO', monto: 7 }] },
+          }),
+          expect.anything(),
+        ),
+      );
+    } finally {
+      datos.propina!.carta = false;
+    }
+  });
+
   it('un monto igual o mayor al total no es un pago dividido', async () => {
     abrirPedido();
     await irAPago();

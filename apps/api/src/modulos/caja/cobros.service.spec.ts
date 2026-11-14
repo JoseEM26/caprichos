@@ -102,6 +102,7 @@ describe('CobrosService', () => {
       },
       parametro: {
         findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       // El cierre silencioso de Validar pago consulta conversaciones en espera (sin ninguna por defecto)
       conversacion: {
@@ -433,6 +434,69 @@ describe('CobrosService', () => {
       expect(Number(renglon.vuelto)).toBe(5); // recibido 60 - (venta + propina) 55
       expect(res.pagos[0].propina).toBe(5);
       expect(res.total).toBe(50); // el total de la venta no cambia
+    });
+
+    describe('propina escrita al cobrar (pedido sin propina)', () => {
+      const cobroMock = (propina: number, medio = 'EFECTIVO') => ({
+        id: 79n, pedido_id: 100n, caja_id: 10n, total: new Prisma.Decimal(50), credito_personal: false, cobrado_por: 2n, en: new Date(),
+        pagos: [{ id: 1n, medio, monto: new Prisma.Decimal(50), propina: new Prisma.Decimal(propina), recibido: null, vuelto: null }],
+      });
+      const prepararCobro = (propina = 0) => {
+        prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+        prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, propina: new Prisma.Decimal(propina) });
+        prismaMock.cobro.create.mockResolvedValue(cobroMock(7.5));
+        prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO' });
+      };
+
+      it('guarda la propina en el pedido y por renglón; con pago dividido se reparte en proporción', async () => {
+        prepararCobro();
+        await service.cobrar(
+          { pedidoId: '100', propina: 7.5, pagos: [{ medio: 'EFECTIVO', monto: 20 }, { medio: 'YAPE', monto: 37.5 }] } as any,
+          cajeroUsuario,
+        );
+        const renglones = prismaMock.cobro.create.mock.calls[0][0].data.pagos.create;
+        const sumaProp = renglones.reduce((t: number, r: any) => t + Number(r.propina), 0);
+        expect(Math.round(sumaProp * 100)).toBe(750);
+        expect(renglones.map((r: any) => Number(r.monto) + Number(r.propina))).toEqual([20, 37.5]);
+        expect(prismaMock.pedido.update.mock.calls[0][0].data.propina.toString()).toBe('7.5');
+      });
+
+      it('sin sumar la propina al pago: PAGO_NO_CUADRA', async () => {
+        prepararCobro();
+        await expect(
+          service.cobrar({ pedidoId: '100', propina: 7.5, pagos: [{ medio: 'TARJETA', monto: 50 }] } as any, cajeroUsuario),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGO_NO_CUADRA' } });
+      });
+
+      it.each(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'])('medio %s: la propina queda en su renglón', async (medio) => {
+        prepararCobro();
+        await service.cobrar({ pedidoId: '100', propina: 5, pagos: [{ medio, monto: 55 }], confirmaSinCaptura: true } as any, cajeroUsuario);
+        const r = prismaMock.cobro.create.mock.calls[0][0].data.pagos.create[0];
+        expect(r.medio).toBe(medio);
+        expect(Number(r.propina)).toBe(5);
+        expect(Number(r.monto)).toBe(50);
+      });
+
+      it('interruptor de Caja apagado: PROPINA_APAGADA', async () => {
+        prepararCobro();
+        prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'propina_activa', valor: { carta: true, bot: true, mozo: true, caja: false } }]);
+        await expect(
+          service.cobrar({ pedidoId: '100', propina: 5, pagos: [{ medio: 'EFECTIVO', monto: 55 }] } as any, cajeroUsuario),
+        ).rejects.toMatchObject({ response: { codigo: 'PROPINA_APAGADA' } });
+      });
+
+      it('sobre el tope o con el pedido ya con propina: se rechaza', async () => {
+        prepararCobro();
+        prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'propina_tope', valor: 20 }]);
+        await expect(
+          service.cobrar({ pedidoId: '100', propina: 30, pagos: [{ medio: 'EFECTIVO', monto: 80 }] } as any, cajeroUsuario),
+        ).rejects.toMatchObject({ response: { codigo: 'PROPINA_INVALIDA' } });
+        prismaMock.parametro.findMany.mockResolvedValue([]);
+        prepararCobro(5);
+        await expect(
+          service.cobrar({ pedidoId: '100', propina: 3, pagos: [{ medio: 'EFECTIVO', monto: 58 }] } as any, cajeroUsuario),
+        ).rejects.toMatchObject({ response: { codigo: 'PROPINA_NO_APLICA' } });
+      });
     });
 
     it('crédito del personal + delivery: el cobro es solo el envío (total - monto_credito) y el cobro guarda ese monto', async () => {

@@ -152,6 +152,25 @@ describe('caja.calculo', () => {
     expect(cliente.pedido.findMany.mock.calls[0][0].where.devolucion.is.creado_en.gte.toISOString()).toBe('2026-11-06T05:00:00.000Z');
   });
 
+  it('propina en pago dividido con los 5 medios: cada medio recibe su parte y el total de propinas cuadra', async () => {
+    const m = (monto: number, propina: number, medio: string) => ({ medio, monto: new Prisma.Decimal(monto), propina: new Prisma.Decimal(propina) });
+    const cliente: any = {
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      cobro: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 1n, anulado_en: null, pagos: [m(10, 1, 'EFECTIVO'), m(10, 1, 'YAPE'), m(10, 1, 'PLIN'), m(10, 1, 'TARJETA'), m(10, 1, 'TRANSFERENCIA')] },
+        ]),
+      },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const montos = await calcularMontosCaja(cliente, { id: 10n, fecha: new Date('2026-11-06T00:00:00.000Z'), apertura: new Prisma.Decimal(0) });
+    expect(montos.propinasEfectivo).toBe(1);
+    expect(montos.propinasDigitales).toBe(4);
+    expect([montos.sistemaYape, montos.sistemaPlin, montos.sistemaTransferencia, montos.sistemaTarjeta]).toEqual([11, 11, 11, 11]);
+    expect(montos.esperadoEfectivo).toBe(11);
+  });
+
   it('el cobro anulado (conservado, RNF-CAP-014) no cuenta en lo esperado: solo los vigentes de la caja', async () => {
     const cobros = [
       { id: 1n, caja_id: 10n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(30) }] },

@@ -1,7 +1,8 @@
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { PuntosService } from '../clientes/puntos.service';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
-import { repartirPropina } from '../propinas/propinas.util';
+import { normalizarPropina, propinaActivaParaCanal, repartirPropina } from '../propinas/propinas.util';
+import { leerConfigPropina } from '../propinas/propinas.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
@@ -305,7 +306,33 @@ export class CobrosService {
 
       // Los montos de los pagos son lo que entrega el cliente por cada medio: venta + propina.
       // Deben sumar exactamente lo que se cobra (en céntimos, sin floats).
-      const propinaPedido = Number(pedido.propina ?? 0);
+      let propinaPedido = Number(pedido.propina ?? 0);
+      // Propina escrita al cobrar (pedido que se paga al final, delivery, WhatsApp sin propina): solo si el pedido
+      // aún no tiene, con el interruptor de Caja encendido y dentro del tope. Se guarda en el pedido.
+      const propinaCobro = Number(dto.propina ?? 0);
+      if (propinaCobro > 0) {
+        if (propinaPedido > 0 || pedido.es_personal) {
+          throw new HttpException(
+            { codigo: 'PROPINA_NO_APLICA', mensaje: 'Este pedido ya tiene propina o es de crédito del personal' },
+            HttpStatus.CONFLICT,
+          );
+        }
+        const cfg = await leerConfigPropina(tx as any);
+        if (!propinaActivaParaCanal(cfg.activa, 'CAJA')) {
+          throw new HttpException(
+            { codigo: 'PROPINA_APAGADA', mensaje: 'La propina está apagada para Caja en Configuración' },
+            HttpStatus.CONFLICT,
+          );
+        }
+        const r = normalizarPropina(propinaCobro, cfg.tope);
+        if (!r.valido) {
+          throw new BadRequestException({
+            codigo: 'PROPINA_INVALIDA',
+            mensaje: `La propina debe ser un monto en soles, con hasta 2 decimales y no mayor a S/ ${cfg.tope}`,
+          });
+        }
+        propinaPedido = r.monto;
+      }
       // Con crédito del personal + delivery, lo que se cobra es solo el envío (total - monto_credito)
       const totalPedido = aCentimos(montoACobrar(pedido)) + aCentimos(propinaPedido);
       const totalPagos = dto.pagos.reduce((acc, p) => acc + aCentimos(p.monto), 0);
@@ -400,6 +427,7 @@ export class CobrosService {
         data: {
           pago_estado: 'PAGADO',
           pago_metodo: pagoMetodo,
+          ...(propinaCobro > 0 ? { propina: new Prisma.Decimal(propinaPedido) } : {}),
         },
       });
 

@@ -60,4 +60,11 @@ export class CobrarDto {
   @IsOptional()
   @IsBoolean()
   confirmaSinCaptura?: boolean;
+
+  /** Propina (monto libre, aparte de la venta) escrita al cobrar un pedido que aún no la tiene. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'La propina debe ser un monto con hasta 2 decimales' })
+  @Min(0, { message: 'La propina no puede ser negativa' })
+  propina?: number;
 }

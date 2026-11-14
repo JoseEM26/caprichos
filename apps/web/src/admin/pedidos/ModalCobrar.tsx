@@ -5,7 +5,7 @@ import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, montoPorCobrar, Pedido, PagoItem, CobrarDto } from './pedidosApi';
-import { ErrorApi } from '../../comun/api';
+import { api, ErrorApi } from '../../comun/api';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
@@ -50,7 +50,31 @@ export function ModalCobrar({
   const sinUbicar = deliverySinUbicacion(pedido);
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
-  const propinaPedido = Number(pedido.propina) || 0;
+  const propinaGuardada = Number(pedido.propina) || 0;
+  // Propina escrita aquí (pedido que se paga al final, delivery o WhatsApp sin propina): monto libre, solo si Caja la tiene encendida
+  const [propinaTexto, setPropinaTexto] = useState('');
+  const [cfgPropina, setCfgPropina] = useState<{ caja: boolean; tope: number }>({ caja: false, tope: 200 });
+  useEffect(() => {
+    if (propinaGuardada > 0 || pedido.es_personal) return;
+    let vigente = true;
+    Promise.resolve(api.get<{ propina?: { caja?: boolean; tope?: number } }>('/carta/local'))
+      .then((d) => {
+        if (vigente && d?.propina) setCfgPropina({ caja: d.propina.caja === true, tope: d.propina.tope && d.propina.tope > 0 ? d.propina.tope : 200 });
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [pedido.id]);
+  const puedeEscribirPropina = propinaGuardada === 0 && !pedido.es_personal && cfgPropina.caja;
+  const propinaLimpia = propinaTexto.trim().replace(',', '.');
+  const propinaFormatoOk = /^\d+(\.\d{1,2})?$/.test(propinaLimpia);
+  const propinaEscrita = puedeEscribirPropina && propinaLimpia !== '' && propinaFormatoOk ? Math.round(Number(propinaLimpia) * 100) / 100 : 0;
+  const errorPropina =
+    puedeEscribirPropina && propinaLimpia !== '' && (!propinaFormatoOk || propinaEscrita > cfgPropina.tope)
+      ? `La propina debe ser un monto entre S/ 0 y S/ ${cfgPropina.tope.toFixed(2)}, con hasta 2 decimales`
+      : '';
+  const propinaPedido = propinaGuardada > 0 ? propinaGuardada : errorPropina ? 0 : propinaEscrita;
   const totalPedido = montoPorCobrar(pedido) + propinaPedido;
 
   // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
@@ -140,6 +164,20 @@ export function ModalCobrar({
   }, [sumaPagos, totalPedido]);
 
   const cuadra = Math.abs(diferencia) < 0.005;
+
+  const cambiarPropina = (texto: string) => {
+    const limpio = texto.trim().replace(',', '.');
+    const nueva = /^\d+(\.\d{1,2})?$/.test(limpio) && Number(limpio) <= cfgPropina.tope ? Math.round(Number(limpio) * 100) / 100 : 0;
+    const delta = Math.round((nueva - propinaPedido) * 100) / 100;
+    setPropinaTexto(texto);
+    setErrorMensaje('');
+    // lo que entrega el cliente sube o baja con la propina: la diferencia va al primer renglón
+    if (delta !== 0) {
+      setPagos((prev) =>
+        prev.map((f, i) => (i === 0 ? { ...f, monto: Math.max(0, Number(((parseFloat(f.monto) || 0) + delta).toFixed(2))).toFixed(2) } : f)),
+      );
+    }
+  };
 
   const cambiarFila = (index: number, parche: Partial<FilaPago>) => {
     setErrorMensaje('');
@@ -236,6 +274,7 @@ export function ModalCobrar({
       await cobrar({
         pedidoId: pedido.id,
         pagos: itemsDto,
+        ...(propinaGuardada === 0 && propinaPedido > 0 ? { propina: propinaPedido } : {}),
         ...comprobante,
       });
       alCobrarExitoso();
@@ -339,6 +378,29 @@ export function ModalCobrar({
           <span>Total a cobrar</span>
           <span>S/ {totalPedido.toFixed(2)}</span>
         </div>
+
+        {puedeEscribirPropina && (
+          <div data-testid="cobro-propina-escribir" style={{ marginTop: -6, marginBottom: 6 }}>
+            <label htmlFor="cobro-propina-input" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)', display: 'block', marginBottom: 4 }}>
+              Propina para el equipo (opcional, S/)
+            </label>
+            <input
+              id="cobro-propina-input"
+              type="text"
+              inputMode="decimal"
+              value={propinaTexto}
+              placeholder="0.00"
+              aria-invalid={errorPropina !== ''}
+              onChange={(e) => cambiarPropina(e.target.value)}
+              style={{ width: '100%', minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-navy, #0B2C3E)', padding: '0 12px', fontSize: 16 }}
+            />
+            {errorPropina && (
+              <div role="alert" style={{ fontSize: 12, color: 'var(--cp-rust, #B2500F)', marginTop: 4 }}>
+                {errorPropina}
+              </div>
+            )}
+          </div>
+        )}
 
         {propinaPedido > 0 && (
           <div data-testid="cobro-propina" style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)', marginTop: -6, marginBottom: 6 }}>

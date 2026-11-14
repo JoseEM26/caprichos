@@ -1882,6 +1882,30 @@ describe('PedidosService', () => {
         });
       });
 
+      describe('propina en cada canal (interruptor por defecto, monto libre y tope)', () => {
+        const validar = (v: unknown, canal: string) => (service as any).validarPropina(v, canal);
+        it('sin parámetro o con el canal sin valor: ENCENDIDA (carta, bot, mozo, caja)', async () => {
+          prismaMock.parametro.findMany.mockResolvedValue([]);
+          for (const canal of ['CARTA', 'WHATSAPP', 'MOZO', 'CAJA']) expect(await validar(7.5, canal)).toBe(7.5);
+        });
+        it('solo un false explícito apaga ese canal; los demás siguen', async () => {
+          prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'propina_activa', valor: { carta: false, bot: true } }]);
+          expect(await validar(5, 'CARTA')).toBe(0);
+          expect(await validar(5, 'BOT')).toBe(5);
+          expect(await validar(5, 'MOZO')).toBe(5);
+        });
+        it('monto libre: decimales, coma y «S/»; vacío o 0 = sin propina; negativo, 3 decimales o sobre el tope = PROPINA_INVALIDA', async () => {
+          prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'propina_tope', valor: 50 }]);
+          expect(await validar('2,50', 'CARTA')).toBe(2.5);
+          expect(await validar('S/ 3', 'CARTA')).toBe(3);
+          expect(await validar(0, 'CARTA')).toBe(0);
+          expect(await validar('', 'CARTA')).toBe(0);
+          for (const malo of [-1, 1.234, 51, 'abc']) {
+            await expect(validar(malo, 'CARTA')).rejects.toMatchObject({ response: { codigo: 'PROPINA_INVALIDA' } });
+          }
+        });
+      });
+
       it('acepta un medio digital (YAPE, PLIN, TRANSFERENCIA) para llevar desde el canal MOZO', async () => {
         for (const metodo of ['YAPE', 'PLIN', 'TRANSFERENCIA'] as const) {
           let pedidoCreadoData: any = null;

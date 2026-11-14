@@ -438,6 +438,8 @@ export interface CobrarDto {
   sinVoucher?: { motivo: string };
   /** Casilla única «ya hablé con el cliente y pagó» (pedido del local, sin captura). */
   confirmaSinCaptura?: boolean;
+  /** Propina escrita al cobrar un pedido que aún no la tiene (monto libre, aparte de la venta). */
+  propina?: number;
 }
 
 /** Excepción a la foto: la casilla del local viaja como confirmaSinCaptura; el resto, con motivo. */
