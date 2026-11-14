@@ -124,6 +124,8 @@ export function PasoPagoPedido({
     <section className="np2-pago" aria-label="Pago del pedido" data-testid="paso-pago">
       <div className="np2-resumen-linea">{resumen}</div>
 
+      <div className="np2-columnas">
+      <div className="np2-col np2-col--pago">
       {bloqueProgramar}
 
       {onCuandoPaga && !bloquePersonal && (
@@ -263,6 +265,8 @@ export function PasoPagoPedido({
         </div>
       )}
 
+      </div>
+      <div className="np2-col np2-col--resumen">
       {propinaActiva && !bloquePersonal && conDetalle && (
         <div className="np2-propina" data-testid="propina-nuevo-pedido">
           <label htmlFor="np-propina">Propina para el equipo (opcional)</label>
@@ -327,6 +331,8 @@ export function PasoPagoPedido({
           </div>
         )}
       </dl>
+      </div>
+      </div>
     </section>
   );
 }

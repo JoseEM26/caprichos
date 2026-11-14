@@ -57,8 +57,43 @@
 .np2-contenedor {
   display: flex;
   flex-direction: column;
+  /* El panel del modal oculta lo que se pasa: el paso 2 hace su propio scroll y el pie queda fijo abajo */
+  flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   gap: 4px;
+  container: np2 / inline-size;
+}
+
+/* Una columna en celular; en PC/tablet ancha: a la izquierda cómo y cuánto paga, a la derecha propina,
+   comprobante y total (siempre a la vista) */
+.np2-columnas {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.np2-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+@container np2 (min-width: 780px) {
+  .np2-pago {
+    max-width: 1040px;
+  }
+  .np2-columnas {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .np2-col--resumen {
+    position: sticky;
+    top: 0;
+  }
 }
 
 .np2-pago {
