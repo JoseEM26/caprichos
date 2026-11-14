@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { CrearMensajeInternoDto, FiltroHistorialDto, MarcarClaveDto, MarcarLeidaDto, MarcarTodasDto } from './dto/notificaciones.dto';
+import { CrearMensajeInternoDto, FiltroHistorialDto, GuardarAvisosPorRolDto, MarcarClaveDto, MarcarLeidaDto, MarcarTodasDto } from './dto/notificaciones.dto';
 import { NotificacionesService } from './notificaciones.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -42,6 +42,17 @@ export class NotificacionesController {
   @Permiso('notificaciones', 'marcar')
   marcarTodas(@Body() dto: MarcarTodasDto, @Req() req: any) {
     return this.notificaciones.marcarTodasLeidas(req.usuario, dto.ids);
+  }
+
+  /** Tabla «Avisos por rol» (solo ADMIN: lo comprueba el servicio) */
+  @Get('avisos-por-rol')
+  avisosPorRol(@Req() req: any) {
+    return this.notificaciones.avisosPorRol(req.usuario);
+  }
+
+  @Put('avisos-por-rol')
+  guardarAvisosPorRol(@Body() dto: GuardarAvisosPorRolDto, @Req() req: any) {
+    return this.notificaciones.guardarAvisosPorRol(dto.matriz, req.usuario, ipDe(req));
   }
 
   @Post('mensaje-interno')

@@ -11,6 +11,10 @@ const cumple = (fila: any, where: any): boolean => {
       if (!(cond as any[]).every((c) => cumple(fila, c))) return false;
       continue;
     }
+    if (k === 'NOT') {
+      if (cumple(fila, cond)) return false;
+      continue;
+    }
     if (k === 'OR') {
       if (!(cond as any[]).some((c) => cumple(fila, c))) return false;
       continue;
