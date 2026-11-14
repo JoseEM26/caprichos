@@ -371,7 +371,7 @@ describe('Carta ▸ PuntosCanje y NotificacionesCliente', () => {
 
     render(<PuntosCanje totalPedido={25} puntosAplicados={0} alAplicar={alAplicar} />);
 
-    expect(screen.getByText(/Pides con la cuenta de/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tienes/i)).toBeInTheDocument();
     expect(screen.getByText(/Puedes usar hasta/i)).toBeInTheDocument();
 
     const input = screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i);

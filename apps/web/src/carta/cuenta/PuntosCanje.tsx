@@ -8,14 +8,11 @@ interface PropsPuntosCanje {
   alAplicar: (puntos: number) => void;
   /** puntos_porcentaje del servidor (5 por defecto) */
   porcentaje?: number;
+  /** Por qué no se pueden usar (p. ej. descuento del equipo); si no llega, se explica por saldo o promoción */
+  motivoNoAplica?: string;
 }
 
 const contenedor: CSSProperties = {
-  background: 'var(--card, var(--cp-cream, #FFFBF5))',
-  border: '1px solid var(--line, var(--cp-line, #E5D6C5))',
-  borderRadius: 12,
-  padding: 12,
-  marginBottom: 12,
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
@@ -88,7 +85,7 @@ function evaluarPuntos(texto: string, saldo: number, maximo: number): { puntos: 
 /**
  * Componente de canje de puntos en el paso de pago (DT-55, RQ-CLI-02-11, mockup Main.dc.html).
  */
-export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaje = 5 }: PropsPuntosCanje) {
+export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaje = 5, motivoNoAplica }: PropsPuntosCanje) {
   const { cliente, abrirPanel } = useCuenta();
   const [valorInput, setValorInput] = useState(puntosAplicados > 0 ? String(puntosAplicados) : '');
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -160,8 +157,14 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
   if (maximoUsable < 1 && puntosAplicados <= 0) {
     return (
       <div style={contenedor}>
-        <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
-          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos. Se pueden usar desde 1 punto, en productos sin promoción ni descuento.
+        <div data-testid="puntos-saldo" style={{ fontSize: 13, lineHeight: '18px' }}>
+          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos (= S/ {saldoDisponible.toFixed(2)})
+        </div>
+        <div data-testid="puntos-motivo" role="status" style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
+          {motivoNoAplica ??
+            (saldoDisponible < 1
+              ? `Te faltan ${(1 - saldoDisponible).toFixed(2)} puntos para usarlos (mínimo 1).`
+              : 'Los puntos no aplican a productos con descuento del equipo o en promoción.')}
         </div>
       </div>
     );
@@ -173,6 +176,12 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
     alAplicar(puntosEscritos);
   };
 
+  const usarTodos = () => {
+    cancelarPendiente();
+    setValorInput(String(maximoUsable));
+    alAplicar(maximoUsable);
+  };
+
   const quitar = () => {
     cancelarPendiente();
     alAplicar(0);
@@ -181,11 +190,14 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
 
   return (
     <div style={contenedor}>
-      <div style={{ fontSize: 13, lineHeight: '18px' }}>
-        Pides con la cuenta de <b>{cliente.nombre}</b>
+      <div data-testid="puntos-saldo" style={{ fontSize: 13, lineHeight: '18px' }}>
+        Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos (= S/ {saldoDisponible.toFixed(2)})
       </div>
 
-      <div style={{ borderTop: '1px solid var(--line, var(--cp-line, #E5D6C5))', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <button type="button" onClick={usarTodos} style={{ ...botonIngresar, minHeight: 44 }}>
+          Usar mis puntos
+        </button>
         <label htmlFor="f-canje" style={{ fontWeight: 700, fontSize: 13 }}>
           ¿Cuántos puntos deseas usar?
         </label>
@@ -219,7 +231,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
         </div>
 
         <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--soft, var(--cp-soft, #5A6D7C))' }}>
-          Tienes <b>{saldoDisponible.toFixed(2)}</b> puntos. Puedes usar hasta <b>{maximoUsable}</b>, en números enteros.{' '}
+          Puedes usar hasta <b>{maximoUsable}</b> en este pedido.{' '}
           {numInput > 0 && numInput <= saldoDisponible && `Te quedan ${saldoRestante.toFixed(2)} puntos.`}
         </div>
 

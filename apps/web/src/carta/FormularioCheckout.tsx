@@ -15,6 +15,7 @@ import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
 import { enlaceGoogleMaps } from '../comun/mapa/leaflet';
 import { useCarrito } from './CarritoContext';
 import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
+import { TituloBloque } from './BloquesPago';
 type DatosRuc = { ruc: string; razon_social: string; estado: string | null; condicion: string | null; direccion: string | null; desactualizado: boolean };
 type ConsultaRuc =
   | { estado: 'idle' | 'cargando' | 'invalido' | 'noencontrado' | 'manual' }
@@ -1894,6 +1895,7 @@ export function FormularioCheckout({
               {/* ================= APARTADO 3: PAGO ================= */}
               {paso === 3 && (
                 <>
+                  {!tarjetasPago && <TituloBloque id="bloque-como-pagas">Cómo pagas</TituloBloque>}
                   {equipoCuenta && (
                     <SelectorPagoEquipo valor={pagoEquipo} alCambiar={setPagoEquipo} puedeCredito={equipoCuenta.puedeCredito} esDelivery={modalidad === 'DELIVERY'} />
                   )}
@@ -1945,8 +1947,347 @@ export function FormularioCheckout({
                   {!tarjetasPago && (!conCredito || pagaEnvio) && (
                   <>
                   <EncabezadoDetalle titulo={tituloPago} textoCambiar="Cambiar" alCambiar={() => setVistaPago('medios')} />
-                  {!conCredito && (
+                  {/* Medio de pago */}
+                  <div
+                    style={{
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--cp-line)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    {dividirPago && <PagoDivididoCarta filas={filasDiv} aCobrar={aCobrar} medios={mediosDisponibles} alCambiar={setFilasDiv} />}
+
+                    {mediosDatos.map((mp) => (
+                      <Fragment key={mp}>
+                    {/* Datos copiables del medio de pago */}
+                    {(mp === 'YAPE' || mp === 'PLIN') && (
+                      <div
+                        style={{
+                          backgroundColor: 'var(--cp-sand)',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {mp}:{' '}
+                            {mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
+                              datosLocal?.telefono ||
+                              '123456789'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                            Titular: {datosLocal?.nombre || 'Caprichos'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copiarTexto(
+                              mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
+                                datosLocal?.telefono ||
+                                '123456789',
+                              'pago-tel',
+                            )
+                          }
+                          style={{
+                            minHeight: '36px',
+                            padding: '0 10px',
+                            border: '1px solid var(--cp-navy)',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--cp-white)',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {copiadoKey === 'pago-tel' ? 'Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                    )}
+
+                    {mp === 'TRANSFERENCIA' && (
+                      <div
+                        style={{
+                          backgroundColor: 'var(--cp-sand)',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
+                          </div>
+                          <div style={{ fontSize: '12px' }}>
+                            Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copiarTexto(
+                              mediosPagoDisponibles.transferencia?.cuenta || '123456789',
+                              'pago-cta',
+                            )
+                          }
+                          style={{
+                            minHeight: '36px',
+                            padding: '0 10px',
+                            border: '1px solid var(--cp-navy)',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--cp-white)',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {copiadoKey === 'pago-cta' ? 'Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                    )}
+
+                      </Fragment>
+                    ))}
+
+                    {metodoPago === 'TARJETA' && (
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
+                      </div>
+                    )}
+
+                    {efectivoParte > 0 && (
+                      <div>
+                        <label
+                          htmlFor="f-paga-con"
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          Paga con (monto en soles, obligatorio){planDividido.plan ? ` · efectivo S/ ${efectivoParte.toFixed(2)}` : ''}
+                        </label>
+                        <input
+                          id="f-paga-con"
+                          type="number"
+                          step="0.10"
+                          min={efectivoParte}
+                          value={pagaCon}
+                          onChange={(e) => setPagaCon(e.target.value)}
+                          aria-required="true"
+                          placeholder={`Ej.: ${Math.ceil(efectivoParte / 10) * 10}`}
+                          style={{
+                            width: '100%',
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            backgroundColor: 'var(--cp-cream)',
+                            color: 'var(--cp-navy)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPagaCon(efectivoParte.toFixed(2))}
+                          style={{
+                            marginTop: '6px',
+                            minHeight: '36px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            background: 'var(--cp-white)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            padding: '0 12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Pago exacto (S/ {efectivoParte.toFixed(2)})
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                      Pasa directo a cocina; te avisamos por WhatsApp.
+                    </div>
+                  </div>
+
+                  </>
+                  )}
+
+                  {/* Descuentos: puntos y cupón */}
+                  {!tarjetasPago && (
+                  <div data-testid="bloque-descuentos" style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <TituloBloque id="bloque-descuentos" ayuda={textoPuntos}>Descuentos</TituloBloque>
+                  {!clienteCuenta && !conCredito && (
+                    <div style={{ fontSize: '13px', color: 'var(--cp-navy)' }}>
+                      <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 0, padding: 0, minHeight: '44px', fontSize: '13px', fontWeight: 800, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
+                        Inicia sesión
+                      </button>{' '}
+                      para usar y sumar puntos.
+                    </div>
+                  )}
+                  {cuponAplicado && clienteCuenta && !conCredito && (
+                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Con cupón no se usan puntos.</div>
+                  )}
+                  {!tarjetasPago && !cuponAplicado && clienteCuenta && !conCredito && (
+                    <PuntosCanje
+                      totalPedido={Math.max(0, promos.canjeable ?? 0)}
+                      puntosAplicados={puntosAplicados}
+                      alAplicar={setPuntosAplicados}
+                      porcentaje={pctPuntos}
+                      motivoNoAplica={detalleEquipo ? 'Los puntos no aplican a productos con descuento del equipo o en promoción.' : undefined}
+                    />
+                  )}
+
+                  {!tarjetasPago && puntosAplicados === 0 && (
+                    <div
+                      style={{
+                        borderTop: '1px solid var(--cp-line)',
+                        paddingTop: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <label htmlFor="f-cup" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                        Cupón <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
+                      </label>
+                      {!cuponAplicado ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            id="f-cup"
+                            type="text"
+                            value={cuponCodigo}
+                            onChange={(e) => {
+                              setCuponCodigo(e.target.value);
+                              setMensajeCupon(null);
+                            }}
+                            placeholder="Código"
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              boxSizing: 'border-box',
+                              minHeight: '44px',
+                              borderRadius: '12px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              textTransform: 'uppercase',
+                              fontSize: '14px',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={aplicarCupon}
+                            disabled={cargandoCupon || !cuponCodigo.trim()}
+                            style={{
+                              minHeight: '44px',
+                              padding: '0 16px',
+                              border: '1.5px solid var(--cp-navy)',
+                              borderRadius: '12px',
+                              backgroundColor: 'transparent',
+                              color: 'var(--cp-navy)',
+                              fontWeight: 800,
+                              cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
+                              opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
+                            }}
+                          >
+                            {cargandoCupon ? '...' : 'Aplicar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
+                          <button
+                            type="button"
+                            onClick={removerCupon}
+                            style={{
+                              minHeight: '40px',
+                              padding: '0 8px',
+                              border: 0,
+                              backgroundColor: 'transparent',
+                              color: 'var(--cp-rust)',
+                              fontWeight: 700,
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Quitar cupón
+                          </button>
+                        </div>
+                      )}
+                      {mensajeCupon && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            lineHeight: '17px',
+                            fontWeight: 600,
+                            color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
+                          }}
+                        >
+                          {mensajeCupon}
+                        </div>
+                      )}
+                      {cuponAplicado?.envioGratis && modalidad !== 'DELIVERY' && (
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cp-rust)' }}>
+                          El cupón de envío gratis solo aplica a delivery.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!tarjetasPago && !conCredito && (
                   <>
+                    {propinaActiva && !conCredito && (
+                      <div data-testid="propina-carta" style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)' }}>
+                        <TituloBloque id="bloque-propina" ayuda="Va aparte de tu pedido: no entra en el comprobante.">Propina</TituloBloque>
+                        <label htmlFor="f-propina" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}>
+                          Propina (S/)
+                        </label>
+                        <input
+                          id="f-propina"
+                          type="text"
+                          inputMode="decimal"
+                          value={propinaTexto}
+                          onChange={(e) => setPropinaTexto(e.target.value)}
+                          placeholder="0.00"
+                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '16px' }}
+                        />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px', marginTop: '4px' }}>
+                          Opcional · máximo S/ {topePropina.toFixed(2)}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          {[1, 2, 5].filter((m) => m <= topePropina).map((m) => (
+                            <button key={m} type="button" aria-pressed={propinaTexto === String(m)} onClick={() => setPropinaTexto(propinaTexto === String(m) ? '' : String(m))} style={{ minHeight: '44px', minWidth: '64px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', background: propinaTexto === String(m) ? 'var(--cp-sand)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                              S/ {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+
                   {/* Comprobante Boleta o Factura (DT-77) */}
                   <div
                     style={{
@@ -1959,15 +2300,7 @@ export function FormularioCheckout({
                       gap: '12px',
                     }}
                   >
-                    <div
-                      style={{
-                        fontFamily: 'var(--fuente-titulos)',
-                        fontWeight: 700,
-                        fontSize: '14px',
-                      }}
-                    >
-                      Comprobante de pago
-                    </div>
+                    <TituloBloque id="bloque-comprobante" ayuda="Simple: ticket sin tus datos. Boleta o factura: con datos para SUNAT.">Comprobante</TituloBloque>
 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {(
@@ -2001,12 +2334,6 @@ export function FormularioCheckout({
                         </button>
                       ))}
                     </div>
-
-                    {tipoComprobante === 'SIMPLE' ? (
-                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                        Es el ticket de tu pedido, sin datos tuyos. Si necesitas boleta o factura con SUNAT, elígela aquí.
-                      </div>
-                    ) : null}
 
                     {tipoComprobante === 'SIMPLE' ? null : tipoComprobante === 'BOLETA' ? (
                       <div>
@@ -2151,321 +2478,7 @@ export function FormularioCheckout({
                   </>
                   )}
 
-                  {/* Medio de pago */}
-                  <div
-                    style={{
-                      backgroundColor: 'var(--cp-white)',
-                      padding: '14px',
-                      borderRadius: '14px',
-                      border: '1px solid var(--cp-line)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    {dividirPago && <PagoDivididoCarta filas={filasDiv} aCobrar={aCobrar} medios={mediosDisponibles} alCambiar={setFilasDiv} />}
-
-                    {mediosDatos.map((mp) => (
-                      <Fragment key={mp}>
-                    {/* Datos copiables del medio de pago */}
-                    {(mp === 'YAPE' || mp === 'PLIN') && (
-                      <div
-                        style={{
-                          backgroundColor: 'var(--cp-sand)',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          fontSize: '13px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {mp}:{' '}
-                            {mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
-                              datosLocal?.telefono ||
-                              '123456789'}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                            Titular: {datosLocal?.nombre || 'Caprichos'}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copiarTexto(
-                              mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
-                                datosLocal?.telefono ||
-                                '123456789',
-                              'pago-tel',
-                            )
-                          }
-                          style={{
-                            minHeight: '36px',
-                            padding: '0 10px',
-                            border: '1px solid var(--cp-navy)',
-                            borderRadius: '8px',
-                            backgroundColor: 'var(--cp-white)',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {copiadoKey === 'pago-tel' ? 'Copiado' : 'Copiar'}
-                        </button>
-                      </div>
-                    )}
-
-                    {mp === 'TRANSFERENCIA' && (
-                      <div
-                        style={{
-                          backgroundColor: 'var(--cp-sand)',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          fontSize: '13px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
-                          </div>
-                          <div style={{ fontSize: '12px' }}>
-                            Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copiarTexto(
-                              mediosPagoDisponibles.transferencia?.cuenta || '123456789',
-                              'pago-cta',
-                            )
-                          }
-                          style={{
-                            minHeight: '36px',
-                            padding: '0 10px',
-                            border: '1px solid var(--cp-navy)',
-                            borderRadius: '8px',
-                            backgroundColor: 'var(--cp-white)',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {copiadoKey === 'pago-cta' ? 'Copiado' : 'Copiar'}
-                        </button>
-                      </div>
-                    )}
-
-                      </Fragment>
-                    ))}
-
-                    {propinaActiva && !conCredito && (
-                      <div data-testid="propina-carta">
-                        <label htmlFor="f-propina" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}>
-                          Propina opcional para el equipo (S/)
-                        </label>
-                        <input
-                          id="f-propina"
-                          type="text"
-                          inputMode="decimal"
-                          value={propinaTexto}
-                          onChange={(e) => setPropinaTexto(e.target.value)}
-                          placeholder="0.00"
-                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '16px' }}
-                        />
-                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px', marginTop: '4px' }}>
-                          Va aparte de tu pedido: no es parte del total de productos ni del comprobante. Máximo S/ {topePropina.toFixed(2)}. Déjalo vacío si no quieres dejar propina.
-                        </div>
-                      </div>
-                    )}
-
-                    {metodoPago === 'TARJETA' && (
-                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                        Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
-                      </div>
-                    )}
-
-                    {efectivoParte > 0 && (
-                      <div>
-                        <label
-                          htmlFor="f-paga-con"
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: 'var(--cp-soft)',
-                            display: 'block',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          Paga con (monto en soles, obligatorio){planDividido.plan ? ` · efectivo S/ ${efectivoParte.toFixed(2)}` : ''}
-                        </label>
-                        <input
-                          id="f-paga-con"
-                          type="number"
-                          step="0.10"
-                          min={efectivoParte}
-                          value={pagaCon}
-                          onChange={(e) => setPagaCon(e.target.value)}
-                          aria-required="true"
-                          placeholder={`Ej.: ${Math.ceil(efectivoParte / 10) * 10}`}
-                          style={{
-                            width: '100%',
-                            minHeight: '44px',
-                            borderRadius: '10px',
-                            border: '1.5px solid var(--cp-line)',
-                            backgroundColor: 'var(--cp-cream)',
-                            color: 'var(--cp-navy)',
-                            padding: '0 12px',
-                            fontSize: '14px',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPagaCon(efectivoParte.toFixed(2))}
-                          style={{
-                            marginTop: '6px',
-                            minHeight: '36px',
-                            borderRadius: '10px',
-                            border: '1.5px solid var(--cp-line)',
-                            background: 'var(--cp-white)',
-                            color: 'var(--cp-navy)',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            padding: '0 12px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Pago exacto (S/ {efectivoParte.toFixed(2)})
-                        </button>
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                      Tu pedido pasa directo a cocina. Un asesor te contactará por WhatsApp para coordinar el pago.
-                    </div>
                   </div>
-
-                  </>
-                  )}
-
-                  {/* Campo de cupón / puntos */}
-                  {!tarjetasPago && !cuponAplicado && clienteCuenta && !conCredito && (
-                    <PuntosCanje
-                      totalPedido={Math.max(0, promos.canjeable ?? 0)}
-                      puntosAplicados={puntosAplicados}
-                      alAplicar={setPuntosAplicados}
-                      porcentaje={pctPuntos}
-                    />
-                  )}
-
-                  {!tarjetasPago && puntosAplicados === 0 && (
-                    <div
-                      style={{
-                        border: '1px solid var(--cp-line)',
-                        borderRadius: '12px',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        backgroundColor: 'var(--cp-white)',
-                      }}
-                    >
-                      <label htmlFor="f-cup" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
-                        ¿Tienes un cupón? <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(opcional)</span>
-                      </label>
-                      {!cuponAplicado ? (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input
-                            id="f-cup"
-                            type="text"
-                            value={cuponCodigo}
-                            onChange={(e) => {
-                              setCuponCodigo(e.target.value);
-                              setMensajeCupon(null);
-                            }}
-                            placeholder="Código"
-                            style={{
-                              flex: 1,
-                              minWidth: 0,
-                              boxSizing: 'border-box',
-                              minHeight: '44px',
-                              borderRadius: '12px',
-                              border: '1.5px solid var(--cp-line)',
-                              backgroundColor: 'var(--cp-cream)',
-                              color: 'var(--cp-navy)',
-                              padding: '0 12px',
-                              textTransform: 'uppercase',
-                              fontSize: '14px',
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={aplicarCupon}
-                            disabled={cargandoCupon || !cuponCodigo.trim()}
-                            style={{
-                              minHeight: '44px',
-                              padding: '0 16px',
-                              border: '1.5px solid var(--cp-navy)',
-                              borderRadius: '12px',
-                              backgroundColor: 'transparent',
-                              color: 'var(--cp-navy)',
-                              fontWeight: 800,
-                              cursor: cargandoCupon || !cuponCodigo.trim() ? 'not-allowed' : 'pointer',
-                              opacity: cargandoCupon || !cuponCodigo.trim() ? 0.6 : 1,
-                            }}
-                          >
-                            {cargandoCupon ? '...' : 'Aplicar'}
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{cuponAplicado.codigo}</span>
-                          <button
-                            type="button"
-                            onClick={removerCupon}
-                            style={{
-                              minHeight: '40px',
-                              padding: '0 8px',
-                              border: 0,
-                              backgroundColor: 'transparent',
-                              color: 'var(--cp-rust)',
-                              fontWeight: 700,
-                              textDecoration: 'underline',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Quitar cupón
-                          </button>
-                        </div>
-                      )}
-                      {mensajeCupon && (
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            lineHeight: '17px',
-                            fontWeight: 600,
-                            color: cuponAplicado ? '#2F7A45' : 'var(--cp-rust)',
-                          }}
-                        >
-                          {mensajeCupon}
-                        </div>
-                      )}
-                      {cuponAplicado?.envioGratis && modalidad !== 'DELIVERY' && (
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cp-rust)' }}>
-                          El cupón de envío gratis solo aplica a delivery.
-                        </div>
-                      )}
-                    </div>
                   )}
 
                   {/* Resumen de totales */}
@@ -2493,6 +2506,7 @@ export function FormularioCheckout({
                           ))}
                       </div>
                     )}
+                    <TituloBloque id="bloque-resumen">Resumen</TituloBloque>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                       <span>Subtotal productos</span>
                       <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
@@ -2530,14 +2544,14 @@ export function FormularioCheckout({
                     )}
 
                     {clienteCuenta && detalleEquipo && (
-                          <div role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px', margin: 0 }}>
-                            Tienes {pctEquipo ? `${pctEquipo} % de` : 'tu'} descuento por ser parte del equipo Caprichos. No aplica a combos, promociones ni productos que ya tienen descuento.
+                          <div role="status" title="No aplica a combos, promociones ni productos que ya tienen descuento." style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px', margin: 0 }}>
+                            Descuento del equipo{pctEquipo ? `: ${pctEquipo} %` : ''}
                           </div>
                         )}
 
                     {primeraCompra && !tieneSesion && (
                       <div role="note" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px' }}>
-                        Tienes {primeraCompra.descuento} de descuento en tu primera compra. Inicia sesión con tu celular para aplicarlo. No aplica a promociones ni combos.
+                        {primeraCompra.descuento} de descuento en tu primera compra: inicia sesión para aplicarlo.
                       </div>
                     )}
 
@@ -2579,12 +2593,14 @@ export function FormularioCheckout({
                     <div
                       style={{
                         borderTop: '1px solid var(--cp-line)',
-                        paddingTop: '8px',
+                        padding: '10px',
+                        background: 'var(--cp-sand)',
+                        borderRadius: '10px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         fontFamily: 'var(--fuente-titulos)',
                         fontWeight: 800,
-                        fontSize: '18px',
+                        fontSize: '20px',
                         color: 'var(--cp-navy)',
                       }}
                     >
@@ -2595,11 +2611,13 @@ export function FormularioCheckout({
                     {clienteCuenta && (
                       <div data-testid="puntos-estimados" style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)' }}>
                         {detalleEquipo ? (
-                          <b>Este pedido no suma puntos porque lleva el descuento del equipo.</b>
+                          <b>No suma puntos: lleva el descuento del equipo.</b>
+                        ) : cuponAplicado ? (
+                          <b>No suma puntos: usas un cupón.</b>
+                        ) : puntosEstimados <= 0 && promoMonto > 0 ? (
+                          <b>No suma puntos: solo lleva promociones.</b>
                         ) : (
-                          <>
-                            <b>Con este pedido ganarás ~{puntosEstimados.toFixed(2)} pts</b> (0 si usas cupón o es solo promoción).
-                          </>
+                          <b>Con este pedido sumas {puntosEstimados.toFixed(2)} puntos.</b>
                         )}
                       </div>
                     )}

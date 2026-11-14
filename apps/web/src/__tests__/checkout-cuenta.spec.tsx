@@ -203,7 +203,7 @@ describe('Pago con puntos y resumen de precios', () => {
 
     // todo el pedido está en promoción: no hay campo de puntos, solo la explicación
     expect(screen.queryByLabelText(/¿Cuántos puntos deseas usar\?/i)).toBeNull();
-    expect(screen.getByText(/Se pueden usar desde 1 punto, en productos sin promoción ni descuento/)).toBeInTheDocument();
+    expect(screen.getByText(/Los puntos no aplican a productos con descuento del equipo o en promoción/)).toBeInTheDocument();
     expect(screen.queryByText('Puntos usados')).toBeNull();
   });
 
