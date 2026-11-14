@@ -149,7 +149,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
     await irAUbicacion();
 
-    expect(await screen.findByText('¿A dónde lo enviamos?')).toBeInTheDocument();
+    expect(await screen.findByText('¿Dónde te lo llevamos?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Av\. Las Palmeras 123/ })).toBeInTheDocument();
     expect(screen.getByText('Portón azul')).toBeInTheDocument();
     expect(screen.getByText('usada 3 veces')).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(screen.getByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' }));
     expect(screen.getByText('usada 1 vez')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Otra dirección' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Escribir la dirección' })).toBeInTheDocument();
     // hasta elegir no aparece el formulario de dirección
     expect(document.getElementById('f-direccion')).toBeNull();
   });
@@ -203,7 +203,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Av\. Las Palmeras 123/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/quedó fuera de nuestra zona de reparto/);
-    expect(screen.getByText('¿A dónde lo enviamos?')).toBeInTheDocument();
+    expect(screen.getByText('¿Dónde te lo llevamos?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Av\. Las Palmeras 123/ })).toBeInTheDocument();
     expect(document.getElementById('f-direccion')).toBeNull();
   });
@@ -219,11 +219,11 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/carta/envio'));
   });
 
-  it('«Otra dirección» muestra el formulario vacío', async () => {
+  it('«Escribir la dirección» muestra el formulario vacío', async () => {
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
     await irAUbicacion();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Otra dirección' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Escribir la dirección' }));
 
     expect(document.getElementById('f-direccion')).toHaveValue('');
     expect(document.getElementById('f-referencia')).toHaveValue('');
@@ -283,7 +283,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     fireEvent.click(screen.getByRole('button', { name: /Jr\. Los Olivos 45/ }));
 
     await waitFor(() => expect(document.getElementById('f-direccion')).toHaveValue('Jr. Los Olivos 45'));
-    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
+    expect(screen.queryByText('¿Dónde te lo llevamos?')).not.toBeInTheDocument();
   });
 
   it('sin ubicación elegida el botón Continuar está deshabilitado con un aviso; al elegir se habilita', async () => {
@@ -310,7 +310,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
 
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/carta/envio?lat=-12.05&lng=-77.04'));
-    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
+    expect(screen.queryByText('¿Dónde te lo llevamos?')).not.toBeInTheDocument();
     expect(screen.getByText('Mi pedido llega aquí')).toBeInTheDocument();
     Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
   });
@@ -329,8 +329,8 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
 
     expect(await screen.findByLabelText(/Paso 2: Ubicación/i)).toBeInTheDocument();
-    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
     expect(api.get).not.toHaveBeenCalledWith('/carta/cuenta/direcciones');
+    fireEvent.click(screen.getByRole('button', { name: 'Escribir la dirección' }));
     expect(document.getElementById('f-direccion')).toBeInTheDocument();
   });
 });

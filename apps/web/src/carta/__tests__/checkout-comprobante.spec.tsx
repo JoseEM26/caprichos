@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -85,7 +86,7 @@ async function irAPago() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  expect(await screen.findByRole('button', { name: /Enviar pedido/i })).toBeInTheDocument();
+  expect(await alEnvio()).toBeInTheDocument();
 }
 
 /** Con sesión no se pide nombre ni celular: el paso 1 solo elige la modalidad. */
@@ -94,7 +95,7 @@ async function irAPagoConSesion() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  expect(await screen.findByRole('button', { name: /Enviar pedido/i })).toBeInTheDocument();
+  expect(await alEnvio()).toBeInTheDocument();
 }
 
 const comprobanteEnviado = () => (vi.mocked(api.post).mock.calls.find((c) => c[0] === '/pedidos')?.[1] as any)?.comprobante;

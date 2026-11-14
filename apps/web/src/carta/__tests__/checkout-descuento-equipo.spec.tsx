@@ -5,6 +5,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { EstadoLocalCarta, DatosLocalCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -85,7 +86,7 @@ async function irAlResumen(conSesion: boolean) {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/);
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  await screen.findByRole('button', { name: /Enviar pedido/i });
+  await alEnvio();
 }
 
 describe('Checkout ▸ descuento del equipo (solo con sesión)', () => {

@@ -6,6 +6,7 @@ import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
 import { DatosLocalCarta, EstadoLocalCarta, ProductoCarta } from '../tipos';
 import * as cuentaModulo from '../cuenta/CuentaContext';
+import { alEnvio } from './medioPago';
 
 vi.mock('../../comun/api', async () => {
   const real = await vi.importActual<typeof import('../../comun/api')>('../../comun/api');
@@ -74,7 +75,7 @@ async function irAEnviar() {
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
   expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-  fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+  fireEvent.click(await alEnvio());
 }
 
 describe('Checkout ▸ mezcla de sabores y 409 de stock por sabor', () => {

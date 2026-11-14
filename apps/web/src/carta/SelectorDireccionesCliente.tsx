@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import type { DireccionCliente } from './tipos';
 import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
+import { TarjetasFormaUbicacion, type FormaUbicacion } from './FormasUbicacion';
 
 interface SelectorDireccionesClienteProps {
   /** null mientras carga la libreta */
@@ -8,10 +9,8 @@ interface SelectorDireccionesClienteProps {
   ocupado: boolean;
   aviso: string | null;
   alElegir: (direccion: DireccionCliente) => void;
-  alNueva: () => void;
-  /** Usa la ubicación actual del celular (mismo flujo que «Usar mi ubicación actual» del formulario) */
-  alUbicacionActual: () => void;
-  cargandoUbicacion: boolean;
+  /** GPS, mapa o escribir: pasa al detalle de esa forma */
+  alForma: (forma: FormaUbicacion) => void;
 }
 
 const textoUsos = (usos: number) => (usos === 1 ? 'usada 1 vez' : `usada ${usos} veces`);
@@ -41,15 +40,13 @@ function MetaUbicacion({ d }: { d: DireccionCliente }) {
   );
 }
 
-/** Pregunta «¿A dónde lo enviamos?»: la ubicación más usada destacada, el historial plegado y las acciones de siempre. */
+/** Pregunta «¿Dónde te lo llevamos?»: la ubicación más usada destacada, el historial plegado y las acciones de siempre. */
 export function SelectorDireccionesCliente({
   direcciones,
   ocupado,
   aviso,
   alElegir,
-  alNueva,
-  alUbicacionActual,
-  cargandoUbicacion,
+  alForma,
 }: SelectorDireccionesClienteProps) {
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const idHistorial = useId();
@@ -68,7 +65,7 @@ export function SelectorDireccionesCliente({
         gap: '12px',
       }}
     >
-      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>¿A dónde lo enviamos?</div>
+      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>¿Dónde te lo llevamos?</div>
 
       {direcciones === null ? (
         <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>Buscando tus direcciones...</div>
@@ -179,46 +176,7 @@ export function SelectorDireccionesCliente({
             </>
           )}
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={alUbicacionActual}
-              style={{
-                flex: '1 1 160px',
-                minHeight: '44px',
-                padding: '0 12px',
-                borderRadius: '12px',
-                border: '1.5px solid var(--cp-navy)',
-                backgroundColor: 'var(--cp-sand)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: ocupado ? 'wait' : 'pointer',
-              }}
-            >
-              {cargandoUbicacion ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
-            </button>
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={alNueva}
-              style={{
-                flex: '1 1 160px',
-                minHeight: '44px',
-                padding: '0 12px',
-                borderRadius: '12px',
-                border: '1.5px dashed var(--cp-navy)',
-                backgroundColor: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: ocupado ? 'wait' : 'pointer',
-              }}
-            >
-              Otra dirección
-            </button>
-          </div>
+          <TarjetasFormaUbicacion deshabilitado={ocupado} alElegir={alForma} />
         </>
       )}
 
