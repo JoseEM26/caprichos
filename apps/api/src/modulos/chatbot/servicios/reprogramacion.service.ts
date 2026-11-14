@@ -149,6 +149,31 @@ export class ReprogramacionService {
     const cfg = CANCELACION[motivo];
     const ahora = new Date();
 
+    // Un pedido ya pagado NUNCA se anula solo (el dinero quedaría en el aire): queda en LISTO para que una persona
+    // elija en Pedidos/Caja entre devolver el dinero o reprogramar. La pregunta se da por resuelta para no repetirse.
+    const previo = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      select: { codigo: true, estado: true, pago_estado: true, cobros: { where: { anulado_en: null }, select: { credito_personal: true } } },
+    });
+    const conDinero =
+      previo != null &&
+      ((previo.cobros ?? []).length > 0 ? previo.cobros.some((c) => !c.credito_personal) : ['PAGADO', 'COORDINADO'].includes(String(previo.pago_estado)));
+    if (previo && previo.estado === 'LISTO' && conDinero) {
+      const r = await this.prisma.mensajeReparto.updateMany({
+        where: { pedido_id: pedidoId, numero: NUMERO_PREGUNTA_REPROG, estado: { in: [ESTADO_REPROG.ENVIADO, ESTADO_REPROG.REPROGRAMAR] } },
+        data: { estado: cfg.estado, respondido_en: ahora },
+      });
+      if (r.count > 0) {
+        await this.notificarCaja(
+          'Pedido pagado por decidir',
+          `El pedido ${previo.codigo} ya está pagado y no se reprogramó (${cfg.motivo}). No se anuló solo: elige en Pedidos si devuelves el dinero o lo reprogramas.`,
+          'REVISAR_DEVOLUCION',
+          '/admin/caja',
+        );
+      }
+      return false;
+    }
+
     const ok = await this.prisma.$transaction(async (tx) => {
       const r = await tx.pedido.updateMany({
         where: { id: pedidoId, estado: 'LISTO', repartidor_party_id: null, motivo_falla: MOTIVO_RETIRO },

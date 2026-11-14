@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PedidosAdminController } from './pedidos-admin.controller';
+import { AnulacionPagadoService } from './anulacion-pagado.service';
+import { RevertirAnulacionService } from './revertir-anulacion.service';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { SalonModule } from '../salon/salon.module';
 import { ZonasModule } from '../zonas/zonas.module';
@@ -48,6 +50,8 @@ import { PedidoExtraController } from './pedido-extra.controller';
     UbicarPedidoService,
     CorregirClienteService,
     ReabrirPedidoService,
+    AnulacionPagadoService,
+    RevertirAnulacionService,
     PedidoComprobanteService,
     DevolucionPedidoService,
     CambioUbicacionService,

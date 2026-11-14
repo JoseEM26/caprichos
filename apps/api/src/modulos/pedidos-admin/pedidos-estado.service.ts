@@ -1,3 +1,4 @@
+import { AnulacionPagadoService } from './anulacion-pagado.service';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { CANALES_CON_ATENDIDO, nombresDePersonas } from './linea-tiempo.service';
 import { totalSegDePedido } from './linea-tiempo.util';
@@ -129,6 +130,7 @@ export class PedidosEstadoService {
     @Optional() private readonly cobros?: CobrosService,
     @Optional() private readonly comandas?: ComandasService,
     @Optional() private readonly consumoAlmacen?: ConsumoRecetaService,
+    @Optional() private readonly anulacionPagado?: AnulacionPagadoService,
   ) {}
 
   /**
@@ -1148,6 +1150,14 @@ export class PedidosEstadoService {
       }
 
       const aprobadoPor = usuarioActual.partyId;
+
+      // Pedido ya pagado: no se anula sin decidir qué pasa con el dinero (devolverlo o reprogramar el pedido)
+      if (this.anulacionPagado && (await this.anulacionPagado.estaPagado(pedido))) {
+        const destino = await this.anulacionPagado.resolver(pedido, dto, motivo, usuarioActual, ip);
+        if (destino === 'REPROGRAMADO') {
+          return { ...(await this.prisma.pedido.findUnique({ where: { id: pedido.id } })), reprogramado: true };
+        }
+      }
 
       // Un pedido cobrado y aún sin entregar: primero se anula su cobro (el mismo flujo de Caja: sale del arqueo
       // y del cierre, devuelve puntos e insumos). Si la caja del cobro ya cerró, no se anula: queda para devolución.

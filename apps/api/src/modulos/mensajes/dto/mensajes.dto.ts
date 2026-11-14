@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
@@ -155,4 +156,23 @@ export class OrdenPlantillasDto {
   @IsString({ each: true })
   @MaxLength(20, { each: true })
   ids!: string[];
+}
+
+/** Aplicar la solicitud de cambio; al cancelar un pedido ya pagado trae qué pasa con el dinero (mismos campos que anular). */
+export class AplicarCambioDto {
+  @IsOptional()
+  @IsIn(['DEVOLVER', 'REPROGRAMAR'])
+  destinoDinero?: 'DEVOLVER' | 'REPROGRAMAR';
+
+  @IsOptional()
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'])
+  devolucionMedio?: string;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  devolucionMonto?: number;
+
+  @IsOptional()
+  @IsString()
+  devolucionCodigo?: string;
 }

@@ -449,6 +449,10 @@ export const repartosApi = {
   reasignarPedido: (id: string, repartidorPartyId: string, motivo: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/reasignar`, { repartidorPartyId, motivo }),
 
+  /** ADMIN y SUPERVISOR: asigna el repartidor (si hace falta) y cierra el reparto por él; el repartidor figura como quien entregó. */
+  cerrarPorRepartidor: (id: string, repartidorPartyId: string, motivo: string) =>
+    api.post<PedidoReparto>(`/admin/repartos/${id}/cerrar-por-repartidor`, { repartidorPartyId, motivo }),
+
   /** `sinCobro`: solo el administrador, con motivo, cuando el pedido digital aún no está cobrado. */
   salir: (id: string, sinCobro?: { forzarSinCobro: true; motivo: string }) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/salir`, sinCobro ?? {}),

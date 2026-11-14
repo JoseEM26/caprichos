@@ -8,6 +8,7 @@ import { CocinaCheck } from './CocinaCheck';
 import { contarDespacho, FASES, pedidosDespacho, PedidoDespacho, ResumenDespacho, rutaDespacho } from './despachoModelo';
 import { nombreClienteVisible } from './textoVisible';
 import { useEsMovil } from '../../carta/useEsMovil';
+import { ModalCerrarPorRepartidor } from './ModalCerrarPorRepartidor';
 
 const MOTIVO_ASIGNAR = 'Asignado por el administrador desde el despacho';
 
@@ -53,15 +54,18 @@ export function ContadoresDespacho({ r }: { r: ResumenDespacho }) {
 }
 
 export function TarjetaDespacho({
-  d, seleccionada, repartidores, puedeAsignar, alSeleccionar, alAbrirDetalle, alAsignar,
+  d, seleccionada, repartidores, puedeAsignar, puedeCerrar = false, alSeleccionar, alAbrirDetalle, alAsignar, alCerrarPor,
 }: {
   d: PedidoDespacho;
   seleccionada: boolean;
   repartidores: RepartidorPanel[];
   puedeAsignar: boolean;
+  /** Solo ADMIN y SUPERVISOR: cerrar el reparto por el repartidor. */
+  puedeCerrar?: boolean;
   alSeleccionar: (id: string) => void;
   alAbrirDetalle: (id: string) => void;
   alAsignar: (pedido: PedidoSeguimiento, repartidorPartyId: string) => void;
+  alCerrarPor?: (pedido: PedidoSeguimiento) => void;
 }) {
   const p = d.pedido;
   const fase = FASES[d.fase];
@@ -119,6 +123,11 @@ export function TarjetaDespacho({
         {digitos && <a href={`tel:${digitos}`} style={boton}>Llamar</a>}
         {digitos && <a href={`https://wa.me/51${digitos}`} target="_blank" rel="noreferrer" style={boton}>WhatsApp</a>}
         <button type="button" onClick={() => alAbrirDetalle(p.id)} style={boton}>Detalle y cobro</button>
+        {puedeCerrar && d.fase !== 'cocina' && alCerrarPor && (
+          <button type="button" onClick={() => alCerrarPor(p)} style={boton} aria-label={`Cerrar el pedido ${p.codigo} por el repartidor`}>
+            Cerrar por el repartidor
+          </button>
+        )}
       </div>
       {p.repartidor && puedeAsignar && d.fase !== 'cocina' && (
         <span style={{ fontSize: 12, color: 'var(--cp-soft, #5A6E78)' }}>Lo lleva {p.repartidor.nombre}</span>
@@ -132,13 +141,15 @@ export function TarjetaDespacho({
  * números. Tocar un pin o una tarjeta resalta el otro. Tablet y PC: dos columnas; celular: mapa arriba y lista abajo.
  */
 export function DespachoAdmin({
-  pedidos, repartidores, config, zonas, puedeAsignar, seleccionadoId, alSeleccionar, alAbrirDetalle, alActualizar,
+  pedidos, repartidores, config, zonas, puedeAsignar, puedeCerrar = false, seleccionadoId, alSeleccionar, alAbrirDetalle, alActualizar,
 }: {
   pedidos: PedidoSeguimiento[];
   repartidores: RepartidorPanel[];
   config: ConfigReparto;
   zonas: ZonaGeoItem[];
   puedeAsignar: boolean;
+  /** Solo ADMIN y SUPERVISOR: cerrar el reparto por el repartidor (asigna y marca entregado a su nombre). */
+  puedeCerrar?: boolean;
   seleccionadoId: string | null;
   alSeleccionar: (id: string | null) => void;
   alAbrirDetalle: (id: string) => void;
@@ -146,6 +157,7 @@ export function DespachoAdmin({
 }) {
   const [filtro, setFiltro] = useState('todos');
   const [error, setError] = useState<string | null>(null);
+  const [cerrando, setCerrando] = useState<PedidoSeguimiento | null>(null);
   const listaRef = useRef<HTMLDivElement>(null);
   const movil = useEsMovil();
 
@@ -242,14 +254,27 @@ export function DespachoAdmin({
                 seleccionada={d.pedido.id === seleccionadoId}
                 repartidores={repartidores}
                 puedeAsignar={puedeAsignar}
+                puedeCerrar={puedeCerrar}
                 alSeleccionar={(id) => alSeleccionar(seleccionadoId === id ? null : id)}
                 alAbrirDetalle={alAbrirDetalle}
                 alAsignar={asignar}
+                alCerrarPor={setCerrando}
               />
             ))
           )}
         </div>
       </div>
+      {cerrando && (
+        <ModalCerrarPorRepartidor
+          pedido={cerrando}
+          repartidores={repartidores}
+          alCerrar={() => setCerrando(null)}
+          alTerminar={() => {
+            setCerrando(null);
+            alActualizar();
+          }}
+        />
+      )}
     </div>
   );
 }

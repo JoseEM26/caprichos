@@ -429,6 +429,23 @@ function cuerpoSinVoucher(sv?: { motivo: string; sinCaptura?: boolean }) {
   return sv.sinCaptura ? { confirmaSinCaptura: true } : { sinVoucher: { motivo: sv.motivo } };
 }
 
+/** Qué pasa con el dinero al anular un pedido ya pagado. */
+export interface DestinoDineroAnulacion {
+  destinoDinero: 'DEVOLVER' | 'REPROGRAMAR';
+  devolucionMedio?: string;
+  devolucionMonto?: number;
+  devolucionCodigo?: string;
+}
+
+export interface RespuestaRevertir {
+  id: string;
+  codigo: string;
+  estado: string;
+  cobroReactivado: boolean;
+  avisoCobro: string | null;
+  pendientes: string[];
+}
+
 export const pedidosApi = {
   /** Cambia el comprobante antes de cobrar (Caja). 409 si ya está cobrado o con comprobante emitido. */
   cambiarComprobante: (pedidoId: string, dto: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string }) =>
@@ -478,11 +495,17 @@ export const pedidosApi = {
   },
 
   /** `forzar`: solo el administrador, con motivo, cuando Cocina aún no despejó el pedido. */
-  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER', forzarSinCobro?: boolean): Promise<Pedido> {
+  async cambiarEstado(id: string | number, estado: string, motivo?: string, forzar?: boolean, consumoAlmacen?: 'MERMA' | 'DEVOLVER', forzarSinCobro?: boolean, dinero?: DestinoDineroAnulacion): Promise<Pedido> {
     const cuerpo: Record<string, unknown> = forzar ? { estado, motivo, forzar: true } : { estado, motivo };
+    if (dinero) Object.assign(cuerpo, dinero);
     if (forzarSinCobro) cuerpo.forzarSinCobro = true;
     if (consumoAlmacen) cuerpo.consumoAlmacen = consumoAlmacen;
     return api.post<Pedido>(`/admin/pedidos/${id}/estado`, cuerpo);
+  },
+
+  /** Revertir un pedido anulado (solo ADMIN y SUPERVISOR; motivo obligatorio). */
+  async revertirAnulacion(id: string | number, motivo: string): Promise<RespuestaRevertir> {
+    return api.post<RespuestaRevertir>(`/admin/pedidos/${id}/revertir-anulacion`, { motivo });
   },
 
   /** «Volver atrás» un pedido entregado por error (solo Caja y Administrador; motivo obligatorio). */

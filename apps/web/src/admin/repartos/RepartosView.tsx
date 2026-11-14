@@ -47,7 +47,10 @@ function SeguimientoRepartosView() {
 
   const esAdmin = usuario?.rol === 'ADMIN';
   const puedeTomar = esAdmin && tiene('repartos/tomar');
-  const puedeSoltar = (esAdmin || usuario?.rol === 'CAJERO') && tiene('repartos/liquidar');
+  const esSupervisor = usuario?.rol === 'SUPERVISOR';
+  const puedeSoltar = (esAdmin || usuario?.rol === 'CAJERO' || esSupervisor) && tiene('repartos/liquidar');
+  // Cerrar el reparto por el repartidor: solo ADMIN y SUPERVISOR (el servidor responde 403 al resto)
+  const puedeCerrarPorRepartidor = (esAdmin || esSupervisor) && tiene('repartos/liquidar');
   const puedeLiquidar = tiene('repartos/liquidar');
   // Ubicación en vivo de los repartidores: solo ADMIN, SUPERVISOR y CAJERO
   const puedeVerUbicacion = tiene('repartos/ver_ubicacion');
@@ -232,6 +235,7 @@ function SeguimientoRepartosView() {
           config={config}
           zonas={zonasGeo}
           puedeAsignar={puedeSoltar}
+          puedeCerrar={puedeCerrarPorRepartidor}
           seleccionadoId={pedidoSeleccionadoId}
           alSeleccionar={setPedidoSeleccionadoId}
           alAbrirDetalle={setDetalleId}

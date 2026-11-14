@@ -28,6 +28,7 @@ import {
   OrdenPlantillasDto,
   PlantillaRespuestaDto,
   RechazarCambioDto,
+  AplicarCambioDto,
   RechazarPagoDto,
   TextoDto,
   TomarDto,
@@ -271,8 +272,8 @@ export class MensajesController {
 
   @Post('conversaciones/:id/aplicar-cambio')
   @Permiso('mensajes', 'enviar')
-  aplicarCambio(@Param('id') id: string, @Req() req: any) {
-    return this.mensajes.aplicarCambio(id, req.usuario, ipDe(req));
+  aplicarCambio(@Param('id') id: string, @Body() dto: AplicarCambioDto, @Req() req: any) {
+    return this.mensajes.aplicarCambio(id, req.usuario, ipDe(req), dto);
   }
 
   @Post('conversaciones/:id/rechazar-cambio')

@@ -84,10 +84,15 @@ describe('Seguimiento: panel y lista de hoy', () => {
 });
 
 describe('Seguimiento: excepciones y admin repartidor', () => {
-  it('MOZO y SUPERVISOR no pueden soltar ni reasignar; CAJERO sí llega a validar', async () => {
+  it('el MOZO no puede soltar ni reasignar; SUPERVISOR sí reasigna (asigna directo) pero no suelta; CAJERO sí llega a validar', async () => {
     const { service } = montar();
     await expect(service.liberarPedido('1', { motivo: 'x' } as any, u('MOZO'))).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(service.reasignarPedido('1', { repartidorPartyId: '2', motivo: 'x' } as any, u('SUPERVISOR'))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.liberarPedido('1', { motivo: 'x' } as any, u('SUPERVISOR'))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.reasignarPedido('1', { repartidorPartyId: '2', motivo: 'x' } as any, u('MOZO'))).rejects.toBeInstanceOf(ForbiddenException);
+    // El supervisor asigna directo: pasa el control de rol y llega a validar el pedido (aquí no existe: 404)
+    const { service: sv, prisma: pv } = montar();
+    pv.pedido.findUnique.mockResolvedValue(null);
+    await expect(sv.reasignarPedido('1', { repartidorPartyId: '2', motivo: 'x' } as any, u('SUPERVISOR'))).rejects.not.toBeInstanceOf(ForbiddenException);
     const { service: s2, prisma } = montar();
     prisma.pedido.findUnique.mockResolvedValue(null);
     await expect(s2.liberarPedido('1', { motivo: 'x' } as any, u('CAJERO'))).rejects.not.toBeInstanceOf(ForbiddenException);
