@@ -39,8 +39,6 @@ describe('AvisosPedidoService: avisos en todos los pedidos', () => {
     ['CAJA', 'COMER_LOCAL', 'Caja en el local'],
     ['CAJA', 'PARA_LLEVAR', 'Caja para llevar'],
     ['MOZO', 'MESA', 'mozo en mesa'],
-    ['BOT', 'DELIVERY', 'delivery por el bot'],
-    ['WHATSAPP', 'RECOGER', 'recojo por WhatsApp'],
     ['CARTA', 'DELIVERY', 'delivery de la carta'],
   ];
 
@@ -93,5 +91,30 @@ describe('AvisosPedidoService: avisos en todos los pedidos', () => {
   it('interruptor propio apagado (pago confirmado): ese aviso no sale', async () => {
     parametros.whatsapp_aviso_pago_confirmado_activo = 'no';
     expect((await servicio.avisar(55, 'ACEPTADO')).motivo).toBe('DESACTIVADO');
+  });
+
+  it.each(['BOT', 'WHATSAPP'])('canal %s: no manda «recibido» extra (lo confirma el bot) pero sí pago confirmado y entregado', async (canal) => {
+    pedido.canal = canal;
+    expect(await servicio.avisar(55, 'RECIBIDO')).toEqual({ estado: 'OMITIDO', motivo: 'LO_CONFIRMA_EL_BOT' });
+    expect((await servicio.avisar(55, 'ACEPTADO')).estado).toBe('ENCOLADO');
+    expect((await servicio.avisar(55, 'ENTREGADO')).estado).toBe('ENCOLADO');
+    expect(outbox.encolar.mock.calls.map((c: any[]) => c[0].clave)).toEqual(['pedido-55-ACEPTADO', 'pedido-55-ENTREGADO']);
+  });
+
+  it('pago confirmado en mesa o ya entregado: texto libre sin «en preparación»; en recojo en preparación sí lo dice', async () => {
+    pedido.modalidad = 'MESA';
+    await servicio.avisar(55, 'ACEPTADO');
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toBe('Hola Rosa, recibimos tu pago del pedido CP-055. ¡Gracias!');
+    expect(outbox.encolar.mock.calls[0][0].carga.plantillaClave).toBe('PAGO_CONFIRMADO');
+
+    outbox.encolar.mockClear(); etapasCreadas.clear();
+    pedido.modalidad = 'RECOGER'; pedido.estado = 'ENTREGADO';
+    await servicio.avisar(55, 'ACEPTADO');
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).not.toContain('preparacion');
+
+    outbox.encolar.mockClear(); etapasCreadas.clear();
+    pedido.estado = 'COLA';
+    await servicio.avisar(55, 'ACEPTADO');
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toContain('esta en preparacion');
   });
 });

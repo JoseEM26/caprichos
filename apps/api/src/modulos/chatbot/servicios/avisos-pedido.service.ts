@@ -92,7 +92,7 @@ export interface DatosAviso {
   /** RECIBIDO delivery sin ubicación: usar las plantillas que piden la ubicación (parámetro whatsapp_plantilla_delivery_ubicacion_activa). */
   plantillaUbicacion?: boolean;
   /** ACEPTADO de un pedido que no es delivery: «recibimos tu pago» (plantilla caprichos_pago_confirmado). */
-  pagoConfirmado?: boolean;
+  pagoConfirmado?: boolean | 'SIMPLE';
   /** RECIBIDO: productos, total, medio y estado del envío (se arma al avisar). */
   resumen?: ResumenRecibido | null;
   /** RECIBIDO con pago digital: bloque «número, titular y monto» (se arma al avisar). */
@@ -173,9 +173,12 @@ export class AvisosPedidoService {
         puntos_ganados: true,
         repartidor_party_id: true,
         es_personal: true,
+        estado: true,
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
+    // Pedido del bot o de WhatsApp: el bot ya confirmó el pedido en la conversación, no se manda un «recibido» extra
+    if (etapa === 'RECIBIDO' && (pedido.canal === 'BOT' || pedido.canal === 'WHATSAPP')) return { estado: 'OMITIDO', motivo: 'LO_CONFIRMA_EL_BOT' };
     // El pedido del personal nunca se avisa
     if (pedido.es_personal) return { estado: 'OMITIDO', motivo: 'PEDIDO_PERSONAL' };
     // «Comer en el local»: se le llama en voz alta por su nombre, nunca se avisa por WhatsApp que está listo
@@ -213,7 +216,7 @@ export class AvisosPedidoService {
       datos = { ...datos, repartidorNombre: (persona?.nombres ?? '').trim().split(/\s+/)[0] || 'nuestro repartidor' };
     }
 
-    if (etapa === 'ACEPTADO' && pedido.modalidad !== 'DELIVERY') datos = { ...datos, pagoConfirmado: true };
+    if (etapa === 'ACEPTADO' && pedido.modalidad !== 'DELIVERY') datos = { ...datos, pagoConfirmado: pedido.modalidad === 'MESA' || pedido.estado === 'ENTREGADO' ? 'SIMPLE' : true };
     const nombre = pedido.cliente_nombre || 'Cliente';
     const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
     if (etapa === 'RECIBIDO') {
@@ -538,7 +541,7 @@ export class AvisosPedidoService {
           ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento, datos.resumen, datos.datosPago)
           : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento, datos.resumen);
       case 'ACEPTADO':
-        return datos.pagoConfirmado ? TEXTOS_REPARTO.pagoConfirmado(nombre, codigo) : TEXTOS_REPARTO.aceptado(nombre, codigo);
+        return datos.pagoConfirmado ? TEXTOS_REPARTO.pagoConfirmado(nombre, codigo, datos.pagoConfirmado === 'SIMPLE') : TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':
         return TEXTOS_REPARTO.listo(nombre, codigo);
       case 'LISTO_RECOJO':

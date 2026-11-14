@@ -208,8 +208,11 @@ export const TEXTOS_REPARTO = {
   }),
 
   /** Pedido de recojo, local o mesa con el pago confirmado (plantilla caprichos_pago_confirmado). */
-  pagoConfirmado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `Hola ${nombre}, recibimos tu pago. Tu pedido ${codigo} esta en preparacion.`,
+  // `simple`: mesa o pedido ya entregado, sin «en preparación» (la plantilla de Meta no cambia: conviene una genérica)
+  pagoConfirmado: (nombre: string, codigo: string, simple = false): PayloadAvisoReparto => ({
+    textoLibre: simple
+      ? `Hola ${nombre}, recibimos tu pago del pedido ${codigo}. ¡Gracias!`
+      : `Hola ${nombre}, recibimos tu pago. Tu pedido ${codigo} esta en preparacion.`,
     plantillaClave: 'PAGO_CONFIRMADO',
     variablesPlantilla: [nombre, codigo],
   }),
