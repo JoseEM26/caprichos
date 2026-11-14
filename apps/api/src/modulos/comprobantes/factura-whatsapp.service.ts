@@ -12,6 +12,7 @@ import {
   EstadoEnvioFactura,
   IDIOMA_PLANTILLA_FACTURA,
   celularParaFactura,
+  esComprobanteEnviable,
   esErrorVentana,
   esperaReintento,
   nombreArchivoFactura,
@@ -115,7 +116,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
 
   async iniciar(comprobanteId: bigint): Promise<ResultadoProcesoFactura | null> {
     const c = await this.prisma.comprobante.findUnique({ where: { id: comprobanteId }, select: { tipo: true, facturacion_estado: true, simulado: true } });
-    if (!c || c.tipo !== 'FACTURA' || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return null;
+    if (!c || !esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return null;
     const r = await this.prisma.facturaWhatsappEnvio.createMany({
       data: [{ comprobante_id: comprobanteId, estado: 'PENDIENTE', proximo_intento_en: new Date(Date.now() + ARRENDAMIENTO_MS) }],
       skipDuplicates: true,
@@ -134,8 +135,8 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
     }
     const c = await this.prisma.comprobante.findUnique({ where: { id }, select: { tipo: true, facturacion_estado: true, simulado: true, anulado_en: true } });
     if (!c) throw new HttpException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' }, HttpStatus.NOT_FOUND);
-    if (c.tipo !== 'FACTURA' || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado || c.anulado_en) {
-      throw new HttpException({ codigo: 'FACTURA_NO_ENVIABLE', mensaje: 'Solo se envía por WhatsApp una factura real aceptada por SUNAT y vigente' }, HttpStatus.CONFLICT);
+    if (!esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado || c.anulado_en) {
+      throw new HttpException({ codigo: 'FACTURA_NO_ENVIABLE', mensaje: 'Solo se envía por WhatsApp una boleta o factura real aceptada por SUNAT y vigente' }, HttpStatus.CONFLICT);
     }
     if (!(await this.leerConfig()).activo) {
       throw new HttpException({ codigo: 'ENVIO_APAGADO', mensaje: 'El envío de facturas por WhatsApp está apagado en Configuración' }, HttpStatus.CONFLICT);
@@ -193,7 +194,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
       where: { id },
       include: { pedido: { select: { id: true, cliente_telefono: true, es_personal: true } } },
     });
-    if (!c || c.tipo !== 'FACTURA' || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return this.cerrar(id, 'OMITIDO', { detalle: 'NO_ENVIABLE' }, o);
+    if (!c || !esComprobanteEnviable(c.tipo) || c.facturacion_estado !== 'EMITIDO_SUNAT' || c.simulado) return this.cerrar(id, 'OMITIDO', { detalle: 'NO_ENVIABLE' }, o);
     if (c.anulado_en || c.baja_estado) return this.cerrar(id, 'OMITIDO', { detalle: 'ANULADA' }, o);
     if (c.pedido.es_personal) return this.cerrar(id, 'OMITIDO', { detalle: 'PERSONAL' }, o);
 
@@ -206,7 +207,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
 
     // El PDF se genera una vez y viaja a Meta por la Media API (nunca por link: da 131000)
     const pdf = await this.comprobantes.pdfParaEnvio(id);
-    const nombre = nombreArchivoFactura(c.numero_texto as string);
+    const nombre = nombreArchivoFactura(c.numero_texto as string, c.tipo);
     const conv = await this.prisma.conversacion.findUnique({ where: { telefono }, select: { id: true, phone_number_id: true } });
     const phoneNumberId = conv?.phone_number_id ?? undefined;
     const opciones = { pedidoId: c.pedido.id, ...(phoneNumberId ? { phoneNumberId } : {}), ...(conv ? { conversacionId: conv.id } : {}) };
@@ -217,7 +218,7 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
       this.mensajeria.enviarPlantilla(telefono, cfg.plantilla, IDIOMA_PLANTILLA_FACTURA, [c.numero_texto as string], { ...opciones, documentoCabecera: { mediaId, nombre } });
     let via: 'DOCUMENTO' | 'PLANTILLA' = abierta ? 'DOCUMENTO' : 'PLANTILLA';
     let r: ResultadoEnvioWhatsApp = abierta
-      ? await this.mensajeria.enviarDocumento(telefono, mediaId, nombre, textoFactura(c.numero_texto as string), opciones)
+      ? await this.mensajeria.enviarDocumento(telefono, mediaId, nombre, textoFactura(c.numero_texto as string, c.tipo), opciones)
       : await enPlantilla();
     // La ventana se cerró entre la consulta y el envío (o Meta la cuenta por otro número): una sola vez con la plantilla
     if (!r.exito && abierta && cfg.plantilla && esErrorVentana(r.errorCodigo, r.errorDetalle)) {

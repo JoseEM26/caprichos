@@ -126,13 +126,37 @@ describe('FacturaWhatsappService.iniciar', () => {
     expect(cuerposMensaje(m.fetchFalso)).toHaveLength(1);
   });
 
-  it('boleta, nota de venta, simulada y no aceptada: no envían nada ni crean fila', async () => {
-    for (const extra of [{ tipo: 'BOLETA' }, { tipo: 'NOTA_VENTA' }, { simulado: true }, { facturacion_estado: 'PENDIENTE_ENVIO' }]) {
+  it('nota de venta, simulada y no aceptada: no envían nada ni crean fila', async () => {
+    for (const extra of [{ tipo: 'NOTA_VENTA' }, { simulado: true }, { facturacion_estado: 'PENDIENTE_ENVIO' }]) {
       const m = montar({ comp: factura(extra) });
       expect(await m.servicio.iniciar(10n)).toBeNull();
       expect(m.envios.size).toBe(0);
       expect(m.fetchFalso).not.toHaveBeenCalled();
     }
+  });
+
+  it.each(['CARTA', 'CAJA', 'MOZO', 'BOT', 'DELIVERY'])('boleta emitida al cobrar (%s): se envía por WhatsApp una sola vez, con el PDF como documento', async (canal) => {
+    const m = montar({ comp: factura({ tipo: 'BOLETA', serie: 'B002', numero_texto: 'B002-000045' }), pedido: { canal } });
+    expect(await m.servicio.iniciar(10n)).toMatchObject({ estado: 'ENVIADO', via: 'DOCUMENTO' });
+    expect(await m.servicio.iniciar(10n)).toBeNull();
+    const cuerpos = cuerposMensaje(m.fetchFalso);
+    expect(cuerpos).toHaveLength(1);
+    expect(cuerpos[0].document.filename).toBe('Boleta B002-000045.pdf');
+    expect(cuerpos[0].document.caption).toContain('boleta electrónica B002-000045');
+  });
+
+  it('boleta y factura sin celular: no se intenta enviar', async () => {
+    for (const tipo of ['BOLETA', 'FACTURA']) {
+      const m = montar({ comp: factura({ tipo }), pedido: { cliente_telefono: null } });
+      expect(await m.servicio.iniciar(10n)).toMatchObject({ estado: 'SIN_CELULAR' });
+      expect(m.fetchFalso).not.toHaveBeenCalled();
+    }
+  });
+
+  it('boleta con la baja del cliente: no se envía', async () => {
+    const m = montar({ comp: factura({ tipo: 'BOLETA' }), consentimiento: false });
+    expect(await m.servicio.iniciar(10n)).toMatchObject({ estado: 'OMITIDO', detalle: 'CLIENTE_BAJA' });
+    expect(m.fetchFalso).not.toHaveBeenCalled();
   });
 
   it('sin celular válido (vacío, relleno, no 9 dígitos): no envía y queda «sin celular»', async () => {
@@ -282,9 +306,9 @@ describe('FacturaWhatsappService.reenviar (botón)', () => {
     expect(m.fetchFalso).not.toHaveBeenCalled();
   });
 
-  it('respeta el interruptor, boletas y anuladas con un 409', async () => {
+  it('respeta el interruptor, notas de venta y anuladas con un 409', async () => {
     await expect(montar({ parametros: [{ clave: 'facturacion_enviar_whatsapp', valor: false }] }).servicio.reenviar('10', ADMIN)).rejects.toMatchObject({ response: { codigo: 'ENVIO_APAGADO' } });
-    await expect(montar({ comp: factura({ tipo: 'BOLETA' }) }).servicio.reenviar('10', ADMIN)).rejects.toMatchObject({ response: { codigo: 'FACTURA_NO_ENVIABLE' } });
+    await expect(montar({ comp: factura({ tipo: 'NOTA_VENTA' }) }).servicio.reenviar('10', ADMIN)).rejects.toMatchObject({ response: { codigo: 'FACTURA_NO_ENVIABLE' } });
     await expect(montar({ comp: factura({ anulado_en: new Date() }) }).servicio.reenviar('10', ADMIN)).rejects.toMatchObject({ response: { codigo: 'FACTURA_NO_ENVIABLE' } });
     await expect(montar({ comp: null }).servicio.reenviar('10', ADMIN)).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_NO_ENCONTRADO' } });
   });
@@ -319,8 +343,14 @@ describe('ComprobantesService: disparo en la transición a EMITIDO_SUNAT', () =>
     expect(aviso).toHaveBeenCalledTimes(1);
     expect(aviso).toHaveBeenCalledWith(1n);
   });
-  it('boleta, simulada, rechazada o ya registrada sin CDR: no avisa', async () => {
-    for (const [tipo, res] of [['BOLETA', ok], ['FACTURA', { ...ok, simulado: true }], ['FACTURA', { ...ok, estado: 'RECHAZADO' }], ['FACTURA', { ...ok, yaRegistrado: true }], ['FACTURA', { ...ok, estado: 'PENDIENTE_ENVIO' }]] as const) {
+  it('boleta aceptada de verdad (al cobrar, envío al instante): avisa una vez con su id', async () => {
+    const { aviso, guardar } = montarEmision('BOLETA');
+    await guardar(ok);
+    expect(aviso).toHaveBeenCalledTimes(1);
+    expect(aviso).toHaveBeenCalledWith(1n);
+  });
+  it('simulada, rechazada o ya registrada sin CDR: no avisa', async () => {
+    for (const [tipo, res] of [['FACTURA', { ...ok, simulado: true }], ['FACTURA', { ...ok, estado: 'RECHAZADO' }], ['FACTURA', { ...ok, yaRegistrado: true }], ['FACTURA', { ...ok, estado: 'PENDIENTE_ENVIO' }]] as const) {
       const { aviso, guardar } = montarEmision(tipo);
       await guardar(res);
       expect(aviso).not.toHaveBeenCalled();

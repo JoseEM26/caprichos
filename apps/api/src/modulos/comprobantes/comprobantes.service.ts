@@ -659,8 +659,8 @@ export class ComprobantesService {
       ip: opciones.ip,
     });
 
-    // Factura aceptada por SUNAT con su CDR (no simulada): el WhatsApp al cliente sale aparte, sin esperar ni afectar la emisión
-    if (aceptado && c.tipo === 'FACTURA' && !data.simulado && !res.yaRegistrado) {
+    // Boleta o factura aceptada por SUNAT con su CDR (no simulada): el WhatsApp al cliente sale aparte, sin esperar ni afectar la emisión
+    if (aceptado && (c.tipo === 'FACTURA' || c.tipo === 'BOLETA') && !data.simulado && !res.yaRegistrado) {
       try {
         this.alAceptarFactura?.(c.id);
       } catch (e: any) {

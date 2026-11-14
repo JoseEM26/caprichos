@@ -25,11 +25,14 @@ export function celularParaFactura(telefono: string | null | undefined): string 
 }
 
 /** Nombre del documento en el chat del cliente: «Factura F002-000123.pdf». */
-export const nombreArchivoFactura = (numeroTexto: string): string => `Factura ${numeroTexto}.pdf`;
+export const nombreArchivoFactura = (numeroTexto: string, tipo: string = 'FACTURA'): string => `${tipo === 'BOLETA' ? 'Boleta' : 'Factura'} ${numeroTexto}.pdf`;
 
 /** Texto del documento (una línea, sin montos ni RUC). */
-export const textoFactura = (numeroTexto: string): string =>
-  `Gracias por tu compra en Caprichos 💛 Aquí está tu factura electrónica ${numeroTexto}.`;
+export const textoFactura = (numeroTexto: string, tipo: string = 'FACTURA'): string =>
+  `Gracias por tu compra en Caprichos 💛 Aquí está tu ${tipo === 'BOLETA' ? 'boleta' : 'factura'} electrónica ${numeroTexto}.`;
+
+/** Boleta o factura: lo que se envía por WhatsApp al emitirse (la nota de venta simple no es electrónica). */
+export const esComprobanteEnviable = (tipo: string | null | undefined): boolean => tipo === 'FACTURA' || tipo === 'BOLETA';
 
 /** Nombre de plantilla válido de Meta (minúsculas, números y guion bajo), o '' si no sirve. */
 export function plantillaValida(v: unknown): string {
