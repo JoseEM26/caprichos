@@ -48,11 +48,12 @@ import { INCLUIR_EXTRAS, resumenExtras } from './extras-pedido.util';
 const INCLUIR_LISTA = {
   lineas: { include: { opcionesElegidas: true, sabores: true, area: true } },
   zona: true,
-  cobros: { where: { anulado_en: null }, select: { id: true, en: true, cobrado_por: true, pagos: { select: { medio: true } } }, take: 1 },
+  cobros: { where: { anulado_en: null }, select: { id: true, en: true, cobrado_por: true, pagos: { select: { medio: true, origen: true } } }, take: 1 },
   ...INCLUIR_EXTRAS,
 };
 /** Tope de «todas» en la lista: una jornada normal cabe sobrada. */
 export const LIMITE_TODAS = 2000;
+import { pagosOnlineDe } from './pago-online-resumen';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { FiltrosMisPedidos, RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -313,17 +314,25 @@ export class PedidosEstadoService {
       ];
     }
     if (filtros.medios) {
-      // Medio de algún cobro vigente (basta uno si es pago mixto) o, sin cobro aún, el medio elegido (pago_metodo/pago_preferido)
-      const medios = filtros.medios.split(',').filter(Boolean);
+      // Medio de algún cobro vigente (basta uno si es pago mixto) o, sin cobro aún, el medio elegido (pago_metodo/pago_preferido).
+      // «CULQI» no es un medio: es el origen «pagado por la pasarela» (algún renglón del cobro vigente con origen CULQI).
+      const lista = filtros.medios.split(',').filter(Boolean);
+      const medios = lista.filter((m) => m !== 'CULQI');
+      const porCulqi = lista.includes('CULQI');
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : []),
         {
           OR: [
-            { cobros: { some: { anulado_en: null, pagos: { some: { medio: { in: medios } } } } } },
-            {
-              cobros: { none: { anulado_en: null } },
-              OR: medios.flatMap((m) => [{ pago_metodo: { contains: m } }, { pago_preferido: { contains: m } }]),
-            },
+            ...(porCulqi ? [{ cobros: { some: { anulado_en: null, pagos: { some: { origen: 'CULQI' } } } } }] : []),
+            ...(medios.length
+              ? [
+                  { cobros: { some: { anulado_en: null, pagos: { some: { medio: { in: medios } } } } } },
+                  {
+                    cobros: { none: { anulado_en: null } },
+                    OR: medios.flatMap((m) => [{ pago_metodo: { contains: m } }, { pago_preferido: { contains: m } }]),
+                  },
+                ]
+              : []),
           ],
         },
       ];
@@ -382,6 +391,7 @@ export class PedidosEstadoService {
         : [];
     const todos = [...pedidos, ...relacionadosCrudos];
     const cobrosMozo = await this.cobrosMozoDe(todos);
+    const pagosOnline = await pagosOnlineDe(this.prisma, todos.map((p) => p.id));
     const ajustes = await ajustesPendientesUbicacion(this.prisma, todos.map((p) => p.id));
     // Columnas de Caja: quién tomó el pedido (mozo/cajero) y quién lo cobró
     const nombres = await nombresDePersonas(
@@ -416,6 +426,9 @@ export class PedidosEstadoService {
         ),
         mediosPago: sinCobro ? mediosElegidos : mediosCobro,
         mediosPagoPendiente: sinCobro && mediosElegidos.length > 0,
+        // Medios del cobro vigente que llegaron por la pasarela (Culqi), no al Yape/POS del local
+        mediosCulqi: [...new Set((cobro?.pagos ?? []).filter((x: any) => x.origen === 'CULQI').map((x) => x.medio))],
+        pagoOnline: pagosOnline.get(String(p.id)) ?? null,
         atendidoPorNombre:
           CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? (nombres.get(String(p.party_id)) ?? null) : null,
         atendidoEn: CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? p.creado_en : null,
@@ -1075,6 +1088,7 @@ export class PedidosEstadoService {
       ...pedidoSinIncidentes,
       ...(tieneConsumoAlmacen ? { tieneConsumoAlmacen: true } : {}),
       ...(pagoCulqi ? { pagoCulqi } : {}),
+      pagoOnline: (await pagosOnlineDe(this.prisma, [pedido.id])).get(String(pedido.id)) ?? null,
       canjePuntos,
       ajustePago,
       lineas: pedido.lineas.map((l: any) =>

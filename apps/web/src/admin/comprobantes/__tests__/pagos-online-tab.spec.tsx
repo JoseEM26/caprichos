@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as sesionModulo from '../../../comun/sesion';
 import { culqiApi } from '../../../carta/pagos/culqiApi';
+import { MemoryRouter } from 'react-router-dom';
 import { PagosOnlineTab } from '../PagosOnlineTab';
 
 const pago = { id: 'g1', pedidoCodigo: 'A1', monto: 25, medio: 'YAPE', estado: 'APROBADO', culqiId: 'chr_1', creadoEn: '2026-01-01T15:00:00Z', devuelto: false };
@@ -47,5 +48,36 @@ describe('Pagos en línea (admin)', () => {
     fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'Cliente' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sí, devolver' }));
     await waitFor(() => expect(dev).toHaveBeenCalledWith('g1', { motivo: 'Cliente', medio: 'YAPE', monto: 5, confirmar: true }));
+  });
+
+  it('lista con medio (ícono y tarjeta), hora, nº de operación, total cobrado y «Ver pedido»', async () => {
+    comoRol('CAJERO');
+    vi.spyOn(culqiApi, 'listar').mockResolvedValue({
+      items: [
+        { ...pago, pedidoId: '77', aprobadoEn: '2026-01-01T15:00:00Z' },
+        { ...pago, id: 'g2', pedidoCodigo: 'B2', pedidoId: '78', medio: 'TARJETA', marca: 'Visa', ultimos4: '1111', culqiId: 'chr_2', monto: 10 },
+      ],
+      total: 2,
+      totalAprobado: 35,
+      totalDevuelto: 0,
+    });
+    render(<MemoryRouter><PagosOnlineTab /></MemoryRouter>);
+    expect((await screen.findByTestId('total-pagos-online')).textContent).toMatch(/S\/ 35\.00/);
+    expect(screen.getByText('Visa ···1111')).toBeTruthy();
+    expect(screen.getByText('chr_1')).toBeTruthy();
+    expect(screen.getByText('chr_2')).toBeTruthy();
+    expect((screen.getByRole('link', { name: 'Ver pedido A1' }) as HTMLAnchorElement).getAttribute('href')).toBe('/admin/caja?pedido=77');
+    expect(screen.getByRole('columnheader', { name: 'N.º de operación' })).toBeTruthy();
+  });
+
+  it('el filtro de estado ofrece Aprobado, Rechazado, Pendiente y Devuelto y consulta por el elegido', async () => {
+    comoRol('CAJERO');
+    const listar = vi.spyOn(culqiApi, 'listar');
+    render(<MemoryRouter><PagosOnlineTab /></MemoryRouter>);
+    await screen.findByText('#A1');
+    const sel = screen.getByLabelText('Estado') as HTMLSelectElement;
+    expect([...sel.options].map((o) => o.text)).toEqual(['Todos', 'Aprobado', 'Rechazado', 'Pendiente', 'Devuelto']);
+    fireEvent.change(sel, { target: { value: 'DEVUELTO' } });
+    await waitFor(() => expect(listar).toHaveBeenLastCalledWith(expect.objectContaining({ estado: 'DEVUELTO' })));
   });
 });

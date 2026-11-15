@@ -6,6 +6,7 @@ import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import type { ResultadoReimpresionPedido } from '../impresion/impresionApi';
 import { BotonCambiarPago } from '../pedidos/CambiarPago';
+import { RecuadroPagoCulqi } from '../pedidos/RecuadroPagoCulqi';
 import { errorCelular } from '../pedidos/ModalCorregirCliente';
 import { pedidosApi, type Pedido } from '../pedidos/pedidosApi';
 import { ModalCargoLibre, esCargoLibre, etiquetaCargoLibre, type CargoLibreDatos } from '../pedidos/ModalCargoLibre';
@@ -117,7 +118,8 @@ export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alC
         <section className="dpm-sec" aria-label="Forma de pago">
           <h3 className="dpm-h">Forma de pago</h3>
           <PagoDe p={pedido} completo={completo} permitido={tiene('pedidos/ajustar_pago')} alExito={() => { cargarCompleto(); alCambio(); }} />
-          {vouchers}
+          {/* Pagado por Culqi: la prueba es su número de operación, no una captura (sin «falta captura») */}
+          {completo?.pagoOnline ? <RecuadroPagoCulqi pago={completo.pagoOnline} /> : vouchers}
         </section>
         {/* Cada extra tiene su propio plan de pago: también se cambia desde aquí */}
         {extras.filter((e) => !['ANULADO', 'RECHAZADO'].includes(e.estado)).map((e) => (

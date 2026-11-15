@@ -215,6 +215,13 @@ Ver tambien: [[repartos]], [[mensajes]]
 5. El boton Chat de WhatsApp aparece en el apartado del cliente si el pedido tiene celular: abre su chat en Mensajes si existe y tienes permiso; si no, abre WhatsApp en una pestana nueva.
 6. Pagos: medios, efectivo y vuelto, propina, quien cobro y las capturas del pago (aprobada, por verificar o rechazada). Tiempos: la linea de tiempo del pedido.
 
+## Como se hace: Distinguir lo pagado por Culqi del Yape normal
+1. Un pedido que el cliente pago en linea (tarjeta o Yape desde la carta) se cobra solo, sin que Caja haga nada. En la lista, tabla y tarjetas su medio sale como "Yape · Culqi" o "Tarjeta · Culqi", con el icono de pago en linea. El "Yape" sin la palabra Culqi es el que llego al celular del local.
+2. En Ver detalle, pestana Pagos, aparece el recuadro "Pagado en linea por Culqi ✓": medio (Yape o Visa ···1111), monto, hora de Lima, numero de operacion de Culqi con el boton Copiar, y el estado (Aprobado, Devuelto parcial o Devuelto). El enlace Ver en Culqi abre el panel de Culqi y copia el numero de operacion para que lo busques ahi. El mozo ve el mismo recuadro en su detalle del pedido.
+3. Un pedido pagado por Culqi no lleva voucher ni dice "Falta captura": su prueba es la operacion en CulqiPanel, no el Yape del local.
+4. Para ver solo esos pedidos, abre el filtro Medio de pago y marca "Pagado por Culqi". Al pie de la tabla, el total de Culqi sale aparte ("Yape · Culqi", "Tarjeta · Culqi") y no se mezcla con el Yape normal ni con la tarjeta del POS.
+5. La lista completa de pagos en linea (con filtros por fecha y estado: Aprobados, Rechazados, Pendientes, Devueltos; total cobrado, numero de operacion y el boton Ver pedido) esta en [[comprobantes]], pestana Pagos en linea. La ven Administrador, Supervisor y Cajero; solo el Administrador devuelve dinero.
+
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si el boton Registrar cobro no se activa con Yape o Plin, falta la foto del comprobante: subela, o usa la excepcion con motivo.

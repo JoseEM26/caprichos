@@ -9,6 +9,7 @@ import { duracionSegLegible, lineaTiempoApi, type EtapaLineaTiempo, type LineaTi
 import { SeccionComprobantesPedido } from './SeccionComprobantesPedido';
 import { SeccionClientePedido } from './SeccionClientePedido';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
+import { RecuadroPagoCulqi } from './RecuadroPagoCulqi';
 import './detalle-venta.css';
 
 const hora = (iso: string | null | undefined) => {
@@ -166,7 +167,7 @@ function PestanaPagos({ p }: { p: PedidoExtra }) {
         <h3 className="dv-sec">Medios</h3>
         <ul className="dv-lista">
           {filas.length === 0 && <li className="dv-nota">Sin pagos registrados</li>}
-          {filas.map((f, i) => <li key={i} className="dv-fila"><span>{f.medio}</span><span className="dv-num">{formatearSoles(f.monto)}</span></li>)}
+          {filas.map((f, i) => <li key={i} className="dv-fila"><span>{p.pagoOnline && String(f.medio).toUpperCase() === String(p.pagoOnline.medio).toUpperCase() ? `${f.medio} · Culqi` : f.medio}</span><span className="dv-num">{formatearSoles(f.monto)}</span></li>)}
         </ul>
         {efectivo != null && (
           <dl className="dv-grid">
@@ -188,10 +189,14 @@ function PestanaPagos({ p }: { p: PedidoExtra }) {
           </dl>
         </section>
       )}
-      <section className="dv-bloque">
-        <h3 className="dv-sec">Vouchers</h3>
-        <SeccionVouchersPedido pedidoId={String(p.id)} total={montoPorCobrar(p)} medio={p.pago_metodo ?? p.cobroMozo?.medio} compacto />
-      </section>
+      {p.pagoOnline ? (
+        <RecuadroPagoCulqi pago={p.pagoOnline} />
+      ) : (
+        <section className="dv-bloque">
+          <h3 className="dv-sec">Vouchers</h3>
+          <SeccionVouchersPedido pedidoId={String(p.id)} total={montoPorCobrar(p)} medio={p.pago_metodo ?? p.cobroMozo?.medio} compacto />
+        </section>
+      )}
       {cobros.length > 0 && (
         <section className="dv-bloque">
           <h3 className="dv-sec">Movimientos</h3>

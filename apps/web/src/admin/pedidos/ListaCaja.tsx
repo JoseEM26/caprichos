@@ -8,7 +8,8 @@ import { IconoModalidad, claveModalidad, textoMesa } from './InsigniaModalidad';
 import { ReimprimirPedido } from './ReimprimirPedido';
 import { CANAL, MOD, aHora, textoPago } from './columnasCaja';
 import { esCerrado, estadoVisual } from './estadosCaja';
-import { mediosDePedido, nombreMedio } from './mediosFila';
+import { mediosDePedido, medioPorCulqi } from './mediosFila';
+import { textoMedio } from './EtiquetaMedio';
 import { totalDe } from './resumenDia';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import './lista-caja.css';
@@ -164,7 +165,7 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
       <div className="lc-total">
         <strong className={v.clave === 'anulado' ? 'lc-anulado' : undefined}>{soles(totalDe(p))}</strong>
         <span className="lc-pago" data-pago={textoPago(p)}>{textoPago(p)}</span>
-        {medios.length > 0 && <span className="lc-medios">{medios.map(nombreMedio).join(' + ')}</span>}
+        {medios.length > 0 && <span className="lc-medios">{medios.map((m) => textoMedio(m, medioPorCulqi(p, m))).join(' + ')}</span>}
       </div>
 
       <div className="lc-cliente">

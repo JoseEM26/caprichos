@@ -366,3 +366,53 @@ describe('Historial: «Cerrado con diferencia»', () => {
     expect(screen.getAllByText('Cerró: Carmen Cajera')).toHaveLength(2);
   });
 });
+
+describe('Cuadre: pagos en línea (Culqi) aparte del Yape y la tarjeta del local', () => {
+  const conCulqi: MontosEsperados = {
+    ...esperado,
+    culqi: {
+      yape: 70, tarjeta: 40, cobradoYape: 80, cobradoTarjeta: 40, devueltoYape: 10, devueltoTarjeta: 0, total: 110,
+      operaciones: [
+        { pedidoId: '9', pedidoCodigo: 'CP-009', medio: 'YAPE', monto: 80, en: '2026-11-08T21:00:00Z', operacion: 'chr_live_777' },
+        { pedidoId: '9', pedidoCodigo: 'CP-009', medio: 'TARJETA', monto: 40, en: '2026-11-08T21:00:00Z', operacion: 'chr_live_777' },
+      ],
+    },
+  };
+
+  it('las filas dicen «Yape (manual)» y «Tarjeta POS»; el esperado de Yape del local no incluye lo de Culqi', () => {
+    montar({ esperado: conCulqi });
+    const yape = screen.getByTestId('digital-yape');
+    expect(within(yape).getByText('Yape (manual)')).toBeTruthy();
+    expect(within(yape).getByText('S/ 200.00')).toBeTruthy(); // sin los 80 de Culqi
+    expect(within(screen.getByTestId('digital-tarjeta')).getByText('Tarjeta POS')).toBeTruthy();
+  });
+
+  it('bloque «Pagos en línea (Culqi)»: filas propias, total, operaciones y la nota de CulqiPanel', () => {
+    montar({ esperado: conCulqi });
+    const b = screen.getByTestId('bloque-culqi');
+    expect(within(b).getByText('Pagos en línea (Culqi)')).toBeTruthy();
+    expect(within(b).getByText(/Se verifica en CulqiPanel, no en el Yape del local/)).toBeTruthy();
+    expect(within(screen.getByTestId('culqi-yape')).getByText('Yape por Culqi')).toBeTruthy();
+    expect(within(screen.getByTestId('culqi-yape')).getByText('S/ 70.00')).toBeTruthy();
+    expect(within(screen.getByTestId('culqi-tarjeta')).getByText('Tarjeta por Culqi')).toBeTruthy();
+    expect(within(screen.getByTestId('culqi-total')).getByText('S/ 110.00')).toBeTruthy();
+    const ops = screen.getByTestId('operaciones-culqi');
+    expect(within(ops).getAllByText('chr_live_777')).toHaveLength(2);
+    expect(within(ops).getAllByText('CP-009')).toHaveLength(2);
+  });
+
+  it('sin cobros por Culqi no aparece el bloque', () => {
+    montar();
+    expect(screen.queryByTestId('bloque-culqi')).toBeNull();
+  });
+
+  it('Culqi no suma diferencia: cuadrar efectivo y digitales del local cierra sin tocar Culqi', () => {
+    const { onCerrar } = montar({ esperado: conCulqi });
+    llenarCuentaExacta();
+    fireEvent.click(within(screen.getByTestId('digital-yape')).getByRole('button', { name: /Coincide con el sistema/ }));
+    fireEvent.click(within(screen.getByTestId('digital-transferencia')).getByRole('button', { name: /Coincide con el sistema/ }));
+    fireEvent.click(within(screen.getByTestId('digital-tarjeta')).getByRole('button', { name: /Coincide con el sistema/ }));
+    expect(screen.getByTestId('cc-pie').textContent).toMatch(/Cuadra/);
+    expect(onCerrar).not.toHaveBeenCalled();
+  });
+});

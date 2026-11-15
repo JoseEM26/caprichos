@@ -9,7 +9,7 @@ const MAX_FILAS = 50;
 /** Hasta este número de días la evolución es diaria; más allá, semanal (lunes a domingo). */
 export const MAX_DIAS_DIARIO = 31;
 
-const MEDIOS = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'];
+const MEDIOS = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'YAPE_CULQI', 'TARJETA_CULQI'];
 const centimos = (v: unknown) => Math.round(Number(v ?? 0) * 100);
 const diaLima = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
 const lunesDe = (dia: string) => {
@@ -38,7 +38,7 @@ export interface PedidoVenta {
     cargo_libre?: boolean;
     producto?: { categoria?: { nombre: string } | null } | null;
   }>;
-  cobros: Array<{ pagos: Array<{ medio: string | null; monto: unknown }> }>;
+  cobros: Array<{ pagos: Array<{ medio: string | null; monto: unknown; origen?: string | null }> }>;
 }
 
 interface Acum {
@@ -102,7 +102,9 @@ export function agregarVentas(todos: PedidoVenta[], rango: { dias: number; turno
     const pagos = p.cobros.flatMap((x) => x.pagos);
     if (p.cobros.length === 0) sinCobro += 1;
     for (const g of pagos) {
-      const medio = (g.medio || '').trim().toUpperCase() || 'OTRO';
+      // Lo cobrado por la pasarela sale aparte («Yape por Culqi»): llega a la cuenta de Culqi, no al Yape del local
+      const base = (g.medio || '').trim().toUpperCase() || 'OTRO';
+      const medio = g.origen === 'CULQI' && (base === 'YAPE' || base === 'TARJETA') ? `${base}_CULQI` : base;
       const m = centimos(g.monto);
       sumar(porMedio, medio, m);
       const celdaMedio = porMedioPeriodo.get(medio) ?? new Map<string, Acum>();
@@ -251,7 +253,7 @@ export class VentasService {
           where: { linea_combo_id: null },
           select: { nombre: true, cantidad: true, subtotal: true, producto_id: true, oferta_id: true, es_cortesia: true, cargo_libre: true, producto: { select: { categoria: { select: { nombre: true } } } } },
         },
-        cobros: { where: { anulado_en: null }, select: { pagos: { select: { medio: true, monto: true } } } },
+        cobros: { where: { anulado_en: null }, select: { pagos: { select: { medio: true, monto: true, origen: true } } } },
       },
       orderBy: { creado_en: 'desc' },
       take: MAX_PEDIDOS_VENTAS + 1,

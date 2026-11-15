@@ -1511,4 +1511,58 @@ describe('CierreService', () => {
       expect(res.medios!.find((m: any) => m.medio === 'YAPE')).toMatchObject({ sistema: 150, visto: 200, diferencia: 50 });
     });
   });
+  // -------------------------------------------------------------------------
+  // 15. Pagos en línea (Culqi): fila propia, fuera del esperado de Yape y tarjeta del local
+  // -------------------------------------------------------------------------
+  describe('15. pagos en línea (Culqi) separados del Yape y la tarjeta del local', () => {
+    beforeEach(() => {
+      const base = mockCobros.map((c) => ({ ...c, pedido_id: c.id, en: new Date('2026-10-21T15:00:00Z'), pedido: { codigo: `PED-${c.id}`, cliente_nombre: 'Ana' } }));
+      prismaMock.cobro.findMany.mockResolvedValue([
+        ...base,
+        { id: 90n, pedido_id: 90n, caja_id: 10n, anulado_en: null, total: 120, en: new Date('2026-10-21T16:00:00Z'), pedido: { codigo: 'PED-90', cliente_nombre: 'Luz' }, pagos: [
+          { medio: 'YAPE', monto: 80, propina: 0, origen: 'CULQI' },
+          { medio: 'TARJETA', monto: 40, propina: 0, origen: 'CULQI' },
+        ] },
+      ]);
+      prismaMock.pagoOnlineIntento = {
+        findMany: jest.fn(async (args: any) =>
+          args?.select?.culqi_cargo_id !== undefined
+            ? [{ pedido_id: 90n, culqi_cargo_id: 'chr_test_abc' }]
+            : [{ medio: 'YAPE', devoluciones: [{ monto_centimos: 1000, en: '2026-10-21T20:00:00Z' }] }],
+        ),
+      };
+    });
+
+    it('el esperado de Yape y de tarjeta del local EXCLUYE lo cobrado por Culqi; Culqi va aparte con su neto', async () => {
+      const res = await service.obtenerEsperado(mockUsuarioAdmin);
+      expect(res.medios.yape).toBe(200); // sin los 80 de Culqi
+      expect(res.medios.tarjeta).toBe(100); // sin los 40 de Culqi
+      expect(res.culqi).toMatchObject({ cobradoYape: 80, cobradoTarjeta: 40, devueltoYape: 10, yape: 70, tarjeta: 40, total: 110 });
+      expect(res.culqi.operaciones).toEqual([
+        expect.objectContaining({ pedidoCodigo: 'PED-90', medio: 'YAPE', monto: 80, operacion: 'chr_test_abc' }),
+        expect.objectContaining({ pedidoCodigo: 'PED-90', medio: 'TARJETA', monto: 40, operacion: 'chr_test_abc' }),
+      ]);
+    });
+
+    it('el cierre guarda YAPE_CULQI y TARJETA_CULQI con visto = sistema y sin diferencia; YAPE y TARJETA del local no cambian', async () => {
+      const res = await service.cerrar(
+        { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
+        mockUsuarioCajero,
+      );
+      const por = (m: string) => res.medios!.find((x: any) => x.medio === m);
+      expect(por('YAPE')).toMatchObject({ sistema: 200, visto: 200, diferencia: 0 });
+      expect(por('TARJETA')).toMatchObject({ sistema: 100, visto: 100, diferencia: 0 });
+      expect(por('YAPE_CULQI')).toMatchObject({ sistema: 70, visto: 70, diferencia: 0 });
+      expect(por('TARJETA_CULQI')).toMatchObject({ sistema: 40, visto: 40, diferencia: 0 });
+    });
+
+    it('sin cobros por Culqi el cierre no agrega filas de Culqi (los cierres de siempre quedan igual)', async () => {
+      prismaMock.cobro.findMany.mockResolvedValue(mockCobros.map((c) => ({ ...c, pedido_id: c.id, en: new Date('2026-10-21T15:00:00Z'), pedido: { codigo: `PED-${c.id}`, cliente_nombre: 'Ana' } })));
+      const res = await service.cerrar(
+        { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
+        mockUsuarioCajero,
+      );
+      expect(res.medios!.map((m: any) => m.medio)).toEqual(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA']);
+    });
+  });
 });

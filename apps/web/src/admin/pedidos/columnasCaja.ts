@@ -1,8 +1,8 @@
 import type { Pedido } from './pedidosApi';
 import { estadoVisual } from './estadosCaja';
 import { claveModalidad } from './InsigniaModalidad';
-import { mediosDePedido } from './mediosFila';
-import { nombreMedio } from './planPago';
+import { mediosDePedido, medioPorCulqi } from './mediosFila';
+import { textoMedio } from './EtiquetaMedio';
 import { totalDe } from './resumenDia';
 
 export const aHora = (iso?: string | null) =>
@@ -52,7 +52,7 @@ export const COLUMNAS_CAJA: ColumnaCaja[] = [
   { id: 'canal', titulo: 'Canal', texto: (p) => CANAL[String(p.canal || '').toUpperCase()] ?? (p.canal || 'Web') },
   { id: 'estado', titulo: 'Estado', texto: (p) => estadoVisual(p).l },
   { id: 'pago', titulo: 'Estado de pago', texto: textoPago },
-  { id: 'medios', titulo: 'Medios de pago', texto: (p) => mediosDePedido(p).map(nombreMedio).join(' + ') },
+  { id: 'medios', titulo: 'Medios de pago', texto: (p) => mediosDePedido(p).map((m) => textoMedio(m, medioPorCulqi(p, m))).join(' + ') },
   { id: 'total', titulo: 'Total', numerica: true, texto: (p) => dinero(totalDe(p)) },
   { id: 'propina', titulo: 'Propina', numerica: true, texto: (p) => (Number(p.propina || 0) > 0 ? dinero(p.propina) : '') },
   { id: 'atendio', titulo: 'Atendió', texto: (p) => p.atendidoPorNombre ?? p.cobroMozo?.mozo ?? '' },

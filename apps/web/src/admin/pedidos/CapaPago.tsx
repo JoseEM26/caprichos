@@ -14,9 +14,11 @@ import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { digitalesDelPlan, faltanCapturas, medioDigitalVoucher } from './mediosPago';
-import { nombreMedio } from './planPago';
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
 import { BotonCambiarPago, MarcaPagoModificado } from './CambiarPago';
+import { RecuadroPagoCulqi } from './RecuadroPagoCulqi';
+import { EtiquetaMedio } from './EtiquetaMedio';
+import { medioPorCulqi } from './mediosFila';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -71,7 +73,9 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
   const digitales = useMemo(() => digitalesDelPlan(plan), [plan]);
   const medioDigital = medioDigitalVoucher(pedido.pago_metodo || pedido.pago_preferido);
   const [vouchers, setVouchers] = useState<VoucherPagoItem[] | null>(null);
-  const faltan = useMemo(() => (vouchers ? faltanCapturas(digitales, vouchers) : []), [digitales, vouchers]);
+  const pagoOnline = pedido.pagoOnline ?? null;
+  // Pagado por Culqi: la prueba es la operación de Culqi, no una captura: nunca «falta captura»
+  const faltan = useMemo(() => (vouchers && !pagoOnline ? faltanCapturas(digitales, vouchers) : []), [digitales, vouchers, pagoOnline]);
   const v = calcularVuelto(pedido);
 
   // Cambiar comprobante: solo antes de cobrar y sin comprobante emitido (la API lo rechaza si no)
@@ -84,6 +88,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
   return (
     <div className="dp-grid dp-grid-2">
       <div className="dp-col">
+        {pagoOnline && <RecuadroPagoCulqi pago={pagoOnline} />}
         <section className="dp-sec" aria-label="Estado del cobro">
           <h3 className="dp-sec-titulo">Cómo se paga</h3>
           <div className="dp-fila">
@@ -104,13 +109,13 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
           {plan.length > 0 ? (
             plan.map((f, i) => {
               const m = String(f.medio).toUpperCase();
-              const digital = medioDigitalVoucher(m) !== null;
+              const porCulqi = medioPorCulqi(pedido, m) || (!!pagoOnline && String(pagoOnline.medio).toUpperCase() === m);
+              const digital = medioDigitalVoucher(m) !== null && !porCulqi;
               const falta = digital && faltan.includes(m);
               return (
                 <div key={i} className="dp-medio" data-testid={`plan-${m.toLowerCase()}`}>
                   <span style={{ fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <IconoMedioPago medio={m} tamano={20} ariaHidden />
-                    <span>{nombreMedio(m)}</span>
+                    <EtiquetaMedio medio={m} culqi={porCulqi} tamano={20} />
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span
@@ -120,7 +125,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
                         color: !digital ? 'var(--cp-soft, #2C4C5D)' : falta ? 'var(--cp-rust, #B2500F)' : '#1F5C33',
                       }}
                     >
-                      {!digital ? 'Sin captura' : vouchers === null ? 'Cargando captura' : falta ? 'Falta captura' : 'Captura subida'}
+                      {porCulqi ? 'Pagado por Culqi' : !digital ? 'Sin captura' : vouchers === null ? 'Cargando captura' : falta ? 'Falta captura' : 'Captura subida'}
                     </span>
                     <strong style={{ fontSize: 17 }}>{soles(Number(f.monto || 0))}</strong>
                   </span>
@@ -131,8 +136,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
             <div className="dp-fila">
               <span>Medio de pago</span>
               <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <IconoMedioPago medio={medioTxt} tamano={20} ariaHidden />
-                <span>{medioTxt}</span>
+                {pagoOnline ? <EtiquetaMedio medio={medioTxt.toUpperCase()} culqi tamano={20} /> : (<><IconoMedioPago medio={medioTxt} tamano={20} ariaHidden /><span>{medioTxt}</span></>)}
               </strong>
             </div>
           )}
@@ -140,8 +144,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
             <div className="dp-fila" style={{ fontSize: 14 }}>
               <span>Medio de pago</span>
               <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <IconoMedioPago medio={medioTxt} tamano={18} ariaHidden />
-                <span>{medioTxt}</span>
+                {pagoOnline ? <EtiquetaMedio medio={medioTxt.toUpperCase()} culqi tamano={18} /> : (<><IconoMedioPago medio={medioTxt} tamano={18} ariaHidden /><span>{medioTxt}</span></>)}
               </strong>
             </div>
           )}
@@ -255,6 +258,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
         </section>
       </div>
 
+      {!pagoOnline && (
       <section className="dp-sec" aria-label="Capturas de pago" style={{ minWidth: 0 }}>
         <h3 className="dp-sec-titulo">Capturas de pago</h3>
         {digitales.length >= 2 && (
@@ -270,6 +274,7 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
           ofrecerSubida={digitales.length < 2 && (digitales.length === 1 || medioDigital !== null)}
         />
       </section>
+      )}
 
       <Confirmar
         abierto={confirmarCambio}

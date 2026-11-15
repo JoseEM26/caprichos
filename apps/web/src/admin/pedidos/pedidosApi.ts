@@ -195,6 +195,10 @@ export interface Pedido {
   tieneConsumoAlmacen?: boolean;
   /** Pago aprobado por Culqi con dinero por devolver (S/): el diálogo de anular ofrece «Devolver por Culqi» */
   pagoCulqi?: { restante: number } | null;
+  /** Pago en línea (Culqi) aprobado del pedido: medio, marca, nº de operación, estado y lo devuelto. Null si no hay. */
+  pagoOnline?: PagoOnlineResumen | null;
+  /** Medios del cobro vigente que llegaron por la pasarela (Culqi), no al Yape ni al POS del local. */
+  mediosCulqi?: string[];
   /** Último cambio de pago (Caja, mozo o repartidor): quién, cuándo y «Pago modificado: antes → ahora» */
   ajustePago?: { por: string | null; en: string; texto: string } | null;
   /** Número del día en cocina (referencial); null si no llegó a cocina */
@@ -806,3 +810,17 @@ export const pedidosApi = {
 /** Lo que hay que cobrar de un pedido (sin propina): con crédito del personal + delivery, solo el envío. Igual que el servidor. */
 export const montoPorCobrar = (p: { total?: string | number | null; monto_credito?: string | number | null; adelanto_total?: string | number | null }): number =>
   Math.max(0, Math.round(Number(p.total || 0) * 100) - Math.round(Number(p.monto_credito || 0) * 100) - Math.round(Number(p.adelanto_total || 0) * 100)) / 100;
+
+/** Pago aprobado por la pasarela (Culqi), como lo manda el servidor en el pedido. */
+export interface PagoOnlineResumen {
+  medio: string | null;
+  marca: string | null;
+  ultimos4: string | null;
+  /** Número de operación de Culqi (id del cargo). */
+  cargoId: string;
+  monto: number;
+  aprobadoEn: string | null;
+  devuelto: number;
+  estado: 'APROBADO' | 'DEVUELTO_PARCIAL' | 'DEVUELTO';
+  modo: string;
+}

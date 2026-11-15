@@ -13,6 +13,15 @@ export const MEDIOS_DIGITALES_CUADRE: Array<{ clave: Exclude<ClaveMedio, 'efecti
   { clave: 'tarjeta', medio: 'TARJETA', etiqueta: 'Tarjeta / POS' },
 ];
 
+/** Nombre de un medio del cierre: el Yape y la tarjeta del local se rotulan «manual»/«POS»; lo de Culqi va aparte. */
+export const ROTULO_MEDIO_CIERRE: Record<string, string> = {
+  YAPE: 'Yape (manual)',
+  TARJETA: 'Tarjeta POS',
+  YAPE_CULQI: 'Yape por Culqi',
+  TARJETA_CULQI: 'Tarjeta por Culqi',
+};
+export const rotuloMedioCierre = (medio: string) => ROTULO_MEDIO_CIERRE[String(medio).toUpperCase()] ?? medio;
+
 /** Redondeo a céntimos: los montos se comparan en céntimos, nunca como floats sueltos. */
 export const redondear = (n: number) => Math.round(n * 100) / 100;
 

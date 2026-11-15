@@ -74,6 +74,13 @@ Ver tambien: [[caja]]
 3. Un cobro anulado deja de contarse en la seccion.
 Ver tambien: [[caja]]
 
+## Como se hace: Cuadrar los pagos en linea (Culqi) aparte del Yape y la tarjeta
+1. En el cuadre, las filas digitales dicen "Yape (manual)" y "Tarjeta POS": son solo lo que llego al Yape del local y al POS. Compara esas filas con tu app de Yape y con el POS.
+2. Lo que los clientes pagaron en linea por Culqi va en su propio bloque "Pagos en linea (Culqi)", con filas "Yape por Culqi" y "Tarjeta por Culqi", el total y la lista de operaciones (pedido, medio, monto, hora y numero de operacion). Ese dinero llega a la cuenta de Culqi, no al Yape del local: se verifica en CulqiPanel. No hay nada que escribir ahi: su visto es igual al sistema y nunca suma diferencia.
+3. El Yape esperado y la tarjeta esperada NO incluyen lo cobrado por Culqi. Ejemplo: Yape manual S/ 200, Yape por Culqi S/ 80 (con S/ 10 devueltos ese dia), tarjeta POS S/ 100, tarjeta por Culqi S/ 40. Comparas tu app de Yape contra S/ 200 y el POS contra S/ 100; Culqi muestra S/ 70 + S/ 40 = S/ 110 para revisar en CulqiPanel. El total de ventas del turno es el mismo de siempre: suma todo, tambien Culqi.
+4. Al cerrar, el cierre guarda las filas YAPE_CULQI y TARJETA_CULQI (solo si hubo cobros por Culqi) con diferencia 0. En Historial de cierres, Detalle, pestana Medios de pago, salen aparte con la lista de operaciones. Los cierres anteriores no cambian.
+5. En el reporte de analisis de ventas por medio de pago, Culqi tambien sale aparte ("Yape por Culqi", "Tarjeta por Culqi").
+
 ## Como se hace: Proceder cuando la caja no cuadra
 1. Si los montos declarados difieren de las ventas registradas, la pantalla muestra el aviso No cuadra y solicita un segundo conteo fisico.
 2. Volver a contar el dinero y corregir las cantidades ingresadas.

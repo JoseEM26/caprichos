@@ -109,6 +109,29 @@ export interface ServiciosLibresTurno {
   total: number;
 }
 
+/** Pagos en línea (Culqi) del turno: llegan a la cuenta de Culqi, no al Yape ni al POS del local. */
+export interface OperacionCulqi {
+  pedidoId: string;
+  pedidoCodigo: string;
+  medio: string;
+  monto: number;
+  en: string;
+  /** Número de operación de Culqi (id del cargo) */
+  operacion: string | null;
+}
+
+export interface CulqiTurno {
+  /** Neto del día (cobrado menos devuelto) */
+  yape: number;
+  tarjeta: number;
+  cobradoYape: number;
+  cobradoTarjeta: number;
+  devueltoYape: number;
+  devueltoTarjeta: number;
+  total: number;
+  operaciones?: OperacionCulqi[];
+}
+
 export interface MontosEsperados {
   cajaId: number;
   /** Fecha de la caja ABIERTA que se cierra (puede ser de un día anterior) */
@@ -122,6 +145,8 @@ export interface MontosEsperados {
   movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;
+  /** Pagos en línea (Culqi), aparte de medios.yape y medios.tarjeta; puede faltar en servidores viejos */
+  culqi?: CulqiTurno;
   medios: {
     efectivo: number;
     yape: number;
@@ -263,6 +288,8 @@ export interface DetalleCierreCompleto {
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
   ajustesMedio?: AjusteMedio[];
+  /** Operaciones Culqi del cierre (pedido, medio, monto, hora, nº de operación) */
+  culqi?: { operaciones: OperacionCulqi[] };
   /** Todo el detalle del cierre ya armado (el mismo que se imprime); falta en respuestas de un API viejo. */
   ticket?: TicketCierreDatos;
 }

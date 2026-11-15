@@ -39,6 +39,8 @@ const MEDIO: Record<string, string> = {
   PLIN: 'Plin',
   TARJETA: 'Tarjeta',
   TRANSFERENCIA: 'Transferencia',
+  YAPE_CULQI: 'Yape por Culqi',
+  TARJETA_CULQI: 'Tarjeta por Culqi',
   OTRO: 'Otro',
 };
 const TIPO_DESCUENTO: Record<string, string> = {
