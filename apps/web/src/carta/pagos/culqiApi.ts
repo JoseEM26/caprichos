@@ -188,45 +188,103 @@ export interface ResultadoCulqi {
   email?: string;
 }
 
+const log = (...a: unknown[]) => console.info('[culqi]', ...a);
+/** Segundos sin ver el iframe de Culqi antes de pasar al respaldo (ventana modal de Culqi). */
+export const ESPERA_IFRAME_MS = 8000;
+
 /**
- * Monta Culqi Checkout Custom EMBEBIDO en `#culqi-container` (debe existir en el DOM) y devuelve el token
- * (o null si se cierra sin pagar). `cerrar()` lo desmonta (volver, desmontar el componente).
+ * Monta Culqi Checkout Custom EMBEBIDO dentro de `anfitrion` (un nodo estable; React no es dueño de lo que
+ * se crea dentro) y devuelve el token (o null si se cierra sin pagar). `cerrar()` lo desmonta.
+ * Culqi hace document.querySelector(container) y monta una app Vue ahí: por eso el nodo de montaje lo crea
+ * este código con un id único justo antes, y no un div que React pueda re-montar.
+ * Respaldo: si a los ESPERA_IFRAME_MS no hay iframe, se cierra y se abre en `modal:true` (`alRespaldo(true)`).
  * La tarjeta se escribe en un iframe de Culqi: nuestro JS solo recibe el token.
  */
-export function abrirCulqi(intento: IntentoCulqi): { resultado: Promise<ResultadoCulqi | null>; cerrar: () => void } {
+export function abrirCulqi(
+  intento: IntentoCulqi,
+  anfitrion: HTMLElement,
+  alRespaldo?: (activo: boolean) => void,
+  esperaMs = ESPERA_IFRAME_MS,
+): { resultado: Promise<ResultadoCulqi | null>; cerrar: () => void } {
   let instancia: any = null;
+  let nodo: HTMLElement | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cerrado = false;
   let terminar: (r: ResultadoCulqi | null, e?: Error) => void = () => {};
   const resultado = new Promise<ResultadoCulqi | null>((resolver, rechazar) => {
     terminar = (r, e) => (e ? rechazar(e) : resolver(r));
   });
-  const cerrar = () => {
+  const soltar = () => {
+    clearTimeout(timer);
     try { instancia?.close(); } catch { /* ya cerrado */ }
+    instancia = null;
+    nodo?.remove();
+    nodo = null;
+  };
+  const cerrar = () => {
+    cerrado = true;
+    soltar();
     terminar(null);
+  };
+  const crear = (modal: boolean) => {
+    const CC = (window as any).CulqiCheckout;
+    if (!CC) throw new ErrorAperturaCulqi();
+    let cfg = configCulqi(intento);
+    if (modal) {
+      const opciones = { ...cfg.options, container: undefined };
+      cfg = { ...cfg, options: { ...opciones, modal: true } as any };
+    } else {
+      nodo = document.createElement('div');
+      nodo.id = `${ID_CONTENEDOR_CULQI}-${Math.random().toString(36).slice(2, 10)}`;
+      nodo.style.cssText = 'width:100%;height:100%';
+      anfitrion.appendChild(nodo);
+      cfg = { ...cfg, options: { ...cfg.options, container: `#${nodo.id}` } };
+    }
+    instancia = new CC(intento.publicKey, cfg);
+    log('instancia creada', modal ? 'modal' : cfg.options.container);
+    instancia.culqi = () => {
+      const C = instancia;
+      if (C.token?.id) {
+        const tk = C.token;
+        C.close();
+        terminar({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
+      } else if (C.error) {
+        C.close();
+        terminar(null, new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
+      } else {
+        C.close();
+        terminar(null);
+      }
+    };
+    instancia.closeCheckout = () => terminar(null);
+    instancia.open();
+    log('open', modal ? 'modal' : 'embebido');
+  };
+  const hayIframe = (modal: boolean) =>
+    !!(modal ? document.querySelector('iframe[name="checkout_frame"]') : nodo?.querySelector('iframe'));
+  const vigilar = (modal: boolean) => {
+    timer = setTimeout(() => {
+      if (cerrado) return;
+      if (hayIframe(modal)) return log('iframe visto', modal ? 'modal' : 'embebido');
+      if (modal) return terminar(null, new ErrorAperturaCulqi());
+      log('sin iframe: respaldo modal');
+      soltar();
+      try {
+        alRespaldo?.(true);
+        crear(true);
+        vigilar(true);
+      } catch {
+        alRespaldo?.(false);
+        terminar(null, new ErrorAperturaCulqi());
+      }
+    }, esperaMs);
   };
   cargarScriptCulqi()
     .then(() => {
-      const CC = (window as any).CulqiCheckout;
-      if (!CC) throw new ErrorAperturaCulqi();
-      // Culqi hace document.querySelector(container) al abrir; si el div aún no existe, crea uno suelto en <body>
-      // (fuera de nuestro modal) y nuestro contenedor queda vacío. Mejor fallar a la vista.
-      if (!document.getElementById(ID_CONTENEDOR_CULQI)) throw new ErrorAperturaCulqi();
-      instancia = new CC(intento.publicKey, configCulqi(intento));
-      instancia.culqi = () => {
-        const C = instancia;
-        if (C.token?.id) {
-          const tk = C.token;
-          C.close();
-          terminar({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
-        } else if (C.error) {
-          C.close();
-          terminar(null, new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
-        } else {
-          C.close();
-          terminar(null);
-        }
-      };
-      instancia.closeCheckout = () => terminar(null);
-      instancia.open();
+      if (cerrado) return;
+      log('script cargado');
+      crear(false);
+      vigilar(false);
     })
     .catch(() => terminar(null, new ErrorAperturaCulqi()));
   return { resultado, cerrar };

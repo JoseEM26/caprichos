@@ -3,14 +3,13 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
-import { abrirCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, ID_CONTENEDOR_CULQI, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { abrirCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
 const VIGENCIA_MS = 15 * 60 * 1000;
-const ESPERA_MONTAJE_MS = 10000;
 
 /** Minutos que quedan para pagar (el pedido sin pagar se anula a los 15 min); null si no se sabe la hora. */
 function useMinutosRestantes(creadoEn?: string): number | null {
@@ -111,28 +110,36 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     }
   };
 
-  // Culqi embebido: se monta en #culqi-container (dentro de nuestro modal) y se desmonta al volver o cerrar.
-  const cancelarCulqi = useRef<() => void>(() => {});
+  // Culqi embebido: abrirCulqi crea su propio nodo dentro de `anfitrion` (React no lo posee). Se abre en el
+  // frame siguiente, cuando el padre ya aplicó el cambio de layout (alFormulario).
+  const anfitrion = useRef<HTMLDivElement>(null);
+  const [respaldo, setRespaldo] = useState(false);
   useEffect(() => {
     if (fase !== 'formulario' || !intento) return;
     document.getElementById('culqi-embebido')?.focus();
-    const { resultado, cerrar } = abrirCulqi(intento);
-    cancelarCulqi.current = cerrar;
     let vivo = true;
-    resultado
-      .then((res) => {
-        if (!vivo) return;
-        if (!res) setFase('listo');
-        else { setFase('pagando'); void cobrar(res.token, res.medio, res.email, intento); }
-      })
-      .catch((e) => {
-        if (!vivo) return;
-        setMensaje(e instanceof Error ? e.message : 'No pudimos conectar. Reintenta.');
-        setFase(e instanceof ErrorAperturaCulqi ? 'error' : 'rechazado');
-      });
+    let cerrar = () => {};
+    const frame = requestAnimationFrame(() => {
+      if (!vivo || !anfitrion.current) return;
+      const a = abrirCulqi(intento, anfitrion.current, (v) => vivo && setRespaldo(v));
+      cerrar = a.cerrar;
+      a.resultado
+        .then((res) => {
+          if (!vivo) return;
+          if (!res) setFase('listo');
+          else { setFase('pagando'); void cobrar(res.token, res.medio, res.email, intento); }
+        })
+        .catch((e) => {
+          if (!vivo) return;
+          setMensaje(e instanceof Error ? e.message : 'No pudimos conectar. Reintenta.');
+          setFase(e instanceof ErrorAperturaCulqi ? 'error' : 'rechazado');
+        });
+    });
     return () => {
       vivo = false;
+      cancelAnimationFrame(frame);
       cerrar();
+      setRespaldo(false);
     };
   }, [fase, intento]);
 
@@ -141,25 +148,12 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     return () => alFormulario?.(false);
   }, [fase]);
 
-  // Si Culqi no llegó a montar su iframe en el contenedor, se avisa en vez de dejar un hueco vacío.
-  useEffect(() => {
-    if (fase !== 'formulario') return;
-    const t = setTimeout(() => {
-      if (!document.querySelector(`#${ID_CONTENEDOR_CULQI} iframe`)) {
-        setMensaje(new ErrorAperturaCulqi().message);
-        setFase('error');
-      }
-    }, ESPERA_MONTAJE_MS);
-    return () => clearTimeout(t);
-  }, [fase]);
-
   const iniciado = useRef(false);
   useEffect(() => {
     if (auto && config?.activo && config.modo === 'REAL' && !iniciado.current) {
       iniciado.current = true;
       void pagar();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, config]);
 
   if (!config?.activo) return null;
@@ -211,7 +205,8 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
             <div id="culqi-embebido" tabIndex={-1} data-testid="culqi-embebido" style={{ outline: 'none' }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFase('listo'); } }}>
               {/* Culqi monta aquí su formulario (iframe alojado por Culqi: la tarjeta no pasa por nuestro código) */}
               {/* Altura DEFINIDA: el iframe de Culqi mide height:100% y con solo min-height se colapsaba */}
-              <div id={ID_CONTENEDOR_CULQI} className="sg-culqi" aria-label="Formulario de pago de Culqi" />
+              {respaldo && <p role="status" data-testid="culqi-respaldo" style={{ margin: 0 }}>Abriendo la ventana segura de Culqi…</p>}
+              <div ref={anfitrion} className="sg-culqi" aria-label="Formulario de pago de Culqi" style={respaldo ? { display: 'none' } : undefined} />
               <Boton variante="secundario" onClick={() => setFase('listo')} style={{ marginTop: 8 }}>
                 Volver
               </Boton>

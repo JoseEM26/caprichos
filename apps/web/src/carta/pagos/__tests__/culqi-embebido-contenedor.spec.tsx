@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { culqiApi, URL_CULQI } from '../culqiApi';
@@ -30,6 +31,15 @@ function simularScriptCulqi(opts: { cargaBien: boolean }) {
   return vistoAlAbrir;
 }
 
+function cargaOk() {
+  const original = document.head.appendChild.bind(document.head);
+  vi.spyOn(document.head, 'appendChild').mockImplementation(((el: Node) => {
+    const r = original(el);
+    if (el instanceof HTMLScriptElement) queueMicrotask(() => el.dispatchEvent(new Event('load')));
+    return r;
+  }) as any);
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
   delete (window as any).CulqiCheckout;
@@ -49,10 +59,10 @@ describe('Culqi embebido: orden de montaje', () => {
     const alFormulario = vi.fn();
     render(<PagarEnLinea pedidoId="p1" monto={16.5} creadoEn={new Date().toISOString()} alFormulario={alFormulario} />);
     fireEvent.click(await screen.findByText('Pagar ahora'));
-    await waitFor(() => expect(document.querySelector('#culqi-container iframe')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('.sg-culqi iframe')).not.toBeNull());
     expect(visto.contenedorExistia).toBe(true);
-    expect(visto.selector).toBe('#culqi-container');
-    expect(document.getElementById('culqi-container')!.className).toContain('sg-culqi');
+    expect(visto.selector).toMatch(/^#culqi-container-[a-z0-9]+$/);
+    expect(document.querySelector('.sg-culqi')!.className).toContain('sg-culqi');
     expect(alFormulario).toHaveBeenCalledWith(true);
     expect(screen.getByTestId('falta-pagar').textContent).toMatch(/^Pagar S\/ 16\.50 · Te quedan 1[45] min$/);
   });
@@ -71,21 +81,62 @@ describe('Culqi embebido: errores visibles, no un hueco', () => {
     expect((await screen.findByTestId('pago-error')).textContent).toMatch(/No se pudo abrir el pago/);
     expect(screen.getByText('Reintentar el pago')).toBeTruthy();
   });
-  it('si Culqi no llega a montar su iframe, avisa en vez de dejar el contenedor vacío', async () => {
+  it('sin iframe usa el respaldo modal:true; si tampoco aparece, avisa «No se pudo abrir el pago»', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    (window as any).CulqiCheckout = function (this: any) { this.open = () => {}; this.close = () => {}; };
-    const original = document.head.appendChild.bind(document.head);
-    vi.spyOn(document.head, 'appendChild').mockImplementation(((el: Node) => {
-      const r = original(el);
-      if (el instanceof HTMLScriptElement) queueMicrotask(() => el.dispatchEvent(new Event('load')));
-      return r;
-    }) as any);
+    const configs: any[] = [];
+    (window as any).CulqiCheckout = function (this: any, _pk: string, cfg: any) { configs.push(cfg); this.open = () => {}; this.close = () => {}; };
+    cargaOk();
     render(<PagarEnLinea pedidoId="p1" monto={16.5} />);
     fireEvent.click(await screen.findByText('Pagar ahora'));
     await screen.findByTestId('culqi-embebido');
-    await vi.advanceTimersByTimeAsync(10500);
+    await vi.advanceTimersByTimeAsync(8500);
+    expect(configs.map((c) => c.options.modal)).toEqual([false, true]);
+    expect(configs[1].options.container).toBeUndefined();
+    expect(screen.getByTestId('culqi-respaldo').textContent).toMatch(/Abriendo la ventana segura de Culqi/);
+    await vi.advanceTimersByTimeAsync(8500);
     expect((await screen.findByTestId('pago-error')).textContent).toMatch(/No se pudo abrir el pago/);
     vi.useRealTimers();
+  });
+  it('con iframe no se activa el respaldo', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const configs: any[] = [];
+    (window as any).CulqiCheckout = function (this: any, _pk: string, cfg: any) {
+      configs.push(cfg); this.close = () => {};
+      this.open = () => { document.querySelector(cfg.options.container)?.appendChild(document.createElement('iframe')); };
+    };
+    cargaOk();
+    render(<PagarEnLinea pedidoId="p1" monto={16.5} />);
+    fireEvent.click(await screen.findByText('Pagar ahora'));
+    await screen.findByTestId('culqi-embebido');
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(configs).toHaveLength(1);
+    expect(screen.queryByTestId('culqi-respaldo')).toBeNull();
+    expect(screen.queryByTestId('pago-error')).toBeNull();
+    vi.useRealTimers();
+  });
+});
+
+describe('Culqi embebido: el nodo de montaje no es de React', () => {
+  it('lo crea el código y sigue en el DOM tras re-renders del padre y el cambio de layout', async () => {
+    const nodos: Element[] = [];
+    (window as any).CulqiCheckout = function (this: any, _pk: string, cfg: any) {
+      this.close = () => {};
+      this.open = () => { const n = document.querySelector(cfg.options.container)!; nodos.push(n); n.appendChild(document.createElement('iframe')); };
+    };
+    cargaOk();
+    function Padre() {
+      const [amplio, setAmplio] = useState(false);
+      return <div className={amplio ? 'mcp-ampliado' : ''}>{amplio && <i data-testid="x" />}<PagarEnLinea pedidoId="p1" monto={16.5} alFormulario={setAmplio} /></div>;
+    }
+    const { rerender } = render(<Padre />);
+    fireEvent.click(await screen.findByText('Pagar ahora'));
+    await waitFor(() => expect(nodos).toHaveLength(1));
+    rerender(<Padre />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(nodos).toHaveLength(1);
+    expect(nodos[0].isConnected).toBe(true);
+    expect(nodos[0].parentElement!.className).toContain('sg-culqi');
+    expect(nodos[0].querySelector('iframe')).not.toBeNull();
   });
 });
 

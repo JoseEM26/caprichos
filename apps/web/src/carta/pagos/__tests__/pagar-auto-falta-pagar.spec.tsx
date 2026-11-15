@@ -39,7 +39,8 @@ describe('pago en línea recién creado', () => {
     render(<PagarEnLinea pedidoId="p1" monto={13.5} />);
     fireEvent.click(await screen.findByText('Pagar ahora'));
     const cont = await screen.findByTestId('culqi-embebido');
-    expect(cont.querySelector('#culqi-container')).toBeTruthy();
+    expect(cont.querySelector('.sg-culqi')).toBeTruthy();
+    await waitFor(() => expect(abrir).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Volver'));
     expect(await screen.findByText('Pagar ahora')).toBeTruthy();
     expect(screen.queryByTestId('culqi-embebido')).toBeNull();
