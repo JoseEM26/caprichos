@@ -55,6 +55,9 @@ export function salidaDevolucion(
     por_party_id: bigint;
     autorizado_por_party_id: bigint;
     creado_en: Date;
+    estado?: string;
+    culqi_devolucion_id?: string | null;
+    error?: string | null;
   },
   nombres: Map<string, string>,
 ) {
@@ -66,6 +69,10 @@ export function salidaDevolucion(
     porNombre: nombres.get(String(f.por_party_id)) ?? null,
     autorizadoPorNombre: nombres.get(String(f.autorizado_por_party_id)) ?? null,
     comprobanteBajaEstado: f.comprobante_baja_estado,
+    estado: f.estado ?? 'HECHA',
+    // Últimos caracteres del id del reembolso de Culqi (el id completo no se muestra)
+    culqiReembolso: f.culqi_devolucion_id ? f.culqi_devolucion_id.slice(-6) : null,
+    errorCulqi: f.error ?? null,
     creadoEn: f.creado_en,
   };
 }

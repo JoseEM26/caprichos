@@ -78,11 +78,13 @@ export function ModalAnular({
     !esCobro && !!pedido && (!!pedido.cobro_vigente_id || ['PAGADO', 'COORDINADO'].includes(String(pedido.pago_estado || '').toUpperCase()));
   const mostrarDinero = !esCobro && (pagadoConocido || pideDinero);
   const puedeReprogramar = !pedido || String(pedido.modalidad || '').toUpperCase() === 'DELIVERY';
+  // Pago aprobado por Culqi: «Devolver por Culqi» es la primera opción y la recomendada (el cajero puede elegir otro medio)
+  const culqiDisponible = !esCobro && !!pedido?.pagoCulqi && pedido.pagoCulqi.restante > 0;
   const montoNum = Number(montoDev.replace(',', '.'));
   const dineroCompleto =
     !mostrarDinero ||
     destino === 'REPROGRAMAR' ||
-    (destino === 'DEVOLVER' && medioDev !== '' && montoNum > 0 && (medioDev === 'EFECTIVO' || codigoDev.trim().length > 0));
+    (destino === 'DEVOLVER' && medioDev !== '' && montoNum > 0 && (medioDev === 'EFECTIVO' || medioDev === 'CULQI' || codigoDev.trim().length > 0));
   const dineroParaEnviar = (): DestinoDineroAnulacion | undefined => {
     if (!mostrarDinero || !destino) return undefined;
     if (destino === 'REPROGRAMAR') return { destinoDinero: 'REPROGRAMAR' };
@@ -90,7 +92,7 @@ export function ModalAnular({
       destinoDinero: 'DEVOLVER',
       devolucionMedio: medioDev,
       devolucionMonto: Math.round(montoNum * 100) / 100,
-      ...(medioDev !== 'EFECTIVO' ? { devolucionCodigo: codigoDev.trim() } : {}),
+      ...(medioDev !== 'EFECTIVO' && medioDev !== 'CULQI' ? { devolucionCodigo: codigoDev.trim() } : {}),
     };
   };
   // Todos los roles anulan el pedido completo con la misma advertencia; anular un cobro es aparte
@@ -336,7 +338,13 @@ export function ModalAnular({
             <fieldset data-testid="destino-dinero" style={{ border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: 10, padding: 10, margin: 0 }}>
               <legend style={{ fontWeight: 700, fontSize: 13 }}>¿Qué pasa con el dinero?</legend>
               <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center', fontSize: 13 }}>
-                <input type="radio" name="destino-dinero" checked={destino === 'DEVOLVER'} onChange={() => setDestino('DEVOLVER')} />
+                <input type="radio" name="destino-dinero" checked={destino === 'DEVOLVER'} onChange={() => {
+                  setDestino('DEVOLVER');
+                  if (culqiDisponible && medioDev === '') {
+                    setMedioDev('CULQI');
+                    setMontoDev(String(pedido!.pagoCulqi!.restante));
+                  }
+                }} />
                 Se devuelve al cliente
               </label>
               {destino === 'DEVOLVER' && (
@@ -345,6 +353,7 @@ export function ModalAnular({
                     Medio de la devolución
                     <select value={medioDev} onChange={(e) => setMedioDev(e.target.value)} style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 4 }}>
                       <option value="">Elige el medio…</option>
+                      {culqiDisponible && <option value="CULQI">Devolver por Culqi (a la tarjeta/Yape del cliente) — recomendado</option>}
                       {MEDIOS_DEVOLUCION.map(([v, t]) => (
                         <option key={v} value={v}>{t}</option>
                       ))}
@@ -354,11 +363,18 @@ export function ModalAnular({
                     Monto devuelto (S/)
                     <input type="text" inputMode="decimal" value={montoDev} onChange={(e) => setMontoDev(e.target.value)} style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44, marginTop: 4 }} />
                   </label>
-                  {medioDev !== '' && medioDev !== 'EFECTIVO' && (
+                  {medioDev !== '' && medioDev !== 'EFECTIVO' && medioDev !== 'CULQI' && (
                     <label style={{ fontSize: 13, fontWeight: 700 }}>
                       Código de operación
                       <input type="text" value={codigoDev} onChange={(e) => setCodigoDev(e.target.value)} style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: 44, marginTop: 4 }} />
                     </label>
+                  )}
+                  {medioDev === 'CULQI' && (
+                    <span style={{ fontSize: 12 }} data-testid="nota-culqi">
+                      {esAdmin
+                        ? 'Se anula el pedido y se pide el reembolso a Culqi. Si Culqi falla, queda pendiente para reintentar.'
+                        : 'Se anula el pedido y la devolución queda pendiente de aprobación del administrador.'}
+                    </span>
                   )}
                   {medioDev === 'EFECTIVO' && <span style={{ fontSize: 12 }}>La devolución en efectivo queda en la caja de hoy (debe estar abierta).</span>}
                 </div>

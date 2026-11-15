@@ -1120,6 +1120,7 @@ export function PedidosAdminView() {
           error={errorNoEntregados}
           puedeLiquidar={puedeLiquidar}
           puedeDevolver={tiene('pedidos/cambiar_estado')}
+          puedeEjecutarCulqi={tieneRolUsuario(usuario, 'ADMIN')}
           puedeDescartar={tiene('pedidos/cambiar_estado') && (tieneRolUsuario(usuario, 'ADMIN') || tieneRolUsuario(usuario, 'SUPERVISOR'))}
           alActualizar={() => {
             void cargarNoEntregados();

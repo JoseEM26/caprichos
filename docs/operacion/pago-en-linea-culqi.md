@@ -60,7 +60,18 @@ El webhook acepta cualquier evento. Las devoluciones también se simulan. Nunca 
 - **Efectivo en el cierre**: el cobro en línea es TARJETA o YAPE, nunca efectivo. Devolver en efectivo registra un egreso de la caja de hoy (baja el efectivo esperado, correcto porque salió dinero del cajón); anular después el cobro digital no mueve el efectivo, así que no se resta dos veces. Lo que baja en el cierre por la anulación es la venta digital.
 - **Cuenta «Pago en línea»**: la crea la migración con rol `ADMIN` (sin rol nuevo), inactiva y sin contraseña válida, así que nadie puede iniciar sesión. Se reconoce por su marca interna y no aparece en Usuarios ni en sus conteos. Figura como quien cobra los pagos en línea y como quien anula los pedidos sin pago a tiempo.
 - La suma devuelta nunca supera lo cobrado. El listado trae `montoDevuelto` y `devoluciones:[{monto, medio, en}]`.
-- La devolución **no anula el cobro en Caja** ni el comprobante: eso sigue siendo un paso aparte de Caja.
+- La devolución **no anula el cobro en Caja** por sí sola cuando es parcial; la total sí (ver arriba).
+
+## Anular un pedido pagado con Culqi: un solo camino para devolver
+Anular y `/devolver` usan el mismo código (`DevolucionCulqiService`: reserva el monto, pide el reembolso, lo anota en el JSON del intento con una clave `ref`; repetir la misma `ref` nunca vuelve a llamar a Culqi). Todo queda en una sola tabla, `devolucion_pedido`, que es lo que ven «Cancelados por no recibir» y el cierre.
+- **Diálogo de anular** (pedido con intento APROBADO con algo por devolver; el detalle trae `pagoCulqi.restante`): entre los medios aparece primero «Devolver por Culqi (a la tarjeta/Yape del cliente) — recomendado», ya elegido. El cajero puede elegir otro medio (efectivo, Yape, Plin, Transferencia, Tarjeta). Con otro medio **no se llama a Culqi**: se registra la devolución con ese medio y se anota en el intento como «devuelto por fuera»; en efectivo sale un egreso de la caja de hoy (abierta), una sola vez.
+- **Devolver por Culqi**: se anula el pedido con el flujo normal (cobro anulado, comprobante de baja) y, ya anulado, se pide el reembolso (total, o el monto elegido si es parcial). La fila de `devolucion_pedido` lleva `medio = CULQI`, `estado` y `culqi_devolucion_id` (la pantalla muestra solo los últimos caracteres).
+- **Estados**: `HECHA`; `PENDIENTE_APROBACION` (anuló alguien que no es ADMIN: el reembolso real exige ADMIN; sale aviso en la campanita al admin); `PENDIENTE` (Culqi falló la primera vez) y `FALLIDA` (falló el reintento), con aviso al admin. En los tres el pedido queda anulado igual.
+- **Ejecutar o reintentar**: `POST /admin/pedidos/:id/devolucion/culqi` (solo ADMIN), botón «Aprobar y devolver por Culqi» / «Reintentar devolución por Culqi» en «Cancelados por no recibir». En un reintento tras un fallo sin respuesta se consulta primero a Culqi si ya devolvió ese monto, para no devolver dos veces. Auditado: `DEVOLUCION_AL_ANULAR`, `DEVOLUCION_CULQI_EJECUTADA`, `DEVOLUCION_CULQI_FALLIDA`.
+- **`/devolver` también escribe en `devolucion_pedido`** (una fila por pedido; si ya existe no se duplica; si era una Culqi pendiente, la marca HECHA).
+- **Cierre**: el efectivo no cambia con una devolución por Culqi (el dinero sale por la pasarela, no del cajón) y no se resta de los medios digitales (el cobro ya se anuló).
+- **Revertir la anulación** de un pedido con devolución Culqi se bloquea (`DEVOLUCION_CULQI_REGISTRADA`): el dinero salió o está por salir. «No corresponde devolver» sigue igual para los pedidos sin devolución registrada.
+- Modo simulado (sin llaves): el reembolso se simula igual.
 
 ## Seguridad
 

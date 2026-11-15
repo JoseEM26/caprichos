@@ -1219,6 +1219,11 @@ model DevolucionPedido {
   // Resultado de la comunicación de baja de la boleta/factura (null si no tenía comprobante electrónico)
   comprobante_baja_estado String?
   movimiento_caja_id      BigInt?
+  // HECHA | PENDIENTE | PENDIENTE_APROBACION | FALLIDA (las tres últimas solo con medio CULQI)
+  estado                  String         @default("HECHA")
+  culqi_intento_id        BigInt?
+  culqi_devolucion_id     String?
+  error                   String?
   creado_en               DateTime       @default(now()) @db.Timestamptz
 
   pedido         Pedido          @relation(fields: [pedido_id], references: [id])

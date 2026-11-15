@@ -3,10 +3,13 @@ import { exigirPuedeProgramar } from '../pedidos/programado.util';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Optional,
   Param,
   Patch,
@@ -42,6 +45,7 @@ import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
 import { PedidosProgramadosService } from './pedidos-programados.service';
+import { AnulacionPagadoService } from './anulacion-pagado.service';
 import { DevolucionPedidoService } from './devolucion-pedido.service';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 
@@ -63,6 +67,7 @@ export class PedidosAdminController {
     @Optional() private readonly historialCajaService?: HistorialCajaPedidoService,
     @Optional() private readonly revertirAnulacion?: RevertirAnulacionService,
     @Optional() private readonly programados?: PedidosProgramadosService,
+    @Optional() private readonly anulacionPagado?: AnulacionPagadoService,
   ) {}
 
   @Post()
@@ -236,6 +241,16 @@ export class PedidosAdminController {
   async registrarDevolucion(@Param('id') id: string, @Body() dto: RegistrarDevolucionDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.devolucionPedido!.registrar(id, dto, req.usuario, BigInt(req.usuario.partyId), ip);
+  }
+
+  /** Ejecuta o reintenta la devolución por Culqi de un pedido anulado (solo ADMIN). */
+  @Post(':id/devolucion/culqi')
+  @Permiso('pedidos', 'cambiar_estado')
+  @HttpCode(HttpStatus.OK)
+  async devolucionCulqi(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    if (!/^\d+$/.test(String(id))) throw new BadRequestException({ codigo: 'PEDIDO_INVALIDO', mensaje: 'El pedido no es válido' });
+    return this.anulacionPagado!.ejecutarCulqi(BigInt(id), req.usuario, ip);
   }
 
   /** «No corresponde devolver»: saca el pedido de las devoluciones pendientes sin mover dinero (solo ADMIN/SUPERVISOR). */

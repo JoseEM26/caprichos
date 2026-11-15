@@ -47,6 +47,17 @@ export class RevertirAnulacionService {
       throw new ConflictException({ codigo: 'TRANSICION_INVALIDA', mensaje: `Solo se revierte un pedido anulado (está ${pedido.estado})` });
     }
 
+    // Devolución por Culqi: el dinero ya salió (o está por salir) por la pasarela; revertir dejaría el pedido vivo y sin cobro
+    const culqi = await this.prisma.devolucionPedido.findUnique({ where: { pedido_id: id }, select: { medio: true, estado: true } });
+    if (culqi?.medio === 'CULQI') {
+      throw new ConflictException({
+        codigo: 'DEVOLUCION_CULQI_REGISTRADA',
+        mensaje: culqi.estado === 'HECHA'
+          ? 'El dinero ya se devolvió al cliente por Culqi: no se puede revertir la anulación. Crea un pedido nuevo.'
+          : 'Este pedido tiene una devolución por Culqi sin completar: no se puede revertir la anulación. Resuélvela primero en Cancelados por no recibir.',
+      });
+    }
+
     const ultima = await this.prisma.pedidoEstadoHistorial.findFirst({
       where: { pedido_id: id, estado_nuevo: 'ANULADO' },
       orderBy: { en: 'desc' },

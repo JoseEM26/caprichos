@@ -12,6 +12,7 @@ import { esComprobanteElegible, validarDocumentoComprobante } from '../comproban
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { verificarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
 import { tieneRol } from '../acceso/roles-usuario';
+import { DevolucionCulqiService, ErrorReembolso, Devolucion } from './devolucion-culqi.service';
 import { usuarioSistema } from './usuario-sistema';
 import { ErrorPasarela, MedioPagoOnline, PASARELA_PAGO, PasarelaPago, ResultadoCargo } from './pasarela.puerto';
 
@@ -20,17 +21,6 @@ const ESTADOS_VIVOS = ['CREADO', 'PROCESANDO', 'PENDIENTE', 'APROBADO'];
 const MSG_PENDIENTE = 'Estamos confirmando tu pago. Te avisaremos en unos minutos.';
 const MSG_COBRO_PENDIENTE = 'Recibimos tu pago. Un asesor confirmará tu pedido en unos minutos.';
 const TAMANO_PAGINA = 20;
-
-export interface Devolucion {
-  id: string;
-  monto_centimos: number;
-  en: string;
-  motivo: string;
-  origen: 'SISTEMA' | 'WEBHOOK';
-  /** CULQI (reembolso por la pasarela) o el medio con que se devolvió por fuera */
-  medio?: string;
-  movimiento_caja_id?: string;
-}
 
 export const MEDIOS_DEVOLUCION = ['CULQI', 'EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'];
 
@@ -48,7 +38,12 @@ export class PagosOnlineService {
     private readonly cobros: CobrosService,
     @Inject(PASARELA_PAGO) private readonly pasarela: PasarelaPago,
     @Optional() private readonly eventos?: EventosGateway,
-  ) {}
+    @Optional() nucleo?: DevolucionCulqiService,
+  ) {
+    this.nucleo = nucleo ?? new DevolucionCulqiService(prisma, pasarela);
+  }
+
+  private readonly nucleo: DevolucionCulqiService;
 
   // ---------------------------------------------------------------- configuración
 
@@ -507,38 +502,38 @@ export class PagosOnlineService {
     if (!Number.isInteger(monto) || monto <= 0) throw error(400, 'MONTO_INVALIDO', 'El monto a devolver no es válido');
     if (monto > restante) throw error(409, 'MONTO_EXCEDE', `Solo se pueden devolver S/ ${enPesos(restante).toFixed(2)} más`);
 
-    // Reserva el monto antes de llamar a Culqi: dos devoluciones a la vez no pasan del total
-    const reserva = await this.prisma.pagoOnlineIntento.updateMany({
-      where: { id: intento.id, devuelto_centimos: intento.devuelto_centimos },
-      data: { devuelto_centimos: intento.devuelto_centimos + monto },
-    });
-    if (reserva.count === 0) throw error(409, 'DEVOLUCION_EN_CURSO', 'Hay otra devolución en curso. Intenta de nuevo.');
     let devolucionId: string;
     let movimientoCajaId: string | undefined;
+    let totalDevuelto: number;
     try {
       if (medio === 'CULQI') {
-        ({ devolucionId } = await this.pasarela.devolver({ cargoId: intento.culqi_cargo_id!, montoCentimos: monto, motivo }));
+        // Mismo camino que la anulación: reserva, reembolso a Culqi y registro en el intento (idempotente por ref)
+        const r = await this.nucleo.reembolsar({ intentoId: intento.id, montoCentimos: monto, motivo, ref: `manual:${randomUUID()}` });
+        devolucionId = r.devolucionId;
+        totalDevuelto = r.totalDevuelto;
       } else {
         // Devuelta por fuera de Culqi: solo se registra. En efectivo sale de la caja de hoy (egreso) para que el cierre cuadre.
-        devolucionId = `${medio.toLowerCase()}_${intento.id}_${Date.now()}`;
-        if (medio === 'EFECTIVO') {
-          const mov = await this.prisma.$transaction((tx) => registrarEgresoDevolucionCajaHoy(tx, enPesos(monto), `Devolución pago en línea ${intento.pedido.codigo}`));
-          movimientoCajaId = mov.id.toString();
+        if (!(await this.nucleo.reservar(intento.id, intento.devuelto_centimos, monto))) throw error(409, 'DEVOLUCION_EN_CURSO', 'Hay otra devolución en curso. Intenta de nuevo.');
+        try {
+          devolucionId = `${medio.toLowerCase()}_${intento.id}_${Date.now()}`;
+          if (medio === 'EFECTIVO') {
+            const mov = await this.prisma.$transaction((tx) => registrarEgresoDevolucionCajaHoy(tx, enPesos(monto), `Devolución pago en línea ${intento.pedido.codigo}`));
+            movimientoCajaId = mov.id.toString();
+          }
+        } catch (e) {
+          await this.nucleo.liberar(intento.id, monto);
+          throw e;
         }
+        totalDevuelto = (await this.nucleo.anotar(intento.id, { id: devolucionId, monto_centimos: monto, en: new Date().toISOString(), motivo, origen: 'SISTEMA', medio, ...(movimientoCajaId ? { movimiento_caja_id: movimientoCajaId } : {}) })).totalDevuelto;
       }
     } catch (e: any) {
-      await this.prisma.pagoOnlineIntento.updateMany({ where: { id: intento.id }, data: { devuelto_centimos: { decrement: monto } } });
+      if (e?.getStatus?.() === 409 && e?.response?.codigo === 'DEVOLUCION_EN_CURSO') throw e;
       await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'DEVOLUCION_FALLIDA', resultado: 'RECHAZADO', entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip, despues: { medio } });
-      if (medio !== 'CULQI') throw e;
-      throw error(502, 'DEVOLUCION_RECHAZADA', `Culqi no aceptó la devolución: ${String(e?.message ?? 'sin detalle').slice(0, 150)}`);
+      if (!(e instanceof ErrorReembolso)) throw e;
+      throw error(502, 'DEVOLUCION_RECHAZADA', `Culqi no aceptó la devolución: ${String(e.message ?? 'sin detalle').slice(0, 150)}`);
     }
     const actual = await this.prisma.pagoOnlineIntento.findUniqueOrThrow({ where: { id: intento.id } });
-    const lista = (actual.devoluciones as unknown as Devolucion[]) ?? [];
-    const nueva = lista.some((x) => x.id === devolucionId) ? lista : [...lista, { id: devolucionId, monto_centimos: monto, en: new Date().toISOString(), motivo, origen: 'SISTEMA' as const, medio, ...(movimientoCajaId ? { movimiento_caja_id: movimientoCajaId } : {}) }];
-    await this.prisma.pagoOnlineIntento.update({
-      where: { id: intento.id },
-      data: { devoluciones: nueva as unknown as Prisma.InputJsonValue, estado: actual.devuelto_centimos >= actual.monto_centimos ? 'DEVUELTO' : actual.estado },
-    });
+    await this.registrarEnDevolucionPedido(intento, medio, monto, devolucionId, motivo, usuario);
     // Devolución TOTAL: se anula también el cobro de Caja (y con él la boleta o factura se da de baja) por el mismo
     // camino de «anular cobro». Parcial: el cobro queda. El efectivo no se resta dos veces: el cobro es TARJETA o YAPE
     // (sin efectivo), así que anularlo no mueve el efectivo; solo el egreso de esta devolución lo baja.
@@ -550,9 +545,37 @@ export class PagosOnlineService {
       entidad: 'pago_online_intento', entidadId: intento.id, motivo, partyId: usuario?.partyId, ip,
       antes: { devuelto_centimos: intento.devuelto_centimos },
       despues: {
-        cobro_anulado: cobroAnulado.anulado, aviso_cobro: cobroAnulado.aviso, devuelto_centimos: actual.devuelto_centimos, devolucion: devolucionId, medio, movimiento_caja_id: movimientoCajaId ?? null, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
+        cobro_anulado: cobroAnulado.anulado, aviso_cobro: cobroAnulado.aviso, devuelto_centimos: totalDevuelto, devolucion: devolucionId, medio, movimiento_caja_id: movimientoCajaId ?? null, monto_centimos: monto, pedido: intento.pedido.codigo, pedido_anulado: intento.pedido.estado === 'ANULADO' },
     });
     return { id: intento.id.toString(), devolucionId, medio, cobroAnulado: cobroAnulado.anulado, avisoCobro: cobroAnulado.aviso, montoDevuelto: enPesos(monto), totalDevuelto: enPesos(actual.devuelto_centimos), restante: enPesos(actual.monto_centimos - actual.devuelto_centimos) };
+  }
+
+  /**
+   * Deja la devolución también en `devolucion_pedido` (lo que ven «Cancelados por no recibir» y el cierre). Una por pedido:
+   * si ya hay una no se duplica; si es una de Culqi pendiente y esta lo resuelve, la marca HECHA. Nunca rompe la devolución ya hecha.
+   */
+  private async registrarEnDevolucionPedido(intento: { id: bigint; pedido_id: bigint; monto_centimos: number }, medio: string, monto: number, devolucionId: string, motivo: string, usuario: any) {
+    try {
+      const previa = await this.prisma.devolucionPedido.findUnique({ where: { pedido_id: intento.pedido_id } });
+      if (previa) {
+        if (medio === 'CULQI' && previa.medio === 'CULQI' && previa.estado !== 'HECHA') {
+          await this.prisma.devolucionPedido.update({ where: { id: previa.id }, data: { estado: 'HECHA', culqi_devolucion_id: devolucionId, error: null } });
+        }
+        return;
+      }
+      const party = BigInt(usuario.partyId);
+      await this.prisma.devolucionPedido.create({
+        data: {
+          pedido_id: intento.pedido_id, monto_pagado: enPesos(Math.max(intento.monto_centimos, monto)), monto_envio: 0,
+          monto_sugerido: enPesos(monto), monto_devuelto: enPesos(monto), medio,
+          codigo_operacion: medio === 'EFECTIVO' || medio === 'CULQI' ? null : devolucionId,
+          motivo, por_party_id: party, autorizado_por_party_id: party, estado: 'HECHA',
+          ...(medio === 'CULQI' ? { culqi_intento_id: intento.id, culqi_devolucion_id: devolucionId } : {}),
+        },
+      });
+    } catch (e: any) {
+      this.logger.warn(`Devolución hecha pero sin registrar en devolucion_pedido (intento ${intento.id}): ${String(e?.message ?? e)}`);
+    }
   }
 
   /**
