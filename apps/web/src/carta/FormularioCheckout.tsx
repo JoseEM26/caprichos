@@ -30,7 +30,7 @@ import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
 import { armarPlanCarta, medioPrincipalCarta, type FilaDiv } from './pagoDividido';
 import { PagoDivididoCarta } from './PagoDivididoCarta';
-import { culqiApi, METODO_CULQI } from './pagos/culqiApi';
+import { cargarScriptCulqi, culqiApi, METODO_CULQI } from './pagos/culqiApi';
 import { AVISO_PAGO_EN_LINEA } from './pagos/PagarEnLinea';
 import {
   ConsultaEnvioRespuesta,
@@ -75,6 +75,7 @@ export function FormularioCheckout({
     abrirCajon,
     limpiarCarrito,
     setPedidoConfirmado,
+    setSeguimientoAbierto,
     inventario,
     marcarQuedan,
     marcarQuedanSabor,
@@ -191,11 +192,17 @@ export function FormularioCheckout({
   const [dividirPago, setDividirPago] = useState(false);
   const [filasDiv, setFilasDiv] = useState<FilaDiv[]>([]);
   const [culqiActivo, setCulqiActivo] = useState(false);
+  const [culqiReal, setCulqiReal] = useState(false);
   useEffect(() => {
     let vivo = true;
-    culqiApi.config().then((c) => vivo && setCulqiActivo(Boolean(c.activo))).catch(() => {});
+    culqiApi.config().then((c) => { if (vivo) { setCulqiActivo(Boolean(c.activo)); setCulqiReal(c.modo === 'REAL'); } }).catch(() => {});
     return () => { vivo = false; };
   }, []);
+  const pagaEnLinea = culqiActivo && metodoPago === METODO_CULQI && !dividirPago;
+  // Al elegir el medio se baja el script de Culqi: al enviar, la ventana abre sin esperar descargas.
+  useEffect(() => {
+    if (pagaEnLinea && culqiReal) void cargarScriptCulqi().catch(() => {});
+  }, [pagaEnLinea, culqiReal]);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -916,6 +923,7 @@ export function FormularioCheckout({
       });
 
       limpiarCarrito();
+      setSeguimientoAbierto(null); // si había un pedido viejo abierto, la pantalla muestra el nuevo
       cerrarCheckout();
       void cuentaCtx?.refrescar();
       guardarPedido({
@@ -939,6 +947,8 @@ export function FormularioCheckout({
         clienteNombre: nombre.trim(),
         modalidad,
         seguimientoToken: respuesta.seguimientoToken,
+        enLinea: metodoPago === METODO_CULQI,
+        creadoEn: new Date().toISOString(),
       });
     } catch (err) {
       if (err instanceof ErrorApi) {
@@ -2884,10 +2894,17 @@ export function FormularioCheckout({
                         ? 'Elige cómo pagas'
                         : enviarBloqueadoPorStock || sinModalidadOferta
                         ? 'Ajusta tu pedido para enviar'
+                        : pagaEnLinea
+                        ? `Pagar S/ ${aCobrar.toFixed(2)} con tarjeta o Yape`
                         : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>
                 )}
               </div>
+              {pagaEnLinea && !enviando && !localCerrado && !tarjetasPago && (
+                <div data-testid="aviso-ventana-culqi" style={{ textAlign: 'center', fontSize: '12px', color: 'var(--cp-soft)' }}>
+                  Se abrirá la ventana segura de Culqi
+                </div>
+              )}
 
               <div style={{ textAlign: 'center' }}>
                 <button

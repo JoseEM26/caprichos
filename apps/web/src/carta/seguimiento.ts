@@ -214,6 +214,19 @@ export function leerEnlaceSeguimiento(busqueda: string = window.location.search)
   return { codigo, token };
 }
 
+/** Quita `seguimiento` y `t` de la dirección: el enlace se usa una sola vez y no reabre el pedido al recargar. */
+export function quitarEnlaceSeguimiento(): void {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('seguimiento') && !url.searchParams.has('t')) return;
+    url.searchParams.delete('seguimiento');
+    url.searchParams.delete('t');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  } catch {
+    /* sin historial: no pasa nada */
+  }
+}
+
 /**
  * Pide el seguimiento con su token al servidor (él valida el token; un código sin token válido no devuelve nada).
  * Si no coincide o falla, devuelve null y la carta se abre normal.

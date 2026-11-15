@@ -28,7 +28,9 @@ export function PantallaConfirmacion() {
           token: pedidoConfirmado.seguimientoToken,
           modalidad: pedidoConfirmado.modalidad,
           nombre: pedidoConfirmado.clienteNombre,
-          creadoEn: '',
+          id: pedidoConfirmado.id,
+          enLinea: pedidoConfirmado.enLinea,
+          creadoEn: pedidoConfirmado.creadoEn ?? '',
         }
       : null);
 
@@ -119,7 +121,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'pago',
       etiqueta: 'Pago',
       insignia: marca('pago'),
-      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} />,
+      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} creadoEn={pedido.creadoEn} />,
     },
   ];
   const cambiosTexto = [...cambiadas].map((id) => ({ estado: 'Estado', pedido: 'Mi pedido', pago: 'Pago' })[id]).join(', ');
@@ -361,11 +363,12 @@ function PanelPedido({
 }
 
 function PanelPago({
-  pedido, estado, total, onSubida, pedidoId, token, auto,
+  pedido, estado, total, onSubida, pedidoId, token, auto, creadoEn,
 }: {
   pedidoId?: string;
   token?: string;
   auto?: boolean;
+  creadoEn?: string;
   pedido: PedidoGuardado;
   estado: EstadoSeguimiento | null;
   total: number | undefined;
@@ -384,7 +387,7 @@ function PanelPago({
   return (
     <>
       {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
-        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} alPagado={onSubida} />
+        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} />
       )}
       {resumen && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">

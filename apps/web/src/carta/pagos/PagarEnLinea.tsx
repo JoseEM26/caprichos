@@ -9,6 +9,18 @@ type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'pendi
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
+const VIGENCIA_MS = 15 * 60 * 1000;
+
+/** Minutos que quedan para pagar (el pedido sin pagar se anula a los 15 min); null si no se sabe la hora. */
+function useMinutosRestantes(creadoEn?: string): number | null {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, []);
+  const inicio = creadoEn ? Date.parse(creadoEn) : NaN;
+  return Number.isNaN(inicio) ? null : Math.max(0, Math.ceil((inicio + VIGENCIA_MS - ahora) / 60000));
+}
 const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
   { token: 'tkn_simulado_ok', medio: 'TARJETA', texto: 'Probar tarjeta aprobada' },
   { token: 'tkn_simulado_rechazo', medio: 'TARJETA', texto: 'Probar tarjeta rechazada' },
@@ -16,11 +28,12 @@ const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
 ];
 
 /** «Pagar ahora con tarjeta o Yape» (Culqi). No pinta nada si la pasarela no está activa. */
-export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado }: { pedidoId: string; token?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void }) {
+export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado, monto, creadoEn }: { pedidoId: string; token?: string; /** lo que falta pagar */ monto?: number; /** ISO de creación del pedido, para el contador de 15 min */ creadoEn?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void }) {
   const [config, setConfig] = useState<ConfigCulqi | null>(null);
   const [fase, setFase] = useState<Fase>('cargando');
   const [mensaje, setMensaje] = useState('');
   const [intento, setIntento] = useState<IntentoCulqi | null>(null);
+  const minutos = useMinutosRestantes(creadoEn);
   const enCurso = useRef(false); // evita el doble clic antes de que React deshabilite el botón
 
   useEffect(() => {
@@ -126,7 +139,14 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
         </p>
       ) : (
         <>
-          <strong style={{ color: 'var(--cp-navy)' }}>Pagar ahora con tarjeta o Yape</strong>
+          <strong data-testid="falta-pagar" style={{ color: 'var(--cp-navy)' }}>
+            {monto && monto > 0 ? `Falta pagar ${SOLES(monto)}` : 'Pagar ahora con tarjeta o Yape'}
+          </strong>
+          {minutos !== null && (
+            <p data-testid="contador-pago" className="sg-detalle" style={{ margin: '4px 0 0', fontWeight: 700 }}>
+              {minutos > 0 ? `Te quedan ${minutos} min para pagar` : 'El tiempo para pagar se acabó: el pedido se anula solo'}
+            </p>
+          )}
           <p className="sg-detalle" style={{ margin: '4px 0 8px' }}>
             Pagas el total del pedido, sin recargo. {AVISO_PAGO_EN_LINEA}
           </p>

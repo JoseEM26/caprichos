@@ -238,4 +238,7 @@ export interface PedidoConfirmado {
   seguimientoToken: string;
   /** Propina aparte de la venta (0 o ausente = sin propina) */
   propina?: number;
+  /** Se pidió con «Tarjeta / Yape en línea»: la confirmación abre el pago sola */
+  enLinea?: boolean;
+  creadoEn?: string;
 }
