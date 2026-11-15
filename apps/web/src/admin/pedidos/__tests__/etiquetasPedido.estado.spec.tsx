@@ -106,7 +106,7 @@ describe('Etiquetas: una tarjeta por sticker con estado real', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir todas' }));
     expect(screen.getByText('¿Cuáles reimprimes?')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('checkbox')[2]);
-    fireEvent.click(screen.getByRole('button', { name: 'Reimprimir 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir 1' }));
     await waitFor(() => expect(impresionApi.reimprimirElegidas).toHaveBeenCalledWith('ped-9', 'TODAS', ['AREA:COCINA']));
     expect(impresionApi.reimprimirTodas).not.toHaveBeenCalled();
   });

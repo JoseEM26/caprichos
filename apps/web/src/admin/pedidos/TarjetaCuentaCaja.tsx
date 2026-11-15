@@ -179,7 +179,7 @@ export function TarjetaCuentaCaja({ cuenta, seleccionadoId, resaltados, puedeCam
                 <details className="cj2-cta-mas">
                   <summary aria-label={`Más acciones de ${m.codigo}`}>⋯</summary>
                   <div className="cj2-cta-menu">
-                    <ReimprimirPedido pedido={m} variante="tarjeta" />
+                    <ReimprimirPedido pedido={m} variante="tarjeta" rotulo={esRaiz ? "Pedido original" : "Extra"} />
                     {puedeCambiarPago && <BotonCambiarPago permitido pedido={m} variante="tarjeta" />}
                   </div>
                 </details>

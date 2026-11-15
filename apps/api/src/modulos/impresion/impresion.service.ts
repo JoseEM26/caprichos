@@ -1690,7 +1690,8 @@ await this.anotarResaltadas(pedido);
     }
 
     const omitidas = aplicables.length - nuevas.length;
-    if (elegidas && this.auditoria && usuario) {
+    const clavesAud = elegidas ? [...elegidas] : dto.clave ? [dto.clave] : null;
+    if (clavesAud && this.auditoria && usuario) {
       await this.auditoria.registrar({
         categoria: 'CAMBIO',
         modulo: 'impresion',
@@ -1698,7 +1699,7 @@ await this.anotarResaltadas(pedido);
         entidad: 'pedido',
         entidadId: pedido.id,
         partyId: usuario.partyId,
-        despues: { pedido: pedido.codigo, tipo: dto.tipo, clavesPedidas: [...elegidas], encoladas: nuevas.map((s) => s.clave), omitidas, trabajoIds: trabajosCreados.map((t) => t.id.toString()) },
+        despues: { pedido: pedido.codigo, tipo: dto.tipo, clavesPedidas: clavesAud, encoladas: nuevas.map((s) => s.clave), omitidas, trabajoIds: trabajosCreados.map((t) => t.id.toString()) },
         ip,
       });
     }
@@ -1874,15 +1875,18 @@ await this.anotarResaltadas(pedido);
     const reglas = await leerReglasImpresion(this.prisma);
     const ctx = await this.contextoRuteo();
     let { items, omitidos } = planReimpresion(pedido, dto.tipo, dto.sub ?? 'todos', reglas, ticket, marca);
-    // `claves`: solo los stickers elegidos; una clave que el pedido no tiene se rechaza sin imprimir nada
+    // `claves`: SOLO las piezas elegidas (stickers, comandas y ticket de pago); lista blanca = lo que el plan completo del
+    // pedido tiene. Una clave ajena se rechaza sin imprimir nada.
     const clavesPedidas = dto.claves?.length ? new Set(dto.claves) : null;
     if (clavesPedidas) {
-      const tiene = new Set(planReimpresion(pedido, 'stickers', 'todos', reglas, ticket, marca).items.map((i) => i.clave));
+      const todo = planReimpresion(pedido, 'todo', 'todos', reglas, ticket, marca);
+      const tiene = new Set(todo.items.map((i) => i.clave));
       const mala = [...clavesPedidas].find((c) => !tiene.has(c));
       if (mala !== undefined) {
-        throw new BadRequestException({ codigo: 'ETIQUETA_INEXISTENTE', mensaje: `El pedido no tiene la etiqueta ${mala}` });
+        throw new BadRequestException({ codigo: 'ETIQUETA_INEXISTENTE', mensaje: `El pedido no tiene la pieza ${mala}` });
       }
-      items = items.filter((i) => clavesPedidas.has(i.clave));
+      items = todo.items.filter((i) => clavesPedidas.has(i.clave));
+      omitidos = todo.omitidos;
     }
     await this.anotarCategorias(items.filter((i) => i.tipo === 'ETIQUETA_BEBIDA').map((i) => i.payload));
 

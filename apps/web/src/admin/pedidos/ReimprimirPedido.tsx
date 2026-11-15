@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { impresionApi, type DestinoReimpresion, type PeticionReimpresionPedido, type ResultadoReimpresionPedido } from '../impresion/impresionApi';
-import { SelectorEtiquetas } from './SelectorEtiquetas';
-import { VistaPreviaReimpresion } from './VistaPreviaReimpresion';
+import { SelectorEtiquetas, type ItemElegible } from './SelectorEtiquetas';
+import { Papel, VistaPreviaReimpresion } from './VistaPreviaReimpresion';
 import type { Pedido } from './pedidosApi';
 
 const URL_COLA = '/admin/configuracion?tab=impresion&seccion=cola';
@@ -23,14 +23,32 @@ const OPCIONES: Opcion[] = [
   { id: 'ticket_pago', texto: 'Solo ticket de pago / boleta', peticion: { tipo: 'ticket_pago' } },
 ];
 
-/** Stickers de la vista previa entre los que se puede elegir (solo en «Solo stickers», con 2 o más). */
-const elegibles = (v: ResultadoReimpresionPedido) =>
-  v.papeles
-    .filter((p) => p.tipo.startsWith('ETIQUETA') && p.clave)
-    .map((p) => ({
-      clave: p.clave as string,
-      texto: p.tipo === 'ETIQUETA_BEBIDA' && p.payload ? ['Vaso ' + p.payload.bebidaIndex, p.payload.bebidaNombre, p.payload.persona].filter(Boolean).join(' · ') : p.etiqueta,
-    }));
+const GRUPO_PAPEL = (tipo: string) =>
+  tipo === 'ETIQUETA_GENERAL' ? 'Sticker general'
+  : tipo === 'ETIQUETA_AREA' ? 'Stickers de área'
+  : tipo === 'ETIQUETA_BEBIDA' ? 'Stickers de bebida'
+  : tipo === 'TICKET_PAGO' ? 'Ticket de pago'
+  : 'Tickets de cocina';
+const ORDEN_GRUPO = ['Sticker general', 'Stickers de área', 'Stickers de bebida', 'Tickets de cocina', 'Ticket de pago'];
+
+/**
+ * Piezas de la vista previa entre las que se puede elegir (stickers, comandas y ticket de pago): una por hoja,
+ * cada vaso por separado («Frappé moca 1 de 2»), agrupadas por tipo y con su vista previa.
+ */
+const elegibles = (v: ResultadoReimpresionPedido): ItemElegible[] => {
+  const conClave = v.papeles.filter((p) => p.clave);
+  const vasos = conClave.filter((p) => p.tipo === 'ETIQUETA_BEBIDA' && p.payload);
+  const items = conClave.map((p) => {
+    let texto = p.etiqueta;
+    if (p.tipo === 'ETIQUETA_BEBIDA' && p.payload) {
+      const mismos = vasos.filter((x) => x.payload.bebidaNombre === p.payload.bebidaNombre);
+      const k = mismos.indexOf(p) + 1;
+      texto = ['Vaso ' + p.payload.bebidaIndex, p.payload.bebidaNombre + (mismos.length > 1 ? ` ${k} de ${mismos.length}` : ''), p.payload.persona].filter(Boolean).join(' · ');
+    }
+    return { clave: p.clave as string, texto, grupo: GRUPO_PAPEL(p.tipo), vista: p.payload ? <Papel p={p} /> : undefined };
+  });
+  return items.sort((a, b) => ORDEN_GRUPO.indexOf(a.grupo) - ORDEN_GRUPO.indexOf(b.grupo));
+};
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
@@ -60,6 +78,8 @@ export interface ReimprimirPedidoProps {
   pedido: Pick<Pedido, 'id' | 'codigo'>;
   /** `detalle`: botón con texto en PC; `tarjeta`: solo icono. */
   variante: 'detalle' | 'tarjeta';
+  /** «Pedido original» o «Extra»: sale en el título del diálogo para no confundir las boletas de una misma cuenta. */
+  rotulo?: string;
   alTerminar?: () => void;
 }
 
@@ -67,7 +87,7 @@ export interface ReimprimirPedidoProps {
  * Botón «Reimprimir» con su menú (todo, stickers, ticket de cocina, ticket de pago), confirmación Sí/No que dice
  * qué se imprime y dónde, y el aviso con el resultado. Un solo botón por pedido; sirve para pedidos cerrados.
  */
-export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPedidoProps) {
+export function ReimprimirPedido({ pedido, variante, alTerminar, rotulo }: ReimprimirPedidoProps) {
   const [menu, setMenu] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [pendiente, setPendiente] = useState<{ opcion: Opcion; vista: ResultadoReimpresionPedido } | null>(null);
@@ -121,7 +141,7 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
       const r = await impresionApi.reimprimirPedido(pedido.id, {
         ...alt.opcion.peticion,
         confirmar_anulado: alt.vista.exigeConfirmacionAnulado,
-        ...(alt.opcion.peticion.tipo === 'stickers' && elegibles(alt.vista).length >= 2 ? { claves: elegidas } : {}),
+        ...(elegibles(alt.vista).length >= 2 ? { claves: elegidas } : {}),
         ...(otraCopia ? { otra_copia: true } : {}),
       });
       setPendiente(null);
@@ -143,10 +163,10 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
   };
 
   const v = pendiente?.vista;
-  const lista = v && pendiente?.opcion.peticion.tipo === 'stickers' ? elegibles(v) : [];
+  const lista = v ? elegibles(v) : [];
   const eligiendo = lista.length >= 2;
   const mensajeConfirmar = eligiendo
-    ? 'Marca los stickers que quieres volver a imprimir.'
+    ? 'Marca las hojas que quieres volver a imprimir; cada una gasta papel.'
     : v
     ? `¿Seguro? Se imprimirá ${plural(v.cantidad, 'papel', 'papeles')} (${plural(v.stickers, 'sticker', 'stickers')} y ${plural(v.tickets, 'ticket', 'tickets')}) en ${dondeVa(v)}.` +
       (v.exigeConfirmacionAnulado
@@ -214,9 +234,9 @@ export function ReimprimirPedido({ pedido, variante, alTerminar }: ReimprimirPed
 
       <Confirmar
         abierto={Boolean(pendiente)}
-        titulo={eligiendo ? '¿Cuáles reimprimes?' : v?.exigeConfirmacionAnulado ? 'Reimprimir un pedido anulado' : 'Reimprimir'}
+        titulo={eligiendo ? `¿Cuáles reimprimes?${rotulo ? ` · ${rotulo} ${pedido.codigo}` : ` · ${pedido.codigo}`}` : v?.exigeConfirmacionAnulado ? 'Reimprimir un pedido anulado' : 'Reimprimir'}
         mensaje={mensajeConfirmar}
-        textoConfirmar={cargando ? 'Enviando…' : eligiendo ? `Reimprimir ${elegidas.length}` : 'Sí, reimprimir'}
+        textoConfirmar={cargando ? 'Enviando…' : eligiendo ? `Imprimir ${elegidas.length}` : 'Sí, reimprimir'}
         textoNo="No"
         peligro={Boolean(v?.exigeConfirmacionAnulado)}
         deshabilitarConfirmar={cargando || (eligiendo && elegidas.length === 0)}

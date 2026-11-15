@@ -107,6 +107,15 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
     setElegidas([]);
     setAccion(a);
   };
+  const vistaDe = (e: EtiquetaEstado): React.ReactNode => {
+    if (e.clave === 'GENERAL') return <EtiquetaGeneral datos={resumen.general} />;
+    if (e.clave.startsWith('AREA:')) {
+      const a = resumen.areas.find((x) => `AREA:${x.areaNombre}` === e.clave);
+      return a ? <EtiquetaArea datos={a} /> : undefined;
+    }
+    const b = resumen.bebidas.find((x) => `BEBIDA:${x.bebidaIndex}` === e.clave);
+    return b ? <EtiquetaBebida datos={b} /> : undefined;
+  };
   const etiquetaLista = (e: EtiquetaEstado) => {
     const b = resumen.bebidas.find((x) => `BEBIDA:${x.bebidaIndex}` === e.clave);
     return b ? ['Vaso ' + b.bebidaIndex, b.bebidaNombre, b.persona].filter(Boolean).join(' · ') : [e.titulo, e.detalle].filter(Boolean).join(' · ');
@@ -441,7 +450,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
           titulo={eligiendo ? '¿Cuáles reimprimes?' : textoAccion(accion).titulo}
           mensaje={eligiendo ? 'Marca los stickers que quieres volver a imprimir. Los que ya están en cola no se duplican.' : textoAccion(accion).mensaje}
           textoSi="Sí, reimprimir"
-          textoConfirmar={eligiendo ? `Reimprimir ${elegidas.length}` : undefined}
+          textoConfirmar={eligiendo ? `Imprimir ${elegidas.length}` : undefined}
           deshabilitarConfirmar={eligiendo && elegidas.length === 0}
           textoNo="No, cancelar"
           cargando={procesando}
@@ -450,7 +459,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         >
           {eligiendo && (
             <SelectorEtiquetas
-              items={lista.map((e) => ({ clave: e.clave, texto: etiquetaLista(e), enCola: e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO' }))}
+              items={lista.map((e) => ({ clave: e.clave, texto: etiquetaLista(e), enCola: e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO', grupo: e.clave.startsWith('AREA:') ? 'Stickers de área' : e.clave.startsWith('BEBIDA:') ? 'Stickers de bebida' : 'Sticker general', vista: vistaDe(e) }))}
               elegidas={elegidas}
               alCambiar={setElegidas}
             />

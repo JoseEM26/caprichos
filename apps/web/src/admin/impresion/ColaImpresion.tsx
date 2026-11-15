@@ -8,6 +8,7 @@ import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { FiltroCola, GrupoCola, RespuestaCola, impresionApi } from './impresionApi';
 import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useSesion } from '../../comun/sesion';
+import { ReimprimirPedido } from '../pedidos/ReimprimirPedido';
 import { ListaTrabajos, type PestanaMaquina } from './ListaTrabajos';
 import type { TrabajoImpresionAdmin } from './impresionApi';
 import './cola-impresion.css';
@@ -118,9 +119,6 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
       setTrabajando(false);
     }
   };
-
-  const reimprimir = (g: GrupoCola) =>
-    ejecutar(() => impresionApi.reimprimirTodas(g.pedidoId as string), () => undefined);
 
   // Una prueba es un trabajo suelto (sin pedido): se descarta por trabajo, no por pedido
   const descartarGrupo = (g: GrupoCola) =>
@@ -272,9 +270,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
                   </button>
                 )}
                 {!g.esPrueba && (
-                  <button type="button" className="cola-btn" disabled={trabajando} onClick={() => void reimprimir(g)}>
-                    Reimprimir
-                  </button>
+                  <ReimprimirPedido pedido={{ id: g.pedidoId as string, codigo: g.pedidoCodigo ?? String(g.pedidoId) }} variante="detalle" alTerminar={() => void cargar()} />
                 )}
               </div>
             </div>

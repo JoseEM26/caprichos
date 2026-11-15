@@ -54,7 +54,7 @@ export class ReimprimirPedidoDto {
   @IsBoolean()
   confirmar_anulado?: boolean;
 
-  /** Solo con stickers: claves elegidas (GENERAL, AREA:<nombre>, BEBIDA:<n>), validadas contra las del pedido. */
+  /** Piezas exactas elegidas (GENERAL, AREA:<nombre>, BEBIDA:<n>, TICKET_PAGO, comandas), validadas contra las del pedido; solo se reimprimen esas. */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)

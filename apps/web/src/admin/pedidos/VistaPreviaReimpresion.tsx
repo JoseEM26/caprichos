@@ -3,7 +3,7 @@ import type { PapelReimpresion } from '../impresion/impresionApi';
 import { EtiquetaArea, EtiquetaBebida, EtiquetaGeneral, TicketPagoPrevia } from './EtiquetaPrevia';
 
 /** Un papel tal como saldrá, con las mismas previas que ya usa Caja (sticker, ticket de pago, comanda). */
-function Papel({ p }: { p: PapelReimpresion }) {
+export function Papel({ p }: { p: PapelReimpresion }) {
   const d = p.payload;
   if (!d) return <p className="rp-prev-vacio">Sin vista previa de este papel.</p>;
   if (p.tipo === 'ETIQUETA_GENERAL') return <EtiquetaGeneral datos={d} />;

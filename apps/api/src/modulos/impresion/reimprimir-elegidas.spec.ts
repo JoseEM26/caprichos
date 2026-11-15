@@ -85,6 +85,16 @@ describe('reimprimir etiquetas: solo las elegidas', () => {
       await expect(service.reimprimirPedido(9, { tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:7'] })).rejects.toThrow(BadRequestException);
       expect(prisma.printJob.create).not.toHaveBeenCalled();
     });
+    it('con claves de ticket y sticker mezclados imprime solo esas piezas', async () => {
+      prisma.deviceKey.findMany.mockResolvedValue([{ id: 1n, nombre: 'Caja' }]);
+      const r: any = await service.reimprimirPedido(9, { tipo: 'todo', claves: ['BEBIDA:2'] }, { partyId: '3' } as any, '1.1.1.1');
+      expect(r.papeles.map((x: any) => x.clave)).toEqual(['BEBIDA:2']);
+      expect(creados()).toEqual([2]);
+    });
+    it('clave de otro pedido en un tipo distinto (todo): 400 y no encola', async () => {
+      await expect(service.reimprimirPedido(9, { tipo: 'todo', claves: ['BEBIDA:2', 'AREA:OTRA'] })).rejects.toThrow(BadRequestException);
+      expect(prisma.printJob.create).not.toHaveBeenCalled();
+    });
     it('lo que ya está en cola no se duplica', async () => {
       prisma.printJob.findMany.mockResolvedValue([{ tipo: 'ETIQUETA_BEBIDA', payload: { bebidaIndex: 2 } }]);
       await service.reimprimirPedido(9, { tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:1', 'BEBIDA:2'] });

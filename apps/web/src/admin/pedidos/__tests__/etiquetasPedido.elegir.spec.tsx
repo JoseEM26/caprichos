@@ -46,9 +46,9 @@ describe('Reimprimir un grupo: elegir cuáles', () => {
     const casillas = screen.getAllByRole('checkbox');
     expect(casillas).toHaveLength(2);
     casillas.forEach((c) => expect(c).not.toBeChecked());
-    expect(screen.getByRole('button', { name: 'Reimprimir 0' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Imprimir 0' })).toBeDisabled();
     fireEvent.click(casillas[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Reimprimir 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir 1' }));
     await waitFor(() => expect(impresionApi.reimprimirElegidas).toHaveBeenCalledWith('p1', 'bebida', ['BEBIDA:2']));
     expect(impresionApi.reimprimirEtiquetas).not.toHaveBeenCalled();
   });
@@ -59,9 +59,9 @@ describe('Reimprimir un grupo: elegir cuáles', () => {
     await screen.findByText(/3 etiquetas/);
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir las de bebida' }));
     fireEvent.click(screen.getByRole('button', { name: 'Marcar todos' }));
-    expect(screen.getByRole('button', { name: 'Reimprimir 2' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Imprimir 2' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Marcar ninguno' }));
-    expect(screen.getByRole('button', { name: 'Reimprimir 0' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Imprimir 0' })).toBeDisabled();
   });
 
   it('con un solo sticker sigue la confirmación Sí/No de siempre', async () => {
