@@ -1,8 +1,8 @@
 /**
  * Canales de las ofertas (Descuento, Lleva y paga, Combo, Envío gratis y Cupón).
- * Un solo selector «¿Dónde aplica?» con tres casillas: Carta web, En el local (caja y mozo) y WhatsApp (bot).
- * Se guarda en `canales` como CARTA, ADMIN (local) y BOT. Valores históricos al leer: TODOS = carta y local,
- * WEB = carta, CAJA/MOZO/LOCAL = local, WHATSAPP = BOT.
+ * Un solo selector «¿Dónde aplica?» con cuatro casillas: Carta web, Caja, Mozo y WhatsApp (bot).
+ * Se guarda en `canales` como CARTA, CAJA, MOZO y BOT. Valores históricos al leer: TODOS = carta, Caja y mozo,
+ * ADMIN/LOCAL = Caja y mozo, WEB = carta, WHATSAPP = BOT.
  */
 
 export type TipoOfertaCanal = 'DESCUENTO' | 'LLEVA_PAGA' | 'COMBO' | 'ENVIO_GRATIS' | 'CUPON';
@@ -17,8 +17,11 @@ export interface ModalidadesEstado {
 
 export interface CanalesEstado {
   carta: boolean;
-  local: boolean;
+  caja: boolean;
+  mozo: boolean;
   bot: boolean;
+  /** Medios de pago con los que vale (solo Descuento y Lleva y paga). Vacío o ausente = cualquier medio. */
+  medios?: string[];
   /** Los cupones no lo usan. Ausente = todas. */
   modalidades?: ModalidadesEstado;
 }
@@ -63,8 +66,50 @@ export function incluyeModalidadFiltro(modalidades: string[] | null | undefined,
 }
 
 /** Canales y modalidades de una oferta que viene del servidor. */
-export function estadoDesdeOferta(o: { canales?: string[] | null; modalidades?: string[] | null }): CanalesEstado {
-  return { ...estadoDesdeCanales(o.canales), modalidades: estadoDesdeModalidades(o.modalidades) };
+export function estadoDesdeOferta(o: { canales?: string[] | null; modalidades?: string[] | null; mediosPago?: string[] | null }): CanalesEstado {
+  return { ...estadoDesdeCanales(o.canales), modalidades: estadoDesdeModalidades(o.modalidades), medios: o.mediosPago ?? [] };
+}
+
+/** Medios de pago que se pueden exigir en una promo (el pago en línea llega con la pasarela). */
+const MEDIOS_PROMO: { id: string; nombre: string }[] = [
+  { id: 'EFECTIVO', nombre: 'Efectivo' },
+  { id: 'YAPE', nombre: 'Yape' },
+  { id: 'PLIN', nombre: 'Plin' },
+  { id: 'TARJETA', nombre: 'Tarjeta' },
+  { id: 'TRANSFERENCIA', nombre: 'Transferencia' },
+  { id: 'PAGO_EN_LINEA', nombre: 'Pago en línea' },
+];
+
+/** Lo que se guarda en `mediosPago`: vacío = cualquier medio. */
+export function mediosPagoDesdeEstado(e: CanalesEstado): string[] {
+  return e.medios ?? [];
+}
+
+/** «Vale con cualquier medio de pago» o «Solo si el pedido se paga con Yape o Plin». */
+export function resumenMedios(medios: string[] | undefined): string {
+  const n = (medios ?? []).map((m) => MEDIOS_PROMO.find((x) => x.id === m)?.nombre ?? m);
+  if (n.length === 0) return 'Vale con cualquier medio de pago.';
+  return `Solo si TODO el pedido se paga con ${n.length === 1 ? n[0] : `${n.slice(0, -1).join(', ')} o ${n[n.length - 1]}`}. Si al cobrar se usa otro medio, el descuento se quita.`;
+}
+
+/** Bloque «¿Con qué medio de pago?» (solo Descuento y Lleva y paga). Ninguna casilla marcada = cualquier medio. */
+export function SelectorMediosPago({ id, valor, onChange, bloqueado }: { id: string; valor: CanalesEstado; onChange: (v: CanalesEstado) => void; bloqueado?: boolean }) {
+  const marcados = valor.medios ?? [];
+  const alternar = (m: string) => onChange({ ...valor, medios: marcados.includes(m) ? marcados.filter((x) => x !== m) : [...marcados, m] });
+  return (
+    <fieldset data-testid={`${id}-medios`} style={{ border: 0, padding: 0, margin: '12px 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <legend style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>¿Con qué medio de pago vale?</legend>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+        {MEDIOS_PROMO.map((m) => (
+          <label key={m.id} htmlFor={`${id}-medio-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', fontWeight: 700, padding: '8px 12px', borderRadius: '12px', border: marcados.includes(m.id) ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)', backgroundColor: marcados.includes(m.id) ? 'var(--cp-sand)' : 'var(--cp-white)' }}>
+            <input id={`${id}-medio-${m.id}`} type="checkbox" checked={marcados.includes(m.id)} disabled={bloqueado} onChange={() => alternar(m.id)} />
+            {m.nombre}
+          </label>
+        ))}
+      </div>
+      <span data-testid={`${id}-resumen-medios`} style={{ fontSize: '12px', fontWeight: 700 }}>{resumenMedios(marcados)}</span>
+    </fieldset>
+  );
 }
 
 export const ERROR_SIN_MODALIDADES = 'Marca al menos un tipo de pedido: comer en el local, para llevar, recoger o delivery.';
@@ -80,7 +125,7 @@ export function errorModalidades(tipo: TipoOfertaCanal, e: CanalesEstado): strin
 
 /** «Aplica en: Carta web y WhatsApp, solo para llevar y recoger» */
 export function resumenAplica(e: CanalesEstado): string {
-  const donde = [e.carta && 'Carta web', e.local && 'Caja/Mozo', e.bot && 'WhatsApp'].filter(Boolean) as string[];
+  const donde = [e.carta && 'Carta web', e.caja && 'Caja', e.mozo && 'Mozo', e.bot && 'WhatsApp'].filter(Boolean) as string[];
   const lista = donde.length <= 1 ? donde[0] ?? 'ningún lugar' : `${donde.slice(0, -1).join(', ')} y ${donde[donde.length - 1]}`;
   const m = e.modalidades ?? TODAS_MODALIDADES;
   const cuales = ORDEN_MODALIDADES.filter((k) => m[k]);
@@ -133,7 +178,7 @@ export function SelectorModalidades({ id, tipo, valor, onChange, bloqueado }: Se
 
 /** WhatsApp encendido por defecto en todo lo que el bot ya aplica o arma (el cupón no: el bot no pide códigos). */
 export function canalesPorDefecto(tipo: TipoOfertaCanal): CanalesEstado {
-  return { carta: true, local: true, bot: tipo !== 'CUPON' };
+  return { carta: true, caja: true, mozo: true, bot: tipo !== 'CUPON', medios: [] };
 }
 
 /** Estado de las casillas a partir de los canales guardados. */
@@ -142,21 +187,22 @@ export function estadoDesdeCanales(canales: string[] | null | undefined): Canale
   const todos = n.includes('TODOS');
   return {
     carta: todos || n.includes('CARTA') || n.includes('WEB'),
-    local: todos || n.some((c) => ['ADMIN', 'CAJA', 'MOZO', 'LOCAL'].includes(c)),
+    caja: todos || n.some((c) => ['ADMIN', 'CAJA', 'LOCAL'].includes(c)),
+    mozo: todos || n.some((c) => ['ADMIN', 'MOZO', 'LOCAL'].includes(c)),
     bot: n.includes('BOT') || n.includes('WHATSAPP'),
   };
 }
 
-/** Canales que se guardan a partir de las casillas. `valorLocal`: el cupón guarda CAJA en vez de ADMIN. */
-export function canalesDesdeEstado(e: CanalesEstado, valorLocal = 'ADMIN'): string[] {
-  return [...(e.carta ? ['CARTA'] : []), ...(e.local ? [valorLocal] : []), ...(e.bot ? ['BOT'] : [])];
+/** Canales que se guardan a partir de las casillas. */
+export function canalesDesdeEstado(e: CanalesEstado): string[] {
+  return [...(e.carta ? ['CARTA'] : []), ...(e.caja ? ['CAJA'] : []), ...(e.mozo ? ['MOZO'] : []), ...(e.bot ? ['BOT'] : [])];
 }
 
-export const ERROR_SIN_CANALES = 'Elige al menos un lugar donde aplica: carta web, en el local o WhatsApp.';
+export const ERROR_SIN_CANALES = 'Elige al menos un lugar donde aplica: carta web, Caja, mozo o WhatsApp.';
 
 /** Texto de ayuda según el tipo y el estado de las casillas (cambia al marcar o desmarcar WhatsApp). */
 export function ayudaCanales(tipo: TipoOfertaCanal, e: CanalesEstado): string {
-  const donde = [e.carta && 'la carta web', e.local && 'el local (caja y mozo)', e.bot && 'WhatsApp'].filter(Boolean) as string[];
+  const donde = [e.carta && 'la carta web', e.caja && 'Caja', e.mozo && 'el mozo', e.bot && 'WhatsApp'].filter(Boolean) as string[];
   if (donde.length === 0) return 'No aplica en ningún lugar: marca al menos uno.';
   const lista = donde.length === 1 ? donde[0] : `${donde.slice(0, -1).join(', ')} y ${donde[donde.length - 1]}`;
   const base = `Aplica en ${lista}.`;
@@ -172,7 +218,7 @@ export function ayudaCanales(tipo: TipoOfertaCanal, e: CanalesEstado): string {
 }
 
 interface SelectorCanalesProps {
-  /** Prefijo de los ids de las casillas: `${id}-carta`, `${id}-local`, `${id}-bot`. */
+  /** Prefijo de los ids de las casillas: `${id}-carta`, `${id}-caja`, `${id}-mozo`, `${id}-bot`. */
   id: string;
   tipo: TipoOfertaCanal;
   valor: CanalesEstado;
@@ -184,7 +230,7 @@ interface SelectorCanalesProps {
 export function SelectorCanales({ id, tipo, valor, onChange, bloqueado }: SelectorCanalesProps) {
   const botNoDisponible = tipo === 'CUPON';
   const casilla = { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, minHeight: '32px' } as const;
-  const item = (clave: keyof CanalesEstado, etiqueta: string, desactivada = false) => (
+  const item = (clave: 'carta' | 'caja' | 'mozo' | 'bot', etiqueta: string, desactivada = false) => (
     <label htmlFor={`${id}-${clave}`} style={casilla}>
       <input
         id={`${id}-${clave}`}
@@ -203,12 +249,14 @@ export function SelectorCanales({ id, tipo, valor, onChange, bloqueado }: Select
     >
       <legend style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>¿Dónde aplica?</legend>
       {item('carta', 'Carta web')}
-      {item('local', 'En el local (caja y mozo)')}
+      {item('caja', 'Caja')}
+      {item('mozo', 'Mozo')}
       {item('bot', 'WhatsApp (bot)', botNoDisponible)}
       <span data-testid={`${id}-ayuda`} style={{ fontSize: '11px', lineHeight: '15px', color: 'var(--cp-soft)' }}>
         {bloqueado ? 'Solo en la carta web.' : ayudaCanales(tipo, botNoDisponible ? { ...valor, bot: false } : valor)}
       </span>
       {tipo !== 'CUPON' && !bloqueado && <SelectorModalidades id={id} tipo={tipo} valor={valor} onChange={onChange} />}
+      {(tipo === 'DESCUENTO' || tipo === 'LLEVA_PAGA' || tipo === 'CUPON') && !bloqueado && <SelectorMediosPago id={id} valor={valor} onChange={onChange} />}
     </fieldset>
   );
 }

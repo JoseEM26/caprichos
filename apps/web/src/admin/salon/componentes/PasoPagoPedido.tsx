@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
 import {
   MAX_MEDIOS_PLAN,
-  MEDIOS_PLAN,
   aPlan,
   montoEfectivoPlan,
   nombreMedio,
@@ -50,6 +50,10 @@ export interface PasoPagoPedidoProps {
   bloqueProgramar?: ReactNode;
   /** Selector de comprobante (simple, boleta o factura). */
   comprobante: ReactNode;
+  /** Canal que decide qué medios están encendidos (Configuración › Pagos). */
+  canal?: CanalPersonal;
+  /** «Ahorras S/ X si pagas con Yape»: promos por medio todavía sin aplicar (se aplican al elegir ese medio). */
+  ahorrosPorMedio?: Array<{ medio: string; ahorro: number }>;
 }
 
 function dinero(n: number): string {
@@ -83,7 +87,10 @@ export function PasoPagoPedido({
   bloquePersonal,
   bloqueProgramar,
   comprobante,
+  canal = 'MOZO',
+  ahorrosPorMedio = [],
 }: PasoPagoPedidoProps) {
+  const MEDIOS_PLAN = mediosPlanEncendidos(useMediosEncendidos(canal));
   const conDetalle = bloquePersonal ? false : cuandoPaga !== 'final';
   const propinaNum = Math.max(0, Math.round((aPagar - total) * 100) / 100);
 
@@ -160,6 +167,11 @@ export function PasoPagoPedido({
       {conDetalle && (
         <div className="np2-metodos" data-testid="plan-pago-editor" id="np-plan-pago">
           <h3 className="np2-titulo">¿Cómo paga?</h3>
+          {ahorrosPorMedio.map((a) => (
+            <div key={a.medio} data-testid="ahorro-por-medio" role="status" style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>
+              Ahorras S/ {a.ahorro.toFixed(2)} si pagas con {nombreMedio(a.medio)}
+            </div>
+          ))}
 
           {filas.map((fila, i) => (
             <div key={i} className="np2-fila" role="group" aria-label={i === 0 ? '¿Cómo paga?' : `Método de pago ${i + 1}`}>

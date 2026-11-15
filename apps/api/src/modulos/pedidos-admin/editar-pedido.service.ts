@@ -377,9 +377,13 @@ export class EditarPedidoService {
         noSumaBeneficios: l.noSumaBeneficios,
       })),
     ].filter(Boolean) as any[];
+    // Promos por medio: el pedido conserva su descuento mientras su(s) medio(s) de pago sigan siendo los de la promo
+    const planActual: Array<{ medio: string }> = (await this.prisma.pedidoPagoPlan?.findMany?.({ where: { pedido_id: pedido.id } })) ?? [];
+    const mediosActuales = planActual.length ? planActual.map((f) => f.medio) : [pedido.pago_preferido ?? pedido.pago_metodo].filter(Boolean);
     const desglose = await this.ofertas.calcularDescuentosParaPedido({
       subtotal,
       lineas: lineasDescuento,
+      medios: mediosActuales as string[],
       canal: pedido.canal,
       modalidad: pedido.modalidad,
       cuponCodigo: undefined,

@@ -585,11 +585,6 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'mm',
   },
-  pago_online_activo: {
-    nombre: 'Pago en línea encendido (tarjeta y Yape por Culqi)',
-    descripcion: 'Muestra en la carta la opción de pagar con tarjeta o Yape en línea. El cliente paga en la pantalla de Culqi y el pedido pasa a cocina solo cuando el pago se confirma.',
-    tipo: 'sino',
-  },
   pago_online_espera_min: {
     nombre: 'Minutos para completar el pago en línea',
     descripcion: 'Tiempo que tiene el cliente para pagar en la pantalla de Culqi antes de que el pedido quede sin pagar y se libere.',

@@ -326,6 +326,8 @@ export interface VistaPreviaPedidoBot {
   envioPromoNombre?: string | null;
   /** Soles que faltan para llegar a la compra mínima de una promoción de envío gratis vigente por WhatsApp. */
   envioGratisFalta?: number | null;
+  /** «Ahorras S/ X si pagas con Yape»: promos por medio de pago aún no aplicadas (falta elegir ese medio). */
+  ahorrosPorMedio?: Array<{ medio: string; ahorro: number; nombre: string }>;
 }
 
 export interface ContextoConversacion {

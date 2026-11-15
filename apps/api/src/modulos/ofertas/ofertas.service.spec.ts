@@ -1094,7 +1094,7 @@ describe('OfertasService', () => {
         // otro canal: solo carta web
         { id: 21n, codigo_base: 'SOLOWEB', dias_validez: 15, canales: ['CARTA'], fecha_desde: null, fecha_hasta: null, dias: [], hora_desde: null, hora_hasta: null },
         // vigente y de caja
-        { id: 22n, codigo_base: 'BUENO', dias_validez: 15, canales: ['CARTA', 'CAJA'], fecha_desde: null, fecha_hasta: null, dias: [], hora_desde: null, hora_hasta: null },
+        { id: 22n, codigo_base: 'BUENO', dias_validez: 15, canales: ['CARTA', 'CAJA', 'MOZO'], fecha_desde: null, fecha_hasta: null, dias: [], hora_desde: null, hora_hasta: null },
       ]);
       prismaMock.cuponEmitido.create.mockImplementation(({ data }: any) =>
         Promise.resolve({

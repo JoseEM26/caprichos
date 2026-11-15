@@ -94,6 +94,8 @@ export interface OfertaItem {
   fechaDesde: string | null;
   fechaHasta: string | null;
   canales: string[];
+  /** Medios de pago con los que vale (promo por medio). Vacío = cualquier medio. */
+  mediosPago: string[];
   /** Tipos de pedido donde vale (COMER_LOCAL, LLEVAR, RECOGER, DELIVERY). Vacío = todos. */
   modalidades: string[];
   limiteUsos: number | null;
@@ -146,6 +148,8 @@ export interface CuponItem {
   categoriaId: string | null;
   productoId: string | null;
   canales: string[];
+  /** Medios de pago con los que vale el cupón (vacío = cualquier medio). */
+  mediosPago: string[];
   requiereCuenta: boolean;
   diasValidez: number | null;
   topeUsos: number | null;
@@ -210,6 +214,15 @@ export interface DesgloseDescuentosPedido {
   detalles: DetalleDescuentoAplicado[];
   /** El cupón canjeado da envío gratis (no descuenta productos). Solo delivery; lo aplica el pedido. */
   envioGratisCupon?: boolean;
+  /** El cupón ingresado vale solo con estos medios y aún no se eligió uno: no se aplicó. */
+  cuponMediosRequeridos?: string[];
+}
+
+/** «Ahorras S/ X si pagas con <medio>»: lo que se descontaría de más con ese medio (sin aplicarlo al total). */
+export interface AhorroPorMedio {
+  medio: string;
+  ahorro: number;
+  nombre: string;
 }
 
 /** Una línea de cocina que sale de una parte de combo (FIJO o A_ELECCION), por producto. */

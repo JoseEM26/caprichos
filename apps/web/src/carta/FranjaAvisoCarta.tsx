@@ -1,3 +1,4 @@
+import { textoCondicionMedios } from '@caprichos/compartido';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { CategoriaCarta } from './tipos';
@@ -55,10 +56,12 @@ export function formatearTextoOferta(
   }
 
   if (oferta.tipo === 'DESCUENTO') {
+    const cond = textoCondicionMedios(oferta.mediosPago);
+    const sufijo = cond ? ` ${cond}` : '';
     if (oferta.descuentoTipo === 'PORCENTAJE') {
-      return `${oferta.descuentoValor || 0} % de descuento en ${objetivo}`;
+      return `${oferta.descuentoValor || 0} % de descuento en ${objetivo}${sufijo}`;
     }
-    return `S/ ${oferta.descuentoValor || 0} de descuento en ${objetivo}`;
+    return `S/ ${oferta.descuentoValor || 0} de descuento en ${objetivo}${sufijo}`;
   }
 
   return oferta.nombre;

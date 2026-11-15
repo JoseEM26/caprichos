@@ -366,7 +366,7 @@ describe('PedidosService', () => {
       const conCulqi = () => ({ ...pedidoBaseDto, pago: { metodo: 'CULQI' } }) as any;
 
       it('encendido: el pedido nace POR_PAGAR, PENDIENTE_ONLINE y sin pasar a cocina', async () => {
-        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: { CARTA: { PAGO_EN_LINEA: true } } });
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'POR_PAGAR', subtotal: 28, envio: 5, total: 33 });
         await service.crear(conCulqi(), 'idemp-culqi-1');
         const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
@@ -374,12 +374,12 @@ describe('PedidosService', () => {
       });
 
       it('apagado (por defecto): se rechaza antes de crear el pedido', async () => {
-        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'no' });
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: { CARTA: { PAGO_EN_LINEA: false } } });
         await expect(service.crear(conCulqi(), 'idemp-culqi-2')).rejects.toMatchObject({ response: { codigo: 'PAGO_ONLINE_APAGADO' } });
       });
 
       it('fuera de la carta (mozo): no aplica', async () => {
-        prismaMock.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+        prismaMock.parametro.findUnique.mockResolvedValue({ valor: { CARTA: { PAGO_EN_LINEA: true } } });
         await expect(service.crear(conCulqi(), 'idemp-culqi-3', { canal: 'MOZO' } as any)).rejects.toMatchObject({ response: { codigo: 'PAGO_ONLINE_NO_APLICA' } });
       });
     });
@@ -554,6 +554,30 @@ describe('PedidosService', () => {
         expect(data.pago_metodo).toBe('YAPE');
         expect(data.pago_preferido).toBe('YAPE');
         expect(Number(data.paga_con)).toBe(20);
+      });
+
+      it('medio apagado en el canal del pedido: 400 y no se crea; en el pago dividido basta uno apagado', async () => {
+        const base = prismaMock.parametro.findUnique.getMockImplementation();
+        const apagar = (canal: string, medio: string) =>
+          prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+            where.clave === 'medios_pago_canal' ? Promise.resolve({ clave: where.clave, valor: { [canal]: { [medio]: false } } }) : base!({ where }),
+          );
+        apagar('CARTA', 'YAPE');
+        await expect(
+          service.crear(conPlan([{ medio: 'EFECTIVO', monto: 13 }, { medio: 'YAPE', monto: 20 }], { pagaCon: 20 }), 'idemp-ap-1'),
+        ).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Yape no está disponible ahora' } });
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-2')).rejects.toMatchObject({
+          response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        // Apagado en MOZO no afecta a la carta
+        apagar('MOZO', 'YAPE');
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-3')).resolves.toBeDefined();
+        // En el canal MOZO sí se rechaza
+        await expect(service.crear({ ...pedidoBaseDto, pago: { metodo: 'YAPE' } as any }, 'idemp-ap-4', { canal: 'MOZO' } as any)).rejects.toMatchObject({
+          response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+        });
+        prismaMock.parametro.findUnique.mockImplementation(base!);
       });
 
       it('rechaza un plan cuya suma no iguala el total y no crea el pedido', async () => {

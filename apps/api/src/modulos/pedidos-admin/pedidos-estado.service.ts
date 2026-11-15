@@ -1,4 +1,5 @@
 import { AnulacionPagadoService } from './anulacion-pagado.service';
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { CANALES_CON_ATENDIDO, nombresDePersonas } from './linea-tiempo.service';
 import { totalSegDePedido } from './linea-tiempo.util';
@@ -1564,6 +1565,9 @@ export class PedidosEstadoService {
         mensaje: `El método de pago '${dto.metodo}' no es válido`,
       });
     }
+
+    // «Apagado es apagado» para pagos NUEVOS: confirmar un medio que el cliente ya pagó (con su comprobante) siempre se puede
+    await exigirMediosActivos(this.prisma, [metodoUpper], 'CAJA', pedido.id);
 
     // Confirmar un pago (COORDINADO o PAGADO) exige caja abierta; el pedido en sí no depende de la caja
     // Excepción: delivery en efectivo/tarjeta solo COORDINADO (se cobra al entregar): no entra dinero a caja, no la exige

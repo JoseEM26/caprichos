@@ -1,4 +1,6 @@
 import { esSoloMozo, rolEfectivoMozo } from '../acceso/roles-usuario';
+import { type QuitaPromoMedio, evaluarQuitaPromoMedio, errorPromoSeQuita, aplicarQuitaPromoMedio } from '../ofertas/promo-medio.util';
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { totalCobrable } from '../propinas/propinas.util';
 import {
   BadRequestException,
@@ -59,6 +61,8 @@ export interface EnviarACajaOpciones {
   comprobante?: { tipo?: unknown; doc?: unknown; razon?: unknown; direccion?: unknown };
   /** Casilla única «ya hablé con el cliente y pagó (sin captura)»: sustituye a la foto en pedidos del local. */
   confirmaSinCaptura?: unknown;
+  /** El mozo vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma enviar así. */
+  confirmaSinDescuento?: unknown;
 }
 const NOMBRE_MEDIO_CAJA: Record<string, string> = {
   EFECTIVO: 'Efectivo',
@@ -719,6 +723,14 @@ export class VouchersService {
         comprobante_doc: true,
         comprobante_razon: true,
         comprobante_direccion: true,
+        oferta_id: true,
+        cupon_id: true,
+        cupon_emitido_id: true,
+        descuento_detalle: true,
+        subtotal: true,
+        descuento: true,
+        envio: true,
+        puntos_canjeados: true,
       },
     });
     if (!pedido) {
@@ -728,8 +740,19 @@ export class VouchersService {
       throw new ConflictException({ codigo: 'PEDIDO_YA_PAGADO', mensaje: 'El pedido ya está cobrado' });
     }
 
+    // Promo por medio de pago: con otro medio el descuento se quita y el total sube (el mozo debe haberlo visto)
+    await this.aplicarPromoPorMedio(
+      pedido,
+      conPlan ? (plan as Array<{ medio?: unknown }>).map((f) => String(f?.medio ?? '')) : [medioNormalizado],
+      opciones.confirmaSinDescuento === true,
+      usuario,
+      ip,
+    );
+
     // Pago dividido: el plan debe sumar el total del pedido (lo valida PagoPlanService)
     const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido)) : null;
+    // «Apagado es apagado» en el mozo: el medio (o todos los del pago dividido) debe estar encendido en MOZO
+    await exigirMediosActivos(this.prisma, planValidado ? planValidado.map((f) => f.medio) : [medioNormalizado], 'MOZO', id);
     const desglose = planValidado
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
@@ -1139,18 +1162,58 @@ export class VouchersService {
   }
 
   /**
+   * Promo por medio de pago: si los medios no son los de la promo del pedido, el descuento se quita y el total sube.
+   * Sin `confirma` (el mozo vio «Sin descuento <promo>: total S/ X») lanza 409 y no cambia nada. Deja `pedido` actualizado.
+   */
+  private async aplicarPromoPorMedio(
+    pedido: { id: bigint; oferta_id?: bigint | null; cupon_id?: bigint | null; cupon_emitido_id?: bigint | null; descuento_detalle?: unknown; subtotal?: unknown; descuento?: unknown; envio?: unknown; puntos_canjeados?: unknown; total?: unknown },
+    medios: string[],
+    confirma: boolean,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ): Promise<void> {
+    const quita = await evaluarQuitaPromoMedio(this.prisma, pedido, medios);
+    if (!quita) return;
+    if (!confirma) throw errorPromoSeQuita(quita);
+    Object.assign(pedido, await this.prisma.$transaction((tx) => aplicarQuitaPromoMedio(tx, pedido, quita)));
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'vouchers',
+      accion: 'QUITAR_PROMO_POR_MEDIO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      antes: { promo: quita.nombre, descuento: quita.descuento, total: quita.totalAnterior },
+      despues: { total: quita.totalNuevo, medios },
+      partyId: usuario.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+  }
+
+  /** Vista previa para el mozo y Caja: si cobrar con estos medios quita el descuento de una promo por medio, y a cuánto queda el total. */
+  async promoPorMedio(pedidoId: string, medios: unknown): Promise<{ quita: QuitaPromoMedio | null }> {
+    const lista = Array.isArray(medios) ? medios.map((m) => String(m ?? '')) : [];
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: this.parsearId(pedidoId) },
+      select: { id: true, oferta_id: true, cupon_id: true, cupon_emitido_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true, total: true },
+    });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
+    return { quita: await evaluarQuitaPromoMedio(this.prisma, pedido, lista) };
+  }
+
+  /**
    * Guarda el plan de pago que armó el mozo ANTES de subir la captura, para que el servidor compare
    * cada captura contra el monto de su medio. Solo mientras el pago no esté aprobado (puedeSubirVoucher).
    * El mozo solo toca sus pedidos. Audita GUARDAR_PLAN_PAGO.
    */
-  async guardarPlanMozo(pedidoId: string, plan: unknown, usuario: UsuarioAutenticado, ip?: string) {
+  async guardarPlanMozo(pedidoId: string, plan: unknown, usuario: UsuarioAutenticado, ip?: string, confirmaSinDescuento = false) {
     if (!Array.isArray(plan) || plan.length === 0) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago debe ser una lista de medios y montos' });
     }
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, adelanto_total: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
+      select: { id: true, codigo: true, party_id: true, total: true, monto_credito: true, adelanto_total: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, oferta_id: true, cupon_id: true, cupon_emitido_id: true, descuento_detalle: true, subtotal: true, descuento: true, envio: true, puntos_canjeados: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -1161,10 +1224,12 @@ export class VouchersService {
     if (esSoloMozo(usuario) && !puedeSubirVoucher(pedido, 'MOZO')) {
       throw new ConflictException({ codigo: 'PLAN_BLOQUEADO', mensaje: 'El pago ya fue aprobado; pide a Caja cualquier cambio del plan' });
     }
+    await this.aplicarPromoPorMedio(pedido, (plan as Array<{ medio?: unknown }>).map((f) => String(f?.medio ?? '')), confirmaSinDescuento, usuario, ip);
     const planValidado = this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido));
     if (!planValidado) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago no es válido' });
     }
+    await exigirMediosActivos(this.prisma, planValidado.map((f) => f.medio), 'MOZO', id);
     const medioPrincipal = this.pagoPlan.pagoPrincipal(planValidado);
     await this.prisma.$transaction(async (tx) => {
       await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: id } });

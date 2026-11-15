@@ -100,6 +100,7 @@ describe('CobrosService', () => {
         findUnique: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
       },
+      oferta: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
       parametro: {
         findUnique: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
@@ -914,8 +915,77 @@ describe('CobrosService', () => {
       sinFoto();
       const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario);
       expect(res.id).toBe('77');
-      expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.parametro.findUnique).not.toHaveBeenCalledWith({ where: { clave: 'voucher_mozo_obligatorio' } });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', partyId: 3n }));
+    });
+  });
+
+  describe('promo por medio de pago al cobrar', () => {
+    const caja = { id: 10n, fecha: new Date('2026-10-21T00:00:00.000Z'), estado: 'ABIERTA' };
+    const conPromo = {
+      id: 100n, codigo: 'CP-0100', subtotal: new Prisma.Decimal(100), descuento: new Prisma.Decimal(10), envio: new Prisma.Decimal(0),
+      puntos_canjeados: new Prisma.Decimal(0), total: new Prisma.Decimal(90), estado: 'ENTREGADO', pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'SIMPLE', es_personal: false, cobros: [], planPago: [], oferta_id: 7n,
+      descuento_detalle: [{ tipo: 'DESCUENTO', id: '7', montoDescontado: 10 }],
+    };
+
+    it('cobrar con otro medio que el de la promo: 409 «Sin descuento <promo>: total S/ X» y no se cobra sin confirmar', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(caja);
+      prismaMock.pedido.findUnique.mockResolvedValue(conPromo);
+      prismaMock.oferta.findUnique.mockResolvedValue({ id: 7n, nombre: '10 % con Yape', medios_pago: ['YAPE'] });
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 90 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'PROMO_SE_QUITA', mensaje: 'Sin descuento 10 % con Yape: total S/ 100.00', totalNuevo: 100 },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('confirmado, el descuento se quita y los pagos deben cuadrar con el total nuevo (con el viejo ya no cuadran)', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(caja);
+      prismaMock.pedido.findUnique.mockResolvedValue(conPromo);
+      prismaMock.oferta.findUnique.mockResolvedValue({ id: 7n, nombre: '10 % con Yape', medios_pago: ['YAPE'] });
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 90 }], confirmaSinDescuento: true }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'PAGO_NO_CUADRA', diferencia: -10 } });
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ total: 100, oferta_id: null }) }));
+    });
+
+    it('con el medio de la promo no pide nada', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(caja);
+      prismaMock.pedido.findUnique.mockResolvedValue(conPromo);
+      prismaMock.oferta.findUnique.mockResolvedValue({ id: 7n, nombre: '10 % con Yape', medios_pago: ['YAPE'] });
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 80 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'PAGO_NO_CUADRA' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('medios de pago apagados en Caja', () => {
+    it('lo ya pagado se confirma: con el voucher de Yape el cobro no se frena aunque Yape esté apagado en Caja; sin voucher sí', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'medios_pago_canal', valor: { CAJA: { YAPE: false } } });
+      prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([{ medio: 'YAPE' }]);
+      // pasa el interruptor y se detiene más adelante (caja cerrada) en vez de MEDIO_NO_DISPONIBLE
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: expect.not.stringMatching(/MEDIO_NO_DISPONIBLE/) },
+      });
+      prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([]);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'MEDIO_NO_DISPONIBLE' },
+      });
+    });
+
+    it('cobrar con un medio apagado en CAJA se rechaza (400) sin tocar el pedido; encendido pasa', async () => {
+      const cajaSinPlin = { CAJA: { PLIN: false } };
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'medios_pago_canal', valor: cajaSinPlin });
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'PLIN', monto: 10 }] }, cajeroUsuario)).rejects.toMatchObject({
+        response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Plin no está disponible ahora' },
+      });
+      // pago dividido: un solo medio apagado rechaza todo el cobro
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 5 }, { medio: 'PLIN', monto: 5 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
   });
 

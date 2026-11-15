@@ -207,7 +207,7 @@ describe('cupón de envío gratis (ofertas)', () => {
         lleva: null,
         paga: null,
         alcance_producto_id: null,
-        canales: ['CARTA', 'ADMIN', 'BOT'],
+        canales: ['CARTA', 'CAJA', 'MOZO', 'BOT'],
       });
     });
 

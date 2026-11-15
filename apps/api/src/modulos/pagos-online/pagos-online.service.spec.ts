@@ -28,7 +28,7 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
       return i[k] === v;
     });
   const prisma: any = {
-    parametro: { findUnique: jest.fn().mockResolvedValue({ valor: opts.activo === false ? 'no' : 'si' }) },
+    parametro: { findUnique: jest.fn().mockResolvedValue({ valor: { CARTA: { PAGO_EN_LINEA: opts.activo !== false } } }) },
     caja: { findUnique: jest.fn().mockResolvedValue({ estado: opts.cajaAbierta === false ? 'CERRADA' : 'ABIERTA' }), findFirst: jest.fn().mockResolvedValue(null) },
     pedido: {
       findUnique: jest.fn(async () => pedido),

@@ -445,6 +445,15 @@ export interface PagoItem {
   recibido?: number;
 }
 
+/** Descuento de una promo por medio de pago que se quita porque se cobra con otro medio. */
+export interface QuitaPromoMedio {
+  ofertaId: string;
+  nombre: string;
+  descuento: number;
+  totalAnterior: number;
+  totalNuevo: number;
+}
+
 export interface CobrarDto {
   pedidoId: string | number;
   pagos: PagoItem[];
@@ -456,6 +465,8 @@ export interface CobrarDto {
   confirmaSinCaptura?: boolean;
   /** Propina escrita al cobrar un pedido que aún no la tiene (monto libre, aparte de la venta). */
   propina?: number;
+  /** Caja vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma cobrar así. */
+  confirmaSinDescuento?: boolean;
 }
 
 /** Excepción a la foto: la casilla del local viaja como confirmaSinCaptura; el resto, con motivo. */
@@ -736,6 +747,14 @@ export const pedidosApi = {
       `/admin/caja/pedidos/${id}/coordinado`,
       cuerpoSinVoucher(sinVoucher),
     );
+  },
+
+  /**
+   * Promo por medio de pago: si cobrar con estos medios quita el descuento de la promo del pedido, devuelve a cuánto queda el total.
+   * Caja y mozo lo ven antes de confirmar.
+   */
+  async promoPorMedio(pedidoId: string | number, medios: string[]): Promise<{ quita: QuitaPromoMedio | null }> {
+    return api.post<{ quita: QuitaPromoMedio | null }>('/admin/vouchers/promo-medio', { pedidoId: String(pedidoId), medios });
   },
 
   async obtenerCajaActual(): Promise<CajaActualRespuesta> {

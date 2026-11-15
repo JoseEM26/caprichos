@@ -37,6 +37,7 @@ export async function vistaPreviaPedidoBot(
 
   let descuento = 0;
   let descuentoNombre: string | null = null;
+  let ahorrosPorMedio: Array<{ medio: string; ahorro: number; nombre: string }> = [];
   if (deps.ofertasService) {
     const lineas = pedido.items.map((i) => ({
       productoId: BigInt(i.productoId),
@@ -46,9 +47,12 @@ export async function vistaPreviaPedidoBot(
       precioUnitario: i.precioUnitario,
       noSumaBeneficios: i.noSumaBeneficios,
     }));
-    const desglose = await deps.ofertasService.calcularDescuentosParaPedido({ subtotal, lineas, canal: 'WHATSAPP', modalidad: pedido.modalidad });
+    const desglose = await deps.ofertasService.calcularDescuentosParaPedido({ subtotal, lineas, canal: 'WHATSAPP', modalidad: pedido.modalidad, medios: pedido.pago?.plan?.length ? pedido.pago.plan.map((f) => f.medio) : pedido.pago?.metodo ? [pedido.pago.metodo] : [] });
     descuento = desglose.descuentoTotal;
     descuentoNombre = desglose.detalles[0]?.nombre ?? null;
+    const mediosElegidos = pedido.pago?.plan?.length ? pedido.pago.plan.map((f) => f.medio) : pedido.pago?.metodo ? [pedido.pago.metodo] : [];
+    // Aviso extra: si falla, el total del bot sigue igual
+    ahorrosPorMedio = await Promise.resolve(deps.ofertasService.ahorrosPorMedio?.({ subtotal, lineas, canal: 'WHATSAPP', modalidad: pedido.modalidad }, desglose, mediosElegidos)).then((r) => r ?? []).catch(() => []);
   }
 
   let envio: number | null = 0;
@@ -80,5 +84,6 @@ export async function vistaPreviaPedidoBot(
     envioGratis: envio === 0 && pedido.modalidad === 'DELIVERY',
     envioPromoNombre,
     envioGratisFalta,
+    ...(ahorrosPorMedio.length ? { ahorrosPorMedio } : {}),
   };
 }

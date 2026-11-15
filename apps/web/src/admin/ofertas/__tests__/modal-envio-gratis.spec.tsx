@@ -22,7 +22,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
       dias: [3],
       horaDesde: '14:00',
       horaHasta: '18:00',
-      canales: ['CARTA', 'ADMIN', 'BOT'],
+      canales: ['CARTA', 'CAJA', 'MOZO', 'BOT'],
       compraMinima: null,
     });
     expect(datos).not.toHaveProperty('descuentoValor');
@@ -37,7 +37,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
     fireEvent.click(screen.getByLabelText('WhatsApp (bot)'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(onGuardar).toHaveBeenCalled());
-    expect(onGuardar.mock.calls[0][0].canales).toEqual(['CARTA', 'ADMIN']);
+    expect(onGuardar.mock.calls[0][0].canales).toEqual(['CARTA', 'CAJA', 'MOZO']);
   });
 
   it('valida que la hora de fin sea después de la de inicio y no guarda', () => {

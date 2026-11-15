@@ -67,4 +67,9 @@ export class CobrarDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'La propina debe ser un monto con hasta 2 decimales' })
   @Min(0, { message: 'La propina no puede ser negativa' })
   propina?: number;
+
+  /** Caja vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma cobrar así. */
+  @IsOptional()
+  @IsBoolean()
+  confirmaSinDescuento?: boolean;
 }

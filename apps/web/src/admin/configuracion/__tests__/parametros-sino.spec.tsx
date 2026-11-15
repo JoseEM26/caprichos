@@ -5,7 +5,7 @@ import { ParametrosOperacionTab, META_PARAMETROS } from '../ParametrosOperacionT
 import { AYUDA_PARAMETROS, GRUPOS_PARAMETROS } from '../catalogo/parametros';
 
 const datos = [
-  { clave: 'pago_online_activo', valor: 'no' },
+  { clave: 'evolution_pausado', valor: 'no' },
   { clave: 'pago_online_espera_min', valor: 15 },
   { clave: 'clave_nueva_rara', valor: 'si' },
   { clave: 'voucher_mozo_obligatorio', valor: true },
@@ -21,23 +21,23 @@ function montar() {
 describe('Parámetros: todo sí/no es un interruptor', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('un booleano catalogado (pago_online_activo) se muestra como interruptor y no hay cuadro de texto', async () => {
+  it('un booleano catalogado (evolution_pausado) se muestra como interruptor y no hay cuadro de texto', async () => {
     montar();
-    const interruptor = await screen.findByRole('switch', { name: /Pago en línea encendido/ });
+    const interruptor = await screen.findByRole('switch', { name: /Pausar los envíos por Evolution/ });
     expect(interruptor).not.toBeChecked();
-    const fila = document.querySelector('[data-cfg-id="parametros-pago-online-activo"]') as HTMLElement;
+    const fila = document.querySelector('[data-cfg-id="parametros-evolution-pausado"]') as HTMLElement;
     expect(within(fila).queryByRole('button', { name: /^Editar$/ })).toBeNull();
     expect(within(fila).queryByRole('textbox')).toBeNull();
   });
 
   it('un toque en un parámetro de riesgo pide confirmar Sí/No y guarda «si»', async () => {
-    const put = vi.spyOn(api, 'put').mockResolvedValue({ clave: 'pago_online_activo', valor: 'si' } as any);
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ clave: 'evolution_pausado', valor: 'si' } as any);
     montar();
-    fireEvent.click(await screen.findByRole('switch', { name: /Pago en línea encendido/ }));
+    fireEvent.click(await screen.findByRole('switch', { name: /Pausar los envíos por Evolution/ }));
     expect(put).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Sí, cambiar/ }));
-    await waitFor(() => expect(put).toHaveBeenCalledWith('/admin/configuracion/pago_online_activo', { valor: 'si' }));
-    await waitFor(() => expect(screen.getByRole('switch', { name: /Pago en línea encendido/ })).toBeChecked());
+    await waitFor(() => expect(put).toHaveBeenCalledWith('/admin/configuracion/evolution_pausado', { valor: 'si' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: /Pausar los envíos por Evolution/ })).toBeChecked());
   });
 
   it('una clave no catalogada con valor «si» o true también es interruptor', async () => {
@@ -48,7 +48,7 @@ describe('Parámetros: todo sí/no es un interruptor', () => {
 
   it('los números siguen con su campo numérico y unidad', async () => {
     montar();
-    await screen.findByRole('switch', { name: /Pago en línea encendido/ });
+    await screen.findByRole('switch', { name: /Pausar los envíos por Evolution/ });
     const fila = document.querySelector('[data-cfg-id="parametros-pago-online-espera-min"]') as HTMLElement;
     expect(within(fila).getByText('15 minutos')).toBeInTheDocument();
     fireEvent.click(within(fila).getByRole('button', { name: /^Editar$/ }));
@@ -64,7 +64,7 @@ describe('Parámetros: todo sí/no es un interruptor', () => {
 
   it('el grupo de Evolution y el de pago en línea existen en el catálogo y toda clave sí/no del catálogo es interruptor', () => {
     const titulos = GRUPOS_PARAMETROS.map((g) => g.titulo);
-    expect(titulos).toContain('Pago en línea (tarjeta y Yape por Culqi)');
+    expect(titulos).toContain('Pago en línea (se enciende en Local › Pagos)');
     expect(titulos).toContain('WhatsApp por Evolution');
     for (const [clave, a] of Object.entries(AYUDA_PARAMETROS)) {
       if (a.rango === 'Sí o No') expect(META_PARAMETROS[clave].tipo, clave).toBe('sino');

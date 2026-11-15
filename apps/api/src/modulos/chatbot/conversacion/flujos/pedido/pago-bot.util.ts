@@ -1,5 +1,6 @@
 import { VistaPreviaPedidoBot } from '../../tipos-conversacion';
 import { EstadoCarritoPedido, MedioPagoBot } from './tipos-pedido';
+import { medioActivo } from '@caprichos/compartido';
 import { BotonAccion, FilaLista } from '../../../puerto/whatsapp-mensajeria.puerto';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -15,14 +16,14 @@ export function calcularTotales(pedido: EstadoCarritoPedido, vista?: VistaPrevia
     const total = Math.max(0, r2(vista.subtotal - vista.descuento + (vista.envio ?? 0)));
     return {
       subtotal: vista.subtotal, descuento: vista.descuento, descuentoNombre: vista.descuentoNombre, envio: vista.envio,
-      envioPromoNombre: vista.envioPromoNombre ?? null, envioGratisFalta: vista.envioGratisFalta ?? null,
+      envioPromoNombre: vista.envioPromoNombre ?? null, envioGratisFalta: vista.envioGratisFalta ?? null, ahorrosPorMedio: vista.ahorrosPorMedio ?? [],
       total, propina, aCobrar: r2(total + propina),
     };
   }
   const subtotal = r2(pedido.items.reduce((s, i) => s + i.subtotal, 0));
   const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
   const total = Math.max(0, r2(subtotal + (envio || 0)));
-  return { subtotal, descuento: 0, descuentoNombre: null, envio, envioPromoNombre: null, envioGratisFalta: null, total, propina, aCobrar: r2(total + propina) };
+  return { ahorrosPorMedio: [] as Array<{ medio: string; ahorro: number; nombre: string }>, subtotal, descuento: 0, descuentoNombre: null, envio, envioPromoNombre: null, envioGratisFalta: null, total, propina, aCobrar: r2(total + propina) };
 }
 
 export const NOMBRE_MEDIO: Record<MedioPagoBot, string> = {
@@ -47,11 +48,34 @@ const CLAVES: Array<[MedioPagoBot, string]> = [
  */
 export function mediosActivos(datosLocalPublicos: any): MedioPagoBot[] {
   const cfg = datosLocalPublicos?.mediosPago ?? datosLocalPublicos?.mediosPagoVisibles ?? {};
-  if (Object.keys(cfg).length === 0) return CLAVES.map(([m]) => m);
-  return CLAVES.filter(([m, k]) => {
-    const c = cfg[k] ?? (m === 'TARJETA' ? cfg.pos : undefined);
-    return Boolean(c) && c.activo !== false;
-  }).map(([m]) => m);
+  const delLocal =
+    Object.keys(cfg).length === 0
+      ? CLAVES.map(([m]) => m)
+      : CLAVES.filter(([m, k]) => {
+          const c = cfg[k] ?? (m === 'TARJETA' ? cfg.pos : undefined);
+          return Boolean(c) && c.activo !== false;
+        }).map(([m]) => m);
+  // Interruptor medio × canal de Configuración (canal BOT): apagado es apagado. Sin dato = como siempre.
+  const canal = datosLocalPublicos?.mediosPagoCanal;
+  return canal ? delLocal.filter((m) => medioActivo(canal, m, 'BOT')) : delLocal;
+}
+
+/** «Efectivo, Yape y Plin» */
+export function listaMediosTexto(medios: MedioPagoBot[]): string {
+  const n = medios.map((m) => NOMBRE_MEDIO[m]);
+  return n.length <= 1 ? n.join('') : `${n.slice(0, -1).join(', ')} y ${n[n.length - 1]}`;
+}
+
+/** Respuesta amable cuando el cliente pide un medio que está apagado en el bot. */
+export function textoMedioNoDisponible(medio: MedioPagoBot, activos: MedioPagoBot[]): string {
+  return `${NOMBRE_MEDIO[medio]} no está disponible por ahora. Puedes pagar con ${listaMediosTexto(activos)}.`;
+}
+
+/** «💡 Ahorras S/ 5.00 si pagas con Yape» (una línea por medio); vacío si no hay promos por medio pendientes. */
+export function lineasAhorroPorMedio(ahorros: Array<{ medio: string; ahorro: number }> | undefined): string {
+  return (ahorros ?? [])
+    .map((a) => `💡 Ahorras S/ ${a.ahorro.toFixed(2)} si pagas con ${NOMBRE_MEDIO[a.medio as MedioPagoBot] ?? a.medio}\n`)
+    .join('');
 }
 
 /** Medios que llevan voucher (los mismos que el servidor). */

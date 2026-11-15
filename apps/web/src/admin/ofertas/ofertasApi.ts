@@ -123,6 +123,8 @@ export interface OfertaItem {
   canales?: string[];
   /** Tipos de pedido donde vale (COMER_LOCAL, LLEVAR, RECOGER, DELIVERY); vacío = todos */
   modalidades?: string[];
+  /** Medios de pago con los que vale (promo por medio); vacío = cualquier medio */
+  mediosPago?: string[];
   limiteUsos?: number | null;
   usosActuales?: number;
   noSumaBeneficios?: boolean;
@@ -184,6 +186,8 @@ export interface CuponItem {
   diasValidez?: number | null;
   canal?: string;
   canales?: string[];
+  /** Medios de pago con los que vale el cupón (vacío = cualquiera) */
+  mediosPago?: string[];
   requiereCuenta?: boolean;
   orden: number;
   activo: boolean;

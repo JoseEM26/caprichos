@@ -1,3 +1,4 @@
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -110,6 +111,11 @@ export class CambioCobroService {
     const plan = this.pagoPlan.validar(this.parsearPlan(body.plan), total);
     if (!plan) throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'Elige la nueva forma de pago' });
     const planNuevo: PlanPagoItem[] = plan.map((f) => ({ medio: f.medio, monto: f.monto }));
+    // Se revisa ANTES de subir capturas (que cuentan como evidencia): solo frena medios NUEVOS apagados en Caja
+    const medioActual = new Set<string>(
+      pedido.planPago.length > 0 ? pedido.planPago.map((f) => f.medio) : [String(pedido.pago_preferido ?? pedido.pago_metodo ?? '').toUpperCase()],
+    );
+    await exigirMediosActivos(this.prisma, planNuevo.map((f) => f.medio).filter((m) => !medioActual.has(m)), 'CAJA', id);
 
     // Una captura por medio digital, opcional: se lee con la IA contra el plan NUEVO; una ilegible se retira
     const voucherIds: bigint[] = [];

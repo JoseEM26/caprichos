@@ -69,6 +69,17 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
       expect(prisma.solicitudCambioCobro.create).not.toHaveBeenCalled();
     });
 
+    it('respeta los interruptores de Caja: Yape apagado se rechaza ANTES de subir capturas; el medio que el pedido ya tenía no se frena', async () => {
+      prisma.parametro = { findUnique: jest.fn().mockResolvedValue({ valor: { CAJA: { YAPE: false, EFECTIVO: false } } }) };
+      prisma.voucherPago.findMany = jest.fn().mockResolvedValue([]);
+      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).rejects.toMatchObject({
+        response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Yape no está disponible ahora' },
+      });
+      expect(vouchers.subirYProcesar).not.toHaveBeenCalled();
+      // el pedido ya era Efectivo (aunque esté apagado): se queda en Efectivo sin chocar con el interruptor
+      await expect(service.solicitar('7', { plan: plan([{ medio: 'EFECTIVO', monto: 40 }]) }, {}, repartidor)).resolves.toBeDefined();
+    });
+
     // ANTES: LISTO/ENTREGADO/ANULADO daban 409 ESTADO_INVALIDO; ahora el estado lo decide AjustarPagoService (solo ANULADO se rechaza allí)
     it('se aplica de inmediato por AjustarPagoService (sin aprobar) y queda la fila APROBADA para Caja', async () => {
       const r = await service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor);

@@ -42,7 +42,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_todos_pedidos_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_asignado_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_voucher_recordatorio_activo', 'whatsapp_plantilla_recibido_seguimiento_activa', 'whatsapp_plantilla_delivery_ubicacion_activa', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min', 'voucher_recordatorio_min', 'voucher_mozo_obligatorio'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_modo_libre', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo', 'ayuda_ia_max_por_minuto_usuario', 'ayuda_ia_max_por_hora_usuario'] },
-  { id: 'pago_online', titulo: 'Pago en línea (tarjeta y Yape por Culqi)', claves: ['pago_online_activo', 'pago_online_espera_min'] },
+  { id: 'pago_online', titulo: 'Pago en línea (se enciende en Local › Pagos)', claves: ['pago_online_espera_min'] },
   { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
   { id: 'cola', titulo: 'Cola de envío de WhatsApp (reintentos y alertas)', claves: ['outbox_alerta_fallidos', 'outbox_max_intentos', 'outbox_retencion_dias', 'outbox_retencion_fallidos_dias', 'outbox_lag_alerta_min'] },
   { id: 'aprendizaje', titulo: 'Aprendizaje nocturno del bot', claves: ['aprendizaje_activo', 'aprendizaje_hora', 'aprendizaje_min_repeticiones', 'aprendizaje_tope_usd_noche', 'aprendizaje_tope_usd_historico', 'aprendizaje_usd_por_millon_entrada', 'aprendizaje_usd_por_millon_salida'] },
@@ -641,13 +641,6 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 100: es el segundo 100 de «100 x 100».',
     efecto: 'Cambiarlo afecta a los stickers que se impriman desde que guardas, también a los que ya esperan en cola. Si la medida no coincide con el rollo, la etiqueta sale cortada o con espacio de sobra.',
     porDefecto: '100', unidad: 'milímetros', rango: 'entero de 30 a 200', palabras: ['etiqueta', 'sticker', 'tamano', 'medida', 'milimetros', 'etiquetera', 'rollo', 'bebida', 'general', 'ancho', 'alto'], peligro: 'medio',
-  },
-  pago_online_activo: {
-    grupo: 'pago_online', titulo: 'Pago en línea encendido (tarjeta y Yape por Culqi)',
-    descripcion: 'Muestra en la carta la opción de pagar con tarjeta o Yape en línea. El cliente paga en la pantalla de Culqi y el pedido pasa a cocina solo cuando el pago se confirma.',
-    ejemplo: 'En «No», la carta no ofrece pagar en línea; los pedidos con Yape o Plin por voucher siguen igual.',
-    efecto: 'Apagarlo quita la opción de pago en línea a los clientes nuevos. Los pagos que ya están en curso se terminan de confirmar.',
-    porDefecto: 'No', rango: SI_NO, palabras: ['culqi', 'tarjeta', 'yape', 'pago en linea', 'pagar con tarjeta', 'cobro online'], peligro: 'alto',
   },
   pago_online_espera_min: {
     grupo: 'pago_online', titulo: 'Minutos para completar el pago en línea',

@@ -99,6 +99,13 @@ export class VouchersController {
    * Forma anterior: medio (EFECTIVO | YAPE | PLIN | TRANSFERENCIA).
    * No cobra: Caja revisa el voucher y cobra. Permiso: vouchers/subir (MOZO, CAJERO, ADMIN)
    */
+  /** ¿Cobrar con estos medios quita el descuento de una promo por medio de pago? Lo ven el mozo y Caja antes de confirmar. */
+  @Post('promo-medio')
+  @Permiso('vouchers', 'subir')
+  async promoPorMedio(@Body('pedidoId') pedidoIdRaw: any, @Body('medios') mediosRaw: any) {
+    return this.vouchersService.promoPorMedio(pedidoIdRaw ? String(pedidoIdRaw).trim() : '', mediosRaw);
+  }
+
   @Post('enviar-a-caja')
   @Permiso('vouchers', 'subir')
   async enviarACaja(
@@ -108,6 +115,7 @@ export class VouchersController {
     @Body('recibido') recibidoRaw: any,
     @Body('comprobante') comprobanteRaw: any,
     @Body('confirmaSinCaptura') confirmaRaw: any,
+    @Body('confirmaSinDescuento') confirmaDescRaw: any,
     @Req() req: any,
   ) {
     const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
@@ -120,6 +128,7 @@ export class VouchersController {
       {
         recibido: recibidoRaw ?? undefined,
         confirmaSinCaptura: confirmaRaw === true,
+        confirmaSinDescuento: confirmaDescRaw === true,
         comprobante: comprobanteRaw && typeof comprobanteRaw === 'object' ? comprobanteRaw : undefined,
       },
     );

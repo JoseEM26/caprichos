@@ -1,4 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { mediosPagoActivosCanal } from '@caprichos/compartido';
+import { PrismaService } from '../../comun/prisma/prisma.service';
+import { leerMediosPagoCanal } from '../../comun/medios-pago-canal';
 import { LocalService } from './local.service';
 
 /**
@@ -6,7 +9,10 @@ import { LocalService } from './local.service';
  */
 @Controller('carta')
 export class CartaLocalController {
-  constructor(private readonly localService: LocalService) {}
+  constructor(
+    private readonly localService: LocalService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get('estado')
   @Header('Cache-Control', 'no-store')
@@ -17,5 +23,12 @@ export class CartaLocalController {
   @Get('local')
   async obtenerDatosLocal() {
     return this.localService.obtenerDatosPublicosLocal();
+  }
+
+  /** Medios de pago encendidos en la carta virtual (solo lectura, público). */
+  @Get('medios-pago')
+  @Header('Cache-Control', 'no-store')
+  async mediosPago() {
+    return { medios: mediosPagoActivosCanal(await leerMediosPagoCanal(this.prisma), 'CARTA') };
   }
 }

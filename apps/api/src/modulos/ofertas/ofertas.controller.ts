@@ -41,6 +41,7 @@ export class OfertasController {
       dto.canal === 'MOZO' ? 'MOZO' : 'CAJA',
       dto.modalidad,
       dto.colaboradorPartyId,
+      dto.medios,
     );
   }
 

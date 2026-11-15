@@ -1,4 +1,6 @@
 import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, trabajadorDeCuentaCliente, validarColaborador } from '../creditos/descuento-personal';
+import { exigirMediosActivos, leerMediosPagoCanal } from '../../comun/medios-pago-canal';
+import { medioActivo } from '@caprichos/compartido';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { totalPedido } from '../../comun/total-pedido';
@@ -216,6 +218,7 @@ export class PedidosService {
     if (!['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'].includes(medio)) {
       throw new BadRequestException({ codigo: 'MEDIO_REQUERIDO', mensaje: 'Elige con qué paga el trabajador' });
     }
+    await exigirMediosActivos(this.prisma, [medio], origen.canal ?? 'CARTA');
     const pagaCon = Number(origen.pagoPersonal?.pagaCon ?? 0);
     if (medio === 'EFECTIVO' && total > 0) {
       if (!(pagaCon > 0)) {
@@ -1001,6 +1004,8 @@ export class PedidosService {
       })),
       canal: canalPedido,
       modalidad: dto.modalidad,
+      // Promos por medio de pago: valen solo si TODO el pedido se paga con medios de la promo
+      medios: dto.pago?.plan?.length ? dto.pago.plan.map((f) => f.medio) : dto.pago?.metodo ? [dto.pago.metodo] : [],
       cuponCodigo: dto.cuponCodigo,
       clientePartyId: clienteFinal,
       // Solo la carta con sesión iniciada (no WhatsApp, mozo ni celular suelto)
@@ -1254,18 +1259,19 @@ export class PedidosService {
     const montoCredito = creditoConEnvio ? Number((totalCalculado - (envio ?? 0)).toFixed(2)) : totalCalculado; // el crédito nunca incluye el envío
     const aCobrarAhora = creditoConEnvio ? Number((envio ?? 0).toFixed(2)) : aCobrar;
     const sinPagoAhora = personal || (creditoConEnvio && aCobrarAhora <= 0);
-    // «Tarjeta / Yape en línea»: solo carta web, con la función encendida; el pedido espera el pago (POR_PAGAR) y no llega a cocina ni a Caja
+    // «Tarjeta / Yape en línea»: solo carta web; el interruptor «Pago en línea» (Configuración › Pagos) lo enciende. El pedido espera el pago (POR_PAGAR) y no llega a cocina ni a Caja
     const enLinea = dto.pago.metodo === 'CULQI';
-    if (enLinea) {
-      if ((origen?.canal ?? 'CARTA') !== 'CARTA' || personal) {
-        throw new BadRequestException({ codigo: 'PAGO_ONLINE_NO_APLICA', mensaje: 'El pago en línea solo está disponible en la carta web' });
-      }
-      const flag = await this.prisma.parametro.findUnique({ where: { clave: 'pago_online_activo' } }).catch(() => null);
-      if (!['si', 'sí', 'true'].includes(String(flag?.valor ?? 'no').replace(/"/g, '').toLowerCase().trim())) {
-        throw new BadRequestException({ codigo: 'PAGO_ONLINE_APAGADO', mensaje: 'El pago en línea no está disponible por ahora. Elige otro medio de pago.' });
-      }
+    if (enLinea && ((origen?.canal ?? 'CARTA') !== 'CARTA' || personal)) {
+      throw new BadRequestException({ codigo: 'PAGO_ONLINE_NO_APLICA', mensaje: 'El pago en línea solo está disponible en la carta web' });
     }
     const planPago = sinPagoAhora || enLinea ? null : this.pagoPlan.validar(dto.pago.plan, aCobrarAhora);
+    if (enLinea && !medioActivo(await leerMediosPagoCanal(this.prisma as any), 'PAGO_EN_LINEA', 'CARTA')) {
+      throw new BadRequestException({ codigo: 'PAGO_ONLINE_APAGADO', mensaje: 'El pago en línea no está disponible por ahora. Elige otro medio de pago.' });
+    }
+    // «Apagado es apagado»: el medio (o todos los del pago dividido) debe estar encendido en el canal del pedido
+    if (!sinPagoAhora) {
+      await exigirMediosActivos(this.prisma, planPago ? planPago.map((f) => f.medio) : [enLinea ? 'PAGO_EN_LINEA' : dto.pago.metodo], origen?.canal ?? 'CARTA');
+    }
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
       : dto.pago.metodo === 'EFECTIVO' && !sinPagoAhora

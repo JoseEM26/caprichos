@@ -1,3 +1,4 @@
+import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -107,6 +108,13 @@ export class AjustarPagoService {
         : p.planPago.length > 0
           ? p.planPago.map((f) => ({ medio: f.medio, monto: redondear(Number(f.monto)) }))
           : [{ medio: String(p.pago_metodo ?? p.pago_preferido ?? 'EFECTIVO').toUpperCase(), monto: total }];
+      // «Apagado es apagado» para pagos NUEVOS: un medio que el pedido ya tenía, o que ya tiene su comprobante, no se rechaza
+      await exigirMediosActivos(
+        tx,
+        planNuevo.map((f) => f.medio).filter((m) => !planAntes.some((a) => a.medio === m)),
+        'CAJA',
+        pedidoId,
+      );
       if (mismoPlan(planAntes, planNuevo) && pagaCon == null) {
         throw new BadRequestException({ codigo: 'SIN_CAMBIO', mensaje: 'La forma de pago elegida es la misma que ya tiene el pedido' });
       }

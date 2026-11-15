@@ -6,7 +6,7 @@ import {
 import { ModalDescuento } from '../ModalDescuento';
 import { ModalEnvioGratis } from '../ModalEnvioGratis';
 
-const base = { carta: true, local: false, bot: true };
+const base = { carta: true, caja: false, mozo: false, bot: true };
 
 describe('modalidades de la oferta (modelo)', () => {
   it('vacío = todas, y todas marcadas se guarda vacío', () => {

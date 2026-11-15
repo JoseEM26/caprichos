@@ -151,7 +151,7 @@ export function BotonCambiarFormaPago({
             <div style={{ fontSize: 13 }}>
               Total a cobrar: <strong>S/ {totalCobrable.toFixed(2)}</strong>. El cambio se aplica al instante y Caja lo ve como aviso, sin aprobación.
             </div>
-            <PlanPagoEditor total={totalCobrable} filas={filas} onChange={setFilas} pagaCon={pagaCon} onPagaCon={setPagaCon} />
+            <PlanPagoEditor canal="SIN_FILTRO" total={totalCobrable} filas={filas} onChange={setFilas} pagaCon={pagaCon} onPagaCon={setPagaCon} />
             {digitales.map((d) => (
               <CapturaMedio key={d.medio} medio={d.medio} monto={d.monto} archivo={capturas[d.medio]} alElegir={(f) => setCapturas((c) => ({ ...c, [d.medio]: f }))} />
             ))}

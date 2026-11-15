@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { umbralesAvisoStock } from '@caprichos/compartido';
+import { normalizarMediosPagoCanal } from '@caprichos/compartido';
 import { topePropina } from '../propinas/propinas.util';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -351,6 +352,7 @@ export class LocalService {
               'puntos_porcentaje',
               'carta_invitado_activo',
               'propina_activa',
+              'medios_pago_canal',
               'propina_tope',
               'aviso_stock_quedan_desde',
               'aviso_stock_ultimas_desde',
@@ -411,6 +413,8 @@ export class LocalService {
       mediosPago: mediosPagoVisibles,
       // Alias que lee el bot de WhatsApp (antes leía una clave que no existía y mostraba números de relleno)
       mediosPagoVisibles,
+      // Interruptores medio × canal (CARTA, CAJA, MOZO, BOT); el bot lee de aquí los medios de su canal
+      mediosPagoCanal: normalizarMediosPagoCanal(parametros.find((p) => p.clave === 'medios_pago_canal')?.valor),
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,

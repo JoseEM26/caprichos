@@ -56,6 +56,8 @@ import {
   botonesEfectivo,
   calcularTotales,
   mediosActivos,
+  lineasAhorroPorMedio,
+  textoMedioNoDisponible,
   medioPrincipal,
   opcionesMedios,
   parsearMonto,
@@ -1999,6 +2001,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!metodo) {
       return this.mostrarOpcionesPago(flujo, pedido, contexto, false);
     }
+    const activos = mediosActivos(contexto.datosLocalPublicos);
+    if (!activos.includes(metodo)) {
+      // Medio apagado en el bot: no se acepta; se responde amable y se vuelven a mostrar los disponibles
+      const res = this.mostrarOpcionesPago(flujo, pedido, contexto, false);
+      res.acciones = [{ tipo: 'enviarTexto', texto: textoMedioNoDisponible(metodo, activos) }, ...res.acciones];
+      return res;
+    }
     return this.aplicarMedioUnico(flujo, pedido, metodo, contexto);
   }
 
@@ -2929,11 +2938,27 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     conResumen = true,
   ): ResultadoTransicion {
     const activos = mediosActivos(contexto.datosLocalPublicos);
+    if (activos.length === 0) {
+      // Ningún medio encendido en el bot: lo atiende una persona
+      return {
+        nuevoEstado: 'ATENCION_PERSONA',
+        acciones: [
+          { tipo: 'pasarAPersona', motivo: 'SIN_MEDIOS_DE_PAGO_BOT', mensajeCliente: 'Pedido sin medios de pago disponibles en el bot' },
+          { tipo: 'enviarBotones', texto: 'Por ahora no puedo cobrar pedidos por aquí. Una persona del equipo te ayuda enseguida.', botones: [BOTON_VOLVER_MENU] },
+        ],
+        nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA' },
+      };
+    }
+    if (activos.length === 1) {
+      // Un solo medio: no se pregunta, se aplica y se avisa
+      const res = this.aplicarMedioUnico(flujo, pedido, activos[0], contexto);
+      res.acciones = [{ tipo: 'enviarTexto', texto: `Por ahora pagas con ${NOMBRE_MEDIO[activos[0]]}.` }, ...res.acciones];
+      return res;
+    }
     const opciones = activos.map((m) => ({
       id: m === 'TRANSFERENCIA' ? 'ped_pago_transf' : `ped_pago_${m.toLowerCase()}`,
       titulo: m === 'TARJETA' ? 'Tarjeta (POS)' : NOMBRE_MEDIO[m],
     }));
-    if (opciones.length === 0) opciones.push({ id: 'ped_pago_efectivo', titulo: 'Efectivo' });
     if (opciones.length >= 2) opciones.push({ id: 'ped_pago_dividir', titulo: 'Dividir el pago' });
 
     const op = opcionesMedios(opciones);
@@ -2968,7 +2993,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
-    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta, ahorrosPorMedio } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido, contexto);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
@@ -2988,7 +3013,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       `${envioTxt}\n` +
       (pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0 ? `${TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)}\n` : '') +
       (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
-      `*TOTAL: S/ ${total.toFixed(2)}*`
+      `*TOTAL: S/ ${total.toFixed(2)}*` +
+      (ahorrosPorMedio.length ? `\n${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
     );
   }
 

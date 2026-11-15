@@ -119,7 +119,7 @@ export function BotonCambiarPago({
             <div style={{ fontSize: 13 }}>
               Total a cobrar: <strong>{soles(total)}</strong>. Se aplica al instante, sin código de supervisor.
             </div>
-            <PlanPagoEditor total={total} filas={filas} onChange={setFilas} pagaCon={pagaCon} onPagaCon={setPagaCon} />
+            <PlanPagoEditor canal="CAJA" total={total} filas={filas} onChange={setFilas} pagaCon={pagaCon} onPagaCon={setPagaCon} />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 700 }}>
               Motivo (opcional)
               <input

@@ -44,6 +44,7 @@ describe('ModalNuevoPedidoMesa: promoción automática del local', () => {
     fireEvent.click(screen.getByText('Agregar al pedido'));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/admin/ofertas/vista-previa', {
+        medios: ['EFECTIVO'],
         canal: 'CAJA',
         modalidad: 'LLEVAR',
         codigo: undefined,

@@ -1,4 +1,4 @@
-import { ofertaIncluyeCanal } from '../../ofertas/ofertas.util';
+import { ofertaIncluyeCanal, ofertaIncluyeLocal } from '../../ofertas/ofertas.util';
 
 interface OfertaConCanales {
   tipo?: string;
@@ -23,7 +23,7 @@ export function ofertasFueraDeWhatsapp<T extends OfertaConCanales>(todas: T[] | 
     (o) => o.activo !== false && o.vigenteAhora !== false && !(o.tipo === 'COMBO' && o.disponible === false) && !ofertaIncluyeCanal(o.canales, 'BOT'),
   );
   const web = (o: T) => ofertaIncluyeCanal(o.canales, 'CARTA');
-  const local = (o: T) => ofertaIncluyeCanal(o.canales, 'ADMIN');
+  const local = (o: T) => ofertaIncluyeLocal(o.canales);
   return {
     soloWeb: lista.filter(web).map((o) => ({ ...o, tambienLocal: local(o) })),
     soloLocal: lista.filter((o) => local(o) && !web(o)),

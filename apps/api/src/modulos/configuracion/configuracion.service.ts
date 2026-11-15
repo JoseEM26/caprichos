@@ -12,6 +12,10 @@ import {
   CLAVES_METAS_TIEMPOS,
   RANGOS_METAS_TIEMPOS,
   medidaEtiquetaValida,
+  CLAVE_MEDIOS_PAGO_CANAL,
+  CANALES_MEDIO_PAGO,
+  MEDIOS_PAGO_CANAL,
+  normalizarMediosPagoCanal,
 } from '@caprichos/compartido';
 import { hoyLima } from '../reclamos/textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -302,7 +306,6 @@ export const CLAVES_SI_NO = [
   'voucher_mozo_obligatorio',
   'outbox_alerta_fallidos',
   'aprendizaje_activo',
-  'pago_online_activo',
   'evolution_pausado',
   'evolution_exigir_contacto_previo',
 ] as const;
@@ -323,6 +326,8 @@ export const CLAVES_OBJETO = [
   'propina_activa',
   'local_datos',
   'local_pagos',
+  // Medios de pago encendidos por canal (CARTA, CAJA, MOZO, BOT): solo el ADMIN los cambia
+  CLAVE_MEDIOS_PAGO_CANAL,
 ] as const;
 
 export const CLAVES_PERMITIDAS = [
@@ -536,7 +541,23 @@ export class ConfiguracionService {
           mensaje: 'El valor debe ser un objeto o estructura válida',
         });
       }
-      if (clave === 'propina_activa') {
+      if (clave === CLAVE_MEDIOS_PAGO_CANAL) {
+        if (usuarioActual?.rol !== 'ADMIN') {
+          throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia los medios de pago por canal' });
+        }
+        const v = valor as Record<string, unknown>;
+        for (const c of CANALES_MEDIO_PAGO) {
+          const fila = v[c];
+          if (fila !== undefined && (typeof fila !== 'object' || fila === null || Object.entries(fila).some(([m, x]) => !(MEDIOS_PAGO_CANAL as readonly string[]).includes(m) || typeof x !== 'boolean'))) {
+            throw new BadRequestException({ codigo: 'VALOR_INVALIDO', mensaje: 'Cada canal lleva sus medios de pago en verdadero o falso' });
+          }
+        }
+        // Se guarda completo (lo que falte toma el valor de fábrica) y Caja nunca se queda sin medios
+        valor = normalizarMediosPagoCanal(v);
+        if (!MEDIOS_PAGO_CANAL.some((m) => (valor as any).CAJA[m])) {
+          throw new BadRequestException({ codigo: 'CAJA_SIN_MEDIOS', mensaje: 'Caja debe tener al menos un medio de pago encendido' });
+        }
+      } else if (clave === 'propina_activa') {
         // Interruptor por canal: carta y bot (obligatorios) y mozo y caja (opcionales; sin valor = encendido)
         const v = valor as Record<string, unknown>;
         const opcionalBool = (x: unknown) => x === undefined || typeof x === 'boolean';

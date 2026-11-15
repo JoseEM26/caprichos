@@ -5,6 +5,8 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
+import { leerMediosPagoCanal } from '../../comun/medios-pago-canal';
+import { medioActivo } from '@caprichos/compartido';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
 import { aCentimos, enPesos, exigirCajaAbiertaHoy, registrarEgresoDevolucionCajaHoy } from '../caja/caja.calculo';
@@ -48,9 +50,8 @@ export class PagosOnlineService {
   // ---------------------------------------------------------------- configuración
 
   async estaActivo(): Promise<boolean> {
-    const p = await this.prisma.parametro.findUnique({ where: { clave: 'pago_online_activo' } }).catch(() => null);
-    const v = String(p?.valor ?? 'no').replace(/"/g, '').toLowerCase().trim();
-    return v === 'si' || v === 'sí' || v === 'true';
+    // Única fuente: el interruptor «Pago en línea» de la carta (Configuración › Pagos)
+    return medioActivo(await leerMediosPagoCanal(this.prisma as any).catch(() => null), 'PAGO_EN_LINEA', 'CARTA');
   }
 
   async config() {

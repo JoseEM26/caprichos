@@ -45,6 +45,15 @@ Decide qué medios de pago ofrece Caprichos (efectivo, tarjeta con POS al entreg
 - **Número de cuenta o CCI** (local_pagos.transferencia.cuenta): Cuenta o CCI a la que el cliente transfiere. Sale en el paso de pago de la carta con botón para copiar, junto al banco. Ejemplo: 191-12345678-0-12. Riesgo alto: toca dinero o deja de atender clientes. [Número de cuenta o CCI](/admin/mirest?tab=pagos&campo=pagos-cuenta)
 - **Guardar medios de pago**: Aplica los medios activos y sus datos de cobro a la carta, el bot y la caja. Pide confirmación Sí/No. Los pedidos ya creados no cambian. Riesgo alto: toca dinero o deja de atender clientes. [Guardar medios de pago](/admin/mirest?tab=pagos&campo=pagos-guardar)
 
+## Medios de pago por canal
+Debajo de los medios del local hay la tabla «Medios de pago por canal»: filas = Efectivo, Yape, Plin, Tarjeta, Transferencia y Pago en línea; columnas = Carta web, Caja, Mozo y WhatsApp. Cada casilla enciende o apaga un medio en ese lugar. Un medio apagado no se muestra ahí y el sistema tampoco lo acepta, ni siquiera de parte del Administrador (sale «Plin no está disponible ahora»). Al guardar se pide confirmación Sí/No y el cambio queda en auditoría con el antes y el después.
+- De fábrica todo está encendido, menos Pago en línea (la pasarela llega después).
+- Caja siempre debe tener al menos un medio encendido. En los otros canales puedes apagar todo: la carta, el mozo o el bot lo dicen de forma simple.
+- El pago dividido solo usa medios encendidos en ese canal.
+- Pagos ya hechos: si el cliente ya pagó con un medio que luego apagas (el pedido tiene su comprobante), Caja y el mozo pueden confirmar ese cobro igual. El interruptor frena solo pagos nuevos, sin comprobante previo. Cambiar la forma de pago (Caja o repartidor) también respeta los interruptores de Caja para medios nuevos.
+- Lo ya registrado no cambia: pedidos y cobros hechos con un medio que luego apagas se siguen viendo, anulando y cerrando igual (cierre de caja, reportes y devoluciones).
+- En WhatsApp: si queda un solo medio, el bot no pregunta; si no queda ninguno, pasa el pedido a una persona.
+
 ## Errores y dudas comunes
 - El cliente no ve un medio de pago: está apagado en esta pestaña.
 - La carta muestra mi teléfono como Yape o Plin: el número de ese medio está vacío; escríbelo.

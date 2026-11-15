@@ -83,7 +83,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
   const errorCuando = (): string | null => {
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de fin debe ser después de la hora de inicio.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
-    if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    if (!canales.carta && !canales.caja && !canales.mozo && !canales.bot) return ERROR_SIN_CANALES;
     { const errMod = errorModalidades('ENVIO_GRATIS', canales); if (errMod) return errMod; }
     return null;
   };

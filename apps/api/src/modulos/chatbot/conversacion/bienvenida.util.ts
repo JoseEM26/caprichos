@@ -1,3 +1,4 @@
+import { textoCondicionMedios } from '@caprichos/compartido';
 import {
   BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES,
   LIMITE_CUERPO_TEXTO,
@@ -57,7 +58,9 @@ export function lineaPromo(o: any): string | null {
   } else if (o.descuentoValor) {
     beneficio = o.descuentoTipo === 'MONTO' ? `${soles(Number(o.descuentoValor))} de descuento` : `${Number(o.descuentoValor)} % de descuento`;
   }
-  return `• ${nombre}${beneficio ? ` — ${beneficio}` : ''}`.slice(0, 90);
+  // Promo por medio de pago: la condición va en la línea («10 % de descuento pagando con Yape»)
+  const condicion = textoCondicionMedios(o?.mediosPago);
+  return `• ${nombre}${beneficio ? ` — ${beneficio}${condicion ? ` ${condicion}` : ''}` : condicion ? ` — ${condicion}` : ''}`.slice(0, 90);
 }
 
 /**

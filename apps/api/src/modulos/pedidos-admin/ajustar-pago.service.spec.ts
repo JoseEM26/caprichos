@@ -77,6 +77,21 @@ describe('AjustarPagoService (cambiar o agregar medios de pago, siempre y sin ap
     await expect(service.ajustar('7', { plan: mixto, pagaCon: 10 }, cajero)).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_INVALIDO' } });
   });
 
+  it('medios apagados en Caja: un medio NUEVO se rechaza (también al repartidor); con su comprobante, o si el pedido ya lo tenía, pasa', async () => {
+    tx.parametro = { findUnique: jest.fn().mockResolvedValue({ valor: { CAJA: { YAPE: false } } }) };
+    tx.voucherPago = { findMany: jest.fn().mockResolvedValue([]) };
+    await expect(service.ajustar('7', { plan: yape }, cajero)).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE', mensaje: 'Yape no está disponible ahora' } });
+    await expect(service.ajustar('7', { plan: yape }, repartidor, undefined, 'REPARTIDOR')).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+    expect(tx.pedido.update).not.toHaveBeenCalled();
+    // ya pagado: el pedido trae el voucher de Yape
+    tx.voucherPago.findMany.mockResolvedValue([{ medio: 'YAPE' }]);
+    await expect(service.ajustar('7', { plan: yape }, cajero)).resolves.toMatchObject({ ok: true });
+    // el efectivo nunca tiene comprobante: apagado sigue rechazándose si es nuevo
+    tx.parametro.findUnique.mockResolvedValue({ valor: { CAJA: { EFECTIVO: false, YAPE: false } } });
+    pedidoActual = pedido({ pago_metodo: 'YAPE', pago_preferido: 'YAPE' });
+    await expect(service.ajustar('7', { plan: [{ medio: 'EFECTIVO', monto: 41 }] }, cajero)).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+  });
+
   it('suma distinta del total, medio inválido, mismo plan o plan vacío: 400', async () => {
     await expect(service.ajustar('7', { plan: [{ medio: 'YAPE', monto: 30 }] }, cajero)).rejects.toMatchObject({ response: { codigo: 'PLAN_PAGO_NO_CUADRA' } });
     await expect(service.ajustar('7', { plan: [{ medio: 'BITCOIN', monto: 41 }] }, cajero)).rejects.toMatchObject({ response: { codigo: 'PLAN_PAGO_MEDIO_INVALIDO' } });

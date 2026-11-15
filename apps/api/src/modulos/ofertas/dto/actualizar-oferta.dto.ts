@@ -106,6 +106,12 @@ export class ActualizarOfertaDto {
   @IsArray()
   canales?: string[] | null;
 
+  /** Medios de pago con los que vale (solo Descuento y Lleva y paga); vacío = cualquier medio */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'PAGO_EN_LINEA'], { each: true, message: 'Medio de pago no válido' })
+  mediosPago?: string[] | null;
+
   /** Tipos de pedido donde vale; vacío = todos */
   @IsOptional()
   @IsArray()

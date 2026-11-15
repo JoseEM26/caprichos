@@ -1,3 +1,4 @@
+import { medioActivo, NOMBRE_MEDIO_PAGO } from '@caprichos/compartido';
 import { Fragment, useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -187,6 +188,8 @@ export function FormularioCheckout({
   const [vistaPago, setVistaPago] = useState<'medios' | 'detalle'>('medios');
   // Ubicación en dos momentos: null = se deduce de lo escrito; 'elegir' = vuelve a las tarjetas
   const [formaUbic, setFormaUbic] = useState<FormaUbicacion | 'elegir' | null>(null);
+  // Medios apagados para la carta (Configuración › Pagos): no se muestran; el servidor además los rechaza
+  const medioOk = (m: MetodoPago) => medioActivo(datosLocal?.mediosPagoCanal, m, 'CARTA');
   const [pagaCon, setPagaCon] = useState('');
   // Pago dividido: 2 o 3 medios; el último renglón lleva lo que falta
   const [dividirPago, setDividirPago] = useState(false);
@@ -203,6 +206,11 @@ export function FormularioCheckout({
   useEffect(() => {
     if (pagaEnLinea && culqiReal) void cargarScriptCulqi().catch(() => {});
   }, [pagaEnLinea, culqiReal]);
+  const primerMedioActivo = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).find(medioOk);
+  useEffect(() => {
+    if (primerMedioActivo && !medioOk(metodoPago)) setMetodoPago(primerMedioActivo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datosLocal?.mediosPagoCanal]);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -217,13 +225,15 @@ export function FormularioCheckout({
     codigo: string;
     descripcion: string;
     descuentoCalculado: number;
+    /** Medios con los que vale el cupón (vacío = cualquiera) */
+    mediosPago?: string[];
     tipo: string;
     valor: number;
     envioGratis?: boolean;
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[]; ahorros: { medio: string; ahorro: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [], ahorros: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   // Solo el equipo con sesión ve la elección contado / crédito del personal (el servidor vuelve a decidirlo)
@@ -305,19 +315,23 @@ export function FormularioCheckout({
   const tieneSesion = Boolean(clienteCuenta);
   const detalleEquipo = promos.detalles.find((d) => d.tipo === 'PERSONAL');
   const pctEquipo = detalleEquipo?.nombre.match(/\((\d+(?:[.,]\d+)?) %\)/)?.[1];
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad]);
+  // Promos por medio de pago («10 % pagando con Yape»): el total se recalcula al elegir el medio (o los dos del pago dividido)
+  // Mientras elige en las tarjetas «¿Cómo pagas?» todavía no hay medio: se avisa lo que ahorraría con cada uno
+  const mediosPromo: string[] = dividirPago ? filasDiv.map((f) => f.medio).filter(Boolean) : vistaPago === 'medios' ? [] : [metodoPago];
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad, mediosPromo]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[]; ahorrosPorMedio?: { medio: string; ahorro: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
         // Las promociones valen según el tipo de pedido: al cambiarlo se recalcula sin perder el carrito
         modalidad,
+        medios: mediosPromo,
       })
-      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
-      .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));
+      .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [], ahorros: Array.isArray(r?.ahorrosPorMedio) ? r.ahorrosPorMedio : [] }))
+      .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [], ahorros: [] }));
     return () => {
       vigente = false;
     };
@@ -395,7 +409,9 @@ export function FormularioCheckout({
         ? `Zona ${zonaEnvio} · envío gratis`
         : textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
       : null;
-  const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  // Cupón por medio de pago: vale solo si todo el pago va con medios de su lista
+  const cuponValeConMedio = !cuponAplicado || (cuponAplicado.mediosPago ?? []).length === 0 || mediosPromo.every((m) => cuponAplicado.mediosPago!.includes(m));
+  const descuentoCupon = cuponAplicado && cuponValeConMedio ? cuponAplicado.descuentoCalculado : 0;
   // Descuentos del servidor (promociones + cupón). El cupón se muestra aparte; lo demás son promociones.
   const descuentosServidor = promos.total > 0 ? promos.total : descuentoCupon;
   const promoMonto = Math.max(0, Math.round((descuentosServidor - descuentoCupon) * 100) / 100);
@@ -609,7 +625,7 @@ export function FormularioCheckout({
     tarjeta: { activo: true },
   };
   const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
-    (m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false,
+    (m) => medioOk(m) && (m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false),
   );
   // Medios con datos para copiar (Yape, Plin, cuenta): el elegido, o los digitales del plan dividido
   const mediosDatos: MetodoPago[] = dividirPago ? filasDiv.map((f) => f.medio) : [metodoPago];
@@ -1947,6 +1963,16 @@ export function FormularioCheckout({
                   {tarjetasPago && (
                     <div style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>¿Cómo pagas?</div>
+                      {promos.ahorros.map((a) => (
+                        <div key={a.medio} data-testid="ahorro-por-medio" role="status" style={{ fontSize: '13px', fontWeight: 700, color: '#92400E' }}>
+                          Ahorras S/ {a.ahorro.toFixed(2)} si pagas con {NOMBRE_MEDIO_PAGO[a.medio as keyof typeof NOMBRE_MEDIO_PAGO] ?? a.medio}
+                        </div>
+                      ))}
+                      {mediosDisponibles.length === 0 && !culqiActivo && (
+                        <div role="status" data-testid="sin-medios-pago" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                          Por ahora no podemos recibir pagos desde la carta. Escríbenos por WhatsApp y te ayudamos.
+                        </div>
+                      )}
                       <TarjetasMedioPago
                         medios={culqiActivo ? [...mediosDisponibles, METODO_CULQI] : mediosDisponibles}
                         seleccionado={null}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CuponItem } from './ofertasApi';
-import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales } from './canalesPromo';
+import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales, mediosPagoDesdeEstado } from './canalesPromo';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 
@@ -68,7 +68,7 @@ export function ModalCupon({
   const [productoBusqueda, setProductoBusqueda] = useState('');
   const [tituloImpreso, setTituloImpreso] = useState('En tu siguiente compra');
   const [validezDias, setValidezDias] = useState(String(validezReglasDefecto));
-  const [canales, setCanales] = useState<CanalesEstado>({ carta: true, local: true, bot: false });
+  const [canales, setCanales] = useState<CanalesEstado>({ carta: true, caja: true, mozo: true, bot: false });
   const [requiereCuenta, setRequiereCuenta] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -102,7 +102,7 @@ export function ModalCupon({
       }
       setTituloImpreso(cuponAEditar.tituloImpreso || 'En tu siguiente compra');
       setValidezDias(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso ? String(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso) : String(validezReglasDefecto));
-      setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false });
+      setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false, medios: cuponAEditar.mediosPago ?? [] });
       setRequiereCuenta(Boolean(cuponAEditar.requiereCuenta));
       setMensajeError('');
       setPestana('datos');
@@ -126,7 +126,7 @@ export function ModalCupon({
       setProducto('');
       setTituloImpreso('En tu siguiente compra');
       setValidezDias(String(validezReglasDefecto));
-      setCanales({ carta: true, local: true, bot: false });
+      setCanales({ carta: true, caja: true, mozo: true, bot: false });
       setRequiereCuenta(false);
       setMensajeError('');
       setPestana('datos');
@@ -145,7 +145,7 @@ export function ModalCupon({
     return null;
   };
   const errorCuando = (): string | null => {
-    if (!canales.carta && !canales.local) return 'Elige al menos un lugar donde aplica: carta web o en el local.';
+    if (!canales.carta && !canales.caja && !canales.mozo) return 'Elige al menos un lugar donde aplica: carta web o en el local.';
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de fin debe ser después de la hora de inicio.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
     return null;
@@ -203,7 +203,8 @@ export function ModalCupon({
         compraMinima: parseFloat(minima) || 0,
         categoriaId: aplica === 'cat' && categoriaObj ? categoriaObj.id : undefined,
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
-        canales: canalesDesdeEstado(canales, 'CAJA'),
+        canales: canalesDesdeEstado(canales),
+        mediosPago: mediosPagoDesdeEstado(canales),
         requiereCuenta,
         diasValidez: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
         topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,

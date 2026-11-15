@@ -1071,7 +1071,11 @@ export function ModalNuevoPedidoMesa({
   // Pedido del personal: el servidor devuelve también su descuento (misma cuenta que al guardar); null = sin confirmar
   const [descuentoPersonal, setDescuentoPersonal] = useState<{ pct: number; monto: number } | null>(null);
   const colaboradorPrevia = pideMode === 'personal' && !extra && !edicion ? staffElegido?.partyId : undefined;
+  // Promos y cupones por medio de pago: el servidor descuenta según los medios del pago (todo el pedido) y avisa lo que ahorraría con otro
+  const mediosDelPago = filasPlan.map((f) => f.medio);
+  const [ahorrosPorMedio, setAhorrosPorMedio] = useState<Array<{ medio: string; ahorro: number }>>([]);
   const claveDescuento = JSON.stringify([
+    mediosDelPago,
     lineas.filter((l) => !l.cortesia).map((l) => [l.productoId, l.cantidad, l.precioTotal, l.ofertaId ?? null]),
     cuponAplicado?.codigo ?? null,
     modalidad,
@@ -1087,7 +1091,8 @@ export function ModalNuevoPedidoMesa({
     }
     let vigente = true;
     const pedir = (colaboradorPartyId?: string | number) =>
-      api.post<{ descuentoTotal: number; montoCanjeable?: number; descuentoPersonal?: { pct: number; monto: number } }>('/admin/ofertas/vista-previa', {
+      api.post<{ descuentoTotal: number; montoCanjeable?: number; descuentoPersonal?: { pct: number; monto: number }; ahorrosPorMedio?: Array<{ medio: string; ahorro: number }> }>('/admin/ofertas/vista-previa', {
+        medios: mediosDelPago,
         canal: edicion?.datos.canal ?? canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
         codigo: cuponAplicado?.codigo,
         // mesa/local = COMER_LOCAL: las promociones valen según el tipo de pedido
@@ -1109,6 +1114,7 @@ export function ModalNuevoPedidoMesa({
         if (!vigente) return;
         setDescuentoServidor(typeof r?.descuentoTotal === 'number' ? Math.round(r.descuentoTotal * 100) / 100 : null);
         setMontoCanjeable(typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null);
+        setAhorrosPorMedio(Array.isArray(r?.ahorrosPorMedio) ? r.ahorrosPorMedio : []);
         const dp = r?.descuentoPersonal;
         setDescuentoPersonal(colaboradorPrevia && dp && typeof dp.monto === 'number' ? { pct: Number(dp.pct), monto: Math.round(dp.monto * 100) / 100 } : null);
       })
@@ -2999,6 +3005,8 @@ export function ModalNuevoPedidoMesa({
           {paso === 'items' && !edicion && fase === 'pago' && (
             <div className="np2-contenedor">
               <PasoPagoPedido
+                canal={canalActual}
+                ahorrosPorMedio={ahorrosPorMedio}
                 total={total}
                 puntosCanje={puntosCanje}
                 aPagar={aPagar}
@@ -3036,6 +3044,7 @@ export function ModalNuevoPedidoMesa({
                     <></>
                   ) : personalPide ? (
                     <PagoPersonalBloque
+                      canal={canalActual}
                       modo={pagoPersonal}
                       onModo={setPagoPersonal}
                       medio={medioPersonal}
