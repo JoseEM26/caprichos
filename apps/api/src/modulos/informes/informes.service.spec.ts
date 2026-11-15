@@ -77,6 +77,7 @@ describe('InformesService', () => {
       },
       categoria: {
         count: jest.fn().mockResolvedValue(7),
+        findMany: jest.fn().mockResolvedValue([{ nombre: 'Frappes' }, { nombre: 'Waffles' }]),
       },
       cierreCaja: {
         count: jest.fn().mockResolvedValue(3),
@@ -365,6 +366,37 @@ describe('InformesService', () => {
       expect(ind.topHistorial.length).toBeGreaterThan(0);
       expect(Array.isArray(ind.promocionesVendidas)).toBe(true);
       expect(Array.isArray(ind.productosDescontados)).toBe(true);
+      expect(ind.categoriasDisponibles).toEqual(['Frappes', 'Waffles']);
+    });
+
+    it('sin filtros no agrega periodo, canal ni tipo de pedido a las consultas', async () => {
+      await service.obtenerIndicadores();
+      const donde = prisma.pedido.count.mock.calls[0][0].where;
+      expect(donde).toEqual({ estado: { notIn: ['RECHAZADO', 'ANULADO'] } });
+      expect(prisma.reclamo.count).toHaveBeenCalledWith(undefined);
+      expect(prisma.pedidoLinea.count.mock.calls[0][0].where).toEqual({ producto: { agotado_hasta: { not: null } } });
+    });
+
+    it('el rango va en hora de Lima y se aplica con canal, tipo de pedido y categoría', async () => {
+      await service.obtenerIndicadores({ desde: '2026-11-14', hasta: '2026-11-14', canal: 'CARTA', modalidad: 'DELIVERY', categoria: 'Waffles' });
+      const esperado = {
+        gte: new Date('2026-11-14T05:00:00.000Z'),
+        lte: new Date('2026-11-15T04:59:59.999Z'),
+      };
+      const donde = prisma.pedido.findMany.mock.calls[0][0].where;
+      expect(donde.creado_en).toEqual(esperado);
+      expect(donde.canal).toBe('CARTA');
+      expect(donde.modalidad).toBe('DELIVERY');
+      expect(prisma.reclamo.count).toHaveBeenCalledWith({ where: { creado_en: esperado } });
+      const lineas = prisma.pedidoLinea.findMany.mock.calls[0][0].where;
+      expect(lineas.producto).toEqual({ categoria: { nombre: 'Waffles' } });
+      expect(lineas.pedido.canal).toBe('CARTA');
+      expect(prisma.producto.count).toHaveBeenCalledWith({ where: { oculto: false, categoria: { nombre: 'Waffles' } } });
+    });
+
+    it('rechaza rangos invertidos o de más de 366 días', async () => {
+      await expect(service.obtenerIndicadores({ desde: '2026-11-14', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.obtenerIndicadores({ desde: '2025-01-01', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_MUY_GRANDE' } });
     });
   });
 

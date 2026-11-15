@@ -1,7 +1,35 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
+import { Cargando } from '../../comun/Cargando';
+import { EstadoError } from '../../comun/EstadoError';
 import { SeccionEncuestas } from './encuestas/SeccionEncuestas';
+import { BarraFiltrosIndicadores, notaNoAplica, textoPeriodo, useFiltrosIndicadores, type ClaveFiltro } from './FiltrosIndicadores';
+
+/** Filtros que usa cada cuadro; los demás se muestran con la nota «No aplica…». */
+const APLICA_META: Record<string, ClaveFiltro[]> = {
+  'Tiempo de entrega': ['periodo', 'canal', 'modalidad'],
+  'Ventas de productos agotados': ['periodo', 'canal', 'modalidad', 'categoria'],
+  'Platos con margen visible': ['categoria'],
+  'Pedidos por carta o chatbot sin reingreso': ['periodo', 'modalidad'],
+  'Rotación de mesas': ['periodo', 'canal'],
+  'Reclamos de delivery': ['periodo'],
+};
+const APLICA_TOP: ClaveFiltro[] = ['periodo', 'canal', 'modalidad', 'categoria'];
+const APLICA_PROMOS: ClaveFiltro[] = ['periodo', 'canal', 'modalidad'];
+const APLICA_ENCUESTAS: ClaveFiltro[] = ['periodo', 'canal', 'modalidad'];
+
+const estiloNota = { fontSize: 12, color: 'var(--cp-soft)', lineHeight: '16px' } as const;
+function Sub({ periodo, nota }: { periodo?: string; nota: string }) {
+  if (!periodo && !nota) return null;
+  return (
+    <div style={estiloNota}>
+      {periodo && <span>Periodo: {periodo}</span>}
+      {periodo && nota ? ' · ' : ''}
+      {nota && <span>{nota}</span>}
+    </div>
+  );
+}
 
 interface IndicadorMeta {
   n: string;
@@ -38,12 +66,28 @@ export function IndicadoresView() {
   const [estrellasActivadas, setEstrellasActivadas] = useState(true);
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(false);
+  const [reintento, setReintento] = useState(0);
+  const { filtros, errorFechas, hoy, cambiar, limpiar, hayFiltros } = useFiltrosIndicadores();
+  const periodo = textoPeriodo(filtros, hoy);
+
+  const { desde, hasta, canal, modalidad, categoria } = filtros;
   useEffect(() => {
+    if (errorFechas) return;
     let montado = true;
+    setCargando(true);
+    setError(false);
+    const q = new URLSearchParams({ desde, hasta });
+    if (canal) q.set('canal', canal);
+    if (modalidad) q.set('modalidad', modalidad);
+    if (categoria) q.set('categoria', categoria);
     api
-      .get<any>('/admin/informes/indicadores')
+      .get<any>(`/admin/informes/indicadores?${q.toString()}`)
       .then((res: any) => {
         if (montado && res) {
+          if (res.categoriasDisponibles) setCategorias(res.categoriasDisponibles);
           if (res.metas) setMetas(res.metas);
           if (res.topActual) setTopActual(res.topActual);
           if (res.topHistorial) setTopHistorial(res.topHistorial);
@@ -51,29 +95,42 @@ export function IndicadoresView() {
           if (res.productosDescontados) setProductosDescontados(res.productosDescontados);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (montado) setError(true);
+      })
+      .finally(() => {
+        if (montado) setCargando(false);
+      });
     return () => {
       montado = false;
     };
-  }, []);
+  }, [desde, hasta, canal, modalidad, categoria, errorFechas, reintento]);
 
   const conmutarEstrellas = () => {
     setEstrellasActivadas(!estrellasActivadas);
     setConfirmarAbierto(false);
   };
 
-  const hoy = new Date();
-  const mesNombre = hoy.toLocaleDateString('es-PE', { month: 'long', timeZone: 'America/Lima' });
-  const anioActual = hoy.toLocaleDateString('es-PE', { year: 'numeric', timeZone: 'America/Lima' });
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <BarraFiltrosIndicadores
+        filtros={filtros}
+        errorFechas={errorFechas}
+        hoy={hoy}
+        categorias={categorias}
+        hayFiltros={hayFiltros}
+        alCambiar={cambiar}
+        alLimpiar={limpiar}
+      />
+      {error && <EstadoError mensaje="No pudimos cargar los indicadores. Revisa tu conexión e inténtalo de nuevo." alReintentar={() => setReintento((n) => n + 1)} />}
+      {!error && cargando && <Cargando mensaje="Cargando indicadores" />}
       {/* Rejilla de Metas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
         {metas.map((g, idx) => (
           <div
             key={idx}
             style={{
+              opacity: cargando ? 0.6 : 1,
               background: 'var(--cp-white)',
               border: '1px solid var(--cp-line)',
               borderRadius: '12px',
@@ -84,6 +141,7 @@ export function IndicadoresView() {
             }}
           >
             <div style={{ fontWeight: 700 }}>{g.n}</div>
+            <Sub periodo={APLICA_META[g.n]?.includes('periodo') ? periodo : undefined} nota={notaNoAplica(APLICA_META[g.n] ?? [], filtros)} />
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '26px', lineHeight: '32px' }}>
               {g.v}
             </div>
@@ -113,7 +171,7 @@ export function IndicadoresView() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px' }}>
-              Más comprado de cada categoría · {mesNombre} de {anioActual} (en curso)
+              Más comprado de cada categoría
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 700 }}>Estrellas en la carta</span>
@@ -137,9 +195,11 @@ export function IndicadoresView() {
             </span>
           </div>
 
+          <Sub periodo={periodo} nota={notaNoAplica(APLICA_TOP, filtros)} />
+
           {topActual.length === 0 ? (
             <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '12px 0' }}>
-              Sin productos registrados este mes.
+              Sin productos registrados en este periodo.
             </div>
           ) : (
             topActual.map((t, idx) => (
@@ -161,7 +221,7 @@ export function IndicadoresView() {
           )}
 
           <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-            Cada categoría (frappes, iced, calientes, waffles, salados, complementos y combos) tiene su propio más comprado, con una estrella en la carta. Se calcula con las ventas del mes; el 1 de cada mes se reinicia solo y el mes que termina pasa al historial.
+            Cada categoría (frappes, iced, calientes, waffles, salados, complementos y combos) tiene su propio más comprado, con una estrella en la carta. Este cuadro sigue los filtros de arriba. El interruptor de estrellas en la carta no: siempre usa los más comprados del mes actual (el 1 de cada mes se reinicia solo y el mes que termina pasa al historial).
           </div>
         </div>
 
@@ -182,6 +242,8 @@ export function IndicadoresView() {
           <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px' }}>
             Historial de más comprados
           </div>
+          <Sub nota={notaNoAplica([], filtros)} />
+          <div style={estiloNota}>Historial mensual fijo.</div>
           {topHistorial.length === 0 ? (
             <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '12px 0' }}>
               Sin historial previo registrado.
@@ -215,15 +277,16 @@ export function IndicadoresView() {
           }}
         >
           <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px' }}>
-            Lo vendido hoy: promociones y productos
+            Promociones y productos vendidos
           </div>
+          <Sub periodo={periodo} nota={notaNoAplica(APLICA_PROMOS, filtros)} />
           <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-            Cada promoción vendida se cuenta como promoción y, dentro de ella, se descuentan sus productos por separado (acta 02). Acepta un pedido en Pedidos y caja para ver cómo suma.
+            Cada promoción vendida se cuenta como promoción y, dentro de ella, se descuentan sus productos por separado (acta 02).
           </div>
 
           {promocionesVendidas.length === 0 ? (
             <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '8px 0' }}>
-              No hay promociones vendidas hoy.
+              No hay promociones vendidas en este periodo.
             </div>
           ) : (
             promocionesVendidas.map((p, idx) => (
@@ -241,7 +304,7 @@ export function IndicadoresView() {
           </div>
           {productosDescontados.length === 0 ? (
             <div style={{ color: 'var(--cp-soft)', fontSize: '13px', padding: '8px 0' }}>
-              No hay productos descontados hoy.
+              No hay productos descontados en este periodo.
             </div>
           ) : (
             productosDescontados.map((p, idx) => (
@@ -255,7 +318,9 @@ export function IndicadoresView() {
       </div>
 
       {/* Encuestas posventa por WhatsApp */}
-      <SeccionEncuestas />
+      <SeccionEncuestas
+        filtros={{ desde, hasta, canal, modalidad, periodo, nota: notaNoAplica(APLICA_ENCUESTAS, filtros) }}
+      />
 
       {/* Confirmación Sí/No */}
       <Confirmar

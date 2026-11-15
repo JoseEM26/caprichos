@@ -29,6 +29,8 @@ export const COLOR_PUNTAJE: Record<number, string> = {
 export const ETIQUETA_MODALIDAD: Record<string, string> = {
   MESA: 'En mesa',
   RECOGER: 'Para recoger',
+  LLEVAR: 'Para llevar',
+  COMER_LOCAL: 'Comer en local',
   DELIVERY: 'Delivery',
 };
 

@@ -148,4 +148,10 @@ describe('EncuestasEstadisticaService', () => {
     expect(r.items).toEqual([]);
     expect(prisma.quejaWhatsapp.findMany).not.toHaveBeenCalled();
   });
+
+  it('filtra por canal y tipo de pedido en el conteo y en la lista', async () => {
+    await service.obtenerEstadisticas({ desde: '2026-10-01', hasta: '2026-10-29', canal: 'WHATSAPP', modalidad: 'DELIVERY' });
+    expect(prisma.encuestaPosventa.count.mock.calls[0][0].where.pedido).toEqual({ modalidad: 'DELIVERY', canal: 'WHATSAPP' });
+    expect(prisma.encuestaPosventa.findMany.mock.calls[0][0].where.pedido).toEqual({ modalidad: 'DELIVERY', canal: 'WHATSAPP' });
+  });
 });

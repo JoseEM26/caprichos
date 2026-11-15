@@ -69,7 +69,8 @@ export class EncuestasEstadisticaService {
     const limite = filtro.limite ?? LIMITE_DEFECTO;
     const modalidad = filtro.modalidad;
     const enviadoEn = { gte: inicioDiaLima(desde), lt: inicioDiaLima(sumarDias(hasta, 1)) };
-    const relacionPedido = modalidad ? { pedido: { modalidad } } : {};
+    const canal = filtro.canal;
+    const relacionPedido = modalidad || canal ? { pedido: { ...(modalidad ? { modalidad } : {}), ...(canal ? { canal } : {}) } } : {};
 
     const whereEnviadas = { enviada_en: enviadoEn, estado: { notIn: ['SIMULADA', 'OMITIDA'] }, ...relacionPedido };
     const whereRespondidas = {
@@ -80,6 +81,7 @@ export class EncuestasEstadisticaService {
     };
     const whereLista = { ...whereRespondidas, puntaje: filtro.puntaje ?? { not: null } };
 
+    const filtroSqlCanal = canal ? Prisma.sql`AND p.canal = ${canal}` : Prisma.empty;
     const filtroSqlModalidad = modalidad ? Prisma.sql`AND p.modalidad = ${modalidad}` : Prisma.empty;
     const filtroSqlRango = Prisma.sql`e.estado = 'RESPONDIDA' AND e.puntaje IS NOT NULL
       AND e.enviada_en >= ${enviadoEn.gte} AND e.enviada_en < ${enviadoEn.lt}`;
@@ -97,7 +99,7 @@ export class EncuestasEstadisticaService {
                AVG(e.puntaje)::float AS promedio
         FROM encuesta_posventa e
         JOIN pedido p ON p.id = e.pedido_id
-        WHERE ${filtroSqlRango} ${filtroSqlModalidad}
+        WHERE ${filtroSqlRango} ${filtroSqlModalidad} ${filtroSqlCanal}
         GROUP BY 1 ORDER BY 1`,
       this.prisma.$queryRaw<FilaModalidad[]>`
         SELECT p.modalidad AS modalidad,
@@ -105,7 +107,7 @@ export class EncuestasEstadisticaService {
                AVG(e.puntaje)::float AS promedio
         FROM encuesta_posventa e
         JOIN pedido p ON p.id = e.pedido_id
-        WHERE ${filtroSqlRango}
+        WHERE ${filtroSqlRango} ${filtroSqlCanal}
         GROUP BY 1`,
       this.prisma.encuestaPosventa.findMany({
         where: whereLista,

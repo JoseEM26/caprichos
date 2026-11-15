@@ -15,6 +15,8 @@ import { EquipoController } from './equipo/equipo.controller';
 import { EquipoService } from './equipo/equipo.service';
 import { AlmacenAnalisisController } from './almacen/almacen.controller';
 import { AlmacenAnalisisService } from './almacen/almacen.service';
+import { ProductosAnalisisController } from './productos/productos.controller';
+import { ProductosAnalisisService } from './productos/productos.service';
 import { ChatbotModule } from '../chatbot';
 import { AsistenciaModule } from '../asistencia';
 import { CierreModule } from '../cierre';
@@ -36,6 +38,7 @@ import { CierreModule } from '../cierre';
     RepartoAnalisisController,
     EquipoController,
     AlmacenAnalisisController,
+    ProductosAnalisisController,
   ],
   providers: [
     TiemposService,
@@ -46,6 +49,7 @@ import { CierreModule } from '../cierre';
     RepartoService,
     EquipoService,
     AlmacenAnalisisService,
+    ProductosAnalisisService,
   ],
 })
 export class AnalisisModule {}

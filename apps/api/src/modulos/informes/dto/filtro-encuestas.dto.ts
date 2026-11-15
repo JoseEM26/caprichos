@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { MODALIDADES_INDICADORES, CANALES_INDICADORES } from './filtro-indicadores.dto';
 import { IsIn, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,8 +21,12 @@ export class FiltroEncuestasDto {
   puntaje?: number;
 
   @IsOptional()
-  @IsIn(['MESA', 'RECOGER', 'DELIVERY'])
+  @IsIn(MODALIDADES_INDICADORES)
   modalidad?: string;
+
+  @IsOptional()
+  @IsIn(CANALES_INDICADORES)
+  canal?: string;
 
   @IsOptional()
   @Type(() => Number)

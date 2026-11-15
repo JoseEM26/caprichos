@@ -5,6 +5,7 @@ import { inicioDiaLimaIso, finDiaLimaIso, horaLimaEntera, pedidoVivoDeHoy } from
 import { COORDENADAS_LOCAL_DEFAULT, DATOS_LOCAL_DEFAULT } from '../local/local.service';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
+import { FiltroIndicadoresDto, rangoIndicadores } from './dto/filtro-indicadores.dto';
 import {
   IndicadoresData,
   MapaEntregasData,
@@ -1336,13 +1337,27 @@ export class InformesService {
    * Metas, más vendidos por categoría y promociones para «Indicadores»
    * Todo calculado con datos reales de la base de datos.
    */
-  async obtenerIndicadores(): Promise<IndicadoresData> {
+  async obtenerIndicadores(filtro: FiltroIndicadoresDto = {}): Promise<IndicadoresData> {
+    const rango = rangoIndicadores(filtro);
+    const { canal, modalidad, categoria } = filtro;
+    const enRango = rango ? { gte: rango.inicio, lte: rango.fin } : undefined;
+    // Pedidos vivos del periodo, canal y tipo de pedido elegidos (sin filtros = todos, como siempre)
+    const dePedido = (extra: Record<string, unknown> = {}) => ({
+      estado: { notIn: ['RECHAZADO', 'ANULADO'] },
+      ...(enRango && { creado_en: enRango }),
+      ...(canal && { canal }),
+      ...(modalidad && { modalidad }),
+      ...extra,
+    });
+    const hayFiltroPedido = !!(enRango || canal || modalidad);
+    const deCategoria = categoria ? { categoria: { nombre: categoria } } : {};
+
     // 1. Cálculo real de entrega promedio
     const pedidosEntregados = await this.prisma.pedido.findMany({
       where: {
         confirmado_en: { not: null },
         OR: [{ entregado_en: { not: null } }, { despachado_en: { not: null } }],
-        estado: { notIn: ['RECHAZADO', 'ANULADO'] },
+        ...dePedido(),
       },
       select: { confirmado_en: true, entregado_en: true, despachado_en: true },
     });
@@ -1356,30 +1371,31 @@ export class InformesService {
 
     // 2. Ventas de productos agotados
     const lineasAgotadas = await this.prisma.pedidoLinea.count({
-      where: { producto: { agotado_hasta: { not: null } } },
+      where: {
+        producto: { agotado_hasta: { not: null }, ...deCategoria },
+        ...(hayFiltroPedido && { pedido: dePedido() }),
+      },
     });
 
     // 3. Platos con receta y margen visible
-    const totalProductos = await this.prisma.producto.count({ where: { oculto: false } });
-    const conReceta = await this.prisma.receta.count();
+    const totalProductos = await this.prisma.producto.count({ where: { oculto: false, ...deCategoria } });
+    const conReceta = await this.prisma.receta.count(categoria ? { where: { producto: deCategoria } } : undefined);
 
     // 4. Reclamos de delivery y pedidos por canal
-    const reclamosCount = await this.prisma.reclamo.count();
+    const reclamosCount = await this.prisma.reclamo.count(enRango ? { where: { creado_en: enRango } } : undefined);
+    // El canal no se aplica aquí: este cuadro ya compara los canales digitales contra el total
     const totalPedidosValidos = await this.prisma.pedido.count({
-      where: { estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+      where: dePedido({ canal: undefined }),
     });
     const pedidosDigitales = await this.prisma.pedido.count({
-      where: {
-        canal: { in: ['CARTA', 'WHATSAPP', 'WEB'] },
-        estado: { notIn: ['RECHAZADO', 'ANULADO'] },
-      },
+      where: dePedido({ canal: { in: ['CARTA', 'WHATSAPP', 'WEB'] } }),
     });
     const pctDigital = totalPedidosValidos > 0 ? Math.round((pedidosDigitales / totalPedidosValidos) * 100) : 0;
 
     // 5. Rotación de mesas
     const totalMesas = await this.prisma.elementoPlano.count({ where: { tipo: 'MESA', activo: true } });
     const pedidosSalon = await this.prisma.pedido.count({
-      where: { modalidad: 'LOCAL', estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+      where: dePedido({ modalidad: { in: ['MESA', 'COMER_LOCAL'] } }),
     });
     const rotacionMesas = totalMesas > 0 ? (pedidosSalon / totalMesas).toFixed(1) : '0';
 
@@ -1436,7 +1452,7 @@ export class InformesService {
 
     // Ranking actual por categoría y producto (desde líneas de pedidos no anulados)
     const lineas = await this.prisma.pedidoLinea.findMany({
-      where: { es_cortesia: false, pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
+      where: { es_cortesia: false, pedido: dePedido(), ...(categoria && { producto: deCategoria }) },
       include: { producto: { include: { categoria: true } } },
     });
 
@@ -1483,7 +1499,7 @@ export class InformesService {
     const combosVendidos = await this.prisma.pedidoLinea.findMany({
       where: {
         OR: [{ oferta_id: { not: null } }, { linea_combo_id: { not: null } }],
-        pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+        pedido: dePedido(),
       },
       take: 10,
     });
@@ -1501,7 +1517,12 @@ export class InformesService {
     // 8. Productos con descuento aplicado
     const productosDescontados: { nombre: string; unidades: string }[] = [];
 
+    const categoriasDisponibles = (
+      await this.prisma.categoria.findMany({ where: { oculta: false }, orderBy: { orden: 'asc' }, select: { nombre: true } })
+    ).map((c) => c.nombre);
+
     return {
+      categoriasDisponibles,
       metas,
       topActual,
       topHistorial,

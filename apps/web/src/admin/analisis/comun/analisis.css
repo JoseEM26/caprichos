@@ -108,3 +108,11 @@ button.an-barras__fila { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) { .an-esqueleto { animation: none; } }
 @media (max-width: 480px) { .an-kpi__valor { font-size: 22px; } }
+
+/* Productos */
+.an-tabla { overflow-x: auto; max-width: 100%; }
+.an-tabla table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.an-tabla th, .an-tabla td { text-align: left; padding: 8px; border-bottom: 1px solid var(--cp-line); font-variant-numeric: tabular-nums; vertical-align: top; }
+.an-tabla .an-num { text-align: right; white-space: nowrap; }
+.an-fila-boton { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; font-weight: 800; color: var(--cp-navy); min-height: 44px; text-align: left; }
+.an-herramientas { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
