@@ -1,4 +1,4 @@
-import { detallarVentasTurno, idsDePersonas, CobroConDetalle } from './ventas-turno.util';
+import { detallarVentasTurno, idsDePersonas, serviciosLibresDelTurno, CobroConDetalle } from './ventas-turno.util';
 
 const cobro = (o: Partial<CobroConDetalle> & { pedido?: CobroConDetalle['pedido'] } = {}): CobroConDetalle => ({
   pedido_id: 5n,
@@ -72,5 +72,34 @@ describe('detallarVentasTurno', () => {
 
   it('pide los nombres de cobrador, repartidor y mozo (solo si es canal de la casa)', () => {
     expect(idsDePersonas([cobro()]).map(String).sort()).toEqual(['11', '12', '13']);
+  });
+});
+
+describe('serviciosLibresDelTurno (Servicios y productos libres del cierre)', () => {
+  const conCargo = (anulado: Date | null, monto: number, en: Date) =>
+    cobro({
+      anulado_en: anulado,
+      pedido: {
+        codigo: 'P-1',
+        lineas: [
+          { producto: null, cargo_libre: false, nombre: 'Brownie', subtotal: 12 },
+          { producto: null, cargo_libre: true, nombre: 'Texto Feliz cumple Ana', subtotal: monto, cargo_libre_por: 7n, cargo_libre_en: en },
+        ],
+      },
+    });
+
+  it('lista cada cargo con pedido, medios y quién lo agregó, y suma el total al céntimo', () => {
+    const r = serviciosLibresDelTurno([conCargo(null, 3.1, new Date('2027-03-09T15:00:00Z')), conCargo(null, 0.2, new Date('2027-03-09T16:00:00Z'))], new Map([['7', 'Rosa Mozo']]));
+    expect(r.lista).toHaveLength(2);
+    expect(r.lista[0]).toMatchObject({ pedidoCodigo: 'P-1', descripcion: 'Texto Feliz cumple Ana', monto: 3.1, medios: ['EFECTIVO', 'YAPE'], agregadoPor: 'Rosa Mozo' });
+    expect(r.total).toBe(3.3);
+  });
+
+  it('un cobro anulado no cuenta', () => {
+    expect(serviciosLibresDelTurno([conCargo(new Date(), 5, new Date())], new Map())).toEqual({ lista: [], total: 0 });
+  });
+
+  it('idsDePersonas incluye a quien agregó el cargo', () => {
+    expect(idsDePersonas([conCargo(null, 5, new Date())])).toContain(7n);
   });
 });

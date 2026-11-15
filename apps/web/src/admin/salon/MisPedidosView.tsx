@@ -1,3 +1,4 @@
+import type { CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import { useSesion } from '../../comun/sesion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
@@ -162,6 +163,7 @@ export function MisPedidosView() {
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
   const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
+  const [cargoExtra, setCargoExtra] = useState<CargoLibreDatos | undefined>(undefined);
   const [anularDe, setAnularDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
@@ -678,8 +680,9 @@ export function MisPedidosView() {
           }
           alCerrar={() => setDetalleId(null)}
           alCambio={() => void cargar()}
-          alExtra={() => {
+          alExtra={(cargo) => {
             setDetalleId(null);
+            setCargoExtra(cargo);
             setExtraDe(detalle);
           }}
           alAnular={() => {
@@ -708,7 +711,8 @@ export function MisPedidosView() {
           canal="MOZO"
           pisos={pisos}
           extra={{ id: extraDe.id, codigo: extraDe.codigo, modalidad: extraDe.modalidad, mesa_nombre: extraDe.mesaNombre, cliente_nombre: extraDe.clienteNombre }}
-          alCerrar={() => setExtraDe(null)}
+          cargoInicial={cargoExtra}
+          alCerrar={() => { setExtraDe(null); setCargoExtra(undefined); }}
           alExitoPedido={() => void cargar()}
         />
       )}

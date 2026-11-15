@@ -20,6 +20,7 @@ import { GuiaRevision } from './GuiaRevision';
 import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
+import { ServiciosLibresCierre } from './ServiciosLibresCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -891,6 +892,9 @@ export function CierreView() {
 
               {/* Ventas del turno: una fila por venta cobrada, en tabla o tarjetas (solo muestra, no calcula) */}
               {esperado && <VentasTurno cobrados={pedidosCobrados} ventas={esperado.ventas} fecha={fechaTurno} />}
+
+              {/* Servicios y productos libres del turno: de dónde salió ese dinero (ya está dentro de los cobros) */}
+              {esperado && <ServiciosLibresCierre datos={esperado.serviciosLibres} />}
 
               {/* Movimientos de caja */}
               <div

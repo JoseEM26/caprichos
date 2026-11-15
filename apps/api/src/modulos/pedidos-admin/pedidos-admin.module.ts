@@ -32,6 +32,7 @@ import { OfertasModule } from '../ofertas/ofertas.module';
 import { EditarPedidoService } from './editar-pedido.service';
 import { EditarPedidoController } from './editar-pedido.controller';
 import { PedidoExtraService } from './pedido-extra.service';
+import { CargoLibreService } from './cargo-libre.service';
 import { CorregirClienteService } from './corregir-cliente.service';
 import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { LineaTiempoService } from './linea-tiempo.service';
@@ -63,6 +64,7 @@ import { PedidosProgramadosTarea } from './pedidos-programados.tarea';
     AjustarPagoService,
     EditarPedidoService,
     PedidoExtraService,
+    CargoLibreService,
     PedidosProgramadosService,
     PedidosProgramadosTarea,
     // Sin estado ni dependencias; PedidosModule no lo exporta

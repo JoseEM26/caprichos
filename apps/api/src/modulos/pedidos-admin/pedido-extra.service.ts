@@ -8,6 +8,7 @@ import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
+import { puedeCargoLibre } from '../pedidos/cargo-libre';
 import { ExtraPedidoDto } from './dto/extra-pedido.dto';
 
 /** Un pedido anulado o rechazado ya no admite extras; entregado o pagado sí. */
@@ -63,7 +64,8 @@ export class PedidoExtraService {
               lng: original.entrega_lng != null ? Number(original.entrega_lng) : undefined,
             }
           : undefined,
-      lineas: dto.lineas,
+      lineas: dto.lineas ?? [],
+      cargosLibres: dto.cargosLibres,
       pago: dto.pago,
       comprobante: dto.comprobante,
       nota: dto.nota,
@@ -77,6 +79,7 @@ export class PedidoExtraService {
       canal: usuario && esSoloMozo(usuario) ? 'MOZO' : 'CAJA',
       usuarioPartyId: usuario?.partyId,
       omitirChequeoCarta: true,
+      puedeCargoLibre: puedeCargoLibre(usuario),
       pedidoOrigenId: raiz.id,
       mesaNombre: original.mesa_nombre ?? undefined,
     });

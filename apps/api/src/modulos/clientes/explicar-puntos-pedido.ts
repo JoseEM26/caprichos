@@ -39,6 +39,7 @@ export interface PedidoParaPuntos {
     cantidad: number;
     oferta_id?: unknown;
     es_cortesia?: boolean | null;
+    cargo_libre?: boolean | null;
     linea_combo_id?: unknown;
     producto?: { no_suma_beneficios?: boolean | null } | null;
   }[];
@@ -81,7 +82,8 @@ export function explicarPuntosPedido(pedido: PedidoParaPuntos, ctx: ContextoPunt
   const lineas = pedido.lineas.map((l) => ({
     productoId: l.producto_id ?? `linea-${l.id}`,
     subtotal: Number(l.subtotal ?? Number(l.precio_unit ?? 0) * l.cantidad),
-    noSumaBeneficios: (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia === true,
+    // «Servicio o producto» libre: suma puntos como cualquier venta (sin producto no hay marca «no suma»)
+    noSumaBeneficios: l.cargo_libre === true ? false : (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia === true,
     enPromocion: l.oferta_id != null || l.linea_combo_id != null,
   }));
   const elegible = montoElegiblePuntos(lineas, (pedido.descuento_detalle as any) ?? []);

@@ -211,3 +211,10 @@ describe('Planilla y asistencia obligatoria', () => {
     for (const r of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'SUPERVISOR']) expect(MATRIZ[r]).toContain('asistencia/marcar');
   });
 });
+
+describe("pedidos/cargo_libre (Servicio o producto libre)", () => {
+  it("lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO; nadie mas", () => {
+    for (const r of ["ADMIN", "SUPERVISOR", "CAJERO", "MOZO"]) expect(MATRIZ[r]).toContain("pedidos/cargo_libre");
+    for (const r of ["COCINA", "ALMACEN", "REPARTIDOR"]) expect(MATRIZ[r]).not.toContain("pedidos/cargo_libre");
+  });
+});

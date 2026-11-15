@@ -1,14 +1,21 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { ComprobantePedidoDto, LineaPedidoDto, PagoPedidoDto } from '../../pedidos/dto/crear-pedido.dto';
+import { ArrayMaxSize, IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { CargoLibreDto, ComprobantePedidoDto, LineaPedidoDto, PagoPedidoDto } from '../../pedidos/dto/crear-pedido.dto';
 
 /** «Agregar extra»: solo productos, pago y comprobante propios; cliente, modalidad, mesa y dirección salen del pedido original. */
 export class ExtraPedidoDto {
+  /** Puede ir vacía si el extra es solo un servicio o producto libre (cargosLibres). */
   @IsArray({ message: 'Las líneas del extra son requeridas' })
-  @ArrayMinSize(1, { message: 'El extra debe tener al menos un producto' })
   @ValidateNested({ each: true })
   @Type(() => LineaPedidoDto)
   lineas!: LineaPedidoDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => CargoLibreDto)
+  cargosLibres?: CargoLibreDto[];
 
   @ValidateNested()
   @Type(() => PagoPedidoDto)

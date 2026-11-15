@@ -388,6 +388,8 @@ export class PedidosEstadoService {
       todos.flatMap((p) => [
         ...(CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? [p.party_id] : []),
         ...(p.cobros?.[0]?.cobrado_por != null ? [p.cobros[0].cobrado_por] : []),
+        // «Servicio o producto» libre: quién lo agregó
+        ...p.lineas.filter((l: any) => l.cargo_libre && l.cargo_libre_por != null).map((l: any) => l.cargo_libre_por as bigint),
       ]),
     );
 
@@ -408,6 +410,9 @@ export class PedidosEstadoService {
 
       return {
         ...p,
+        lineas: p.lineas.map((l: any) =>
+          l.cargo_libre ? { ...l, cargoLibre: true, agregadoPor: l.cargo_libre_por != null ? (nombres.get(String(l.cargo_libre_por)) ?? null) : null, agregadoEn: l.cargo_libre_en } : l,
+        ),
         mediosPago: sinCobro ? mediosElegidos : mediosCobro,
         mediosPagoPendiente: sinCobro && mediosElegidos.length > 0,
         atendidoPorNombre:
@@ -624,6 +629,10 @@ export class PedidosEstadoService {
             subtotal: true,
             // Cortesía: la línea sale a S/ 0; su valor de lista se muestra aparte
             es_cortesia: true,
+            // «Servicio o producto» libre: quién lo agregó y cuándo
+            cargo_libre: true,
+            cargo_libre_por: true,
+            cargo_libre_en: true,
             cortesia: { select: { valor_lista: true } },
             opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
             // Producto por sabor: reparto de las unidades entre sabores
@@ -663,7 +672,7 @@ export class PedidosEstadoService {
           _count: { _all: true },
         })
       : [];
-    const idsMozo = [...new Set([...pedidos.map((p) => p.party_id), ...conteoMozos.map((c) => c.party_id)].filter((i): i is bigint => i != null))];
+    const idsMozo = [...new Set([...pedidos.map((p) => p.party_id), ...conteoMozos.map((c) => c.party_id), ...pedidos.flatMap((p) => p.lineas.map((l) => l.cargo_libre_por))].filter((i): i is bigint => i != null))];
     const personas = idsMozo.length
       ? await this.prisma.person
           .findMany({ where: { party_id: { in: idsMozo } }, select: { party_id: true, nombres: true, apellidos: true } })
@@ -751,6 +760,8 @@ export class PedidosEstadoService {
           subtotal: l.subtotal != null ? Number(l.subtotal) : null,
           // Solo en las cortesías: el resto de las líneas conserva su forma
           ...(l.es_cortesia ? { esCortesia: true, valorLista: l.cortesia ? Number(l.cortesia.valor_lista) : null } : {}),
+          // «Servicio o producto» libre: etiqueta destacada con quién y a qué hora
+          ...(l.cargo_libre ? { cargoLibre: true, agregadoPor: l.cargo_libre_por != null ? nombreMozo.get(String(l.cargo_libre_por)) || null : null, agregadoEn: l.cargo_libre_en } : {}),
           // Cocina ya tiene todas las unidades de la línea listas (listas = cantidad)
           lista: l.listas >= l.cantidad,
         })),
@@ -1043,6 +1054,9 @@ export class PedidosEstadoService {
       const nombre = reg?.party_id ? (await nombresDePartes(this.prisma, [reg.party_id]).catch(() => new Map<string, string>())).get(String(reg.party_id)) ?? null : null;
       canjePuntos = { puntos: Number(pedido.puntos_canjeados), aplicadoPor: nombre };
     }
+    // «Servicio o producto» libre: quién lo agregó (una consulta solo si hay)
+    const porCargo = pedido.lineas.filter((l: any) => l.cargo_libre && l.cargo_libre_por != null).map((l: any) => l.cargo_libre_por);
+    const nombresCargo = porCargo.length ? await nombresDePartes(this.prisma, porCargo).catch(() => new Map<string, string>()) : new Map<string, string>();
     // Solo con el control de almacén encendido y consumo registrado; si no, la respuesta no cambia
     const tieneConsumoAlmacen = (await this.consumoAlmacen?.tieneConsumo(pedido.id)) === true;
     return {
@@ -1050,7 +1064,13 @@ export class PedidosEstadoService {
       ...(tieneConsumoAlmacen ? { tieneConsumoAlmacen: true } : {}),
       canjePuntos,
       ajustePago,
-      lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
+      lineas: pedido.lineas.map((l: any) =>
+        l.es_cortesia
+          ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia }
+          : l.cargo_libre
+            ? { ...l, cargoLibre: true, agregadoPor: nombresCargo.get(String(l.cargo_libre_por)) ?? null, agregadoEn: l.cargo_libre_en }
+            : l,
+      ),
       eventos: eventosPedido,
       ...resumenExtras(pedido),
       ajusteUbicacionPendiente,

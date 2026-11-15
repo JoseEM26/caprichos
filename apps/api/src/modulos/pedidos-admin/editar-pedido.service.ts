@@ -136,7 +136,7 @@ export class EditarPedidoService {
     if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     this.exigirEditable(pedido, pedido.cobros.length > 0);
 
-    const filas: LineaDb[] = pedido.lineas.filter((l: LineaDb) => l.linea_combo_id == null);
+    const filas: LineaDb[] = pedido.lineas.filter((l: LineaDb) => l.linea_combo_id == null && !l.cargo_libre);
     const productos = await this.productosPorIds(filas.map((l) => l.producto_id).filter(Boolean));
     const vouchers = await this.prisma.voucherPago.count({ where: { pedido_id: id, reemplazado_en: null } });
     const actual = this.editando.get(String(id));
@@ -164,6 +164,8 @@ export class EditarPedidoService {
       envio: pedido.envio != null ? Number(pedido.envio) : null,
       total: Number(pedido.total),
       propina: Number(pedido.propina ?? 0),
+      // «Servicio o producto» libre: no se edita aquí (no va en `lineas`), pero cuenta en subtotal y total
+      cargosLibres: pedido.lineas.filter((l: LineaDb) => l.cargo_libre).map((l: LineaDb) => ({ descripcion: l.nombre, monto: Number(l.subtotal ?? l.precio_unit) })),
       tieneVoucher: vouchers > 0,
       editandoPor: otro ? { partyId: otro.partyId, nombre: otro.nombre } : null,
       lineas: filas.map((l) => {
@@ -316,7 +318,7 @@ export class EditarPedidoService {
     this.exigirEditable(pedido, pedido.cobros.length > 0);
 
     // 1. Qué líneas se quedan, cuáles se quitan y cuáles son nuevas
-    const filas: LineaDb[] = pedido.lineas.filter((l: LineaDb) => l.linea_combo_id == null);
+    const filas: LineaDb[] = pedido.lineas.filter((l: LineaDb) => l.linea_combo_id == null && !l.cargo_libre);
     const porId = new Map<string, LineaDb>(filas.map((f) => [String(f.id), f]));
     const anfitriones = await this.anfitrionesDeCombos(filas);
     const productos = await this.productosPorIds([
@@ -351,6 +353,8 @@ export class EditarPedidoService {
       ? await this.pedidos.calcularLineasPedido(nuevasDto, clienteNombre, { canal: pedido.canal as any }, pedido.modalidad)
       : { lineasCalculadas: [] as any[], subtotalCalculado: 0 };
     const lineasNuevas = calculo.lineasCalculadas;
+    // Los cargos libres no se editan aquí: se quedan, no llevan descuento y no cuentan para el mínimo ni el envío
+    const cargosLibres = redondear(pedido.lineas.filter((l: LineaDb) => l.cargo_libre).reduce((a: number, l: LineaDb) => a + Number(l.subtotal ?? l.precio_unit), 0));
     const subtotal = redondear(
       [...mantenidas.values()].reduce((a, f) => a + Number(f.subtotal ?? Number(f.precio_unit) * f.cantidad), 0) + calculo.subtotalCalculado,
     );
@@ -386,7 +390,8 @@ export class EditarPedidoService {
 
     // 4. Modalidad, entrega y envío
     const entregaNueva = await this.resolverEntrega(pedido, dto, subtotal);
-    const total = redondear(Math.max(0, subtotal - descuento + (entregaNueva.envio ?? 0)));
+    const subtotalConCargos = redondear(subtotal + cargosLibres);
+    const total = redondear(Math.max(0, subtotalConCargos - descuento + (entregaNueva.envio ?? 0)));
 
     // 5. Datos del cliente
     let telefono: string | null = tieneTelefonoReal(pedido.cliente_telefono) ? pedido.cliente_telefono : null;
@@ -467,7 +472,7 @@ export class EditarPedidoService {
           entrega_lng: entregaNueva.lng != null ? new Prisma.Decimal(entregaNueva.lng) : null,
           entrega_origen: entregaNueva.origen,
           zona_id: entregaNueva.zonaId,
-          subtotal: new Prisma.Decimal(subtotal),
+          subtotal: new Prisma.Decimal(subtotalConCargos),
           descuento: new Prisma.Decimal(descuento),
           envio: entregaNueva.envio !== null ? new Prisma.Decimal(entregaNueva.envio) : null,
           total: new Prisma.Decimal(total),
@@ -488,7 +493,7 @@ export class EditarPedidoService {
           entidad: 'pedido',
           entidadId: id,
           antes: { version: pedido.version, subtotal: Number(pedido.subtotal), descuento: Number(pedido.descuento), envio: pedido.envio != null ? Number(pedido.envio) : null, total: Number(pedido.total), plan: planViejo },
-          despues: { version: actualizado.version, subtotal, descuento, envio: entregaNueva.envio, total, plan: planNuevo, cambios: cambios.detalle, resumen: cambios.resumen },
+          despues: { version: actualizado.version, subtotal: subtotalConCargos, descuento, envio: entregaNueva.envio, total, plan: planNuevo, cambios: cambios.detalle, resumen: cambios.resumen },
           partyId: usuario.partyId,
           ip,
         },
@@ -529,7 +534,7 @@ export class EditarPedidoService {
       codigo: pedido.codigo,
       version: resultado.actualizado.version,
       estado: resultado.estadoNuevo,
-      subtotal,
+      subtotal: subtotalConCargos,
       descuento,
       envio: entregaNueva.envio,
       total,
