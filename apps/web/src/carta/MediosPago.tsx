@@ -8,6 +8,8 @@ export const MEDIOS_PAGO: (OpcionTarjeta & { id: MetodoPago })[] = [
   { id: 'EFECTIVO', nombre: 'Efectivo', linea: 'Contra entrega', icono: iconos.efectivo },
   { id: 'TARJETA', nombre: 'Tarjeta', linea: 'Débito o crédito al recibir', icono: iconos.tarjeta },
   { id: 'TRANSFERENCIA', nombre: 'Transferencia', linea: 'Desde tu banco', icono: iconos.transferencia },
+  // Solo la carta la ofrece, y solo si Configuración enciende el pago en línea (Culqi)
+  { id: 'CULQI', nombre: 'Tarjeta / Yape en línea', linea: 'Pagas ahora, sin recargo', icono: iconos.tarjeta },
 ];
 
 export const nombreMedio = (m: string) => MEDIOS_PAGO.find((x) => x.id === m)?.nombre ?? m;

@@ -30,6 +30,8 @@ import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
 import { armarPlanCarta, medioPrincipalCarta, type FilaDiv } from './pagoDividido';
 import { PagoDivididoCarta } from './PagoDivididoCarta';
+import { culqiApi, METODO_CULQI } from './pagos/culqiApi';
+import { AVISO_PAGO_EN_LINEA } from './pagos/PagarEnLinea';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -188,6 +190,12 @@ export function FormularioCheckout({
   // Pago dividido: 2 o 3 medios; el último renglón lleva lo que falta
   const [dividirPago, setDividirPago] = useState(false);
   const [filasDiv, setFilasDiv] = useState<FilaDiv[]>([]);
+  const [culqiActivo, setCulqiActivo] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    culqiApi.config().then((c) => vivo && setCulqiActivo(Boolean(c.activo))).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -911,6 +919,8 @@ export function FormularioCheckout({
       cerrarCheckout();
       void cuentaCtx?.refrescar();
       guardarPedido({
+        id: respuesta.id,
+        enLinea: metodoPago === METODO_CULQI,
         codigo: respuesta.codigo,
         token: respuesta.seguimientoToken,
         modalidad,
@@ -1928,7 +1938,7 @@ export function FormularioCheckout({
                     <div style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>¿Cómo pagas?</div>
                       <TarjetasMedioPago
-                        medios={mediosDisponibles}
+                        medios={culqiActivo ? [...mediosDisponibles, METODO_CULQI] : mediosDisponibles}
                         seleccionado={null}
                         alElegir={(m) => {
                           setDividirPago(false);
@@ -2057,6 +2067,12 @@ export function FormularioCheckout({
 
                       </Fragment>
                     ))}
+
+                    {metodoPago === METODO_CULQI && !dividirPago && (
+                      <div data-testid="aviso-culqi" style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Pagas el total ahora, sin recargo, con tarjeta o Yape. {AVISO_PAGO_EN_LINEA}
+                      </div>
+                    )}
 
                     {metodoPago === 'TARJETA' && (
                       <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>

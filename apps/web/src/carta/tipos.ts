@@ -194,7 +194,7 @@ export interface LineaCarrito {
 
 export type ModalidadEntrega = 'DELIVERY' | 'RECOGER' | 'COMER_LOCAL';
 export type TipoComprobante = 'SIMPLE' | 'BOLETA' | 'FACTURA';
-export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA' | 'CULQI';
 
 export interface DatosClienteFormulario {
   nombre: string;
