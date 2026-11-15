@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type DragEvent } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
 import { api } from '../../comun/api';
 import { subirImagenAlServidor } from '../../comun/subidaImagen';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
@@ -7,6 +7,8 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { normalizarUrlArchivo } from './paletas-constantes';
+import { CirculoItem, FotoItem, HojaAcciones, ModalTexto, type AccionHoja } from './DestacadasPiezas';
+import './destacadas.css';
 
 interface FotoDestacada {
   id: string;
@@ -150,6 +152,15 @@ export function DestacadasView() {
   // Diálogo único de confirmación Sí / No igual que ask() en Admin.dc.html
   const [confirmacion, setConfirmacion] = useState<ConfirmacionActiva | null>(null);
   const [guardandoAccion, setGuardandoAccion] = useState(false);
+
+  // Hoja de acciones (pulsación larga o «⋯») y modales de edición. Siempre sobre la destacada seleccionada.
+  const [hoja, setHoja] = useState<{ tipo: 'circulo' } | { tipo: 'foto'; idx: number } | null>(null);
+  const [edicion, setEdicion] = useState<{ tipo: 'nombre' } | { tipo: 'pie'; idx: number } | null>(null);
+  const portadaInputRef = useRef<HTMLInputElement>(null);
+  const reemplazoInputRef = useRef<HTMLInputElement>(null);
+  const reemplazoIdx = useRef(0);
+  // Arrastrar con el ratón solo en PC: en pantalla táctil chocaría con la pulsación larga.
+  const [puedeArrastrar] = useState(() => window.matchMedia?.('(pointer: fine)').matches ?? true);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -610,13 +621,13 @@ export function DestacadasView() {
   };
 
   // --- Visor de destacadas (hlvOpen / hlvStep / hlvAuto de Admin.dc.html) ---
-  const abrirVisor = (id?: string) => {
+  const abrirVisor = (id?: string, idx = 0) => {
     const h = destacadas.find((x) => x.id === id);
     if (!h || h.fotos.length === 0) {
       setMensaje('Ese círculo todavía no tiene imágenes: agrégalas para poder verlo.');
       return;
     }
-    setVisor({ id: h.id, i: 0, play: false });
+    setVisor({ id: h.id, i: Math.min(idx, h.fotos.length - 1), play: false });
     setMensaje(null);
   };
 
@@ -659,453 +670,133 @@ export function DestacadasView() {
   if (cargando) return <Cargando mensaje="Cargando destacadas de la carta..." />;
   if (error) return <EstadoError mensaje={error} alReintentar={cargarDatos} />;
 
+  // --- Hojas de acciones: cada acción cierra la hoja y luego actúa ---
+  const elegir = (fn: () => void) => () => {
+    setHoja(null);
+    fn();
+  };
+  const abrirMenuCirculo = (id: string) => {
+    setSelId(id);
+    setHoja({ tipo: 'circulo' });
+  };
+  const accionesCirculo: AccionHoja[] = seleccionada
+    ? [
+        { id: 'configurar', icono: '✎', etiqueta: 'Configurar (editar el nombre)', alElegir: elegir(() => setEdicion({ tipo: 'nombre' })) },
+        { id: 'portada', icono: '▣', etiqueta: seleccionada.portada_url ? 'Cambiar portada' : 'Subir portada', alElegir: elegir(() => portadaInputRef.current?.click()) },
+        ...(seleccionada.portada_url
+          ? [{ id: 'sin-portada', icono: '▢', etiqueta: 'Quitar portada', alElegir: elegir(quitarPortada) }]
+          : []),
+        { id: 'ver', icono: '▶', etiqueta: 'Ver como cliente', alElegir: elegir(() => abrirVisor(seleccionada.id)) },
+        { id: 'activar', icono: '◐', etiqueta: seleccionada.activo === false ? 'Activar' : 'Desactivar', alElegir: elegir(toggleActiva) },
+        { id: 'antes', icono: '←', etiqueta: 'Mover a la izquierda', alElegir: elegir(() => moverCirculo(-1)) },
+        { id: 'despues', icono: '→', etiqueta: 'Mover a la derecha', alElegir: elegir(() => moverCirculo(1)) },
+        { id: 'duplicar', icono: '⧉', etiqueta: 'Duplicar', alElegir: elegir(duplicarSeleccionada) },
+        { id: 'vaciar', icono: '∅', etiqueta: 'Quitar todas las imágenes', deshabilitada: seleccionada.fotos.length === 0, alElegir: elegir(quitarTodasLasImagenes) },
+        { id: 'archivar', icono: '▤', etiqueta: 'Archivar', alElegir: elegir(archivarSeleccionada) },
+        { id: 'eliminar', icono: '✕', etiqueta: 'Eliminar', peligro: true, alElegir: elegir(() => eliminarDestacada(seleccionada, false)) },
+      ]
+    : [];
+  const fotoHoja = hoja?.tipo === 'foto' && seleccionada ? seleccionada.fotos[hoja.idx] : undefined;
+  const accionesFoto: AccionHoja[] =
+    hoja?.tipo === 'foto' && seleccionada && fotoHoja
+      ? [
+          { id: 'pie', icono: '✎', etiqueta: 'Editar el texto', alElegir: elegir(() => setEdicion({ tipo: 'pie', idx: hoja.idx })) },
+          {
+            id: 'portada',
+            icono: '▣',
+            etiqueta: seleccionada.portada_url === fotoHoja.url ? '✓ Es la portada' : 'Hacer portada',
+            deshabilitada: seleccionada.portada_url === fotoHoja.url,
+            alElegir: elegir(() => hacerFotoPortada(fotoHoja.url)),
+          },
+          {
+            id: 'reemplazar',
+            icono: '⇄',
+            etiqueta: 'Reemplazar la foto',
+            alElegir: elegir(() => {
+              reemplazoIdx.current = hoja.idx;
+              reemplazoInputRef.current?.click();
+            }),
+          },
+          { id: 'izq', icono: '←', etiqueta: 'Mover a la izquierda', deshabilitada: hoja.idx === 0, alElegir: elegir(() => moverFoto(hoja.idx, -1)) },
+          { id: 'der', icono: '→', etiqueta: 'Mover a la derecha', deshabilitada: hoja.idx >= seleccionada.fotos.length - 1, alElegir: elegir(() => moverFoto(hoja.idx, 1)) },
+          { id: 'quitar', icono: '✕', etiqueta: 'Quitar', peligro: true, alElegir: elegir(() => quitarFoto(hoja.idx)) },
+        ]
+      : [];
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Texto explicativo literal del mockup (línea 2020) */}
-      <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft)' }}>
-        Son los círculos "Momentos Caprichos" de la carta. Al tocar uno, el cliente ve sus fotos como en las historias de Instagram: clientes, local, equipo, eventos. Solo muestran fotos; no llevan a ninguna parte. Toca un círculo para editarlo. Un círculo sin fotos no se ve en la carta. Los cambios llegan a la carta al pulsar "Publicar".
+    <div className="dst">
+      <div className="dst-ayuda">
+        Son los círculos "Momentos Caprichos" de la carta. Al tocar uno, el cliente ve sus fotos como en las historias de Instagram: clientes, local, equipo, eventos. Solo muestran fotos; no llevan a ninguna parte. Toca un círculo para verlo y editarlo; mantén el dedo apretado sobre un círculo o una foto (o pulsa «⋯») para ver sus opciones. Un círculo sin fotos no se ve en la carta. Los cambios llegan a la carta al pulsar "Publicar".
       </div>
 
-      {/* Barra de botones de acción (líneas 2021-2030) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        <button
-          onClick={crearNuevaDestacada}
-          style={{
-            minHeight: 44,
-            padding: '0 14px',
-            borderRadius: 12,
-            border: '1.5px dashed var(--cp-navy)',
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          + Nueva destacada
-        </button>
-        <button
-          onClick={() => abrirVisor(hlVis[0]?.id)}
-          style={{
-            minHeight: 44,
-            padding: '0 14px',
-            borderRadius: 12,
-            border: '1.5px solid var(--cp-navy)',
-            background: 'var(--cp-navy)',
-            color: 'var(--cp-cream)',
-            fontWeight: 800,
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          ▶ Ver como cliente
-        </button>
+      <div className="dst-barra">
+        <button type="button" className="dst-btn dst-btn-linea" onClick={crearNuevaDestacada}>+ Nueva destacada</button>
+        <button type="button" className="dst-btn dst-btn-oscuro" onClick={() => abrirVisor(hlVis[0]?.id)}>▶ Ver como cliente</button>
         {hlHasNoPhotos && (
-          <button
-            onClick={cargarEjemplos}
-            style={{
-              minHeight: 44,
-              padding: '0 14px',
-              borderRadius: 12,
-              border: '1.5px dashed var(--cp-navy)',
-              background: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            Cargar fotos de ejemplo
-          </button>
+          <button type="button" className="dst-btn dst-btn-linea" onClick={cargarEjemplos}>Cargar fotos de ejemplo</button>
         )}
-        <span style={{ flex: 1 }} />
-        {dirty && (
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              borderRadius: 9999,
-              padding: '4px 12px',
-              background: 'var(--cp-gold)',
-              color: 'var(--cp-navy)',
-            }}
-          >
-            Cambios sin publicar
-          </span>
-        )}
-        {mensaje && (
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-soft)' }}>
-            {mensaje}
-          </span>
-        )}
-        <button
-          onClick={ejecutarPublicar}
-          style={{
-            minHeight: 44,
-            padding: '0 18px',
-            border: 0,
-            borderRadius: 12,
-            background: 'var(--cp-orange)',
-            color: 'var(--cp-navy)',
-            fontWeight: 800,
-            cursor: 'pointer',
-          }}
-        >
-          Publicar en la carta
-        </button>
-        <button
-          onClick={ejecutarDescartar}
-          style={{
-            minHeight: 44,
-            padding: '0 14px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: 12,
-            background: 'transparent',
-            color: 'var(--cp-navy)',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          Descartar
-        </button>
+        <span className="dst-barra-fin" />
+        {dirty && <span className="dst-aviso">Cambios sin publicar</span>}
+        {mensaje && <span className="dst-mensaje">{mensaje}</span>}
+        <button type="button" className="dst-btn dst-btn-naranja" onClick={ejecutarPublicar}>Publicar en la carta</button>
+        <button type="button" className="dst-btn" onClick={ejecutarDescartar}>Descartar</button>
       </div>
 
-      {/* Caja de círculos estilo Instagram (líneas 2031-2045) */}
-      <div
-        style={{
-          background: 'var(--cp-cream)',
-          border: '1px solid var(--cp-line)',
-          borderRadius: 12,
-          padding: 12,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              color: 'var(--cp-soft)',
-            }}
-          >
-            ASÍ SE VEN EN LA CARTA · ARRASTRA UN CÍRCULO PARA CAMBIARLO DE LUGAR
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>{hlSummary}</div>
+      <div className="dst-caja">
+        <div className="dst-caja-cab">
+          <div className="dst-caja-tit">ASÍ SE VEN EN LA CARTA · ARRASTRA UN CÍRCULO PARA CAMBIARLO DE LUGAR</div>
+          <div className="dst-resumen">{hlSummary}</div>
         </div>
-        <div
-          className="noscroll"
-          style={{
-            display: 'flex',
-            gap: 12,
-            overflowX: 'auto',
-            padding: '4px 2px',
-          }}
-        >
-          {hlLive.map((c) => {
-            const esSeleccionado = c.id === selId;
-            const fotoPortada = obtenerPortadaEfectiva(c);
-            const tieneFoto = Boolean(fotoPortada);
-            const countText =
-              `${c.fotos.length} ${c.fotos.length === 1 ? 'imagen' : 'imágenes'}` +
-              (c.activo === false ? ' · desactivada' : '');
-            const warnText =
-              c.activo === false
-                ? 'Oculta'
-                : c.fotos.length === 0
-                  ? 'Sin fotos: no se ve'
-                  : '';
-
-            return (
-              <div
-                key={c.id}
-                draggable
-                onDragStart={(e) => onDragStartCirculo(e, c.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => onDropCirculo(e, c.id)}
-                onDragEnd={() => setDragId('')}
-                style={{
-                  flex: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 4,
-                  borderBottom: `3px solid ${dragId === c.id ? 'var(--cp-orange)' : 'transparent'}`,
-                  paddingBottom: 2,
-                }}
-              >
-                <button
-                  onClick={() => setSelId(c.id)}
-                  style={{
-                    flex: 'none',
-                    width: 76,
-                    border: 0,
-                    background: 'transparent',
-                    padding: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: 'var(--cp-navy)',
-                    opacity: c.activo === false ? 0.45 : 1,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: '50%',
-                      padding: 3,
-                      boxSizing: 'border-box',
-                      background: esSeleccionado
-                        ? 'var(--cp-navy)'
-                        : 'linear-gradient(135deg, var(--cp-orange), var(--cp-rust))',
-                      display: 'block',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        border: '2px solid var(--cp-cream)',
-                        boxSizing: 'border-box',
-                        overflow: 'hidden',
-                        background: 'var(--cp-sand)',
-                        color: 'var(--cp-soft)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                      }}
-                    >
-                      {tieneFoto ? (
-                        <img
-                          src={fotoPortada}
-                          alt=""
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            top: 0,
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                        />
-                      ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="22"
-                          height="22"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M3 8h4l2-3h6l2 3h4v11H3z" />
-                          <circle cx="12" cy="13.5" r="3.5" />
-                        </svg>
-                      )}
-                    </span>
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      lineHeight: '14px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {c.titulo || '(sin nombre)'}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-                    {countText}
-                  </span>
-                </button>
-                {warnText && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: 'var(--cp-rust)',
-                    }}
-                  >
-                    {warnText}
-                  </span>
-                )}
-                <button
-                  onClick={() => abrirVisor(c.id)}
-                  style={{
-                    minHeight: 32,
-                    padding: '0 10px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy)',
-                    background: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 11,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ▶ Ver
-                </button>
-              </div>
-            );
-          })}
+        <div className="dst-circulos noscroll">
+          {hlLive.map((c) => (
+            <CirculoItem
+              key={c.id}
+              titulo={c.titulo}
+              portada={obtenerPortadaEfectiva(c)}
+              seleccionado={c.id === selId}
+              apagado={c.activo === false}
+              conteo={`${c.fotos.length} ${c.fotos.length === 1 ? 'imagen' : 'imágenes'}` + (c.activo === false ? ' · desactivada' : '')}
+              aviso={c.activo === false ? 'Oculta' : c.fotos.length === 0 ? 'Sin fotos: no se ve' : ''}
+              arrastrable={puedeArrastrar}
+              arrastrando={dragId === c.id}
+              alSeleccionar={() => setSelId(c.id)}
+              alVer={() => abrirVisor(c.id)}
+              alMenu={() => abrirMenuCirculo(c.id)}
+              alArrastrar={(e) => onDragStartCirculo(e, c.id)}
+              alSoltar={(e) => onDropCirculo(e, c.id)}
+              alTerminarArrastre={() => setDragId('')}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Editor de la destacada seleccionada (líneas 2046-2083) */}
+      {/* Entradas de archivo ocultas: las abren las hojas y los botones */}
+      <input ref={portadaInputRef} type="file" accept="image/*" hidden onChange={cambiarPortada} disabled={subidaImagen.subiendo} aria-label="Elegir foto del círculo" />
+      <input ref={reemplazoInputRef} type="file" accept="image/*" hidden onChange={(e) => reemplazarFoto(reemplazoIdx.current, e)} disabled={subidaImagen.subiendo} aria-label="Elegir la foto nueva" />
+
       {seleccionada && (
-        <div
-          style={{
-            background: 'var(--cp-white)',
-            border: '2px solid var(--cp-orange)',
-            borderRadius: 12,
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 16,
-            }}
-          >
-            Editar: {seleccionada.titulo}
+        <div className="dst-detalle">
+          <div className="dst-detalle-cab">
+            <h3 className="dst-detalle-tit">Editar: {seleccionada.titulo}</h3>
+            <button type="button" className="dst-btn" onClick={() => setEdicion({ tipo: 'nombre' })}>✎ Nombre</button>
+            <button type="button" className="dst-btn" onClick={() => setHoja({ tipo: 'circulo' })}>⋯ Más opciones</button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ flex: '1 1 220px' }}>
-              <label
-                htmlFor="h-n"
-                style={{
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: 'block',
-                  marginBottom: 4,
-                }}
-              >
-                Nombre del círculo
-              </label>
-              <input
-                id="h-n"
-                type="text"
-                value={seleccionada.titulo}
-                onChange={(e) =>
-                  actualizarSeleccionada({ titulo: e.target.value })
-                }
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-line)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 10px',
-                  fontSize: 14,
-                }}
-              />
-            </div>
+
+          <div className="dst-acciones-fila">
+            <button type="button" className="dst-btn dst-btn-naranja" onClick={() => portadaInputRef.current?.click()} disabled={subidaImagen.subiendo}>
+              {seleccionada.portada_url ? 'Cambiar foto' : 'Subir foto'}
+            </button>
+            <button type="button" className="dst-btn" onClick={toggleActiva}>
+              {seleccionada.activo === false ? 'Activar' : 'Desactivar'}
+            </button>
+            <button type="button" className="dst-btn dst-btn-cuadro" onClick={() => moverCirculo(-1)} aria-label="Mover antes">←</button>
+            <button type="button" className="dst-btn dst-btn-cuadro" onClick={() => moverCirculo(1)} aria-label="Mover después">→</button>
           </div>
 
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
-              Foto del círculo
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <label
-                style={{
-                  position: 'relative',
-                  minHeight: 44,
-                  padding: '0 16px',
-                  boxSizing: 'border-box',
-                  borderRadius: 10,
-                  background: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {seleccionada.portada_url ? 'Cambiar foto' : 'Subir foto'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={cambiarPortada}
-                  disabled={subidaImagen.subiendo}
-                  style={{ position: 'absolute', left: -9999 }}
-                />
-              </label>
-              {seleccionada.portada_url && (
-                <button
-                  onClick={quitarPortada}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 12px',
-                    border: '1.5px solid var(--cp-rust)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-rust)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Quitar foto
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Lista de imágenes (líneas 2053-2070) */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-                flexWrap: 'wrap',
-                marginBottom: 6,
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: 13 }}>
-                Imágenes que ve el cliente ({seleccionada.fotos.length})
-              </span>
-              <label
-                style={{
-                  position: 'relative',
-                  minHeight: 44,
-                  padding: '0 16px',
-                  boxSizing: 'border-box',
-                  borderRadius: 10,
-                  background: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
-              >
+            <div className="dst-fotos-cab" style={{ marginBottom: 8 }}>
+              <span className="dst-fotos-tit">Imágenes que ve el cliente ({seleccionada.fotos.length})</span>
+              <label className="dst-btn dst-btn-naranja" style={{ position: 'relative', overflow: 'hidden' }}>
                 + Subir varias imágenes
                 <input
                   type="file"
@@ -1119,300 +810,31 @@ export function DestacadasView() {
             </div>
             <IndicadorSubida estado={subidaImagen.estado} error={subidaImagen.error} onReintentar={subidaImagen.reintentar} />
             {seleccionada.fotos.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-                Todavía no hay imágenes. Un círculo sin imágenes no se muestra en la carta.
-              </div>
+              <div className="dst-vacio">Todavía no hay imágenes. Un círculo sin imágenes no se muestra en la carta.</div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="dst-fotos">
               {seleccionada.fotos.map((f, fIdx) => (
-                <div
+                <FotoItem
                   key={f.id}
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                    alignItems: 'center',
-                    border: '1px solid var(--cp-line)',
-                    borderRadius: 12,
-                    padding: 8,
-                  }}
-                >
-                  <img
-                    src={f.url}
-                    alt=""
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 10,
-                      objectFit: 'cover',
-                      flex: 'none',
-                    }}
-                  />
-                  <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                    <label
-                      htmlFor={`h-cap-${fIdx}`}
-                      style={{ position: 'absolute', left: -9999 }}
-                    >
-                      Texto de la imagen {fIdx + 1}
-                    </label>
-                    <input
-                      id={`h-cap-${fIdx}`}
-                      type="text"
-                      value={f.pie || ''}
-                      onChange={(e) => cambiarPieFoto(fIdx, e.target.value)}
-                      placeholder="Texto que acompaña la imagen (opcional)"
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: 44,
-                        borderRadius: 10,
-                        border: '1.5px solid var(--cp-line)',
-                        background: 'var(--cp-white)',
-                        color: 'var(--cp-navy)',
-                        padding: '0 10px',
-                        fontSize: 14,
-                      }}
-                    />
-                  </div>
-                  <button
-                    onClick={() => moverFoto(fIdx, -1)}
-                    aria-label="Subir"
-                    style={{
-                      width: 44,
-                      minHeight: 44,
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => moverFoto(fIdx, 1)}
-                    aria-label="Bajar"
-                    style={{
-                      width: 44,
-                      minHeight: 44,
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    onClick={() => hacerFotoPortada(f.url)}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 12px',
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {seleccionada.portada_url && seleccionada.portada_url === f.url
-                      ? '✓ Es la portada'
-                      : 'Usar de portada'}
-                  </button>
-                  <label
-                    style={{
-                      position: 'relative',
-                      minHeight: 44,
-                      padding: '0 12px',
-                      boxSizing: 'border-box',
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 10,
-                      color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cambiar foto
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => reemplazarFoto(fIdx, e)}
-                      disabled={subidaImagen.subiendo}
-                      style={{ position: 'absolute', left: -9999 }}
-                    />
-                  </label>
-                  <button
-                    onClick={() => quitarFoto(fIdx)}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 12px',
-                      border: '1.5px solid var(--cp-rust)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-rust)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Quitar
-                  </button>
-                </div>
+                  n={fIdx + 1}
+                  url={f.url}
+                  pie={f.pie || ''}
+                  esPortada={Boolean(seleccionada.portada_url) && seleccionada.portada_url === f.url}
+                  puedeSubir={fIdx > 0}
+                  puedeBajar={fIdx < seleccionada.fotos.length - 1}
+                  alVer={() => abrirVisor(seleccionada.id, fIdx)}
+                  alMenu={() => setHoja({ tipo: 'foto', idx: fIdx })}
+                  alEditarPie={() => setEdicion({ tipo: 'pie', idx: fIdx })}
+                  alMover={(dir) => moverFoto(fIdx, dir)}
+                />
               ))}
             </div>
-          </div>
-
-          {/* Activar/Desactivar y mover orden (líneas 2071-2075) */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={toggleActiva}
-              style={{
-                flex: '1 1 150px',
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              {seleccionada.activo === false ? 'Activar' : 'Desactivar'}
-            </button>
-            <button
-              onClick={() => moverCirculo(-1)}
-              aria-label="Mover antes"
-              style={{
-                width: 44,
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              ←
-            </button>
-            <button
-              onClick={() => moverCirculo(1)}
-              aria-label="Mover después"
-              style={{
-                width: 44,
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              →
-            </button>
-          </div>
-
-          {/* Acciones inferiores (líneas 2076-2081) */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              flexWrap: 'wrap',
-              borderTop: '1px solid var(--cp-line)',
-              paddingTop: 10,
-            }}
-          >
-            <button
-              onClick={duplicarSeleccionada}
-              style={{
-                flex: '1 1 110px',
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Duplicar
-            </button>
-            <button
-              onClick={quitarTodasLasImagenes}
-              style={{
-                flex: '1 1 130px',
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Quitar todas las imágenes
-            </button>
-            <button
-              onClick={archivarSeleccionada}
-              style={{
-                flex: '1 1 110px',
-                minHeight: 44,
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 10,
-                background: 'var(--cp-sand)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Archivar
-            </button>
-            <button
-              onClick={() => eliminarDestacada(seleccionada, false)}
-              style={{
-                flex: '1 1 110px',
-                minHeight: 44,
-                border: '1.5px solid var(--cp-rust)',
-                borderRadius: 10,
-                background: 'transparent',
-                color: 'var(--cp-rust)',
-                fontWeight: 800,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Eliminar
-            </button>
           </div>
         </div>
       )}
 
-      {/* Sección Archivadas (líneas 2084-2090) */}
       {hlArch.length > 0 && (
-        <div
-          style={{
-            background: 'var(--cp-white)',
-            border: '1px solid var(--cp-line)',
-            borderRadius: 12,
-            padding: 14,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
+        <div className="dst-archivadas">
           <div style={{ fontWeight: 800 }}>Archivadas ({hlArch.length})</div>
           <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
             No se ven en la carta ni en la lista de arriba. Puedes restaurarlas o eliminarlas para siempre.
@@ -1420,78 +842,55 @@ export function DestacadasView() {
           {hlArch.map((a) => {
             const coverArch = obtenerPortadaEfectiva(a);
             return (
-              <div
-                key={a.id}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  alignItems: 'center',
-                  border: '1px solid var(--cp-line)',
-                  borderRadius: 12,
-                  padding: 8,
-                }}
-              >
-                <span
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    overflow: 'hidden',
-                    background: 'var(--cp-sand)',
-                    flex: 'none',
-                  }}
-                >
-                  {coverArch && (
-                    <img
-                      src={coverArch}
-                      alt=""
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  )}
-                </span>
-                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div key={a.id} className="dst-arch">
+                <span className="dst-arch-miniatura">{coverArch && <img src={coverArch} alt="" />}</span>
+                <div className="dst-arch-info">
                   <div style={{ fontWeight: 700 }}>{a.titulo || '(sin nombre)'}</div>
                   <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
                     {a.fotos.length} {a.fotos.length === 1 ? 'imagen' : 'imágenes'}
                   </div>
                 </div>
-                <button
-                  onClick={() => restaurarArchivada(a)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 14px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Restaurar
-                </button>
-                <button
-                  onClick={() => eliminarDestacada(a, true)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 14px',
-                    border: '1.5px solid var(--cp-rust)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-rust)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Eliminar para siempre
-                </button>
+                <button type="button" className="dst-btn" onClick={() => restaurarArchivada(a)}>Restaurar</button>
+                <button type="button" className="dst-btn dst-btn-peligro" onClick={() => eliminarDestacada(a, true)}>Eliminar para siempre</button>
               </div>
             );
           })}
         </div>
+      )}
+
+      {hoja?.tipo === 'circulo' && seleccionada && (
+        <HojaAcciones titulo="Opciones del círculo" subtitulo={seleccionada.titulo || '(sin nombre)'} acciones={accionesCirculo} alCerrar={() => setHoja(null)} />
+      )}
+      {hoja?.tipo === 'foto' && fotoHoja && (
+        <HojaAcciones titulo={`Opciones de la imagen ${hoja.idx + 1}`} subtitulo={fotoHoja.pie || undefined} acciones={accionesFoto} alCerrar={() => setHoja(null)} />
+      )}
+      {edicion?.tipo === 'nombre' && seleccionada && (
+        <ModalTexto
+          titulo="Nombre del círculo"
+          etiqueta="Nombre del círculo"
+          idCampo="h-n"
+          inicial={seleccionada.titulo}
+          alCerrar={() => setEdicion(null)}
+          alGuardar={(v) => {
+            actualizarSeleccionada({ titulo: v });
+            setEdicion(null);
+          }}
+        />
+      )}
+      {edicion?.tipo === 'pie' && seleccionada?.fotos[edicion.idx] && (
+        <ModalTexto
+          titulo={`Texto de la imagen ${edicion.idx + 1}`}
+          etiqueta={`Texto de la imagen ${edicion.idx + 1}`}
+          idCampo={`h-cap-${edicion.idx}`}
+          inicial={seleccionada.fotos[edicion.idx].pie || ''}
+          placeholder="Texto que acompaña la imagen (opcional)"
+          vistaPrevia={seleccionada.fotos[edicion.idx].url}
+          alCerrar={() => setEdicion(null)}
+          alGuardar={(v) => {
+            cambiarPieFoto(edicion.idx, v);
+            setEdicion(null);
+          }}
+        />
       )}
 
       {/* Visor de la destacada (isHlv en Admin.dc.html líneas 2960-2975) */}

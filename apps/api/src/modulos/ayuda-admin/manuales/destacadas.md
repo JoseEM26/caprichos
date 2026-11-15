@@ -39,6 +39,12 @@ Ver tambien: [[destacadas]]
 3. Para borrar un círculo de forma definitiva, pulsa "Eliminar círculo". Se abrirá un cuadro de confirmación titulado "¿Eliminar destacada definitivamente?". Pulsa "Sí, eliminar" o "No, conservar".
 Ver tambien: [[novedades]]
 
+## Como se hace: opciones con pulsación larga (celular y tablet)
+1. Toca un círculo de la fila para verlo y editarlo. Mantén el dedo apretado sobre él cerca de un segundo (el celular vibra un poco y el círculo se achica): se abre la hoja "Opciones del círculo" con Configurar (editar el nombre), Cambiar portada, Activar o Desactivar, Mover a la izquierda o derecha, Duplicar, Quitar todas las imágenes, Archivar y Eliminar. Eliminar siempre pregunta "Sí" o "No".
+2. En la grilla de fotos, un toque corto la muestra en el visor. Mantén el dedo sobre una foto para abrir sus opciones: Editar el texto, Hacer portada, Reemplazar la foto, Mover a la izquierda o derecha y Quitar (con "Sí" o "No").
+3. Si mueves el dedo mientras presionas, no se abre nada y puedes seguir deslizando la lista. El nombre y el texto de cada foto se editan en una ventana pequeña con "Guardar".
+4. En computadora, o con teclado, usa el botón "⋯ Más opciones" (o el "⋯" de cada círculo y de cada foto); el clic derecho también abre las mismas opciones.
+
 ## Como se hace: publicar cambios en la carta
 1. Mientras agregas fotos o cambias títulos, el sistema registrará los cambios como pendientes y mostrará la advertencia de borrador.
 2. Para que las modificaciones se apliquen en la carta virtual, pulsa el botón "Publicar en la carta".
