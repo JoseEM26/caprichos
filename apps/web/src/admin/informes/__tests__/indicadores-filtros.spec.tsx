@@ -17,7 +17,7 @@ const indicadores = {
   productosDescontados: [],
 };
 
-const urls = (parte: string) => (api.get as any).mock.calls.map((c: any[]) => String(c[0])).filter((u: string) => u.includes(parte));
+const urls = (parte: string): string[] => (api.get as any).mock.calls.map((c: any[]) => String(c[0])).filter((u: string) => u.includes(parte));
 
 function montar(entrada = '/admin/indicadores') {
   render(
