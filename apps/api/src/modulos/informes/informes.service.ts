@@ -1395,7 +1395,7 @@ export class InformesService {
     // 5. Rotación de mesas
     const totalMesas = await this.prisma.elementoPlano.count({ where: { tipo: 'MESA', activo: true } });
     const pedidosSalon = await this.prisma.pedido.count({
-      where: dePedido({ modalidad: 'LOCAL' }),
+      where: dePedido({ modalidad: { in: ['MESA', 'COMER_LOCAL'] } }),
     });
     const rotacionMesas = totalMesas > 0 ? (pedidosSalon / totalMesas).toFixed(1) : '0';
 
