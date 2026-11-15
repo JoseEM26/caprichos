@@ -106,3 +106,23 @@ export function rucValido(ruc: string): boolean {
   const suma = pesos.reduce((a, p, i) => a + p * Number(ruc[i]), 0);
   return (11 - (suma % 11)) % 10 === Number(ruc[10]);
 }
+
+/**
+ * Enlace «click-to-chat» de WhatsApp con el comprobante ya escrito (el local solo da clic en enviar).
+ * `celular` ya viene normalizado del servidor (51 + 9 dígitos); sin celular válido devuelve null.
+ */
+export function urlWhatsappManual(
+  celular: string | null | undefined,
+  c: { tipo: string; numero_texto: string | null; total: number },
+  enlacePdf: string | null | undefined,
+): string | null {
+  const numero = String(celular ?? '').replace(/\D/g, '');
+  if (!/^519\d{8}$/.test(numero)) return null;
+  const que = c.tipo === 'FACTURA' ? 'factura' : 'boleta';
+  const lineas = [
+    'Hola 👋 Gracias por tu compra en Caprichos 💛',
+    `Tu ${que} electrónica ${c.numero_texto ?? ''} por ${formatearSoles(c.total)}.`,
+    ...(enlacePdf ? [`Puedes verla y descargarla aquí: ${enlacePdf}`] : []),
+  ];
+  return `https://wa.me/${numero}?text=${encodeURIComponent(lineas.join('\n'))}`;
+}

@@ -63,7 +63,7 @@ export function FacturaWhatsappConfig() {
     <section aria-label="Factura por WhatsApp" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontWeight: 800 }}>Factura por WhatsApp</div>
       <p style={{ margin: 0, fontSize: 13 }}>
-        Cuando SUNAT acepta una factura, el bot manda su PDF al celular del pedido (su WhatsApp). Sin celular válido no se envía nada.
+        Cuando SUNAT acepta una factura, o cuando la boleta queda firmada al cobrar, el bot manda su PDF al celular del pedido (su WhatsApp). Sin celular válido no se envía nada.
         Fuera de las 24 horas de WhatsApp solo sale con una plantilla aprobada en Meta; sin ella queda «Sin ventana de WhatsApp».
       </p>
       <div role="group" aria-label="Enviar la factura por WhatsApp" style={{ display: 'flex', gap: 8 }}>

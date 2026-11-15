@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -15,6 +16,8 @@ import {
 import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
+import { FILTROS_ELECTRONICOS, esFiltroElectronicos } from './comprobante-enlace';
+import { tieneRol } from '../acceso/roles-usuario';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
@@ -99,20 +102,31 @@ export class ComprobantesController {
     return this.comprobantesService.marcarEmitido(id, dto, req.usuario, ip);
   }
 
-  /** GET /admin/comprobantes/emitidos?pagina=&limite= : BOLETA/FACTURA enviadas a SUNAT (cualquier estado). */
+  /** GET /admin/comprobantes/emitidos?pagina=&limite=&filtro=todos|faltan|aceptados|sin_whatsapp : BOLETA/FACTURA enviadas a SUNAT. */
   @Get('emitidos')
   @Permiso('comprobantes', 'ver')
-  async listarEmitidos(@Query('pagina') pagina?: string, @Query('limite') limite?: string, @Query('problemas') problemas?: string) {
+  async listarEmitidos(@Query('pagina') pagina?: string, @Query('limite') limite?: string, @Query('problemas') problemas?: string, @Query('filtro') filtro?: string) {
     const p = Math.max(1, Number(pagina) || 1);
     const l = Math.max(1, Math.min(100, Number(limite) || 20));
-    return this.comprobantesService.listarElectronicos(p, l, problemas === '1' || problemas === 'true');
+    if (filtro !== undefined && !esFiltroElectronicos(filtro)) {
+      throw new BadRequestException({ codigo: 'FILTRO_INVALIDO', mensaje: `El filtro debe ser uno de: ${FILTROS_ELECTRONICOS.join(', ')}` });
+    }
+    return this.comprobantesService.listarElectronicos(p, l, problemas === '1' || problemas === 'true', filtro ?? 'todos');
+  }
+
+  /** POST /admin/comprobantes/:id/whatsapp-manual : deja la marca «Enviado a mano» cuando abren WhatsApp con el comprobante. */
+  @Post(':id/whatsapp-manual')
+  @Permiso('comprobantes', 'ver')
+  async whatsappManual(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.comprobantesService.registrarEnvioManualWhatsapp(id, req.usuario, ip);
   }
 
   /** GET /admin/comprobantes/salud : solo conteos para el monitoreo (ADMIN). Sin datos personales. */
   @Get('salud')
   @Permiso('comprobantes', 'ver')
   async salud(@Req() req: any) {
-    if (req.usuario?.rol !== 'ADMIN') throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador ve la salud de la facturación' });
+    if (!(req.usuario && tieneRol(req.usuario, 'ADMIN'))) throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador ve la salud de la facturación' });
     return this.comprobantesSalud.salud();
   }
 
@@ -156,8 +170,10 @@ export class ComprobantesController {
   @Permiso('comprobantes', 'emitir')
   async emitirAhora() {
     const lote = await this.nocturno.emitirLote(new Date(), true);
+    // Los pendientes de envío también se reintentan ahora (no esperan los 5 minutos del barrido); si falla, el resto sigue
+    const reintento = await this.comprobantesService.reintentarPendientes().catch(() => ({ revisados: 0 }));
     const resumen = await this.sunatService.resumenDiario();
-    return { ...lote, resumenes: resumen.resumenes, boletas: resumen.boletas };
+    return { ...lote, reintentados: reintento.revisados, resumenes: resumen.resumenes, boletas: resumen.boletas };
   }
 
   /** GET /admin/comprobantes/facturacion: IGV, series, proveedor y estado de credenciales (sin valores). */

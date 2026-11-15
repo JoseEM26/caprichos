@@ -19,6 +19,7 @@ import type {
   SaludFacturacion,
   ConfigFacturaWhatsapp,
   EstadoEnvioWhatsapp,
+  FiltroElectronicos,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -78,9 +79,15 @@ export const comprobantesApi = {
   },
 
   // Facturación electrónica (SUNAT)
-  async listarElectronicos(pagina = 1, limite = 20): Promise<RespuestaListarElectronicos> {
+  async listarElectronicos(pagina = 1, limite = 20, filtro: FiltroElectronicos = 'todos'): Promise<RespuestaListarElectronicos> {
     const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite) });
+    if (filtro !== 'todos') params.set('filtro', filtro);
     return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  /** Deja la marca «Enviado a mano» al abrir WhatsApp con el comprobante. */
+  async marcarEnviadoWhatsappManual(id: string): Promise<{ ok: boolean }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/whatsapp-manual`, { method: 'POST' });
   },
 
   /** Solo los comprobantes con problemas: rechazados, en revisión manual o pendientes con más de 15 min. */
@@ -152,7 +159,7 @@ export const comprobantesApi = {
   },
 
   /** Emite ya lo que espera la noche (boletas, facturas y cambios pendientes) y envía el resumen de boletas. */
-  async emitirAhora(): Promise<{ emitidos: number; cambios: number; descartados: number; fallidos?: number; resumenes: number; boletas: number }> {
+  async emitirAhora(): Promise<{ emitidos: number; cambios: number; descartados: number; fallidos?: number; reintentados?: number; resumenes: number; boletas: number }> {
     return clienteFetch('/admin/comprobantes/sunat/emitir-ahora', { method: 'POST' });
   },
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSesion } from '../../comun/sesion';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
@@ -12,7 +13,7 @@ import { FacturaWhatsappConfig } from './FacturaWhatsappConfig';
 import { comprobantesApi } from './comprobantesApi';
 import { formatearSoles, rucValido } from './utilidades';
 import { consultarDocumento, mensajeConsulta, tipoPorLongitud } from '../pedidos/consultaDocumento';
-import type { BoletaPorDefecto, ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
+import type { BoletaPorDefecto, ComprobanteElectronico, ContadoresElectronicos, FiltroElectronicos, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
 
 const ALTO_TOQUE = '44px';
 
@@ -29,6 +30,13 @@ export function estadoDe(c: Pick<ComprobanteElectronico, 'baja_estado' | 'factur
   if (c.facturacion_estado === 'REVISION_MANUAL') return { texto: 'Revisión manual', variante: 'peligro' };
   return { texto: 'Rechazado', variante: 'peligro' };
 }
+
+const CHIPS: Array<[FiltroElectronicos, string]> = [
+  ['todos', 'Todos'],
+  ['faltan', 'Faltan emitir'],
+  ['aceptados', 'Aceptados'],
+  ['sin_whatsapp', 'Sin enviar por WhatsApp'],
+];
 
 const tipoTexto = (t: string) => (t === 'FACTURA' ? 'Factura' : 'Boleta');
 
@@ -72,7 +80,11 @@ function accionDe(c: ComprobanteElectronico): string {
 
 export function ElectronicosTab() {
   const { usuario, tiene } = useSesion();
-  const esAdmin = usuario?.rol === 'ADMIN';
+  // El usuario puede tener varios roles: ADMIN puede ser uno extra, no solo el principal
+  const esAdmin = tieneRolUsuario(usuario, 'ADMIN');
+  const puedeEmitir = esAdmin || tiene('comprobantes/emitir');
+  const [filtro, setFiltro] = useState<FiltroElectronicos>('todos');
+  const [contadores, setContadores] = useState<ContadoresElectronicos | null>(null);
 
   const [filas, setFilas] = useState<ComprobanteElectronico[]>([]);
   const [problemas, setProblemas] = useState<ComprobanteElectronico[]>([]);
@@ -132,8 +144,9 @@ export function ElectronicosTab() {
     setCargando(true);
     setError(null);
     try {
-      const r = await comprobantesApi.listarElectronicos(p, 20);
+      const r = await comprobantesApi.listarElectronicos(p, 20, filtro);
       setFilas(r.elementos);
+      if (r.contadores) setContadores(r.contadores);
       setPagina(r.pagina);
       setTotalPaginas(Math.max(1, r.totalPaginas));
     } catch (err: any) {
@@ -142,10 +155,13 @@ export function ElectronicosTab() {
       setCargando(false);
     }
     void cargarProblemas();
-  }, [cargarProblemas]);
+  }, [cargarProblemas, filtro]);
 
   useEffect(() => {
-    cargar(1);
+    void cargar(1);
+  }, [cargar]);
+
+  useEffect(() => {
     comprobantesApi
       .obtenerFacturacion()
       .then((c) => {
@@ -159,7 +175,7 @@ export function ElectronicosTab() {
         setFormHoraResumen(c.hora_resumen ?? '23:30');
       })
       .catch(() => setConfig(null));
-  }, [cargar]);
+  }, []);
 
   useEffect(() => {
     if (!esAdmin) return;
@@ -242,8 +258,9 @@ export function ElectronicosTab() {
       const partes = [`${r.emitidos} comprobante(s) emitido(s)`];
       if (r.cambios > 0) partes.push(`${r.cambios} cambio(s) aplicado(s)`);
       if (r.boletas > 0) partes.push(`${r.boletas} boleta(s) en el resumen`);
+      if ((r.reintentados ?? 0) > 0) partes.push(`${r.reintentados} pendiente(s) reintentado(s)`);
       const fallidos = r.fallidos ?? 0;
-      const algo = r.emitidos + r.cambios + r.boletas > 0;
+      const algo = r.emitidos + r.cambios + r.boletas + (r.reintentados ?? 0) > 0;
       if (fallidos === 0) setAviso(algo ? `Listo: ${partes.join(', ')}` : 'No había nada pendiente de emitir');
       await cargar(pagina);
       void cargarProblemas();
@@ -443,9 +460,6 @@ export function ElectronicosTab() {
               <Boton variante="oscuro" onClick={() => setConfirmarConfig(true)} style={{ minHeight: ALTO_TOQUE, flex: 1 }}>
                 Guardar configuración
               </Boton>
-              <Boton variante="secundario" onClick={() => setConfirmarEmitir(true)} cargando={emitiendo} style={{ minHeight: ALTO_TOQUE, flex: 1 }}>
-                Emitir ahora
-              </Boton>
             </div>
           </div>
         )}
@@ -496,13 +510,37 @@ export function ElectronicosTab() {
           {salud.credenciales_invalidas && <span style={{ color: 'var(--cp-red, #b00020)' }}>Credenciales SUNAT inválidas</span>}
         </div>
       )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div role="group" aria-label="Filtrar comprobantes" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {CHIPS.map(([id, texto]) => {
+            const marcado = filtro === id;
+            const n = contadores?.[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={marcado}
+                onClick={() => setFiltro(id)}
+                style={{ minHeight: ALTO_TOQUE, padding: '0 14px', borderRadius: 999, fontWeight: 700, cursor: 'pointer', border: marcado ? '2px solid var(--cp-navy)' : '1.5px solid var(--cp-line)', background: marcado ? 'var(--cp-navy)' : 'var(--cp-white)', color: marcado ? 'var(--cp-cream)' : 'var(--cp-navy)' }}
+              >
+                {texto}{n !== undefined ? ` (${n})` : ''}
+              </button>
+            );
+          })}
+        </div>
+        {puedeEmitir && (
+          <Boton variante="primario" onClick={() => setConfirmarEmitir(true)} cargando={emitiendo} style={{ minHeight: ALTO_TOQUE }}>
+            {(contadores?.pendientes_resumen ?? 0) > 0 ? `Emitir ahora (${contadores?.pendientes_resumen} pendientes)` : 'Emitir ahora'}
+          </Boton>
+        )}
+      </div>
       {aviso && <div role="status" style={{ fontWeight: 600 }}>{aviso}</div>}
       {error && <EstadoError mensaje={error} />}
 
       {cargando ? (
         <Cargando />
       ) : filas.length === 0 ? (
-        <EstadoVacio titulo="Sin comprobantes electrónicos" descripcion="Aquí aparecen las boletas y facturas enviadas a SUNAT." />
+        <EstadoVacio titulo="Sin comprobantes electrónicos" descripcion={filtro === 'todos' ? 'Aquí aparecen las boletas y facturas enviadas a SUNAT.' : 'No hay comprobantes con este filtro.'} />
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filas.map((c) => {
@@ -644,7 +682,7 @@ export function ElectronicosTab() {
       <Confirmar
         abierto={confirmarEmitir}
         titulo="Emitir ahora"
-        mensaje="Se emiten ya todas las boletas y facturas que esperan la noche y se envía el resumen de boletas. Si después cambian el comprobante de uno de esos pedidos, se hará con una baja. Lo que se cobre más tarde sale en la noche como siempre. ¿Emitir ahora?"
+        mensaje="Se emiten ya todas las boletas y facturas que esperan la noche, se reintentan las pendientes y se envía el resumen diario de boletas a SUNAT. Si después cambian el comprobante de uno de esos pedidos, se hará con una baja. Lo que se cobre más tarde sale en la noche como siempre. ¿Emitir ahora?"
         textoSi="Sí, emitir"
         textoNo="No"
         cargando={emitiendo}

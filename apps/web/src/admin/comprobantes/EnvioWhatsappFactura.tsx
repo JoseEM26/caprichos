@@ -3,6 +3,7 @@ import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { comprobantesApi } from './comprobantesApi';
+import { urlWhatsappManual } from './utilidades';
 import type { ComprobanteElectronico, EnvioWhatsappFactura, EstadoEnvioWhatsapp } from './tipos';
 
 /** Hora de Lima corta: «11/11 14:05». */
@@ -26,12 +27,16 @@ const TEXTO: Record<EstadoEnvioWhatsapp, { texto: string; variante: VarianteInsi
 export function etiquetaEnvio(e: EnvioWhatsappFactura | null | undefined): { texto: string; variante: VarianteInsignia } | null {
   if (!e) return null;
   const base = TEXTO[e.estado] ?? { texto: 'No enviada', variante: 'neutro' as VarianteInsignia };
+  if (e.detalle === 'ENVIADO_A_MANO') return { texto: 'Enviado a mano', variante: 'exito' };
   return e.estado === 'ENVIADO' && e.enviado_en ? { ...base, texto: `${base.texto} · ${horaCorta(e.enviado_en)}` } : base;
 }
 
-/** ¿Es una factura real, aceptada por SUNAT y vigente? Solo esas se mandan por WhatsApp. */
-export const esFacturaEnviable = (c: Pick<ComprobanteElectronico, 'tipo' | 'facturacion_estado' | 'simulado'> & { anulado_en?: string | null }) =>
-  String(c.tipo).toUpperCase() === 'FACTURA' && c.facturacion_estado === 'EMITIDO_SUNAT' && !c.simulado && !c.anulado_en;
+/** ¿Es una boleta o factura real, ya firmada y vigente? Solo esas se mandan por WhatsApp (misma regla que el servidor). */
+export const esFacturaEnviable = (c: Pick<ComprobanteElectronico, 'tipo' | 'facturacion_estado' | 'simulado'> & { anulado_en?: string | null }) => {
+  const tipo = String(c.tipo).toUpperCase();
+  const firmado = c.facturacion_estado === 'EMITIDO_SUNAT' || (tipo === 'BOLETA' && c.facturacion_estado === 'PENDIENTE_RESUMEN');
+  return (tipo === 'FACTURA' || tipo === 'BOLETA') && firmado && !c.simulado && !c.anulado_en;
+};
 
 /** Etiqueta pequeña + botón «Reenviar por WhatsApp» (Sí/No) de una factura. Se muestra solo para facturas reales aceptadas. */
 export function EnvioWhatsappFactura({
@@ -49,6 +54,14 @@ export function EnvioWhatsappFactura({
   const [error, setError] = useState<string | null>(null);
   if (!esFacturaEnviable(comprobante)) return null;
   const etiqueta = etiquetaEnvio(comprobante.envio_whatsapp);
+  // Envío a mano: solo en la lista de electrónicos (trae celular_wa); el botón se destaca cuando no hay ventana de 24 h
+  const enLista = 'celular_wa' in comprobante;
+  const urlManual = urlWhatsappManual(comprobante.celular_wa, comprobante, comprobante.enlace_pdf_publico);
+  const sinVentana = comprobante.envio_whatsapp?.estado === 'SIN_VENTANA' && comprobante.envio_whatsapp.detalle !== 'ENVIADO_A_MANO';
+  // El enlace se abre sin esperar; la marca «Enviado a mano» va aparte y, si falla, no estorba
+  const alAbrirManual = () => {
+    void comprobantesApi.marcarEnviadoWhatsappManual(comprobante.id).then(() => alCambiar?.(), () => undefined);
+  };
 
   const reenviar = async () => {
     setOcupado(true);
@@ -69,6 +82,30 @@ export function EnvioWhatsappFactura({
   return (
     <div data-testid={`envio-whatsapp-${comprobante.id}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 }}>
       {etiqueta && <Insignia variante={etiqueta.variante}>{etiqueta.texto}</Insignia>}
+      {enLista && !urlManual && !etiqueta && <Insignia variante="neutro">Sin celular</Insignia>}
+      {enLista && urlManual && (
+        <a
+          href={urlManual}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={alAbrirManual}
+          aria-label={`Enviar por WhatsApp ${comprobante.numero_texto}`}
+          style={{
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '0 14px',
+            borderRadius: 10,
+            fontWeight: 700,
+            textDecoration: 'none',
+            border: '1.5px solid #25D366',
+            background: sinVentana ? '#25D366' : 'var(--cp-white)',
+            color: sinVentana ? '#fff' : '#128C7E',
+          }}
+        >
+          Enviar por WhatsApp
+        </a>
+      )}
       {puedeReenviar && (
         <Boton variante="secundario" onClick={() => setConfirmar(true)} style={{ minHeight: 44 }} aria-label={`Reenviar por WhatsApp ${comprobante.numero_texto}`}>
           Reenviar por WhatsApp

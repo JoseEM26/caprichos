@@ -279,6 +279,10 @@ export interface ComprobanteElectronico {
   baja_en: string | null;
   /** Envío de la factura por WhatsApp (solo FACTURA). */
   envio_whatsapp?: EnvioWhatsappFactura | null;
+  /** Celular listo para WhatsApp (51 + 9 dígitos), o null = «Sin celular». Solo en la lista de electrónicos. */
+  celular_wa?: string | null;
+  /** Enlace público firmado al PDF de este comprobante (para mandarlo por WhatsApp a mano). */
+  enlace_pdf_publico?: string | null;
 }
 
 /** Comprobante de un pedido (o de un extra suyo) tal como lo da GET /admin/comprobantes/pedido/:id/lista. */
@@ -298,11 +302,22 @@ export interface CambioComprobantePendiente {
   solicitado_en: string;
 }
 
+export type FiltroElectronicos = 'todos' | 'faltan' | 'aceptados' | 'sin_whatsapp';
+export interface ContadoresElectronicos {
+  todos: number;
+  faltan: number;
+  aceptados: number;
+  sin_whatsapp: number;
+  /** Boletas firmadas que esperan el resumen diario a SUNAT. */
+  pendientes_resumen: number;
+}
+
 export interface RespuestaListarElectronicos {
   total: number;
   pagina: number;
   limite: number;
   totalPaginas: number;
+  contadores?: ContadoresElectronicos;
   elementos: ComprobanteElectronico[];
 }
 

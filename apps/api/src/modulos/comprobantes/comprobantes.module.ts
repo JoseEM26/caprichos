@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ComprobantesController } from './comprobantes.controller';
+import { ComprobantePublicoController } from './comprobante-publico.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesReintentosService } from './comprobantes-reintentos.service';
 import { ComprobantesNocturnoService } from './comprobantes-nocturno.service';
@@ -15,7 +16,7 @@ import { ComprobantesCertificadoAvisoService } from './comprobantes-certificado-
 
 @Module({
   imports: [LocalModule, CorreoModule],
-  controllers: [ComprobantesController],
+  controllers: [ComprobantesController, ComprobantePublicoController],
   providers: [
     ComprobantesService,
     ComprobantesReintentosService,

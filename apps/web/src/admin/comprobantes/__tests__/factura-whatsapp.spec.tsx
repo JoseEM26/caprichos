@@ -68,11 +68,11 @@ describe('EnvioWhatsappFactura', () => {
     await waitFor(() => expect(alCambiar).toHaveBeenCalled());
   });
 
-  it('sin permiso no hay botón (pero sí la etiqueta); boleta, simulada y anulada no muestran nada', () => {
+  it('sin permiso no hay botón (pero sí la etiqueta); boleta rechazada, simulada y anulada no muestran nada', () => {
     const { rerender, container } = render(<EnvioWhatsappFactura comprobante={factura({ envio_whatsapp: envio('ENVIADO') }) as any} puedeReenviar={false} />);
     expect(screen.queryByRole('button', { name: /Reenviar por WhatsApp/ })).toBeNull();
     expect(screen.getByText(/Enviada por WhatsApp/)).toBeTruthy();
-    for (const extra of [{ tipo: 'BOLETA' }, { simulado: true }, { anulado_en: '2026-11-11' }, { facturacion_estado: 'RECHAZADO' }]) {
+    for (const extra of [{ tipo: 'BOLETA', facturacion_estado: 'RECHAZADO' }, { simulado: true }, { anulado_en: '2026-11-11' }, { facturacion_estado: 'RECHAZADO' }]) {
       rerender(<EnvioWhatsappFactura comprobante={factura(extra) as any} puedeReenviar />);
       expect(container.textContent).toBe('');
     }
@@ -99,11 +99,11 @@ describe('Electrónicos SUNAT: factura por WhatsApp', () => {
       pagina: 1,
       limite: 20,
       totalPaginas: 1,
-      elementos: [factura({ envio_whatsapp: envio('ENVIADO', { enviado_en: '2026-11-11T19:05:00Z' }) }), factura({ id: '11', tipo: 'BOLETA', numero_texto: 'B002-000009', facturacion_estado: 'PENDIENTE_RESUMEN' })],
+      elementos: [factura({ envio_whatsapp: envio('ENVIADO', { enviado_en: '2026-11-11T19:05:00Z' }) }), factura({ id: '11', tipo: 'BOLETA', numero_texto: 'B002-000009', facturacion_estado: 'RECHAZADO' })],
     } as any);
   });
 
-  it('la factura muestra su etiqueta y la boleta no', async () => {
+  it('la factura muestra su etiqueta y la boleta rechazada no', async () => {
     vi.spyOn(comprobantesApi, 'obtenerFacturaWhatsapp').mockResolvedValue({ activo: true, plantilla: '' });
     render(<ElectronicosTab />);
     const tarjeta = await screen.findByTestId('electronico-10');

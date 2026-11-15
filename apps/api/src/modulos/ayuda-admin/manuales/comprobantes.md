@@ -10,10 +10,10 @@ sugerencias:
   - Donde veo los pedidos que necesitan boleta o factura electronica
   - Como marco un comprobante como emitido en el facturador
   - Que datos necesito para emitir una factura
-  - Que es el comprobante simple y se envia a SUNAT
   - Como se envia la factura por WhatsApp al cliente
-  - A que hora se envian las boletas y facturas a SUNAT
   - Como corrijo la boleta o factura despues del cobro
+  - Como mando la boleta por WhatsApp a mano cuando no hay ventana
+  - Como veo que boletas y facturas faltan emitir
 ---
 # Comprobantes
 
@@ -74,13 +74,23 @@ Antes: [[caja]]
 Ver tambien: [[cierre]]
 
 ## Como se hace: Factura enviada por WhatsApp al cliente
-1. Cuando SUNAT acepta una FACTURA real (no una boleta, no una nota de venta, no una de prueba), el bot manda el PDF al celular del pedido, que es su WhatsApp. Sale una sola vez por factura, sin que nadie haga nada.
+1. Cuando SUNAT acepta una FACTURA real, o una BOLETA real queda firmada al cobrar (no la nota de venta ni las de prueba), el bot manda el PDF al celular del pedido, que es su WhatsApp. Sale una sola vez por factura, sin que nadie haga nada.
 2. Si el pedido no tiene celular valido (9 digitos que empiezan con 9), no se envia nada y la etiqueta dice Sin celular. Los pedidos del personal tampoco reciben nada.
 3. En Electronicos SUNAT y en el detalle del pedido, cada factura muestra una etiqueta: Enviada por WhatsApp (con la hora), Sin celular, Sin ventana de WhatsApp, Error al enviar, Apagado o No enviada.
 4. WhatsApp solo deja mandar un documento libre si el cliente escribio al bot en las ultimas 24 horas. Si no, y hay una plantilla de factura configurada y aprobada en Meta, sale por la plantilla; si no hay plantilla queda Sin ventana de WhatsApp y el sistema reintenta unas pocas veces (a los 15 minutos, 1 hora, 4 horas y 12 horas) por si el cliente escribe, y luego se cierra.
 5. Para volver a mandarla (fallo, o el cliente la pide de nuevo), pulsar Reenviar por WhatsApp en la factura y confirmar con Si. Respeta la ventana de 24 horas y cuenta como un mensaje mas en Meta. Requiere el permiso de emitir comprobantes.
 6. El Administrador enciende o apaga el envio automatico (y escribe el nombre de la plantilla de Meta) en Electronicos SUNAT, seccion Factura por WhatsApp. Viene encendido. Apagado, no se envia nada, ni siquiera con Reenviar.
 7. Las facturas aceptadas antes de activar esta funcion no se envian solas: usa Reenviar por WhatsApp si hace falta.
+Antes: [[caja]]
+Ver tambien: [[mensajes]]
+
+## Como se hace: Ver lo que falta emitir y mandar por WhatsApp a mano
+1. En Electronicos SUNAT, arriba de la lista hay filtros: Todos, Faltan emitir (todo lo que SUNAT aun no acepto: se emite esta noche, pendiente de envio o de resumen, en resumen, rechazado o en revision manual), Aceptados y Sin enviar por WhatsApp. Cada filtro muestra cuantos hay.
+2. Junto a los filtros esta el boton Emitir ahora. Si hay boletas esperando el resumen diario dice «Emitir ahora (N pendientes)». Al confirmar con Si emite lo que espera la noche, reintenta los pendientes de envio y manda el resumen diario de boletas a SUNAT; el aviso dice que se hizo. Lo ve el Administrador (aunque tenga mas de un rol) y quien tenga permiso de emitir comprobantes.
+3. La boleta y la factura se mandan solas al WhatsApp del pedido: la factura cuando SUNAT la acepta y la boleta apenas queda firmada al cobrar.
+4. Cuando no salio solo (etiqueta Sin ventana de WhatsApp, Error al enviar, o cuando quieras), pulsa Enviar por WhatsApp en la tarjeta del comprobante. Se abre WhatsApp (en tu celular o en WhatsApp Web) con el mensaje ya escrito: saludo, Gracias por tu compra en Caprichos, tipo y numero del comprobante, total y un enlace al PDF. Solo das clic en enviar. El boton sale en verde cuando no hay ventana de 24 horas.
+5. Al pulsarlo, la tarjeta queda con la etiqueta Enviado a mano y queda registrado quien lo hizo. Si el pedido no tiene celular valido no hay boton y dice Sin celular.
+6. El enlace al PDF solo abre ese comprobante y no muestra nada mas; no sirve para ver otros.
 Antes: [[caja]]
 Ver tambien: [[mensajes]]
 

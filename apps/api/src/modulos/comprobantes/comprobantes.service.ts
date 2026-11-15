@@ -14,6 +14,9 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { tieneRol } from '../acceso/roles-usuario';
+import { DETALLE_ENVIADO_A_MANO, FiltroElectronicos, condicionFiltroElectronicos, enlacePublicoPdf, origenPublico } from './comprobante-enlace';
+import { celularParaFactura } from './factura-whatsapp';
 import { cobroVigente } from '../caja/caja.calculo';
 import {
   extraerOpciones,
@@ -182,7 +185,7 @@ export class ComprobantesService {
    * Nada se guarda en base. Audita la lectura (datos personales). DNI/RUC completos solo para ADMIN.
    */
   async pdfComprobante(idRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string): Promise<{ nombre: string; contenido: Buffer }> {
-    const { c, datos, contenido } = await this.generarPdf(idRaw, usuario?.rol === 'ADMIN');
+    const { c, datos, contenido } = await this.generarPdf(idRaw, !!usuario && tieneRol(usuario, 'ADMIN'));
     await this.auditoria.registrar({
       categoria: 'LECTURA_SENSIBLE',
       modulo: 'comprobantes',
@@ -1291,7 +1294,7 @@ export class ComprobantesService {
 
   /** Estado del envío por WhatsApp de cada factura (solo FACTURA); sin la tabla o con error de lectura, nada (la pantalla sigue). */
   private async enviosWhatsapp(filas: Array<{ id: bigint; tipo: string }>): Promise<Map<string, any>> {
-    const ids = filas.filter((f) => f.tipo === 'FACTURA').map((f) => f.id);
+    const ids = filas.filter((f) => f.tipo === 'FACTURA' || f.tipo === 'BOLETA').map((f) => f.id);
     const mapa = new Map<string, any>();
     if (ids.length === 0) return mapa;
     try {
@@ -1305,11 +1308,9 @@ export class ComprobantesService {
     return mapa;
   }
 
-  /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. */
-  async listarElectronicos(pagina = 1, limite = 20, soloProblemas = false) {
-    const where: any = soloProblemas
-      ? condicionProblemas(new Date())
-      : { tipo: { in: ['BOLETA', 'FACTURA'] }, facturacion_estado: { not: null } };
+  /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. `filtro` ya viene validado (lista blanca). */
+  async listarElectronicos(pagina = 1, limite = 20, soloProblemas = false, filtro: FiltroElectronicos = 'todos') {
+    const where: any = soloProblemas ? condicionProblemas(new Date()) : condicionFiltroElectronicos(filtro);
     const [total, filas] = await Promise.all([
       this.prisma.comprobante.count({ where }),
       this.prisma.comprobante.findMany({
@@ -1317,15 +1318,17 @@ export class ComprobantesService {
         skip: (pagina - 1) * limite,
         take: limite,
         orderBy: { creado_en: 'desc' },
-        include: { pedido: { select: { codigo: true, total: true } } },
+        include: { pedido: { select: { codigo: true, total: true, cliente_telefono: true, es_personal: true } } },
       }),
     ]);
     const envios = await this.enviosWhatsapp(filas);
+    const origen = origenPublico();
     return {
       total,
       pagina,
       limite,
       totalPaginas: Math.ceil(total / limite),
+      contadores: soloProblemas ? undefined : await this.contadoresElectronicos(),
       elementos: filas.map((c) => ({
         ...this.serializarComprobante(c),
         envio_whatsapp: envios.get(c.id.toString()) ?? null,
@@ -1333,8 +1336,54 @@ export class ComprobantesService {
         total: Number(c.pedido.total),
         numero_texto: c.numero_texto,
         fecha_lima: formatearFechaHoraLima(c.creado_en),
+        // Envío a mano: celular listo para wa.me (null = «Sin celular») y enlace público al PDF de este comprobante
+        celular_wa: c.pedido.es_personal ? null : celularParaFactura(c.pedido.cliente_telefono),
+        enlace_pdf_publico: c.numero_texto && c.facturacion_estado !== 'POR_EMITIR_NOCHE' ? enlacePublicoPdf(origen, c.id) : null,
       })),
     };
+  }
+
+  /** Cuántos hay en cada chip de la lista, y cuántas boletas esperan el resumen diario (para «Emitir ahora (N)»). */
+  async contadoresElectronicos() {
+    const contar = (where: any) => this.prisma.comprobante.count({ where });
+    const [todos, faltan, aceptados, sin_whatsapp, pendientes_resumen] = await Promise.all([
+      contar(condicionFiltroElectronicos('todos')),
+      contar(condicionFiltroElectronicos('faltan')),
+      contar(condicionFiltroElectronicos('aceptados')),
+      contar(condicionFiltroElectronicos('sin_whatsapp')),
+      contar({ tipo: 'BOLETA', facturacion_estado: 'PENDIENTE_RESUMEN' }),
+    ]);
+    return { todos, faltan, aceptados, sin_whatsapp, pendientes_resumen };
+  }
+
+  /**
+   * Una persona abrió WhatsApp con el comprobante para mandarlo a mano. Deja la marca «Enviado a mano» (sin tocar el estado
+   * del envío automático y sin más reintentos) y lo audita. No toca el comprobante.
+   */
+  async registrarEnvioManualWhatsapp(idRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string) {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const c = await this.prisma.comprobante.findUnique({ where: { id }, select: { id: true, tipo: true, numero_texto: true } });
+    if (!c || !TIPOS_ELECTRONICOS.includes(c.tipo)) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    const ahora = new Date();
+    await this.prisma.facturaWhatsappEnvio.upsert({
+      where: { comprobante_id: id },
+      update: { detalle: DETALLE_ENVIADO_A_MANO, proximo_intento_en: null, actualizado_en: ahora },
+      create: { comprobante_id: id, estado: 'OMITIDO', detalle: DETALLE_ENVIADO_A_MANO, proximo_intento_en: null },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'FACTURA_WHATSAPP_A_MANO',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: id,
+      despues: { tipo: c.tipo, numero_texto: c.numero_texto },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return { ok: true };
   }
 
   /**
@@ -1354,7 +1403,7 @@ export class ComprobantesService {
     const archivos = filas.length
       ? await this.prisma.comprobanteArchivo.findMany({ where: { comprobante_id: { in: filas.map((c: any) => c.id) } }, select: { comprobante_id: true, tipo: true } })
       : [];
-    const esAdmin = usuario?.rol === 'ADMIN';
+    const esAdmin = !!usuario && tieneRol(usuario, 'ADMIN');
     const envios = await this.enviosWhatsapp(filas);
     const tiene = (id: bigint, tipo: string) => archivos.some((a: any) => a.comprobante_id === id && a.tipo === tipo);
     const orden = (c: any) => new Date(c.creado_en).getTime();
@@ -1585,7 +1634,7 @@ export class ComprobantesService {
     }
 
     // Auditar lectura de comprobante completo si es ADMIN
-    if (usuario?.rol === 'ADMIN') {
+    if (!!usuario && tieneRol(usuario, 'ADMIN')) {
       await this.auditoria.registrar({
         categoria: 'LECTURA_SENSIBLE',
         modulo: 'comprobantes',
@@ -1733,7 +1782,7 @@ export class ComprobantesService {
       ]);
     }
 
-    const esAdmin = usuario?.rol === 'ADMIN';
+    const esAdmin = !!usuario && tieneRol(usuario, 'ADMIN');
 
     // Auditar lectura de lista completa con DNI/RUC visibles solo si es ADMIN
     if (esAdmin) {

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException, Optional, Bad
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { tieneRol } from '../acceso/roles-usuario';
 import { ComprobantesService } from './comprobantes.service';
 import { enmascararDni, formatearCorrelativo, validarDocumentoComprobante } from './comprobantes.util';
 import { siguienteCorrelativo } from './secuencia';
@@ -106,7 +107,7 @@ export class ComprobantesNocturnoService {
   async leerCambio(pedidoIdRaw: bigint | string, usuario?: UsuarioAutenticado) {
     const c = await this.prisma.comprobanteCambioPendiente.findUnique({ where: { pedido_id: this.id(pedidoIdRaw) } });
     if (!c) return null;
-    const admin = usuario?.rol === 'ADMIN';
+    const admin = !!usuario && tieneRol(usuario, 'ADMIN');
     return {
       tipo: c.tipo,
       documento: admin ? c.documento : c.documento ? enmascararDni(c.documento) : null,
