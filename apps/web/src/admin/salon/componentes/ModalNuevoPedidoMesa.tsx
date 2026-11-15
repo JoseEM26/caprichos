@@ -25,6 +25,7 @@ import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
 import { useSesion } from '../../../comun/sesion';
 import { ModalCortesia } from '../../cortesias/ModalCortesia';
+import { ModalCargoLibre, type CargoLibreDatos } from '../../pedidos/ModalCargoLibre';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi, type DatosEdicionPedido, type LineaEdicionPedido } from '../../pedidos/pedidosApi';
@@ -92,6 +93,8 @@ export interface ModalNuevoPedidoMesaProps {
   edicion?: { datos: DatosEdicionPedido };
   /** «Agregar extra»: pedido nuevo enlazado a este; cliente, modalidad y mesa o dirección vienen bloqueados (solo productos, pago y comprobante) */
   extra?: DatosPedidoOriginal;
+  /** «Servicio o producto» ya escrito (desde el detalle de un pedido cobrado): entra al extra como primer cargo libre */
+  cargoInicial?: CargoLibreDatos;
 }
 
 /** Datos del pedido original que hereda un extra (los da el detalle del pedido). */
@@ -112,6 +115,15 @@ export interface DatosPedidoOriginal {
 function usePuedeSaldarPersonal(): boolean {
   try {
     return Boolean(useSesion().tiene('creditos/cobrar_ahora'));
+  } catch {
+    return false;
+  }
+}
+
+/** «Servicio o producto» libre (pedidos/cargo_libre: ADMIN, SUPERVISOR, Caja y Mozo) sin romper fuera del contexto de sesión. */
+function usePuedeCargoLibre(): boolean {
+  try {
+    return Boolean(useSesion().tiene('pedidos/cargo_libre'));
   } catch {
     return false;
   }
@@ -241,6 +253,7 @@ export function ModalNuevoPedidoMesa({
   puedePersonal = true,
   edicion,
   extra,
+  cargoInicial,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -1039,6 +1052,16 @@ export function ModalNuevoPedidoMesa({
     return lineas.reduce((acc, l) => acc + (l.cortesia ? 0 : l.precioTotal), 0);
   }, [lineas]);
 
+  // «Servicio o producto» libre: va aparte de los productos (sin descuentos ni promos) y suma al total.
+  // Al editar, los que ya tenía el pedido siguen contando pero no se editan aquí.
+  const puedeCargoLibre = usePuedeCargoLibre() && !edicion && pideMode !== 'personal';
+  const [cargos, setCargos] = useState<Array<CargoLibreDatos & { id: string }>>(() => (cargoInicial ? [{ ...cargoInicial, id: 'cl-0' }] : []));
+  const [cargoAbierto, setCargoAbierto] = useState(false);
+  const cargosTotal = useMemo(
+    () => Math.round((cargos.reduce((a, c) => a + c.monto, 0) + (edicion?.datos.cargosLibres ?? []).reduce((a, c) => a + c.monto, 0)) * 100) / 100,
+    [cargos, edicion],
+  );
+
   // Lo que descontará el servidor (promociones del canal local + cupón): el total y el plan de pago
   // deben salir con ese mismo descuento o el servidor responde que el plan no cuadra.
   const [descuentoServidor, setDescuentoServidor] = useState<number | null>(null);
@@ -1144,7 +1167,7 @@ export function ModalNuevoPedidoMesa({
   useEffect(() => {
     if (motivoCanje && puntosTexto !== '') setPuntosTexto('');
   }, [motivoCanje]);
-  const total = Math.max(0, Math.round((subtotal - descuento - montoPersonal - puntosCanje + envioCalculado) * 100) / 100);
+  const total = Math.max(0, Math.round((subtotal + cargosTotal - descuento - montoPersonal - puntosCanje + envioCalculado) * 100) / 100);
 
   // ¿Se declara el pago en este pedido? Mesa de local solo con «Pagar ahora»; llevar, delivery y extra siempre.
   const personalPide = pideMode === 'personal' && !extra;
@@ -1272,7 +1295,7 @@ export function ModalNuevoPedidoMesa({
       ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
       : null;
   const erroresEnvio: ErrorEnvio[] = [];
-  if (lineas.length === 0)
+  if (lineas.length === 0 && !(extra && cargos.length > 0))
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
   if (pideMode === 'personal' && !staffElegido)
     erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
@@ -1391,7 +1414,7 @@ export function ModalNuevoPedidoMesa({
   const handleEnviarPedido = async () => {
     if (enviando) return; // anti doble envío
     setErrorExtra(null);
-    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
+    if ((lineas.length === 0 && !(extra && cargos.length > 0)) || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
       return;
@@ -1423,6 +1446,13 @@ export function ModalNuevoPedidoMesa({
         };
       });
 
+      // «Servicio o producto» libre: el texto acompaña al producto elegido (posición en `lineas`); sin producto, va suelto
+      const cargosLibres = cargos.map((c) => {
+        const idx = c.paraId ? lineas.findIndex((l) => l.id === c.paraId) : -1;
+        return { descripcion: c.descripcion, monto: c.monto, ...(idx >= 0 ? { paraLineaIndex: idx } : {}) };
+      });
+      const conCargos = cargosLibres.length > 0 ? { cargosLibres } : {};
+
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
       const canalEnvio: 'MOZO' | 'CAJA' = canalActual;
       let res: any;
@@ -1433,6 +1463,7 @@ export function ModalNuevoPedidoMesa({
           extra.id,
           {
             lineas: payloadLineas,
+            ...conCargos,
             nota: notaGeneral.trim() || undefined,
             comprobante: aComprobanteAlta(valorComp),
             pago: { metodo: metodoPrincipalAhora, pagaCon: pagaConValido(), plan: planAhora },
@@ -1445,6 +1476,7 @@ export function ModalNuevoPedidoMesa({
             mesas: enEspera ? [] : mesasSeleccionadas,
             ...(enEspera ? { enEsperaMesa: true } : {}),
             lineas: payloadLineas,
+            ...conCargos,
             nota: notaGeneral.trim() || undefined,
             reservaId: reservaIdPreseleccionada,
             cuponCodigo: cuponAplicado?.codigo,
@@ -1492,6 +1524,7 @@ export function ModalNuevoPedidoMesa({
               telefono: modalidad === 'local' ? (telefonoMesaValido && telefonoMesa ? telefonoMesa : telefonoFinal) : telefonoFinal,
             },
             lineas: payloadLineas,
+            ...conCargos,
             // El pedido del personal paga con su propio bloque (pagoPersonal): no usa el plan, y un plan vacío lo rechaza el servidor
             pago: programando
               ? { metodo: 'EFECTIVO' as const }
@@ -3682,6 +3715,31 @@ export function ModalNuevoPedidoMesa({
                   )}
                 </div>
 
+                {/* «Servicio o producto» libre: para lo que no está en la carta (topping, helado extra, texto en el brownie…) */}
+                {(puedeCargoLibre || cargos.length > 0) && (
+                  <div className="np-cargos" data-testid="cargos-libres">
+                    {cargos.map((c) => (
+                      <div key={c.id} className="np-linea" data-testid="cargo-libre-fila">
+                        <div className="np-linea-fila">
+                          <span style={{ flex: 1, fontWeight: 700 }}>
+                            Servicio/producto libre · {c.descripcion}
+                            {c.paraId && lineas.find((l) => l.id === c.paraId) ? ` (para ${lineas.find((l) => l.id === c.paraId)!.nombre})` : ''}
+                          </span>
+                          <b>S/ {c.monto.toFixed(2)}</b>
+                          <button type="button" aria-label={`Quitar ${c.descripcion}`} onClick={() => setCargos((prev) => prev.filter((x) => x.id !== c.id))} style={{ minHeight: 44, minWidth: 44, border: 0, background: 'transparent', fontWeight: 800, fontSize: 18, cursor: 'pointer' }}>
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {puedeCargoLibre && (
+                      <button type="button" className="np-cupon-toggle" data-testid="btn-cargo-libre" onClick={() => setCargoAbierto(true)}>
+                        + Servicio o producto
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Cupón: plegado detrás de un botón; se despliega al tocarlo */}
                 {!edicion && !extra && (<>
                 <button
@@ -3768,6 +3826,12 @@ export function ModalNuevoPedidoMesa({
                     <span>Subtotal</span>
                     <span>S/ {subtotal.toFixed(2)}</span>
                   </div>
+                  {cargosTotal > 0 && (
+                    <div data-testid="fila-cargos-libres" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Servicios y productos libres</span>
+                      <span>S/ {cargosTotal.toFixed(2)}</span>
+                    </div>
+                  )}
                   {descuento > 0 && (
                     <div
                       style={{
@@ -3893,6 +3957,18 @@ export function ModalNuevoPedidoMesa({
           </div>
         </div>
       </div>
+
+      {cargoAbierto && (
+        <ModalCargoLibre
+          productos={extra ? [] : lineas.filter((l) => !l.bloqueada).map((l) => ({ id: l.id, nombre: l.nombre }))}
+          ayuda={extra ? 'Se cobra en este pedido extra, con su propio pago y comprobante.' : undefined}
+          alCerrar={() => setCargoAbierto(false)}
+          alConfirmar={(d) => {
+            setCargos((prev) => [...prev, { ...d, id: `cl-${Date.now()}-${prev.length}` }]);
+            setCargoAbierto(false);
+          }}
+        />
+      )}
 
       {/* Ventana de Opciones de Producto */}
       {productoSeleccionado && (

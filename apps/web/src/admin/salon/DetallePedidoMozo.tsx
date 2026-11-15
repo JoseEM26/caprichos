@@ -8,6 +8,7 @@ import type { ResultadoReimpresionPedido } from '../impresion/impresionApi';
 import { BotonCambiarPago } from '../pedidos/CambiarPago';
 import { errorCelular } from '../pedidos/ModalCorregirCliente';
 import { pedidosApi, type Pedido } from '../pedidos/pedidosApi';
+import { ModalCargoLibre, esCargoLibre, etiquetaCargoLibre, type CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import type { AreaProgreso, MiPedido } from './tipos';
 import './detalle-pedido-mozo.css';
 
@@ -59,7 +60,8 @@ function SeccionPedido({ p, extra }: { p: MiPedido; extra: boolean }) {
             <li key={l.id ?? i} className="dpm-linea">
               <span className="dpm-cant">{l.cantidad}×</span>
               <span className="dpm-linea-txt">
-                <span>{l.nombre}{l.lista ? ' · ✓ Listo' : ''}</span>
+                <span>{l.nombre}{l.lista && !l.cargoLibre ? ' · ✓ Listo' : ''}</span>
+                {esCargoLibre(l) && <span className="dpm-det" data-testid="etiqueta-cargo-libre" style={{ fontWeight: 800, color: '#5A4300' }}>{etiquetaCargoLibre(l)}</span>}
                 {det && <span className="dpm-det">{det}</span>}
                 {l.nota && <span className="dpm-det">Nota: {l.nota}</span>}
               </span>
@@ -82,7 +84,7 @@ export interface DetallePedidoMozoProps {
   /** Hubo un cambio guardado: la lista se vuelve a cargar */
   alCambio: () => void;
   /** Acciones que abren otro modal: el padre cierra este y abre el suyo */
-  alExtra: () => void;
+  alExtra: (cargoInicial?: CargoLibreDatos) => void;
   alAnular: () => void;
 }
 
@@ -129,7 +131,7 @@ export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alC
     { id: 'estado', etiqueta: PASOS[2].etiqueta, contenido: (
       <>
         <PasoEstado pedido={pedido} completo={completo} />
-        <Acciones pedido={pedido} vigente={vigente} alExtra={alExtra} alAnular={alAnular} />
+        <Acciones pedido={pedido} vigente={vigente} alExtra={alExtra} alAnular={alAnular} alCambio={alCambio} />
       </>
     ) },
   ];
@@ -274,8 +276,13 @@ function PasoEstado({ pedido, completo }: { pedido: MiPedido; completo: Pedido |
   );
 }
 
-function Acciones({ pedido, vigente, alExtra, alAnular }: { pedido: MiPedido; vigente: boolean; alExtra: () => void; alAnular: () => void }) {
+function Acciones({ pedido, vigente, alExtra, alAnular, alCambio }: { pedido: MiPedido; vigente: boolean; alExtra: (cargoInicial?: CargoLibreDatos) => void; alAnular: () => void; alCambio: () => void }) {
   const { tiene } = useSesion();
+  // «Servicio o producto»: sin cobrar se suma aquí mismo; cobrado, abre el pedido extra con el cargo
+  const [cargoAbierto, setCargoAbierto] = useState(false);
+  const [enviandoCargo, setEnviandoCargo] = useState(false);
+  const [errorCargo, setErrorCargo] = useState('');
+  const cobrado = String(pedido.pagoEstado || '').toUpperCase() === 'PAGADO';
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; t: string } | null>(null);
@@ -302,10 +309,38 @@ function Acciones({ pedido, vigente, alExtra, alAnular }: { pedido: MiPedido; vi
       <h3 className="dpm-h">Acciones</h3>
       <div className="dpm-acciones">
         {puedeReimprimir && <Boton variante="secundario" onClick={() => setConfirmando(true)}>Reimprimir comprobante de pago</Boton>}
-        {vigente && tiene('pedidos/extra') && <Boton variante="secundario" onClick={alExtra}>+ Pedido extra</Boton>}
+        {vigente && tiene('pedidos/extra') && <Boton variante="secundario" onClick={() => alExtra()}>+ Pedido extra</Boton>}
+        {vigente && tiene('pedidos/cargo_libre') && <Boton variante="secundario" onClick={() => { setErrorCargo(''); setCargoAbierto(true); }}>+ Servicio o producto</Boton>}
         {vigente && pedido.estado !== 'ENTREGADO' && tiene('pedidos/anular') && <Boton variante="peligro" onClick={alAnular}>Anular pedido</Boton>}
       </div>
       {aviso && <p className={aviso.ok ? 'dpm-ok' : 'dpm-error'} role={aviso.ok ? 'status' : 'alert'}>{aviso.t}</p>}
+      {cargoAbierto && (
+        <ModalCargoLibre
+          productos={cobrado ? [] : pedido.lineas.filter((l) => !esCargoLibre(l) && l.id).map((l) => ({ id: String(l.id), nombre: l.nombre }))}
+          ayuda={cobrado ? 'El pedido ya está cobrado: se abre un pedido extra con este servicio o producto.' : 'Se suma al total de este pedido y al plan de pago.'}
+          enviando={enviandoCargo}
+          error={errorCargo}
+          alCerrar={() => setCargoAbierto(false)}
+          alConfirmar={async (d) => {
+            if (cobrado) {
+              setCargoAbierto(false);
+              alExtra(d);
+              return;
+            }
+            setEnviandoCargo(true);
+            setErrorCargo('');
+            try {
+              await pedidosApi.agregarCargoLibre(pedido.id, { descripcion: d.descripcion, monto: d.monto, paraLineaId: d.paraId || undefined });
+              setCargoAbierto(false);
+              alCambio();
+            } catch (e) {
+              setErrorCargo(e instanceof Error ? e.message : 'No se pudo agregar el servicio o producto.');
+            } finally {
+              setEnviandoCargo(false);
+            }
+          }}
+        />
+      )}
       <Confirmar
         abierto={confirmando}
         titulo="Reimprimir comprobante de pago"

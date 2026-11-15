@@ -388,6 +388,8 @@ export class PedidosEstadoService {
       todos.flatMap((p) => [
         ...(CANALES_CON_ATENDIDO.includes(p.canal) && p.party_id != null ? [p.party_id] : []),
         ...(p.cobros?.[0]?.cobrado_por != null ? [p.cobros[0].cobrado_por] : []),
+        // «Servicio o producto» libre: quién lo agregó
+        ...p.lineas.filter((l: any) => l.cargo_libre && l.cargo_libre_por != null).map((l: any) => l.cargo_libre_por as bigint),
       ]),
     );
 
@@ -408,6 +410,9 @@ export class PedidosEstadoService {
 
       return {
         ...p,
+        lineas: p.lineas.map((l: any) =>
+          l.cargo_libre ? { ...l, cargoLibre: true, agregadoPor: l.cargo_libre_por != null ? (nombres.get(String(l.cargo_libre_por)) ?? null) : null, agregadoEn: l.cargo_libre_en } : l,
+        ),
         mediosPago: sinCobro ? mediosElegidos : mediosCobro,
         mediosPagoPendiente: sinCobro && mediosElegidos.length > 0,
         atendidoPorNombre:

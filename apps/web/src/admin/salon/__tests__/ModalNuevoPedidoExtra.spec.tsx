@@ -5,6 +5,7 @@ import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
 import { listarPersonalActivo } from '../../creditos/creditosApi';
+import * as sesionModulo from '../../../comun/sesion';
 
 vi.mock('../useSalonSocket', () => ({
   useSalonSocket: () => ({ avisoListo: null, cerrarAvisoListo: () => {} }),
@@ -55,6 +56,24 @@ describe('Modal de pedido en modo «extra»', () => {
     expect(screen.getByTestId('extra-bloqueado')).toHaveTextContent('Lucía');
     expect(screen.queryByText('Cambiar mesa')).toBeNull();
     expect(screen.queryByText('Cambiar datos')).toBeNull();
+  });
+
+  it('pedido cobrado + «Servicio o producto»: el extra nace con el cargo (sin productos) y lo envía en cargosLibres', async () => {
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ tiene: (p: string) => p === 'pedidos/cargo_libre', usuario: { rol: 'CAJERO' } } as any);
+    render(
+      <ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={[]} canal="CAJA" extra={original} cargoInicial={{ descripcion: 'Bola de helado extra', monto: 4, paraId: '' }} />,
+    );
+    expect(await screen.findByTestId('cargo-libre-fila')).toHaveTextContent('Bola de helado extra');
+    expect(screen.getByRole('button', { name: 'Continuar' })).toHaveTextContent('S/ 4.00');
+    const boleta = screen.queryByTestId('comprobante-BOLETA');
+    if (boleta && boleta.getAttribute('aria-pressed') !== 'true') fireEvent.click(boleta);
+    continuarYEnviar();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, agregar' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    const [ruta, cuerpo] = vi.mocked(api.post).mock.calls.at(-1) as any[];
+    expect(ruta).toBe('/admin/pedidos/45/extra');
+    expect(cuerpo.lineas).toEqual([]);
+    expect(cuerpo.cargosLibres).toEqual([{ descripcion: 'Bola de helado extra', monto: 4 }]);
   });
 
   it('envía solo productos, pago y comprobante a /admin/pedidos/:id/extra, sin mesa ni cliente', async () => {

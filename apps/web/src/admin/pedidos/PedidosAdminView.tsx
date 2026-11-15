@@ -1,3 +1,4 @@
+import type { CargoLibreDatos } from './ModalCargoLibre';
 import { useCuadricula } from './paginacionCaja';
 import { PaginadorCaja, TOPE_TODAS, normalizarFilas, tamanoPagina, type FilasPorPagina } from './PaginadorCaja';
 import { TablaCaja } from './TablaCaja';
@@ -239,6 +240,8 @@ export function PedidosAdminView() {
   const [errorEditar, setErrorEditar] = useState<string | null>(null);
   // Agregar extra: pedido original sobre el que se abre el modal en modo «extra»
   const [pedidoExtra, setPedidoExtra] = useState<Pedido | null>(null);
+  // «Servicio o producto» escrito en el detalle de un pedido ya cobrado: entra al extra como primer cargo libre
+  const [cargoExtra, setCargoExtra] = useState<CargoLibreDatos | undefined>(undefined);
   const abrirEditor = async (p: Pedido) => {
     setErrorEditar(null);
     try {
@@ -1286,7 +1289,7 @@ export function PedidosAdminView() {
               setNuevoPedidoAbierto(true);
             }}
             alEditar={(p) => void abrirEditor(p)}
-            alAgregarExtra={(p) => setPedidoExtra(p)}
+            alAgregarExtra={(p, cargo) => { setCargoExtra(cargo); setPedidoExtra(p); }}
             alAbrirPedido={(id) => setPedidoSeleccionadoId(String(id))}
             editandoPor={editando[String(pedidoSeleccionado.id)]?.nombre ?? null}
           />
@@ -1321,7 +1324,8 @@ export function PedidosAdminView() {
         pasoInicial="modal"
         pisos={pisosSalon}
         extra={pedidoExtra}
-        alCerrar={() => setPedidoExtra(null)}
+        cargoInicial={cargoExtra}
+        alCerrar={() => { setPedidoExtra(null); setCargoExtra(undefined); }}
         alExitoPedido={() => void cargarDatos()}
         alRefrescarMesas={async () => void cargarDatos()}
       />

@@ -237,6 +237,10 @@ export interface MiPedidoLinea {
   subtotal?: number | null;
   /** Cocina ya tiene todas las unidades listas */
   lista?: boolean;
+  /** «Servicio o producto» libre: quién lo agregó y cuándo */
+  cargoLibre?: boolean;
+  agregadoPor?: string | null;
+  agregadoEn?: string | null;
 }
 
 /** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */
