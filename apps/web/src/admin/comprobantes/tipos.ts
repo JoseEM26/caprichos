@@ -222,7 +222,7 @@ export interface RespuestaListarQuejasWhatsApp {
 
 export interface EstadoConexionWhatsAppInfo {
   conectado: boolean;
-  modo: 'meta' | 'simulado';
+  modo: 'meta' | 'simulado' | 'evolution';
   razon?: string;
 }
 

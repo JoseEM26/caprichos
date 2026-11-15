@@ -11,7 +11,7 @@ export interface MensajeEnviado {
   estado?: string;
   errorCodigo?: string | null;
   errorDetalle?: string | null;
-  modo?: 'meta' | 'simulado';
+  modo?: 'meta' | 'simulado' | 'evolution';
   whatsappMensajeId?: bigint | null;
 }
 
@@ -71,7 +71,7 @@ export interface WhatsAppGateway {
     phoneNumberId?: string,
   ): Promise<MensajeEnviado>;
 
-  estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado'; razon?: string };
+  estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado' | 'evolution'; razon?: string };
 }
 
 export const WHATSAPP_GATEWAY = 'WHATSAPP_GATEWAY';

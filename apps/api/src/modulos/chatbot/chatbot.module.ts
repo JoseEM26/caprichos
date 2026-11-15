@@ -41,6 +41,14 @@ import { NumerosWhatsappService } from './servicios/numeros-whatsapp.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto';
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
 import { ColaWebhookService } from './servicios/cola-webhook.service';
+import { WhatsAppEvolutionAdaptador } from './adaptadores/whatsapp-evolution.adaptador';
+import { EvolutionApiCliente } from './evolution/evolution-api.cliente';
+import { EvolutionConfigService } from './evolution/evolution-config.service';
+import { MenuNumeradoStore } from './evolution/menu-numerado.store';
+import { PoliticaEvolutionService } from './evolution/politica-evolution.service';
+import { EvolutionWebhookService } from './evolution/evolution-webhook.service';
+import { EvolutionWebhookController } from './evolution/evolution-webhook.controller';
+import { EvolutionAdminController } from './evolution/evolution-admin.controller';
 
 @Module({
   imports: [
@@ -62,12 +70,18 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     AccesoModule,
     DireccionesModule,
   ],
-  controllers: [NumerosBloqueadosController, WhatsappWebhookController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
+  controllers: [NumerosBloqueadosController, WhatsappWebhookController, EvolutionWebhookController, EvolutionAdminController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
   providers: [
     { provide: CUENTA_CLIENTE_BOT_PUERTO, useExisting: ClientesService },
     NumerosWhatsappService,
     WhatsAppMetaAdaptador,
     WhatsAppSimuladoAdaptador,
+    EvolutionApiCliente,
+    EvolutionConfigService,
+    MenuNumeradoStore,
+    PoliticaEvolutionService,
+    EvolutionWebhookService,
+    WhatsAppEvolutionAdaptador,
     WhatsAppMensajeriaProvider,
     WhatsappWebhookService,
     Ventana24hService,

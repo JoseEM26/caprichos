@@ -147,7 +147,7 @@ export interface DetalleConversacion {
   ventanaAbierta?: boolean;
   /** Numero de la cuenta al que escribio el cliente (ej. 51914244077). */
   numeroReceptor?: string | null;
-  modo?: 'meta' | 'simulado';
+  modo?: 'meta' | 'simulado' | 'evolution';
   simulado?: boolean;
   mensajes: MensajeItem[];
   /** El historial viene por páginas (las últimas); true = hay mensajes más antiguos por pedir. */

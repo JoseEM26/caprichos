@@ -594,7 +594,7 @@ export function ParametrosOperacionTab({
   // Estado del conector de WhatsApp (solo lectura, sin secretos)
   const [estadoWhatsApp, setEstadoWhatsApp] = useState<{
     conectado: boolean;
-    modo: 'meta' | 'simulado';
+    modo: 'meta' | 'simulado' | 'evolution';
   } | null>(null);
 
   // Estado del consumo de IA del mes actual (solo lectura, Ola 3 Agente G)
@@ -627,7 +627,7 @@ export function ParametrosOperacionTab({
       setParametros(filtrados);
 
       try {
-        const infoWa = await api.get<{ conectado: boolean; modo: 'meta' | 'simulado' }>(
+        const infoWa = await api.get<{ conectado: boolean; modo: 'meta' | 'simulado' | 'evolution' }>(
           '/admin/reclamos/whatsapp/estado-conexion',
         );
         setEstadoWhatsApp(infoWa);

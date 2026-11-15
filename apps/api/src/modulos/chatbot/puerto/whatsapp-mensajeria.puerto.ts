@@ -40,7 +40,7 @@ export interface ResultadoEnvioWhatsApp {
 
 export interface EstadoConexionWhatsApp {
   conectado: boolean;
-  modo: 'meta' | 'simulado';
+  modo: 'meta' | 'simulado' | 'evolution';
   razon?: string;
 }
 
