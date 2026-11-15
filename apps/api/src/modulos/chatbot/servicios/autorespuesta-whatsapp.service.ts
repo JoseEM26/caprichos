@@ -60,7 +60,8 @@ export class AutorespuestaWhatsappService {
 
   /** Reacciona al mensaje del cliente. true si quedó la reacción (si falla o no se puede, quien llama contesta con texto como antes). */
   async reaccionar(telefono: string, waMessageId: string | null | undefined, emoji: string): Promise<boolean> {
-    if (!waMessageId || !this.mensajeria.reaccionar) return false;
+    // Decisión del dueño: las novedades son solo de Evolution; con Meta todo sigue como antes (acuse en texto)
+    if (!waMessageId || !this.mensajeria.reaccionar || !(await this.esEvolution())) return false;
     try {
       const r = await this.mensajeria.reaccionar(telefono, waMessageId, emoji);
       return r.exito;
@@ -77,6 +78,7 @@ export class AutorespuestaWhatsappService {
 
   /** true si el mensaje quedó atendido aquí (el bot no debe contestarlo). */
   async atender(e: EntradaCortesia): Promise<boolean> {
+    if (!(await this.esEvolution())) return false; // con Meta el bot y los avisos siguen exactamente como antes
     const tomado = e.conversacion.tomado_por != null;
     const estadoFlujo = String((e.conversacion.flujo as any)?.estado ?? 'INICIO');
 
@@ -114,6 +116,10 @@ export class AutorespuestaWhatsappService {
       return this.enviarUnaVez(e.telefono, 'BIENVENIDA', TEXTOS_CORTESIA.bienvenidaConCarta(nombre, link));
     }
     return false;
+  }
+
+  private async esEvolution(): Promise<boolean> {
+    return (await this.evolution.proveedor()) === 'EVOLUTION';
   }
 
   private async botActivo(): Promise<boolean> {

@@ -171,9 +171,9 @@ describe('decisión 6: reacciones', () => {
 });
 
 describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', () => {
-  const montar = (o: { botActivo?: boolean; abierto?: boolean; pedidoActivo?: boolean; pedidoHoy?: boolean; previa?: boolean; carta?: string | null; reaccion?: boolean } = {}) => {
+  const montar = (o: { botActivo?: boolean; abierto?: boolean; pedidoActivo?: boolean; pedidoHoy?: boolean; previa?: boolean; carta?: string | null; reaccion?: boolean; proveedor?: string } = {}) => {
     const prisma: any = {
-      parametro: { findMany: jest.fn(async () => []), findUnique: jest.fn(async ({ where }: any) => (where.clave === 'chatbot_activo' ? { valor: o.botActivo ? 'si' : 'no' } : null)) },
+      parametro: { findMany: jest.fn(async () => [{ clave: 'whatsapp_proveedor', valor: o.proveedor ?? 'EVOLUTION' }]), findUnique: jest.fn(async ({ where }: any) => (where.clave === 'chatbot_activo' ? { valor: o.botActivo ? 'si' : 'no' } : null)) },
       pedido: { count: jest.fn(async ({ where }: any) => ((where.estado ? o.pedidoActivo : o.pedidoHoy) ? 1 : 0)) },
       salienteWhatsapp: { findFirst: jest.fn(async () => (o.previa ? { id: 1n } : null)) },
       horarioDia: { findUnique: jest.fn(async () => ({ cerrado: false, abre: '09:00' })) },
@@ -267,6 +267,15 @@ describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', 
     expect(await svc.reaccionarAVoucher('51900000001', 'MSGV')).toBe(true);
     expect(mensajeria.reaccionar).toHaveBeenCalledWith('51900000001', 'MSGV', '✅');
     expect(await svc.reaccionarAVoucher('51900000001', null)).toBe(false);
+  });
+  it('con Meta activo todo sigue como hoy: sin reacciones, sin fuera de horario nuevo y sin bienvenida con carta', async () => {
+    const m = montar({ proveedor: 'META', abierto: false, pedidoHoy: true });
+    expect(await m.svc.atender(entrada('quiero una torta'))).toBe(false);
+    expect(await m.svc.atender(entrada('hola'))).toBe(false);
+    expect(await m.svc.atender(entrada('gracias'))).toBe(false);
+    expect(await m.svc.reaccionarAVoucher('51900000001', 'MSGV')).toBe(false); // el acuse sale en texto
+    expect(m.outbox.encolar).not.toHaveBeenCalled();
+    expect(m.mensajeria.reaccionar).not.toHaveBeenCalled();
   });
   it('reconoce los saludos que ya reconoce el bot', () => {
     for (const t of ['hola', 'Buenas tardes', 'buen día', 'Holaa']) expect(esSaludo(t)).toBe(true);
