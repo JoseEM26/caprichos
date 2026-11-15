@@ -8,11 +8,11 @@ relacionados: [informes, cocina, caja, repartos, cierre, mirest, clientes, mensa
 sugerencias:
   - Donde veo cuanto tarda cada etapa de un pedido
   - Como encuentro los pedidos atascados ahora
-  - Como cambio la meta de minutos de una etapa
   - Cuales son los productos mas y menos vendidos
+  - Que productos tienen margen bajo o no tienen costo
+  - Que dias vendo mas y que opciones eligen mas los clientes
   - Cuantos clientes nuevos tuve y en que paso de la carta se caen antes de pedir
   - Cuanto tarda el equipo en responder por WhatsApp
-  - Que chats de WhatsApp estan sin respuesta ahora
   - Cuanto efectivo me deben rendir los repartidores y desde cuando
 ---
 # Analisis
@@ -21,7 +21,7 @@ sugerencias:
 Es el lugar para entender como trabaja el local, con graficos simples y sin salir del panel. Cada tema es una pestana y todas comparten el mismo filtro de fechas. Las pestanas son Tiempos (sigue al pedido desde que entra hasta el cierre de caja), Clientes (quienes regresan, embudo de la carta, puntos y calificaciones) y WhatsApp (cuanto tarda el equipo en responder y como se reparte el trabajo entre el bot y las personas). Los pedidos y su detalle siguen en [[caja]] y [[cocina]]; los reportes en [[informes]].
 
 ## Como se hace: Elegir fechas y filtros
-1. Entra a Analisis y elige la pestana (Tiempos, Demanda, Ventas, Clientes, WhatsApp, Reparto, Equipo o Almacen).
+1. Entra a Analisis y elige la pestana (Tiempos, Demanda, Ventas, Clientes, WhatsApp, Reparto, Equipo, Almacen o Productos).
 2. En la barra de filtros toca Hoy, Ayer, 7 dias, 30 dias o Elegir fechas (con Desde y Hasta).
 3. Si quieres, filtra por modalidad (Mesa, Recoger, Delivery, Comer en local), canal (Carta, Caja, Mozo, WhatsApp, Bot) y turno (manana, tarde, noche, por hora de Lima).
 4. El rango maximo es de 92 dias y no se puede mirar el futuro. Los filtros quedan en la direccion de la pagina.
@@ -109,6 +109,15 @@ Ver tambien: [[cierre]]
 4. Si sale Control de almacen apagado, vender no descuenta insumos y no hay consumo que analizar: no se muestran la duracion de insumos ni sus mermas de insumo. El Administrador lo enciende en Configuracion. Los productos terminados siguen porque llevan su propio conteo.
 Ver tambien: [[caja]]
 
+## Como se hace: Decidir que productos quedan y cuales salen (pestana Productos)
+1. Elige Productos. Usa las fechas y los filtros de modalidad, canal y turno; no cuentan los pedidos anulados ni rechazados, ni las cortesias, ni las partes de un combo (el combo se cuenta en Ventas).
+2. Productos vendidos: salen TODOS los productos de la carta, tambien los que vendieron cero. Cada uno trae unidades, monto, porcentaje del total, en cuantos pedidos salio y la tendencia contra el periodo anterior de igual largo. Se ordena por mas o menos vendidos, se busca por nombre y se filtra por categoria. Los dos graficos muestran los 10 mas y los 10 menos vendidos. La marca Top 20 % es el quinto de productos que mas vende y Bajo 20 % el quinto que menos vende (con menos de 5 productos no se marca).
+3. Dias de venta: el promedio de cada dia de la semana (lunes, martes...) y las 10 fechas con mas y con menos ventas. El promedio se saca solo de los dias que tuvieron ventas, asi un lunes cerrado no baja el promedio.
+4. Opciones elegidas: el ranking de opciones y tamanos de todos los productos y, al tocar un producto, que opciones se eligieron y cuantas veces.
+5. Margen: margen = (precio de venta menos costo) entre precio de venta. El costo es la suma de la receta: cantidad de cada insumo por su costo, con la merma habitual del insumo y dividido entre lo que rinde si la receta es de produccion. Se clasifica en Margen bajo (menos de 30 %), medio (30 a 70 %) y alto (mas de 70 %) y cada grupo muestra cuantos productos tiene. Un producto sin receta o con algun insumo sin costo va a Sin costo registrado y dice que le falta; no se inventa ningun numero. El margen del periodo pesa cada producto por lo que vendio y solo cuenta los que tienen costo. Si un producto no vendio nada, su margen usa el precio de la carta. No se incluyen los cambios de insumo que hacen las opciones (por ejemplo leche de almendra).
+6. Los montos y el margen son solo del Administrador; el Supervisor ve unidades, pedidos y promedios de pedidos.
+Ver tambien: [[stock]]
+
 ## Errores y dudas comunes
 - Por que una etapa dice Sin dato: falta la hora en el sistema, por ejemplo un pedido puesto en Listo a mano no guarda la hora de despacho por linea, o el delivery no registro quien lo tomo. Lo que faltaria guardar se explica en el panel.
 - Los pedidos anulados no cuentan en los promedios: aparecen aparte con su cantidad y cuanto tardaron en anularse.
@@ -121,6 +130,7 @@ Ver tambien: [[caja]]
 - Por que no coincide el total de mensajes enviados con lo que cobra Meta: aqui se cuentan solo los enviados, entregados o leidos; Meta cobra por conversacion y lo suyo manda.
 - Por que el efectivo por rendir no coincide con lo que veo en Cierre: aqui se cuenta lo entregado en los ultimos 92 dias menos lo liquidado, sin importar la caja del dia; el repartidor salda primero lo mas antiguo.
 - Por que no veo nombres en Reparto o Equipo: solo el Administrador ve el detalle por persona.
+- Por que un producto sale en Sin costo registrado: le falta la receta o a algun insumo de su receta le falta el costo; se completa en Almacen y recetas.
 - Si no veo la opcion Analisis: solo la tienen el Administrador y el Supervisor.
 
 ## Quien puede hacerlo

@@ -952,6 +952,7 @@ model PedidoLinea {
   sabores          PedidoLineaSabor[]
   cortesia         Cortesia?
 
+  @@index([pedido_id], map: "pedido_linea_pedido_id_idx")
   @@map("pedido_linea")
 }
 
@@ -967,6 +968,7 @@ model PedidoLineaOpcion {
   pedido_linea    PedidoLinea @relation(fields: [pedido_linea_id], references: [id])
   opcion          Opcion?     @relation(fields: [opcion_id], references: [id])
 
+  @@index([pedido_linea_id], map: "pedido_linea_opcion_pedido_linea_id_idx")
   @@map("pedido_linea_opcion")
 }
 
