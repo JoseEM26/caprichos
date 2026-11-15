@@ -23,6 +23,7 @@ import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { descuentosDePedido, lineaDetalleTicket } from '../impresion/constructor-etiquetas';
 import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
+import { puedeCargoLibre } from '../pedidos/cargo-libre';
 import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa, TEXTO_EN_ESPERA } from './mesas-pedido.util';
 
@@ -355,6 +356,7 @@ export class SalonService {
         telefono: tieneTelefonoReal(telefonoDigitos) ? telefonoDigitos : '',
       },
       lineas: dto.lineas,
+      cargosLibres: dto.cargosLibres,
       pago: dto.pago || { metodo: 'EFECTIVO' },
       comprobante: dto.comprobante,
       propina: dto.propina,
@@ -385,6 +387,7 @@ export class SalonService {
         omitirChequeoCarta: true,
         // Cortesías en mesa: mismo permiso cortesias/dar que en Pedidos (Caja y ADMIN; el MOZO no)
         puedeCortesia: puedeDarCortesia(usuario),
+        puedeCargoLibre: puedeCargoLibre(usuario),
         enTransaccion: async (tx, pedido) => {
           if (enEspera) {
             await tx.pedido.update({

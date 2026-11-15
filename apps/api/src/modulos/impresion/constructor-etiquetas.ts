@@ -192,7 +192,11 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
   const clienteNombre = obtenerNombreCliente(pedido);
 
   const areaMap = new Map<string, any[]>();
+  // «Servicio o producto» libre: si acompaña a un producto, su texto ya va en la nota de ese producto; si va suelto,
+  // sale como línea propia en el primer sticker de área (o en SALADOS si no hay otro)
+  const cargosSueltos = lineas.filter((l) => l.cargo_libre && !String(l.nota ?? '').startsWith('Para: '));
   lineas.forEach((l) => {
+    if (l.cargo_libre) return;
     if (l.producto_id == null && l.area_id == null && !l.area) return; // madre de combo: sus partes van por área
     const areaRaw = l.area?.nombre?.trim();
     // Bebidas no tiene sticker por área: sus vasos ya salen en construirEtiquetasBebida
@@ -204,6 +208,10 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
     areaMap.get(areaNombre)!.push(l);
   });
 
+  if (cargosSueltos.length > 0) {
+    const destino = areaMap.keys().next().value ?? 'SALADOS';
+    areaMap.set(destino, [...(areaMap.get(destino) ?? []), ...cargosSueltos]);
+  }
   const totalAreas = areaMap.size;
   let areaIdx = 1;
   const areas: EtiquetaAreaDatos[] = [];

@@ -404,6 +404,57 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('«Servicio o producto» libre (cargosLibres)', () => {
+      const dtoRecoger: CrearPedidoDto = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 } };
+      const creado = { id: 400n, codigo: 'CP-W400', estado: 'COLA', subtotal: 31.5, envio: null, total: 31.5, canal: 'CAJA', modalidad: 'RECOGER' };
+      const caja = { canal: 'CAJA' as const, usuarioPartyId: 7n, puedeCargoLibre: true };
+
+      it('Caja: suma el monto al subtotal y al total, escribe la línea libre sin producto y vincula el texto al producto', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado);
+        const dto = { ...dtoRecoger, cargosLibres: [{ descripcion: ' Texto: Feliz cumple Ana ', monto: 3.5, paraLineaIndex: 0 }] };
+        await service.crear(dto, 'cl-1', caja);
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(Number(data.subtotal)).toBe(31.5);
+        expect(Number(data.total)).toBe(31.5);
+        const lineas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(lineas[0].nota).toContain('+ Texto: Feliz cumple Ana');
+        const libre = lineas.find((l: any) => l.cargo_libre);
+        expect(libre).toMatchObject({ producto_id: null, cantidad: 1, nombre: 'Texto: Feliz cumple Ana', cargo_libre_por: 7n });
+        expect(Number(libre.precio_unit)).toBe(3.5);
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CARGO_LIBRE', entidadId: 400n }));
+      });
+
+      it('carta, WhatsApp, bot (o sin permiso): 403 y no se crea nada', async () => {
+        const dto = { ...dtoRecoger, cargosLibres: [{ descripcion: 'Topping', monto: 2 }] };
+        for (const origen of [{ canal: 'CARTA' as const }, { canal: 'WHATSAPP' as const }, { canal: 'BOT' as const }, { canal: 'CAJA' as const, usuarioPartyId: 7n }]) {
+          await expect(service.crear(dto, `cl-${origen.canal}`, origen)).rejects.toMatchObject({ response: { codigo: 'CARGO_LIBRE_NO_PERMITIDO' } });
+        }
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it.each([0, -1, 500.01, 1.234])('monto %p inválido: 400', async (monto) => {
+        await expect(service.crear({ ...dtoRecoger, cargosLibres: [{ descripcion: 'Topping', monto }] }, `cl-m-${monto}`, caja)).rejects.toMatchObject({
+          response: { codigo: 'CARGO_LIBRE_MONTO' },
+        });
+      });
+
+      it('descripción vacía o de más de 120 letras: 400', async () => {
+        for (const descripcion of ['   ', 'x'.repeat(121)]) {
+          await expect(service.crear({ ...dtoRecoger, cargosLibres: [{ descripcion, monto: 2 }] }, 'cl-d', caja)).rejects.toMatchObject({ response: { codigo: 'CARGO_LIBRE_DESCRIPCION' } });
+        }
+      });
+
+      it('sin productos solo se admite como pedido extra (con pedidoOrigenId)', async () => {
+        const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Bola de helado extra', monto: 4 }] };
+        await expect(service.crear(solo, 'cl-s1', caja)).rejects.toMatchObject({ response: { codigo: 'LINEAS_REQUERIDAS' } });
+        prismaMock.pedido.create.mockResolvedValue({ ...creado, subtotal: 4, total: 4 });
+        await service.crear(solo, 'cl-s2', { ...caja, pedidoOrigenId: 100n });
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(Number(data.total)).toBe(4);
+        expect(prismaMock.pedidoLinea.create.mock.calls.at(-1)[0].data.cargo_libre).toBe(true);
+      });
+    });
+
     describe('delivery sin punto en el mapa (esperando ubicación)', () => {
       it('con dirección y referencia es válido: sin zona ni envío, el total no suma envío', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: null, total: 28.0 });

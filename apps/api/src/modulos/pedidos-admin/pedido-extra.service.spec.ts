@@ -66,6 +66,16 @@ describe('PedidoExtraService', () => {
     expect(auditoria.registrar.mock.calls[1][0]).toMatchObject({ partyId: 8n, despues: expect.objectContaining({ rol: 'MOZO' }) });
   });
 
+  it('pedido cobrado + «Servicio o producto»: el extra lleva solo el cargo libre y el permiso del usuario', async () => {
+    const solo: any = { lineas: [], cargosLibres: [{ descripcion: 'Bola de helado extra', monto: 4 }], pago: { metodo: 'YAPE' } };
+    await servicio.crearExtra('100', solo, cajero, 'k2');
+    const [crearDto, , origen] = pedidos.crear.mock.calls[0];
+    expect(crearDto).toMatchObject({ lineas: [], cargosLibres: [{ descripcion: 'Bola de helado extra', monto: 4 }] });
+    expect(origen).toMatchObject({ pedidoOrigenId: 100n, puedeCargoLibre: true });
+    await servicio.crearExtra('100', solo, { partyId: 3n, rol: 'COCINA' } as any, 'k3');
+    expect(pedidos.crear.mock.calls[1][2]).toMatchObject({ puedeCargoLibre: false });
+  });
+
   it('audita AGREGAR_EXTRA sobre el original', async () => {
     await servicio.crearExtra('100', dto, cajero, undefined, '1.2.3.4');
     expect(auditoria.registrar).toHaveBeenCalledWith(

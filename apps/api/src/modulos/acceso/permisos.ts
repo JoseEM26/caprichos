@@ -69,6 +69,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'reimprimir_ticket' },
   // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'extra' },
+  // «Servicio o producto» (cargo libre con descripción y monto): ADMIN, SUPERVISOR, CAJERO y MOZO. Nunca la carta ni el bot
+  { modulo: 'pedidos', accion: 'cargo_libre' },
   // Historial completo de un pedido en Caja (quién hizo qué y cuándo, con antes/después): solo ADMIN y SUPERVISOR
   { modulo: 'caja', accion: 'auditoria_pedido' },
   { modulo: 'zonas', accion: 'ver' },
@@ -287,6 +289,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/imprimir_precuenta',
     'pedidos/reimprimir_ticket',
     'pedidos/extra',
+    'pedidos/cargo_libre',
     'cortesias/dar',
     'cortesias/ver',
     'creditos/cobrar_ahora',
@@ -360,6 +363,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/reimprimir_ticket', // copia del ticket de pago, solo de SUS pedidos (lo valida el servicio)
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
+    'pedidos/cargo_libre', // agrega un servicio o producto libre (descripción y monto) a un pedido
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
     'creditos/cobrar_ahora', // cobra al trabajador en el momento (pedido del personal); queda quién cobró

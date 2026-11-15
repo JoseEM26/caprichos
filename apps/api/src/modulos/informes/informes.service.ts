@@ -594,7 +594,7 @@ export class InformesService {
         const pMap: Record<string, { q: number; sub: number }> = {};
         let totU = 0;
         for (const l of lineas) {
-          const n = l.nombre || l.producto?.nombre || 'Producto';
+          const n = l.cargo_libre ? 'Servicio o producto libre' : l.nombre || l.producto?.nombre || 'Producto';
           const q = Number(l.cantidad || 1);
           const sub = Number(l.subtotal || 0);
           pMap[n] = pMap[n] || { q: 0, sub: 0 };
@@ -634,7 +634,7 @@ export class InformesService {
         const cMap: Record<string, { q: number; sub: number }> = {};
         let totMonto = 0;
         for (const l of lineas) {
-          const cat = l.producto?.categoria?.nombre || 'General';
+          const cat = l.cargo_libre ? 'Servicio o producto libre' : l.producto?.categoria?.nombre || 'General';
           const q = Number(l.cantidad || 1);
           const sub = Number(l.subtotal || 0);
           cMap[cat] = cMap[cat] || { q: 0, sub: 0 };
@@ -1452,7 +1452,7 @@ export class InformesService {
 
     // Ranking actual por categoría y producto (desde líneas de pedidos no anulados)
     const lineas = await this.prisma.pedidoLinea.findMany({
-      where: { es_cortesia: false, pedido: dePedido(), ...(categoria && { producto: deCategoria }) },
+      where: { es_cortesia: false, cargo_libre: false, pedido: dePedido(), ...(categoria && { producto: deCategoria }) },
       include: { producto: { include: { categoria: true } } },
     });
 

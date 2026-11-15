@@ -43,7 +43,16 @@ export interface CobroConDetalle {
     party_id?: bigint | null;
     repartidor_party_id?: bigint | null;
     cobro_mozo_party_id?: bigint | null;
-    lineas?: Array<{ producto?: { categoria?: { nombre?: string | null } | null } | null }>;
+    lineas?: Array<{
+      producto?: { categoria?: { nombre?: string | null } | null } | null;
+      // «Servicio o producto» libre
+      cargo_libre?: boolean;
+      nombre?: string;
+      subtotal?: unknown;
+      cargo_libre_por?: bigint | null;
+      cargo_libre_en?: Date | null;
+    }>;
+    codigo?: string;
     comprobante?: Array<{ tipo: string; numero_texto: string; facturacion_estado?: string | null; emision?: string | null; anulado_en?: Date | null }>;
   };
 }
@@ -57,6 +66,7 @@ export function idsDePersonas(cobros: CobroConDetalle[]): bigint[] {
   for (const c of cobros) {
     if (c.anulado_en) continue;
     if (c.cobrado_por != null) ids.push(c.cobrado_por);
+    for (const l of c.pedido.lineas ?? []) if (l.cargo_libre && l.cargo_libre_por != null) ids.push(l.cargo_libre_por);
     if (c.pedido.repartidor_party_id != null) ids.push(c.pedido.repartidor_party_id);
     if (c.pedido.cobro_mozo_party_id != null) ids.push(c.pedido.cobro_mozo_party_id);
     if (CANALES_CON_ATENDIDO.includes(String(c.pedido.canal)) && c.pedido.party_id != null) ids.push(c.pedido.party_id);
@@ -103,4 +113,41 @@ export function detallarVentasTurno(cobros: CobroConDetalle[], nombres: Map<stri
         comprobante: vigente ? { tipo: vigente.tipo, numero: vigente.numero_texto, estado: vigente.facturacion_estado ?? vigente.emision ?? null } : null,
       };
     });
+}
+
+/** Una línea de «Servicio o producto» libre cobrada en el turno, con el medio con que se pagó su pedido. */
+export interface ServicioLibreTurno {
+  pedidoId: string;
+  pedidoCodigo: string | null;
+  descripcion: string;
+  monto: number;
+  /** Medios del cobro del pedido (si se pagó mixto, todos; el monto de la línea cuenta una sola vez). */
+  medios: string[];
+  agregadoPor: string | null;
+  agregadoEn: Date | null;
+}
+
+/**
+ * «Servicios y productos libres» del turno: cada cargo libre de los pedidos cobrados (sin cobros anulados), con su pedido,
+ * medio de pago y quién lo agregó, más el total. El dinero ya está dentro del cobro del pedido: esto solo lo detalla.
+ */
+export function serviciosLibresDelTurno(cobros: CobroConDetalle[], nombres: Map<string, string>) {
+  const lista: ServicioLibreTurno[] = [];
+  for (const c of cobros) {
+    if (c.anulado_en) continue;
+    for (const l of c.pedido.lineas ?? []) {
+      if (!l.cargo_libre) continue;
+      lista.push({
+        pedidoId: c.pedido_id.toString(),
+        pedidoCodigo: c.pedido.codigo ?? null,
+        descripcion: l.nombre ?? '',
+        monto: enPesos(aCentimos(l.subtotal)),
+        medios: [...new Set(c.pagos.map((x) => (x.medio || '').toUpperCase()).filter(Boolean))],
+        agregadoPor: l.cargo_libre_por != null ? (nombres.get(String(l.cargo_libre_por)) ?? null) : null,
+        agregadoEn: l.cargo_libre_en ?? null,
+      });
+    }
+  }
+  lista.sort((a, b) => (a.agregadoEn?.getTime() ?? 0) - (b.agregadoEn?.getTime() ?? 0));
+  return { lista, total: enPesos(lista.reduce((t, x) => t + aCentimos(x.monto), 0)) };
 }
