@@ -920,6 +920,10 @@ model ClienteFacturacion {
 
 model PedidoLinea {
   es_cortesia      Boolean            @default(false)
+  /// «Servicio o producto» libre: descripción en `nombre`, monto en `precio_unit` (cantidad 1). Sin producto ni stock.
+  cargo_libre      Boolean            @default(false)
+  cargo_libre_por  BigInt?
+  cargo_libre_en   DateTime?          @db.Timestamptz
   id               BigInt              @id @default(autoincrement())
   pedido_id        BigInt
   producto_id      BigInt?

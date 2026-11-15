@@ -63,6 +63,8 @@ export interface DatosEdicionPedido {
   propina: number;
   tieneVoucher: boolean;
   editandoPor: { partyId: string; nombre: string } | null;
+  /** «Servicio o producto» libre ya en el pedido: no se edita aquí, pero cuenta en el total */
+  cargosLibres?: Array<{ descripcion: string; monto: number }>;
   lineas: LineaEdicionPedido[];
 }
 
@@ -139,6 +141,11 @@ export interface LineaPedido {
   /** Cortesía: la línea sale a S/ 0 y su valor de lista va en cortesia.valor_lista */
   es_cortesia?: boolean;
   cortesia?: FichaCortesia | null;
+  /** «Servicio o producto» libre: quién lo agregó y cuándo (agregadoPor puede faltar en listas viejas) */
+  cargoLibre?: boolean;
+  cargo_libre?: boolean;
+  agregadoPor?: string | null;
+  agregadoEn?: string | null;
   producto_id?: string | null;
   oferta_id?: string | null;
   linea_combo_id?: string | null;
@@ -593,11 +600,18 @@ export const pedidosApi = {
     return api.get<DatosEdicionPedido>(`/admin/pedidos/${id}/editar`);
   },
 
+  /** «Servicio o producto» en un pedido SIN cobrar: suma al total, ajusta el plan de pago (permiso pedidos/cargo_libre). */
+  async agregarCargoLibre(id: string | number, dto: { descripcion: string; monto: number; paraLineaId?: string }): Promise<{ id: string; codigo: string; version: number; total: number; totalAnterior: number }> {
+    return api.post(`/admin/pedidos/${id}/cargo-libre`, dto);
+  },
+
   /** «Agregar extra»: crea un pedido enlazado a este (hereda cliente, modalidad, mesa o dirección; sin envío). */
   async crearExtra(
     id: string | number,
     dto: {
       lineas: unknown[];
+      /** Solo cargo libre (pedido ya cobrado): lineas puede ir vacía. */
+      cargosLibres?: Array<{ descripcion: string; monto: number; paraLineaIndex?: number }>;
       pago: { metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; pagaCon?: number; plan?: PlanPagoItem[] };
       comprobante?: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; dni?: string; ruc?: string; razonSocial?: string; direccion?: string };
       nota?: string;

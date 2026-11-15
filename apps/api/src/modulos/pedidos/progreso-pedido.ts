@@ -273,6 +273,7 @@ export function unidadesDeProgreso(p: EntradaProgreso) {
   let total = 0;
   let listas = 0;
   for (const l of p.lineas ?? []) {
+    if ((l as { cargo_libre?: boolean }).cargo_libre) continue; // «Servicio o producto» libre: no pasa por cocina
     const lista = Math.min(l.listas ?? 0, l.cantidad);
     const id = areaDeLinea(l);
     const area = (id != null && nombres.get(String(id))) || 'Otros';

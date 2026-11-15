@@ -2,6 +2,7 @@ import { descuentosDePedido } from '@caprichos/compartido';
 import { InsigniaCortesia } from './HistorialAuditoria';
 import type { LineaPedido, Pedido } from './pedidosApi';
 import { itemsCaja, type ItemCaja } from './detalleCaja';
+import { esCargoLibre, etiquetaCargoLibre } from './ModalCargoLibre';
 
 const soles = (n: unknown) => `S/ ${Number(n || 0).toFixed(2)}`;
 
@@ -57,6 +58,11 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
               <div className="dp-linea-cant">{it.cantidad}×</div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div className="dp-linea-nombre">{it.nombre}</div>
+                {esCargoLibre(it) && (
+                  <div data-testid="etiqueta-cargo-libre" style={{ alignSelf: 'flex-start', background: '#FFF1C9', border: '1.5px solid #E8B923', color: '#5A4300', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 800 }}>
+                    {etiquetaCargoLibre(it)}
+                  </div>
+                )}
                 <DetalleItem x={x} />
                 {x.partes.length > 0 && (
                   <ul data-testid="partes-combo" aria-label="Piezas del combo" style={{ margin: 0, padding: '0 0 0 12px', listStyle: 'none', borderLeft: '3px solid #E3D6C6', display: 'flex', flexDirection: 'column', gap: 6 }}>

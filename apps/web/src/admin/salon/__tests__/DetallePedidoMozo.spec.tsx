@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { DetallePedidoMozo } from '../DetallePedidoMozo';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { api } from '../../../comun/api';
 
-const TODOS = ['pedidos/corregir_cliente', 'pedidos/ajustar_pago', 'pedidos/extra', 'pedidos/anular', 'pedidos/reimprimir_ticket'];
+const TODOS = ['pedidos/cargo_libre', 'pedidos/corregir_cliente', 'pedidos/ajustar_pago', 'pedidos/extra', 'pedidos/anular', 'pedidos/reimprimir_ticket'];
 let permisos = new Set(TODOS);
 vi.mock('../../../comun/sesion', () => ({ useSesion: () => ({ tiene: (p: string) => permisos.has(p) }) }));
 
@@ -120,5 +120,45 @@ describe('DetallePedidoMozo', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Cliente y pago/ }));
     await screen.findByText(/Pago del extra CP-M012/);
     expect(screen.queryByRole('button', { name: 'Cambiar método de pago' })).toBeNull();
+  });
+});
+
+describe('DetallePedidoMozo ▸ Servicio o producto', () => {
+  const abrirModal = () => {
+    fireEvent.click(screen.getByRole('tab', { name: /Estado y acciones/ }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Servicio o producto' }));
+    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Topping de fresa' } });
+    fireEvent.change(screen.getByLabelText('Monto (S/)'), { target: { value: '3.5' } });
+  };
+
+  it('sin cobrar: lo agrega al pedido (con el producto elegido) y recarga', async () => {
+    const agregar = vi.spyOn(pedidosApi, 'agregarCargoLibre').mockResolvedValue({ id: '11', codigo: 'CP-M011', version: 2, total: 13.5, totalAnterior: 10 });
+    const p = props();
+    render(<DetallePedidoMozo {...p} />);
+    abrirModal();
+    fireEvent.change(screen.getByLabelText(/¿Para qué producto/), { target: { value: 'Frappé' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+    await waitFor(() => expect(agregar).toHaveBeenCalledWith('11', { descripcion: 'Topping de fresa', monto: 3.5, paraLineaId: 'Frappé' }));
+    await waitFor(() => expect(p.alCambio).toHaveBeenCalled());
+  });
+
+  it('cobrado: abre el pedido extra con el cargo', () => {
+    const p = { ...props(), pedido: { ...pedido, pagoEstado: 'PAGADO' } };
+    render(<DetallePedidoMozo {...p} />);
+    abrirModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+    expect(p.alExtra).toHaveBeenCalledWith({ descripcion: 'Topping de fresa', monto: 3.5, paraId: '' });
+  });
+
+  it('la línea libre sale con la etiqueta y sin «Listo»; sin permiso no hay botón', () => {
+    const conCargo = { ...pedido, lineas: [linea('Frappé'), { id: 'c1', nombre: 'Topping de fresa', cantidad: 1, subtotal: 3.5, lista: true, cargoLibre: true, agregadoPor: 'Rosa', agregadoEn: '2026-10-29T20:42:00Z' }] };
+    render(<DetallePedidoMozo {...props()} pedido={conCargo} />);
+    expect(screen.getByTestId('etiqueta-cargo-libre')).toHaveTextContent('Servicio/producto libre · agregado por Rosa a las 15:42');
+    expect(screen.queryByText(/Topping de fresa · ✓ Listo/)).toBeNull();
+    cleanup();
+    permisos = new Set(TODOS.filter((x) => x !== 'pedidos/cargo_libre'));
+    render(<DetallePedidoMozo {...props()} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Estado y acciones/ }));
+    expect(screen.queryByRole('button', { name: '+ Servicio o producto' })).toBeNull();
   });
 });

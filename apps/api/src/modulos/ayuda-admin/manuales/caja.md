@@ -151,6 +151,16 @@ Ver tambien: [[repartos]]
 4. Las etiquetas de pedidos anulados, o que llevaron demasiado tiempo en cola, quedan como Vencida y no salen solas. Si hacen falta, se reimprimen desde la pestana Etiquetas.
 Ver tambien: [[cocina]]
 
+## Como se hace: Agregar un servicio o producto libre (topping, helado extra, texto en el brownie)
+Es una linea extra con una descripcion y un monto que escribes tu, para lo que no esta en la carta porque se pide poco. Suma al total del pedido, se cobra con el medio con que pague el cliente y sale en la boleta, factura o nota de venta (con IGV como el resto). No es propina, no lleva descuentos ni promociones y no descuenta stock. Solo Caja, mozo, Supervisor y Administrador lo agregan; la carta virtual y el bot no.
+1. Al armar el pedido (Nuevo pedido, paso Pedido): pulsa + Servicio o producto, bajo la lista de productos. Escribe la Descripcion (hasta 120 letras), el Monto (mayor a 0 y hasta S/ 500, con 2 decimales) y, si quieres, elige "Para que producto?". Pulsa Agregar. La linea aparece como "Servicio/producto libre" y el total sube; la x la quita antes de enviar.
+2. En un pedido ya creado y sin cobrar: abre el pedido y pulsa Servicio (Agregar servicio o producto). El total, el plan de pago y el comprobante pendiente se recalculan solos.
+3. En un pedido ya cobrado: el mismo boton abre un pedido extra enlazado al original con ese cargo, con su propio pago y su propia boleta. Revisa el pago y pulsa Registrar extra.
+4. Cocina: si elegiste un producto, el texto sale en su comanda y en su sticker (por ejemplo "+ Texto: Feliz cumple Ana"). Si lo dejaste suelto, sale como linea propia en la comanda y en el primer sticker de area.
+5. Se ve detallado: en el detalle del pedido la linea sale destacada con "Servicio/producto libre · agregado por [nombre] a las HH:MM". En el cierre, la seccion "Servicios y productos libres" lista cada uno con su pedido, monto, medio de pago y quien lo agrego, mas el total del turno. En Analisis y Ventas aparece agrupado como "Servicio o producto libre", nunca como un producto de la carta.
+6. Suma puntos como cualquier venta. Todo queda auditado: quien, cuando, el pedido, la descripcion y el monto.
+Ver tambien: [[cierre]] [[mis-pedidos]]
+
 ## Como se hace: Dar una cortesia (producto a costo S/ 0)
 Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (SUNAT y PDF) ni da puntos, y no cuenta como merma. Descuenta stock como una venta y queda registrada con su motivo y su valor de lista.
 1. Dentro de un pedido que aun no esta cobrado ni tiene descuento: abre el pedido, en la linea del producto pulsa Dar como cortesia. Tambien se puede al armar el pedido en el local (+ Pedido en mesa), en la linea del pedido.

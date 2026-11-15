@@ -12,6 +12,7 @@ import { ModalVolverAtras } from './ModalVolverAtras';
 import { ModalRevertirAnulacion } from './ModalRevertirAnulacion';
 import { fechaLima } from '../../comun/agotadoTiempo';
 import { ModalCortesia } from '../cortesias/ModalCortesia';
+import { ModalCargoLibre, esCargoLibre, estaPagadoCargo, type CargoLibreDatos } from './ModalCargoLibre';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
 import { ModalUbicar } from './ModalUbicar';
@@ -56,7 +57,7 @@ export interface PedidoDetalleProps {
   /** Abre el editor de productos y datos (solo para pedidos sin cobrar en cola, preparando o listo). */
   alEditar?: (pedido: Pedido) => void;
   /** Abre el modal en modo «extra»: pedido nuevo enlazado a este (permiso pedidos/extra). */
-  alAgregarExtra?: (pedido: Pedido) => void;
+  alAgregarExtra?: (pedido: Pedido, cargoInicial?: CargoLibreDatos) => void;
   /** Abre otro pedido (enlaces de «Extras» y «EXTRA de …»). */
   alAbrirPedido?: (id: string) => void;
   /** Nombre de quien tiene abierto el editor de este pedido (llega por socket a la lista; vale 2 minutos). */
@@ -78,6 +79,7 @@ const ICONOS = {
   imprimir: <path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z" />,
   editar: <path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" />,
   extra: <path d="M12 5v14M5 12h14" />,
+  cargo: <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 2.6 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3" />,
   repetir: <path d="M4 12a8 8 0 0114-5l2 2M20 4v5h-5M20 12a8 8 0 01-14 5l-2-2M4 20v-5h5" />,
   precuenta: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" />,
   credito: <path d="M3 6h18v12H3zM3 10h18M7 15h3" />,
@@ -121,6 +123,10 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const [abrirRechazarMozo, setAbrirRechazarMozo] = useState(false);
   const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
   const [abrirCreditoPersonal, setAbrirCreditoPersonal] = useState(false);
+  // «Servicio o producto» libre: sin cobrar se agrega aquí mismo; cobrado, abre un pedido extra con el cargo
+  const [abrirCargoLibre, setAbrirCargoLibre] = useState(false);
+  const [enviandoCargo, setEnviandoCargo] = useState(false);
+  const [errorCargo, setErrorCargo] = useState('');
 
   // Confirmar genérico Sí/No para acciones que cambian datos
   const [accionConfirmar, setAccionConfirmar] = useState<{
@@ -178,6 +184,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
     !pedido.cobroMozo;
   // Extra: con permiso y mientras el pedido no esté anulado ni rechazado (entregado o pagado sí)
   const puedeAgregarExtra = !!alAgregarExtra && tiene('pedidos/extra') && est !== 'ANULADO' && est !== 'RECHAZADO';
+  const puedeCargoLibre = tiene('pedidos/cargo_libre') && est !== 'ANULADO' && est !== 'RECHAZADO' && !(estaPagadoCargo(pedido) && !alAgregarExtra);
   // Corregir datos del cliente: con permiso y en cualquier estado salvo anulado o rechazado (entregado o cobrado sí)
   const puedeCorregirCliente = tiene('pedidos/corregir_cliente') && est !== 'ANULADO' && est !== 'RECHAZADO';
   const esPorConfirmar =
@@ -597,6 +604,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               )}
               {puedeEditar && <BotonIcono n="editar" texto="Editar" etiqueta="Editar pedido" alClic={() => alEditar?.(pedido)} />}
               {puedeAgregarExtra && <BotonIcono n="extra" texto="Extra" etiqueta="Agregar extra" alClic={() => alAgregarExtra?.(pedido)} />}
+              {puedeCargoLibre && <BotonIcono n="cargo" texto="Servicio" etiqueta="Agregar servicio o producto" alClic={() => { setErrorCargo(''); setAbrirCargoLibre(true); }} />}
               <BotonIcono n="repetir" texto="Repetir" etiqueta="Repetir este pedido" alClic={() => alRepetir?.(pedido)} />
               {esMesa && <BotonIcono n="precuenta" texto="Precuenta" etiqueta="Sacar precuenta (el cajero cobra)" alClic={() => setAbrirPrecuenta(true)} />}
               <BotonIcono n="imprimir" texto="Imprimir" etiqueta="Imprimir etiquetas y ticket" alClic={() => setAbrirImpresion(true)} />
@@ -721,6 +729,34 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           alRechazar={() => {
             setAbrirRechazarMozo(false);
             alActualizar();
+          }}
+        />
+      )}
+
+      {abrirCargoLibre && (
+        <ModalCargoLibre
+          productos={estaPagadoCargo(pedido) ? [] : (pedido.lineas ?? []).filter((l) => l.linea_combo_id == null && !l.es_cortesia && !esCargoLibre(l)).map((l) => ({ id: String(l.id), nombre: l.nombre }))}
+          ayuda={estaPagadoCargo(pedido) ? 'El pedido ya está cobrado: se abre un pedido extra con este servicio o producto.' : 'Se suma al total de este pedido y al plan de pago.'}
+          enviando={enviandoCargo}
+          error={errorCargo}
+          alCerrar={() => setAbrirCargoLibre(false)}
+          alConfirmar={async (d) => {
+            if (estaPagadoCargo(pedido)) {
+              setAbrirCargoLibre(false);
+              alAgregarExtra?.(pedido, d);
+              return;
+            }
+            setEnviandoCargo(true);
+            setErrorCargo('');
+            try {
+              await pedidosApi.agregarCargoLibre(pedido.id, { descripcion: d.descripcion, monto: d.monto, paraLineaId: d.paraId || undefined });
+              setAbrirCargoLibre(false);
+              alActualizar();
+            } catch (err) {
+              setErrorCargo(err instanceof Error ? err.message : 'No se pudo agregar el servicio o producto.');
+            } finally {
+              setEnviandoCargo(false);
+            }
           }}
         />
       )}

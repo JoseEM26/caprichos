@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsInt,
@@ -12,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  CargoLibreDto,
   ComprobantePedidoDto,
   LineaPedidoDto,
   PagoPersonalDto,
@@ -49,6 +51,14 @@ export class AbrirPedidoMesaDto {
   @ValidateNested({ each: true })
   @Type(() => LineaPedidoDto)
   lineas!: LineaPedidoDto[];
+
+  /** «Servicio o producto» libre (descripción y monto). Lo valida PedidosService (permiso pedidos/cargo_libre). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => CargoLibreDto)
+  cargosLibres?: CargoLibreDto[];
 
   @IsOptional()
   @IsString()

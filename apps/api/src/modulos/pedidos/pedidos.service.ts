@@ -47,6 +47,7 @@ import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarS
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
+import { exigirCanalPersonal, textoCargoParaNota, validarCargosLibres } from './cargo-libre';
 import { AdelantoEntrada, registrarAdelantoTx } from './adelanto.util';
 import { leerConfigProgramados, validarProgramadoPara } from './programado.util';
 
@@ -114,6 +115,8 @@ export interface OrigenPedido {
   puedeCobrarAhora?: boolean;
   /** Quien da cortesías (permiso cortesias/dar). */
   puedeCortesia?: boolean;
+  /** Quien agrega «Servicio o producto» libre (permiso pedidos/cargo_libre); la carta y el bot nunca lo traen. */
+  puedeCargoLibre?: boolean;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -696,6 +699,37 @@ export class PedidosService {
     }
   }
 
+  /** Escribe los cargos libres como líneas sin producto (cantidad 1, sin stock ni área). Quién y cuándo quedan en la fila. */
+  async escribirCargosLibres(
+    tx: Prisma.TransactionClient,
+    pedidoId: bigint,
+    cargos: Array<{ descripcion: string; monto: number; paraLineaIndex?: number | null; paraNombre?: string | null }>,
+    lineasCalculadas: any[],
+    porPartyId?: bigint | string | number,
+  ) {
+    const ahora = new Date();
+    for (const c of cargos) {
+      const para = c.paraNombre ?? (c.paraLineaIndex != null ? lineasCalculadas[c.paraLineaIndex]?.nombre : null);
+      await tx.pedidoLinea.create({
+        data: {
+          pedido_id: pedidoId,
+          producto_id: null,
+          nombre: c.descripcion,
+          cantidad: 1,
+          precio_unit: new Prisma.Decimal(c.monto),
+          subtotal: new Prisma.Decimal(c.monto),
+          nota: para ? `Para: ${para}` : null,
+          cargo_libre: true,
+          // no pasa por cocina: nace lista y despachada para no frenar el pedido
+          listas: 1,
+          despachadas: 1,
+          cargo_libre_por: porPartyId != null ? BigInt(porPartyId) : null,
+          cargo_libre_en: ahora,
+        },
+      });
+    }
+  }
+
   /** Lo que consumen del stock las líneas calculadas: sus opciones ligadas a stock, el producto de cada línea y las partes de sus combos. */
   async ventaDeLineas(db: any, lineasCalculadas: any[]): Promise<LineaVentaProducto[]> {
     const ventaOpciones = await lineasDeRequisitosOpcion(db, lineasCalculadas.flatMap((l) => l.requisitosOpcion));
@@ -890,14 +924,27 @@ export class PedidosService {
     }
 
     // 5. Validar líneas del pedido y calcular precios en el servidor
-    if (!Array.isArray(dto.lineas) || dto.lineas.length === 0) {
+    // 5.-1. «Servicio o producto» libre: solo Caja y mozo; descripción y monto validados aquí (nunca confiar en el cliente)
+    if ((dto.cargosLibres ?? []).length > 0) exigirCanalPersonal(origen?.canal, !!origen?.usuarioPartyId && !!origen?.puedeCargoLibre);
+    const cargosLibres = validarCargosLibres(dto.cargosLibres, dto.lineas?.length ?? 0);
+    const cargosTotal = Number(cargosLibres.reduce((a, c) => a + c.monto, 0).toFixed(2));
+    // Solo un pedido extra puede llevar únicamente cargos libres (el de un pedido ya cobrado)
+    const soloCargos = cargosLibres.length > 0 && (dto.lineas ?? []).length === 0 && origen?.pedidoOrigenId != null;
+    if (!soloCargos && (!Array.isArray(dto.lineas) || dto.lineas.length === 0)) {
       throw new BadRequestException({
         codigo: 'LINEAS_REQUERIDAS',
         mensaje: 'El pedido debe contener al menos un producto',
       });
     }
 
-    const { lineasCalculadas, subtotalCalculado } = await this.calcularLineasPedido(dto.lineas, clienteNombre, origen, dto.modalidad);
+    const { lineasCalculadas, subtotalCalculado } = soloCargos
+      ? { lineasCalculadas: [] as any[], subtotalCalculado: 0 }
+      : await this.calcularLineasPedido(dto.lineas, clienteNombre, origen, dto.modalidad);
+    // El texto del cargo acompaña al producto elegido: sale en su comanda y en su sticker (vía la nota de la línea)
+    for (const c of cargosLibres) {
+      const destino = c.paraLineaIndex != null ? lineasCalculadas[c.paraLineaIndex] : null;
+      if (destino) destino.nota = [destino.nota, textoCargoParaNota(c.descripcion)].filter(Boolean).join(' · ');
+    }
 
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
@@ -1194,7 +1241,7 @@ export class PedidosService {
 
     // El total es lo que realmente se paga: ya sin los puntos canjeados (1 punto = S/ 1). El plan de pago, «paga con»,
     // el voucher y el comprobante se validan contra este neto.
-    const totalCalculado = totalPedido({ subtotal: subtotalCalculado, descuento: descuentoAplicado, envio: envio ?? 0, puntosCanjeados: puntosCanje });
+    const totalCalculado = totalPedido({ subtotal: Number((subtotalCalculado + cargosTotal).toFixed(2)), descuento: descuentoAplicado, envio: envio ?? 0, puntosCanjeados: puntosCanje });
 
     // 7.5. Propina opcional: va APARTE de la venta (no suma al total, comprobante ni puntos). Lo que paga el
     // cliente (plan, voucher, efectivo) es total + propina.
@@ -1323,7 +1370,7 @@ export class PedidosService {
           pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
-          subtotal: new Prisma.Decimal(subtotalCalculado),
+          subtotal: new Prisma.Decimal(Number((subtotalCalculado + cargosTotal).toFixed(2))),
           descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
           total: new Prisma.Decimal(totalCalculado),
@@ -1408,6 +1455,7 @@ export class PedidosService {
       }
 
       await this.escribirLineasPedido(tx, pedido.id, lineasCalculadas, clienteNombre, origen);
+      await this.escribirCargosLibres(tx, pedido.id, cargosLibres, lineasCalculadas, origen?.usuarioPartyId);
 
       // Adelanto de un pedido programado: entra a la caja de HOY en esta misma transacción (si la caja está cerrada, no se crea nada)
       if (origen?.adelanto && programadoPara) {
@@ -1548,6 +1596,23 @@ export class PedidosService {
         { ruc: comprobanteDoc, razonSocial: comprobanteRazon, direccion: comprobanteDireccion },
         { canal: canalPedido, actorPartyId: origen?.usuarioPartyId ?? null, pedido: pedidoCreado.codigo },
       );
+    }
+
+    if (cargosLibres.length > 0) {
+      try {
+        await this.auditoria?.registrar({
+          categoria: 'CAMBIO',
+          modulo: 'pedidos',
+          accion: 'CARGO_LIBRE',
+          resultado: 'OK',
+          entidad: 'pedido',
+          entidadId: pedidoCreado.id,
+          partyId: origen?.usuarioPartyId !== undefined ? BigInt(origen.usuarioPartyId) : undefined,
+          despues: { pedido: pedidoCreado.codigo, cargos: cargosLibres.map((c) => ({ descripcion: c.descripcion, monto: c.monto })), total: totalFinal },
+        });
+      } catch {
+        // la línea ya quedó con quién y cuándo; la auditoría no deshace el pedido
+      }
     }
 
     if (cobroAhora) {

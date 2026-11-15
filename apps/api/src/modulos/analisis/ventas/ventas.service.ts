@@ -35,6 +35,7 @@ export interface PedidoVenta {
     producto_id: bigint | null;
     oferta_id: bigint | null;
     es_cortesia: boolean;
+    cargo_libre?: boolean;
     producto?: { categoria?: { nombre: string } | null } | null;
   }>;
   cobros: Array<{ pagos: Array<{ medio: string | null; monto: unknown }> }>;
@@ -114,8 +115,9 @@ export function agregarVentas(todos: PedidoVenta[], rango: { dias: number; turno
       if (l.es_cortesia) continue; // cortesía: no es venta
       const lc = centimos(l.subtotal);
       const esCombo = l.oferta_id != null;
-      const clave = esCombo ? `o${l.oferta_id}` : l.producto_id != null ? `p${l.producto_id}` : `n${l.nombre}`;
-      const f = productos.get(clave) ?? { nombre: l.nombre, categoria: esCombo ? 'Combos' : (l.producto?.categoria?.nombre ?? 'Sin categoría'), unidades: 0, c: 0, ids: new Set<number>(), combo: esCombo };
+      // «Servicio o producto» libre: un solo renglón agrupado, nunca un producto del catálogo
+      const clave = l.cargo_libre ? 'cargo-libre' : esCombo ? `o${l.oferta_id}` : l.producto_id != null ? `p${l.producto_id}` : `n${l.nombre}`;
+      const f = productos.get(clave) ?? { nombre: l.cargo_libre ? 'Servicio o producto libre' : l.nombre, categoria: l.cargo_libre ? 'Servicio o producto libre' : esCombo ? 'Combos' : (l.producto?.categoria?.nombre ?? 'Sin categoría'), unidades: 0, c: 0, ids: new Set<number>(), combo: esCombo };
       f.unidades += l.cantidad;
       f.c += lc; // las opciones ya van dentro del subtotal de su línea: no se suman aparte
       f.ids.add(idx);
@@ -247,7 +249,7 @@ export class VentasService {
         descuento_detalle: true,
         lineas: {
           where: { linea_combo_id: null },
-          select: { nombre: true, cantidad: true, subtotal: true, producto_id: true, oferta_id: true, es_cortesia: true, producto: { select: { categoria: { select: { nombre: true } } } } },
+          select: { nombre: true, cantidad: true, subtotal: true, producto_id: true, oferta_id: true, es_cortesia: true, cargo_libre: true, producto: { select: { categoria: { select: { nombre: true } } } } },
         },
         cobros: { where: { anulado_en: null }, select: { pagos: { select: { medio: true, monto: true } } } },
       },

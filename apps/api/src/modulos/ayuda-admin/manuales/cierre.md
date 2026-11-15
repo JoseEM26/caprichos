@@ -68,6 +68,12 @@ Ver tambien: [[comprobantes]]
 9. Abajo puedes cambiar cuantas ventas ver por pagina y pasar de pagina.
 Ver tambien: [[caja]]
 
+## Como se hace: Ver de donde salio el dinero de los servicios y productos libres
+1. En la pestana Turno actual, bajo Ventas del turno, esta la seccion Servicios y productos libres: una fila por cada cargo libre cobrado en el turno, con pedido, descripcion, monto, medio de pago, quien lo agrego y la hora, y arriba el total del turno.
+2. Ese dinero ya esta dentro del cobro de cada pedido (con el medio con que se pago) y en los montos esperados: la seccion solo lo detalla, no cambia lo que debe cuadrar. En Movimientos lo ves dentro de su pedido.
+3. Un cobro anulado deja de contarse en la seccion.
+Ver tambien: [[caja]]
+
 ## Como se hace: Proceder cuando la caja no cuadra
 1. Si los montos declarados difieren de las ventas registradas, la pantalla muestra el aviso No cuadra y solicita un segundo conteo fisico.
 2. Volver a contar el dinero y corregir las cantidades ingresadas.

@@ -132,6 +132,22 @@ export class LineaPedidoDto {
   cortesia?: { motivo: string; nota?: string };
 }
 
+/** «Servicio o producto» libre (solo Caja y mozo; el servidor valida canal, descripción y monto). */
+export class CargoLibreDto {
+  @IsString({ message: 'La descripción debe ser un texto' })
+  descripcion!: string;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto debe ser un número con 2 decimales como máximo' })
+  monto!: number;
+
+  /** Posición, en `lineas`, del producto al que acompaña (opcional). */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  paraLineaIndex?: number;
+}
+
 export class PlanPagoItemDto {
   @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'], {
     message: 'Medio de pago del plan no válido',
@@ -244,6 +260,14 @@ export class CrearPedidoDto {
   @ValidateNested({ each: true })
   @Type(() => LineaPedidoDto)
   lineas!: LineaPedidoDto[];
+
+  /** Servicios o productos libres (descripción + monto). Solo Caja y mozo: carta, WhatsApp y bot reciben 403. */
+  @IsOptional()
+  @IsArray({ message: 'cargosLibres debe ser una lista' })
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => CargoLibreDto)
+  cargosLibres?: CargoLibreDto[];
 
   @ValidateNested()
   @Type(() => PagoPedidoDto)

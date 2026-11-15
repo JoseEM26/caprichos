@@ -47,7 +47,7 @@ import {
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
-import { detallarVentasTurno, idsDePersonas, nombresDeCobros } from './ventas-turno.util';
+import { detallarVentasTurno, idsDePersonas, nombresDeCobros, serviciosLibresDelTurno } from './ventas-turno.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -842,7 +842,7 @@ export class CierreService {
             party_id: true,
             repartidor_party_id: true,
             cobro_mozo_party_id: true,
-            lineas: { select: { producto: { select: { categoria: { select: { nombre: true } } } } } },
+            lineas: { select: { producto: { select: { categoria: { select: { nombre: true } } } }, cargo_libre: true, nombre: true, subtotal: true, cargo_libre_por: true, cargo_libre_en: true } },
             comprobante: { select: { tipo: true, numero_texto: true, facturacion_estado: true, emision: true, anulado_en: true } },
           },
         },
@@ -873,6 +873,8 @@ export class CierreService {
       cobrados: mapearCobrosCaja(cobros),
       // Detalle de cada venta (quién, tipo, categoría, repartidor…): aditivo, se une por pedidoId
       ventas: detallarVentasTurno(cobros as any, nombres),
+      // «Servicios y productos libres» del turno: lista y total (ya están dentro de los cobros; solo se detallan)
+      serviciosLibres: serviciosLibresDelTurno(cobros as any, nombres),
       movimientos: mapearMovimientosCaja(movimientos),
       apertura: Number(caja.apertura),
       efectivoEsperado: montos.esperadoEfectivo,

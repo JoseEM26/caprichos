@@ -103,6 +103,12 @@ export interface VentaDetalle {
   comprobante: { tipo: string; numero: string; estado: string | null } | null;
 }
 
+/** «Servicios y productos libres» del turno: cada cargo cobrado, su medio de pago y quién lo agregó, y el total. */
+export interface ServiciosLibresTurno {
+  lista: Array<{ pedidoId: string; pedidoCodigo: string | null; descripcion: string; monto: number; medios: string[]; agregadoPor: string | null; agregadoEn: string | null }>;
+  total: number;
+}
+
 export interface MontosEsperados {
   cajaId: number;
   /** Fecha de la caja ABIERTA que se cierra (puede ser de un día anterior) */
@@ -111,6 +117,8 @@ export interface MontosEsperados {
   cobrados: CobroTurno[];
   /** Detalle de cada venta de `cobrados` (quién, tipo, categoría, repartidor…); puede faltar en servidores viejos */
   ventas?: VentaDetalle[];
+  /** Cargos libres del turno (ya incluidos en los cobros); puede faltar en servidores viejos */
+  serviciosLibres?: ServiciosLibresTurno;
   movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;

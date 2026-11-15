@@ -83,7 +83,8 @@ export class PuntosService {
         productoId: l.producto_id ?? `linea-${l.id}`,
         subtotal: Number(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
         // Una cortesía no suma puntos ni se canjea
-        noSumaBeneficios: (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia,
+        // «Servicio o producto» libre: suma puntos como cualquier venta (sin producto no hay marca «no suma»)
+        noSumaBeneficios: l.cargo_libre ? false : (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia,
         enPromocion: l.oferta_id !== null || l.linea_combo_id !== null,
       })),
       (descuentoDetalle as any) ?? [],

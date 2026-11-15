@@ -40,6 +40,13 @@ Despues: [[caja]]
 1. El mozo no anula pedidos: solo Caja o el Administrador pueden hacerlo (decision del dueno).
 2. Avisa a Caja; ella anula el pedido con motivo y se devuelven el stock y los puntos y se libera la mesa.
 
+## Como se hace: Agregar un servicio o producto libre
+1. Para algo que no esta en la carta (topping, bola de helado extra, texto en el brownie): al armar el pedido pulsa + Servicio o producto, escribe la Descripcion y el Monto (hasta S/ 500) y, si quieres, para que producto es.
+2. En un pedido que ya tomaste y aun no se cobra: Ver detalle, paso 3 Estado y acciones, + Servicio o producto. El total y el plan de pago se actualizan.
+3. Si el pedido ya se cobro, el mismo boton abre un pedido extra con ese cargo (con su propio pago).
+4. El texto sale en la comanda y en el sticker del producto elegido. En el detalle la linea dice "Servicio/producto libre · agregado por [nombre] a las HH:MM".
+Ver tambien: [[caja]]
+
 ## Errores y dudas
 - El pedido digital no aparece en cocina hasta que Caja apruebe el voucher; ver [[caja]].
 - "Voucher bloqueado": Caja ya aprobo; todo cambio lo hace Caja.
