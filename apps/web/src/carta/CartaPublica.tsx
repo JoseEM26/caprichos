@@ -14,7 +14,7 @@ import {
   EstadoLocalCarta,
 } from './tipos';
 import { CarritoProvider, useCarrito } from './CarritoContext';
-import { abrirSeguimientoDesdeEnlace, leerEnlaceSeguimiento } from './seguimiento';
+import { abrirSeguimientoDesdeEnlace, leerEnlaceSeguimiento, quitarEnlaceSeguimiento } from './seguimiento';
 import { CabeceraCarta } from './CabeceraCarta';
 import type { PaginaCarta } from './CabeceraCarta';
 import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
@@ -134,6 +134,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     if (vistaPrevia) return;
     const enlace = leerEnlaceSeguimiento();
     if (!enlace) return;
+    quitarEnlaceSeguimiento(); // se abre una sola vez: recargar o pedir otra vez no vuelve a este pedido
     void abrirSeguimientoDesdeEnlace(enlace).then((estado) => {
       if (estado) setSeguimientoAbierto({ codigo: estado.codigo, token: enlace.token, modalidad: estado.modalidad, nombre: '', creadoEn: '' });
     });

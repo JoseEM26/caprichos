@@ -73,6 +73,7 @@ export function FormularioCheckout({
     abrirCajon,
     limpiarCarrito,
     setPedidoConfirmado,
+    setSeguimientoAbierto,
     inventario,
     marcarQuedan,
     marcarQuedanSabor,
@@ -908,6 +909,7 @@ export function FormularioCheckout({
       });
 
       limpiarCarrito();
+      setSeguimientoAbierto(null); // si había un pedido viejo abierto, la pantalla muestra el nuevo
       cerrarCheckout();
       void cuentaCtx?.refrescar();
       guardarPedido({
