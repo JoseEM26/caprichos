@@ -54,8 +54,10 @@ export class PagosOnlineService {
   }
 
   async config() {
+    // Sin la caja de hoy abierta el cobro se rechazaría (LOCAL_SIN_CAJA): la carta ni lo ofrece
+    const cajaAbierta = await exigirCajaAbiertaHoy(this.prisma as any).then(() => true, () => false);
     return {
-      activo: await this.estaActivo(),
+      activo: (await this.estaActivo()) && cajaAbierta,
       publicKey: this.pasarela.publicKey,
       modo: this.pasarela.modo,
       medios: MEDIOS_ONLINE,
