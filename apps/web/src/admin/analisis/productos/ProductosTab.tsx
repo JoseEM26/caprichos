@@ -1,14 +1,38 @@
 import { Fragment, useId, useMemo, useState } from 'react';
 import { Cargando } from '../../../comun/Cargando';
 import { EstadoError } from '../../../comun/EstadoError';
-import { BarrasHorizontales, Semaforo, TarjetaAnalisis, TarjetaIndicador, consultaDe, ddmm, useConsultaAnalisis, type NivelSemaforo, type PropsPestanaAnalisis } from '../comun';
+import {
+  BarrasHorizontales,
+  Paginador,
+  Semaforo,
+  TarjetaAnalisis,
+  TarjetaIndicador,
+  consultaDe,
+  ddmm,
+  usePaginacion,
+  useConsultaAnalisis,
+  type NivelSemaforo,
+  type PropsPestanaAnalisis,
+} from '../comun';
 import type { FilaMargen, FilaProducto, GrupoMargen, Opcion, RespuestaProductos } from './tipos';
 
-const FORMATO = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+const FORMATO = new Intl.NumberFormat('es-PE', {
+  style: 'currency',
+  currency: 'PEN',
+});
 const soles = (n: number | null) => (n == null ? 'Sin dato' : FORMATO.format(n));
 const pct = (n: number | null) => (n == null ? 'Sin dato' : `${String(n).replace('.', ',')} %`);
 const NUM = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 });
 const TOP_BARRAS = 10;
+
+/** Misma regla del servidor: 20 % que más vende (TOP) y 20 % que menos (BAJO); con menos de 5 no se marca. */
+function marcar(filas: FilaProducto[]): FilaProducto[] {
+  const k = Math.ceil(filas.length * 0.2);
+  return filas.map((f, i) => ({
+    ...f,
+    marca: filas.length < 5 ? null : i >= filas.length - k ? 'BAJO' : i < k ? 'TOP' : null,
+  }));
+}
 
 type Seccion = 'vendidos' | 'dias' | 'modificadores' | 'margen';
 const SECCIONES: ReadonlyArray<{ id: Seccion; nombre: string }> = [
@@ -19,14 +43,29 @@ const SECCIONES: ReadonlyArray<{ id: Seccion; nombre: string }> = [
 ];
 
 /** Pestaña «Productos»: qué se vende, qué días, con qué opciones y cuánto se gana. Los montos y márgenes son solo del ADMIN. */
-export function ProductosTab({ filtros }: PropsPestanaAnalisis) {
+export function ProductosTab({ filtros, alCambiarPeriodo }: PropsPestanaAnalisis) {
   const { datos, estado, mensaje, recargar } = useConsultaAnalisis<RespuestaProductos>(`/admin/analisis/productos?${consultaDe(filtros, ['modalidad', 'canal', 'turno'])}`);
   const [seccion, setSeccion] = useState<Seccion>('vendidos');
   return (
     <div className="an">
       {estado === 'cargando' && !datos && <Cargando mensaje="Calculando los productos" />}
       {estado === 'error' && !datos && <EstadoError titulo="No se pudieron calcular los productos" mensaje={mensaje || 'Prueba de nuevo en unos segundos.'} alReintentar={recargar} />}
-      {datos && (
+      {datos && datos.productos.total > 0 && datos.productos.unidades === 0 && (
+        <div className="an-estado" role="status">
+          <strong>Todavía no hay ventas en este periodo</strong>
+          {alCambiarPeriodo && (
+            <div className="an-chips">
+              <button type="button" className="an-chip" onClick={() => alCambiarPeriodo('ayer')}>
+                Ver ayer
+              </button>
+              <button type="button" className="an-chip" onClick={() => alCambiarPeriodo('7d')}>
+                Ver últimos 7 días
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {datos && !(datos.productos.total > 0 && datos.productos.unidades === 0) && (
         <>
           <div className="an-chips" role="group" aria-label="Secciones de productos">
             {SECCIONES.map((s) => (
@@ -69,12 +108,16 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
   const [orden, setOrden] = useState<'mas' | 'menos'>('mas');
   const [texto, setTexto] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [conCeros, setConCeros] = useState(false);
   const p = d.productos;
+  // sin el interruptor, los de 0 ventas no se muestran ni cuentan para «Bajo 20 %» (la marca se recalcula entre los que vendieron)
+  const base = useMemo(() => (conCeros ? p.filas : marcar(p.filas.filter((x) => x.unidades > 0))), [p.filas, conCeros]);
   const filas = useMemo(() => {
     const q = texto.trim().toLowerCase();
-    const f = p.filas.filter((x) => (!categoria || x.categoria === categoria) && (!q || x.nombre.toLowerCase().includes(q)));
+    const f = base.filter((x) => (!categoria || x.categoria === categoria) && (!q || x.nombre.toLowerCase().includes(q)));
     return orden === 'mas' ? f : [...f].reverse();
-  }, [p.filas, orden, texto, categoria]);
+  }, [base, orden, texto, categoria]);
+  const pag = usePaginacion(filas, `${texto}|${categoria}|${orden}|${conCeros}`);
   // las barras muestran los N de cada extremo sobre TODO el catálogo (sin buscador): la marca decide quedarse o irse
   const barras = (lista: FilaProducto[]) =>
     lista.map((f) => ({
@@ -85,8 +128,8 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
       texto: `${f.unidades} u.${f.monto != null ? ` · ${soles(f.monto)}` : ''}`,
       semaforo: (f.marca === 'TOP' ? 'verde' : f.marca === 'BAJO' ? 'rojo' : undefined) as NivelSemaforo | undefined,
     }));
-  const mas = p.filas.filter((f) => f.unidades > 0).slice(0, TOP_BARRAS);
-  const menos = [...p.filas].reverse().slice(0, TOP_BARRAS);
+  const mas = base.filter((f) => f.unidades > 0).slice(0, TOP_BARRAS);
+  const menos = [...base].reverse().slice(0, TOP_BARRAS);
   if (p.total === 0) return <div className="an-estado">No hay productos en el catálogo.</div>;
   return (
     <>
@@ -100,14 +143,19 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
         <TarjetaAnalisis id="an-prod-mas" titulo={`Los ${TOP_BARRAS} más vendidos`} estado={mas.length ? 'ok' : 'vacio'} vacio="Sin ventas en este período.">
           <BarrasHorizontales descripcion="Productos más vendidos por unidades" filas={barras(mas)} />
         </TarjetaAnalisis>
-        <TarjetaAnalisis id="an-prod-menos" titulo={`Los ${TOP_BARRAS} menos vendidos`} subtitulo="Incluye los que no vendieron nada." estado="ok">
+        <TarjetaAnalisis
+          id="an-prod-menos"
+          titulo={`Los ${TOP_BARRAS} menos vendidos`}
+          subtitulo={conCeros ? 'Incluye los que no vendieron nada.' : 'Solo los que vendieron algo. Activa «Mostrar productos sin ventas» para ver los demás.'}
+          estado="ok"
+        >
           <BarrasHorizontales descripcion="Productos menos vendidos por unidades" filas={barras(menos)} />
         </TarjetaAnalisis>
       </div>
       <TarjetaAnalisis
         id="an-prod-lista"
         titulo="Todos los productos"
-        subtitulo="Top 20 % es el quinto que más vende; Bajo 20 % el quinto que menos vende. La tendencia compara con el período anterior de igual largo."
+        subtitulo="Top 20 % es el quinto que más vende; Bajo 20 % el quinto que menos vende (los productos sin ventas solo cuentan si activas el interruptor). La tendencia compara con el período anterior de igual largo."
         estado="ok"
       >
         <div className="an-herramientas">
@@ -130,6 +178,10 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
               ))}
             </select>
           </div>
+          <label className="an-interruptor">
+            <input type="checkbox" checked={conCeros} onChange={(e) => setConCeros(e.target.checked)} />
+            Mostrar productos sin ventas ({p.sinVentas})
+          </label>
           <div className="an-chips" role="group" aria-label="Orden">
             <button type="button" className="an-chip" aria-pressed={orden === 'mas'} onClick={() => setOrden('mas')}>
               Más vendidos primero
@@ -156,7 +208,7 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
                 </tr>
               </thead>
               <tbody>
-                {filas.map((f) => (
+                {pag.filas.map((f) => (
                   <tr key={f.id}>
                     <td>
                       {f.nombre}
@@ -179,6 +231,7 @@ function Vendidos({ d }: { d: RespuestaProductos }) {
             </table>
           </div>
         )}
+        <Paginador p={pag} />
       </TarjetaAnalisis>
     </>
   );
@@ -189,12 +242,7 @@ function Dias({ d }: { d: RespuestaProductos }) {
   const x = d.dias;
   const dinero = d.conDinero;
   const tabla = (titulo: string, id: string, filas: typeof x.masVentas) => (
-    <TarjetaAnalisis
-      id={id}
-      titulo={titulo}
-      estado={filas.length ? 'ok' : 'vacio'}
-      vacio="Sin ventas en este período."
-    >
+    <TarjetaAnalisis id={id} titulo={titulo} estado={filas.length ? 'ok' : 'vacio'} vacio="Sin ventas en este período.">
       <div className="an-tabla">
         <table>
           <thead>
@@ -259,6 +307,7 @@ function Dias({ d }: { d: RespuestaProductos }) {
 function Modificadores({ d }: { d: RespuestaProductos }) {
   const [abierto, setAbierto] = useState<string | null>(null);
   const m = d.modificadores;
+  const pag = usePaginacion(m.porProducto);
   const texto = (o: Opcion) => `${o.grupo}: ${o.opcion}`;
   return (
     <>
@@ -268,14 +317,29 @@ function Modificadores({ d }: { d: RespuestaProductos }) {
         subtitulo="Tamaños y opciones de todos los productos. Cuenta las unidades vendidas con esa opción."
         estado={m.global.length ? 'ok' : 'vacio'}
         vacio="No se eligieron opciones en este período."
-        tabla={{ cabecera: ['Grupo', 'Opción', 'Veces'], filas: m.global.map((o) => [o.grupo, o.opcion, o.veces]) }}
+        tabla={{
+          cabecera: ['Grupo', 'Opción', 'Veces'],
+          filas: m.global.map((o) => [o.grupo, o.opcion, o.veces]),
+        }}
       >
         <BarrasHorizontales
           descripcion="Opciones más elegidas"
-          filas={m.global.slice(0, 15).map((o) => ({ id: `${o.grupo}|${o.opcion}`, nombre: o.opcion, detalle: o.grupo, valor: o.veces, texto: String(o.veces) }))}
+          filas={m.global.slice(0, 15).map((o) => ({
+            id: `${o.grupo}|${o.opcion}`,
+            nombre: o.opcion,
+            detalle: o.grupo,
+            valor: o.veces,
+            texto: String(o.veces),
+          }))}
         />
       </TarjetaAnalisis>
-      <TarjetaAnalisis id="an-mod-prod" titulo="Opciones por producto" subtitulo="Toca un producto para ver qué opciones y tamaños se eligieron." estado={m.porProducto.length ? 'ok' : 'vacio'} vacio="Ningún producto vendió con opciones.">
+      <TarjetaAnalisis
+        id="an-mod-prod"
+        titulo="Opciones por producto"
+        subtitulo="Toca un producto para ver qué opciones y tamaños se eligieron."
+        estado={m.porProducto.length ? 'ok' : 'vacio'}
+        vacio="Ningún producto vendió con opciones."
+      >
         <div className="an-tabla">
           <table>
             <thead>
@@ -285,7 +349,7 @@ function Modificadores({ d }: { d: RespuestaProductos }) {
               </tr>
             </thead>
             <tbody>
-              {m.porProducto.map((p) => (
+              {pag.filas.map((p) => (
                 <Fragment key={p.id}>
                   <tr>
                     <td>
@@ -315,6 +379,7 @@ function Modificadores({ d }: { d: RespuestaProductos }) {
             </tbody>
           </table>
         </div>
+        <Paginador p={pag} />
       </TarjetaAnalisis>
     </>
   );
@@ -332,6 +397,8 @@ const ORDEN_GRUPOS: GrupoMargen[] = ['BAJO', 'MEDIO', 'ALTO', 'SIN_COSTO'];
 function Margen({ d }: { d: RespuestaProductos }) {
   const [grupo, setGrupo] = useState<GrupoMargen | ''>('');
   const m = d.margen;
+  const lista = useMemo(() => (m && grupo ? m.filas.filter((f) => f.grupo === grupo) : (m?.filas ?? [])), [m, grupo]);
+  const pag = usePaginacion(lista, grupo);
   if (!m) {
     return (
       <section className="an-tarjeta" role="status">
@@ -340,7 +407,7 @@ function Margen({ d }: { d: RespuestaProductos }) {
       </section>
     );
   }
-  const filas: FilaMargen[] = grupo ? m.filas.filter((f) => f.grupo === grupo) : m.filas;
+  const filas: FilaMargen[] = lista;
   return (
     <>
       <div className="an-rejilla an-rejilla--kpi">
@@ -390,7 +457,7 @@ function Margen({ d }: { d: RespuestaProductos }) {
                 </tr>
               </thead>
               <tbody>
-                {filas.map((f) => (
+                {pag.filas.map((f) => (
                   <tr key={f.id}>
                     <td>
                       {f.nombre}
@@ -412,6 +479,7 @@ function Margen({ d }: { d: RespuestaProductos }) {
             </table>
           </div>
         )}
+        <Paginador p={pag} />
       </TarjetaAnalisis>
     </>
   );

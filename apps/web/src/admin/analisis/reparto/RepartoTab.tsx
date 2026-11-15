@@ -2,24 +2,17 @@ import { useState } from 'react';
 import { Cargando } from '../../../comun/Cargando';
 import { EstadoError } from '../../../comun/EstadoError';
 import { Boton } from '../../../comun/Boton';
-import {
-  BarrasHorizontales,
-  MapaDeCalor,
-  PanelDetalle,
-  TarjetaAnalisis,
-  TarjetaIndicador,
-  consultaDe,
-  textoMinutos,
-  useConsultaAnalisis,
-  type PropsPestanaAnalisis,
-} from '../comun';
+import { BarrasHorizontales, MapaDeCalor, PanelDetalle, Secciones, TarjetaAnalisis, TarjetaIndicador, consultaDe, textoMinutos, useConsultaAnalisis, type PropsPestanaAnalisis } from '../comun';
 import { fechaHoraLima, num, soles } from './formato';
 import type { RespuestaPorRendir, RespuestaReparto, ZonaReparto } from './tipos';
 
-const NOMBRE_TURNO: Record<string, string> = { MANANA: 'Mañana', TARDE: 'Tarde', NOCHE: 'Noche' };
+const NOMBRE_TURNO: Record<string, string> = {
+  MANANA: 'Mañana',
+  TARDE: 'Tarde',
+  NOCHE: 'Noche',
+};
 
-const masLenta = (zonas: ZonaReparto[]) =>
-  zonas.filter((z) => z.minutosPromedio != null).sort((a, b) => (b.minutosPromedio as number) - (a.minutosPromedio as number))[0]?.id;
+const masLenta = (zonas: ZonaReparto[]) => zonas.filter((z) => z.minutosPromedio != null).sort((a, b) => (b.minutosPromedio as number) - (a.minutosPromedio as number))[0]?.id;
 
 /** Pestaña «Reparto»: entregas por zona (tabla y calor), productividad por repartidor y efectivo por rendir. */
 export function RepartoTab({ filtros, esAdmin }: PropsPestanaAnalisis) {
@@ -50,56 +43,77 @@ export function RepartoTab({ filtros, esAdmin }: PropsPestanaAnalisis) {
               Hay más de {datos.limite} pedidos en el rango: se leyeron los más recientes. Acorta las fechas para ver todo.
             </p>
           )}
-          <div className="an-rejilla">
-            <TarjetaAnalisis
-              id="an-zonas"
-              titulo="Entregas por zona"
-              subtitulo="Tiempo promedio desde que entra el pedido hasta que se entrega, contra la promesa máxima de la zona."
-              estado={datos.zonas.length ? 'ok' : 'vacio'}
-              vacio="No hubo pedidos delivery con zona en este período."
-              tabla={{
-                cabecera: ['Zona', 'Pedidos', 'Entregados', 'Promedio (min)', 'Mediana (min)', 'Promesa (min)'],
-                filas: datos.zonas.map((z) => [z.zona, z.pedidos, z.entregados, z.minutosPromedio ?? 'Sin dato', z.minutosMediana ?? 'Sin dato', z.metaMin ?? 'Sin promesa']),
-              }}
-            >
-              <BarrasHorizontales
-                descripcion="Minutos promedio de entrega de cada zona, con la promesa máxima de la zona"
-                etiquetaDestacada="Más lenta"
-                elegida={zonaElegida}
-                alElegir={(id) => setZonaElegida((a) => (a === id ? null : id))}
-                filas={datos.zonas.map((z) => ({
-                  id: z.id,
-                  nombre: z.zona,
-                  detalle: `${z.pedidos} ${z.pedidos === 1 ? 'pedido' : 'pedidos'} · ${z.entregados} entregados`,
-                  valor: z.minutosPromedio,
-                  texto: z.entregados ? `Prom. ${textoMinutos(z.minutosPromedio)}` : 'Sin dato',
-                  meta: z.metaMin ?? undefined,
-                  semaforo: z.semaforo,
-                  destacada: datos.zonas.length > 1 && z.id === masLenta(datos.zonas),
-                }))}
-              />
-              {zona && (
-                <PanelDetalle titulo={zona.zona} alCerrar={() => setZonaElegida(null)}>
-                  <DetalleZona zona={zona} turnos={datos.turnos} />
-                </PanelDetalle>
-              )}
-            </TarjetaAnalisis>
-            <TarjetaAnalisis
-              id="an-calor-zonas"
-              titulo="Dónde y cuándo se pide"
-              subtitulo="Pedidos delivery por zona y turno. Más oscuro, más pedidos (el número manda)."
-              estado={datos.zonas.length ? 'ok' : 'vacio'}
-              vacio="Sin pedidos por zona en este período."
-            >
-              <MapaDeCalor
-                descripcion="Pedidos delivery por zona y turno"
-                filas={datos.zonas.map((z) => z.zona)}
-                columnas={datos.turnos.map((t) => NOMBRE_TURNO[t] ?? t)}
-                valores={datos.zonas.map((z) => z.porTurno)}
-              />
-            </TarjetaAnalisis>
-          </div>
-          <ProductividadRepartidores datos={datos} esAdmin={esAdmin} />
+          <Secciones
+            etiqueta="Secciones de reparto"
+            secciones={[
+              {
+                id: 'zonas',
+                nombre: 'Zonas',
+                contenido: (
+                  <>
+                    <div className="an-rejilla">
+                      <TarjetaAnalisis
+                        id="an-zonas"
+                        titulo="Entregas por zona"
+                        subtitulo="Tiempo promedio desde que entra el pedido hasta que se entrega, contra la promesa máxima de la zona."
+                        estado={datos.zonas.length ? 'ok' : 'vacio'}
+                        vacio="No hubo pedidos delivery con zona en este período."
+                        tabla={{
+                          cabecera: ['Zona', 'Pedidos', 'Entregados', 'Promedio (min)', 'Mediana (min)', 'Promesa (min)'],
+                          filas: datos.zonas.map((z) => [z.zona, z.pedidos, z.entregados, z.minutosPromedio ?? 'Sin dato', z.minutosMediana ?? 'Sin dato', z.metaMin ?? 'Sin promesa']),
+                        }}
+                      >
+                        <BarrasHorizontales
+                          descripcion="Minutos promedio de entrega de cada zona, con la promesa máxima de la zona"
+                          etiquetaDestacada="Más lenta"
+                          elegida={zonaElegida}
+                          alElegir={(id) => setZonaElegida((a) => (a === id ? null : id))}
+                          filas={datos.zonas.map((z) => ({
+                            id: z.id,
+                            nombre: z.zona,
+                            detalle: `${z.pedidos} ${z.pedidos === 1 ? 'pedido' : 'pedidos'} · ${z.entregados} entregados`,
+                            valor: z.minutosPromedio,
+                            texto: z.entregados ? `Prom. ${textoMinutos(z.minutosPromedio)}` : 'Sin dato',
+                            meta: z.metaMin ?? undefined,
+                            semaforo: z.semaforo,
+                            destacada: datos.zonas.length > 1 && z.id === masLenta(datos.zonas),
+                          }))}
+                        />
+                        {zona && (
+                          <PanelDetalle titulo={zona.zona} alCerrar={() => setZonaElegida(null)}>
+                            <DetalleZona zona={zona} turnos={datos.turnos} />
+                          </PanelDetalle>
+                        )}
+                      </TarjetaAnalisis>
+                      <TarjetaAnalisis
+                        id="an-calor-zonas"
+                        titulo="Dónde y cuándo se pide"
+                        subtitulo="Pedidos delivery por zona y turno. Más oscuro, más pedidos (el número manda)."
+                        estado={datos.zonas.length ? 'ok' : 'vacio'}
+                        vacio="Sin pedidos por zona en este período."
+                      >
+                        <MapaDeCalor
+                          descripcion="Pedidos delivery por zona y turno"
+                          filas={datos.zonas.map((z) => z.zona)}
+                          columnas={datos.turnos.map((t) => NOMBRE_TURNO[t] ?? t)}
+                          valores={datos.zonas.map((z) => z.porTurno)}
+                        />
+                      </TarjetaAnalisis>
+                    </div>
+                  </>
+                ),
+              },
+              {
+                id: 'repartidores',
+                nombre: 'Repartidores',
+                contenido: (
+                  <>
+                    <ProductividadRepartidores datos={datos} esAdmin={esAdmin} />
+                  </>
+                ),
+              },
+            ]}
+          />
         </>
       )}
     </div>

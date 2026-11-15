@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { Boton } from '../../../comun/Boton';
+import { Paginador, usePaginacion } from './Paginacion';
 import './analisis.css';
 
 /**
@@ -23,7 +24,12 @@ const TEXTO_SEMAFORO: Record<NivelSemaforo, string> = {
   rojo: 'Pasada de la meta',
   sin_dato: 'Sin dato',
 };
-const FORMA_SEMAFORO: Record<NivelSemaforo, string> = { verde: '●', ambar: '▲', rojo: '■', sin_dato: '○' };
+const FORMA_SEMAFORO: Record<NivelSemaforo, string> = {
+  verde: '●',
+  ambar: '▲',
+  rojo: '■',
+  sin_dato: '○',
+};
 
 /** Etiqueta con forma, color y palabra (verde ●, ámbar ▲, rojo ■): se entiende sin ver colores. */
 export function Semaforo({ nivel, texto, corto = false }: { nivel: NivelSemaforo; texto?: string; corto?: boolean }) {
@@ -80,6 +86,7 @@ export function TarjetaAnalisis({ id, titulo, subtitulo, estado, vacio, alReinte
 
 /** Los mismos datos del gráfico como tabla, plegada. */
 export function TablaDatos({ tabla }: { tabla: TablaAlterna }) {
+  const pag = usePaginacion(tabla.filas);
   return (
     <details className="an-alt">
       <summary>Ver como tabla</summary>
@@ -95,7 +102,7 @@ export function TablaDatos({ tabla }: { tabla: TablaAlterna }) {
             </tr>
           </thead>
           <tbody>
-            {tabla.filas.map((f, i) => (
+            {pag.filas.map((f, i) => (
               <tr key={i}>
                 {f.map((v, j) => (
                   <td key={j}>{v}</td>
@@ -105,22 +112,13 @@ export function TablaDatos({ tabla }: { tabla: TablaAlterna }) {
           </tbody>
         </table>
       </div>
+      <Paginador p={pag} />
     </details>
   );
 }
 
 /* ---------- Indicador (KPI) ---------- */
-export function TarjetaIndicador({
-  titulo,
-  valor,
-  detalle,
-  semaforo,
-}: {
-  titulo: string;
-  valor: string;
-  detalle?: string;
-  semaforo?: NivelSemaforo;
-}) {
+export function TarjetaIndicador({ titulo, valor, detalle, semaforo }: { titulo: string; valor: string; detalle?: string; semaforo?: NivelSemaforo }) {
   return (
     <div className="an-kpi">
       <span className="an-kpi__titulo">{titulo}</span>
@@ -166,46 +164,57 @@ export function BarrasHorizontales({
   elegida?: string | null;
 }) {
   const max = Math.max(1, ...filas.map((f) => Math.max(f.valor ?? 0, f.meta ?? 0)));
+  const pag = usePaginacion(filas);
   return (
-    <ul className="an-barras" aria-label={descripcion}>
-      {filas.map((f) => {
-        const ancho = f.valor == null ? 0 : Math.max(2, Math.round((f.valor / max) * 100));
-        const contenido = (
-          <>
-            <span className="an-barras__cab">
-              <span className="an-barras__nombre">
-                {f.nombre}
-                {f.destacada && <span className="an-pastilla">{etiquetaDestacada}</span>}
+    <>
+      <ul className="an-barras" aria-label={descripcion}>
+        {pag.filas.map((f) => {
+          const ancho = f.valor == null ? 0 : Math.max(2, Math.round((f.valor / max) * 100));
+          const contenido = (
+            <>
+              <span className="an-barras__cab">
+                <span className="an-barras__nombre">
+                  {f.nombre}
+                  {f.destacada && <span className="an-pastilla">{etiquetaDestacada}</span>}
+                </span>
+                <span className="an-barras__valor">{f.texto}</span>
               </span>
-              <span className="an-barras__valor">{f.texto}</span>
-            </span>
-            {f.detalle && <span className="an-barras__detalle">{f.detalle}</span>}
-            <span className={`an-barras__pista${f.valor == null ? ' an-barras__pista--vacia' : ''}`} aria-hidden="true">
-              {f.valor != null && <span className={`an-barras__barra an-barras__barra--${f.semaforo ?? 'neutro'}`} style={{ width: `${ancho}%` }} />}
-              {f.meta != null && <span className="an-barras__meta" style={{ left: `${Math.min(100, Math.round((f.meta / max) * 100))}%` }} />}
-            </span>
-            {f.semaforo && (
-              <span className="an-barras__pie">
-                <Semaforo nivel={f.semaforo} />
-                {f.meta != null && <span className="an-sub">Meta: {f.meta} min</span>}
+              {f.detalle && <span className="an-barras__detalle">{f.detalle}</span>}
+              <span className={`an-barras__pista${f.valor == null ? ' an-barras__pista--vacia' : ''}`} aria-hidden="true">
+                {f.valor != null && <span className={`an-barras__barra an-barras__barra--${f.semaforo ?? 'neutro'}`} style={{ width: `${ancho}%` }} />}
+                {f.meta != null && (
+                  <span
+                    className="an-barras__meta"
+                    style={{
+                      left: `${Math.min(100, Math.round((f.meta / max) * 100))}%`,
+                    }}
+                  />
+                )}
               </span>
-            )}
-          </>
-        );
-        const clase = `an-barras__fila${f.destacada ? ' an-barras__fila--destacada' : ''}${elegida === f.id ? ' an-barras__fila--elegida' : ''}`;
-        return (
-          <li key={f.id}>
-            {alElegir ? (
-              <button type="button" className={clase} aria-pressed={elegida === f.id} onClick={() => alElegir(f.id)}>
-                {contenido}
-              </button>
-            ) : (
-              <div className={clase}>{contenido}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              {f.semaforo && (
+                <span className="an-barras__pie">
+                  <Semaforo nivel={f.semaforo} />
+                  {f.meta != null && <span className="an-sub">Meta: {f.meta} min</span>}
+                </span>
+              )}
+            </>
+          );
+          const clase = `an-barras__fila${f.destacada ? ' an-barras__fila--destacada' : ''}${elegida === f.id ? ' an-barras__fila--elegida' : ''}`;
+          return (
+            <li key={f.id}>
+              {alElegir ? (
+                <button type="button" className={clase} aria-pressed={elegida === f.id} onClick={() => alElegir(f.id)}>
+                  {contenido}
+                </button>
+              ) : (
+                <div className={clase}>{contenido}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <Paginador p={pag} />
+    </>
   );
 }
 
@@ -294,7 +303,11 @@ export function ListaRanking({ items, descripcion, max = 10 }: { items: ItemRank
             </span>
             {i.detalle && <span className="an-sub">{i.detalle}</span>}
             <span className="an-ranking__pista" aria-hidden="true">
-              <span style={{ width: `${Math.max(2, Math.round((i.valor / tope) * 100))}%` }} />
+              <span
+                style={{
+                  width: `${Math.max(2, Math.round((i.valor / tope) * 100))}%`,
+                }}
+              />
             </span>
           </span>
         </li>

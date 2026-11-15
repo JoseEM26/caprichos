@@ -25,9 +25,9 @@ export function AnalisisView() {
         id: p.id,
         etiqueta: p.etiqueta,
         persistente: false,
-        contenido: errorFechas ? null : <p.Componente filtros={filtros} esAdmin={esAdmin} />,
+        contenido: errorFechas ? null : <p.Componente filtros={filtros} esAdmin={esAdmin} alCambiarPeriodo={(x) => cambiar({ periodo: x, desde: '', hasta: '' })} />,
       })),
-    [filtros, errorFechas, esAdmin],
+    [filtros, errorFechas, esAdmin, cambiar],
   );
 
   if (!tiene('analisis/ver')) {

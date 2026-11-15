@@ -22,9 +22,10 @@ Es el lugar para entender como trabaja el local, con graficos simples y sin sali
 
 ## Como se hace: Elegir fechas y filtros
 1. Entra a Analisis y elige la pestana (Tiempos, Demanda, Ventas, Clientes, WhatsApp, Reparto, Equipo, Almacen o Productos).
-2. En la barra de filtros toca Hoy, Ayer, 7 dias, 30 dias o Elegir fechas (con Desde y Hasta).
-3. Si quieres, filtra por modalidad (Mesa, Recoger, Delivery, Comer en local), canal (Carta, Caja, Mozo, WhatsApp, Bot) y turno (manana, tarde, noche, por hora de Lima).
-4. El rango maximo es de 92 dias y no se puede mirar el futuro. Los filtros quedan en la direccion de la pagina.
+2. En la barra de filtros toca Hoy, Ayer, 7 dias, 30 dias o Elegir fechas (con Desde y Hasta). Al entrar, Analisis muestra los ultimos 7 dias, o el periodo que elegiste la ultima vez en ese navegador. Si el periodo no tiene ventas (por ejemplo, Hoy pasada la medianoche), Productos dice «Todavia no hay ventas en este periodo» y ofrece los botones Ver ayer y Ver ultimos 7 dias.
+3. Cada pestana con varias secciones las muestra una a la vez, como botones arriba (por ejemplo Ventas: Productos, Canal y modalidad, Turno, Medios de pago). Las tablas y listas largas se pagan de 10 en 10: abajo ves «Mostrando 1-10 de 70», Anterior, Siguiente y el selector de filas (10, 25 o 50). Al buscar, filtrar o cambiar el orden vuelves a la pagina 1.
+4. Si quieres, filtra por modalidad (Mesa, Recoger, Delivery, Comer en local), canal (Carta, Caja, Mozo, WhatsApp, Bot) y turno (manana, tarde, noche, por hora de Lima).
+5. El rango maximo es de 92 dias y no se puede mirar el futuro. Los filtros quedan en la direccion de la pagina.
 Ver tambien: [[informes]]
 
 ## Como se hace: Leer el recorrido del pedido (pestana Tiempos)
@@ -111,7 +112,7 @@ Ver tambien: [[caja]]
 
 ## Como se hace: Decidir que productos quedan y cuales salen (pestana Productos)
 1. Elige Productos. Usa las fechas y los filtros de modalidad, canal y turno; no cuentan los pedidos anulados ni rechazados, ni las cortesias, ni las partes de un combo (el combo se cuenta en Ventas).
-2. Productos vendidos: salen TODOS los productos de la carta, tambien los que vendieron cero. Cada uno trae unidades, monto, porcentaje del total, en cuantos pedidos salio y la tendencia contra el periodo anterior de igual largo. Se ordena por mas o menos vendidos, se busca por nombre y se filtra por categoria. Los dos graficos muestran los 10 mas y los 10 menos vendidos. La marca Top 20 % es el quinto de productos que mas vende y Bajo 20 % el quinto que menos vende (con menos de 5 productos no se marca).
+2. Productos vendidos: por defecto salen solo los que vendieron algo en el periodo. Activa «Mostrar productos sin ventas (N)» para ver tambien los de cero; solo con ese interruptor activo los de cero cuentan para la marca Bajo 20 %. Cada uno trae unidades, monto, porcentaje del total, en cuantos pedidos salio y la tendencia contra el periodo anterior de igual largo. Se ordena por mas o menos vendidos, se busca por nombre y se filtra por categoria. Los dos graficos muestran los 10 mas y los 10 menos vendidos. La marca Top 20 % es el quinto de productos que mas vende y Bajo 20 % el quinto que menos vende (con menos de 5 productos no se marca).
 3. Dias de venta: el promedio de cada dia de la semana (lunes, martes...) y las 10 fechas con mas y con menos ventas. El promedio se saca solo de los dias que tuvieron ventas, asi un lunes cerrado no baja el promedio.
 4. Opciones elegidas: el ranking de opciones y tamanos de todos los productos y, al tocar un producto, que opciones se eligieron y cuantas veces.
 5. Margen: margen = (precio de venta menos costo) entre precio de venta. El costo es la suma de la receta: cantidad de cada insumo por su costo, con la merma habitual del insumo y dividido entre lo que rinde si la receta es de produccion. Se clasifica en Margen bajo (menos de 30 %), medio (30 a 70 %) y alto (mas de 70 %) y cada grupo muestra cuantos productos tiene. Un producto sin receta o con algun insumo sin costo va a Sin costo registrado y dice que le falta; no se inventa ningun numero. El margen del periodo pesa cada producto por lo que vendio y solo cuenta los que tienen costo. Si un producto no vendio nada, su margen usa el precio de la carta. No se incluyen los cambios de insumo que hacen las opciones (por ejemplo leche de almendra).

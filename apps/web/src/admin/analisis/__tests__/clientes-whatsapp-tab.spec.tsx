@@ -1,3 +1,4 @@
+import { ir } from './ayudas';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ClientesTab } from '../clientes/ClientesTab';
@@ -128,17 +129,22 @@ describe('Pestaña Clientes', () => {
     const semanas = screen.getByRole('list', { name: /Clientes por semana/ });
     expect(within(semanas).getByText('4 nuevos · 9 recurrentes')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: /Reencuentros por tramo/ })).getByText('Hasta 7 días')).toBeInTheDocument();
+    ir('Puntos');
     expect(screen.getByText(/^S\/ 120[.,]00$/)).toBeInTheDocument();
     expect(screen.getByText(/Pendiente si todo el saldo se canjea: S\/ 800[.,]00/)).toBeInTheDocument();
+    ir('Calificaciones');
     expect(screen.getByText(/4[.,]2 de 5/)).toBeInTheDocument();
-    expect(screen.getAllByText('50 %').length).toBeGreaterThan(0);
     expect(screen.getByRole('list', { name: /Puntaje promedio según si hubo demora/ })).toBeInTheDocument();
+    ir('Embudo');
+    expect(screen.getAllByText('50 %').length).toBeGreaterThan(0);
   });
 
   it('el embudo completo: % paso a paso, caída por etapa, tabla accesible y aviso de datos desde cuándo', async () => {
     servidor(clientes);
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
-    const embudo = await screen.findByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
+    await screen.findByRole('group', { name: 'Secciones de clientes' });
+    ir('Embudo');
+    const embudo = screen.getByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
     expect(within(embudo).getByText('Visitó la carta')).toBeInTheDocument();
     expect(within(embudo).getByText(/50 % del paso anterior · caen 50 %/)).toBeInTheDocument();
     expect(screen.getByText(/Sin datos de visitas antes de 05\/11\/2026/)).toBeInTheDocument();
@@ -149,7 +155,9 @@ describe('Pestaña Clientes', () => {
   it('el embudo abre un detalle inline (no un modal) con qué se mide y desde cuándo', async () => {
     servidor(clientes);
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
-    const embudo = await screen.findByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
+    await screen.findByRole('group', { name: 'Secciones de clientes' });
+    ir('Embudo');
+    const embudo = screen.getByRole('list', { name: /Sesiones y pedidos de la carta en cada etapa/ });
     fireEvent.click(within(embudo).getByRole('button', { name: /Abrió el checkout/ }));
     const detalle = screen.getByRole('region', { name: /Detalle: Abrió el checkout/ });
     expect(within(detalle).getByText(/no se guarda celular, nombre, IP ni modelo/)).toBeInTheDocument();
@@ -165,7 +173,9 @@ describe('Pestaña Clientes', () => {
       embudo: { ...clientes.embudo, pasos: clientes.embudo.pasos.map((p) => ({ ...p, n: 0, pctDelAnterior: null, pctDeVisitas: null, caida: null, pctCaida: null })), sinDatosAntesDe: null, rangoParcial: true, anulados: 0, pedidosSinMedir: 0 },
     });
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
-    expect(await screen.findByText(/Aún no hay visitas registradas/)).toBeInTheDocument();
+    await screen.findByRole('group', { name: 'Secciones de clientes' });
+    ir('Embudo');
+    expect(screen.getByText(/Aún no hay visitas registradas/)).toBeInTheDocument();
   });
 
   it('sin datos: estados vacíos y «Sin dato», nunca ceros inventados', async () => {
@@ -185,7 +195,9 @@ describe('Pestaña Clientes', () => {
     render(<ClientesTab filtros={filtros} esAdmin={false} />);
     expect(await screen.findByText('No hay pedidos de clientes identificados en este período.')).toBeInTheDocument();
     expect(screen.getByText('Aún nadie repitió pedido')).toBeInTheDocument();
+    ir('Embudo');
     expect(screen.getByText('No hubo visitas ni pedidos de la carta en este período.')).toBeInTheDocument();
+    ir('Calificaciones');
     expect(screen.getByText('Nadie respondió la encuesta en este período.')).toBeInTheDocument();
     expect(screen.getAllByText('Sin dato').length).toBeGreaterThanOrEqual(3);
   });
@@ -232,8 +244,10 @@ describe('Pestaña WhatsApp', () => {
     const detalle = screen.getByRole('region', { name: /Detalle: Hora 14:00/ });
     expect(within(detalle).getByText(/8 consultas\. Mediana 4 min/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
+    ir('Bot y derivaciones');
     expect(within(screen.getByRole('list', { name: /Chats según quién respondió/ })).getByText('Solo el bot')).toBeInTheDocument();
     expect(screen.getAllByText('Consulta ia fallida').length).toBeGreaterThan(0);
+    ir('Mensajes');
     expect(screen.getByRole('region', { name: /Mensajes por hora del día/ })).toBeInTheDocument();
     expect(screen.getByText(/Este mes \(2026-11\) van 120/)).toBeInTheDocument();
     expect(screen.getByText('caprichos_encuesta_posventa')).toBeInTheDocument();
@@ -279,7 +293,9 @@ describe('Pestaña WhatsApp', () => {
     render(<WhatsappTab filtros={filtros} esAdmin={true} />);
     expect(await screen.findByText('Nadie respondió a mano en este período')).toBeInTheDocument();
     expect(screen.getAllByText('Ninguna persona respondió chats en este período.').length).toBe(2);
+    ir('Bot y derivaciones');
     expect(screen.getByText('El bot no derivó chats en este período.')).toBeInTheDocument();
+    ir('Mensajes');
     expect(screen.getByText('No hubo mensajes en este período.')).toBeInTheDocument();
     expect(screen.getByText('No se envió ningún mensaje en este período.')).toBeInTheDocument();
   });

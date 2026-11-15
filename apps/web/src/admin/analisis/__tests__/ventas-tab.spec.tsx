@@ -1,3 +1,4 @@
+import { ir } from './ayudas';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { VentasTab } from '../ventas/VentasTab';
@@ -94,18 +95,25 @@ describe('Pestaña Ventas', () => {
   it('canal, modalidad, turno, ofertas y medios con sus números escritos', async () => {
     servidor(base);
     render(<VentasTab filtros={filtros} esAdmin />);
-    const canal = await screen.findByRole('list', { name: 'Ventas por canal' });
+    await screen.findByRole('group', { name: 'Secciones de ventas' });
+    ir('Canal y modalidad');
+    const canal = screen.getByRole('list', { name: 'Ventas por canal' });
     expect(within(canal).getByText('Caja')).toBeInTheDocument();
     expect(within(canal).getByText(/Ticket promedio .*33.*12 pedidos/)).toBeInTheDocument();
     expect(within(canal).getByText('Ticket más alto')).toBeInTheDocument();
+    ir('Turno');
     expect(screen.getByRole('list', { name: 'Ventas por turno' })).toBeInTheDocument();
+    ir('Combos y ofertas');
     expect(screen.getByRole('list', { name: 'Combos vendidos' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /Descuentos dados/ })).toBeInTheDocument();
     expect(screen.getByText(/canibalización/)).toBeInTheDocument();
+    ir('Medios de pago');
     const medios = screen.getByRole('list', { name: 'Proporción por medio de pago' });
     expect(within(medios).getByText('Yape')).toBeInTheDocument();
     expect(within(medios).getByText(/75 %/)).toBeInTheDocument();
-    expect(screen.getAllByRole('region', { name: /Canales por día|Medios de pago por día/ }).length).toBe(2);
+    expect(screen.getByRole('region', { name: /Medios de pago por día/ })).toBeInTheDocument();
+    ir('Evolución por canal');
+    expect(screen.getByRole('region', { name: /Canales por día/ })).toBeInTheDocument();
   });
 
   it('SUPERVISOR: sin soles en ninguna parte, con pedidos y unidades', async () => {
@@ -116,6 +124,7 @@ describe('Pestaña Ventas', () => {
     expect([...container.querySelectorAll('.an-kpi__titulo')].map((e) => e.textContent)).not.toContain('Ticket promedio');
     expect(screen.queryByRole('button', { name: 'Por monto' })).toBeNull();
     expect(container.textContent).not.toMatch(/S\/\s?\d/);
+    ir('Canal y modalidad');
     expect(screen.getByText('Pedidos por canal')).toBeInTheDocument();
   });
 
@@ -133,8 +142,12 @@ describe('Pestaña Ventas', () => {
       ofertas: { ...base.ofertas, pedidosConCombo: 0, aporteCombos: 0, porcentajeAporte: null, combos: [], descuentos: [], pedidosConDescuento: 0 },
     });
     render(<VentasTab filtros={filtros} esAdmin />);
-    expect(await screen.findByText('No hubo combos ni descuentos en este período.')).toBeInTheDocument();
+    await screen.findByRole('group', { name: 'Secciones de ventas' });
+    ir('Combos y ofertas');
+    expect(screen.getByText('No hubo combos ni descuentos en este período.')).toBeInTheDocument();
+    ir('Medios de pago');
     expect(screen.getByText('Aún no hay cobros en este período.')).toBeInTheDocument();
+    ir('Turno');
     expect(screen.getAllByText('Sin ventas en este período.').length).toBeGreaterThan(0);
   });
 
@@ -153,7 +166,7 @@ describe('Pestaña Ventas', () => {
   it('los filtros viajan en la consulta', async () => {
     const espia = servidor(base);
     render(<VentasTab filtros={{ ...filtros, canal: 'MOZO', turno: 'NOCHE', modalidad: 'MESA' }} esAdmin />);
-    await screen.findByText('Productos');
+    await screen.findByRole('group', { name: 'Secciones de ventas' });
     const url = String(espia.mock.calls[0][0]);
     expect(url).toContain('/admin/analisis/ventas?');
     expect(url).toContain('canal=MOZO');

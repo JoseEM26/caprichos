@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { ir } from './ayudas';
 import { RepartoTab } from '../reparto/RepartoTab';
 import { EquipoTab } from '../equipo/EquipoTab';
 import { AlmacenTab } from '../almacen/AlmacenTab';
@@ -122,6 +123,7 @@ describe('Pestaña Reparto', () => {
     render(<RepartoTab filtros={filtros} esAdmin />);
     expect(await screen.findByText('Todo liquidado')).toBeInTheDocument();
     expect(screen.getByText('No hubo pedidos delivery con zona en este período.')).toBeInTheDocument();
+    ir('Repartidores');
     expect(screen.getByText('Todavía no hay entregas con repartidor en este período.')).toBeInTheDocument();
     expect(screen.getByText('Falta asistencia marcada')).toBeInTheDocument();
   });
@@ -206,6 +208,7 @@ describe('Pestaña Equipo', () => {
     expect(within(dias).getByText('2 tardanzas')).toBeInTheDocument();
     expect(screen.getByText('77,8 %')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Puntualidad por persona' })).toBeInTheDocument();
+    ir('Mozos y cajeros');
     expect(screen.getByRole('table', { name: 'Mozos' })).toBeInTheDocument();
     expect(screen.getAllByText('Ana Mozo').length).toBeGreaterThan(0);
   });
@@ -216,6 +219,8 @@ describe('Pestaña Equipo', () => {
     await screen.findByRole('list', { name: /Tardanzas de cada día/ });
     expect(screen.queryByText('Ana Mozo')).toBeNull();
     expect(screen.queryByRole('table', { name: 'Puntualidad por persona' })).toBeNull();
+    expect(screen.getAllByText(/lo ve solo el Administrador/).length).toBeGreaterThanOrEqual(1);
+    ir('Mozos y cajeros');
     expect(screen.getAllByText(/lo ve solo el Administrador/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Ticket promedio', { selector: '.an-kpi__titulo' })).toHaveLength(2);
   });
@@ -230,6 +235,7 @@ describe('Pestaña Equipo', () => {
     });
     render(<EquipoTab filtros={filtros} esAdmin />);
     expect(await screen.findByText('No hay asistencia ni horarios en este período.')).toBeInTheDocument();
+    ir('Mozos y cajeros');
     expect(screen.getByText('Ningún mozo registró pedidos en este período.')).toBeInTheDocument();
     expect(screen.getByText('No hubo cobros en este período.')).toBeInTheDocument();
   });
@@ -326,7 +332,9 @@ describe('Pestaña Almacén', () => {
   it('mermas con costo y motivo; productos sin costo muestran la cantidad', async () => {
     servidor({ '/admin/analisis/almacen': almacen() });
     render(<AlmacenTab filtros={filtros} esAdmin />);
-    const m = await screen.findByRole('list', { name: /Mermas por insumo o producto/ });
+    await screen.findByRole('group', { name: 'Secciones de almacén' });
+    ir('Mermas');
+    const m = screen.getByRole('list', { name: /Mermas por insumo o producto/ });
     expect(within(m).getByText('S/ 16.00')).toBeInTheDocument();
     expect(within(m).getByText(/3 veces · se venció/)).toBeInTheDocument();
     expect(within(m).getByText('3')).toBeInTheDocument();
@@ -335,7 +343,9 @@ describe('Pestaña Almacén', () => {
   it('productos terminados con pocas unidades se destacan; los que tienen de sobra no', async () => {
     servidor({ '/admin/analisis/almacen': almacen() });
     render(<AlmacenTab filtros={filtros} esAdmin />);
-    const t = await screen.findByRole('list', { name: /Unidades que quedan/ });
+    await screen.findByRole('group', { name: 'Secciones de almacén' });
+    ir('Productos terminados');
+    const t = screen.getByRole('list', { name: /Unidades que quedan/ });
     expect(within(t).getByText('Dona')).toBeInTheDocument();
     expect(within(t).getByText('3 u.')).toBeInTheDocument();
     expect(within(t).queryByText('Galleta')).toBeNull();
@@ -346,6 +356,7 @@ describe('Pestaña Almacén', () => {
     render(<AlmacenTab filtros={filtros} esAdmin />);
     expect(await screen.findByRole('heading', { name: 'Control de almacén apagado' })).toBeInTheDocument();
     expect(screen.queryByText('Cuánto dura cada insumo')).toBeNull();
+    ir('Productos terminados');
     expect(screen.getByText('Productos terminados con pocas unidades')).toBeInTheDocument();
   });
 
@@ -359,7 +370,9 @@ describe('Pestaña Almacén', () => {
     });
     render(<AlmacenTab filtros={filtros} esAdmin />);
     expect(await screen.findByText('No hay insumos activos.')).toBeInTheDocument();
+    ir('Mermas');
     expect(screen.getByText('No se registró ninguna merma en este período.')).toBeInTheDocument();
+    ir('Productos terminados');
     expect(screen.getByText('Ningún producto lleva conteo de unidades.')).toBeInTheDocument();
   });
 

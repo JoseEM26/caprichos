@@ -63,10 +63,11 @@ describe('AnalisisView', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
-  it('con permiso: filtros de fechas y extras, y consulta de hoy por defecto', async () => {
+  it('con permiso: filtros de fechas y extras, y consulta de los últimos 7 días por defecto', async () => {
     sesionCon('SUPERVISOR', ['analisis/ver']);
     ver();
     for (const t of ['Hoy', 'Ayer', '7 días', '30 días', 'Elegir fechas']) expect(screen.getByRole('button', { name: t })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7 días' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('Modalidad')).toBeInTheDocument();
     expect(screen.getByLabelText('Canal')).toBeInTheDocument();
     expect(screen.getByLabelText('Turno')).toBeInTheDocument();
@@ -99,5 +100,16 @@ describe('AnalisisView', () => {
     ver('/admin/analisis?periodo=rango&desde=2025-01-01&hasta=2025-12-31');
     expect(screen.getByText(/como máximo 92 días/)).toBeInTheDocument();
     expect(get).not.toHaveBeenCalled();
+  });
+
+  it('recuerda el último período elegido', async () => {
+    sesionCon('ADMIN', []);
+    localStorage.clear();
+    const { unmount } = ver();
+    fireEvent.click(screen.getByRole('button', { name: 'Ayer' }));
+    unmount();
+    ver();
+    expect(screen.getByRole('button', { name: 'Ayer' })).toHaveAttribute('aria-pressed', 'true');
+    localStorage.clear();
   });
 });

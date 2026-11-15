@@ -1,6 +1,6 @@
 import { EstadoError } from '../../../comun/EstadoError';
 import { Cargando } from '../../../comun/Cargando';
-import { TarjetaIndicador, consultaDe, textoMinutos, useConsultaAnalisis, type PropsPestanaAnalisis } from '../comun';
+import { Secciones, TarjetaIndicador, consultaDe, textoMinutos, useConsultaAnalisis, type PropsPestanaAnalisis } from '../comun';
 import { ComparativoAreas } from './ComparativoAreas';
 import { EmbudoTiempos } from './EmbudoTiempos';
 import { MetasTiempos } from './MetasTiempos';
@@ -10,9 +10,7 @@ import type { RespuestaTiempos } from './tipos';
 
 /** Pestaña «Tiempos»: cuánto tarda cada etapa del pedido, las áreas de cocina, lo atascado y las metas. */
 export function TiemposTab({ filtros, esAdmin }: PropsPestanaAnalisis) {
-  const { datos, estado, mensaje, recargar } = useConsultaAnalisis<RespuestaTiempos>(
-    `/admin/analisis/tiempos?${consultaDe(filtros, ['modalidad', 'canal', 'turno'])}`,
-  );
+  const { datos, estado, mensaje, recargar } = useConsultaAnalisis<RespuestaTiempos>(`/admin/analisis/tiempos?${consultaDe(filtros, ['modalidad', 'canal', 'turno'])}`);
 
   return (
     <div className="an">
@@ -39,21 +37,58 @@ export function TiemposTab({ filtros, esAdmin }: PropsPestanaAnalisis) {
               Hay más de {datos.limite} pedidos en el rango: se leyeron los más recientes. Acorta las fechas para ver todo.
             </p>
           )}
-          <div className="an-rejilla">
-            <EmbudoTiempos etapas={datos.etapas} masLenta={datos.etapaMasLenta} modalidad={filtros.modalidad} entran={datos.pedidos.entran} />
-            <ComparativoAreas areas={datos.areas} />
-          </div>
-          <MetasTiempos etapas={datos.etapas} esAdmin={esAdmin} alGuardar={recargar} />
-          <details className="an-tarjeta">
-            <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', fontWeight: 800, cursor: 'pointer' }}>
-              Qué todavía no se guarda
-            </summary>
-            <ul>
-              {NO_SE_GUARDA.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </details>
+          <Secciones
+            etiqueta="Secciones de tiempos"
+            secciones={[
+              {
+                id: 'etapas-y-reas',
+                nombre: 'Etapas y áreas',
+                contenido: (
+                  <>
+                    <div className="an-rejilla">
+                      <EmbudoTiempos etapas={datos.etapas} masLenta={datos.etapaMasLenta} modalidad={filtros.modalidad} entran={datos.pedidos.entran} />
+                      <ComparativoAreas areas={datos.areas} />
+                    </div>
+                  </>
+                ),
+              },
+              {
+                id: 'metas',
+                nombre: 'Metas',
+                contenido: (
+                  <>
+                    <MetasTiempos etapas={datos.etapas} esAdmin={esAdmin} alGuardar={recargar} />
+                  </>
+                ),
+              },
+              {
+                id: 'qu-falta-guardar',
+                nombre: 'Qué falta guardar',
+                contenido: (
+                  <>
+                    <details className="an-tarjeta">
+                      <summary
+                        style={{
+                          minHeight: 44,
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Qué todavía no se guarda
+                      </summary>
+                      <ul>
+                        {NO_SE_GUARDA.map((t) => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  </>
+                ),
+              },
+            ]}
+          />
         </>
       )}
     </div>
