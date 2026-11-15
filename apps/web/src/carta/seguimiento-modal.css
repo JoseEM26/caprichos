@@ -34,3 +34,6 @@
 .sg-otros-lista > button { min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); font-size: 13px; font-weight: 700; cursor: pointer; }
 .sg-solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sg-punto { color: var(--cp-orange, #F28C28); }
+/* Formulario embebido de Culqi: ancho completo y altura definida (su iframe mide height:100%). */
+.sg-culqi { display: block; width: 100%; max-width: 100%; height: 560px; min-height: 520px; overflow: hidden; }
+@media (max-width: 640px) { .sg-culqi { height: 640px; } }

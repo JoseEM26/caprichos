@@ -6,6 +6,7 @@ export const NOMBRE_MEDIO: Record<string, string> = {
   TRANSFERENCIA: 'Transferencia',
   EFECTIVO: 'Efectivo',
   TARJETA: 'Tarjeta',
+  CULQI: 'Tarjeta / Yape en línea',
 };
 
 export const NOMBRE_MODALIDAD: Record<string, string> = {
@@ -85,6 +86,10 @@ export function etapaCliente(estado: EstadoSeguimiento | null, nombre = ''): Eta
 
 /** Texto del estado de un medio de pago, igual de claro para el cliente que para el equipo. */
 export function textoPagoMedio(p: PagoMedioSeguimiento, hora?: string | null): string {
+  // Pago en línea (Culqi): nunca «lo pagas al recibir»; o está pagado o falta pagar
+  if (p.medio === 'CULQI') {
+    return p.estado === 'PAGADO' || p.estado === 'VERIFICADO' ? 'Pago en línea con tarjeta o Yape · Pagado ✓' : 'Pago en línea con tarjeta o Yape · Falta pagar';
+  }
   switch (p.estado) {
     case 'SIN_VOUCHER':
       return 'Aún no enviaste tu captura';

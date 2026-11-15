@@ -3,13 +3,14 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
-import { abrirCulqi, culqiApi, ESTADO_3DS, ID_CONTENEDOR_CULQI, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { abrirCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, ID_CONTENEDOR_CULQI, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
 const VIGENCIA_MS = 15 * 60 * 1000;
+const ESPERA_MONTAJE_MS = 10000;
 
 /** Minutos que quedan para pagar (el pedido sin pagar se anula a los 15 min); null si no se sabe la hora. */
 function useMinutosRestantes(creadoEn?: string): number | null {
@@ -28,7 +29,7 @@ const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
 ];
 
 /** «Pagar ahora con tarjeta o Yape» (Culqi). No pinta nada si la pasarela no está activa. */
-export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado, monto, creadoEn }: { pedidoId: string; token?: string; /** lo que falta pagar */ monto?: number; /** ISO de creación del pedido, para el contador de 15 min */ creadoEn?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void }) {
+export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado, monto, creadoEn, alFormulario }: { pedidoId: string; token?: string; /** lo que falta pagar */ monto?: number; /** ISO de creación del pedido, para el contador de 15 min */ creadoEn?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void; /** avisa si el formulario de pago está abierto, para que el modal le dé todo el espacio */ alFormulario?: (abierto: boolean) => void }) {
   const [config, setConfig] = useState<ConfigCulqi | null>(null);
   const [fase, setFase] = useState<Fase>('cargando');
   const [mensaje, setMensaje] = useState('');
@@ -127,13 +128,30 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
       .catch((e) => {
         if (!vivo) return;
         setMensaje(e instanceof Error ? e.message : 'No pudimos conectar. Reintenta.');
-        setFase('rechazado');
+        setFase(e instanceof ErrorAperturaCulqi ? 'error' : 'rechazado');
       });
     return () => {
       vivo = false;
       cerrar();
     };
   }, [fase, intento]);
+
+  useEffect(() => {
+    alFormulario?.(fase === 'formulario');
+    return () => alFormulario?.(false);
+  }, [fase]);
+
+  // Si Culqi no llegó a montar su iframe en el contenedor, se avisa en vez de dejar un hueco vacío.
+  useEffect(() => {
+    if (fase !== 'formulario') return;
+    const t = setTimeout(() => {
+      if (!document.querySelector(`#${ID_CONTENEDOR_CULQI} iframe`)) {
+        setMensaje(new ErrorAperturaCulqi().message);
+        setFase('error');
+      }
+    }, ESPERA_MONTAJE_MS);
+    return () => clearTimeout(t);
+  }, [fase]);
 
   const iniciado = useRef(false);
   useEffect(() => {
@@ -163,17 +181,21 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
         </p>
       ) : (
         <>
-          <strong data-testid="falta-pagar" style={{ color: 'var(--cp-navy)' }}>
-            {monto && monto > 0 ? `Falta pagar ${SOLES(monto)}` : 'Pagar ahora con tarjeta o Yape'}
+          <strong data-testid="falta-pagar" style={{ color: 'var(--cp-navy)', fontSize: enFormulario ? 17 : undefined }}>
+            {enFormulario
+              ? `Pagar ${SOLES(monto && monto > 0 ? monto : (intento?.montoCentimos ?? 0) / 100)}${minutos !== null && minutos > 0 ? ` · Te quedan ${minutos} min` : ''}`
+              : monto && monto > 0 ? `Falta pagar ${SOLES(monto)}` : 'Pagar ahora con tarjeta o Yape'}
           </strong>
-          {minutos !== null && (
+          {minutos !== null && !(enFormulario && minutos > 0) && (
             <p data-testid="contador-pago" className="sg-detalle" style={{ margin: '4px 0 0', fontWeight: 700 }}>
               {minutos > 0 ? `Te quedan ${minutos} min para pagar` : 'El tiempo para pagar se acabó: el pedido se anula solo'}
             </p>
           )}
-          <p className="sg-detalle" style={{ margin: '4px 0 8px' }}>
-            Pagas el total del pedido, sin recargo. {AVISO_PAGO_EN_LINEA}
-          </p>
+          {!enFormulario && (
+            <p className="sg-detalle" style={{ margin: '4px 0 8px' }}>
+              Pagas el total del pedido, sin recargo. {AVISO_PAGO_EN_LINEA}
+            </p>
+          )}
           {fase === 'rechazado' && (
             <p role="alert" data-testid="pago-rechazado" style={{ color: 'var(--cp-rust)', margin: '0 0 8px' }}>
               {mensaje} Puedes reintentar u otro medio de pago.
@@ -188,7 +210,8 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
           {enFormulario ? (
             <div id="culqi-embebido" tabIndex={-1} data-testid="culqi-embebido" style={{ outline: 'none' }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFase('listo'); } }}>
               {/* Culqi monta aquí su formulario (iframe alojado por Culqi: la tarjeta no pasa por nuestro código) */}
-              <div id={ID_CONTENEDOR_CULQI} aria-label="Formulario de pago de Culqi" style={{ width: '100%', maxWidth: '100%', minHeight: 320, overflowX: 'hidden' }} />
+              {/* Altura DEFINIDA: el iframe de Culqi mide height:100% y con solo min-height se colapsaba */}
+              <div id={ID_CONTENEDOR_CULQI} className="sg-culqi" aria-label="Formulario de pago de Culqi" />
               <Boton variante="secundario" onClick={() => setFase('listo')} style={{ marginTop: 8 }}>
                 Volver
               </Boton>
@@ -207,7 +230,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
               {fase === 'rechazado' || fase === 'error' ? 'Reintentar el pago' : 'Pagar ahora'}
             </Boton>
           )}
-          {intento && <span className="sg-detalle" style={{ display: 'block', marginTop: 6 }}>Monto: {SOLES(intento.montoCentimos / 100)}</span>}
+          {intento && !enFormulario && <span className="sg-detalle" style={{ display: 'block', marginTop: 6 }}>Monto: {SOLES(intento.montoCentimos / 100)}</span>}
         </>
       )}
     </section>

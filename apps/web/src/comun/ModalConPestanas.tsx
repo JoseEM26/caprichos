@@ -35,6 +35,8 @@ export interface ModalConPestanasProps {
   pie?: ReactNode;
   /** Ancho máximo en px (por defecto 960). */
   ancho?: number;
+  /** true = en celular ocupa toda la pantalla (p. ej. un formulario de pago embebido que necesita espacio). */
+  ampliado?: boolean;
 }
 
 const idPest = (base: string, id: string) => `${base}-t-${id}`;
@@ -117,7 +119,7 @@ export function Pestanas({ pestanas, pestanaInicial, pestanaActiva, alCambiarPes
  */
 export function ModalConPestanas({
   titulo, subtitulo, pestanas, pestanaInicial, pestanaActiva, alCambiarPestana, alCerrar,
-  bloquearCierre = false, accionesEncabezado, bajoPestanas, pie, ancho = 960,
+  bloquearCierre = false, accionesEncabezado, bajoPestanas, pie, ancho = 960, ampliado = false,
 }: ModalConPestanasProps) {
   const base = useId();
   const dialogoRef = useRef<HTMLDivElement>(null);
@@ -131,7 +133,7 @@ export function ModalConPestanas({
   return createPortal(
     <>
       <div className="mcp-fondo" onClick={bloquearCierre ? undefined : alCerrar} />
-      <div ref={dialogoRef} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="mcp-dialogo"
+      <div ref={dialogoRef} role="dialog" aria-modal="true" aria-labelledby={tituloId} className={ampliado ? 'mcp-dialogo mcp-ampliado' : 'mcp-dialogo'}
         style={{ maxWidth: ancho }} onKeyDown={alTeclear} tabIndex={-1}>
         <div className="mcp-cabecera">
           <div className="mcp-titulos">

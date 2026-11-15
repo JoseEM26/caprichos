@@ -93,6 +93,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
   const { estado, error, refrescar } = useSeguimientoPedido(pedido.codigo, pedido.token);
   const [activa, setActiva] = useState<IdPestana>(creacion && pedido.enLinea ? 'pago' : 'estado');
   const cambiadas = useCambiosPorPestana(activa, estado);
+  const [pagando, setPagando] = useState(false);
   const anulado = estado?.anulado === true;
   // Lo que paga el cliente: la venta más la propina (si dejó)
   const total = creacion
@@ -121,7 +122,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'pago',
       etiqueta: 'Pago',
       insignia: marca('pago'),
-      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} creadoEn={pedido.creadoEn} />,
+      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} creadoEn={pedido.creadoEn} alFormulario={setPagando} />,
     },
   ];
   const cambiosTexto = [...cambiadas].map((id) => ({ estado: 'Estado', pedido: 'Mi pedido', pago: 'Pago' })[id]).join(', ');
@@ -135,12 +136,13 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       alCambiarPestana={(id) => setActiva(id as IdPestana)}
       alCerrar={onCerrar}
       ancho={560}
+      ampliado={pagando}
       bajoPestanas={
         <span className="sg-solo-lector" role="status" aria-live="polite">
           {cambiosTexto ? `Novedades en: ${cambiosTexto}` : ''}
         </span>
       }
-      pie={
+      pie={pagando ? undefined : (
         <div className="sg-pie">
           {otros.length > 0 && (
             <details className="sg-otros">
@@ -159,7 +161,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
             Volver a la carta
           </button>
         </div>
-      }
+      )}
     />
   );
 }
@@ -363,8 +365,9 @@ function PanelPedido({
 }
 
 function PanelPago({
-  pedido, estado, total, onSubida, pedidoId, token, auto, creadoEn,
+  pedido, estado, total, onSubida, pedidoId, token, auto, creadoEn, alFormulario,
 }: {
+  alFormulario?: (abierto: boolean) => void;
   pedidoId?: string;
   token?: string;
   auto?: boolean;
@@ -374,6 +377,7 @@ function PanelPago({
   total: number | undefined;
   onSubida: () => void;
 }) {
+  const [pagandoForm, setPagandoForm] = useState(false); // formulario de Culqi abierto: el resto del panel se oculta
   if (!estado) return <p className="sg-detalle">Consultando el pago de tu pedido...</p>;
   const resumen = estado.resumenPago;
   const pagos = resumen?.pagos ?? [];
@@ -387,9 +391,9 @@ function PanelPago({
   return (
     <>
       {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
-        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} />
+        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} alFormulario={(a) => { setPagandoForm(a); alFormulario?.(a); }} />
       )}
-      {resumen && (
+      {resumen && !pagandoForm && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">
           <div className="sg-fila" data-testid="resumen-pagado">
             <span>Pagado</span>
@@ -401,7 +405,7 @@ function PanelPago({
         </section>
       )}
 
-      {pagos.map((p) => (
+      {!pagandoForm && pagos.map((p) => (
         <div key={p.medio} className="sg-medio" data-testid="pago-medio" data-medio={p.medio} data-estado={p.estado}>
           <div className="sg-fila">
             <span>{NOMBRE_MEDIO[p.medio] ?? p.medio}</span>
@@ -412,9 +416,9 @@ function PanelPago({
       ))}
 
       {/* API sin desglose por medio: se conserva la tarjeta única del estado del voucher */}
-      {!resumen && !estado.anulado && <EstadoVoucherPedido voucher={estado.voucher} />}
+      {!pagandoForm && !resumen && !estado.anulado && <EstadoVoucherPedido voucher={estado.voucher} />}
 
-      {puedeAdjuntar && (
+      {puedeAdjuntar && !pagandoForm && (
         <AdjuntarCapturaPago
           codigo={pedido.codigo}
           token={pedido.token ?? ''}
@@ -423,10 +427,10 @@ function PanelPago({
           onSubida={onSubida}
         />
       )}
-      {!resumen && !estado.anulado && !estado.terminado && (
+      {!pagandoForm && !resumen && !estado.anulado && !estado.terminado && (
         <AdjuntarCapturaPago codigo={pedido.codigo} token={pedido.token ?? ''} pagoDigital={Boolean(estado.pagoDigital)} medio={estado.medioPago} total={estado.montoDigital ?? total} restoAlRecibir={estado.montoContraentrega} onSubida={onSubida} />
       )}
-      {resumen && pagos.length > 0 && pagos.every((p) => !p.digital) && (
+      {!pagandoForm && resumen && pagos.length > 0 && pagos.every((p) => !p.digital && p.medio !== 'CULQI') && (
         <p className="sg-detalle">No necesitas enviar captura: lo pagas al recibir tu pedido.</p>
       )}
     </>
