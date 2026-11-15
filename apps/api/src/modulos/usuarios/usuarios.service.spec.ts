@@ -442,9 +442,9 @@ describe('UsuariosService', () => {
       expect(and.some((c: any) => c.alta_en?.gte && !c.alta_en.lte)).toBe(true);
       expect(and).toEqual(expect.arrayContaining([{ alta_en: { lte: new Date('2026-02-01T00:00:00.000Z') } }, { party_id: { in: [7n] } }]));
       await service.listar({ acceso: 'nunca' });
-      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { notIn: [7n, 8n] } }]);
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { notIn: [7n, 8n] } }, { hash: { not: '!pago-en-linea-sin-acceso' } }]);
       await service.listar({ acceso: 'mas30' });
-      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { in: [8n] } }]);
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ party_id: { in: [8n] } }, { hash: { not: '!pago-en-linea-sin-acceso' } }]);
     });
 
     it('la búsqueda por nombre completo ignora tildes, ñ y mayúsculas', async () => {
@@ -454,9 +454,9 @@ describe('UsuariosService', () => {
         a.select?.party ? [cand(1n, 'Juan', 'Pérez'), cand(2n, 'Peña', 'Núñez'), cand(3n, 'Ana', 'Ruiz')] : [],
       );
       await service.listar({ busqueda: 'JUAN perez' });
-      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [1n] } }]);
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [1n] } }, { hash: { not: '!pago-en-linea-sin-acceso' } }]);
       await service.listar({ busqueda: 'pena nunez' });
-      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [2n] } }]);
+      expect(prismaMock.userAccount.findMany.mock.calls.at(-2)[0].where.AND).toEqual([{ id: { in: [2n] } }, { hash: { not: '!pago-en-linea-sin-acceso' } }]);
     });
 
     it('devuelve conteos reales (activos, inactivos y por rol con extras vigentes) independientes de la página', async () => {

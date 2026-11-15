@@ -1207,7 +1207,18 @@ export class PedidosService {
     const montoCredito = creditoConEnvio ? Number((totalCalculado - (envio ?? 0)).toFixed(2)) : totalCalculado; // el crédito nunca incluye el envío
     const aCobrarAhora = creditoConEnvio ? Number((envio ?? 0).toFixed(2)) : aCobrar;
     const sinPagoAhora = personal || (creditoConEnvio && aCobrarAhora <= 0);
-    const planPago = sinPagoAhora ? null : this.pagoPlan.validar(dto.pago.plan, aCobrarAhora);
+    // «Tarjeta / Yape en línea»: solo carta web, con la función encendida; el pedido espera el pago (POR_PAGAR) y no llega a cocina ni a Caja
+    const enLinea = dto.pago.metodo === 'CULQI';
+    if (enLinea) {
+      if ((origen?.canal ?? 'CARTA') !== 'CARTA' || personal) {
+        throw new BadRequestException({ codigo: 'PAGO_ONLINE_NO_APLICA', mensaje: 'El pago en línea solo está disponible en la carta web' });
+      }
+      const flag = await this.prisma.parametro.findUnique({ where: { clave: 'pago_online_activo' } }).catch(() => null);
+      if (!['si', 'sí', 'true'].includes(String(flag?.valor ?? 'no').replace(/"/g, '').toLowerCase().trim())) {
+        throw new BadRequestException({ codigo: 'PAGO_ONLINE_APAGADO', mensaje: 'El pago en línea no está disponible por ahora. Elige otro medio de pago.' });
+      }
+    }
+    const planPago = sinPagoAhora || enLinea ? null : this.pagoPlan.validar(dto.pago.plan, aCobrarAhora);
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
       : dto.pago.metodo === 'EFECTIVO' && !sinPagoAhora
@@ -1293,7 +1304,7 @@ export class PedidosService {
           codigo,
           canal: origen?.canal || 'CARTA',
           modalidad: dto.modalidad,
-          estado: programadoPara ? 'PROGRAMADO' : 'COLA',
+          estado: enLinea ? 'POR_PAGAR' : programadoPara ? 'PROGRAMADO' : 'COLA',
           programado_para: programadoPara,
           party_id: mozoPartyId ?? (origen?.clientePartyId ? BigInt(origen.clientePartyId) : null),
           cliente_party_id: clienteFinal,
@@ -1308,7 +1319,7 @@ export class PedidosService {
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
           pago_metodo: personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
-          pago_estado: personal ? 'PAGADO' : 'PENDIENTE',
+          pago_estado: personal ? 'PAGADO' : enLinea ? 'PENDIENTE_ONLINE' : 'PENDIENTE',
           pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
@@ -1333,7 +1344,7 @@ export class PedidosService {
           es_personal: personal,
           monto_credito: new Prisma.Decimal(creditoConEnvio ? montoCredito : 0),
           clave_idempotencia: claveIdempotencia,
-          pasa_cocina_en: programadoPara ? null : new Date(),
+          pasa_cocina_en: enLinea || programadoPara ? null : new Date(),
         },
       });
 
@@ -1637,7 +1648,8 @@ export class PedidosService {
     }
 
     // 10.1. Aviso en la campana: cada pedido nuevo (carta, mozo o WhatsApp) es su propia notificación
-    try {
+    // (el pedido que espera pago en línea avisa cuando se aprueba el pago)
+    if (pedidoCreado.estado !== 'POR_PAGAR') try {
       const avisoPedido = await this.prisma.notificacion.create({
         data: {
           tipo: 'PEDIDO_NUEVO',

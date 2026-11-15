@@ -144,10 +144,11 @@ export class PlanPagoItemDto {
 }
 
 export class PagoPedidoDto {
-  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'], {
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'CULQI'], {
     message: 'Método de pago no válido',
   })
-  metodo!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
+  /** CULQI = «Tarjeta / Yape en línea» (solo carta web): el pedido espera el pago y no pasa a cocina hasta que se apruebe */
+  metodo!: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA' | 'CULQI';
 
   @IsOptional()
   @IsNumber({}, { message: 'pagaCon debe ser un número' })
