@@ -1,5 +1,9 @@
 -- Pago en línea con Culqi (tarjeta y Yape) para la carta web. Apagado por defecto.
-CREATE TABLE "pago_online_intento" (
+-- El pedido espera el pago en el estado POR_PAGAR: el CHECK de estado (ampliado por pedidos programados) debe admitirlo.
+ALTER TABLE "pedido" DROP CONSTRAINT IF EXISTS ck_pedido_estado;
+ALTER TABLE "pedido" ADD CONSTRAINT ck_pedido_estado CHECK (estado IN ('POR_PAGAR','PROGRAMADO','COLA','PREPARANDO','POR_CONFIRMAR','EN_COCINA','LISTO','EN_CAMINO','ENTREGADO','EN_COORDINACION','COBRADO','RECHAZADO','ANULADO'));
+
+CREATE TABLE IF NOT EXISTS "pago_online_intento" (
     "id" BIGSERIAL NOT NULL,
     "clave" TEXT NOT NULL,
     "pedido_id" BIGINT NOT NULL,
@@ -23,18 +27,20 @@ CREATE TABLE "pago_online_intento" (
     CONSTRAINT "pago_online_intento_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "pago_online_intento_clave_key" ON "pago_online_intento"("clave");
-CREATE UNIQUE INDEX "pago_online_intento_culqi_cargo_id_key" ON "pago_online_intento"("culqi_cargo_id");
-CREATE INDEX "ix_pago_online_intento_pedido" ON "pago_online_intento"("pedido_id");
-CREATE INDEX "ix_pago_online_intento_creado" ON "pago_online_intento"("creado_en");
+CREATE UNIQUE INDEX IF NOT EXISTS "pago_online_intento_clave_key" ON "pago_online_intento"("clave");
+CREATE UNIQUE INDEX IF NOT EXISTS "pago_online_intento_culqi_cargo_id_key" ON "pago_online_intento"("culqi_cargo_id");
+CREATE INDEX IF NOT EXISTS "ix_pago_online_intento_pedido" ON "pago_online_intento"("pedido_id");
+CREATE INDEX IF NOT EXISTS "ix_pago_online_intento_creado" ON "pago_online_intento"("creado_en");
 -- Un solo intento vivo por pedido: no se puede cobrar dos veces el mismo pedido
-CREATE UNIQUE INDEX "pago_online_intento_vivo_key" ON "pago_online_intento"("pedido_id")
+CREATE UNIQUE INDEX IF NOT EXISTS "pago_online_intento_vivo_key" ON "pago_online_intento"("pedido_id")
   WHERE "estado" IN ('CREADO', 'PROCESANDO', 'PENDIENTE', 'APROBADO');
+ALTER TABLE "pago_online_intento" DROP CONSTRAINT IF EXISTS "pago_online_intento_pedido_id_fkey";
 ALTER TABLE "pago_online_intento" ADD CONSTRAINT "pago_online_intento_pedido_id_fkey"
   FOREIGN KEY ("pedido_id") REFERENCES "pedido"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "pago_online_intento" DROP CONSTRAINT IF EXISTS "pago_online_intento_monto_chk";
 ALTER TABLE "pago_online_intento" ADD CONSTRAINT "pago_online_intento_monto_chk" CHECK ("monto_centimos" > 0 AND "devuelto_centimos" >= 0 AND "devuelto_centimos" <= "monto_centimos");
 
-CREATE TABLE "pago_online_evento" (
+CREATE TABLE IF NOT EXISTS "pago_online_evento" (
     "id" BIGSERIAL NOT NULL,
     "evento_id" TEXT NOT NULL,
     "tipo" TEXT NOT NULL,
@@ -45,7 +51,7 @@ CREATE TABLE "pago_online_evento" (
     "procesado_en" TIMESTAMPTZ,
     CONSTRAINT "pago_online_evento_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "pago_online_evento_evento_id_key" ON "pago_online_evento"("evento_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "pago_online_evento_evento_id_key" ON "pago_online_evento"("evento_id");
 
 -- Función apagada por defecto; si ya existía la clave, no se toca
 INSERT INTO "parametro" ("clave", "valor") VALUES ('pago_online_activo', '"no"'::jsonb)

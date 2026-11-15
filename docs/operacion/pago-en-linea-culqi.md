@@ -125,3 +125,7 @@ Solo con llaves de integración; son transacciones de mentira y datos públicos 
 | Diners | 3600 020000 0006 | 01/30 | 230 | fraudulent |
 
 Dudas abiertas: los nombres del flujo 3DS (`action_code: REVIEW` en HTTP 200 y los campos de `authentication_3DS`) vienen de los demos oficiales de Python y Java; confírmalos con la primera prueba en integración.
+
+## Pre-producción (demo)
+- Acción `configurar-culqi` del workflow: guarda `CULQI_PUBLIC_KEY`, `CULQI_SECRET_KEY` y `CULQI_WEBHOOK_SECRET` (secretos del entorno) y redespliega. En la demo rechaza llaves `live`; además la API (`AMBIENTE_DESPLIEGUE=demo`) se niega a cobrar con `sk_live`.
+- Tarjetas de prueba de Culqi (integración) y webhook: ver las secciones anteriores. Sin llaves el pago corre simulado.

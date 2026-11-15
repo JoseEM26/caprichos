@@ -4,11 +4,12 @@ import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
 
 export const CLAVE_NUMEROS_PROPIOS = 'whatsapp_numeros_propios';
-export type MotivoOmision = 'DESTINO_NUMERO_PROPIO' | 'DESTINO_BLOQUEADO';
+export type MotivoOmision = 'DESTINO_NUMERO_PROPIO' | 'DESTINO_BLOQUEADO' | 'DESTINO_FUERA_DE_LISTA_BLANCA';
 
 export const TEXTO_OMISION: Record<MotivoOmision, string> = {
   DESTINO_NUMERO_PROPIO: 'Omitido: es el número del negocio',
   DESTINO_BLOQUEADO: 'Omitido: número bloqueado',
+  DESTINO_FUERA_DE_LISTA_BLANCA: 'Omitido: este ambiente solo escribe a los números de prueba (WHATSAPP_SOLO_NUMEROS)',
 };
 
 /** Últimos 9 dígitos de un celular peruano (quita +51, espacios, guiones, ceros a la izquierda). '' si no hay 9 dígitos (p. ej. un BSUID). */
@@ -43,6 +44,15 @@ export function listaCelulares(valor: unknown): string[] {
 }
 
 const TTL_MS = 30_000;
+
+/**
+ * Lista blanca de pre-producción: si WHATSAPP_SOLO_NUMEROS trae algo, solo esos celulares reciben mensajes, por Meta
+ * o por Evolution (un valor sin celulares válidos, p. ej. «ninguno», bloquea todo). Vacía o ausente: sin restricción.
+ */
+export function listaBlancaEnvio(env: NodeJS.ProcessEnv = process.env): Set<string> | null {
+  const crudo = (env.WHATSAPP_SOLO_NUMEROS ?? '').trim();
+  return crudo ? new Set(listaCelulares(crudo)) : null;
+}
 
 type UsuarioBasico = { partyId?: any; nombre?: string; usuario?: string } | undefined;
 
@@ -99,6 +109,8 @@ export class NumerosWhatsappService {
   async motivoOmision(tel: unknown): Promise<MotivoOmision | null> {
     const c = celular9(tel);
     const d = destinoBloqueo(tel);
+    const blanca = listaBlancaEnvio();
+    if (blanca && !(c && blanca.has(c))) return 'DESTINO_FUERA_DE_LISTA_BLANCA';
     if (!c && !d) return null;
     try {
       const { propios, bloqueados } = await this.cargar();

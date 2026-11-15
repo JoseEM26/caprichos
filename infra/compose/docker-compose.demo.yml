@@ -46,6 +46,16 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      # Marca la demo: la API se niega a cobrar con llaves Culqi de producción (sk_live)
+      AMBIENTE_DESPLIEGUE: demo
+      # Seguridad de la demo: la base trae celulares reales. Solo escribe a estos números (Meta y Evolution);
+      # sin valor en el .env queda «ninguno» = no sale ningún WhatsApp. Lista separada por comas, 51XXXXXXXXX.
+      WHATSAPP_SOLO_NUMEROS: ${WHATSAPP_SOLO_NUMEROS:-ninguno}
+      # Evolution API (WhatsApp no oficial, solo pruebas): lo escribe la acción instalar-evolution. Sin valores = simulado.
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN:-}
       CULQI_SECRET_KEY: ${CULQI_SECRET_KEY:-}
       CULQI_PUBLIC_KEY: ${CULQI_PUBLIC_KEY:-}
       CULQI_WEBHOOK_SECRET: ${CULQI_WEBHOOK_SECRET:-}

@@ -88,3 +88,9 @@ Pausa automática: si Evolution reporta `connection.update` con cierre y el moti
 - Mensaje propio, de grupo o de estado: se ignora.
 - Un «2» tras un menú de 3 opciones: el bot actúa como si se hubiera pulsado la segunda opción.
 - Cambiar a Evolution sin credenciales: los envíos quedan en modo simulado (log `[EVOLUTION SIMULADO]`).
+
+## 10. Pre-producción (demo): cómo se prueba sin escribir a clientes reales
+- La demo tiene una copia de datos reales: la variable `WHATSAPP_SOLO_NUMEROS` (lista de celulares `51XXXXXXXXX` separados por coma) limita TODO envío (Evolution y Meta) a esos números. Cualquier otro destino se descarta como OMITIDO (en Mensajes › Salientes figura DESCARTADO, motivo «DESTINO_FUERA_DE_LISTA_BLANCA»). En el compose de la demo, sin valor, queda «ninguno» y no sale nada.
+- Los avisos automáticos de la demo siguen apagados (`whatsapp_aviso_*_activo`, lo deja así `clonar-prod-a-demo`): el apagado se evalúa antes de encolar, por lo que Evolution lo respeta igual que Meta.
+- Instalación: acción `instalar-evolution` del workflow (solo demo, rama preprod; input `numeros_prueba` o secreto `WHATSAPP_SOLO_NUMEROS`). Crea `/opt/caprichos/evolution/evolution.env` (0600) y la instancia `caprichos`; Evolution no publica puertos: el QR se pide a la API de Caprichos (Configuración › Chatbot › WhatsApp).
+- Con `evolution_exigir_contacto_previo = si`, el número de prueba debe escribir primero al número de Evolution para recibir avisos.

@@ -5,7 +5,9 @@ import { PagosOnlineService } from './pagos-online.service';
 import { SimuladoAdaptador, TOKEN_3DS } from './simulado.adaptador';
 import { CulqiAdaptador } from './culqi.adaptador';
 import { crearPasarela } from './pasarela.fabrica';
-import { PasarelaPago } from './pasarela.puerto';
+import { ErrorPasarela, PasarelaPago } from './pasarela.puerto';
+import { mensajeDeError } from './culqi.errores';
+import { PagosOnlineVencimientoService } from './pagos-online-vencimiento.service';
 import { generarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
 
 // Datos sintéticos: nada real
@@ -174,7 +176,7 @@ describe('PagosOnlineService', () => {
 
   it('pasarela sin respuesta: queda PENDIENTE (no se rechaza) y no se cobra en Caja', async () => {
     const pasarela = new SimuladoAdaptador();
-    jest.spyOn(pasarela, 'cargar').mockRejectedValue(new (require('./pasarela.puerto').ErrorPasarela)('x'));
+    jest.spyOn(pasarela, 'cargar').mockRejectedValue(new ErrorPasarela('x'));
     const { s, acceso, cobros } = armar({ pasarela });
     const { intentoId } = await s.crearIntento('7', acceso);
     expect((await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' })).estado).toBe('PENDIENTE');
@@ -448,7 +450,6 @@ describe('adaptadores', () => {
   });
 
   it('mensajes de error simples, sin hablar de fraude', () => {
-    const { mensajeDeError } = require('./culqi.errores');
     const m = (x: any) => mensajeDeError(x);
     expect(m({ decline_code: 'insufficient_funds' })).toMatch(/Fondos insuficientes/);
     expect(m({ code: 'incorrect_cvv' })).toMatch(/código de seguridad/);
@@ -465,7 +466,6 @@ describe('adaptadores', () => {
 });
 
 describe('PagosOnlineVencimientoService', () => {
-  const { PagosOnlineVencimientoService } = require('./pagos-online-vencimiento.service');
   function armarV(valor: any, vencidos: any[]) {
     const prisma: any = {
       parametro: { findUnique: jest.fn().mockResolvedValue(valor === undefined ? null : { valor }) },
@@ -499,5 +499,17 @@ describe('PagosOnlineVencimientoService', () => {
     const { v, pedidos } = armarV(15, [{ id: 1n }, { id: 2n }]);
     pedidos.cambiarEstado.mockRejectedValueOnce(new Error('x'));
     expect(await v.anularVencidos(new Date())).toBe(1);
+  });
+});
+
+describe('llaves live en la demo', () => {
+  it('la demo se niega a cobrar con sk_live; con sk_test cobra normal; prod no se toca', async () => {
+    const live = { CULQI_SECRET_KEY: 'sk_live_x', CULQI_PUBLIC_KEY: 'pk_live_x' };
+    const bloqueada = crearPasarela({ ...live, AMBIENTE_DESPLIEGUE: 'demo' } as any);
+    expect(bloqueada.publicKey).toBeNull();
+    expect((await bloqueada.cargar({} as any)).estado).toBe('RECHAZADO');
+    await expect(bloqueada.devolver({} as any)).rejects.toThrow();
+    expect(crearPasarela({ CULQI_SECRET_KEY: 'sk_test_x', CULQI_PUBLIC_KEY: 'pk_test_x', AMBIENTE_DESPLIEGUE: 'demo' } as any).publicKey).toBe('pk_test_x');
+    expect(crearPasarela(live as any).publicKey).toBe('pk_live_x');
   });
 });
