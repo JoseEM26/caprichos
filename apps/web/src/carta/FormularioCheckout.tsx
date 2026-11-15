@@ -43,6 +43,7 @@ import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { EncabezadoDetalle } from './ElegirEnTarjetas';
 import { leerNombreInvitado } from './nombreInvitado';
 import { nombreMedio, TarjetasMedioPago } from './MediosPago';
+import { IconoMedioPago } from '../comun/IconoMedioPago';
 import { TarjetasFormaUbicacion, tituloForma, type FormaUbicacion } from './FormasUbicacion';
 
 interface FormularioCheckoutProps {
@@ -1978,15 +1979,18 @@ export function FormularioCheckout({
                           alignItems: 'center',
                         }}
                       >
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {mp}:{' '}
-                            {mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
-                              datosLocal?.telefono ||
-                              '123456789'}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                            Titular: {datosLocal?.nombre || 'Caprichos'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <IconoMedioPago medio={mp} tamano={22} ariaHidden />
+                          <div>
+                            <div style={{ fontWeight: 700 }}>
+                              {mp}:{' '}
+                              {mediosPagoDisponibles[mp.toLowerCase()]?.numero ||
+                                datosLocal?.telefono ||
+                                '123456789'}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                              Titular: {datosLocal?.nombre || 'Caprichos'}
+                            </div>
                           </div>
                         </div>
                         <button
@@ -2026,12 +2030,15 @@ export function FormularioCheckout({
                           alignItems: 'center',
                         }}
                       >
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
-                          </div>
-                          <div style={{ fontSize: '12px' }}>
-                            Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <IconoMedioPago medio="TRANSFERENCIA" tamano={22} ariaHidden />
+                          <div>
+                            <div style={{ fontWeight: 700 }}>
+                              {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
+                            </div>
+                            <div style={{ fontSize: '12px' }}>
+                              Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
+                            </div>
                           </div>
                         </div>
                         <button
@@ -2061,8 +2068,11 @@ export function FormularioCheckout({
                     ))}
 
                     {metodoPago === 'TARJETA' && (
-                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                        Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <IconoMedioPago medio="TARJETA" tamano={24} ariaHidden />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                          Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
+                        </div>
                       </div>
                     )}
 

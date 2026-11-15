@@ -3,6 +3,7 @@ import { detalleLinea, resumenAntesDelTotal, type DescuentoTicket, type DetalleL
 import '../salon.css';
 import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
+import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 import { SubirVoucherMozo } from '../../vouchers/SubirVoucherMozo';
 import { impresionApi, type ResultadoReimpresionPedido } from '../../impresion/impresionApi';
 import { vouchersApi, type EnvioCajaExtra } from '../../vouchers/vouchersApi';
@@ -381,11 +382,18 @@ export function ModalPrecuenta({
               <h3>Cómo pagar</h3>
               <div className="pc-tarjetas">
                 <div className="pc-tarjeta">
-                  <div className="pc-tarjeta-titulo">Yape o Plin</div>
+                  <div className="pc-tarjeta-titulo" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IconoMedioPago medio="YAPE" tamano={18} ariaHidden />
+                    <IconoMedioPago medio="PLIN" tamano={18} ariaHidden />
+                    <span>Yape o Plin</span>
+                  </div>
                   <div className="pc-tarjeta-texto">Paga al 9XX XXX XXX. Caja cobra y emite el comprobante.</div>
                 </div>
                 <div className="pc-tarjeta">
-                  <div className="pc-tarjeta-titulo">Efectivo</div>
+                  <div className="pc-tarjeta-titulo" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IconoMedioPago medio="EFECTIVO" tamano={18} ariaHidden />
+                    <span>Efectivo</span>
+                  </div>
                   <div className="pc-tarjeta-texto">Entrega el efectivo al mozo. Caja cobra y da el vuelto.</div>
                 </div>
               </div>

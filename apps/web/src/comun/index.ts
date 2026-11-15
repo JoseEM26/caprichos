@@ -13,6 +13,7 @@ export * from './Paginacion';
 export * from './Combo';
 export * from './FiltroCombo';
 export * from './Icono';
+export * from './IconoMedioPago';
 export * from './socket';
 export * from './mapa/MapaUbicacion';
 export * from './mapa/MapaPedidos';

@@ -3,6 +3,7 @@ import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
+import { IconoMedioPago } from '../../comun/IconoMedioPago';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, montoPorCobrar, Pedido, PagoItem, CobrarDto } from './pedidosApi';
 import { api, ErrorApi } from '../../comun/api';
@@ -496,9 +497,13 @@ export function ModalCobrar({
                           : 'var(--cp-navy, #0B2C3E)',
                         fontWeight: 700,
                         fontSize: 13,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      {m}
+                      <IconoMedioPago medio={m.toUpperCase()} tamano={18} ariaHidden />
+                      <span>{m}</span>
                     </button>
                   );
                 })}

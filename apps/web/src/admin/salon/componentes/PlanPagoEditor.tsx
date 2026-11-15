@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 import {
   MAX_MEDIOS_PLAN,
   MEDIOS_PLAN,
@@ -138,9 +139,13 @@ export function PlanPagoEditor({
                       fontSize: '13px',
                       cursor: usadoEnOtraFila ? 'not-allowed' : 'pointer',
                       opacity: usadoEnOtraFila ? 0.4 : 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
                     }}
                   >
-                    {m.nombre}
+                    <IconoMedioPago medio={m.id} tamano={18} ariaHidden />
+                    <span>{m.nombre}</span>
                   </button>
                 );
               })}

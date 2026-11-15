@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCarrito } from './CarritoContext';
 import { Icono } from '../comun/Icono';
+import { IconoMedioPago } from '../comun/IconoMedioPago';
 import { ModalConPestanas } from '../comun/ModalConPestanas';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { EstadoSeguimiento, PasoSeguimiento, PedidoGuardado } from './seguimiento';
@@ -394,7 +395,10 @@ function PanelPago({
       {pagos.map((p) => (
         <div key={p.medio} className="sg-medio" data-testid="pago-medio" data-medio={p.medio} data-estado={p.estado}>
           <div className="sg-fila">
-            <span>{NOMBRE_MEDIO[p.medio] ?? p.medio}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <IconoMedioPago medio={p.medio} tamano={22} ariaHidden />
+              {NOMBRE_MEDIO[p.medio] ?? p.medio}
+            </span>
             <span>{SOLES(p.monto)}</span>
           </div>
           <span className="sg-medio-estado">{textoPagoMedio(p, hora(p.actualizadoEn))}</span>

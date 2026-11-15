@@ -1,4 +1,5 @@
 import { DIAS_MAX_PROGRAMADO, errorParaCuando, hoyLima, sumarDias, type ParaCuando } from './paraCuando';
+import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 
 export type MedioAdelanto = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
@@ -87,13 +88,16 @@ export function SelectorParaCuando({ valor, onChange, adelanto, onAdelanto, medi
               style={{ width: 90 }}
             />
           </label>{' '}
-          <select aria-label="Medio del adelanto" value={medioAdelanto} onChange={(e) => onMedioAdelanto(e.target.value as MedioAdelanto)}>
-            <option value="EFECTIVO">Efectivo</option>
-            <option value="YAPE">Yape</option>
-            <option value="PLIN">Plin</option>
-            <option value="TRANSFERENCIA">Transferencia</option>
-            <option value="TARJETA">Tarjeta</option>
-          </select>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <IconoMedioPago medio={medioAdelanto} tamano={20} ariaHidden />
+            <select aria-label="Medio del adelanto" value={medioAdelanto} onChange={(e) => onMedioAdelanto(e.target.value as MedioAdelanto)}>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="YAPE">Yape</option>
+              <option value="PLIN">Plin</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="TARJETA">Tarjeta</option>
+            </select>
+          </span>
         </div>
       )}
       {error && (

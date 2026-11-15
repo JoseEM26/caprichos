@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 28" width="46" height="28" fill="none" role="img" aria-label="Plin">
+  <defs>
+    <linearGradient id="plin-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00B4DB"/>
+      <stop offset="100%" stop-color="#0083B0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="45" height="27" rx="6" fill="url(#plin-bg)" stroke="#00A9CE" stroke-width="1"/>
+  <path d="M4 8C4 6.895 4.895 6 6 6H12V22H6C4.895 22 4 21.105 4 20V8Z" fill="#005B7F" opacity="0.45"/>
+  <circle cx="8" cy="14" r="1.8" fill="#FFFFFF"/>
+  <text x="27" y="19" font-family="Montserrat, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13.5" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="-0.2">Plin</text>
+  <circle cx="33.8" cy="11.5" r="1.7" fill="#002D62"/>
+</svg>

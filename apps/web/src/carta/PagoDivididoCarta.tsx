@@ -1,6 +1,7 @@
 import { estadoDiv, filasVisibles, MAX_MEDIOS_CARTA, type FilaDiv } from './pagoDividido';
 import { nombreMedio } from './MediosPago';
 import type { MetodoPago } from './tipos';
+import { IconoMedioPago } from '../comun/IconoMedioPago';
 
 interface Props {
   filas: FilaDiv[];
@@ -30,6 +31,9 @@ export function PagoDivididoCarta({ filas, aCobrar, medios, alCambiar }: Props) 
         const ultimo = i === vista.length - 1;
         return (
           <div key={i} role="group" aria-label={`Medio ${i + 1} del pago`} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', flexShrink: 0 }} aria-hidden="true">
+              <IconoMedioPago medio={f.medio} tamano={24} ariaHidden />
+            </span>
             <select
               aria-label={`Medio ${i + 1}`}
               value={f.medio}
