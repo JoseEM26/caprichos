@@ -152,10 +152,24 @@ function mensajeDeError(err: unknown): string {
   return err instanceof ErrorApi ? err.message : 'No pudimos cargar las encuestas. Revisa tu conexión e inténtalo de nuevo.';
 }
 
-export function SeccionEncuestas() {
+/** Filtros que manda la barra general de Indicadores (si faltan, la sección usa sus propios chips). */
+export interface FiltrosExternosEncuestas {
+  desde: string;
+  hasta: string;
+  canal: string;
+  modalidad: string;
+  /** Texto del periodo aplicado, p. ej. «14/11 al 14/11». */
+  periodo: string;
+  /** Nota «No aplica el filtro de …» (vacía si no hay). */
+  nota: string;
+}
+
+export function SeccionEncuestas({ filtros }: { filtros?: FiltrosExternosEncuestas } = {}) {
   const [preset, setPreset] = useState<Preset>('30');
   const [puntaje, setPuntaje] = useState<string>('');
-  const [modalidad, setModalidad] = useState<string>('');
+  const [modalidadPropia, setModalidad] = useState<string>('');
+  const modalidad = filtros ? filtros.modalidad : modalidadPropia;
+  const canal = filtros?.canal ?? '';
   const [pagina, setPagina] = useState(1);
   const [reintento, setReintento] = useState(0);
   const [datos, setDatos] = useState<RespuestaEncuestas | null>(null);
@@ -164,12 +178,12 @@ export function SeccionEncuestas() {
   const [csvEnCurso, setCsvEnCurso] = useState(false);
   const [mensajeCsv, setMensajeCsv] = useState('');
 
-  const rango = rangoDePreset(preset);
+  const rango = filtros ? { desde: filtros.desde, hasta: filtros.hasta } : rangoDePreset(preset);
 
   // Cambiar un filtro vuelve a la primera página
   useEffect(() => {
     setPagina(1);
-  }, [preset, puntaje, modalidad]);
+  }, [preset, puntaje, modalidad, canal, rango.desde, rango.hasta]);
 
   useEffect(() => {
     let vigente = true;
@@ -180,6 +194,7 @@ export function SeccionEncuestas() {
       hasta: rango.hasta,
       puntaje: puntaje || undefined,
       modalidad: modalidad || undefined,
+      canal: canal || undefined,
       pagina,
       limite: TAMANO_PAGINA,
     });
@@ -198,7 +213,7 @@ export function SeccionEncuestas() {
       vigente = false;
     };
     // rango se deriva de preset; reintento fuerza nueva consulta
-  }, [preset, puntaje, modalidad, pagina, reintento]);
+  }, [preset, puntaje, modalidad, canal, rango.desde, rango.hasta, pagina, reintento]);
 
   const descargarCsv = async () => {
     setCsvEnCurso(true);
@@ -214,6 +229,7 @@ export function SeccionEncuestas() {
             hasta: rango.hasta,
             puntaje: puntaje || undefined,
             modalidad: modalidad || undefined,
+            canal: canal || undefined,
             pagina: pag,
             limite: LIMITE_CSV,
           })}`,
@@ -285,17 +301,25 @@ export function SeccionEncuestas() {
         <p style={{ fontSize: 13, color: 'var(--cp-soft)', margin: '4px 0 0' }}>
           Lo que calificaron los clientes después de su pedido. Las fechas corresponden al envío de la encuesta.
         </p>
+        {filtros && (
+          <p style={{ fontSize: 12, color: 'var(--cp-soft)', margin: '2px 0 0' }}>
+            Periodo: {filtros.periodo}
+            {filtros.nota ? ` · ${filtros.nota}` : ''}
+          </p>
+        )}
       </div>
 
       {/* Filtros */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div role="group" aria-label="Rango de fechas" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {!filtros && (
+<div role="group" aria-label="Rango de fechas" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {PRESETS.map((p) => (
             <button key={p.id} type="button" aria-pressed={preset === p.id} onClick={() => setPreset(p.id)} style={chip(preset === p.id)}>
               {p.etiqueta}
             </button>
           ))}
         </div>
+)}
         <div role="group" aria-label="Puntaje" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <button type="button" aria-pressed={puntaje === ''} onClick={() => setPuntaje('')} style={chip(puntaje === '')}>
             Todos los puntajes
@@ -306,13 +330,15 @@ export function SeccionEncuestas() {
             </button>
           ))}
         </div>
-        <div role="group" aria-label="Modalidad" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {!filtros && (
+<div role="group" aria-label="Modalidad" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {MODALIDADES.map((m) => (
             <button key={m.id || 'todas'} type="button" aria-pressed={modalidad === m.id} onClick={() => setModalidad(m.id)} style={chip(modalidad === m.id)}>
               {m.etiqueta}
             </button>
           ))}
         </div>
+)}
       </div>
 
       {error && <EstadoError mensaje={error} alReintentar={() => setReintento((r) => r + 1)} />}

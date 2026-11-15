@@ -45,7 +45,16 @@ Ver tambien: [[disenador]]
 Antes: [[ofertas]]
 Ver tambien: [[informes]]
 
+## Como se hace: Filtrar los indicadores por periodo, canal, tipo de pedido y categoria
+1. Arriba de la pantalla esta la barra de filtros. Elige el periodo: Hoy, Ayer, Ultimos 7 dias, Este mes (el que se usa al abrir), Mes anterior o Personalizado (aparecen las fechas Desde y Hasta; maximo 366 dias).
+2. Si quieres, elige tambien el Canal (carta web, WhatsApp, bot, caja, mozo, mostrador o telefono), el Tipo de pedido (en mesa, comer en local, para recoger, para llevar o delivery) y la Categoria de producto.
+3. Todos los cuadros se recalculan a la vez, y cada uno muestra debajo del titulo el periodo aplicado (por ejemplo "14/11 al 14/11"). Los pedidos anulados o rechazados no cuentan, igual que antes.
+4. Si un cuadro no puede usar uno de los filtros (por ejemplo, los reclamos no se separan por canal), lo avisa con la nota "No aplica el filtro de canal" en lugar de ignorarlo en silencio.
+5. Pulsa "Limpiar filtros" para volver a Este mes sin otros filtros. Los filtros quedan en la direccion de la pagina: puedes copiarla para compartir la misma vista o recargar sin perderla.
+Ver tambien: [[informes]]
+
 ## Errores y dudas comunes
+- Las estrellas de la carta cambian si filtro otro periodo: no. El interruptor "Estrellas en la carta" siempre usa los mas comprados del mes actual, sin importar los filtros.
 - Quien selecciona los productos que llevan estrella: no se escogen manualmente; el sistema calcula de forma automatica y objetiva cual fue el articulo con mas unidades cobradas en cada categoria durante el mes calendario.
 - Cuando se reinicia el calculo mensual: la medicion se reinicia automaticamente a las 00:00 horas del primer dia de cada mes, archivando el resultado del mes saliente en el historial.
 

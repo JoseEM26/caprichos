@@ -51,6 +51,7 @@ export interface TopCategoriaItem {
 }
 
 export interface IndicadoresData {
+  categoriasDisponibles?: string[];
   metas: IndicadorMeta[];
   topActual: TopCategoriaItem[];
   topHistorial: { mes: string; top: string[] }[];

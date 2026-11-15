@@ -3,6 +3,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { InformesService } from './informes.service';
 import { FiltroInformeDto, FiltroMapaDto } from './dto/filtro-informe.dto';
+import { FiltroIndicadoresDto } from './dto/filtro-indicadores.dto';
 import { CortesiasService } from '../cortesias/cortesias.service';
 import { FiltroCortesiasDto } from '../cortesias/dto/cortesias.dto';
 
@@ -35,8 +36,8 @@ export class InformesController {
 
   @Get('indicadores')
   @Permiso('auditoria', 'ver')
-  obtenerIndicadores() {
-    return this.informesService.obtenerIndicadores();
+  obtenerIndicadores(@Query() filtro: FiltroIndicadoresDto) {
+    return this.informesService.obtenerIndicadores(filtro);
   }
 
   @Get('mapa')
