@@ -175,6 +175,13 @@ export function mensajeRechazo(codigo?: string, mensajeServidor?: string): strin
   return mensajeServidor || 'No se pudo cobrar el pago.';
 }
 
+/** El script de Culqi no cargó o no pudo montarse (no es un rechazo del banco). */
+export class ErrorAperturaCulqi extends Error {
+  constructor(detalle?: string) {
+    super(`No se pudo abrir el pago.${detalle ? ` ${detalle}` : ''}`);
+  }
+}
+
 export interface ResultadoCulqi {
   token: string;
   medio: MedioCulqi;
@@ -199,7 +206,10 @@ export function abrirCulqi(intento: IntentoCulqi): { resultado: Promise<Resultad
   cargarScriptCulqi()
     .then(() => {
       const CC = (window as any).CulqiCheckout;
-      if (!CC) throw new Error('No se pudo cargar el pago. Intenta de nuevo.');
+      if (!CC) throw new ErrorAperturaCulqi();
+      // Culqi hace document.querySelector(container) al abrir; si el div aún no existe, crea uno suelto en <body>
+      // (fuera de nuestro modal) y nuestro contenedor queda vacío. Mejor fallar a la vista.
+      if (!document.getElementById(ID_CONTENEDOR_CULQI)) throw new ErrorAperturaCulqi();
       instancia = new CC(intento.publicKey, configCulqi(intento));
       instancia.culqi = () => {
         const C = instancia;
@@ -218,6 +228,6 @@ export function abrirCulqi(intento: IntentoCulqi): { resultado: Promise<Resultad
       instancia.closeCheckout = () => terminar(null);
       instancia.open();
     })
-    .catch((e) => terminar(null, e instanceof Error ? e : new Error('No se pudo cargar el pago.')));
+    .catch(() => terminar(null, new ErrorAperturaCulqi()));
   return { resultado, cerrar };
 }
