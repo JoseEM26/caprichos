@@ -1028,6 +1028,20 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     };
   }
 
+  /** Reacción con emoji a un mensaje del cliente (type: reaction de la Cloud API). No crea conversación ni se cobra. */
+  async reaccionar(telefono: string, waMessageId: string, emoji: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
+    if (!this.token || !this.phoneDe(opciones)) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'SIN_CREDENCIALES_META', errorDetalle: 'Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en la configuración' };
+    }
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
+    const payload = { messaging_product: 'whatsapp', ...construirDestinatario(telefono), type: 'reaction', reaction: { message_id: waMessageId, emoji } };
+    const r = await this.ejecutarConReintentos(url, payload, enmascararTelefono(telefono));
+    return r.exito
+      ? { exito: true, estado: 'ENVIADO', waMessageId: r.data?.messages?.[0]?.id }
+      : { exito: false, estado: 'FALLIDO', errorCodigo: r.error?.codigo ?? 'ERROR_META', errorDetalle: r.error?.mensaje ?? 'Meta rechazó la reacción' };
+  }
+
   async marcarLeido(waMessageId: string, phoneNumberId?: string): Promise<boolean> {
     const opciones = { phoneNumberId };
     if (!this.token || !this.phoneDe(opciones)) return false;

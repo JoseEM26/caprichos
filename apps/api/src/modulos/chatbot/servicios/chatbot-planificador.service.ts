@@ -170,7 +170,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
       repartoEsperaMaxMin: Number(mapa.get('reparto_espera_max_min') ?? 10),
       reprogRespuestaMin: Number(mapa.get('reprog_respuesta_min') ?? 30),
       reprogMaxIntentos: Number(mapa.get('reprog_max_intentos') ?? 1),
-      encuestaEsperaMin: acotar(mapa.get('encuesta_espera_min'), 30, 5, 1440),
+      encuestaEsperaMin: acotar(mapa.get('encuesta_espera_min'), 15, 5, 1440),
       encuestaPuntajeQueja: Number(mapa.get('encuesta_puntaje_queja') ?? 2),
       encuestaTopeDias: acotar(mapa.get('encuesta_tope_dias'), 7, 1, 90),
       encuestaHoraDesde: acotar(mapa.get('encuesta_hora_desde'), 9, 0, 23),

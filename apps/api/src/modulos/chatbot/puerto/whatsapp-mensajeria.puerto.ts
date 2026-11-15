@@ -96,6 +96,9 @@ export interface WhatsAppMensajeriaPuerto {
   /** Sube un archivo (foto o documento) a la Media API de Meta y devuelve su media id (solo el adaptador real; null si falla). */
   subirMedia?(archivo: Buffer, mime?: string, phoneNumberId?: string, nombreArchivo?: string): Promise<string | null>;
 
+  /** Reacciona con un emoji a un mensaje que el cliente envió (en vez de contestarle con texto). Gratis: no abre conversación. */
+  reaccionar?(telefono: string, waMessageId: string, emoji: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp>;
+
   marcarLeido(waMessageId: string, phoneNumberId?: string): Promise<boolean>;
 
   estaConectado(): EstadoConexionWhatsApp;

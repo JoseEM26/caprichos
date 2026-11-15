@@ -380,6 +380,15 @@ export function conBienvenidaPuntos(
   return { ...base, textoLibre };
 }
 
+/** Línea que se suma al «recibimos tu pedido» cuando el pedido ya está pagado (así no sale un segundo mensaje de pago). */
+export const LINEA_PAGO_CONFIRMADO = '✅ ¡Tu pago ya está confirmado!';
+
+/** Pedido ya pagado al recibirlo: «pedido recibido» y «pago confirmado» van en UN solo mensaje. */
+export function conPagoConfirmado(base: PayloadAvisoReparto): PayloadAvisoReparto {
+  if (/pago (recibido|confirmado)/i.test(base.textoLibre)) return base;
+  return { ...base, textoLibre: `${base.textoLibre}\n\n${LINEA_PAGO_CONFIRMADO}` };
+}
+
 /** Aviso ENTREGADO de un pedido que suma puntos: «Ganaste N puntos. Total: M». */
 export function conPuntosEntregado(base: PayloadAvisoReparto, nombre: string, codigo: string, ganados: number, total: number): PayloadAvisoReparto {
   const g = formatearPuntos(ganados);

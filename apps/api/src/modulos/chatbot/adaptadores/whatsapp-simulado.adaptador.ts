@@ -326,6 +326,11 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
     }
   }
 
+  async reaccionar(telefono: string, _waMessageId: string, emoji: string): Promise<ResultadoEnvioWhatsApp> {
+    this.logger.log(`[SIMULADO] Reacción ${emoji} a ${enmascararTelefono(telefono)}`);
+    return { exito: true, estado: 'SIMULADO' };
+  }
+
   async marcarLeido(waMessageId: string, _phoneNumberId?: string): Promise<boolean> {
     this.logger.log(`[SIMULADO] Marcar como leído mensaje ${waMessageId}`);
     try {

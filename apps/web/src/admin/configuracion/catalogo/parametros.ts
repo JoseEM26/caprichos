@@ -375,9 +375,9 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   encuesta_espera_min: {
     grupo: 'encuesta', titulo: 'Espera antes de enviar la encuesta',
     descripcion: 'Minutos después de la entrega (o del cobro en mesa) para enviar la encuesta de satisfacción por WhatsApp. Solo actúa si el aviso de encuesta está en Sí.',
-    ejemplo: 'Con 30: un pedido entregado a las 8:00 recibe la encuesta a las 8:30.',
+    ejemplo: 'Con 15: un pedido entregado a las 8:00 recibe la encuesta a las 8:15.',
     efecto: 'Subirlo retrasa la encuesta; los pedidos sin teléfono real o sin consentimiento de WhatsApp no la reciben.',
-    porDefecto: '30', unidad: 'minutos', rango: '5 a 1440', palabras: ['encuesta', 'posventa', 'calificacion', 'satisfaccion', 'opinion'], peligro: 'bajo',
+    porDefecto: '15', unidad: 'minutos', rango: '5 a 1440', palabras: ['encuesta', 'posventa', 'calificacion', 'satisfaccion', 'opinion'], peligro: 'bajo',
   },
   encuesta_tope_dias: {
     grupo: 'encuesta', titulo: 'Días entre encuestas por celular',

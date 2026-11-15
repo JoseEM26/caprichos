@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmascarar.util';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
+import { textoDePlantilla } from '../catalogo/texto-plantilla';
 import { aTextoNumerado } from '../evolution/menu-numerado.util';
 import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
 import { escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
@@ -101,8 +102,13 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     );
     if (r.ok) {
       const waMessageId: string | undefined = r.data?.key?.id ?? r.data?.id ?? undefined;
+      await this.config.registrarResultadoEnvio(true).catch(() => undefined);
       await this.registrar(tel, tipo, waMessageId, opciones);
       return { exito: true, estado: 'ENVIADO', waMessageId };
+    }
+    // Cuentan para la pausa automática la red caída, los 5xx y 401/403; un 400/404 (p. ej. número sin WhatsApp) es del destinatario
+    if (r.red || r.status >= 500 || r.status === 401 || r.status === 403) {
+      await this.config.registrarResultadoEnvio(false, r.red ? 'Evolution no respondió' : `HTTP ${r.status}`).catch(() => undefined);
     }
     if (r.red) return { exito: false, estado: 'FALLIDO', errorCodigo: 'EVOLUTION_NO_DISPONIBLE', errorDetalle: 'Evolution no respondió' };
     return this.fallo('ERROR_EVOLUTION', `HTTP ${r.status}: ${JSON.stringify(r.data?.response?.message ?? r.data?.message ?? r.data ?? '')}`);
@@ -169,8 +175,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
   async enviarPlantilla(telefono: string, nombre: string, _idioma: string, variables?: Record<string, string> | string[], opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const def = Object.values(CATALOGO_PLANTILLAS).find((d) => d.nombre === nombre);
     if (!def) return { exito: false, estado: 'FALLIDO', errorCodigo: 'PLANTILLA_NO_CONFIGURADA', errorDetalle: `Plantilla desconocida '${nombre}'` };
-    const valores = Array.isArray(variables) ? variables : Object.values(variables ?? {});
-    const texto = def.texto.replace(/\{\{(\d+)\}\}/g, (_m, i) => String(valores[Number(i) - 1] ?? ''));
+    const texto = textoDePlantilla(def.nombre, variables) ?? '';
     if (def.botones?.length && opciones?.botonesRespuesta?.length) {
       return this.enviarBotones(telefono, texto, opciones.botonesRespuesta.map((id, i) => ({ id, titulo: def.botones![i] ?? id })), opciones);
     }
@@ -204,6 +209,23 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     const c = this.contenidoMedia(mediaId);
     if (!c && this.api.configurado()) return { exito: false, estado: 'FALLIDO', errorCodigo: 'MEDIA_NO_DISPONIBLE', errorDetalle: 'El documento ya no está disponible para enviar' };
     return this.post('/message/sendMedia', { mediatype: 'document', mimetype: c?.mime ?? 'application/pdf', media: c?.media ?? mediaId, caption: caption ?? '', fileName: nombreArchivo }, telefono, 'documento', 0, opciones, 'DOCUMENTO');
+  }
+
+  /** Reacción a un mensaje del cliente (Evolution v2: POST /message/sendReaction/{instancia}); no pasa por la fila de anti-bloqueo de textos. */
+  async reaccionar(telefono: string, waMessageId: string, emoji: string): Promise<ResultadoEnvioWhatsApp> {
+    if (!this.api.configurado()) {
+      this.logger.log(`[EVOLUTION SIMULADO] reacción ${emoji} a ${enmascararTelefono(telefono)}`);
+      return { exito: true, estado: 'SIMULADO' };
+    }
+    if (await this.config.estaPausado()) {
+      return { exito: false, estado: 'FALLIDO', errorCodigo: 'EVOLUTION_PAUSADO', errorDetalle: 'El envío por Evolution está en pausa' };
+    }
+    const r = await this.api.llamar('POST', `/message/sendReaction/${encodeURIComponent(this.api.instancia)}`, {
+      key: { remoteJid: `${this.numero(telefono)}@s.whatsapp.net`, fromMe: false, id: waMessageId },
+      reaction: emoji,
+    });
+    if (r.ok) return { exito: true, estado: 'ENVIADO', waMessageId: r.data?.key?.id };
+    return { exito: false, estado: 'FALLIDO', errorCodigo: r.red ? 'EVOLUTION_NO_DISPONIBLE' : 'ERROR_EVOLUTION', errorDetalle: r.red ? 'Evolution no respondió' : `HTTP ${r.status}` };
   }
 
   /** Evolution marca como leído por su cuenta al recibir; no se pide nada más. */

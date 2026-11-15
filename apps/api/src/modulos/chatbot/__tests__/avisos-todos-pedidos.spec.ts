@@ -27,7 +27,9 @@ describe('AvisosPedidoService: avisos en todos los pedidos', () => {
       mensajeReparto: {
         findUnique: jest.fn(async ({ where }: any) => (etapasCreadas.has(where.pedido_id_numero.numero) ? { numero: 1 } : null)),
         create: jest.fn(async ({ data }: any) => { etapasCreadas.add(data.numero); return {}; }),
+        createMany: jest.fn(async ({ data }: any) => { for (const d of data) etapasCreadas.add(d.numero); return { count: data.length }; }),
       },
+      salienteWhatsapp: { findUnique: jest.fn(async () => null), updateMany: jest.fn(async () => ({ count: 1 })) },
       conversacion: { upsert: jest.fn().mockResolvedValue({ id: BigInt(5), flujo: null }), update: jest.fn() },
     };
     outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
@@ -116,5 +118,64 @@ describe('AvisosPedidoService: avisos en todos los pedidos', () => {
     pedido.estado = 'COLA';
     await servicio.avisar(55, 'ACEPTADO');
     expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toContain('esta en preparacion');
+  });
+
+  describe('menos mensajes: «recibido» y «pago confirmado» en uno solo si el pedido ya está pagado', () => {
+    const conLineas = (extra: any = {}) => {
+      Object.assign(pedido, {
+        pago_estado: 'PAGADO', estado: 'COLA',
+        lineas: [{ id: BigInt(1), linea_combo_id: null, nombre: 'Dona', cantidad: 2, tamano: null, sabor: null, nota: null, opciones: null, opcionesElegidas: [], sabores: [] }],
+        planPago: [], ...extra,
+      });
+    };
+    const textos = () => outbox.encolar.mock.calls.map((c: any[]) => c[0].carga.textoLibre as string);
+
+    it('pagado al crearse: un solo mensaje con el pago, y el aviso de pago confirmado ya no sale aparte', async () => {
+      conLineas();
+      expect((await servicio.avisar(55, 'RECIBIDO')).estado).toBe('ENCOLADO');
+      expect(textos()).toHaveLength(1);
+      expect(textos()[0]).toMatch(/pago (recibido|confirmado)/i);
+      expect(etapasCreadas.has(6)).toBe(true);
+      expect(await servicio.avisar(55, 'ACEPTADO')).toMatchObject({ estado: 'YA_ENVIADO' });
+      expect(outbox.encolar).toHaveBeenCalledTimes(1);
+    });
+
+    it('sin pagar al crearse: recibido sale solo y el pago confirmado sale después, como dos mensajes', async () => {
+      conLineas({ pago_estado: 'PENDIENTE' });
+      await servicio.avisar(55, 'RECIBIDO');
+      expect(etapasCreadas.has(6)).toBe(false);
+      pedido.pago_estado = 'PAGADO';
+      expect((await servicio.avisar(55, 'ACEPTADO')).estado).toBe('ENCOLADO');
+      expect(textos()).toHaveLength(2);
+    });
+
+    it('delivery pagado: no se junta (su «aceptado» avisa que ya lo preparan, otra cosa)', async () => {
+      conLineas({ modalidad: 'DELIVERY', canal: 'CARTA' });
+      await servicio.avisar(55, 'RECIBIDO');
+      expect(etapasCreadas.has(6)).toBe(false);
+    });
+
+    it('con el interruptor de pago confirmado apagado no se inventa nada que juntar', async () => {
+      parametros.whatsapp_aviso_pago_confirmado_activo = 'no';
+      conLineas();
+      await servicio.avisar(55, 'RECIBIDO');
+      expect(etapasCreadas.has(6)).toBe(false);
+    });
+
+    it('el pago se confirma cuando «recibido» aún espera en la cola: se le suma la línea y no sale otro mensaje', async () => {
+      prisma.salienteWhatsapp.findUnique.mockResolvedValueOnce({ id: BigInt(9), estado: 'PENDIENTE', carga: { textoLibre: 'Recibimos tu pedido CP-055.', plantillaClave: 'CARTA_RECIBIDO_EFECTIVO' } });
+      expect(await servicio.avisar(55, 'ACEPTADO')).toMatchObject({ estado: 'YA_ENVIADO', motivo: 'COMBINADO_CON_RECIBIDO' });
+      const data = prisma.salienteWhatsapp.updateMany.mock.calls[0][0].data;
+      expect(data.carga.textoLibre).toContain('Recibimos tu pedido CP-055.');
+      expect(data.carga.textoLibre).toContain('Tu pago ya está confirmado');
+      expect(etapasCreadas.has(6)).toBe(true);
+      expect(outbox.encolar).not.toHaveBeenCalled();
+    });
+
+    it('si «recibido» ya salió, el pago confirmado va en su propio mensaje', async () => {
+      prisma.salienteWhatsapp.findUnique.mockResolvedValueOnce({ id: BigInt(9), estado: 'ENVIADO', carga: { textoLibre: 'x' } });
+      expect((await servicio.avisar(55, 'ACEPTADO')).estado).toBe('ENCOLADO');
+      expect(prisma.salienteWhatsapp.updateMany).not.toHaveBeenCalled();
+    });
   });
 });

@@ -485,6 +485,11 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       expect((await planificador.obtenerParametros()).encuestaEsperaMin).toBe(5);
     });
 
+    it('sin parámetro, la encuesta sale a los 15 minutos de entregado (decisión del dueño 15/11)', async () => {
+      mockPrisma.parametro.findMany.mockResolvedValue([]);
+      expect((await planificador.obtenerParametros()).encuestaEsperaMin).toBe(15);
+    });
+
     it('número bloqueado (spam): se omite con motivo y no se encola', async () => {
       (planificador as any).numeros = { motivoOmision: jest.fn().mockResolvedValue('DESTINO_BLOQUEADO') };
       conEncuestas([base({ id: BigInt(83) })]);

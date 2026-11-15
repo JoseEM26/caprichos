@@ -26,12 +26,14 @@ const LIMITES: Array<{ clave: string; texto: string; ayuda?: string; texto_libre
   { clave: 'evolution_pausa_min_seg', texto: 'Pausa mínima entre envíos (seg)' },
   { clave: 'evolution_pausa_max_seg', texto: 'Pausa máxima entre envíos (seg)' },
   { clave: 'evolution_escribiendo_ms_por_caracter', texto: '«Escribiendo…» (ms por letra)' },
-  { clave: 'evolution_horario_desde', texto: 'Avisos desde la hora (Lima)' },
-  { clave: 'evolution_horario_hasta', texto: 'Avisos hasta la hora (Lima)' },
+  { clave: 'evolution_horario_desde', texto: 'Respaldo: avisos desde la hora (Lima)', ayuda: 'Solo si no se puede leer el horario del local; Evolution envía en el horario de Configuración › Local' },
+  { clave: 'evolution_horario_hasta', texto: 'Respaldo: avisos hasta la hora (Lima)' },
+  { clave: 'evolution_fallos_seguidos', texto: 'Fallos seguidos que pausan Evolution y pasan a Meta', ayuda: '0 = no pausar solo' },
+  { clave: 'evolution_fallos_ventana_min', texto: 'Ventana de esos fallos (minutos)' },
   { clave: 'evolution_max_enlaces', texto: 'Máx. enlaces por mensaje' },
   { clave: 'evolution_max_texto_identico', texto: 'Mismo texto repetido antes de variar el saludo' },
   { clave: 'evolution_exigir_contacto_previo', texto: 'Solo escribir a quien ya escribió (si / no)', texto_libre: true },
-  { clave: 'evolution_origenes_permitidos', texto: 'Avisos que sí salen por Evolution', texto_libre: true },
+  { clave: 'evolution_origenes_permitidos', texto: 'Solo estos orígenes salen por Evolution (vacío = los mismos avisos que con Meta)', texto_libre: true },
 ];
 
 /** true si quien mira la pantalla es ADMIN (sin sesión: false). */

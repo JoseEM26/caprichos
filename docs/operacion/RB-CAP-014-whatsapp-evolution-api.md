@@ -9,9 +9,13 @@ Evolution API es un servidor que se conecta a WhatsApp Web (librería Baileys) c
 
 ## 1. Qué cambia para el cliente con Evolution
 - Menús en texto numerado. No hay botones, listas ni carruseles: el bot manda «1. Ver carta / 2. Pedir / Responde 1 o 2» y la respuesta «2» se convierte en el mismo botón que habría pulsado. Un texto normal posterior del bot cierra el menú (un «2» suelto después ya no se toma como opción). El menú dura 30 minutos.
-- Sin plantillas ni ventana de 24 h: las plantillas salen como su texto libre equivalente del catálogo.
-- Mensajes que el número manda por su cuenta (sin que el cliente acabe de escribir): SOLO avisos del pedido (recibido, listo, salió, llegó, entregado...), la encuesta posventa y lo que el propio cliente pidió (código de cuenta o de recuperar contraseña, confirmación de reserva, aviso de cuenta creada). Todo lo demás (puntos ganados, bienvenida de puntos, cumpleaños, recordatorios de reserva y de pago, campañas, alertas al personal) se bloquea: queda DESCARTADO en Mensajes › Salientes con el motivo «Bloqueado: ...». Las respuestas del bot a un mensaje del cliente siempre salen.
-- Nunca se escribe primero a un número que jamás escribió al negocio (queda DESCARTADO, «sin contacto previo»). Excepciones: los avisos del pedido también salen si ese celular hizo un pedido en las últimas 24 h (p. ej. por la carta web), y el código, la reserva y la cuenta creada no lo exigen (los pidió el cliente).
+- Igualito a Meta (decisión del 15/11): rige la MISMA ventana de 24 h. Solo se escribe libre si el cliente pidió o escribió en las últimas 24 h; fuera de eso, lo que en Meta iría por plantilla sale con EL MISMO TEXTO de esa plantilla, con sus variables puestas (una sola función: `textoDePlantilla`, con prueba por cada plantilla del catálogo). Lo que no tiene plantilla se descarta, igual que en Meta.
+- Mismos avisos que Meta: rigen los mismos interruptores `whatsapp_aviso_*`. Ya no hay una lista corta de orígenes: `evolution_origenes_permitidos` queda vacío (= todos los de Meta); si un ADMIN escribe una lista, solo salen esos. Las respuestas del bot a un mensaje del cliente siempre salen.
+- Solo dentro del HORARIO DE TRABAJO DEL LOCAL (el de Configuración › Local: horario por día y fechas especiales). Lo que cae fuera de horario se DESCARTA (motivo «Descartado: ... fuera del horario»), no se manda al día siguiente; las respuestas a un mensaje del cliente sí salen. `evolution_horario_desde/hasta` quedan solo de respaldo si no se puede leer el horario del local (o hay una pausa por alta demanda).
+- Menos mensajes: si el pedido ya está pagado cuando se recibe, «recibimos tu pedido» y «pago confirmado» salen en UN solo mensaje (el pago confirmado no sale aparte; también si el pago se confirma cuando «recibido» aún espera en la cola). Si el pago se confirma después, siguen siendo dos. El delivery no se junta (su aviso «aceptado» dice que ya lo preparan). Rige igual con Meta.
+- Reacciones en vez de texto: al voucher recibido se reacciona ✅ y a un «gracias / ok / listo / 👍» se reacciona ❤️ (si el cliente tiene un pedido de hoy y el bot no está en medio de una pregunta). Con Evolution usa `POST /message/sendReaction/{instancia}` (API v2); con Meta, `type: reaction`. Si la reacción falla, se contesta con texto como antes. La lista blanca `WHATSAPP_SOLO_NUMEROS` también corta las reacciones.
+- Sin bot (apagado, o chat en manos de una persona): si un cliente escribe FUERA DE HORARIO se le responde UNA vez (máx. 1 cada 12 h) con el texto de «fuera de horario» del bot (`chatbot_texto_fuera_horario`), cuándo abrimos y el enlace de la carta; si saluda sin pedido activo, se le da la bienvenida con el enlace a la carta (máx. 1 cada 12 h). Con el bot activo no cambia nada: el bot ya saluda con su bienvenida y avisa el horario. Rige con Meta y con Evolution.
+- Nunca se escribe primero a un número que jamás escribió al negocio (queda DESCARTADO, «sin contacto previo»). Excepciones: los avisos del pedido también salen si ese celular hizo un pedido en las últimas 24 h (p. ej. por la carta web), y el código, la reserva, la cuenta creada y los avisos al equipo no lo exigen (los pidió el cliente o son del personal).
 
 ## 2. Variables de entorno
 En el `.env` de la API de Caprichos (nunca en Git; en producción por los secretos del ambiente):
@@ -58,23 +62,25 @@ Todas se editan en la misma pantalla (solo ADMIN, auditado) o en `parametro`. «
 
 | Parámetro | Defecto | Efecto |
 | :--- | :--- | :--- |
-| `evolution_limite_minuto` / `_hora` / `_dia` | 3 / 30 / 150 | Máximo de avisos proactivos enviados. Lo que excede espera (1 min, 10 min, 60 min) y sale después; no se pierde. |
+| `evolution_limite_minuto` / `_hora` / `_dia` | 3 / 60 / 350 | Máximo de mensajes enviados. Lo que excede espera (1 min, 10 min, 60 min) y sale después; no se pierde. Con 60 por hora el tope de la hora manda (1 por minuto en promedio); 3 por minuto deja pasar un pico corto sin estrangularlo, por eso no se subió a 5. |
 | `evolution_pausa_min_seg` / `_max_seg` | 2 / 6 | Pausa aleatoria entre cualquier envío (los envíos salen de a uno). |
 | `evolution_escribiendo_ms_por_caracter` | 40 | Tiempo de «escribiendo…» antes de cada texto (mín. 1 s, máx. 8 s). |
-| `evolution_horario_desde` / `_hasta` | 9 / 22 | Horas de Lima en que pueden salir proactivos; fuera de horario esperan. |
+| `evolution_horario_desde` / `_hasta` | 9 / 22 | Solo respaldo (ver arriba): horas de Lima que se usan si no se puede leer el horario del local. |
 | `evolution_exigir_contacto_previo` | si | No se escribe primero a quien nunca escribió. |
 | `evolution_max_enlaces` | 1 | Enlaces por mensaje; los demás se reemplazan por «(enlace omitido)». |
 | `evolution_max_texto_identico` | 2 | Si el mismo texto se repite más de esto en una hora, se cambia el saludo. |
-| `evolution_origenes_permitidos` | `AVISO_PEDIDO,ENCUESTA,CODIGO_CUENTA,RESERVA,AVISO_CUENTA` | Orígenes del outbox que pueden salir como proactivos. Agregar uno a esta lista es asumir más riesgo. |
+| `evolution_origenes_permitidos` | (vacío) | Vacío = los mismos avisos que Meta. Con valores, lista blanca de orígenes del outbox. |
+| `evolution_fallos_seguidos` / `_ventana_min` | 5 / 10 | Pausa automática: esa cantidad de fallos de envío seguidos dentro de esos minutos (0 = no pausar solo). |
 | `evolution_pausado` | no | Pausa manual del envío (botón «Pausar envío»). |
 
-Pausa automática: si Evolution reporta `connection.update` con cierre y el motivo es baneo o sesión revocada (401, 403, `banned`, `logged_out`), o un envío falla con un error de bloqueo, `evolution_pausado` pasa a `si`. Con el número desconectado, los proactivos esperan. En cada desconexión (solo en el cambio de estado) se crea una notificación para los ADMIN en la campanita: «WhatsApp: número desconectado».
+Pausa automática (con Evolution como proveedor activo): si hay N fallos de envío seguidos (red caída, 5xx, 401/403; un 400 por «número sin WhatsApp» no cuenta), si la instancia se desconecta (`connection.update` con cierre; un cierre 515 de reinicio no cuenta) o si hay señal de baneo (401, 403, `banned`, `logged_out`), pasa todo solo esto: `evolution_pausado` = `si`, `whatsapp_proveedor` = `META` (si Meta tiene `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`; si no, solo se pausa y los avisos esperan), queda en la auditoría (módulo `whatsapp_proveedor`, acción `pausa_automatica`) y se avisa a los ADMIN por el canal de avisos internos (campanita, y WhatsApp/correo si están activos). Ocurre una sola vez; un ADMIN lo devuelve a Evolution a mano («Reanudar envío» y «Cambiar a Evolution»). Con Meta activo, una desconexión solo avisa a la campanita.
 
 ## 7. Si el número se desconecta o lo bloquean
 1. Revisa la campanita y el estado en la pantalla.
 2. Desconexión simple: «Mostrar QR para vincular» y escanear de nuevo. Los avisos en espera salen solos.
 3. Si el envío quedó en pausa por baneo: no insistas con el mismo número. Cambia a «Volver a Meta» para no dejar de atender, y recién después decide si se reintenta, se reanuda («Reanudar envío») o se usa otro número.
-4. Revisa Mensajes › Salientes: los DESCARTADOS «Bloqueado» son esperados; los PENDIENTES con «Tope» o «Fuera de horario» salen solos.
+4. Revisa Mensajes › Salientes: los DESCARTADOS «Fuera del horario» o «sin contacto previo» son esperados; los PENDIENTES con «Tope» salen solos.
+5. Si Evolution se pausó solo, los avisos ya salen por Meta: arregla el número con calma y vuelve a Evolution a mano.
 
 ## 8. Qué no hace Evolution
 - No hay carruseles ni imágenes por tarjeta: el carrusel sale como lista numerada.

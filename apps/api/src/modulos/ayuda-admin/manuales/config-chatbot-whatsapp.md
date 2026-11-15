@@ -28,7 +28,7 @@ Controla el chatbot de WhatsApp: qué funciones atiende (pedidos, cobro, reserva
 ## Como se hace: cambiar los mensajes fijos del bot
 1. En la sección "Textos y mensajes" elige el mensaje (bienvenida, despedida, pase a una persona, no entiendo, derivación…).
 2. Edítalo (máximo 1024 caracteres, límite de WhatsApp; no puede quedar vacío) y pulsa "Guardar texto".
-3. Dos textos están guardados pero hoy el bot no los usa: "Mensaje fuera de horario" e "Indicación para enviar el comprobante de pago".
+3. "Indicación para enviar el comprobante de pago" está guardado pero hoy el bot no lo usa. "Mensaje fuera de horario" sí se usa cuando el bot no va a contestar (apagado o chat en manos de una persona): ese cliente recibe, una vez cada 12 horas, un saludo cálido, este texto con la hora a la que abrimos y el enlace de la carta.
 
 ## Como se hace: configurar la protección contra spam
 1. En la sección "Protección y privacidad" abre la tarjeta de protección contra spam y pedidos falsos.
@@ -39,6 +39,14 @@ Controla el chatbot de WhatsApp: qué funciones atiende (pedidos, cobro, reserva
 1. En "Protección y privacidad" escribe los días de retención y pulsa "Guardar plazo". Guardar el plazo no borra nada.
 2. Pulsa "Ejecutar anonimización ahora" para tapar el contenido de los mensajes más antiguos que el plazo (los registros se conservan; el texto original no se recupera).
 3. Para un cliente que pidió ver o dar de baja sus datos, escribe su teléfono y el motivo, consulta o exporta sus datos, o "Dar de baja y anonimizar" (no se puede deshacer).
+
+## Como se hace: saber qué hace el WhatsApp cuando se usa Evolution (número no oficial)
+1. En la pestaña "Chatbot y seguridad" está la tarjeta del proveedor de WhatsApp: Meta (oficial) o Evolution (no oficial). Solo el ADMIN cambia de uno a otro.
+2. Con Evolution rigen las mismas reglas que con Meta: la misma ventana de 24 horas (fuera de ella, el aviso sale con el texto de su plantilla) y los mismos interruptores de avisos de Parámetros.
+3. Evolution solo envía dentro del horario de trabajo del local (Configuración › Local). Lo que cae fuera de horario se descarta y no se manda al día siguiente.
+4. Si el pedido ya está pagado, "recibimos tu pedido" y "pago confirmado" llegan en un solo mensaje. Al voucher se le responde con un ✅ y a un "gracias" con un ❤️ sobre su mensaje, sin texto.
+5. Si Evolution falla 5 veces seguidas en 10 minutos o el número se desconecta, se pausa solo, los avisos pasan a Meta (si tiene credenciales) y el ADMIN recibe un aviso en la campanita. El ADMIN lo devuelve a Evolution a mano.
+6. Topes de Evolution: 3 por minuto, 60 por hora y 350 por día.
 
 ## Como se hace: encender o apagar un aviso automático de WhatsApp
 1. Ve a Parámetros del sistema, grupo "Avisos automáticos por WhatsApp al cliente" (por ejemplo [Aviso: pedido de delivery listo](/admin/mirest?tab=parametros&campo=parametros-whatsapp-aviso-listo-activo)).
@@ -56,7 +64,7 @@ Controla el chatbot de WhatsApp: qué funciones atiende (pedidos, cobro, reserva
 - **Mensaje de bienvenida del bot** (chatbot_texto_bienvenida): Primer saludo que recibe el cliente cuando escribe por WhatsApp o pide el menú. Lo ven todos los clientes nuevos. Ejemplo: «¡Hola! Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy?». [Mensaje de bienvenida del bot](/admin/mirest?tab=chatbot&campo=chatbot-texto-bienvenida)
 - **Mensaje de despedida del bot** (chatbot_texto_despedida): Respuesta cuando el cliente agradece o se despide («gracias», «chau»). [Mensaje de despedida del bot](/admin/mirest?tab=chatbot&campo=chatbot-texto-despedida)
 - **Mensaje al pasar a una persona del equipo** (chatbot_texto_pase_persona): Lo recibe el cliente que pide hablar con alguien o que el bot deriva a un asesor, dentro del horario de atención. Ejemplo: «Te paso con alguien del equipo; en unos minutos te escriben.». [Mensaje al pasar a una persona del equipo](/admin/mirest?tab=chatbot&campo=chatbot-texto-pase-persona)
-- **Mensaje fuera de horario (texto guardado)** (chatbot_texto_fuera_horario): Texto pensado para el cliente que escribe con el local cerrado. Aviso: hoy el bot no lo envía; cuando el local está cerrado usa su aviso fijo con el horario. [Mensaje fuera de horario (texto guardado)](/admin/mirest?tab=chatbot&campo=chatbot-texto-fuera-horario)
+- **Mensaje fuera de horario (texto guardado)** (chatbot_texto_fuera_horario): Texto para el cliente que escribe con el local cerrado. Con el bot encendido, el bot avisa el horario con su propio aviso; con el bot apagado o el chat en manos de una persona, se envía este texto una vez cada 12 horas, con la hora de apertura ({apertura}) y el enlace de la carta. [Mensaje fuera de horario (texto guardado)](/admin/mirest?tab=chatbot&campo=chatbot-texto-fuera-horario)
 - **Repregunta cuando el bot no entiende** (chatbot_texto_no_entiendo): Primera respuesta cuando el bot no reconoce lo que escribió el cliente y la IA está apagada. [Repregunta cuando el bot no entiende](/admin/mirest?tab=chatbot&campo=chatbot-texto-no-entiendo)
 - **Derivación cuando el bot no entiende por segunda vez** (chatbot_texto_no_entiendo_derivacion): Mensaje cuando el bot tampoco entiende la segunda vez seguida y pasa la conversación a una persona del equipo. [Derivación cuando el bot no entiende por segunda vez](/admin/mirest?tab=chatbot&campo=chatbot-texto-no-entiendo-derivacion)
 - **Aviso de «se está acabando» en el bot (texto)** (chatbot_texto_aviso_stock): Línea que el bot agrega en el menú, al pedir la cantidad y en el resumen cuando un producto con stock controlado está por agotarse. Usa {aviso} para el texto automático. Ejemplo: Con «🍩 {aviso}», el cliente lee «🍩 ¡Quedan solo 3, ya se acaban!». Desde cuántas unidades avisa se cambia en Parámetros del sistema. [Aviso de «se está acabando» en el bot (texto)](/admin/mirest?tab=chatbot&campo=chatbot-texto-aviso-stock)

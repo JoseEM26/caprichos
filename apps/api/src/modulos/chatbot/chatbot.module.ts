@@ -27,6 +27,7 @@ import { ChatbotPlanificadorService } from './servicios/chatbot-planificador.ser
 import { AvisosPedidoService } from './servicios/avisos-pedido.service';
 import { ReprogramacionService } from './servicios/reprogramacion.service';
 import { OutboxWhatsappService } from './servicios/outbox-whatsapp.service';
+import { AutorespuestaWhatsappService } from './servicios/autorespuesta-whatsapp.service';
 import { AdminWhatsappSalientesController } from './controladores/admin-whatsapp-salientes.controller';
 import { UbicacionWhatsappController } from './controladores/ubicacion-whatsapp.controller';
 import { StockModule } from '../stock/stock.module';
@@ -88,6 +89,7 @@ import { EvolutionAdminController } from './evolution/evolution-admin.controller
     AvisosPedidoService,
     ReprogramacionService,
     OutboxWhatsappService,
+    AutorespuestaWhatsappService,
     ChatbotPlanificadorService,
     VigilanteSinRespuestaService,
     RecordatorioReservasTarea,

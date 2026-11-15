@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
-import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPlantillaUbicacion, conPuntosEntregado } from '../conversacion/textos-reparto';
+import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPagoConfirmado, conPlantillaUbicacion, conPuntosEntregado } from '../conversacion/textos-reparto';
 import { partyClienteDelPedido } from '../../clientes/cliente-del-pedido';
 import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
@@ -97,6 +97,8 @@ export interface DatosAviso {
   resumen?: ResumenRecibido | null;
   /** RECIBIDO con pago digital: bloque «número, titular y monto» (se arma al avisar). */
   datosPago?: string | null;
+  /** RECIBIDO de un pedido ya pagado: lleva también «pago confirmado» y el aviso ACEPTADO (6) ya no sale aparte. */
+  pagoYaConfirmado?: boolean;
 }
 
 /**
@@ -230,6 +232,14 @@ export class AvisosPedidoService {
         resumen: await this.resumenRecibido(db, pedidoId),
         datosPago: medio ? await this.bloqueDatosPago(db, pedidoId, pedido) : null,
       };
+      // Ya pagado y sin delivery: «recibido» y «pago confirmado» salen juntos (el ACEPTADO sencillo se da por enviado)
+      if (String(datos.resumen?.pagoEstado ?? '').toUpperCase() === 'PAGADO' && (await this.pagoConfirmadoSeAvisaria(db, pedido))) {
+        datos = { ...datos, pagoYaConfirmado: true };
+      }
+    }
+    // ACEPTADO de pago confirmado cuando «recibido» sigue en la cola sin salir: se suma a ese mensaje, no sale otro
+    if (etapa === 'ACEPTADO' && pedido.modalidad !== 'DELIVERY' && (await this.sumarPagoAlRecibidoPendiente(db, pedidoId))) {
+      return { estado: 'YA_ENVIADO', motivo: 'COMBINADO_CON_RECIBIDO' };
     }
     // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
     const extraPuntos = await this.extraPuntos(db, etapa, pedido);
@@ -259,6 +269,10 @@ export class AvisosPedidoService {
       await t.mensajeReparto.create({
         data: { pedido_id: pedidoId, numero: cfg.numero, enviado_en: new Date(), estado: 'PENDIENTE' },
       });
+      // Con «recibido + pago confirmado» en un mensaje, la etapa ACEPTADO (6) queda como ya enviada
+      if (datos.pagoYaConfirmado) {
+        await t.mensajeReparto.createMany({ data: [{ pedido_id: pedidoId, numero: ETAPAS_AVISO.ACEPTADO.numero, enviado_en: new Date(), estado: 'ENVIADO' }], skipDuplicates: true });
+      }
       const mensaje = { telefono, tipo: 'TEXTO' as const, origen: 'AVISO_PEDIDO', pedidoId, carga };
       if (await this.outbox.encolar({ ...mensaje, clave: `pedido-${pedidoId}-${etapa}` }, t)) return true;
       // La etapa se borró para un nuevo intento (retiro, reasignación) pero la clave del outbox sigue: sin
@@ -283,6 +297,34 @@ export class AvisosPedidoService {
     if (!tx) this.outbox.despertar();
     this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} encolado a ${enmascararTelefono(telefono)}`);
     return { estado: 'ENCOLADO' };
+  }
+
+  /** ¿Saldría el aviso «recibimos tu pago» (ACEPTADO de un pedido sin delivery) con los interruptores de hoy? */
+  private async pagoConfirmadoSeAvisaria(db: Prisma.TransactionClient | PrismaService, pedido: { modalidad: string }): Promise<boolean> {
+    if (pedido.modalidad === 'DELIVERY') return false;
+    const [todos, flag] = await Promise.all([
+      db.parametro.findUnique({ where: { clave: 'whatsapp_aviso_todos_pedidos_activo' } }),
+      db.parametro.findUnique({ where: { clave: ETAPAS_AVISO.ACEPTADO.parametro } }),
+    ]);
+    return parametroActivoConDefecto(todos?.valor, true) && parametroActivoConDefecto(flag?.valor, false);
+  }
+
+  /**
+   * El pago se confirmó cuando el «recibimos tu pedido» aún espera en la cola (sin salir): se le suma la línea de pago
+   * y el ACEPTADO se da por enviado. Si «recibido» ya salió, devuelve false y el pago va en su propio mensaje.
+   */
+  private async sumarPagoAlRecibidoPendiente(db: Prisma.TransactionClient | PrismaService, pedidoId: bigint): Promise<boolean> {
+    const fila = await db.salienteWhatsapp.findUnique({ where: { clave_idempotencia: `pedido-${pedidoId}-RECIBIDO` }, select: { id: true, estado: true, carga: true } });
+    if (!fila || fila.estado !== 'PENDIENTE') return false;
+    const carga = (fila.carga ?? {}) as unknown as CargaSaliente;
+    const combinado = conPagoConfirmado({ textoLibre: carga.textoLibre, plantillaClave: String(carga.plantillaClave ?? ''), variablesPlantilla: [] });
+    const r = await db.salienteWhatsapp.updateMany({
+      where: { id: fila.id, estado: 'PENDIENTE' },
+      data: { carga: { ...(fila.carga as object), textoLibre: combinado.textoLibre } as unknown as Prisma.InputJsonValue },
+    });
+    if (r.count === 0) return false;
+    await db.mensajeReparto.createMany({ data: [{ pedido_id: pedidoId, numero: ETAPAS_AVISO.ACEPTADO.numero, enviado_en: new Date(), estado: 'ENVIADO' }], skipDuplicates: true });
+    return true;
   }
 
   /** Monto, número o cuenta y titular del medio digital del pedido (mismos datos que ve la carta). */
@@ -506,7 +548,7 @@ export class AvisosPedidoService {
     if (etapa === 'RECIBIDO' && datos.plantillaUbicacion && datos.resumen?.envioPorConfirmar) {
       return conPlantillaUbicacion(base, nombre, codigo, medio);
     }
-    return base;
+    return etapa === 'RECIBIDO' && datos.pagoYaConfirmado ? conPagoConfirmado(base) : base;
   }
 
   /** Anota el pedido que espera captura en la conversación, sin tomar el chat: si el cliente manda la foto se enlaza. */

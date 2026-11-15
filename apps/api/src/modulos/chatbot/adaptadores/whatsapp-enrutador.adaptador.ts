@@ -56,6 +56,10 @@ export class WhatsAppEnrutadorAdaptador implements WhatsAppMensajeriaPuerto {
   async subirMedia(a: Buffer, mime?: string, pid?: string, n?: string): Promise<string | null> {
     return (await this.activo()).subirMedia?.(a, mime, pid, n) ?? null;
   }
+  async reaccionar(t: string, id: string, emoji: string, o?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    const p = await this.activo();
+    return p.reaccionar ? p.reaccionar(t, id, emoji, o) : { exito: false, estado: 'OMITIDO', errorCodigo: 'REACCION_NO_SOPORTADA', errorDetalle: 'El proveedor no admite reacciones' };
+  }
   async marcarLeido(id: string, pid?: string): Promise<boolean> {
     return (await this.activo()).marcarLeido(id, pid);
   }

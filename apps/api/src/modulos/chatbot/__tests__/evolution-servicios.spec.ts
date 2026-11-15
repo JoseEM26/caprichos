@@ -50,10 +50,10 @@ describe('conmutación de proveedor', () => {
   it('un valor ausente o inválido cae al defecto conservador', async () => {
     const svc = new EvolutionConfigService(prismaFalso({ evolution_limite_minuto: 'abc' }));
     const c = await svc.obtener();
-    expect([c.evolution_limite_minuto, c.evolution_limite_hora, c.evolution_limite_dia]).toEqual([3, 30, 150]);
+    expect([c.evolution_limite_minuto, c.evolution_limite_hora, c.evolution_limite_dia]).toEqual([3, 60, 350]);
     expect([c.evolution_pausa_min_seg, c.evolution_pausa_max_seg, c.evolution_horario_desde, c.evolution_horario_hasta]).toEqual([2, 6, 9, 22]);
   });
-  it('desconexión: avisa al ADMIN una sola vez y el baneo pausa el envío', async () => {
+  it('desconexión con Meta activo: avisa al ADMIN una sola vez y el baneo pausa el envío', async () => {
     const prisma = prismaFalso();
     const svc = new EvolutionConfigService(prisma);
     await svc.registrarConexion('open');
@@ -80,11 +80,20 @@ describe('política de envío con Evolution', () => {
     const { politica } = crear({ whatsapp_proveedor: 'META' });
     expect(await politica.evaluar({ telefono_destino: '51900000001', origen: 'CAMPANA' }, FUERA)).toEqual({ accion: 'ENVIAR' });
   });
-  it('bloquea los proactivos que no son aviso del pedido ni encuesta', async () => {
+  it('igualito a Meta: salen los mismos avisos (rigen los interruptores whatsapp_aviso_*), no una lista aparte', async () => {
     const { politica } = crear();
-    for (const origen of ['RECORDATORIO_RESERVA', 'ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'ESPERA', 'RECORDATORIO_PAGO']) {
-      expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'PROACTIVO_BLOQUEADO' });
+    for (const origen of ['RECORDATORIO_RESERVA', 'ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'ESPERA', 'RECORDATORIO_PAGO', 'AVISO_PEDIDO', 'ENCUESTA']) {
+      expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toEqual({ accion: 'ENVIAR' });
     }
+  });
+  it('si el ADMIN escribe una lista de orígenes, solo salen esos', async () => {
+    const { politica } = crear({ evolution_origenes_permitidos: 'AVISO_PEDIDO' });
+    expect(await politica.evaluar({ ...aviso, origen: 'ESPERA' }, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'PROACTIVO_BLOQUEADO' });
+    expect(await politica.evaluar(aviso, DENTRO)).toEqual({ accion: 'ENVIAR' });
+  });
+  it('los avisos al equipo no exigen contacto previo (sus números no escriben primero)', async () => {
+    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
+    for (const origen of ['ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'EQUIPO_ALERTA_ALMACEN']) expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toEqual({ accion: 'ENVIAR' });
   });
   it('permite aviso del pedido y encuesta, y siempre las respuestas a un mensaje del cliente', async () => {
     const { politica } = crear();
@@ -105,9 +114,26 @@ describe('política de envío con Evolution', () => {
     const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
     for (const origen of ['CODIGO_CUENTA', 'RESERVA', 'AVISO_CUENTA']) expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toEqual({ accion: 'ENVIAR' });
   });
-  it('fuera de horario espera, no se descarta', async () => {
+  it('fuera de horario se DESCARTA (no se manda al día siguiente), salvo las respuestas a un mensaje del cliente', async () => {
     const { politica } = crear();
-    expect(await politica.evaluar(aviso, FUERA)).toMatchObject({ accion: 'DIFERIR' });
+    expect(await politica.evaluar(aviso, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+    for (const origen of ['VOUCHER', 'AUTORESPUESTA']) expect(await politica.evaluar({ ...aviso, origen }, FUERA)).toEqual({ accion: 'ENVIAR' });
+  });
+  it('el horario es el del local en Configuración; el evolution_horario_* solo es respaldo', async () => {
+    const prisma = prismaFalso({ whatsapp_proveedor: 'EVOLUTION' });
+    const cerrado = { obtenerEstadoCarta: jest.fn(async () => ({ abierta: false, motivo: 'HORARIO', abre: '15:00' })) } as any;
+    const abierto = { obtenerEstadoCarta: jest.fn(async () => ({ abierta: true, motivo: 'OK', abre: '09:00' })) } as any;
+    const pausa = { obtenerEstadoCarta: jest.fn(async () => ({ abierta: false, motivo: 'PAUSA', abre: null })) } as any;
+    const roto = { obtenerEstadoCarta: jest.fn(async () => { throw new Error('bd'); }) } as any;
+    const con = (local: any) => new PoliticaEvolutionService(prisma, new EvolutionConfigService(prisma), local);
+    // A las 12:00 de Lima el respaldo (9 a 22) diría «abierto»; el local manda y dice cerrado
+    expect(await con(cerrado).evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+    // A las 02:00 de Lima el respaldo diría «cerrado»; el local manda y dice abierto (turno de madrugada)
+    expect(await con(abierto).evaluar(aviso, FUERA)).toEqual({ accion: 'ENVIAR' });
+    // Pausa por alta demanda y fallo de lectura: cae al respaldo
+    expect(await con(pausa).evaluar(aviso, DENTRO)).toEqual({ accion: 'ENVIAR' });
+    expect(await con(pausa).evaluar(aviso, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
+    expect(await con(roto).evaluar(aviso, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
   });
   it('pausado o desconectado espera', async () => {
     expect(await crear({ evolution_pausado: 'si' }).politica.evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DIFERIR' });

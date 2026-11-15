@@ -12,7 +12,6 @@ import {
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { CODIGOS_PLANTILLA_PERMANENTES } from '../utilidades/meta-errores.util';
 import { enmascararTelefono, hashTelefono } from '../utilidades/enmascarar.util';
-import { EvolutionConfigService } from '../evolution/evolution-config.service';
 
 const esFalloDePlantilla = (codigo?: string | null): boolean =>
   !!codigo && (codigo === 'PLANTILLA_NO_CONFIGURADA' || CODIGOS_PLANTILLA_PERMANENTES.includes(codigo));
@@ -45,17 +44,14 @@ export class Ventana24hService {
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
     @Optional() private readonly eventos?: EventosGateway,
-    @Optional() private readonly evolution?: EvolutionConfigService,
   ) {}
 
   /**
    * Determina si la ventana de 24 horas está abierta para el cliente.
    * La ventana está abierta si existe un mensaje ENTRANTE recibido en las últimas 24 horas.
-   * Con Evolution (WhatsApp no oficial) no hay ventana ni plantillas: siempre abierta (las reglas anti-bloqueo
-   * del outbox deciden qué mensajes proactivos salen).
+   * Rige igual con Meta y con Evolution: fuera de las 24 h lo que iría por plantilla sale con el texto de esa plantilla.
    */
   async esVentanaAbierta(telefono: string, conversacionId?: bigint): Promise<boolean> {
-    if (this.evolution && (await this.evolution.proveedor()) === 'EVOLUTION') return true;
     const telHash = hashTelefono(telefono);
     const hace24h = new Date(Date.now() - DURACION_VENTANA_24H_MS);
 

@@ -77,6 +77,7 @@ import {
 } from '../../../comun/documentos-whatsapp.util';
 
 import { EvolutionApiCliente } from '../evolution/evolution-api.cliente';
+import { AutorespuestaWhatsappService } from './autorespuesta-whatsapp.service';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
 /** Notas de voz y audios: hasta 16 MB (Meta entrega las notas de voz como audio/ogg; codecs=opus). */
@@ -127,6 +128,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly moduleRef?: ModuleRef,
     @Optional() private readonly numeros?: NumerosWhatsappService,
     @Optional() private readonly evolutionApi?: EvolutionApiCliente,
+    @Optional() private readonly autorespuesta?: AutorespuestaWhatsappService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -815,8 +817,12 @@ export class WhatsappWebhookService {
       return true;
     }
 
+    // Voucher recibido: ✅ sobre su mensaje en vez de un texto (con Evolution y con Meta). Si la reacción no sale, va el acuse en texto.
+    const voucherReaccionado = voucherAtendido && telefonoNorm && this.autorespuesta
+      ? await this.autorespuesta.reaccionarAVoucher(telefonoNorm, waMessageId)
+      : false;
     // Acuse del voucher por el outbox (registrado en el chat). No aprueba nada: Caja revisa el pago.
-    if (voucherAtendido && pedidoVoucher && telefonoNorm && this.outbox) {
+    if (voucherAtendido && !voucherReaccionado && pedidoVoucher && telefonoNorm && this.outbox) {
       try {
         const nombre = obtenerNombreMostrar(conversacion);
         await this.outbox.encolar({
@@ -901,9 +907,28 @@ export class WhatsappWebhookService {
       (conversacion.motivo_derivacion === 'CALIFICACION_BAJA' && !conversacion.tomado_por) ||
       esAtencionPersona;
 
+    // Cortesías sin bot: ❤️ a un «gracias», y con el bot apagado o el chat en manos de una persona, el aviso de fuera de
+    // horario y la bienvenida con la carta (una vez cada 12 h). Con el bot activo no cambia nada: él ya saluda y avisa el horario.
+    let cortesiaAtendida = false;
+    if (this.autorespuesta && telefonoNorm && clasificacion.clase === 'TEXTO' && !esComandoBajaOAlta && !encuestaAtendida && !reprogramacionAtendida && !ubicacionAtendida && !voucherAtendido) {
+      try {
+        cortesiaAtendida = await this.autorespuesta.atender({
+          telefono: telefonoNorm,
+          nombre: obtenerNombreMostrar(conversacion),
+          texto,
+          waMessageId,
+          conversacion: conversacion as any,
+          puedeProcesarMotor,
+        });
+      } catch (err: any) {
+        this.logger.error(`Error en la cortesía automática: ${err.message}`, err.stack);
+      }
+    }
+
     if (
       this.motorConversacion &&
       !esComandoBajaOAlta &&
+      !cortesiaAtendida &&
       puedeProcesarMotor &&
       !reprogramacionAtendida &&
       !ubicacionAtendida &&

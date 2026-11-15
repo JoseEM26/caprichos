@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 
 export type ProveedorWhatsapp = 'META' | 'EVOLUTION';
 
@@ -9,8 +12,8 @@ export type ProveedorWhatsapp = 'META' | 'EVOLUTION';
 export const DEFECTOS_EVOLUTION = {
   whatsapp_proveedor: 'META',
   evolution_limite_minuto: 3,
-  evolution_limite_hora: 30,
-  evolution_limite_dia: 150,
+  evolution_limite_hora: 60,
+  evolution_limite_dia: 350,
   evolution_pausa_min_seg: 2,
   evolution_pausa_max_seg: 6,
   evolution_escribiendo_ms_por_caracter: 40,
@@ -19,7 +22,11 @@ export const DEFECTOS_EVOLUTION = {
   evolution_exigir_contacto_previo: 'si',
   evolution_max_enlaces: 1,
   evolution_max_texto_identico: 2,
-  evolution_origenes_permitidos: 'AVISO_PEDIDO,ENCUESTA,CODIGO_CUENTA,RESERVA,AVISO_CUENTA',
+  /** Vacío = los mismos avisos que con Meta (rigen los interruptores whatsapp_aviso_*). Con valores, solo esos orígenes. */
+  evolution_origenes_permitidos: '',
+  /** Pausa automática: fallos de envío seguidos (dentro de la ventana en minutos) que pasan a Meta. */
+  evolution_fallos_seguidos: 5,
+  evolution_fallos_ventana_min: 10,
   evolution_pausado: 'no',
 } as const;
 
@@ -51,11 +58,16 @@ export interface UsuarioAccion {
 export class EvolutionConfigService implements OnModuleInit {
   private readonly logger = new Logger(EvolutionConfigService.name);
   private cache: { en: number; valores: ConfigEvolution } | null = null;
+  /** Momentos de los últimos fallos de envío seguidos (en memoria; un éxito los borra). */
+  private fallosSeguidos: number[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly configService?: ConfigService,
+    // Se resuelve al avisar (no al construir): AvisosInternosService depende del outbox, que depende de este servicio
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
   /** Calienta el cache para que el enrutador sepa el proveedor desde el primer envío. */
@@ -185,8 +197,9 @@ export class EvolutionConfigService implements OnModuleInit {
   }
 
   /**
-   * connection.update de Evolution. Al desconectarse: se guarda, se avisa a los ADMIN (solo en el cambio de estado)
-   * y, si el motivo parece baneo o sesión revocada, el envío queda pausado hasta que un ADMIN lo reanude.
+   * connection.update de Evolution. Al desconectarse: se guarda y, si Evolution era el proveedor activo, se pausa solo,
+   * pasa a Meta (si tiene credenciales) y se avisa a los ADMIN (solo en el cambio de estado). Con Meta activo solo se
+   * avisa, y un cierre por baneo o sesión revocada deja Evolution pausado hasta que un ADMIN lo reanude.
    */
   async registrarConexion(state: string, codigoCierre?: string | number | null): Promise<void> {
     const conectado = String(state).toLowerCase() === 'open';
@@ -199,7 +212,13 @@ export class EvolutionConfigService implements OnModuleInit {
     };
     await this.guardar(CLAVE_ESTADO, nuevo);
     if (conectado || previo.estado === 'DESCONECTADO') return;
+    // 515 = reinicio pedido por WhatsApp (pasa al vincular): reconecta solo en segundos, no es una caída
+    if (Number(codigoCierre) === 515) return;
     const baneo = codigoCierre != null && MOTIVOS_BANEO.includes(typeof codigoCierre === 'string' ? codigoCierre.toLowerCase() : codigoCierre);
+    if ((await this.proveedor()) === 'EVOLUTION') {
+      await this.pausarAutomatico(baneo ? 'BANEO' : 'DESCONEXION', `Cierre ${codigoCierre ?? state}`);
+      return;
+    }
     if (baneo) await this.guardar('evolution_pausado', 'si');
     await this.avisarAdmin(baneo);
   }
@@ -207,23 +226,92 @@ export class EvolutionConfigService implements OnModuleInit {
   /** Un error de envío que huele a baneo pausa el envío (lo llama el adaptador). */
   async pausarPorErrorDeEnvio(detalle: string): Promise<void> {
     if (!/ban|blocked|logged.?out|unauthori[sz]ed|forbidden/i.test(detalle)) return;
-    if (await this.estaPausado()) return;
-    await this.guardar('evolution_pausado', 'si');
-    await this.avisarAdmin(true);
+    await this.pausarAutomatico('BANEO', detalle);
   }
 
-  private async avisarAdmin(baneo: boolean): Promise<void> {
+  /**
+   * Resultado de cada envío por Evolution (lo llama el adaptador): un éxito borra la racha; N fallos seguidos dentro
+   * de la ventana (evolution_fallos_seguidos en evolution_fallos_ventana_min minutos) pausan y pasan a Meta.
+   * ponytail: la racha vive en memoria de este proceso; con varias réplicas de la API se cuenta por réplica.
+   */
+  async registrarResultadoEnvio(ok: boolean, detalle = ''): Promise<void> {
+    if (ok) {
+      this.fallosSeguidos = [];
+      return;
+    }
+    const cfg = await this.obtener();
+    const ahora = Date.now();
+    const ventanaMs = cfg.evolution_fallos_ventana_min * 60_000;
+    this.fallosSeguidos = [...this.fallosSeguidos.filter((t) => ahora - t <= ventanaMs), ahora];
+    if (cfg.evolution_fallos_seguidos > 0 && this.fallosSeguidos.length >= cfg.evolution_fallos_seguidos) {
+      const n = this.fallosSeguidos.length;
+      this.fallosSeguidos = [];
+      await this.pausarAutomatico('FALLOS', `${n} envíos fallidos seguidos en ${cfg.evolution_fallos_ventana_min} minutos. Último error: ${detalle.slice(0, 120)}`);
+    }
+  }
+
+  private metaDisponible(): boolean {
+    const g = (k: string) => (this.configService?.get<string>(k) || '').trim();
+    return !!(g('WHATSAPP_TOKEN') && g('WHATSAPP_PHONE_ID'));
+  }
+
+  /**
+   * Bloqueo o caída de Evolution: pausa el envío, pasa a META si Meta tiene credenciales, deja constancia en la
+   * auditoría y avisa a los ADMIN (campana, y WhatsApp/correo si están activos). Un ADMIN lo devuelve a Evolution a mano.
+   * Una sola vez: si ya estaba pausado no repite nada.
+   */
+  async pausarAutomatico(motivo: 'BANEO' | 'DESCONEXION' | 'FALLOS', detalle: string): Promise<void> {
+    if (await this.estaPausado()) return;
+    const antes = await this.proveedor();
+    await this.guardar('evolution_pausado', 'si');
+    const aMeta = antes === 'EVOLUTION' && this.metaDisponible();
+    if (aMeta) await this.guardar('whatsapp_proveedor', 'META');
     try {
-      const titulo = 'WhatsApp: número desconectado';
-      const mensaje = baneo
+      await this.auditoria?.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'whatsapp_proveedor',
+        accion: 'pausa_automatica',
+        entidad: 'parametro',
+        antes: { whatsapp_proveedor: antes, evolution_pausado: 'no' },
+        despues: { whatsapp_proveedor: aMeta ? 'META' : antes, evolution_pausado: 'si', motivo, detalle: detalle.slice(0, 200) },
+      });
+    } catch (err: any) {
+      this.logger.error(`No se pudo auditar la pausa automática de Evolution: ${err?.message}`);
+    }
+    this.logger.warn(JSON.stringify({ evento: 'evolution_pausa_automatica', motivo, aMeta }));
+    const titulo = motivo === 'BANEO' ? 'WhatsApp: posible bloqueo del número' : 'WhatsApp: el número de Evolution falló';
+    const que = aMeta ? 'Los avisos ahora salen por Meta (WhatsApp oficial).' : 'Meta no tiene credenciales: los avisos esperan hasta que lo reanudes.';
+    await this.avisarAdmin(motivo === 'BANEO', {
+      titulo,
+      mensaje: `Evolution se pausó solo (${detalle.slice(0, 160)}). ${que} Revisa el número en Configuración › Chatbot y, cuando esté bien, reanuda Evolution y vuelve a elegirlo como proveedor.`,
+    });
+  }
+
+  private async avisarAdmin(baneo: boolean, texto?: { titulo: string; mensaje: string }): Promise<void> {
+    const titulo = texto?.titulo ?? 'WhatsApp: número desconectado';
+    const mensaje =
+      texto?.mensaje ??
+      (baneo
         ? 'El número de WhatsApp (Evolution) se cerró y parece un bloqueo o sesión revocada. El envío quedó pausado. Revisa el estado en Configuración y vuelve a vincular el número.'
-        : 'El número de WhatsApp (Evolution) se desconectó. Los avisos esperan hasta que vuelva. Revisa el estado en Configuración y vincula el número si hace falta.';
+        : 'El número de WhatsApp (Evolution) se desconectó. Los avisos esperan hasta que vuelva. Revisa el estado en Configuración y vincula el número si hace falta.');
+    try {
+      let avisosInternos: AvisosInternosService | undefined;
+      try {
+        avisosInternos = texto ? this.moduleRef?.get(AvisosInternosService, { strict: false }) : undefined;
+      } catch {
+        avisosInternos = undefined; // sin el servicio (pruebas, módulo no cargado): va solo a la campana
+      }
+      if (texto && avisosInternos) {
+        // Canal de avisos internos que ya existe: campana + los demás canales que el negocio tenga activos
+        await avisosInternos.enviarAvisoAdmin(titulo, mensaje, '/admin/configuracion', undefined, `evolution-pausa:${Date.now()}`, { correo: true });
+        return;
+      }
       const notif = await this.prisma.notificacion.create({
         data: { tipo: 'WHATSAPP_ALERTA', rol_destino: 'ADMIN', titulo, mensaje, enlace: '/admin/configuracion' },
       });
       this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
     } catch (err: any) {
-      this.logger.error(`No se pudo avisar al ADMIN de la desconexión: ${err?.message}`);
+      this.logger.error(`No se pudo avisar al ADMIN: ${err?.message}`);
     }
   }
 }
