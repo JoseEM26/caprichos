@@ -36,7 +36,7 @@ Si falta `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` o `EVOLUTION_INSTANCE`, el env
    ```
    docker compose -p caprichos-evolution -f infra/compose/docker-compose.evolution.yml --env-file ~/.aybar/evolution.env up -d
    ```
-   Crea su propia base y su propio Redis (volúmenes `caprichos_evolution_*`); no toca los de Caprichos. La imagen es `evoapicloud/evolution-api` con versión fija (v2.2.3). No publica puertos.
+   Crea su propia base y su propio Redis (volúmenes `caprichos_evolution_*`); no toca los de Caprichos. La imagen es `evoapicloud/evolution-api` con versión fija (v2.3.7; la v2.2.3 no generaba el QR por usar una versión vieja de WhatsApp Web). No publica puertos.
 4. Crea la instancia (una sola vez, desde el servidor):
    ```
    docker compose -p caprichos-evolution exec evolution-api sh -c 'wget -qO- --header="apikey: $AUTHENTICATION_API_KEY" --header="Content-Type: application/json" --post-data="{\"instanceName\":\"caprichos\",\"integration\":\"WHATSAPP-BAILEYS\",\"qrcode\":true}" http://127.0.0.1:8080/instance/create'
