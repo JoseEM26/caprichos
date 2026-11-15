@@ -15,7 +15,7 @@ export interface OpcionesConsulta {
 
 /**
  * GET con estados cargando/ok/error, que ignora respuestas viejas (si cambian los filtros a mitad de camino)
- * y conserva los datos anteriores mientras recarga en segundo plano. `recargar()` fuerza una consulta nueva.
+ * y conserva los datos solo en los refrescos en segundo plano (al cambiar filtros los borra y muestra «Calculando»). `recargar()` fuerza una consulta nueva.
  */
 export function useConsultaAnalisis<T>(ruta: string, { cadaMs, eventos = [], activo = true }: OpcionesConsulta = {}) {
   const [datos, setDatos] = useState<T | null>(null);
@@ -27,7 +27,11 @@ export function useConsultaAnalisis<T>(ruta: string, { cadaMs, eventos = [], act
     (silencioso: boolean) => {
       if (!activo) return;
       const mio = ++numero.current;
-      if (!silencioso) setEstado('cargando');
+      if (!silencioso) {
+        // Filtros nuevos: no dejar a la vista el dato del filtro anterior (parecía que el filtro «no hacía nada»)
+        setDatos(null);
+        setEstado('cargando');
+      }
       api
         .get<T>(ruta)
         .then((r) => {
@@ -62,5 +66,5 @@ export function useConsultaAnalisis<T>(ruta: string, { cadaMs, eventos = [], act
 
   useTiempoReal(eventos, () => cargar(true));
 
-  return { datos, estado, mensaje, recargar: () => cargar(false) };
+  return { datos, estado, mensaje, recargar: () => cargar(!!datos) };
 }
