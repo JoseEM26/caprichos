@@ -78,8 +78,12 @@ export const culqiApi = {
     api.post(`/admin/pagos-online/${encodeURIComponent(id)}/devolver`, cuerpo),
 };
 
-export const URL_CULQI = 'https://checkout.culqi.com/js/v4';
+/** Culqi Checkout Custom (reemplaza al V4, que Culqi retirará): admite `modal:false` + `container`. */
+export const URL_CULQI = 'https://js.culqi.com/checkout-js';
+/** Id del div de nuestro modal donde Culqi monta su formulario (iframe alojado por Culqi). */
+export const ID_CONTENEDOR_CULQI = 'culqi-container';
 const COLOR_AZUL = '#0B2C3E';
+const COLOR_CREMA = '#FBF4EC';
 const COLOR_NARANJA = '#E67929';
 
 /** Carga un script externo una sola vez y bajo demanda. */
@@ -103,27 +107,50 @@ export function cargarScript(url: string, memo?: { p: Promise<void> | null }): P
 const memoCulqi = { p: null as Promise<void> | null };
 export const cargarScriptCulqi = () => cargarScript(URL_CULQI, memoCulqi);
 
-/** Opciones de Culqi Checkout V4: solo tarjeta y Yape; los medios con orden quedan apagados. */
-export function opcionesCulqi(medios: MedioCulqi[]) {
+/** Configuración de Culqi Checkout Custom embebido: solo tarjeta y Yape; los medios con orden quedan apagados. */
+export function configCulqi(intento: Pick<IntentoCulqi, 'moneda' | 'montoCentimos' | 'medios'>) {
+  const paymentMethods = {
+    tarjeta: intento.medios.includes('TARJETA'),
+    yape: intento.medios.includes('YAPE'),
+    bancaMovil: false,
+    agente: false,
+    billetera: false,
+    cuotealo: false,
+  };
   return {
-    lang: 'auto',
-    paymentMethods: {
-      tarjeta: medios.includes('TARJETA'),
-      yape: medios.includes('YAPE'),
-      bancaMovil: false,
-      agente: false,
-      billetera: false,
-      cuotealo: false,
+    settings: { title: 'Caprichos', currency: intento.moneda, amount: intento.montoCentimos },
+    options: {
+      lang: 'auto',
+      modal: false,
+      container: `#${ID_CONTENEDOR_CULQI}`,
+      paymentMethods,
+      paymentMethodsSort: Object.keys(paymentMethods).filter((k) => paymentMethods[k as keyof typeof paymentMethods]),
     },
-    style: {
-      logo: `${window.location.origin}/logo.webp`,
-      bannerColor: COLOR_AZUL,
-      buttonBackground: COLOR_NARANJA,
-      menuColor: COLOR_AZUL,
-      linksColor: COLOR_NARANJA,
-      buttonText: 'Pagar',
-      buttonTextColor: COLOR_AZUL,
-      priceColor: COLOR_NARANJA,
+    appearance: {
+      theme: 'default',
+      hiddenCulqiLogo: false,
+      hiddenBanner: true, // el encabezado (título, monto, contador) es de nuestro modal
+      menuType: 'sliderTop', // cabe en 360 px
+      buttonCardPayText: 'Pagar',
+      defaultStyle: {
+        bannerColor: COLOR_AZUL,
+        buttonBackground: COLOR_NARANJA,
+        menuColor: COLOR_AZUL,
+        linksColor: COLOR_NARANJA,
+        buttonTextColor: COLOR_AZUL,
+        priceColor: COLOR_NARANJA,
+      },
+      variables: {
+        borderRadius: '10px',
+        colorBackground: COLOR_CREMA,
+        colorPrimary: COLOR_NARANJA,
+        colorPrimaryText: COLOR_AZUL,
+        colorText: COLOR_AZUL,
+      },
+      rules: {
+        '.Culqi-Main-Container': { background: COLOR_CREMA },
+        '.Culqi-Button': { background: COLOR_NARANJA, color: COLOR_AZUL, fontWeight: '700' },
+      },
     },
   };
 }
@@ -148,28 +175,49 @@ export function mensajeRechazo(codigo?: string, mensajeServidor?: string): strin
   return mensajeServidor || 'No se pudo cobrar el pago.';
 }
 
-/** Abre Culqi Checkout V4 y devuelve el token (o null si el cliente cierra sin pagar). */
-export async function abrirCulqi(intento: IntentoCulqi): Promise<{ token: string; medio: MedioCulqi; email?: string } | null> {
-  await cargarScriptCulqi();
-  const C = (window as any).Culqi;
-  if (!C) throw new Error('No se pudo cargar el pago. Intenta de nuevo.');
-  return new Promise((resolver, rechazar) => {
-    C.publicKey = intento.publicKey;
-    C.settings({ title: 'Caprichos', currency: intento.moneda, amount: intento.montoCentimos });
-    C.options(opcionesCulqi(intento.medios));
-    (window as any).culqi = () => {
-      if (C.token?.id) {
-        const tk = C.token;
-        C.close();
-        resolver({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
-      } else if (C.error) {
-        C.close();
-        rechazar(new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
-      } else {
-        C.close();
-        resolver(null);
-      }
-    };
-    C.open();
+export interface ResultadoCulqi {
+  token: string;
+  medio: MedioCulqi;
+  email?: string;
+}
+
+/**
+ * Monta Culqi Checkout Custom EMBEBIDO en `#culqi-container` (debe existir en el DOM) y devuelve el token
+ * (o null si se cierra sin pagar). `cerrar()` lo desmonta (volver, desmontar el componente).
+ * La tarjeta se escribe en un iframe de Culqi: nuestro JS solo recibe el token.
+ */
+export function abrirCulqi(intento: IntentoCulqi): { resultado: Promise<ResultadoCulqi | null>; cerrar: () => void } {
+  let instancia: any = null;
+  let terminar: (r: ResultadoCulqi | null, e?: Error) => void = () => {};
+  const resultado = new Promise<ResultadoCulqi | null>((resolver, rechazar) => {
+    terminar = (r, e) => (e ? rechazar(e) : resolver(r));
   });
+  const cerrar = () => {
+    try { instancia?.close(); } catch { /* ya cerrado */ }
+    terminar(null);
+  };
+  cargarScriptCulqi()
+    .then(() => {
+      const CC = (window as any).CulqiCheckout;
+      if (!CC) throw new Error('No se pudo cargar el pago. Intenta de nuevo.');
+      instancia = new CC(intento.publicKey, configCulqi(intento));
+      instancia.culqi = () => {
+        const C = instancia;
+        if (C.token?.id) {
+          const tk = C.token;
+          C.close();
+          terminar({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
+        } else if (C.error) {
+          C.close();
+          terminar(null, new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
+        } else {
+          C.close();
+          terminar(null);
+        }
+      };
+      instancia.closeCheckout = () => terminar(null);
+      instancia.open();
+    })
+    .catch((e) => terminar(null, e instanceof Error ? e : new Error('No se pudo cargar el pago.')));
+  return { resultado, cerrar };
 }

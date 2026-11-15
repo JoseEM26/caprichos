@@ -39,7 +39,7 @@ export async function autenticar3ds(
     window.addEventListener('message', escuchar);
     C3.publicKey = publicKey;
     C3.settings = { charge: { totalAmount: datos.montoCentimos, currency: datos.moneda ?? 'PEN', returnUrl: window.location.href }, card: { email: datos.email ?? '' } };
-    C3.options = { showModal: true, showLoading: true, showIcon: true, closeModalAction: () => escuchar(new MessageEvent('message', { data: { error: 'cerrado' } })) };
+    C3.options = { showModal: true, showLoading: true, showIcon: true, style: { btnColor: '#E67929', btnTextColor: '#0B2C3E' }, closeModalAction: () => escuchar(new MessageEvent('message', { data: { error: 'cerrado' } })) };
     C3.initAuthentication(tokenId);
   });
 }

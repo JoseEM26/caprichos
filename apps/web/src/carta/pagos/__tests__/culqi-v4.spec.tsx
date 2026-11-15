@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { culqiApi, opcionesCulqi, mensajeRechazo, URL_CULQI } from '../culqiApi';
+import { culqiApi, configCulqi, mensajeRechazo, URL_CULQI } from '../culqiApi';
 import * as tres from '../culqi3ds';
 import { PagarEnLinea } from '../PagarEnLinea';
 
@@ -15,15 +15,18 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe('Culqi Checkout V4', () => {
-  it('usa el script oficial', () => expect(URL_CULQI).toBe('https://checkout.culqi.com/js/v4'));
-  it('apaga los medios que piden orden y usa los colores de Caprichos', () => {
-    const o = opcionesCulqi(medios);
-    expect(o.paymentMethods).toEqual({ tarjeta: true, yape: true, bancaMovil: false, agente: false, billetera: false, cuotealo: false });
-    expect(o.style.bannerColor).toBe('#0B2C3E');
-    expect(o.style.buttonBackground).toBe('#E67929');
-    expect(o.style.buttonText).toBe('Pagar');
-    expect(o.lang).toBe('auto');
+describe('Culqi Checkout Custom embebido', () => {
+  it('usa el script oficial del Checkout Custom', () => expect(URL_CULQI).toBe('https://js.culqi.com/checkout-js'));
+  it('va embebido en el contenedor, sin modal, con solo tarjeta y Yape y los colores de Caprichos', () => {
+    const c = configCulqi({ moneda: 'PEN', montoCentimos: 2500, medios });
+    expect(c.options.modal).toBe(false);
+    expect(c.options.container).toBe('#culqi-container');
+    expect(c.options.paymentMethods).toEqual({ tarjeta: true, yape: true, bancaMovil: false, agente: false, billetera: false, cuotealo: false });
+    expect(c.options.paymentMethodsSort).toEqual(['tarjeta', 'yape']);
+    expect(c.settings).toEqual({ title: 'Caprichos', currency: 'PEN', amount: 2500 });
+    expect(c.appearance.defaultStyle.buttonBackground).toBe('#E67929');
+    expect(c.appearance.defaultStyle.bannerColor).toBe('#0B2C3E');
+    expect(c.appearance.variables.colorBackground).toBe('#FBF4EC');
   });
   it('mensajes simples por código', () => {
     expect(mensajeRechazo('insufficient_funds')).toBe('Tu banco rechazó el pago: fondos insuficientes.');

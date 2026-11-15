@@ -3,9 +3,9 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
-import { abrirCulqi, culqiApi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { abrirCulqi, culqiApi, ESTADO_3DS, ID_CONTENEDOR_CULQI, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
-type Fase = 'cargando' | 'listo' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
+type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -96,9 +96,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
         if (token && medio) await cobrar(token, medio, undefined, it);
         else setFase('listo');
       } else {
-        const res = await abrirCulqi(it);
-        if (!res) setFase('listo');
-        else await cobrar(res.token, res.medio, res.email, it);
+        setFase('formulario'); // el efecto de abajo monta Culqi dentro del contenedor de este modal
       }
     } catch (e) {
       if (e instanceof ErrorApi && e.codigo === 'PAGO_ONLINE_APAGADO') {
@@ -111,6 +109,31 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
       enCurso.current = false;
     }
   };
+
+  // Culqi embebido: se monta en #culqi-container (dentro de nuestro modal) y se desmonta al volver o cerrar.
+  const cancelarCulqi = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (fase !== 'formulario' || !intento) return;
+    document.getElementById('culqi-embebido')?.focus();
+    const { resultado, cerrar } = abrirCulqi(intento);
+    cancelarCulqi.current = cerrar;
+    let vivo = true;
+    resultado
+      .then((res) => {
+        if (!vivo) return;
+        if (!res) setFase('listo');
+        else { setFase('pagando'); void cobrar(res.token, res.medio, res.email, intento); }
+      })
+      .catch((e) => {
+        if (!vivo) return;
+        setMensaje(e instanceof Error ? e.message : 'No pudimos conectar. Reintenta.');
+        setFase('rechazado');
+      });
+    return () => {
+      vivo = false;
+      cerrar();
+    };
+  }, [fase, intento]);
 
   const iniciado = useRef(false);
   useEffect(() => {
@@ -126,6 +149,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
 
   const simulado = config.modo === 'SIMULADO';
   const ocupado = fase === 'pagando';
+  const enFormulario = fase === 'formulario';
 
   return (
     <section className="sg-tarjeta" aria-label="Pagar en línea" data-testid="pagar-en-linea">
@@ -161,7 +185,15 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
             </p>
           )}
           {ocupado && <p role="status" style={{ margin: '0 0 8px' }}>Procesando tu pago...</p>}
-          {simulado ? (
+          {enFormulario ? (
+            <div id="culqi-embebido" tabIndex={-1} data-testid="culqi-embebido" style={{ outline: 'none' }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFase('listo'); } }}>
+              {/* Culqi monta aquí su formulario (iframe alojado por Culqi: la tarjeta no pasa por nuestro código) */}
+              <div id={ID_CONTENEDOR_CULQI} aria-label="Formulario de pago de Culqi" style={{ width: '100%', maxWidth: '100%', minHeight: 320, overflowX: 'hidden' }} />
+              <Boton variante="secundario" onClick={() => setFase('listo')} style={{ marginTop: 8 }}>
+                Volver
+              </Boton>
+            </div>
+          ) : simulado ? (
             <div style={{ display: 'grid', gap: 8 }} data-testid="pago-simulado">
               <p className="sg-detalle" style={{ margin: 0 }}>Modo de prueba: no se cobra dinero real.</p>
               {TOKENS_PRUEBA.filter((t) => config.medios.includes(t.medio)).map((t) => (
