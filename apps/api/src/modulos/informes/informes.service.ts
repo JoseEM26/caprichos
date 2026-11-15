@@ -745,7 +745,9 @@ export class InformesService {
         const pMap: Record<string, { count: number; monto: number }> = {};
         let totP = 0;
         for (const cp of cobroPagos) {
-          const m = cp.medio || 'EFECTIVO';
+          // Culqi aparte («Yape por Culqi»): no llegó al Yape ni al POS del local
+          const base = cp.medio || 'EFECTIVO';
+          const m = cp.origen === 'CULQI' ? `${base} por Culqi` : base;
           pMap[m] = pMap[m] || { count: 0, monto: 0 };
           pMap[m].count += 1;
           pMap[m].monto += Number(cp.monto || 0);

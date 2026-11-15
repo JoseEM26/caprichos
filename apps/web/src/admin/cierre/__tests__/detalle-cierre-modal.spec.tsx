@@ -80,13 +80,37 @@ describe('Detalle del cierre', () => {
     const { unmount } = abrir();
     fireEvent.click(screen.getByRole('tab', { name: 'Medios de pago' }));
     const t = screen.getByTestId('detalle-medios');
-    expect(within(t).getByText('YAPE').closest('tr')).toHaveTextContent('S/ 200.00S/ 200.00Cuadra');
+    expect(within(t).getByText('Yape (manual)').closest('tr')).toHaveTextContent('S/ 200.00S/ 200.00Cuadra');
     expect(within(t).getByText('EFECTIVO').closest('tr')).toHaveTextContent('−S/ 4.00');
     unmount();
     abrir({ esAdmin: false });
     fireEvent.click(screen.getByRole('tab', { name: 'Medios de pago' }));
     expect(screen.queryByTestId('detalle-medios')).not.toBeInTheDocument();
     expect(screen.getByTestId('aviso-detalle-restringido')).toBeInTheDocument();
+  });
+
+  it('Medios de pago: Culqi va en filas aparte y con su lista de operaciones (nº de operación)', () => {
+    const ticket = ticketEjemplo();
+    ticket.medios = [...ticket.medios, { medio: 'YAPE_CULQI', sistema: 70, visto: 70, diferencia: 0 }, { medio: 'TARJETA_CULQI', sistema: 40, visto: 40, diferencia: 0 }];
+    render(
+      <DetalleCierreModal
+        cajaId={5}
+        detalle={{ ...detalleDe(ticket), culqi: { operaciones: [{ pedidoId: '9', pedidoCodigo: 'CP-009', medio: 'YAPE', monto: 80, en: '2026-10-21T21:00:00Z', operacion: 'chr_live_777' }] } }}
+        cargando={false}
+        error={null}
+        esAdmin
+        puedeImprimir
+        alCerrar={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Medios de pago' }));
+    const t = screen.getByTestId('detalle-medios');
+    expect(within(t).getByText('Yape por Culqi').closest('tr')).toHaveTextContent('S/ 70.00S/ 70.00Cuadra');
+    expect(within(t).getByText('Tarjeta por Culqi')).toBeInTheDocument();
+    const c = screen.getByTestId('culqi-cierre');
+    expect(c).toHaveTextContent('Se verifica en CulqiPanel, no en el Yape del local');
+    expect(c).toHaveTextContent('chr_live_777');
+    expect(c).toHaveTextContent('CP-009');
   });
 
   it('Movimientos: egresos, liquidaciones y cobros anulados', () => {

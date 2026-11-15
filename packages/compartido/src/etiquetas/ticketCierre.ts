@@ -120,7 +120,7 @@ export function lineasTicketCierre(t: TicketCierreDatos, columnas: number = 48):
   p(raya);
   p('MEDIOS DE PAGO (sistema/visto/dif)', { negrita: true });
   for (const m of t.medios) {
-    p(m.medio);
+    p(m.medio.replace('_CULQI', ' POR CULQI')); // pagos en línea aparte del Yape/POS del local
     p(fila(`  ${soles(m.sistema)} / ${soles(m.visto)}`, conSigno(m.diferencia), c));
   }
   if (t.movimientos.length) {

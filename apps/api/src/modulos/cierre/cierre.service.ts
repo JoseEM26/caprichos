@@ -48,6 +48,7 @@ import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-p
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { detallarVentasTurno, idsDePersonas, nombresDeCobros, serviciosLibresDelTurno } from './ventas-turno.util';
+import { armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, type CulqiCierre } from './culqi-cierre.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -121,6 +122,8 @@ function digitalesAceptados(
 type MontosCierre = MontosSistema & {
   digitalesCobrados: Record<ClaveDigitalCierre, number>;
   digitalesDevueltos: Record<ClaveDigitalCierre, number>;
+  /** Pagos en línea (Culqi): aparte del Yape y la tarjeta del local. */
+  culqi: CulqiCierre;
 };
 
 function exigirAdmin(usuario: UsuarioAutenticado | undefined, mensaje: string) {
@@ -199,7 +202,7 @@ export class CierreService {
    * ya entran como egreso en calcularMontosCaja.
    */
   private async montosCierre(
-    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido' | 'pedidoCambioUbicacion'>,
+    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido' | 'pedidoCambioUbicacion'> & Partial<Pick<Prisma.TransactionClient, 'pagoOnlineIntento'>>,
     caja: { id: bigint; fecha: Date; apertura: unknown },
   ): Promise<MontosCierre> {
     const montos = await calcularMontosCaja(cliente, caja);
@@ -225,8 +228,13 @@ export class CierreService {
       devueltos[k] = enPesos(aCentimos(devueltos[k]) + aCentimos(ajustesDig.devueltos[k]));
     }
     const neto = (clave: ClaveDigitalCierre) => enPesos(aCentimos(cobrados[clave]) - aCentimos(devueltos[clave]));
+    const culqi = armarCulqiCierre(
+      { yape: montos.sistemaYapeCulqi, tarjeta: montos.sistemaTarjetaCulqi },
+      cliente.pagoOnlineIntento ? await devueltoCulqiDelDia(cliente as any, inicio, fin) : { yape: 0, tarjeta: 0 },
+    );
     return {
       ...montos,
+      culqi,
       sistemaYape: neto('yape'),
       sistemaPlin: neto('plin'),
       sistemaTransferencia: neto('transferencia'),
@@ -290,6 +298,7 @@ export class CierreService {
     return {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
+      culqi: montos.culqi,
       medios: Object.fromEntries(
         MEDIOS_DIGITALES.map((m) => {
           const clave = CLAVE_DIGITAL[m];
@@ -694,6 +703,10 @@ export class CierreService {
         { medio: 'PLIN', sistema: montos.sistemaPlin, visto: vistos.plin, diferencia: comparacion.difPlin },
         { medio: 'TRANSFERENCIA', sistema: montos.sistemaTransferencia, visto: vistos.transferencia, diferencia: comparacion.difTransferencia },
         { medio: 'TARJETA', sistema: montos.sistemaTarjeta, visto: vistos.tarjeta, diferencia: comparacion.difTarjeta },
+        // Pagos en línea: se verifican en CulqiPanel, no en el Yape ni el POS del local. Visto = sistema (sin diferencia).
+        // Solo hay fila cuando hubo cobros por Culqi: un cierre sin ellos queda igual que siempre.
+        ...(montos.culqi.cobradoYape > 0 ? [{ medio: 'YAPE_CULQI', sistema: montos.culqi.yape, visto: montos.culqi.yape, diferencia: 0 }] : []),
+        ...(montos.culqi.cobradoTarjeta > 0 ? [{ medio: 'TARJETA_CULQI', sistema: montos.culqi.tarjeta, visto: montos.culqi.tarjeta, diferencia: 0 }] : []),
       ];
 
       await tx.cierreCaja.create({
@@ -885,6 +898,8 @@ export class CierreService {
         transferencia: montos.sistemaTransferencia,
         tarjeta: montos.sistemaTarjeta,
       },
+      // Pagos en línea (Culqi): no entran al esperado de Yape ni de tarjeta del local
+      culqi: { ...montos.culqi, operaciones: await operacionesCulqiDeCaja(this.prisma, caja.id) },
       desglose: {
         ventasEfectivo: montos.ventasEfectivo,
         // Propinas del día: aparte de las ventas (no son ingreso). Efectivo y digital ya están en medios.
@@ -1080,6 +1095,7 @@ export class CierreService {
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
       ajustesMedio: ajustes,
+      culqi: { operaciones: await operacionesCulqiDeCaja(this.prisma, cierre.caja_id) },
       ticket,
     };
   }

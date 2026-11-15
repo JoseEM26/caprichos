@@ -4,7 +4,8 @@ import { memo, useMemo } from 'react';
 import type { Pedido } from './pedidosApi';
 import { COLUMNAS_CAJA } from './columnasCaja';
 import { estadoVisual } from './estadosCaja';
-import { mediosDePedido, montosPorMedio, nombreMedio, MEDIOS_FILTRO } from './mediosFila';
+import { mediosDePedido, medioPorCulqi, montosPorMedio, MEDIOS_FILTRO } from './mediosFila';
+import { EtiquetaMedio } from './EtiquetaMedio';
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
 
 const soles = (n: number) => `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -24,10 +25,19 @@ export function totalesDeFilas(filas: Pedido[]): TotalesTabla {
     if (anulado(p)) continue;
     t.total += totalDe(p);
     t.propina += Number(p.propina || 0);
-    for (const [m, v] of Object.entries(montosPorMedio(p))) t.porMedio[m] = (t.porMedio[m] ?? 0) + v;
+    // Lo pagado por Culqi se totaliza aparte (YAPE_CULQI…): no es lo que llegó al Yape ni al POS del local
+    for (const [m, v] of Object.entries(montosPorMedio(p))) {
+      const clave = medioPorCulqi(p, m) ? `${m}_CULQI` : m;
+      t.porMedio[clave] = (t.porMedio[clave] ?? 0) + v;
+    }
   }
   return t;
 }
+
+const TOTALES_CULQI = [
+  { id: 'YAPE_CULQI', n: 'Yape · Culqi', icono: 'YAPE' },
+  { id: 'TARJETA_CULQI', n: 'Tarjeta · Culqi', icono: 'TARJETA' },
+];
 
 export interface TablaCajaProps {
   /** Filas de la página actual. */
@@ -50,9 +60,8 @@ const Fila = memo(function Fila({ p, columnas, alVerDetalle }: { p: Pedido; colu
         if (id === 'medios') {
           const m = mediosDePedido(p);
           contenido = m.length ? m.map((x) => (
-            <span key={x} className="cj2-tb-chip cj2-tb-medio" data-medio={x} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <IconoMedioPago medio={x} tamano={15} ariaHidden />
-              <span>{nombreMedio(x)}</span>
+            <span key={x} className="cj2-tb-chip cj2-tb-medio" data-medio={x} data-origen={medioPorCulqi(p, x) ? 'CULQI' : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <EtiquetaMedio medio={x} culqi={medioPorCulqi(p, x)} />
             </span>
           )) : '';
         }
@@ -74,7 +83,10 @@ const Fila = memo(function Fila({ p, columnas, alVerDetalle }: { p: Pedido; colu
 /** Tabla compacta para cuadrar la caja: cabecera fija, scroll horizontal dentro de su cuadro y totales al pie. */
 export function TablaCaja({ filas, todas, columnas, alVerDetalle }: TablaCajaProps) {
   const totales = useMemo(() => totalesDeFilas(todas), [todas]);
-  const medios = MEDIOS_FILTRO.filter((m) => totales.porMedio[m.id] != null);
+  const medios = [
+    ...MEDIOS_FILTRO.filter((m) => totales.porMedio[m.id] != null).map((m) => ({ ...m, icono: m.id })),
+    ...TOTALES_CULQI.filter((m) => totales.porMedio[m.id] != null),
+  ];
   return (
     <div className="cj2-tabla-marco" data-testid="tabla-caja">
       <div className="cj2-tabla-scroll">
@@ -101,7 +113,7 @@ export function TablaCaja({ filas, todas, columnas, alVerDetalle }: TablaCajaPro
         {totales.propina > 0 && <span>Propinas <strong>{soles(totales.propina)}</strong></span>}
         {medios.map((m) => (
           <span key={m.id} data-testid={`total-medio-${m.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <IconoMedioPago medio={m.id} tamano={15} ariaHidden />
+            <IconoMedioPago medio={m.icono} tamano={15} ariaHidden />
             <span>{m.n}</span> <strong>{soles(totales.porMedio[m.id])}</strong>
           </span>
         ))}

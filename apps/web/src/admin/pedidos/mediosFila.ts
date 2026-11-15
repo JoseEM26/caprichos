@@ -2,7 +2,11 @@ import { montoPorCobrar, type Pedido } from './pedidosApi';
 import { MEDIOS_PLAN, nombreMedio } from './planPago';
 
 /** Medios del filtro «Medio de pago» (mismo orden y nombres que el plan de pago). */
-export const MEDIOS_FILTRO = MEDIOS_PLAN.map((m) => ({ id: m.id as string, n: m.nombre }));
+export const MEDIOS_FILTRO = [
+  ...MEDIOS_PLAN.map((m) => ({ id: m.id as string, n: m.nombre })),
+  // No es un medio sino un origen: pedidos pagados por la pasarela (Culqi), que no llegan al Yape ni al POS del local
+  { id: 'CULQI', n: 'Pagado por Culqi' },
+];
 
 const norm = (m: unknown) => String(m ?? '').trim().toUpperCase();
 
@@ -23,7 +27,17 @@ export function mediosDePedido(p: Pedido): string[] {
 export function enMedios(p: Pedido, medios: readonly string[]): boolean {
   if (medios.length === 0) return true;
   const propios = mediosDePedido(p);
-  return medios.some((m) => propios.includes(norm(m)));
+  return medios.some((m) => (norm(m) === 'CULQI' ? pagadoPorCulqi(p) : propios.includes(norm(m))));
+}
+
+/** ¿El pedido se pagó por la pasarela (cobro con origen Culqi o pago en línea aprobado)? */
+export function pagadoPorCulqi(p: Pedido): boolean {
+  return (p.mediosCulqi?.length ?? 0) > 0 || !!p.pagoOnline;
+}
+
+/** ¿Este medio del pedido llegó por Culqi? (Yape/Tarjeta de un cobro con origen Culqi). */
+export function medioPorCulqi(p: Pedido, medio: string): boolean {
+  return (p.mediosCulqi ?? []).map(norm).includes(norm(medio));
 }
 
 /** Reparte el total de un pedido entre sus medios: con plan dividido usa sus montos; si no, todo al único medio (o al primero). */

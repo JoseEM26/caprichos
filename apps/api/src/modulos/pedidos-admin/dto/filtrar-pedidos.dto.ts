@@ -53,9 +53,9 @@ export class FiltrarPedidosDto {
   @Max(100)
   limite?: number | 'todas';
 
-  /** Medios de pago (uno o varios separados por coma): YAPE,PLIN,TARJETA,EFECTIVO,TRANSFERENCIA. */
+  /** Medios de pago (uno o varios separados por coma): YAPE,PLIN,TARJETA,EFECTIVO,TRANSFERENCIA, y CULQI (pagado por la pasarela). */
   @IsOptional()
-  @Matches(/^(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA)(,(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA))*$/, {
+  @Matches(/^(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA|CULQI)(,(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA|CULQI))*$/, {
     message: 'medios no válido',
   })
   medios?: string;

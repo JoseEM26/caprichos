@@ -68,6 +68,12 @@ export class CobrarDto {
   @Min(0, { message: 'La propina no puede ser negativa' })
   propina?: number;
 
+  /**
+   * Solo lo fija el servidor (pagos en línea). Sin decorador: la validación global (whitelist) lo descarta
+   * si llega por HTTP, así que ningún cajero puede marcar un cobro como «Culqi».
+   */
+  origen?: 'CULQI';
+
   /** Caja vio «Sin descuento <promo>: total S/ X» (promo por medio de pago) y confirma cobrar así. */
   @IsOptional()
   @IsBoolean()

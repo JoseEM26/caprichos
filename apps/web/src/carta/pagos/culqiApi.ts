@@ -52,6 +52,10 @@ export interface PagoOnline {
   devoluciones?: { monto: number; medio: string; en: string }[];
   /** Cobrado en Culqi pero aún sin registrar en Caja. */
   cobroPendiente?: boolean;
+  pedidoId?: string;
+  marca?: string | null;
+  ultimos4?: string | null;
+  aprobadoEn?: string | null;
   modo?: ModoCulqi;
 }
 
@@ -72,7 +76,7 @@ export const culqiApi = {
     const q = new URLSearchParams();
     (['desde', 'hasta', 'estado'] as const).forEach((k) => f[k] && q.set(k, f[k]!));
     q.set('pagina', String(f.pagina ?? 1));
-    return api.get<{ items: PagoOnline[]; total: number }>(`/admin/pagos-online?${q}`);
+    return api.get<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number }>(`/admin/pagos-online?${q}`);
   },
   devolver: (id: string, cuerpo: { monto?: number; motivo: string; medio: MedioDevolucion; confirmar?: boolean }) =>
     api.post(`/admin/pagos-online/${encodeURIComponent(id)}/devolver`, cuerpo),

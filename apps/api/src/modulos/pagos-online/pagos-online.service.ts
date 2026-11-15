@@ -281,7 +281,7 @@ export class PagosOnlineService {
       const usuario = await usuarioSistema(this.prisma);
       const partyId = usuario.partyId;
       await this.cobros.cobrar(
-        { pedidoId: pedido.id.toString(), pagos: [{ medio: intento.medio!, monto: enPesos(intento.monto_centimos) }] } as any,
+        { pedidoId: pedido.id.toString(), pagos: [{ medio: intento.medio!, monto: enPesos(intento.monto_centimos) }], origen: 'CULQI' } as any,
         { ...usuario, partyId: usuario.partyId.toString() },
       );
       const ahora = new Date();
@@ -453,8 +453,13 @@ export class PagosOnlineService {
     if (q.desde && /^\d{4}-\d{2}-\d{2}$/.test(q.desde)) rango.gte = inicioDiaLimaIso(q.desde);
     if (q.hasta && /^\d{4}-\d{2}-\d{2}$/.test(q.hasta)) rango.lt = inicioDiaLimaIso(sumarDiasIso(q.hasta, 1));
     if (rango.gte || rango.lt) donde.creado_en = rango;
-    if (q.estado) donde.estado = String(q.estado).toUpperCase();
-    const [total, filas] = await Promise.all([
+    if (q.estado) {
+      const est = String(q.estado).toUpperCase();
+      // «Devueltos» incluye las devoluciones parciales (el intento sigue APROBADO con algo devuelto)
+      if (est === 'DEVUELTO') donde.OR = [{ estado: 'DEVUELTO' }, { devuelto_centimos: { gt: 0 } }];
+      else donde.estado = est;
+    }
+    const [total, filas, sumas] = await Promise.all([
       this.prisma.pagoOnlineIntento.count({ where: donde }),
       this.prisma.pagoOnlineIntento.findMany({
         where: donde,
@@ -463,11 +468,19 @@ export class PagosOnlineService {
         take: TAMANO_PAGINA,
         include: { pedido: { select: { codigo: true, estado: true } } },
       }),
+      // Total cobrado (aprobados y ya devueltos) de TODO el filtro, no solo de la página
+      this.prisma.pagoOnlineIntento.aggregate({ where: { ...donde, estado: { in: ['APROBADO', 'DEVUELTO'] } }, _sum: { monto_centimos: true, devuelto_centimos: true } }),
     ]);
     return {
       total,
+      totalAprobado: enPesos(sumas?._sum?.monto_centimos ?? 0),
+      totalDevuelto: enPesos(sumas?._sum?.devuelto_centimos ?? 0),
       items: filas.map((f) => ({
         id: f.id.toString(),
+        pedidoId: f.pedido_id.toString(),
+        marca: f.marca,
+        ultimos4: f.ultimos4,
+        aprobadoEn: f.aprobado_en,
         pedidoCodigo: f.pedido.codigo,
         pedidoEstado: f.pedido.estado,
         monto: enPesos(f.monto_centimos),

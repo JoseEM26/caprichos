@@ -1075,6 +1075,8 @@ model CobroPago {
   vuelto   Decimal? @db.Decimal(12, 2)
   // Parte de este renglón que es propina (el monto es venta). Entregado = monto + propina.
   propina  Decimal  @default(0) @db.Decimal(12, 2)
+  /// MANUAL (Caja/mozo) | CULQI (pago en línea aprobado por la pasarela; CHECK en la BD)
+  origen   String   @default("MANUAL")
 
   cobro    Cobro    @relation(fields: [cobro_id], references: [id])
 

@@ -15,6 +15,9 @@ export interface MontosSistema {
   sistemaPlin: number;
   sistemaTransferencia: number;
   sistemaTarjeta: number;
+  /** Cobrado por Culqi (pago en línea): llega a la cuenta de Culqi, NO al Yape ni al POS del local; va aparte de sistemaYape/sistemaTarjeta. */
+  sistemaYapeCulqi?: number;
+  sistemaTarjetaCulqi?: number;
   ventasEfectivo: number;
   ingresos: number;
   egresos: number;
@@ -246,6 +249,8 @@ export async function calcularMontosCaja(
   let sistemaPlin = 0;
   let sistemaTransferencia = 0;
   let sistemaTarjeta = 0;
+  let sistemaYapeCulqi = 0;
+  let sistemaTarjetaCulqi = 0;
 
   // pago.monto es la venta del renglón y pago.propina su propina: lo que entró por el medio es la suma.
   // Las ventas (ventasEfectivo) no incluyen propina; el efectivo esperado sí, porque está en la caja.
@@ -258,7 +263,8 @@ export async function calcularMontosCaja(
         ventasEfectivo += monto;
         propinasEfectivo += propina;
       } else if (medio === 'YAPE') {
-        sistemaYape += monto + propina;
+        if (pago.origen === 'CULQI') sistemaYapeCulqi += monto + propina;
+        else sistemaYape += monto + propina;
         propinasDigitales += propina;
       } else if (medio === 'PLIN') {
         sistemaPlin += monto + propina;
@@ -267,7 +273,8 @@ export async function calcularMontosCaja(
         sistemaTransferencia += monto + propina;
         propinasDigitales += propina;
       } else if (medio === 'TARJETA') {
-        sistemaTarjeta += monto + propina;
+        if (pago.origen === 'CULQI') sistemaTarjetaCulqi += monto + propina;
+        else sistemaTarjeta += monto + propina;
         propinasDigitales += propina;
       }
     }
@@ -324,6 +331,8 @@ export async function calcularMontosCaja(
     sistemaPlin: enPesos(sistemaPlin),
     sistemaTransferencia: enPesos(sistemaTransferencia),
     sistemaTarjeta: enPesos(sistemaTarjeta),
+    sistemaYapeCulqi: enPesos(sistemaYapeCulqi),
+    sistemaTarjetaCulqi: enPesos(sistemaTarjetaCulqi),
     ventasEfectivo: enPesos(ventasEfectivo),
     ingresos: enPesos(ingresos),
     egresos: enPesos(egresos),

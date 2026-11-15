@@ -47,6 +47,12 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
       }),
       findUniqueOrThrow: jest.fn(async ({ where }: any) => intentos.find((x) => x.id === where.id)),
       count: jest.fn(async () => intentos.length),
+      aggregate: jest.fn(async () => ({
+        _sum: {
+          monto_centimos: intentos.filter((x) => ['APROBADO', 'DEVUELTO'].includes(x.estado)).reduce((t, x) => t + x.monto_centimos, 0),
+          devuelto_centimos: intentos.reduce((t, x) => t + (x.devuelto_centimos ?? 0), 0),
+        },
+      })),
       findMany: jest.fn(async () => intentos.map((i) => ({ ...i, pedido: { codigo: pedido.codigo, estado: pedido.estado } }))),
       findFirst: jest.fn(async ({ where }: any) => intentos.find((x) => cumple(x, where)) ?? null),
       create: jest.fn(async ({ data }: any) => {
@@ -120,6 +126,9 @@ describe('PagosOnlineService', () => {
     expect(cobros.cobrar).toHaveBeenCalledTimes(1);
     const [dto] = cobros.cobrar.mock.calls[0];
     expect(dto.pagos).toEqual([{ medio: 'TARJETA', monto: 52.5 }]);
+    // El cobro se marca como venido de la pasarela: en Caja y en el cierre se distingue del Yape/POS del local
+    expect(dto.origen).toBe('CULQI');
+    expect((await s.listar({})).totalAprobado).toBe(52.5);
     expect(pedido.pago_coordinado_en).toBeInstanceOf(Date);
     expect(pedido.pasa_cocina_en).toBeInstanceOf(Date);
     expect(pedido.estado).toBe('COLA');

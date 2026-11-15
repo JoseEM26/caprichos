@@ -7,6 +7,8 @@ import { PapelTermico } from '../impresion/facil/PanelVistaPrevia';
 import { cierreApi, DetalleCierreCompleto } from './cierreApi';
 import { ListaCorrecciones } from './CorreccionesMedios';
 import { PorQueNoCuadra } from './PorQueNoCuadra';
+import { OperacionesCulqi } from './BloqueCulqi';
+import { rotuloMedioCierre } from './cuadre.util';
 import './detalle-cierre.css';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -94,14 +96,16 @@ function SeccionEfectivo({ t }: { t: TicketCierreDatos }) {
   );
 }
 
-function SeccionMedios({ t }: { t: TicketCierreDatos }) {
+function SeccionMedios({ t, detalle }: { t: TicketCierreDatos; detalle: DetalleCierreCompleto }) {
+  const ops = detalle.culqi?.operaciones ?? [];
   return (
+    <>
     <table className="dc-tabla" data-testid="detalle-medios">
       <thead><tr><th>Medio</th><th>Sistema</th><th>Visto</th><th>Dif.</th></tr></thead>
       <tbody>
         {t.medios.map((m) => (
           <tr key={m.medio}>
-            <td>{m.medio}</td>
+            <td>{rotuloMedioCierre(m.medio)}{m.medio.endsWith('_CULQI') && <small> · se verifica en CulqiPanel</small>}</td>
             <td>{soles(m.sistema)}</td>
             <td>{soles(m.visto)}</td>
             <td className={claseDif(m.diferencia)}>{Math.abs(m.diferencia) < 0.005 ? 'Cuadra' : conSigno(m.diferencia)}</td>
@@ -109,6 +113,14 @@ function SeccionMedios({ t }: { t: TicketCierreDatos }) {
         ))}
       </tbody>
     </table>
+    {ops.length > 0 && (
+      <section data-testid="culqi-cierre">
+        <h4>Pagos en línea (Culqi)</h4>
+        <p className="dc-aviso">Se verifica en CulqiPanel, no en el Yape del local.</p>
+        <OperacionesCulqi operaciones={ops} />
+      </section>
+    )}
+    </>
   );
 }
 
@@ -242,7 +254,7 @@ export function DetalleCierreModal({ cajaId, detalle, cargando, error, esAdmin, 
           {pestana === 'resumen' && <SeccionResumen t={t} />}
           {pestana === 'efectivo' && <SeccionEfectivo t={t} />}
           {pestana === 'medios' && (esAdmin
-            ? <SeccionMedios t={t} />
+            ? <SeccionMedios t={t} detalle={detalle} />
             : <p className="dc-aviso" data-testid="aviso-detalle-restringido">El desglose por medio de pago y las diferencias del sistema están reservados para el administrador (cierre ciego).</p>)}
           {pestana === 'movimientos' && <SeccionMovimientos t={t} detalle={detalle} />}
           {pestana === 'porque' && esAdmin && <PorQueNoCuadra cajaId={cajaId} />}

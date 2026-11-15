@@ -441,6 +441,7 @@ export class CobrosService {
                 // monto = venta del renglón; propina = su parte de propina (monto + propina = lo entregado)
                 monto: new Prisma.Decimal(enPesos(aCentimos(p.monto) - aCentimos(propina))),
                 propina: new Prisma.Decimal(propina),
+                origen: dto.origen === 'CULQI' ? 'CULQI' : 'MANUAL',
                 recibido: conRecibido ? new Prisma.Decimal(enPesos(aCentimos(p.recibido))) : null,
                 vuelto: conRecibido
                   ? new Prisma.Decimal(enPesos(aCentimos(p.recibido) - aCentimos(p.monto)))

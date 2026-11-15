@@ -11,6 +11,7 @@ import {
   DevolucionTurno,
   DigitalesCaja,
   MedioAjustable,
+  OperacionCulqi,
   PendienteCobro,
   RepartidorPorLiquidar,
 } from './cierreApi';
@@ -229,7 +230,9 @@ export function CierreView() {
   const ventasTotales = useMemo(() => {
     if (esperado) {
       const { yape = 0, plin = 0, transferencia = 0, tarjeta = 0 } = esperado.medios || {};
-      return Math.round((ventasEfectivo + yape + plin + transferencia + tarjeta - propinasDigital) * 100) / 100;
+      // Lo cobrado por Culqi ya no está en yape/tarjeta del local (va aparte), pero SÍ es venta: el total no cambia
+      const culqi = esperado.culqi?.total ?? 0;
+      return Math.round((ventasEfectivo + yape + plin + transferencia + tarjeta + culqi - propinasDigital) * 100) / 100;
     }
     return pedidosCobrados.reduce((acc, p) => acc + p.total, 0);
   }, [esperado, pedidosCobrados, ventasEfectivo, propinasDigital]);
@@ -237,6 +240,11 @@ export function CierreView() {
   // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
   // Cuenta los pedidos que tienen un pago en ese medio (un pedido mixto cuenta en cada medio)
   const pedidosPorMedio = (medio: string) => pedidosCobrados.filter((p) => p.medios.includes(medio)).length;
+  const hayCulqi = (esperado?.culqi?.cobradoYape ?? 0) > 0 || (esperado?.culqi?.cobradoTarjeta ?? 0) > 0;
+  const operacionesCulqi: OperacionCulqi[] = esperado?.culqi?.operaciones ?? [];
+  // Pedidos del medio que NO llegaron por Culqi: los de Culqi son los que tienen una operación de ese medio
+  const pedidosPorMedioManual = (medio: string) =>
+    pedidosCobrados.filter((p) => p.medios.includes(medio) && !operacionesCulqi.some((o) => o.pedidoId === p.pedidoId && o.medio === medio)).length;
 
   const movimientosVigentes = useMemo(() => movimientos.filter((m) => !m.anulado_en), [movimientos]);
 
@@ -755,10 +763,16 @@ export function CierreView() {
                     >
                       {[
                         { n: 'Efectivo', t: ventasEfectivo, c: pedidosPorMedio('EFECTIVO') },
-                        { n: 'Yape', t: esperado?.medios?.yape ?? 0, c: pedidosPorMedio('YAPE') },
+                        { n: hayCulqi ? 'Yape (manual)' : 'Yape', t: esperado?.medios?.yape ?? 0, c: pedidosPorMedio('YAPE') },
                         { n: 'Plin', t: esperado?.medios?.plin ?? 0, c: pedidosPorMedio('PLIN') },
                         { n: 'Transferencia', t: esperado?.medios?.transferencia ?? 0, c: pedidosPorMedio('TRANSFERENCIA') },
-                        { n: 'Tarjeta', t: esperado?.medios?.tarjeta ?? 0, c: pedidosPorMedio('TARJETA') },
+                        { n: hayCulqi ? 'Tarjeta POS' : 'Tarjeta', t: esperado?.medios?.tarjeta ?? 0, c: pedidosPorMedio('TARJETA') },
+                        ...(hayCulqi
+                          ? [
+                              { n: 'Yape por Culqi', t: esperado?.culqi?.yape ?? 0, c: pedidosPorMedio('YAPE') - pedidosPorMedioManual('YAPE') },
+                              { n: 'Tarjeta por Culqi', t: esperado?.culqi?.tarjeta ?? 0, c: pedidosPorMedio('TARJETA') - pedidosPorMedioManual('TARJETA') },
+                            ]
+                          : []),
                       ].map((m) => (
                         <div
                           key={m.n}

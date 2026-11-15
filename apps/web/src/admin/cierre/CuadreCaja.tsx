@@ -11,6 +11,7 @@ import {
   type RepartidorPorLiquidar,
 } from './cierreApi';
 import { ListaCorrecciones } from './CorreccionesMedios';
+import { BloqueCulqi } from './BloqueCulqi';
 import {
   MEDIOS_DIGITALES_CUADRE,
   difFila,
@@ -25,6 +26,7 @@ import {
   limpiarMontoTexto,
   parseMonto,
   redondear,
+  rotuloMedioCierre,
   soles,
   solesConSigno,
   sumaDenominaciones,
@@ -491,7 +493,7 @@ export function CuadreCaja({
               <div key={m.clave} className="cc-dig" data-testid={`digital-${m.clave}`}>
                 <div className="cc-dig-nom" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <IconoMedioPago medio={m.medio} tamano={22} ariaHidden />
-                  <span>{m.etiqueta}</span>
+                  <span>{rotuloMedioCierre(m.medio) === m.medio ? m.etiqueta : rotuloMedioCierre(m.medio)}</span>
                 </div>
                 <div className="cc-dig-sis">
                   Sistema <b>{soles(sistema)}</b>
@@ -534,6 +536,9 @@ export function CuadreCaja({
         </div>
         {ajustesMedio.length > 0 && <ListaCorrecciones ajustes={ajustesMedio} />}
       </section>
+
+      {/* 3b. Pagos en línea (Culqi): fuera del esperado de Yape y tarjeta del local; sin diferencia que cuadrar */}
+      {esperado.culqi && (esperado.culqi.cobradoYape > 0 || esperado.culqi.cobradoTarjeta > 0) && <BloqueCulqi culqi={esperado.culqi} />}
 
       {/* 4. Pie fijo: diferencia total + cerrar */}
       <div className="cc-pie" data-testid="cc-pie">

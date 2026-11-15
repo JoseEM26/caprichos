@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useInRouterContext } from 'react-router-dom';
+import { IconoMedioPago } from '../../comun/IconoMedioPago';
+import { medioDelPagoCulqi } from '../pedidos/RecuadroPagoCulqi';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
@@ -14,6 +17,16 @@ const POR_PAGINA = 20;
 const saldo = (p: PagoOnline) => Math.max(0, Number(p.monto) - Number(p.montoDevuelto ?? 0));
 const fecha = (iso: string) =>
   new Date(iso).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const copiar = (t: string) => void navigator.clipboard?.writeText(t).catch(() => undefined);
+
+/** «Ver pedido»: abre el pedido en Caja (enlace del router; fuera de él, un enlace normal). */
+function VerPedido({ pedidoId, codigo }: { pedidoId?: string; codigo: string }) {
+  const enRouter = useInRouterContext();
+  if (!pedidoId) return null;
+  const href = `/admin/caja?pedido=${pedidoId}`;
+  const props = { 'aria-label': `Ver pedido ${codigo}`, style: { minHeight: 44, display: 'inline-flex', alignItems: 'center', fontWeight: 700 } as const };
+  return enRouter ? <Link to={href} {...props}>Ver pedido</Link> : <a href={href} {...props}>Ver pedido</a>;
+}
 
 /** Pagos en línea (Culqi). La devolución es solo del ADMIN. */
 export function PagosOnlineTab() {
@@ -23,7 +36,7 @@ export function PagosOnlineTab() {
   const [hasta, setHasta] = useState('');
   const [estado, setEstado] = useState('');
   const [pagina, setPagina] = useState(1);
-  const [datos, setDatos] = useState<{ items: PagoOnline[]; total: number } | null>(null);
+  const [datos, setDatos] = useState<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aDevolver, setADevolver] = useState<PagoOnline | null>(null);
   const [motivo, setMotivo] = useState('');
@@ -88,6 +101,12 @@ export function PagosOnlineTab() {
         </label>
       </div>
 
+      {datos && datos.items.length > 0 && datos.totalAprobado !== undefined && (
+        <p data-testid="total-pagos-online" style={{ margin: '0 0 12px', fontWeight: 700 }}>
+          Total cobrado por Culqi: S/ {datos.totalAprobado.toFixed(2)}
+          {(datos.totalDevuelto ?? 0) > 0 ? ` · devuelto S/ ${(datos.totalDevuelto ?? 0).toFixed(2)}` : ''}
+        </p>
+      )}
       {error ? (
         <EstadoError mensaje={error} alReintentar={cargar} />
       ) : !datos ? (
@@ -99,7 +118,7 @@ export function PagosOnlineTab() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Fecha', 'Pedido', 'Medio', 'Monto', 'Estado', ''].map((h) => (
+                {['Hora', 'Pedido', 'Medio', 'Monto', 'N.º de operación', 'Estado', ''].map((h) => (
                   <th key={h} scope="col" style={{ textAlign: 'left', padding: 8 }}>{h}</th>
                 ))}
               </tr>
@@ -107,10 +126,23 @@ export function PagosOnlineTab() {
             <tbody>
               {datos.items.map((p) => (
                 <tr key={p.id} style={{ borderTop: '1px solid var(--cp-line)' }}>
-                  <td style={{ padding: 8 }}>{fecha(p.creadoEn)}</td>
+                  <td style={{ padding: 8 }}>{fecha(p.aprobadoEn ?? p.creadoEn)}</td>
                   <td style={{ padding: 8 }}>#{p.pedidoCodigo}</td>
-                  <td style={{ padding: 8 }}>{p.medio === 'YAPE' ? 'Yape' : 'Tarjeta'}</td>
+                  <td style={{ padding: 8 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <IconoMedioPago medio={p.medio ?? 'PAGO_EN_LINEA'} tamano={18} ariaHidden />
+                      {medioDelPagoCulqi({ medio: p.medio ?? null, marca: p.marca ?? null, ultimos4: p.ultimos4 ?? null })}
+                    </span>
+                  </td>
                   <td style={{ padding: 8 }}>S/ {Number(p.monto).toFixed(2)}</td>
+                  <td style={{ padding: 8 }}>
+                    {p.culqiId ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{p.culqiId}</code>
+                        <Boton variante="secundario" tamano="pequeno" onClick={() => copiar(p.culqiId!)} aria-label={`Copiar operación ${p.culqiId}`}>Copiar</Boton>
+                      </span>
+                    ) : '—'}
+                  </td>
                   <td style={{ padding: 8 }}>
                     {p.cobroPendiente && (
                       <div data-testid="cobro-pendiente" style={{ color: 'var(--cp-rust)', fontSize: 12, fontWeight: 700 }}>
@@ -125,6 +157,7 @@ export function PagosOnlineTab() {
                     </Insignia>
                   </td>
                   <td style={{ padding: 8 }}>
+                    <VerPedido pedidoId={p.pedidoId} codigo={p.pedidoCodigo} />
                     {esAdmin && p.estado === 'APROBADO' && saldo(p) > 0 && (
                       <Boton variante="peligro" tamano="pequeno" onClick={() => { setADevolver(p); setMotivo(''); setMontoTxt(''); setMedioDev('CULQI'); setErrDevolver(null); }}>
                         Devolver
