@@ -22,6 +22,8 @@ interface MetaParametro {
   descripcion: string;
   tipo: 'numero' | 'texto' | 'sino' | 'solo_lectura' | 'objeto' | 'selector';
   sufijo?: string;
+  /** Texto sobre la lista desplegable de un selector (por defecto «Cómo se cobra»). */
+  etiquetaSelector?: string;
   opciones?: { valor: string; etiqueta: string; ayuda: string }[];
 }
 
@@ -59,6 +61,26 @@ const OPCIONES_RECARGO_REPROG = [
 
 /** Claves que ya no se muestran: duplicado muerto (las reservas leen reserva_tolerancia_min). El valor sigue en el servidor. */
 const CLAVES_OCULTAS = ['tolerancia_reserva_min'];
+
+const OPCIONES_PROVEEDOR_WHATSAPP = [
+  { valor: 'META', etiqueta: 'Meta (conexión oficial)', ayuda: 'Los avisos salen por la API oficial de WhatsApp. Es el valor seguro.' },
+  { valor: 'EVOLUTION', etiqueta: 'Evolution (número único conectado por QR)', ayuda: 'Los avisos salen por el número del local conectado por QR, con topes anti-bloqueo. Solo el administrador lo cambia.' },
+];
+
+/** Claves que tienen su propia pantalla o endpoint: aquí solo se ven, no se editan (el servidor no las acepta por esta vía). */
+const GESTIONADAS_APARTE = /^(facturacion_|wa_|aprendizaje_historico|notificaciones_por_rol|impresion_etiqueta_general_modalidades|contenido_|terminos_version|privacidad_version|evolution_estado)/;
+
+const esValorSiNo = (v: unknown) =>
+  typeof v === 'boolean' || (typeof v === 'string' && ['si', 'no', 'true', 'false'].includes(v.trim().toLowerCase()));
+const valorEsSi = (v: unknown) => v === true || (typeof v === 'string' && ['si', 'true'].includes(v.trim().toLowerCase()));
+
+/** Tipo de control de un parámetro: el del catálogo; si no está catalogado, se deduce del valor guardado (si/no = interruptor). */
+function tipoParametro(clave: string, valor: unknown): MetaParametro['tipo'] {
+  const t = META_PARAMETROS[clave]?.tipo;
+  if (t) return t;
+  if (esValorSiNo(valor)) return 'sino';
+  return typeof valor === 'number' ? 'numero' : 'texto';
+}
 
 export const META_PARAMETROS: Record<string, MetaParametro> = {
   // Verificación del celular al crear cuenta o recuperar contraseña (ver verificacion-whatsapp.util.ts en la API)
@@ -563,6 +585,192 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'mm',
   },
+  pago_online_activo: {
+    nombre: 'Pago en línea encendido (tarjeta y Yape por Culqi)',
+    descripcion: 'Muestra en la carta la opción de pagar con tarjeta o Yape en línea. El cliente paga en la pantalla de Culqi y el pedido pasa a cocina solo cuando el pago se confirma.',
+    tipo: 'sino',
+  },
+  pago_online_espera_min: {
+    nombre: 'Minutos para completar el pago en línea',
+    descripcion: 'Tiempo que tiene el cliente para pagar en la pantalla de Culqi antes de que el pedido quede sin pagar y se libere.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  whatsapp_proveedor: {
+    nombre: 'Por dónde sale WhatsApp (Meta o Evolution)',
+    descripcion: 'Elige el número que envía los avisos al cliente: META es la conexión oficial; EVOLUTION usa el número único del local conectado por QR. Solo el administrador lo cambia.',
+    tipo: 'selector',
+    etiquetaSelector: 'Número que envía',
+    opciones: OPCIONES_PROVEEDOR_WHATSAPP,
+  },
+  evolution_pausado: {
+    nombre: 'Pausar los envíos por Evolution',
+    descripcion: 'Detiene de inmediato todo envío por el número de Evolution (por ejemplo ante un riesgo de bloqueo). Los mensajes quedan en cola. Solo el administrador lo cambia.',
+    tipo: 'sino',
+  },
+  evolution_limite_minuto: {
+    nombre: 'Evolution: tope de mensajes por minuto',
+    descripcion: 'Máximo de mensajes que salen por minuto por el número de Evolution, para no parecer un envío masivo. 0 = sin tope.',
+    tipo: 'numero',
+    sufijo: 'mensajes',
+  },
+  evolution_limite_hora: {
+    nombre: 'Evolution: tope de mensajes por hora',
+    descripcion: 'Máximo de mensajes por hora por el número de Evolution. 0 = sin tope.',
+    tipo: 'numero',
+    sufijo: 'mensajes',
+  },
+  evolution_limite_dia: {
+    nombre: 'Evolution: tope de mensajes por día',
+    descripcion: 'Máximo de mensajes por día por el número de Evolution. 0 = sin tope.',
+    tipo: 'numero',
+    sufijo: 'mensajes',
+  },
+  evolution_pausa_min_seg: {
+    nombre: 'Evolution: pausa mínima entre mensajes',
+    descripcion: 'Segundos mínimos que se espera entre un mensaje y el siguiente. La pausa real es al azar entre este valor y el máximo.',
+    tipo: 'numero',
+    sufijo: 'segundos',
+  },
+  evolution_pausa_max_seg: {
+    nombre: 'Evolution: pausa máxima entre mensajes',
+    descripcion: 'Segundos máximos que se espera entre un mensaje y el siguiente.',
+    tipo: 'numero',
+    sufijo: 'segundos',
+  },
+  evolution_escribiendo_ms_por_caracter: {
+    nombre: 'Evolution: tiempo de «escribiendo…» por letra',
+    descripcion: 'Milisegundos de «escribiendo…» que se muestran por cada letra del mensaje antes de enviarlo, para que parezca escrito por una persona.',
+    tipo: 'numero',
+    sufijo: 'milisegundos',
+  },
+  evolution_horario_desde: {
+    nombre: 'Evolution: hora desde la que envía',
+    descripcion: 'Hora del día (Lima) desde la que Evolution envía mensajes. Fuera de horario los mensajes esperan a que abra.',
+    tipo: 'numero',
+    sufijo: 'hora',
+  },
+  evolution_horario_hasta: {
+    nombre: 'Evolution: hora hasta la que envía',
+    descripcion: 'Hora del día (Lima) hasta la que Evolution envía mensajes. 24 = hasta medianoche.',
+    tipo: 'numero',
+    sufijo: 'hora',
+  },
+  evolution_exigir_contacto_previo: {
+    nombre: 'Evolution: solo a quien ya escribió antes',
+    descripcion: 'Solo envía por Evolution a clientes que ya tienen una conversación con el local. Reduce el riesgo de que reporten el número como spam.',
+    tipo: 'sino',
+  },
+  evolution_max_enlaces: {
+    nombre: 'Evolution: enlaces por mensaje',
+    descripcion: 'Cuántos enlaces como máximo lleva cada mensaje; el resto se quita. Los mensajes con muchos enlaces parecen spam.',
+    tipo: 'numero',
+    sufijo: 'enlaces',
+  },
+  evolution_max_texto_identico: {
+    nombre: 'Evolution: veces seguidas el mismo texto',
+    descripcion: 'Cuántas veces seguidas puede salir exactamente el mismo texto; luego se varía un poco la redacción para no parecer un envío masivo.',
+    tipo: 'numero',
+    sufijo: 'veces',
+  },
+  evolution_origenes_permitidos: {
+    nombre: 'Evolution: qué mensajes pueden salir por ese número',
+    descripcion: 'Lista de tipos de mensaje que se envían por Evolution, separados por coma. Lo que no esté en la lista no sale por ese número.',
+    tipo: 'texto',
+  },
+  voucher_recordatorio_min: {
+    nombre: 'Minutos para recordar el voucher',
+    descripcion: 'Minutos después del aviso «pedido recibido» a los que se recuerda al cliente que falta enviar el voucher del pago digital (si el recordatorio de voucher está encendido).',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  voucher_mozo_obligatorio: {
+    nombre: 'Mozo obligatorio con voucher',
+    descripcion: 'Valor guardado para exigir mozo en los pedidos con voucher. Hoy la regla del voucher siempre se aplica y este parámetro no se lee.',
+    tipo: 'sino',
+  },
+  ayuda_ia_max_por_minuto_usuario: {
+    nombre: 'Ayuda con IA: consultas por minuto por persona',
+    descripcion: 'Cuántas preguntas por minuto puede hacer cada persona del equipo al asistente de ayuda (Capri).',
+    tipo: 'numero',
+    sufijo: 'consultas',
+  },
+  ayuda_ia_max_por_hora_usuario: {
+    nombre: 'Ayuda con IA: consultas por hora por persona',
+    descripcion: 'Cuántas preguntas por hora puede hacer cada persona del equipo al asistente de ayuda (Capri).',
+    tipo: 'numero',
+    sufijo: 'consultas',
+  },
+  outbox_alerta_fallidos: {
+    nombre: 'Avisar cuando un WhatsApp no se pudo enviar',
+    descripcion: 'Muestra en la campanita de Caja y Administración cada mensaje de WhatsApp que se agotó sin poder enviarse.',
+    tipo: 'sino',
+  },
+  outbox_max_intentos: {
+    nombre: 'Intentos de envío de cada WhatsApp',
+    descripcion: 'Cuántas veces se intenta enviar un mensaje de WhatsApp antes de darlo por fallido.',
+    tipo: 'numero',
+    sufijo: 'intentos',
+  },
+  outbox_retencion_dias: {
+    nombre: 'Días que se guardan los WhatsApp enviados',
+    descripcion: 'Días que se conservan los mensajes ya enviados en la cola antes de limpiarlos.',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
+  outbox_retencion_fallidos_dias: {
+    nombre: 'Días que se guardan los WhatsApp fallidos o descartados',
+    descripcion: 'Días que se conservan los mensajes fallidos o descartados antes de limpiarlos.',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
+  outbox_lag_alerta_min: {
+    nombre: 'Minutos de atraso para avisar de la cola',
+    descripcion: 'Si hay mensajes de WhatsApp esperando más de estos minutos sin salir, se avisa a la administración.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  aprendizaje_activo: {
+    nombre: 'Aprendizaje nocturno del bot encendido',
+    descripcion: 'Cada noche la IA lee los chats del día anterior y propone preguntas frecuentes nuevas para el bot; una persona las aprueba o descarta.',
+    tipo: 'sino',
+  },
+  aprendizaje_hora: {
+    nombre: 'Hora del aprendizaje nocturno',
+    descripcion: 'Hora del día (Lima) a la que corre el aprendizaje de la noche.',
+    tipo: 'numero',
+    sufijo: 'hora',
+  },
+  aprendizaje_min_repeticiones: {
+    nombre: 'Repeticiones mínimas para proponer una pregunta',
+    descripcion: 'Cuántas veces debe aparecer una duda en los chats para que se proponga como pregunta frecuente.',
+    tipo: 'numero',
+    sufijo: 'veces',
+  },
+  aprendizaje_tope_usd_noche: {
+    nombre: 'Tope de gasto de IA por noche (aprendizaje)',
+    descripcion: 'Dólares máximos que puede gastar la IA en una corrida nocturna.',
+    tipo: 'numero',
+    sufijo: 'USD',
+  },
+  aprendizaje_tope_usd_historico: {
+    nombre: 'Tope de gasto de IA del análisis histórico',
+    descripcion: 'Dólares máximos que puede gastar la IA al analizar todo el historial de chats.',
+    tipo: 'numero',
+    sufijo: 'USD',
+  },
+  aprendizaje_usd_por_millon_entrada: {
+    nombre: 'Precio de la IA por millón de tokens leídos',
+    descripcion: 'Dólares por millón de tokens de lectura, usado para estimar el gasto del aprendizaje.',
+    tipo: 'numero',
+    sufijo: 'USD por millón',
+  },
+  aprendizaje_usd_por_millon_salida: {
+    nombre: 'Precio de la IA por millón de tokens escritos',
+    descripcion: 'Dólares por millón de tokens de respuesta, usado para estimar el gasto del aprendizaje.',
+    tipo: 'numero',
+    sufijo: 'USD por millón',
+  },
 };
 
 interface ParametrosOperacionTabProps {
@@ -584,6 +792,9 @@ export function ParametrosOperacionTab({
   // Solo para el selector del costo de reprogramar: monto fijo (se usa si el modo es FIJO)
   const [montoFijoInput, setMontoFijoInput] = useState<string>('');
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
+
+  // Interruptor Sí/No pendiente de confirmar (parámetros de riesgo medio o alto)
+  const [cambioSino, setCambioSino] = useState<{ item: ParametroItem; nuevo: boolean } | null>(null);
 
   // Confirmación Sí/No antes de guardar
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
@@ -729,8 +940,7 @@ export function ParametrosOperacionTab({
 
   const prepararGuardado = () => {
     if (!parametroEditando) return;
-    const meta = META_PARAMETROS[parametroEditando.clave];
-    const tipo = meta?.tipo || (typeof parametroEditando.valor === 'number' ? 'numero' : 'texto');
+    const tipo = tipoParametro(parametroEditando.clave, parametroEditando.valor);
 
     if (tipo === 'numero') {
       const num = Number(nuevoValorInput.trim());
@@ -758,8 +968,7 @@ export function ParametrosOperacionTab({
   const handleGuardarParametro = async () => {
     if (!parametroEditando || !puedeEditar) return;
     const clave = parametroEditando.clave;
-    const meta = META_PARAMETROS[clave];
-    const tipo = meta?.tipo || (typeof parametroEditando.valor === 'number' ? 'numero' : 'texto');
+    const tipo = tipoParametro(parametroEditando.clave, parametroEditando.valor);
 
     let valorFinal: any = nuevoValorInput.trim();
     if (tipo === 'numero') {
@@ -807,6 +1016,30 @@ export function ParametrosOperacionTab({
     } finally {
       setGuardando(false);
     }
+  };
+
+  /** Guarda un interruptor Sí/No de un toque (el servidor guarda «si» o «no»). */
+  const guardarSino = async (item: ParametroItem, nuevo: boolean) => {
+    if (!puedeEditar) return;
+    setGuardando(true);
+    setErrorServidor(null);
+    try {
+      const res = await api.put<ParametroItem>(`/admin/configuracion/${item.clave}`, { valor: nuevo ? 'si' : 'no' });
+      setParametros((prev) => prev.map((p) => (p.clave === item.clave ? { clave: item.clave, valor: res.valor } : p)));
+      setMensajeGuardado(`Guardado a las ${new Date().toLocaleTimeString('es-PE', { hour12: false })}`);
+    } catch (err) {
+      setErrorServidor(err instanceof ErrorApi ? err.message : 'Error al actualizar el parámetro en el servidor');
+    } finally {
+      setGuardando(false);
+      setCambioSino(null);
+    }
+  };
+
+  /** Un toque cambia el interruptor; pide confirmación Sí/No salvo en parámetros de riesgo bajo. */
+  const alternarSino = (item: ParametroItem) => {
+    const nuevo = !valorEsSi(item.valor);
+    if (AYUDA_PARAMETROS[item.clave]?.peligro === 'bajo') void guardarSino(item, nuevo);
+    else setCambioSino({ item, nuevo });
   };
 
   const formatearValorVisual = (clave: string, valor: any) => {
@@ -1068,9 +1301,11 @@ export function ParametrosOperacionTab({
             const meta = META_PARAMETROS[p.clave] || {
               nombre: p.clave.replace(/_/g, ' '),
               descripcion: `Parámetro de configuración del sistema (${p.clave}).`,
-              tipo: typeof p.valor === 'number' ? 'numero' : typeof p.valor === 'boolean' ? 'sino' : 'texto',
+              tipo: tipoParametro(p.clave, p.valor),
             };
-            const esSoloLectura = meta.tipo === 'solo_lectura' || p.clave === 'pausa_alta_demanda';
+            const aparte = !META_PARAMETROS[p.clave] && GESTIONADAS_APARTE.test(p.clave);
+            const esSoloLectura = meta.tipo === 'solo_lectura' || p.clave === 'pausa_alta_demanda' || aparte;
+            const esInterruptor = meta.tipo === 'sino' && !esSoloLectura;
 
             return (
               <div
@@ -1115,7 +1350,7 @@ export function ParametrosOperacionTab({
                       {p.clave}
                     </span>
                     {esSoloLectura && (
-                      <Insignia variante="aviso">{p.clave === 'pausa_alta_demanda' ? 'Solo lectura (Cocina)' : 'Solo lectura'}</Insignia>
+                      <Insignia variante="aviso">{p.clave === 'pausa_alta_demanda' ? 'Solo lectura (Cocina)' : aparte ? 'Se cambia en su propia pantalla' : 'Solo lectura'}</Insignia>
                     )}
                   </div>
                   {AYUDA_PARAMETROS[p.clave] ? (
@@ -1139,6 +1374,21 @@ export function ParametrosOperacionTab({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  {esInterruptor && puedeEditar && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '44px', cursor: guardando ? 'wait' : 'pointer', fontWeight: 800, color: 'var(--cp-navy)' }}>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        aria-label={meta.nombre}
+                        checked={valorEsSi(p.valor)}
+                        disabled={guardando}
+                        onChange={() => alternarSino(p)}
+                        style={{ width: '44px', height: '24px', accentColor: 'var(--cp-navy)' }}
+                      />
+                      {valorEsSi(p.valor) ? 'Sí' : 'No'}
+                    </label>
+                  )}
+                  {!(esInterruptor && puedeEditar) && (
                   <div
                     style={{
                       fontFamily: 'var(--fuente-titulos)',
@@ -1154,8 +1404,9 @@ export function ParametrosOperacionTab({
                   >
                     {formatearValorVisual(p.clave, p.valor)}
                   </div>
+                  )}
 
-                  {!esSoloLectura && puedeEditar && (
+                  {!esSoloLectura && !esInterruptor && puedeEditar && (
                     <Boton
                       type="button"
                       variante="secundario"
@@ -1268,65 +1519,14 @@ export function ParametrosOperacionTab({
 
             {(() => {
               const meta = META_PARAMETROS[parametroEditando.clave];
-              const tipo = meta?.tipo || (typeof parametroEditando.valor === 'number' ? 'numero' : 'texto');
-
-              if (tipo === 'sino') {
-                const esTrue = nuevoValorInput === 'true';
-                const ayudaSino = AYUDA_PARAMETROS[parametroEditando.clave];
-                return (
-                  <>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setNuevoValorInput('true')}
-                      style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        borderRadius: '10px',
-                        border: '1.5px solid var(--cp-navy)',
-                        background: esTrue ? 'var(--cp-navy)' : 'transparent',
-                        color: esTrue ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 800,
-                      }}
-                    >
-                      Sí / Activo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNuevoValorInput('false')}
-                      style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        borderRadius: '10px',
-                        border: '1.5px solid var(--cp-navy)',
-                        background: !esTrue ? 'var(--cp-navy)' : 'transparent',
-                        color: !esTrue ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 800,
-                      }}
-                    >
-                      No / Inactivo
-                    </button>
-                  </div>
-                  {ayudaSino && (
-                    <AyudaDetalle
-                      id="ayuda-edicion-parametro"
-                      etiqueta={meta?.nombre || parametroEditando.clave}
-                      nombreBoton={parametroEditando.clave}
-                      ayuda={ayudaSino.ejemplo}
-                      porDefecto={ayudaSino.porDefecto}
-                      efecto={ayudaSino.efecto}
-                    />
-                  )}
-                  </>
-                );
-              }
+              const tipo = tipoParametro(parametroEditando.clave, parametroEditando.valor);
 
               if (tipo === 'selector') {
                 const opcionActual = meta?.opciones?.find((o) => o.valor === nuevoValorInput);
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>
-                      Cómo se cobra
+                      {meta?.etiquetaSelector ?? 'Cómo se cobra'}
                       <select
                         value={nuevoValorInput}
                         onChange={(e) => {
@@ -1414,6 +1614,18 @@ export function ParametrosOperacionTab({
           </div>
         </div>
       )}
+
+      {/* Confirmación Sí/No del interruptor de un toque */}
+      <Confirmar
+        abierto={cambioSino !== null}
+        titulo={cambioSino?.nuevo ? '¿Activar este parámetro?' : '¿Desactivar este parámetro?'}
+        mensaje={`¿Confirmas poner "${cambioSino ? META_PARAMETROS[cambioSino.item.clave]?.nombre || cambioSino.item.clave : ''}" en "${cambioSino?.nuevo ? 'Sí' : 'No'}"? El cambio rige desde que guardas.`}
+        textoSi="Sí, cambiar"
+        textoNo="No, dejarlo"
+        cargando={guardando}
+        alConfirmar={() => { if (cambioSino) return guardarSino(cambioSino.item, cambioSino.nuevo); }}
+        alCancelar={() => setCambioSino(null)}
+      />
 
       {/* Modal Confirmar Sí/No obligatorio antes de guardar un parámetro */}
       <Confirmar

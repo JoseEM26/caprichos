@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { ConfiguracionService } from './configuracion.service';
+import { ConfiguracionService, CLAVES_SI_NO, CLAVES_PERMITIDAS } from './configuracion.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -528,6 +528,50 @@ describe('ConfiguracionService', () => {
       await expect(service.actualizar('eta_inventada_min', 5, adminAuth)).rejects.toMatchObject({
         response: expect.objectContaining({ codigo: 'CLAVE_DESCONOCIDA' }),
       });
+    });
+  });
+
+  describe('interruptores Sí/No (CLAVES_SI_NO)', () => {
+    it('toda clave sí/no acepta true/false/si/no y guarda «si» o «no»; rechaza otro valor', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async (a: any) => ({ clave: a.where.clave, valor: a.update.valor }));
+      expect(CLAVES_SI_NO.length).toBeGreaterThan(40);
+      for (const clave of CLAVES_SI_NO) {
+        expect((await service.actualizar(clave, true, adminAuth)).valor).toBe('si');
+        expect((await service.actualizar(clave, false, adminAuth)).valor).toBe('no');
+        expect((await service.actualizar(clave, 'true', adminAuth)).valor).toBe('si');
+        expect((await service.actualizar(clave, 'false', adminAuth)).valor).toBe('no');
+        expect((await service.actualizar(clave, 'SI', adminAuth)).valor).toBe('si');
+        expect((await service.actualizar(clave, 'no', adminAuth)).valor).toBe('no');
+        for (const malo of ['tal vez', '', 1, null]) {
+          await expect(service.actualizar(clave, malo, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+        }
+      }
+    });
+
+    it('pago_online_activo está permitido; una clave desconocida sigue rechazada', async () => {
+      expect(CLAVES_PERMITIDAS).toContain('pago_online_activo');
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'pago_online_activo', valor: 'si' });
+      await expect(service.actualizar('pago_online_activo', 'true', adminAuth)).resolves.toBeTruthy();
+      await expect(service.actualizar('clave_inventada_activo', 'si', adminAuth)).rejects.toMatchObject({
+        response: { codigo: 'CLAVE_DESCONOCIDA' },
+      });
+    });
+
+    it('pago online y Evolution: rangos numéricos, enumerado y solo ADMIN para proveedor y pausa', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async (a: any) => ({ clave: a.where.clave, valor: a.update.valor }));
+      await expect(service.actualizar('pago_online_espera_min', 15, adminAuth)).resolves.toBeTruthy();
+      await expect(service.actualizar('pago_online_espera_min', 4, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('pago_online_espera_min', 121, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      expect((await service.actualizar('whatsapp_proveedor', 'evolution', adminAuth)).valor).toBe('EVOLUTION');
+      await expect(service.actualizar('whatsapp_proveedor', 'OTRO', adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      const caja = { partyId: 2n, rol: 'CAJA', debeCambiar: false } as UsuarioAutenticado;
+      await expect(service.actualizar('evolution_pausado', 'si', caja)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('evolution_horario_hasta', 25, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      expect((await service.actualizar('evolution_origenes_permitidos', 'aviso_pedido, encuesta', adminAuth)).valor).toBe('AVISO_PEDIDO,ENCUESTA');
+      await expect(service.actualizar('evolution_origenes_permitidos', 'AVISO PEDIDO!', adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
     });
   });
 });

@@ -23,10 +23,10 @@ Es la lista de ajustes finos del local: tiempos, envío gratis y pedido mínimo,
 2. O abre la pestaña "Parámetros del sistema" ([Parámetros del sistema](/admin/mirest?tab=parametros)) y baja al grupo que buscas.
 
 ## Como se hace: cambiar un parámetro
-1. Busca la fila del parámetro y pulsa "Editar".
-2. Escribe el nuevo valor. Según el parámetro es un número (mayor o igual a 0), un texto, un interruptor Sí/No o una lista de opciones (por ejemplo el costo de volver a enviar un pedido: IGUAL_ENVIO, FIJO o SIN_COSTO; con FIJO aparece el monto fijo).
-3. Pulsa "Guardar" y confirma con "Sí, guardar" en "¿Guardar parámetro de operación?". Verás "Guardado a las HH:MM:SS".
-4. El cambio queda en el historial de auditoría y rige para lo nuevo.
+1. Busca la fila del parámetro. Si es de Sí/No (por ejemplo "Pago en línea encendido"), verás un interruptor: tócalo para cambiarlo y, si el parámetro es de riesgo, confirma con "Sí, cambiar". No hay que escribir "true" ni "si": el interruptor lo guarda solo. Los ajustes de Sí/No que no están en el catálogo también salen con interruptor.
+2. Si es un número, un texto o una lista, pulsa "Editar". Los números llevan su unidad (minutos, segundos, soles…); las listas de opciones (por ejemplo el costo de volver a enviar un pedido: IGUAL_ENVIO, FIJO o SIN_COSTO, o el número que envía WhatsApp: Meta o Evolution) se eligen de la lista; con FIJO aparece el monto fijo.
+3. Pulsa "Continuar" y confirma con "Sí, guardar" en "¿Guardar parámetro de operación?". Verás "Guardado a las HH:MM:SS".
+4. El cambio queda en el historial de auditoría y rige para lo nuevo. Algunos ajustes (facturación, consumo de WhatsApp, notificaciones por rol) solo se ven aquí y se cambian en su propia pantalla.
 
 ## Ajustes: Estado de conexiones
 - **Estado de la conexión de WhatsApp**: Indica si el bot está conectado a Meta y envía mensajes reales, o en modo simulado donde no sale ningún mensaje a los clientes. Solo informa; no se cambia aquí. Ejemplo: En «Simulado» los avisos se guardan pero ningún cliente los recibe. Riesgo alto: toca dinero o deja de atender clientes. [Estado de la conexión de WhatsApp](/admin/mirest?tab=parametros&campo=parametros-estado-whatsapp)
@@ -144,11 +144,28 @@ Es la lista de ajustes finos del local: tiempos, envío gratis y pedido mínimo,
 - **Sticker general: ancho** (impresion_etiqueta_general_ancho_mm): Medida en milímetros del ancho del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200. Ejemplo: Con 100: es el primer 100 de «100 x 100». [Sticker general: ancho](/admin/mirest?tab=parametros&campo=parametros-impresion-etiqueta-general-ancho-mm)
 - **Sticker general: alto** (impresion_etiqueta_general_alto_mm): Medida en milímetros del alto del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200. Ejemplo: Con 100: es el segundo 100 de «100 x 100». [Sticker general: alto](/admin/mirest?tab=parametros&campo=parametros-impresion-etiqueta-general-alto-mm)
 
+## Ajustes: Pago en línea (tarjeta y Yape por Culqi)
+- **Pago en línea encendido** (pago_online_activo): interruptor Sí/No, viene en "No". En "Sí" la carta ofrece pagar con tarjeta o Yape en línea. Riesgo alto: toca dinero o deja de atender clientes.
+- **Minutos para completar el pago en línea** (pago_online_espera_min): de 5 a 120 minutos, viene en 15. Pasado ese tiempo el pedido sin pagar se libera.
+
+## Ajustes: WhatsApp por Evolution
+Solo aparece si el sistema ya tiene los ajustes de Evolution.
+- **Por dónde sale WhatsApp** (whatsapp_proveedor): Meta o Evolution; solo el administrador lo cambia.
+- **Pausar los envíos por Evolution** (evolution_pausado): interruptor para detener todo envío por ese número.
+- **Topes y ritmo** (evolution_limite_minuto, evolution_limite_hora, evolution_limite_dia, evolution_pausa_min_seg, evolution_pausa_max_seg, evolution_escribiendo_ms_por_caracter, evolution_horario_desde, evolution_horario_hasta, evolution_max_enlaces, evolution_max_texto_identico): números con su unidad para no parecer un envío masivo.
+- **Solo a quien ya escribió antes** (evolution_exigir_contacto_previo): interruptor Sí/No.
+- **Qué mensajes pueden salir** (evolution_origenes_permitidos): lista en mayúsculas separada por coma.
+
+## Ajustes: Cola de envío de WhatsApp y aprendizaje del bot
+- **Cola**: avisar fallidos (outbox_alerta_fallidos, interruptor), intentos (outbox_max_intentos), días que se guardan (outbox_retencion_dias y outbox_retencion_fallidos_dias) y minutos de atraso para avisar (outbox_lag_alerta_min).
+- **Aprendizaje nocturno**: interruptor (aprendizaje_activo), hora, repeticiones mínimas, topes de gasto y precios por millón de tokens (aprendizaje_*).
+
 ## Errores y dudas comunes
 - "El valor debe ser un número mayor o igual a 0": no se aceptan negativos.
 - "El texto no puede estar vacío": los parámetros de texto no se pueden dejar en blanco.
 - Un parámetro dice que no hace nada ("Tiempo máximo de entrega", "Minutos base por alta demanda"): hoy ninguna pantalla lo lee; se muestra solo para conservar el valor.
-- Si no ves el botón "Editar": tu usuario solo puede ver los parámetros, no cambiarlos.
+- "La clave de configuración … no es válida": ese ajuste no se cambia desde esta lista; búscalo en su pantalla propia.
+- Si no ves el botón "Editar" ni el interruptor: tu usuario solo puede ver los parámetros, no cambiarlos.
 - Un valor fuera de rango muestra el rango permitido en el mensaje de error (por ejemplo, la tolerancia de reservas es de 1 a 180 minutos).
 
 ## Quien puede hacerlo

@@ -107,6 +107,33 @@ export const CLAVES_NUMERICAS = [
   'aviso_pc_impresion_recordatorio_min',
   'aviso_chat_sin_responder_min',
   // Metas de minutos por etapa de Análisis › Tiempos (catálogo en @caprichos/compartido): solo el ADMIN las cambia
+  // Pantalla de ayuda IA, cola de WhatsApp (outbox), recordatorio de voucher y aprendizaje nocturno del bot
+  'ayuda_ia_max_por_minuto_usuario',
+  'ayuda_ia_max_por_hora_usuario',
+  'outbox_max_intentos',
+  'outbox_retencion_dias',
+  'outbox_retencion_fallidos_dias',
+  'outbox_lag_alerta_min',
+  'voucher_recordatorio_min',
+  'aprendizaje_hora',
+  'aprendizaje_min_repeticiones',
+  'aprendizaje_tope_usd_noche',
+  'aprendizaje_tope_usd_historico',
+  'aprendizaje_usd_por_millon_entrada',
+  'aprendizaje_usd_por_millon_salida',
+  // Pago en línea (Culqi)
+  'pago_online_espera_min',
+  // WhatsApp por Evolution (límites anti-bloqueo)
+  'evolution_limite_minuto',
+  'evolution_limite_hora',
+  'evolution_limite_dia',
+  'evolution_pausa_min_seg',
+  'evolution_pausa_max_seg',
+  'evolution_escribiendo_ms_por_caracter',
+  'evolution_horario_desde',
+  'evolution_horario_hasta',
+  'evolution_max_enlaces',
+  'evolution_max_texto_identico',
   ...CLAVES_METAS_TIEMPOS,
 ] as const;
 
@@ -139,6 +166,30 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   aviso_pc_impresion_minutos_tras_abrir: [5, 120, true, 'Los minutos tras abrir la caja deben ser un entero entre 5 y 120'],
   aviso_pc_impresion_recordatorio_min: [15, 240, true, 'El recordatorio debe ser un entero entre 15 y 240 minutos'],
   aviso_chat_sin_responder_min: [5, 120, true, 'Los minutos de espera del chat deben ser un entero entre 5 y 120'],
+  ayuda_ia_max_por_minuto_usuario: [1, 1000, true, 'Las consultas por minuto deben ser un entero entre 1 y 1000'],
+  ayuda_ia_max_por_hora_usuario: [1, 10000, true, 'Las consultas por hora deben ser un entero entre 1 y 10000'],
+  outbox_max_intentos: [1, 20, true, 'Los intentos de envío deben ser un entero entre 1 y 20'],
+  outbox_retencion_dias: [1, 3650, true, 'Los días de guardado deben ser un entero entre 1 y 3650'],
+  outbox_retencion_fallidos_dias: [1, 3650, true, 'Los días de guardado deben ser un entero entre 1 y 3650'],
+  outbox_lag_alerta_min: [1, 1440, true, 'Los minutos de atraso deben ser un entero entre 1 y 1440'],
+  voucher_recordatorio_min: [1, 120, true, 'Los minutos del recordatorio deben ser un entero entre 1 y 120'],
+  aprendizaje_hora: [0, 23, true, 'La hora del aprendizaje debe ser un entero entre 0 y 23'],
+  aprendizaje_min_repeticiones: [1, 50, true, 'Las repeticiones mínimas deben ser un entero entre 1 y 50'],
+  aprendizaje_tope_usd_noche: [0, 1000, false, 'El tope por noche debe estar entre 0 y 1000 USD'],
+  aprendizaje_tope_usd_historico: [0, 10000, false, 'El tope histórico debe estar entre 0 y 10000 USD'],
+  aprendizaje_usd_por_millon_entrada: [0, 1000, false, 'El precio debe estar entre 0 y 1000 USD por millón'],
+  aprendizaje_usd_por_millon_salida: [0, 1000, false, 'El precio debe estar entre 0 y 1000 USD por millón'],
+  pago_online_espera_min: [5, 120, true, 'La espera del pago en línea debe ser un entero entre 5 y 120 minutos'],
+  evolution_limite_minuto: [0, 600, true, 'El límite por minuto debe ser un entero entre 0 y 600 (0 = sin tope)'],
+  evolution_limite_hora: [0, 10000, true, 'El límite por hora debe ser un entero entre 0 y 10000 (0 = sin tope)'],
+  evolution_limite_dia: [0, 100000, true, 'El límite por día debe ser un entero entre 0 y 100000 (0 = sin tope)'],
+  evolution_pausa_min_seg: [0, 300, true, 'La pausa mínima debe ser un entero entre 0 y 300 segundos'],
+  evolution_pausa_max_seg: [0, 600, true, 'La pausa máxima debe ser un entero entre 0 y 600 segundos'],
+  evolution_escribiendo_ms_por_caracter: [0, 500, true, 'Los milisegundos por letra deben ser un entero entre 0 y 500'],
+  evolution_horario_desde: [0, 23, true, 'La hora de inicio debe ser un entero entre 0 y 23'],
+  evolution_horario_hasta: [1, 24, true, 'La hora de fin debe ser un entero entre 1 y 24'],
+  evolution_max_enlaces: [0, 10, true, 'Los enlaces por mensaje deben ser un entero entre 0 y 10'],
+  evolution_max_texto_identico: [0, 20, true, 'Los textos idénticos seguidos deben ser un entero entre 0 y 20'],
   ...RANGOS_METAS_TIEMPOS,
 };
 
@@ -154,40 +205,18 @@ export const RANGOS_PROTECCION_SPAM: Record<string, [number, number, string]> = 
 
 export const CLAVES_TEXTO = [
   // Lectura de vouchers con IA: interruptor y datos de las cuentas que reciben el pago
-  'voucher_ia_activo',
   'voucher_titular_nombre',
   'voucher_yape_numero',
   'voucher_plin_numero',
   'envio_gratis_modo',
   'reprog_recargo_modo',
-  'carta_aviso_entrada',
-  'aviso_pc_impresion_activo',
-  'aviso_chat_sin_responder_activo',
-  'ayuda_ia_activo',
-  'stock_control_activo',
   // Aviso «Hoy cumple años …» para todo el equipo en el panel (si/no, nace «si»): solo el ADMIN lo cambia
-  'cumpleanos_banner_equipo',
   // Almacén: descontar insumos de Cocina al preparar (nace «no») y permitir Cocina en negativo con pendiente de emitir (nace «si»)
-  'almacen_consumir_al_preparar',
-  'almacen_permitir_cocina_negativa',
-  'carta_invitado_activo',
   'terminos_texto',
   'privacidad_texto',
-  'chatbot_activo',
-  'chatbot_ia_activo',
-  'chatbot_modo_libre',
-  'chatbot_pago_recordatorio_activo',
-  'chatbot_avisos_equipo_activo',
-  'reserva_web_activa',
-  'chatbot_funcion_pedido',
-  'chatbot_funcion_pago',
-  'chatbot_funcion_reservas',
-  'chatbot_funcion_cambios',
-  'chatbot_funcion_promociones',
   'chatbot_texto_bienvenida',
   'chatbot_texto_promos_encabezado',
   'chatbot_texto_mas_descuento',
-  'chatbot_promos_mostrar',
   'chatbot_promos_max',
   'chatbot_texto_despedida',
   'chatbot_texto_pase_persona',
@@ -199,6 +228,55 @@ export const CLAVES_TEXTO = [
   'chatbot_texto_aviso_stock',
   'chatbot_texto_combo_intro',
   'chatbot_texto_combo_plan_b',
+  // Puntos y avisos de la carta: bienvenida al primer pedido, puntos al entregar y aviso de seguridad de la cuenta
+  // Despacho parcial: si avisa (mozo o cliente) al despachar solo lo ya listo; por defecto No
+  // Orden de salida de la cola de impresión: TICKETS_PRIMERO (por defecto) | ORDEN_LLEGADA
+  'impresion_prioridad',
+  // Imprimir en el ticket de pago el cupón real y vigente del pedido (SI/NO; apagado por defecto)
+  // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
+  'cocina_minutos_preparacion_defecto',
+  // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido
+  'notif_sonido_alcance',
+  // Verificación del celular al crear cuenta o recuperar contraseña (ver clientes/verificacion-whatsapp.util.ts)
+  'verificacion_celular_modo',
+  'verificacion_whatsapp_numero',
+  // Celulares del propio negocio (9 dígitos, separados por coma): el sistema NUNCA les escribe
+  'whatsapp_numeros_propios',
+  // WhatsApp por Evolution: proveedor (META | EVOLUTION) y orígenes que pueden salir por ese número (lista separada por coma)
+  'whatsapp_proveedor',
+  'evolution_origenes_permitidos',
+] as const;
+
+/** Alcances del sonido de avisos (valor guardado en `notif_sonido_alcance`). */
+export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_HOY'] as const;
+
+/**
+ * Parámetros de interruptor Sí/No: aceptan true/false/si/no y se guardan siempre como «si» o «no».
+ * Un parámetro booleano nuevo se agrega SOLO aquí (la validación y la lista permitida salen de esta lista).
+ */
+export const CLAVES_SI_NO = [
+  'voucher_ia_activo',
+  'carta_aviso_entrada',
+  'aviso_pc_impresion_activo',
+  'aviso_chat_sin_responder_activo',
+  'ayuda_ia_activo',
+  'stock_control_activo',
+  'cumpleanos_banner_equipo',
+  'almacen_consumir_al_preparar',
+  'almacen_permitir_cocina_negativa',
+  'carta_invitado_activo',
+  'chatbot_activo',
+  'chatbot_ia_activo',
+  'chatbot_modo_libre',
+  'chatbot_pago_recordatorio_activo',
+  'chatbot_avisos_equipo_activo',
+  'reserva_web_activa',
+  'chatbot_funcion_pedido',
+  'chatbot_funcion_pago',
+  'chatbot_funcion_reservas',
+  'chatbot_funcion_cambios',
+  'chatbot_funcion_promociones',
+  'chatbot_promos_mostrar',
   'whatsapp_aviso_asignado_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
@@ -213,32 +291,32 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_voucher_recordatorio_activo',
   'whatsapp_plantilla_recibido_seguimiento_activa',
   'whatsapp_plantilla_delivery_ubicacion_activa',
-  // Puntos y avisos de la carta: bienvenida al primer pedido, puntos al entregar y aviso de seguridad de la cuenta
   'whatsapp_aviso_bienvenida_puntos_activo',
   'whatsapp_aviso_puntos_ganados_activo',
   'whatsapp_aviso_cuenta_activo',
   'cocina_confirmar_despejar',
-  // Despacho parcial: si avisa (mozo o cliente) al despachar solo lo ya listo; por defecto No
   'despacho_parcial_avisa',
-  // Orden de salida de la cola de impresión: TICKETS_PRIMERO (por defecto) | ORDEN_LLEGADA
-  'impresion_prioridad',
-  // Imprimir en el ticket de pago el cupón real y vigente del pedido (SI/NO; apagado por defecto)
   'impresion_cupon_en_ticket',
-  // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
-  'cocina_minutos_preparacion_defecto',
-  // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido
   'notif_sonido_activo',
-  'notif_sonido_alcance',
   'notif_marcar_todas_activo',
-  // Verificación del celular al crear cuenta o recuperar contraseña (ver clientes/verificacion-whatsapp.util.ts)
-  'verificacion_celular_modo',
-  'verificacion_whatsapp_numero',
-  // Celulares del propio negocio (9 dígitos, separados por coma): el sistema NUNCA les escribe
-  'whatsapp_numeros_propios',
+  'voucher_mozo_obligatorio',
+  'outbox_alerta_fallidos',
+  'aprendizaje_activo',
+  'pago_online_activo',
+  'evolution_pausado',
+  'evolution_exigir_contacto_previo',
 ] as const;
 
-/** Alcances del sonido de avisos (valor guardado en `notif_sonido_alcance`). */
-export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_HOY'] as const;
+/** Enumerados de lista cerrada: clave → valores permitidos (se guardan en mayúscula). */
+export const ENUMERADOS: Record<string, readonly string[]> = {
+  notif_sonido_alcance: ALCANCES_SONIDO_NOTIF,
+  impresion_prioridad: ['TICKETS_PRIMERO', 'ORDEN_LLEGADA'],
+  reprog_recargo_modo: ['IGUAL_ENVIO', 'FIJO', 'SIN_COSTO'],
+  whatsapp_proveedor: ['META', 'EVOLUTION'],
+};
+
+/** Parámetros que solo el ADMIN puede cambiar, además de los ya protegidos aparte. */
+const SOLO_ADMIN_CLAVES: readonly string[] = ['whatsapp_proveedor', 'evolution_pausado'];
 
 export const CLAVES_OBJETO = [
   'pausa_alta_demanda',
@@ -250,6 +328,7 @@ export const CLAVES_OBJETO = [
 export const CLAVES_PERMITIDAS = [
   ...CLAVES_NUMERICAS,
   ...CLAVES_TEXTO,
+  ...CLAVES_SI_NO,
   ...CLAVES_OBJETO,
 ] as const;
 
@@ -302,6 +381,10 @@ export class ConfiguracionService {
       });
     }
 
+    if (SOLO_ADMIN_CLAVES.includes(clave) && usuarioActual?.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia este parámetro' });
+    }
+
     if (clave === 'cumpleanos_banner_equipo' && usuarioActual?.rol !== 'ADMIN') {
       throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia el aviso de cumpleaños del equipo' });
     }
@@ -352,6 +435,18 @@ export class ConfiguracionService {
           mensaje: 'Los minutos de preparación deben ser un número entero entre 1 y 120',
         });
       }
+    } else if ((CLAVES_SI_NO as readonly string[]).includes(clave)) {
+      const valNorm =
+        typeof valor === 'boolean' ? (valor ? 'si' : 'no') : typeof valor === 'string' ? valor.toLowerCase().trim() : '';
+      const SI = ['si', 'true'];
+      const NO = ['no', 'false'];
+      if (!SI.includes(valNorm) && !NO.includes(valNorm)) {
+        throw new BadRequestException({
+          codigo: 'VALOR_INVALIDO',
+          mensaje: 'El valor debe ser "si" o "no"',
+        });
+      }
+      valor = SI.includes(valNorm) ? 'si' : 'no';
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
       if (clave === 'verificacion_celular_modo') {
         const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
@@ -388,74 +483,24 @@ export class ConfiguracionService {
           }
           valor = `51${n.celular9}`;
         }
-      } else if (
-        clave === 'carta_aviso_entrada' ||
-        clave === 'aviso_pc_impresion_activo' ||
-        clave === 'aviso_chat_sin_responder_activo' ||
-        clave === 'ayuda_ia_activo' ||
-        clave === 'stock_control_activo' ||
-        clave === 'cumpleanos_banner_equipo' ||
-        clave === 'almacen_consumir_al_preparar' ||
-        clave === 'almacen_permitir_cocina_negativa' ||
-        clave === 'carta_invitado_activo' ||
-        clave === 'chatbot_activo' ||
-        clave === 'chatbot_ia_activo' ||
-        clave === 'chatbot_modo_libre' ||
-        clave === 'voucher_ia_activo' ||
-        clave === 'reserva_web_activa' ||
-        clave === 'chatbot_avisos_equipo_activo' ||
-        clave === 'cocina_confirmar_despejar' ||
-        clave === 'despacho_parcial_avisa' ||
-        clave === 'notif_sonido_activo' ||
-        clave === 'notif_marcar_todas_activo' ||
-        clave === 'whatsapp_plantilla_recibido_seguimiento_activa' ||
-        clave === 'whatsapp_plantilla_delivery_ubicacion_activa' ||
-        clave.startsWith('chatbot_funcion_') ||
-        clave.startsWith('whatsapp_aviso_')
-      ) {
-        const valNorm =
-          typeof valor === 'boolean'
-            ? valor
-              ? 'si'
-              : 'no'
-            : typeof valor === 'string'
-              ? valor.toLowerCase().trim()
-              : '';
-        if (valNorm !== 'si' && valNorm !== 'no') {
+      } else if (ENUMERADOS[clave]) {
+        const v = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+        if (!ENUMERADOS[clave].includes(v)) {
           throw new BadRequestException({
             codigo: 'VALOR_INVALIDO',
-            mensaje: 'El valor debe ser "si" o "no"',
+            mensaje: `El valor debe ser uno de: ${ENUMERADOS[clave].join(', ')}`,
           });
         }
-        valor = valNorm;
-      } else if (clave === 'notif_sonido_alcance') {
-        const alcance = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
-        if (!(ALCANCES_SONIDO_NOTIF as readonly string[]).includes(alcance)) {
+        valor = v;
+      } else if (clave === 'evolution_origenes_permitidos') {
+        const partes = typeof valor === 'string' ? valor.split(',').map((x) => x.trim().toUpperCase()).filter(Boolean) : [];
+        if (partes.length === 0 || partes.some((x) => !/^[A-Z_]+$/.test(x))) {
           throw new BadRequestException({
             codigo: 'VALOR_INVALIDO',
-            mensaje: 'El alcance debe ser TODOS_NO_LEIDOS, SOLO_URGENTES o SOLO_HOY',
+            mensaje: 'Escribe los orígenes en mayúscula separados por coma, por ejemplo AVISO_PEDIDO,ENCUESTA',
           });
         }
-        valor = alcance;
-      } else if (clave === 'impresion_prioridad') {
-        const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
-        if (modo !== 'TICKETS_PRIMERO' && modo !== 'ORDEN_LLEGADA') {
-          throw new BadRequestException({
-            codigo: 'VALOR_INVALIDO',
-            mensaje: 'La prioridad debe ser TICKETS_PRIMERO u ORDEN_LLEGADA',
-          });
-        }
-        valor = modo;
-      } else if (clave === 'reprog_recargo_modo') {
-        // Mismos valores que MODOS_RECARGO_REPROG (repartos/recargo-reprogramacion.ts)
-        const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
-        if (!['IGUAL_ENVIO', 'FIJO', 'SIN_COSTO'].includes(modo)) {
-          throw new BadRequestException({
-            codigo: 'VALOR_INVALIDO',
-            mensaje: 'El modo debe ser IGUAL_ENVIO, FIJO o SIN_COSTO',
-          });
-        }
-        valor = modo;
+        valor = partes.join(',');
       } else if (clave.startsWith('chatbot_texto_')) {
         if (typeof valor !== 'string' || valor.trim().length === 0) {
           throw new BadRequestException({

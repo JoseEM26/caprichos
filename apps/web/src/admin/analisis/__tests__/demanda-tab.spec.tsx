@@ -1,3 +1,4 @@
+import { ir } from './ayudas';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { DemandaTab } from '../demanda/DemandaTab';
@@ -61,6 +62,7 @@ describe('Pestaña Demanda', () => {
     expect(within(mapa).getByText('7')).toBeInTheDocument();
     expect(within(mapa).getByText('Miércoles')).toBeInTheDocument();
     expect(screen.getByText('Miércoles 15h')).toBeInTheDocument();
+    ir('Tiempo prometido y anulados');
     expect(screen.getAllByText('75 %').length).toBeGreaterThan(0);
     expect(screen.getByText('3 de 4 delivery')).toBeInTheDocument();
     const motivos = screen.getByRole('list', { name: 'Motivos de anulación' });
@@ -82,7 +84,9 @@ describe('Pestaña Demanda', () => {
   it('«Quién anula» abre un detalle inline (no modal) y se cierra', async () => {
     servidor(base);
     render(<DemandaTab filtros={filtros} esAdmin={false} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Quién anula' }));
+    await screen.findByRole('group', { name: 'Secciones de demanda' });
+    ir('Tiempo prometido y anulados');
+    fireEvent.click(screen.getByRole('button', { name: 'Quién anula' }));
     const detalle = screen.getByRole('region', { name: 'Detalle: Quién anuló' });
     expect(within(detalle).getByText('Ana Paz')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -93,6 +97,8 @@ describe('Pestaña Demanda', () => {
   it('sin datos de cumplimiento dice «Sin dato» y explica por qué, no 0 %', async () => {
     servidor({ ...base, cumplimiento: { ...base.cumplimiento, evaluados: 0, cumplieron: 0, porcentaje: null, sinDato: true } });
     render(<DemandaTab filtros={filtros} esAdmin={false} />);
+    await screen.findByRole('group', { name: 'Secciones de demanda' });
+    ir('Tiempo prometido y anulados');
     expect(await screen.findByText(/Solo el delivery guarda un tiempo prometido|solo el delivery guarda un tiempo prometido/i)).toBeInTheDocument();
     expect(screen.getByText('Aún no hay delivery con tiempo prometido')).toBeInTheDocument();
     expect(screen.queryByText('0 %')).toBeNull();
@@ -107,6 +113,7 @@ describe('Pestaña Demanda', () => {
     });
     render(<DemandaTab filtros={filtros} esAdmin={false} />);
     expect(await screen.findByText('No hubo pedidos en este período.')).toBeInTheDocument();
+    ir('Tiempo prometido y anulados');
     expect(screen.getByText('No hubo pedidos anulados en este período.')).toBeInTheDocument();
   });
 
@@ -126,7 +133,7 @@ describe('Pestaña Demanda', () => {
   it('los filtros viajan en la consulta', async () => {
     const espia = servidor(base);
     render(<DemandaTab filtros={{ ...filtros, modalidad: 'DELIVERY', canal: 'CARTA', turno: 'NOCHE' }} esAdmin={false} />);
-    await screen.findByText('Cuándo piden');
+    await screen.findByRole('heading', { name: 'Cuándo piden' });
     const url = String(espia.mock.calls.find((c) => !String(c[0]).includes('vivo'))?.[0]);
     expect(url).toContain('modalidad=DELIVERY');
     expect(url).toContain('canal=CARTA');

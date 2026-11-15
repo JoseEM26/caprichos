@@ -48,7 +48,18 @@ export const OPCIONES_EXTRA: Record<FiltroExtra, { etiqueta: string; opciones: R
   },
 };
 
-const PRESET_DEFECTO: PresetFecha = 'hoy';
+const PRESET_DEFECTO: PresetFecha = '7d';
+const CLAVE_PERIODO = 'caprichos.analisis.periodo';
+
+/** Último período elegido (solo atajos; «Elegir fechas» no se recuerda). Sin almacenamiento, vale el de siempre. */
+function periodoGuardado(): PresetFecha {
+  try {
+    const v = localStorage.getItem(CLAVE_PERIODO);
+    return PRESETS_FECHA.some((p) => p.id === v && p.id !== 'rango') ? (v as PresetFecha) : PRESET_DEFECTO;
+  } catch {
+    return PRESET_DEFECTO;
+  }
+}
 
 /**
  * Filtros guardados en la dirección (se comparten y sobreviven a recargar). Devuelve los filtros ya resueltos,
@@ -60,7 +71,7 @@ export function useFiltrosAnalisis() {
   const hoy = useMemo(() => hoyLima(), []);
 
   const presetUrl = params.get('periodo') as PresetFecha | null;
-  const preset = PRESETS_FECHA.some((p) => p.id === presetUrl) ? (presetUrl as PresetFecha) : PRESET_DEFECTO;
+  const preset = PRESETS_FECHA.some((p) => p.id === presetUrl) ? (presetUrl as PresetFecha) : periodoGuardado();
   const { desde, hasta } = rangoDePreset(preset, hoy, params.get('desde') ?? '', params.get('hasta') ?? '');
   const filtros: FiltrosActivos = {
     preset,
@@ -74,6 +85,13 @@ export function useFiltrosAnalisis() {
 
   const cambiar = useCallback(
     (cambios: Record<string, string>) => {
+      if (cambios.periodo && cambios.periodo !== 'rango') {
+        try {
+          localStorage.setItem(CLAVE_PERIODO, cambios.periodo);
+        } catch {
+          /* sin almacenamiento: no se recuerda */
+        }
+      }
       setParams(
         (previo) => {
           const nuevo = new URLSearchParams(previo);

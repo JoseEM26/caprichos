@@ -73,6 +73,7 @@ describe('Pestaña Productos', () => {
     render(<ProductosTab filtros={filtros} esAdmin />);
     expect(screen.getByText('Calculando los productos')).toBeInTheDocument();
     const tabla = await screen.findByRole('table');
+    fireEvent.click(screen.getByLabelText(/Mostrar productos sin ventas \(1\)/));
     expect(get.mock.calls[0][0]).toContain('/admin/analisis/productos?desde=2026-11-10&hasta=2026-11-11');
     expect(within(tabla).getByText('Torta')).toBeInTheDocument();
     expect(within(tabla).getByText('Té')).toBeInTheDocument();
@@ -83,6 +84,7 @@ describe('Pestaña Productos', () => {
   it('busca por nombre, filtra por categoría y cambia el orden', async () => {
     render(<ProductosTab filtros={filtros} esAdmin />);
     const tabla = await screen.findByRole('table');
+    fireEvent.click(screen.getByLabelText(/Mostrar productos sin ventas/));
     fireEvent.change(screen.getByLabelText('Buscar producto'), { target: { value: 'caf' } });
     expect(within(tabla).queryByText('Torta')).not.toBeInTheDocument();
     expect(within(tabla).getByText('Café')).toBeInTheDocument();
@@ -154,5 +156,46 @@ describe('Pestaña Productos', () => {
     get.mockResolvedValue(datos({ productos: { total: 0, conVentas: 0, sinVentas: 0, unidades: 0, monto: 0, categorias: [], filas: [] } }) as never);
     render(<ProductosTab filtros={filtros} esAdmin />);
     expect(await screen.findByText('No hay productos en el catálogo.')).toBeInTheDocument();
+  });
+
+  const muchos = (n: number) => Array.from({ length: n }, (_, i) => fila(String(i), `Prod ${String(i).padStart(2, '0')}`, n - i));
+
+  it('oculta los de 0 ventas por defecto; el interruptor los muestra y cuentan para Bajo 20 %', async () => {
+    render(<ProductosTab filtros={filtros} esAdmin />);
+    const tabla = await screen.findByRole('table');
+    expect(within(tabla).queryByText('Té')).not.toBeInTheDocument();
+    // con 2 productos vendidos no hay marca Bajo (menos de 5)
+    expect(within(tabla).queryByText('Bajo 20 %')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Mostrar productos sin ventas (1)'));
+    expect(within(tabla).getByText('Té')).toBeInTheDocument();
+    expect(within(tabla).getByText('Bajo 20 %')).toBeInTheDocument();
+  });
+
+  it('pagina de 10 en 10, cambia el tamaño y vuelve a la página 1 al buscar', async () => {
+    get.mockResolvedValue(datos({ productos: { total: 70, conVentas: 70, sinVentas: 0, unidades: 100, monto: 1, categorias: ['Postres'], filas: muchos(70) } }) as never);
+    render(<ProductosTab filtros={filtros} esAdmin />);
+    const tabla = await screen.findByRole('table');
+    expect(within(tabla).getAllByRole('row')).toHaveLength(11);
+    expect(screen.getByText('Mostrando 1–10 de 70')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    expect(screen.getByText('Página 2 de 7')).toBeInTheDocument();
+    expect(within(tabla).getByText('Prod 10')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filas'), { target: { value: '25' } });
+    expect(screen.getByText('Mostrando 1–25 de 70')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    fireEvent.change(screen.getByLabelText('Buscar producto'), { target: { value: 'Prod' } });
+    expect(screen.getByText('Mostrando 1–25 de 70')).toBeInTheDocument();
+  });
+
+  it('sin ventas en el periodo: estado vacío con Ver ayer y Ver últimos 7 días', async () => {
+    const alCambiarPeriodo = vi.fn();
+    get.mockResolvedValue(datos({ productos: { ...datos().productos, conVentas: 0, sinVentas: 3, unidades: 0, monto: 0 } }) as never);
+    render(<ProductosTab filtros={filtros} esAdmin alCambiarPeriodo={alCambiarPeriodo} />);
+    expect(await screen.findByText('Todavía no hay ventas en este periodo')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver ayer' }));
+    expect(alCambiarPeriodo).toHaveBeenLastCalledWith('ayer');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver últimos 7 días' }));
+    expect(alCambiarPeriodo).toHaveBeenLastCalledWith('7d');
   });
 });

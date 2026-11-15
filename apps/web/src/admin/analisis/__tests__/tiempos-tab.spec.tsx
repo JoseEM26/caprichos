@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TiemposTab } from '../tiempos/TiemposTab';
+import { ir } from './ayudas';
 import { api } from '../../../comun/api';
 
 vi.mock('../../../comun/socket', () => ({ useTiempoReal: vi.fn(), useEventos: vi.fn() }));
@@ -189,6 +190,8 @@ describe('Metas por etapa', () => {
   const abrir = async (esAdmin: boolean) => {
     servidor(respuesta);
     render(<TiemposTab filtros={filtros} esAdmin={esAdmin} />);
+    await screen.findByRole('group', { name: 'Secciones de tiempos' });
+    ir('Metas');
     await screen.findByText('Metas por etapa');
     fireEvent.click(screen.getByText('Metas por etapa'));
   };

@@ -1,12 +1,24 @@
 import { useState } from 'react';
 import { Cargando } from '../../../comun/Cargando';
 import { EstadoError } from '../../../comun/EstadoError';
-import { BarrasHorizontales, PanelDetalle, TarjetaAnalisis, TarjetaIndicador, consultaDe, useConsultaAnalisis, type NivelSemaforo, type PropsPestanaAnalisis } from '../comun';
+import { BarrasHorizontales, PanelDetalle, Secciones, TarjetaAnalisis, TarjetaIndicador, consultaDe, useConsultaAnalisis, type NivelSemaforo, type PropsPestanaAnalisis } from '../comun';
 import { diaMes, num, soles } from '../reparto/formato';
 import type { EstadoInsumo, InsumoDura, MermaItem, RespuestaAlmacen, TerminadoItem } from './tipos';
 
-const SEMAFORO: Record<EstadoInsumo, NivelSemaforo> = { AGOTADO: 'rojo', CRITICO: 'rojo', PRONTO: 'ambar', OK: 'verde', SIN_CONSUMO: 'sin_dato' };
-const TEXTO_ESTADO: Record<EstadoInsumo, string> = { AGOTADO: 'Agotado', CRITICO: 'Se acaba en 3 días o menos', PRONTO: 'Se acaba en una semana o menos', OK: 'Alcanza más de una semana', SIN_CONSUMO: 'Sin consumo en el período' };
+const SEMAFORO: Record<EstadoInsumo, NivelSemaforo> = {
+  AGOTADO: 'rojo',
+  CRITICO: 'rojo',
+  PRONTO: 'ambar',
+  OK: 'verde',
+  SIN_CONSUMO: 'sin_dato',
+};
+const TEXTO_ESTADO: Record<EstadoInsumo, string> = {
+  AGOTADO: 'Agotado',
+  CRITICO: 'Se acaba en 3 días o menos',
+  PRONTO: 'Se acaba en una semana o menos',
+  OK: 'Alcanza más de una semana',
+  SIN_CONSUMO: 'Sin consumo en el período',
+};
 /** Barras visibles de insumos: los que se acaban antes; el resto queda en «Ver como tabla». */
 const MAX_BARRAS_INSUMOS = 25;
 
@@ -31,7 +43,11 @@ function Insumos({ items, truncado }: { items: InsumoDura[]; truncado: boolean }
         filas: items.map((x) => [x.nombre, x.unidad, x.stock, x.minimo, x.consumoDiario ?? 'Sin consumo', x.diasRestantes ?? 'Sin dato', x.seAcabaEl ? diaMes(x.seAcabaEl) : 'Sin dato']),
       }}
     >
-      {truncado && <p className="an-error-fechas" role="status">Hay más insumos de los que se leen: se muestran los primeros por nombre.</p>}
+      {truncado && (
+        <p className="an-error-fechas" role="status">
+          Hay más insumos de los que se leen: se muestran los primeros por nombre.
+        </p>
+      )}
       <BarrasHorizontales
         descripcion="Días que dura cada insumo según su consumo reciente"
         etiquetaDestacada="Bajo el mínimo"
@@ -58,7 +74,8 @@ function Insumos({ items, truncado }: { items: InsumoDura[]; truncado: boolean }
                   Stock {num(i.stock, 2)} {i.unidad} (mínimo {num(i.minimo, 2)})
                 </span>
                 <span className="an-sub">
-                  Consumió {num(i.consumoRango, 2)} {i.unidad} en el período{i.consumoDiario == null ? '' : ` (${num(i.consumoDiario, 2)} por día)`}.
+                  Consumió {num(i.consumoRango, 2)} {i.unidad} en el período
+                  {i.consumoDiario == null ? '' : ` (${num(i.consumoDiario, 2)} por día)`}.
                 </span>
               </span>
             </li>
@@ -81,10 +98,21 @@ function Mermas({ datos }: { datos: RespuestaAlmacen['mermas'] }) {
       vacio="No se registró ninguna merma en este período."
       tabla={{
         cabecera: ['Nombre', 'Tipo', 'Veces', 'Cantidad', 'Costo', 'Motivo más repetido'],
-        filas: items.map((m) => [m.nombre, m.tipo === 'INSUMO' ? 'Insumo' : 'Producto', m.veces, `${num(m.cantidad, 2)}${m.unidad ? ` ${m.unidad}` : ''}`, m.costo == null ? 'Sin costo guardado' : soles(m.costo), m.motivos[0]?.motivo ?? 'Sin motivo']),
+        filas: items.map((m) => [
+          m.nombre,
+          m.tipo === 'INSUMO' ? 'Insumo' : 'Producto',
+          m.veces,
+          `${num(m.cantidad, 2)}${m.unidad ? ` ${m.unidad}` : ''}`,
+          m.costo == null ? 'Sin costo guardado' : soles(m.costo),
+          m.motivos[0]?.motivo ?? 'Sin motivo',
+        ]),
       }}
     >
-      {datos.truncado && <p className="an-error-fechas" role="status">Hay más de {datos.limite} mermas: se leyeron las más recientes. Acorta las fechas.</p>}
+      {datos.truncado && (
+        <p className="an-error-fechas" role="status">
+          Hay más de {datos.limite} mermas: se leyeron las más recientes. Acorta las fechas.
+        </p>
+      )}
       <div className="an-rejilla an-rejilla--kpi">
         <TarjetaIndicador titulo="Registros de merma" valor={String(datos.registros)} />
         <TarjetaIndicador titulo="Costo de las mermas" valor={soles(datos.costoTotal)} detalle={datos.costoTotal == null ? 'Ningún insumo con costo guardado' : 'Solo insumos con costo'} />
@@ -120,7 +148,9 @@ function Terminados({ items, umbral }: { items: TerminadoItem[]; umbral: number 
       }}
     >
       {pocas.length === 0 ? (
-        <p className="an-sub" role="status">Todos tienen más de {umbral} unidades.</p>
+        <p className="an-sub" role="status">
+          Todos tienen más de {umbral} unidades.
+        </p>
       ) : (
         <BarrasHorizontales
           descripcion="Unidades que quedan de cada producto con pocas unidades"
@@ -153,14 +183,31 @@ export function AlmacenTab({ filtros }: PropsPestanaAnalisis) {
             <section className="an-tarjeta" role="status" aria-labelledby="an-apagado-t">
               <h3 id="an-apagado-t">Control de almacén apagado</h3>
               <p>
-                Mientras esté apagado, vender no descuenta insumos y no hay consumo que analizar: no se muestran la duración de los insumos ni sus mermas.
-                El ADMIN lo enciende en Configuración. Abajo siguen los productos terminados, que llevan su propio conteo.
+                Mientras esté apagado, vender no descuenta insumos y no hay consumo que analizar: no se muestran la duración de los insumos ni sus mermas. El ADMIN lo enciende en Configuración. Abajo
+                siguen los productos terminados, que llevan su propio conteo.
               </p>
             </section>
           )}
-          {datos.insumos && <Insumos items={datos.insumos.items} truncado={datos.insumos.truncado} />}
-          <Mermas datos={datos.mermas} />
-          <Terminados items={datos.terminados.items} umbral={datos.umbralPocas} />
+          <Secciones
+            etiqueta="Secciones de almacén"
+            secciones={[
+              datos.insumos && {
+                id: 'insumos',
+                nombre: 'Duración de insumos',
+                contenido: <Insumos items={datos.insumos.items} truncado={datos.insumos.truncado} />,
+              },
+              {
+                id: 'mermas',
+                nombre: 'Mermas',
+                contenido: <Mermas datos={datos.mermas} />,
+              },
+              {
+                id: 'terminados',
+                nombre: 'Productos terminados',
+                contenido: <Terminados items={datos.terminados.items} umbral={datos.umbralPocas} />,
+              },
+            ]}
+          />
         </>
       )}
     </div>
