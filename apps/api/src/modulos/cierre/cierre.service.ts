@@ -336,10 +336,20 @@ export class CierreService {
       this.prisma,
       filas.flatMap((f) => [f.por_party_id, f.autorizado_por_party_id]),
     );
+    // Pedido pagado por Culqi y devuelto por fuera (Yape, efectivo… del local): sale del medio usado, y el detalle lo dice
+    const porCulqi = new Set(
+      (
+        await this.prisma.pagoOnlineIntento.findMany({
+          where: { pedido_id: { in: filas.map((f) => f.pedido_id) }, culqi_cargo_id: { not: null } },
+          select: { pedido_id: true },
+        })
+      ).map((i) => String(i.pedido_id)),
+    );
     return filas.map((f) => ({
       ...salidaDevolucion(f, nombres),
       pedidoCodigo: f.pedido.codigo,
       codigoOperacion: f.codigo_operacion,
+      detalle: f.medio !== 'CULQI' && porCulqi.has(String(f.pedido_id)) ? `Devolución del pedido ${f.pedido.codigo} pagado por Culqi` : null,
     }));
   }
 

@@ -27,6 +27,17 @@ describe('Pagos en línea (admin)', () => {
     await waitFor(() => expect(dev).toHaveBeenCalledWith('g1', { motivo: 'Error de cobro', medio: 'CULQI', confirmar: true }));
   });
 
+  it('devuelto por fuera (Yape del local): sigue en la lista con estado «Devuelto por fuera» y el medio usado', async () => {
+    comoRol('SUPERVISOR');
+    vi.spyOn(culqiApi, 'listar').mockResolvedValue({
+      items: [{ ...pago, devuelto: true, montoDevuelto: 25, devoluciones: [{ monto: 25, medio: 'YAPE', en: '2026-01-01T16:00:00Z' }] }],
+      total: 1,
+    });
+    render(<PagosOnlineTab />);
+    expect((await screen.findByTestId('devuelto-por-fuera')).textContent).toMatch(/Devuelto por fuera \(Yape del local\)/);
+    expect(screen.getByText('Devuelto por fuera')).toBeTruthy();
+  });
+
   it('otros roles no ven Devolver', async () => {
     comoRol('SUPERVISOR');
     render(<PagosOnlineTab />);

@@ -118,6 +118,10 @@ export interface OperacionCulqi {
   en: string;
   /** Número de operación de Culqi (id del cargo) */
   operacion: string | null;
+  /** Estado de la operación; ausente en servidores viejos */
+  estado?: 'COBRADO' | 'DEVUELTO_CULQI' | 'DEVUELTO_FUERA' | 'ANULADO';
+  /** Medios de la devolución por fuera (YAPE, EFECTIVO…) */
+  devueltoPor?: string[];
 }
 
 export interface CulqiTurno {
@@ -260,6 +264,8 @@ export interface DevolucionTurno {
   porNombre: string | null;
   autorizadoPorNombre: string | null;
   comprobanteBajaEstado: string | null;
+  /** «Devolución del pedido CP-XXX pagado por Culqi» cuando se devolvió por fuera de Culqi */
+  detalle?: string | null;
   creadoEn: string;
 }
 

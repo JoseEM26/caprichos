@@ -218,6 +218,20 @@ describe('caja.calculo', () => {
     expect(montos.ventasEfectivo).toBe(30);
   });
 
+  it('cobro Culqi ANULADO (devuelto por fuera) sigue como cobrado en el bloque Culqi; no entra al Yape manual', async () => {
+    const culqiAnulado = { id: 7n, caja_id: 10n, anulado_en: new Date('2026-10-21T20:00:00Z'), pagos: [{ medio: 'YAPE', monto: 50, propina: 0, origen: 'CULQI' }] };
+    const manual = { id: 8n, caja_id: 10n, anulado_en: null, pagos: [{ medio: 'YAPE', monto: 30, propina: 0, origen: 'MANUAL' }] };
+    const cliente: any = {
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      cobro: { findMany: jest.fn(async ({ where }: any) => (where.anulado_en === null ? [manual] : [culqiAnulado])) },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const m = await calcularMontosCaja(cliente, { id: 10n, fecha: new Date('2026-10-21T00:00:00.000Z'), apertura: new Prisma.Decimal(0) });
+    expect(m.sistemaYape).toBe(30);
+    expect(m.sistemaYapeCulqi).toBe(50);
+  });
+
   describe('exigirCajaAbiertaHoy (aprobar y cobrar pagos)', () => {
     const cajaDb = (hoy: any, otraAbierta: any = null) => ({
       caja: {

@@ -280,6 +280,23 @@ export async function calcularMontosCaja(
     }
   }
 
+  // Pagos en línea (Culqi) de cobros YA ANULADOS de esta caja (pedido anulado y devuelto por Yape/efectivo del local, o por
+  // Culqi): el cobro en la cuenta de Culqi sigue ahí, así que cuenta como cobrado en el bloque Culqi (lo devuelto por Culqi se
+  // resta aparte, por el día de cada devolución). No entra a las ventas ni al Yape/POS del local.
+  const anuladosCulqi = (await cliente.cobro.findMany({
+    where: { caja_id: caja.id, anulado_en: { not: null }, pagos: { some: { origen: 'CULQI' } } },
+    include: { pagos: true },
+  })) as any[];
+  for (const cobro of anuladosCulqi.filter((c) => c?.anulado_en)) {
+    for (const pago of cobro.pagos ?? []) {
+      if (pago.origen !== 'CULQI') continue;
+      const medio = (pago.medio || '').trim().toUpperCase();
+      const total = aCentimos(pago.monto) + aCentimos(pago.propina);
+      if (medio === 'YAPE') sistemaYapeCulqi += total;
+      else if (medio === 'TARJETA') sistemaTarjetaCulqi += total;
+    }
+  }
+
   // Adelantos de pedidos programados recibidos en esta caja (efectivo o tarjeta): entran el día en que se reciben,
   // aunque el pedido se cobre o se entregue otro día. El cobro final es solo el saldo, así que no se cuenta dos veces.
   const adelantos = (await cliente.pedidoAdelanto?.findMany({ where: { caja_id: caja.id, anulado_en: null } })) ?? [];

@@ -89,6 +89,24 @@ describe('Detalle del cierre', () => {
     expect(screen.getByTestId('aviso-detalle-restringido')).toBeInTheDocument();
   });
 
+  it('operación Culqi devuelta por fuera: sigue en el bloque Culqi con estado «Devuelto por fuera (Yape del local)»', () => {
+    const ticket = ticketEjemplo();
+    ticket.medios = [...ticket.medios, { medio: 'YAPE_CULQI', sistema: 80, visto: 80, diferencia: 0 }];
+    render(
+      <DetalleCierreModal
+        cajaId={5}
+        detalle={{ ...detalleDe(ticket), culqi: { operaciones: [{ pedidoId: '9', pedidoCodigo: 'CP-009', medio: 'YAPE', monto: 80, en: '2026-10-21T21:00:00Z', operacion: 'chr_live_777', estado: 'DEVUELTO_FUERA', devueltoPor: ['YAPE'] }] } }}
+        cargando={false}
+        error={null}
+        esAdmin
+        puedeImprimir
+        alCerrar={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Medios de pago' }));
+    expect(screen.getByTestId('estado-operacion-culqi').textContent).toBe('Devuelto por fuera (Yape del local)');
+  });
+
   it('Medios de pago: Culqi va en filas aparte y con su lista de operaciones (nº de operación)', () => {
     const ticket = ticketEjemplo();
     ticket.medios = [...ticket.medios, { medio: 'YAPE_CULQI', sistema: 70, visto: 70, diferencia: 0 }, { medio: 'TARJETA_CULQI', sistema: 40, visto: 40, diferencia: 0 }];

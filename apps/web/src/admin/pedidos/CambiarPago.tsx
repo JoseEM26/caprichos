@@ -8,6 +8,8 @@ const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 const esMedio = (m: string): m is MedioPlan => MEDIOS_PLAN.some((x) => x.id === m);
 
 /** Venta + propina: lo que el plan debe sumar (igual que el servidor). */
+export const TEXTO_PAGO_CULQI = 'Este pago se hizo en línea por Culqi y no se puede cambiar. Si hay que devolverlo, usa Anular › Devolver por Culqi';
+
 export const totalCobrablePedido = (p: Pick<Pedido, 'total' | 'propina' | 'monto_credito'>) => Math.round((montoPorCobrar(p) + Number(p.propina ?? 0)) * 100) / 100;
 
 /** Plan que tiene hoy el pedido, como filas editables. Un cobro «MIXTO» sin renglones arranca en Efectivo por el total. */
@@ -54,6 +56,9 @@ export function BotonCambiarPago({
   const pagaConMalo = efectivo > 0 && pagaCon !== '' && !(Number(pagaCon) >= efectivo);
 
   if (String(pedido.estado).toUpperCase() === 'ANULADO' || !permitido) return null;
+  // Todo el cobro es de Culqi: nada que cambiar. Con renglones manuales además, el servidor los deja ajustar sin tocar el de Culqi.
+  const culqi = pedido.mediosCulqi ?? [];
+  const soloCulqi = culqi.length > 0 && filasActuales(pedido, total).every((f) => culqi.includes(f.medio));
 
   const abrir = (m: 'cambiar' | 'agregar') => {
     const actual = filasActuales(pedido, total);
@@ -90,15 +95,20 @@ export function BotonCambiarPago({
   return (
     <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className={variante === 'detalle' ? 'dp-btn' : undefined} style={estilo} data-testid="btn-cambiar-pago-caja" onClick={() => abrir('cambiar')}>
+        <button type="button" className={variante === 'detalle' ? 'dp-btn' : undefined} style={estilo} data-testid="btn-cambiar-pago-caja" disabled={soloCulqi} title={soloCulqi ? TEXTO_PAGO_CULQI : undefined} onClick={() => abrir('cambiar')}>
           Cambiar método de pago
         </button>
         {variante === 'detalle' && (
-          <button type="button" className="dp-btn" data-testid="btn-agregar-metodo" onClick={() => abrir('agregar')}>
+          <button type="button" className="dp-btn" data-testid="btn-agregar-metodo" disabled={soloCulqi} title={soloCulqi ? TEXTO_PAGO_CULQI : undefined} onClick={() => abrir('agregar')}>
             Agregar otro método
           </button>
         )}
       </div>
+      {soloCulqi && (
+        <div data-testid="aviso-pago-culqi" style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+          {TEXTO_PAGO_CULQI}
+        </div>
+      )}
       {hecho && (
         <div role="status" style={{ fontSize: 13, fontWeight: 700, color: '#1F5C33' }}>
           {hecho}

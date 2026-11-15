@@ -25,6 +25,10 @@ export interface OperacionCulqi {
   en: Date;
   /** Número de operación de Culqi (id del cargo): lo que se busca en CulqiPanel. */
   operacion: string | null;
+  /** COBRADO | DEVUELTO_CULQI | DEVUELTO_FUERA (devuelto por Yape/efectivo… del local) | ANULADO (cobro anulado sin devolución) */
+  estado: 'COBRADO' | 'DEVUELTO_CULQI' | 'DEVUELTO_FUERA' | 'ANULADO';
+  /** Medios usados en la devolución por fuera (YAPE, EFECTIVO…) */
+  devueltoPor: string[];
 }
 
 type Db = { pagoOnlineIntento: { findMany: (args: any) => Promise<any[]> }; cobro: { findMany: (args: any) => Promise<any[]> } };
@@ -40,6 +44,8 @@ export async function devueltoCulqiDelDia(db: Pick<Db, 'pagoOnlineIntento'>, ini
     const medio = String(i.medio ?? '').toUpperCase() as 'YAPE' | 'TARJETA';
     if (!(medio in out)) continue;
     for (const d of Array.isArray(i.devoluciones) ? (i.devoluciones as any[]) : []) {
+      // Devuelta por fuera (Yape, efectivo… del local): el dinero sigue en Culqi, no baja el bloque Culqi
+      if (d?.medio && String(d.medio).toUpperCase() !== 'CULQI') continue;
       const en = new Date(d?.en);
       if (en >= inicio && en < fin) out[medio] += Math.round(Number(d?.monto_centimos) || 0);
     }
@@ -67,11 +73,11 @@ export function armarCulqiCierre(
   };
 }
 
-/** Operaciones Culqi de una caja: un renglón por cobro vigente pagado por la pasarela, con su nº de operación. */
+/** Operaciones Culqi de una caja: un renglón por cobro pagado por la pasarela (también el anulado: en Culqi sigue cobrado), con su nº de operación y estado. */
 export async function operacionesCulqiDeCaja(db: Pick<Db, 'cobro' | 'pagoOnlineIntento'>, cajaId: bigint): Promise<OperacionCulqi[]> {
   const cobros = (
     await db.cobro.findMany({
-      where: { caja_id: cajaId, anulado_en: null, pagos: { some: { origen: 'CULQI' } } },
+      where: { caja_id: cajaId, pagos: { some: { origen: 'CULQI' } } },
       include: { pagos: true, pedido: { select: { codigo: true } } },
       orderBy: { id: 'asc' },
     })
@@ -79,12 +85,17 @@ export async function operacionesCulqiDeCaja(db: Pick<Db, 'cobro' | 'pagoOnlineI
   if (cobros.length === 0) return [];
   const intentos = await db.pagoOnlineIntento.findMany({
     where: { pedido_id: { in: cobros.map((c) => c.pedido_id) }, culqi_cargo_id: { not: null } },
-    select: { pedido_id: true, culqi_cargo_id: true },
+    select: { pedido_id: true, culqi_cargo_id: true, devoluciones: true },
     orderBy: { id: 'asc' },
   });
   const cargo = new Map<string, string>(intentos.map((i) => [String(i.pedido_id), String(i.culqi_cargo_id)]));
-  return cobros.flatMap((c) =>
-    c.pagos
+  const devs = new Map<string, any[]>(intentos.map((i) => [String(i.pedido_id), Array.isArray(i.devoluciones) ? (i.devoluciones as any[]) : []]));
+  return cobros.flatMap((c) => {
+    const lista = devs.get(String(c.pedido_id)) ?? [];
+    const fuera = [...new Set(lista.filter((d) => d?.medio && String(d.medio).toUpperCase() !== 'CULQI').map((d) => String(d.medio).toUpperCase()))];
+    const porCulqi = lista.some((d) => !d?.medio || String(d.medio).toUpperCase() === 'CULQI');
+    const estado: OperacionCulqi['estado'] = fuera.length > 0 ? 'DEVUELTO_FUERA' : porCulqi ? 'DEVUELTO_CULQI' : c.anulado_en ? 'ANULADO' : 'COBRADO';
+    return c.pagos
       .filter((p: any) => p.origen === 'CULQI')
       .map((p: any) => ({
         pedidoId: String(c.pedido_id),
@@ -93,6 +104,8 @@ export async function operacionesCulqiDeCaja(db: Pick<Db, 'cobro' | 'pagoOnlineI
         monto: enPesos(aCentimos(p.monto) + aCentimos(p.propina)),
         en: c.en,
         operacion: cargo.get(String(c.pedido_id)) ?? null,
-      })),
-  );
+        estado,
+        devueltoPor: fuera,
+      }));
+  });
 }

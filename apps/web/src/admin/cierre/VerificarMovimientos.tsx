@@ -214,7 +214,7 @@ export function VerificarMovimientos(p: Props) {
               </div>
               {devoluciones.map((d) => (
                 <div className="vm-fila vm-fila-4" role="row" key={d.id}>
-                  <span role="cell"><b>{d.pedidoCodigo}</b></span>
+                  <span role="cell"><b>{d.pedidoCodigo}</b>{d.detalle && <small data-testid="detalle-devolucion" style={{ display: 'block' }}>{d.detalle}</small>}</span>
                   <span role="cell">{MEDIO_DEVOLUCION[d.medio] ?? d.medio}</span>
                   <span role="cell">{d.codigoOperacion || '—'}</span>
                   <span role="cell" className="vm-der vm-monto">{soles(d.montoDevuelto)}</span>

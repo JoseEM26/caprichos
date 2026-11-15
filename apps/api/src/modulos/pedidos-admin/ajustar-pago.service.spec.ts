@@ -100,6 +100,51 @@ describe('AjustarPagoService (cambiar o agregar medios de pago, siempre y sin ap
     expect(tx.pedido.update).not.toHaveBeenCalled();
   });
 
+  describe('renglones pagados por Culqi', () => {
+    const conCulqi = (pagos: any[], total = 41) => {
+      pedidoActual = pedido({ pago_estado: 'PAGADO', estado: 'ENTREGADO', total, cobros: [cobro({ total, pagos })] });
+      tx.cobro.findFirst.mockResolvedValue({ caja_id: 5n });
+    };
+
+    it('cobro 100% Culqi: cambiar de medio, quitar o reasignar el renglón responde 409 PAGO_CULQI_NO_EDITABLE y no escribe nada', async () => {
+      conCulqi([{ medio: 'YAPE', monto: 41, propina: 0, origen: 'CULQI' }]);
+      await expect(service.ajustar('7', { plan: [{ medio: 'EFECTIVO', monto: 41 }] }, cajero)).rejects.toMatchObject({
+        response: { codigo: 'PAGO_CULQI_NO_EDITABLE', mensaje: expect.stringContaining('Devolver por Culqi') },
+      });
+      await expect(service.ajustar('7', { plan: [{ medio: 'YAPE', monto: 20 }, { medio: 'EFECTIVO', monto: 21 }] }, cajero)).rejects.toMatchObject({ response: { codigo: 'PAGO_CULQI_NO_EDITABLE' } });
+      expect(tx.cobroPago.deleteMany).not.toHaveBeenCalled();
+      expect(tx.cobroPago.createMany).not.toHaveBeenCalled();
+      expect(tx.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('Culqi + manual: ajusta solo el manual; el renglón CULQI no se borra ni se recrea y lo nuevo nace MANUAL', async () => {
+      conCulqi([
+        { medio: 'YAPE', monto: 20, propina: 0, origen: 'CULQI' },
+        { medio: 'EFECTIVO', monto: 21, propina: 0, origen: 'MANUAL' },
+      ]);
+      await service.ajustar('7', { plan: [{ medio: 'YAPE', monto: 20 }, { medio: 'PLIN', monto: 21 }] }, cajero);
+      expect(tx.cobroPago.deleteMany).toHaveBeenCalledWith({ where: { cobro_id: 90n, origen: 'MANUAL' } });
+      const filas = tx.cobroPago.createMany.mock.calls[0][0].data;
+      expect(filas).toHaveLength(1);
+      expect(filas[0]).toMatchObject({ medio: 'PLIN', origen: 'MANUAL' });
+      expect(Number(filas[0].monto)).toBe(21);
+    });
+
+    it('el manual no puede tocar el medio ni el monto del Culqi aunque el total cuadre', async () => {
+      conCulqi([
+        { medio: 'YAPE', monto: 20, propina: 0, origen: 'CULQI' },
+        { medio: 'EFECTIVO', monto: 21, propina: 0, origen: 'MANUAL' },
+      ]);
+      await expect(service.ajustar('7', { plan: [{ medio: 'YAPE', monto: 30 }, { medio: 'EFECTIVO', monto: 11 }] }, cajero)).rejects.toMatchObject({ response: { codigo: 'PAGO_CULQI_NO_EDITABLE' } });
+    });
+
+    it('caja cerrada con un cobro Culqi: tampoco se puede cambiar', async () => {
+      conCulqi([{ medio: 'TARJETA', monto: 41, propina: 0, origen: 'CULQI' }]);
+      (bloquearCaja as jest.Mock).mockResolvedValue({ id: 5n, estado: 'CERRADA' });
+      await expect(service.ajustar('7', { plan: yape }, cajero)).rejects.toMatchObject({ response: { codigo: 'PAGO_CULQI_NO_EDITABLE' } });
+    });
+  });
+
   it('pedido anulado: se rechaza; entregado, en cocina y listo: se permite', async () => {
     pedidoActual = pedido({ estado: 'ANULADO' });
     await expect(service.ajustar('7', { plan: yape }, cajero)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_ANULADO' } });
@@ -114,7 +159,7 @@ describe('AjustarPagoService (cambiar o agregar medios de pago, siempre y sin ap
     tx.cobro.findFirst.mockResolvedValue({ caja_id: 5n });
     const r = await service.ajustar('7', { plan: [{ medio: 'YAPE', monto: 20 }, { medio: 'EFECTIVO', monto: 25 }], pagaCon: 30 }, supervisor);
     expect(bloquearCaja).toHaveBeenCalledWith(tx, 5n);
-    expect(tx.cobroPago.deleteMany).toHaveBeenCalledWith({ where: { cobro_id: 90n } });
+    expect(tx.cobroPago.deleteMany).toHaveBeenCalledWith({ where: { cobro_id: 90n, origen: 'MANUAL' } });
     const filas = tx.cobroPago.createMany.mock.calls[0][0].data;
     expect(filas.map((f: any) => f.medio)).toEqual(['YAPE', 'EFECTIVO']);
     // entregado por medio = monto + propina; suma de propinas = 4

@@ -27,6 +27,18 @@ describe('Cambiar método de pago en Caja (siempre, sin código de supervisor)',
     expect(screen.getByTestId('btn-cambiar-pago-caja')).toBeInTheDocument();
   });
 
+  it('pago hecho por Culqi: los botones quedan deshabilitados con el texto explicativo', () => {
+    render(<BotonCambiarPago permitido pedido={pedido({ pago_metodo: 'YAPE', mediosCulqi: ['YAPE'] })} />);
+    expect(screen.getByTestId('btn-cambiar-pago-caja')).toBeDisabled();
+    expect(screen.getByTestId('btn-agregar-metodo')).toBeDisabled();
+    expect(screen.getByTestId('aviso-pago-culqi')).toHaveTextContent('Este pago se hizo en línea por Culqi y no se puede cambiar. Si hay que devolverlo, usa Anular › Devolver por Culqi');
+  });
+
+  it('cobro con Culqi y un renglón manual: se puede ajustar (el servidor conserva el de Culqi)', () => {
+    render(<BotonCambiarPago permitido pedido={pedido({ pago_metodo: 'MIXTO', mediosCulqi: ['YAPE'], planPago: [{ medio: 'YAPE', monto: 20 }, { medio: 'EFECTIVO', monto: 21 }] as any })} />);
+    expect(screen.getByTestId('btn-cambiar-pago-caja')).toBeEnabled();
+  });
+
   it('sin permiso o con el pedido anulado no se ofrece', () => {
     const { rerender } = render(<BotonCambiarPago permitido={false} pedido={pedido()} />);
     expect(screen.queryByTestId('btn-cambiar-pago-caja')).toBeNull();

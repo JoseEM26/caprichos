@@ -5,12 +5,22 @@ import { soles } from './cuadre.util';
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
 /** Lista de operaciones Culqi (pedido, medio, monto, hora y n.º de operación) con la nota de dónde se verifican. */
+const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia', EFECTIVO: 'efectivo', TARJETA: 'Tarjeta' };
+
+/** Estado de la operación en Culqi; «Devuelto por fuera» = el dinero sigue en Culqi y salió del medio del local. */
+export function estadoOperacionCulqi(o: OperacionCulqi): string {
+  if (o.estado === 'DEVUELTO_FUERA') return `Devuelto por fuera (${(o.devueltoPor ?? []).map((m) => NOMBRE_MEDIO[m] ?? m).join(', ')} del local)`;
+  if (o.estado === 'DEVUELTO_CULQI') return 'Devuelto por Culqi';
+  if (o.estado === 'ANULADO') return 'Cobro anulado, sin devolver';
+  return 'Cobrado';
+}
+
 export function OperacionesCulqi({ operaciones }: { operaciones: OperacionCulqi[] }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="dc-tabla" data-testid="operaciones-culqi">
         <thead>
-          <tr><th>Pedido</th><th>Medio</th><th>Monto</th><th>Hora</th><th>N.º de operación</th></tr>
+          <tr><th>Pedido</th><th>Medio</th><th>Monto</th><th>Hora</th><th>N.º de operación</th><th>Estado</th></tr>
         </thead>
         <tbody>
           {operaciones.map((o, i) => (
@@ -20,6 +30,7 @@ export function OperacionesCulqi({ operaciones }: { operaciones: OperacionCulqi[
               <td>{soles(o.monto)}</td>
               <td>{hora(o.en)}</td>
               <td><code style={{ wordBreak: 'break-all' }}>{o.operacion ?? 'Sin dato'}</code></td>
+              <td data-testid="estado-operacion-culqi">{estadoOperacionCulqi(o)}</td>
             </tr>
           ))}
         </tbody>

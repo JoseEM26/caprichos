@@ -14,6 +14,9 @@ import { ErrorApi } from '../../comun/api';
 import { culqiApi, type MedioDevolucion, type PagoOnline } from '../../carta/pagos/culqiApi';
 
 const POR_PAGINA = 20;
+const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia', EFECTIVO: 'efectivo' };
+/** Medios (no Culqi) con los que se devolvió el pago: ese dinero sigue en la cuenta de Culqi. */
+const porFuera = (p: PagoOnline) => [...new Set((p.devoluciones ?? []).map((d) => String(d.medio).toUpperCase()).filter((m) => m !== 'CULQI'))];
 const saldo = (p: PagoOnline) => Math.max(0, Number(p.monto) - Number(p.montoDevuelto ?? 0));
 const fecha = (iso: string) =>
   new Date(iso).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -152,8 +155,13 @@ export function PagosOnlineTab() {
                     {(p.montoDevuelto ?? 0) > 0 && (
                       <div style={{ fontSize: 12 }}>Devuelto S/ {Number(p.montoDevuelto).toFixed(2)} de S/ {Number(p.monto).toFixed(2)}</div>
                     )}
+                    {porFuera(p).length > 0 && (
+                      <div data-testid="devuelto-por-fuera" style={{ fontSize: 12 }}>
+                        Devuelto por fuera ({porFuera(p).map((m) => NOMBRE_MEDIO[m] ?? m).join(', ')} del local): el dinero sigue en Culqi
+                      </div>
+                    )}
                     <Insignia variante={p.devuelto ? 'neutro' : p.estado === 'APROBADO' ? 'exito' : p.estado === 'RECHAZADO' ? 'peligro' : 'aviso'}>
-                      {p.devuelto ? 'Devuelto' : p.estado}
+                      {p.devuelto ? (porFuera(p).length > 0 ? 'Devuelto por fuera' : 'Devuelto') : p.estado}
                     </Insignia>
                   </td>
                   <td style={{ padding: 8 }}>

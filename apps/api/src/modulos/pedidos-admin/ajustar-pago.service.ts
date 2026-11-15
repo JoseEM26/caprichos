@@ -7,7 +7,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { ROLES_ALCANCE_AMPLIO, esSoloMozo, rolesDelUsuario } from '../acceso/roles-usuario';
-import { bloquearCaja, cobroVigente } from '../caja/caja.calculo';
+import { aCentimos, bloquearCaja, cobroVigente } from '../caja/caja.calculo';
 import { PagoPlanService, PlanPagoItem, efectivoDelPedido } from '../pedidos/pago-plan.service';
 import { repartirPropina, totalCobrable } from '../propinas/propinas.util';
 import { nombresDePartes } from './devolucion-pedido.util';
@@ -119,6 +119,21 @@ export class AjustarPagoService {
         throw new BadRequestException({ codigo: 'SIN_CAMBIO', mensaje: 'La forma de pago elegida es la misma que ya tiene el pedido' });
       }
 
+      // Renglones pagados en línea (Culqi): ese dinero ya está en la cuenta de Culqi; no se cambia de medio, no se quita ni se
+      // reasigna. El plan nuevo debe traerlos intactos (mismo medio y monto); solo el resto (manuales) se puede ajustar.
+      const culqiRenglones = (cobro?.pagos ?? []).filter((x) => x.origen === 'CULQI');
+      const restoPlan = [...planNuevo];
+      for (const c of culqiRenglones) {
+        const idx = restoPlan.findIndex((f) => f.medio === c.medio && aCentimos(f.monto) === aCentimos(c.monto) + aCentimos(c.propina));
+        if (idx < 0) {
+          throw new ConflictException({
+            codigo: 'PAGO_CULQI_NO_EDITABLE',
+            mensaje: 'Este pago se hizo en línea por Culqi y no se puede cambiar. Si hay que devolverlo, usa Anular › Devolver por Culqi',
+          });
+        }
+        restoPlan.splice(idx, 1);
+      }
+
       // Plan del pedido (renglones solo si hay varios medios) y medio principal, igual que al cobrar o al pedir
       await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: pedidoId } });
       if (planNuevo.length > 1) await this.pagoPlan.guardar(tx, pedidoId, planNuevo);
@@ -143,14 +158,18 @@ export class AjustarPagoService {
       if (cobro) {
         if (caja && caja.estado !== 'ABIERTA') cierre = true;
         else if (Number(cobro.total) >= montoACobrar(p)) {
-          const propinas = repartirPropina(planNuevo.map((f) => ({ monto: f.monto })), Number(p.propina ?? 0));
-          await tx.cobroPago.deleteMany({ where: { cobro_id: cobro.id } });
+          // Los renglones CULQI quedan intactos (con su origen); solo se recrean los manuales, con la propina que les queda
+          const propinaCulqiC = culqiRenglones.reduce((t, x) => t + aCentimos(x.propina), 0);
+          const propinaResto = Math.max(0, (Math.round(Number(p.propina ?? 0) * 100) - propinaCulqiC) / 100);
+          const propinas = repartirPropina(restoPlan.map((f) => ({ monto: f.monto })), propinaResto);
+          await tx.cobroPago.deleteMany({ where: { cobro_id: cobro.id, origen: 'MANUAL' } });
           await tx.cobroPago.createMany({
-            data: planNuevo.map((f, i) => {
+            data: restoPlan.map((f, i) => {
               const conRecibido = f.medio === 'EFECTIVO' && pagaCon != null;
               return {
                 cobro_id: cobro.id,
                 medio: f.medio,
+                origen: 'MANUAL' as const,
                 monto: new Prisma.Decimal(redondear(f.monto - propinas[i])),
                 propina: new Prisma.Decimal(propinas[i]),
                 recibido: conRecibido ? new Prisma.Decimal(pagaCon as number) : null,
