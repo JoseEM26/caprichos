@@ -1,4 +1,5 @@
 import { useMediosEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 /** Cómo paga el trabajador su pedido del personal: a su crédito (por defecto) o «Pagar ahora» con medio. */
 export type ModoPagoPersonal = 'credito' | 'ahora';
 export const MEDIOS_PAGO_PERSONAL = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] as const;
@@ -74,9 +75,10 @@ export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCo
                 role="radio"
                 aria-checked={medio === m}
                 onClick={() => onMedio(m)}
-                style={{ ...tarjeta(medio === m), flex: '0 0 auto', minWidth: 80, minHeight: 44, textAlign: 'center', fontWeight: 700 }}
+                style={{ ...tarjeta(medio === m), flex: '0 0 auto', minWidth: 80, minHeight: 44, textAlign: 'center', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
-                {ETIQUETA_MEDIO[m]}
+                <IconoMedioPago medio={m} tamano={18} ariaHidden />
+                <span>{ETIQUETA_MEDIO[m]}</span>
               </button>
             ))}
           </div>

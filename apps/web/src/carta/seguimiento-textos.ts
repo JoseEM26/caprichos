@@ -7,6 +7,7 @@ export const NOMBRE_MEDIO: Record<string, string> = {
   EFECTIVO: 'Efectivo',
   TARJETA: 'Tarjeta',
   CULQI: 'Tarjeta / Yape en línea',
+  PAGO_EN_LINEA: 'Tarjeta / Yape en línea',
 };
 
 export const NOMBRE_MODALIDAD: Record<string, string> = {

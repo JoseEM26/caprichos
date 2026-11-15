@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { IconoMedioPago } from '../comun/IconoMedioPago';
 
 /** Una opción grande del checkout (medio de pago o forma de dar la ubicación). */
 export interface OpcionTarjeta {
@@ -79,19 +80,18 @@ export function EncabezadoDetalle({ titulo, textoCambiar, alCambiar }: { titulo:
 }
 
 const trazo = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
-const Insignia = ({ letra, color }: { letra: string; color: string }) => (
-  <span style={{ width: 36, height: 36, borderRadius: 10, background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18 }}>{letra}</span>
-);
 const Svg = ({ children }: { children: ReactNode }) => (
   <svg width="32" height="32" viewBox="0 0 24 24" {...trazo}>{children}</svg>
 );
 
 export const iconos = {
-  yape: <Insignia letra="Y" color="#6D2077" />,
-  plin: <Insignia letra="P" color="#00A9CE" />,
-  efectivo: <Svg><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" /></Svg>,
-  tarjeta: <Svg><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></Svg>,
-  transferencia: <Svg><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18" /></Svg>,
+  yape: <IconoMedioPago medio="YAPE" tamano={32} ariaHidden />,
+  plin: <IconoMedioPago medio="PLIN" tamano={32} ariaHidden />,
+  efectivo: <IconoMedioPago medio="EFECTIVO" tamano={30} ariaHidden />,
+  tarjeta: <IconoMedioPago medio="TARJETA" tamano={28} ariaHidden />,
+  transferencia: <IconoMedioPago medio="TRANSFERENCIA" tamano={30} ariaHidden />,
+  culqi: <IconoMedioPago medio="CULQI" tamano={30} ariaHidden />,
+  pagoEnLinea: <IconoMedioPago medio="PAGO_EN_LINEA" tamano={30} ariaHidden />,
   dividido: <Svg><path d="M12 3v6M12 9L5 21M12 9l7 12" /></Svg>,
   gps: <Svg><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" /></Svg>,
   mapa: <Svg><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></Svg>,

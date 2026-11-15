@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28" width="32" height="28" fill="none" role="img" aria-label="Transferencia bancaria">
+  <!-- Techo triangular / frontispicio -->
+  <path d="M16 2L3 9V11H29V9L16 2Z" fill="#0B2C3E"/>
+  <rect x="4" y="11" width="24" height="2" fill="#F59E0B"/>
+  <!-- Columnas -->
+  <rect x="6" y="13" width="3.5" height="9" rx="0.5" fill="#0B2C3E"/>
+  <rect x="11.5" y="13" width="3.5" height="9" rx="0.5" fill="#0B2C3E"/>
+  <rect x="17" y="13" width="3.5" height="9" rx="0.5" fill="#0B2C3E"/>
+  <rect x="22.5" y="13" width="3.5" height="9" rx="0.5" fill="#0B2C3E"/>
+  <!-- Base escalonada -->
+  <rect x="4" y="22" width="24" height="2" fill="#F59E0B"/>
+  <rect x="2" y="24" width="28" height="2.5" rx="0.5" fill="#0B2C3E"/>
+</svg>

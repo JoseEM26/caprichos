@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { IconoMedioPago } from '../../comun/IconoMedioPago';
 import './cuadre-caja.css';
 import {
   DENOMINACIONES_LISTA,
@@ -488,7 +489,10 @@ export function CuadreCaja({
             const dif = visto === null ? null : redondear(visto - sistema);
             return (
               <div key={m.clave} className="cc-dig" data-testid={`digital-${m.clave}`}>
-                <div className="cc-dig-nom">{m.etiqueta}</div>
+                <div className="cc-dig-nom" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <IconoMedioPago medio={m.medio} tamano={22} ariaHidden />
+                  <span>{m.etiqueta}</span>
+                </div>
                 <div className="cc-dig-sis">
                   Sistema <b>{soles(sistema)}</b>
                 </div>
@@ -571,7 +575,12 @@ export function CuadreCaja({
                   const dif = f.clave === 'efectivo' ? redondear((efectivoTocado ? efectivoContado : 0) - f.sistema) : difFila(f);
                   return (
                     <tr key={f.clave}>
-                      <th scope="row">{f.etiqueta}</th>
+                      <th scope="row">
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <IconoMedioPago medio={f.clave.toUpperCase()} tamano={18} ariaHidden />
+                          <span>{f.etiqueta}</span>
+                        </span>
+                      </th>
                       <td>{soles(f.sistema)}</td>
                       <td>{f.clave === 'efectivo' ? soles(efectivoTocado ? efectivoContado : 0) : f.visto === null ? 'Sin ingresar' : soles(f.visto)}</td>
                       <td><Semaforo valor={dif} /></td>

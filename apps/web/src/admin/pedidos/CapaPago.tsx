@@ -15,6 +15,7 @@ import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { digitalesDelPlan, faltanCapturas, medioDigitalVoucher } from './mediosPago';
 import { nombreMedio } from './planPago';
+import { IconoMedioPago } from '../../comun/IconoMedioPago';
 import { BotonCambiarPago, MarcaPagoModificado } from './CambiarPago';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 
@@ -107,7 +108,10 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
               const falta = digital && faltan.includes(m);
               return (
                 <div key={i} className="dp-medio" data-testid={`plan-${m.toLowerCase()}`}>
-                  <span style={{ fontWeight: 800, fontSize: 16 }}>{nombreMedio(m)}</span>
+                  <span style={{ fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <IconoMedioPago medio={m} tamano={20} ariaHidden />
+                    <span>{nombreMedio(m)}</span>
+                  </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span
                       className="dp-chip"
@@ -126,13 +130,19 @@ export function CapaPago({ pedido, esMesa, estaPagado, cambioCobroPendiente, alR
           ) : (
             <div className="dp-fila">
               <span>Medio de pago</span>
-              <strong>{medioTxt}</strong>
+              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <IconoMedioPago medio={medioTxt} tamano={20} ariaHidden />
+                <span>{medioTxt}</span>
+              </strong>
             </div>
           )}
           {plan.length > 0 && (
             <div className="dp-fila" style={{ fontSize: 14 }}>
               <span>Medio de pago</span>
-              <strong>{medioTxt}</strong>
+              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <IconoMedioPago medio={medioTxt} tamano={18} ariaHidden />
+                <span>{medioTxt}</span>
+              </strong>
             </div>
           )}
 

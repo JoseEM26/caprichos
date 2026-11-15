@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 import {
   MAX_MEDIOS_PLAN,
   aPlan,
@@ -195,8 +196,10 @@ export function PasoPagoPedido({
                       disabled={usado}
                       className={activo ? 'np2-medio np2-medio--on' : 'np2-medio'}
                       onClick={() => cambiarFila(i, { medio: m.id as MedioPlan })}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     >
-                      {m.nombre}
+                      <IconoMedioPago medio={m.id} tamano={20} ariaHidden />
+                      <span>{m.nombre}</span>
                     </button>
                   );
                 })}

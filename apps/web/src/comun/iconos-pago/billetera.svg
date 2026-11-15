@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28" width="32" height="28" fill="none" role="img" aria-label="Billetera digital">
+  <rect x="2" y="5" width="28" height="20" rx="3.5" fill="#0B2C3E" stroke="#1E3A5F" stroke-width="1.2"/>
+  <!-- Tarjetas saliendo de la billetera -->
+  <path d="M6 5V3C6 1.895 6.895 1 8 1H24C25.105 1 26 1.895 26 3V5" fill="#F59E0B"/>
+  <path d="M9 5V3.5H23V5" fill="#10B981"/>
+  <!-- Solapa de cierre con broche -->
+  <path d="M19 11H29.5C30.328 11 31 11.672 31 12.5V17.5C31 18.328 30.328 19 29.5 19H19V11Z" fill="#1E3A5F"/>
+  <circle cx="25" cy="15" r="1.8" fill="#F59E0B"/>
+</svg>

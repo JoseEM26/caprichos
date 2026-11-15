@@ -5,6 +5,7 @@ import type { Pedido } from './pedidosApi';
 import { COLUMNAS_CAJA } from './columnasCaja';
 import { estadoVisual } from './estadosCaja';
 import { mediosDePedido, montosPorMedio, nombreMedio, MEDIOS_FILTRO } from './mediosFila';
+import { IconoMedioPago } from '../../comun/IconoMedioPago';
 
 const soles = (n: number) => `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const anulado = (p: Pedido) => ['ANULADO', 'RECHAZADO'].includes(String(p.estado).toUpperCase());
@@ -48,7 +49,12 @@ const Fila = memo(function Fila({ p, columnas, alVerDetalle }: { p: Pedido; colu
         if (id === 'estado') contenido = <span className="cj2-tb-chip" style={{ background: v.bg, color: v.fg }}>{v.l}</span>;
         if (id === 'medios') {
           const m = mediosDePedido(p);
-          contenido = m.length ? m.map((x) => <span key={x} className="cj2-tb-chip cj2-tb-medio" data-medio={x}>{nombreMedio(x)}</span>) : '';
+          contenido = m.length ? m.map((x) => (
+            <span key={x} className="cj2-tb-chip cj2-tb-medio" data-medio={x} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <IconoMedioPago medio={x} tamano={15} ariaHidden />
+              <span>{nombreMedio(x)}</span>
+            </span>
+          )) : '';
         }
         return (
           <td key={id} className={c.numerica ? 'cj2-tb-num' : undefined} data-col={id} title={typeof contenido === 'string' ? contenido : undefined}>
@@ -94,7 +100,10 @@ export function TablaCaja({ filas, todas, columnas, alVerDetalle }: TablaCajaPro
         <span data-testid="total-filtro">Total <strong>{soles(totales.total)}</strong></span>
         {totales.propina > 0 && <span>Propinas <strong>{soles(totales.propina)}</strong></span>}
         {medios.map((m) => (
-          <span key={m.id} data-testid={`total-medio-${m.id}`}>{m.n} <strong>{soles(totales.porMedio[m.id])}</strong></span>
+          <span key={m.id} data-testid={`total-medio-${m.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <IconoMedioPago medio={m.id} tamano={15} ariaHidden />
+            <span>{m.n}</span> <strong>{soles(totales.porMedio[m.id])}</strong>
+          </span>
         ))}
         <span className="cj2-tabla-nota">Sin anulados ni rechazados</span>
       </div>
