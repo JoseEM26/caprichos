@@ -31,7 +31,7 @@ export class CambiarEstadoDto {
 
   /** Con DEVOLVER: medio de la devolución, monto devuelto y código de operación (no efectivo). */
   @IsOptional()
-  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'])
+  @IsIn(['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA', 'CULQI'])
   devolucionMedio?: string;
 
   @IsOptional()

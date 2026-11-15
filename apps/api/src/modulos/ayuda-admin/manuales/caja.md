@@ -115,6 +115,9 @@ Ver tambien: [[cierre]]
 4. Si el control de almacen esta encendido y el pedido ya gasto insumos, aparece "Se llego a preparar?". Elegir "Si": los ingredientes quedan como merma (es lo normal si no eliges). Elegir "No, nunca se preparo": los ingredientes vuelven al stock de Cocina. Con el control apagado esta pregunta no aparece.
 5. En la ventana de confirmacion con la pregunta ¿Confirmas anular el pedido?, pulsar Si, anular.
 6. Si el cobro es de una caja que ya se cerro, solo el Administrador puede anularlo: pulsar "Anular de todos modos (caja cerrada)" y escribir un motivo de al menos 10 caracteres. El pedido vuelve a por cobrar y, si el cobro fue en efectivo, se registra un egreso de ajuste en la caja de hoy (que debe estar abierta). La caja cerrada no cambia.
+7. Si el pedido ya estaba pagado, la ventana pregunta que pasa con el dinero. Si se pago en linea con Culqi, la primera opcion es "Devolver por Culqi (a la tarjeta/Yape del cliente) - recomendado": el pedido se anula y Culqi devuelve el dinero al cliente. Tambien puedes elegir devolver en Efectivo, Yape, Plin, Transferencia o Tarjeta (en efectivo sale de la caja de hoy, que debe estar abierta; Culqi no interviene).
+8. El reembolso real por Culqi lo hace el Administrador. Si anula Caja, el pedido se anula y la devolucion queda "Pendiente de aprobacion del admin": el administrador la ve en la campanita y la aprueba con "Aprobar y devolver por Culqi" en Pedidos, Cancelados por no recibir. Si Culqi falla, el pedido queda anulado y la devolucion pendiente: el administrador pulsa "Reintentar devolucion por Culqi". Cada devolucion muestra su estado y los ultimos caracteres del reembolso.
+9. Un pedido con devolucion por Culqi no se puede revertir (el dinero ya salio o esta por salir): hay que crear un pedido nuevo.
 Ver tambien: [[historial]]
 
 ## Como se hace: Crear un pedido directo en mesa o mostrador

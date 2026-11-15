@@ -16,6 +16,8 @@ export interface PanelNoEntregadosProps {
   puedeDevolver?: boolean;
   /** ADMIN o SUPERVISOR: «No corresponde devolver» (lo saca de la lista sin mover dinero). */
   puedeDescartar?: boolean;
+  /** Solo ADMIN: ejecuta o reintenta la devolución por Culqi */
+  puedeEjecutarCulqi?: boolean;
   alActualizar: () => void;
 }
 
@@ -25,6 +27,13 @@ const MEDIO_TEXTO: Record<string, string> = {
   PLIN: 'Plin',
   TRANSFERENCIA: 'Transferencia',
   TARJETA: 'Tarjeta',
+  CULQI: 'Culqi',
+};
+
+const TEXTO_ESTADO_CULQI: Record<string, string> = {
+  PENDIENTE_APROBACION: 'Pendiente de aprobación del admin',
+  PENDIENTE: 'Pendiente, reintentar',
+  FALLIDA: 'Falló, reintentar',
 };
 
 function cuandoDevolvio(iso: string) {
@@ -37,7 +46,11 @@ function cuandoDevolvio(iso: string) {
 function textoDevuelto(d: DevolucionRegistrada) {
   const quien = d.porNombre ?? 'Sin nombre';
   const autorizo = d.autorizadoPorNombre && d.autorizadoPorNombre !== d.porNombre ? `, autorizó ${d.autorizadoPorNombre}` : '';
-  return `Devuelto S/ ${d.montoDevuelto.toFixed(2)} · ${MEDIO_TEXTO[d.medio] ?? d.medio} · ${quien}${autorizo} · ${cuandoDevolvio(d.creadoEn)}`;
+  const pendiente = d.estado && d.estado !== 'HECHA' ? TEXTO_ESTADO_CULQI[d.estado] : null;
+  const reembolso = d.culqiReembolso ? ` · reembolso …${d.culqiReembolso}` : '';
+  const error = pendiente && d.errorCulqi ? ` (${d.errorCulqi})` : '';
+  const monto = d.montoDevuelto.toFixed(2);
+  return `${pendiente ? `Por devolver S/ ${monto} por Culqi — ${pendiente}${error}` : `Devuelto S/ ${monto} · ${MEDIO_TEXTO[d.medio] ?? d.medio}${reembolso}`} · ${quien}${autorizo} · ${cuandoDevolvio(d.creadoEn)}`;
 }
 
 const TEXTO_PREGUNTA: Record<PreguntaNoEntregado, string> = {
@@ -78,7 +91,7 @@ const estiloBoton = {
   alignSelf: 'flex-start' as const,
 };
 
-export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puedeDevolver = false, puedeDescartar = false, alActualizar }: PanelNoEntregadosProps) {
+export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puedeDevolver = false, puedeDescartar = false, puedeEjecutarCulqi = false, alActualizar }: PanelNoEntregadosProps) {
   const [confirmar, setConfirmar] = useState<NoEntregado | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
@@ -103,6 +116,20 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
       alActualizar();
     } catch (e: any) {
       setErrorDescarte(e?.message || 'No se pudo guardar. Intenta de nuevo.');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const ejecutarCulqi = async (p: NoEntregado) => {
+    setProcesando(true);
+    setErrorAccion(null);
+    try {
+      const r = await pedidosApi.ejecutarDevolucionCulqi(p.id);
+      if (r.estado !== 'HECHA') setErrorAccion(`Culqi no devolvió el dinero${r.error ? `: ${r.error}` : ''}. Se puede reintentar.`);
+      alActualizar();
+    } catch (e: any) {
+      setErrorAccion(e?.message || 'No se pudo devolver por Culqi. Intenta de nuevo.');
     } finally {
       setProcesando(false);
     }
@@ -226,6 +253,18 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
           <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
             Aún no responde. Si dice que sí, aparece aquí el botón para reenviarlo.
           </div>
+        )}
+
+        {grupo === 'cancelados' && puedeEjecutarCulqi && p.devolucion && p.devolucion.medio === 'CULQI' && p.devolucion.estado && p.devolucion.estado !== 'HECHA' && (
+          <button
+            type="button"
+            data-testid={`culqi-${p.codigo}`}
+            style={estiloBoton}
+            disabled={procesando}
+            onClick={() => ejecutarCulqi(p)}
+          >
+            {p.devolucion.estado === 'PENDIENTE_APROBACION' ? 'Aprobar y devolver por Culqi' : 'Reintentar devolución por Culqi'}
+          </button>
         )}
 
         {grupo === 'cancelados' && p.revisar_devolucion && !p.devolucion && puedeDevolver && (

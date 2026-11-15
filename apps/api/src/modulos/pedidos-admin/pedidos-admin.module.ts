@@ -39,10 +39,11 @@ import { HistorialCajaPedidoService } from './historial-caja-pedido.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 import { ReservasModule } from '../reservas/reservas.module';
 import { PedidosProgramadosService } from './pedidos-programados.service';
+import { DevolucionCulqiModule } from '../pagos-online/devolucion-culqi.module';
 import { PedidosProgramadosTarea } from './pedidos-programados.tarea';
 
 @Module({
-  imports: [ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule, ReservasModule],
+  imports: [DevolucionCulqiModule, ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule, ReservasModule],
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,

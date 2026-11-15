@@ -44,7 +44,7 @@ describe('PedidosEstadoService.listarNoEntregados', () => {
 
     await service.listarNoEntregados();
 
-    const [filtro, alcance] = prisma.pedido.findMany.mock.calls[1][0].where.AND;
+    const [filtro, alcance] = prisma.pedido.findMany.mock.calls[1][0].where.OR[0].AND;
     const where = filtro;
     expect(where.estado).toBe('ANULADO');
     // Hoy, o de días anteriores solo si estaban pagados y falta registrar la devolución

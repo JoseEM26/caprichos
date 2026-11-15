@@ -186,6 +186,8 @@ export interface Pedido {
   cobro_vigente_id?: string | number | null;
   /** Solo con el Control de almacén encendido y el pedido con consumo de insumos registrado: al anular hay que decidir. */
   tieneConsumoAlmacen?: boolean;
+  /** Pago aprobado por Culqi con dinero por devolver (S/): el diálogo de anular ofrece «Devolver por Culqi» */
+  pagoCulqi?: { restante: number } | null;
   /** Último cambio de pago (Caja, mozo o repartidor): quién, cuándo y «Pago modificado: antes → ahora» */
   ajustePago?: { por: string | null; en: string; texto: string } | null;
   /** Número del día en cocina (referencial); null si no llegó a cocina */
@@ -298,6 +300,11 @@ export interface DevolucionRegistrada {
   porNombre: string | null;
   autorizadoPorNombre: string | null;
   comprobanteBajaEstado: string | null;
+  /** HECHA o, solo en devoluciones por Culqi: PENDIENTE_APROBACION, PENDIENTE, FALLIDA */
+  estado?: 'HECHA' | 'PENDIENTE_APROBACION' | 'PENDIENTE' | 'FALLIDA';
+  /** Últimos caracteres del id del reembolso de Culqi */
+  culqiReembolso?: string | null;
+  errorCulqi?: string | null;
   creadoEn: string;
 }
 
@@ -513,6 +520,11 @@ export const pedidosApi = {
     datos: { montoDevuelto: number; medio: string; codigoOperacion?: string; motivo?: string },
   ): Promise<RegistroDevolucion> {
     return api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos);
+  },
+
+  /** Ejecuta o reintenta la devolución por Culqi de un pedido anulado (solo ADMIN). */
+  async ejecutarDevolucionCulqi(id: string | number): Promise<{ estado: string; error?: string }> {
+    return api.post<{ estado: string; error?: string }>(`/admin/pedidos/${id}/devolucion/culqi`, {});
   },
 
   /** «No corresponde devolver»: saca el pedido de las devoluciones pendientes sin mover dinero (ADMIN/SUPERVISOR). */

@@ -113,3 +113,43 @@ describe('Revertir un pedido anulado', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/supervisor/);
   });
 });
+
+describe('Anular un pedido pagado con Culqi', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('sin pago Culqi aprobado no aparece la opción «Devolver por Culqi»', () => {
+    abrir(pedido());
+    fireEvent.click(screen.getByLabelText(/Se devuelve al cliente/i));
+    expect(screen.queryByRole('option', { name: /Devolver por Culqi/i })).toBeNull();
+  });
+
+  it('con pago Culqi aprobado es la primera opción y viene elegida; no pide código y envía CULQI', async () => {
+    const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
+    abrir(pedido({ pagoCulqi: { restante: 40 } }));
+    fireEvent.click(screen.getByLabelText(/Se devuelve al cliente/i));
+    const opciones = screen.getAllByRole('option');
+    expect(opciones[1]).toHaveTextContent(/Devolver por Culqi.*recomendado/i);
+    expect((screen.getByLabelText(/Medio de la devolución/i) as HTMLSelectElement).value).toBe('CULQI');
+    expect(screen.queryByLabelText(/Código de operación/i)).toBeNull();
+    expect(screen.getByTestId('nota-culqi')).toHaveTextContent(/pendiente de aprobación/i);
+    confirmar();
+    await waitFor(() =>
+      expect(cambiar).toHaveBeenCalledWith('10', 'ANULADO', 'Cliente no recibió', undefined, undefined, undefined, {
+        destinoDinero: 'DEVOLVER', devolucionMedio: 'CULQI', devolucionMonto: 40,
+      }),
+    );
+  });
+
+  it('con pago Culqi también se puede devolver en efectivo (no se manda a Culqi)', async () => {
+    const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
+    abrir(pedido({ pagoCulqi: { restante: 40 } }));
+    fireEvent.click(screen.getByLabelText(/Se devuelve al cliente/i));
+    fireEvent.change(screen.getByLabelText(/Medio de la devolución/i), { target: { value: 'EFECTIVO' } });
+    confirmar();
+    await waitFor(() =>
+      expect(cambiar).toHaveBeenCalledWith('10', 'ANULADO', 'Cliente no recibió', undefined, undefined, undefined, {
+        destinoDinero: 'DEVOLVER', devolucionMedio: 'EFECTIVO', devolucionMonto: 40,
+      }),
+    );
+  });
+});

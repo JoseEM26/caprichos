@@ -487,9 +487,15 @@ export class PedidosEstadoService {
       // (antes salían todos, de cualquier día, aunque ya no hubiera nada que hacer).
       this.prisma.pedido.findMany({
         where: {
-          AND: [
-            FILTRO_CANCELADO_NO_RECIBIR,
-            { OR: [{ anulado_en: { gte: inicioHoyLima() } }, { pago_estado: { in: PAGOS_DEVOLVIBLES }, devolucion: { is: null }, devolucion_descartada_en: null }] },
+          OR: [
+            {
+              AND: [
+                FILTRO_CANCELADO_NO_RECIBIR,
+                { OR: [{ anulado_en: { gte: inicioHoyLima() } }, { pago_estado: { in: PAGOS_DEVOLVIBLES }, devolucion: { is: null }, devolucion_descartada_en: null }] },
+              ],
+            },
+            // Anulado con devolución por Culqi sin completar (pendiente de aprobación, pendiente o fallida): el admin la ejecuta aquí
+            { estado: 'ANULADO', devolucion: { is: { medio: 'CULQI', estado: { not: 'HECHA' } } } },
           ],
         },
         include: { ...incluir, devolucion: true },
@@ -1045,9 +1051,15 @@ export class PedidosEstadoService {
     }
     // Solo con el control de almacén encendido y consumo registrado; si no, la respuesta no cambia
     const tieneConsumoAlmacen = (await this.consumoAlmacen?.tieneConsumo(pedido.id)) === true;
+    // Pago aprobado por Culqi con algo por devolver: el diálogo de anular ofrece «Devolver por Culqi»
+    const intentoCulqi = await this.prisma.pagoOnlineIntento
+      ?.findFirst({ where: { pedido_id: pedido.id, estado: { in: ['APROBADO', 'DEVUELTO'] }, culqi_cargo_id: { not: null } }, orderBy: { id: 'desc' }, select: { monto_centimos: true, devuelto_centimos: true } })
+      .catch(() => null);
+    const pagoCulqi = intentoCulqi && intentoCulqi.monto_centimos > intentoCulqi.devuelto_centimos ? { restante: (intentoCulqi.monto_centimos - intentoCulqi.devuelto_centimos) / 100 } : null;
     return {
       ...pedidoSinIncidentes,
       ...(tieneConsumoAlmacen ? { tieneConsumoAlmacen: true } : {}),
+      ...(pagoCulqi ? { pagoCulqi } : {}),
       canjePuntos,
       ajustePago,
       lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
@@ -1182,11 +1194,13 @@ export class PedidosEstadoService {
       const aprobadoPor = usuarioActual.partyId;
 
       // Pedido ya pagado: no se anula sin decidir qué pasa con el dinero (devolverlo o reprogramar el pedido)
+      let devolviendoDinero = false;
       if (this.anulacionPagado && (await this.anulacionPagado.estaPagado(pedido))) {
         const destino = await this.anulacionPagado.resolver(pedido, dto, motivo, usuarioActual, ip);
         if (destino === 'REPROGRAMADO') {
           return { ...(await this.prisma.pedido.findUnique({ where: { id: pedido.id } })), reprogramado: true };
         }
+        devolviendoDinero = true;
       }
 
       // Un pedido cobrado y aún sin entregar: primero se anula su cobro (el mismo flujo de Caja: sale del arqueo
@@ -1233,6 +1247,9 @@ export class PedidosEstadoService {
           data: { estado: 'CANCELADA', motivo_cancelacion: `Pedido anulado: ${motivo}`.slice(0, 250) },
         });
       }
+
+      // Devolución por Culqi (ADMIN): el reembolso se pide recién con el pedido ya anulado; si Culqi falla queda pendiente de reintento
+      if (devolviendoDinero) await this.anulacionPagado?.ejecutarCulqiAlAnular(pedido.id, usuarioActual, ip);
 
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
       await this.devolverAlAnular(pedido.id, pedido.codigo, usuarioActual?.partyId, ip);

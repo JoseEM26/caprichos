@@ -143,3 +143,33 @@ describe('PanelNoEntregados', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Sin conexión');
   });
 });
+
+describe('PanelNoEntregados: devolución por Culqi', () => {
+  const conCulqi = (estado: 'PENDIENTE_APROBACION' | 'HECHA'): RespuestaNoEntregados => ({
+    reprogramar: [],
+    total: 1,
+    cancelados: [
+      fila({
+        id: '9', codigo: 'CP-CQ', pregunta: 'SIN_PREGUNTA', pago_estado: 'PAGADO',
+        devolucion: { id: '1', montoDevuelto: 40, medio: 'CULQI', motivo: null, porNombre: 'Ana', autorizadoPorNombre: 'Ana', comprobanteBajaEstado: null, estado, culqiReembolso: estado === 'HECHA' ? 'ab12cd' : null, creadoEn: '2026-11-01T10:00:00Z' },
+      }),
+    ],
+  });
+  const montar = (d: RespuestaNoEntregados, admin: boolean) =>
+    render(<PanelNoEntregados datos={d} cargando={false} error="" puedeLiquidar={false} puedeEjecutarCulqi={admin} alActualizar={vi.fn()} />);
+
+  it('pendiente de aprobación: el admin ve el botón; quien no es admin solo ve el estado', () => {
+    const { unmount } = montar(conCulqi('PENDIENTE_APROBACION'), true);
+    expect(screen.getByTestId('devuelto-CP-CQ')).toHaveTextContent(/Pendiente de aprobación del admin/);
+    expect(screen.getByTestId('culqi-CP-CQ')).toHaveTextContent(/Aprobar y devolver por Culqi/);
+    unmount();
+    montar(conCulqi('PENDIENTE_APROBACION'), false);
+    expect(screen.queryByTestId('culqi-CP-CQ')).toBeNull();
+  });
+
+  it('hecha: muestra los últimos caracteres del reembolso y no hay botón', () => {
+    montar(conCulqi('HECHA'), true);
+    expect(screen.getByTestId('devuelto-CP-CQ')).toHaveTextContent(/reembolso …ab12cd/);
+    expect(screen.queryByTestId('culqi-CP-CQ')).toBeNull();
+  });
+});
