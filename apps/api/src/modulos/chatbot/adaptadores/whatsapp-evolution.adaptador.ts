@@ -4,6 +4,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmascarar.util';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { textoDePlantilla } from '../catalogo/texto-plantilla';
+import { destinoEvolution } from '../evolution/evolution-mensaje.util';
 import { aTextoNumerado } from '../evolution/menu-numerado.util';
 import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
 import { escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
@@ -52,7 +53,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
       : { conectado: false, modo: 'simulado', razon: 'Evolution sin configurar (modo simulado, no se envía nada)' };
   }
 
-  private numero = (telefono: string) => telefono.replace(/\D/g, '');
+  private numero = (telefono: string) => destinoEvolution(telefono);
 
   /** Un envío a la vez, separados por una pausa aleatoria. */
   private turno<T>(fn: () => Promise<T>, minSeg: number, maxSeg: number): Promise<T> {
@@ -221,7 +222,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
       return { exito: false, estado: 'FALLIDO', errorCodigo: 'EVOLUTION_PAUSADO', errorDetalle: 'El envío por Evolution está en pausa' };
     }
     const r = await this.api.llamar('POST', `/message/sendReaction/${encodeURIComponent(this.api.instancia)}`, {
-      key: { remoteJid: `${this.numero(telefono)}@s.whatsapp.net`, fromMe: false, id: waMessageId },
+      key: { remoteJid: this.numero(telefono).includes('@') ? this.numero(telefono) : `${this.numero(telefono)}@s.whatsapp.net`, fromMe: false, id: waMessageId },
       reaction: emoji,
     });
     if (r.ok) return { exito: true, estado: 'ENVIADO', waMessageId: r.data?.key?.id };

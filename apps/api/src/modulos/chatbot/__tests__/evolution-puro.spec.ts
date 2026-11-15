@@ -51,7 +51,7 @@ describe('normalizar messages.upsert de Evolution', () => {
     expect(normalizarMensajeEvolution({ key: clave({ fromMe: true }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'PROPIO' });
     expect(normalizarMensajeEvolution({ key: clave({ remoteJid: '1203630@g.us' }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'GRUPO' });
     expect(normalizarMensajeEvolution({ key: clave({ remoteJid: 'status@broadcast' }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'ESTADO' });
-    expect(normalizarMensajeEvolution({ key: clave({ remoteJid: '9988@lid' }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'SIN_NUMERO' });
+    expect(normalizarMensajeEvolution({ key: clave({ remoteJid: 'raro@otro' }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'SIN_NUMERO' });
     expect(normalizarMensajeEvolution({ key: clave({ id: '' }), message: { conversation: 'x' } })).toEqual({ ok: false, razon: 'SIN_ID' });
   });
   it('un @lid con número alterno se usa', () => {

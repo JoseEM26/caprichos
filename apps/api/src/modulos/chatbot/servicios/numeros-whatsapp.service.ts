@@ -30,7 +30,7 @@ export function destinoBloqueo(tel: unknown): string {
   if (!raw) return '';
   if (/^wa-user:/i.test(raw) || raw.includes('.')) {
     const id = raw.toLowerCase().replace(/\s+/g, '');
-    return /^[a-z0-9:._-]{3,40}$/.test(id) ? id : '';
+    return /^[a-z0-9:._@-]{3,40}$/.test(id) ? id : '';
   }
   const d = raw.replace(/\D/g, '').replace(/^0+/, '');
   if (d.length === 11 && d.startsWith('519')) return d.slice(2);
@@ -52,6 +52,16 @@ const TTL_MS = 30_000;
 export function listaBlancaEnvio(env: NodeJS.ProcessEnv = process.env): Set<string> | null {
   const crudo = (env.WHATSAPP_SOLO_NUMEROS ?? '').trim();
   return crudo ? new Set(listaCelulares(crudo)) : null;
+}
+
+/**
+ * WHATSAPP_PERMITIR_LID_SIN_NUMERO=si: con lista blanca activa, también se responde a quien WhatsApp solo identifica
+ * con un LID (Evolution no entrega su número). Un LID solo se conoce porque esa persona escribió al bot, así que
+ * ningún aviso saliente puede apuntarle por su cuenta; pero cualquiera que escriba al número de prueba recibe respuesta.
+ * Por defecto 'no' (falla cerrado).
+ */
+export function permiteLidSinNumero(env: NodeJS.ProcessEnv = process.env): boolean {
+  return /^(si|sí|true|1)$/i.test((env.WHATSAPP_PERMITIR_LID_SIN_NUMERO ?? '').trim());
 }
 
 type UsuarioBasico = { partyId?: any; nombre?: string; usuario?: string } | undefined;
@@ -110,7 +120,8 @@ export class NumerosWhatsappService {
     const c = celular9(tel);
     const d = destinoBloqueo(tel);
     const blanca = listaBlancaEnvio();
-    if (blanca && !(c && blanca.has(c))) return 'DESTINO_FUERA_DE_LISTA_BLANCA';
+    // Un LID sin número no se puede comparar con la lista blanca: solo pasa si WHATSAPP_PERMITIR_LID_SIN_NUMERO=si
+    if (blanca && !(c && blanca.has(c)) && !(/@lid$/i.test(String(tel ?? '').trim()) && permiteLidSinNumero())) return 'DESTINO_FUERA_DE_LISTA_BLANCA';
     if (!c && !d) return null;
     try {
       const { propios, bloqueados } = await this.cargar();

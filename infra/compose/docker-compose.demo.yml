@@ -51,6 +51,10 @@ services:
       # Seguridad de la demo: la base trae celulares reales. Solo escribe a estos números (Meta y Evolution);
       # sin valor en el .env queda «ninguno» = no sale ningún WhatsApp. Lista separada por comas, 51XXXXXXXXX.
       WHATSAPP_SOLO_NUMEROS: ${WHATSAPP_SOLO_NUMEROS:-ninguno}
+      # Evolution a veces solo entrega el LID (identificador anonimo) y no el numero de quien escribe. Con 'si' el bot
+      # responde a ese LID aunque haya lista blanca (solo respuestas: un LID solo se conoce porque escribio); cualquiera
+      # que escriba al numero de prueba recibe respuesta. Solo demo; el codigo por defecto es 'no'.
+      WHATSAPP_PERMITIR_LID_SIN_NUMERO: ${WHATSAPP_PERMITIR_LID_SIN_NUMERO:-si}
       # Evolution API (WhatsApp no oficial, solo pruebas): lo escribe la acción instalar-evolution. Sin valores = simulado.
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}

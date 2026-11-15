@@ -19,17 +19,33 @@ function desenvolver(message: any): any {
   return m;
 }
 
-/** Número del remitente: el jid normal, o el alterno cuando WhatsApp manda un identificador interno (@lid). */
+/** ¿Es un identificador anónimo de WhatsApp (LID), con o sin el prefijo «wa-user:» del sistema? */
+export const esLid = (v: unknown): boolean => /@lid$/i.test(String(v ?? '').trim());
+
+/**
+ * Destino que Evolution entiende: un LID se manda completo («<digitos>@lid»; createJid de Evolution 2.3.7 lo deja tal cual),
+ * un teléfono va solo con dígitos.
+ */
+export function destinoEvolution(tel: string): string {
+  const limpio = String(tel ?? '').trim().replace(/^wa-user:/i, '');
+  return esLid(limpio) ? `${soloDigitos(limpio)}@lid` : soloDigitos(limpio);
+}
+
+/**
+ * Remitente: el número (jid normal o alterno remoteJidAlt/participantAlt/senderPn) o, si WhatsApp solo entrega el
+ * identificador interno y Evolution no trae el número, el propio LID «<digitos>@lid» (se responde a ese LID, sin número).
+ */
 function numeroDe(key: any, data: any): string {
   const jid = String(key?.remoteJid ?? '');
   if (jid.endsWith('@s.whatsapp.net')) return soloDigitos(jid.split('@')[0]);
-  const alterno = [key?.remoteJidAlt, key?.senderPn, data?.senderPn].find((x) => typeof x === 'string' && x.endsWith('@s.whatsapp.net'));
-  return alterno ? soloDigitos(String(alterno).split('@')[0]) : '';
+  const alterno = [key?.remoteJidAlt, key?.participantAlt, key?.senderPn, data?.senderPn].find((x) => typeof x === 'string' && x.endsWith('@s.whatsapp.net'));
+  if (alterno) return soloDigitos(String(alterno).split('@')[0]);
+  return jid.endsWith('@lid') && soloDigitos(jid) ? `${soloDigitos(jid)}@lid` : '';
 }
 
 /**
  * messages.upsert de Evolution → mensaje con la forma que ya procesa el webhook de Meta (type, text.body, image.id, ...).
- * Ignora lo propio (fromMe), los grupos, los estados y a quien no tiene número visible.
+ * Ignora lo propio (fromMe), los grupos, los estados y a quien no trae ni número ni LID.
  */
 export function normalizarMensajeEvolution(data: any): ResultadoNormalizado {
   const key = data?.key ?? {};
