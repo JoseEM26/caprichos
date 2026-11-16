@@ -22,6 +22,7 @@ import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
 import { ServiciosLibresCierre } from './ServiciosLibresCierre';
+import { ProgramadosCierre } from './ProgramadosCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -909,6 +910,9 @@ export function CierreView() {
 
               {/* Servicios y productos libres del turno: de dónde salió ese dinero (ya está dentro de los cobros) */}
               {esperado && <ServiciosLibresCierre datos={esperado.serviciosLibres} />}
+
+              {/* Pedidos programados: adelantos y pagos recibidos hoy (ya están dentro de los cobros) */}
+              {esperado && <ProgramadosCierre datos={esperado.programadosDelTurno} />}
 
               {/* Movimientos de caja */}
               <div

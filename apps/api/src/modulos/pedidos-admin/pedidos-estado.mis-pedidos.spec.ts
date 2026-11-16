@@ -92,6 +92,8 @@ describe('PedidosEstadoService.misPedidos', () => {
     expect(res.pedidos[0]).toEqual({
       id: '3',
       codigo: 'CP-M001',
+      programadoPara: null,
+      adelantoTotal: 0,
       estado: 'EN_CAMINO',
       propina: 0,
       modalidad: 'MESA',

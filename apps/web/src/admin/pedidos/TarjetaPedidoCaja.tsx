@@ -15,6 +15,8 @@ import type { AccionCaja } from './accionesCaja';
 import { ReimprimirPedido } from './ReimprimirPedido';
 import { itemsCaja, textoDetalle, MAX_PRODUCTOS_TARJETA, type ItemCaja } from './detalleCaja';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
+import { BloqueEncargoTarjeta, ChipProgramado } from './ProgramadoInfo';
+import { esCargoLibre } from './ModalCargoLibre';
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
@@ -103,7 +105,9 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const conMesa = !!o.mesa_nombre?.trim() && (clave === 'MESA' || /^en espera/i.test(o.mesa_nombre));
   const nombreCompleto = o.cliente_nombre?.trim() || 'Cliente';
   const lineas = o.lineas || [];
-  const items = itemsCaja(lineas);
+  // Lo libre («Servicio / encargo») va en su bloque aparte; los productos de la carta, en su lista
+  const items = itemsCaja(lineas.filter((l) => !esCargoLibre(l)));
+  const hayEncargo = lineas.some((l) => esCargoLibre(l));
   const esDelivery = clave === 'DELIVERY';
   const sinUbicacion = esDelivery && deliverySinUbicacion(o);
   const lugar = esDelivery ? (sinUbicacion ? MARCA_FALTA_UBICACION : o.entrega_direccion || null) : null;
@@ -126,7 +130,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
             {conMesa && <InsigniaMesa mesaNombre={o.mesa_nombre} grande />}
             <NombreCliente pedido={o} />
           </span>
-          <PastillaEspera creadoEn={o.creado_en} cerrado={cerrado} ahora={ahora} />
+          <PastillaEspera creadoEn={o.creado_en} cerrado={cerrado || o.estado === 'PROGRAMADO'} ahora={ahora} />
         </span>
 
         <span className="cj2-mod">
@@ -149,8 +153,12 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
           </span>
         )}
 
+        <ChipProgramado pedido={o} ahora={ahora != null ? new Date(ahora) : undefined} />
+
+        <BloqueEncargoTarjeta lineas={lineas} />
+
         <span className="cj2-prods" data-testid="productos-tarjeta">
-          {items.length === 0 && <span className="cj2-prod-nombre">1 producto</span>}
+          {items.length === 0 && !hayEncargo && <span className="cj2-prod-nombre">1 producto</span>}
           {items.slice(0, MAX_PRODUCTOS_TARJETA).map((it) => (
             <ProductoTarjeta key={it.id} it={it} />
           ))}

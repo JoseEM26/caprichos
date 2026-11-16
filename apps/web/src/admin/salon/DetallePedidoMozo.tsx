@@ -11,6 +11,7 @@ import { errorCelular } from '../pedidos/ModalCorregirCliente';
 import { pedidosApi, type Pedido } from '../pedidos/pedidosApi';
 import { ModalDarCupon } from '../ofertas/ModalDarCupon';
 import { ModalCargoLibre, esCargoLibre, etiquetaCargoLibre, type CargoLibreDatos } from '../pedidos/ModalCargoLibre';
+import { ChipProgramado } from '../pedidos/ProgramadoInfo';
 import type { AreaProgreso, MiPedido } from './tipos';
 import './detalle-pedido-mozo.css';
 
@@ -41,6 +42,9 @@ function SeccionPedido({ p, extra }: { p: MiPedido; extra: boolean }) {
         <span className="dpm-chip">{ESTADO_TXT[p.estado] ?? p.estado}</span>
         <strong className="dpm-der">{soles(p.total)}</strong>
       </div>
+      {p.programadoPara && (
+        <ChipProgramado pedido={{ estado: p.estado, programado_para: p.programadoPara, total: p.total, pago_estado: p.pagoEstado, adelanto_total: p.adelantoTotal }} />
+      )}
       {pr && (
         <>
           <div className="dpm-barra" role="progressbar" aria-label={`Avance en cocina de ${p.codigo}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>

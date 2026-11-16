@@ -24,6 +24,7 @@ import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
 import { useAvisoCobroPendiente } from './avisoCobroPendiente';
 import { esDeliveryContraEntrega } from './mediosPago';
 import { InsigniaModalidad } from './InsigniaModalidad';
+import { BloqueParaCuando, BloqueServicioEncargo } from './ProgramadoDetalle';
 import { InsigniaMesa } from './InsigniaMesa';
 import { esCerrado } from './estadosCaja';
 import { PastillaEspera } from './PastillaEspera';
@@ -374,7 +375,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                 <span className="dp-codigo">{pedido.codigo}</span> · {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)} · {hora}
               </div>
             </div>
-            <PastillaEspera creadoEn={pedido.creado_en} cerrado={esCerrado(pedido)} />
+            <PastillaEspera creadoEn={pedido.creado_en} cerrado={esCerrado(pedido) || est === 'PROGRAMADO'} />
             <div className="dp-total-cab" aria-label="Total del pedido">
               S/ {totalNum.toFixed(2)}
             </div>
@@ -421,6 +422,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
 
         {/* CUERPO: lo único que se desplaza */}
         <div className="dp-cuerpo" data-testid="dp-cuerpo">
+          <BloqueParaCuando pedido={pedido} puedeReprogramar={tiene('pedidos/crear')} alActualizar={alActualizar} />
+          <BloqueServicioEncargo pedido={pedido} />
           {sinUbicar && (
             <AvisoDeliverySinUbicacion
               pedidoId={String(pedido.id)}
