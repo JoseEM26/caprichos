@@ -66,7 +66,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
-import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, notaResumenAsesor } from './escalado-ia.util';
+import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
   motivoSalidaValidarPago,
@@ -1112,6 +1112,15 @@ export class EjecutorConversacionService {
       errorServicio = true;
     }
 
+    // Local cerrado: el aviso único lo da AutorespuestaWhatsappService; aquí el bot no conversa (ni «hola de nuevo» ni IA).
+    // Excepción: pedido en curso (últimas 24 h, no terminado) o pago por validar.
+    const terminado = ['ENTREGADO', 'ANULADO', 'CANCELADO', 'FINALIZADO', 'RECHAZADO'];
+    const enCursoCerrado = esValidarPago || String((flujoPrevio as any)?.estado ?? '').startsWith('PAGO') || (pedidoActivo && !terminado.includes(String(pedidoActivo.estado)));
+    if (!errorServicio && datosLocal && datosLocal.abierta === false && !datosLocal.pausaAltaDemanda && !enCursoCerrado) {
+      await this.registrarSilencio(conversacion.id, 'Local cerrado: el bot no conversa fuera del horario (ya se avisó la hora de apertura).');
+      return false;
+    }
+
     let minutosInactividad = 0;
     let inactividadExpirada = false;
     if (conversacion.ultima_actividad) {
@@ -1273,6 +1282,8 @@ export class EjecutorConversacionService {
     if (this.chatbotIaService) {
       try {
         chatbotIaActivo = await this.chatbotIaService.estaDisponible();
+        // Tope de turnos de IA seguidos: pasado el tope, el bot responde con su menú hasta que el cliente elija una opción
+        if (chatbotIaActivo && iaAgotada((flujoPrevio as any)?.ia_turnos, Boolean(entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId))) chatbotIaActivo = false;
       } catch (err: any) {
         this.logger.warn(`Error comprobando disponibilidad de IA: ${err.message}`);
       }
@@ -1775,7 +1786,12 @@ export class EjecutorConversacionService {
     const flujoPersistir: FlujoConversacion = {
       ...resultado.nuevoFlujo,
       ultimo_wa_message_id: entradaRaw.waMessageId || undefined,
-    };
+      ia_turnos: siguienteTurnosIa(
+        (flujoPrevio as any)?.ia_turnos,
+        Boolean(entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId),
+        resultado.acciones.some((a: any) => a.tipo === 'consultarIa'),
+      ),
+    } as FlujoConversacion;
 
     const dataUpdate: any = {
       flujo: flujoPersistir,

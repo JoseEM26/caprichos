@@ -159,8 +159,16 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
     expect(notasCreadas).toHaveLength(1);
   });
 
-  it('fuera de horario dice cuándo responderán', async () => {
+  it('fuera de horario y sin pedido en curso: silencio total (ni IA ni respuesta)', async () => {
     (service as any).localService.obtenerEstadoCarta.mockResolvedValue({ abierta: false, abre: '12:00', cierra: '23:00', texto: 'Cerrado' });
+    await cliente(CHAT[3]);
+    expect(ia.procesarConsulta).not.toHaveBeenCalled();
+    expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
+  });
+
+  it('fuera de horario con pedido en curso: sigue atendido y dice cuándo responderán', async () => {
+    (service as any).localService.obtenerEstadoCarta.mockResolvedValue({ abierta: false, abre: '12:00', cierra: '23:00', texto: 'Cerrado' });
+    prisma.pedido.findFirst.mockResolvedValue({ codigo: 'CP-0201', estado: 'COLA', cliente_telefono: '51987654321', creado_en: new Date(), total: 40, lineas: [] });
     await cliente(CHAT[3]);
     expect(mensajeria.enviarBotones.mock.calls[0][1]).toMatch(/fuera de horario.*12:00/);
   });

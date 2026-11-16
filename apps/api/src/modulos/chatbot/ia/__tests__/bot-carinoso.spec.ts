@@ -11,8 +11,8 @@ import { TEXTOS_BOT_DEFECTO } from '../../configuracion/chatbot-configuracion.ti
 
 describe('Capri cariñosa: prompt', () => {
   const prompt = conUrlCarta(construirPromptSistema('Ana', true), 'https://carta.ejemplo.pe');
-  it('pide emojis cariñosos (3 a 6) y no los moderados', () => {
-    expect(prompt).toContain('de 3 a 6');
+  it('pide uno o dos emojis como máximo, al grano', () => {
+    expect(prompt).toContain('uno o dos emojis como máximo');
     expect(prompt).not.toContain('moderados');
   });
   it('invita a la carta web con la URL completa y menciona promociones solo de la carta', () => {

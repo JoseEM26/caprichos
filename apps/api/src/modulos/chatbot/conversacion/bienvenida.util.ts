@@ -20,6 +20,8 @@ export function nombreParaSaludo(nombre: string | null | undefined): string {
 export interface DatosBienvenidaLocal {
   abierta?: boolean;
   abre?: string | null;
+  /** «hoy a las 14:00» o «mañana a las 09:00»: si viene, manda sobre `abre`. */
+  aperturaTexto?: string | null;
   textoEstado?: string | null;
   pausaAltaDemanda?: boolean;
   motivoPausa?: string | null;
@@ -109,11 +111,11 @@ export function armarBienvenida(nombre: string | null | undefined, datos: DatosB
   // Cerrado: dice la hora de apertura y NO invita a pedir (sin promociones ni «más descuento»)
   if (datos && datos.abierta === false) {
     const saludo = interpolar(t('chatbot_texto_bienvenida'), { ...base, promociones: '' }).trim();
-    const apertura = datos.abre ? `Abrimos hoy a las ${datos.abre}.` : 'Abrimos en nuestro próximo horario regular.';
+    const apertura = datos.aperturaTexto ? `Abrimos ${datos.aperturaTexto}.` : datos.abre ? `Abrimos hoy a las ${datos.abre}.` : 'Abrimos en nuestro próximo horario regular.';
     const cerrado = interpolar(t('chatbot_texto_fuera_horario'), {
       ...base,
       horario: datos.textoEstado || '',
-      hora_apertura: datos.abre || 'nuestro próximo horario',
+      hora_apertura: datos.aperturaTexto || datos.abre || 'nuestro próximo horario',
       apertura,
     });
     return `${saludo}\n\n${cerrado}`.slice(0, LIMITE_CUERPO_TEXTO);

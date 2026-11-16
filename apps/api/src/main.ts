@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { PinoLoggerService } from './comun/logger/pino-logger.service';
+import { limiteWebhookEvolutionMb, parserWebhookEvolution, RUTA_WEBHOOK_EVOLUTION } from './comun/limite-webhook-evolution';
 import { RedisIoAdapter } from './comun/socket/redis-io.adapter';
 
 // Los ids de la base son BigInt: salen como texto en el JSON
@@ -21,6 +22,8 @@ async function bootstrap() {
 
   const pinoLogger = app.get(PinoLoggerService);
   app.useLogger(pinoLogger);
+  // Cuerpos grandes (fotos/audios en base64, historial) SOLO en el webhook de Evolution; el límite global no cambia
+  app.use(RUTA_WEBHOOK_EVOLUTION, parserWebhookEvolution(limiteWebhookEvolutionMb(process.env.EVOLUTION_WEBHOOK_MAX_MB)));
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 

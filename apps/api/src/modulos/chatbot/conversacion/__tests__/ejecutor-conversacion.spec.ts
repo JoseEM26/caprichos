@@ -490,7 +490,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
 
   describe('5. Pruebas de ampliación (a) a (f): consumo real de BD y seguridad', () => {
 
-    it('(b) Disponibilidad: avisa si el local está cerrado con datos reales', async () => {
+    it('(b) Disponibilidad: cerrado sin pedido en curso, el motor calla (el aviso único lo da la autorespuesta)', async () => {
       mockLocalService.obtenerEstadoCarta.mockResolvedValueOnce({
         abierta: false,
         abre: '18:00',
@@ -508,13 +508,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       });
 
       await service.procesarMensajeEntrante(21n, { texto: 'hola' });
-      expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('Ahora estamos cerrados. Abrimos hoy a las 18:00.'),
-        expect.any(String),
-        expect.any(Array),
-        expect.any(Object),
-      );
+      expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
+      expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
     });
 
     it('(f) Fallo de servicio/BD notifica a Caja por la campana y responde con mensaje honesto', async () => {

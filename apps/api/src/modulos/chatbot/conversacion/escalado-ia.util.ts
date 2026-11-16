@@ -82,3 +82,17 @@ export function notaResumenAsesor(d: {
     .filter(Boolean)
     .join('\n');
 }
+
+/** Respuestas de IA seguidas (sin que el cliente toque el menú) tras las cuales el bot ofrece el menú y deja la IA. */
+export const TOPE_TURNOS_IA = 6;
+
+/** true si la IA ya no debe contestar: llegó al tope y el cliente escribe texto libre (un toque de menú la reactiva). */
+export function iaAgotada(turnosPrevios: number | undefined, eligioOpcion: boolean): boolean {
+  return !eligioOpcion && (turnosPrevios ?? 0) >= TOPE_TURNOS_IA;
+}
+
+/** Contador de turnos de IA seguidos: se reinicia al elegir una opción del menú y sube con cada consulta a la IA. */
+export function siguienteTurnosIa(turnosPrevios: number | undefined, eligioOpcion: boolean, consultoIa: boolean): number {
+  if (eligioOpcion) return 0;
+  return (turnosPrevios ?? 0) + (consultoIa ? 1 : 0);
+}

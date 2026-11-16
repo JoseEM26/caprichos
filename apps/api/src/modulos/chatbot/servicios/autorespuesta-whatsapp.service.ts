@@ -2,8 +2,9 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { LocalService } from '../../local/local.service';
-import { nombreParaSaludo } from '../conversacion/bienvenida.util';
+import { armarBienvenida, nombreParaSaludo } from '../conversacion/bienvenida.util';
 import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esSaludo } from '../conversacion/cortesia-entrante.util';
+import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
 import { horarioDelLocal } from '../evolution/horario-local';
 import { WHATSAPP_MENSAJERIA_PUERTO, WhatsAppMensajeriaPuerto } from '../puerto/whatsapp-mensajeria.puerto';
@@ -35,13 +36,6 @@ export function aHora12(texto: string): string {
 }
 
 export const TEXTOS_CORTESIA = {
-  /** Corto y cariñoso, con la hora real de apertura y la carta; sin menú (con el local cerrado el bot no conversa). */
-  fueraDeHorario: (nombre: string, apertura: string | null, linkCarta: string): string =>
-    [
-      `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Gracias por escribirnos 🥰 Ahora estamos descansando 🌙`,
-      apertura ? `Abrimos ${aHora12(apertura)} ☕` : 'Te esperamos en nuestro próximo horario de atención ☕',
-      linkCarta ? `Mientras tanto, mira nuestra carta aquí: ${linkCarta} 🍰 ¡Te esperamos con algo rico! ✨` : '¡Te esperamos con algo rico! 🍰✨',
-    ].join('\n\n'),
   bienvenidaConCarta: (nombre: string, linkCarta: string): string =>
     `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Qué gusto saludarte. Mira nuestra carta aquí: ${linkCarta} 🍰 Cuando quieras pedir, escríbenos y te ayudamos. ¡Te esperamos con algo rico!`,
 };
@@ -62,6 +56,7 @@ export class AutorespuestaWhatsappService {
     private readonly config: ConfigService,
     private readonly evolution: EvolutionConfigService,
     @Optional() private readonly local?: LocalService,
+    @Optional() private readonly configuracionBot?: ChatbotConfiguracionService,
   ) {}
 
   /** Reacciona al mensaje del cliente. true si quedó la reacción (si falla o no se puede, quien llama contesta con texto como antes). */
@@ -84,30 +79,37 @@ export class AutorespuestaWhatsappService {
 
   /** true si el mensaje quedó atendido aquí (el bot no debe contestarlo). */
   async atender(e: EntradaCortesia): Promise<boolean> {
-    if (!(await this.esEvolution())) return false; // con Meta el bot y los avisos siguen exactamente como antes
-    const tomado = e.conversacion.tomado_por != null;
+    const evolution = await this.esEvolution();
     const estadoFlujo = String((e.conversacion.flujo as any)?.estado ?? 'INICIO');
 
-    // «Gracias», «ok», «listo»: ❤️ en vez de texto, si no estamos en medio de una pregunta del bot y el cliente tiene un pedido de hoy
-    if (esAgradecimiento(e.texto) && (ESTADOS_SIN_PREGUNTA.has(estadoFlujo) || !e.puedeProcesarMotor) && e.conversacion.estado !== 'VALIDAR_PAGO') {
-      if ((await this.pedidoDesde(e.telefono, 24 * 3_600_000, false)) && (await this.reaccionar(e.telefono, e.waMessageId, EMOJI_AGRADECIMIENTO))) return true;
-      return false;
+    // «Gracias», «ok», «listo»: ❤️ en vez de texto (solo Evolution), si no estamos en medio de una pregunta del bot y el cliente tiene un pedido de hoy
+    if (
+      evolution &&
+      esAgradecimiento(e.texto) &&
+      (ESTADOS_SIN_PREGUNTA.has(estadoFlujo) || !e.puedeProcesarMotor) &&
+      e.conversacion.estado !== 'VALIDAR_PAGO' &&
+      (await this.pedidoDesde(e.telefono, 24 * 3_600_000, false)) &&
+      (await this.reaccionar(e.telefono, e.waMessageId, EMOJI_AGRADECIMIENTO))
+    ) {
+      return true;
     }
 
-    if (tomado) return false; // una persona lo está atendiendo
+    if (e.conversacion.tomado_por != null) return false; // una persona lo está atendiendo
 
     const cfg = await this.evolution.obtener();
     const horario = await horarioDelLocal(this.local, this.prisma, new Date(), { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
     const link = urlPublicaCarta((k) => this.config.get<string>(k));
     const nombre = nombreParaSaludo(e.nombre);
 
-    // Local cerrado: el bot NO conversa (ni menú ni IA). Un solo aviso corto con la hora de apertura y la carta, y silencio
-    // hasta pasadas HORAS_ENTRE_AUTORESPUESTAS. Excepción: quien tiene un pedido en curso o un pago por validar sigue con el bot.
+    // Local cerrado (Meta y Evolution por igual): el bot NO conversa (ni menú ni IA ni «hola de nuevo»). UN solo aviso
+    // (saludo + «Ahora estamos cerrados. Abrimos…») y silencio total hasta que abra o pasen HORAS_ENTRE_AUTORESPUESTAS.
+    // Excepción: quien tiene un pedido en curso o un pago por validar sigue con el bot.
     if (!horario.abierto) {
       const enCurso = estadoFlujo.startsWith('PAGO') || e.conversacion.estado === 'VALIDAR_PAGO' || (await this.pedidoDesde(e.telefono, 24 * 3_600_000, true));
       if (enCurso) return false;
-      return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', TEXTOS_CORTESIA.fueraDeHorario(nombre, horario.apertura, link));
+      return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', await this.avisoCerrado(nombre, horario.apertura, link));
     }
+    if (!evolution) return false; // con el local abierto, Meta sigue exactamente como antes
 
     // Abierto y el bot va a contestar: él ya saluda
     if (e.puedeProcesarMotor && (await this.botActivo())) return false;
@@ -117,6 +119,12 @@ export class AutorespuestaWhatsappService {
       return this.enviarUnaVez(e.telefono, 'BIENVENIDA', TEXTOS_CORTESIA.bienvenidaConCarta(nombre, link));
     }
     return false;
+  }
+
+  /** El mismo saludo + aviso de cierre que arma el bot (textos de Configuración), con «hoy/mañana a las HH:MM». */
+  private async avisoCerrado(nombre: string, apertura: string | null, link: string): Promise<string> {
+    const textos = (await this.configuracionBot?.obtenerTextosBot().catch(() => null)) ?? null;
+    return armarBienvenida(nombre, { abierta: false, aperturaTexto: apertura }, { textos, linkCarta: link });
   }
 
   private async esEvolution(): Promise<boolean> {

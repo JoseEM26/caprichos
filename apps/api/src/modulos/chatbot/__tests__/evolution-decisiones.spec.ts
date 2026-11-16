@@ -196,10 +196,10 @@ describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', 
     const arg = outbox.encolar.mock.calls[0][0];
     expect(arg).toMatchObject({ origen: 'AUTORESPUESTA', tipo: 'TEXTO', telefono: '51900000001' });
     expect(arg.carga.textoLibre).toContain('Ana');
-    expect(arg.carga.textoLibre).toContain('descansando');
-    expect(arg.carga.textoLibre).toMatch(/Abrimos (hoy|mañana) a las \d{1,2}:\d\d (a|p)\. m\./);
+    expect(arg.carga.textoLibre).toContain('Ahora estamos cerrados.');
+    expect(arg.carga.textoLibre).toMatch(/Abrimos (hoy|mañana) a las \d{1,2}:\d\d\./);
+    expect(arg.carga.textoLibre).toContain('No tomamos pedidos fuera de horario');
     expect(arg.carga.textoLibre).not.toMatch(/Responde|1\. /);
-    expect(arg.carga.textoLibre).toContain('https://carta.caprichos.pe');
     expect(outbox.despertar).toHaveBeenCalled();
   });
   it('fuera de horario: máximo una vez cada 6 horas por cliente', async () => {
@@ -282,8 +282,8 @@ describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', 
     expect(mensajeria.reaccionar).toHaveBeenCalledWith('51900000001', 'MSGV', '✅');
     expect(await svc.reaccionarAVoucher('51900000001', null)).toBe(false);
   });
-  it('con Meta activo todo sigue como hoy: sin reacciones, sin fuera de horario nuevo y sin bienvenida con carta', async () => {
-    const m = montar({ proveedor: 'META', abierto: false, pedidoHoy: true });
+  it('con Meta activo y abierto todo sigue como hoy: sin reacciones ni bienvenida con carta', async () => {
+    const m = montar({ proveedor: 'META', pedidoHoy: true });
     expect(await m.svc.atender(entrada('quiero una torta'))).toBe(false);
     expect(await m.svc.atender(entrada('hola'))).toBe(false);
     expect(await m.svc.atender(entrada('gracias'))).toBe(false);
