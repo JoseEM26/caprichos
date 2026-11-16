@@ -44,6 +44,10 @@ export class PagarPlanillaDto {
   @IsOptional() @IsString({ each: true }) omitirRecurrenteIds?: string[];
   /** Consumos de períodos anteriores que SÍ se cobran en este pago. */
   @IsOptional() @IsString({ each: true }) incluirConsumoIds?: string[];
+  /** «Pagar igual» (solo ADMIN): motivo, mínimo 10 caracteres, para pagar con jornadas pendientes. */
+  @IsOptional() @IsString() @MaxLength(300) pagarIgualMotivo?: string;
+  /** Confirmó pagar sin descontar los créditos de períodos anteriores sin cobrar. */
+  @IsOptional() @IsBoolean() sinDescontarAnteriores?: boolean;
 }
 
 export class ReabrirPlanillaDto {

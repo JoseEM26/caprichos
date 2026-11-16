@@ -228,8 +228,9 @@ export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { pa
   api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
-export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = []) =>
-  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds });
+/** `confirma`: «Pagar igual» (solo ADMIN, con motivo) y la confirmación de pagar sin descontar créditos anteriores. */
+export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = [], confirma: { pagarIgualMotivo?: string; sinDescontarAnteriores?: boolean } = {}) =>
+  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds, ...confirma });
 
 // Préstamos con cuotas y descuentos recurrentes (Netflix)
 export interface CuotaPrestamoApi { id: number; numero: number; monto: number; estado: 'PENDIENTE' | 'DESCONTADA' | 'OMITIDA'; periodoDesde: string | null; periodoHasta: string | null; reprogramada: boolean }

@@ -147,7 +147,7 @@ describe('PlanillaTab', () => {
     expect(screen.getByTestId('resumen-planilla')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Marcar pagado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
-    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], []));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], [], {}));
   });
 
   it('con jornadas por revisar «Siguiente» no avanza, dice qué falta y Aprobar todas pide confirmación', async () => {
@@ -161,6 +161,25 @@ describe('PlanillaTab', () => {
     expect(screen.getByText('Paso 1 de 4 · Asistencia')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar todas las marcas dudosas del período' }));
     expect(await screen.findByText('¿Aprobar todas las marcas dudosas del período?')).toBeInTheDocument();
+  });
+
+  it('«Pagar igual (solo administrador)» pide motivo de 10+ caracteres, deja avanzar y lo manda al pagar', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue({ ...base, pendientes: 1, jornadasPorRevisar: ['2026-11-03'] });
+    pagar.mockResolvedValue({});
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    fireEvent.click(await screen.findByRole('button', { name: 'Pagar igual (solo administrador)' }));
+    const dejar = screen.getByRole('button', { name: 'Dejar avanzar' });
+    expect(dejar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Motivo para pagar con jornadas pendientes/), { target: { value: 'Se le pagó en efectivo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Dejar avanzar' }));
+    expect(screen.getByTestId('aviso-pagar-igual')).toHaveTextContent('Se le pagó en efectivo');
+    sig(); sig(); sig();
+    expect(screen.getByText('Paso 4 de 4 · Resumen')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar pagado' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], [], { pagarIgualMotivo: 'Se le pagó en efectivo' }));
   });
 
   it('Atrás no pierde lo escrito en el formulario de adelanto', async () => {
@@ -280,6 +299,6 @@ describe('PlanillaTab', () => {
     sig(); sig();
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar pagado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
-    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], ['3']));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], ['3'], { sinDescontarAnteriores: true }));
   });
 });

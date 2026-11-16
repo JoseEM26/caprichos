@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -32,6 +32,13 @@ export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as cons
 /** Lo que se descarta del pago de este período: cuotas de préstamo y descuentos recurrentes (ids) que NO se cobran. */
 /** `incluirAnteriores`: consumos de períodos anteriores que SÍ se cobran en este pago (por defecto pasan al siguiente). */
 export interface OmitirPeriodo { cuotas?: string[]; recurrentes?: string[]; incluirAnteriores?: string[] }
+/** Confirmaciones del admin al pagar, que quedan en el pago y en la auditoría. */
+export interface ConfirmacionesPago {
+  /** «Pagar igual»: motivo (mín. 10 caracteres) para pagar con jornadas pendientes. Solo ADMIN. */
+  pagarIgualMotivo?: string;
+  /** Confirmó pagar sin descontar los créditos de períodos anteriores que siguen sin cobrar. */
+  sinDescontarAnteriores?: boolean;
+}
 
 /** Sueldo y método de valor hora de la persona, tal como lo usa el cálculo. */
 export interface SueldoCalc {
@@ -540,18 +547,27 @@ export class PlanillaService {
   // ---------------------------------------------------------------------------
 
   /** Marca el período como pagado: congela las cifras y deja los consumos cobrados como PLANILLA (sin mover caja). */
-  async pagar(partyId: number, fecha: string, excluirConsumoIds: string[], usuario: UsuarioAutenticado, ip?: string, ahora = new Date(), omitir: OmitirPeriodo = {}) {
+  async pagar(partyId: number, fecha: string, excluirConsumoIds: string[], usuario: UsuarioAutenticado, ip?: string, ahora = new Date(), omitir: OmitirPeriodo = {}, confirma: ConfirmacionesPago = {}) {
     const id = BigInt(partyId);
     const d = await this.detalle(partyId, fecha, excluirConsumoIds, ahora, omitir);
     if (d.estado === 'PAGADO') throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Ese período ya está pagado' });
-    if (d.pendientes > 0) {
+    let pagarIgual: { motivo: string; jornadas: string[] } | null = null;
+    if (d.pendientes > 0 && confirma.pagarIgualMotivo !== undefined) {
+      if (![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+        throw new ForbiddenException({ codigo: 'SOLO_ADMIN_PAGA_IGUAL', mensaje: 'Solo el administrador puede pagar con jornadas pendientes.' });
+      }
+      pagarIgual = { motivo: motivoValido(confirma.pagarIgualMotivo, 10), jornadas: d.jornadasPorRevisar ?? [] };
+    }
+    if (d.pendientes > 0 && !pagarIgual) {
       throw new ConflictException({
         codigo: 'JORNADAS_PENDIENTES',
         mensaje: `Hay ${d.pendientes} jornada(s) incompletas o por revisar. Corrígelas en Asistencia antes de pagar.`,
       });
     }
     const aCobrar: string[] = d.consumos.filter((c: any) => c.cobrar).map((c: any) => c.id);
-    const detalle = { ...d, consumosCobradosIds: aCobrar, pagadoPor: Number(usuario.partyId) };
+    // Lo que el admin confirmó queda en el pago congelado y en la auditoría
+    const sinDescontar = confirma.sinDescontarAnteriores && d.consumosAnterioresPendiente > 0 ? { monto: d.consumosAnterioresPendiente } : null;
+    const detalle = { ...d, consumosCobradosIds: aCobrar, pagadoPor: Number(usuario.partyId), ...(pagarIgual ? { pagarIgual } : {}), ...(sinDescontar ? { sinDescontarAnteriores: sinDescontar } : {}) };
     const motivo = `Planilla ${d.periodo.desde} a ${d.periodo.hasta}`;
     const periodoId = await this.prisma.$transaction(async (tx) => {
       const fila = await tx.planillaPeriodo.create({
@@ -575,7 +591,7 @@ export class PlanillaService {
           throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Alguno de los consumos ya estaba cobrado. Vuelve a abrir la planilla.' });
         }
       }
-      await this.auditar('CAMBIO', 'PAGAR_PLANILLA', usuario, ip, 'planilla_periodo', fila.id, { periodo: d.periodo, resultado: d.resultado, consumos: aCobrar, cuotas: (d.cuotas ?? []).map((c: any) => ({ id: c.id, cobrar: c.cobrar })) }, undefined, tx);
+      await this.auditar('CAMBIO', 'PAGAR_PLANILLA', usuario, ip, 'planilla_periodo', fila.id, { periodo: d.periodo, resultado: d.resultado, consumos: aCobrar, cuotas: (d.cuotas ?? []).map((c: any) => ({ id: c.id, cobrar: c.cobrar })), ...(pagarIgual ? { pagarIgual: { jornadasPendientes: pagarIgual.jornadas } } : {}), ...(sinDescontar ? { sinDescontarAnteriores: sinDescontar.monto } : {}) }, pagarIgual?.motivo, tx);
       return fila.id;
     });
     return { ok: true, periodoId: Number(periodoId), neto: d.resultado.neto };

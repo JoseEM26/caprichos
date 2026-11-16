@@ -604,4 +604,26 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     await m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1000, pagoMedio: 'YAPE' }, ADMIN);
     expect(m.vigencias).toHaveLength(0);
   });
+
+  it('«Pagar igual»: solo ADMIN, con motivo de 10+ caracteres, y queda auditado y congelado', async () => {
+    const m = montar({ estadoDia: 'INCOMPLETO' });
+    const MARIA: UsuarioAutenticado = { partyId: 3n, rol: 'CAJERO', debeCambiar: false, roles: ['CAJERO'] };
+    await expect(m.svc.pagar(7, '2026-11-15', ['1', '2'], MARIA, undefined, AHORA, {}, { pagarIgualMotivo: 'Se le pagó en efectivo' })).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN_PAGA_IGUAL' } });
+    await expect(m.svc.pagar(7, '2026-11-15', ['1', '2'], ADMIN, undefined, AHORA, {}, { pagarIgualMotivo: 'corto' })).rejects.toMatchObject({ response: { codigo: 'MOTIVO_REQUERIDO' } });
+    await expect(m.svc.pagar(7, '2026-11-15', ['1', '2'], ADMIN, undefined, AHORA, {}, {})).rejects.toMatchObject({ response: { codigo: 'JORNADAS_PENDIENTES' } });
+    const r = await m.svc.pagar(7, '2026-11-15', ['1', '2'], ADMIN, undefined, AHORA, {}, { pagarIgualMotivo: 'Se le pagó en efectivo' });
+    expect(r.ok).toBe(true);
+    expect(m.periodos[0].detalle.pagarIgual).toMatchObject({ motivo: 'Se le pagó en efectivo', jornadas: ['2026-11-07'] });
+    const aud = m.auditoria.registrar.mock.calls.map((c: any[]) => c[0]).find((x: any) => x.accion === 'PAGAR_PLANILLA');
+    expect(aud.motivo).toBe('Se le pagó en efectivo');
+    expect(aud.despues.pagarIgual.jornadasPendientes).toEqual(['2026-11-07']);
+  });
+
+  it('pagar sin descontar créditos anteriores deja la confirmación en el pago y en la auditoría', async () => {
+    const m = montar({ consumosExtra: [{ id: 3n, party_id: LUIS, fecha: d('2026-10-20'), pedido_id: 99n, monto: 12, pagado_en: null, pedido: { codigo: 'P-99' } }] });
+    await m.svc.pagar(7, '2026-11-15', ['1', '2'], ADMIN, undefined, AHORA, {}, { sinDescontarAnteriores: true });
+    expect(m.periodos[0].detalle.sinDescontarAnteriores).toEqual({ monto: 12 });
+    const aud = m.auditoria.registrar.mock.calls.map((c: any[]) => c[0]).find((x: any) => x.accion === 'PAGAR_PLANILLA');
+    expect(aud.despues.sinDescontarAnteriores).toBe(12);
+  });
 });
