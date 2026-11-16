@@ -141,7 +141,11 @@ export interface FilaBarra {
   texto: string;
   /** Marca de meta sobre la barra, en la misma unidad que `valor`. */
   meta?: number;
+  /** Texto de la meta bajo la barra (por defecto «Meta: N min»). */
+  textoMeta?: string;
   semaforo?: NivelSemaforo;
+  /** Palabra del semáforo (por defecto la de metas: «En meta»…). */
+  textoSemaforo?: string;
   /** Resalta la fila (borde grueso y la palabra de `etiquetaDestacada`). */
   destacada?: boolean;
 }
@@ -193,8 +197,8 @@ export function BarrasHorizontales({
               </span>
               {f.semaforo && (
                 <span className="an-barras__pie">
-                  <Semaforo nivel={f.semaforo} />
-                  {f.meta != null && <span className="an-sub">Meta: {f.meta} min</span>}
+                  <Semaforo nivel={f.semaforo} texto={f.textoSemaforo} />
+                  {f.meta != null && <span className="an-sub">{f.textoMeta ?? `Meta: ${f.meta} min`}</span>}
                 </span>
               )}
             </>

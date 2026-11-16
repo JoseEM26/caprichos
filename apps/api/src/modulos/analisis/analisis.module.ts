@@ -9,6 +9,7 @@ import { ClientesAnalisisController } from './clientes/clientes.controller';
 import { ClientesAnalisisService } from './clientes/clientes.service';
 import { WhatsappAnalisisController } from './whatsapp/whatsapp.controller';
 import { WhatsappAnalisisService } from './whatsapp/whatsapp.service';
+import { SaludBotAnalisisService } from './whatsapp/salud.service';
 import { RepartoAnalisisController } from './reparto/reparto.controller';
 import { RepartoService } from './reparto/reparto.service';
 import { EquipoController } from './equipo/equipo.controller';
@@ -49,6 +50,7 @@ import { CierreModule } from '../cierre';
     VentasService,
     ClientesAnalisisService,
     WhatsappAnalisisService,
+    SaludBotAnalisisService,
     RepartoService,
     EquipoService,
     AlmacenAnalisisService,

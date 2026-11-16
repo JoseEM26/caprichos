@@ -216,12 +216,15 @@ export class EvolutionConfigService implements OnModuleInit {
     };
     await this.guardar(CLAVE_ESTADO, nuevo);
     if (conectado) {
+      // Constancia para Análisis › WhatsApp › Salud del bot (solo cuando estaba caído de verdad)
+      if (previo.estado === 'DESCONECTADO') await this.registrarEventoConexion('reconexion');
       await this.reanudarSiPausaAutomatica();
       return;
     }
     if (previo.estado === 'DESCONECTADO') return;
     // 515 = reinicio pedido por WhatsApp (pasa al vincular): reconecta solo en segundos, no es una caída
     if (Number(codigoCierre) === 515) return;
+    await this.registrarEventoConexion('desconexion', `Cierre ${codigoCierre ?? state}`);
     const baneo = codigoCierre != null && MOTIVOS_BANEO.includes(typeof codigoCierre === 'string' ? codigoCierre.toLowerCase() : codigoCierre);
     if ((await this.proveedor()) === 'EVOLUTION') {
       await this.pausarAutomatico(baneo ? 'BANEO' : 'DESCONEXION', `Cierre ${codigoCierre ?? state}`);
@@ -229,6 +232,17 @@ export class EvolutionConfigService implements OnModuleInit {
     }
     if (baneo) await this.guardar('evolution_pausado', 'si');
     await this.avisarAdmin(baneo);
+  }
+
+  /** Deja en la auditoría la caída o vuelta del número (sin datos personales); nunca rompe el flujo. */
+  private async registrarEventoConexion(accion: 'desconexion' | 'reconexion', motivo?: string): Promise<void> {
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'whatsapp_proveedor',
+      accion,
+      entidad: 'parametro',
+      despues: motivo ? { motivo } : undefined,
+    });
   }
 
   /** Un error de envío que huele a baneo pausa el envío (lo llama el adaptador). */
