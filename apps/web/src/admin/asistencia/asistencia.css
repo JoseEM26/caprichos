@@ -124,3 +124,4 @@
 .as-tabla--hoy th, .as-tabla--hoy td { padding: 6px 8px; }
 @media (min-width: 721px) and (max-width: 1100px) { .as-tabla--hoy th { white-space: normal; } }
 .as-vista { max-width: 1280px; }
+.as-aviso--accion { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }

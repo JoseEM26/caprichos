@@ -57,6 +57,8 @@ export const totalPenalidad = (p?: PenalidadTardanza | null): number => (p ? p.t
 export interface FilaPlanilla {
   partyId: number;
   nombre: string;
+  /** Rol de la cuenta (para filtrar la lista). */
+  rol?: string | null;
   sueldo: SueldoPersona | null;
   pago?: PagoPersona;
   excel?: ResumenExcel;
@@ -265,3 +267,7 @@ export interface MiGanado {
   neto?: number | null;
 }
 export const miGanado = () => api.get<MiGanado>('/admin/asistencia/mi/ganado');
+
+/** Pagos anteriores de una persona (pagados y reabiertos), con sus cifras congeladas. */
+export interface PagoHistorial { id: number; desde: string; hasta: string; estado: string; neto: number; pagadoEn: string; pagadoPor: number; pagadoPorNombre?: string | null; reabiertoEn: string | null; reabiertoMotivo: string | null }
+export const historialPagos = (partyId: number) => api.get<PagoHistorial[]>(`/admin/planilla/persona/${partyId}/historial`);

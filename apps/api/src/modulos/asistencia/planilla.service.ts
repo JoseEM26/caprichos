@@ -191,8 +191,9 @@ export class PlanillaService {
    */
   async listar(fecha?: string, ahora = new Date(), modo?: 'SEMANA' | 'MES') {
     const ref = fecha ? fechaValida(fecha) : jornadaDe(ahora).jornada;
-    const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true } });
+    const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true, rol: true } });
     const ids = cuentas.map((c) => c.party_id);
+    const rolDe = new Map(cuentas.map((c) => [c.party_id, c.rol as string]));
     const [sueldos, personas, vinculos] = await Promise.all([
       this.prisma.sueldoPersonal.findMany({ where: { party_id: { in: ids } } }),
       this.prisma.person.findMany({ where: { party_id: { in: ids } } }),
@@ -204,7 +205,7 @@ export class PlanillaService {
     const filas: any[] = [];
     for (const id of ids) {
       const s = sueldos.find((x) => x.party_id === id);
-      const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}`, vinculo: vinculoDe.get(id) ?? null };
+      const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}`, rol: rolDe.get(id) ?? null, vinculo: vinculoDe.get(id) ?? null };
       if (!s) {
         filas.push({ ...base, sueldo: null });
         continue;
@@ -669,6 +670,8 @@ export class PlanillaService {
   /** Historial de pagos de una persona (pagados y reabiertos), con sus cifras congeladas. */
   async historial(partyId: number) {
     const filas = await this.prisma.planillaPeriodo.findMany({ where: { party_id: BigInt(partyId) }, orderBy: { desde: 'desc' }, take: 60 });
+    const quienes = await this.prisma.person.findMany({ where: { party_id: { in: [...new Set(filas.map((f) => f.pagado_por))] } } });
+    const nombreDe = new Map(quienes.map((p) => [Number(p.party_id), [p.nombres, p.apellidos].filter(Boolean).join(' ')]));
     return filas.map((f) => ({
       id: Number(f.id),
       desde: isoDe(f.desde),
@@ -677,6 +680,7 @@ export class PlanillaService {
       neto: Number(f.neto),
       pagadoEn: f.pagado_en.toISOString(),
       pagadoPor: Number(f.pagado_por),
+      pagadoPorNombre: nombreDe.get(Number(f.pagado_por)) ?? null,
       reabiertoEn: f.reabierto_en?.toISOString() ?? null,
       reabiertoMotivo: f.reabierto_motivo,
     }));
