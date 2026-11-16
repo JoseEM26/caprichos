@@ -95,6 +95,21 @@ describe('serviciosLibresDelTurno (Servicios y productos libres del cierre)', ()
     expect(r.total).toBe(3.3);
   });
 
+  it('un pedido solo con «Servicio o producto» (sin ningún producto) entra al cuadre: se lista, se suma y la venta no falla sin categorías', () => {
+    const soloCargo = cobro({
+      pagos: [{ medio: 'yape', monto: 29, propina: 0 }],
+      pedido: { codigo: 'P-9', lineas: [{ producto: null, cargo_libre: true, nombre: 'Torta chocolate 10 cm corazón', subtotal: 29, cargo_libre_por: 7n, cargo_libre_en: new Date('2026-11-16T20:00:00Z') }] },
+    });
+    const r = serviciosLibresDelTurno([soloCargo], new Map([['7', 'Rosa Mozo']]));
+    expect(r.lista).toHaveLength(1);
+    expect(r.lista[0]).toMatchObject({ pedidoCodigo: 'P-9', descripcion: 'Torta chocolate 10 cm corazón', monto: 29, medios: ['YAPE'], agregadoPor: 'Rosa Mozo' });
+    expect(r.total).toBe(29);
+    const v = detallarVentasTurno([soloCargo], new Map());
+    expect(v).toHaveLength(1);
+    expect(v[0].categorias).toEqual([]);
+    expect(v[0].pagos).toEqual([{ medio: 'YAPE', monto: 29 }]);
+  });
+
   it('un cobro anulado no cuenta', () => {
     expect(serviciosLibresDelTurno([conCargo(new Date(), 5, new Date())], new Map())).toEqual({ lista: [], total: 0 });
   });
