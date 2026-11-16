@@ -35,21 +35,19 @@ describe('Reimprimir un grupo: elegir cuáles', () => {
     vi.mocked(impresionApi.reimprimirEtiquetas).mockResolvedValue({ ok: true, mensaje: 'Listo' });
   });
 
-  it('con 2 vasos: lista, ninguno marcado, «Reimprimir N» y manda solo los elegidos', async () => {
+  it('con 2 vasos iguales: una fila con contador (por defecto 2) y manda solo los elegidos', async () => {
     vi.mocked(impresionApi.obtenerEtiquetasPedido).mockResolvedValue(estado(2));
     render(<EtiquetasPedido pedido={pedido(2)} />);
     await screen.findByText(/3 etiquetas/);
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir las de bebida' }));
     expect(screen.getByText('¿Cuáles reimprimes?')).toBeInTheDocument();
-    expect(screen.getByText('Vaso 1 · Frappe Maracuyá · Lucía')).toBeInTheDocument();
-    expect(screen.getByText('Vaso 2 · Frappe Maracuyá · Lucía')).toBeInTheDocument();
-    const casillas = screen.getAllByRole('checkbox');
-    expect(casillas).toHaveLength(2);
-    casillas.forEach((c) => expect(c).not.toBeChecked());
-    expect(screen.getByRole('button', { name: 'Imprimir 0' })).toBeDisabled();
-    fireEvent.click(casillas[1]);
+    expect(screen.getByText(/Hay 2 stickers de Frappe Maracuyá/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    const cuantos = screen.getByRole('combobox', { name: /Cuántos de Frappe Maracuyá/ });
+    expect(cuantos).toHaveValue('2');
+    fireEvent.change(cuantos, { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Imprimir 1' }));
-    await waitFor(() => expect(impresionApi.reimprimirElegidas).toHaveBeenCalledWith('p1', 'bebida', ['BEBIDA:2']));
+    await waitFor(() => expect(impresionApi.reimprimirElegidas).toHaveBeenCalledWith('p1', 'bebida', ['BEBIDA:1']));
     expect(impresionApi.reimprimirEtiquetas).not.toHaveBeenCalled();
   });
 
@@ -58,7 +56,6 @@ describe('Reimprimir un grupo: elegir cuáles', () => {
     render(<EtiquetasPedido pedido={pedido(2)} />);
     await screen.findByText(/3 etiquetas/);
     fireEvent.click(screen.getByRole('button', { name: 'Reimprimir las de bebida' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar todos' }));
     expect(screen.getByRole('button', { name: 'Imprimir 2' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Marcar ninguno' }));
     expect(screen.getByRole('button', { name: 'Imprimir 0' })).toBeDisabled();

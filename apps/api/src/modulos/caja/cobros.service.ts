@@ -3,7 +3,6 @@ import { type QuitaPromoMedio, evaluarQuitaPromoMedio, errorPromoSeQuita, aplica
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { MAX_MEDIOS_PLAN } from '../pedidos/pago-plan.service';
 import { PuntosService } from '../clientes/puntos.service';
-import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { normalizarPropina, propinaActivaParaCanal, repartirPropina } from '../propinas/propinas.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { ImpresionService } from '../impresion/impresion.service';
@@ -283,8 +282,6 @@ export class CobrosService {
           HttpStatus.CONFLICT,
         );
       }
-
-      exigirDeliveryUbicado(pedido);
 
       if (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros)) {
         throw new HttpException(
@@ -1067,8 +1064,6 @@ export class CobrosService {
         HttpStatus.CONFLICT,
       );
     }
-
-    exigirDeliveryUbicado(pedido);
 
     if (pedido.pago_estado === 'PAGADO') {
       throw new HttpException(

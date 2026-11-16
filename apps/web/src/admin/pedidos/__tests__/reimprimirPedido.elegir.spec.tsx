@@ -25,17 +25,18 @@ const abrir = async (opcion: string) => {
 beforeEach(() => reimprimir.mockReset());
 
 describe('Caja › Reimprimir stickers: elegir cuáles', () => {
-  it('con 2 vasos: lista, ninguno marcado, «Reimprimir N» y manda claves', async () => {
+  it('con 2 vasos iguales: una fila «Hay 2 stickers», por defecto los 2, y se puede bajar a 1', async () => {
     reimprimir.mockResolvedValueOnce(res(2)).mockResolvedValueOnce(res(1, { vistaPrevia: false }));
     await abrir('Stickers de bebida');
     expect(await screen.findByText('¿Cuáles reimprimes? · PED-9')).toBeInTheDocument();
-    expect(screen.getByText('Vaso 1 · Frappe Maracuyá 1 de 2 · Lucía')).toBeInTheDocument();
-    const casillas = screen.getAllByRole('checkbox');
-    casillas.forEach((c) => expect(c).not.toBeChecked());
-    expect(screen.getByRole('button', { name: 'Imprimir 0' })).toBeDisabled();
-    fireEvent.click(casillas[1]);
+    expect(screen.getByText(/Hay 2 stickers de Frappe Maracuyá/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    const cuantos = screen.getByRole('combobox', { name: /Cuántos de Frappe Maracuyá/ });
+    expect(cuantos).toHaveValue('2');
+    expect(screen.getByRole('button', { name: 'Imprimir 2' })).toBeEnabled();
+    fireEvent.change(cuantos, { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Imprimir 1' }));
-    await waitFor(() => expect(reimprimir).toHaveBeenLastCalledWith('9', expect.objectContaining({ tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:2'] })));
+    await waitFor(() => expect(reimprimir).toHaveBeenLastCalledWith('9', expect.objectContaining({ tipo: 'stickers', sub: 'bebida', claves: ['BEBIDA:1'] })));
   });
 
   it('con 1 sticker sigue el Sí/No y no manda claves', async () => {
@@ -48,18 +49,15 @@ describe('Caja › Reimprimir stickers: elegir cuáles', () => {
     expect(reimprimir.mock.calls[1][1].claves).toBeUndefined();
   });
 
-  it('Todo con ticket + sticker + vasos: agrupa, cuenta hojas, vista previa y manda solo las claves marcadas', async () => {
+  it('Todo con ticket + sticker + vasos iguales: los vasos van agrupados con su contador y el ticket aparte', async () => {
     const ticket = { tipo: 'TICKET_PAGO', clave: 'TICKET_PAGO', etiqueta: 'Ticket de pago', equipoId: '1', equipo: 'Caja', rol: 'TICKETERA', conectado: true, payload: null };
     reimprimir.mockResolvedValueOnce(res(2, { papeles: [ticket, papel(1), papel(2)], tickets: 1, cantidad: 3 })).mockResolvedValueOnce(res(1, { vistaPrevia: false }));
     await abrir('Todo (stickers + ticket)');
     expect(await screen.findByText('Ticket de pago (1)')).toBeInTheDocument();
     expect(screen.getByText('Stickers de bebida (2)')).toBeInTheDocument();
-    expect(screen.getByText('No se imprimirá nada: marca lo que quieres')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar todo: Stickers de bebida' }));
     expect(screen.getByText('Se imprimirán 2 hojas')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Vista previa de Vaso 1 · Frappe Maracuyá 1 de 2 · Lucía' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar todo: Stickers de bebida' }));
-    fireEvent.click(screen.getAllByRole('checkbox')[2]);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '0' } });
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
     expect(screen.getByText('Se imprimirán 1 hoja')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Imprimir 1' }));
     await waitFor(() => expect(reimprimir).toHaveBeenLastCalledWith('9', expect.objectContaining({ tipo: 'todo', claves: ['TICKET_PAGO'] })));

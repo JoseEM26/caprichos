@@ -9,6 +9,8 @@ import { contarDespacho, FASES, pedidosDespacho, PedidoDespacho, ResumenDespacho
 import { nombreClienteVisible } from './textoVisible';
 import { useEsMovil } from '../../carta/useEsMovil';
 import { ModalCerrarPorRepartidor } from './ModalCerrarPorRepartidor';
+import { AvisoDeliverySinUbicacion } from '../pedidos/AvisoDeliverySinUbicacion';
+import { MARCA_FALTA_UBICACION } from '../pedidos/ubicacionDelivery';
 
 const MOTIVO_ASIGNAR = 'Asignado por el administrador desde el despacho';
 
@@ -54,7 +56,7 @@ export function ContadoresDespacho({ r }: { r: ResumenDespacho }) {
 }
 
 export function TarjetaDespacho({
-  d, seleccionada, repartidores, puedeAsignar, puedeCerrar = false, alSeleccionar, alAbrirDetalle, alAsignar, alCerrarPor,
+  d, seleccionada, repartidores, puedeAsignar, puedeCerrar = false, alSeleccionar, alAbrirDetalle, alAsignar, alCerrarPor, alActualizar,
 }: {
   d: PedidoDespacho;
   seleccionada: boolean;
@@ -66,8 +68,11 @@ export function TarjetaDespacho({
   alAbrirDetalle: (id: string) => void;
   alAsignar: (pedido: PedidoSeguimiento, repartidorPartyId: string) => void;
   alCerrarPor?: (pedido: PedidoSeguimiento) => void;
+  alActualizar?: () => void;
 }) {
   const p = d.pedido;
+  // Sin punto en el mapa no se asigna ni sale con el motorizado (el servidor responde 409 UBICACION_REQUERIDA)
+  const sinUbicar = p.lat == null && d.fase !== 'cocina';
   const fase = FASES[d.fase];
   const digitos = p.cliente_telefono ? p.cliente_telefono.replace(/\D/g, '').slice(-9) : '';
   const pagado = p.pago_estado === 'PAGADO';
@@ -91,8 +96,9 @@ export function TarjetaDespacho({
         <span style={{ flex: 'none', width: 40, height: 40, borderRadius: '50%', background: fase.color, color: '#fff', fontWeight: 900, fontSize: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{d.numero}</span>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
           <strong style={{ fontSize: 15, color: 'var(--cp-navy, #0B2C3E)' }}>{p.codigo} · {nombreClienteVisible(p.cliente_nombre)}</strong>
-          <span style={{ fontSize: 13, color: 'var(--cp-soft, #5A6E78)' }}>{p.direccion ?? 'Sin dirección'}{p.lat == null ? ' · sin ubicación en el mapa' : ''}</span>
+          <span style={{ fontSize: 13, color: 'var(--cp-soft, #5A6E78)' }}>{p.direccion ?? 'Sin dirección'}</span>
           <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+            {p.lat == null && <span data-testid="marca-falta-ubicacion" style={{ fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: '#FFF1C9', color: 'var(--cp-navy, #0B2C3E)', border: '1.5px solid var(--cp-orange, #E67929)' }}>{MARCA_FALTA_UBICACION}</span>}
             <span style={{ fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: '#fff', background: fase.color }}>{fase.texto}{horaEtapa ? ` · ${horaEtapa}` : ''}</span>
             <span style={{ fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: '#fff', background: urgente ? '#B91C1C' : '#4B5B64' }}>{p.minutosEspera} min</span>
             <span style={{ fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: pagado ? '#DCFCE7' : '#FEF3C7', color: 'var(--cp-navy, #0B2C3E)' }}>{pagado ? 'Pagado' : `Falta cobrar S/ ${Number(p.total).toFixed(2)}`}</span>
@@ -102,8 +108,12 @@ export function TarjetaDespacho({
 
       <CocinaCheck pedido={p} />
 
+      {sinUbicar && (
+        <AvisoDeliverySinUbicacion pedidoId={p.id} codigo={p.codigo} direccion={p.direccion} telefono={p.cliente_telefono ?? ''} alActualizar={alActualizar ?? (() => {})} />
+      )}
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        {puedeAsignar && d.fase !== 'cocina' ? (
+        {puedeAsignar && d.fase !== 'cocina' && !sinUbicar ? (
           <select
             aria-label={`${p.repartidor_party_id ? 'Reasignar' : 'Asignar'} repartidor del pedido ${p.codigo}`}
             value={p.repartidor_party_id ?? ''}
@@ -259,6 +269,7 @@ export function DespachoAdmin({
                 alAbrirDetalle={alAbrirDetalle}
                 alAsignar={asignar}
                 alCerrarPor={setCerrando}
+                alActualizar={alActualizar}
               />
             ))
           )}

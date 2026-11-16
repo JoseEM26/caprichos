@@ -22,7 +22,7 @@ const POR_PAGINA = 100;
 const DIAS_CORTOS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
 const VARIANTE: Record<string, VarianteInsignia> = {
-  CUMPLIO: 'exito', TARDANZA: 'aviso', SALIO_ANTES: 'aviso', SALIO_DESPUES: 'neutro', FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro',
+  CUMPLIO: 'exito', TARDANZA: 'aviso', SALIO_ANTES: 'aviso', SALIO_DESPUES: 'neutro', FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro', POR_EMPEZAR: 'neutro', SIN_MARCAR_ENTRADA: 'aviso', SIN_SALIDA: 'peligro',
 };
 
 const tienePendiente = (f: FilaCal) => f.solicitudes.some((s) => s.estado === 'PENDIENTE');

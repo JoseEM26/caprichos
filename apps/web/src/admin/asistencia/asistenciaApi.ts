@@ -19,6 +19,9 @@ export const ETIQUETA_ESTADO: Record<string, string> = {
   INCOMPLETO: 'Incompleto',
   A_REVISAR: 'A revisar',
   SIN_EVALUAR: 'En curso',
+  POR_EMPEZAR: 'Por empezar',
+  SIN_MARCAR_ENTRADA: 'Sin marcar entrada',
+  SIN_SALIDA: 'No marcó salida',
   VACACIONES: 'Vacaciones',
 };
 

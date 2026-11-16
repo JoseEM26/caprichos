@@ -6,13 +6,22 @@ import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import type { Punto } from '../../comun/mapa/MapaUbicacion';
 import { SEDE_DEFECTO, cargarSede } from '../../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
+import { UbicacionRapidaDelivery } from '../salon/componentes/UbicacionRapidaDelivery';
 import { cambioUbicacionApi, PrevisualizacionCambio, textoDifEnvio } from './cambioUbicacionApi';
+
+/** Celular de 9 dígitos que empieza con 9, o null si no hay uno válido. */
+function ultimos9(t: string): string | null {
+  const d = t.replace(/\D/g, '').slice(-9);
+  return /^9\d{8}$/.test(d) ? d : null;
+}
 
 export interface ModalCambiarUbicacionProps {
   pedidoId: string;
   codigoPedido: string;
   direccionActual?: string | null;
   puntoActual?: Punto | null;
+  /** Celular del cliente: ofrece «Usar ubicación de WhatsApp» y pegar un enlace de Google Maps */
+  telefono?: string | null;
   alCerrar: () => void;
   alCambiar: (respuesta: { envioNuevo: number; totalNuevo: number; avisoCliente: string | null }) => void;
 }
@@ -26,6 +35,7 @@ export function ModalCambiarUbicacion({
   codigoPedido,
   direccionActual,
   puntoActual = null,
+  telefono = null,
   alCerrar,
   alCambiar,
 }: ModalCambiarUbicacionProps) {
@@ -140,6 +150,15 @@ export function ModalCambiarUbicacion({
             setDireccion(texto.split(',').slice(0, 2).join(',').trim());
           }}
         />
+        {telefono !== null && (
+          <UbicacionRapidaDelivery
+            telefono={ultimos9(telefono)}
+            onElegir={(p, aprox) => {
+              setPunto(p);
+              if (aprox && !direccion.trim()) setDireccion(aprox);
+            }}
+          />
+        )}
         <MapaUbicacion punto={punto} onCambiar={setPunto} altura={280} local={sedeLocal} ajustarA={punto ? 'ambos' : 'local'} />
 
         <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>

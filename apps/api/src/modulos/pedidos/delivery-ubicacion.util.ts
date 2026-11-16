@@ -1,29 +1,22 @@
 import { ConflictException } from '@nestjs/common';
 
-export const MENSAJE_DELIVERY_SIN_UBICACION = 'Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).';
+export const MENSAJE_DELIVERY_SIN_UBICACION = 'Falta la ubicación del cliente: confírmala por WhatsApp antes de mandarlo con el motorizado';
 
 type PedidoUbicable = {
   modalidad: string;
   entrega_lat?: unknown;
   entrega_lng?: unknown;
-  zona_id?: unknown;
 };
 
-/** Un delivery está ubicado cuando tiene punto Y zona (sin zona no hay envío calculado). Otras modalidades no aplican. */
+/** Un delivery está ubicado cuando tiene punto en el mapa (con el punto se calcula la zona y el envío). Otras modalidades no aplican. */
 export function deliveryUbicado(p: PedidoUbicable): boolean {
   if (p.modalidad !== 'DELIVERY') return true;
-  return p.entrega_lat != null && p.entrega_lng != null && p.zona_id != null;
+  return p.entrega_lat != null && p.entrega_lng != null;
 }
 
-/** 409 DELIVERY_SIN_UBICACION: no se confirma, cobra ni manda a cocina un delivery sin ubicación. */
+/** 409 UBICACION_REQUERIDA: un delivery sin ubicación pasa a cocina, pero no se asigna ni sale con el motorizado. */
 export function exigirDeliveryUbicado(p: PedidoUbicable): void {
   if (!deliveryUbicado(p)) {
-    throw new ConflictException({ codigo: 'DELIVERY_SIN_UBICACION', mensaje: MENSAJE_DELIVERY_SIN_UBICACION });
+    throw new ConflictException({ codigo: 'UBICACION_REQUERIDA', mensaje: MENSAJE_DELIVERY_SIN_UBICACION });
   }
 }
-
-/** Fragmento de `where` de Prisma: delivery sin punto o sin zona (para excluirlo de cocina). */
-export const DELIVERY_SIN_UBICACION_WHERE = {
-  modalidad: 'DELIVERY',
-  OR: [{ entrega_lat: null }, { entrega_lng: null }, { zona_id: null }],
-} as const;

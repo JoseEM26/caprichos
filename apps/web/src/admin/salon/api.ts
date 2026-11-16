@@ -113,6 +113,18 @@ export const misPedidosApi = {
   },
 };
 
+/** Borrador de pedido de mesa guardado en el servidor. */
+export interface BorradorMesa {
+  mesaId: string;
+  mesaNombre: string;
+  partyId: string;
+  mozo: string;
+  productos: number;
+  contenido: Record<string, any>;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
 export const salonApi = {
   // =========================================================================
   // PLANO
@@ -152,6 +164,13 @@ export const salonApi = {
     api.post('/admin/salon/pedidos', payload, {
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
+
+  /** Borradores de pedido de mesa del día (uno por mesa; no ocupan la mesa). */
+  listarBorradoresMesa: () => api.get<BorradorMesa[]>('/admin/salon/borradores'),
+  borradorDeMesa: (mesaId: string) => api.get<BorradorMesa | null>(`/admin/salon/borradores/mesa/${mesaId}`),
+  guardarBorradorMesa: (mesaId: string, contenido: Record<string, unknown>, productos: number) =>
+    api.put<BorradorMesa>(`/admin/salon/borradores/mesa/${mesaId}`, { contenido, productos }),
+  eliminarBorradorMesa: (mesaId: string) => api.delete(`/admin/salon/borradores/mesa/${mesaId}`),
 
   /** Lista de espera de mesa (FIFO): pedidos de mesa que aún no tienen mesa. */
   listarEspera: () => api.get<RespuestaEspera>('/admin/salon/espera'),

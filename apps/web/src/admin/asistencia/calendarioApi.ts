@@ -52,7 +52,7 @@ export const ETIQUETA_TIPO_CAL: Record<string, string> = {
 };
 
 const ESTADOS_PRESENTE = ['CUMPLIO', 'SALIO_ANTES', 'SALIO_DESPUES'];
-const A_REVISAR = ['A_REVISAR', 'INCOMPLETO'];
+const A_REVISAR = ['A_REVISAR', 'INCOMPLETO', 'SIN_SALIDA'];
 export const esPresente = (e: string) => ESTADOS_PRESENTE.includes(e);
 export const esARevisar = (e: string) => A_REVISAR.includes(e);
 

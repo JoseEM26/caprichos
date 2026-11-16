@@ -22,7 +22,9 @@ import { unidadesDeLinea } from '../../../carta/stock';
 import { agruparUnidadesIguales } from '../../../carta/unidadesPorBebida';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
-import { salonApi } from '../api';
+import { salonApi, type BorradorMesa } from '../api';
+import { haceTexto } from '../haceTexto';
+import { DialogoOpciones } from './DialogoOpciones';
 import { useSesion } from '../../../comun/sesion';
 import { ModalCortesia } from '../../cortesias/ModalCortesia';
 import { ModalCargoLibre, type CargoLibreDatos } from '../../pedidos/ModalCargoLibre';
@@ -96,6 +98,8 @@ export interface ModalNuevoPedidoMesaProps {
   extra?: DatosPedidoOriginal;
   /** «Servicio o producto» ya escrito (desde el detalle de un pedido cobrado): entra al extra como primer cargo libre */
   cargoInicial?: CargoLibreDatos;
+  /** Borrador guardado (desde Mis pedidos › Continuar): se restaura al abrir */
+  borradorInicial?: BorradorMesa;
 }
 
 /** Datos del pedido original que hereda un extra (los da el detalle del pedido). */
@@ -255,6 +259,7 @@ export function ModalNuevoPedidoMesa({
   edicion,
   extra,
   cargoInicial,
+  borradorInicial,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -914,6 +919,118 @@ export function ModalNuevoPedidoMesa({
     [todasLasMesas],
   );
 
+  // ---- Borrador del pedido de mesa (se guarda en el servidor; no ocupa la mesa ni va a cocina) ----
+  const esPedidoNuevoLocal = !edicion && !extra && modalidad === 'local';
+  const mesaBorrador = mesasSeleccionadas.length === 1 && !enEspera ? mesasSeleccionadas[0] : null;
+  const hayEscrito = esPedidoNuevoLocal && (lineas.length > 0 || cliNombre.trim() !== '' || cliTelefono.trim() !== '');
+  const [salirPregunta, setSalirPregunta] = useState(false);
+  const [reemplazoPregunta, setReemplazoPregunta] = useState<BorradorMesa | null>(null);
+  const [borradorPregunta, setBorradorPregunta] = useState<BorradorMesa | null>(null);
+  const [errorBorrador, setErrorBorrador] = useState<string | null>(null);
+  // Mesa del borrador que se retomó: al enviar con éxito se borra
+  const [borradorOrigen, setBorradorOrigen] = useState<string | null>(null);
+  const consultadaRef = useRef<string | null>(borradorInicial?.mesaId ?? null);
+
+  const pedirCerrar = () => {
+    if (hayEscrito) setSalirPregunta(true);
+    else alCerrar();
+  };
+
+  const contenidoBorrador = () => ({
+    lineas,
+    cliNombre,
+    cliTelefono,
+    pideMode,
+    clienteEncontrado,
+    staffElegido,
+    cuponAplicado,
+    personasTxt,
+    cuandoPaga,
+    filasPlan,
+    pagoPersonal,
+    medioPersonal,
+    fase,
+  });
+
+  const guardarComoBorrador = async (reemplazar = false) => {
+    if (!mesaBorrador) return;
+    setErrorBorrador(null);
+    try {
+      if (!reemplazar && mesaBorrador !== borradorOrigen) {
+        const previo = await salonApi.borradorDeMesa(mesaBorrador);
+        if (previo) {
+          setSalirPregunta(false);
+          setReemplazoPregunta(previo);
+          return;
+        }
+      }
+      await salonApi.guardarBorradorMesa(mesaBorrador, contenidoBorrador(), lineas.reduce((a, l) => a + l.cantidad, 0));
+      setSalirPregunta(false);
+      setReemplazoPregunta(null);
+      alCerrar();
+    } catch (err: any) {
+      setReemplazoPregunta(null);
+      setSalirPregunta(true);
+      setErrorBorrador(err?.message || 'No se pudo guardar el borrador. Inténtalo otra vez.');
+    }
+  };
+
+  const restaurarBorrador = async (b: BorradorMesa) => {
+    const c = b.contenido ?? {};
+    setLineas(Array.isArray(c.lineas) ? c.lineas : []);
+    setCliNombre(c.cliNombre ?? '');
+    setCliTelefono(c.cliTelefono ?? '');
+    if (c.pideMode) setPideMode(c.pideMode);
+    setClienteEncontrado(c.clienteEncontrado ?? null);
+    setStaffElegido(c.staffElegido ?? null);
+    setCuponAplicado(c.cuponAplicado ?? null);
+    setPersonasTxt(c.personasTxt ?? '');
+    if (c.cuandoPaga) setCuandoPaga(c.cuandoPaga);
+    if (Array.isArray(c.filasPlan) && c.filasPlan.length > 0) setFilasPlan(c.filasPlan);
+    if (c.pagoPersonal) setPagoPersonal(c.pagoPersonal);
+    if (c.medioPersonal) setMedioPersonal(c.medioPersonal);
+    setFase(c.fase === 'pago' ? 'pago' : 'pedido');
+    setBorradorOrigen(b.mesaId);
+    // La mesa puede haberse ocupado mientras tanto: se pide otra libre y se conservan los productos
+    let ocupada = false;
+    try {
+      const r = await salonApi.obtenerMesas();
+      const m = (r?.pisos ?? []).flatMap((p) => p.mesas || []).find((x) => x.id === b.mesaId);
+      ocupada = m?.estado === 'OCUPADA';
+    } catch {
+      // sin conexión: se intenta con la mesa; el servidor avisa al enviar
+    }
+    if (ocupada) {
+      setMesasSeleccionadas([]);
+      setFase('pedido');
+      setPaso('plan');
+      setAvisoMesa(`${b.mesaNombre} ya está ocupada. Elige otra mesa libre; tus productos se conservan.`);
+    } else {
+      setMesasSeleccionadas([b.mesaId]);
+      setPaso('items');
+    }
+  };
+
+  // Al abrir desde Mis pedidos › Continuar
+  useEffect(() => {
+    if (borradorInicial) void restaurarBorrador(borradorInicial);
+  }, []);
+
+  // Al llegar a los productos de una mesa con borrador (de cualquier mozo), se pregunta qué hacer
+  useEffect(() => {
+    if (!abierto || paso !== 'items' || !esPedidoNuevoLocal || !mesaBorrador || pedidoRepetir) return;
+    if (lineas.length > 0 || consultadaRef.current === mesaBorrador) return;
+    consultadaRef.current = mesaBorrador;
+    void (async () => {
+      try {
+        const b = await salonApi.borradorDeMesa(mesaBorrador);
+        if (b) setBorradorPregunta(b);
+      } catch {
+        // sin borrador o sin conexión: se sigue con un pedido nuevo
+      }
+    })();
+  }, [abierto, paso, mesaBorrador]);
+
   // Croquis nuevo (elegir una o varias mesas): tocar una libre la elige; en «Tomar pedido», la primera abre la carta
   const alCambiarSeleccionCroquis = (ids: string[]) => {
     setAvisoMesa(null);
@@ -1519,6 +1636,8 @@ export function ModalNuevoPedidoMesa({
           },
           idempotencyKey,
         );
+        // El pedido ya salió: el borrador que se retomó deja de existir
+        if (borradorOrigen) void Promise.resolve().then(() => salonApi.eliminarBorradorMesa(borradorOrigen)).catch(() => undefined);
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
         // Sin celular real no se manda nada (el personal usa la ficha del trabajador); nunca el relleno 999999999
@@ -1847,7 +1966,7 @@ export function ModalNuevoPedidoMesa({
           // Escape cierra; un diálogo anidado (confirmación, ventana del producto) cierra solo lo suyo
           if (e.key === 'Escape' && (e.target as HTMLElement).closest('[role="dialog"]') === e.currentTarget) {
             e.stopPropagation();
-            alCerrar();
+            pedirCerrar();
           }
         }}
         className="salon-overlay salon-pantalla"
@@ -1862,7 +1981,7 @@ export function ModalNuevoPedidoMesa({
       >
         {/* Fondo oscurecido */}
         <div
-          onClick={alCerrar}
+          onClick={pedirCerrar}
           style={{
             position: 'absolute',
             left: 0,
@@ -1912,14 +2031,14 @@ export function ModalNuevoPedidoMesa({
                     setPaso(modalidad === 'local' ? 'plan' : 'cli');
                   } else if (paso === 'cli' || paso === 'plan') {
                     if (todasLasMesasIniciales.length > 0) {
-                      alCerrar();
+                      pedirCerrar();
                     } else {
                       setPaso('modal');
                     }
                   } else if (paso === 'floor') {
                     setPaso('modal');
                   } else {
-                    alCerrar();
+                    pedirCerrar();
                   }
                 }}
                 aria-label="Volver"
@@ -1953,7 +2072,7 @@ export function ModalNuevoPedidoMesa({
 
             <button
               type="button"
-              onClick={alCerrar}
+              onClick={pedirCerrar}
               aria-label="Cerrar"
               style={{
                 flex: 'none',
@@ -4012,6 +4131,59 @@ export function ModalNuevoPedidoMesa({
           cargando={enviando}
           alConfirmar={handleGuardarEdicion}
           alCancelar={() => setConfirmarGuardar(false)}
+        />
+      )}
+
+      {/* Cerrar con algo escrito: nunca se bota en silencio */}
+      {salirPregunta && (
+        <DialogoOpciones
+          titulo="¿Salir del pedido?"
+          mensaje={
+            (mesaBorrador
+              ? 'Puedes guardarlo como borrador y seguirlo después. El borrador no ocupa la mesa ni va a cocina.'
+              : 'Si sales, se pierde lo que escribiste.') + (errorBorrador ? ` ${errorBorrador}` : '')
+          }
+          opciones={[
+            ...(mesaBorrador ? [{ texto: 'Guardar como borrador', variante: 'primario' as const, alElegir: () => void guardarComoBorrador() }] : []),
+            { texto: 'Salir sin guardar', variante: 'peligro' as const, alElegir: () => { setSalirPregunta(false); alCerrar(); } },
+            { texto: 'Seguir con el pedido', alElegir: () => { setSalirPregunta(false); setErrorBorrador(null); } },
+          ]}
+        />
+      )}
+      {reemplazoPregunta && (
+        <DialogoOpciones
+          titulo="Esta mesa ya tiene un borrador"
+          mensaje={`${reemplazoPregunta.mesaNombre} ya tiene un borrador (de ${reemplazoPregunta.mozo}, ${haceTexto(reemplazoPregunta.actualizadoEn)}). ¿Lo reemplazas con este?`}
+          opciones={[
+            { texto: 'Reemplazar', variante: 'peligro' as const, alElegir: () => void guardarComoBorrador(true) },
+            { texto: 'No, volver al pedido', alElegir: () => setReemplazoPregunta(null) },
+          ]}
+        />
+      )}
+      {borradorPregunta && (
+        <DialogoOpciones
+          titulo="Hay un borrador de esta mesa"
+          mensaje={`Hay un borrador de esta mesa (de ${borradorPregunta.mozo}, ${haceTexto(borradorPregunta.actualizadoEn)}, ${borradorPregunta.productos} producto${borradorPregunta.productos === 1 ? '' : 's'}). ¿Continuar el borrador o eliminarlo y crear uno nuevo?`}
+          opciones={[
+            {
+              texto: 'Eliminar y crear uno nuevo',
+              variante: 'peligro' as const,
+              alElegir: () => {
+                const id = borradorPregunta.mesaId;
+                setBorradorPregunta(null);
+                void Promise.resolve().then(() => salonApi.eliminarBorradorMesa(id)).catch(() => undefined);
+              },
+            },
+            {
+              texto: 'Continuar el borrador',
+              variante: 'primario' as const,
+              alElegir: () => {
+                const b = borradorPregunta;
+                setBorradorPregunta(null);
+                void restaurarBorrador(b);
+              },
+            },
+          ]}
         />
       )}
 

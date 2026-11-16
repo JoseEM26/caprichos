@@ -223,7 +223,9 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Abrir la planilla de Luis/ }));
     const banner = await screen.findByTestId('banner-por-revisar');
     expect(banner).toHaveTextContent('2 jornadas por revisar');
-    expect(screen.getByRole('button', { name: 'Marcar pagado' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // bloqueado: dice qué falta
+    expect(screen.getByText(/Falta resolver 2 jornadas por revisar o sin evaluar/)).toBeInTheDocument();
+    expect(screen.getByText('Paso 1 de 4 · Asistencia')).toBeInTheDocument();
 
     fireEvent.click(within(banner).getByRole('button', { name: '2026-11-05' })); // enlace al día
     const fila = (await screen.findByText('2026-11-05', { selector: 'td' })).closest('tr')!;

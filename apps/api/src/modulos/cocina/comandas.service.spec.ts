@@ -333,11 +333,6 @@ describe('ComandasService', () => {
   });
 
   describe('delivery sin ubicación', () => {
-    it('despejar un delivery sin ubicación: 409 DELIVERY_SIN_UBICACION', async () => {
-      prisma.pedido.findUnique.mockResolvedValue({ id: 9n, codigo: 'CP-0009', estado: 'COLA', modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null, zona_id: null, comandas: [] });
-      await expect(service.despejar(9n, 1n, mockUsuario)).rejects.toMatchObject({ response: { codigo: 'DELIVERY_SIN_UBICACION' } });
-    });
-
     it('D: sincronizar pendientes y la vista de cocina solo miran pedidos vivos de HOY (no los de días anteriores)', async () => {
       prisma.pedido.findMany.mockResolvedValue([]);
       prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Barra' }]);
@@ -350,12 +345,10 @@ describe('ComandasService', () => {
       expect(donde.creado_en.gte).toBeInstanceOf(Date);
     });
 
-    it('sincronizar pendientes excluye los delivery sin ubicación', async () => {
+    it('sincronizar pendientes incluye los delivery sin ubicación (pasan a cocina igual)', async () => {
       prisma.pedido.findMany.mockResolvedValue([]);
       await service.sincronizarPendientes();
-      expect(prisma.pedido.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ NOT: expect.objectContaining({ modalidad: 'DELIVERY' }) }) }),
-      );
+      expect(prisma.pedido.findMany.mock.calls[0][0].where.NOT).toBeUndefined();
     });
   });
 

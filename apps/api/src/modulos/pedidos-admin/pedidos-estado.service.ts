@@ -5,7 +5,7 @@ import { CANALES_CON_ATENDIDO, nombresDePersonas } from './linea-tiempo.service'
 import { totalSegDePedido } from './linea-tiempo.util';
 import { cargarAuditoriaPedido } from './auditoria-pedido';
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
-import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
+import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { MEDIOS_DIGITALES_PLAN, mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { totalCobrable } from '../propinas/propinas.util';
@@ -832,10 +832,6 @@ export class PedidosEstadoService {
         where: {
           estado: { in: ['COLA', 'PREPARANDO'] },
           // El pago digital sin captura NO frena a cocina (la captura es opcional y se puede subir después).
-          NOT: [
-            // Delivery sin ubicación (punto o zona): sin envío calculado no pasa a cocina
-            { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
-          ],
         },
         orderBy: { creado_en: 'asc' }, // Más viejos primero
         include: {
@@ -1386,8 +1382,8 @@ export class PedidosEstadoService {
       });
     }
 
-    // Delivery sin ubicación (punto y zona): sin envío calculado no pasa a cocina ni avanza
-    exigirDeliveryUbicado(pedido);
+    // Sin ubicación pasa a cocina igual, pero no sale con el motorizado
+    if (nuevoEstado === 'EN_CAMINO') exigirDeliveryUbicado(pedido);
 
     // Un delivery no se marca entregado sin repartidor: su efectivo no tendría quién lo liquide
     if (nuevoEstado === 'ENTREGADO' && pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id) {
@@ -1569,8 +1565,6 @@ export class PedidosEstadoService {
         });
       }
     }
-
-    exigirDeliveryUbicado(pedido);
 
     const metodoUpper = dto.metodo.toUpperCase().trim();
     if (!METODOS_PAGO_PERMITIDOS.includes(metodoUpper as any)) {

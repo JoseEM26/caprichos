@@ -623,3 +623,11 @@ export function construirTicketPrueba(local: any, quien: string, ahora = new Dat
     pagos: [{ medio: 'SIN VALOR', monto: 0 }],
   };
 }
+
+/** Contenido propio de una etiqueta (sin mesa, hora, total, índice ni «n de N»): lo que decide si cambió de verdad. */
+export function huellaEtiqueta(tipo: string, p: any): string {
+  p = p || {};
+  if (tipo === 'ETIQUETA_GENERAL') return JSON.stringify({ productos: p.productos, cantidadProductos: p.cantidadProductos, nota: p.nota });
+  if (tipo === 'ETIQUETA_AREA') return JSON.stringify({ lineas: p.lineas, nota: p.nota });
+  return JSON.stringify({ n: p.bebidaNombre, t: p.tamano, o: p.opciones, c: p.contiene, p: p.persona });
+}

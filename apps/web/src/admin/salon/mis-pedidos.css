@@ -750,3 +750,36 @@
 .mp-sub-ver { min-height: 44px; margin-left: auto; }
 @keyframes mp-acc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .mp-acc-cuerpo { animation: none; } .mp-acc-chev::after { transition: none; } }
+
+.mp-borradores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.mp-borrador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1.5px dashed var(--cp-navy);
+  border-radius: 14px;
+  background: var(--cp-white);
+  font-size: 14px;
+  color: var(--cp-navy);
+}
+.mp-borrador span {
+  flex: 1 1 200px;
+  font-weight: 700;
+}
+.mp-borrador button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-navy);
+  background: transparent;
+  color: var(--cp-navy);
+  font-weight: 800;
+  cursor: pointer;
+}

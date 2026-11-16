@@ -16,7 +16,10 @@ export type EstadoJornada =
   | 'DESCANSO'
   | 'INCOMPLETO'
   | 'A_REVISAR'
-  | 'SIN_EVALUAR';
+  | 'SIN_EVALUAR' // en curso: ya marcó y el turno no se cerró
+  | 'POR_EMPEZAR' // sin marcas y el turno aún no empieza
+  | 'SIN_MARCAR_ENTRADA' // sin marcas, pasó la hora de entrada y la jornada no se cerró
+  | 'SIN_SALIDA'; // jornada cerrada con entrada y sin salida (en planilla cuenta como INCOMPLETO)
 
 const MS_HORA = 3_600_000;
 const MIN_DIA = 1440;
@@ -46,9 +49,18 @@ export function jornadaDe(momento: Date): { jornada: string; minutos: number } {
   return { jornada: fecha, minutos: hm };
 }
 
-/** Instante en que se cierra una jornada (04:00 Lima del día siguiente = 09:00 UTC). */
-export function cierreJornada(jornada: string): Date {
-  return new Date(Date.parse(`${sumarDias(jornada, 1)}T09:00:00Z`));
+/** Gracia tras el fin del turno antes de cerrar la jornada. */
+export const GRACIA_CIERRE_MIN = 120;
+
+/**
+ * Instante en que se cierra una jornada: fin del turno + 2 h de gracia, y como tope las 04:00 Lima del día
+ * siguiente (09:00 UTC), que es el cierre sin turno. Medianoche Lima = 05:00 UTC.
+ */
+export function cierreJornada(jornada: string, turno?: Pick<Turno, 'salida'> | null): Date {
+  const tope = Date.parse(`${sumarDias(jornada, 1)}T09:00:00Z`);
+  if (!turno) return new Date(tope);
+  const finTurno = Date.parse(`${jornada}T05:00:00Z`) + (turno.salida + GRACIA_CIERRE_MIN) * 60_000;
+  return new Date(Math.min(tope, finTurno));
 }
 
 /** Minutos de un TIME de Prisma (se guarda como 1970-01-01 HH:MM en UTC) o de un «HH:MM». */
@@ -148,7 +160,7 @@ export function evaluarJornada(entrada: {
 }): { resultado: ResultadoJornada; interp: Interpretacion } {
   const { jornada, turno, ahora, tolerancia } = entrada;
   const base = { programadaMin: 0, trabajadaMin: 0, almuerzoMin: 0, tardanzaMin: 0, salioAntesMin: 0, extraMin: 0 };
-  const cerrada = ahora.getTime() >= cierreJornada(jornada).getTime();
+  const cerrada = ahora.getTime() >= cierreJornada(jornada, turno).getTime();
   const interp = interpretarMarcas(entrada.marcas, turno, cerrada, entrada.dobleMarcaMin ?? DOBLE_MARCA_MIN_DEFECTO);
   const alertas: string[] = [];
   const fin = (r: Omit<ResultadoJornada, 'alertas'> & { alertas?: string[] }) => ({ resultado: { alertas, ...r } as ResultadoJornada, interp });
@@ -180,7 +192,11 @@ export function evaluarJornada(entrada: {
   const antes = base.salioAntesMin > tolerancia && Boolean(salidaM);
   const despues = base.extraMin > tolerancia;
 
-  if (entrada.marcas.length === 0) return fin({ ...base, estado: cerrada ? 'FALTA' : 'SIN_EVALUAR' });
+  if (entrada.marcas.length === 0) {
+    if (cerrada) return fin({ ...base, estado: 'FALTA' });
+    const limiteEntrada = Date.parse(`${jornada}T05:00:00Z`) + (turno.entrada + tolerancia) * 60_000;
+    return fin({ ...base, estado: ahora.getTime() < limiteEntrada ? 'POR_EMPEZAR' : 'SIN_MARCAR_ENTRADA' });
+  }
   if (contadas.some((m) => m.estado === 'A_REVISAR')) return fin({ ...base, estado: 'A_REVISAR' });
   if (interp.estado === 'A_REVISAR') {
     alertas.push(...interp.alertas);
@@ -189,7 +205,7 @@ export function evaluarJornada(entrada: {
   if (interp.estado !== 'OK') {
     if (!cerrada) return fin({ ...base, estado: 'SIN_EVALUAR' });
     alertas.push('Faltan marcas del día');
-    return fin({ ...base, estado: 'INCOMPLETO' });
+    return fin({ ...base, estado: interp.faltan.includes('SALIDA') && entradaM ? 'SIN_SALIDA' : 'INCOMPLETO' });
   }
   let estado: EstadoJornada = 'CUMPLIO';
   if (tarde) estado = 'TARDANZA';

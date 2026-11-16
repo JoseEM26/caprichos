@@ -108,7 +108,7 @@ describe('ImpresionService: tamaño al entregar el trabajo y modalidades al enco
 
   beforeEach(() => {
     prismaMock = {
-      printJob: { updateMany: jest.fn().mockResolvedValue({ count: 0 }), findMany: jest.fn(), upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(1) },
+      printJob: { updateMany: jest.fn().mockResolvedValue({ count: 0 }), findMany: jest.fn(), upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0) },
       deviceKey: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       areaCocina: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_general_modalidades', valor: ['LLEVAR', 'RECOGER', 'DELIVERY'] }]) },

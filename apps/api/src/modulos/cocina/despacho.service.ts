@@ -3,7 +3,6 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { ComandasService, lineasDeArea } from './comandas.service';
 import { estadoAreasDePedido } from './areas-pedido';
 import { obtenerInicioDiaLima } from './cocina.util';
@@ -39,7 +38,6 @@ export class DespachoService {
         creado_en: { gte: obtenerInicioDiaLima(ahora) },
         estado: incluirAtendidos ? { notIn: FUERA } : { in: EN_DESPACHO },
         comandas: { some: {} },
-        NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
       },
       include: {
         comandas: { include: { area: true } },

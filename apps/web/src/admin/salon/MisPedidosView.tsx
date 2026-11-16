@@ -7,7 +7,8 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
 import { normalizarBusqueda } from '../../comun/normalizarBusqueda';
-import { salonApi } from './api';
+import { salonApi, type BorradorMesa } from './api';
+import { haceTexto } from './haceTexto';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalVoucherPedido } from './ModalVoucherPedido';
 import { HistorialVoucher } from './HistorialVoucher';
@@ -157,6 +158,20 @@ export function MisPedidosView() {
   const [error, setError] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  // Borradores de pedido de mesa del día (guardados en el servidor)
+  const [borradores, setBorradores] = useState<BorradorMesa[]>([]);
+  const [borradorAbierto, setBorradorAbierto] = useState<BorradorMesa | null>(null);
+  const [borradorABorrar, setBorradorABorrar] = useState<BorradorMesa | null>(null);
+  const cargarBorradores = useCallback(async () => {
+    try {
+      setBorradores((await salonApi.listarBorradoresMesa()) ?? []);
+    } catch {
+      // sin borradores o sin conexión: no se muestran
+    }
+  }, []);
+  useEffect(() => {
+    void cargarBorradores();
+  }, [cargarBorradores, modalAbierto, borradorAbierto]);
   const [quitarDe, setQuitarDe] = useState<{ voucherId: string; codigo: string } | null>(null);
   const [quitando, setQuitando] = useState(false);
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
@@ -448,6 +463,20 @@ export function MisPedidosView() {
         Nuevo pedido
       </button>
 
+      {borradores.length > 0 && (
+        <div className="mp-borradores" aria-label="Borradores de pedido">
+          {borradores.map((b) => (
+            <div key={b.mesaId} className="mp-borrador">
+              <span>
+                Borrador · {b.mesaNombre} · {b.productos} producto{b.productos === 1 ? '' : 's'} · de {b.mozo} · {haceTexto(b.actualizadoEn)}
+              </span>
+              <button type="button" onClick={() => setBorradorAbierto(b)}>Continuar</button>
+              <button type="button" onClick={() => setBorradorABorrar(b)}>Eliminar</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {pestana === 'salon' && (
         <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-salon">
           <SalonMozo puedeForzar={tiene('mesas/liberar')} puedeDespachar={tiene('cocina/despachar')} />
@@ -652,16 +681,20 @@ export function MisPedidosView() {
       )}
 
       {/* Fuera de las pestañas: Nuevo pedido se abre igual desde Salón que desde Lista */}
-      {modalAbierto && (
+      {(modalAbierto || borradorAbierto) && (
         <ModalNuevoPedidoMesa
           abierto={true}
+          {...(borradorAbierto ? { borradorInicial: borradorAbierto, mesaPreseleccionadaId: borradorAbierto.mesaId } : {})}
           pasoInicial="modal"
           canal="MOZO"
           puedeForzarLiberacion={tiene('mesas/liberar')}
           puedeMesa={tiene('mesas/ver') && tiene('mesas/abrir')}
           puedePersonal={tiene('pedidos/crear')}
           pisos={pisos}
-          alCerrar={() => setModalAbierto(false)}
+          alCerrar={() => {
+            setModalAbierto(false);
+            setBorradorAbierto(null);
+          }}
           alExitoPedido={() => void cargar()}
         />
       )}
@@ -720,6 +753,25 @@ export function MisPedidosView() {
       {errorQuitar && (
         <p role="alert" className="mpv-ayuda">{errorQuitar}</p>
       )}
+      <Confirmar
+        abierto={borradorABorrar !== null}
+        titulo="Eliminar el borrador"
+        mensaje={borradorABorrar ? `Se borra el borrador de ${borradorABorrar.mesaNombre} (de ${borradorABorrar.mozo}). No se puede deshacer.` : ''}
+        textoSi="Sí, eliminar"
+        textoNo="No"
+        peligro
+        alConfirmar={async () => {
+          const b = borradorABorrar;
+          setBorradorABorrar(null);
+          if (!b) return;
+          try {
+            await salonApi.eliminarBorradorMesa(b.mesaId);
+          } finally {
+            void cargarBorradores();
+          }
+        }}
+        alCancelar={() => setBorradorABorrar(null)}
+      />
       <Confirmar
         abierto={quitarDe !== null}
         titulo="Quitar el voucher"

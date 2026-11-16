@@ -91,6 +91,17 @@ export function PlanoView() {
   // Zoom del plano (1 = ancho de la pantalla); el lienzo se desplaza con el dedo
   const [zoomPlano, setZoomPlano] = useState(1);
 
+  // Mesas con un borrador de pedido guardado (marca discreta; la mesa sigue libre)
+  const [mesasConBorrador, setMesasConBorrador] = useState<Set<string>>(() => new Set());
+  const cargarMarcasBorrador = useCallback(async () => {
+    try {
+      const lista = (await salonApi.listarBorradoresMesa()) ?? [];
+      setMesasConBorrador(new Set(lista.map((b) => b.mesaId)));
+    } catch {
+      // sin marcas
+    }
+  }, []);
+
   // Cargar datos
   const cargarDatos = useCallback(async () => {
     try {
@@ -102,6 +113,7 @@ export function PlanoView() {
 
       setPisos(datosPlano || []);
       setPisosSalon(datosSalon.pisos || []);
+      void cargarMarcasBorrador();
 
       setPisoActivoId((prev) => {
         if (datosPlano && datosPlano.some((p) => p.id === prev)) {
@@ -114,7 +126,7 @@ export function PlanoView() {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [cargarMarcasBorrador]);
 
   useEffect(() => {
     cargarDatos();
@@ -127,6 +139,7 @@ export function PlanoView() {
         .obtenerMesas()
         .then((res) => {
           if (res?.pisos) setPisosSalon(res.pisos);
+          void cargarMarcasBorrador();
         })
         .catch(() => {});
     },
@@ -982,6 +995,16 @@ export function PlanoView() {
                         ]
                           .filter(Boolean)
                           .join(' · ')}
+                      </span>
+                    )}
+                    {esMesa && !ocupadaSalon && mesasConBorrador.has(String(e.id)) && (
+                      <span
+                        data-testid={`borrador-mesa-${e.id}`}
+                        title="Esta mesa tiene un borrador de pedido"
+                        aria-label="Mesa con borrador de pedido"
+                        style={{ position: 'absolute', top: 1, right: 2, fontSize: '11px', lineHeight: 1 }}
+                      >
+                        📝
                       </span>
                     )}
                     {ocupadaSalon && (

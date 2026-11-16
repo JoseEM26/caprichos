@@ -1,6 +1,4 @@
 import { useState, useMemo, useEffect } from 'react';
-import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
-import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
@@ -49,10 +47,8 @@ export function ModalCobrar({
   alCerrar,
   alCobrarExitoso,
   cobrar = pedidosApi.cobrar,
-  alActualizarPedido,
 }: ModalCobrarProps) {
   const encendidos = useMediosEncendidos('CAJA');
-  const sinUbicar = deliverySinUbicacion(pedido);
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
   const propinaGuardada = Number(pedido.propina) || 0;
@@ -791,15 +787,6 @@ export function ModalCobrar({
           </div>
         )}
 
-        {sinUbicar && (
-          <AvisoDeliverySinUbicacion
-            pedidoId={String(pedido.id)}
-            codigo={pedido.codigo}
-            direccion={pedido.entrega_direccion}
-            alActualizar={alActualizarPedido ?? alCerrar}
-          />
-        )}
-
         {quita && (
           <div role="alert" data-testid="aviso-sin-descuento" style={{ background: '#FEF3C7', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '10px 12px', fontSize: 14, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
             Sin descuento {quita.nombre}: total S/ {totalPedido.toFixed(2)}
@@ -814,8 +801,7 @@ export function ModalCobrar({
           <Boton
             variante="primario"
             cargando={enviando}
-            disabled={!cuadra || enviando || sinUbicar}
-            title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
+            disabled={!cuadra || enviando}
             onClick={iniciarCobro}
             style={{
               flex: 1,

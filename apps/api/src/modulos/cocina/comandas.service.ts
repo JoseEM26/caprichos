@@ -1,7 +1,6 @@
 import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { SalonService } from '../salon/salon.service';
 import { pedidoDebeEstarCobrado } from '../pedidos';
-import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
   BadRequestException,
@@ -288,8 +287,6 @@ export class ComandasService {
         ...pedidoVivoDeHoy(),
         estado: { in: ['COLA', 'PREPARANDO'] },
         comandas: { none: {} },
-        // Delivery sin ubicación (punto o zona): no llega a cocina
-        NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
       },
       select: { id: true },
     });
@@ -414,7 +411,6 @@ export class ComandasService {
         pedido: {
           ...pedidoVivoDeHoy(ahora),
           estado: { notIn: ESTADOS_FUERA_DE_COCINA },
-          NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
         },
         OR: [
           { estado: 'EN_COCINA' },
@@ -570,7 +566,6 @@ export class ComandasService {
         mensaje: `No se puede despejar un pedido en estado ${pedido.estado}`,
       });
     }
-    exigirDeliveryUbicado(pedido);
 
     const comanda = await this.prisma.comandaArea.findUnique({
       where: {
@@ -750,7 +745,6 @@ export class ComandasService {
     if (!ESTADOS_PARA_LISTO.includes(pedido.estado)) {
       return { ok: true, pedidoId: pId.toString(), completo: true, parcial: false, estado: pedido.estado, yaDespachado: true };
     }
-    exigirDeliveryUbicado(pedido);
 
     const listas = pedido.comandas.filter((c) => c.estado === 'DESPEJADA');
     const faltan = pedido.comandas.filter((c) => c.estado !== 'DESPEJADA');

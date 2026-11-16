@@ -101,7 +101,7 @@ export class AsistenciaCorreccionesService {
         const d = this.asistencia.evaluarDia(pid, j, ctx, ahora, cfg);
         const sols = solDe.get(`${pid}|${j}`) ?? [];
         if (!d.turno && d.interp.marcas.length === 0 && sols.length === 0) continue; // día de descanso sin nada
-        const cerrada = ahora.getTime() >= cierreJornada(j).getTime();
+        const cerrada = ahora.getTime() >= cierreJornada(j, d.turno).getTime();
         const inc = cerrada ? detectarInconsistencia(d.resultado.estado, d.interp, etiquetaDia(j)) : null;
         const r = resumen[j];
         const est = d.resultado.estado;
@@ -109,7 +109,7 @@ export class AsistenciaCorreccionesService {
           r.total++;
           if (est === 'CUMPLIO' || est === 'SALIO_DESPUES' || est === 'SALIO_ANTES') r.cumplieron++;
           if (est === 'TARDANZA') r.tardanzas++;
-          if (est === 'A_REVISAR' || est === 'INCOMPLETO' || d.interp.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
+          if (est === 'A_REVISAR' || est === 'INCOMPLETO' || est === 'SIN_SALIDA' || d.interp.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
           if (est === 'FALTA') r.faltas++;
         }
         r.solicitudes += sols.length;

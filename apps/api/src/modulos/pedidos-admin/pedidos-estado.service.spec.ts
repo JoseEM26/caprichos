@@ -337,29 +337,21 @@ describe('PedidosEstadoService', () => {
     });
   });
 
-  describe('delivery sin ubicación: DELIVERY_SIN_UBICACION', () => {
+  describe('delivery sin ubicación: pasa a cocina, pero no sale con el motorizado', () => {
     const sinUbicar = { id: 10n, codigo: 'CP-W031', modalidad: 'DELIVERY', estado: 'COLA', pago_estado: 'PENDIENTE', entrega_lat: null, entrega_lng: null, zona_id: null, pasa_cocina_en: null };
 
-    it.each(['PREPARANDO', 'LISTO'])('cambiarEstado a %s no pasa a cocina: 409 y no actualiza', async (estado) => {
+    it('cambiarEstado a PREPARANDO pasa igual que uno con ubicación', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(sinUbicar);
-      await expect(service.cambiarEstado(10n, { estado }, cocinaAuth)).rejects.toMatchObject({
-        response: { codigo: 'DELIVERY_SIN_UBICACION', mensaje: 'Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).' },
+      prismaMock.pedido.update.mockResolvedValue({ ...sinUbicar, estado: 'PREPARANDO' });
+      const res = await service.cambiarEstado(10n, { estado: 'PREPARANDO' }, cocinaAuth);
+      expect(res.estado).toBe('PREPARANDO');
+    });
+
+    it('LISTO -> EN_CAMINO sin ubicación: 409 UBICACION_REQUERIDA y no actualiza', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...sinUbicar, estado: 'LISTO' });
+      await expect(service.cambiarEstado(10n, { estado: 'EN_CAMINO' }, cajeroAuth)).rejects.toMatchObject({
+        response: { codigo: 'UBICACION_REQUERIDA', mensaje: 'Falta la ubicación del cliente: confírmala por WhatsApp antes de mandarlo con el motorizado' },
         status: 409,
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-    });
-
-    it('con punto pero sin zona tampoco pasa', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue({ ...sinUbicar, entrega_lat: -12.1, entrega_lng: -77 });
-      await expect(service.cambiarEstado(10n, { estado: 'PREPARANDO' }, cocinaAuth)).rejects.toMatchObject({
-        response: { codigo: 'DELIVERY_SIN_UBICACION' },
-      });
-    });
-
-    it('registrarPago (confirmar pedido y pago) queda bloqueado', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue(sinUbicar);
-      await expect(service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth)).rejects.toMatchObject({
-        response: { codigo: 'DELIVERY_SIN_UBICACION' },
       });
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
@@ -1055,10 +1047,6 @@ describe('PedidosEstadoService', () => {
         expect.objectContaining({
           where: {
             estado: { in: ['COLA', 'PREPARANDO'] },
-            // El pago digital sin captura NO frena a cocina: solo el delivery sin ubicación queda fuera
-            NOT: [
-              { modalidad: 'DELIVERY', OR: [{ entrega_lat: null }, { entrega_lng: null }, { zona_id: null }] },
-            ],
           },
           orderBy: { creado_en: 'asc' },
         }),
