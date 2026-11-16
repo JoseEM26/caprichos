@@ -61,6 +61,7 @@ import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
+import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
 import { AvisosPedidoService, ETAPAS_AVISO } from '../chatbot/servicios/avisos-pedido.service';
 import {
@@ -1306,12 +1307,7 @@ export class RepartosService {
         });
       }
 
-      if (pedidoExistente.entrega_lat == null || pedidoExistente.entrega_lng == null) {
-        throw new ConflictException({
-          codigo: 'FALTA_UBICAR',
-          mensaje: 'El pedido no tiene ubicación: caja debe ubicarlo antes de que se pueda tomar',
-        });
-      }
+      exigirDeliveryUbicado(pedidoExistente);
 
       throw new ConflictException({
         codigo: 'YA_TOMADO',
@@ -1405,6 +1401,7 @@ export class RepartosService {
         mensaje: `Solo se puede salir con un pedido en estado LISTO (estado actual: ${pedido.estado})`,
       });
     }
+    exigirDeliveryUbicado(pedido);
 
     // Delivery digital: no sale sin cobrar (el efectivo contra entrega sí sale); solo el ADMIN fuerza con motivo
     const forzadoSinCobro = await exigirCobroAntesDeEntregar(this.prisma, pedido as any, usuario, {
@@ -2782,6 +2779,7 @@ export class RepartosService {
         mensaje: 'No se puede reasignar un pedido que ya fue entregado',
       });
     }
+    exigirDeliveryUbicado(pedido);
 
     // Verificar que el nuevo repartidor existe y tiene rol REPARTIDOR activo
     const userAccount = await this.prisma.userAccount.findUnique({

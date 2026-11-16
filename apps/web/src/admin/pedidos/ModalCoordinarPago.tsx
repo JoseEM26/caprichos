@@ -3,8 +3,6 @@ import { Confirmar } from '../../comun/Confirmar';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { pedidosApi, montoPorCobrar, PedidoPorCobrar } from './pedidosApi';
 import { medioDigitalVoucher } from './mediosPago';
-import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
-import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 
 export interface ModalCoordinarPagoProps {
   pedido: PedidoPorCobrar;
@@ -18,8 +16,7 @@ export interface ModalCoordinarPagoProps {
  * Marca el pago como coordinado. En un medio digital (Yape, Plin, transferencia) la foto del comprobante es
  * opcional: sin ella queda «Pagado sin captura» y se puede subir después.
  */
-export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualizarPedido }: ModalCoordinarPagoProps) {
-  const sinUbicar = deliverySinUbicacion(pedido);
+export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoordinarPagoProps) {
   const medio = pedido.pago_preferido || pedido.pago_metodo || '';
   const medioVoucher = medioDigitalVoucher(medio);
 
@@ -30,7 +27,6 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
   const [error, setError] = useState<string>('');
 
   const usaExcepcion = Boolean(medioVoucher) && !voucherListo;
-  const listo = !sinUbicar;
 
   const ejecutar = async () => {
     setConfirmando(false);
@@ -85,15 +81,6 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
           Medio: <b>{medio || 'sin medio'}</b> · Total S/ {montoPorCobrar(pedido).toFixed(2)}
         </div>
 
-        {sinUbicar && (
-          <AvisoDeliverySinUbicacion
-            pedidoId={String(pedido.id)}
-            codigo={pedido.codigo}
-            direccion={pedido.entrega_direccion}
-            alActualizar={alActualizarPedido ?? alCerrar}
-          />
-        )}
-
         {medioVoucher ? (
           <div
             data-testid="seccion-coordinar-comprobante"
@@ -145,8 +132,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
-            disabled={!listo || enviando}
-            title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
+            disabled={enviando}
             onClick={() => setConfirmando(true)}
             style={{
               flex: 1,
@@ -158,8 +144,8 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
               fontFamily: 'Montserrat, sans-serif',
               fontWeight: 800,
               fontSize: 15,
-              cursor: !listo || enviando ? 'not-allowed' : 'pointer',
-              opacity: !listo || enviando ? 0.6 : 1,
+              cursor: enviando ? 'not-allowed' : 'pointer',
+              opacity: enviando ? 0.6 : 1,
             }}
           >
             {enviando ? 'Guardando...' : 'Marcar coordinado'}

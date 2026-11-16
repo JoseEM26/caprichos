@@ -40,7 +40,7 @@ import { InsigniaNumeroDia } from './InsigniaNumeroDia';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { descuentosDePedido } from '@caprichos/compartido';
 import { lineasPrecuenta } from './precuentaDetalle';
-import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
+import { deliverySinUbicacion } from './ubicacionDelivery';
 import { InsigniaCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
 import { CapaProductos } from './CapaProductos';
 import { CapaPago } from './CapaPago';
@@ -425,6 +425,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               pedidoId={String(pedido.id)}
               codigo={pedido.codigo}
               direccion={pedido.entrega_direccion}
+              telefono={pedido.cliente_telefono ?? ''}
               alActualizar={alActualizar}
             />
           )}
@@ -511,8 +512,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   type="button"
                   className="dp-primaria"
                   onClick={() => setAbrirConfirmarPago(true)}
-                  disabled={sinUbicar}
-                  title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
                 >
                   {contraEntrega ? 'Confirmar pedido' : 'Confirmar pedido y pago'}
                 </button>
@@ -522,8 +521,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   type="button"
                   className="dp-primaria"
                   onClick={() => setAbrirCobrar(true)}
-                  disabled={sinUbicar}
-                  title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
                 >
                   Registrar cobro S/ {totalNum.toFixed(2)}
                 </button>
@@ -601,8 +598,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   texto="Crédito personal"
                   etiqueta="Cobrar a crédito del personal"
                   alClic={() => setAbrirCreditoPersonal(true)}
-                  deshabilitado={sinUbicar}
-                  titulo={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
                 />
               )}
               {puedeEditar && <BotonIcono n="editar" texto="Editar" etiqueta="Editar pedido" alClic={() => alEditar?.(pedido)} />}

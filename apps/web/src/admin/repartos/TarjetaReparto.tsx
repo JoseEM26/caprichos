@@ -176,7 +176,7 @@ export function TarjetaReparto({
               );
             } else if (err.codigo === 'YA_TOMADO') {
               setErrorAccion(err.message || 'Otro repartidor ya tomó este pedido');
-            } else if (err.codigo === 'FALTA_UBICAR') {
+            } else if (err.codigo === 'UBICACION_REQUERIDA') {
               setErrorAccion(
                 err.message || 'El pedido no tiene ubicación: caja debe ubicarlo antes de que se pueda tomar',
               );
@@ -342,7 +342,7 @@ export function TarjetaReparto({
                     border: '1.5px solid var(--cp-rust, #C4412B)',
                   }}
                 >
-                  Falta ubicar
+                  📍 Falta ubicación
                 </span>
               )}
             </div>

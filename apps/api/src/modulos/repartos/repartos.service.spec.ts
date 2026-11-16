@@ -215,7 +215,7 @@ describe('RepartosService', () => {
   });
 
   describe('2b. Delivery sin ubicación (RQ-CAJ-01-03)', () => {
-    it('no se puede tomar hasta que caja lo ubique: 409 FALTA_UBICAR', async () => {
+    it('no se puede tomar hasta que caja lo ubique: 409 UBICACION_REQUERIDA', async () => {
       prismaMock.pedido.count.mockResolvedValue(0);
       prismaMock.pedido.updateMany.mockResolvedValue({ count: 0 });
       prismaMock.pedido.findUnique.mockResolvedValue({
@@ -223,12 +223,13 @@ describe('RepartosService', () => {
         estado: 'LISTO',
         repartidor_party_id: null,
         motivo_falla: null,
+        modalidad: 'DELIVERY',
         entrega_lat: null,
         entrega_lng: null,
       });
 
       await expect(service.tomarPedido('30', repartidor1)).rejects.toMatchObject({
-        response: { codigo: 'FALTA_UBICAR' },
+        response: { codigo: 'UBICACION_REQUERIDA' },
       });
       expect(prismaMock.pedido.updateMany.mock.calls[0][0].where).toMatchObject({
         entrega_lat: { not: null },
@@ -243,6 +244,8 @@ describe('RepartosService', () => {
         id: 30n,
         codigo: 'CP-0102',
         modalidad: 'DELIVERY',
+        entrega_lat: -12.1,
+        entrega_lng: -77,
         pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,
@@ -399,6 +402,8 @@ describe('RepartosService', () => {
   describe('3.b Voucher opcional: el delivery sale y entrega con el pago pendiente', () => {
     const digitalPendiente = {
       modalidad: 'DELIVERY',
+      entrega_lat: -12.1,
+      entrega_lng: -77,
       repartidor_party_id: 101n,
       pago_estado: 'PENDIENTE',
       pago_metodo: 'YAPE',
@@ -1356,6 +1361,8 @@ describe('RepartosService', () => {
         id: 400n,
         codigo: 'CP-400',
         modalidad: 'DELIVERY',
+        entrega_lat: -12.1,
+        entrega_lng: -77,
         pago_estado: 'PAGADO',
         estado: 'LISTO',
         repartidor_party_id: 101n,

@@ -68,9 +68,9 @@ describe('TarjetaPedidoCaja', () => {
     expect(screen.getByText('CP-W041')).toBeInTheDocument();
   });
 
-  it('delivery sin ubicación avisa «Falta la ubicación»', () => {
+  it('delivery sin ubicación avisa «📍 Falta ubicación»', () => {
     pintar({ modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null } as Partial<Pedido>);
-    expect(screen.getByText('Falta la ubicación')).toBeInTheDocument();
+    expect(screen.getByText('📍 Falta ubicación')).toBeInTheDocument();
   });
 
   it('pagado y clic seleccionan el pedido', () => {
