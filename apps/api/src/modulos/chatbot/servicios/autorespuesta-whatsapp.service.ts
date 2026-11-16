@@ -2,8 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { LocalService } from '../../local/local.service';
-import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
-import { interpolar, NOMBRE_LOCAL_BOT, textoBot } from '../conversacion/bienvenida.util';
+import { nombreParaSaludo } from '../conversacion/bienvenida.util';
 import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esSaludo } from '../conversacion/cortesia-entrante.util';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
 import { horarioDelLocal } from '../evolution/horario-local';
@@ -12,7 +11,7 @@ import { urlPublicaCarta } from './carrusel.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 
 /** Cada cuánto como máximo se le repite al mismo cliente el aviso de «fuera de horario» o la bienvenida con la carta. */
-export const HORAS_ENTRE_AUTORESPUESTAS = 12;
+export const HORAS_ENTRE_AUTORESPUESTAS = 6;
 const ESTADOS_PEDIDO_TERMINADOS = ['ENTREGADO', 'ANULADO', 'CANCELADO', 'FINALIZADO', 'RECHAZADO'];
 /** Estados del bot en los que un «ok» o «gracias» puede ser la respuesta a una pregunta: ahí no se reacciona. */
 const ESTADOS_SIN_PREGUNTA = new Set(['INICIO', 'MENU', 'ATENCION_PERSONA']);
@@ -27,13 +26,21 @@ export interface EntradaCortesia {
   puedeProcesarMotor: boolean;
 }
 
+/** «mañana a las 09:00» → «mañana a las 9:00 a. m.» */
+export function aHora12(texto: string): string {
+  return texto.replace(/(\d{1,2}):(\d{2})/g, (_m, h: string, m: string) => {
+    const n = Number(h);
+    return `${n % 12 || 12}:${m} ${n >= 12 && n < 24 ? 'p. m.' : 'a. m.'}`;
+  });
+}
+
 export const TEXTOS_CORTESIA = {
-  /** Reusa el texto «fuera de horario» del bot (chatbot_texto_fuera_horario) y le suma el saludo y la carta. */
-  fueraDeHorario: (nombre: string, fueraDeHorarioBot: string, linkCarta: string): string =>
+  /** Corto y cariñoso, con la hora real de apertura y la carta; sin menú (con el local cerrado el bot no conversa). */
+  fueraDeHorario: (nombre: string, apertura: string | null, linkCarta: string): string =>
     [
-      `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Gracias por escribirnos.`,
-      fueraDeHorarioBot,
-      linkCarta ? `Mientras tanto puedes ver nuestra carta aquí: ${linkCarta} 🍰 ¡Te esperamos con algo rico!` : '¡Te esperamos con algo rico! 🍰',
+      `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Gracias por escribirnos 🥰 Ahora estamos descansando 🌙`,
+      apertura ? `Abrimos ${aHora12(apertura)} ☕` : 'Te esperamos en nuestro próximo horario de atención ☕',
+      linkCarta ? `Mientras tanto, mira nuestra carta aquí: ${linkCarta} 🍰 ¡Te esperamos con algo rico! ✨` : '¡Te esperamos con algo rico! 🍰✨',
     ].join('\n\n'),
   bienvenidaConCarta: (nombre: string, linkCarta: string): string =>
     `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Qué gusto saludarte. Mira nuestra carta aquí: ${linkCarta} 🍰 Cuando quieras pedir, escríbenos y te ayudamos. ¡Te esperamos con algo rico!`,
@@ -55,7 +62,6 @@ export class AutorespuestaWhatsappService {
     private readonly config: ConfigService,
     private readonly evolution: EvolutionConfigService,
     @Optional() private readonly local?: LocalService,
-    @Optional() private readonly chatbotConfig?: ChatbotConfiguracionService,
   ) {}
 
   /** Reacciona al mensaje del cliente. true si quedó la reacción (si falla o no se puede, quien llama contesta con texto como antes). */
@@ -88,28 +94,23 @@ export class AutorespuestaWhatsappService {
       return false;
     }
 
-    // Si el bot va a contestar, él ya saluda y avisa del horario (con la bienvenida y chatbot_texto_fuera_horario)
-    if (e.puedeProcesarMotor && (await this.botActivo())) return false;
     if (tomado) return false; // una persona lo está atendiendo
 
     const cfg = await this.evolution.obtener();
     const horario = await horarioDelLocal(this.local, this.prisma, new Date(), { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
     const link = urlPublicaCarta((k) => this.config.get<string>(k));
-    const nombre = String(e.nombre ?? '').trim();
+    const nombre = nombreParaSaludo(e.nombre);
 
+    // Local cerrado: el bot NO conversa (ni menú ni IA). Un solo aviso corto con la hora de apertura y la carta, y silencio
+    // hasta pasadas HORAS_ENTRE_AUTORESPUESTAS. Excepción: quien tiene un pedido en curso o un pago por validar sigue con el bot.
     if (!horario.abierto) {
-      const textos = await this.chatbotConfig?.obtenerTextosBot().catch(() => null);
-      const apertura = horario.apertura ? `Abrimos ${horario.apertura}.` : 'Abrimos en nuestro próximo horario regular.';
-      const fuera = interpolar(textoBot(textos, 'chatbot_texto_fuera_horario'), {
-        nombre,
-        local: NOMBRE_LOCAL_BOT,
-        link_carta: link,
-        horario: '',
-        hora_apertura: horario.apertura ?? 'nuestro próximo horario',
-        apertura,
-      });
-      return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', TEXTOS_CORTESIA.fueraDeHorario(nombre, fuera, link));
+      const enCurso = estadoFlujo.startsWith('PAGO') || e.conversacion.estado === 'VALIDAR_PAGO' || (await this.pedidoDesde(e.telefono, 24 * 3_600_000, true));
+      if (enCurso) return false;
+      return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', TEXTOS_CORTESIA.fueraDeHorario(nombre, horario.apertura, link));
     }
+
+    // Abierto y el bot va a contestar: él ya saluda
+    if (e.puedeProcesarMotor && (await this.botActivo())) return false;
 
     // Saludo de alguien sin pedido activo: bienvenida con la carta (solo si hay enlace público que dar)
     if (esSaludo(e.texto) && link && !(await this.pedidoDesde(e.telefono, 2 * 24 * 3_600_000, true))) {
@@ -139,7 +140,7 @@ export class AutorespuestaWhatsappService {
     return n > 0;
   }
 
-  /** Encola la respuesta (origen AUTORESPUESTA: responde a un mensaje del cliente) una sola vez cada 12 h por cliente. */
+  /** Encola la respuesta (origen AUTORESPUESTA: responde a un mensaje del cliente) una sola vez cada 6 h por cliente. */
   private async enviarUnaVez(telefono: string, tipo: 'FUERA_DE_HORARIO' | 'BIENVENIDA', texto: string): Promise<boolean> {
     const previa = await this.prisma.salienteWhatsapp.findFirst({
       where: { origen: 'AUTORESPUESTA', telefono_destino: telefono, creado_en: { gte: new Date(Date.now() - HORAS_ENTRE_AUTORESPUESTAS * 3_600_000) } },

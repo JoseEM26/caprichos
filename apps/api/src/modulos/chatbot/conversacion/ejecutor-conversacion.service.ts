@@ -7,6 +7,8 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { LocalService } from '../../local/local.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
+import { aplanarEnlacesMarkdown } from '../utilidades/texto-whatsapp.util';
+import { EvolutionConfigService } from '../evolution/evolution-config.service';
 import { enviarCarruselConRespaldo, resumenCarrusel, urlPublicaCarta } from '../servicios/carrusel.util';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
@@ -110,6 +112,7 @@ export class EjecutorConversacionService {
     @Optional() @Inject(CUENTA_CLIENTE_BOT_PUERTO) private readonly clientesService?: CuentaClienteBotPuerto,
     @Optional() private readonly reanudacionBot?: ReanudacionBotService,
     @Optional() private readonly facturacionCliente?: FacturacionClienteService,
+    @Optional() private readonly evolutionConfig?: EvolutionConfigService,
   ) {}
 
   /**
@@ -182,6 +185,24 @@ export class EjecutorConversacionService {
     } catch (err: any) {
       this.logger.warn(`Redis no disponible para rate limit del chatbot: ${err.message}`);
       return true;
+    }
+  }
+
+  /** Con Evolution: 5 respuestas por 2 minutos y 20 por hora por conversación. Con Meta no hace nada. */
+  private async verificarTopeEvolution(conversacionId: string | bigint): Promise<'OK' | 'SILENCIO' | 'DERIVAR'> {
+    try {
+      if (!this.evolutionConfig || (await this.evolutionConfig.proveedor()) !== 'EVOLUTION') return 'OK';
+      const redis = this.redisService.obtenerCliente();
+      const id = conversacionId.toString();
+      const incr = async (clave: string, seg: number) => {
+        const n = await redis.incr(clave);
+        if (n === 1) await redis.expire(clave, seg);
+        return n;
+      };
+      if ((await incr(`chatbot:evo:hora:${id}`, 3600)) > 20) return 'DERIVAR';
+      return (await incr(`chatbot:evo:2min:${id}`, 120)) > 5 ? 'SILENCIO' : 'OK';
+    } catch {
+      return 'OK';
     }
   }
 
@@ -924,6 +945,22 @@ export class EjecutorConversacionService {
           conversacion.id,
           antiSpamCheck.bloqueado ? 'Anti-spam: el contacto está bloqueado temporalmente.' : 'Anti-spam: demasiados mensajes por minuto/hora; el bot no respondió.',
         );
+        return false;
+      }
+    }
+
+    // 4.c Anti-bucle con Evolution (WhatsApp no oficial: el spam o un bucle bana el número): máx. 5 respuestas en 2 min y 20 por
+    // hora por cliente; pasado el tope de la hora, silencio y el chat pasa a una persona. Los toques de menú no cuentan.
+    if (!(entradaRaw.buttonPayload || entradaRaw.listReplyId || entradaRaw.listRowId)) {
+      const tope = await this.verificarTopeEvolution(conversacion.id);
+      if (tope !== 'OK') {
+        if (tope === 'DERIVAR') {
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: { duenio: 'PERSONA', urgente: true, motivo_derivacion: 'ANTI_BUCLE', ultima_actividad: new Date() },
+          });
+        }
+        await this.registrarSilencio(conversacion.id, tope === 'DERIVAR' ? 'Demasiados mensajes en una hora (20): el bot calla y el chat pasa a una persona.' : 'Más de 5 respuestas en 2 minutos: el bot espera.');
         return false;
       }
     }
@@ -2546,6 +2583,8 @@ export class EjecutorConversacionService {
           this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
         }
 
+        // WhatsApp no entiende los enlaces Markdown de la IA: URL plana
+        textoRespuesta = aplanarEnlacesMarkdown(textoRespuesta);
         let metaId: string | null = null;
         if (destinoEnvio) {
           const res = await this.mensajeria.enviarBotones(

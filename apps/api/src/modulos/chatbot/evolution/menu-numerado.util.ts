@@ -15,6 +15,23 @@ export interface MenuNumerado {
 
 const TOPE_OPCIONES = 30;
 
+const EMOJI_ESCALA: Record<string, string> = { 'encuesta:1': '😞', 'encuesta:2': '😕', 'encuesta:3': '😐', 'encuesta:4': '😊', 'encuesta:5': '🤩' };
+const ESCALA_ENCUESTA: BotonAccion[] = [
+  { id: 'encuesta:1', titulo: '1 Malo' },
+  { id: 'encuesta:2', titulo: '2 Pobre' },
+  { id: 'encuesta:3', titulo: '3 Regular' },
+  { id: 'encuesta:4', titulo: '4 Bueno' },
+  { id: 'encuesta:5', titulo: '5 Excelente' },
+];
+
+/**
+ * La plantilla de la encuesta trae solo 1, 3 y 5; numerada, «2» elegiría la segunda opción (el 3). Con texto numerado
+ * la escala sale siempre completa y cada número vale su puntaje.
+ */
+export function completarEscalaEncuesta(items: Array<BotonAccion | FilaLista>): Array<BotonAccion | FilaLista> {
+  return items.length > 0 && items.every((i) => /^encuesta:[1-5]$/.test(i.id)) ? ESCALA_ENCUESTA : items;
+}
+
 /** Convierte botones o filas en texto numerado y devuelve el menú para mapear la respuesta del cliente. */
 export function aTextoNumerado(
   texto: string,
@@ -24,10 +41,13 @@ export function aTextoNumerado(
   const opciones = items.slice(0, TOPE_OPCIONES).map((it, i) => ({ n: i + 1, id: it.id, titulo: it.titulo }));
   const lineas = opciones.map((o) => {
     const desc = (items[o.n - 1] as FilaLista).descripcion;
-    return `${o.n}. ${o.titulo}${desc ? ` (${desc})` : ''}`;
+    // «3 Regular» ya trae su número (escala de la encuesta): no se duplica, y lleva su emoji
+    const titulo = o.titulo.replace(new RegExp(`^${o.n}\\s+`), '');
+    const emoji = EMOJI_ESCALA[o.id] ? `${EMOJI_ESCALA[o.id]} ` : '';
+    return `${o.n}. ${emoji}${titulo}${desc ? ` (${desc})` : ''}`;
   });
   const rango = opciones.length <= 1 ? '1' : opciones.length === 2 ? '1 o 2' : `${opciones.slice(0, -1).map((o) => o.n).join(', ')} o ${opciones.length}`;
-  return { texto: `${texto.trim()}\n\n${lineas.join('\n')}\n\nResponde ${rango}.`, menu: { tipo, opciones } };
+  return { texto: `${texto.trim()}\n\n${lineas.join('\n')}\n\n👉 Responde ${rango}. 💛`, menu: { tipo, opciones } };
 }
 
 /** Número que el cliente escribió como respuesta («2», «2.», «opción 2»); null si el texto es otra cosa. */

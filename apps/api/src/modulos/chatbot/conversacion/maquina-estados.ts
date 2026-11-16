@@ -47,6 +47,7 @@ import {
   adjuntarCierreComercial,
 } from './cierre-comercial.util';
 import { esSaludo as esSaludoPuro } from './normalizador-entrada.util';
+import { nombreParaSaludo } from './bienvenida.util';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
@@ -1928,7 +1929,8 @@ function transicionarSoloMenus(
 
   const saludoCorto = () => {
     const ped = contexto.pedidoActivo;
-    const nombre = contexto.nombreCliente && contexto.nombreCliente !== 'Cliente' ? ` ${String(contexto.nombreCliente).split(/\s+/)[0]}` : '';
+    const nombreReal = nombreParaSaludo(contexto.nombreCliente);
+    const nombre = nombreReal ? ` ${nombreReal.split(/\s+/)[0]}` : '';
     const lineaPedido = ped?.codigo ? ` Tu pedido ${ped.codigo} sigue su curso.` : '';
     return respuesta([
       { tipo: 'enviarBotones', texto: `¡Hola de nuevo${nombre}! 😊${lineaPedido}\nAquí sigo por si necesitas algo más.`, botones: [BOTON_VOLVER_MENU] },
@@ -2151,6 +2153,14 @@ function transicionarSoloMenus(
 
   // 14. Primer contacto sin intención clara: saludo con el menú
   if (flujo.estado === 'INICIO') return saludo();
+
+  // 14.b Un número suelto sin menú vigente («1» de un «Volver al menú» viejo): vuelve al menú, nunca a la IA ni al «no entendí»
+  if (!id && !enPersona && /^\d{1,2}\s*[.)]?$/.test(texto.trim())) return saludo();
+  // Solo emojis (sin letras ni números): no es una pregunta, la IA no gasta ni el bot contesta (anti-bucle)
+  const crudo = (entrada.textoOriginal || texto || '').trim();
+  if (!id && !enPersona && crudo && /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f\s]+$/u.test(crudo)) {
+    return { nuevoEstado: flujo.estado, acciones: [], nuevoFlujo: flujo };
+  }
 
   // 15. Texto libre que ninguna regla entendió: primero la IA (si está encendida); al segundo «no entendí» seguido, a una persona
   if (contexto.chatbotIaActivo && texto.trim() && !id) {

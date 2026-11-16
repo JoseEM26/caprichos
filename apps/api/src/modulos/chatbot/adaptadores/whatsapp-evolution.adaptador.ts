@@ -5,7 +5,7 @@ import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmas
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { textoDePlantilla } from '../catalogo/texto-plantilla';
 import { destinoEvolution } from '../evolution/evolution-mensaje.util';
-import { aTextoNumerado } from '../evolution/menu-numerado.util';
+import { aTextoNumerado, completarEscalaEncuesta } from '../evolution/menu-numerado.util';
 import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
 import { escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
 import { EvolutionApiCliente } from '../evolution/evolution-api.cliente';
@@ -20,6 +20,7 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import type { CargaCarrusel } from '../servicios/carrusel.util';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
+import { aplanarEnlacesMarkdown, textoSinBotonPedirEste } from '../utilidades/texto-whatsapp.util';
 
 const PREFIJO_MEDIA = 'evo:';
 const MEDIA_TTL_MS = 15 * 60_000;
@@ -140,14 +141,14 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
 
   async enviarTexto(telefono: string, texto: string, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const cfg = await this.config.obtener();
-    const final = this.variar(limitarEnlaces(texto, cfg.evolution_max_enlaces), cfg.evolution_max_texto_identico);
+    const final = this.variar(limitarEnlaces(aplanarEnlacesMarkdown(texto), cfg.evolution_max_enlaces), cfg.evolution_max_texto_identico);
     await this.menus.borrar(telefono);
     return this.post('/message/sendText', { text: final }, telefono, `texto (${final.length} caracteres)`, escribiendoMs(final, cfg.evolution_escribiendo_ms_por_caracter), opciones);
   }
 
   private async enviarMenu(telefono: string, texto: string, items: Array<BotonAccion | FilaLista>, tipo: 'boton' | 'lista', opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const cfg = await this.config.obtener();
-    const { texto: cuerpo, menu } = aTextoNumerado(texto, items, tipo);
+    const { texto: cuerpo, menu } = aTextoNumerado(aplanarEnlacesMarkdown(texto), completarEscalaEncuesta(items), tipo);
     const final = limitarEnlaces(cuerpo, cfg.evolution_max_enlaces);
     // Se guarda antes de enviar: el cliente puede contestar muy rápido
     await this.menus.guardar(telefono, menu);
@@ -164,12 +165,17 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     return this.enviarMenu(telefono, texto, filas, 'lista', o);
   }
 
-  /** Carrusel: sin imágenes por tarjeta; sale la lista de respaldo si la hay, o una lista con los nombres de las tarjetas. */
+  /**
+   * Carrusel: sin imágenes ni botones por tarjeta. Sale una lista numerada con los productos (nombre y precio) y, al final,
+   * las opciones de salida del respaldo («Volver al menú»); elegir un número equivale a «Pedir este». El texto no manda a tocar botones.
+   */
   enviarCarrusel(telefono: string, carga: CargaCarrusel, o?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
     const rp = carga.respaldo;
-    if (rp?.filas?.length) return this.enviarMenu(telefono, rp.texto, rp.filas.slice(0, 10), 'lista', o);
-    if (rp?.botones?.length) return this.enviarMenu(telefono, rp.texto, rp.botones.slice(0, 3), 'boton', o);
-    return this.enviarMenu(telefono, carga.cuerpo, carga.tarjetas.map((t) => ({ id: t.boton.id, titulo: t.nombre })), 'lista', o);
+    const filas: FilaLista[] = rp?.filas?.length
+      ? rp.filas.slice(0, 10)
+      : carga.tarjetas.slice(0, 10).map((t) => ({ id: t.boton.id, titulo: t.nombre, descripcion: t.cuerpo.split('\n')[1] ?? '' }));
+    const salidas = rp?.botones?.length ? rp.botones : carga.botonComun ? [carga.botonComun] : [];
+    return this.enviarMenu(telefono, textoSinBotonPedirEste(rp?.texto ?? carga.cuerpo), [...filas, ...salidas], 'lista', o);
   }
 
   /** Plantilla = su texto libre equivalente del catálogo, con las variables puestas. */

@@ -485,7 +485,7 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
                 origen: 'ENCUESTA',
                 pedidoId: p.id,
                 carga: {
-                  textoLibre: `Hola ${nombre}, gracias por tu compra en Caprichos (pedido ${p.codigo}). ¿Como calificarias tu atencion del 1 al 5?`,
+                  textoLibre: `¡Hola ${nombre}! 💛 Gracias por tu compra en Caprichos (pedido ${p.codigo}) 🥰 ¿Cómo calificarías tu atención del 1 al 5? ⭐`,
                   plantillaClave: 'ENCUESTA_POSVENTA',
                   variablesPlantilla: [nombre, p.codigo],
                   botones: [
