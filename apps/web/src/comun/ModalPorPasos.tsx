@@ -27,14 +27,22 @@ export interface ModalPorPasosProps {
   error?: string | null;
   /** true mientras se envía: bloquea botones, Esc y fondo. */
   enviando?: boolean;
+  /** Ancho máximo en px (620 por defecto). */
+  ancho?: number;
+  /** Paso en el que abre (p. ej. el resumen en modo solo lectura). */
+  indiceInicial?: number;
+  /** Reemplaza el botón de finalizar en el último paso (p. ej. solo lectura). */
+  accionFinal?: ReactNode;
+  /** Texto bajo el título (período, estado). */
+  subtitulo?: ReactNode;
 }
 
 /** Asistente por pasos: progreso, Atrás/Siguiente/Finalizar y validación por paso. Para modales largos y lineales. */
 export function ModalPorPasos({
-  titulo, pasos, resumen, alCerrar, alFinalizar, textoFinalizar = 'Finalizar', error, enviando = false,
+  titulo, pasos, resumen, alCerrar, alFinalizar, textoFinalizar = 'Finalizar', error, enviando = false, ancho, indiceInicial = 0, accionFinal, subtitulo,
 }: ModalPorPasosProps) {
   const todos: PasoModal[] = resumen ? [...pasos, { id: 'resumen', titulo: 'Resumen', contenido: resumen }] : pasos;
-  const [indice, setIndice] = useState(0);
+  const [indice, setIndice] = useState(indiceInicial);
   const [aviso, setAviso] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const alTeclear = useDialogoAccesible(ref, alCerrar, enviando);
@@ -65,10 +73,13 @@ export function ModalPorPasos({
   return createPortal(
     <>
       <div className="mpp-fondo" onClick={enviando ? undefined : alCerrar} />
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="ad-dialogo mpp-dialogo"
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="ad-dialogo mpp-dialogo" style={ancho ? { width: `min(${ancho}px, calc(100% - 24px))` } : undefined}
         onKeyDown={alTeclear} tabIndex={-1}>
         <div className="ad-cabecera">
-          <h2 id={tituloId} className="ad-titulo" style={{ margin: 0 }}>{titulo}</h2>
+          <div>
+            <h2 id={tituloId} className="ad-titulo" style={{ margin: 0 }}>{titulo}</h2>
+            {subtitulo && <div className="as-ayuda" style={{ margin: 0 }}>{subtitulo}</div>}
+          </div>
           <button type="button" className="ad-cerrar" aria-label="Cerrar" disabled={enviando} onClick={alCerrar}>×</button>
         </div>
         <div className="mpp-progreso">
@@ -93,7 +104,7 @@ export function ModalPorPasos({
           ) : (
             <Boton variante="secundario" disabled={enviando} onClick={() => { setAviso(null); setIndice(indice - 1); }}>Atrás</Boton>
           )}
-          {ultimo ? (
+          {ultimo && accionFinal ? accionFinal : ultimo ? (
             <Boton variante="primario" cargando={enviando} disabled={enviando} onClick={finalizar}>{textoFinalizar}</Boton>
           ) : (
             <Boton variante="primario" onClick={siguiente}>Siguiente</Boton>

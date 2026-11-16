@@ -1,11 +1,9 @@
-import { ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
-import { useDialogoAccesible } from '../../comun/useDialogoAccesible';
-import '../../comun/modal-pestanas.css';
+import { ModalPorPasos } from '../../comun/ModalPorPasos';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
 import { jornadaActual, useUltimaPeticion } from './jornada';
 import { ETIQUETA_ROL, ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
@@ -36,7 +34,7 @@ const Fila = ({ t, v, fuerte }: { t: ReactNode; v: ReactNode; fuerte?: boolean }
   <li className={`pl-fila${fuerte ? ' pl-fila--total' : ''}`}><span>{t}</span><span className="as-num">{v}</span></li>
 );
 
-/** Detalle de una persona: panel con secciones plegables (Pago, Asistencia, Penalidad, Adelantos, Descuentos, Préstamos, Servicios extra). */
+/** Cierre de planilla de una persona por pasos: Asistencia, Descuentos, Pago y Resumen (solo lectura si ya está pagado). */
 export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila: FilaPlanilla; fecha: string; alCerrar: () => void; onError: Avisar; onOk: Avisar }) {
   const [d, setD] = useState<DetallePlanilla | null>(null);
   const [excluidos, setExcluidos] = useState<string[]>([]);
@@ -50,13 +48,10 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
   const [aj, setAj] = useState({ tipo: 'DESCUENTO' as 'ADELANTO' | 'DESCUENTO' | 'BONO', categoria: 'OTRO', fecha: jornadaActual(), monto: '', motivo: '' });
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
   const [resaltar, setResaltar] = useState<string | null>(null);
+  // el admin confirma pagar sin descontar los créditos de días anteriores sin cerrar
+  const [sinDescontarAnt, setSinDescontarAnt] = useState(false);
   const [confirmaSimples, setConfirmaSimples] = useState(false);
   const [resSimples, setResSimples] = useState<ResultadoLote | null>(null);
-  const [asistAbierta, setAsistAbierta] = useState(false);
-
-  const base = useId();
-  const dialogoRef = useRef<HTMLDivElement>(null);
-  const alTeclear = useDialogoAccesible(dialogoRef, alCerrar, ocupado);
 
   const nueva = useUltimaPeticion();
   const cargar = useCallback(async () => {
@@ -93,7 +88,6 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
   const descuentos = d?.ajustes.filter((a) => a.tipo !== 'ADELANTO') ?? [];
   const irAlDia = (j: string) => {
     setResaltar(j);
-    setAsistAbierta(true);
     setTimeout(() => document.getElementById(`dia-${j}`)?.scrollIntoView?.({ block: 'center' }), 50);
   };
 
@@ -164,16 +158,18 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
       ))}
     </ul>
   );
-
+  const faltan = !pagado && d ? Math.max(porRevisar.length, d.pendientes) : 0;
+  const antSinCobrar = !pagado && d ? d.consumos.filter((c) => c.anterior && !c.cobrar) : [];
+  const antTotal = antSinCobrar.reduce((a, c) => a + c.monto, 0);
+  const faltaCredito = antSinCobrar.length > 0 && !sinDescontarAnt;
   const cuotas = d?.cuotas ?? [];
   const recurrentes = d?.recurrentes ?? [];
-  const cuerpo = !d || !r ? <Cargando mensaje="Cargando" /> : (
+  const paso1 = d && r && (
     <div style={{ display: 'grid', gap: 8 }}>
       {pagado && <div role="status" className="as-aviso as-aviso--ok">Período pagado el {new Date(d.pagadoEn!).toLocaleString('es-PE', { timeZone: 'America/Lima' })}. Las cifras están congeladas.</div>}
-      {r.neto < 0 && <div role="alert" className="as-aviso as-aviso--alerta">El neto es negativo: los descuentos superan lo ganado.</div>}
-      {!pagado && porRevisar.length > 0 && (
+      {!pagado && faltan > 0 && (
         <div role="alert" className="as-aviso as-aviso--alerta" data-testid="banner-por-revisar">
-          <strong>{porRevisar.length} {porRevisar.length === 1 ? 'jornada por revisar' : 'jornadas por revisar'}</strong>: no se puede marcar pagado hasta corregirlas.{' '}
+          <strong>{faltan} {faltan === 1 ? 'jornada por revisar' : 'jornadas por revisar o sin evaluar'}</strong>: no se puede pasar al pago hasta corregirlas.{' '}
           {porRevisar.map((j) => <button key={j} type="button" className="as-enlace" style={{ background: 'none', border: 0, cursor: 'pointer', padding: '0 6px', minHeight: 32 }} onClick={() => irAlDia(j)}>{j}</button>)}
           <div style={{ marginTop: 6 }}>
             <Boton type="button" variante="secundario" disabled={ocupado} onClick={() => setConfirmaSimples(true)}>Aprobar todas las marcas dudosas del período</Boton>
@@ -187,33 +183,11 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
           {resSimples.resultados.filter((x) => !x.ok).map((x) => <div key={`${x.tipo}${x.id}`}>✗ {x.tipo === 'MARCA' ? 'Marca' : 'Solicitud'} #{x.id}: {x.mensaje}</div>)}
         </div>
       )}
-
-      <Plegable titulo="Pago" resumen={`Neto ${soles(r.neto)}`} abierta>
-        <p className="as-ayuda">
-          Período {d.periodo.desde} a {d.periodo.hasta} · Sueldo {d.sueldo.modalidad === 'SEMANAL' ? 'semanal' : 'mensual'} {soles(d.sueldo.modalidad === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual)} · Valor hora {soles(r.valorHora)}
-          {d.tercerizado && <> · <Insignia variante="acento">Tercerizado: sin feriado ×2 ni vacaciones</Insignia></>}
-        </p>
-        <ul className="pl-filas">
+      <ul className="pl-filas">
           <Fila t="Horas programadas" v={`${horas(r.programadaMin)} h`} />
           <Fila t="Horas trabajadas (el break se paga)" v={`${horas(r.trabajadaMin)} h → ${soles(r.pagoTrabajado)}`} />
           <Fila t={`Horas extra aprobadas (de ${horas(r.extraMin)} h)`} v={`${horas(r.extraAprobadaMin)} h → ${soles(r.pagoExtra)}`} />
-          {!!r.pagoVacaciones && <Fila t="Vacaciones pagadas en dinero" v={soles(r.pagoVacaciones)} />}
-          {!!r.adicional && <Fila t="Adicional (bonos)" v={`+ ${soles(r.adicional)}`} />}
-          <Fila t="Ganado" v={soles(r.ganado)} fuerte />
-          <Fila t="Penalidad por tardanza" v={`− ${soles(penal)}`} />
-          <Fila t="Consumos cobrados" v={`− ${soles(r.consumosCobrados)}`} />
-          <Fila t="Descuentos" v={`− ${soles(r.descuentos)}`} />
-          <Fila t="Adelantos" v={`− ${soles(r.adelantos)}`} />
-          <Fila t="Neto a pagar" v={soles(r.neto)} fuerte />
-        </ul>
-        {r.descuentosPorCategoria && Object.keys(r.descuentosPorCategoria).length > 0 && (
-          <small className="as-nota">Se descuenta: {Object.entries(r.descuentosPorCategoria).map(([c, m]) => `${ETIQUETA_CATEGORIA[c] ?? (c === 'TARDANZA' ? 'Tardanza' : c)}: ${soles(m)}`).join(' · ')}</small>
-        )}
-        {r.consumosPendientes > 0 && <small className="as-nota">Consumos que pasan al siguiente período: {soles(r.consumosPendientes)}</small>}
-        {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)} (se marcan en «Descuentos y consumos»).</small>}
-        {d.pago && <p className="as-ayuda">Pagar a: <DatosPago pago={d.pago} onOk={onOk} /></p>}
-        <p className="as-ayuda">Marcar como pagado no mueve la caja: solo congela esta planilla y deja los consumos cobrados como «descontados por planilla».</p>
-      </Plegable>
+      </ul>
 
       <Plegable titulo="Penalidad por tardanza" resumen={penal > 0 ? `− ${soles(penal)}` : 'Sin penalidad'} abierta={penal > 0}>
         <p className="as-ayuda">La hora tarde no se paga y además se cobra una penalidad según su valor (el factor se cambia en Configuración).</p>
@@ -225,7 +199,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
         )}
       </Plegable>
 
-      <Plegable titulo="Asistencia del período" resumen={`${horas(r.trabajadaMin)} h de ${horas(r.programadaMin)} h`} abierta={asistAbierta} key={asistAbierta ? 'a1' : 'a0'}>
+      <Plegable titulo="Asistencia del período" resumen={`${horas(r.trabajadaMin)} h de ${horas(r.programadaMin)} h`} abierta>
         <p className="as-ayuda">Cada sol sale de aquí: horario, marcas interpretadas, horas pagadas y recargos. Las dobles marcas aparecen tachadas y no cuentan.</p>
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas">
@@ -268,7 +242,22 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
           </table>
         </div>
       </Plegable>
+    </div>
+  );
 
+  const paso2 = d && r && (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {antSinCobrar.length > 0 && (
+        <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-creditos-anteriores">
+          <strong>Tiene {antSinCobrar.length} {antSinCobrar.length === 1 ? 'crédito sin cerrar' : 'créditos sin cerrar'} de días anteriores por {soles(antTotal)}.</strong>
+          {' '}No entran solos en «Consumos cobrados» de esta planilla: marca abajo los que quieres descontar en este pago o confirma pagar sin descontarlos.
+          <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{antSinCobrar.map((c) => <li key={c.id}>{c.fecha} · {c.pedido} · {soles(c.monto)}</li>)}</ul>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
+            <input type="checkbox" checked={sinDescontarAnt} onChange={(e) => setSinDescontarAnt(e.target.checked)} aria-label="Confirmo pagar sin descontar los créditos anteriores" />
+            Confirmo pagar sin descontar estos créditos (siguen pendientes en Créditos).
+          </label>
+        </div>
+      )}
       <Plegable titulo="Adelantos" resumen={r.adelantos > 0 ? `− ${soles(r.adelantos)}` : 'Sin adelantos'}>
         {formAjuste(['ADELANTO'])}
         {listaAjustes(adelantos, 'En este período no hay adelantos.')}
@@ -345,76 +334,130 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
         {vista && <ServiciosExtraPersona partyId={fila.partyId} alCambiar={() => void cargar()} />}
         </>)}
       </Plegable>
+    </div>
+  );
 
-      <Plegable titulo="Vínculo y vacaciones" perezoso>
+  const paso3 = d && r && (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {r.neto < 0 && <div role="alert" className="as-aviso as-aviso--alerta">El neto es negativo: los descuentos superan lo ganado.</div>}
+      <p className="as-ayuda">
+        Período {d.periodo.desde} a {d.periodo.hasta} · Sueldo {d.sueldo.modalidad === 'SEMANAL' ? 'semanal' : 'mensual'} {soles(d.sueldo.modalidad === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual)} · Valor hora {soles(r.valorHora)}
+        {d.tercerizado && <> · <Insignia variante="acento">Tercerizado: sin feriado ×2 ni vacaciones</Insignia></>}
+      </p>
+        <ul className="pl-filas">
+          {!!r.pagoVacaciones && <Fila t="Vacaciones pagadas en dinero" v={soles(r.pagoVacaciones)} />}
+          {!!r.adicional && <Fila t="Adicional (bonos)" v={`+ ${soles(r.adicional)}`} />}
+          <Fila t="Ganado" v={soles(r.ganado)} fuerte />
+          <Fila t="Penalidad por tardanza" v={`− ${soles(penal)}`} />
+          <Fila t="Consumos cobrados" v={`− ${soles(r.consumosCobrados)}`} />
+          <Fila t="Descuentos" v={`− ${soles(r.descuentos)}`} />
+          <Fila t="Adelantos" v={`− ${soles(r.adelantos)}`} />
+          <Fila t="Neto a pagar" v={soles(r.neto)} fuerte />
+        </ul>
+      {r.descuentosPorCategoria && Object.keys(r.descuentosPorCategoria).length > 0 && (
+        <small className="as-nota">Se descuenta: {Object.entries(r.descuentosPorCategoria).map(([c, m]) => `${ETIQUETA_CATEGORIA[c] ?? (c === 'TARDANZA' ? 'Tardanza' : c)}: ${soles(m)}`).join(' · ')}</small>
+      )}
+      {r.consumosPendientes > 0 && <small className="as-nota">Consumos que pasan al siguiente período: {soles(r.consumosPendientes)}</small>}
+      {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)} (se marcan en «Descuentos y consumos»).</small>}
+      {d.pago && <p className="as-ayuda">Pagar a: <DatosPago pago={d.pago} onOk={onOk} /></p>}
+      <p className="as-ayuda">Marcar como pagado no mueve la caja: solo congela esta planilla y deja los consumos cobrados como «descontados por planilla».</p>
+      <Plegable titulo="Vínculo y vacaciones" resumen="Más" perezoso>
         <PestanaVinculoVacaciones partyId={fila.partyId} alCambiar={() => void cargar()} />
       </Plegable>
     </div>
   );
 
-  const pie = d && (
-    <>
-      <Boton type="button" variante="secundario" tamano="grande" onClick={alCerrar}>Cerrar</Boton>
-      {pagado ? (
-        reabrir === null
-          ? <Boton type="button" variante="peligro" tamano="grande" onClick={() => setReabrir('')}>Reabrir período</Boton>
-          : (
-            <>
-              <input aria-label="Motivo para reabrir (mínimo 10 caracteres)" placeholder="Motivo para reabrir (mín. 10 caracteres)" value={reabrir} onChange={(e) => setReabrir(e.target.value)} style={{ minHeight: 44, flex: 1, minWidth: 160, borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' }} />
-              <Boton type="button" variante="peligro" tamano="grande" disabled={ocupado || reabrir.trim().length < 10} onClick={() => void ejecutar(async () => { await reabrirPlanilla(d.periodoId!, reabrir.trim()); setReabrir(null); }, 'Período reabierto.')}>Confirmar</Boton>
-            </>
-          )
-      ) : confirmaPago ? (
+  const resumen = d && r && (
+    <div style={{ display: 'grid', gap: 8 }} data-testid="resumen-planilla">
+      <p className="as-ayuda">{fila.nombre} · {d.periodo.desde} a {d.periodo.hasta}{pagado ? ' · Pagado (solo lectura)' : ''}</p>
+      <ul className="pl-filas">
+        <Fila t="Horas trabajadas / programadas" v={`${horas(r.trabajadaMin)} h de ${horas(r.programadaMin)} h`} />
+        <Fila t="Ganado" v={soles(r.ganado)} />
+        <Fila t="Penalidad por tardanza" v={`− ${soles(penal)}`} />
+        <Fila t="Adelantos" v={`− ${soles(r.adelantos)}`} />
+        <Fila t="Descuentos y consumos" v={`− ${soles(r.descuentos + r.consumosCobrados)}`} />
+        <Fila t="Cuotas de préstamo y servicios extra" v={`${cuotas.filter((c) => c.cobrar).length + recurrentes.filter((c) => c.cobrar).length} en este pago`} />
+        <Fila t="Total a pagar" v={soles(r.neto)} fuerte />
+      </ul>
+      {d.pago && <p className="as-ayuda">Pagar a: <DatosPago pago={d.pago} onOk={onOk} /></p>}
+    </div>
+  );
+
+  const accionPagado = d && pagado && (
+    reabrir === null
+      ? <Boton type="button" variante="peligro" onClick={() => setReabrir('')}>Reabrir período</Boton>
+      : (
         <>
-          <span style={{ fontWeight: 700 }}>¿Pagar {soles(d.resultado.neto)}? Se congela.</span>
-          <Boton type="button" variante="secundario" tamano="grande" onClick={() => setConfirmaPago(false)}>No</Boton>
-          <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); }, 'Período marcado como pagado.')}>Sí, marcar pagado</Boton>
+          <input aria-label="Motivo para reabrir (mínimo 10 caracteres)" placeholder="Motivo para reabrir (mín. 10 caracteres)" value={reabrir} onChange={(e) => setReabrir(e.target.value)} style={{ minHeight: 44, flex: 1, minWidth: 160, borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' }} />
+          <Boton type="button" variante="peligro" disabled={ocupado || reabrir.trim().length < 10} onClick={() => void ejecutar(async () => { await reabrirPlanilla(d.periodoId!, reabrir.trim()); setReabrir(null); }, 'Período reabierto.')}>Confirmar</Boton>
         </>
-      ) : (
-        <Boton type="button" tamano="grande" disabled={ocupado || d.pendientes > 0} onClick={() => setConfirmaPago(true)}>Marcar pagado</Boton>
-      )}
+      )
+  );
+
+  const confirmaciones = (
+    <>
+      <Confirmar
+        abierto={confirmaPago}
+        titulo={`¿Pagar ${soles(d?.resultado.neto ?? 0)}? Se congela.`}
+        mensaje="Se congela la planilla de este período."
+        textoSi="Sí, marcar pagado"
+        textoNo="No"
+        cargando={ocupado}
+        alConfirmar={() => void ejecutar(async () => { await pagarPlanilla(d!.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); }, 'Período marcado como pagado.')}
+        alCancelar={() => setConfirmaPago(false)}
+      />
+      <Confirmar
+        abierto={confirmaSimples}
+        titulo="¿Aprobar todas las marcas dudosas del período?"
+        mensaje={`Se aprobarán las marcas manuales por revisar y las solicitudes de corrección pendientes de ${fila.nombre} del ${d?.periodo.desde} al ${d?.periodo.hasta}. Revisa antes las cámaras.`}
+        textoSi="Sí, aprobar"
+        textoNo="No"
+        cargando={ocupado}
+        alConfirmar={async () => {
+          if (!d) return;
+          setOcupado(true);
+          try {
+            setResSimples(await aprobarSimplesPeriodo(d.partyId, d.periodo.desde, d.periodo.hasta));
+            setConfirmaSimples(false);
+            onError(null);
+            await cargar();
+          } catch (e) {
+            onError(mensajeDe(e, 'No se pudo aprobar en lote.'));
+          } finally {
+            setOcupado(false);
+          }
+        }}
+        alCancelar={() => setConfirmaSimples(false)}
+      />
     </>
   );
 
-  const tituloId = `${base}-titulo`;
-  return createPortal(
+  const titulo = `Planilla de ${fila.nombre}`;
+  if (!d || !r) {
+    return <ModalPorPasos key="cargando" titulo={titulo} ancho={860} alCerrar={alCerrar} alFinalizar={() => undefined}
+      pasos={[{ id: 'cargando', titulo: 'Cargando', contenido: <Cargando mensaje="Cargando" /> }]} />;
+  }
+  return (
     <>
-      <div className="mcp-fondo" onClick={ocupado ? undefined : alCerrar} />
-      <div ref={dialogoRef} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="mcp-dialogo" style={{ maxWidth: 820 }} onKeyDown={alTeclear} tabIndex={-1}>
-        <div className="mcp-cabecera">
-          <div className="mcp-titulos">
-            <h2 id={tituloId} className="mcp-titulo">Planilla de {fila.nombre}</h2>
-            {d && <div className="mcp-subtitulo">{d.periodo.desde} a {d.periodo.hasta}{pagado ? ' · Pagado' : ''}</div>}
-          </div>
-          <button type="button" className="mcp-cerrar" aria-label="Cerrar" disabled={ocupado} onClick={alCerrar}>×</button>
-        </div>
-        <div className="mcp-cuerpo">{cuerpo}</div>
-        {pie && <div className="mcp-pie">{pie}</div>}
-        <Confirmar
-          abierto={confirmaSimples}
-          titulo="¿Aprobar todas las marcas dudosas del período?"
-          mensaje={`Se aprobarán las marcas manuales por revisar y las solicitudes de corrección pendientes de ${fila.nombre} del ${d?.periodo.desde} al ${d?.periodo.hasta}. Revisa antes las cámaras.`}
-          textoSi="Sí, aprobar"
-          textoNo="No"
-          cargando={ocupado}
-          alConfirmar={async () => {
-            if (!d) return;
-            setOcupado(true);
-            try {
-              setResSimples(await aprobarSimplesPeriodo(d.partyId, d.periodo.desde, d.periodo.hasta));
-              setConfirmaSimples(false);
-              onError(null);
-              await cargar();
-            } catch (e) {
-              onError(mensajeDe(e, 'No se pudo aprobar en lote.'));
-            } finally {
-              setOcupado(false);
-            }
-          }}
-          alCancelar={() => setConfirmaSimples(false)}
-        />
-      </div>
-    </>,
-    document.body,
+      <ModalPorPasos key="listo" titulo={titulo} ancho={860} alCerrar={alCerrar} enviando={ocupado}
+        subtitulo={`${d.periodo.desde} a ${d.periodo.hasta}${pagado ? ' · Pagado' : ''}`}
+        indiceInicial={pagado ? 3 : 0}
+        textoFinalizar="Marcar pagado"
+        alFinalizar={() => setConfirmaPago(true)}
+        accionFinal={pagado ? accionPagado : undefined}
+        pasos={[
+          { id: 'asistencia', titulo: 'Asistencia', contenido: paso1,
+            validar: () => (faltan > 0
+              ? `Falta resolver ${faltan} ${faltan === 1 ? 'jornada' : 'jornadas'} por revisar o sin evaluar${porRevisar.length ? ` (${porRevisar.join(', ')})` : ''}. Usa «Aprobar todas las marcas dudosas» o corrígelas en Calendario.`
+              : null) },
+          { id: 'descuentos', titulo: 'Descuentos', contenido: paso2,
+            validar: () => (faltaCredito
+              ? `Tiene ${antSinCobrar.length} ${antSinCobrar.length === 1 ? 'crédito sin cerrar' : 'créditos sin cerrar'} de días anteriores por ${soles(antTotal)}. Márcalos para descontarlos en este pago o confirma pagar sin descontarlos.`
+              : null) },
+          { id: 'pago', titulo: 'Pago', contenido: paso3 },
+        ]}
+        resumen={resumen} />
+      {confirmaciones}
+    </>
   );
 }
