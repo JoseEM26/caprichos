@@ -357,6 +357,8 @@ export class AsistenciaCorreccionesService {
     usuario: UsuarioAutenticado,
     ip?: string,
     ahora = new Date(),
+    /** Datos del origen del lote (persona y período en «Aprobar todas») para el registro único del lote. */
+    contexto: Record<string, unknown> = {},
   ) {
     const vistos = new Set<string>();
     const items = dto.items.filter((i) => !vistos.has(`${i.tipo}${i.id}`) && vistos.add(`${i.tipo}${i.id}`));
@@ -395,7 +397,7 @@ export class AsistenciaCorreccionesService {
       }
     }
     const ok = resultados.filter((r) => r.ok).length;
-    await this.auditar(dto.accion === 'APROBAR' ? 'APROBAR_LOTE' : 'RECHAZAR_LOTE', usuario.partyId, ip, 0n, { total: resultados.length, ok, fallidas: resultados.length - ok, resultados }, motivo || undefined);
+    await this.auditar(dto.accion === 'APROBAR' ? 'APROBAR_LOTE' : 'RECHAZAR_LOTE', usuario.partyId, ip, 0n, { ...contexto, total: resultados.length, ok, fallidas: resultados.length - ok, resultados }, motivo || undefined);
     return { total: resultados.length, ok, fallidas: resultados.length - ok, resultados };
   }
 
@@ -416,7 +418,7 @@ export class AsistenciaCorreccionesService {
       for (const s of d.solicitudes) items.push({ tipo: 'SOLICITUD', id: s.id });
     }
     if (items.length === 0) return { total: 0, ok: 0, fallidas: 0, omitidas, resultados: [] };
-    const r = await this.lote({ accion: 'APROBAR', motivo: 'Aprobada en lote desde el resumen de pago', items }, usuario, ip, ahora);
+    const r = await this.lote({ accion: 'APROBAR', motivo: 'Aprobada en lote desde el resumen de pago', items }, usuario, ip, ahora, { origen: 'APROBAR_TODAS_PERIODO', partyId, desde, hasta, omitidas });
     return { ...r, omitidas };
   }
 

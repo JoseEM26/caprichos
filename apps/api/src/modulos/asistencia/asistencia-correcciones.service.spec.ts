@@ -322,3 +322,14 @@ describe('pendientes de revisión del admin (campanita)', () => {
     expect(r).toMatchObject({ marcasDudosas: 0, sinSalida: 0, incompletas: 0 });
   });
 });
+
+describe('«Aprobar todas»: registro único del lote', () => {
+  it('deja un registro del lote con quién, cuántas, la persona y el período, además del de cada marca', async () => {
+    const { svc, auditoria } = montar({ marcas: [celular(1, 9), { ...celular(2, 18), tipo: 'SALIDA', origen: 'WEB', estado: 'A_REVISAR' }] });
+    const r = await svc.aprobarSimples(7, '2026-11-02', '2026-11-08', ADMIN, '1.1.1.1', AHORA);
+    expect(r.total).toBeGreaterThanOrEqual(1);
+    const lote = auditoria.registrar.mock.calls.map((c: any[]) => c[0]).filter((x: any) => x.accion === 'APROBAR_LOTE');
+    expect(lote).toHaveLength(1);
+    expect(lote[0]).toMatchObject({ partyId: ADMIN.partyId, despues: { origen: 'APROBAR_TODAS_PERIODO', partyId: 7, desde: '2026-11-02', hasta: '2026-11-08', total: r.total, ok: r.ok } });
+  });
+});
