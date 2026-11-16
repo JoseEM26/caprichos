@@ -96,6 +96,8 @@ export interface DiaPlanilla {
   extraMin: number;
   /** Feriado activo ese día: multiplicador del valor hora para las horas trabajadas y la tardanza (vacío = 1). */
   recargo?: number;
+  /** Día de descanso (sin horario) en que marcó entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */
+  descansoTrabajado?: boolean;
   /** Valor hora vigente ESE día (sueldo con vigencia). Ausente = el de la persona para todo el período. */
   valorHora?: number;
 }
@@ -124,6 +126,11 @@ export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPla
     extraMin: 0,
   };
   const t = dia.turno;
+  if (!t && dia.estado === 'A_REVISAR' && dia.marcas.length > 0 && dia.marcas.every((m) => m.estado !== 'A_REVISAR')) {
+    const e = dia.marcas.find((m) => m.tipo === 'ENTRADA');
+    const sa = [...dia.marcas].reverse().find((m) => m.tipo === 'SALIDA');
+    if (e && sa && sa.minutos > e.minutos) return { ...base, extraMin: sa.minutos - e.minutos, descansoTrabajado: true };
+  }
   if (!t || !PAGABLES.includes(dia.estado)) return base;
   const entrada = dia.marcas.find((m) => m.tipo === 'ENTRADA');
   const salida = [...dia.marcas].reverse().find((m) => m.tipo === 'SALIDA');

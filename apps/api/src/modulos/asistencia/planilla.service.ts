@@ -466,6 +466,8 @@ export class PlanillaService {
       vacacionesPagadas: vacPagadas.map((v) => Number(v.monto ?? 0)),
     });
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
+    // Pendiente = jornada que bloquea el pago. Un descanso trabajado que el admin ya aprobó deja de bloquear.
+    const diasPendientes = diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado) && !(d.descansoTrabajado && porDia.has(d.jornada)));
     const crudo = new Map(dias.map((d) => [d.jornada, d]));
     return {
       partyId: Number(id),
@@ -496,9 +498,9 @@ export class PlanillaService {
       },
       cuotas,
       recurrentes,
-      pendientes: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).length,
+      pendientes: diasPendientes.length,
       /** Jornadas que bloquean «Marcar pagado» (para el banner y su enlace al día). */
-      jornadasPorRevisar: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).map((d) => d.jornada),
+      jornadasPorRevisar: diasPendientes.map((d) => d.jornada),
       vacaciones: {
         diasTomados: diasCalc.filter((d) => d.estado === 'VACACIONES').length,
         pagadas: vacPagadas.map((v) => ({ id: Number(v.id), fecha: isoDe(v.fecha_desde), dias: Number(v.dias), monto: Number(v.monto ?? 0) })),

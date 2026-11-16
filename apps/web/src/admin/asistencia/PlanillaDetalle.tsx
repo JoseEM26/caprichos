@@ -232,7 +232,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
             <tbody>
               {d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0 || (x.marcas ?? []).length > 0).map((x) => (
                 <tr key={x.jornada} id={`dia-${x.jornada}`} style={resaltar === x.jornada ? { outline: '3px solid var(--cp-gold)' } : undefined}>
-                  <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">Feriado ×{x.recargo}</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}</td>
+                  <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">{x.trabajadaMin > 0 ? 'Feriado trabajado' : 'Feriado'} ×{x.recargo}</Insignia></> : null}{x.descansoTrabajado ? <> <Insignia variante="aviso">Descanso trabajado</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}</td>
                   <td data-label="Horario" className="as-num">{x.horario ? `${x.horario.entrada}–${x.horario.salida}` : '—'}</td>
                   <td data-label="Marcas">
                     {(x.marcas ?? []).length === 0 ? '—' : (x.marcas ?? []).map((m, i) => (
@@ -253,9 +253,9 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
                   <td data-label="Aprobar extra">
                     {x.extraMin > 0 ? (
                       <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
-                        <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={`Aprobar las horas extra del ${x.jornada}`}
+                        <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={x.descansoTrabajado ? `Aprobar el descanso trabajado del ${x.jornada}` : `Aprobar las horas extra del ${x.jornada}`}
                           onChange={(e) => void ejecutar(() => aprobarExtra(d.partyId, x.jornada, e.target.checked), e.target.checked ? 'Horas extra aprobadas.' : 'Aprobación de horas extra quitada.')} />
-                        {x.extraAprobada ? 'Aprobada' : 'Sin aprobar'}
+                        {x.extraAprobada ? 'Aprobada' : x.descansoTrabajado ? 'Aprobar descanso trabajado' : 'Sin aprobar'}
                       </label>
                     ) : '—'}
                   </td>

@@ -182,6 +182,15 @@ describe('PlanillaTab', () => {
     await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], [], { pagarIgualMotivo: 'Se le pagó en efectivo' }));
   });
 
+  it('un descanso trabajado se ve como tal y se aprueba en el paso 1', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue({ ...base, dias: [{ jornada: '2026-11-11', estado: 'A_REVISAR', programadaMin: 0, trabajadaMin: 0, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 300, extraPendiente: true, extraAprobada: false, descansoTrabajado: true, ganado: 0, marcas: [] }] });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    expect(await screen.findByText('Descanso trabajado')).toBeInTheDocument();
+    expect(screen.getByLabelText('Aprobar el descanso trabajado del 2026-11-11')).not.toBeChecked();
+  });
+
   it('Atrás no pierde lo escrito en el formulario de adelanto', async () => {
     listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
     detalle.mockResolvedValue(base);

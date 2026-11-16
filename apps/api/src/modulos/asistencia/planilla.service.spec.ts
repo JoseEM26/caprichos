@@ -24,6 +24,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     ...(opts.consumosExtra ?? []),
   ];
   const periodos: Fila[] = [];
+  const extrasAprob: Fila[] = [];
   const vigencias: Fila[] = opts.vigencias ?? [];
   const ajustes: Fila[] = [];
   const vacaciones: Fila[] = [];
@@ -58,7 +59,11 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     },
     person: { findUnique: async () => ({ nombres: 'Luis', apellidos: 'Pérez' }), findMany: async () => [{ party_id: LUIS, nombres: 'Luis', apellidos: 'Pérez' }] },
     contactMechanism: { findFirst: async () => opts.contacto ?? null },
-    planillaExtraAprobada: { findMany: async () => [] },
+    planillaExtraAprobada: {
+      findMany: async () => extrasAprob,
+      upsert: async ({ create }: any) => { extrasAprob.push({ aprobado_en: AHORA, ...create }); return create; },
+      deleteMany: async () => ({}),
+    },
     feriado: { findMany: async () => opts.feriados ?? [] },
     vinculoPersonal: { findMany: async () => (opts.vinculo ? [opts.vinculo] : []) },
     descuentoRecurrentePersonal: { findMany: async () => opts.recurrentes ?? [] },
@@ -625,5 +630,18 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     expect(m.periodos[0].detalle.sinDescontarAnteriores).toEqual({ monto: 12 });
     const aud = m.auditoria.registrar.mock.calls.map((c: any[]) => c[0]).find((x: any) => x.accion === 'PAGAR_PLANILLA');
     expect(aud.despues.sinDescontarAnteriores).toBe(12);
+  });
+
+  it('descanso trabajado: se ve como tal, sus horas van como extra, bloquea el pago hasta que el admin lo aprueba y entonces se paga', async () => {
+    const m = montar({ sueldo: { metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: 10 }, vigencias: [] });
+    m.dias[10] = { jornada: '2026-11-11', estado: 'A_REVISAR', turno: null, marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
+    const antes = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    const dia = antes.dias.find((x: any) => x.jornada === '2026-11-11');
+    expect(dia).toMatchObject({ descansoTrabajado: true, extraMin: 300, extraPendiente: true });
+    expect(antes.pendientes).toBe(1);
+    await m.svc.aprobarExtra(7, '2026-11-11', true, ADMIN);
+    const despues = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(despues.pendientes).toBe(0);
+    expect(despues.resultado.pagoExtra).toBe(5 * 10 * 1.25);
   });
 });

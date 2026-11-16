@@ -108,6 +108,8 @@ export interface DiaPlanillaApi {
   breakMin?: number;
   alertas?: string[];
   extraPendiente?: boolean;
+  /** Descanso (sin horario) con entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */
+  descansoTrabajado?: boolean;
   vacacion?: boolean;
 }
 
