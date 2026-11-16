@@ -48,6 +48,19 @@ export class EvolutionWebhookService {
       if (state) await this.estado.registrarConexion(state, d.statusReason ?? d.disconnectionReasonCode ?? null);
       return res;
     }
+    if (evento === 'chats.update' || evento === 'chats.upsert') {
+      // El local leyó el chat en WhatsApp Business (celular o Web): sin mensajes por leer → queda visto en Mensajes
+      const crudoChats = body?.data;
+      const chats: any[] = Array.isArray(crudoChats) ? crudoChats : crudoChats ? [crudoChats] : [];
+      for (const ch of chats) {
+        const sinLeer = ch?.unreadCount ?? ch?.unreadMessages;
+        if (Number(sinLeer) === 0 && typeof (ch?.remoteJid ?? ch?.id) === 'string') {
+          const hecho = await this.webhook.marcarLeidoDesdeWhatsapp(String(ch.remoteJid ?? ch.id));
+          if (hecho) res.procesados++;
+        }
+      }
+      return res;
+    }
     if (evento !== 'messages.upsert') {
       res.ignorados++;
       return res;
@@ -58,6 +71,13 @@ export class EvolutionWebhookService {
     for (const data of lista) {
       const adj = extraerAdjuntoEvolution(data);
       if (adj) this.api?.recordarAdjunto(adj.id, adj);
+      if (data?.key?.fromMe === true) {
+        // Lo que el local escribe desde WhatsApp Business: se guarda en el chat y el bot calla (si no lo envió el sistema)
+        const propio = normalizarMensajeEvolution(data, { propios: true });
+        if (propio.ok && (await this.webhook.registrarMensajeDelLocal(propio.msg)) === 'GUARDADO') res.procesados++;
+        else res.ignorados++;
+        continue;
+      }
       const n = normalizarMensajeEvolution(data);
       if (!n.ok) {
         res.ignorados++;

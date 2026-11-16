@@ -1,4 +1,5 @@
 import { NumerosWhatsappService } from './numeros-whatsapp.service';
+import { CANAL_WHATSAPP_BUSINESS } from '../utilidades/canal-whatsapp-business';
 import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
 import { interactivoDesdeContenido } from './interactivo.util';
 import {
@@ -99,6 +100,8 @@ export interface ReceptorWhatsapp {
   id: string;
   display?: string;
 }
+
+export { CANAL_WHATSAPP_BUSINESS };
 
 @Injectable()
 export class WhatsappWebhookService {
@@ -1462,7 +1465,7 @@ export class WhatsappWebhookService {
   async recuperarArchivoDeMensaje(mensajeId: bigint): Promise<{ ok: boolean; motivo?: string }> {
     try {
       const m = await this.prisma.mensajeChat.findUnique({ where: { id: mensajeId } });
-      if (!m || m.direccion !== 'ENTRA' || !m.meta_id || !['IMAGEN', 'AUDIO', 'DOCUMENTO'].includes(m.tipo)) {
+      if (!m || (m.direccion !== 'ENTRA' && (m.contenido as any)?.canal !== CANAL_WHATSAPP_BUSINESS) || !m.meta_id || !['IMAGEN', 'AUDIO', 'DOCUMENTO'].includes(m.tipo)) {
         return { ok: false, motivo: 'Este mensaje no tiene un archivo que recuperar' };
       }
       const c = (m.contenido as any) ?? {};
@@ -1806,6 +1809,94 @@ export class WhatsappWebhookService {
     if (!motivo) return false;
     this.numeros.logOmitido(motivo, de, 'webhook_entrante');
     return true;
+  }
+
+  /** Espera entre intentos de reconocer el eco de un envío del sistema (la respuesta de Evolution y su webhook se cruzan). */
+  esperaEcoMs = 700;
+
+  /** ¿Ese id de WhatsApp es de un mensaje que envió o guardó nuestro sistema (bot, avisos, panel Mensajes)? Lo contrario: lo escribió una persona. */
+  private async esMensajeDelSistema(waId: string): Promise<boolean> {
+    for (let i = 0; i < 4; i++) {
+      const [a, b, c] = await Promise.all([
+        this.prisma.whatsappMensaje.findUnique({ where: { wa_message_id: waId }, select: { id: true } }),
+        this.prisma.mensajeChat.findUnique({ where: { meta_id: waId }, select: { id: true } }),
+        this.prisma.salienteWhatsapp.findFirst({ where: { wa_message_id: waId }, select: { id: true } }),
+      ]);
+      if (a || b || c) return true;
+      if (i < 3 && this.esperaEcoMs > 0) await new Promise((ok) => setTimeout(ok, this.esperaEcoMs));
+    }
+    return false;
+  }
+
+  /**
+   * Mensaje que una persona del local escribió desde WhatsApp Business (Evolution: messages.upsert con fromMe). Si el id no es de un
+   * envío nuestro: se guarda en el chat como «Enviado desde WhatsApp Business por el local» (autor PERSONA) y el chat pasa a
+   * «atiende una persona» (duenio PERSONA): el bot calla 2 h desde ese mensaje, hasta Atendido o «Devolver al bot». Nunca lanza.
+   */
+  async registrarMensajeDelLocal(msg: any): Promise<'GUARDADO' | 'SISTEMA' | 'OMITIDO'> {
+    try {
+      const waId = String(msg?.id ?? '').trim();
+      const rawFrom = String(msg?.from ?? '').trim();
+      if (!waId || !rawFrom) return 'OMITIDO';
+      if (await this.remitenteOmitido(msg)) return 'OMITIDO';
+      if (await this.esMensajeDelSistema(waId)) return 'SISTEMA';
+
+      const identificador = /^\+?\d{7,15}$/.test(rawFrom) ? normalizarTelefono(rawFrom) : `wa-user:${rawFrom}`;
+      const tipo = String(msg.type ?? '');
+      const clase = tipo === 'image' ? 'IMAGEN' : tipo === 'audio' ? 'AUDIO' : tipo === 'document' ? 'DOCUMENTO' : 'TEXTO';
+      const pie = String(msg.image?.caption ?? msg.document?.caption ?? '').trim();
+      const texto =
+        tipo === 'text' ? String(msg.text?.body ?? '').trim()
+        : tipo === 'image' ? pie || 'Foto'
+        : tipo === 'audio' ? 'Nota de voz'
+        : tipo === 'document' ? String(msg.document?.filename ?? pie ?? '').trim() || 'Documento'
+        : tipo === 'location' ? String(msg.location?.address ?? msg.location?.name ?? 'Ubicación').trim()
+        : tipo === 'reaction' ? '' : tipo === 'sticker' ? 'Sticker' : tipo === 'video' ? 'Video' : 'Mensaje';
+      // Una reacción no es una respuesta ni interrumpe al bot
+      if (tipo === 'reaction' || (!texto && clase === 'TEXTO')) return 'OMITIDO';
+
+      const conv = await this.prisma.conversacion.findUnique({ where: { telefono: identificador } });
+      const datos: any = { duenio: 'PERSONA', ultima_actividad: new Date() };
+      const conversacion = conv
+        ? await this.prisma.conversacion.update({ where: { id: conv.id }, data: datos })
+        : await this.prisma.conversacion.create({
+            data: { telefono: identificador, ...datos, estado: 'ABIERTA', identificador_tipo: identificador.startsWith('wa-user:') ? 'USUARIO_WA' : 'TELEFONO' },
+          });
+      const m = await this.prisma.mensajeChat.create({
+        data: {
+          conversacion_id: conversacion.id,
+          direccion: 'SALE',
+          autor: 'PERSONA',
+          tipo: clase,
+          contenido: { texto, canal: CANAL_WHATSAPP_BUSINESS, waMessageId: waId, ...(tipo === 'location' ? { ubicacion: { lat: Number(msg.location?.latitude), lng: Number(msg.location?.longitude) } } : {}) },
+          meta_id: waId,
+        },
+      });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
+      if (clase !== 'TEXTO') void this.recuperarArchivoDeMensaje(m.id);
+      return 'GUARDADO';
+    } catch (err: any) {
+      // meta_id único: el mismo mensaje entregado dos veces no se duplica
+      if (err?.code !== 'P2002') this.logger.warn(`No se pudo guardar un mensaje del local: ${err?.message}`);
+      return 'OMITIDO';
+    }
+  }
+
+  /** El local leyó el chat en WhatsApp Business (chats.update sin mensajes por leer): queda visto en Mensajes. */
+  async marcarLeidoDesdeWhatsapp(jid: string): Promise<boolean> {
+    try {
+      const dig = jid.replace(/\D/g, '');
+      if (!dig || jid.endsWith('@g.us')) return false;
+      const ids = jid.endsWith('@lid') ? [`wa-user:${dig}@lid`] : [normalizarTelefono(dig), dig];
+      const c = await this.prisma.conversacion.findFirst({ where: { telefono: { in: ids } }, select: { id: true } });
+      if (!c) return false;
+      await this.prisma.conversacion.update({ where: { id: c.id }, data: { visto_en: new Date(), marcado_no_visto: false } });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: c.id.toString() });
+      return true;
+    } catch (err: any) {
+      this.logger.warn(`No se pudo marcar leído desde WhatsApp: ${err?.message}`);
+      return false;
+    }
   }
 
   async procesarPayload(payload: any) {

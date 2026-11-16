@@ -1,3 +1,4 @@
+import { CANAL_WHATSAPP_BUSINESS, SILENCIO_WHATSAPP_BUSINESS_MIN } from '../utilidades/canal-whatsapp-business';
 import { PuntosService } from '../../clientes/puntos.service';
 import { CUENTA_CLIENTE_BOT_PUERTO, CuentaClienteBotPuerto } from '../puerto/cuenta-cliente-bot.puerto';
 import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
@@ -863,6 +864,18 @@ export class EjecutorConversacionService {
       if (ultimoMensajePersona) {
         minutosDesdeUltimoHumano =
           (Date.now() - new Date(ultimoMensajePersona.en).getTime()) / (60 * 1000);
+      }
+
+      // Lo último que escribió una persona fue desde WhatsApp Business: el bot calla SILENCIO min (fijo), también ante el menú.
+      // Termina antes si se marcó Atendido después de ese mensaje o si se tocó «Devolver al bot» (duenio BOT: no entra aquí).
+      if (
+        (ultimoMensajePersona?.contenido as any)?.canal === CANAL_WHATSAPP_BUSINESS &&
+        minutosDesdeUltimoHumano < SILENCIO_WHATSAPP_BUSINESS_MIN &&
+        !(conversacion.atendido_en && new Date(conversacion.atendido_en) > new Date(ultimoMensajePersona!.en))
+      ) {
+        this.logger.log(`Una persona escribió desde WhatsApp Business hace ${minutosDesdeUltimoHumano.toFixed(1)} min. El bot calla.`);
+        await this.registrarSilencio(conversacion.id, `Atiende una persona desde WhatsApp Business (escribió hace ${Math.round(minutosDesdeUltimoHumano)} min; el bot calla ${SILENCIO_WHATSAPP_BUSINESS_MIN / 60} h).`);
+        return false;
       }
 
       // Una acción directa del cliente (menú, carta, pedir) se atiende aunque la persona haya escrito hace poco;

@@ -23,7 +23,7 @@ const ENTRADAS: any[] = [
 ];
 
 const base = { telefono: '51987654321', tomado_por: null, ultima_actividad: new Date(), urgente: false, motivo_derivacion: null };
-const ESCENARIOS: Array<[string, any, { apagado?: boolean; antispam?: boolean; personaHaceMin?: number }]> = [
+const ESCENARIOS: Array<[string, any, { apagado?: boolean; antispam?: boolean; personaHaceMin?: number; personaWb?: boolean }]> = [
   ...['INICIO', 'MENU', 'CARTA_CATEGORIAS', 'PEDIDO_MODALIDAD', 'PEDIDO_VER_CARRITO', 'PAGO_ESPERANDO_VOUCHER', 'RESERVA_FECHA', 'DUDA_IA'].map(
     (e): [string, any, any] => [`BOT en ${e}`, { ...base, id: 1n, duenio: 'BOT', estado: 'ABIERTA', flujo: { version: 2, estado: e, repreguntasFallidas: 0 } }, {}],
   ),
@@ -33,6 +33,7 @@ const ESCENARIOS: Array<[string, any, { apagado?: boolean; antispam?: boolean; p
   ['duenio PERSONA sin tomar (calificación baja)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', motivo_derivacion: 'CALIFICACION_BAJA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, {}],
   ['modo asistido (persona escribió hace 1 min)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'ATENCION_PERSONA', repreguntasFallidas: 0 } }, { personaHaceMin: 1 }],
   ['chatbot apagado', { ...base, id: 1n, duenio: 'BOT', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { apagado: true }],
+  ['persona escribió desde WhatsApp Business hace 30 min (el bot calla 2 h, también ante el menú)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { personaHaceMin: 30, personaWb: true }],
   ['anti-spam', { ...base, id: 1n, duenio: 'BOT', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { antispam: true }],
 ];
 
@@ -164,7 +165,7 @@ describe('Invariante: ningún mensaje del cliente queda sin respuesta ni evento 
           return Promise.resolve({ id: 1n });
         });
         prismaMock.mensajeChat.findFirst = jest.fn().mockResolvedValue(
-          opts.personaHaceMin != null ? { en: new Date(Date.now() - opts.personaHaceMin * 60000) } : null,
+          opts.personaHaceMin != null ? { en: new Date(Date.now() - opts.personaHaceMin * 60000), contenido: opts.personaWb ? { canal: 'WHATSAPP_BUSINESS' } : {} } : null,
         );
         prismaMock.mensajeChat.findMany = jest.fn().mockResolvedValue([]);
         prismaMock.conversacion.findUnique.mockResolvedValue(JSON.parse(JSON.stringify(conv, (_, v) => (typeof v === 'bigint' ? v.toString() + 'n' : v)), (_, v) => (typeof v === 'string' && /^\d+n$/.test(v) ? BigInt(v.slice(0, -1)) : v)));
@@ -177,4 +178,24 @@ describe('Invariante: ningún mensaje del cliente queda sin respuesta ni evento 
       });
     }
   }
+
+  describe('persona escribió desde WhatsApp Business', () => {
+    const conv = { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } };
+    const correr = async (minutos: number, canal: string | undefined, extra: any = {}) => {
+      mensajeriaMock.enviarTexto = jest.fn().mockResolvedValue({ exito: true, waMessageId: 'm' });
+      for (const k of ['enviarBotones', 'enviarLista', 'enviarCarrusel', 'enviarImagen']) mensajeriaMock[k] = jest.fn().mockResolvedValue({ exito: true, waMessageId: 'm' });
+      prismaMock.mensajeChat.findFirst = jest.fn().mockResolvedValue({ en: new Date(Date.now() - minutos * 60000), contenido: canal ? { canal } : {} });
+      prismaMock.mensajeChat.findMany = jest.fn().mockResolvedValue([]);
+      prismaMock.conversacion.findUnique.mockResolvedValue({ ...conv, ...extra });
+      (service as any).chatbotConfiguracionService.verificarAntiSpam = jest.fn().mockResolvedValue({ permitido: true });
+      await service.procesarMensajeEntrante(1n, { texto: 'hola', waMessageId: undefined });
+    };
+    // callar deja el evento «El bot no respondió» en el chat (la regla de «una persona atendió hoy» ya cubre lo de WhatsApp Business)
+    const respondio = () => !prismaMock.mensajeChat.create.mock.calls.some(([a]: any) => String(a?.data?.contenido?.texto ?? '').includes('El bot no respondió'));
+
+    it('hace 30 min: el bot NO responde ni a un saludo', async () => {
+      await correr(30, 'WHATSAPP_BUSINESS');
+      expect(respondio()).toBe(false);
+    });
+  });
 });

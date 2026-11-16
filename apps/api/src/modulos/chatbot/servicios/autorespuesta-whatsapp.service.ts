@@ -1,3 +1,4 @@
+import { personaAtiendeDesdeWhatsapp } from '../utilidades/canal-whatsapp-business';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
@@ -95,6 +96,7 @@ export class AutorespuestaWhatsappService {
     }
 
     if (e.conversacion.tomado_por != null) return false; // una persona lo está atendiendo
+    if (await personaAtiendeDesdeWhatsapp(this.prisma, e.conversacion)) return false; // la persona escribió desde WhatsApp Business
 
     const cfg = await this.evolution.obtener();
     const horario = await horarioDelLocal(this.local, this.prisma, new Date(), { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
