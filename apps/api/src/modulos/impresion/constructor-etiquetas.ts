@@ -17,7 +17,7 @@ import {
   plusCodeParaMostrar,
   calcularPagoPedido,
 } from '@caprichos/compartido';
-import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { lineasDeCuenta, notaDeLinea } from '../pedidos/lineas-combo.util';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
 export const CRITERIO_BEBIDA_CATEGORIAS = [
@@ -231,7 +231,7 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
         nombre: l.nombre,
         tamano: l.tamano || null,
         opciones,
-        nota: l.nota || null,
+        nota: notaDeLinea(l, lineas) || null,
       };
     });
 
@@ -322,7 +322,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
         contiene,
         who: `Para: ${clienteNombre}`,
         hora,
-        ...(linea.nota && String(linea.nota).trim() ? { nota: String(linea.nota).trim() } : {}),
+        ...(notaDeLinea(linea, lineas) ? { nota: notaDeLinea(linea, lineas) as string } : {}),
         ...(modalidadPill ? { modalidadPill } : {}),
         ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
         ...(linea.producto?.categoria_id ? { categoriaId: String(linea.producto.categoria_id) } : {}),
@@ -346,7 +346,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
  * La imprime la ticketera de Caja al aceptarse el pedido; no se usa para llevar ni delivery (lo filtra la regla).
  */
 /** Línea de comanda con su detalle (`detalleLinea`: una sola fuente de verdad con el ticket de pago) y sus piezas de combo. */
-function lineaDeComanda(l: any, todas: any[]): LineaComandaDatos {
+function lineaDeComanda(l: any, todas: any[], heredarNota = true): LineaComandaDatos {
   const entrada = entradaDeLineaPedido(l, todas);
   const hijas = l.id == null ? [] : todas.filter((h) => h.linea_combo_id != null && String(h.linea_combo_id) === String(l.id));
   return {
@@ -354,9 +354,10 @@ function lineaDeComanda(l: any, todas: any[]): LineaComandaDatos {
     nombre: l.nombre,
     tamano: l.tamano || null,
     opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map(nombreOpcion).filter(Boolean)),
-    nota: l.nota || null,
+    // bajo su madre la parte no repite la nota del combo (ya sale arriba); suelta en la comanda de un área, la hereda
+    nota: (heredarNota ? notaDeLinea(l, todas) : l.nota) || null,
     detalles: detalleLinea({ ...entrada, partes: [] }).detalles,
-    ...(hijas.length > 0 ? { partes: hijas.map((h) => lineaDeComanda(h, todas)) } : {}),
+    ...(hijas.length > 0 ? { partes: hijas.map((h) => lineaDeComanda(h, todas, false)) } : {}),
   };
 }
 

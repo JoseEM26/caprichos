@@ -26,6 +26,7 @@ import {
 } from './cocina.util';
 import { motivoResaltado, resaltadoDeLineas, type Resaltado } from './opcion-menos-pedida';
 import { asignarNumeroDia } from './numero-dia';
+import { notaDeLinea } from '../pedidos/lineas-combo.util';
 import { mesaDePedido } from './mesa-comanda.util';
 import { ConsumoRecetaService } from '../almacen';
 
@@ -84,7 +85,7 @@ export function lineasDeArea(lineas: any[], areaId: bigint, resaltado?: Resaltad
           return { ...o, pocoPedida: motivo !== null, ...(motivo ? { motivoResaltado: motivo } : {}) };
         }),
         personas: l.nombres_persona ?? [],
-        nota: l.nota ?? null,
+        nota: notaDeLinea(l, lineas),
       };
     });
 }
@@ -1403,7 +1404,7 @@ export class ComandasService {
           combo: extraerNombreCombo(l),
           opciones: extraerOpciones(l),
           personas: l.nombres_persona ?? [],
-          nota: l.nota ?? null,
+          nota: notaDeLinea(l, p.lineas),
         }));
 
       const mesa = mesaDePedido(p);
