@@ -478,6 +478,18 @@ describe('PedidosService', () => {
         expect(Number(prismaMock.pedido.create.mock.calls.at(-1)[0].data.total)).toBe(29);
       });
 
+      it('PROGRAMADO solo con un «Servicio o producto» (torta por encargo para otro día) se crea', async () => {
+        const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta chocolate 10 cm corazón', monto: 22 }] };
+        prismaMock.pedido.create.mockResolvedValue({ ...creado, estado: 'PROGRAMADO', subtotal: 22, total: 22, programado_para: new Date(Date.now() + 2 * 86400000) });
+        const manana = new Date(Date.now() + 2 * 86400000);
+        manana.setUTCHours(18, 0, 0, 0);
+        const res = await service.crear(solo, 'cl-prog', { ...caja, programadoPara: manana.toISOString() } as any);
+        expect(res.estado).toBe('PROGRAMADO');
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(Number(data.total)).toBe(22);
+        expect(data.estado).toBe('PROGRAMADO');
+      });
+
       it('sin productos ni cargos libres sigue rechazado; la carta/bot nunca pueden mandar cargos', async () => {
         await expect(service.crear({ ...dtoRecoger, lineas: [] }, 'cl-s3', caja)).rejects.toMatchObject({ response: { codigo: 'LINEAS_REQUERIDAS' } });
         const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta', monto: 29 }] };
