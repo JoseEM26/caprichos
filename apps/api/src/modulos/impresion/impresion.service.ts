@@ -46,6 +46,7 @@ import {
   claveDeTrabajo,
   claveEtiquetaArea,
   claveEtiquetaBebida,
+  huellaEtiqueta,
   construirEtiquetaGeneral,
   construirEtiquetaPrueba,
   construirEtiquetasArea,
@@ -1139,6 +1140,9 @@ await this.anotarResaltadas(pedido);
       const ctx = await this.contextoRuteo();
       // Solo el primer encolado del pedido avisa a Caja (los reintentos de la misma aceptación no repiten el aviso)
       const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedido.id, tipo: { in: TIPOS_ETIQUETA } } })) > 0;
+      // Un pedido que ya imprimió sus etiquetas no las vuelve a sacar al cobrar o cambiar de estado: lo agregado después
+      // lo encola la edición (sin clave), y reencolar por índice duplicaría los vasos nuevos y sacaría de nuevo los que se corrieron
+      if (yaTenia) return;
 
       // Cada trabajo se encola si la regla de su tipo y modalidad lo pide; su destino sale del ruteo (NULL = Caja)
       let cajas = 0;
@@ -2157,7 +2161,7 @@ await this.anotarResaltadas(pedido);
   async capturarEtiquetas(pedidoIdInput: bigint | string | number): Promise<Map<string, string>> {
     try {
       const r = await this.etiquetasActualesDePedido(BigInt(pedidoIdInput));
-      return new Map((r?.lista ?? []).map((e) => [e.clave, JSON.stringify(e.payload)]));
+      return new Map((r?.lista ?? []).map((e) => [e.clave, huellaEtiqueta(e.tipo, e.payload)]));
     } catch {
       return new Map();
     }
@@ -2175,7 +2179,20 @@ await this.anotarResaltadas(pedido);
       if (!yaTenia) return 0;
       const r = await this.etiquetasActualesDePedido(pedidoId);
       if (!r) return 0;
-      const cambiadas = r.lista.filter((e) => antes.get(e.clave) !== JSON.stringify(e.payload));
+      // Solo cuenta el contenido propio de cada etiqueta (no mesa, hora, total ni «n de N»). Los vasos se comparan por
+      // contenido, no por índice: agregar una bebida no reimprime las que ya estaban aunque se corra su «n de N».
+      const vasosAntes = new Map<string, number>();
+      for (const [k, h] of antes) if (k.startsWith('BEBIDA:')) vasosAntes.set(h, (vasosAntes.get(h) ?? 0) + 1);
+      const cambiadas = r.lista.filter((e) => {
+        const h = huellaEtiqueta(e.tipo, e.payload);
+        if (e.tipo !== 'ETIQUETA_BEBIDA') return antes.get(e.clave) !== h;
+        const quedan = vasosAntes.get(h) ?? 0;
+        if (quedan > 0) {
+          vasosAntes.set(h, quedan - 1);
+          return false;
+        }
+        return true;
+      });
       if (cambiadas.length === 0) return 0;
       const reglas = await leerReglasImpresion(this.prisma);
       const ctx = await this.contextoRuteo();

@@ -11,6 +11,10 @@ export interface ItemElegible {
   enCola?: boolean;
   /** Encabezado del grupo («Bebidas», «Ticket de pago»…); sin él, la lista va sin grupos. */
   grupo?: string;
+  /** Piezas casi iguales (misma bebida, tamaño y opciones) comparten identidad: salen en una fila con «cuántas». */
+  identidad?: string;
+  /** Texto de la fila agrupada (sin número de vaso ni persona). */
+  rotulo?: string;
   /** Vista previa de la pieza: se muestra al pulsar «Ver». */
   vista?: React.ReactNode;
 }
@@ -19,6 +23,13 @@ export interface ItemElegible {
  * Casillas para elegir cuáles piezas reimprimir (stickers, comandas, ticket): una fila por pieza, agrupadas, con
  * vista previa y el contador de hojas. Compartido por el diálogo rápido de Caja, la pestaña Etiquetas y la cola.
  */
+/** Claves de las piezas repetidas (2 o más casi iguales): por defecto salen todas, como pide la regla de reimpresión. */
+export function clavesRepetidas(items: ItemElegible[]): string[] {
+  const por = new Map<string, string[]>();
+  for (const it of items) if (it.identidad) por.set(`${it.grupo}|${it.identidad}`, [...(por.get(`${it.grupo}|${it.identidad}`) ?? []), it.clave]);
+  return [...por.values()].filter((c) => c.length > 1).flat();
+}
+
 export function SelectorEtiquetas({ items, elegidas, alCambiar }: { items: ItemElegible[]; elegidas: string[]; alCambiar: (c: string[]) => void }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   const grupos: Array<{ nombre?: string; items: ItemElegible[] }> = [];
@@ -30,6 +41,16 @@ export function SelectorEtiquetas({ items, elegidas, alCambiar }: { items: ItemE
   const marcar = (claves: string[], si: boolean) =>
     alCambiar(si ? [...elegidas, ...claves.filter((c) => !elegidas.includes(c))] : elegidas.filter((c) => !claves.includes(c)));
   const n = elegidas.length;
+  // Filas: cada pieza sola, salvo las casi iguales (misma identidad), que van juntas en una fila con «cuántas»
+  const filasDe = (its: ItemElegible[]): ItemElegible[][] => {
+    const filas: ItemElegible[][] = [];
+    for (const it of its) {
+      const f = it.identidad ? filas.find((x) => x[0].identidad === it.identidad) : undefined;
+      if (f) f.push(it);
+      else filas.push([it]);
+    }
+    return filas;
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '55vh', overflowY: 'auto' }}>
@@ -53,7 +74,21 @@ export function SelectorEtiquetas({ items, elegidas, alCambiar }: { items: ItemE
                 </button>
               </legend>
             )}
-            {g.items.map((e) => (
+            {filasDe(g.items).map((fila) => fila.length > 1 ? (
+              <div key={fila[0].clave} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>Hay {fila.length} stickers de {fila[0].rotulo ?? fila[0].texto}. ¿Cuántos?</span>
+                  <select
+                    aria-label={`Cuántos de ${fila[0].rotulo ?? fila[0].texto}`}
+                    style={{ minHeight: 44, fontSize: 14, fontWeight: 800 }}
+                    value={fila.filter((f) => elegidas.includes(f.clave)).length}
+                    onChange={(ev) => alCambiar([...elegidas.filter((c) => !fila.some((f) => f.clave === c)), ...fila.slice(0, Number(ev.target.value)).map((f) => f.clave)])}
+                  >
+                    {Array.from({ length: fila.length + 1 }, (_, k) => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </label>
+              </div>
+            ) : fila.map((e) => (
               <div key={e.clave} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
                   <label style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0, minHeight: 44 }}>
@@ -74,7 +109,7 @@ export function SelectorEtiquetas({ items, elegidas, alCambiar }: { items: ItemE
                 </div>
                 {e.vista && abierta === e.clave && <div style={{ overflowX: 'auto', maxWidth: '100%' }}>{e.vista}</div>}
               </div>
-            ))}
+            )))}
           </fieldset>
         );
       })}
