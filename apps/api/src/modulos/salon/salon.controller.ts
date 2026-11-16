@@ -6,6 +6,7 @@ import {
   Headers,
   Param,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,11 +18,42 @@ import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CambiarMesaDto } from './dto/cambiar-mesa.dto';
 import { PersonasEsperaDto } from './dto/personas-espera.dto';
 import { AgregarMesasDto } from './dto/agregar-mesas.dto';
+import { GuardarBorradorMesaDto } from './dto/borrador-mesa.dto';
+import { BorradorMesaService } from './borrador-mesa.service';
 
 @Controller('admin/salon')
 @UseGuards(AccesoGuard)
 export class SalonController {
-  constructor(private readonly salonService: SalonService) {}
+  constructor(
+    private readonly salonService: SalonService,
+    private readonly borradores: BorradorMesaService,
+  ) {}
+
+  /** Borradores de pedido de mesa vigentes del día (mesas/abrir). */
+  @Get('borradores')
+  @Permiso('mesas', 'abrir')
+  listarBorradores() {
+    return this.borradores.listar();
+  }
+
+  @Get('borradores/mesa/:mesaId')
+  @Permiso('mesas', 'abrir')
+  borradorDeMesa(@Param('mesaId') mesaId: string) {
+    return this.borradores.obtenerPorMesa(mesaId);
+  }
+
+  /** Crea o reemplaza el borrador de la mesa. No ocupa la mesa. */
+  @Put('borradores/mesa/:mesaId')
+  @Permiso('mesas', 'abrir')
+  guardarBorrador(@Param('mesaId') mesaId: string, @Body() dto: GuardarBorradorMesaDto, @Req() req: any) {
+    return this.borradores.guardar(mesaId, dto.contenido, dto.productos, req.usuario);
+  }
+
+  @Delete('borradores/mesa/:mesaId')
+  @Permiso('mesas', 'abrir')
+  eliminarBorrador(@Param('mesaId') mesaId: string, @Req() req: any) {
+    return this.borradores.eliminar(mesaId, req.usuario);
+  }
 
   /**
    * 1) GET /admin/salon/mesas (mesas/ver)

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SalonController } from './salon.controller';
 import { SalonService } from './salon.service';
+import { BorradorMesaService } from './borrador-mesa.service';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ReservasModule } from '../reservas/reservas.module';
 import { ImpresionModule } from '../impresion/impresion.module';
@@ -8,7 +9,7 @@ import { ImpresionModule } from '../impresion/impresion.module';
 @Module({
   imports: [PedidosModule, ReservasModule, ImpresionModule],
   controllers: [SalonController],
-  providers: [SalonService],
+  providers: [SalonService, BorradorMesaService],
   exports: [SalonService],
 })
 export class SalonModule {}

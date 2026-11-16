@@ -15,6 +15,7 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { SalonController } from './salon.controller';
+import { BorradorMesaService } from './borrador-mesa.service';
 import { SalonService } from './salon.service';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -37,6 +38,7 @@ describe('SalonController', () => {
       controllers: [SalonController],
       providers: [
         { provide: SalonService, useValue: salonService },
+        { provide: BorradorMesaService, useValue: {} },
         { provide: PrismaService, useValue: {} },
         { provide: AuditoriaService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => 'secreto' } },

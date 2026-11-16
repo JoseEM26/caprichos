@@ -20,6 +20,7 @@ model ControlSistema {
 // ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
 
 model Party {
+  borradoresMesa       PedidoBorradorMesa[]
   aprendizajesDecididos AprendizajePropuesto[] @relation("AprendizajeDecididoPor")
   conocimientosAprobados ConocimientoBot[] @relation("ConocimientoAprobadoPor")
   conocimientosRetirados ConocimientoBot[] @relation("ConocimientoRetiradoPor")
@@ -1509,6 +1510,7 @@ model ElementoPlano {
   piso         Piso          @relation(fields: [piso_id], references: [id])
   pedidosMesa  PedidoMesa[]
   reservasMesa ReservaMesa[]
+  borradorPedido PedidoBorradorMesa?
 
   @@map("elemento_plano")
 }
@@ -3541,4 +3543,21 @@ model ConocimientoBot {
 
   @@index([estado, aprobado_en])
   @@map("conocimiento_bot")
+}
+
+/// Borrador de pedido de mesa del mozo/caja. No ocupa la mesa, no va a cocina ni descuenta stock.
+/// Uno por mesa (único); vence al cierre del día (America/Lima).
+model PedidoBorradorMesa {
+  id            BigInt         @id @default(autoincrement())
+  mesa_id       BigInt         @unique
+  party_id      BigInt
+  contenido     Json
+  productos     Int            @default(0)
+  creado_en     DateTime       @default(now()) @db.Timestamptz
+  actualizado_en DateTime      @default(now()) @db.Timestamptz
+
+  mesa          ElementoPlano  @relation(fields: [mesa_id], references: [id], onDelete: Cascade)
+  party         Party          @relation(fields: [party_id], references: [id])
+
+  @@map("pedido_borrador_mesa")
 }
