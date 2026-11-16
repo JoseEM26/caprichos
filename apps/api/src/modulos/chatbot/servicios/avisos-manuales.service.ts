@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
+import { montoACobrar } from '../../../comun/monto-a-cobrar';
+import { mediosPagoPublicos } from '../../local/local.service';
+import { montoDigitalDePlan } from '../../pedidos/pago-plan.service';
+import { textoDatosPagoPersona } from './datos-pago-persona.util';
 import type { CargaSaliente } from './outbox-whatsapp.service';
 
 export interface AvisoManualPedido {
@@ -67,5 +71,27 @@ export class AvisosManualesService {
     }
     for (const k of Object.keys(salida)) if (salida[k].length === 0) delete salida[k];
     return salida;
+  }
+
+  /** Celular del pedido y mensaje ya escrito con los datos para pagar (Yape, Plin o transferencia). telefono null = el pedido no tiene celular. */
+  async datosPago(pedidoId: string, medioPedido?: string): Promise<{ telefono: string | null; texto: string; medio: string } | null> {
+    if (!/^\d+$/.test(pedidoId)) return null;
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) } });
+    if (!pedido) return null;
+    const medio = String(medioPedido || pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase();
+    if (!['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(medio)) return null;
+    const parametros = await this.prisma.parametro.findMany({
+      where: { clave: { in: ['local_pagos', 'voucher_titular_nombre', 'voucher_yape_numero', 'voucher_plin_numero'] } },
+    });
+    const plan = (await this.prisma.pedidoPagoPlan.findMany({ where: { pedido_id: pedido.id }, select: { medio: true, monto: true } })).map((f) => ({ medio: f.medio, monto: Number(f.monto) }));
+    const delMedio = plan.filter((f) => f.medio.toUpperCase() === medio).reduce((a, f) => a + f.monto, 0);
+    const monto = delMedio > 0 ? delMedio : plan.length > 0 ? montoDigitalDePlan(plan) || montoACobrar(pedido) : montoACobrar(pedido);
+    const digitos = String(pedido.cliente_telefono ?? '').replace(/\D/g, '').slice(-9);
+    const telefono = /^9\d{8}$/.test(digitos) && digitos !== '999999999' ? digitos : null;
+    return {
+      telefono,
+      medio,
+      texto: textoDatosPagoPersona({ nombre: pedido.cliente_nombre, codigo: pedido.codigo, medio, monto, pagos: mediosPagoPublicos(parametros) }),
+    };
   }
 }

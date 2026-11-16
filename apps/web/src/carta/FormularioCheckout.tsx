@@ -65,6 +65,7 @@ import { AvisoComerEnLocal } from './AvisoComerEnLocal';
 import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
 import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
 import { celularAlEscribir } from '../comun/celular';
+import { DatosTransferencia } from '../comun/DatosTransferencia';
 
 export function FormularioCheckout({
   estadoLocal,
@@ -2063,48 +2064,12 @@ export function FormularioCheckout({
                     )}
 
                     {mp === 'TRANSFERENCIA' && (
-                      <div
-                        style={{
-                          backgroundColor: 'var(--cp-sand)',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          fontSize: '13px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ backgroundColor: 'var(--cp-sand)', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
                           <IconoMedioPago medio="TRANSFERENCIA" tamano={22} ariaHidden />
-                          <div>
-                            <div style={{ fontWeight: 700 }}>
-                              {mediosPagoDisponibles.transferencia?.banco || 'BCP'}
-                            </div>
-                            <div style={{ fontSize: '12px' }}>
-                              Cuenta: {mediosPagoDisponibles.transferencia?.cuenta || '123456789'}
-                            </div>
-                          </div>
+                          Datos para transferir
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copiarTexto(
-                              mediosPagoDisponibles.transferencia?.cuenta || '123456789',
-                              'pago-cta',
-                            )
-                          }
-                          style={{
-                            minHeight: '36px',
-                            padding: '0 10px',
-                            border: '1px solid var(--cp-navy)',
-                            borderRadius: '8px',
-                            backgroundColor: 'var(--cp-white)',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {copiadoKey === 'pago-cta' ? 'Copiado' : 'Copiar'}
-                        </button>
+                        <DatosTransferencia info={mediosPagoDisponibles.transferencia} />
                       </div>
                     )}
 

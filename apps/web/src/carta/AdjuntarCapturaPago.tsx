@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { clienteFetch, ErrorApi } from '../comun/api';
 import { reducirImagenVoucher } from '../admin/vouchers/reducirImagenVoucher';
+import { DatosTransferencia } from '../comun/DatosTransferencia';
 import type { DatosLocalCarta } from './tipos';
 
 export interface AdjuntarCapturaPagoProps {
@@ -26,7 +27,6 @@ const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANS
 /** Tarjeta «a quién pagar»: número o cuenta, titular y monto, con botón para copiar. */
 export function DatosParaPagar({ medio, total, local, restoAlRecibir }: { medio: string; total?: number; local: DatosLocalCarta | null; restoAlRecibir?: number }) {
   const [copiado, setCopiado] = useState(false);
-  const [copiadoCci, setCopiadoCci] = useState(false);
   const info = local?.mediosPago?.[CLAVE_MEDIO[medio] ?? ''];
   const destino = medio === 'TRANSFERENCIA' ? info?.cuenta || info?.cci : info?.numero;
   if (!destino) return null;
@@ -49,30 +49,24 @@ export function DatosParaPagar({ medio, total, local, restoAlRecibir }: { medio:
       {restoAlRecibir != null && restoAlRecibir > 0 && (
         <div style={{ fontSize: '13px', color: 'var(--cp-navy)' }}>Los S/ {Number(restoAlRecibir).toFixed(2)} restantes los pagas al recibir tu pedido.</div>
       )}
-      <div style={{ fontSize: '14px', color: 'var(--cp-navy)' }}>
-        {medio === 'TRANSFERENCIA' ? `Cuenta${info?.banco ? ` ${info.banco}` : ''}: ` : monto ? 'Yapea a: ' : 'Número: '}
-        <strong style={{ fontSize: '18px' }}>{destino}</strong>
-      </div>
-      {medio === 'TRANSFERENCIA' && info?.cci && info?.cuenta && (
-        <div style={{ fontSize: '14px', color: 'var(--cp-navy)' }}>
-          CCI: <strong style={{ fontSize: '16px' }}>{info.cci}</strong>{' '}
+      {medio === 'TRANSFERENCIA' ? (
+        <DatosTransferencia info={info} />
+      ) : (
+        <>
+          <div style={{ fontSize: '14px', color: 'var(--cp-navy)' }}>
+            {monto ? 'Yapea a: ' : 'Número: '}
+            <strong style={{ fontSize: '18px' }}>{destino}</strong>
+          </div>
+          {info?.titular && <div style={{ fontSize: '13px' }}>A nombre de <strong>{info.titular}</strong></div>}
           <button
             type="button"
-            onClick={() => void navigator.clipboard?.writeText(String(info.cci)).then(() => setCopiadoCci(true)).catch(() => undefined)}
-            style={{ minHeight: '36px', marginLeft: '6px', padding: '0 10px', borderRadius: '8px', border: '1.5px solid var(--cp-navy)', background: 'transparent', fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)', cursor: 'pointer' }}
+            onClick={() => void copiar()}
+            style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', background: 'transparent', fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)', cursor: 'pointer' }}
           >
-            {copiadoCci ? 'Copiado' : 'Copiar CCI'}
+            {copiado ? 'Copiado' : 'Copiar número'}
           </button>
-        </div>
+        </>
       )}
-      {info?.titular && <div style={{ fontSize: '13px' }}>A nombre de <strong>{info.titular}</strong></div>}
-      <button
-        type="button"
-        onClick={() => void copiar()}
-        style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', background: 'transparent', fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)', cursor: 'pointer' }}
-      >
-        {copiado ? 'Copiado' : medio === 'TRANSFERENCIA' ? 'Copiar cuenta' : 'Copiar número'}
-      </button>
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Sube tu captura aquí o por WhatsApp (opcional).</div>
     </div>
   );

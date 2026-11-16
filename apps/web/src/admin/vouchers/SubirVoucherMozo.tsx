@@ -5,6 +5,7 @@ import { FotoAmpliable } from './FotoAmpliable';
 import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { ErrorApi } from '../../comun/api';
+import { PanelDatosPago } from '../mensajes/PanelDatosPago';
 import { MotivoCambioVoucher, MOTIVO_MINIMO } from './MotivoCambioVoucher';
 import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
 
@@ -235,6 +236,8 @@ export function SubirVoucherMozo({
       >
         {medio === 'TARJETA' ? 'Foto de la copia del POS' : `Foto del voucher (${medio})`}
       </div>
+
+      {medio !== 'TARJETA' && <PanelDatosPago pedidoId={pedidoId} medio={medio} />}
 
       <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.4 }}>
         {opcional

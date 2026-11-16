@@ -34,7 +34,7 @@ const datos: DatosLocalCarta = {
   whatsapp: '999888777',
   redes: {},
   horario: [],
-  mediosPago: { efectivo: { activo: true }, yape: { activo: true } },
+  mediosPago: { efectivo: { activo: true }, yape: { activo: true }, transferencia: { activo: true, banco: 'BCP', titular: 'Ana Prueba', cuenta: '191-00000000-0-00', cci: '002-191-000000000000-00' } },
   envioGratisDesde: 70,
   pedidoMinimo: 0,
   invitadoPermitido: false,
@@ -133,7 +133,8 @@ describe('Checkout ▸ pago en dos momentos', () => {
     fireEvent.click(tarjeta('Yape'));
     expect(screen.getByRole('button', { name: 'Copiar' })).toBeInTheDocument();
     cambiarMedio('Transferencia');
-    expect(screen.getByText(/Cuenta:/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copiar CCI' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copiar N.º de cuenta' })).toBeInTheDocument();
   });
 
   it.each([
