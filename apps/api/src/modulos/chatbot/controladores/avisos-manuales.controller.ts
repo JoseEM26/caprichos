@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../../acceso/acceso.guard';
 import { Permiso } from '../../acceso/permiso.decorator';
 import { AvisosManualesService } from '../servicios/avisos-manuales.service';
@@ -16,5 +16,12 @@ export class AvisosManualesController {
   ])
   pendientes(@Query('ids') ids?: string) {
     return this.avisos.pendientes(String(ids ?? '').split(',').map((i) => i.trim()));
+  }
+
+  /** Datos para pagar de ese pedido con el mensaje ya escrito, para enviarlo desde Mensajes (la persona toca Enviar). */
+  @Get('datos-pago-pedido/:id')
+  @Permiso([{ modulo: 'mensajes', accion: 'enviar' }])
+  datosPago(@Param('id') id: string, @Query('medio') medio?: string) {
+    return this.avisos.datosPago(id, medio);
   }
 }

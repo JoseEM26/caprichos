@@ -83,11 +83,14 @@ export function detalleDatosPago(med: string, datosLocalPagos: any, tot: string)
     detalle = `📲 Plin:\n• Número: ${num}${tit}`;
   } else if (med === 'TRANSFERENCIA') {
     const t = pagos.transferencia || {};
-    const bco = t.banco ? ` (${t.banco})` : '';
-    const cta = t.cuenta || 'Consultar en caja';
-    const tit = t.titular ? `\n• Titular: ${t.titular}` : '';
-    const cci = t.cci ? `\n• CCI: ${t.cci}` : '';
-    detalle = `🏦 Transferencia bancaria${bco}:\n• Cuenta: ${cta}${cci}${tit}`;
+    // Cada dato en su línea y sin texto pegado: se copia y se pega tal cual en la app del banco
+    const lineas = [
+      t.banco ? `• Banco: ${t.banco}` : '',
+      t.titular ? `• Titular: ${t.titular}` : '',
+      `• Cuenta: ${t.cuenta || 'Consultar en caja'}`,
+      t.cci ? `• CCI: ${t.cci}` : '',
+    ].filter(Boolean);
+    detalle = `🏦 Transferencia bancaria:\n${lineas.join('\n')}`;
   } else {
     detalle = `📲 Pago digital:\n• Monto: S/ ${tot}`;
   }

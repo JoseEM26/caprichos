@@ -3355,9 +3355,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (cfg.plin?.numero) lineas.push(`• Plin: ${cfg.plin.numero}${cfg.plin.titular ? ` (${cfg.plin.titular})` : ''}`);
     if (cfg.transferencia?.cuenta || cfg.transferencia?.cci) {
       const t = cfg.transferencia;
-      lineas.push(`• ${t.banco || 'Transferencia'}: ${t.cuenta || t.cci}`);
-      if (t.cci && t.cuenta) lineas.push(`• CCI: ${t.cci}`);
-      if (t.titular) lineas.push(`• Titular: ${t.titular}`);
+      lineas.push('• Transferencia bancaria:');
+      if (t.banco) lineas.push(`   Banco: ${t.banco}`);
+      if (t.titular) lineas.push(`   Titular: ${t.titular}`);
+      if (t.cuenta) lineas.push(`   Cuenta: ${t.cuenta}`);
+      if (t.cci) lineas.push(`   CCI: ${t.cci}`);
     }
     return (
       `📱 *Datos para realizar tu pago:*\n` +

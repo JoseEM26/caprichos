@@ -493,7 +493,7 @@ export class IaHerramientasService {
         datosParaPagar = {};
         if (vis.yape?.numero) datosParaPagar.yape = detalleDatosPago('YAPE', vis, '0');
         if (vis.plin?.numero) datosParaPagar.plin = detalleDatosPago('PLIN', vis, '0');
-        if (vis.transferencia?.cuenta) datosParaPagar.transferencia = detalleDatosPago('TRANSFERENCIA', vis, '0');
+        if (vis.transferencia?.cuenta || vis.transferencia?.cci) datosParaPagar.transferencia = detalleDatosPago('TRANSFERENCIA', vis, '0');
       }
     } catch {
       datosParaPagar = undefined;

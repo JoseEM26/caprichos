@@ -17,6 +17,18 @@ describe('AdjuntarCapturaPago (carta, seguimiento)', () => {
     vi.restoreAllMocks();
   });
 
+  it('transferencia: banco, titular, cuenta y CCI, cada uno con Copiar, y Copiar todo', async () => {
+    const local = { whatsapp: '', mediosPago: { transferencia: { activo: true, banco: 'BCP', titular: 'Ana Prueba', cuenta: '191-00000000-0-00', cci: '002-191-000000000000-00' } } };
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(local), { status: 200, headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;
+    const escribir = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: escribir } });
+    render(<AdjuntarCapturaPago codigo="CP-1" token="t" pagoDigital medio="TRANSFERENCIA" total={35} />);
+    expect(await screen.findByText('002-191-000000000000-00')).toBeDefined();
+    for (const e of ['Banco', 'Titular', 'N.º de cuenta', 'CCI']) expect(screen.getByRole('button', { name: `Copiar ${e}` })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar todo' }));
+    await waitFor(() => expect(escribir).toHaveBeenCalledWith(expect.stringContaining('CCI: 002-191-000000000000-00')));
+  });
+
   it('no aparece si el pago no es digital (efectivo, tarjeta)', () => {
     const { container } = render(
       <AdjuntarCapturaPago codigo="CP-1" token="tok" pagoDigital={false} />,
