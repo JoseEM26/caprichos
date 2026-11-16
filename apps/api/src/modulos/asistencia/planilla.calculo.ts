@@ -96,6 +96,8 @@ export interface DiaPlanilla {
   extraMin: number;
   /** Feriado activo ese día: multiplicador del valor hora para las horas trabajadas y la tardanza (vacío = 1). */
   recargo?: number;
+  /** Valor hora vigente ESE día (sueldo con vigencia). Ausente = el de la persona para todo el período. */
+  valorHora?: number;
 }
 
 /**
@@ -103,12 +105,12 @@ export interface DiaPlanilla {
  * La penalidad por tardanza se calcula aparte (penalidadTardanzaDia) y se RESTA en los descuentos.
  * Única fuente de la fórmula: la usan el total de la planilla y el «ganado por día» de Mi asistencia.
  */
-export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.trabajadaMin / 60) * vh * (d.recargo ?? 1);
+export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.trabajadaMin / 60) * (d.valorHora ?? vh) * (d.recargo ?? 1);
 /** Penalidad del día = minutos de tardanza × (valor hora ÷ 60) × recargo del feriado × factor%. Proporcional, sin redondear a horas. */
 export const penalidadTardanzaDia = (d: DiaPlanilla, vh: number, factorPct: number): number =>
-  redondear2((d.tardanzaMin / 60) * vh * (d.recargo ?? 1) * (factorPct / 100));
+  redondear2((d.tardanzaMin / 60) * (d.valorHora ?? vh) * (d.recargo ?? 1) * (factorPct / 100));
 export const pagoDia = (d: DiaPlanilla, vh: number, extraAprobada: boolean, multExtra = 1): number =>
-  pagoTrabajadoDia(d, vh) + (extraAprobada ? (d.extraMin / 60) * vh * multExtra : 0);
+  pagoTrabajadoDia(d, vh) + (extraAprobada ? (d.extraMin / 60) * (d.valorHora ?? vh) * multExtra : 0);
 
 /** Jornada de una persona: minutos programados, trabajados válidos, tardanza, salida anticipada y extra. */
 export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPlanilla {
@@ -231,7 +233,7 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
   const mult = e.multiplicadorExtra ?? 1;
   // Las horas del período para el valor hora NO cambian por feriado; solo el pago de esas horas lleva recargo.
   const pagoTrabajado = redondear2(e.dias.reduce((a, d) => a + pagoTrabajadoDia(d, vh), 0));
-  const pagoExtra = redondear2((extraAprobadaMin / 60) * vh * mult);
+  const pagoExtra = redondear2(e.dias.filter((d) => e.extrasAprobadas.has(d.jornada)).reduce((a, d) => a + (d.extraMin / 60) * (d.valorHora ?? vh) * mult, 0));
   const total = (xs: number[]) => redondear2(xs.reduce((a, x) => a + x, 0));
   const pagoVacaciones = total(e.vacacionesPagadas ?? []);
   const ganado = redondear2(pagoTrabajado + pagoExtra + pagoVacaciones);

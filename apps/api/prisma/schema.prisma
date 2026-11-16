@@ -3236,6 +3236,26 @@ model SueldoPersonal {
   @@map("sueldo_personal")
 }
 
+/// Historial del sueldo con vigencia: cada cambio es una fila nueva. sueldo_personal sigue siendo el sueldo de hoy.
+model SueldoVigencia {
+  id                BigInt   @id @default(autoincrement())
+  party_id          BigInt
+  /// Desde esta fecha (incluida) rige este sueldo. 1900-01-01 = desde siempre.
+  vigente_desde     DateTime @db.Date
+  modalidad         String   @db.VarChar(8)
+  monto_semanal     Decimal  @db.Decimal(10, 2)
+  monto_mensual     Decimal  @db.Decimal(10, 2)
+  metodo_valor_hora String   @default("PROGRAMADAS") @db.VarChar(12)
+  dias_mes          Int?
+  horas_dia         Decimal? @db.Decimal(4, 1)
+  tarifa_hora       Decimal? @db.Decimal(10, 4)
+  creado_en         DateTime @default(now()) @db.Timestamptz
+  creado_por        BigInt?
+
+  @@unique([party_id, vigente_desde])
+  @@map("sueldo_vigencia")
+}
+
 model PlanillaAjuste {
   id             BigInt    @id @default(autoincrement())
   party_id       BigInt

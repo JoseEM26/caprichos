@@ -14,7 +14,7 @@ const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null; vigencias?: Fila[] } = {}) {
   const sueldoFila = () => ({ party_id: LUIS, modalidad: 'MENSUAL', monto_semanal: 230.77, monto_mensual: 1000, ...opts.sueldo });
   const prestamos: Fila[] = [];
   const cuotas: Fila[] = [];
@@ -24,6 +24,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     ...(opts.consumosExtra ?? []),
   ];
   const periodos: Fila[] = [];
+  const vigencias: Fila[] = opts.vigencias ?? [];
   const ajustes: Fila[] = [];
   const vacaciones: Fila[] = [];
   let id = 1n;
@@ -45,6 +46,15 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       findUnique: async () => sueldoFila(),
       findMany: async () => [sueldoFila()],
       upsert: async () => ({}),
+    },
+    sueldoVigencia: {
+      findMany: async ({ orderBy }: any = {}) => vigencias.slice().sort((a, b) => (a.vigente_desde.getTime() - b.vigente_desde.getTime()) * (orderBy?.vigente_desde === 'desc' ? -1 : 1)),
+      create: async ({ data }: any) => { vigencias.push({ ...data, creado_en: AHORA }); return data; },
+      upsert: async ({ where, create, update }: any) => {
+        const f = vigencias.find((v) => v.vigente_desde.getTime() === where.party_id_vigente_desde.vigente_desde.getTime());
+        if (f) Object.assign(f, update); else vigencias.push({ ...create });
+        return {};
+      },
     },
     person: { findUnique: async () => ({ nombres: 'Luis', apellidos: 'Pérez' }), findMany: async () => [{ party_id: LUIS, nombres: 'Luis', apellidos: 'Pérez' }] },
     contactMechanism: { findFirst: async () => opts.contacto ?? null },
@@ -85,7 +95,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       },
     },
     planillaPeriodo: {
-      findFirst: async ({ where }: any) => periodos.find((p) => p.estado === 'PAGADO' && p.party_id === where.party_id && (where.desde?.lte ? p.desde <= where.desde.lte && p.hasta >= where.hasta.gte : p.desde.getTime() === where.desde.getTime())) ?? null,
+      findFirst: async ({ where }: any) => periodos.find((p) => p.estado === 'PAGADO' && p.party_id === where.party_id && (where.desde?.lte ? p.desde <= where.desde.lte && p.hasta >= where.hasta.gte : where.desde ? p.desde.getTime() === where.desde.getTime() : p.hasta >= where.hasta.gte)) ?? null,
       findUnique: async ({ where }: any) => periodos.find((p) => p.id === where.id) ?? null,
       create: async ({ data }: any) => { const f = { id: id++, estado: 'PAGADO', pagado_en: AHORA, ...data }; periodos.push(f); return f; },
       update: async ({ where, data }: any) => Object.assign(periodos.find((p) => p.id === where.id)!, data),
@@ -100,7 +110,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     prestamos.push(p);
     montos.forEach((m, i) => cuotas.push({ id: id++, prestamo_id: p.id, numero: i + 1, monto: m, estado: 'PENDIENTE', reprogramada_de: null, periodo_hasta: null, planilla_periodo_id: null }));
   };
-  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias };
+  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias };
 }
 
 describe('PlanillaService', () => {
@@ -561,5 +571,37 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     // la fila de la lista trae exactamente lo mismo
     const fila = (await m.svc.listar('2026-11-15', AHORA, 'MES')).filas[0];
     expect(fila.neto).toBe(347.94);
+  });
+
+  it('sueldo con vigencia: cada día se paga con el valor hora vigente ese día', async () => {
+    const fila = (desde: string, tarifa: number) => ({ party_id: LUIS, vigente_desde: d(desde), modalidad: 'MENSUAL', monto_semanal: 0, monto_mensual: 0, metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: tarifa });
+    const m = montar({ sueldo: { metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: 20 }, vigencias: [fila('1900-01-01', 10), fila('2026-11-04', 20)] });
+    const r = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    // días 1-3 (5 h c/u) a S/ 10 + días 4-6 a S/ 20
+    expect(r.resultado.pagoTrabajado).toBe(450);
+  });
+
+  it('cambiar el sueldo crea una fila con fecha y conserva el historial (lo anterior queda «desde siempre»)', async () => {
+    const m = montar({ sueldo: { metodo_valor_hora: 'DIAS_HORAS' } });
+    const upsert = jest.fn(async () => ({}));
+    (m.svc as any).prisma.sueldoPersonal.upsert = upsert;
+    await m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1500, vigenteDesde: '2026-11-10' }, ADMIN, undefined, AHORA);
+    expect(m.vigencias.map((v) => [v.vigente_desde.toISOString().slice(0, 10), Number(v.monto_mensual)])).toEqual([['1900-01-01', 1000], ['2026-11-10', 1500]]);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ update: expect.objectContaining({ monto_mensual: 1500 }) }));
+    const h = (await m.svc.obtenerSueldo(7)).historial;
+    expect(h.map((x: any) => x.vigenteDesde)).toEqual(['2026-11-10', null]);
+  });
+
+  it('un sueldo no puede regir desde el futuro ni desde un período ya pagado', async () => {
+    const m = montar({ sueldo: { metodo_valor_hora: 'DIAS_HORAS' } });
+    await expect(m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1500, vigenteDesde: '2999-01-01' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'FECHA_FUTURA' } });
+    m.periodos.push({ id: 99n, party_id: LUIS, estado: 'PAGADO', desde: d('2026-11-01'), hasta: d('2026-11-30') });
+    await expect(m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1500, vigenteDesde: '2026-11-20' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'PERIODO_PAGADO' } });
+  });
+
+  it('guardar solo el celular de pago no crea una fila nueva de sueldo', async () => {
+    const m = montar({ sueldo: { metodo_valor_hora: 'DIAS_HORAS' } });
+    await m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1000, pagoMedio: 'YAPE' }, ADMIN);
+    expect(m.vigencias).toHaveLength(0);
   });
 });

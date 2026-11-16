@@ -52,6 +52,8 @@ const sueldoDe = (s: any): SueldoCalc => ({
   horasDia: s.horas_dia !== null && s.horas_dia !== undefined ? Number(s.horas_dia) : null,
   tarifaHora: s.tarifa_hora !== null && s.tarifa_hora !== undefined ? Number(s.tarifa_hora) : null,
 });
+/** Fecha de inicio de un sueldo que rige «desde siempre» (el de antes de llevar historial). */
+const DESDE_SIEMPRE = '1900-01-01';
 const pagoDe = (s: any) => ({ celular: (s.pago_celular as string | null) ?? null, medio: (s.pago_medio as string | null) ?? null });
 
 const fechaDb = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -94,14 +96,18 @@ export class PlanillaService {
     });
     const digitos = (c?.valor ?? '').replace(/\D/g, '');
     const celularUsuario = digitos.length >= 9 ? digitos.slice(-9) : null;
-    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null, ...(celularUsuario ? { celularUsuario } : {}) };
+    const filas = await this.prisma.sueldoVigencia.findMany({ where: { party_id: BigInt(partyId) }, orderBy: { vigente_desde: 'desc' } });
+    // Historial del sueldo: «vigenteDesde» vacío = desde siempre (el sueldo que ya tenía antes de llevar historial)
+    const historial = filas.map((f) => ({ ...sueldoDe(f), vigenteDesde: isoDe(f.vigente_desde) === DESDE_SIEMPRE ? null : isoDe(f.vigente_desde), creadoEn: f.creado_en.toISOString() }));
+    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null, historial, ...(celularUsuario ? { celularUsuario } : {}) };
   }
 
   async guardarSueldo(
     partyId: number,
-    dto: { modalidad: Modalidad; monto: number; metodo?: MetodoValorHora; diasMes?: number | null; horasDia?: number | null; tarifaHora?: number | null; pagoCelular?: string | null; pagoMedio?: string | null },
+    dto: { modalidad: Modalidad; monto: number; vigenteDesde?: string; metodo?: MetodoValorHora; diasMes?: number | null; horasDia?: number | null; tarifaHora?: number | null; pagoCelular?: string | null; pagoMedio?: string | null },
     usuario: UsuarioAutenticado,
     ip?: string,
+    ahora = new Date(),
   ) {
     const id = BigInt(partyId);
     const persona = await this.prisma.userAccount.findUnique({ where: { party_id: id } });
@@ -127,11 +133,39 @@ export class PlanillaService {
     if (celular !== undefined) opc.pago_celular = celular;
     if (dto.pagoMedio !== undefined) opc.pago_medio = dto.pagoMedio || null;
     const datos = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo, ...opc, actualizado_en: new Date(), actualizado_por: usuario.partyId };
-    await this.prisma.sueldoPersonal.upsert({ where: { party_id: id }, create: { party_id: id, ...datos }, update: datos });
+    // Sueldo con vigencia: un cambio en las cifras es una fila nueva con su fecha de inicio (hoy por defecto); no se pisa el historial.
+    const hoy = jornadaDe(ahora).jornada;
+    const desde = dto.vigenteDesde ? fechaValida(dto.vigenteDesde) : antes ? hoy : DESDE_SIEMPRE;
+    if (desde > hoy) throw new BadRequestException({ codigo: 'FECHA_FUTURA', mensaje: 'El sueldo nuevo puede regir desde hoy o desde un día pasado, no desde el futuro' });
+    const nuevo = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo,
+      dias_mes: dto.diasMes !== undefined ? dto.diasMes : antes?.dias_mes ?? null, horas_dia: dto.horasDia !== undefined ? dto.horasDia : antes?.horas_dia ?? null,
+      tarifa_hora: dto.tarifaHora !== undefined ? dto.tarifaHora : antes?.tarifa_hora ?? null };
+    const num = (x: unknown) => (x === null || x === undefined ? null : Number(x));
+    const cambioCifras = !antes || (['modalidad', 'metodo_valor_hora'] as const).some((k) => antes[k] !== nuevo[k])
+      || (['monto_semanal', 'monto_mensual', 'dias_mes', 'horas_dia', 'tarifa_hora'] as const).some((k) => num(antes[k]) !== num(nuevo[k]));
+    let esUltima = true;
+    if (cambioCifras) {
+      const pagadoDespues = antes ? await this.prisma.planillaPeriodo.findFirst({ where: { party_id: id, estado: 'PAGADO', hasta: { gte: fechaDb(desde) } } }) : null;
+      if (pagadoDespues) {
+        throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Hay un período pagado desde esa fecha. Elige una fecha posterior al último período pagado o reábrelo (con motivo).' });
+      }
+      const filas = await this.prisma.sueldoVigencia.findMany({ where: { party_id: id }, orderBy: { vigente_desde: 'asc' } });
+      // Persona con sueldo anterior al historial: primero se guarda lo que tenía «desde siempre» (para no perderlo)
+      if (antes && filas.length === 0) {
+        await this.prisma.sueldoVigencia.create({ data: { party_id: id, vigente_desde: fechaDb(DESDE_SIEMPRE), modalidad: antes.modalidad, monto_semanal: antes.monto_semanal, monto_mensual: antes.monto_mensual,
+          metodo_valor_hora: antes.metodo_valor_hora, dias_mes: antes.dias_mes, horas_dia: antes.horas_dia, tarifa_hora: antes.tarifa_hora, creado_por: antes.actualizado_por } });
+      }
+      esUltima = !filas.length || filas.every((f) => isoDe(f.vigente_desde) <= desde);
+      const fila = { ...nuevo, creado_en: new Date(), creado_por: usuario.partyId };
+      await this.prisma.sueldoVigencia.upsert({ where: { party_id_vigente_desde: { party_id: id, vigente_desde: fechaDb(desde) } }, create: { party_id: id, vigente_desde: fechaDb(desde), ...fila }, update: fila });
+    }
+    // sueldo_personal = el sueldo de hoy: solo cambian sus cifras si la fila nueva es la más reciente
+    const soloPago = { ...(celular !== undefined ? { pago_celular: celular } : {}), ...(dto.pagoMedio !== undefined ? { pago_medio: dto.pagoMedio || null } : {}) };
+    await this.prisma.sueldoPersonal.upsert({ where: { party_id: id }, create: { party_id: id, ...datos }, update: esUltima ? datos : soloPago });
     // El celular es dato personal: la auditoría solo dice si cambió, nunca su valor.
     await this.auditar('CAMBIO', 'GUARDAR_SUELDO', usuario, ip, 'party', id, {
       antes: antes ? { modalidad: antes.modalidad, semanal: Number(antes.monto_semanal), mensual: Number(antes.monto_mensual), metodo: sueldoDe(antes).metodo } : null,
-      despues: { modalidad: dto.modalidad, ...eq, metodo, tarifaHora: dto.tarifaHora ?? null, diasMes: dto.diasMes ?? null, horasDia: dto.horasDia ?? null, pagoMedio: dto.pagoMedio ?? null, cambioCelular: celular !== undefined },
+      despues: { modalidad: dto.modalidad, ...eq, metodo, vigenteDesde: cambioCifras ? desde : null, tarifaHora: dto.tarifaHora ?? null, diasMes: dto.diasMes ?? null, horasDia: dto.horasDia ?? null, pagoMedio: dto.pagoMedio ?? null, cambioCelular: celular !== undefined },
     });
     return { partyId, modalidad: dto.modalidad, ...eq, metodo };
   }
@@ -355,6 +389,16 @@ export class PlanillaService {
       tarifaHora: sueldo.tarifaHora ?? 0,
     };
     const vhFijo = valorHoraPersona(parametros);
+    // Sueldo con vigencia: cada día se paga con el valor hora del sueldo vigente ese día (solo si hubo cambios de sueldo).
+    const vigencias = await this.prisma.sueldoVigencia.findMany({ where: { party_id: id }, orderBy: { vigente_desde: 'asc' } });
+    if (vigencias.length > 1) {
+      for (const d of diasCalc) {
+        const fila = [...vigencias].reverse().find((v) => isoDe(v.vigente_desde) <= d.jornada) ?? vigencias[0];
+        const sd = sueldoDe(fila);
+        const vh = valorHoraPersona({ metodo: sd.metodo, sueldoMensual: sd.mensual, diasMes: sd.diasMes ?? cfg.diasMesDefecto ?? DIAS_MES_DEFECTO, horasDia: sd.horasDia ?? cfg.horasDiaDefecto ?? HORAS_DIA_DEFECTO, tarifaHora: sd.tarifaHora ?? 0 });
+        if (vh !== null) d.valorHora = vh;
+      }
+    }
     const multExtra = sueldo.metodo === 'PROGRAMADAS' ? 1 : cfg.multiplicadorExtra ?? MULTIPLICADOR_EXTRA_DEFECTO;
     // Penalidad por tardanza: factor % del valor del tiempo no pagado. Contrato temporal (sin subordinación): sin penalidad
     // (el tiempo tarde igual no se paga, porque solo se pagan las horas trabajadas).
