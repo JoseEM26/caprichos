@@ -2050,6 +2050,10 @@ model CuponCanjeCompartido {
   pedido_id BigInt
   party_id  BigInt?
   en        DateTime @default(now()) @db.Timestamptz
+  /// Party del trabajador que aplicó el cupón (null: lo aplicó el cliente en la carta, o es un canje antiguo)
+  aplicado_por BigInt?
+  /// CARTA | CAJA | MOZO | BOT (null en canjes antiguos)
+  canal     String?
 
   cupon     Cupon    @relation(fields: [cupon_id], references: [id])
   pedido    Pedido   @relation(fields: [pedido_id], references: [id])

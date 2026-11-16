@@ -1,4 +1,5 @@
 import { montoElegiblePuntos } from './puntos-elegibles.util';
+import { usosDeCupon } from './cupon-usos';
 import {
   BadRequestException,
   ConflictException,
@@ -932,6 +933,11 @@ export class OfertasService {
     return cuponesDb.map(this.mapearCupon);
   }
 
+  /** Usos del cupón: resumen, por trabajador, por día e historial paginado. */
+  async usosDelCupon(id: string, pagina?: number, tamano?: number) {
+    return usosDeCupon(this.prisma, id, pagina, tamano);
+  }
+
   async obtenerCuponPorId(id: bigint | string | number): Promise<CuponItem> {
     const cuponDb = await this.prisma.cupon.findUnique({
       where: { id: BigInt(id) },
@@ -1615,6 +1621,8 @@ export class OfertasService {
             cupon_id: BigInt(validacion.cupon.id),
             pedido_id: pedido.id,
             party_id: partyClienteDelPedido(pedido),
+            canal: 'CAJA',
+            aplicado_por: usuario?.partyId != null ? BigInt(usuario.partyId) : null,
           },
         });
       }

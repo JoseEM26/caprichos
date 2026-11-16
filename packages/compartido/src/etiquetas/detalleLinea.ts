@@ -79,6 +79,8 @@ export interface DescuentoTicket {
   tipo?: string;
   nombre: string;
   monto: number;
+  /** Cupón de envío gratis: no resta soles (el envío ya va en 0) pero el ticket debe nombrarlo. */
+  envioGratis?: boolean;
 }
 
 /** Renglones de totales que comparten ticket y precuenta, antes del TOTAL: subtotal, descuentos desglosados y envío. */
@@ -88,11 +90,14 @@ export function resumenAntesDelTotal(d: {
   envio?: number | null;
 }): { etiqueta: string; monto: number; resta?: boolean }[] {
   const o: { etiqueta: string; monto: number; resta?: boolean }[] = [];
-  const descuentos = (d.descuentos ?? []).filter((x) => Number(x.monto) > 0);
+  const descuentos = (d.descuentos ?? []).filter((x) => Number(x.monto) > 0 || x.envioGratis);
   const envio = Number(d.envio ?? 0);
   // Subtotal solo si hay algo que explicar (descuentos o envío)
   if (d.subtotal != null && (descuentos.length > 0 || envio > 0)) o.push({ etiqueta: 'Subtotal', monto: Number(d.subtotal) });
-  for (const x of descuentos) o.push({ etiqueta: x.nombre, monto: Number(x.monto), resta: true });
+  for (const x of descuentos) {
+    if (x.envioGratis && !(Number(x.monto) > 0)) o.push({ etiqueta: `${x.nombre} (envío gratis)`, monto: 0 });
+    else o.push({ etiqueta: x.nombre, monto: Number(x.monto), resta: true });
+  }
   if (envio > 0) o.push({ etiqueta: 'Envío', monto: envio });
   return o;
 }
@@ -133,9 +138,10 @@ export function descuentosDePedido(pedido: { descuento_detalle?: unknown; descue
   const out: DescuentoTicket[] = lista
     .map((d) => {
       const nombre = d.tipo === 'CUPON' ? `Cupón ${d.codigo || d.nombre || ''}`.trim() : String(d.nombre || d.codigo || 'Descuento');
-      return { tipo: String(d.tipo ?? ''), nombre, monto: redondeo(d.montoDescontado ?? d.monto) };
+      const envioGratis = d.tipo === 'CUPON' && d.descuentoTipo === 'ENVIO_GRATIS';
+      return { tipo: String(d.tipo ?? ''), nombre, monto: redondeo(d.montoDescontado ?? d.monto), ...(envioGratis ? { envioGratis: true } : {}) };
     })
-    .filter((d) => d.monto > 0);
+    .filter((d) => d.monto > 0 || d.envioGratis);
   if (out.length === 0 && redondeo(pedido.descuento) > 0) out.push({ tipo: 'DESCUENTO', nombre: 'Descuento', monto: redondeo(pedido.descuento) });
   const puntos = redondeo(pedido.puntos_canjeados);
   if (puntos > 0) out.push({ tipo: 'PUNTOS', nombre: `Puntos canjeados (${puntos})`, monto: puntos });

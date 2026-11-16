@@ -1534,6 +1534,11 @@ export class PedidosService {
             cupon_id: BigInt(desgloseDescuento.cuponId),
             pedido_id: pedido.id,
             party_id: clienteFinal,
+            canal: canalPedido === 'WHATSAPP' ? 'BOT' : canalPedido,
+            aplicado_por:
+              (canalPedido === 'MOZO' || canalPedido === 'CAJA') && origen?.usuarioPartyId != null
+                ? BigInt(origen.usuarioPartyId)
+                : null,
           },
         });
       }

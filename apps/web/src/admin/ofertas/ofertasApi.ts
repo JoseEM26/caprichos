@@ -198,6 +198,36 @@ export interface CuponItem {
   creadoEn: string;
 }
 
+export interface UsoCuponFila {
+  fecha: string;
+  pedidoCodigo: string;
+  canal: string | null;
+  aplicadoPor: string | null;
+  cliente: { nombre: string | null; celular: string | null; sinCuenta?: boolean };
+  totalPedido: number;
+  descuento: number;
+  anulado: boolean;
+}
+
+export interface UsosCupon {
+  cuponId: string;
+  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+  resumen: {
+    usos: number;
+    tope: number | null;
+    quedan: number | null;
+    descuentoTotal: number;
+    clientesDistintos: number;
+    anulados: number;
+    emitidos?: number;
+    canjeados?: number;
+    vencidos?: number;
+  };
+  porTrabajador: { partyId: string | null; nombre: string; usos: number; soles: number }[];
+  porDia: { dia: string; usos: number; soles: number }[];
+  historial: { items: UsoCuponFila[]; total: number; pagina: number; tamano: number; totalPaginas: number };
+}
+
 export interface CuponEmitidoItem {
   id: string;
   cuponId: string;
@@ -289,6 +319,10 @@ export const ofertasApi = {
 
   async anularCuponEmitido(id: string, motivo: string): Promise<any> {
     return api.post(`/admin/cupones/emitidos/${id}/anular`, { motivo });
+  },
+
+  async usosDeCupon(id: string, pagina = 1, tamano = 10): Promise<UsosCupon> {
+    return api.get<UsosCupon>(`/admin/cupones/${id}/usos?pagina=${pagina}&tamano=${tamano}`);
   },
 
   async subirFoto(file: File): Promise<{ id: string; url: string }> {

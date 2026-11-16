@@ -14,6 +14,8 @@ import { ModalDescuento } from './ModalDescuento';
 import { ModalEnvioGratis } from './ModalEnvioGratis';
 import { chipsModalidades, estadoDesdeCanales, incluyeModalidadFiltro, OPCIONES_FILTRO_MODALIDAD } from './canalesPromo';
 import { ModalCupon } from './ModalCupon';
+import { ModalUsosCupon } from './ModalUsosCupon';
+import { ModalVistaPreviaCupon } from './ModalVistaPreviaCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { Confirmar } from '../../comun/Confirmar';
@@ -392,6 +394,8 @@ export function OfertasAdminView() {
   const [busquedaEmitidos, setBusquedaEmitidos] = useState('');
 
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
+  const [cuponUsos, setCuponUsos] = useState<CuponItem | null>(null);
+  const [cuponVoucher, setCuponVoucher] = useState<CuponItem | null>(null);
 
   // Modal para ver cómo se ve en la carta
   const [modalPreviewAbierto, setModalPreviewAbierto] = useState(false);
@@ -1790,7 +1794,42 @@ export function OfertasAdminView() {
                       </div>
                     )}
 
-                    <div className="oferta-acciones" style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                    <div className="oferta-acciones" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: 'auto' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCuponUsos(c)}
+                        style={{
+                          flex: '1 1 45%',
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Ver usos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCuponVoucher(c)}
+                        style={{
+                          flex: '1 1 45%',
+                          minHeight: '44px',
+                          border: '1.5px solid var(--cp-navy)',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Ver cómo se imprime
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -2311,6 +2350,8 @@ export function OfertasAdminView() {
               categorias={categorias}
       />
 
+      {cuponUsos && <ModalUsosCupon cupon={cuponUsos} onCerrar={() => setCuponUsos(null)} />}
+      {cuponVoucher && <ModalVistaPreviaCupon cupon={cuponVoucher} onCerrar={() => setCuponVoucher(null)} />}
       <ModalHistorialCupones
         abierto={modalHistorialAbierto}
         onCerrar={() => setModalHistorialAbierto(false)}
