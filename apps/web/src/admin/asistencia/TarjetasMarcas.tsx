@@ -5,6 +5,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { ETIQUETA_TIPO_CAL, type FilaCal } from './calendarioApi';
 import type { CronoDia, CronoMarca } from './correccionesApi';
+import { CambiarHoraMarca } from './CambiarHoraMarca';
 import { DetalleMarca } from './CronogramaTab';
 import { SelfieMarca } from './SelfieMarca';
 import { normalizarTipo, type TipoMarcaElegido } from './tiposMarca';
@@ -51,7 +52,16 @@ export function TarjetasMarcas({ fila, dia, cargando, error, reintentar, onError
   onError: Avisar; onOk: Avisar; recargar: () => Promise<void>;
 }) {
   const [abierta, setAbierta] = useState<number | null>(null);
+  const [cambiando, setCambiando] = useState<CronoMarca | null>(null);
   const marcas: CronoMarca[] = dia ? [...dia.marcas].sort((a, b) => a.minutos - b.minutos) : [];
+  if (cambiando) {
+    return (
+      <div className="ca-detalle-sec">
+        <CambiarHoraMarca fila={fila} marca={cambiando} alVolver={() => setCambiando(null)} onError={onError}
+          alGuardar={async () => { await recargar(); onOk('Hora cambiada. La marca original quedó anulada en el historial y se recalculó el día.'); }} />
+      </div>
+    );
+  }
   return (
     <div className="ca-detalle-sec">
       <Franja fila={fila} />
@@ -79,11 +89,13 @@ export function TarjetasMarcas({ fila, dia, cargando, error, reintentar, onError
                       <Insignia variante={est.variante}>{est.texto}</Insignia>
                       {m.duplicada && <Insignia variante="aviso">Doble marca: no cuenta</Insignia>}
                     </span>
+                    {m.origen === 'CORRECCION' && m.motivo && <small className="tm-origen" data-testid="historial-correccion">{m.motivo}</small>}
                     <small className="tm-origen">
                       {ORIGEN[m.origen ?? ''] ?? 'Origen desconocido'}
                       {m.distanciaM != null ? ` · GPS a ${m.distanciaM} m del local` : ''}
                     </small>
                   </div>
+                  <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Cambiar hora de la marca de las ${m.hora}`} onClick={() => setCambiando(m)}>Cambiar hora</Boton>
                   <Boton type="button" variante="secundario" tamano="pequeno" aria-expanded={abierta === m.id} aria-label={`Acciones de la marca de las ${m.hora}`} onClick={() => setAbierta(abierta === m.id ? null : m.id)}>
                     {abierta === m.id ? 'Ocultar' : 'Acciones'}
                   </Boton>

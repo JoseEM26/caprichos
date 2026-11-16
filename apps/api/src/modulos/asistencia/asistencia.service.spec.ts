@@ -1,5 +1,5 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
-import { AsistenciaService, VERSION_CONSENTIMIENTO } from './asistencia.service';
+import { AsistenciaService, VERSION_CONSENTIMIENTO, mensajeMarca } from './asistencia.service';
 import { payloadQr, secretoQr, slotDe, codigoCorto } from './asistencia.qr';
 import { MarcarDto } from './dto/asistencia.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -139,7 +139,7 @@ describe('AsistenciaService.marcar', () => {
     expect(b.marcas).toHaveLength(1);
     expect(b.selfies).toHaveLength(1);
     expect(r.marca.tipo).toBe('ENTRADA');
-    expect(r.mensaje).toBe('Marcaste tu entrada a las 08:00');
+    expect(r.mensaje).toBe('Marcaste tu entrada a las 08:00. Hoy no tienes turno programado, así que no se mide tardanza');
   });
 
   it('rechaza un QR ajeno (firmado con otro secreto)', async () => {
@@ -498,5 +498,25 @@ describe('AsistenciaService.cambiarHoraMarca', () => {
     const mal = await validate(plainToInstance(CambiarHoraMarcaDto, { momento: '2026-11-06T19:00:00.000Z', motivo: 'corto' }));
     expect(mal.some((e) => e.property === 'motivo')).toBe(true);
     expect(await validate(plainToInstance(CambiarHoraMarcaDto, { momento: '2026-11-06T19:00:00.000Z', motivo: 'Falla del sistema' }))).toHaveLength(0);
+  });
+});
+
+describe('mensajeMarca: entrada y salida frente al turno', () => {
+  const turno = { entrada: 14 * 60, salida: 23 * 60 };
+  const a = (h: number, m: number) => new Date(Date.UTC(2026, 10, 6, h + 5, m)); // hora Lima
+  const m = (rol: any, h: number, mi: number, t: any = turno) => mensajeMarca({ rol, duplicada: false, turno: t }, a(h, mi), 3, 5);
+
+  it('entrada puntual, temprano y tarde', () => {
+    expect(m('ENTRADA', 14, 0)).toContain('✅ Llegaste puntual (tu turno empieza a las 14:00)');
+    expect(m('ENTRADA', 13, 50)).toContain('🌟 Llegaste temprano: 10 min antes');
+    expect(m('ENTRADA', 14, 12)).toContain('⏰ Llegaste tarde: 12 min (tu turno empieza a las 14:00)');
+  });
+  it('sin turno no se mide tardanza', () => {
+    expect(m('ENTRADA', 14, 5, null)).toBe('Marcaste tu entrada a las 14:05. Hoy no tienes turno programado, así que no se mide tardanza');
+  });
+  it('salida antes, a tiempo y después', () => {
+    expect(m('SALIDA', 22, 30)).toContain('Saliste 30 min antes');
+    expect(m('SALIDA', 23, 0)).toContain('Saliste a tiempo');
+    expect(m('SALIDA', 23, 20)).toContain('Saliste 20 min después');
   });
 });

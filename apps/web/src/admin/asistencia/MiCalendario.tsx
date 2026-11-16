@@ -4,6 +4,7 @@ import { Cargando } from '../../comun/Cargando';
 import { jornadaActual } from './jornada';
 import { miCalendario, type DiaCalendario, type EstadoRespuesta, type MiCalendario as Datos } from './miCalendarioApi';
 import { ETIQUETA_LINEA, horasMin, normalizarTipo } from './tiposMarca';
+import type { PedidoCorreccion } from './CorreccionesAsistencia';
 import './miAsistencia.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -68,7 +69,7 @@ export function pasosDelDia(d: DiaCalendario): Paso[] {
   });
 }
 
-function DetalleDia({ dia, alCerrar, alPedirCorreccion }: { dia: DiaCalendario; alCerrar: () => void; alPedirCorreccion?: (fecha: string) => void }) {
+function DetalleDia({ dia, alCerrar, alPedirCorreccion, alJustificar }: { dia: DiaCalendario; alCerrar: () => void; alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void }) {
   const e = estadoDe(dia.estado);
   const pasos = pasosDelDia(dia);
   const extra = dia.extraMin ?? 0;
@@ -105,6 +106,11 @@ function DetalleDia({ dia, alCerrar, alPedirCorreccion }: { dia: DiaCalendario; 
           </div>
         )}
       </dl>
+      {alJustificar && (dia.tardanzaMin ?? 0) > 0 && dia.entradaMarcaId && dia.programado && (!dia.solicitud || dia.solicitud.estado === 'RECHAZADA') && (
+        <button type="button" className="mc-atajo-corr" onClick={() => alJustificar({ jornada: dia.fecha, justificar: { marcaId: dia.entradaMarcaId!, horaTurno: dia.programado!.entrada, tardanzaMin: dia.tardanzaMin! } })}>
+          ¿Quieres justificar esta tardanza?
+        </button>
+      )}
       {dia.solicitud && (
         <div className="mc-solicitud" data-testid="solicitud-dia">
           <strong>Tu solicitud de {dia.solicitud.tipo.toLowerCase().replace(/_/g, ' ')}</strong>{' '}
@@ -121,7 +127,7 @@ function DetalleDia({ dia, alCerrar, alPedirCorreccion }: { dia: DiaCalendario; 
 }
 
 /** Historial propio en calendario mensual: estado por día, entrada/salida chicas, feriados y detalle al tocar. */
-export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha: string) => void } = {}) {
+export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void } = {}) {
   const hoy = jornadaActual();
   const inicial = parse(hoy);
   const [mes, setMes] = useState({ a: inicial.a, m0: inicial.m0 });
@@ -257,7 +263,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
       {!cargando && !error && (datos?.dias ?? []).length === 0 && !dia && (
         <p className="as-ayuda">Aún no hay registros en este mes. Toca un día para ver su detalle.</p>
       )}
-      {dia && <DetalleDia dia={dia} alCerrar={() => setElegido(null)} alPedirCorreccion={alPedirCorreccion} />}
+      {dia && <DetalleDia dia={dia} alCerrar={() => setElegido(null)} alPedirCorreccion={alPedirCorreccion} alJustificar={alJustificar} />}
     </section>
   );
 }

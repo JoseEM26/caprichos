@@ -5,6 +5,8 @@ export type EstadoRespuesta = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
 
 export interface DiaCalendario {
   fecha: string;
+  /** Marca de entrada que cuenta (para justificar una tardanza). */
+  entradaMarcaId?: number | null;
   feriado?: string | null;
   programado?: { entrada: string; salida: string } | null;
   estado: string;

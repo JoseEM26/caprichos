@@ -68,6 +68,8 @@ export type EstadoSolicitudMia = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
 export type EstadoExtraMia = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
 export interface MiCalendarioDia {
   fecha: string;
+  /** Id de la marca que cuenta como entrada (para pedir que se justifique una tardanza); null si no hay. */
+  entradaMarcaId?: number | null;
   feriado: string | null;
   programado: { entrada: string; salida: string } | null;
   estado: string;

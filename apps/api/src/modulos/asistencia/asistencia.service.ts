@@ -395,7 +395,7 @@ export class AsistenciaService {
           distanciaM: metros === null ? null : Math.round(metros * 100) / 100,
           alertas,
         },
-        mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin)}${manual ? '. Queda pendiente de revisión del administrador.' : ''}`,
+        mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin, cfg.toleranciaMin)}${manual ? '. Queda pendiente de revisión del administrador.' : ''}`,
         interpretacion: { rol: tipo, duplicada: lectura.duplicada, alertas: lectura.interp.alertas },
       };
     } catch (e: any) {
@@ -743,7 +743,7 @@ export class AsistenciaService {
       jornada, turno, marcas: [...previas, nueva], ahora: momento, tolerancia: cfg.toleranciaMin, motivoDescanso, dobleMarcaMin: cfg.dobleMarcaMin,
     });
     const m = interp.marcas.find((x) => x.id === -1)!;
-    return { rol: (rolEfectivo(interp, m) ?? 'SALIDA') as TipoMarca, duplicada: m.duplicadaDe !== null, interp };
+    return { rol: (rolEfectivo(interp, m) ?? 'SALIDA') as TipoMarca, duplicada: m.duplicadaDe !== null, interp, turno };
   }
 
   async cargarContexto(desde: string, hasta: string, partyIds?: bigint[]) {
@@ -937,11 +937,32 @@ const declaradoDe = (t?: string): TipoMarcaQr | null => (!t ? null : NUEVOS.has(
 const etiquetaTipo = (t: TipoMarca): string =>
   ({ ENTRADA: 'tu entrada', SALIDA_ALMUERZO: 'tu salida a break', ENTRADA_ALMUERZO: 'tu regreso del break', SALIDA: 'tu salida' })[t];
 
-/** Lo que se le dice a la persona al marcar: qué interpretó el sistema (o que se unió a la marca anterior). */
-const mensajeMarca = (l: { rol: TipoMarca; duplicada: boolean }, ahora: Date, dobleMin: number): string =>
-  l.duplicada
-    ? `Tu marca de las ${horaLima(ahora)} se unió a la anterior (menos de ${dobleMin} min): cuenta la primera`
-    : `Marcaste ${etiquetaTipo(l.rol)} a las ${horaLima(ahora)}`;
+/** Lo que se le dice a la persona al marcar: qué interpretó el sistema y, en entrada y salida, cómo quedó frente a su turno. */
+export const mensajeMarca = (
+  l: { rol: TipoMarca; duplicada: boolean; turno?: { entrada: number; salida: number } | null }, ahora: Date, dobleMin: number, tolerancia = 0,
+): string => {
+  if (l.duplicada) return `Tu marca de las ${horaLima(ahora)} se unió a la anterior (menos de ${dobleMin} min): cuenta la primera`;
+  const base = `Marcaste ${etiquetaTipo(l.rol)} a las ${horaLima(ahora)}`;
+  if (l.rol !== 'ENTRADA' && l.rol !== 'SALIDA') return base;
+  const min = jornadaDe(ahora).minutos;
+  if (!l.turno) {
+    return l.rol === 'ENTRADA'
+      ? `${base}. Hoy no tienes turno programado, así que no se mide tardanza`
+      : `${base}. Hoy no tienes turno programado, así que no se mide la hora de salida`;
+  }
+  if (l.rol === 'ENTRADA') {
+    const dif = min - l.turno.entrada;
+    const turno = `tu turno empieza a las ${aHoraTexto(l.turno.entrada)}`;
+    if (dif > tolerancia) return `${base}. ⏰ Llegaste tarde: ${dif} min (${turno})`;
+    if (dif < 0) return `${base}. 🌟 Llegaste temprano: ${-dif} min antes (${turno})`;
+    return `${base}. ✅ Llegaste puntual (${turno})`;
+  }
+  const dif = min - l.turno.salida;
+  const turno = `tu turno termina a las ${aHoraTexto(l.turno.salida)}`;
+  if (dif < -tolerancia) return `${base}. Saliste ${-dif} min antes (${turno})`;
+  if (dif > tolerancia) return `${base}. Saliste ${dif} min después (${turno})`;
+  return `${base}. Saliste a tiempo (${turno})`;
+};
 
 const horaLima = (d: Date): string => aHoraTexto(jornadaDe(d).minutos);
 

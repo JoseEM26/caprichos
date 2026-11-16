@@ -28,7 +28,7 @@ export interface CronoMarca {
   distanciaM?: number | null;
   precisionM?: number | null;
 }
-export interface ItemSolicitud { tipo: TipoMarca; hora: string; momento: string }
+export interface ItemSolicitud { tipo: TipoMarca; hora: string; momento: string; reemplazaMarcaId?: number }
 export interface CronoSolicitud { id: number; motivo: string; creadaEn: string; items: ItemSolicitud[] }
 export interface Tramo { desde: number; hasta: number | null; tipo: 'TRABAJO' | 'BREAK' }
 export interface InconsistenciaDia { tipo: string; texto: string; falta: TipoMarca | null; sinSolicitud: boolean }
@@ -53,6 +53,9 @@ export interface Cronograma { desde: string; hasta: string; dias: string[]; resu
 export const cronograma = (desde: string, hasta: string) => api.get<Cronograma>(`/admin/asistencia/cronograma?desde=${desde}&hasta=${hasta}`);
 export const separarMarca = (id: number, motivo: string) => api.post(`/admin/asistencia/marcas/${id}/separar`, { motivo });
 export const reasignarMarca = (id: number, tipo: TipoMarca, motivo: string) => api.post(`/admin/asistencia/marcas/${id}/reasignar`, { tipo, motivo });
+
+export const cambiarHoraMarca = (id: number, momento: string, motivo: string, tipo?: TipoMarca | null) =>
+  api.post(`/admin/asistencia/marcas/${id}/cambiar-hora`, { momento, motivo, ...(tipo ? { tipo } : {}) });
 
 export type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA';
 export interface Solicitud {
@@ -81,7 +84,7 @@ export interface InconsistenciaPersona {
 }
 export const miInconsistencias = () => api.get<InconsistenciaPersona[]>('/admin/asistencia/mi/inconsistencias');
 export const misSolicitudes = () => api.get<Solicitud[]>('/admin/asistencia/mi/solicitudes');
-export const crearSolicitud = (datos: { jornada: string; items: Array<{ tipo: TipoMarca; hora: string }>; motivo: string }) =>
+export const crearSolicitud = (datos: { jornada: string; items: Array<{ tipo: TipoMarca; hora: string; reemplazaMarcaId?: number }>; motivo: string }) =>
   api.post<{ ok: boolean; id: number }>('/admin/asistencia/mi/solicitudes', datos);
 export const cancelarSolicitud = (id: number) => api.post(`/admin/asistencia/mi/solicitudes/${id}/cancelar`, {});
 

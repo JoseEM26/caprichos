@@ -4,7 +4,7 @@ import type {
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { aHoraTexto, cierreJornada, jornadaDe, sumarDias } from './asistencia.calculo';
-import { almuerzoMarcadoMin, detectarInconsistencia } from './asistencia.interpretacion';
+import { almuerzoMarcadoMin, detectarInconsistencia, rolEfectivo } from './asistencia.interpretacion';
 import { AsistenciaCorreccionesService, etiquetaDia } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
 
@@ -218,8 +218,10 @@ export class AsistenciaCalendarioService {
       if (extraEstado === 'APROBADA') resumen.extraAprobadaMin += r.extraMin;
       if (extraEstado === 'PENDIENTE') resumen.extraPendienteMin += r.extraMin;
       const { almuerzoMin, ...horas } = horasDelDia(d);
+      const entradaM = d.interp.marcas.find((m) => m.duplicadaDe === null && rolEfectivo(d.interp, m) === 'ENTRADA');
       return {
         fecha,
+        entradaMarcaId: entradaM?.id && entradaM.id > 0 ? entradaM.id : null,
         feriado: feriados.get(fecha) ?? null,
         programado: turnoSimple(d),
         estado: r.estado,

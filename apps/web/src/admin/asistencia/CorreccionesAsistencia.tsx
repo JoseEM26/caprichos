@@ -16,7 +16,11 @@ export interface PedidoCorreccion {
   jornada: string;
   /** Marca que probablemente falta: prellena la primera fila. */
   tipo?: TipoMarca | null;
+  /** Justificar una tardanza: la entrada que dice haber hecho a otra hora reemplaza a la marca original al aprobarse. */
+  justificar?: { marcaId: number; horaTurno: string; tardanzaMin: number };
 }
+
+export const ATAJOS_JUSTIFICAR = ['Falla del sistema al marcar', 'Me autorizaron llegar tarde'];
 
 const TIPOS: TipoMarca[] = ['ENTRADA', 'SALIDA_ALMUERZO', 'ENTRADA_ALMUERZO', 'SALIDA'];
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.response?.mensaje ?? (e as any)?.message ?? fallback;
@@ -75,7 +79,17 @@ export function CorreccionesAsistencia({ pedido, alAbrir, alCerrar }: { pedido: 
         </section>
       )}
 
-      {pedido && (
+      {pedido?.justificar && (
+        <FormularioJustificar
+          key={`j-${pedido.jornada}`}
+          jornada={pedido.jornada}
+          datos={pedido.justificar}
+          alCerrar={alCerrar}
+          alEnviado={async () => { setAviso('Justificación enviada. Queda pendiente de aprobación del administrador.'); alCerrar(); await cargar(); }}
+        />
+      )}
+
+      {pedido && !pedido.justificar && (
         <FormularioSolicitud
           key={`${pedido.jornada}-${pedido.tipo ?? ''}`}
           pedido={pedido}
@@ -157,6 +171,49 @@ function FormularioSolicitud({ pedido, alCerrar, alEnviado }: { pedido: PedidoCo
       </label>
       {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
       <Boton type="submit" tamano="grande" disabled={!valido || enviando}>{enviando ? 'Enviando…' : 'Enviar solicitud'}</Boton>
+      <Boton type="button" variante="texto" onClick={alCerrar}>Cancelar</Boton>
+    </form>
+  );
+}
+
+/** Justificar una tardanza: la hora en que debió contar (por defecto el inicio de su turno) y el motivo. Va como solicitud al administrador. */
+function FormularioJustificar({ jornada, datos, alCerrar, alEnviado }: {
+  jornada: string; datos: { marcaId: number; horaTurno: string; tardanzaMin: number }; alCerrar: () => void; alEnviado: () => Promise<void>;
+}) {
+  const [hora, setHora] = useState(datos.horaTurno);
+  const [motivo, setMotivo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const valido = /^\d{2}:\d{2}$/.test(hora) && motivo.trim().length >= 10;
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    setEnviando(true);
+    setError(null);
+    try {
+      await crearSolicitud({ jornada, items: [{ tipo: 'ENTRADA', hora, reemplazaMarcaId: datos.marcaId }], motivo: motivo.trim() });
+      await alEnviado();
+    } catch (err) {
+      setError(mensajeDe(err, 'No se pudo enviar la justificación.'));
+    } finally {
+      setEnviando(false);
+    }
+  };
+  return (
+    <form className="ma-card" aria-label="Justificar tardanza" onSubmit={(e) => void enviar(e)}>
+      <h3 className="as-sub">Justificar tu tardanza de {datos.tardanzaMin} min</h3>
+      <p className="as-ayuda">El administrador revisa tu pedido. Si lo aprueba, tu entrada cuenta a la hora que indiques y la tardanza se recalcula.</p>
+      <label className="as-campo">Hora a la que debió contar tu entrada
+        <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} required />
+      </label>
+      <div role="group" aria-label="Motivos frecuentes">
+        {ATAJOS_JUSTIFICAR.map((t) => <Boton key={t} type="button" variante="secundario" tamano="pequeno" onClick={() => setMotivo(t)}>{t}</Boton>)}
+        <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setMotivo('')}>Otro</Boton>
+      </div>
+      <label className="as-campo">Motivo (mínimo 10 caracteres)
+        <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} rows={2} required />
+      </label>
+      {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
+      <Boton type="submit" tamano="grande" disabled={!valido || enviando}>{enviando ? 'Enviando…' : 'Enviar justificación'}</Boton>
       <Boton type="button" variante="texto" onClick={alCerrar}>Cancelar</Boton>
     </form>
   );

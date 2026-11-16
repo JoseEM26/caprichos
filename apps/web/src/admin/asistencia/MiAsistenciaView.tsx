@@ -142,6 +142,8 @@ export function MiAsistenciaView() {
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
   const ganadoHoy = horasGanadasHoy(h.marcas, horaLima);
   const almuerzoMin = h.almuerzoMin ?? null;
+  const tardanzaHoy: number = hoy.estado === 'TARDANZA' ? (hoy as any).resumen?.tardanzaMin ?? 0 : 0;
+  const entradaHoy = h.marcas.find((m) => !m.duplicada && (m as any).rol === 'ENTRADA' && m.id != null) as { id: number } | undefined;
   const porPagar = propinas.filter((p) => !p.pagadoEn).length;
   const propinasVistas = verTodasPropinas ? propinas : propinas.slice(0, VER_PROPINAS);
 
@@ -176,6 +178,14 @@ export function MiAsistenciaView() {
               })}
             </ol>
           )}
+        {tardanzaHoy > 0 && entradaHoy && hoy.turno && (
+          <div className="ma-vas" data-testid="tardanza-hoy">
+            <p>⏰ Llegaste tarde: {tardanzaHoy} min (tu turno empieza a las {hoy.turno.entrada})</p>
+            <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => { setPedido({ jornada: hoy.jornada, justificar: { marcaId: entradaHoy.id, horaTurno: hoy.turno!.entrada, tardanzaMin: tardanzaHoy } }); cambiarPestana('calendario'); }}>
+              ¿Quieres justificar esta tardanza?
+            </Boton>
+          </div>
+        )}
         {ganadoHoy !== null && <p className="ma-vas" data-testid="horas-hoy">Horas ganadas hoy: <strong>{horasMin(ganadoHoy)}</strong> (el almuerzo cuenta)</p>}
       </section>
     </>
@@ -236,7 +246,7 @@ export function MiAsistenciaView() {
       contenido: (
         <>
           <CorreccionesAsistencia pedido={pedido} alAbrir={setPedido} alCerrar={() => setPedido(null)} />
-          <MiCalendario alPedirCorreccion={(jornada) => setPedido({ jornada })} />
+          <MiCalendario alPedirCorreccion={(jornada) => setPedido({ jornada })} alJustificar={setPedido} />
           <Plegable titulo="Reemplazos y cambios de turno" perezoso><ReemplazosTurno /></Plegable>
         </>
       ),
