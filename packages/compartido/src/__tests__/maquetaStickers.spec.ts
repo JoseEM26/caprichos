@@ -4,6 +4,7 @@ import {
   TAMANO_BEBIDA_DEFECTO,
   TAMANO_GENERAL_DEFECTO,
   maquetarBebida,
+  modalidadSticker,
   maquetarEtiqueta,
   maquetarGeneral,
   medidaEtiquetaValida,
@@ -179,5 +180,33 @@ describe('sticker general', () => {
     const m = maquetarGeneral(general(2, { who: 'MARIA ELENA GUADALUPE DEL CARMEN DE LOS SANTOS PEREZ' }));
     verificarDentro(m);
     sinSolapes(m);
+  });
+});
+
+describe('sticker de bebida con nota y modalidad', () => {
+  const tam = [{ anchoMm: 76, altoMm: 38 }, { anchoMm: 100, altoMm: 100 }, { anchoMm: 50, altoMm: 30 }, { anchoMm: 60, altoMm: 60 }];
+  it.each(tam)('cabe en %o con nota larga y cada modalidad', (t) => {
+    for (const pill of ['DELIVERY', 'PARA LLEVAR', 'SALÓN MESA 12']) {
+      const m = maquetarBebida(bebida({ nota: `sin azucar poco hielo ${largo} ${largo}`, modalidadPill: pill }), t);
+      verificarDentro(m);
+      sinSolapes(m);
+    }
+  });
+  it('muestra la nota y la modalidad (pill invertida)', () => {
+    const m = maquetarBebida(bebida({ nota: 'sin azucar', modalidadPill: 'PARA LLEVAR' }));
+    const textos = verificarDentro(m).join('|');
+    expect(textos).toContain('NOTA: sin azucar');
+    expect(textos).toContain('PARA LLEVAR');
+    expect((m.primitivas as Primitiva[]).some((p) => p.t === 'texto' && p.texto === 'PARA LLEVAR' && p.invertido)).toBe(true);
+  });
+  it('sin nota ni modalidad queda como antes', () => {
+    expect(JSON.stringify(maquetarBebida(bebida({ nota: null, modalidadPill: null })))).toBe(JSON.stringify(maquetarBebida(bebida())));
+  });
+  it('modalidadSticker', () => {
+    expect(modalidadSticker('DELIVERY')).toBe('DELIVERY');
+    expect(modalidadSticker('LLEVAR')).toBe('PARA LLEVAR');
+    expect(modalidadSticker('MESA', 'Mesa 4')).toBe('SALÓN MESA 4');
+    expect(modalidadSticker('COMER_LOCAL')).toBe('SALÓN');
+    expect(modalidadSticker(null)).toBeNull();
   });
 });

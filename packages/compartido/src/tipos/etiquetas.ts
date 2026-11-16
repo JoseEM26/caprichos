@@ -1,4 +1,5 @@
 import type { TamanoEtiquetaPc } from '../constantes/tamanoPc.js';
+import type { Maqueta } from '../etiquetas/maquetaEtiquetas.js';
 import type { LineaDetalleEntrada, DescuentoTicket } from '../etiquetas/detalleLinea.js';
 
 export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
@@ -319,6 +320,15 @@ export interface EtiquetaBebidaDatos {
   tamano?: string | null;
   opciones: string[];
   contiene?: string | null;
+  /** Nota de la línea (la que puso el cliente o el mozo: «sin azúcar», «poco hielo»); sale en un recuadro. Un .exe viejo la ignora. */
+  nota?: string | null;
+  /** Modalidad del pedido para el sticker: «DELIVERY», «PARA LLEVAR», «SALÓN» o «SALÓN MESA 4». Un .exe viejo la ignora. */
+  modalidadPill?: string | null;
+  /**
+   * Maqueta ya calculada por el servidor para el tamaño de esa PC: el programa de impresión solo la dibuja, así un
+   * diseño nuevo no exige reinstalar el .exe. Sin ella (trabajo viejo) el programa maqueta con su propio diseño.
+   */
+  maqueta?: Maqueta;
   who: string;
   hora: string;
   /** Área de la línea (id): decide en qué PC sale el vaso. */

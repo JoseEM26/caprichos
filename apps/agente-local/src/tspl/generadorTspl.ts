@@ -144,8 +144,11 @@ function generarSticker(
   // El tamaño llega por PC (con décimas, como 101,6 x 63,5, y margen); si no es válido, el de fábrica
   const propio = tamanoPcValido(datos.tamanoMm);
   const tam = propio ?? defecto;
-  const m = maquetarEtiqueta(tipo, datos, { anchoMm: tam.anchoMm, altoMm: tam.altoMm, margenMm: propio?.margenMm });
-  const f = resolverFormato({ ...opciones?.formato, orientacion: 'horizontal', anchoMm: tam.anchoMm, altoMm: tam.altoMm });
+  // Si el servidor ya mando la maqueta (vaso), solo se dibuja: un diseno nuevo no exige otro .exe. Sin ella, se maqueta aqui.
+  const enviada = tipo === 'ETIQUETA_BEBIDA' ? (datos as EtiquetaBebidaDatos).maqueta : undefined;
+  const valida = !!enviada && enviada.W > 0 && enviada.H > 0 && Array.isArray(enviada.primitivas);
+  const m = valida ? enviada! : maquetarEtiqueta(tipo, datos, { anchoMm: tam.anchoMm, altoMm: tam.altoMm, margenMm: propio?.margenMm });
+  const f = resolverFormato({ ...opciones?.formato, orientacion: 'horizontal', ...(Math.round(tam.anchoMm * 8) === m.W && Math.round(tam.altoMm * 8) === m.H ? { anchoMm: tam.anchoMm, altoMm: tam.altoMm } : { anchoMm: m.W / 8, altoMm: m.H / 8 }) });
   return comandosInicio(f) + primitivasATspl(m.primitivas, m.W, m.H, 0) + `PRINT 1,${opciones?.copias ?? 1}\r\n`;
 }
 

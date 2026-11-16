@@ -1,6 +1,7 @@
 import { representacionDe } from '../comprobantes/facturacion/representacion';
 import {
   modalidadDeFiltroBebida,
+  modalidadSticker,
   EtiquetaGeneralDatos,
   EtiquetaGeneralProducto,
   EtiquetaAreaDatos,
@@ -262,6 +263,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
   const hora = formatearHora(pedido.creado_en);
   const clienteNombre = obtenerNombreCliente(pedido);
   const bebidas: EtiquetaBebidaDatos[] = [];
+  const modalidadPill = modalidadSticker(pedido.modalidad, pedido.mesa_nombre);
 
   lineas.forEach((linea) => {
     const cant = Math.max(1, Number(linea.cantidad) || 1);
@@ -289,6 +291,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
             contiene: extras.length > 0 ? extras.join(', ') : null,
             who: `Para: ${clienteNombre}`,
             hora,
+            ...(modalidadPill ? { modalidadPill } : {}),
             ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
           });
         });
@@ -319,6 +322,8 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
         contiene,
         who: `Para: ${clienteNombre}`,
         hora,
+        ...(linea.nota && String(linea.nota).trim() ? { nota: String(linea.nota).trim() } : {}),
+        ...(modalidadPill ? { modalidadPill } : {}),
         ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
         ...(linea.producto?.categoria_id ? { categoriaId: String(linea.producto.categoria_id) } : {}),
         // Tipo de pedido vigente: el filtro del vaso por PC lo usa para elegir su lista de categorías
@@ -593,6 +598,8 @@ export function construirEtiquetaBebidaPrueba(quien: string, ahora = new Date())
     contiene: 'PRUEBA - no es un pedido',
     who: 'Para: prueba',
     hora: formatearHora(ahora),
+    nota: 'poco hielo',
+    modalidadPill: 'PARA LLEVAR',
   };
 }
 

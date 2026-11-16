@@ -1,4 +1,4 @@
-import { descuentosDePedido, entradaDeLineaPedido, esAreaBebidas, type TicketPagoDatos } from '@caprichos/compartido';
+import { descuentosDePedido, entradaDeLineaPedido, esAreaBebidas, modalidadSticker, type TicketPagoDatos } from '@caprichos/compartido';
 import { lineasDeCuenta } from './precuentaDetalle';
 import { Pedido, LineaPedido } from './pedidosApi';
 import { canalLabel, modLabel } from './PedidosAdminView';
@@ -124,6 +124,8 @@ export interface EtiquetaBebidaDatos {
   tamano?: string | null;
   opciones: string[];
   contiene?: string | null;
+  nota?: string | null;
+  modalidadPill?: string | null;
   who: string;
   hora: string;
 }
@@ -234,6 +236,7 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
   // 3. Por Bebida
   // Una por cada vaso: si linea tiene cantidad 2, son 2 etiquetas
   const bebidas: EtiquetaBebidaDatos[] = [];
+  const modalidadVaso = modalidadSticker(pedido.modalidad, pedido.mesa_nombre);
 
   lineas.forEach((linea) => {
     const cant = Math.max(1, linea.cantidad || 1);
@@ -253,6 +256,7 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
             contiene: null,
             who: `Para: ${clienteNombre}`,
             hora,
+            modalidadPill: modalidadVaso,
           });
         });
       }
@@ -280,6 +284,8 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
         contiene,
         who: `Para: ${clienteNombre}`,
         hora,
+        nota: linea.nota?.trim() || null,
+        modalidadPill: modalidadVaso,
       });
     }
   });

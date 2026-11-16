@@ -191,6 +191,21 @@ describe('generadorTspl', () => {
       verificarDentro(tspl, 608, 304);
     });
 
+    it('con nota y modalidad las imprime; verificarDentro cuadra', () => {
+      const tspl = generarEtiquetaBebida({ ...datosBebida, nota: 'poco hielo', modalidadPill: 'PARA LLEVAR' });
+      expect(tspl).toContain('NOTA: poco hielo');
+      expect(tspl).toContain('PARA LLEVAR');
+    });
+
+    it('si el servidor manda la maqueta, solo la dibuja (SIZE sale de ella); sin maqueta usa la propia', () => {
+      const maqueta = { W: 400, H: 240, primitivas: [{ t: 'texto' as const, x: 20, y: 20, fuente: '3' as const, xm: 1, ym: 1, texto: 'DISENO NUEVO' }] };
+      const tspl = generarEtiquetaBebida({ ...datosBebida, maqueta });
+      expect(tspl).toContain('SIZE 50 mm,30 mm\r\n');
+      expect(tspl).toContain('DISENO NUEVO');
+      expect(tspl).not.toContain('CAPPUCCINO');
+      expect(generarEtiquetaBebida(datosBebida)).toContain('CAPPUCCINO');
+    });
+
     it('con tamanoMm 100 x 100 cambia el SIZE y sigue cuadrando', () => {
       const tspl = generarEtiquetaBebida({ ...datosBebida, tamanoMm: { anchoMm: 100, altoMm: 100 } });
       expect(tspl).toContain('SIZE 100 mm,100 mm\r\n');

@@ -175,12 +175,64 @@ const alturaNivel = ([f, m]: Nivel) => alto(f) * m;
 
 const nombreCliente = (t: string | null | undefined) => (t || '').trim().toUpperCase().replace(/\s+/g, ' ') || 'CLIENTE';
 
+/**
+ * Modalidad del pedido para el sticker de bebida: «DELIVERY», «PARA LLEVAR», «SALÓN» o «SALÓN MESA 4».
+ * Una mesa manda sobre la modalidad (salón); sin modalidad conocida devuelve null.
+ */
+export function modalidadSticker(modalidad: unknown, mesa?: unknown): string | null {
+  const m = String(mesa ?? '').trim().replace(/^mesa\s*/i, '');
+  if (m) return /^en espera/i.test(m) ? 'SALÓN' : `SALÓN MESA ${m.toUpperCase()}`;
+  switch (String(modalidad ?? '').toUpperCase()) {
+    case 'DELIVERY':
+      return 'DELIVERY';
+    case 'LLEVAR':
+    case 'RECOGER':
+      return 'PARA LLEVAR';
+    case 'MESA':
+    case 'LOCAL':
+    case 'COMER_LOCAL':
+      return 'SALÓN';
+    default:
+      return null;
+  }
+}
+
 export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
   const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_BEBIDA_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_BEBIDA_DEFECTO.altoMm, margenMm: tam.margenMm });
   // Cabecera: marca (logo + CAPRICHOS) e indice "BEBIDA 1/3" (der)
   let y = banda(L, L.b + 4, L.H >= 560 ? '4' : '3', `BEBIDA ${d.bebidaIndex}/${d.totalBebidas}`) + 6;
   // Pie: codigo del pedido y cliente (izq), hora (der)
-  const finCuerpo = pie(L, [d.codigo, d.who].filter(Boolean).join(' '), d.hora) - 4;
+  let finCuerpo = pie(L, [d.codigo, d.who].filter(Boolean).join(' '), d.hora) - 4;
+
+  // Modalidad (pill negra) y nota (recuadro) en una fila justo sobre el pie; la nota se parte en lineas, no se corta
+  const pillTxt = (d.modalidadPill || '').trim().toUpperCase();
+  const notaTxt = (d.nota || '').trim().replace(/\s+/g, ' ');
+  if (pillTxt || notaTxt) {
+    const f2: Nivel = ['2', 1];
+    const nPill: Nivel = [L.H >= 400 ? '3' : '2', 1];
+    const pillCortado = pillTxt ? truncar(pillTxt, charsEn(Math.round(L.w * (notaTxt ? 0.42 : 0.9)) - 16, nPill)) : '';
+    const wPill = pillCortado ? ancho_(pillCortado, nPill) + 16 : 0;
+    const hPill = alto(nPill[0]) + 8;
+    const xNota = L.x0 + (wPill ? wPill + 8 : 0);
+    const wNota = L.x0 + L.w - xNota;
+    // Cuerpo disponible para la fila: nunca mas de 45 % del cuerpo; la nota puede usar 1 a 3 lineas
+    const tope = Math.floor((finCuerpo - y) * 0.45);
+    const maxLin = Math.max(1, Math.min(L.H >= 400 ? 3 : 2, Math.floor((tope - 8 + 2) / hLinea(f2))));
+    const lineasNota = notaTxt ? ajustarLineas(`NOTA: ${notaTxt}`, charsEn(wNota - 12, f2), maxLin) : [];
+    const hNota = lineasNota.length ? lineasNota.length * hLinea(f2) + 8 : 0;
+    const h = Math.max(hPill, hNota);
+    const top = finCuerpo - h;
+    if (pillCortado) {
+      const ty = top + Math.round((h - hPill) / 2);
+      texto(L, L.x0 + 8, ty + 4, nPill[0], 1, pillCortado, true);
+      inverso(L, L.x0, ty, wPill, hPill);
+    }
+    if (lineasNota.length) {
+      L.prim.push({ t: 'caja', x1: xNota, y1: top, x2: xNota + wNota, y2: top + h, grosor: 2, radio: 4 });
+      lineasNota.forEach((l, i) => texto(L, xNota + 6, top + Math.round((h - lineasNota.length * hLinea(f2)) / 2) + i * hLinea(f2), '2', 1, l));
+    }
+    finCuerpo = top - 6;
+  }
   const cuerpo = finCuerpo - y;
 
   // Cliente: el protagonista, lo mas grande posible (hasta 52 % del cuerpo)

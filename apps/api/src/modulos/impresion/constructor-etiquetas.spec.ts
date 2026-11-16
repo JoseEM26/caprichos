@@ -71,6 +71,14 @@ describe('Constructor server-side de etiquetas', () => {
     expect(vasos[0].who).toContain('Miguel');
   });
 
+  it('el vaso lleva la nota de su línea y la modalidad (salón con mesa, llevar, delivery)', () => {
+    const v = construirEtiquetasBebida(pedidoMock);
+    expect(v[0].nota).toBe('Caliente');
+    expect(v[0].modalidadPill).toBe('SALÓN MESA 3');
+    expect(construirEtiquetasBebida({ ...pedidoMock, mesa_nombre: null, modalidad: 'LLEVAR' })[0].modalidadPill).toBe('PARA LLEVAR');
+    expect(construirEtiquetasBebida({ ...pedidoMock, mesa_nombre: null, modalidad: 'DELIVERY' })[0].modalidadPill).toBe('DELIVERY');
+  });
+
   it('construye etiquetas por área agrupadas', () => {
     const areas = construirEtiquetasArea(pedidoMock);
     expect(areas).toHaveLength(2);

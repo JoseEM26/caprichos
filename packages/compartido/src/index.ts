@@ -71,7 +71,7 @@ export {
   ajustarLineas,
   maquetarArea,
 } from './etiquetas/maquetaEtiquetas.js';
-export { maquetarGeneral, maquetarBebida, maquetarEtiqueta, lineasDeDatos } from './etiquetas/maquetaStickers.js';
+export { maquetarGeneral, maquetarBebida, maquetarEtiqueta, lineasDeDatos, modalidadSticker } from './etiquetas/maquetaStickers.js';
 export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
 export { calcularPagoPedido } from './etiquetas/pagoPedido.js';
 export { PAGOS_EJEMPLO } from './etiquetas/pagosEjemplo.js';

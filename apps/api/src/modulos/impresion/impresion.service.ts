@@ -93,7 +93,7 @@ import { EquipoConfigService } from './equipo-config.service';
 import { DkLite, destinoDeTrabajoParaCola, motivoTipoSinAsignar, NOMBRE_TIPO_PAPEL, textoConexion, rolDeTipo } from './destinos-impresion';
 import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { tamanoEfectivo } from '@caprichos/compartido';
+import { maquetarEtiqueta, tamanoEfectivo } from '@caprichos/compartido';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 import { datosOrigen, deducirOrigen } from './origen-impresion';
 
@@ -295,11 +295,21 @@ export class ImpresionService {
         const m = tamanoEfectivo(propio, general);
         return { anchoMm: m.anchoMm, altoMm: m.altoMm, ...(m.margenMm ? { margenMm: m.margenMm } : {}) };
       };
+      // El servidor arma el diseño del vaso para la medida de esa PC; el programa solo lo dibuja (un diseño nuevo no exige otro .exe)
+      // Si el payload no se puede maquetar (dato roto), sale sin maqueta y el programa usa la suya: nunca se frena la entrega
+      const conMaqueta = (p: any) => {
+        try {
+          return { ...p, maqueta: maquetarEtiqueta('ETIQUETA_BEBIDA', p, p.tamanoMm) };
+        } catch {
+          return p;
+        }
+      };
       const conTamano = (t: (typeof actualizados)[number]) => {
         const p = t.payload as any;
+        if (t.tipo === 'ETIQUETA_BEBIDA' && p?.tamanoMm) return conMaqueta(p);
         if (!tamanos || p?.tamanoMm) return p;
         if (t.tipo === 'ETIQUETA_GENERAL') return { ...p, tamanoMm: medida(cfg?.tamanoGeneral, tamanos.general) };
-        if (t.tipo === 'ETIQUETA_BEBIDA') return { ...p, tamanoMm: medida(cfg?.tamanoBebida, tamanos.bebida) };
+        if (t.tipo === 'ETIQUETA_BEBIDA') return conMaqueta({ ...p, tamanoMm: medida(cfg?.tamanoBebida, tamanos.bebida) });
         return p;
       };
 

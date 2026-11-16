@@ -61,6 +61,8 @@ export const muestraEtiquetaBebida: EtiquetaBebidaDatos = {
   contiene: 'Avena, canela, espresso doble',
   who: 'Para: Juan Pérez',
   hora: '15:30',
+  nota: 'poco hielo',
+  modalidadPill: 'PARA LLEVAR',
 };
 
 /** Ticket de prueba de la ticketera (asistente de vinculación por red). */

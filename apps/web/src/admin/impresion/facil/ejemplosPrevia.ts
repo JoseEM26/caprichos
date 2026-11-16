@@ -42,7 +42,7 @@ const RECETAS: Receta[] = [
     medio: 'YAPE',
     documento: 'BOLETA',
     lineas: [
-      { cantidad: 2, nombre: 'Café latte', tamano: 'Grande', precioUnit: 11, subtotal: 22, bebida: true, opciones: [{ grupo: 'Leche', nombre: 'Avena', extra: 2 }, { grupo: 'Endulzante', nombre: 'Sin azúcar' }], nombresPersona: ['Ana', 'Luis'] },
+      { cantidad: 2, nombre: 'Café latte', tamano: 'Grande', precioUnit: 11, subtotal: 22, bebida: true, nota: 'Poco hielo', opciones: [{ grupo: 'Leche', nombre: 'Avena', extra: 2 }, { grupo: 'Endulzante', nombre: 'Sin azúcar' }], nombresPersona: ['Ana', 'Luis'] },
       { cantidad: 1, nombre: 'Torta de chocolate', subtotal: 14.5, nota: 'Con vela' },
     ],
   },
@@ -155,7 +155,7 @@ export function ejemploPrevia(indice: number, nombreAzar: string): EjemploPrevia
   });
   return {
     indice, nombre, descripcion: `${rc.descripcion}, cliente ${nombre}`,
-    bebida: { bebidaIndex: 1, totalBebidas: Math.max(1, bebidas.reduce((a, l) => a + l.cantidad, 0)), codigo, persona: b0?.nombresPersona?.[0] ?? nombre, bebidaNombre: b0?.nombre ?? 'Limonada', tamano: b0?.tamano ?? 'Grande', opciones: b0 ? opts(b0) : [], contiene: null, who: nombre, hora: HORA },
+    bebida: { bebidaIndex: 1, totalBebidas: Math.max(1, bebidas.reduce((a, l) => a + l.cantidad, 0)), codigo, persona: b0?.nombresPersona?.[0] ?? nombre, bebidaNombre: b0?.nombre ?? 'Limonada', tamano: b0?.tamano ?? 'Grande', opciones: b0 ? opts(b0) : [], contiene: null, nota: b0?.nota ?? null, modalidadPill: delivery ? 'DELIVERY' : rc.modalidad === 'MESA' ? 'SALÓN MESA 4' : 'PARA LLEVAR', who: nombre, hora: HORA },
     area: { areaNombre: 'SALADOS', areaIndex: 1, totalAreas: 2, codigo, modalidadPill: modalidadTxt.toUpperCase(), who: nombre, canal: delivery ? 'WEB' : 'MESA', hora: HORA, fecha: FECHA, lineas: rc.lineas.filter((l) => !l.bebida).map((l) => ({ ...prods(l), opciones: opts(l), nota: l.nota ?? null })), esCompacta: false, nota: rc.nota ?? null, printer: 'Etiquetera cocina' },
     general: { codigo, modalidad: rc.modalidad === 'MESA' ? 'LLEVAR' : rc.modalidad, modalidadPill: modalidadTxt.toUpperCase(), who: nombre, canal: delivery ? 'WEB' : 'CAJA', hora: HORA, fecha: FECHA, cantidadProductos: rc.lineas.reduce((a, l) => a + l.cantidad, 0), productos: rc.lineas.map(prods), nota: rc.nota ?? null, total, pago: pagoEt, printer: 'PC Caja', ...(delivery ? { direccion: rc.entrega, telefono: '987 654 321' } : {}) },
     pago: ticket,

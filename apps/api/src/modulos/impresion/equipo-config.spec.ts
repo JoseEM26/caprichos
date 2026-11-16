@@ -193,9 +193,9 @@ describe('tamaño por PC en la entrega de trabajos y config en el latido', () =>
   const fila = (tamanos: any = {}) => ({ device_key_id: 10n, configurado: true, pausado: false, ticketera: true, etiquetera: true, ticket_pago: true, comanda_salon: false, comanda_areas: [], sticker_general: true, sticker_areas: [], sticker_bebida_areas: [], tamanos });
   const montar = (cfgFila: any) => {
     const trabajos = [
-      { id: 1n, tipo: 'ETIQUETA_BEBIDA', payload: { codigo: 'A' }, copia: false, intentos: 0 },
+      { id: 1n, tipo: 'ETIQUETA_BEBIDA', payload: { codigo: 'A', hora: '10:00', persona: 'Ana', bebidaNombre: 'Latte', opciones: [], who: 'x', bebidaIndex: 1, totalBebidas: 1 }, copia: false, intentos: 0 },
       { id: 2n, tipo: 'ETIQUETA_GENERAL', payload: { codigo: 'A' }, copia: false, intentos: 0 },
-      { id: 3n, tipo: 'ETIQUETA_BEBIDA', payload: { codigo: 'P', tamanoMm: { anchoMm: 50, altoMm: 30 } }, copia: false, intentos: 0 },
+      { id: 3n, tipo: 'ETIQUETA_BEBIDA', payload: { codigo: 'P', hora: '10:00', persona: 'Ana', bebidaNombre: 'Latte', opciones: [], who: 'x', bebidaIndex: 1, totalBebidas: 1, tamanoMm: { anchoMm: 50, altoMm: 30 } }, copia: false, intentos: 0 },
     ];
     const prisma: any = {
       printJob: { updateMany: jest.fn().mockResolvedValue({ count: 0 }), findMany: jest.fn().mockResolvedValue(trabajos) },
@@ -215,6 +215,16 @@ describe('tamaño por PC en la entrega de trabajos y config en el latido', () =>
     expect((r.trabajos[1].payload as any).tamanoMm).toEqual({ anchoMm: 100, altoMm: 100 });
     // una prueba con tamaño ya trae el suyo y no se pisa
     expect((r.trabajos[2].payload as any).tamanoMm).toEqual({ anchoMm: 50, altoMm: 30 });
+  });
+
+  it('el vaso sale con la maqueta calculada por el servidor para la medida de esa PC; el sticker general no', async () => {
+    const r = await montar(fila({ bebida: { anchoMm: 101.6, altoMm: 63.5, margenMm: 2 } })).tomarTrabajos(10, 10n);
+    const m = (r.trabajos[0].payload as any).maqueta;
+    expect([m.W, m.H]).toEqual([813, 508]);
+    expect(m.primitivas.length).toBeGreaterThan(0);
+    expect((r.trabajos[1].payload as any).maqueta).toBeUndefined();
+    // la prueba con tamaño propio también la lleva, con su medida
+    expect([(r.trabajos[2].payload as any).maqueta.W, (r.trabajos[2].payload as any).maqueta.H]).toEqual([400, 240]);
   });
 
   it('la orientación vertical deja el lado largo como alto', async () => {

@@ -68,6 +68,8 @@ const BEBIDA: EtiquetaBebidaDatos = {
   contiene: null,
   who: 'CLIENTE EJEMPLO',
   hora: '12:40',
+  nota: 'poco hielo',
+  modalidadPill: 'SALÓN MESA 4',
 };
 const COMANDA_AREA: TicketComandaSalonDatos = {
   tipo: 'TICKET_COMANDA_AREA',

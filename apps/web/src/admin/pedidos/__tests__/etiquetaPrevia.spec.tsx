@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { maquetarGeneral, lineasTicketPago } from '@caprichos/compartido';
-import { EtiquetaGeneral, TicketPagoPrevia } from '../EtiquetaPrevia';
+import { EtiquetaBebida, EtiquetaGeneral, TicketPagoPrevia } from '../EtiquetaPrevia';
 import { armarTicketPago } from '../etiquetasPedido';
 import type { EtiquetaGeneralDatos } from '../etiquetasPedido';
 import type { Pedido } from '../pedidosApi';
@@ -22,6 +22,16 @@ describe('vista previa SVG = maqueta compartida', () => {
     expect(dibujados.map((t) => t.textContent)).toEqual(textos.map((t) => (t.t === 'texto' ? t.texto : '')));
     expect(dibujados.map((t) => t.getAttribute('data-fuente'))).toEqual(textos.map((t) => (t.t === 'texto' ? t.fuente : '')));
     expect(svg.querySelectorAll('rect').length).toBeGreaterThan(m.primitivas.filter((p) => p.t === 'barra').length);
+  });
+});
+
+describe('vista previa del vaso', () => {
+  it('muestra la nota y la modalidad, igual que la maqueta que imprime', () => {
+    const d = { bebidaIndex: 1, totalBebidas: 1, codigo: 'CP-7', persona: 'Ana', bebidaNombre: 'Latte', opciones: [], who: 'Para: Ana', hora: '10:00', nota: 'sin azucar', modalidadPill: 'DELIVERY' };
+    const { container } = render(<EtiquetaBebida datos={d} />);
+    const textos = [...container.querySelectorAll('text')].map((t) => t.textContent);
+    expect(textos).toContain('NOTA: sin azucar');
+    expect(textos).toContain('DELIVERY');
   });
 });
 
