@@ -25,9 +25,10 @@ export function BloqueoVinculacion({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
-  const desvinculado = est?.vinculado === false;
-  // Con Evolution en uso, sin vínculo no hay chat posible: se tapa todo. Con Meta en uso, el QR va arriba y el chat sigue.
-  const bloqueado = desvinculado && est?.proveedor === 'EVOLUTION';
+  // Se usa SOLO el proveedor elegido en Configuración: con Evolution sin vincular no hay chat, solo el QR.
+  // Con Meta en uso, Mensajes es el chat de Meta y aquí no se muestra nada de Evolution.
+  const desvinculado = est?.proveedor === 'EVOLUTION' && est.vinculado === false;
+  const bloqueado = desvinculado;
 
   useEffect(() => {
     void consultar();
@@ -64,21 +65,6 @@ export function BloqueoVinculacion({ children }: { children: React.ReactNode }) 
     return (
       <>
         {fallo && <div role="status" data-testid="aviso-vinculacion" style={{ fontSize: 11, color: 'var(--cp-soft)', padding: '2px 8px' }}>No se pudo comprobar la conexión de WhatsApp.</div>}
-        {desvinculado && (
-          <section data-testid="qr-vincular-meta" aria-label="Vincular el número de WhatsApp a Evolution" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14, margin: '6px 8px', padding: 12, borderRadius: 14, border: '2px solid var(--cp-orange)', background: 'var(--cp-cream)' }}>
-            {imagenQr ? (
-              <img alt="QR para vincular el número de WhatsApp del local" src={imagenQr} style={{ width: 200, height: 200, background: '#fff', borderRadius: 8 }} />
-            ) : (
-              <div role="status" style={{ width: 200, textAlign: 'center' }}>{errorQr ? 'No se pudo generar el código.' : 'Generando código…'}</div>
-            )}
-            <div style={{ flex: '1 1 220px', display: 'grid', gap: 6, color: 'var(--cp-navy)' }}>
-              <strong>Vincula el número del local a Evolution</strong>
-              <span style={{ fontSize: 13 }}>En el celular del local: WhatsApp › Dispositivos vinculados › Vincular dispositivo, y escanea este código. Se renueva solo.</span>
-              <span role="status" style={{ fontSize: 13, fontWeight: 700 }}>{conectando ? 'Conectando…' : 'Esperando que escanees…'} · Mientras tanto se sigue atendiendo por Meta.</span>
-              <small style={{ color: 'var(--cp-soft)' }}>Escanéalo solo con el celular del local.</small>
-            </div>
-          </section>
-        )}
         {children}
       </>
     );
