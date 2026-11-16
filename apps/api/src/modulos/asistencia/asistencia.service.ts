@@ -289,9 +289,7 @@ export class AsistenciaService {
 
     // Decisión del dueño (10/11/2026): ya no se pide consentimiento para marcar; el aviso de datos no bloquea.
 
-    if (cfg.localLat === null || cfg.localLng === null) {
-      throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
-    }
+    // Sin límite de distancia: la ubicación del local ya no es requisito para marcar (solo sirve para ver la distancia)
     // Sin foto solo si la cámara no abrió (`sinSelfie`): se acepta pero queda A_REVISAR
     const sinFoto = !manual && !dto.selfie && dto.sinSelfie === true;
     if (!manual && !dto.selfie && !sinFoto) {
@@ -323,33 +321,25 @@ export class AsistenciaService {
     const incoherencia = declarado === 'ALMUERZO_VUELTA' && lectura.interp.alertas.some((a) => a.includes('sin salida a break'))
       ? ['Marcó el regreso del almuerzo sin haber marcado la salida a almorzar'] : [];
 
-    // Ubicación aproximada (celulares sin GPS preciso): ya no se rechaza; se acepta si el punto, con su margen de
-    // error, puede estar dentro del radio, y la marca queda A_REVISAR. Más allá de PRECISION_TOPE_M sí se rechaza.
-    if (dto.precision > PRECISION_TOPE_M) {
-      throw new RechazoAsistencia('PRECISION_BAJA', 'La ubicación es muy imprecisa. Activa el GPS del celular y sal a un lugar abierto.');
-    }
-    const metros = distanciaMetros(cfg.localLat, cfg.localLng, dto.lat, dto.lng);
-    const imprecisa = dto.precision > cfg.precisionMaxM;
-    const margen = imprecisa ? Math.min(dto.precision, PRECISION_TOPE_M) : 0;
-    if (metros > cfg.radioM + margen) {
-      throw new RechazoAsistencia(
-        'FUERA_DE_RADIO',
-        `Estás a ${Math.round(metros)} m del local. Debes estar a ${cfg.radioM} m o menos para marcar.`,
-      );
-    }
+    // Decisión del dueño (16/11): sin límite de radio ni de precisión. El QR de la pantalla prueba que está en el local;
+    // el GPS solo se guarda como referencia si es un punto válido (un celular que manda una latitud imposible no bloquea).
+    const ubic = ubicacionValida(dto.lat, dto.lng, dto.precision);
+    // Solo informativo (sin límite): distancia al punto del local si hay GPS válido y local configurado
+    const metros = ubic && cfg.localLat != null && cfg.localLng != null ? distanciaMetros(cfg.localLat, cfg.localLng, ubic.lat, ubic.lng) : null;
 
     const previas = await this.prisma.asistenciaMarca.findMany({
       where: { party_id: partyId, origen: 'CELULAR' },
       orderBy: { momento: 'desc' },
       take: 3,
     });
-    const alertas = alertasDeUbicacion(
-      { lat: dto.lat, lng: dto.lng, precision: dto.precision, momento: ahora },
-      previas.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
-    );
+    const alertas = ubic
+      ? alertasDeUbicacion(
+          { ...ubic, momento: ahora },
+          previas.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
+        )
+      : [];
     const avisos = [
       ...incoherencia,
-      ...(imprecisa ? [`Ubicación aproximada (±${Math.round(dto.precision)} m)`] : []),
       ...(sinFoto ? ['Sin selfie: la cámara del celular no abrió'] : []),
     ];
     const estado = manual || alertas.length || avisos.length ? 'A_REVISAR' : 'VALIDA';
@@ -367,10 +357,10 @@ export class AsistenciaService {
             momento: ahora,
             estado,
             motivos_revision: motivos.length ? motivos.join('; ') : null,
-            lat: dto.lat,
-            lng: dto.lng,
-            precision_m: dto.precision,
-            distancia_m: Math.round(metros * 100) / 100,
+            lat: ubic?.lat ?? null,
+            lng: ubic?.lng ?? null,
+            precision_m: ubic ? Math.min(ubic.precision, 999999) : null,
+            distancia_m: metros === null ? null : Math.min(Math.round(metros * 100) / 100, 999999),
             qr_slot: slot === null ? null : BigInt(slot),
             dispositivo_hash: manual ? null : huella,
           },
@@ -402,7 +392,7 @@ export class AsistenciaService {
           tipo,
           momento: ahora.toISOString(),
           estado,
-          distanciaM: Math.round(metros * 100) / 100,
+          distanciaM: metros === null ? null : Math.round(metros * 100) / 100,
           alertas,
         },
         mensaje: `${mensajeMarca(lectura, ahora, cfg.dobleMarcaMin)}${manual ? '. Queda pendiente de revisión del administrador.' : ''}`,
@@ -922,3 +912,9 @@ const csv = (v: unknown): string => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
+/** Punto del GPS solo si es real (latitud ±90, longitud ±180, precisión ≥ 0); si no, null y la marca sigue. */
+export function ubicacionValida(lat?: number, lng?: number, precision?: number): { lat: number; lng: number; precision: number } | null {
+  const ok = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+  if (!ok(lat) || !ok(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng, precision: ok(precision) && precision >= 0 ? precision : 0 };
+}

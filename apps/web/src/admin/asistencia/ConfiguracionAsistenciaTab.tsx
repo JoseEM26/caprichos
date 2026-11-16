@@ -172,17 +172,12 @@ export function ConfiguracionAsistenciaTab({ onError, onOk, alGuardar }: { onErr
           etiqueta="Mapa para marcar la ubicación del local"
           local={conUbicacion ? null : SEDE_DEFECTO}
           ajustarA={conUbicacion ? 'punto' : 'local'}
-          radioM={cfg.radioM ?? undefined}
         />
         <p className="as-ayuda">
           {conUbicacion ? 'Arrastra el punto o toca el mapa para moverlo.' : 'Toca el mapa para colocar el punto del local: hasta entonces no se guarda ninguno.'}
         </p>
-        <div className="as-form">
-          {campo('radioM', 'Radio del local (m)', 'A cuántos metros del punto del local se puede marcar. Hoy: 10.')}
-          {campo('precisionMaxM', 'Precisión GPS máxima aceptada (m)', 'Si el GPS del celular es peor que esto (número más alto), se le pide reintentar.')}
-        </div>
         <p className="as-ayuda" data-testid="texto-regla">
-          La asistencia se mide desde este punto: el trabajador debe estar a {cfg.radioM ?? '—'} m o menos (radio) y con el GPS del celular con precisión mejor que {cfg.precisionMaxM ?? '—'} m.
+          Sin límite de distancia ni de precisión del GPS: el QR de la pantalla prueba que la persona está en el local. La ubicación del celular se guarda solo como referencia.
         </p>
         <div className="as-acciones">
           <Boton type="button" variante="oscuro" cargando={leyendo} onClick={usarMiUbicacion}>Usar mi ubicación actual</Boton>

@@ -392,6 +392,19 @@ export function MarcarAsistente({ sugerido, puedeMarcar, activo, alRegistrar }: 
               <Boton type="button" variante="secundario" onClick={() => { setForzarUbic(true); setIntentoUbic((n) => n + 1); }}>
                 Forzar ubicación aproximada
               </Boton>
+              <Boton
+                type="button"
+                variante="secundario"
+                onClick={() => {
+                  // El GPS no bloquea la marca: el QR ya prueba que está en el local (se envía sin ubicación)
+                  const u = { lat: Number.NaN, lng: Number.NaN, precision: Number.NaN };
+                  setUbicacion(u);
+                  if (manual) void enviar({ u });
+                  else setPaso('selfie');
+                }}
+              >
+                Seguir sin ubicación
+              </Boton>
               <Plegable titulo="¿Qué hace «forzar»?">
                 <p className="as-ayuda">«Forzar» usa la ubicación por red/WiFi cuando el GPS no responde. La marca puede quedar para revisión del administrador.</p>
               </Plegable>

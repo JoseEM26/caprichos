@@ -40,24 +40,22 @@ export class MarcarDto {
   @MaxLength(10)
   codigo?: string;
 
+  // Decisión del dueño (16/11): el GPS no bloquea la marca (el QR prueba que está en el local). Se guarda si es válido.
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(-90)
-  @Max(90)
-  lat!: number;
+  lat?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(-180)
-  @Max(180)
-  lng!: number;
+  lng?: number;
 
   /** Precisión reportada por el GPS del celular, en metros. */
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
-  @Max(100000)
-  precision!: number;
+  precision?: number;
 
   /** Selfie JPEG en base64 (con o sin prefijo data:). Opcional si la cámara no abrió (`sinSelfie`). */
   @IsOptional()
@@ -87,9 +85,9 @@ export class MarcarManualDto {
   @IsOptional() @IsIn(TIPOS_AL_MARCAR, { message: 'Tipo de marca no válido' })
   tipo?: TipoMarcaQr | TipoMarca;
 
-  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) lat!: number;
-  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) lng!: number;
-  @Type(() => Number) @IsNumber() @Min(0) @Max(100000) precision!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() lat?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() lng?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() precision?: number;
 
   @IsOptional() @IsBoolean() consentimiento?: boolean;
 }

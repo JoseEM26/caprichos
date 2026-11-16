@@ -165,22 +165,21 @@ describe('AsistenciaService.marcar', () => {
     expect(await error(svc.marcar(dto({ tipo: 'SALIDA_ALMUERZO' }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'QR_YA_USADO' });
   });
 
-  it('rechaza fuera del radio de 10 m (Haversine en el servidor)', async () => {
-    const { svc } = servicio();
-    const e = await error(svc.marcar(dto({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA));
-    expect(e.codigo).toBe('FUERA_DE_RADIO');
-  });
-
-  it('una precisión GPS regular (más de 25 m) se acepta pero queda A_REVISAR con el motivo', async () => {
+  it('sin límite de radio ni de precisión: lejos o con GPS impreciso se acepta y queda VÁLIDA', async () => {
     const { svc, b } = servicio();
-    const r = await svc.marcar(dto({ precision: 40 }), LUIS, undefined, AHORA);
-    expect(r.marca.estado).toBe('A_REVISAR');
-    expect(b.marcas[0].motivos_revision).toContain('Ubicación aproximada');
+    const lejos = await svc.marcar(dto({ lat: LOCAL.lat + 0.01 }), LUIS, undefined, AHORA);
+    expect(lejos.ok).toBe(true);
+    expect(lejos.marca.estado).toBe('VALIDA');
+    const impreciso = await svc.marcar(dto({ tipo: 'SALIDA_ALMUERZO', precision: 400, qr: undefined, codigo: undefined }), LUIS, undefined, AHORA).catch((e) => e);
+    expect(impreciso?.codigo).not.toBe('PRECISION_BAJA');
+    expect(b.marcas[0].lat).not.toBeNull();
   });
 
-  it('una precisión pésima (más de 300 m) se rechaza', async () => {
-    const { svc } = servicio();
-    expect(await error(svc.marcar(dto({ precision: 400 }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'PRECISION_BAJA' });
+  it('una latitud imposible (celular con ubicación falsa) no bloquea: se marca sin ubicación', async () => {
+    const { svc, b } = servicio();
+    const r = await svc.marcar(dto({ lat: 120, lng: 300 }), LUIS, undefined, AHORA);
+    expect(r.ok).toBe(true);
+    expect(b.marcas[0]).toMatchObject({ lat: null, lng: null, distancia_m: null });
   });
 
   it('sin selfie porque la cámara no abrió: se acepta A_REVISAR; sin foto ni aviso se rechaza', async () => {
@@ -275,22 +274,23 @@ describe('AsistenciaService.marcar', () => {
     expect(await error(svc.marcar(dto({ selfie: png }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'SELFIE_INVALIDA' });
   });
 
-  it('sin ubicación del local configurada no marca', async () => {
-    const { svc } = servicio({ parametro: null });
-    expect(await error(svc.marcar(dto(), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'LOCAL_SIN_UBICACION' });
+  it('sin ubicación del local configurada igual marca (solo no se calcula la distancia)', async () => {
+    const { svc, b } = servicio({ parametro: null });
+    expect((await svc.marcar(dto(), LUIS, undefined, AHORA)).ok).toBe(true);
+    expect(b.marcas[0].distancia_m).toBeNull();
   });
 
   it('bloquea temporalmente tras 5 intentos fallidos del mismo usuario', async () => {
     const { svc } = servicio();
     for (let i = 0; i < 5; i++) {
-      await error(svc.marcar(dto({ lat: LOCAL.lat + 0.01 }), LUIS, undefined, AHORA));
+      await error(svc.marcar(dto({ qr: 'qr-falso' }), LUIS, undefined, AHORA));
     }
     expect(await error(svc.marcar(dto(), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'ASISTENCIA_BLOQUEADA' });
   });
 
   it('deja auditoria de la marca y del rechazo', async () => {
     const { svc, auditoria } = servicio();
-    await error(svc.marcar(dto({ precision: 500 }), LUIS, undefined, AHORA));
+    await error(svc.marcar(dto({ qr: 'qr-falso' }), LUIS, undefined, AHORA));
     await svc.marcar(dto(), LUIS, undefined, AHORA);
     const acciones = auditoria.registrar.mock.calls.map((c: any[]) => c[0].resultado);
     expect(acciones).toEqual(['RECHAZADO', 'OK']);
@@ -397,11 +397,11 @@ describe('AsistenciaService.marcar manual (solo GPS, sin QR ni selfie)', () => {
     expect(b.selfies).toHaveLength(0);
   });
 
-  it('fuera del radio o con GPS impreciso se rechaza', async () => {
+  it('manual lejos o con GPS impreciso ya no se rechaza (queda A_REVISAR como toda marca manual)', async () => {
     const { svc, b } = servicio();
-    expect(await error(svc.marcar(manual({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'FUERA_DE_RADIO' });
-    expect(await error(svc.marcar(manual({ precision: 400 }), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'PRECISION_BAJA' });
-    expect(b.marcas).toHaveLength(0);
+    const r = await svc.marcar(manual({ lat: LOCAL.lat + 0.01, precision: 400 }), LUIS, undefined, AHORA, true);
+    expect(r.marca.estado).toBe('A_REVISAR');
+    expect(b.marcas).toHaveLength(1);
   });
 
   it('el ADMIN no puede marcar manualmente', async () => {
@@ -409,12 +409,6 @@ describe('AsistenciaService.marcar manual (solo GPS, sin QR ni selfie)', () => {
     const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false, roles: ['ADMIN'] };
     expect(await error(svc.marcar(manual(), admin, undefined, AHORA, true))).toMatchObject({ codigo: 'ADMIN_NO_MARCA' });
     expect(b.marcas).toHaveLength(0);
-  });
-
-  it('un rechazo cuenta para el bloqueo por intentos', async () => {
-    const { svc } = servicio();
-    for (let i = 0; i < 5; i++) await error(svc.marcar(manual({ lat: LOCAL.lat + 0.0002 }), LUIS, undefined, AHORA, true));
-    expect(await error(svc.marcar(manual(), LUIS, undefined, AHORA, true))).toMatchObject({ codigo: 'ASISTENCIA_BLOQUEADA' });
   });
 });
 

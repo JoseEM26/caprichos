@@ -58,21 +58,20 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     expect(screen.getByTestId('mapa').dataset.punto).toBe('');
   });
 
-  it('tocar el mapa fija el punto y el texto explica radio y precisión', async () => {
+  it('tocar el mapa fija el punto y el texto dice que no hay límite de distancia', async () => {
     reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
     render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }));
     fireEvent.click(await screen.findByTestId('mapa'));
     expect(screen.getByTestId('mapa').dataset.punto).toBe('-12.5,-77.5');
-    expect(screen.getByTestId('mapa').dataset.radio).toBe('10');
-    expect(screen.getByTestId('texto-regla')).toHaveTextContent('a 10 m o menos (radio) y con el GPS del celular con precisión mejor que 25 m');
+    expect(screen.getByTestId('texto-regla')).toHaveTextContent('Sin límite de distancia ni de precisión del GPS');
   });
 
   it('un enlace directo ?pestana=config abre la pestaña de Configuración', async () => {
     reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
     render(<MemoryRouter initialEntries={['/admin/asistencia?pestana=config']}><AsistenciaAdminView /></MemoryRouter>);
     expect(await screen.findByRole('tab', { name: 'Configuración', selected: true })).toBeInTheDocument();
-    expect(await screen.findByText('Radio del local (m)')).toBeInTheDocument();
+    expect(await screen.findByTestId('texto-regla')).toBeInTheDocument();
   });
 
   it('una pestaña desconocida en la URL se ignora y se abre «Hoy»', async () => {
