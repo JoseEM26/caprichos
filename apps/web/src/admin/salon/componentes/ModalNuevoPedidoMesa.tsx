@@ -67,6 +67,7 @@ import {
   fechaCortaDireccion,
   type DireccionCliente,
 } from './clienteCuenta';
+import { celularAlEscribir } from '../../../comun/celular';
 
 export interface ModalNuevoPedidoMesaProps {
   abierto: boolean;
@@ -2678,7 +2679,7 @@ export function ModalNuevoPedidoMesa({
                     inputMode="numeric"
                     autoComplete="off"
                     value={cliTelefono}
-                    onChange={(e) => setCliTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    onChange={(e) => setCliTelefono(celularAlEscribir(e.target.value))}
                     placeholder="9 dígitos"
                     style={{
                       maxWidth: '260px',
@@ -3228,7 +3229,7 @@ export function ModalNuevoPedidoMesa({
                           type="tel"
                           inputMode="numeric"
                           value={cliTelefono}
-                          onChange={(e) => setCliTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                          onChange={(e) => setCliTelefono(celularAlEscribir(e.target.value))}
                           placeholder="9 dígitos"
                           aria-invalid={!telefonoMesaValido && (telefonoMesa !== '' || intentoEnvio)}
                           style={{

@@ -12,6 +12,7 @@ import {
   validarCelularPeruano,
   EstadoAlertasUsuario,
 } from './alertasWhatsappApi';
+import { celularAlEscribir } from '../../comun/celular';
 
 export interface BloqueAlertasWhatsAppProps {
   usuarioId: string;
@@ -77,7 +78,7 @@ export function BloqueAlertasWhatsApp({
   }
 
   const handleNumeroChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 9);
+    const raw = celularAlEscribir(e.target.value);
     setNumero(raw);
     setErrorNumero(null);
     setMensajeExito(null);
@@ -331,7 +332,6 @@ export function BloqueAlertasWhatsApp({
                 value={numero}
                 onChange={handleNumeroChange}
                 disabled={deshabilitado || guardando}
-                maxLength={9}
                 style={{
                   flex: 1,
                   padding: '10px 12px',

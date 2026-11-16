@@ -1,5 +1,6 @@
 import type { FormEvent, RefObject } from 'react';
 import { botonPrimarioReserva, botonSecundarioReserva, campoReserva, etiquetaReserva } from './estilosReserva';
+import { celularAlEscribir } from '../../comun/celular';
 
 export interface ErroresDatos {
   nombre?: string;
@@ -77,7 +78,7 @@ export function PasoDatos({
             value={telefono}
             maxLength={16}
             placeholder="987 654 321"
-            onChange={(e) => onCambio('telefono', e.target.value)}
+            onChange={(e) => onCambio('telefono', celularAlEscribir(e.target.value))}
             aria-invalid={errores.telefono ? true : undefined}
             aria-describedby={errores.telefono ? 'reserva-error-telefono' : 'reserva-ayuda-telefono'}
             style={campoReserva}

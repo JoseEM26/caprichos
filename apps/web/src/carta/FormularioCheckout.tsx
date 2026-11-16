@@ -64,6 +64,7 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
 import { AvisoComerEnLocal } from './AvisoComerEnLocal';
 import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
 import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
+import { celularAlEscribir } from '../comun/celular';
 
 export function FormularioCheckout({
   estadoLocal,
@@ -1522,9 +1523,8 @@ export function FormularioCheckout({
                           id="f-tel"
                           type="tel"
                           inputMode="numeric"
-                          maxLength={9}
                           value={telefono}
-                          onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => setTelefono(celularAlEscribir(e.target.value))}
                           placeholder="Ej.: 987654321"
                           required={modalidad === 'DELIVERY'}
                           style={{

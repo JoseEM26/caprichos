@@ -31,6 +31,7 @@ import {
   type HorarioEstado,
   type ReemplazosEstado,
 } from './horario';
+import { celularAlEscribir } from '../../comun/celular';
 
 export interface CrearUsuarioModalProps {
   abierto: boolean;
@@ -383,11 +384,10 @@ export function CrearUsuarioModal({
                 etiqueta="Celular (opcional)"
                 type="text"
                 inputMode="numeric"
-                maxLength={9}
                 placeholder="987654321"
                 value={celular}
                 onChange={(e) => {
-                  setCelular(e.target.value.replace(/\D/g, '').slice(0, 9));
+                  setCelular(celularAlEscribir(e.target.value));
                   limpiarError('celular');
                 }}
                 error={errores.celular}
