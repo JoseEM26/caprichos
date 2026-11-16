@@ -14,10 +14,16 @@ export function limiteWebhookEvolutionMb(valor?: string | number | null): number
  * Guarda rawBody como hace Nest.
  */
 export function parserWebhookEvolution(mb: number): RequestHandler {
-  return json({
+  const parser = json({
     limit: `${mb}mb`,
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },
   });
+  // OJO: NO devolver `parser` directo. Nest decide si registra su parser JSON global buscando una capa llamada
+  // «jsonParser» en el router de Express; si la encuentra (aunque esté montada solo en esta ruta), NO registra el global y
+  // ningún otro endpoint recibe el cuerpo (el 16/11 dejó sin login a todos). Con otro nombre, Nest registra el suyo.
+  return function parserCuerpoWebhookEvolution(req, res, next) {
+    return parser(req, res, next);
+  };
 }
