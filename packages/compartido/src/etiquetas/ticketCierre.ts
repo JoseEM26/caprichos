@@ -52,6 +52,17 @@ export interface TicketCierreDatos {
   /** Comisión de la pasarela del turno (la asume el local): solo informativa, no afecta el cuadre */
   comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number };
   anulaciones: { pedido: string; total: number; hora: string; por: string | null }[];
+  /**
+   * Cupones del turno (solo informativo: no afecta el cuadre). Opcional: un agente de impresión antiguo no lo conoce y lo ignora.
+   * `otros` = compartidos y de comprobante canjeados.
+   */
+  cupones?: {
+    dados: number;
+    canjeados: number;
+    descuento: number;
+    personas: { nombre: string; dados: number; canjeados: number; descuento: number }[];
+    otros?: { canjes: number; descuento: number };
+  };
 }
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -154,6 +165,13 @@ export function lineasTicketCierre(t: TicketCierreDatos, columnas: number = 48):
       p(fila(`${l.repartidor} ${l.hora}`, soles(l.entregado), c));
       p(`  Esperado ${soles(l.esperado)}`);
     }
+  }
+  if (t.cupones && (t.cupones.dados > 0 || t.cupones.canjeados > 0 || (t.cupones.otros?.canjes ?? 0) > 0)) {
+    p(raya);
+    p('CUPONES', { negrita: true });
+    p(`  dados ${t.cupones.dados} · canjeados ${t.cupones.canjeados} · descuento ${soles(t.cupones.descuento)}`);
+    for (const x of t.cupones.personas) p(fila(`  ${x.nombre}`, `${x.dados}d ${x.canjeados}c ${soles(x.descuento)}`, c));
+    if (t.cupones.otros && t.cupones.otros.canjes > 0) p(fila('  Otros cupones', `${t.cupones.otros.canjes}c ${soles(t.cupones.otros.descuento)}`, c));
   }
   if (t.anulaciones.length) {
     p(raya);

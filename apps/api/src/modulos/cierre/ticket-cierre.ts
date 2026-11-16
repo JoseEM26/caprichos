@@ -1,5 +1,6 @@
 import { desglosarConteo, TicketCierreDatos } from '@caprichos/compartido';
 import { calcularTotalConteo } from './cierre.util';
+import type { CuponesTurno } from './cupones-turno';
 
 const num = (v: unknown) => Number(v ?? 0);
 const redondear = (n: number) => Math.round(n * 100) / 100;
@@ -22,6 +23,7 @@ export interface FuentesTicketCierre {
   liquidaciones: Array<{ repartidor_party_id: bigint | number; esperado: unknown; entregado: unknown; en: Date | string }>;
   cobrosAnulados: Array<{ pedido: { codigo: string }; total: unknown; anulado_en: Date | string | null; anulado_por: bigint | number | null }>;
   comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number } | null;
+  cupones?: CuponesTurno | null;
   nombre: (id: bigint | number | null | undefined) => string | null;
 }
 
@@ -66,6 +68,17 @@ export function armarTicketCierre(f: FuentesTicketCierre): TicketCierreDatos {
     correcciones: f.ajustes.map((a) => ({ medio: a.medio, anterior: a.montoAnterior, nuevo: a.montoNuevo, motivo: a.motivo, por: a.porNombre, hora: hora(a.creadoEn) })),
     liquidaciones: f.liquidaciones.map((l) => ({ repartidor: f.nombre(l.repartidor_party_id) ?? `Repartidor #${l.repartidor_party_id}`, esperado: num(l.esperado), entregado: num(l.entregado), hora: hora(l.en) })),
     ...(f.comisionCulqi ? { comisionCulqi: { pagos: f.comisionCulqi.pagos, porConfirmar: f.comisionCulqi.porConfirmar, total: f.comisionCulqi.total, neto: f.comisionCulqi.neto } } : {}),
+    ...(f.cupones
+      ? {
+          cupones: {
+            dados: f.cupones.totales.dados,
+            canjeados: f.cupones.totales.canjeados,
+            descuento: f.cupones.totales.descuento,
+            personas: f.cupones.porPersona.map((x) => ({ nombre: x.nombre, dados: x.totales.dados, canjeados: x.totales.canjeados, descuento: x.totales.descuento })),
+            ...(f.cupones.otros.canjes > 0 ? { otros: f.cupones.otros } : {}),
+          },
+        }
+      : {}),
     anulaciones: f.cobrosAnulados.map((c) => ({ pedido: c.pedido.codigo, total: num(c.total), hora: hora(c.anulado_en), por: f.nombre(c.anulado_por) })),
   };
 }

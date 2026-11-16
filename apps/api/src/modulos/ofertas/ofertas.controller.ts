@@ -153,7 +153,7 @@ export class CuponesController {
   /** Solo consulta (no consume): detalles del cupón y si aplica a este pedido. */
   @Get('revisar')
   @Permiso('cupones', 'canjear')
-  async revisarEnCaja(@Query('codigo') codigo: string, @Query('pedidoId') pedidoId: string, @Query('canal') canal?: string) {
+  async revisarEnCaja(@Query('codigo') codigo: string, @Query('pedidoId') pedidoId?: string, @Query('canal') canal?: string) {
     return this.ofertasService.revisarCuponEnCaja(codigo, pedidoId, canal);
   }
 

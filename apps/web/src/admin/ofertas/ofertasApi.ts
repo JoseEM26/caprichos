@@ -303,7 +303,7 @@ export interface RevisionCupon {
   estado?: 'VIGENTE' | 'CANJEADO' | 'VENCIDO' | 'ANULADO' | 'INACTIVO';
   descuento?: number | null;
   nuevoTotal?: number | null;
-  totalActual?: number;
+  totalActual?: number | null;
   cupon: {
     codigoBase: string;
     descripcion: string | null;
@@ -390,8 +390,8 @@ export const ofertasApi = {
     return api.post(`/admin/cupones/${cuponId}/dar`, { pedidoId });
   },
 
-  async revisarCupon(codigo: string, pedidoId: string, canal: 'CAJA' | 'MOZO'): Promise<RevisionCupon> {
-    return api.get(`/admin/cupones/revisar?codigo=${encodeURIComponent(codigo)}&pedidoId=${encodeURIComponent(pedidoId)}&canal=${canal}`);
+  async revisarCupon(codigo: string, pedidoId: string | undefined, canal: 'CAJA' | 'MOZO'): Promise<RevisionCupon> {
+    return api.get(`/admin/cupones/revisar?codigo=${encodeURIComponent(codigo)}${pedidoId ? `&pedidoId=${encodeURIComponent(pedidoId)}` : ''}&canal=${canal}`);
   },
 
   async canjearCupon(codigo: string, pedidoId: string, canal: 'CAJA' | 'MOZO'): Promise<{ canjeado: boolean; descuento: number; totalActualizado: number }> {

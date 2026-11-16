@@ -22,6 +22,8 @@ import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import { DetallePedidoMozo } from './DetallePedidoMozo';
 import { ModalCanjearCupon } from '../ofertas/ModalCanjearCupon';
+import { esElegible } from '../ofertas/SelectorPedidoCanje';
+import { Icono } from '../../comun/Icono';
 import type { EstadoMisPedidos, FiltrosMisPedidos, MiPedido, OrdenMisPedidos, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { agruparCuentas } from '../pedidos/agruparCuentas';
@@ -181,6 +183,7 @@ export function MisPedidosView() {
   // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
   const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
   const [canjearDe, setCanjearDe] = useState<MiPedido | null>(null);
+  const [canjearGlobal, setCanjearGlobal] = useState(false);
   const [cargoExtra, setCargoExtra] = useState<CargoLibreDatos | undefined>(undefined);
   const [anularDe, setAnularDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
@@ -466,6 +469,11 @@ export function MisPedidosView() {
       <button type="button" className="mp-nuevo" onClick={() => setModalAbierto(true)}>
         Nuevo pedido
       </button>
+      {tiene('cupones/canjear') && (
+        <button type="button" className="mp-nuevo" aria-label="Canjear un cupón" onClick={() => setCanjearGlobal(true)}>
+          <Icono nombre="cupon" tamano={18} aria-hidden="true" /> Canjear cupón
+        </button>
+      )}
 
       {borradores.length > 0 && (
         <div className="mp-borradores" aria-label="Borradores de pedido">
@@ -733,6 +741,16 @@ export function MisPedidosView() {
         />
       )}
 
+      {canjearGlobal && (
+        <ModalCanjearCupon
+          canal="MOZO"
+          candidatos={pedidos
+            .filter((x) => esElegible({ estado: x.estado, pagoEstado: x.pagoEstado }))
+            .map((x) => ({ id: x.id, codigo: x.codigo, quien: x.mesaNombre || x.clienteNombre || 'Sin nombre', total: x.total, estado: x.estado }))}
+          alCerrar={() => setCanjearGlobal(false)}
+          alAplicado={() => void cargar()}
+        />
+      )}
       {canjearDe && <ModalCanjearCupon pedido={{ id: canjearDe.id, codigo: canjearDe.codigo }} canal="MOZO" alCerrar={() => setCanjearDe(null)} alAplicado={() => void cargar()} />}
 
       {anularDe && (

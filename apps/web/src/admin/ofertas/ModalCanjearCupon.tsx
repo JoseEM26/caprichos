@@ -3,6 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { Campo } from '../../comun/Campo';
 import { ModalPorPasos } from '../../comun/ModalPorPasos';
 import { ofertasApi, type RevisionCupon } from './ofertasApi';
+import { SelectorPedidoCanje, type PedidoElegible } from './SelectorPedidoCanje';
 
 const soles = (n: number | null | undefined) => `S/ ${Number(n ?? 0).toFixed(2)}`;
 const fechaHora = (iso: string | null | undefined) =>
@@ -14,7 +15,10 @@ const descuentoTxt = (c: NonNullable<RevisionCupon['cupon']>) =>
 const ESTADOS: Record<string, string> = { VIGENTE: 'Vigente', CANJEADO: 'Canjeado', VENCIDO: 'Vencido', ANULADO: 'Anulado', INACTIVO: 'Desactivado' };
 
 interface Props {
-  pedido: { id: string | number; codigo: string };
+  /** Pedido abierto. Sin él (botón global) hay un paso extra «¿A qué pedido?». */
+  pedido?: { id: string | number; codigo: string };
+  /** Pedidos entre los que elegir (mozo); si falta, se piden los de hoy al servidor (Caja). */
+  candidatos?: PedidoElegible[];
   /** Desde dónde se canjea: queda guardado con el canje. */
   canal: 'CAJA' | 'MOZO';
   alCerrar: () => void;
@@ -23,7 +27,10 @@ interface Props {
 }
 
 /** «Canjear cupón»: 1) código y Revisar, 2) detalles del cupón sin consumirlo, 3) confirmar Sí/No y aplicar al pedido. */
-export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props) {
+export function ModalCanjearCupon({ pedido: pedidoFijo, candidatos, canal, alCerrar, alAplicado }: Props) {
+  const [elegido, setElegido] = useState<PedidoElegible | null>(null);
+  const [revPedido, setRevPedido] = useState<RevisionCupon | null>(null);
+  const pedido = pedidoFijo ?? elegido ?? { id: '', codigo: '' };
   const [codigo, setCodigo] = useState('');
   const [revision, setRevision] = useState<RevisionCupon | null>(null);
   const [revisando, setRevisando] = useState(false);
@@ -37,7 +44,9 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
     setRevisando(true);
     setError('');
     try {
-      setRevision(await ofertasApi.revisarCupon(limpio, String(pedido.id), canal));
+      setRevision(await ofertasApi.revisarCupon(limpio, pedidoFijo ? String(pedidoFijo.id) : undefined, canal));
+      setElegido(null);
+      setRevPedido(null);
       setVersion((v) => v + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo revisar el cupón');
@@ -45,6 +54,19 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
       setRevisando(false);
     }
   };
+
+  const elegir = async (p: PedidoElegible) => {
+    setElegido(p);
+    setRevPedido(null);
+    setError('');
+    try {
+      setRevPedido(await ofertasApi.revisarCupon(revision?.codigo ?? codigo, p.id, canal));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo revisar el cupón en ese pedido');
+    }
+  };
+
+  const final = pedidoFijo ? revision : revPedido;
 
   const aplicar = async () => {
     setAplicando(true);
@@ -72,7 +94,7 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
       />
       <Boton tamano="grande" onClick={() => void revisar()} cargando={revisando} disabled={revisando || !codigo.trim()}>Revisar</Boton>
       {error && <div role="alert" className="mpp-error">{error}</div>}
-      <p className="as-ayuda">Revisar no usa el cupón: solo muestra sus detalles. Se aplica al pedido {pedido.codigo} en el último paso.</p>
+      <p className="as-ayuda">Revisar no usa el cupón: solo muestra sus detalles. {pedidoFijo ? `Se aplica al pedido ${pedidoFijo.codigo} en el último paso.` : 'Después eliges el pedido de hoy al que se aplica.'}</p>
     </>
   );
 
@@ -81,7 +103,9 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
   ) : (
     <div data-testid="detalle-cupon" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {revision.aplicable ? (
-        <div role="status" style={{ fontWeight: 800, color: '#14633b' }}>Sirve para este pedido: descuenta {soles(revision.descuento)}</div>
+        <div role="status" style={{ fontWeight: 800, color: '#14633b' }}>
+          {revision.descuento == null ? 'El cupón sirve. Falta elegir el pedido.' : `Sirve para este pedido: descuenta ${soles(revision.descuento)}`}
+        </div>
       ) : (
         <div role="alert" style={{ fontWeight: 800, color: '#9a2b12' }}>No se puede aplicar: {revision.motivo}</div>
       )}
@@ -114,9 +138,18 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
     </div>
   );
 
+  const pasoPedido = (
+    <>
+      <SelectorPedidoCanje candidatos={candidatos} elegido={elegido} alElegir={(p) => void elegir(p)} />
+      {elegido && revPedido && (revPedido.aplicable
+        ? <div role="status" data-testid="pedido-elegido" style={{ marginTop: 8, fontWeight: 800, color: '#14633b' }}>En {elegido.codigo} descuenta {soles(revPedido.descuento)}</div>
+        : <div role="alert" style={{ marginTop: 8, fontWeight: 800, color: '#9a2b12' }}>No se puede aplicar en {elegido.codigo}: {revPedido.motivo}</div>)}
+    </>
+  );
+
   const pasoConfirmar = (
     <p data-testid="pregunta-aplicar">
-      ¿Aplicar el cupón <strong>{c?.codigoBase}</strong> al pedido <strong>{pedido.codigo}</strong>? El total pasará de {soles(revision?.totalActual)} a {soles(revision?.nuevoTotal)}. Una vez aplicado, el cupón queda canjeado.
+      ¿Aplicar el cupón <strong>{c?.codigoBase}</strong> al pedido <strong>{pedido.codigo}</strong>? El total pasará de {soles(final?.totalActual)} a {soles(final?.nuevoTotal)}. Una vez aplicado, el cupón queda canjeado.
     </p>
   );
 
@@ -125,12 +158,15 @@ export function ModalCanjearCupon({ pedido, canal, alCerrar, alAplicado }: Props
       // al llegar la revisión se vuelve a montar directo en el paso de detalles
       key={version}
       titulo="Canjear cupón"
-      subtitulo={`Pedido ${pedido.codigo}`}
+      subtitulo={pedidoFijo ? `Pedido ${pedidoFijo.codigo}` : undefined}
       ancho={520}
       indiceInicial={revision ? 1 : 0}
       pasos={[
         { id: 'codigo', titulo: 'Código', contenido: pasoCodigo, validar: () => (revision ? null : 'Escribe el código y pulsa Revisar') },
         { id: 'detalles', titulo: 'Detalles', contenido: pasoDetalles, validar: () => (revision?.aplicable ? null : (revision?.motivo ?? 'Revisa primero el cupón')) },
+        ...(pedidoFijo
+          ? []
+          : [{ id: 'pedido', titulo: '¿A qué pedido?', contenido: pasoPedido, validar: () => (!elegido ? 'Elige el pedido' : revPedido?.aplicable ? null : (revPedido?.motivo ?? 'Revisando el pedido…')) }]),
         { id: 'confirmar', titulo: 'Confirmar', contenido: pasoConfirmar },
       ]}
       alCerrar={alCerrar}

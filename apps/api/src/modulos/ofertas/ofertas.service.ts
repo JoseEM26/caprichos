@@ -1599,7 +1599,7 @@ export class OfertasService {
   }
 
   /** Solo consulta: detalles del cupón y si se puede aplicar a este pedido. No consume el cupón. */
-  async revisarCuponEnCaja(codigo: string, pedidoId: string, canal?: string) {
+  async revisarCuponEnCaja(codigo: string, pedidoId?: string, canal?: string) {
     return revisarCupon({ prisma: this.prisma, validar: (d) => this.validarCuponInterno(d), partyCliente: partyClienteDelPedido }, codigo, pedidoId, canal);
   }
 

@@ -54,13 +54,15 @@ const mensajeDe = (e: any): string => {
 const ESTADO_TEXTO: Record<string, string> = { CANJEADO: 'Este cupón ya fue canjeado', ANULADO: 'Este cupón fue anulado', VENCIDO: 'Este cupón está vencido' };
 
 /** Detalles del cupón y si se puede aplicar a ESTE pedido. No consume ni escribe nada. */
-export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codigoCrudo: string, pedidoId: string | number, canalCrudo?: string, ahora = new Date()) {
+export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codigoCrudo: string, pedidoId: string | number | null | undefined, canalCrudo?: string, ahora = new Date()) {
   const canal = canalDeCanje(canalCrudo);
   const codigo = String(codigoCrudo ?? '').replace(/\s+/g, '').toUpperCase();
   if (!codigo) throw new NotFoundException({ codigo: 'CUPON_INVALIDO', mensaje: 'Escribe el código del cupón' });
-  if (!/^\d+$/.test(String(pedidoId))) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No se encontró el pedido' });
-  const pedido = await prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) }, include: PEDIDO_PARA_CUPON });
-  if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No se encontró el pedido' });
+  // Sin pedido (botón global): solo detalles y estado del cupón; el descuento se calcula al elegir el pedido
+  const sinPedido = pedidoId == null || String(pedidoId).trim() === '';
+  if (!sinPedido && !/^\d+$/.test(String(pedidoId))) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No se encontró el pedido' });
+  const pedido = sinPedido ? null : await prisma.pedido.findUnique({ where: { id: BigInt(String(pedidoId)) }, include: PEDIDO_PARA_CUPON });
+  if (!sinPedido && !pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No se encontró el pedido' });
 
   const emitido = await prisma.cuponEmitido.findUnique({
     where: { codigo },
@@ -73,10 +75,14 @@ export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codi
   const estado: string = emitido ? (vencido ? 'VENCIDO' : emitido.estado) : cupon.activo ? 'VIGENTE' : 'INACTIVO';
 
   // Motivo: primero lo del pedido, luego lo del cupón (estado, horario, mínimo, alcance) y al final el canal
-  let motivo: string | null = motivoPedidoNoAdmiteCupon(pedido);
+  let motivo: string | null = pedido ? motivoPedidoNoAdmiteCupon(pedido) : null;
   let descuento: number | null = null;
   let validacion: any = null;
-  if (!motivo) {
+  if (!pedido) {
+    if (emitido && ESTADO_TEXTO[estado]) motivo = ESTADO_TEXTO[estado];
+    else if (estado === 'INACTIVO') motivo = 'Este cupón no se encuentra activo';
+    else motivo = motivoCuponNoAplica({ canales: cupon.canales, tipo: cupon.descuento_tipo }, canal);
+  } else if (!motivo) {
     try {
       validacion = await validar({ codigo, subtotal: Number(pedido.subtotal), lineas: lineasParaCupon(pedido), clientePartyId: partyCliente(pedido) });
       descuento = Number(validacion.cupon.descuentoCalculado);
@@ -94,8 +100,7 @@ export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codi
     const p = id == null ? null : personas.find((x) => String(x.party_id) === String(id));
     return id == null ? null : p ? `${p.nombres} ${p.apellidos ?? ''}`.trim() : 'Trabajador';
   };
-  const subtotal = Number(pedido.subtotal);
-  const nuevoTotal = descuento != null ? Math.max(0, r2(subtotal - descuento + (Number(pedido.envio) || 0))) : null;
+  const nuevoTotal = pedido && descuento != null ? Math.max(0, r2(Number(pedido.subtotal) - descuento + (Number(pedido.envio) || 0))) : null;
 
   return {
     codigo,
@@ -105,7 +110,7 @@ export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codi
     estado,
     descuento,
     nuevoTotal,
-    totalActual: Number(pedido.total),
+    totalActual: pedido ? Number(pedido.total) : null,
     cupon: {
       codigoBase: cupon.codigo_base as string,
       descripcion: (cupon.descripcion ?? null) as string | null,

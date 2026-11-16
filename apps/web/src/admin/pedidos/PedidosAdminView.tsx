@@ -33,6 +33,8 @@ import { BannerCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './Banner
 import './pedidos.css';
 import './caja-lista.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
+import { ModalCanjearCupon } from '../ofertas/ModalCanjearCupon';
+import { Icono } from '../../comun/Icono';
 import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
 
 /** ¿El pedido nuevo cae dentro del día o rango que se ve? (los de «pendientes» son de días anteriores: uno recién creado no entra) */
@@ -223,6 +225,7 @@ export function PedidosAdminView() {
   const [relacionados, setRelacionados] = useState<Pedido[]>([]);
   // Día o rango que muestra la lista (por defecto hoy en Lima; no se recuerda entre visitas)
   const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
+  const [canjearAbierto, setCanjearAbierto] = useState(false);
   // Paginación del servidor: páginas de 100 ya cargadas, cuántos pedidos tiene el filtro y el conteo agrupado
   const paginasRef = useRef<number>(1);
   const [totalDia, setTotalDia] = useState<number>(0);
@@ -853,6 +856,7 @@ export function PedidosAdminView() {
 
   return (
     <div className="cj2">
+    {canjearAbierto && <ModalCanjearCupon canal="CAJA" alCerrar={() => setCanjearAbierto(false)} alAplicado={cargarDatos} />}
     {tiene('pedidos/cambiar_ubicacion') && <BandejaPropuestasUbicacion alAplicar={cargarDatos} />}
     {puedeValidarCobro && <PanelCambioCobro pendientes={cambiosCobro.pendientes} alResolver={() => { cambiosCobro.recargar(); cargarDatos(); }} />}
 
@@ -906,6 +910,11 @@ export function PedidosAdminView() {
       {puedeCortesia && (
         <button type="button" className="cj2-btn cj2-btn--cortesia-cab" onClick={() => setCortesiaSeparadaAbierta(true)}>
           Registrar cortesía
+        </button>
+      )}
+      {tiene('cupones/canjear') && (
+        <button type="button" className="cj2-btn" aria-label="Canjear un cupón" onClick={() => setCanjearAbierto(true)}>
+          <Icono nombre="cupon" tamano={18} aria-hidden="true" /> Canjear cupón
         </button>
       )}
       <AccesoListaEsperaCaja />

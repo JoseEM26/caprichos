@@ -93,4 +93,22 @@ describe('CierreService.imprimirCierre', () => {
     await expect(armar(impresion).imprimirCierre('12', { partyId: 3n, rol: 'CAJERO' } as any)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
     expect(impresion.encolarTicketCierre).not.toHaveBeenCalled();
   });
+
+  it('cupones del turno: bloque corto con totales y una línea por persona; sin cupones no aparece y entra en 48 columnas', () => {
+    const cupones: any = {
+      porPersona: [{ partyId: '7', nombre: 'Ana Mozo', dados: [], canjeados: [], pendientes: [], totales: { dados: 2, canjeados: 1, pendientes: 1, descuento: 5 } }],
+      otros: { canjes: 3, descuento: 9 },
+      totales: { dados: 2, canjeados: 1, pendientes: 1, descuento: 5 },
+    };
+    const t = armarTicketCierre(base({ cupones }));
+    expect(t.cupones).toMatchObject({ dados: 2, canjeados: 1, descuento: 5, personas: [{ nombre: 'Ana Mozo', dados: 2, canjeados: 1, descuento: 5 }], otros: { canjes: 3, descuento: 9 } });
+    const lineas = lineasTicketCierre(t, 48).map((l) => l.texto);
+    expect(lineas.some((l) => l.includes('CUPONES'))).toBe(true);
+    expect(lineas.some((l) => l.includes('dados 2 · canjeados 1 · descuento S/ 5.00'))).toBe(true);
+    expect(lineas.some((l) => l.includes('Ana Mozo') && l.includes('2d 1c S/ 5.00'))).toBe(true);
+    expect(lineas.every((l) => l.length <= 48)).toBe(true);
+    const vacio = armarTicketCierre(base({ cupones: { porPersona: [], otros: { canjes: 0, descuento: 0 }, totales: { dados: 0, canjeados: 0, pendientes: 0, descuento: 0 } } }));
+    expect(lineasTicketCierre(vacio, 48).some((l) => l.texto.includes('CUPONES'))).toBe(false);
+    expect(armarTicketCierre(base()).cupones).toBeUndefined();
+  });
 });

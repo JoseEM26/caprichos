@@ -1080,7 +1080,9 @@ export class CierreService {
     const nombres = await this.nombresDePartes(ids);
     const opsCulqi = await operacionesCulqiDeCaja(this.prisma, cierre.caja_id);
     const comisionCulqi = resumirComisionCulqi(opsCulqi);
+    const cupones = await cuponesDelTurno(this.prisma, cierre.caja).catch(() => null);
     const ticket = armarTicketCierre({
+      cupones,
       comisionCulqi: comisionCulqi.pagos > 0 ? comisionCulqi : null,
       localNombre: ((local?.valor as any)?.nombre as string) || 'Caprichos',
       caja: cierre.caja,
@@ -1111,7 +1113,7 @@ export class CierreService {
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
       ajustesMedio: ajustes,
-      cupones: await cuponesDelTurno(this.prisma, cierre.caja).catch(() => null),
+      cupones,
       culqi: { operaciones: opsCulqi, comision: comisionCulqi },
       ticket,
     };

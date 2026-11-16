@@ -88,6 +88,52 @@ describe('Canjear cupón', () => {
   });
 });
 
+describe('Canjear cupón desde el botón global (con paso ¿A qué pedido?)', () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(cleanup);
+  const candidatos = [
+    { id: '11', codigo: 'CP-11', quien: 'Mesa 3', total: 50, estado: 'COLA' },
+    { id: '12', codigo: 'CP-12', quien: 'Rosa Prueba', total: 30, estado: 'LISTO' },
+  ];
+
+  it('revisa sin pedido, elige el pedido, vuelve a revisar con él y aplica tras confirmar', async () => {
+    const revisarApi = vi.spyOn(ofertasApi, 'revisarCupon').mockImplementation(async (_c, pedidoId) =>
+      pedidoId ? { ...buena } : { ...buena, descuento: null, nuevoTotal: null, totalActual: null });
+    const canjear = vi.spyOn(ofertasApi, 'canjearCupon').mockResolvedValue({ canjeado: true, descuento: 5, totalActualizado: 45 });
+    const alAplicado = vi.fn();
+    render(<ModalCanjearCupon canal="MOZO" candidatos={candidatos} alCerrar={vi.fn()} alAplicado={alAplicado} />);
+    revisar('abc123');
+    expect(await screen.findByTestId('detalle-cupon')).toHaveTextContent('Falta elegir el pedido');
+    expect(revisarApi).toHaveBeenCalledWith('ABC123', undefined, 'MOZO');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    expect(screen.getByRole('heading', { name: '¿A qué pedido?' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Buscar pedido'), { target: { value: 'rosa' } });
+    expect(screen.queryByText(/CP-11/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /CP-12/ }));
+    expect(await screen.findByTestId('pedido-elegido')).toHaveTextContent('En CP-12 descuenta S/ 5.00');
+    expect(revisarApi).toHaveBeenLastCalledWith('ABC123', '12', 'MOZO');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    expect(screen.getByTestId('pregunta-aplicar')).toHaveTextContent('al pedido CP-12');
+    expect(canjear).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, aplicar' }));
+    await waitFor(() => expect(canjear).toHaveBeenCalledWith('ABC123', '12', 'MOZO'));
+    await waitFor(() => expect(alAplicado).toHaveBeenCalled());
+  });
+
+  it('sin elegir pedido no pasa a confirmar', async () => {
+    vi.spyOn(ofertasApi, 'revisarCupon').mockResolvedValue({ ...buena, descuento: null, nuevoTotal: null, totalActual: null });
+    render(<ModalCanjearCupon canal="CAJA" candidatos={candidatos} alCerrar={vi.fn()} alAplicado={vi.fn()} />);
+    revisar('abc123');
+    await screen.findByTestId('detalle-cupon');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Elige el pedido');
+    expect(screen.queryByTestId('pregunta-aplicar')).not.toBeInTheDocument();
+  });
+});
+
 describe('Cupones del turno en el cierre', () => {
   afterEach(cleanup);
   const datos = {

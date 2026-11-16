@@ -81,4 +81,14 @@ describe('revisarCupon', () => {
     const { run } = montar(null);
     expect(await run()).toMatchObject({ existe: false, aplicable: false, motivo: expect.stringContaining('no existe') });
   });
+
+  it('sin pedido (botón global): detalles y estado, sin validar ni calcular descuento', async () => {
+    const { prisma, v } = montar(emitido());
+    const r: any = await revisarCupon({ prisma, validar: v, partyCliente: () => null }, 'abc123', undefined, 'CAJA', HOY);
+    expect(r).toMatchObject({ aplicable: true, motivo: null, descuento: null, nuevoTotal: null, totalActual: null });
+    expect(prisma.pedido.findUnique).not.toHaveBeenCalled();
+    expect(v).not.toHaveBeenCalled();
+    const e = montar(emitido({ estado: 'ANULADO' }));
+    expect(await revisarCupon({ prisma: e.prisma, validar: e.v, partyCliente: () => null }, 'abc123', '', 'CAJA', HOY)).toMatchObject({ aplicable: false, motivo: 'Este cupón fue anulado' });
+  });
 });
