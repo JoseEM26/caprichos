@@ -96,3 +96,12 @@ export function siguienteTurnosIa(turnosPrevios: number | undefined, eligioOpcio
   if (eligioOpcion) return 0;
   return (turnosPrevios ?? 0) + (consultoIa ? 1 : 0);
 }
+
+/**
+ * La IA no inventa: true si la respuesta afirma precios, promociones o disponibilidad y ninguna herramienta de datos
+ * (carta, ofertas, horario, pedido…) se usó en la consulta. Solo `pasarAPersona` no cuenta como dato.
+ */
+export function iaAfirmaSinDatos(respuesta: string, herramientasUsadas: string[] | undefined): boolean {
+  if ((herramientasUsadas ?? []).some((h) => h !== 'pasarAPersona')) return false;
+  return /S\/\s*\d|\bsoles\b|\bpromo\w*|\bdescuento|\btenemos\b|\bhacemos\b|\bhay\b|\bdisponible|\bprecio/i.test(respuesta);
+}

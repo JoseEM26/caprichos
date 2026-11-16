@@ -46,7 +46,7 @@ import {
   generarCierreComercial,
   adjuntarCierreComercial,
 } from './cierre-comercial.util';
-import { esSaludo as esSaludoPuro } from './normalizador-entrada.util';
+import { esSaludo as esSaludoPuro, normalizarTexto } from './normalizador-entrada.util';
 import { nombreParaSaludo } from './bienvenida.util';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 import './flujos/pedido/flujo-pedido';
@@ -1896,6 +1896,57 @@ function atenderConSubflujo(
  * El silencio de ATENCION_PERSONA (chat tomado por una persona) se decide antes, en transicionarEstado.
  */
 function transicionarSoloMenus(
+  flujoIn: FlujoConversacion,
+  entrada: EntradaNormalizada,
+  contexto: ContextoConversacion,
+): ResultadoTransicion {
+  const oferta = (flujoIn as any).ofertaAsesor as { tipo: 'pedido' | 'menu' } | undefined;
+  if (!oferta) return transicionarSoloMenusNucleo(flujoIn, entrada, contexto);
+  // Oferta de asesor pendiente (1 = sí, 2 = no): se resuelve aquí; cualquier otro texto sigue su camino normal
+  const flujoSin: any = { ...flujoIn };
+  delete flujoSin.ofertaAsesor;
+  const t = entrada.texto.trim();
+  if (entrada.id === 'asesor_si' || RE_RESPUESTA_SI.test(t)) {
+    return pasarAsesor(flujoSin, entrada, contexto, 'ASESOR_ACEPTADO', TEXTOS_SOLO_MENUS.asesorAvisado(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
+  }
+  if (entrada.id === 'asesor_no' || RE_RESPUESTA_NO.test(t)) {
+    const vuelta: EntradaNormalizada = oferta.tipo === 'pedido' ? { tipo: 'texto', texto: '', textoOriginal: '' } : { tipo: 'boton', texto: 'menu', textoOriginal: 'menu', id: 'menu' };
+    return transicionarSoloMenusNucleo(flujoSin, vuelta, contexto);
+  }
+  return transicionarSoloMenusNucleo(flujoSin, entrada, contexto);
+}
+
+const RE_RESPUESTA_SI = /^(1|(si|sip|claro|dale|ya|ok|quiero)( (por favor|porfa|xfa|pf|pfv))?|por favor|porfa|xfa|asesor)$/;
+const RE_RESPUESTA_NO = /^(2|no|nop|no gracias|no por ahora)$/;
+
+/** Pedido especial o personalizado (tortas por encargo, cumpleaños, eventos, catering, fotos de…): lo atiende una persona. */
+const RE_PEDIDO_ESPECIAL =
+  /cumpleanos|por encargo|encargo|personaliz|catering|\bevento|\bboda\b|matrimonio|bautizo|\bfotos? de\b|(tienes|tienen|ver|enviar?|envias|pasas|mandas|manda|mandame|pasame) (las |unas |alguna )?fotos?\b|pedido grande|al por mayor|por mayor|\b(haces|hacen|hace|quiero|quisiera|necesito) (una |un |unas |)(torta|tortas|pastel|pasteles)\b|\b(torta|tortas|pastel|pasteles)\b.*\b(pequena|pequenas|grande|grandes|medida|dedicatoria)\b/;
+
+const esPedidoEspecial = (texto: string): boolean => RE_PEDIDO_ESPECIAL.test(texto) && !/reserv|mesa/.test(texto);
+
+/** Pasa el chat a una persona (urgente, «Por responder») con el aviso de horario ya armado. */
+function pasarAsesor(flujo: FlujoConversacion, entrada: EntradaNormalizada, contexto: ContextoConversacion, motivo: string, textoCliente: string): ResultadoTransicion {
+  return {
+    nuevoEstado: 'ATENCION_PERSONA',
+    acciones: [
+      { tipo: 'pasarAPersona', motivo, mensajeCliente: entrada.textoOriginal, esUrgente: true },
+      { tipo: 'enviarTexto', texto: textoCliente },
+    ],
+    nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
+  };
+}
+
+/** Oferta de asesor con botones (en Evolution salen numerados: 1 = Sí, 2 = No). */
+function ofertaAsesor(flujo: FlujoConversacion, tipo: 'pedido' | 'menu', texto: string, tituloNo: string): ResultadoTransicion {
+  return {
+    nuevoEstado: flujo.estado,
+    acciones: [{ tipo: 'enviarBotones', texto, botones: [{ id: 'asesor_si', titulo: 'Sí' }, { id: 'asesor_no', titulo: tituloNo }] }],
+    nuevoFlujo: { ...flujo, ofertaAsesor: { tipo } } as any,
+  };
+}
+
+function transicionarSoloMenusNucleo(
   flujo: FlujoConversacion,
   entrada: EntradaNormalizada,
   contexto: ContextoConversacion,
@@ -2004,10 +2055,32 @@ function transicionarSoloMenus(
     };
   }
 
+  // 2.b Pedido especial (torta por encargo, cumpleaños, evento, fotos de…): no es de la lista; pasa directo a una persona
+  if (!id && !enPago && esPedidoEspecial(texto)) {
+    return pasarAsesor(flujo, entrada, contexto, 'PEDIDO_ESPECIAL', TEXTOS_SOLO_MENUS.pedidoEspecial(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
+  }
+
   // 3. Pedido o pago en curso: el flujo del motor anterior atiende la respuesta (carrito, dirección, medio de pago, voucher)
   if (enPedido) {
     const r = atenderConSubflujo('pedido', flujo, entrada, contexto);
-    if (r) return r;
+    if (r) {
+      if (id || !texto.trim()) return r;
+      const clave = (p: any) => JSON.stringify({ e: r.nuevoEstado, i: p?.estadoInterno, n: p?.items?.length, c: p?.categoriaSeleccionadaId, cf: p?.configuracionActual?.grupoIndexActual, pr: p?.productoSeleccionadoId });
+      const sinAvance = r.nuevoFlujo.estado === flujo.estado && clave(r.nuevoFlujo.pedido) === clave(flujo.pedido);
+      const flujoLimpio: any = { ...r.nuevoFlujo };
+      delete flujoLimpio.pasoNoEntendido;
+      if (!sinAvance) return { ...r, nuevoFlujo: flujoLimpio };
+      // El cliente no eligió una opción válida: nunca se le atrapa repitiendo la misma pregunta
+      if (ACUSES_CORTOS.includes(texto.trim()) || /^(muchas )?gracias\b|^(ok|okey|listo|vale) gracias/.test(texto.trim())) {
+        return { nuevoEstado: flujo.estado, acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.acuseEnPedido() }], nuevoFlujo: flujo };
+      }
+      const prev = Number((flujo as any).pasoNoEntendido?.n ?? 0);
+      if (contexto.chatbotIaActivo && /[a-z]{3}/.test(texto)) {
+        return { nuevoEstado: flujo.estado, acciones: [{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }], nuevoFlujo: flujo };
+      }
+      if (prev >= 1) return ofertaAsesor(flujoLimpio, 'pedido', TEXTOS_SOLO_MENUS.ofertaPersona(), 'Seguir pidiendo');
+      return { ...r, nuevoFlujo: { ...flujoLimpio, pasoNoEntendido: { n: prev + 1 } } };
+    }
   }
   if (enPago) {
     const r = atenderConSubflujo('pago', flujo, entrada, contexto);
@@ -2116,6 +2189,21 @@ function transicionarSoloMenus(
     return respuesta([respuestaFaqSoloMenus(faq, contexto)]);
   }
 
+  // 10.b Pregunta por una categoría de la carta («bebidas frías»): se responde con los datos reales; el saludo la acompaña
+  if (!id) {
+    const cat = (contexto.categoriasCarta || []).find((c: any) => {
+      const n = normalizarTexto(c.nombre);
+      return n.length >= 4 && (texto.includes(n) || texto.includes(n.replace(/s$/, '')));
+    });
+    const prods = (cat?.productos || []).filter((p: any) => p.disponible !== false);
+    if (cat && prods.length) {
+      const lineas = prods.slice(0, 8).map((p: any) => `• ${p.nombre} S/ ${Number(p.precio).toFixed(2)}`);
+      return respuesta([
+        { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.categoriaPedida(cat.nombre, lineas, url, flujo.estado === 'INICIO'), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] },
+      ]);
+    }
+  }
+
   // 11. Ver la carta
   if (esId('carta', 'btn_carta', 'btn_asi_carta', 'btn_categorias', 'btn_esp_carta') || id.startsWith('cat_') || texto === 'carta' || hay(PALABRAS_CARTA)) {
     return respuesta(accionesCartaSoloMenus(contexto, url));
@@ -2155,7 +2243,7 @@ function transicionarSoloMenus(
   if (flujo.estado === 'INICIO') return saludo();
 
   // 14.b Un número suelto sin menú vigente («1» de un «Volver al menú» viejo): vuelve al menú, nunca a la IA ni al «no entendí»
-  if (!id && !enPersona && /^\d{1,2}\s*[.)]?$/.test(texto.trim())) return saludo();
+  if (!id && !enPersona && /^(?:(?:por favor|porfa|xfa)\s+)?\d{1,2}$/.test(texto.trim())) return saludo();
   // Solo emojis (sin letras ni números): no es una pregunta, la IA no gasta ni el bot contesta (anti-bucle)
   const crudo = (entrada.textoOriginal || texto || '').trim();
   if (!id && !enPersona && crudo && /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f\s]+$/u.test(crudo)) {

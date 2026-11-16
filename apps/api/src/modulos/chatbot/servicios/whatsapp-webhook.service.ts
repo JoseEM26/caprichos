@@ -87,6 +87,9 @@ export const TIPOS_AUDIO_PERMITIDOS = ['audio/ogg', 'audio/mpeg', 'audio/mp4', '
 /** Una persona escucha siempre las notas de voz: el bot no las interpreta, avisa una vez y pasa el chat. */
 export const TEXTO_NOTA_DE_VOZ = 'Recibí tu nota de voz 🎧; una persona del equipo la va a escuchar y te responde en breve';
 export const MOTIVO_DERIVACION_NOTA_DE_VOZ = 'NOTA_DE_VOZ';
+/** Imagen sin pedido esperando pago: la IA no la analiza; una persona la revisa (un solo aviso por ráfaga). */
+export const TEXTO_IMAGEN_RECIBIDA = '¡Gracias, cariño! 💛 Recibimos tu imagen. Una persona del equipo la revisa y te escribe en un momento (si estamos cerrados, apenas abramos) 🥰';
+export const MOTIVO_DERIVACION_IMAGEN = 'IMAGEN_RECIBIDA';
 export const TIPOS_MEDIA_PERMITIDOS = [
   'image/jpeg',
   'image/png',
@@ -789,6 +792,19 @@ export class WhatsappWebhookService {
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
     // El bot avisa y repite el paso (ver atenderNoCompatible).
     // Nota de voz: el bot no la interpreta; una persona la escucha (aviso único al cliente, chat a persona y campana).
+    const enPagoDelBot = conversacion.estado === 'VALIDAR_PAGO' || String(((conversacion.flujo as any) ?? {}).estado ?? '').startsWith('PAGO');
+    if (tipo === 'image' && !voucherAtendido && !enPagoDelBot) {
+      await this.atenderMediaParaPersona(conversacion, identificador, telefonoNorm, telHash, waMessageId, {
+        motivo: MOTIVO_DERIVACION_IMAGEN,
+        titulo: `Imagen de ${obtenerNombreMostrar(conversacion)}: hay que revisarla`,
+        mensaje: 'El cliente envió una imagen sin un pedido esperando pago. El bot no la analiza: ábrela en el chat y respóndele.',
+        textoCliente: TEXTO_IMAGEN_RECIBIDA,
+        etapa: 'IMAGEN_RECIBIDA',
+        clave: 'imagen',
+        limitarAviso: true,
+      });
+      return true;
+    }
     if (tipo === 'audio') {
       await this.atenderNotaDeVoz(conversacion, identificador, telefonoNorm, telHash, waMessageId);
       return true;

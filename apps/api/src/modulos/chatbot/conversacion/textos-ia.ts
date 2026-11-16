@@ -109,3 +109,9 @@ export const TEXTOS_IA = {
     return '¡Qué delicia! 🍰 Recuerda que para armar tu pedido con todas sus opciones lo hacemos por los botones de nuestro menú interactivo.';
   },
 };
+
+/** Oferta de asesor (en Evolution salen numerados: 1 = Sí, 2 = No). */
+export const BOTONES_OFERTA_ASESOR: BotonAccion[] = [
+  { id: 'asesor_si', titulo: 'Sí' },
+  { id: 'asesor_no', titulo: 'No, gracias' },
+];
