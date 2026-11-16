@@ -5,6 +5,7 @@ import { comprobantesApi } from '../../admin/comprobantes/comprobantesApi';
 import type { CartaLegalInfo } from '../../admin/comprobantes/tipos';
 import { useCuenta } from './CuentaContext';
 import { VerificacionWhatsapp, esRespuestaWhatsappEntrante, type RespuestaVerificacionWa } from './VerificacionWhatsapp';
+import { celularAlEscribir } from '../../comun/celular';
 
 export const campo: CSSProperties = {
   width: '100%',
@@ -69,7 +70,7 @@ function CampoCelular({ id, valor, alCambiar }: { id: string; valor: string; alC
       <label htmlFor={id} style={etiqueta}>Celular</label>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span aria-hidden="true" style={{ ...campo, width: 56, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cp-sand)', fontWeight: 700 }}>+51</span>
-        <input id={id} type="tel" inputMode="numeric" autoComplete="tel" maxLength={9} value={valor} onChange={(e) => alCambiar(e.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="9XXXXXXXX" style={campo} />
+        <input id={id} type="tel" inputMode="numeric" autoComplete="tel" value={valor} onChange={(e) => alCambiar(celularAlEscribir(e.target.value))} placeholder="9XXXXXXXX" style={campo} />
       </div>
     </div>
   );

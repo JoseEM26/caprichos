@@ -1,6 +1,7 @@
 import { MapaUbicacion } from '../../../comun/mapa/MapaUbicacion';
 import type { Punto } from '../../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../../comun/mapa/BuscadorDireccion';
+import { celularAlEscribir } from '../../../comun/celular';
 
 export interface PanelEdicionPedidoProps {
   /** Un pedido de mesa no cambia de modalidad. */
@@ -80,9 +81,8 @@ export function PanelEdicionPedido(p: PanelEdicionPedidoProps) {
         id="ed-telefono"
         style={campo}
         inputMode="numeric"
-        maxLength={9}
         value={p.telefono}
-        onChange={(e) => p.onTelefono(e.target.value.replace(/\D/g, ''))}
+        onChange={(e) => p.onTelefono(celularAlEscribir(e.target.value))}
       />
       {esDelivery && (
         <>

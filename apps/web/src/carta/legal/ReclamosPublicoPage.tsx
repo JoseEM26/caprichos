@@ -10,6 +10,7 @@ import type {
   ConsultaConstanciaPublica,
 } from '../../admin/comprobantes/tipos';
 import { PieLegal } from './PieLegal';
+import { celularAlEscribir } from '../../comun/celular';
 
 export function ReclamosPublicoPage() {
   const [pestana, setPestana] = useState<'registrar' | 'consultar'>('registrar');
@@ -461,7 +462,7 @@ export function ReclamosPublicoPage() {
                       id="campo-reclamo-telefono"
                       etiqueta="Teléfono de contacto (9 dígitos)"
                       value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
+                      onChange={(e) => setTelefono(celularAlEscribir(e.target.value))}
                       error={errores.telefono}
                       placeholder="Ej: 987654321"
                       type="tel"

@@ -58,6 +58,7 @@ import {
   type RolTemporal,
 } from "./rolesTemporalesApi";
 import { Insignia } from "../../comun/Insignia";
+import { celularAlEscribir } from '../../comun/celular';
 
 export interface EditarUsuarioModalProps {
   usuario: UsuarioItem | null;
@@ -570,7 +571,7 @@ export function EditarUsuarioModal({
             autoComplete="off"
             value={celularNuevo}
             onChange={(e) => {
-              setCelularNuevo(e.target.value);
+              setCelularNuevo(celularAlEscribir(e.target.value));
               if (errores.celular)
                 setErrores((prev) => ({ ...prev, celular: "" }));
             }}
