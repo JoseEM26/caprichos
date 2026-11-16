@@ -1,4 +1,6 @@
-import { aTextoNumerado, numeroEscrito, resolverRespuesta } from '../evolution/menu-numerado.util';
+import { aplanarEnlacesMarkdown, textoSinBotonPedirEste } from '../utilidades/texto-whatsapp.util';
+import { nombreParaSaludo } from '../conversacion/bienvenida.util';
+import { aTextoNumerado, completarEscalaEncuesta, numeroEscrito, resolverRespuesta } from '../evolution/menu-numerado.util';
 import { aRespuestaDeMenu, normalizarMensajeEvolution } from '../evolution/evolution-mensaje.util';
 import { dentroDeHorario, escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
 
@@ -91,5 +93,27 @@ describe('reglas anti-bloqueo puras', () => {
     expect(dentroDeHorario(new Date('2026-11-13T15:00:00Z'), 9, 22)).toBe(true); // 10:00 Lima
     expect(dentroDeHorario(new Date('2026-11-13T03:00:00Z'), 9, 22)).toBe(false); // 22:00 Lima
     expect(dentroDeHorario(new Date('2026-11-13T13:59:00Z'), 9, 22)).toBe(false); // 08:59 Lima
+  });
+});
+
+describe('ajustes del bot con Evolution', () => {
+  it('la escala de la encuesta sale siempre 1 a 5 y cada número vale su puntaje (aunque la plantilla traiga 1, 3 y 5)', () => {
+    const { texto, menu } = aTextoNumerado('¿Cómo calificarías?', completarEscalaEncuesta([{ id: 'encuesta:1', titulo: '1 Malo' }, { id: 'encuesta:3', titulo: '3 Regular' }, { id: 'encuesta:5', titulo: '5 Excelente' }]), 'boton');
+    expect(texto).toContain('2. 😕 Pobre');
+    expect(texto).toContain('Responde 1, 2, 3, 4 o 5.');
+    expect(resolverRespuesta('3', menu)?.id).toBe('encuesta:3');
+    expect(resolverRespuesta('2', menu)?.id).toBe('encuesta:2');
+  });
+  it('enlaces Markdown pasan a URL plana', () => {
+    expect(aplanarEnlacesMarkdown('Aquí: [https://demo.caprichos.pe](https://demo.caprichos.pe) y [la carta](https://x.pe/c)')).toBe('Aquí: https://demo.caprichos.pe y la carta: https://x.pe/c');
+  });
+  it('el texto de la carta no manda a tocar «Pedir este»', () => {
+    const t = textoSinBotonPedirEste('Nuestros favoritos 💛 Toca «Pedir este» para pedirlo. Carta completa: https://x.pe');
+    expect(t).not.toContain('Pedir este');
+    expect(t).toContain('Carta completa: https://x.pe');
+  });
+  it('nombre para saludar: ignora genéricos, teléfonos enmascarados y «Cliente»', () => {
+    for (const n of ['Usuario de WhatsApp (JoseEM)', 'Usuario de WhatsApp', 'Contacto sin nombre', '+51 9*** ***61', 'Cliente', null]) expect(nombreParaSaludo(n)).toBe('');
+    expect(nombreParaSaludo('Ana Pérez')).toBe('Ana Pérez');
   });
 });

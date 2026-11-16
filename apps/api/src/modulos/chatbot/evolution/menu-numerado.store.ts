@@ -2,7 +2,8 @@ import { Injectable, Optional } from '@nestjs/common';
 import { RedisService } from '../../../comun/redis/redis.service';
 import type { MenuNumerado } from './menu-numerado.util';
 
-const TTL_SEG = 30 * 60;
+/** 24 h: un «1» de «Volver al menú» respondido horas después sigue valiendo (nunca cae en la IA). */
+const TTL_SEG = 24 * 60 * 60;
 
 /**
  * Último menú numerado enviado a cada teléfono. Vive en Redis (con vencimiento) y, si Redis no responde, en memoria.

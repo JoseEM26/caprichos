@@ -8,6 +8,15 @@ import {
 /** Fuente única de la bienvenida: la usan el menú, el saludo de «solo menús» y la IA. */
 export const NOMBRE_LOCAL_BOT = 'Caprichos';
 
+/**
+ * Nombre para saludar: solo uno real. El genérico («Usuario de WhatsApp (JoseEM)», «Contacto sin nombre»), el teléfono
+ * enmascarado y «Cliente» no se usan: se saluda sin nombre.
+ */
+export function nombreParaSaludo(nombre: string | null | undefined): string {
+  const n = String(nombre ?? '').trim();
+  return !n || /^(usuario de whatsapp|contacto sin nombre|cliente( whatsapp)?$)/i.test(n) || n.includes('*') || /^\+?[\d\s()-]{6,}$/.test(n) ? '' : n;
+}
+
 export interface DatosBienvenidaLocal {
   abierta?: boolean;
   abre?: string | null;
@@ -90,7 +99,7 @@ export function armarBienvenida(nombre: string | null | undefined, datos: DatosB
   const t = (k: keyof typeof TEXTOS_BOT_DEFECTO) => textoBot(op.textos, k);
   const link = String(op.linkCarta ?? '').trim();
   const local = op.local || NOMBRE_LOCAL_BOT;
-  const base = { nombre: String(nombre ?? '').trim(), local, link_carta: link };
+  const base = { nombre: nombreParaSaludo(nombre), local, link_carta: link };
 
   if (datos?.pausaAltaDemanda) {
     const saludo = interpolar(t('chatbot_texto_bienvenida'), { ...base, promociones: '' }).trim();

@@ -279,6 +279,31 @@ describe('adaptador y enrutador', () => {
     await ad.enviarPlantilla('51900000001', 'caprichos_delivery_en_camino', 'es', ['Ana', 'P-1', '20']);
     expect(api.llamar.mock.calls[1][2].text).toContain('Tu pedido P-1 ya salió');
   });
+  it('«Ver la carta» con Evolution: lista numerada con precio, sin «Pedir este», y elegir un número pide el producto', async () => {
+    const { ad, api, store } = montarAdaptador(true);
+    const cuerpo = 'Nuestros favoritos 💛 Toca «Pedir este» para pedirlo. Carta completa: https://carta.pe';
+    await ad.enviarCarrusel('51900000001', {
+      cuerpo,
+      tarjetas: [{ nombre: 'Frappe Oreo', imagenUrl: null, cuerpo: 'Frappe Oreo\nS/ 12.00', boton: { id: 'ped_prod_1', titulo: 'Pedir este' } }, { nombre: 'Waffle', imagenUrl: null, cuerpo: 'Waffle\nS/ 9.00', boton: { id: 'ped_prod_2', titulo: 'Pedir este' } }],
+      respaldo: { texto: cuerpo, botones: [{ id: 'volver_menu', titulo: 'Volver al menú' }] },
+    });
+    const texto = api.llamar.mock.calls[0][2].text;
+    expect(texto).not.toContain('Pedir este');
+    expect(texto).toContain('1. Frappe Oreo (S/ 12.00)');
+    expect(texto).toContain('3. Volver al menú');
+    expect(texto).toContain('https://carta.pe');
+    expect((await store.obtener('51900000001'))?.opciones.map((o) => o.id)).toEqual(['ped_prod_1', 'ped_prod_2', 'volver_menu']);
+  });
+  it('el menú numerado sigue valiendo horas después (24 h), no cae en la IA', async () => {
+    const { ad, store } = montarAdaptador(true);
+    await ad.enviarBotones('51900000001', 'Carta', [{ id: 'volver_menu', titulo: 'Volver al menú' }]);
+    jest.useFakeTimers().setSystemTime(Date.now() + 5 * 3_600_000);
+    try {
+      expect((await store.obtener('51900000001'))?.opciones[0].id).toBe('volver_menu');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
   it('limita los enlaces y varía el saludo si el mismo texto se repite', async () => {
     const { ad, api } = montarAdaptador(true, { evolution_max_texto_identico: 1 });
     await ad.enviarTexto('51900000001', 'Hola, mira https://a.pe/1 y https://a.pe/2');

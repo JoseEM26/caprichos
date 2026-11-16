@@ -182,7 +182,7 @@ describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', 
     const mensajeria: any = { reaccionar: jest.fn(async () => ({ exito: o.reaccion !== false, estado: 'ENVIADO' })) };
     const config: any = { get: (k: string) => (k === 'CARTA_URL_PUBLICA' ? (o.carta === undefined ? 'https://carta.caprichos.pe' : (o.carta ?? '')) : undefined) };
     const local: any = { obtenerEstadoCarta: jest.fn(async () => (o.abierto === false ? { abierta: false, motivo: 'HORARIO', abre: '23:59' } : { abierta: true, motivo: 'OK', abre: '09:00' })) };
-    const svc = new AutorespuestaWhatsappService(prisma, outbox, mensajeria, config, new EvolutionConfigService(prisma), local, { obtenerTextosBot: jest.fn(async () => ({})) } as any);
+    const svc = new AutorespuestaWhatsappService(prisma, outbox, mensajeria, config, new EvolutionConfigService(prisma), local);
     return { svc, outbox, mensajeria, prisma };
   };
   const entrada = (texto: string, extra: any = {}) => ({
@@ -190,29 +190,43 @@ describe('decisiones 5 y 7: fuera de horario y bienvenida con carta (sin bot)', 
     conversacion: { id: 1n, flujo: { estado: 'MENU' }, estado: 'ABIERTA', duenio: 'PERSONA', tomado_por: null, ...extra },
   });
 
-  it('fuera de horario, con el bot apagado: responde una vez con el texto «fuera de horario» del bot, la hora y la carta', async () => {
+  it('fuera de horario, con el bot apagado: responde una vez, corto y cariñoso, con la hora real de apertura y la carta (sin menú)', async () => {
     const { svc, outbox } = montar({ abierto: false });
     expect(await svc.atender(entrada('quiero una torta'))).toBe(true);
     const arg = outbox.encolar.mock.calls[0][0];
     expect(arg).toMatchObject({ origen: 'AUTORESPUESTA', tipo: 'TEXTO', telefono: '51900000001' });
     expect(arg.carga.textoLibre).toContain('Ana');
-    expect(arg.carga.textoLibre).toContain('Ahora estamos cerrados'); // texto del bot (chatbot_texto_fuera_horario)
-    expect(arg.carga.textoLibre).toMatch(/Abrimos (hoy|mañana) a las \d\d:\d\d/);
+    expect(arg.carga.textoLibre).toContain('descansando');
+    expect(arg.carga.textoLibre).toMatch(/Abrimos (hoy|mañana) a las \d{1,2}:\d\d (a|p)\. m\./);
+    expect(arg.carga.textoLibre).not.toMatch(/Responde|1\. /);
     expect(arg.carga.textoLibre).toContain('https://carta.caprichos.pe');
     expect(outbox.despertar).toHaveBeenCalled();
   });
-  it('fuera de horario: máximo una vez cada 12 horas por cliente', async () => {
+  it('fuera de horario: máximo una vez cada 6 horas por cliente', async () => {
     const { svc, outbox } = montar({ abierto: false, previa: true });
     expect(await svc.atender(entrada('hola'))).toBe(true);
     expect(outbox.encolar).not.toHaveBeenCalled();
-    expect(HORAS_ENTRE_AUTORESPUESTAS).toBe(12);
+    expect(HORAS_ENTRE_AUTORESPUESTAS).toBe(6);
   });
-  it('con el bot activo no se mete: él ya saluda y avisa el horario', async () => {
+  it('cerrado y con el bot activo: el bot NO conversa, responde el aviso corto una vez', async () => {
     const { svc, outbox } = montar({ abierto: false, botActivo: true });
-    expect(await svc.atender(entrada('hola', {}) as any)).toBe(true); // bot apagado por puedeProcesarMotor=false
-    outbox.encolar.mockClear();
+    expect(await svc.atender({ ...entrada('hola'), puedeProcesarMotor: true })).toBe(true);
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+  });
+  it('cerrado pero con un pedido en curso: el bot sigue atendiendo', async () => {
+    const { svc, outbox } = montar({ abierto: false, botActivo: true, pedidoActivo: true });
+    expect(await svc.atender({ ...entrada('dónde está mi pedido'), puedeProcesarMotor: true })).toBe(false);
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+  it('abierto y con el bot activo no se mete: él ya saluda', async () => {
+    const { svc, outbox } = montar({ botActivo: true });
     expect(await svc.atender({ ...entrada('hola'), puedeProcesarMotor: true })).toBe(false);
     expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+  it('sin nombre real (genérico de WhatsApp) saluda sin nombre', async () => {
+    const { svc, outbox } = montar({ abierto: false });
+    await svc.atender({ ...entrada('hola'), nombre: 'Usuario de WhatsApp (JoseEM)' });
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toMatch(/^¡Hola! /);
   });
   it('no responde si una persona ya tomó el chat', async () => {
     const { svc, outbox } = montar({ abierto: false });

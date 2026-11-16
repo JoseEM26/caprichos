@@ -294,4 +294,15 @@ describe('Bot con menú (decisión del dueño)', () => {
       }
     });
   });
+
+  describe('anti-bucle', () => {
+    it('un número suelto sin menú vigente vuelve al menú principal y nunca va a la IA', () => {
+      const r = ejecutar({ texto: '1' }, contextoBase({ chatbotIaActivo: true }), { estado: 'MENU', repreguntasFallidas: 0 });
+      expect(tipos(r)).toEqual(['enviarLista']);
+    });
+    it('solo emojis (sin letras) no gastan IA ni se contestan', () => {
+      const r = ejecutar({ texto: '😂😂' }, contextoBase({ chatbotIaActivo: true }), { estado: 'MENU', repreguntasFallidas: 0 });
+      expect(r.acciones).toEqual([]);
+    });
+  });
 });
