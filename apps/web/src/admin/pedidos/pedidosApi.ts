@@ -823,4 +823,8 @@ export interface PagoOnlineResumen {
   devuelto: number;
   estado: 'APROBADO' | 'DEVUELTO_PARCIAL' | 'DEVUELTO';
   modo: string;
+  /** Comisión de la pasarela (la asume el local). Solo llega al panel con permiso de caja; null = por confirmar. */
+  comision?: number | null;
+  neto?: number | null;
+  comisionFuente?: 'CULQI' | 'ESTIMADA' | null;
 }

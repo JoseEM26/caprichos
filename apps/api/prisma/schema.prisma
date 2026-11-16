@@ -1078,6 +1078,10 @@ model CobroPago {
   propina  Decimal  @default(0) @db.Decimal(12, 2)
   /// MANUAL (Caja/mozo) | CULQI (pago en línea aprobado por la pasarela; CHECK en la BD)
   origen   String   @default("MANUAL")
+  /// Comisión de la pasarela (total con IGV, soles). La asume el local; el cliente no la ve. null = por confirmar.
+  comision_pasarela Decimal? @db.Decimal(10, 2)
+  /// {fijo, variable, igv, neto_depositado, fuente: CULQI|ESTIMADA}
+  comision_detalle  Json?
 
   cobro    Cobro    @relation(fields: [cobro_id], references: [id])
 

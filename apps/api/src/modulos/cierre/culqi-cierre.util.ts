@@ -29,6 +29,9 @@ export interface OperacionCulqi {
   estado: 'COBRADO' | 'DEVUELTO_CULQI' | 'DEVUELTO_FUERA' | 'ANULADO';
   /** Medios usados en la devolución por fuera (YAPE, EFECTIVO…) */
   devueltoPor: string[];
+  /** Comisión de la pasarela con IGV (la asume el local); null = por confirmar */
+  comision: number | null;
+  comisionDetalle: unknown;
 }
 
 type Db = { pagoOnlineIntento: { findMany: (args: any) => Promise<any[]> }; cobro: { findMany: (args: any) => Promise<any[]> } };
@@ -106,6 +109,40 @@ export async function operacionesCulqiDeCaja(db: Pick<Db, 'cobro' | 'pagoOnlineI
         operacion: cargo.get(String(c.pedido_id)) ?? null,
         estado,
         devueltoPor: fuera,
+        comision: p.comision_pasarela == null ? null : Number(p.comision_pasarela),
+        comisionDetalle: p.comision_detalle ?? null,
       }));
   });
+}
+
+/**
+ * Comisión de la pasarela del turno (la asume el local; NO es faltante ni entra al efectivo esperado ni al cuadre de Yape).
+ * Culqi no devuelve la comisión al devolver un pago: las operaciones devueltas también cuentan como costo.
+ * neto = cobrado vigente (no devuelto) menos la comisión de todas las operaciones con comisión conocida.
+ */
+export interface ComisionCulqiCierre {
+  pagos: number;
+  porConfirmar: number;
+  estimadas: number;
+  bruto: number;
+  total: number;
+  fijo: number;
+  variable: number;
+  igv: number;
+  neto: number;
+}
+
+export function resumirComisionCulqi(ops: Array<Pick<OperacionCulqi, 'monto' | 'estado'> & { comision?: number | null; comisionDetalle?: any }>): ComisionCulqiCierre {
+  let bruto = 0, total = 0, fijo = 0, variable = 0, igv = 0, porConfirmar = 0, estimadas = 0;
+  for (const o of ops) {
+    const vigente = o.estado === 'COBRADO' || o.estado === 'ANULADO';
+    if (vigente) bruto += aCentimos(o.monto);
+    if (o.comision == null) { porConfirmar++; continue; }
+    total += aCentimos(o.comision);
+    fijo += aCentimos(o.comisionDetalle?.fijo ?? 0);
+    variable += aCentimos(o.comisionDetalle?.variable ?? 0);
+    igv += aCentimos(o.comisionDetalle?.igv ?? 0);
+    if (o.comisionDetalle?.fuente === 'ESTIMADA') estimadas++;
+  }
+  return { pagos: ops.length, porConfirmar, estimadas, bruto: enPesos(bruto), total: enPesos(total), fijo: enPesos(fijo), variable: enPesos(variable), igv: enPesos(igv), neto: enPesos(bruto - total) };
 }

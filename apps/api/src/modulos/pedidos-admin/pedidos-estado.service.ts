@@ -391,7 +391,7 @@ export class PedidosEstadoService {
         : [];
     const todos = [...pedidos, ...relacionadosCrudos];
     const cobrosMozo = await this.cobrosMozoDe(todos);
-    const pagosOnline = await pagosOnlineDe(this.prisma, todos.map((p) => p.id));
+    const pagosOnline = await pagosOnlineDe(this.prisma, todos.map((p) => p.id), !usuarioActual || !esSoloMozo(usuarioActual));
     const ajustes = await ajustesPendientesUbicacion(this.prisma, todos.map((p) => p.id));
     // Columnas de Caja: quién tomó el pedido (mozo/cajero) y quién lo cobró
     const nombres = await nombresDePersonas(
@@ -1084,7 +1084,7 @@ export class PedidosEstadoService {
       ...pedidoSinIncidentes,
       ...(tieneConsumoAlmacen ? { tieneConsumoAlmacen: true } : {}),
       ...(pagoCulqi ? { pagoCulqi } : {}),
-      pagoOnline: (await pagosOnlineDe(this.prisma, [pedido.id])).get(String(pedido.id)) ?? null,
+      pagoOnline: (await pagosOnlineDe(this.prisma, [pedido.id], !usuarioActual || !esSoloMozo(usuarioActual))).get(String(pedido.id)) ?? null,
       canjePuntos,
       ajustePago,
       lineas: pedido.lineas.map((l: any) =>

@@ -1,5 +1,5 @@
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
-import type { CulqiTurno, OperacionCulqi } from './cierreApi';
+import type { ComisionCulqiTurno, CulqiTurno, OperacionCulqi } from './cierreApi';
 import { soles } from './cuadre.util';
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
@@ -20,7 +20,7 @@ export function OperacionesCulqi({ operaciones }: { operaciones: OperacionCulqi[
     <div style={{ overflowX: 'auto' }}>
       <table className="dc-tabla" data-testid="operaciones-culqi">
         <thead>
-          <tr><th>Pedido</th><th>Medio</th><th>Monto</th><th>Hora</th><th>N.º de operación</th><th>Estado</th></tr>
+          <tr><th>Pedido</th><th>Medio</th><th>Monto</th><th>Hora</th><th>N.º de operación</th><th>Estado</th><th>Comisión</th></tr>
         </thead>
         <tbody>
           {operaciones.map((o, i) => (
@@ -31,10 +31,39 @@ export function OperacionesCulqi({ operaciones }: { operaciones: OperacionCulqi[
               <td>{hora(o.en)}</td>
               <td><code style={{ wordBreak: 'break-all' }}>{o.operacion ?? 'Sin dato'}</code></td>
               <td data-testid="estado-operacion-culqi">{estadoOperacionCulqi(o)}</td>
+              <td>{o.comision == null ? 'Por confirmar' : soles(o.comision)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** «Comisión de la pasarela (la asume el local)»: apartado propio; no es faltante ni cambia el efectivo esperado ni el Yape manual. */
+export function ComisionPasarela({ comision }: { comision: ComisionCulqiTurno }) {
+  if (!comision || comision.pagos === 0) return null;
+  return (
+    <div data-testid="comision-pasarela" style={{ marginTop: 12, borderTop: '1px dashed var(--cp-line)', paddingTop: 8 }}>
+      <h4 className="cc-h3" style={{ fontSize: '1rem' }}>Comisión de la pasarela (la asume el local)</h4>
+      <div className="cc-dig"><div className="cc-dig-nom">Cobrado bruto (sin devueltos)</div><div className="cc-dig-sis"><b>{soles(comision.bruto)}</b></div></div>
+      <div className="cc-dig" data-testid="comision-total">
+        <div className="cc-dig-nom">Comisión de {comision.pagos - comision.porConfirmar} de {comision.pagos} pagos</div>
+        <div className="cc-dig-sis"><b>- {soles(comision.total)}</b></div>
+      </div>
+      {comision.total > 0 && (
+        <div className="cc-peq" data-testid="comision-detalle">
+          Variable (%) {soles(comision.variable)} · fijo {soles(comision.fijo)} · IGV {soles(comision.igv)}
+          {comision.estimadas > 0 ? ` · ${comision.estimadas} estimada${comision.estimadas === 1 ? '' : 's'} con la tarifa configurada` : ''}
+        </div>
+      )}
+      <div className="cc-dig" data-testid="comision-neto"><div className="cc-dig-nom"><strong>Neto que deposita Culqi</strong></div><div className="cc-dig-sis"><b>{soles(comision.neto)}</b></div></div>
+      {comision.porConfirmar > 0 && (
+        <p className="cc-peq" data-testid="comision-por-confirmar" style={{ color: 'var(--cp-rust)' }}>
+          {comision.porConfirmar} pago{comision.porConfirmar === 1 ? '' : 's'} con comisión por confirmar: configura la tarifa en Configuración › Parámetros o revísala en CulqiPanel.
+        </p>
+      )}
+      <p className="cc-peq">Culqi descuenta su comisión antes de depositar. El cliente no la paga: la asume el local. No es faltante y no cambia el efectivo esperado ni el cuadre del Yape manual.</p>
     </div>
   );
 }
@@ -72,6 +101,7 @@ export function BloqueCulqi({ culqi }: { culqi: CulqiTurno }) {
         <div className="cc-dig-nom"><strong>Total Culqi</strong></div>
         <div className="cc-dig-sis"><b>{soles(culqi.total)}</b></div>
       </div>
+      {culqi.comision && <ComisionPasarela comision={culqi.comision} />}
       {culqi.operaciones && culqi.operaciones.length > 0 && <OperacionesCulqi operaciones={culqi.operaciones} />}
     </section>
   );

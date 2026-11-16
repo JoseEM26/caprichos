@@ -17,6 +17,7 @@ import { tieneRol } from '../acceso/roles-usuario';
 import { DevolucionCulqiService, ErrorReembolso, Devolucion } from './devolucion-culqi.service';
 import { usuarioSistema } from './usuario-sistema';
 import { ErrorPasarela, MedioPagoOnline, PASARELA_PAGO, PasarelaPago, ResultadoCargo } from './pasarela.puerto';
+import { ComisionCobro, comisionEstimada, leerTarifaCulqi } from './comision-pasarela';
 
 export const MEDIOS_ONLINE: MedioPagoOnline[] = ['TARJETA', 'YAPE'];
 const ESTADOS_VIVOS = ['CREADO', 'PROCESANDO', 'PENDIENTE', 'APROBADO'];
@@ -247,7 +248,7 @@ export class PagosOnlineService {
         aprobado_en: cargo.estado === 'APROBADO' ? new Date() : null,
       },
     });
-    if (cargo.estado === 'APROBADO') await this.cobrarPedido(actualizado.id);
+    if (cargo.estado === 'APROBADO') await this.cobrarPedido(actualizado.id, cargo.comision);
     const final = await this.prisma.pagoOnlineIntento.findUnique({ where: { id: intento.id } });
     const res = this.resultado(final ?? actualizado, codigo);
     return cargo.estado === 'RECHAZADO' && cargo.codigo ? { ...res, codigo: cargo.codigo } : res;
@@ -262,7 +263,7 @@ export class PagosOnlineService {
    * Pago aprobado -> cobro del pedido con el MISMO flujo de Caja (CobrosService.cobrar: cobro, comprobante, puntos),
    * y el pedido queda aprobado para cocina sin voucher ni revisión. Idempotente: un solo proceso lo toma.
    */
-  async cobrarPedido(intentoId: bigint): Promise<void> {
+  async cobrarPedido(intentoId: bigint, comision?: ComisionCobro | null): Promise<void> {
     const toma = await this.prisma.pagoOnlineIntento.updateMany({
       where: { id: intentoId, estado: { in: ['APROBADO'] }, cobrado_en: null, cobro_error: null },
       data: { cobro_error: 'EN_CURSO' },
@@ -287,6 +288,7 @@ export class PagosOnlineService {
         { pedidoId: pedido.id.toString(), pagos: [{ medio: intento.medio!, monto: enPesos(intento.monto_centimos) }], origen: 'CULQI' } as any,
         { ...usuario, partyId: usuario.partyId.toString() },
       );
+      await this.guardarComision(intento, comision).catch((e) => this.logger.warn(`Comisión no guardada (intento ${intentoId}): ${e?.message}`));
       const ahora = new Date();
       await this.prisma.pedido.update({
         where: { id: pedido.id },
@@ -338,6 +340,19 @@ export class PagosOnlineService {
         })
         .catch(() => undefined);
     }
+  }
+
+  /**
+   * Guarda en el cobro_pago CULQI la comisión de la pasarela (la asume el local; el cliente no la ve). Prefiere la REAL de
+   * Culqi; sin ella, la ESTIMADA con la tarifa del ADMIN; sin tarifa queda null («por confirmar»). Una real nunca se pisa con una estimada.
+   */
+  async guardarComision(intento: { pedido_id: bigint; monto_centimos: number; medio: string | null }, real?: ComisionCobro | null): Promise<void> {
+    const pago = await this.prisma.cobroPago.findFirst({ where: { origen: 'CULQI', cobro: { pedido_id: intento.pedido_id } }, orderBy: { id: 'desc' } });
+    if (!pago) return;
+    if (!real && (pago.comision_detalle as any)?.fuente === 'CULQI') return;
+    const c = real ?? comisionEstimada(enPesos(intento.monto_centimos), await leerTarifaCulqi(this.prisma, intento.medio ?? 'TARJETA'));
+    if (!c) return;
+    await this.prisma.cobroPago.update({ where: { id: pago.id }, data: { comision_pasarela: c.total, comision_detalle: c.detalle as any } });
   }
 
   // ---------------------------------------------------------------- webhook
@@ -404,7 +419,12 @@ export class PagosOnlineService {
         where: { OR: [...(typeof d.id === 'string' ? [{ culqi_cargo_id: d.id }] : []), ...(typeof clave === 'string' ? [{ clave }] : [])] },
       });
       if (!intento || typeof d.id !== 'string') return 'IGNORADO';
-      if (intento.estado === 'APROBADO' || intento.estado === 'DEVUELTO') return 'PROCESADO';
+      if (intento.estado === 'APROBADO' || intento.estado === 'DEVUELTO') {
+        // Ya cobrado: el aviso puede traer la comisión real que el cargo no trajo al crearse
+        const c0 = await this.pasarela.consultarCargo(d.id).catch(() => null);
+        if (c0?.comision && c0.metadata?.intento === intento.clave) await this.guardarComision(intento, c0.comision).catch(() => undefined);
+        return 'PROCESADO';
+      }
       if (!['PROCESANDO', 'PENDIENTE', 'CREADO'].includes(intento.estado)) return 'IGNORADO';
       const c = await this.pasarela.consultarCargo(d.id); // ErrorPasarela -> 500 y Culqi reintenta
       if (!c || c.metadata?.intento !== intento.clave) return 'IGNORADO';
@@ -415,7 +435,7 @@ export class PagosOnlineService {
           where: { id: intento.id },
           data: { estado: 'APROBADO', culqi_cargo_id: intento.culqi_cargo_id ?? c.cargoId, medio: intento.medio ?? 'TARJETA', aprobado_en: new Date(), mensaje: 'Pago aprobado.' },
         });
-        await this.cobrarPedido(intento.id);
+        await this.cobrarPedido(intento.id, c.comision);
         return 'PROCESADO';
       }
       if (c.estado === 'RECHAZADO' && ['PROCESANDO', 'PENDIENTE'].includes(intento.estado)) {
@@ -462,7 +482,7 @@ export class PagosOnlineService {
       if (est === 'DEVUELTO') donde.OR = [{ estado: 'DEVUELTO' }, { devuelto_centimos: { gt: 0 } }];
       else donde.estado = est;
     }
-    const [total, filas, sumas] = await Promise.all([
+    const [total, filas, sumas, vivos] = await Promise.all([
       this.prisma.pagoOnlineIntento.count({ where: donde }),
       this.prisma.pagoOnlineIntento.findMany({
         where: donde,
@@ -473,11 +493,25 @@ export class PagosOnlineService {
       }),
       // Total cobrado (aprobados y ya devueltos) de TODO el filtro, no solo de la página
       this.prisma.pagoOnlineIntento.aggregate({ where: { ...donde, estado: { in: ['APROBADO', 'DEVUELTO'] } }, _sum: { monto_centimos: true, devuelto_centimos: true } }),
+      this.prisma.pagoOnlineIntento.findMany({ where: { ...donde, estado: { in: ['APROBADO', 'DEVUELTO'] } }, select: { pedido_id: true } }),
     ]);
+    // Comisión de la pasarela (la asume el local): del cobro_pago CULQI de cada pedido
+    const pagosCulqi = await this.prisma.cobroPago.findMany({
+      where: { origen: 'CULQI', cobro: { pedido_id: { in: [...new Set([...vivos.map((v: any) => v.pedido_id), ...filas.map((f) => f.pedido_id)])] } } },
+      select: { comision_pasarela: true, comision_detalle: true, cobro: { select: { pedido_id: true } } },
+    });
+    const porPedido = new Map(pagosCulqi.map((p) => [String(p.cobro.pedido_id), p]));
+    const idsVivos = new Set(vivos.map((v: any) => String(v.pedido_id)));
+    const delFiltro = pagosCulqi.filter((p) => idsVivos.has(String(p.cobro.pedido_id)));
+    const totalComision = enPesos(delFiltro.reduce((t, p) => t + aCentimos(p.comision_pasarela == null ? 0 : Number(p.comision_pasarela)), 0));
+    const comisionPorConfirmar = delFiltro.filter((p) => p.comision_pasarela == null).length;
     return {
       total,
       totalAprobado: enPesos(sumas?._sum?.monto_centimos ?? 0),
       totalDevuelto: enPesos(sumas?._sum?.devuelto_centimos ?? 0),
+      totalComision,
+      totalNeto: enPesos(aCentimos(enPesos(sumas?._sum?.monto_centimos ?? 0)) - aCentimos(enPesos(sumas?._sum?.devuelto_centimos ?? 0)) - aCentimos(totalComision)),
+      comisionPorConfirmar,
       items: filas.map((f) => ({
         id: f.id.toString(),
         pedidoId: f.pedido_id.toString(),
@@ -497,6 +531,8 @@ export class PagosOnlineService {
         requiereDevolucion: f.cobro_error?.startsWith('PEDIDO_ANULADO_DEVOLVER') ?? false,
         devoluciones: ((f.devoluciones as unknown as Devolucion[]) ?? []).map((d) => ({ monto: enPesos(d.monto_centimos), medio: d.medio ?? 'CULQI', en: d.en })),
         modo: f.modo,
+        comision: porPedido.get(String(f.pedido_id))?.comision_pasarela == null ? null : Number(porPedido.get(String(f.pedido_id))!.comision_pasarela),
+        neto: (porPedido.get(String(f.pedido_id))?.comision_detalle as any)?.neto_depositado ?? null,
       })),
     };
   }

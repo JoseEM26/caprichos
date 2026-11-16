@@ -1,3 +1,4 @@
+import { comisionDeCargoCulqi } from './comision-pasarela';
 import { codigoDeError, mensajeDeError } from './culqi.errores';
 import { CargoConsultado, CargoHecho, ErrorPasarela, PasarelaPago, PedirCargo, PedirDevolucion } from './pasarela.puerto';
 
@@ -73,7 +74,7 @@ export class CulqiAdaptador implements PasarelaPago {
       marca: tarjeta.iin?.card_brand ?? null,
       ultimos4: /^\d{4}$/.test(num.slice(-4)) ? num.slice(-4) : (tarjeta.last_four ?? null),
     };
-    if (json.outcome?.type === 'venta_exitosa') return { ...base, estado: 'APROBADO', mensaje: 'Pago aprobado.' };
+    if (json.outcome?.type === 'venta_exitosa') return { ...base, estado: 'APROBADO', mensaje: 'Pago aprobado.', comision: comisionDeCargoCulqi(json, p.montoCentimos) };
     // 2xx sin venta exitosa (p. ej. en revisión): no se cobra ni se rechaza hasta que llegue el webhook
     return { ...base, estado: 'PENDIENTE', mensaje: 'Estamos confirmando tu pago. Te avisaremos en unos minutos.' };
   }
@@ -91,6 +92,7 @@ export class CulqiAdaptador implements PasarelaPago {
       moneda: String(json.currency_code ?? ''),
       metadata: json.metadata && typeof json.metadata === 'object' ? json.metadata : {},
       devueltoCentimos: Number(json.amount_refunded ?? 0) || 0,
+      comision: comisionDeCargoCulqi(json, Number(json.amount)),
     };
   }
 

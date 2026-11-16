@@ -57,6 +57,9 @@ export interface PagoOnline {
   ultimos4?: string | null;
   aprobadoEn?: string | null;
   modo?: ModoCulqi;
+  /** Solo en el panel admin: comisión de la pasarela (la asume el local) y neto */
+  comision?: number | null;
+  neto?: number | null;
 }
 
 export interface FiltrosPagosOnline {
@@ -76,7 +79,7 @@ export const culqiApi = {
     const q = new URLSearchParams();
     (['desde', 'hasta', 'estado'] as const).forEach((k) => f[k] && q.set(k, f[k]!));
     q.set('pagina', String(f.pagina ?? 1));
-    return api.get<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number }>(`/admin/pagos-online?${q}`);
+    return api.get<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number; totalComision?: number; totalNeto?: number; comisionPorConfirmar?: number }>(`/admin/pagos-online?${q}`);
   },
   devolver: (id: string, cuerpo: { monto?: number; motivo: string; medio: MedioDevolucion; confirmar?: boolean }) =>
     api.post(`/admin/pagos-online/${encodeURIComponent(id)}/devolver`, cuerpo),

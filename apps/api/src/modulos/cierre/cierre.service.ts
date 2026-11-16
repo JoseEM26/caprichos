@@ -48,7 +48,7 @@ import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-p
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { detallarVentasTurno, idsDePersonas, nombresDeCobros, serviciosLibresDelTurno } from './ventas-turno.util';
-import { armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, type CulqiCierre } from './culqi-cierre.util';
+import { armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, resumirComisionCulqi, type CulqiCierre } from './culqi-cierre.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -909,7 +909,7 @@ export class CierreService {
         tarjeta: montos.sistemaTarjeta,
       },
       // Pagos en línea (Culqi): no entran al esperado de Yape ni de tarjeta del local
-      culqi: { ...montos.culqi, operaciones: await operacionesCulqiDeCaja(this.prisma, caja.id) },
+      culqi: await this.culqiConOperaciones(montos.culqi, caja.id),
       desglose: {
         ventasEfectivo: montos.ventasEfectivo,
         // Propinas del día: aparte de las ventas (no son ingreso). Efectivo y digital ya están en medios.
@@ -1075,7 +1075,10 @@ export class CierreService {
       ...cobrosAnulados.flatMap((c) => (c.anulado_por ? [c.anulado_por] : [])),
     ];
     const nombres = await this.nombresDePartes(ids);
+    const opsCulqi = await operacionesCulqiDeCaja(this.prisma, cierre.caja_id);
+    const comisionCulqi = resumirComisionCulqi(opsCulqi);
     const ticket = armarTicketCierre({
+      comisionCulqi: comisionCulqi.pagos > 0 ? comisionCulqi : null,
       localNombre: ((local?.valor as any)?.nombre as string) || 'Caprichos',
       caja: cierre.caja,
       cierre,
@@ -1105,9 +1108,15 @@ export class CierreService {
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
       ajustesMedio: ajustes,
-      culqi: { operaciones: await operacionesCulqiDeCaja(this.prisma, cierre.caja_id) },
+      culqi: { operaciones: opsCulqi, comision: comisionCulqi },
       ticket,
     };
+  }
+
+  /** Bloque Culqi del cuadre: operaciones + comisión de la pasarela (aparte; no es faltante). */
+  private async culqiConOperaciones(culqi: CulqiCierre, cajaId: bigint) {
+    const operaciones = await operacionesCulqiDeCaja(this.prisma, cajaId);
+    return { ...culqi, operaciones, comision: resumirComisionCulqi(operaciones) };
   }
 
   /** Encola el ticket de cierre de una caja ya cerrada en la ticketera de Caja. Solo administrador. */

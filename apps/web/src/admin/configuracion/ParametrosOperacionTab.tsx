@@ -591,6 +591,30 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  culqi_comision_tarjeta_pct: {
+    nombre: 'Comisión de Culqi por tarjeta: porcentaje (sin IGV)',
+    descripcion: 'Porcentaje que Culqi cobra por cada pago con tarjeta, sin IGV. Solo estima la comisión cuando Culqi no la informa; la asume el local, el cliente no la ve. De 0 a 20.',
+    tipo: 'numero',
+    sufijo: '%',
+  },
+  culqi_comision_tarjeta_fijo: {
+    nombre: 'Comisión de Culqi por tarjeta: monto fijo (sin IGV)',
+    descripcion: 'Monto fijo en soles por cada pago con tarjeta, sin IGV. Vacío = 0 si el porcentaje está. De 0 a 10.',
+    tipo: 'numero',
+    sufijo: 'soles',
+  },
+  culqi_comision_yape_pct: {
+    nombre: 'Comisión de Culqi por Yape: porcentaje (sin IGV)',
+    descripcion: 'Porcentaje que Culqi cobra por cada pago con Yape en línea, sin IGV. Solo estima la comisión cuando Culqi no la informa. De 0 a 20.',
+    tipo: 'numero',
+    sufijo: '%',
+  },
+  culqi_comision_yape_fijo: {
+    nombre: 'Comisión de Culqi por Yape: monto fijo (sin IGV)',
+    descripcion: 'Monto fijo en soles por cada pago con Yape en línea, sin IGV. Vacío = 0 si el porcentaje está. De 0 a 10.',
+    tipo: 'numero',
+    sufijo: 'soles',
+  },
   whatsapp_proveedor: {
     nombre: 'Por dónde sale WhatsApp (Meta o Evolution)',
     descripcion: 'Elige el número que envía los avisos al cliente: META es la conexión oficial; EVOLUTION usa el número único del local conectado por QR. Solo el administrador lo cambia.',

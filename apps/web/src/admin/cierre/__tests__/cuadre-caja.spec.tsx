@@ -401,6 +401,20 @@ describe('Cuadre: pagos en línea (Culqi) aparte del Yape y la tarjeta del local
     expect(within(ops).getAllByText('CP-009')).toHaveLength(2);
   });
 
+  it('apartado «Comisión de la pasarela (la asume el local)»: bruto, comisión con detalle, neto y por qué se descuenta', () => {
+    const comision = { pagos: 2, porConfirmar: 1, estimadas: 0, bruto: 110, total: 4.6, fijo: 0.6, variable: 3.3, igv: 0.7, neto: 105.4 };
+    montar({ esperado: { ...conCulqi, culqi: { ...conCulqi.culqi!, comision } } });
+    const c = screen.getByTestId('comision-pasarela');
+    expect(within(c).getByText('Comisión de la pasarela (la asume el local)')).toBeTruthy();
+    expect(within(screen.getByTestId('comision-total')).getByText('- S/ 4.60')).toBeTruthy();
+    expect(screen.getByTestId('comision-detalle').textContent).toMatch(/IGV S\/ 0\.70/);
+    expect(within(screen.getByTestId('comision-neto')).getByText('S/ 105.40')).toBeTruthy();
+    expect(screen.getByTestId('comision-por-confirmar')).toBeTruthy();
+    expect(within(c).getByText(/No es faltante/)).toBeTruthy();
+    // el esperado de Yape manual no cambia por la comisión
+    expect(within(screen.getByTestId('digital-yape')).getByText('S/ 200.00')).toBeTruthy();
+  });
+
   it('sin cobros por Culqi no aparece el bloque', () => {
     montar();
     expect(screen.queryByTestId('bloque-culqi')).toBeNull();
