@@ -47,7 +47,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import { ConfigurarAsistenciaDto, CambiarHoraMarcaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -677,6 +677,46 @@ export class AsistenciaService {
       });
     });
     await this.auditar('CAMBIO', 'REASIGNAR_MARCA', 'OK', { de: marca.tipo, a: dto.tipo, marcaOriginal: Number(marca.id) }, usuario.partyId, ip, 'asistencia_marca', nueva.id, motivo);
+    return { ok: true, id: Number(nueva.id) };
+  }
+
+  /**
+   * Cambiar la hora de una marca (el admin corrige una hora mal registrada, p. ej. por una falla del sistema). Append-only:
+   * la original queda ANULADA (no cuenta) con quién, cuándo y por qué, y se crea una CORRECCION con la hora nueva y el mismo rol.
+   * Las horas, la tardanza y la penalidad se recalculan solas porque salen de las marcas que cuentan.
+   */
+  async cambiarHoraMarca(id: number, dto: CambiarHoraMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
+    const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
+    if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
+    if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });
+    const momento = new Date(dto.momento);
+    if (Number.isNaN(momento.getTime())) throw new BadRequestException({ codigo: 'MOMENTO_INVALIDO', mensaje: 'La hora no es válida' });
+    const jornada = marca.jornada.toISOString().slice(0, 10);
+    if (jornadaDe(momento).jornada !== jornada) {
+      throw new BadRequestException({ codigo: 'JORNADA_NO_COINCIDE', mensaje: 'La hora nueva debe caer en el mismo día laboral de la marca' });
+    }
+    const pagado = await this.prisma.planillaPeriodo.findFirst({
+      where: { party_id: marca.party_id, estado: 'PAGADO', desde: { lte: marca.jornada }, hasta: { gte: marca.jornada } },
+    });
+    if (pagado) throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Ese período ya está pagado. Reábrelo (con motivo) para cambiar la hora de esta marca.' });
+    const motivo = dto.motivo.trim();
+    const de = aHoraTexto(jornadaDe(marca.momento).minutos);
+    const a = aHoraTexto(jornadaDe(momento).minutos);
+    const quien = (await this.cuentas([usuario.partyId])).get(usuario.partyId)?.nombre ?? `usuario ${usuario.partyId}`;
+    const nueva = await this.prisma.$transaction(async (tx) => {
+      await tx.asistenciaMarca.update({
+        where: { id: marca.id },
+        data: { estado: 'ANULADA', revisado_por: usuario.partyId, revisado_en: new Date(), revisado_motivo: `Hora cambiada a ${a}: ${motivo}` },
+      });
+      return tx.asistenciaMarca.create({
+        data: {
+          party_id: marca.party_id, jornada: marca.jornada, tipo: dto.tipo ?? marca.tipo, origen: 'CORRECCION', momento, estado: 'VALIDA',
+          motivo: `Hora corregida de ${de} a ${a} por ${quien} (marca #${marca.id}): ${motivo}`,
+          por_party_id: usuario.partyId,
+        },
+      });
+    });
+    await this.auditar('CAMBIO', 'CAMBIAR_HORA_MARCA', 'OK', { de, a, marcaOriginal: Number(marca.id), tipo: nueva.tipo }, usuario.partyId, ip, 'asistencia_marca', nueva.id, motivo);
     return { ok: true, id: Number(nueva.id) };
   }
 

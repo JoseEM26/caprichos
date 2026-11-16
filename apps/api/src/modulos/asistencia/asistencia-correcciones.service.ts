@@ -28,6 +28,7 @@ export function momentoDeHora(jornada: string, hora: string): { momento: Date; m
 }
 
 export interface ItemSolicitud {
+  reemplazaMarcaId?: number;
   tipo: TipoMarca;
   hora: string;
   momento: string;
@@ -246,6 +247,9 @@ export class AsistenciaCorreccionesService {
     }
     const motivo = dto.motivo.trim();
     if (motivo.length < 5) throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo (mínimo 5 caracteres)' });
+    if (dto.items.some((i) => i.reemplazaMarcaId != null) && motivo.length < 10) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Para justificar una tardanza escribe el motivo (mínimo 10 caracteres)' });
+    }
     if (await this.periodoPagado(partyId, dto.jornada)) {
       throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Ese período ya está pagado: pide al administrador que lo reabra.' });
     }
@@ -258,7 +262,13 @@ export class AsistenciaCorreccionesService {
       if (items.some((x) => x.tipo === it.tipo && x.hora === it.hora)) {
         throw new BadRequestException({ codigo: 'ITEM_REPETIDO', mensaje: 'Repetiste la misma marca en la solicitud' });
       }
-      items.push({ tipo: it.tipo, hora: it.hora, momento: momento.toISOString() });
+      if (it.reemplazaMarcaId != null) {
+        const orig = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(it.reemplazaMarcaId) } });
+        if (!orig || orig.party_id !== partyId || isoDe(orig.jornada) !== dto.jornada || orig.estado === 'ANULADA') {
+          throw new BadRequestException({ codigo: 'MARCA_NO_VALIDA', mensaje: 'La marca que quieres justificar no es válida' });
+        }
+      }
+      items.push({ tipo: it.tipo, hora: it.hora, momento: momento.toISOString(), ...(it.reemplazaMarcaId != null ? { reemplazaMarcaId: it.reemplazaMarcaId } : {}) });
     }
     const pendientes = await this.prisma.asistenciaSolicitud.findMany({ where: { party_id: partyId, jornada: fechaDb(dto.jornada), estado: 'PENDIENTE' } });
     const claves = new Set(pendientes.flatMap((p) => this.itemsDe(p.items).map((i) => `${i.tipo}|${i.hora}`)));
@@ -437,6 +447,16 @@ export class AsistenciaCorreccionesService {
     const ids = await this.prisma.$transaction(async (tx) => {
       const creadas: number[] = [];
       for (const it of items) {
+        // Justificar una tardanza: la marca original deja de contar (queda en el historial con quién y por qué)
+        if (it.reemplazaMarcaId != null) {
+          const orig = await tx.asistenciaMarca.findUnique({ where: { id: BigInt(it.reemplazaMarcaId) } });
+          if (orig && orig.estado !== 'ANULADA') {
+            await tx.asistenciaMarca.update({
+              where: { id: orig.id },
+              data: { estado: 'ANULADA', revisado_por: usuario.partyId, revisado_en: ahora, revisado_motivo: `Hora cambiada a ${it.hora} (solicitud #${s.id}): ${s.motivo}` },
+            });
+          }
+        }
         const m = await tx.asistenciaMarca.create({
           data: {
             party_id: s.party_id,

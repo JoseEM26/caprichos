@@ -448,3 +448,55 @@ describe('AsistenciaService.revisarMarca', () => {
     expect(await error(svc.revisarMarca(Number(b.marcas[0].id), 'ANULAR', { motivo: 'Marca duplicada' }, admin))).toMatchObject({ codigo: 'MARCA_ANULADA' });
   });
 });
+
+describe('AsistenciaService.cambiarHoraMarca', () => {
+  const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false };
+  const ts = (iso: string) => new Date(iso);
+  // Viernes 2026-11-06, turno 14:00-23:00; entrada marcada a las 14:12 Lima (19:12Z)
+  function conEntradaTarde() {
+    const s = servicio();
+    s.b.bd.horarioTrabajo.findMany = async () => [{
+      party_id: 7n, dia_semana: 5, entrada: ts('1970-01-01T14:00:00Z'), salida: ts('1970-01-01T23:00:00Z'), almuerzo_inicio: null, almuerzo_fin: null,
+    }];
+    s.b.marcas.push({ id: 50n, party_id: 7n, jornada: ts('2026-11-06T00:00:00Z'), tipo: 'ENTRADA', origen: 'CELULAR', momento: ts('2026-11-06T19:12:00Z'), estado: 'VALIDA' });
+    s.b.marcas.push({ id: 51n, party_id: 7n, jornada: ts('2026-11-06T00:00:00Z'), tipo: 'SALIDA', origen: 'CELULAR', momento: ts('2026-11-07T04:00:00Z'), estado: 'VALIDA' });
+    return s;
+  }
+  const dia = async (svc: AsistenciaService) => (await svc.diasDePersona(7n, '2026-11-06', '2026-11-06', ts('2026-11-07T12:00:00Z'))).dias[0];
+
+  it('corregir la entrada quita la tardanza y la original ya no cuenta (queda en el historial)', async () => {
+    const { svc, b } = conEntradaTarde();
+    expect((await dia(svc)).estado).toBe('TARDANZA');
+    await svc.cambiarHoraMarca(50, { momento: '2026-11-06T19:00:00.000Z', motivo: 'Falla del sistema al marcar (GPS)' }, admin);
+    expect(b.marcas[0]).toMatchObject({ estado: 'ANULADA', revisado_por: 1n });
+    expect(b.marcas[2]).toMatchObject({ origen: 'CORRECCION', tipo: 'ENTRADA', estado: 'VALIDA', por_party_id: 1n });
+    expect(b.marcas[2].motivo).toContain('de 14:12 a 14:00');
+    const d = await dia(svc);
+    expect(d.estado).not.toBe('TARDANZA');
+    expect(d.marcas.filter((m: any) => m.tipo === 'ENTRADA')).toHaveLength(1);
+  });
+
+  it('un período pagado bloquea el cambio de hora', async () => {
+    const { svc, b } = conEntradaTarde();
+    b.periodosPagados.push({ estado: 'PAGADO' });
+    expect(await error(svc.cambiarHoraMarca(50, { momento: '2026-11-06T19:00:00.000Z', motivo: 'Falla del sistema al marcar' }, admin))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(b.marcas[0].estado).toBe('VALIDA');
+    expect(b.marcas).toHaveLength(2);
+  });
+
+  it('la hora nueva debe caer en la misma jornada y la marca anulada no se cambia', async () => {
+    const { svc } = conEntradaTarde();
+    expect(await error(svc.cambiarHoraMarca(50, { momento: '2026-11-08T19:00:00.000Z', motivo: 'Falla del sistema al marcar' }, admin))).toMatchObject({ codigo: 'JORNADA_NO_COINCIDE' });
+    await svc.cambiarHoraMarca(50, { momento: '2026-11-06T19:00:00.000Z', motivo: 'Falla del sistema al marcar' }, admin);
+    expect(await error(svc.cambiarHoraMarca(50, { momento: '2026-11-06T19:05:00.000Z', motivo: 'Falla del sistema al marcar' }, admin))).toMatchObject({ codigo: 'MARCA_ANULADA' });
+  });
+
+  it('el motivo es obligatorio (mínimo 10 caracteres) en el DTO', async () => {
+    const { validate } = await import('class-validator');
+    const { plainToInstance } = await import('class-transformer');
+    const { CambiarHoraMarcaDto } = await import('./dto/asistencia.dto');
+    const mal = await validate(plainToInstance(CambiarHoraMarcaDto, { momento: '2026-11-06T19:00:00.000Z', motivo: 'corto' }));
+    expect(mal.some((e) => e.property === 'motivo')).toBe(true);
+    expect(await validate(plainToInstance(CambiarHoraMarcaDto, { momento: '2026-11-06T19:00:00.000Z', motivo: 'Falla del sistema' }))).toHaveLength(0);
+  });
+});

@@ -124,6 +124,34 @@ describe('solicitudes de corrección: crear', () => {
   });
 });
 
+describe('justificar una tardanza (reemplaza la hora de la marca original)', () => {
+  const just = (over: Fila = {}) => ({ jornada: '2026-11-06', items: [{ tipo: 'ENTRADA' as const, hora: '09:00', reemplazaMarcaId: 1 }], motivo: 'Falla del sistema al marcar', ...over });
+
+  it('al aprobar, la entrada original queda anulada en el historial y la corrección cuenta en su lugar', async () => {
+    const { svc, marcas } = montar({ marcas: [celular(1, 9, 12)] });
+    const { id } = await svc.crearSolicitud(just(), LUIS, undefined, AHORA);
+    expect(marcas[0].estado).toBe('VALIDA'); // pedir no cambia nada
+    await svc.aprobarSolicitud(id, undefined, ADMIN, undefined, AHORA);
+    expect(marcas[0]).toMatchObject({ estado: 'ANULADA', revisado_por: 1n });
+    expect(marcas[1]).toMatchObject({ origen: 'CORRECCION', tipo: 'ENTRADA', estado: 'VALIDA' });
+    const d = (await svc.cronograma({ desde: '2026-11-06', hasta: '2026-11-06' }, AHORA)).personas[0].dias[0];
+    expect(d.marcas.filter((m) => m.rol === 'ENTRADA')).toHaveLength(1);
+    expect(d.marcas.find((m) => m.rol === 'ENTRADA')!.hora).toBe('09:00');
+  });
+
+  it('exige motivo de 10+ caracteres, una marca propia de ese día y respeta el período pagado al aprobar', async () => {
+    const { svc } = montar({ marcas: [celular(1, 9, 12)] });
+    expect(await error(svc.crearSolicitud(just({ motivo: 'corto' }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'MOTIVO_REQUERIDO' });
+    expect(await error(svc.crearSolicitud(just(), ANA, undefined, AHORA))).toMatchObject({ codigo: 'MARCA_NO_VALIDA' });
+    const pagado = montar({ marcas: [celular(1, 9, 12)] });
+    const { id } = await pagado.svc.crearSolicitud(just(), LUIS, undefined, AHORA);
+    const otro = montar({ marcas: pagado.marcas, pagado: true });
+    otro.solicitudes.push(...pagado.solicitudes);
+    expect(await error(otro.svc.aprobarSolicitud(id, undefined, ADMIN, undefined, AHORA))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(pagado.marcas[0].estado).toBe('VALIDA');
+  });
+});
+
 describe('solicitudes de corrección: cancelar', () => {
   it('la dueña cancela mientras esté pendiente; una ajena es denegada; ya cancelada no se repite', async () => {
     const { svc, solicitudes } = montar();

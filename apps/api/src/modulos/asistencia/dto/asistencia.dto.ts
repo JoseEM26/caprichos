@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsBoolean,
   IsIn,
+  IsISO8601,
   IsInt,
   IsNumber,
   IsOptional,
@@ -173,6 +174,21 @@ export class ReasignarMarcaDto {
   motivo!: string;
 }
 
+export class CambiarHoraMarcaDto {
+  @IsISO8601({}, { message: 'La hora no es válida' })
+  momento!: string;
+
+  /** Rol que la marca tiene hoy (si no viene, el de la marca original). */
+  @IsOptional()
+  @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' })
+  tipo?: TipoMarca;
+
+  @IsString()
+  @MinLength(10, { message: 'El motivo debe tener al menos 10 caracteres' })
+  @MaxLength(300)
+  motivo!: string;
+}
+
 export class ItemSolicitudDto {
   @IsIn(TIPOS_MARCA as unknown as string[], { message: 'Tipo de marca no válido' })
   tipo!: TipoMarca;
@@ -180,6 +196,10 @@ export class ItemSolicitudDto {
   /** Hora real de Lima «HH:MM». */
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'La hora debe ser HH:MM' })
   hora!: string;
+
+  /** Justificar una tardanza: id de la marca propia cuya hora se reemplaza al aprobar (la original queda anulada en el historial). */
+  @IsOptional() @IsInt()
+  reemplazaMarcaId?: number;
 }
 
 export class CrearSolicitudDto {

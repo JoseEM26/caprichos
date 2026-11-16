@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
-  AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto,
+  AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto, CambiarHoraMarcaDto,
   ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto, CalendarioDto, CalendarioFilasDto,
 } from './dto/asistencia.dto';
 import { AsistenciaCalendarioService } from './asistencia-calendario.service';
@@ -114,6 +114,13 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   reasignar(@Param('id') id: string, @Body() dto: ReasignarMarcaDto, @Req() req: any) {
     return this.asistencia.reasignarMarca(Number(id), dto, req.usuario, ipDe(req));
+  }
+
+  /** Cambiar la HORA de una marca (p. ej. falla del sistema): anula la original y crea una corrección con la hora nueva. */
+  @Post('marcas/:id/cambiar-hora')
+  @Permiso('asistencia', 'administrar')
+  cambiarHora(@Param('id') id: string, @Body() dto: CambiarHoraMarcaDto, @Req() req: any) {
+    return this.asistencia.cambiarHoraMarca(Number(id), dto, req.usuario, ipDe(req));
   }
 
   /** Cronograma por rango (máx. 31 días): por persona, horario, marcas interpretadas, tramos y solicitudes pendientes. */
