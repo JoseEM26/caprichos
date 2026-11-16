@@ -43,6 +43,18 @@ function numeroDe(key: any, data: any): string {
   return jid.endsWith('@lid') && soloDigitos(jid) ? `${soloDigitos(jid)}@lid` : '';
 }
 
+/** Mensaje con adjunto: lo que hay que recordar para bajarlo después (base64 del webhook si viene, mensaje sin base64 y clave). */
+export function extraerAdjuntoEvolution(data: any): { id: string; base64?: string; mime?: string; key: any; message: any } | null {
+  const id = String(data?.key?.id ?? '').trim();
+  if (!id || !data?.message) return null;
+  const { base64: b64Msg, ...mensaje } = data.message as Record<string, any>;
+  const m = desenvolver(mensaje);
+  const tipo = ['imageMessage', 'audioMessage', 'documentMessage', 'videoMessage', 'stickerMessage'].find((t) => m[t]);
+  if (!tipo) return null;
+  const base64 = [b64Msg, data.base64, m[tipo]?.base64].find((x) => typeof x === 'string' && x.length > 0);
+  return { id, base64, mime: baseMime(m[tipo].mimetype, 'application/octet-stream'), key: { id, remoteJid: data.key.remoteJid, fromMe: false }, message: mensaje };
+}
+
 /**
  * messages.upsert de Evolution → mensaje con la forma que ya procesa el webhook de Meta (type, text.body, image.id, ...).
  * Ignora lo propio (fromMe), los grupos, los estados y a quien no trae ni número ni LID.

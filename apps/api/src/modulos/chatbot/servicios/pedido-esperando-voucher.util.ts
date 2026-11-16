@@ -9,6 +9,22 @@ export function ultimos9(telefono: string | null | undefined): string {
   return digitos.length >= 9 ? digitos.slice(-9) : '';
 }
 
+/** Campos del pedido que necesita el voucher (semáforo, plan de pago). */
+export const SELECT_PEDIDO_VOUCHER = {
+  id: true,
+  codigo: true,
+  estado: true,
+  total: true,
+  monto_credito: true, adelanto_total: true,
+  pago_estado: true,
+  pago_metodo: true,
+  pago_preferido: true,
+  modalidad: true,
+  cliente_telefono: true,
+  creado_en: true,
+  planPago: { select: { medio: true, monto: true } },
+} as const;
+
 /**
  * Pedido al que pertenece el voucher que llega por WhatsApp. Regla explícita:
  * 1) el pedido que la conversación ya tiene marcado en VALIDAR_PAGO (flujo.pago.pedidoId), si sigue esperando pago;
@@ -20,27 +36,13 @@ export async function pedidoEsperandoVoucher(
   flujo: unknown,
   telefono: string | null | undefined,
 ) {
-  const select = {
-    id: true,
-    codigo: true,
-    estado: true,
-    total: true,
-    monto_credito: true, adelanto_total: true,
-    pago_estado: true,
-    pago_metodo: true,
-    pago_preferido: true,
-    modalidad: true,
-    cliente_telefono: true,
-    creado_en: true,
-    planPago: { select: { medio: true, monto: true } },
-  } as const;
   const noCerrado = { estado: { notIn: ['ANULADO', 'ENTREGADO'] }, pago_estado: 'PENDIENTE', es_personal: false };
 
   const marcado = (flujo as any)?.pago?.pedidoId;
   if (marcado && /^\d+$/.test(String(marcado))) {
     const pedido = await prisma.pedido.findFirst({
       where: { id: BigInt(marcado), ...noCerrado },
-      select,
+      select: SELECT_PEDIDO_VOUCHER,
     });
     if (pedido) return pedido;
   }
@@ -54,6 +56,6 @@ export async function pedidoEsperandoVoucher(
       OR: [{ pago_preferido: { in: MEDIOS_DIGITALES_VOUCHER } }, { pago_metodo: { in: MEDIOS_DIGITALES_VOUCHER } }],
     },
     orderBy: { creado_en: 'desc' },
-    select,
+    select: SELECT_PEDIDO_VOUCHER,
   });
 }

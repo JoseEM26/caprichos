@@ -38,7 +38,8 @@ import { EjecutorConversacionService } from '../conversacion/ejecutor-conversaci
 import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 import { anotarPagoEnFlujo } from './pago-para-persona.util';
-import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
+import { pedidoEsperandoVoucher, SELECT_PEDIDO_VOUCHER, ultimos9 } from './pedido-esperando-voucher.util';
+import { readFile } from 'fs/promises';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
 import { plusCodeDesdeTexto } from '@caprichos/compartido';
@@ -1378,6 +1379,25 @@ export class WhatsappWebhookService {
       };
 
       const archivoSubido = await this.archivosService.subirArchivo(fileMock, true);
+      await this.ligarVoucherGuardado(buffer, mimeType, archivoSubido.id, pedido, telMask, conversacion);
+      return String(archivoSubido.id);
+    } catch (err: any) {
+      this.logger.error(`Error guardando comprobante privado: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** Liga un archivo ya guardado como voucher del pedido: anota el pago en el chat, avisa a Caja y analiza en segundo plano. */
+  private async ligarVoucherGuardado(
+    buffer: Buffer,
+    mimeType: string,
+    archivoId: bigint | string,
+    pedido: any,
+    telMask: string,
+    conversacion?: any,
+    mensajeId?: bigint | string,
+  ): Promise<void> {
+    const archivoSubido = { id: archivoId };
 
       // Enlazar captura a la conversación y al pedido. El chat NO se toma (la captura es opcional): el bot sigue
       // atendiendo y Caja recibe el aviso de campana para revisarla sin urgencia.
@@ -1420,13 +1440,7 @@ export class WhatsappWebhookService {
       if (this.vouchersService) {
         try {
           this.vouchersService
-            .registrarDesdeWhatsapp(
-              buffer,
-              mimeType,
-              archivoSubido.id,
-              pedido,
-              conversacion,
-            )
+            .registrarDesdeWhatsapp(buffer, mimeType, archivoSubido.id, pedido, conversacion, mensajeId)
             .catch((err: any) => {
               this.logger.error(
                 `Error en segundo plano al procesar voucher para pedido ${pedido.codigo}: ${err.message}`,
@@ -1439,11 +1453,78 @@ export class WhatsappWebhookService {
         }
       }
 
-      return String(archivoSubido.id);
+  }
+
+  /**
+   * Admin: baja de Evolution el archivo de un mensaje del cliente que quedó sin adjunto (imagen, nota de voz o documento)
+   * y lo guarda en privado ligado al mensaje. Mismas validaciones de tipo y tamaño que al llegar. Nunca lanza.
+   */
+  async recuperarArchivoDeMensaje(mensajeId: bigint): Promise<{ ok: boolean; motivo?: string }> {
+    try {
+      const m = await this.prisma.mensajeChat.findUnique({ where: { id: mensajeId } });
+      if (!m || m.direccion !== 'ENTRA' || !m.meta_id || !['IMAGEN', 'AUDIO', 'DOCUMENTO'].includes(m.tipo)) {
+        return { ok: false, motivo: 'Este mensaje no tiene un archivo que recuperar' };
+      }
+      const c = (m.contenido as any) ?? {};
+      if (c.archivoId || c.audio?.archivoId || c.documento?.archivoId) return { ok: true };
+      const media = await this.evolutionApi?.descargarMedia(m.meta_id);
+      if (!media) return { ok: false, motivo: 'WhatsApp ya no tiene el archivo: pide al cliente que lo reenvíe' };
+      let nuevo: Record<string, any>;
+      if (m.tipo === 'IMAGEN') {
+        if (!TIPOS_MEDIA_PERMITIDOS.includes(media.mime) || media.buffer.length > MAX_MEDIA_BYTES) return { ok: false, motivo: 'La imagen no es válida o pesa demasiado' };
+        const sub = await this.archivosService.subirArchivo(
+          { buffer: media.buffer, size: media.buffer.length, mimetype: media.mime, originalname: `imagen-wa-${Date.now()}.jpg`, fieldname: 'file', encoding: '7bit', stream: null as any, destination: '', filename: '', path: '' } as Express.Multer.File,
+          true,
+        );
+        nuevo = { archivoId: String(sub.id) };
+      } else if (m.tipo === 'AUDIO') {
+        if (!TIPOS_AUDIO_PERMITIDOS.includes(media.mime) || media.buffer.length > MAX_AUDIO_BYTES) return { ok: false, motivo: 'El audio no es válido o pesa demasiado' };
+        const sub = await this.archivosService.subirAudio(media.buffer, media.mime);
+        nuevo = { audio: { archivoId: sub.id, mime: media.mime }, clase: 'NOTA_DE_VOZ' };
+      } else {
+        const v = validarDocumento(media.nombre || nombreSegunMime(media.mime), media.mime);
+        if (!v.ok || media.buffer.length > MAX_DOCUMENTO_BYTES || !contenidoCoincide(media.buffer, v.ext)) return { ok: false, motivo: 'El documento no es de un tipo permitido' };
+        const sub = await this.archivosService.subirDocumento(media.buffer, v.mime, v.nombre);
+        nuevo = { texto: textoDocumentoChat(v.nombre, media.buffer.length), documento: { archivoId: sub.id, nombre: v.nombre, mime: v.mime, bytes: media.buffer.length } };
+      }
+      await this.prisma.mensajeChat.update({ where: { id: m.id }, data: { contenido: { ...c, ...nuevo } as any } });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: m.conversacion_id.toString() });
+      this.logger.log(`Archivo recuperado de un mensaje (${m.tipo}, ${media.buffer.length} bytes)`);
+      return { ok: true };
     } catch (err: any) {
-      this.logger.error(`Error guardando comprobante privado: ${err.message}`);
-      return null;
+      this.logger.warn(`No se pudo recuperar el archivo de un mensaje: ${err.message}`);
+      return { ok: false, motivo: 'No se pudo recuperar el archivo' };
     }
+  }
+
+  /**
+   * Admin: una foto del chat que no se ligó sola pasa a ser voucher del pedido elegido (mismo camino que al llegar:
+   * pago en el chat, aviso a Caja, análisis y semáforo). El pedido debe ser del mismo cliente.
+   */
+  async asignarImagenComoVoucher(
+    mensajeId: bigint,
+    pedidoId: bigint,
+    usuario: any,
+    ip?: string,
+    dispositivo?: string,
+  ): Promise<{ ok: true; codigo: string }> {
+    const m = await this.prisma.mensajeChat.findUnique({ where: { id: mensajeId }, include: { conversacion: true } });
+    const archivoId = (m?.contenido as any)?.archivoId;
+    if (!m || m.tipo !== 'IMAGEN' || m.direccion !== 'ENTRA' || !archivoId) {
+      throw new BadRequestException({ codigo: 'FOTO_NO_DISPONIBLE', mensaje: 'Esta foto no está guardada: usa «Recuperar archivo» primero' });
+    }
+    const pedido = await this.prisma.pedido.findFirst({
+      where: { id: pedidoId, estado: { not: 'ANULADO' }, es_personal: false },
+      select: SELECT_PEDIDO_VOUCHER,
+    });
+    const fin = ultimos9(m.conversacion.telefono);
+    if (!pedido || (fin && ultimos9(pedido.cliente_telefono) !== fin)) {
+      throw new BadRequestException({ codigo: 'PEDIDO_NO_VALIDO', mensaje: 'Elige un pedido de este cliente' });
+    }
+    const f = await this.archivosService.obtenerArchivoPrivado(String(archivoId), usuario, ip, dispositivo);
+    const buffer = await readFile(f.rutaAbsoluta);
+    await this.ligarVoucherGuardado(buffer, f.tipoMime, String(archivoId), pedido, enmascararTelefono(m.conversacion.telefono), m.conversacion, m.id);
+    return { ok: true, codigo: pedido.codigo };
   }
 
   /**

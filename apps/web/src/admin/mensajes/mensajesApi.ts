@@ -226,3 +226,24 @@ export async function reintentarMensaje(
     {},
   );
 }
+
+export interface PedidoParaVoucher {
+  id: string;
+  codigo: string;
+  total: number;
+  estado: string;
+  pagoEstado: string;
+  fecha: string;
+}
+
+export async function recuperarArchivoMensaje(mensajeId: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/mensajes/${mensajeId}/recuperar-archivo`, {});
+}
+
+export async function listarPedidosParaVoucher(mensajeId: string): Promise<PedidoParaVoucher[]> {
+  return api.get<PedidoParaVoucher[]>(`/admin/mensajes/mensajes/${mensajeId}/pedidos-voucher`);
+}
+
+export async function asignarFotoComoVoucher(mensajeId: string, pedidoId: string): Promise<{ ok: boolean; codigo: string }> {
+  return api.post<{ ok: boolean; codigo: string }>(`/admin/mensajes/mensajes/${mensajeId}/asignar-voucher`, { pedidoId });
+}

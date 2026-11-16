@@ -191,6 +191,24 @@ export class MensajesController {
     fs.createReadStream(d.rutaAbsoluta).pipe(res);
   }
 
+  @Post('mensajes/:mensajeId/recuperar-archivo')
+  @Permiso('mensajes', 'enviar')
+  recuperarArchivo(@Param('mensajeId') mensajeId: string, @Req() req: any) {
+    return this.mensajes.recuperarArchivo(mensajeId, req.usuario, ipDe(req));
+  }
+
+  @Get('mensajes/:mensajeId/pedidos-voucher')
+  @Permiso('mensajes', 'ver')
+  pedidosParaVoucher(@Param('mensajeId') mensajeId: string) {
+    return this.mensajes.pedidosParaVoucher(mensajeId);
+  }
+
+  @Post('mensajes/:mensajeId/asignar-voucher')
+  @Permiso('mensajes', 'enviar')
+  asignarVoucher(@Param('mensajeId') mensajeId: string, @Body() cuerpo: { pedidoId?: string }, @Req() req: any) {
+    return this.mensajes.asignarVoucher(mensajeId, String(cuerpo?.pedidoId ?? ''), req.usuario, ipDe(req), req.headers?.['user-agent']);
+  }
+
   @Post('conversaciones/:id/reabrir-plantilla')
   @Permiso('mensajes', 'enviar')
   reabrirPlantilla(@Param('id') id: string, @Body() cuerpo: { forzar?: boolean } | undefined, @Req() req: any) {

@@ -6,6 +6,8 @@ import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
 import { EvolutionConfigService } from './evolution-config.service';
 import { aRespuestaDeMenu, normalizarMensajeEvolution } from './evolution-mensaje.util';
 import { MenuNumeradoStore } from './menu-numerado.store';
+import { EvolutionApiCliente } from './evolution-api.cliente';
+import { extraerAdjuntoEvolution } from './evolution-mensaje.util';
 
 export interface ResultadoEvolutionWebhook {
   evento: string;
@@ -24,6 +26,7 @@ export class EvolutionWebhookService {
     private readonly menus: MenuNumeradoStore,
     private readonly webhook: WhatsappWebhookService,
     @Optional() private readonly cola?: ColaWebhookService,
+    @Optional() private readonly api?: EvolutionApiCliente,
   ) {}
 
   /** Comparación en tiempo constante. Sin EVOLUTION_WEBHOOK_TOKEN configurado se rechaza todo (falla cerrado). */
@@ -53,6 +56,8 @@ export class EvolutionWebhookService {
     const crudo = body?.data;
     const lista: any[] = Array.isArray(crudo) ? crudo : Array.isArray(crudo?.messages) ? crudo.messages : crudo ? [crudo] : [];
     for (const data of lista) {
+      const adj = extraerAdjuntoEvolution(data);
+      if (adj) this.api?.recordarAdjunto(adj.id, adj);
       const n = normalizarMensajeEvolution(data);
       if (!n.ok) {
         res.ignorados++;

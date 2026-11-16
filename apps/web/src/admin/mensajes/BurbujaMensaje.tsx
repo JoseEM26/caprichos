@@ -2,6 +2,7 @@ import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { fechaCompletaChat } from './fechasChat';
 import { MensajeItem } from './mensajesTipos';
 import { NotaDeVoz } from './NotaDeVoz';
+import { AccionesArchivoChat } from './AccionesArchivoChat';
 import { TarjetaDocumento } from './TarjetaDocumento';
 import { TarjetaUbicacion } from './TarjetaUbicacion';
 
@@ -27,6 +28,7 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
           <FotoAmpliable archivoId={m.imagenId} alt={esCliente ? 'Foto enviada por el cliente' : 'Foto enviada al cliente'} alturaMaxima={160} />
         </div>
       )}
+      {esCliente && <AccionesArchivoChat mensaje={m} />}
       {m.audioId ? (
         <NotaDeVoz audioId={m.audioId} />
       ) : m.documento ? (

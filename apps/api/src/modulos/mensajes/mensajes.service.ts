@@ -29,6 +29,7 @@ import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { WhatsappWebhookService } from '../chatbot/servicios/whatsapp-webhook.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { StockService } from '../stock/stock.service';
 import { PuntosService } from '../clientes/puntos.service';
@@ -158,6 +159,7 @@ export class MensajesService {
     @Optional() private readonly numeros?: NumerosWhatsappService,
     @Optional() private readonly cola?: EnvioEncoladoService,
     @Optional() private readonly pedidosEstado?: PedidosEstadoService,
+    @Optional() private readonly webhook?: WhatsappWebhookService,
   ) {}
 
   /** Escribir a mano al número del negocio o a uno bloqueado no se permite: los bots se contestarían entre sí. */
@@ -644,6 +646,10 @@ export class MensajesService {
                   url: `/admin/mensajes/documentos/${m.id.toString()}`,
                 }
               : null,
+          // Mensaje del cliente cuyo archivo no se guardó (Evolution lo puede volver a dar): el admin lo recupera
+          recuperable:
+            m.direccion === 'ENTRA' && !!m.meta_id && ['IMAGEN', 'AUDIO', 'DOCUMENTO'].includes(m.tipo) &&
+            !contenido.archivoId && !contenido.audio?.archivoId && !contenido.documento?.archivoId,
           ubicacion: contenido.ubicacion ?? null,
           // el que mandó la web: con él la bandeja reemplaza su mensaje «Enviando…» por el real sin duplicarlo
           idCliente: typeof contenido.idCliente === 'string' ? contenido.idCliente : undefined,
@@ -1096,6 +1102,47 @@ export class MensajesService {
     }
     const f = await this.archivos.obtenerArchivoPrivado(String(d.archivoId), usuario, ip, dispositivo);
     return { ...f, nombre: sanearNombreDocumento(d.nombre) };
+  }
+
+  /** Admin: vuelve a pedir a WhatsApp el archivo de un mensaje del cliente que quedó sin adjunto. */
+  async recuperarArchivo(mensajeId: string, usuario: UsuarioAutenticado, ip?: string) {
+    const id = this.mensajeIdValido(mensajeId);
+    const r = (await this.webhook?.recuperarArchivoDeMensaje(id)) ?? { ok: false, motivo: 'No disponible' };
+    await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'mensajes', accion: 'RECUPERAR_ARCHIVO', entidad: 'mensaje_chat', entidadId: id, partyId: usuario.partyId, despues: { ok: r.ok }, ip });
+    if (!r.ok) throw error(HttpStatus.CONFLICT, 'ARCHIVO_NO_RECUPERADO', r.motivo ?? 'No se pudo recuperar');
+    return { ok: true };
+  }
+
+  /** Pedidos del cliente de los últimos días a los que se puede ligar una foto como voucher. */
+  async pedidosParaVoucher(mensajeId: string) {
+    const m = await this.prisma.mensajeChat.findUnique({ where: { id: this.mensajeIdValido(mensajeId) }, include: { conversacion: { select: { telefono: true } } } });
+    if (!m) throw new NotFoundException({ codigo: 'MENSAJE_NO_ENCONTRADO', mensaje: 'No se encontró el mensaje' });
+    const fin = ultimos9(m.conversacion.telefono);
+    if (!fin) return [];
+    const filas = await this.prisma.pedido.findMany({
+      where: { cliente_telefono: { endsWith: fin }, estado: { not: 'ANULADO' }, es_personal: false, creado_en: { gte: new Date(Date.now() - 10 * 86_400_000) } },
+      orderBy: { creado_en: 'desc' },
+      take: 10,
+      select: { id: true, codigo: true, total: true, estado: true, pago_estado: true, creado_en: true },
+    });
+    return filas.map((p) => ({ id: p.id.toString(), codigo: p.codigo, total: Number(p.total), estado: p.estado, pagoEstado: p.pago_estado, fecha: p.creado_en.toISOString() }));
+  }
+
+  /** Admin: una foto del chat pasa a ser voucher del pedido elegido. */
+  async asignarVoucher(mensajeId: string, pedidoId: string, usuario: UsuarioAutenticado, ip?: string, dispositivo?: string) {
+    if (!this.webhook) throw error(HttpStatus.SERVICE_UNAVAILABLE, 'NO_DISPONIBLE', 'No disponible');
+    if (!/^\d+$/.test(String(pedidoId ?? ''))) throw error(HttpStatus.BAD_REQUEST, 'PEDIDO_NO_VALIDO', 'Elige un pedido');
+    const r = await this.webhook.asignarImagenComoVoucher(this.mensajeIdValido(mensajeId), BigInt(pedidoId), usuario, ip, dispositivo);
+    await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'mensajes', accion: 'ASIGNAR_VOUCHER', entidad: 'mensaje_chat', entidadId: BigInt(mensajeId), partyId: usuario.partyId, despues: { pedidoId }, ip });
+    return r;
+  }
+
+  private mensajeIdValido(v: string): bigint {
+    try {
+      return BigInt(v);
+    } catch {
+      throw new NotFoundException({ codigo: 'MENSAJE_NO_ENCONTRADO', mensaje: 'No se encontró el mensaje' });
+    }
   }
 
   async reabrirConPlantilla(id: string, usuario: UsuarioAutenticado, ip?: string, forzar = false) {

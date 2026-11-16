@@ -31,6 +31,8 @@ export interface MensajeItem {
   /** Documento (PDF, Word...) recibido o enviado: se muestra como tarjeta con «Descargar». */
   documento?: DocumentoChat | null;
   ubicacion?: UbicacionChat | null;
+  /** Mensaje del cliente cuyo archivo no se guardó: el admin puede pedirlo de nuevo a WhatsApp. */
+  recuperable?: boolean;
   hora: string;
   /** Fecha y hora exactas (ISO) del mensaje, para los separadores de día y el title de la burbuja. */
   fecha?: string;
