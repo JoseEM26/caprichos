@@ -422,6 +422,11 @@ export class AsistenciaService {
     const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
     if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
     if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });
+    // Un período pagado queda congelado: no se aprueba, separa ni anula nada (igual que las correcciones)
+    const pagado = await this.prisma.planillaPeriodo.findFirst({
+      where: { party_id: marca.party_id, estado: 'PAGADO', desde: { lte: marca.jornada }, hasta: { gte: marca.jornada } },
+    });
+    if (pagado) throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Ese período ya está pagado. Reábrelo (con motivo) para cambiar esta marca.' });
     // «Separar» = el admin decide que una doble marca cuenta como marca propia (queda APROBADA y ya no se une a la anterior)
     if (accion === 'SEPARAR' && marca.estado !== 'VALIDA' && marca.estado !== 'A_REVISAR') {
       throw new ConflictException({ codigo: 'NO_SE_PUEDE_SEPARAR', mensaje: 'Esa marca ya está aprobada' });
