@@ -210,8 +210,11 @@ export const detallePlanilla = (partyId: number, fecha: string, excluir: string[
   api.get<DetallePlanilla>(
     `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}${incluirAnteriores.length ? `&incluirAnteriores=${incluirAnteriores.join(',')}` : ''}`,
   );
-export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string }>(`/admin/planilla/sueldo/${partyId}`);
+export interface SueldoHistorial extends SueldoPersona { /** null = desde siempre */ vigenteDesde: string | null; creadoEn: string }
+export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string; historial?: SueldoHistorial[] }>(`/admin/planilla/sueldo/${partyId}`);
 export interface DatosSueldoExtra {
+  /** Desde qué día rige el sueldo (AAAA-MM-DD); vacío = hoy. */
+  vigenteDesde?: string;
   metodo?: MetodoValorHora;
   diasMes?: number | null;
   horasDia?: number | null;

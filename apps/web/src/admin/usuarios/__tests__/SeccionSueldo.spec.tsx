@@ -48,4 +48,21 @@ describe('SeccionSueldo: sugerencia del celular de pago', () => {
     await waitFor(() => expect(m.guardar).toHaveBeenCalled());
     expect(m.guardar.mock.calls[0][3].pagoCelular).toBe('');
   });
+
+  it('muestra el historial con «Vigente desde» y manda la fecha elegida al guardar', async () => {
+    m.obtener.mockResolvedValue({
+      sueldo: { modalidad: 'MENSUAL', semanal: 346.15, mensual: 1500, metodo: 'DIAS_HORAS', diasMes: null, horasDia: null, tarifaHora: null },
+      historial: [
+        { modalidad: 'MENSUAL', semanal: 346.15, mensual: 1500, metodo: 'DIAS_HORAS', vigenteDesde: '2026-11-10', creadoEn: '2026-11-10T10:00:00Z' },
+        { modalidad: 'MENSUAL', semanal: 230.77, mensual: 1000, metodo: 'DIAS_HORAS', vigenteDesde: null, creadoEn: '2026-10-01T10:00:00Z' },
+      ],
+    });
+    render(<SeccionSueldo partyId="7" />);
+    expect(await screen.findByText(/Vigente desde 10\/11\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Desde siempre/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Vigente desde \(vacío/), { target: { value: '2026-11-05' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar sueldo' }));
+    await waitFor(() => expect(m.guardar).toHaveBeenCalled());
+    expect(m.guardar.mock.calls[0][3].vigenteDesde).toBe('2026-11-05');
+  });
 });

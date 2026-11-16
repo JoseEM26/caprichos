@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
-import { ETIQUETA_METODO, guardarSueldo, MEDIOS_PAGO, MetodoValorHora, Modalidad, obtenerSueldo, soles, sueldoEquivalente } from '../asistencia/planillaApi';
+import { ETIQUETA_METODO, guardarSueldo, MEDIOS_PAGO, MetodoValorHora, Modalidad, obtenerSueldo, SueldoHistorial, soles, sueldoEquivalente } from '../asistencia/planillaApi';
 
 const ENTRADA = { minHeight: 44, width: '100%', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' } as const;
 
@@ -17,6 +17,8 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
   const [celularGuardado, setCelularGuardado] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [vigenteDesde, setVigenteDesde] = useState('');
+  const [historial, setHistorial] = useState<SueldoHistorial[]>([]);
 
   useEffect(() => {
     let vivo = true;
@@ -24,6 +26,7 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
       .then((r) => {
         if (!vivo) return;
         setCelularGuardado(r.celularUsuario ?? '');
+        setHistorial(r.historial ?? []);
         if (!r.sueldo) return;
         setMetodo(r.sueldo.metodo ?? 'PROGRAMADAS');
         setDiasMes(r.sueldo.diasMes ? String(r.sueldo.diasMes) : '');
@@ -60,7 +63,10 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
         tarifaHora: porHora ? t : null,
         pagoCelular: pagoCelular.trim(),
         pagoMedio,
+        ...(vigenteDesde ? { vigenteDesde } : {}),
       });
+      setVigenteDesde('');
+      obtenerSueldo(Number(partyId)).then((r) => setHistorial(r.historial ?? [])).catch(() => undefined);
       setMsg({ ok: true, texto: 'Sueldo guardado.' });
     } catch (e) {
       setMsg({ ok: false, texto: (e as any)?.message || 'No se pudo guardar el sueldo.' });
@@ -145,6 +151,24 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
           </select>
         </label>
       </div>
+      <label style={{ fontSize: 12, fontWeight: 700 }}>Vigente desde (vacío = hoy)
+        <input type="date" value={vigenteDesde} max={new Date().toISOString().slice(0, 10)} disabled={deshabilitado || guardando} onChange={(e) => setVigenteDesde(e.target.value)} style={ENTRADA} />
+        <small style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>Los días anteriores se siguen pagando con el sueldo de antes.</small>
+      </label>
+      {historial.length > 1 && (
+        <div style={{ fontSize: 13 }}>
+          <strong>Historial del sueldo</strong>
+          <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+            {historial.map((h, i) => (
+              <li key={`${h.vigenteDesde ?? 'siempre'}-${i}`}>
+                {h.vigenteDesde ? `Vigente desde ${h.vigenteDesde.split('-').reverse().join('/')}` : 'Desde siempre (antes del historial)'}
+                {': '}{h.metodo === 'TARIFA_HORA' ? `${soles(h.tarifaHora ?? 0)} por hora` : `${soles(h.modalidad === 'SEMANAL' ? h.semanal : h.mensual)} ${h.modalidad === 'SEMANAL' ? 'semanal' : 'mensual'}`}
+                {i === 0 ? ' (actual)' : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <small style={{ color: 'var(--cp-soft)' }}>Semanal = mensual × 12 ÷ 52. Mensual = semanal × 52 ÷ 12.</small>
       <div>
         <Boton type="button" variante="secundario" disabled={!valido || deshabilitado || guardando} onClick={() => void guardar()}>
