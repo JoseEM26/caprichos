@@ -28,7 +28,7 @@ import { productosComboNoBot } from './flujos/pedido/combo-bot';
 import { ofertasFueraDeWhatsapp } from '../utilidades/ofertas-canal.util';
 import { ajustesPromos, lineasPromosVigentes } from './bienvenida.util';
 import { TEXTOS_RESERVA } from './textos-reserva';
-import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
+import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO, BOTONES_OFERTA_ASESOR } from './textos-ia';
 import {
   buscarOfertaParaProducto,
   generarCierreComercial,
@@ -67,7 +67,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
-import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
+import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAfirmaSinDatos, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
   motivoSalidaValidarPago,
@@ -766,6 +766,25 @@ export class EjecutorConversacionService {
    * Procesa un mensaje entrante coordinando el motor puro de conversación,
    * aplicando validaciones de estado, rate limit, idempotencia y despachando las acciones al puerto.
    */
+  private compactar(t?: string | null): string {
+    return String(t ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  /** Último texto que el bot le mandó a esta conversación (para no repetirlo). */
+  private async ultimoTextoBot(conversacionId: bigint): Promise<string> {
+    try {
+      if (typeof this.prisma.mensajeChat?.findFirst !== 'function') return '';
+      const m: any = await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo: { in: ['TEXTO', 'BOTON', 'LISTA'] } },
+        orderBy: { en: 'desc' },
+        select: { contenido: true },
+      });
+      return this.compactar(m?.contenido?.texto);
+    } catch {
+      return '';
+    }
+  }
+
   async procesarMensajeEntrante(
     conversacionId: bigint | string,
     entradaRaw: EntradaProcesarMensaje,
@@ -1829,7 +1848,21 @@ export class EjecutorConversacionService {
 
     // 9. Ejecutar las acciones devueltas por el motor
     let carruselSalio = false;
-    for (const accion of resultado.acciones) {
+    // Anti-baneo: nunca el mismo texto dos veces seguidas al mismo cliente (se cambia por la oferta de asesor)
+    let ultimoSaliente = await this.ultimoTextoBot(conversacion.id);
+    for (let accion of resultado.acciones) {
+      if (accion.tipo === 'enviarTexto' || accion.tipo === 'enviarBotones' || accion.tipo === 'enviarLista') {
+        const t = this.compactar(accion.texto);
+        if (t && t === ultimoSaliente) {
+          if (accion.tipo === 'enviarBotones' && accion.botones.some((b) => b.id === 'asesor_si')) continue;
+          accion = { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.ofertaPersona(), botones: BOTONES_OFERTA_ASESOR } as any;
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: { flujo: { ...(flujoPersistir as any), ofertaAsesor: { tipo: (flujoPersistir as any).pedido ? 'pedido' : 'menu' } } as any },
+          });
+        }
+        ultimoSaliente = this.compactar((accion as any).texto);
+      }
       if ((accion as any).soloSiCarruselSalio && !carruselSalio) continue;
       if (accion.tipo === 'enviarCarrusel') {
         let metaId: string | null = null;
@@ -2456,6 +2489,7 @@ export class EjecutorConversacionService {
         let textoRespuesta = TEXTOS_IA.errorConsulta();
         let botonesEnvio = BOTONES_IA_ESTANDAR;
         let esDerivacion = false;
+        let ofrecerAsesor = false;
         let motivoDeriv = 'CONSULTA_IA_FALLIDA';
 
         if (this.chatbotIaService) {
@@ -2483,6 +2517,13 @@ export class EjecutorConversacionService {
             textoRespuesta = resIa.respuestaTexto;
             esDerivacion = resIa.necesitaDerivar || !resIa.exito;
             motivoDeriv = resIa.motivoDerivacion || 'CONSULTA_IA_DERIVADA';
+            // La IA no inventa: precios, promos o disponibilidad sin que una herramienta los haya devuelto se descartan
+            if (!esDerivacion && iaAfirmaSinDatos(textoRespuesta, resIa.herramientasUsadas)) {
+              textoRespuesta = TEXTOS_SOLO_MENUS.sinDatoAsesor();
+              botonesEnvio = BOTONES_OFERTA_ASESOR;
+              ofrecerAsesor = true;
+              resIa.necesitaDerivar = false;
+            }
 
             // Cliente atascado (frustrado, repite o pago/delivery sin avanzar): útil + derivar, sin esperar a que lo pida
             const atascado = detectarCasoAtascado(accion.pregunta, historial);
@@ -2491,7 +2532,7 @@ export class EjecutorConversacionService {
               motivoDeriv = atascado.motivo!;
             }
 
-            if (!esDerivacion) {
+            if (!esDerivacion && !ofrecerAsesor) {
               const { productoConcreto, productosMultiples } = this.identificarProductosConsulta(
                 accion.pregunta,
                 textoRespuesta,
@@ -2648,6 +2689,12 @@ export class EjecutorConversacionService {
             meta_id: metaId,
           },
         });
+        if (ofrecerAsesor) {
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: { flujo: { ...(flujoPersistir as any), ofertaAsesor: { tipo: (flujoPersistir as any).pedido ? 'pedido' : 'menu' } } as any },
+          });
+        }
       }
     }
 

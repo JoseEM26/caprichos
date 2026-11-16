@@ -1045,6 +1045,36 @@ export const TEXTOS_SOLO_MENUS = {
     return `\nTiempo estimado: *${rango} min*.`;
   },
 
+  /** Pedido especial (torta personalizada, encargo, evento, fotos): pase directo a una persona. */
+  pedidoEspecial: (abierta: boolean, abre?: string | null): string =>
+    abierta
+      ? '¡Qué lindo antojo! 🎂💛 Eso lo coordina una persona del equipo con todo el cariño. Ya le avisé y te escribe en un momento 🥰'
+      : `¡Qué lindo antojo! 🎂💛 Eso lo coordina una persona del equipo. Lo vemos apenas abramos a las ${abre || '12:00'} 🥰`,
+
+  /** Aceptó el asesor tras la oferta. */
+  asesorAvisado: (abierta: boolean, abre?: string | null): string =>
+    abierta
+      ? 'Listo 💛 Ya avisé a una persona del equipo; te escribe en un momento por aquí 🥰'
+      : `Listo 💛 Lo vemos apenas abramos a las ${abre || '12:00'} y te escribimos por aquí 🥰`,
+
+  /** Oferta de atención personalizada (petición fuera del flujo). */
+  ofertaPersonalizada: (): string =>
+    '¡Qué buena consulta! 💛 ¿Quieres una atención más personalizada para esto? Te puedo pasar con un asesor del equipo.',
+
+  /** Oferta de asesor tras dos «no entendí» seguidos. */
+  ofertaPersona: (): string => '¿Quieres que te atienda una persona? 💛',
+
+  /** Acuse en medio de un paso del pedido: no repite la pregunta. */
+  acuseEnPedido: (): string => '¡Con gusto! 💛 Cuando quieras, elige una opción y seguimos con tu pedido 🥰',
+
+  /** Sin dato confirmado: la IA no inventa. */
+  sinDatoAsesor: (): string =>
+    'Ay, de eso no tengo el dato confirmado y no quiero inventarte nada 🙈💛 ¿Quieres que te pase con un asesor del equipo para que te ayude?',
+
+  /** Carta por categoría pedida («bebidas frías»). */
+  categoriaPedida: (nombre: string, lineas: string[], url: string, saludo: boolean): string =>
+    `${saludo ? '¡Hola! 💛 ' : ''}Estas son nuestras ${nombre.toLowerCase()}:\n${lineas.join('\n')}\n\nMira la carta completa con fotos 👉 ${url} ✨`,
+
   acuse: (): string => '¡Con mucho gusto! 🥰 Aquí estoy si necesitas algo más 💛',
 
   derivadoPorNoEntender: (): string =>
