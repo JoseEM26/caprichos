@@ -37,6 +37,7 @@ function armar() {
     { id: 2n, party_id: 7n, jornada: d('2026-11-13'), estado: 'RECHAZADA', motivo: 'Marqué tarde por el cierre', motivo_resolucion: 'No coincide con la cámara', creada_en: AHORA },
   ];
   const extras: any[] = [];
+  const turnos: any[] = [];
   const horario = (p: bigint) => ({ party_id: p, dia_semana: 5, entrada: hora('09:00'), salida: hora('18:00'), almuerzo_inicio: null, almuerzo_fin: null });
   const bd: any = {
     parametro: { findUnique: async () => null },
@@ -58,12 +59,13 @@ function armar() {
     asistenciaSolicitud: {
       findMany: async ({ where }: any) => solicitudes.filter((s) => (!where.party_id || s.party_id === where.party_id) && where.estado.in.includes(s.estado)),
     },
+    solicitudTurno: { findMany: async () => turnos },
     planillaExtraAprobada: { findMany: async ({ where }: any) => extras.filter((e) => e.party_id === where.party_id) },
   };
   const asistencia = new AsistenciaService(bd, { get: (_k: string, def: string) => def } as any);
   const correcciones = new AsistenciaCorreccionesService(bd, asistencia);
   const cal = new AsistenciaCalendarioService(bd, asistencia, correcciones);
-  return { cal, asistencia, correcciones, aprobarExtra: (p: bigint, f: string) => extras.push({ party_id: p, jornada: d(f) }), solicitudes };
+  return { cal, asistencia, correcciones, turnos, aprobarExtra: (p: bigint, f: string) => extras.push({ party_id: p, jornada: d(f) }), solicitudes };
 }
 
 describe('calendario del admin: resumen por día', () => {
@@ -119,6 +121,15 @@ describe('calendario del admin: filas', () => {
     expect(pedro.inconsistencias).toHaveLength(1);
     expect(r.totales).toEqual({ trabajadaMin: 570 + 520, tardanzaMin: 20, extraMin: 30, faltas: 1 });
     expect(r.filas.some((f) => f.partyId === '10')).toBe(false);
+  });
+
+  it('un reemplazo aprobado que no marcó queda visible como «Reemplazo no asistido»; el que sí marcó no', async () => {
+    const { cal, turnos } = armar();
+    turnos.push({ id: 5n, estado: 'SIN_MARCA', fecha: d('2026-11-06'), reemplazo_party_id: 9n, solicitante_party_id: 8n, fecha_devolucion: null });
+    const r = await cal.filas({ desde: '2026-11-06', hasta: '2026-11-06' }, AHORA);
+    expect(r.filas.find((f) => f.nombre === 'Pedro Díaz')!.inconsistencias).toContain('Reemplazo no asistido: debía cubrir un turno y no marcó.');
+    expect(r.filas.find((f) => f.nombre === 'Ana Rojas')!.inconsistencias).toEqual([]);
+    expect((await cal.resumen('2026-11-06', '2026-11-06', AHORA)).dias[0].inconsistencias).toBe(1);
   });
 
   it('filtra por nombre, estado (lista), rol y persona', async () => {

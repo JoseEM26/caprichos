@@ -108,6 +108,8 @@ export interface DiaPlanillaApi {
   breakMin?: number;
   alertas?: string[];
   extraPendiente?: boolean;
+  /** Descanso (sin horario) con entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */
+  descansoTrabajado?: boolean;
   vacacion?: boolean;
 }
 
@@ -210,8 +212,11 @@ export const detallePlanilla = (partyId: number, fecha: string, excluir: string[
   api.get<DetallePlanilla>(
     `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}${incluirAnteriores.length ? `&incluirAnteriores=${incluirAnteriores.join(',')}` : ''}`,
   );
-export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string }>(`/admin/planilla/sueldo/${partyId}`);
+export interface SueldoHistorial extends SueldoPersona { /** null = desde siempre */ vigenteDesde: string | null; creadoEn: string }
+export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string; historial?: SueldoHistorial[] }>(`/admin/planilla/sueldo/${partyId}`);
 export interface DatosSueldoExtra {
+  /** Desde qué día rige el sueldo (AAAA-MM-DD); vacío = hoy. */
+  vigenteDesde?: string;
   metodo?: MetodoValorHora;
   diasMes?: number | null;
   horasDia?: number | null;
@@ -225,8 +230,9 @@ export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { pa
   api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
-export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = []) =>
-  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds });
+/** `confirma`: «Pagar igual» (solo ADMIN, con motivo) y la confirmación de pagar sin descontar créditos anteriores. */
+export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = [], confirma: { pagarIgualMotivo?: string; sinDescontarAnteriores?: boolean } = {}) =>
+  api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds, ...confirma });
 
 // Préstamos con cuotas y descuentos recurrentes (Netflix)
 export interface CuotaPrestamoApi { id: number; numero: number; monto: number; estado: 'PENDIENTE' | 'DESCONTADA' | 'OMITIDA'; periodoDesde: string | null; periodoHasta: string | null; reprogramada: boolean }

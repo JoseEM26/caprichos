@@ -26,6 +26,7 @@ export const CATALOGO_AVISOS: TipoAviso[] = [
   { tipo: 'PEDIDO_POR_CONFIRMAR', nombre: 'Pedido por confirmar', detalle: 'Un pedido espera que alguien lo confirme.' },
   { tipo: 'PEDIDOS_SIN_PAGAR_TOPE', nombre: 'Cliente con muchos pedidos sin pagar', detalle: 'Un cliente llegó al tope de pedidos sin pagar.' },
   { tipo: 'UBICACION_PROPUESTA', nombre: 'Ubicación propuesta por el cliente', detalle: 'El cliente mandó su ubicación y Caja debe aceptarla.' },
+  { tipo: 'PEDIDO_ANULADO_IMPRESO', nombre: 'Pedido anulado ya impreso', detalle: 'Se anuló un pedido que ya imprimió sus stickers: avisar a barra y cocina.' },
   { tipo: 'ANULACION_SIN_DEVOLUCION', nombre: 'Anulación sin devolución', detalle: 'Se anuló un pedido pagado sin devolver el dinero.' },
   { tipo: 'CAJA_CERRADA_APERTURA', nombre: 'Caja cerrada con pedidos', detalle: 'Entra un pedido y la caja del día no está abierta.' },
   { tipo: 'PAGO_EFECTIVO_MOZO', nombre: 'Pago en efectivo del mozo', detalle: 'Un mozo cobró en efectivo y debe entregar el dinero.' },
@@ -80,6 +81,7 @@ const SOLO_ADMIN = ['ADMIN'];
  */
 const DESTINO_HABITUAL: Record<string, string[]> = {
   ANULACION_SIN_DEVOLUCION: CAJA,
+  PEDIDO_ANULADO_IMPRESO: CAJA,
   CAJA_CERRADA_APERTURA: CAJA,
   PAGO_EFECTIVO_MOZO: CAJA,
   PAGO_SIN_CAPTURA_MOZO: CAJA,

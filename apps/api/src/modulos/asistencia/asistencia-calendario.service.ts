@@ -67,7 +67,7 @@ export class AsistenciaCalendarioService {
     for (const j of dias) for (const p of this.asistencia.partesConActividad(ctx, j)) ids.add(p);
     if (partyId) for (const p of [...ids]) if (p !== BigInt(partyId)) ids.delete(p);
     const lista = [...ids];
-    const [rolesDe, nombres, solicitudes, feriados] = await Promise.all([
+    const [rolesDe, nombres, solicitudes, feriados, turnosSinMarca] = await Promise.all([
       this.correcciones.rolesPorPersona(lista),
       this.asistencia.cuentas(lista),
       this.prisma.asistenciaSolicitud.findMany({
@@ -75,14 +75,23 @@ export class AsistenciaCalendarioService {
         orderBy: { creada_en: 'asc' },
       }),
       this.feriadosDe(desde, hasta),
+      // Reemplazos aprobados que no se presentaron (los marca la tarea de turnos): quien debía cubrir y el día
+      this.prisma.solicitudTurno.findMany({
+        where: { estado: 'SIN_MARCA', OR: [{ fecha: { gte: fechaDb(desde), lte: fechaDb(hasta) } }, { fecha_devolucion: { gte: fechaDb(desde), lte: fechaDb(hasta) } }] },
+      }),
     ]);
+    const noAsistio = new Set<string>();
+    for (const t of turnosSinMarca) {
+      noAsistio.add(`${t.reemplazo_party_id}|${isoDe(t.fecha)}`);
+      if (t.fecha_devolucion) noAsistio.add(`${t.solicitante_party_id}|${isoDe(t.fecha_devolucion)}`);
+    }
     const solDe = new Map<string, typeof solicitudes>();
     for (const s of solicitudes) {
       const k = `${s.party_id}|${isoDe(s.jornada)}`;
       solDe.set(k, [...(solDe.get(k) ?? []), s]);
     }
     const filaPorId = new Map<number, any>(ctx.filas.map((f: any) => [Number(f.id), f]));
-    const items: Array<{ fecha: string; pid: bigint; nombre: string; roles: string[]; d: Dia; sols: typeof solicitudes; inc: string | null }> = [];
+    const items: Array<{ fecha: string; pid: bigint; nombre: string; roles: string[]; d: Dia; sols: typeof solicitudes; inc: string | null; noAsistido: boolean }> = [];
     for (const pid of lista) {
       const roles = rolesDe.get(pid) ?? [];
       if (roles.includes('ADMIN')) continue;
@@ -93,7 +102,9 @@ export class AsistenciaCalendarioService {
         if (!d.turno && d.interp.marcas.length === 0 && sols.length === 0) continue;
         const cerrada = ahora.getTime() >= cierreJornada(j, d.turno).getTime();
         const inc = cerrada ? detectarInconsistencia(d.resultado.estado, d.interp, etiquetaDia(j)) : null;
-        items.push({ fecha: j, pid, nombre, roles, d, sols, inc: inc ? inc.texto : null });
+        // Cubría un turno ajeno y no marcó: se ve claro en el calendario (solo si de verdad no tiene marcas ese día)
+        const noAsistido = noAsistio.has(`${pid}|${j}`) && d.interp.marcas.length === 0;
+        items.push({ fecha: j, pid, nombre, roles, d, sols, inc: inc ? inc.texto : null, noAsistido });
       }
     }
     return { dias, items, feriados, solicitudes, filaPorId };
@@ -106,7 +117,7 @@ export class AsistenciaCalendarioService {
       fecha: f, feriado: feriados.get(f) ?? null, programadas: 0, presentes: 0, tardanzas: 0, faltas: 0, aRevisar: 0,
       solicitudesPendientes: solicitudes.filter((s) => s.estado === 'PENDIENTE' && isoDe(s.jornada) === f).length, inconsistencias: 0,
     }]));
-    for (const { fecha, d, inc } of items) {
+    for (const { fecha, d, inc, noAsistido } of items) {
       const r = res.get(fecha)!;
       const est = d.resultado.estado;
       if (d.turno) r.programadas++;
@@ -114,7 +125,7 @@ export class AsistenciaCalendarioService {
       if (est === 'TARDANZA') r.tardanzas++;
       if (est === 'FALTA') r.faltas++;
       if (est === 'A_REVISAR' || est === 'INCOMPLETO' || est === 'SIN_SALIDA' || d.interp.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
-      if (inc) r.inconsistencias++;
+      if (inc || noAsistido) r.inconsistencias++;
     }
     return { desde, hasta, dias: [...res.values()] };
   }
@@ -168,7 +179,7 @@ export class AsistenciaCalendarioService {
       extraMin: i.d.resultado.extraMin,
       estado: i.d.resultado.estado,
       solicitudes: i.sols.map((s) => ({ id: Number(s.id), tipo: TIPO_SOLICITUD, estado: s.estado })),
-      inconsistencias: i.inc ? [i.inc] : [],
+      inconsistencias: [...(i.inc ? [i.inc] : []), ...(i.noAsistido ? ['Reemplazo no asistido: debía cubrir un turno y no marcó.'] : [])],
     }));
     return { total: filtradas.length, pagina, limite, filas, totales };
   }

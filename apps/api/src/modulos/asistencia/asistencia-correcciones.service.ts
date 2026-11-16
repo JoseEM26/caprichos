@@ -357,6 +357,8 @@ export class AsistenciaCorreccionesService {
     usuario: UsuarioAutenticado,
     ip?: string,
     ahora = new Date(),
+    /** Datos del origen del lote (persona y período en «Aprobar todas») para el registro único del lote. */
+    contexto: Record<string, unknown> = {},
   ) {
     const vistos = new Set<string>();
     const items = dto.items.filter((i) => !vistos.has(`${i.tipo}${i.id}`) && vistos.add(`${i.tipo}${i.id}`));
@@ -395,7 +397,7 @@ export class AsistenciaCorreccionesService {
       }
     }
     const ok = resultados.filter((r) => r.ok).length;
-    await this.auditar(dto.accion === 'APROBAR' ? 'APROBAR_LOTE' : 'RECHAZAR_LOTE', usuario.partyId, ip, 0n, { total: resultados.length, ok, fallidas: resultados.length - ok, resultados }, motivo || undefined);
+    await this.auditar(dto.accion === 'APROBAR' ? 'APROBAR_LOTE' : 'RECHAZAR_LOTE', usuario.partyId, ip, 0n, { ...contexto, total: resultados.length, ok, fallidas: resultados.length - ok, resultados }, motivo || undefined);
     return { total: resultados.length, ok, fallidas: resultados.length - ok, resultados };
   }
 
@@ -416,7 +418,7 @@ export class AsistenciaCorreccionesService {
       for (const s of d.solicitudes) items.push({ tipo: 'SOLICITUD', id: s.id });
     }
     if (items.length === 0) return { total: 0, ok: 0, fallidas: 0, omitidas, resultados: [] };
-    const r = await this.lote({ accion: 'APROBAR', motivo: 'Aprobada en lote desde el resumen de pago', items }, usuario, ip, ahora);
+    const r = await this.lote({ accion: 'APROBAR', motivo: 'Aprobada en lote desde el resumen de pago', items }, usuario, ip, ahora, { origen: 'APROBAR_TODAS_PERIODO', partyId, desde, hasta, omitidas });
     return { ...r, omitidas };
   }
 
@@ -477,6 +479,46 @@ export class AsistenciaCorreccionesService {
   async contarPendientes(): Promise<number> {
     return this.prisma.asistenciaSolicitud.count({ where: { estado: 'PENDIENTE' } });
   }
+
+  /**
+   * Lo que el admin tiene por revisar en asistencia (últimos 14 días, sin períodos ya pagados): marcas dudosas, jornadas
+   * «No marcó salida» o incompletas, y reemplazos por aprobar. Solo conteos, para la campanita.
+   * ponytail: se calcula al consultar (todas las personas x 14 días, con memoria de 60 s); si pesara, guardar el resultado del día.
+   */
+  async pendientesDeRevision(ahora = new Date()): Promise<{ marcasDudosas: number; sinSalida: number; incompletas: number; reemplazos: number }> {
+    if (this.cachePend && ahora.getTime() - this.cachePend.en < 60_000) return this.cachePend.valor;
+    const hoy = jornadaDe(ahora).jornada;
+    const desde = sumarDias(hoy, -14);
+    const [dudosas, reemplazos] = await Promise.all([
+      this.prisma.asistenciaMarca.findMany({ where: { estado: 'A_REVISAR', jornada: { gte: fechaDb(desde), lte: fechaDb(hoy) } }, select: { party_id: true, jornada: true }, take: 500 }),
+      this.prisma.solicitudTurno.count({ where: { estado: 'PENDIENTE_APRUEBA' } }),
+    ]);
+    const cfg = await this.asistencia.obtenerConfig();
+    const ctx = await this.asistencia.cargarContexto(desde, hoy);
+    const ids = new Set<bigint>();
+    for (let j = desde; j <= hoy; j = sumarDias(j, 1)) for (const p of this.asistencia.partesConActividad(ctx, j)) ids.add(p);
+    const lista = [...ids];
+    const [rolesDe, pagados] = await Promise.all([
+      this.rolesPorPersona(lista),
+      lista.length ? this.prisma.planillaPeriodo.findMany({ where: { party_id: { in: lista }, estado: 'PAGADO', desde: { lte: fechaDb(hoy) }, hasta: { gte: fechaDb(desde) } } }) : Promise.resolve([] as any[]),
+    ]);
+    const enPagado = (pid: bigint, j: string) => pagados.some((p: any) => p.party_id === pid && isoDe(p.desde) <= j && isoDe(p.hasta) >= j);
+    let sinSalida = 0;
+    let incompletas = 0;
+    for (const pid of lista) {
+      if ((rolesDe.get(pid) ?? []).includes('ADMIN')) continue;
+      for (let j = desde; j <= hoy; j = sumarDias(j, 1)) {
+        if (enPagado(pid, j)) continue;
+        const est = this.asistencia.evaluarDia(pid, j, ctx, ahora, cfg).resultado.estado;
+        if (est === 'SIN_SALIDA') sinSalida++;
+        else if (est === 'INCOMPLETO' || est === 'A_REVISAR') incompletas++;
+      }
+    }
+    const valor = { marcasDudosas: dudosas.filter((m) => !enPagado(m.party_id, isoDe(m.jornada))).length, sinSalida, incompletas, reemplazos };
+    this.cachePend = { en: ahora.getTime(), valor };
+    return valor;
+  }
+  private cachePend?: { en: number; valor: { marcasDudosas: number; sinSalida: number; incompletas: number; reemplazos: number } };
 
   private async auditar(nombre: string, partyId: bigint, ip: string | undefined, entidadId: bigint, despues: Record<string, unknown>, motivo?: string) {
     await this.auditoria?.registrar({

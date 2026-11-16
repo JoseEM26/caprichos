@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { jornadaActual } from '../jornada';
 
 const miInc = vi.fn();
 const misSol = vi.fn();
@@ -148,7 +149,8 @@ describe('Bandeja de solicitudes: selección múltiple y lote', () => {
 });
 
 describe('Cronograma', () => {
-  const hoy = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+  // misma jornada que usa la pantalla (hasta las 03:59 Lima sigue siendo la del día anterior)
+  const hoy = jornadaActual();
   const dia = {
     jornada: hoy, estado: 'A_REVISAR', turno: { entrada: 540, salida: 1080, almuerzoIni: 780, almuerzoFin: 840 }, alertas: ['Marcó 3 veces: falta el regreso del break'],
     trabajadaMin: 0, tardanzaMin: 0, breakMin: 0, cantidadesRaras: true, inconsistencia: null,
@@ -233,7 +235,7 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
     expect(within(fila).getByText(/09:01 Entrada/)).toHaveStyle({ textDecoration: 'line-through' });
     expect(fila).toHaveTextContent('Marcó 3 veces: falta el regreso del break');
     const feriado = screen.getByText('2026-11-06', { selector: 'td' }).closest('tr')!;
-    expect(feriado).toHaveTextContent('Feriado ×2');
+    expect(feriado).toHaveTextContent('Feriado trabajado ×2');
     expect(feriado).toHaveTextContent('pendiente de aprobar');
 
     fireEvent.click(within(banner).getByRole('button', { name: 'Aprobar todas las marcas dudosas del período' }));

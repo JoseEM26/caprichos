@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -32,6 +32,13 @@ export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as cons
 /** Lo que se descarta del pago de este período: cuotas de préstamo y descuentos recurrentes (ids) que NO se cobran. */
 /** `incluirAnteriores`: consumos de períodos anteriores que SÍ se cobran en este pago (por defecto pasan al siguiente). */
 export interface OmitirPeriodo { cuotas?: string[]; recurrentes?: string[]; incluirAnteriores?: string[] }
+/** Confirmaciones del admin al pagar, que quedan en el pago y en la auditoría. */
+export interface ConfirmacionesPago {
+  /** «Pagar igual»: motivo (mín. 10 caracteres) para pagar con jornadas pendientes. Solo ADMIN. */
+  pagarIgualMotivo?: string;
+  /** Confirmó pagar sin descontar los créditos de períodos anteriores que siguen sin cobrar. */
+  sinDescontarAnteriores?: boolean;
+}
 
 /** Sueldo y método de valor hora de la persona, tal como lo usa el cálculo. */
 export interface SueldoCalc {
@@ -52,6 +59,8 @@ const sueldoDe = (s: any): SueldoCalc => ({
   horasDia: s.horas_dia !== null && s.horas_dia !== undefined ? Number(s.horas_dia) : null,
   tarifaHora: s.tarifa_hora !== null && s.tarifa_hora !== undefined ? Number(s.tarifa_hora) : null,
 });
+/** Fecha de inicio de un sueldo que rige «desde siempre» (el de antes de llevar historial). */
+const DESDE_SIEMPRE = '1900-01-01';
 const pagoDe = (s: any) => ({ celular: (s.pago_celular as string | null) ?? null, medio: (s.pago_medio as string | null) ?? null });
 
 const fechaDb = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -94,14 +103,18 @@ export class PlanillaService {
     });
     const digitos = (c?.valor ?? '').replace(/\D/g, '');
     const celularUsuario = digitos.length >= 9 ? digitos.slice(-9) : null;
-    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null, ...(celularUsuario ? { celularUsuario } : {}) };
+    const filas = await this.prisma.sueldoVigencia.findMany({ where: { party_id: BigInt(partyId) }, orderBy: { vigente_desde: 'desc' } });
+    // Historial del sueldo: «vigenteDesde» vacío = desde siempre (el sueldo que ya tenía antes de llevar historial)
+    const historial = filas.map((f) => ({ ...sueldoDe(f), vigenteDesde: isoDe(f.vigente_desde) === DESDE_SIEMPRE ? null : isoDe(f.vigente_desde), creadoEn: f.creado_en.toISOString() }));
+    return { sueldo: s ? sueldoDe(s) : null, pago: s ? pagoDe(s) : null, historial, ...(celularUsuario ? { celularUsuario } : {}) };
   }
 
   async guardarSueldo(
     partyId: number,
-    dto: { modalidad: Modalidad; monto: number; metodo?: MetodoValorHora; diasMes?: number | null; horasDia?: number | null; tarifaHora?: number | null; pagoCelular?: string | null; pagoMedio?: string | null },
+    dto: { modalidad: Modalidad; monto: number; vigenteDesde?: string; metodo?: MetodoValorHora; diasMes?: number | null; horasDia?: number | null; tarifaHora?: number | null; pagoCelular?: string | null; pagoMedio?: string | null },
     usuario: UsuarioAutenticado,
     ip?: string,
+    ahora = new Date(),
   ) {
     const id = BigInt(partyId);
     const persona = await this.prisma.userAccount.findUnique({ where: { party_id: id } });
@@ -127,11 +140,39 @@ export class PlanillaService {
     if (celular !== undefined) opc.pago_celular = celular;
     if (dto.pagoMedio !== undefined) opc.pago_medio = dto.pagoMedio || null;
     const datos = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo, ...opc, actualizado_en: new Date(), actualizado_por: usuario.partyId };
-    await this.prisma.sueldoPersonal.upsert({ where: { party_id: id }, create: { party_id: id, ...datos }, update: datos });
+    // Sueldo con vigencia: un cambio en las cifras es una fila nueva con su fecha de inicio (hoy por defecto); no se pisa el historial.
+    const hoy = jornadaDe(ahora).jornada;
+    const desde = dto.vigenteDesde ? fechaValida(dto.vigenteDesde) : antes ? hoy : DESDE_SIEMPRE;
+    if (desde > hoy) throw new BadRequestException({ codigo: 'FECHA_FUTURA', mensaje: 'El sueldo nuevo puede regir desde hoy o desde un día pasado, no desde el futuro' });
+    const nuevo = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo,
+      dias_mes: dto.diasMes !== undefined ? dto.diasMes : antes?.dias_mes ?? null, horas_dia: dto.horasDia !== undefined ? dto.horasDia : antes?.horas_dia ?? null,
+      tarifa_hora: dto.tarifaHora !== undefined ? dto.tarifaHora : antes?.tarifa_hora ?? null };
+    const num = (x: unknown) => (x === null || x === undefined ? null : Number(x));
+    const cambioCifras = !antes || (['modalidad', 'metodo_valor_hora'] as const).some((k) => antes[k] !== nuevo[k])
+      || (['monto_semanal', 'monto_mensual', 'dias_mes', 'horas_dia', 'tarifa_hora'] as const).some((k) => num(antes[k]) !== num(nuevo[k]));
+    let esUltima = true;
+    if (cambioCifras) {
+      const pagadoDespues = antes ? await this.prisma.planillaPeriodo.findFirst({ where: { party_id: id, estado: 'PAGADO', hasta: { gte: fechaDb(desde) } } }) : null;
+      if (pagadoDespues) {
+        throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Hay un período pagado desde esa fecha. Elige una fecha posterior al último período pagado o reábrelo (con motivo).' });
+      }
+      const filas = await this.prisma.sueldoVigencia.findMany({ where: { party_id: id }, orderBy: { vigente_desde: 'asc' } });
+      // Persona con sueldo anterior al historial: primero se guarda lo que tenía «desde siempre» (para no perderlo)
+      if (antes && filas.length === 0) {
+        await this.prisma.sueldoVigencia.create({ data: { party_id: id, vigente_desde: fechaDb(DESDE_SIEMPRE), modalidad: antes.modalidad, monto_semanal: antes.monto_semanal, monto_mensual: antes.monto_mensual,
+          metodo_valor_hora: antes.metodo_valor_hora, dias_mes: antes.dias_mes, horas_dia: antes.horas_dia, tarifa_hora: antes.tarifa_hora, creado_por: antes.actualizado_por } });
+      }
+      esUltima = !filas.length || filas.every((f) => isoDe(f.vigente_desde) <= desde);
+      const fila = { ...nuevo, creado_en: new Date(), creado_por: usuario.partyId };
+      await this.prisma.sueldoVigencia.upsert({ where: { party_id_vigente_desde: { party_id: id, vigente_desde: fechaDb(desde) } }, create: { party_id: id, vigente_desde: fechaDb(desde), ...fila }, update: fila });
+    }
+    // sueldo_personal = el sueldo de hoy: solo cambian sus cifras si la fila nueva es la más reciente
+    const soloPago = { ...(celular !== undefined ? { pago_celular: celular } : {}), ...(dto.pagoMedio !== undefined ? { pago_medio: dto.pagoMedio || null } : {}) };
+    await this.prisma.sueldoPersonal.upsert({ where: { party_id: id }, create: { party_id: id, ...datos }, update: esUltima ? datos : soloPago });
     // El celular es dato personal: la auditoría solo dice si cambió, nunca su valor.
     await this.auditar('CAMBIO', 'GUARDAR_SUELDO', usuario, ip, 'party', id, {
       antes: antes ? { modalidad: antes.modalidad, semanal: Number(antes.monto_semanal), mensual: Number(antes.monto_mensual), metodo: sueldoDe(antes).metodo } : null,
-      despues: { modalidad: dto.modalidad, ...eq, metodo, tarifaHora: dto.tarifaHora ?? null, diasMes: dto.diasMes ?? null, horasDia: dto.horasDia ?? null, pagoMedio: dto.pagoMedio ?? null, cambioCelular: celular !== undefined },
+      despues: { modalidad: dto.modalidad, ...eq, metodo, vigenteDesde: cambioCifras ? desde : null, tarifaHora: dto.tarifaHora ?? null, diasMes: dto.diasMes ?? null, horasDia: dto.horasDia ?? null, pagoMedio: dto.pagoMedio ?? null, cambioCelular: celular !== undefined },
     });
     return { partyId, modalidad: dto.modalidad, ...eq, metodo };
   }
@@ -355,6 +396,16 @@ export class PlanillaService {
       tarifaHora: sueldo.tarifaHora ?? 0,
     };
     const vhFijo = valorHoraPersona(parametros);
+    // Sueldo con vigencia: cada día se paga con el valor hora del sueldo vigente ese día (solo si hubo cambios de sueldo).
+    const vigencias = await this.prisma.sueldoVigencia.findMany({ where: { party_id: id }, orderBy: { vigente_desde: 'asc' } });
+    if (vigencias.length > 1) {
+      for (const d of diasCalc) {
+        const fila = [...vigencias].reverse().find((v) => isoDe(v.vigente_desde) <= d.jornada) ?? vigencias[0];
+        const sd = sueldoDe(fila);
+        const vh = valorHoraPersona({ metodo: sd.metodo, sueldoMensual: sd.mensual, diasMes: sd.diasMes ?? cfg.diasMesDefecto ?? DIAS_MES_DEFECTO, horasDia: sd.horasDia ?? cfg.horasDiaDefecto ?? HORAS_DIA_DEFECTO, tarifaHora: sd.tarifaHora ?? 0 });
+        if (vh !== null) d.valorHora = vh;
+      }
+    }
     const multExtra = sueldo.metodo === 'PROGRAMADAS' ? 1 : cfg.multiplicadorExtra ?? MULTIPLICADOR_EXTRA_DEFECTO;
     // Penalidad por tardanza: factor % del valor del tiempo no pagado. Contrato temporal (sin subordinación): sin penalidad
     // (el tiempo tarde igual no se paga, porque solo se pagan las horas trabajadas).
@@ -415,6 +466,8 @@ export class PlanillaService {
       vacacionesPagadas: vacPagadas.map((v) => Number(v.monto ?? 0)),
     });
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
+    // Pendiente = jornada que bloquea el pago. Un descanso trabajado que el admin ya aprobó deja de bloquear.
+    const diasPendientes = diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado) && !(d.descansoTrabajado && porDia.has(d.jornada)));
     const crudo = new Map(dias.map((d) => [d.jornada, d]));
     return {
       partyId: Number(id),
@@ -445,9 +498,9 @@ export class PlanillaService {
       },
       cuotas,
       recurrentes,
-      pendientes: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).length,
+      pendientes: diasPendientes.length,
       /** Jornadas que bloquean «Marcar pagado» (para el banner y su enlace al día). */
-      jornadasPorRevisar: diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado)).map((d) => d.jornada),
+      jornadasPorRevisar: diasPendientes.map((d) => d.jornada),
       vacaciones: {
         diasTomados: diasCalc.filter((d) => d.estado === 'VACACIONES').length,
         pagadas: vacPagadas.map((v) => ({ id: Number(v.id), fecha: isoDe(v.fecha_desde), dias: Number(v.dias), monto: Number(v.monto ?? 0) })),
@@ -496,18 +549,27 @@ export class PlanillaService {
   // ---------------------------------------------------------------------------
 
   /** Marca el período como pagado: congela las cifras y deja los consumos cobrados como PLANILLA (sin mover caja). */
-  async pagar(partyId: number, fecha: string, excluirConsumoIds: string[], usuario: UsuarioAutenticado, ip?: string, ahora = new Date(), omitir: OmitirPeriodo = {}) {
+  async pagar(partyId: number, fecha: string, excluirConsumoIds: string[], usuario: UsuarioAutenticado, ip?: string, ahora = new Date(), omitir: OmitirPeriodo = {}, confirma: ConfirmacionesPago = {}) {
     const id = BigInt(partyId);
     const d = await this.detalle(partyId, fecha, excluirConsumoIds, ahora, omitir);
     if (d.estado === 'PAGADO') throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Ese período ya está pagado' });
-    if (d.pendientes > 0) {
+    let pagarIgual: { motivo: string; jornadas: string[] } | null = null;
+    if (d.pendientes > 0 && confirma.pagarIgualMotivo !== undefined) {
+      if (![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+        throw new ForbiddenException({ codigo: 'SOLO_ADMIN_PAGA_IGUAL', mensaje: 'Solo el administrador puede pagar con jornadas pendientes.' });
+      }
+      pagarIgual = { motivo: motivoValido(confirma.pagarIgualMotivo, 10), jornadas: d.jornadasPorRevisar ?? [] };
+    }
+    if (d.pendientes > 0 && !pagarIgual) {
       throw new ConflictException({
         codigo: 'JORNADAS_PENDIENTES',
         mensaje: `Hay ${d.pendientes} jornada(s) incompletas o por revisar. Corrígelas en Asistencia antes de pagar.`,
       });
     }
     const aCobrar: string[] = d.consumos.filter((c: any) => c.cobrar).map((c: any) => c.id);
-    const detalle = { ...d, consumosCobradosIds: aCobrar, pagadoPor: Number(usuario.partyId) };
+    // Lo que el admin confirmó queda en el pago congelado y en la auditoría
+    const sinDescontar = confirma.sinDescontarAnteriores && d.consumosAnterioresPendiente > 0 ? { monto: d.consumosAnterioresPendiente } : null;
+    const detalle = { ...d, consumosCobradosIds: aCobrar, pagadoPor: Number(usuario.partyId), ...(pagarIgual ? { pagarIgual } : {}), ...(sinDescontar ? { sinDescontarAnteriores: sinDescontar } : {}) };
     const motivo = `Planilla ${d.periodo.desde} a ${d.periodo.hasta}`;
     const periodoId = await this.prisma.$transaction(async (tx) => {
       const fila = await tx.planillaPeriodo.create({
@@ -531,7 +593,7 @@ export class PlanillaService {
           throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Alguno de los consumos ya estaba cobrado. Vuelve a abrir la planilla.' });
         }
       }
-      await this.auditar('CAMBIO', 'PAGAR_PLANILLA', usuario, ip, 'planilla_periodo', fila.id, { periodo: d.periodo, resultado: d.resultado, consumos: aCobrar, cuotas: (d.cuotas ?? []).map((c: any) => ({ id: c.id, cobrar: c.cobrar })) }, undefined, tx);
+      await this.auditar('CAMBIO', 'PAGAR_PLANILLA', usuario, ip, 'planilla_periodo', fila.id, { periodo: d.periodo, resultado: d.resultado, consumos: aCobrar, cuotas: (d.cuotas ?? []).map((c: any) => ({ id: c.id, cobrar: c.cobrar })), ...(pagarIgual ? { pagarIgual: { jornadasPendientes: pagarIgual.jornadas } } : {}), ...(sinDescontar ? { sinDescontarAnteriores: sinDescontar.monto } : {}) }, pagarIgual?.motivo, tx);
       return fila.id;
     });
     return { ok: true, periodoId: Number(periodoId), neto: d.resultado.neto };

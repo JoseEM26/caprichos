@@ -12,6 +12,7 @@ export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   PEDIDOS_SIN_PAGAR_TOPE: ['caja/ver', 'pedidos/ver'],
   UBICACION_PROPUESTA: ['caja/ver', 'pedidos/ver'],
   ANULACION_SIN_DEVOLUCION: ['caja/ver'],
+  PEDIDO_ANULADO_IMPRESO: ['caja/ver', 'pedidos/ver', 'cocina/ver'],
   CAJA_CERRADA_APERTURA: ['caja/ver'],
   PAGO_EFECTIVO_MOZO: ['caja/ver'],
   PAGO_SIN_CAPTURA_MOZO: ['caja/ver', 'vouchers/ver'],

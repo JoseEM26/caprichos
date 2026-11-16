@@ -50,6 +50,9 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
   const [resaltar, setResaltar] = useState<string | null>(null);
   // el admin confirma pagar sin descontar los créditos de días anteriores sin cerrar
   const [sinDescontarAnt, setSinDescontarAnt] = useState(false);
+  // «Pagar igual» (solo administrador): motivo ya confirmado (null = no se usa) y borrador mientras se escribe
+  const [pagarIgual, setPagarIgual] = useState<string | null>(null);
+  const [borradorIgual, setBorradorIgual] = useState<string | null>(null);
   const [confirmaSimples, setConfirmaSimples] = useState(false);
   const [resSimples, setResSimples] = useState<ResultadoLote | null>(null);
 
@@ -158,7 +161,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
       ))}
     </ul>
   );
-  const faltan = !pagado && d ? Math.max(porRevisar.length, d.pendientes) : 0;
+  const faltan = !pagado && d && pagarIgual === null ? Math.max(porRevisar.length, d.pendientes) : 0;
   const antSinCobrar = !pagado && d ? d.consumos.filter((c) => c.anterior && !c.cobrar) : [];
   const antTotal = antSinCobrar.reduce((a, c) => a + c.monto, 0);
   const faltaCredito = antSinCobrar.length > 0 && !sinDescontarAnt;
@@ -176,6 +179,28 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
             <small style={{ display: 'block' }}>Solo las simples (marcas manuales y solicitudes pendientes). Las jornadas con cantidades raras de marcas se corrigen una por una en «Calendario».</small>
           </div>
         </div>
+      )}
+      {!pagado && pagarIgual !== null && (
+        <div role="status" className="as-aviso as-aviso--alerta" data-testid="aviso-pagar-igual">
+          Se pagará igual con jornadas pendientes. Motivo: {pagarIgual}{' '}
+          <button type="button" className="as-enlace" style={{ background: 'none', border: 0, cursor: 'pointer', minHeight: 32 }} onClick={() => setPagarIgual(null)}>Quitar</button>
+        </div>
+      )}
+      {!pagado && pagarIgual === null && (d.pendientes > 0 || porRevisar.length > 0) && (
+        borradorIgual === null
+          ? <div><Boton type="button" variante="texto" onClick={() => setBorradorIgual('')}>Pagar igual (solo administrador)</Boton></div>
+          : (
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label className="as-campo">Motivo para pagar con jornadas pendientes (mínimo 10 caracteres)
+                <input value={borradorIgual} onChange={(e) => setBorradorIgual(e.target.value)} maxLength={300} />
+              </label>
+              <small className="as-nota">Queda guardado en el pago y en la auditoría. Las jornadas pendientes se pagan como están (sin horas).</small>
+              <div className="as-acciones">
+                <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setBorradorIgual(null)}>Cancelar</Boton>
+                <Boton type="button" tamano="pequeno" disabled={borradorIgual.trim().length < 10} onClick={() => { setPagarIgual(borradorIgual.trim()); setBorradorIgual(null); }}>Dejar avanzar</Boton>
+              </div>
+            </div>
+          )
       )}
       {resSimples && (
         <div role="status" className={`as-aviso ${resSimples.fallidas ? 'as-aviso--alerta' : 'as-aviso--ok'}`}>
@@ -207,7 +232,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
             <tbody>
               {d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0 || (x.marcas ?? []).length > 0).map((x) => (
                 <tr key={x.jornada} id={`dia-${x.jornada}`} style={resaltar === x.jornada ? { outline: '3px solid var(--cp-gold)' } : undefined}>
-                  <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">Feriado ×{x.recargo}</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}</td>
+                  <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">{x.trabajadaMin > 0 ? 'Feriado trabajado' : 'Feriado'} ×{x.recargo}</Insignia></> : null}{x.descansoTrabajado ? <> <Insignia variante="aviso">Descanso trabajado</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}</td>
                   <td data-label="Horario" className="as-num">{x.horario ? `${x.horario.entrada}–${x.horario.salida}` : '—'}</td>
                   <td data-label="Marcas">
                     {(x.marcas ?? []).length === 0 ? '—' : (x.marcas ?? []).map((m, i) => (
@@ -228,9 +253,9 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
                   <td data-label="Aprobar extra">
                     {x.extraMin > 0 ? (
                       <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
-                        <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={`Aprobar las horas extra del ${x.jornada}`}
+                        <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={x.descansoTrabajado ? `Aprobar el descanso trabajado del ${x.jornada}` : `Aprobar las horas extra del ${x.jornada}`}
                           onChange={(e) => void ejecutar(() => aprobarExtra(d.partyId, x.jornada, e.target.checked), e.target.checked ? 'Horas extra aprobadas.' : 'Aprobación de horas extra quitada.')} />
-                        {x.extraAprobada ? 'Aprobada' : 'Sin aprobar'}
+                        {x.extraAprobada ? 'Aprobada' : x.descansoTrabajado ? 'Aprobar descanso trabajado' : 'Sin aprobar'}
                       </label>
                     ) : '—'}
                   </td>
@@ -403,7 +428,7 @@ export function PlanillaDetalle({ fila, fecha, alCerrar, onError, onOk }: { fila
         textoSi="Sí, marcar pagado"
         textoNo="No"
         cargando={ocupado}
-        alConfirmar={() => void ejecutar(async () => { await pagarPlanilla(d!.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); }, 'Período marcado como pagado.')}
+        alConfirmar={() => void ejecutar(async () => { await pagarPlanilla(d!.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt, { ...(pagarIgual !== null ? { pagarIgualMotivo: pagarIgual } : {}), ...(sinDescontarAnt && antSinCobrar.length > 0 ? { sinDescontarAnteriores: true } : {}) }); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); }, 'Período marcado como pagado.')}
         alCancelar={() => setConfirmaPago(false)}
       />
       <Confirmar

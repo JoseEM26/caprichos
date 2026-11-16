@@ -91,7 +91,7 @@ export class PlanillaController {
       cuotas: dto.omitirCuotaIds ?? [],
       recurrentes: dto.omitirRecurrenteIds ?? [],
       incluirAnteriores: dto.incluirConsumoIds ?? [],
-    });
+    }, { pagarIgualMotivo: dto.pagarIgualMotivo, sinDescontarAnteriores: dto.sinDescontarAnteriores });
   }
 
   @Post('periodos/:id/reabrir')

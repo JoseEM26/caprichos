@@ -26,6 +26,7 @@ type Fila = Record<string, any>;
 function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo?: string | null; consentimiento?: boolean; cuenta?: Fila } = {}) {
   const marcas: Fila[] = [];
   const selfies: Fila[] = [];
+  const periodosPagados: Fila[] = [];
   let dispositivo: Fila | null = opts.dispositivo === undefined || opts.dispositivo === null
     ? null
     : { party_id: 7n, huella_hash: opts.dispositivo };
@@ -87,6 +88,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
       findUnique: async ({ where }: any) => selfies.find((s) => s.marca_id === where.marca_id) ?? null,
       deleteMany: async () => ({ count: 0 }),
     },
+    planillaPeriodo: { findFirst: async () => periodosPagados[0] ?? null },
     horarioTrabajo: { findMany: async () => [] },
     coberturaTurno: { findMany: async () => [] },
     reemplazoDia: { findMany: async () => [] },
@@ -94,7 +96,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
     party: { findUnique: async () => ({ id: 7n }) },
     $transaction: async (cb: (tx: any) => Promise<unknown>) => cb(bd),
   };
-  return { bd, marcas, selfies, get dispositivo() { return dispositivo; }, get consentimiento() { return consentimiento; }, get upserts() { return upserts; } };
+  return { bd, marcas, selfies, periodosPagados, get dispositivo() { return dispositivo; }, get consentimiento() { return consentimiento; }, get upserts() { return upserts; } };
 }
 
 function servicio(opts?: Parameters<typeof bdFalsa>[0]) {
@@ -418,6 +420,15 @@ describe('AsistenciaService.marcar manual (solo GPS, sin QR ni selfie)', () => {
 
 describe('AsistenciaService.revisarMarca', () => {
   const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false };
+
+  it('no aprueba ni anula marcas de un período ya pagado', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
+    b.periodosPagados.push({ estado: 'PAGADO' });
+    expect(await error(svc.revisarMarca(Number(b.marcas[0].id), 'APROBAR', { motivo: 'Estaba en el local' }, admin))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(await error(svc.revisarMarca(Number(b.marcas[0].id), 'ANULAR', { motivo: 'Marcó por error' }, admin))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(b.marcas[0].estado).toBe('A_REVISAR');
+  });
 
   it('aprobar una marca MANUAL la deja APROBADA con quién y por qué; la fila se conserva', async () => {
     const { svc, b } = servicio();

@@ -188,6 +188,15 @@ describe('NotificacionesService', () => {
       expect(correcciones.contarPendientes).not.toHaveBeenCalled(); // no es admin
     });
 
+    it('el ADMIN recibe un aviso con enlace cuando hay marcas dudosas, «No marcó salida» o reemplazos por aprobar; sin pendientes, ninguno', async () => {
+      const correcciones = { inconsistencias: jest.fn(), contarPendientes: jest.fn().mockResolvedValue(0), pendientesDeRevision: jest.fn().mockResolvedValue({ marcasDudosas: 2, sinSalida: 1, incompletas: 0, reemplazos: 1 }) };
+      const svc = conAsistencia(correcciones);
+      const aviso = (await svc.resumen(ADMIN)).notificaciones.find((n) => n.clave.startsWith('c:asistencia-por-revisar:'));
+      expect(aviso).toMatchObject({ titulo: 'Asistencia por revisar: 2 marcas dudosas, 1 jornada «No marcó salida», 1 reemplazo por aprobar', ruta: '/admin/asistencia?pestana=calendario' });
+      correcciones.pendientesDeRevision.mockResolvedValue({ marcasDudosas: 0, sinSalida: 0, incompletas: 0, reemplazos: 0 });
+      expect((await svc.resumen(ADMIN)).notificaciones.some((n) => n.clave.startsWith('c:asistencia-por-revisar:'))).toBe(false);
+    });
+
     it('sin inconsistencias no hay aviso; el ADMIN no recibe el de la persona y sí el contador de solicitudes', async () => {
       const correcciones = { inconsistencias: jest.fn().mockResolvedValue([]), contarPendientes: jest.fn().mockResolvedValue(2) };
       const svc = conAsistencia(correcciones);

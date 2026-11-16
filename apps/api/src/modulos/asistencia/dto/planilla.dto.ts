@@ -7,6 +7,8 @@ export class SueldoDto {
   @IsIn(['SEMANAL', 'MENSUAL']) modalidad!: 'SEMANAL' | 'MENSUAL';
   /** Monto de la modalidad elegida; el otro se calcula (semanal = mensual×12/52). */
   @Type(() => Number) @IsNumber() @Min(0) @Max(1_000_000) monto!: number;
+  /** Desde qué día rige el cambio (hoy por defecto; no puede ser futuro). El historial se conserva. */
+  @IsOptional() @Matches(FECHA) vigenteDesde?: string;
   /** Método del valor hora (defecto en persona nueva: DIAS_HORAS). */
   @IsOptional() @IsIn(['DIAS_HORAS', 'TARIFA_HORA', 'PROGRAMADAS']) metodo?: 'DIAS_HORAS' | 'TARIFA_HORA' | 'PROGRAMADAS';
   /** DIAS_HORAS: días del mes (defecto 24) y horas por día (defecto 9) de ESTA persona; null = el defecto general. */
@@ -42,6 +44,10 @@ export class PagarPlanillaDto {
   @IsOptional() @IsString({ each: true }) omitirRecurrenteIds?: string[];
   /** Consumos de períodos anteriores que SÍ se cobran en este pago. */
   @IsOptional() @IsString({ each: true }) incluirConsumoIds?: string[];
+  /** «Pagar igual» (solo ADMIN): motivo, mínimo 10 caracteres, para pagar con jornadas pendientes. */
+  @IsOptional() @IsString() @MaxLength(300) pagarIgualMotivo?: string;
+  /** Confirmó pagar sin descontar los créditos de períodos anteriores sin cobrar. */
+  @IsOptional() @IsBoolean() sinDescontarAnteriores?: boolean;
 }
 
 export class ReabrirPlanillaDto {
