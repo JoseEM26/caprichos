@@ -257,3 +257,26 @@ describe('penalidad por tardanza (valor del tiempo no pagado × factor)', () => 
     expect(r.neto).toBe(80 - 3 - 10 - 5);
   });
 });
+
+describe('turno que cruza la medianoche (22:00-06:00) en planilla semanal', () => {
+  const t = turnoDe(1320, 360); // salida = 06:00 del día siguiente
+  const marcas = (e: number, s: number) => [{ tipo: 'ENTRADA', minutos: e, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: s, estado: 'VALIDA' }] as any;
+
+  it('la jornada se paga completa (8 h) y se asigna a la fecha en que empezó el turno', () => {
+    const d = calcularDiaPlanilla({ jornada: '2026-11-13', estado: 'CUMPLIO', turno: t, marcas: marcas(1320, 1800) }, 5);
+    expect(d).toMatchObject({ jornada: '2026-11-13', programadaMin: 480, trabajadaMin: 480, tardanzaMin: 0, extraMin: 0 });
+  });
+
+  it('tardanza y salida anticipada también se miden pasada la medianoche', () => {
+    const d = calcularDiaPlanilla({ jornada: '2026-11-13', estado: 'TARDANZA', turno: t, marcas: marcas(1340, 1790) }, 5);
+    expect(d.tardanzaMin).toBe(20);
+    expect(d.trabajadaMin).toBe(450);
+  });
+
+  it('una semana con 5 noches de 8 h suma 40 h en la planilla', () => {
+    const dias = ['09', '10', '11', '12', '13'].map((n) => calcularDiaPlanilla({ jornada: `2026-11-${n}`, estado: 'CUMPLIO', turno: t, marcas: marcas(1320, 1800) }, 5));
+    const r = calcularPlanilla({ ...base, modalidad: 'SEMANAL', sueldoPeriodo: 400, dias });
+    expect(r.trabajadaMin).toBe(2400);
+    expect(r.ganado).toBe(400);
+  });
+});

@@ -528,6 +528,7 @@ export class NotificacionesService {
       ].filter(Boolean);
       const total = p.marcasDudosas + p.sinSalida + p.incompletas + p.reemplazos;
       if (total) {
+        conteos.asistencia = (conteos.asistencia ?? 0) + total;
         calculadas.push({
           id: 'asistencia-por-revisar',
           clave: claveCalculada('asistencia-por-revisar', [p.marcasDudosas, p.sinSalida, p.incompletas, p.reemplazos]),
