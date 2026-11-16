@@ -72,7 +72,7 @@ describe('calcularDiaPlanilla (turno 13:30-22:30 con break 30 min PAGADO, tolera
     expect(r.trabajadaMin).toBe(540);
   });
   it('falta, incompleto o por revisar no pagan', () => {
-    for (const estado of ['FALTA', 'INCOMPLETO', 'A_REVISAR', 'SIN_EVALUAR'] as const) {
+    for (const estado of ['FALTA', 'INCOMPLETO', 'SIN_SALIDA', 'A_REVISAR', 'SIN_EVALUAR', 'POR_EMPEZAR', 'SIN_MARCAR_ENTRADA'] as const) {
       expect(calcularDiaPlanilla({ jornada: 'x', estado, turno, marcas: completo(810, 1350) }, 5).trabajadaMin).toBe(0);
     }
   });

@@ -26,7 +26,7 @@ const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'juli
 const DIAS_CORTOS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
   CUMPLIO: 'exito', TARDANZA: 'aviso', SALIO_ANTES: 'aviso', SALIO_DESPUES: 'neutro',
-  FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro',
+  FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro', POR_EMPEZAR: 'neutro', SIN_MARCAR_ENTRADA: 'aviso', SIN_SALIDA: 'peligro',
 };
 const ETIQUETA_ORIGEN: Record<string, string> = { CELULAR: 'QR en el celular', WEB: 'Usuario y contraseña', CORRECCION: 'Corrección del admin' };
 
@@ -52,7 +52,7 @@ function resumenDe(personas: CronoPersona[], jornada: string) {
     r.total++;
     if (['CUMPLIO', 'SALIO_ANTES', 'SALIO_DESPUES'].includes(d.estado)) r.cumplieron++;
     if (d.estado === 'TARDANZA') r.tardanzas++;
-    if (['A_REVISAR', 'INCOMPLETO'].includes(d.estado) || d.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
+    if (['A_REVISAR', 'INCOMPLETO', 'SIN_SALIDA'].includes(d.estado) || d.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
     if (d.estado === 'FALTA') r.faltas++;
   }
   return r;

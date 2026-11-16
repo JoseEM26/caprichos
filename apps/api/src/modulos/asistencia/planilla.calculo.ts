@@ -70,7 +70,7 @@ export function periodoDe(modalidad: Modalidad, fecha: string): { desde: string;
 /** Estados con los que la jornada se puede pagar tal cual. */
 const PAGABLES: readonly EstadoJornada[] = ['CUMPLIO', 'TARDANZA', 'SALIO_ANTES', 'SALIO_DESPUES'];
 /** Estados que impiden marcar el período como pagado hasta que el admin los corrija. */
-export const ESTADOS_PENDIENTES: readonly EstadoJornada[] = ['INCOMPLETO', 'A_REVISAR'];
+export const ESTADOS_PENDIENTES: readonly EstadoJornada[] = ['INCOMPLETO', 'SIN_SALIDA', 'A_REVISAR'];
 
 export interface DiaEntrada {
   jornada: string;

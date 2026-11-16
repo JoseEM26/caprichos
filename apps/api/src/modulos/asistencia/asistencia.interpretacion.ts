@@ -198,7 +198,7 @@ const ETIQUETA_FALTA: Record<TipoMarca, string> = {
 /** Qué inconsistencia tiene una jornada ya cerrada, a partir de su estado e interpretación; null si está bien. */
 export function detectarInconsistencia(estado: string, i: Interpretacion, quien: string): Inconsistencia | null {
   if (estado === 'FALTA') return { tipo: 'SIN_MARCAS', texto: `${quien}: tenías horario pero no hay marcas. ¿Te olvidaste de marcar?`, falta: 'ENTRADA' };
-  if (estado !== 'INCOMPLETO' && estado !== 'A_REVISAR') return null;
+  if (estado !== 'INCOMPLETO' && estado !== 'SIN_SALIDA' && estado !== 'A_REVISAR') return null;
   // Marcas bien ordenadas pero a la espera del admin (p. ej. marca web): no es culpa de la persona
   if (i.estado !== 'A_REVISAR' && i.estado !== 'INCOMPLETO') return null;
   const f = i.faltan[0] ?? null;

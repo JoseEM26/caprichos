@@ -9,6 +9,7 @@ import {
   turnoDe,
   TipoMarca,
 } from './asistencia.calculo';
+import { ESTADOS_PENDIENTES } from './planilla.calculo';
 
 const m = (h: number, min = 0) => h * 60 + min;
 const JORNADA = '2026-11-06'; // viernes
@@ -75,8 +76,9 @@ describe('calcularJornada (cumplimiento)', () => {
     expect(calcularJornada({ ...base, marcas: [] }).estado).toBe('FALTA');
   });
 
-  it('SIN_EVALUAR: sin marcas y el día todavía no cierra', () => {
-    expect(calcularJornada({ ...base, ahora: ahoraDuranteDia, marcas: [] }).estado).toBe('SIN_EVALUAR');
+  it('sin marcas: POR_EMPEZAR antes de la entrada y SIN_MARCAR_ENTRADA pasada la tolerancia, sin cerrar', () => {
+    expect(calcularJornada({ ...base, ahora: T(8, 0), marcas: [] }).estado).toBe('POR_EMPEZAR');
+    expect(calcularJornada({ ...base, ahora: ahoraDuranteDia, marcas: [] }).estado).toBe('SIN_MARCAR_ENTRADA');
   });
 
   it('DESCANSO si no tiene turno y no marcó', () => {
@@ -89,9 +91,9 @@ describe('calcularJornada (cumplimiento)', () => {
     expect(calcularJornada({ ...base, turno: null, marcas: [marca('ENTRADA', m(10))] }).estado).toBe('A_REVISAR');
   });
 
-  it('INCOMPLETO si falta la salida y el día ya cerró; SIN_EVALUAR si aún no cierra', () => {
+  it('SIN_SALIDA si falta la salida y el día ya cerró; SIN_EVALUAR (en curso) si aún no cierra', () => {
     const marcas = [marca('ENTRADA', m(9))];
-    expect(calcularJornada({ ...base, marcas }).estado).toBe('INCOMPLETO');
+    expect(calcularJornada({ ...base, marcas }).estado).toBe('SIN_SALIDA');
     expect(calcularJornada({ ...base, ahora: ahoraDuranteDia, marcas }).estado).toBe('SIN_EVALUAR');
   });
 
@@ -177,5 +179,38 @@ describe('orden de marcas', () => {
     expect(marcaPendiente(set('ENTRADA'))).toBe('SALIDA');
     expect(marcasPermitidas(set('ENTRADA'))).toEqual(['SALIDA_ALMUERZO', 'SALIDA']);
     expect(marcaPendiente(set('ENTRADA', 'SALIDA'))).toBeNull();
+  });
+});
+
+describe('cierre por fin de turno + 2 h de gracia', () => {
+  const base = { jornada: JORNADA, turno: turno9a18, ahora: ahoraDespues, tolerancia: 10 };
+  const tarde = { ...base, turno: turnoDe(m(17), m(22, 30)) };
+  const solo = [marca('ENTRADA', m(17))];
+
+  it('17:00-22:30 con solo entrada: En curso a las 23:00 y No marcó salida a las 00:31', () => {
+    expect(calcularJornada({ ...tarde, ahora: T(23, 0), marcas: solo }).estado).toBe('SIN_EVALUAR');
+    expect(calcularJornada({ ...tarde, ahora: T(24, 31), marcas: solo }).estado).toBe('SIN_SALIDA');
+  });
+
+  it('sin marcas: Por empezar a las 16:00, Sin marcar entrada a las 18:00 y Falta a las 00:31', () => {
+    expect(calcularJornada({ ...tarde, ahora: T(16, 0), marcas: [] }).estado).toBe('POR_EMPEZAR');
+    expect(calcularJornada({ ...tarde, ahora: T(18, 0), marcas: [] }).estado).toBe('SIN_MARCAR_ENTRADA');
+    expect(calcularJornada({ ...tarde, ahora: T(24, 31), marcas: [] }).estado).toBe('FALTA');
+  });
+
+  it('turno que cruza medianoche (22:00-02:00): cierra a las 04:00 (tope), no a las 04:00+2 h', () => {
+    const noche = { ...base, turno: turnoDe(m(22), m(2)), marcas: [marca('ENTRADA', m(22))] };
+    expect(calcularJornada({ ...noche, ahora: T(27, 0) }).estado).toBe('SIN_EVALUAR');
+    expect(calcularJornada({ ...noche, ahora: T(28, 1) }).estado).toBe('SIN_SALIDA');
+  });
+
+  it('turno que cruza medianoche (20:00-00:30): cierra a las 02:30', () => {
+    const t = { ...base, turno: turnoDe(m(20), m(0, 30)), marcas: [marca('ENTRADA', m(20))] };
+    expect(calcularJornada({ ...t, ahora: T(26, 0) }).estado).toBe('SIN_EVALUAR');
+    expect(calcularJornada({ ...t, ahora: T(26, 31) }).estado).toBe('SIN_SALIDA');
+  });
+
+  it('en la planilla SIN_SALIDA es pendiente igual que INCOMPLETO', () => {
+    expect(ESTADOS_PENDIENTES).toContain('SIN_SALIDA');
   });
 });

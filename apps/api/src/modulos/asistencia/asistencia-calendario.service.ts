@@ -91,7 +91,7 @@ export class AsistenciaCalendarioService {
         const d = this.asistencia.evaluarDia(pid, j, ctx, ahora, cfg);
         const sols = solDe.get(`${pid}|${j}`) ?? [];
         if (!d.turno && d.interp.marcas.length === 0 && sols.length === 0) continue;
-        const cerrada = ahora.getTime() >= cierreJornada(j).getTime();
+        const cerrada = ahora.getTime() >= cierreJornada(j, d.turno).getTime();
         const inc = cerrada ? detectarInconsistencia(d.resultado.estado, d.interp, etiquetaDia(j)) : null;
         items.push({ fecha: j, pid, nombre, roles, d, sols, inc: inc ? inc.texto : null });
       }
@@ -113,7 +113,7 @@ export class AsistenciaCalendarioService {
       if (d.interp.entrada) r.presentes++;
       if (est === 'TARDANZA') r.tardanzas++;
       if (est === 'FALTA') r.faltas++;
-      if (est === 'A_REVISAR' || est === 'INCOMPLETO' || d.interp.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
+      if (est === 'A_REVISAR' || est === 'INCOMPLETO' || est === 'SIN_SALIDA' || d.interp.marcas.some((m) => m.estado === 'A_REVISAR')) r.aRevisar++;
       if (inc) r.inconsistencias++;
     }
     return { desde, hasta, dias: [...res.values()] };

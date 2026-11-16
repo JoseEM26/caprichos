@@ -22,7 +22,11 @@ export const ESTADO_DIA: Record<string, { icono: string; texto: string; clase: s
   DESCANSO: { icono: '–', texto: 'Descanso', clase: 'neutro' },
   VACACIONES: { icono: '☀', texto: 'Vacaciones', clase: 'vac' },
   SIN_EVALUAR: { icono: '•', texto: 'En curso', clase: 'neutro' },
+  POR_EMPEZAR: { icono: '•', texto: 'Por empezar', clase: 'neutro' },
+  SIN_MARCAR_ENTRADA: { icono: '!', texto: 'Sin marcar entrada', clase: 'aviso' },
+  SIN_SALIDA: { icono: '!', texto: 'No marcó salida', clase: 'mal' },
 };
+const sinEstadoFuturo = (e?: string) => e === 'SIN_EVALUAR' || e === 'POR_EMPEZAR';
 const estadoDe = (e: string) => ESTADO_DIA[e] ?? { icono: '•', texto: e, clase: 'neutro' };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -214,7 +218,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
             const etiqueta = [
               etiquetaFecha(f),
               d?.feriado ? `feriado ${d.feriado}` : null,
-              e && !(futuro && d?.estado === 'SIN_EVALUAR') ? e.texto : futuro ? 'aún no llega' : 'sin registro',
+              e && !(futuro && sinEstadoFuturo(d?.estado)) ? e.texto : futuro ? 'aún no llega' : 'sin registro',
               d?.entrada ? `entrada ${d.entrada}` : null,
               d?.salida ? `salida ${d.salida}` : null,
             ].filter(Boolean).join(', ');
@@ -223,7 +227,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
                 key={f}
                 type="button"
                 data-fecha={f}
-                className={`mc-dia mc-${futuro && d?.estado === 'SIN_EVALUAR' ? 'futuro' : e?.clase ?? 'vacio'}${f === hoy ? ' mc-hoy' : ''}${enSemana ? ' mc-semana' : ''}`}
+                className={`mc-dia mc-${futuro && sinEstadoFuturo(d?.estado) ? 'futuro' : e?.clase ?? 'vacio'}${f === hoy ? ' mc-hoy' : ''}${enSemana ? ' mc-semana' : ''}`}
                 aria-label={etiqueta}
                 aria-pressed={elegido === f}
                 onClick={() => setElegido(elegido === f ? null : f)}
@@ -231,7 +235,7 @@ export function MiCalendario({ alPedirCorreccion }: { alPedirCorreccion?: (fecha
               >
                 <span className="mc-num">{parse(f).d}</span>
                 {d?.feriado && <span className="mc-fer" title={d.feriado}>★</span>}
-                {e && !(futuro && d?.estado === 'SIN_EVALUAR') && (
+                {e && !(futuro && sinEstadoFuturo(d?.estado)) && (
                   <span className="mc-estado"><span aria-hidden="true">{e.icono}</span><span className="mc-txt">{e.texto}</span></span>
                 )}
                 {(d?.entrada || d?.salida) && (

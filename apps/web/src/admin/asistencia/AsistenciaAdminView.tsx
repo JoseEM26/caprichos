@@ -45,6 +45,9 @@ const varianteEstado: Record<string, VarianteInsignia> = {
   A_REVISAR: 'acento',
   DESCANSO: 'neutro',
   SIN_EVALUAR: 'neutro',
+  POR_EMPEZAR: 'neutro',
+  SIN_MARCAR_ENTRADA: 'aviso',
+  SIN_SALIDA: 'peligro',
 };
 
 function Chip({ estado }: { estado: string }) {
@@ -181,7 +184,7 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
         <Cifra n={filas.filter((f) => f.entrada).length} texto="Ya marcaron entrada" tono="ok" />
         <Cifra n={cuenta('TARDANZA')} texto="Llegaron tarde" tono="tarde" />
         <Cifra n={cuenta('FALTA')} texto="Faltas" tono="falta" />
-        <Cifra n={cuenta('A_REVISAR', 'INCOMPLETO')} texto="Por revisar" tono="tarde" />
+        <Cifra n={cuenta('A_REVISAR', 'INCOMPLETO', 'SIN_SALIDA')} texto="Por revisar" tono="tarde" />
       </div>
       <div className="as-filtros">
         <label className="as-campo as-grow">

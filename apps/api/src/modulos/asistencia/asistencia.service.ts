@@ -811,8 +811,8 @@ export class AsistenciaService {
       for (const j of dias) {
         const d = this.evaluarDia(pid, j, ctx, ahora, cfg);
         filas.push({ ...d.resultado, partyId: Number(pid), nombre, jornada: j });
-        if (d.resultado.estado === 'SIN_EVALUAR') continue; // en curso o futuro: no suma a los totales
-        if (d.resultado.estado === 'INCOMPLETO') jornadasIncompletas++;
+        if (['SIN_EVALUAR', 'POR_EMPEZAR', 'SIN_MARCAR_ENTRADA'].includes(d.resultado.estado)) continue; // en curso o futuro: no suma a los totales
+        if (d.resultado.estado === 'INCOMPLETO' || d.resultado.estado === 'SIN_SALIDA') jornadasIncompletas++;
         if (d.resultado.estado === 'A_REVISAR') jornadasARevisar++;
         if (d.resultado.estado !== 'DESCANSO') programadasMin += d.resultado.programadaMin;
         trabajadasMin += d.resultado.trabajadaMin;
