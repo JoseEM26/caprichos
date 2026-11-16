@@ -1282,7 +1282,8 @@ export class PedidosService {
     // Exentos: pedido del personal y cortesía total (montoEfectivo = 0), y la MESA abierta por el personal
     // (mozo/caja): no sabe el billete al abrir y lo pide al cobrar en la precuenta. Pagar exacto = escribir el monto exacto.
     const mesaDelPersonal = dto.modalidad === 'MESA' && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA');
-    if (montoEfectivo > 0 && !mesaDelPersonal && (dto.pago.pagaCon === undefined || dto.pago.pagaCon === null || !(Number(dto.pago.pagaCon) > 0))) {
+    // Un pedido PROGRAMADO tampoco lo pide: no se cobra al crearlo (solo el adelanto opcional, que tiene su propio monto); el vuelto se ve al cobrarlo.
+    if (montoEfectivo > 0 && !mesaDelPersonal && !programadoPara && (dto.pago.pagaCon === undefined || dto.pago.pagaCon === null || !(Number(dto.pago.pagaCon) > 0))) {
       throw new BadRequestException({
         codigo: 'PAGA_CON_REQUERIDO',
         mensaje: 'Escribe con cuánto paga el cliente (en efectivo)',

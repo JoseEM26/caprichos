@@ -478,6 +478,16 @@ describe('PedidosService', () => {
         expect(Number(prismaMock.pedido.create.mock.calls.at(-1)[0].data.total)).toBe(29);
       });
 
+      it('un PROGRAMADO con efectivo no pide «con cuánto paga» (no se cobra al crearlo); el inmediato sí', async () => {
+        const manana = new Date(Date.now() + 2 * 86400000);
+        manana.setUTCHours(18, 0, 0, 0);
+        const sinPagaCon: any = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta', monto: 22 }], pago: { metodo: 'EFECTIVO' } };
+        prismaMock.pedido.create.mockResolvedValue({ ...creado, estado: 'PROGRAMADO', subtotal: 22, total: 22 });
+        const res = await service.crear(sinPagaCon, 'cl-prog-pc', { ...caja, programadoPara: manana.toISOString() } as any);
+        expect(res.estado).toBe('PROGRAMADO');
+        await expect(service.crear(sinPagaCon, 'cl-ahora-pc', caja)).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+      });
+
       it('PROGRAMADO solo con un «Servicio o producto» (torta por encargo para otro día) se crea', async () => {
         const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta chocolate 10 cm corazón', monto: 22 }] };
         prismaMock.pedido.create.mockResolvedValue({ ...creado, estado: 'PROGRAMADO', subtotal: 22, total: 22, programado_para: new Date(Date.now() + 2 * 86400000) });
