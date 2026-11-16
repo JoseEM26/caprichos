@@ -1289,6 +1289,27 @@ export class PedidosEstadoService {
         estado: 'ANULADO',
       });
 
+      // Ya imprimió stickers (p. ej. pedido web impreso antes de que Caja lo acepte): avisar para que barra no lo prepare
+      try {
+        const impresos = await this.prisma.printJob.count({
+          where: { pedido_id: pedido.id, tipo: { in: ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'] } },
+        });
+        if (impresos > 0) {
+          const aviso = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'PEDIDO_ANULADO_IMPRESO',
+              rol_destino: null,
+              titulo: `Pedido ${pedido.codigo} anulado: ya imprimió stickers`,
+              mensaje: 'Avisa a barra y cocina para que no lo preparen.',
+              enlace: `/admin/caja?pedido=${pedido.id}`,
+            },
+          });
+          this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: aviso.id.toString(), titulo: aviso.titulo });
+        }
+      } catch {
+        // el aviso es informativo
+      }
+
       // si estaba en la ruta de un repartidor: la ruta se cierra sola si ya no le quedan pedidos pendientes
       await cerrarRutaTrasAnular(this.prisma, pedido.repartidor_party_id, this.eventosGateway, this.logger);
 

@@ -15,6 +15,7 @@ import { StockModule } from '../stock/stock.module';
 import { RucModule } from '../ruc/ruc.module';
 import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 import { CartaEventosModule } from '../carta-eventos';
+import { ImpresionModule } from '../impresion/impresion.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CartaEventosModule } from '../carta-eventos';
     ComprobantesModule,
     RucModule,
     CartaEventosModule,
+    ImpresionModule,
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => ChatbotModule),
     forwardRef(() => StockModule),
