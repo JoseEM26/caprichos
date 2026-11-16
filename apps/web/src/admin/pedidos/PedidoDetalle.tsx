@@ -22,7 +22,7 @@ import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
 import { useAvisoCobroPendiente } from './avisoCobroPendiente';
-import { esDeliveryContraEntrega, medioDigitalVoucher } from './mediosPago';
+import { esDeliveryContraEntrega } from './mediosPago';
 import { InsigniaModalidad } from './InsigniaModalidad';
 import { InsigniaMesa } from './InsigniaMesa';
 import { esCerrado } from './estadosCaja';
@@ -37,7 +37,6 @@ import {
 import { salonApi } from '../salon/api';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
-import { PanelDatosPago } from '../mensajes/PanelDatosPago';
 import { InsigniaNumeroDia } from './InsigniaNumeroDia';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { descuentosDePedido } from '@caprichos/compartido';
@@ -192,8 +191,6 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const puedeCargoLibre = tiene('pedidos/cargo_libre') && est !== 'ANULADO' && est !== 'RECHAZADO' && !(estaPagadoCargo(pedido) && !alAgregarExtra);
   // Corregir datos del cliente: con permiso y en cualquier estado salvo anulado o rechazado (entregado o cobrado sí)
   const puedeCorregirCliente = tiene('pedidos/corregir_cliente') && est !== 'ANULADO' && est !== 'RECHAZADO';
-  const mdv = medioDigitalVoucher(pedido.pago_preferido || pedido.pago_metodo);
-  const medioDatosPago = mdv;
   const esPorConfirmar =
     (est === 'COLA' || est === 'NUEVO') &&
     !estaPagado &&
@@ -447,7 +444,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               )}
               {panelCoordinar}
               <BotonEnviarConfirmacionWhatsapp pedidoId={pedido.id} />
-              {esPorConfirmar && medioDatosPago && <PanelDatosPago pedidoId={pedido.id} medio={medioDatosPago} />}
+              {/* Los datos de pago (banco, CCI, Yape…) con «Enviar por WhatsApp» salen UNA vez: dentro de la caja de «Foto del voucher» de abajo */}
               <CapaPago
                 pedido={pedido}
                 esMesa={esMesa}

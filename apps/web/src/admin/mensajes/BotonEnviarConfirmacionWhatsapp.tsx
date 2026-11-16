@@ -40,10 +40,12 @@ export function BotonEnviarConfirmacionWhatsapp({ pedidoId, compacto }: { pedido
       vivo = false;
     };
   }, [pedidoId, puede]);
-  if (!puede || avisos.length === 0) return null;
+  // Un mismo botón (misma etiqueta) una sola vez: RECIBIDO y ACEPTADO dicen lo mismo («Enviar confirmación»); queda el más reciente
+  const visibles = [...new Map(avisos.map((a) => [ETIQUETA[a.etapa] ?? `aviso-${a.id}`, a])).values()];
+  if (!puede || visibles.length === 0) return null;
   return (
     <div data-testid="avisos-whatsapp-pendientes" style={{ display: 'flex', flexDirection: 'column', gap: 6 }} onClick={(e) => e.stopPropagation()}>
-      {avisos.map((a) => (
+      {visibles.map((a) => (
         <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <a
             href={urlMensajesConTexto(a.telefono, a.texto)}
