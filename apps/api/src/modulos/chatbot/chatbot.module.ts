@@ -29,6 +29,8 @@ import { ReprogramacionService } from './servicios/reprogramacion.service';
 import { OutboxWhatsappService } from './servicios/outbox-whatsapp.service';
 import { AutorespuestaWhatsappService } from './servicios/autorespuesta-whatsapp.service';
 import { AdminWhatsappSalientesController } from './controladores/admin-whatsapp-salientes.controller';
+import { AvisosManualesController } from './controladores/avisos-manuales.controller';
+import { AvisosManualesService } from './servicios/avisos-manuales.service';
 import { UbicacionWhatsappController } from './controladores/ubicacion-whatsapp.controller';
 import { StockModule } from '../stock/stock.module';
 import { DireccionesModule } from '../direcciones/direcciones.module';
@@ -71,7 +73,7 @@ import { EvolutionAdminController } from './evolution/evolution-admin.controller
     AccesoModule,
     DireccionesModule,
   ],
-  controllers: [NumerosBloqueadosController, WhatsappWebhookController, EvolutionWebhookController, EvolutionAdminController, QuejasWhatsappController, AdminWhatsappSalientesController, UbicacionWhatsappController],
+  controllers: [NumerosBloqueadosController, WhatsappWebhookController, EvolutionWebhookController, EvolutionAdminController, QuejasWhatsappController, AdminWhatsappSalientesController, AvisosManualesController, UbicacionWhatsappController],
   providers: [
     { provide: CUENTA_CLIENTE_BOT_PUERTO, useExisting: ClientesService },
     NumerosWhatsappService,
@@ -86,6 +88,7 @@ import { EvolutionAdminController } from './evolution/evolution-admin.controller
     WhatsAppMensajeriaProvider,
     WhatsappWebhookService,
     Ventana24hService,
+    AvisosManualesService,
     AvisosPedidoService,
     ReprogramacionService,
     OutboxWhatsappService,

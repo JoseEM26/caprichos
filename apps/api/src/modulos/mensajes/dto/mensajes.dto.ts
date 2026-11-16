@@ -176,3 +176,14 @@ export class AplicarCambioDto {
   @IsString()
   devolucionCodigo?: string;
 }
+
+export class IniciarChatDto {
+  @IsString()
+  @MaxLength(30)
+  telefono!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nombre?: string;
+}

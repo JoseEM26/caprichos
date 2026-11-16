@@ -12,6 +12,7 @@ import {
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { CODIGOS_PLANTILLA_PERMANENTES } from '../utilidades/meta-errores.util';
 import { enmascararTelefono, hashTelefono } from '../utilidades/enmascarar.util';
+import { EvolutionConfigService } from '../evolution/evolution-config.service';
 
 const esFalloDePlantilla = (codigo?: string | null): boolean =>
   !!codigo && (codigo === 'PLANTILLA_NO_CONFIGURADA' || CODIGOS_PLANTILLA_PERMANENTES.includes(codigo));
@@ -44,7 +45,21 @@ export class Ventana24hService {
     @Inject(WHATSAPP_MENSAJERIA_PUERTO)
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly evolution?: EvolutionConfigService,
   ) {}
+
+  /** ¿El proveedor en uso es Evolution? Ahí no hay ventana de Meta: la regla de 24 h es del negocio (avisos automáticos). */
+  async esEvolution(): Promise<boolean> {
+    return !!this.evolution && (await this.evolution.proveedor().catch(() => 'META')) === 'EVOLUTION';
+  }
+
+  /**
+   * ¿Puede una PERSONA escribirle ahora desde Mensajes? Con Meta, solo con la ventana abierta (si no, plantilla).
+   * Con Evolution no hay plantillas ni ventana de Meta: la persona decide y puede escribir siempre.
+   */
+  async puedeEscribirPersona(telefono: string, conversacionId?: bigint): Promise<boolean> {
+    return (await this.esEvolution()) || this.esVentanaAbierta(telefono, conversacionId);
+  }
 
   /**
    * Determina si la ventana de 24 horas está abierta para el cliente.

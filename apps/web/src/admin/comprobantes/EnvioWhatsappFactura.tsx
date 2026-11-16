@@ -3,7 +3,8 @@ import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { comprobantesApi } from './comprobantesApi';
-import { urlWhatsappManual } from './utilidades';
+import { textoWhatsappManual, urlWhatsappManual } from './utilidades';
+import { urlMensajesConTexto } from '../mensajes/utilidadesChat';
 import type { ComprobanteElectronico, EnvioWhatsappFactura, EstadoEnvioWhatsapp } from './tipos';
 
 /** Hora de Lima corta: «11/11 14:05». */
@@ -104,6 +105,18 @@ export function EnvioWhatsappFactura({
           }}
         >
           Enviar por WhatsApp
+        </a>
+      )}
+      {enLista && sinVentana && urlManual && (
+        <a
+          href={urlMensajesConTexto(String(comprobante.celular_wa), textoWhatsappManual(comprobante, comprobante.enlace_pdf_publico))}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={alAbrirManual}
+          aria-label={`Enviar ${comprobante.numero_texto} desde Mensajes`}
+          style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', padding: '0 14px', borderRadius: 10, fontWeight: 700, textDecoration: 'none', background: 'var(--cp-green, #2F7A45)', color: '#fff' }}
+        >
+          Enviar desde Mensajes (fuera de las 24 h)
         </a>
       )}
       {puedeReenviar && (

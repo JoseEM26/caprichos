@@ -113,7 +113,7 @@ describe('MensajesService.enviarDocumento', () => {
       enviarDocumento: jest.fn().mockResolvedValue({ id: '5', autor: 'PERSONA', texto: 't', en: new Date(), metaId: 'wamid.1', estado: 'ENVIADO' }),
     };
     archivos = { subirDocumento: jest.fn().mockResolvedValue({ id: '900', url: '/admin/archivos/900', nombre: 'carta.pdf' }) };
-    ventana = { esVentanaAbierta: jest.fn().mockResolvedValue(true) };
+    ventana = { puedeEscribirPersona: jest.fn().mockResolvedValue(true) };
     service = new MensajesService(prisma, auditoria, gateway, { emitirAdmin: jest.fn() } as any, ventana, undefined, archivos);
   });
 
@@ -153,7 +153,7 @@ describe('MensajesService.enviarDocumento', () => {
   });
 
   it('fuera de la ventana de 24 h responde 409 VENTANA_CERRADA y no envía (igual que el texto)', async () => {
-    ventana.esVentanaAbierta.mockResolvedValue(false);
+    ventana.puedeEscribirPersona.mockResolvedValue(false);
     const e: any = await service.enviarDocumento('1', archivo(), undefined, usuario).catch((x) => x);
     expect(e).toBeInstanceOf(HttpException);
     expect(e.getStatus()).toBe(409);

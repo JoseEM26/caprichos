@@ -1,5 +1,6 @@
 import type { CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import { useSesion } from '../../comun/sesion';
+import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
@@ -428,6 +429,7 @@ export function MisPedidosView() {
                 )}
 
                 {bloqueVoucher(p, false)}
+                <BotonEnviarConfirmacionWhatsapp pedidoId={p.id} compacto />
               </Cont>
             );
   };

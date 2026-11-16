@@ -45,7 +45,7 @@ describe('RepartosChatService: chat de WhatsApp de un pedido del repartidor', ()
     };
     mensajes = { enviar: jest.fn(async () => ({ id: 'm-9' })) };
     auditoria = { registrar: jest.fn(async () => undefined) };
-    ventana = { esVentanaAbierta: jest.fn(async () => true) };
+    ventana = { esVentanaAbierta: jest.fn(async () => true), puedeEscribirPersona: (...a: any[]) => ventana.esVentanaAbierta(...a) };
     servicio = new RepartosChatService(prisma, mensajes, auditoria, ventana);
   });
 

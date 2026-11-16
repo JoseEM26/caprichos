@@ -31,6 +31,7 @@ import {
   AplicarCambioDto,
   RechazarPagoDto,
   TextoDto,
+  IniciarChatDto,
   TomarDto,
 } from './dto/mensajes.dto';
 import { MensajesService } from './mensajes.service';
@@ -138,6 +139,13 @@ export class MensajesController {
   @Permiso('mensajes', 'ver')
   anteriores(@Param('id') id: string, @Query() q: AnterioresDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
     return conServerTiming(res, 'conversaciones/:id/mensajes', () => this.mensajes.mensajesAnteriores(id, q.antes, req.usuario), (r) => r.mensajes.length);
+  }
+
+  /** Abre o crea el chat de un celular (botón «Enviar confirmación por WhatsApp» de un pedido sin chat previo). */
+  @Post('conversaciones/iniciar')
+  @Permiso('mensajes', 'enviar')
+  iniciar(@Body() dto: IniciarChatDto) {
+    return this.mensajes.iniciarChat(dto.telefono, dto?.nombre);
   }
 
   @Post('conversaciones/:id/enviar')

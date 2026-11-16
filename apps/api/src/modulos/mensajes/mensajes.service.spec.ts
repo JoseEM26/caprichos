@@ -590,21 +590,21 @@ describe('MensajesService', () => {
 
     beforeEach(() => {
       ventana24h = {
-        esVentanaAbierta: jest.fn().mockResolvedValue(true),
+        puedeEscribirPersona: jest.fn().mockResolvedValue(true),
       };
       service = new MensajesService(prisma, auditoria, gateway, eventos, ventana24h);
     });
 
     it('permite enviar texto libre cuando la ventana está abierta', async () => {
-      ventana24h.esVentanaAbierta.mockResolvedValue(true);
+      ventana24h.puedeEscribirPersona.mockResolvedValue(true);
       const res = await service.enviar('1', 'Hola cliente dentro de 24h', usuarioAdmin);
       expect(res.id).toBe('msg-1');
-      expect(ventana24h.esVentanaAbierta).toHaveBeenCalledWith('999888777', 1n);
+      expect(ventana24h.puedeEscribirPersona).toHaveBeenCalledWith('999888777', 1n);
       expect(gateway.enviarTexto).toHaveBeenCalled();
     });
 
     it('rechaza texto libre con 409 VENTANA_CERRADA cuando pasaron más de 24 horas', async () => {
-      ventana24h.esVentanaAbierta.mockResolvedValue(false);
+      ventana24h.puedeEscribirPersona.mockResolvedValue(false);
       let errorCapturado: any;
       try {
         await service.enviar('1', 'Hola cliente fuera de 24h', usuarioAdmin);

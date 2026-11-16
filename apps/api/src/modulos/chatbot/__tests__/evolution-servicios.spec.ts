@@ -101,14 +101,21 @@ describe('política de envío con Evolution', () => {
     expect(await politica.evaluar({ ...aviso, origen: 'ENCUESTA' }, DENTRO)).toEqual({ accion: 'ENVIAR' });
     expect(await politica.evaluar({ ...aviso, origen: 'VOUCHER' }, FUERA)).toEqual({ accion: 'ENVIAR' });
   });
-  it('nunca escribe primero a un número que jamás escribió', async () => {
+  it('nunca escribe primero a un número que jamás escribió (otros proactivos)', async () => {
     const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
-    expect(await politica.evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'SIN_CONTACTO_PREVIO' });
+    expect(await politica.evaluar({ ...aviso, origen: 'ENCUESTA' }, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'SIN_CONTACTO_PREVIO' });
   });
-  it('un aviso del pedido a quien pidió por la web en las últimas 24 h sí sale; otros proactivos siguen exigiendo contacto', async () => {
-    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) }, pedido: { count: jest.fn(async () => 1) } });
+  it('REGLA 24 h: el aviso del pedido solo sale solo si el cliente escribió en las últimas 24 h; si no, queda DESCARTADO con motivo (aunque haya pedido por la web)', async () => {
+    const count = jest.fn(async (_a?: any) => 0);
+    const { politica } = crear({}, { whatsappMensaje: { count }, pedido: { count: jest.fn(async () => 1) } });
+    const r = await politica.evaluar(aviso, DENTRO);
+    expect(r).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_VENTANA_24H' });
+    expect((r as any).motivo).toContain('Fuera de las 24 h');
+    expect(count.mock.calls[0][0].where.creado_en.gte).toBeInstanceOf(Date);
+  });
+  it('con el cliente dentro de las 24 h el aviso del pedido sale', async () => {
+    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 1) } });
     expect(await politica.evaluar(aviso, DENTRO)).toEqual({ accion: 'ENVIAR' });
-    expect(await politica.evaluar({ ...aviso, origen: 'ENCUESTA' }, DENTRO)).toMatchObject({ codigo: 'SIN_CONTACTO_PREVIO' });
   });
   it('código de cuenta, reserva y cuenta creada no exigen contacto previo (los pidió el cliente)', async () => {
     const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });

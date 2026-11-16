@@ -9,6 +9,7 @@ import {
   desbloquearSpam,
   editarNombreContacto,
   enviarMensaje,
+  iniciarChat,
   listarConversaciones,
   listarMensajesAnteriores,
   listarRespuestasRapidas,
@@ -58,6 +59,7 @@ import {
   mensajeOptimista,
   nuevoIdCliente,
   telefonoDeUrl,
+  textoDeUrl,
 } from './utilidadesChat';
 import { useAtrasCierraPanel, esVistaMovil } from '../../comun/useAtrasCierraPanel';
 import './mensajes.css';
@@ -131,6 +133,30 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [respuestasRapidas, setRespuestasRapidas] = useState<RespuestaRapida[]>([]);
   const [contextoPlantillas, setContextoPlantillas] = useState<Record<string, string>>({});
+
+  // Desde un pedido (?telefono=&texto=): abre el chat de ese celular (lo crea si no existe) con el mensaje ya escrito. No envía nada.
+  const chatIniciadoId = React.useRef<string>('');
+  useEffect(() => {
+    const tel = telefonoDeUrl();
+    const texto = textoDeUrl();
+    if (!tel || !texto) return;
+    let vivo = true;
+    iniciarChat(`51${tel}`)
+      .then(({ id }) => {
+        if (!vivo) return;
+        chatIniciadoId.current = id;
+        telefonoPendiente.current = '';
+        setChatSeleccionadoId(id);
+        setTextoMensaje(texto);
+        if (esVistaMovil()) setChatAbiertoMovil(true);
+      })
+      .catch(() => {
+        if (vivo) setTextoMensaje(texto);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // Vista móvil: chat abierto
   const [chatAbiertoMovil, setChatAbiertoMovil] = useState(false);
@@ -279,12 +305,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         if (esVistaMovil()) setChatAbiertoMovil(true);
       } else if (res.chats.length > 0) {
         setChatSeleccionadoId((prev) => {
+          // El chat abierto desde un pedido se queda aunque la lista (filtrada) aún no lo traiga
+          if (prev && prev === chatIniciadoId.current) return prev;
           if (mantenerSeleccion && prev && res.chats.some((c) => c.id === prev)) {
             return prev;
           }
           return res.chats[0].id;
         });
-      } else {
+      } else if (!chatIniciadoId.current) {
         setChatSeleccionadoId(null);
         setDetalle(null);
       }

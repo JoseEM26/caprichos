@@ -84,7 +84,7 @@ export class RepartosChatService {
       orderBy: { en: 'desc' },
       take: 200,
     });
-    const ventanaAbierta = this.ventana24h ? await this.ventana24h.esVentanaAbierta(conv.telefono, conv.id) : true;
+    const ventanaAbierta = this.ventana24h ? await this.ventana24h.puedeEscribirPersona(conv.telefono, conv.id) : true;
 
     return {
       disponible: true,

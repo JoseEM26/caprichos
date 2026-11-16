@@ -5,6 +5,7 @@ import type { Pedido } from './pedidosApi';
 import type { AccionCaja } from './accionesCaja';
 import { PastillaEspera } from './PastillaEspera';
 import { IconoModalidad, claveModalidad, textoMesa } from './InsigniaModalidad';
+import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
 import { ReimprimirPedido } from './ReimprimirPedido';
 import { CANAL, MOD, aHora, textoPago } from './columnasCaja';
 import { esCerrado, estadoVisual } from './estadosCaja';
@@ -177,6 +178,8 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
           </Link>
         )}
       </div>
+
+      <BotonEnviarConfirmacionWhatsapp pedidoId={p.id} compacto />
 
       <div className="lc-acciones">
         <ReimprimirPedido pedido={p} variante="tarjeta" />

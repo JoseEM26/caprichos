@@ -36,6 +36,7 @@ import {
 } from '../creditos/creditosApi';
 import { salonApi } from '../salon/api';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
+import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
 import { InsigniaNumeroDia } from './InsigniaNumeroDia';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { descuentosDePedido } from '@caprichos/compartido';
@@ -442,6 +443,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                 </div>
               )}
               {panelCoordinar}
+              <BotonEnviarConfirmacionWhatsapp pedidoId={pedido.id} />
               <CapaPago
                 pedido={pedido}
                 esMesa={esMesa}

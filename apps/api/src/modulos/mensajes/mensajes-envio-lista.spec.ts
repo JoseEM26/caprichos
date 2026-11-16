@@ -41,7 +41,7 @@ describe('Envío encolado: validaciones síncronas y respuesta inmediata', () =>
       enviarTexto: jest.fn().mockImplementation(() => new Promise((r) => setTimeout(() => r({ id: '1', estado: 'ENVIADO' }), 2000))),
       transmitirTexto: jest.fn(),
     };
-    ventana = { esVentanaAbierta: jest.fn().mockResolvedValue(true) };
+    ventana = { puedeEscribirPersona: jest.fn().mockResolvedValue(true) };
     svc = new MensajesService(prisma, { registrar: jest.fn() } as any, gateway, { emitirAdmin: jest.fn() } as any, ventana, undefined, undefined, undefined, undefined, undefined, cola);
   });
 
@@ -68,7 +68,7 @@ describe('Envío encolado: validaciones síncronas y respuesta inmediata', () =>
   });
 
   it('ventana de 24 h cerrada: 409 VENTANA_CERRADA al instante y nada queda encolado', async () => {
-    ventana.esVentanaAbierta.mockResolvedValue(false);
+    ventana.puedeEscribirPersona.mockResolvedValue(false);
     await expect(svc.enviar('1', 'Hola', usuario)).rejects.toMatchObject({ status: 409, response: { codigo: 'VENTANA_CERRADA' } });
     expect(prisma.mensajeChat.create).not.toHaveBeenCalled();
     expect(cola.despertar).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('Envío encolado: validaciones síncronas y respuesta inmediata', () =>
 
     it('respeta la ventana de 24 h: 409 y no se reencola', async () => {
       prisma.mensajeChat.findUnique.mockResolvedValue(fallido());
-      ventana.esVentanaAbierta.mockResolvedValue(false);
+      ventana.puedeEscribirPersona.mockResolvedValue(false);
       await expect(svc.reintentarMensaje('1', '500', usuario)).rejects.toMatchObject({ status: 409, response: { codigo: 'VENTANA_CERRADA' } });
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
       expect(cola.despertar).not.toHaveBeenCalled();

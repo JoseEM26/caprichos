@@ -21,7 +21,7 @@ function factura(extra: any = {}) {
   return { id: 10n, pedido_id: 100n, tipo: 'FACTURA', serie: 'F002', numero: 123, numero_texto: 'F002-000123', facturacion_estado: 'EMITIDO_SUNAT', simulado: false, anulado_en: null, baja_estado: null, ...extra };
 }
 
-function montar(o: { comp?: any; pedido?: any; parametros?: any[]; ventana?: boolean; consentimiento?: boolean; conversacion?: any; fetchFn?: any } = {}) {
+function montar(o: { evolution?: boolean; comp?: any; pedido?: any; parametros?: any[]; ventana?: boolean; consentimiento?: boolean; conversacion?: any; fetchFn?: any } = {}) {
   const envios = new Map<string, any>();
   const chat: any[] = [];
   const audit: any[] = [];
@@ -68,7 +68,7 @@ function montar(o: { comp?: any; pedido?: any; parametros?: any[]; ventana?: boo
     });
   global.fetch = fetchFalso as any;
   const comprobantes = { alAceptarFactura: null, pdfParaEnvio: jest.fn(async () => ({ nombre: 'F002-000123.pdf', contenido: PDF })) } as unknown as ComprobantesService;
-  const ventana: any = { esVentanaAbierta: jest.fn(async () => o.ventana ?? true), tieneConsentimiento: jest.fn(async () => o.consentimiento ?? true) };
+  const ventana: any = { esEvolution: jest.fn(async () => o.evolution ?? false), esVentanaAbierta: jest.fn(async () => o.ventana ?? true), tieneConsentimiento: jest.fn(async () => o.consentimiento ?? true) };
   const auditoria: any = { registrar: jest.fn(async (r: any) => { audit.push(r); }) };
   const archivos: any = { subirDocumento: jest.fn(async () => ({ id: '900' })) };
   const servicio = new FacturaWhatsappService(prisma, auditoria, comprobantes, ventana, adaptador as any, archivos);
@@ -203,6 +203,13 @@ describe('FacturaWhatsappService.iniciar', () => {
 
   it('ventana cerrada y sin plantilla: «sin ventana», no sale nada y se programa un reintento', async () => {
     const m = montar({ ventana: false });
+    expect(await m.servicio.iniciar(10n)).toMatchObject({ estado: 'SIN_VENTANA' });
+    expect(m.fetchFalso).not.toHaveBeenCalled();
+    expect(m.envios.get('10').proximo_intento_en).toBeInstanceOf(Date);
+  });
+
+  it('con Evolution no hay plantillas: fuera de las 24 h NO sale solo (queda «sin ventana») aunque haya plantilla configurada', async () => {
+    const m = montar({ evolution: true, ventana: false, parametros: [{ clave: 'facturacion_whatsapp_plantilla', valor: 'caprichos_factura_electronica' }] });
     expect(await m.servicio.iniciar(10n)).toMatchObject({ estado: 'SIN_VENTANA' });
     expect(m.fetchFalso).not.toHaveBeenCalled();
     expect(m.envios.get('10').proximo_intento_en).toBeInstanceOf(Date);

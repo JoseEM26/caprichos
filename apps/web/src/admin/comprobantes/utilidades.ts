@@ -111,6 +111,18 @@ export function rucValido(ruc: string): boolean {
  * Enlace «click-to-chat» de WhatsApp con el comprobante ya escrito (el local solo da clic en enviar).
  * `celular` ya viene normalizado del servidor (51 + 9 dígitos); sin celular válido devuelve null.
  */
+export function textoWhatsappManual(
+  c: { tipo: string; numero_texto: string | null; total: number },
+  enlacePdf: string | null | undefined,
+): string {
+  const que = c.tipo === 'FACTURA' ? 'factura' : 'boleta';
+  return [
+    'Hola 👋 Gracias por tu compra en Caprichos 💛',
+    `Tu ${que} electrónica ${c.numero_texto ?? ''} por ${formatearSoles(c.total)}.`,
+    ...(enlacePdf ? [`Puedes verla y descargarla aquí: ${enlacePdf}`] : []),
+  ].join('\n');
+}
+
 export function urlWhatsappManual(
   celular: string | null | undefined,
   c: { tipo: string; numero_texto: string | null; total: number },
@@ -118,11 +130,5 @@ export function urlWhatsappManual(
 ): string | null {
   const numero = String(celular ?? '').replace(/\D/g, '');
   if (!/^519\d{8}$/.test(numero)) return null;
-  const que = c.tipo === 'FACTURA' ? 'factura' : 'boleta';
-  const lineas = [
-    'Hola 👋 Gracias por tu compra en Caprichos 💛',
-    `Tu ${que} electrónica ${c.numero_texto ?? ''} por ${formatearSoles(c.total)}.`,
-    ...(enlacePdf ? [`Puedes verla y descargarla aquí: ${enlacePdf}`] : []),
-  ];
-  return `https://wa.me/${numero}?text=${encodeURIComponent(lineas.join('\n'))}`;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(textoWhatsappManual(c, enlacePdf))}`;
 }

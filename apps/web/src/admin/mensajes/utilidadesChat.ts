@@ -77,6 +77,21 @@ export function telefonoDeUrl(): string {
   }
 }
 
+/** Mensaje ya escrito de la URL (?texto=...), para que la persona solo toque Enviar; vacío si no viene. */
+export function textoDeUrl(): string {
+  try {
+    return (new URLSearchParams(window.location.search).get('texto') || '').slice(0, 1000);
+  } catch {
+    return '';
+  }
+}
+
+/** Enlace a Mensajes con el chat de ese celular y el mensaje ya escrito (la persona lo envía; el sistema no). */
+export function urlMensajesConTexto(telefono: string, texto: string): string {
+  const d = telefono.replace(/\D/g, '').slice(-9);
+  return `/admin/mensajes?telefono=${d}&texto=${encodeURIComponent(texto.slice(0, 1000))}`;
+}
+
 /** 51914244077 pasa a «+51 914 244 077»; otro formato se muestra con «+» delante. */
 export function formatearNumeroReceptor(n: string): string {
   const d = n.replace(/\D/g, "");

@@ -13,7 +13,10 @@ export const ORIGENES_RESPUESTA = new Set(['VOUCHER', 'BOT_ERROR', 'TOPE_SIN_PAG
 export const ORIGENES_PEDIDOS_POR_EL_CLIENTE = new Set(['CODIGO_CUENTA', 'RESERVA', 'AVISO_CUENTA']);
 /** Avisos al equipo (administradores): sus números no escriben antes al negocio; igual que con Meta, salen. */
 export const ORIGENES_DEL_EQUIPO = new Set(['ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'EQUIPO_ALERTA_ALMACEN']);
-const HORAS_PEDIDO_RECIENTE = 24;
+const HORAS_VENTANA_AVISO = 24;
+/** Código con el que un aviso del pedido queda DESCARTADO por estar fuera de las 24 h: la persona lo envía desde el pedido. */
+export const FUERA_DE_VENTANA_AVISO = 'FUERA_DE_VENTANA_24H';
+export const MOTIVO_FUERA_DE_VENTANA = 'Fuera de las 24 h: el cliente no nos escribió en las últimas 24 h, así que no se envía solo (para cuidar el número). Envíalo tú desde el pedido con «Enviar confirmación por WhatsApp».';
 
 export type DecisionEnvio =
   | { accion: 'ENVIAR' }
@@ -53,14 +56,17 @@ export class PoliticaEvolutionService {
     }
 
     if (String(cfg.evolution_exigir_contacto_previo).toLowerCase() === 'si' && !ORIGENES_PEDIDOS_POR_EL_CLIENTE.has(fila.origen) && !ORIGENES_DEL_EQUIPO.has(fila.origen)) {
-      const previo = await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hashTelefono(fila.telefono_destino), direccion: 'ENTRANTE' } });
-      // Un aviso del pedido también vale si ese celular hizo un pedido en las últimas 24 h (p. ej. por la carta web)
-      const pidioHace = previo === 0 && fila.origen === 'AVISO_PEDIDO' ? await this.pidioRecientemente(fila.telefono_destino, ahora) : false;
-      if (previo === 0 && !pidioHace) {
+      const hash = hashTelefono(fila.telefono_destino);
+      if (fila.origen === 'AVISO_PEDIDO') {
+        // Avisos del pedido (recibido, aceptado, listo, salió...): solo solos si el cliente escribió en las últimas 24 h
+        const desde = new Date(ahora.getTime() - HORAS_VENTANA_AVISO * 3_600_000);
+        const reciente = await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE', creado_en: { gte: desde } } });
+        if (reciente === 0) return { accion: 'DESCARTAR', codigo: FUERA_DE_VENTANA_AVISO, motivo: MOTIVO_FUERA_DE_VENTANA };
+      } else if ((await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE' } })) === 0) {
         return {
           accion: 'DESCARTAR',
           codigo: 'SIN_CONTACTO_PREVIO',
-          motivo: 'Bloqueado: este número nunca escribió al negocio ni tiene un pedido reciente; no se le escribe primero por WhatsApp no oficial.',
+          motivo: 'Bloqueado: este número nunca escribió al negocio; no se le escribe primero por WhatsApp no oficial.',
         };
       }
     }
@@ -90,14 +96,5 @@ export class PoliticaEvolutionService {
       if (enviados >= tope) return { accion: 'DIFERIR', esperaMs, motivo: `Tope de mensajes ${nombre} alcanzado (${tope}); se reintenta luego` };
     }
     return { accion: 'ENVIAR' };
-  }
-
-  private async pidioRecientemente(tel: string, ahora: Date): Promise<boolean> {
-    const solo = tel.replace(/\D/g, '');
-    const variantes = [solo, solo.replace(/^51/, ''), `+${solo}`];
-    const n = await this.prisma.pedido.count({
-      where: { cliente_telefono: { in: variantes }, creado_en: { gte: new Date(ahora.getTime() - HORAS_PEDIDO_RECIENTE * 3_600_000) } },
-    });
-    return n > 0;
   }
 }

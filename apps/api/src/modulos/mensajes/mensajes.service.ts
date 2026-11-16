@@ -17,7 +17,7 @@ import {
   obtenerNombreMostrar,
 } from './utilidades/nombre-contacto.util';
 import { flujoLiberadoParaBot } from '../chatbot/conversacion/flujo-liberado.util';
-import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
+import { enmascararTelefono, normalizarTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { esErrorVentana24h, mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { separarDetalleTecnico } from '../chatbot/utilidades/meta-errores.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
@@ -726,7 +726,7 @@ export class MensajesService {
       this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } }),
       this.prisma.altaDemanda.findFirst({ where: { hasta: null }, orderBy: { id: 'desc' } }),
       this.yo(usuario),
-      this.ventana24hService ? this.ventana24hService.esVentanaAbierta(c.telefono, c.id) : Promise.resolve(true),
+      this.ventana24hService ? this.ventana24hService.puedeEscribirPersona(c.telefono, c.id) : Promise.resolve(true),
       this.bloqueosSpam([c]),
       this.numeros?.motivoOmision(c.telefono),
       this.nombresDe([c.atendido_por]),
@@ -851,12 +851,25 @@ export class MensajesService {
     }
   }
 
+  /**
+   * Abre (o crea) el chat de un celular peruano para escribirle desde Mensajes, p. ej. el aviso de un pedido que no salió solo.
+   * No envía nada: solo deja la conversación lista. Devuelve su id.
+   */
+  async iniciarChat(telefono: string, nombre?: string | null): Promise<{ id: string; creada: boolean }> {
+    const tel = normalizarTelefono(String(telefono ?? ''));
+    if (!/^519\d{8}$/.test(tel)) throw error(HttpStatus.BAD_REQUEST, 'TELEFONO_INVALIDO', 'El celular no es válido');
+    const previa = await this.prisma.conversacion.findUnique({ where: { telefono: tel }, select: { id: true } });
+    if (previa) return { id: previa.id.toString(), creada: false };
+    const c = await this.prisma.conversacion.create({ data: { telefono: tel, nombre_contacto: nombre?.trim() || null }, select: { id: true } });
+    return { id: c.id.toString(), creada: true };
+  }
+
   async enviar(id: string, texto: string, usuario: UsuarioAutenticado, ip?: string, idCliente?: string) {
     const limpio = String(texto ?? '').trim();
     if (!limpio) throw error(HttpStatus.BAD_REQUEST, 'MENSAJE_VACIO', 'Escribe un mensaje');
     const c = await this.cargar(id);
     // Las lecturas independientes arrancan juntas; los errores se evalúan en el mismo orden de siempre
-    const ventana = this.ventana24hService ? this.ventana24hService.esVentanaAbierta(c.telefono, c.id) : Promise.resolve(true);
+    const ventana = this.ventana24hService ? this.ventana24hService.puedeEscribirPersona(c.telefono, c.id) : Promise.resolve(true);
     ventana.catch(() => undefined);
     const numero = this.exigirNumeroEnviable(c);
     numero.catch(() => undefined);
@@ -980,7 +993,7 @@ export class MensajesService {
     }
     await this.exigirNumeroEnviable(c);
     await this.verificarLimiteTasaUsuario(usuario.partyId);
-    if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+    if (this.ventana24hService && !(await this.ventana24hService.puedeEscribirPersona(c.telefono, c.id))) {
       throw new HttpException(
         {
           codigo: 'VENTANA_CERRADA',
@@ -1043,7 +1056,7 @@ export class MensajesService {
     }
     await this.exigirNumeroEnviable(c);
     await this.verificarLimiteTasaUsuario(usuario.partyId);
-    if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+    if (this.ventana24hService && !(await this.ventana24hService.puedeEscribirPersona(c.telefono, c.id))) {
       throw new HttpException(
         {
           codigo: 'VENTANA_CERRADA',
@@ -1205,7 +1218,7 @@ export class MensajesService {
 
     // Texto: se REUSA el mismo mensaje (no se crea otro), se vuelve a poner en la cola y se responde YA
     if (!esPlantilla && mensajeAnterior.tipo === 'TEXTO' && this.cola && this.gateway.transmitirTexto) {
-      if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+      if (this.ventana24hService && !(await this.ventana24hService.puedeEscribirPersona(c.telefono, c.id))) {
         throw new HttpException(
           {
             codigo: 'VENTANA_CERRADA',
@@ -1242,7 +1255,7 @@ export class MensajesService {
       m = await this.gateway.enviarPlantilla(c.id, c.telefono, plantilla, variables, 'PERSONA');
     } else {
       if (this.ventana24hService) {
-        const abierta = await this.ventana24hService.esVentanaAbierta(c.telefono, c.id);
+        const abierta = await this.ventana24hService.puedeEscribirPersona(c.telefono, c.id);
         if (!abierta) {
           throw new HttpException(
             {

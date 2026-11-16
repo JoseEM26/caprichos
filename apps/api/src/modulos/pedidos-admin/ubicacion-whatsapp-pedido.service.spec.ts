@@ -23,7 +23,7 @@ describe('UbicacionWhatsappPedidoService', () => {
       parseId: (x: string) => BigInt(x),
       pedidoEditable: jest.fn(),
     };
-    ventana = { esVentanaAbierta: jest.fn().mockResolvedValue(true), enviarMensajeNegocio: jest.fn().mockResolvedValue({ exito: true }) };
+    ventana = { esVentanaAbierta: jest.fn().mockResolvedValue(true), puedeEscribirPersona: (...a: any[]) => ventana.esVentanaAbierta(...a), enviarMensajeNegocio: jest.fn().mockResolvedValue({ exito: true }) };
     auditoria = { registrar: jest.fn() };
     eventos = { emitirAdmin: jest.fn() };
     svc = new UbicacionWhatsappPedidoService(prisma, cambio, ventana, auditoria, eventos);

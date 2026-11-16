@@ -189,7 +189,7 @@ describe('Enviar imagen desde el admin', () => {
       { registrar: jest.fn() } as any,
       gateway,
       { emitirAdmin: jest.fn() } as any,
-      { esVentanaAbierta: jest.fn().mockResolvedValue(true) } as any,
+      { puedeEscribirPersona: jest.fn().mockResolvedValue(true) } as any,
       undefined,
       archivos,
     );
@@ -216,7 +216,7 @@ describe('Enviar imagen desde el admin', () => {
   });
 
   it('con la ventana de 24 h cerrada responde VENTANA_CERRADA (el front ofrece la plantilla)', async () => {
-    (service as any).ventana24hService.esVentanaAbierta.mockResolvedValue(false);
+    (service as any).ventana24hService.puedeEscribirPersona.mockResolvedValue(false);
     await expect(service.enviarImagen('1', { buffer: JPG, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({
       response: { codigo: 'VENTANA_CERRADA', plantillaReapertura: 'caprichos_reabrir_conversacion' },
     });
@@ -232,7 +232,7 @@ describe('Enviar imagen: conversión, compresión, falla de Meta y permiso', () 
       userAccount: { findUnique: jest.fn().mockResolvedValue({ id: 7n }) },
     };
     return new MensajesService(prisma as any, { registrar: jest.fn() } as any, gateway, { emitirAdmin: jest.fn() } as any,
-      { esVentanaAbierta: jest.fn().mockResolvedValue(true) } as any, undefined, archivos);
+      { puedeEscribirPersona: jest.fn().mockResolvedValue(true) } as any, undefined, archivos);
   };
 
   it('WebP se convierte a JPEG; esa copia es la que se guarda y envía', async () => {

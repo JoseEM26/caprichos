@@ -212,7 +212,7 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
     if (!pedido.cliente_telefono) {
       throw new ConflictException({ codigo: 'SIN_WHATSAPP', mensaje: 'El pedido no tiene celular para escribirle por WhatsApp' });
     }
-    if (!(await this.ventana.esVentanaAbierta(pedido.cliente_telefono))) {
+    if (!(await this.ventana.puedeEscribirPersona(pedido.cliente_telefono))) {
       throw new ConflictException({
         codigo: 'VENTANA_CERRADA',
         mensaje: 'Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp no deja escribirle. Pídele que te escriba o llámalo.',

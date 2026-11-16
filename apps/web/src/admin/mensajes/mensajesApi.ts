@@ -42,6 +42,11 @@ export async function listarConversaciones(
   return api.get<RespuestaListarChats>(`/admin/mensajes/conversaciones${paramsLista(filtro, q, pos, opciones)}`);
 }
 
+/** Abre (o crea, sin enviar nada) el chat de un celular para escribirle desde Mensajes. */
+export async function iniciarChat(telefono: string, nombre?: string): Promise<{ id: string; creada: boolean }> {
+  return api.post<{ id: string; creada: boolean }>('/admin/mensajes/conversaciones/iniciar', { telefono, nombre });
+}
+
 /** Solo los contadores de las pestañas. */
 export async function obtenerConteosChats(): Promise<RespuestaListarChats['conteos']> {
   return api.get<RespuestaListarChats['conteos']>('/admin/mensajes/conversaciones/conteos');

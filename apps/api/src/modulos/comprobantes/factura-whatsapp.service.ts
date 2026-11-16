@@ -204,7 +204,10 @@ export class FacturaWhatsappService implements OnModuleInit, OnModuleDestroy {
     if (!(await this.ventana.tieneConsentimiento(telefono))) return this.cerrar(id, 'OMITIDO', { detalle: 'CLIENTE_BAJA' }, o);
 
     const abierta = await this.ventana.esVentanaAbierta(telefono);
-    if (!abierta && !cfg.plantilla) return this.cerrar(id, 'SIN_VENTANA', { detalle: 'SIN_VENTANA', reintentar: true }, o);
+    // Con Evolution no hay plantillas de Meta: fuera de las 24 h no sale solo (queda «Sin ventana»; se reintenta si el cliente escribe
+    // y la persona puede enviarla a mano desde Mensajes). La regla del dueño: nada automático fuera de la ventana.
+    const sinPlantillas = (await this.ventana.esEvolution?.()) === true;
+    if (!abierta && (!cfg.plantilla || sinPlantillas)) return this.cerrar(id, 'SIN_VENTANA', { detalle: 'SIN_VENTANA', reintentar: true }, o);
 
     // El PDF se genera una vez y viaja a Meta por la Media API (nunca por link: da 131000)
     const pdf = await this.comprobantes.pdfParaEnvio(id);
