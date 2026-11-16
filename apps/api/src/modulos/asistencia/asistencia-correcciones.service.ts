@@ -478,6 +478,46 @@ export class AsistenciaCorreccionesService {
     return this.prisma.asistenciaSolicitud.count({ where: { estado: 'PENDIENTE' } });
   }
 
+  /**
+   * Lo que el admin tiene por revisar en asistencia (últimos 14 días, sin períodos ya pagados): marcas dudosas, jornadas
+   * «No marcó salida» o incompletas, y reemplazos por aprobar. Solo conteos, para la campanita.
+   * ponytail: se calcula al consultar (todas las personas x 14 días, con memoria de 60 s); si pesara, guardar el resultado del día.
+   */
+  async pendientesDeRevision(ahora = new Date()): Promise<{ marcasDudosas: number; sinSalida: number; incompletas: number; reemplazos: number }> {
+    if (this.cachePend && ahora.getTime() - this.cachePend.en < 60_000) return this.cachePend.valor;
+    const hoy = jornadaDe(ahora).jornada;
+    const desde = sumarDias(hoy, -14);
+    const [dudosas, reemplazos] = await Promise.all([
+      this.prisma.asistenciaMarca.findMany({ where: { estado: 'A_REVISAR', jornada: { gte: fechaDb(desde), lte: fechaDb(hoy) } }, select: { party_id: true, jornada: true }, take: 500 }),
+      this.prisma.solicitudTurno.count({ where: { estado: 'PENDIENTE_APRUEBA' } }),
+    ]);
+    const cfg = await this.asistencia.obtenerConfig();
+    const ctx = await this.asistencia.cargarContexto(desde, hoy);
+    const ids = new Set<bigint>();
+    for (let j = desde; j <= hoy; j = sumarDias(j, 1)) for (const p of this.asistencia.partesConActividad(ctx, j)) ids.add(p);
+    const lista = [...ids];
+    const [rolesDe, pagados] = await Promise.all([
+      this.rolesPorPersona(lista),
+      lista.length ? this.prisma.planillaPeriodo.findMany({ where: { party_id: { in: lista }, estado: 'PAGADO', desde: { lte: fechaDb(hoy) }, hasta: { gte: fechaDb(desde) } } }) : Promise.resolve([] as any[]),
+    ]);
+    const enPagado = (pid: bigint, j: string) => pagados.some((p: any) => p.party_id === pid && isoDe(p.desde) <= j && isoDe(p.hasta) >= j);
+    let sinSalida = 0;
+    let incompletas = 0;
+    for (const pid of lista) {
+      if ((rolesDe.get(pid) ?? []).includes('ADMIN')) continue;
+      for (let j = desde; j <= hoy; j = sumarDias(j, 1)) {
+        if (enPagado(pid, j)) continue;
+        const est = this.asistencia.evaluarDia(pid, j, ctx, ahora, cfg).resultado.estado;
+        if (est === 'SIN_SALIDA') sinSalida++;
+        else if (est === 'INCOMPLETO' || est === 'A_REVISAR') incompletas++;
+      }
+    }
+    const valor = { marcasDudosas: dudosas.filter((m) => !enPagado(m.party_id, isoDe(m.jornada))).length, sinSalida, incompletas, reemplazos };
+    this.cachePend = { en: ahora.getTime(), valor };
+    return valor;
+  }
+  private cachePend?: { en: number; valor: { marcasDudosas: number; sinSalida: number; incompletas: number; reemplazos: number } };
+
   private async auditar(nombre: string, partyId: bigint, ip: string | undefined, entidadId: bigint, despues: Record<string, unknown>, motivo?: string) {
     await this.auditoria?.registrar({
       categoria: 'CAMBIO' as any,

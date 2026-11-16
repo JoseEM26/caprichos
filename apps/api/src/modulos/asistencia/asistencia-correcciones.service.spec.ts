@@ -62,6 +62,7 @@ function montar(opts: { marcas?: Fila[]; pagado?: boolean } = {}) {
     asistenciaMarca: tabla(marcas),
     asistenciaSolicitud: tabla(solicitudes),
     planillaPeriodo: tabla(pagados),
+    solicitudTurno: { count: async () => 1 },
     vacacionMovimiento: { findMany: async () => [] },
     person: { findMany: async () => [{ party_id: 7n, nombres: 'Luis', apellidos: 'Pérez' }] },
     userAccount: { findMany: async () => [{ id: 70n, party_id: 7n, rol: 'MOZO' }] },
@@ -304,5 +305,20 @@ describe('aprobar / rechazar en lote', () => {
     expect(r).toMatchObject({ ok: 2, omitidas: 2 });
     expect(marcas.filter((m) => m.estado === 'APROBADA').map((m) => Number(m.id))).toEqual([1, 2]);
     expect(marcas.find((m) => m.id === 3n)!.estado).toBe('A_REVISAR');
+  });
+});
+
+describe('pendientes de revisión del admin (campanita)', () => {
+  it('cuenta marcas dudosas, jornadas «No marcó salida» y reemplazos por aprobar', async () => {
+    const { svc } = montar({ marcas: [celular(1, 9), { ...celular(2, 10), estado: 'A_REVISAR' }] });
+    const r = await svc.pendientesDeRevision(AHORA);
+    expect(r).toMatchObject({ marcasDudosas: 1, reemplazos: 1 });
+    expect(r.sinSalida + r.incompletas).toBeGreaterThanOrEqual(1);
+  });
+
+  it('un período ya pagado no genera avisos (no se puede resolver sin reabrir)', async () => {
+    const { svc } = montar({ marcas: [celular(1, 9), { ...celular(2, 10), estado: 'A_REVISAR' }], pagado: true });
+    const r = await svc.pendientesDeRevision(AHORA);
+    expect(r).toMatchObject({ marcasDudosas: 0, sinSalida: 0, incompletas: 0 });
   });
 });

@@ -517,6 +517,30 @@ export class NotificacionesService {
         });
       }
     }
+    // Asistencia: el admin ve lo que espera su revisión (marcas dudosas, «No marcó salida», jornadas incompletas, reemplazos por aprobar)
+    if (this.correcciones?.pendientesDeRevision && puede('asistencia/administrar')) {
+      const p = await this.correcciones.pendientesDeRevision(new Date(ahora));
+      const partes = [
+        p.marcasDudosas ? plural(p.marcasDudosas, 'marca dudosa', 'marcas dudosas') : '',
+        p.sinSalida ? plural(p.sinSalida, 'jornada «No marcó salida»', 'jornadas «No marcó salida»') : '',
+        p.incompletas ? plural(p.incompletas, 'jornada incompleta', 'jornadas incompletas') : '',
+        p.reemplazos ? plural(p.reemplazos, 'reemplazo por aprobar', 'reemplazos por aprobar') : '',
+      ].filter(Boolean);
+      const total = p.marcasDudosas + p.sinSalida + p.incompletas + p.reemplazos;
+      if (total) {
+        calculadas.push({
+          id: 'asistencia-por-revisar',
+          clave: claveCalculada('asistencia-por-revisar', [p.marcasDudosas, p.sinSalida, p.incompletas, p.reemplazos]),
+          titulo: `Asistencia por revisar: ${partes.join(', ')}`,
+          detalle: 'Resuélvelas antes de pagar la planilla: una jornada pendiente bloquea el pago.',
+          prioridad: 'MEDIA',
+          desde: ahoraIso,
+          modulo: 'asistencia',
+          accion: 'Ir a Asistencia',
+          ruta: '/admin/asistencia?pestana=calendario',
+        });
+      }
+    }
     // Asistencia: cada persona (no el ADMIN) recibe un aviso por jornada con marcas que no cuadran; leído, no vuelve a sonar
     // ponytail: se calcula al consultar (1 persona x 7 días); si pesara, guardar el resultado del día en una tabla
     if (this.correcciones && puede('asistencia/marcar') && ![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
