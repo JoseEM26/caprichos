@@ -1,16 +1,16 @@
 import { deliveryUbicado, exigirDeliveryUbicado } from './delivery-ubicacion.util';
 
 describe('delivery-ubicacion', () => {
-  const ok = { modalidad: 'DELIVERY', entrega_lat: -12, entrega_lng: -77, zona_id: 1n };
-  it('delivery con punto y zona está ubicado', () => expect(deliveryUbicado(ok)).toBe(true));
+  const ok = { modalidad: 'DELIVERY', entrega_lat: -12, entrega_lng: -77 };
+  it('delivery con punto está ubicado', () => expect(deliveryUbicado(ok)).toBe(true));
   it.each([
     { ...ok, entrega_lat: null },
     { ...ok, entrega_lng: null },
-    { ...ok, zona_id: null },
-  ])('delivery sin punto o sin zona no lo está (caso %#)', (p) => {
+  ])('delivery sin punto no lo está (caso %#)', (p) => {
     expect(deliveryUbicado(p)).toBe(false);
     expect(() => exigirDeliveryUbicado(p)).toThrow(expect.objectContaining({
-      response: { codigo: 'DELIVERY_SIN_UBICACION', mensaje: 'Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).' },
+      response: { codigo: 'UBICACION_REQUERIDA', mensaje: 'Falta la ubicación del cliente: confírmala por WhatsApp antes de mandarlo con el motorizado' },
+      status: 409,
     }));
   });
   it('mesa y recoger no aplican', () => {

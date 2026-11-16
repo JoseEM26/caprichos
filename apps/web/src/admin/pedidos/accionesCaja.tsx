@@ -9,7 +9,6 @@ import { ModalCobrar } from './ModalCobrar';
 import { useAvisoCocinaPendiente } from './avisoCocinaPendiente';
 import { useAvisoCobroPendiente } from './avisoCobroPendiente';
 import { esDeliveryContraEntrega } from './mediosPago';
-import { deliverySinUbicacion } from './ubicacionDelivery';
 import { esCerrado, esPorConfirmar, estadoVisual } from './estadosCaja';
 
 /** Botón grande del pie de la tarjeta: la acción que sigue para ese pedido. */
@@ -37,13 +36,8 @@ export function accionDePedido(p: Pedido, tiene: (permiso: string) => boolean): 
   const pagado = mayus(p.pago_estado) === 'PAGADO';
   const coordinado = Boolean(p.pago_coordinado_en) || mayus(p.pago_estado) === 'COORDINADO';
   const v = estadoVisual(p);
-  const sinUbicar = deliverySinUbicacion(p);
   const puedeCambiar = tiene('pedidos/cambiar_estado');
 
-  // Delivery sin punto o zona: no se confirma ni cobra hasta ubicarlo; el aviso para ubicar vive en el detalle
-  if (sinUbicar && (esPorConfirmar(p) || (!pagado && !coordinado))) {
-    return { tipo: 'detalle', texto: 'UBICAR', bg: '#FFF1C9', fg: '#0B2C3E' };
-  }
   if (esPorConfirmar(p)) {
     return { tipo: 'confirmar_pago', texto: esDeliveryContraEntrega(p) ? 'CONFIRMAR PEDIDO' : 'CONFIRMAR PAGO', bg: '#E67929', fg: '#0B2C3E' };
   }

@@ -49,11 +49,9 @@ const delivery = (extra: Partial<Pedido> = {}): Pedido =>
 describe('delivery sin ubicación (Caja)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('regla: sin punto o sin zona es «sin ubicación»; un dato que el listado no trae no cuenta', () => {
+  it('regla: sin punto es «sin ubicación»; un dato que el listado no trae no cuenta', () => {
     expect(deliverySinUbicacion(delivery())).toBe(true);
-    expect(deliverySinUbicacion(delivery({ entrega_lat: -12, entrega_lng: -77, zona: null, zona_id: null }))).toBe(true);
-    expect(deliverySinUbicacion(delivery({ entrega_lat: -12, entrega_lng: -77, zona: { id: '1', nombre: 'Z1', precio: 5 } }))).toBe(false);
-    expect(deliverySinUbicacion(delivery({ entrega_lat: -12, entrega_lng: -77, zona: undefined, zona_id: '3' }))).toBe(false);
+    expect(deliverySinUbicacion(delivery({ entrega_lat: -12, entrega_lng: -77 }))).toBe(false);
     expect(deliverySinUbicacion({ modalidad: 'MESA', entrega_lat: null })).toBe(false);
     expect(deliverySinUbicacion({ modalidad: 'DELIVERY' })).toBe(false);
   });
@@ -75,17 +73,12 @@ describe('delivery sin ubicación (Caja)', () => {
     expect(await screen.findByText(/Pasaron más de 24 h/)).toBeTruthy();
   });
 
-  it('«Confirmar pedido y pago»: con el delivery sin ubicación el botón final está deshabilitado y el mensaje se ve', () => {
-    render(<ModalConfirmarPago pedido={delivery()} alCerrar={vi.fn()} alConfirmarExitoso={vi.fn()} />);
-    expect(screen.getAllByText(MENSAJE_DELIVERY_SIN_UBICACION).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Ubicar en el mapa' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Pedir ubicación por WhatsApp' })).toBeTruthy();
+  it('«Confirmar pedido y pago»: con el delivery sin ubicación NO se bloquea (pasa a cocina igual)', () => {
+    render(<ModalConfirmarPago pedido={delivery({ pago_preferido: 'EFECTIVO' })} alCerrar={vi.fn()} alConfirmarExitoso={vi.fn()} />);
+    expect(screen.queryByText(MENSAJE_DELIVERY_SIN_UBICACION)).toBeNull();
     fireEvent.click(screen.getByRole('checkbox', { name: /Ya hablé con el cliente/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    const boton = screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement;
-    expect(boton.disabled).toBe(true);
-    expect(boton.title).toBe(MENSAJE_DELIVERY_SIN_UBICACION);
+    expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('con punto y zona no hay aviso y el botón queda habilitado', () => {
@@ -98,18 +91,9 @@ describe('delivery sin ubicación (Caja)', () => {
     expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('delivery en efectivo sin ubicación: sigue bloqueado aunque no haya paso de pago', () => {
-    render(<ModalConfirmarPago pedido={delivery({ pago_preferido: 'EFECTIVO' })} alCerrar={vi.fn()} alConfirmarExitoso={vi.fn()} />);
-    fireEvent.click(screen.getByRole('checkbox', { name: /Ya hablé con el cliente/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('«Cobrar»: delivery sin ubicación no se cobra desde la ventana', () => {
+  it('«Cobrar»: delivery sin ubicación se puede cobrar desde la ventana (sin aviso)', () => {
     render(<ModalCobrar pedido={delivery({ estado: 'LISTO' })} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} />);
-    expect(screen.getAllByText(MENSAJE_DELIVERY_SIN_UBICACION).length).toBeGreaterThan(0);
-    const botones = screen.getAllByRole('button').filter((b) => /^Cobrar$/.test(b.textContent ?? '') || /Registrar cobro|Cobrar S\//.test(b.textContent ?? ''));
-    expect(botones.length === 0 || botones.every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    expect(screen.queryByText(MENSAJE_DELIVERY_SIN_UBICACION)).toBeNull();
   });
 });
 

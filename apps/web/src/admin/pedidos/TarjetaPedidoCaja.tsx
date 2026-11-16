@@ -4,7 +4,7 @@ import { montoPorCobrar, type Pedido } from './pedidosApi';
 import { InsigniaMesa } from './InsigniaMesa';
 import { PastillaEspera } from './PastillaEspera';
 import { IconoModalidad, IconoCanal, claveCanal, claveModalidad, textoMesa, type ClaveModalidad } from './InsigniaModalidad';
-import { deliverySinUbicacion } from './ubicacionDelivery';
+import { MARCA_FALTA_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import { canalLabel, ChipCobroMozo } from './PedidosAdminView';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
@@ -106,7 +106,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const items = itemsCaja(lineas);
   const esDelivery = clave === 'DELIVERY';
   const sinUbicacion = esDelivery && deliverySinUbicacion(o);
-  const lugar = esDelivery ? (sinUbicacion ? 'Falta la ubicación' : o.entrega_direccion || null) : null;
+  const lugar = esDelivery ? (sinUbicacion ? MARCA_FALTA_UBICACION : o.entrega_direccion || null) : null;
 
   return (
     <div

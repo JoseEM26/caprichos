@@ -10,7 +10,7 @@ import { CANAL, MOD, aHora, textoPago } from './columnasCaja';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import { mediosDePedido, nombreMedio } from './mediosFila';
 import { totalDe } from './resumenDia';
-import { deliverySinUbicacion } from './ubicacionDelivery';
+import { MARCA_FALTA_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import './lista-caja.css';
 
 const soles = (n: number) => `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -169,7 +169,7 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
 
       <div className="lc-cliente">
         <span className="lc-nombre" title={p.cliente_nombre?.trim() || 'Cliente'}>{p.cliente_nombre?.trim() || 'Cliente'}</span>
-        {sinUbicar && <span className="lc-aviso">Falta la ubicación</span>}
+        {sinUbicar && <span className="lc-aviso">{MARCA_FALTA_UBICACION}</span>}
         {sinRepartidor && (
           <Link to="/admin/repartos" className="lc-repartidor" aria-label={`Elige un repartidor para ${p.codigo}`}>
             Elige un repartidor <span aria-hidden="true">›</span>

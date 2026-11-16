@@ -10,6 +10,8 @@ export interface AvisoDeliverySinUbicacionProps {
   pedidoId: string;
   codigo: string;
   direccion?: string | null;
+  /** Celular del cliente: ofrece la ubicación que mandó por WhatsApp */
+  telefono?: string | null;
   alActualizar: () => void;
 }
 
@@ -17,7 +19,7 @@ export interface AvisoDeliverySinUbicacionProps {
  * Delivery esperando ubicación: aviso claro con las dos salidas, ubicar en el mapa (Caja) o pedir la ubicación al
  * cliente por WhatsApp (cuando llega, el pedido se ubica solo).
  */
-export function AvisoDeliverySinUbicacion({ pedidoId, codigo, direccion, alActualizar }: AvisoDeliverySinUbicacionProps) {
+export function AvisoDeliverySinUbicacion({ pedidoId, codigo, direccion, telefono, alActualizar }: AvisoDeliverySinUbicacionProps) {
   const { tiene } = useSesion();
   const puede = tiene('pedidos/cambiar_ubicacion');
   const [mapa, setMapa] = useState(false);
@@ -65,6 +67,7 @@ export function AvisoDeliverySinUbicacion({ pedidoId, codigo, direccion, alActua
           codigoPedido={codigo}
           direccionActual={direccion}
           puntoActual={null}
+          telefono={telefono}
           alCerrar={() => setMapa(false)}
           alCambiar={() => {
             setMapa(false);
