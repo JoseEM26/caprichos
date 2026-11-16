@@ -24,7 +24,7 @@ describe('cabecera compacta de la bandeja', () => {
     expect(screen.queryByTestId('badge-filtros')).toBeNull();
     expect(screen.getByTestId('boton-filtros')).toHaveAttribute('aria-expanded', 'false');
     const tabs = screen.getByTestId('pestanas');
-    expect(within(tabs).getAllByRole('button')).toHaveLength(5);
+    expect(within(tabs).getAllByRole('button')).toHaveLength(6);
     expect(tabs).toHaveClass('msg-tabs');
     expect(screen.getByRole('button', { name: /Por atender/ })).toHaveAttribute('data-pendiente', '1');
     // el aviso de días anteriores se ve sin abrir el panel

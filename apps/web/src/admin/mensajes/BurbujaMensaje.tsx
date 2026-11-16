@@ -15,7 +15,7 @@ export interface BurbujaMensajeProps {
 export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps) {
   const esCliente = m.autor === 'CLIENTE';
   const esBot = m.autor === 'BOT';
-  const quien = esCliente ? 'Cliente' : esBot ? 'Capri (bot)' : 'Equipo';
+  const quien = esCliente ? 'Cliente' : esBot ? 'Capri (bot)' : m.canal === 'WHATSAPP_BUSINESS' ? 'Equipo · Enviado desde WhatsApp Business por el local' : 'Equipo';
   return (
     <article className="msg-burbuja" data-autor={m.autor}>
       {!esCliente && (

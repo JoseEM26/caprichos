@@ -1882,6 +1882,33 @@ export class WhatsappWebhookService {
     }
   }
 
+  /**
+   * Une un chat que llegó como LID (sin número) con el celular real. Si no hay chat con ese celular, el chat del LID pasa a ser
+   * el del celular (se le escribe a ese número); si ya existen los dos, el del LID guarda el celular vinculado para que sus pedidos
+   * y el botón «Abrir chat» del pedido lo encuentren. No registra números en logs. Nunca lanza.
+   */
+  async vincularLidConCelular(lid: string, celular: string): Promise<boolean> {
+    try {
+      const dl = String(lid).replace(/\D/g, '');
+      const dc = String(celular).replace(/\D/g, '');
+      if (!dl || !/^\d{9,15}$/.test(dc) || dl === dc) return false;
+      const tel = normalizarTelefono(dc);
+      const delLid = await this.prisma.conversacion.findUnique({ where: { telefono: `wa-user:${dl}@lid` }, select: { id: true, celular_vinculado: true } });
+      if (!delLid) return false;
+      const delTel = await this.prisma.conversacion.findUnique({ where: { telefono: tel }, select: { id: true } });
+      if (!delTel) {
+        await this.prisma.conversacion.update({ where: { id: delLid.id }, data: { telefono: tel, identificador_tipo: 'TELEFONO', celular_vinculado: null } });
+      } else if (delLid.celular_vinculado !== tel.slice(-9)) {
+        await this.prisma.conversacion.update({ where: { id: delLid.id }, data: { celular_vinculado: tel.slice(-9) } });
+      } else return false;
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: delLid.id.toString() });
+      return true;
+    } catch (err: any) {
+      this.logger.warn(`No se pudo vincular un chat sin número: ${err?.message}`);
+      return false;
+    }
+  }
+
   /** El local leyó el chat en WhatsApp Business (chats.update sin mensajes por leer): queda visto en Mensajes. */
   async marcarLeidoDesdeWhatsapp(jid: string): Promise<boolean> {
     try {

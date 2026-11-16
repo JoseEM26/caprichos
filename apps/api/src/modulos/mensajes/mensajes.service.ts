@@ -284,7 +284,9 @@ export class MensajesService {
   }
 
   /** Pedidos que pueden ligarse a estos chats, en UNA consulta: los de hoy con celular y los ligados por el flujo. */
-  private async posDeChats(chats: { id: bigint; telefono: string; flujo?: unknown }[]): Promise<Map<bigint, PosChat>> {
+  private async posDeChats(chatsCrudos: { id: bigint; telefono: string; flujo?: unknown; celular_vinculado?: string | null }[]): Promise<Map<bigint, PosChat>> {
+    // Un chat sin número (LID) se une a sus pedidos por el celular vinculado
+    const chats = chatsCrudos.map((c) => (c.celular_vinculado && /^wa-user:/.test(c.telefono) ? { ...c, telefono: `51${c.celular_vinculado}` } : c));
     const ligados = chats.map((c) => pedidoLigadoDelFlujo(c.flujo)).filter((x): x is bigint => x != null);
     const pedidos = await this.prisma.pedido.findMany({
       where: {
@@ -359,7 +361,7 @@ export class MensajesService {
   private static readonly SELECCION_LISTA = {
     id: true, telefono: true, estado: true, duenio: true, urgente: true, tomado_por: true, atendido_en: true, atendido_por: true,
     visto_en: true, marcado_no_visto: true, ultima_actividad: true, motivo_derivacion: true, nombre_contacto: true,
-    nombre_editado: true, identificador_tipo: true, flujo: true,
+    nombre_editado: true, identificador_tipo: true, flujo: true, celular_vinculado: true,
     party: { select: { persona: { select: { nombres: true, apellidos: true } } } },
   } as const;
 
@@ -457,7 +459,8 @@ export class MensajesService {
       (!termino ||
         f.nombre.toLowerCase().includes(termino) ||
         (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(termino)) ||
-        (!esRemitenteSinTelefono(c) && digitos !== '' && c.telefono.replace(/\D/g, '').includes(digitos)))
+        (!esRemitenteSinTelefono(c) && digitos !== '' && c.telefono.replace(/\D/g, '').includes(digitos)) ||
+        (digitos !== '' && !!c.celular_vinculado && c.celular_vinculado.includes(digitos.slice(-9))))
     );
   }
 
@@ -492,6 +495,8 @@ export class MensajesService {
         id: c.id.toString(),
         nombre: f.nombre,
         telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
+        /** Celular al que se vinculó un chat sin número (LID): el botón «Abrir chat» del pedido lo encuentra por él. */
+        celularVinculado: c.celular_vinculado ?? null,
         identificador_tipo: c.identificador_tipo,
         nombre_contacto: c.nombre_contacto,
         nombre_editado: c.nombre_editado,
@@ -732,7 +737,9 @@ export class MensajesService {
       // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
       const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
       const condicion: any[] = [{ cliente_telefono: c.telefono }];
-      if (ultimos9.length === 9) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+      if (ultimos9.length === 9 && !esRemitenteSinTelefono(c)) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+      // Chat sin número (LID) vinculado a un celular: sus pedidos son los de ese celular
+      if (c.celular_vinculado) condicion.push({ cliente_telefono: { endsWith: c.celular_vinculado } });
       if (c.party_id) condicion.push({ party_id: c.party_id });
       // El pedido cuyo voucher llegó por este chat tiene prioridad
       const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
@@ -901,6 +908,9 @@ export class MensajesService {
     if (!/^519\d{8}$/.test(tel)) throw error(HttpStatus.BAD_REQUEST, 'TELEFONO_INVALIDO', 'El celular no es válido');
     const previa = await this.prisma.conversacion.findUnique({ where: { telefono: tel }, select: { id: true } });
     if (previa) return { id: previa.id.toString(), creada: false };
+    // El cliente escribió desde un chat sin número (LID) que ya está vinculado a este celular: es ese chat
+    const vinculada = await this.prisma.conversacion.findFirst({ where: { celular_vinculado: tel.slice(-9) }, orderBy: { ultima_actividad: 'desc' }, select: { id: true } });
+    if (vinculada) return { id: vinculada.id.toString(), creada: false };
     const c = await this.prisma.conversacion.create({ data: { telefono: tel, nombre_contacto: nombre?.trim() || null }, select: { id: true } });
     return { id: c.id.toString(), creada: true };
   }

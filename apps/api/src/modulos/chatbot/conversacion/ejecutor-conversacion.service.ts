@@ -2175,6 +2175,13 @@ export class EjecutorConversacionService {
               this.origenPedidoWhatsapp(conversacion),
             );
             codigoFinal = pedidoCreado.codigo;
+            // Chat sin número (LID): el celular que el cliente dio para su pedido vincula el chat con sus pedidos
+            if (conversacion.identificador_tipo === 'USUARIO_WA' || String(conversacion.telefono).startsWith('wa-user:')) {
+              const cel = String(accion.dto?.cliente?.telefono ?? '').replace(/\D/g, '').slice(-9);
+              if (/^9\d{8}$/.test(cel)) {
+                await this.prisma.conversacion.update({ where: { id: conversacion.id }, data: { celular_vinculado: cel } }).catch(() => undefined);
+              }
+            }
             // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {

@@ -48,6 +48,14 @@ export interface ListaChatsProps {
   onCargarMas?: () => void;
 }
 
+/** «12 min», «2 h 5 min»: tiempo que lleva esperando el cliente. */
+export function textoTiempoEspera(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 /** Chip de estado de la lista. */
 function etiquetaEstado(estado: EstadoChat, urgente: boolean): string {
   return urgente ? `Urgente · ${ESTADOS_LABEL[estado]}` : ESTADOS_LABEL[estado];
@@ -252,6 +260,7 @@ export function ListaChats({
 
       <div ref={pestanasRef} className="msg-tabs" role="group" aria-label="Filtrar chats" data-testid="pestanas">
         {[
+          { id: 'responder', label: 'Por responder', count: conteos.porResponder ?? 0 },
           { id: 'todos', label: 'Todos', count: conteos.todos },
           { id: 'atender', label: 'Por atender', count: conteos.atender },
           { id: 'bot', label: 'Con el bot', count: conteos.bot },
@@ -268,7 +277,7 @@ export function ListaChats({
               type="button"
               className="msg-tab msg-tab-principal"
               aria-pressed={activa}
-              data-pendiente={tab.id === 'atender' && tab.count > 0 ? '1' : '0'}
+              data-pendiente={(tab.id === 'atender' || tab.id === 'responder') && tab.count > 0 ? '1' : '0'}
               onClick={() => onFiltro(tab.id as FiltroChat)}
             >
               {tab.label} <b>{tab.count}</b>
@@ -342,6 +351,7 @@ export function ListaChats({
             const seleccionado = c.id === chatSeleccionadoId;
             const espera = typeof c.esperaMin === 'number' ? obtenerEstiloEspera(c.esperaMin) : null;
             const sinVer = c.sinLeer > 0 || Boolean(c.marcadoNoVisto);
+            const esperaCliente = c.porResponder ? c.sinRespuestaMin ?? null : null;
             return (
               <React.Fragment key={c.id}>
               {nuevoDia && (
@@ -354,6 +364,7 @@ export function ListaChats({
                   type="button"
                   className="msg-fila"
                   data-sin-ver={sinVer ? '1' : '0'}
+                  data-por-responder={c.porResponder ? '1' : '0'}
                   aria-current={seleccionado ? 'true' : undefined}
                   onClick={() => onSeleccionar(c.id)}
                 >
@@ -362,11 +373,11 @@ export function ListaChats({
                   </span>
                   <span className="msg-fila-cuerpo">
                     <span className="msg-fila-l1">
-                      <span className="msg-nombre">{c.nombre}</span>
+                      <span className="msg-nombre" style={c.porResponder || sinVer ? { fontWeight: 800 } : undefined}>{c.nombre}</span>
                       <span className={c.sinLeer > 0 ? 'msg-hora msg-hora-nueva' : 'msg-hora'}>{c.fecha ? horaListaChat(c.fecha) : c.hora}</span>
                     </span>
                     <span className="msg-fila-l2">
-                      <span className="msg-vista" title={c.ultimo}>
+                      <span className="msg-vista" title={c.ultimo} style={c.porResponder || sinVer ? { fontWeight: 700, color: 'inherit' } : undefined}>
                         {c.ultimo}
                       </span>
                       {c.sinLeer > 0 && (
@@ -381,6 +392,20 @@ export function ListaChats({
                       )}
                     </span>
                     <span className="msg-chips">
+ {c.atiende && (
+                        <span className="msg-chip" data-testid={`atiende-${c.id}`} title="Quién atiende este chat">
+                          Atiende: {c.atiende === 'BOT' ? 'Bot' : c.atiende === 'PERSONA' ? 'Persona' : 'WhatsApp Business'}
+                        </span>
+                      )}
+                      {esperaCliente !== null && (
+                        <span
+                          className="msg-chip"
+                          data-testid={`esperando-${c.id}`}
+                          style={esperaCliente >= 15 ? { background: '#A3261A', borderColor: '#A3261A', color: '#FFFFFF' } : undefined}
+                        >
+                          Esperando {esperaCliente < 1 ? 'ahora' : `hace ${textoTiempoEspera(esperaCliente)}`}
+                        </span>
+                      )}
                       {sinVer && (
                         <span className="msg-chip msg-chip-no-visto" data-testid={`no-visto-${c.id}`}>
                           <span aria-hidden="true">●</span> {c.marcadoNoVisto ? 'No visto' : 'Sin ver'}

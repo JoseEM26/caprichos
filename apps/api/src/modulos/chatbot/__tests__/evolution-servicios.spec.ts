@@ -189,7 +189,7 @@ describe('webhook de Evolution', () => {
     const config = { get: (k: string) => (k === 'EVOLUTION_WEBHOOK_TOKEN' ? token : undefined) } as any;
     const estado = { registrarConexion: jest.fn() } as any;
     const store = new MenuNumeradoStore();
-    const webhook = { procesarPayload: jest.fn(async () => ({})) } as any;
+    const webhook = { procesarPayload: jest.fn(async () => ({})), registrarMensajeDelLocal: jest.fn(async () => 'SISTEMA'), vincularLidConCelular: jest.fn() } as any;
     const svc = new EvolutionWebhookService(config, estado, store, webhook);
     return { svc, estado, store, webhook, ctrl: new EvolutionWebhookController(svc) };
   };
@@ -209,12 +209,12 @@ describe('webhook de Evolution', () => {
     await ctrl.recibir(undefined, undefined, 'secreto-de-prueba', evento(texto()));
     expect(webhook.procesarPayload).toHaveBeenCalledTimes(3);
   });
-  it('ignora fromMe, grupos y estados: no llega al flujo del bot', async () => {
+  it('ignora grupos y estados; lo propio (fromMe) va al registro del local y no al flujo del bot', async () => {
     const { svc, webhook } = montar();
     const r1 = await svc.procesar(evento(texto({ fromMe: true })));
     const r2 = await svc.procesar(evento(texto({ remoteJid: '1203@g.us' })));
     const r3 = await svc.procesar(evento(texto({ remoteJid: 'status@broadcast' })));
-    expect([r1, r2, r3].map((r) => r.ignorados)).toEqual([1, 1, 1]);
+    expect([r1, r2, r3].map((r) => r.ignorados)).toEqual([1, 1, 1]); // fromMe del sistema: SISTEMA = ignorado
     expect(webhook.procesarPayload).not.toHaveBeenCalled();
   });
   it('acepta el nombre del evento en mayúsculas con guion bajo', async () => {

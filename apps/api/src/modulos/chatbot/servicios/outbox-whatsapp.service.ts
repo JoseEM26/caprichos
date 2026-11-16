@@ -286,8 +286,32 @@ export class OutboxWhatsappService {
     return resumen;
   }
 
+  /** Motivo por el que un aviso de pago pendiente ya no debe salir, leyendo el estado ACTUAL del pedido; null si sigue vigente. */
+  private async motivoObsoleto(fila: FilaSaliente, carga: CargaSaliente): Promise<string | null> {
+    if (!fila.pedido_id || !(fila.origen === 'RECORDATORIO_PAGO' || carga.etapa === 'RECORDATORIO_PAGO')) return null;
+    try {
+      const p = await this.prisma.pedido?.findUnique?.({ where: { id: fila.pedido_id }, select: { estado: true, pago_estado: true } });
+      if (!p) return null;
+      if (p.estado === 'ANULADO') return 'El pedido ya fue anulado: no se avisa que falta pagar';
+      if (p.estado === 'ENTREGADO') return 'El pedido ya fue entregado: no se avisa que falta pagar';
+      if (p.pago_estado && p.pago_estado !== 'PENDIENTE') return 'El pedido ya está pagado: no se avisa que falta pagar';
+    } catch {
+      // ante la duda se envía como antes
+    }
+    return null;
+  }
+
   private async enviarFila(fila: FilaSaliente, token: string): Promise<'ENVIADO' | 'REINTENTO' | 'FALLIDO' | 'PERDIDO' | 'OMITIDO'> {
     const carga = (fila.carga ?? {}) as unknown as CargaSaliente;
+    // Aviso de «falta pagar» que ya no aplica (pedido pagado, anulado o entregado mientras esperaba en la cola): se descarta con motivo
+    const obsoleto = await this.motivoObsoleto(fila, carga);
+    if (obsoleto) {
+      const r = await this.prisma.salienteWhatsapp.updateMany({
+        where: { id: fila.id, intento_token: token },
+        data: { estado: 'DESCARTADO', ultimo_error: `[AVISO_OBSOLETO] ${obsoleto}`, motivo_descarte: obsoleto, descartado_en: new Date(), descartado_por: 'Sistema', intento_token: null },
+      });
+      return r.count === 0 ? 'PERDIDO' : 'OMITIDO';
+    }
     const decision = await this.politica?.evaluar(fila).catch(() => null);
     if (decision?.accion === 'DESCARTAR') {
       // Política de Evolution: proactivo no permitido o a un número que nunca escribió. Queda DESCARTADO con su motivo.
@@ -540,6 +564,8 @@ export class OutboxWhatsappService {
         whatsapp_mensaje_id: whatsappMensajeId,
       },
     });
+    // Tiempo real: lo que sale del bot o de un aviso aparece al instante en la lista y el chat de Mensajes
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
   }
 
   /** Avisa a Caja y Admin (campana) por cada mensaje que queda FALLIDO. Se apaga con outbox_alerta_fallidos. */
