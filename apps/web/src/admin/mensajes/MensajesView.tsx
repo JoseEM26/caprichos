@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BloqueoVinculacion } from './BloqueoVinculacion';
 import { ModalDestinoDinero } from './ModalDestinoDinero';
 import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
@@ -1189,6 +1190,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
  * sola, con los fallidos para reenviar o descartar). La pestaña solo aparece con el permiso de ver salientes.
  */
 export function MensajesView() {
+  return (
+    <BloqueoVinculacion>
+      <MensajesViewInterna />
+    </BloqueoVinculacion>
+  );
+}
+
+function MensajesViewInterna() {
   let puedeSalientes = false;
   try {
     const sesion = useSesion();

@@ -1,8 +1,9 @@
-import { Body, Controller, ForbiddenException, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Optional, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { IsBoolean, IsIn } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { AccesoGuard } from '../../acceso/acceso.guard';
 import { Permiso } from '../../acceso/permiso.decorator';
+import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EvolutionApiCliente } from './evolution-api.cliente';
 import { CLAVES_LIMITES, EvolutionConfigService } from './evolution-config.service';
 
@@ -27,6 +28,7 @@ export class EvolutionAdminController {
     private readonly config: EvolutionConfigService,
     private readonly api: EvolutionApiCliente,
     private readonly env: ConfigService,
+    @Optional() private readonly auditoria?: AuditoriaService,
   ) {}
 
   private soloAdmin(req: any) {
@@ -57,6 +59,36 @@ export class EvolutionAdminController {
     this.soloAdmin(req);
     const qr = await this.api.qr();
     return { disponible: !!qr?.base64, base64: qr?.base64 ?? null, codigo: qr?.codigo ?? null };
+  }
+
+  /**
+   * Para la pantalla Mensajes (permiso de ver mensajes): solo dice si el número está vinculado. Sin claves ni URL.
+   * vinculado: true/false cuando Evolution lo confirma; null si no aplica (Meta/simulado) o no se pudo consultar.
+   */
+  @Get('mensajes/estado')
+  @Permiso('mensajes', 'ver')
+  async estadoMensajes() {
+    const proveedor = await this.config.proveedor();
+    if (proveedor !== 'EVOLUTION' || !this.api.configurado()) return { proveedor, vinculado: null, estado: null };
+    const enVivo = await this.api.estado();
+    return { proveedor, vinculado: enVivo ? enVivo === 'open' : null, estado: enVivo };
+  }
+
+  /** Genera un QR nuevo para re-vincular el número desde Mensajes. Queda auditado quién lo pidió. */
+  @Post('mensajes/qr')
+  @Permiso('mensajes', 'ver')
+  async qrMensajes(@Req() req: any) {
+    if ((await this.config.proveedor()) !== 'EVOLUTION') return { disponible: false, base64: null };
+    const qr = await this.api.qr();
+    await this.auditoria?.registrar({
+      categoria: 'ACCESO',
+      modulo: 'whatsapp_proveedor',
+      accion: 'pedir_qr',
+      entidad: 'parametro',
+      despues: { disponible: !!qr?.base64 },
+      partyId: req?.usuario?.partyId != null ? BigInt(req.usuario.partyId) : undefined,
+    });
+    return { disponible: !!qr?.base64, base64: qr?.base64 ?? null };
   }
 
   @Put('proveedor')
