@@ -1494,6 +1494,8 @@ export class PedidosService {
       }
 
       // Actualizar canje o uso de cupones u ofertas si aplicó
+      const quienAplica =
+        (canalPedido === 'MOZO' || canalPedido === 'CAJA') && origen?.usuarioPartyId != null ? BigInt(origen.usuarioPartyId) : null;
       if (desgloseDescuento.cuponEmitidoId) {
         // Condicional: dos pedidos a la vez no pueden gastar el mismo cupón emitido
         const gastado = await tx.cuponEmitido.updateMany({
@@ -1502,6 +1504,8 @@ export class PedidosService {
             estado: 'CANJEADO',
             canjeado_en: new Date(),
             pedido_canje_id: pedido.id,
+            canjeado_canal: canalPedido === 'WHATSAPP' ? 'BOT' : canalPedido,
+            canjeado_por: quienAplica,
           },
         });
         if (gastado.count === 0) {
@@ -1518,10 +1522,7 @@ export class PedidosService {
             pedido_id: pedido.id,
             party_id: clienteFinal,
             canal: canalPedido === 'WHATSAPP' ? 'BOT' : canalPedido,
-            aplicado_por:
-              (canalPedido === 'MOZO' || canalPedido === 'CAJA') && origen?.usuarioPartyId != null
-                ? BigInt(origen.usuarioPartyId)
-                : null,
+            aplicado_por: quienAplica,
           },
         });
       }

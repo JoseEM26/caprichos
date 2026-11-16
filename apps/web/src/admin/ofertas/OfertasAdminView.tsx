@@ -1664,6 +1664,8 @@ export function OfertasAdminView() {
             >
               {cupones.map((c) => {
                 const isPrint = c.modo === 'UNICO_COMPROBANTE';
+                const isAsig = c.modo === 'ASIGNADO_PERSONAL';
+                const dados = c.totalDados ?? 0;
                 const emitidosDeEsteCupon = cuponesEmitidos.filter((e) => e.cuponId === c.id);
                 const totalEmitidos = emitidosDeEsteCupon.length;
                 const totalCanjeados = emitidosDeEsteCupon.filter((e) => e.estado === 'CANJEADO').length;
@@ -1681,17 +1683,19 @@ export function OfertasAdminView() {
                     ? c.productoNombre || 'Producto'
                     : 'Toda la carta',
                   c.fechaHasta ? `hasta ${c.fechaHasta.slice(8, 10)}/${c.fechaHasta.slice(5, 7)}` : 'sin fecha límite',
-                  isPrint ? `impreso ${totalEmitidos} ${totalEmitidos === 1 ? 'vez' : 'veces'}` : 'no se imprime',
+                  isPrint ? `impreso ${totalEmitidos} ${totalEmitidos === 1 ? 'vez' : 'veces'}` : isAsig ? 'lo da el personal' : 'no se imprime',
                 ];
 
-                const slotText = isPrint
+                const slotText = isAsig
+                  ? 'Lo da el mozo o cajero · sale impreso en el voucher de quien lo recibe'
+                  : isPrint
                   ? `Entra al sorteo del comprobante (salen ${reglas.cuponesPorComprobante} al azar de ${cuponesImpresosActivos.length})`
                   : 'Código compartido · no se imprime (afiches, volantes, redes)';
 
-                const slotBg = isPrint ? 'rgb(221, 241, 227)' : 'var(--cp-sand)';
-                const slotFg = isPrint ? 'rgb(20, 80, 43)' : 'var(--cp-navy)';
+                const slotBg = isPrint || isAsig ? 'rgb(221, 241, 227)' : 'var(--cp-sand)';
+                const slotFg = isPrint || isAsig ? 'rgb(20, 80, 43)' : 'var(--cp-navy)';
 
-                const pctUso = c.topeUsos ? Math.round(((c.usosActuales || 0) / c.topeUsos) * 100) : 0;
+                const pctUso = c.topeUsos ? Math.round((((isAsig ? dados : c.usosActuales) || 0) / c.topeUsos) * 100) : 0;
 
                 return (
                   <div
@@ -1768,7 +1772,9 @@ export function OfertasAdminView() {
                     </div>
 
                     <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                      {isPrint
+                      {isAsig
+                        ? `Dados ${dados}${c.topeUsos ? ` de ${c.topeUsos}` : ''} · canjeados ${c.totalCanjeados ?? 0}`
+                        : isPrint
                         ? `Emitidos con código: ${totalEmitidos} · canjeados: ${totalCanjeados} · vigentes: ${totalVigentes}`
                         : c.topeUsos
                         ? `Usos: ${c.usosActuales || 0} de ${c.topeUsos} · quedan ${Math.max(0, c.topeUsos - (c.usosActuales || 0))}`

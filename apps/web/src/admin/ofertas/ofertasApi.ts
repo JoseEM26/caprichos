@@ -157,7 +157,9 @@ export interface CuponItem {
   id: string;
   codigoBase: string;
   descripcion: string;
-  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL';
+  /** ASIGNADO_PERSONAL: dados (sin los quitados) y canjeados. */
+  totalDados?: number;
   tipo?: 'PORCENTAJE' | 'MONTO_FIJO';
   descuentoTipo?: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
   valor?: number;
@@ -205,9 +207,42 @@ export interface UsoCuponFila {
   anulado: boolean;
 }
 
+export interface DadoCuponFila {
+  fecha: string;
+  codigo: string;
+  estado: 'VIGENTE' | 'CANJEADO' | 'VENCIDO' | 'ANULADO';
+  pedidoOrigenCodigo: string | null;
+  otorgadoPor: string | null;
+  cliente: { nombre: string | null; celular: string | null; sinCuenta?: boolean };
+  pedidoCanjeCodigo: string | null;
+  canjeadoEn: string | null;
+  canjeadoCanal: string | null;
+  descuento: number;
+}
+
+export interface CuponParaDar {
+  id: string;
+  codigoBase: string;
+  descripcion: string | null;
+  descuentoTipo: string;
+  descuentoValor: number;
+  diasValidez: number;
+  quedan: number | null;
+}
+
+export interface CuponDado {
+  id: string;
+  cuponId: string;
+  codigo: string;
+  codigoBase?: string;
+  descripcion: string | null;
+  venceEn: string | null;
+  estado: string;
+}
+
 export interface UsosCupon {
   cuponId: string;
-  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL';
   resumen: {
     usos: number;
     tope: number | null;
@@ -219,9 +254,11 @@ export interface UsosCupon {
     canjeados?: number;
     vencidos?: number;
   };
-  porTrabajador: { partyId: string | null; nombre: string; usos: number; soles: number }[];
+  /** `dados` y `canjeados` solo en ASIGNADO_PERSONAL (ahí `usos` = dados). */
+  porTrabajador: { partyId: string | null; nombre: string; usos: number; soles: number; dados?: number; canjeados?: number }[];
   porDia: { dia: string; usos: number; soles: number }[];
-  historial: { items: UsoCuponFila[]; total: number; pagina: number; tamano: number; totalPaginas: number };
+  /** ASIGNADO_PERSONAL trae filas de tipo DadoCuponFila. */
+  historial: { items: (UsoCuponFila | DadoCuponFila)[]; total: number; pagina: number; tamano: number; totalPaginas: number };
 }
 
 export interface CuponEmitidoItem {
@@ -315,6 +352,18 @@ export const ofertasApi = {
 
   async anularCuponEmitido(id: string, motivo: string): Promise<any> {
     return api.post(`/admin/cupones/emitidos/${id}/anular`, { motivo });
+  },
+
+  async cuponesParaDar(pedidoId: string): Promise<{ cupones: CuponParaDar[]; dado: CuponDado | null }> {
+    return api.get(`/admin/cupones/para-dar?pedidoId=${encodeURIComponent(pedidoId)}`);
+  },
+
+  async darCupon(cuponId: string, pedidoId: string): Promise<CuponDado & { yaExistia: boolean }> {
+    return api.post(`/admin/cupones/${cuponId}/dar`, { pedidoId });
+  },
+
+  async quitarCuponDado(emitidoId: string): Promise<any> {
+    return api.post(`/admin/cupones/dados/${emitidoId}/quitar`, {});
   },
 
   async usosDeCupon(id: string, pagina = 1, tamano = 10): Promise<UsosCupon> {

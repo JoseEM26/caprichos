@@ -12,10 +12,10 @@ import {
 
 export class ActualizarCuponDto {
   @IsOptional()
-  @IsIn(['UNICO_COMPROBANTE', 'COMPARTIDO'], {
-    message: 'modo debe ser UNICO_COMPROBANTE o COMPARTIDO',
+  @IsIn(['UNICO_COMPROBANTE', 'COMPARTIDO', 'ASIGNADO_PERSONAL'], {
+    message: 'modo debe ser UNICO_COMPROBANTE, COMPARTIDO o ASIGNADO_PERSONAL',
   })
-  modo?: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+  modo?: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL';
 
   @IsOptional()
   @IsString({ message: 'El código base no puede estar vacío' })

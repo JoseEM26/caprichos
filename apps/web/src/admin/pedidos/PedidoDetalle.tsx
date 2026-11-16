@@ -12,6 +12,7 @@ import { ModalVolverAtras } from './ModalVolverAtras';
 import { ModalRevertirAnulacion } from './ModalRevertirAnulacion';
 import { fechaLima } from '../../comun/agotadoTiempo';
 import { ModalCortesia } from '../cortesias/ModalCortesia';
+import { ModalDarCupon } from '../ofertas/ModalDarCupon';
 import { ModalCargoLibre, esCargoLibre, estaPagadoCargo, type CargoLibreDatos } from './ModalCargoLibre';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
@@ -79,6 +80,7 @@ const ICONOS = {
   imprimir: <path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z" />,
   editar: <path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" />,
   extra: <path d="M12 5v14M5 12h14" />,
+  cupon: <path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3zM14 6v12" />,
   cargo: <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 2.6 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3" />,
   repetir: <path d="M4 12a8 8 0 0114-5l2 2M20 4v5h-5M20 12a8 8 0 01-14 5l-2-2M4 20v-5h5" />,
   precuenta: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" />,
@@ -125,6 +127,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const [abrirCreditoPersonal, setAbrirCreditoPersonal] = useState(false);
   // «Servicio o producto» libre: sin cobrar se agrega aquí mismo; cobrado, abre un pedido extra con el cargo
   const [abrirCargoLibre, setAbrirCargoLibre] = useState(false);
+  const [abrirDarCupon, setAbrirDarCupon] = useState(false);
   const [enviandoCargo, setEnviandoCargo] = useState(false);
   const [errorCargo, setErrorCargo] = useState('');
 
@@ -605,6 +608,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               {puedeEditar && <BotonIcono n="editar" texto="Editar" etiqueta="Editar pedido" alClic={() => alEditar?.(pedido)} />}
               {puedeAgregarExtra && <BotonIcono n="extra" texto="Extra" etiqueta="Agregar extra" alClic={() => alAgregarExtra?.(pedido)} />}
               {puedeCargoLibre && <BotonIcono n="cargo" texto="Servicio" etiqueta="Agregar servicio o producto" alClic={() => { setErrorCargo(''); setAbrirCargoLibre(true); }} />}
+              {tiene('cupones/dar') && est !== 'ANULADO' && est !== 'RECHAZADO' && <BotonIcono n="cupon" texto="Dar cupón" etiqueta="Dar un cupón a este cliente" alClic={() => setAbrirDarCupon(true)} />}
               <BotonIcono n="repetir" texto="Repetir" etiqueta="Repetir este pedido" alClic={() => alRepetir?.(pedido)} />
               {esMesa && <BotonIcono n="precuenta" texto="Precuenta" etiqueta="Sacar precuenta (el cajero cobra)" alClic={() => setAbrirPrecuenta(true)} />}
               <BotonIcono n="imprimir" texto="Imprimir" etiqueta="Imprimir etiquetas y ticket" alClic={() => setAbrirImpresion(true)} />
@@ -732,6 +736,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           }}
         />
       )}
+
+      {abrirDarCupon && <ModalDarCupon pedidoId={String(pedido.id)} alCerrar={() => setAbrirDarCupon(false)} />}
 
       {abrirCargoLibre && (
         <ModalCargoLibre

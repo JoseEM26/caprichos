@@ -154,14 +154,22 @@ describe('ImpresionService: ticket del personal', () => {
     expect(prisma.printJob.create).not.toHaveBeenCalled();
   });
 
-  it('cupón: interruptor apagado (por defecto) no consulta ni imprime nada; encendido sin cupón real tampoco', async () => {
+  it('cupón: interruptor apagado (por defecto) solo busca el que dio el personal; encendido sin cupón real tampoco imprime nada', async () => {
     expect(await service.cuponParaTicket({ id: 9n })).toBeNull();
-    expect(prisma.cuponEmitido.findFirst).not.toHaveBeenCalled();
+    expect(prisma.cuponEmitido.findFirst).toHaveBeenCalledTimes(1); // solo el dado por el personal
+    expect(prisma.cuponEmitido.findFirst.mock.calls[0][0].where.cupon).toMatchObject({ modo: 'ASIGNADO_PERSONAL' });
+    prisma.cuponEmitido.findFirst.mockClear();
     flags.impresion_cupon_en_ticket = 'SI';
     expect(await service.cuponParaTicket({ id: 9n })).toBeNull();
-    expect(prisma.cuponEmitido.findFirst).toHaveBeenCalledTimes(1);
-    const where = prisma.cuponEmitido.findFirst.mock.calls[0][0].where;
+    expect(prisma.cuponEmitido.findFirst).toHaveBeenCalledTimes(2);
+    const where = prisma.cuponEmitido.findFirst.mock.calls[1][0].where;
     expect(where).toMatchObject({ pedido_origen_id: 9n, estado: 'VIGENTE', cupon: { activo: true } });
+  });
+
+  it('cupón dado por el mozo o cajero: sale aunque el interruptor esté apagado y manda sobre el sorteado', async () => {
+    prisma.cuponEmitido.findFirst.mockResolvedValueOnce({ codigo: 'AMIGO15-K7M2PQ', vence_en: null, cupon: { descripcion: '15% para ti' } });
+    expect(await service.cuponParaTicket({ id: 9n })).toMatchObject({ codigo: 'AMIGO15-K7M2PQ', descripcion: '15% para ti' });
+    expect(prisma.cuponEmitido.findFirst).toHaveBeenCalledTimes(1);
   });
 
   it('cupón: encendido y con cupón real vigente se devuelve', async () => {

@@ -9,7 +9,8 @@ import type { CuponItem } from './ofertasApi';
 
 /** «Ver cómo se imprime»: el voucher de ejemplo con el descuento de ESTE cupón (mismo dibujo que el ticket real). */
 export function ModalVistaPreviaCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar: () => void }) {
-  const unico = cupon.modo === 'UNICO_COMPROBANTE';
+  const imprime = cupon.modo !== 'COMPARTIDO';
+  const asignado = cupon.modo === 'ASIGNADO_PERSONAL';
   const lineas = useMemo(
     () =>
       lineasTicketPago(
@@ -36,9 +37,11 @@ export function ModalVistaPreviaCupon({ cupon, onCerrar }: { cupon: CuponItem; o
           contenido: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
               <p data-testid="nota-cupon-voucher" style={{ margin: 0, fontSize: 14, textAlign: 'center' }}>
-                {unico
-                  ? 'Este cupón sale impreso al pie del ticket, con un código distinto en cada comprobante (aquí uno de ejemplo).'
-                  : 'Este cupón no imprime su código: solo aparece el descuento.'}
+                {asignado
+                  ? 'Este cupón lo da el mozo o cajero: sale impreso al pie del voucher de quien lo recibe, con un código distinto cada vez (aquí uno de ejemplo).'
+                  : imprime
+                    ? 'Este cupón sale impreso al pie del ticket, con un código distinto en cada comprobante (aquí uno de ejemplo).'
+                    : 'Este cupón no imprime su código: solo aparece el descuento.'}
               </p>
               <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
                 <LogoCaprichos />

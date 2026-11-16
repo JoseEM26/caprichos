@@ -1,5 +1,6 @@
 import { montoElegiblePuntos } from './puntos-elegibles.util';
 import { usosDeCupon } from './cupon-usos';
+import { cuponesParaDar, darCupon, quitarCuponDado } from './cupon-asignado';
 import {
   BadRequestException,
   ConflictException,
@@ -68,6 +69,7 @@ import {
   idsCategoriaDto,
   generarCodigoCuponUnico,
   obtenerAhoraLima,
+  cuponEnHorario,
 } from './ofertas.util';
 import { urlPublicaCarta } from '../chatbot/servicios/carrusel.util';
 import { canalOfertaParaEnvio, CAMPOS_BENEFICIO_ENVIO } from './envio-gratis-promo';
@@ -81,22 +83,6 @@ function alcanceCubreLinea(
   if (cats.length) return !!l.categoriaId && cats.includes(l.categoriaId);
   if (d.alcance_producto_id) return l.productoId === d.alcance_producto_id;
   return true;
-}
-
-/** Horario del cupón con la misma regla de vigencia que las ofertas. Sin horario vale siempre. */
-function cuponEnHorario(cupon: any, ahora: Date): boolean {
-  return estaVigente(
-    {
-      activo: true,
-      dias: cupon.dias,
-      hora_desde: cupon.hora_desde,
-      hora_hasta: cupon.hora_hasta,
-      fecha_desde: cupon.fecha_desde,
-      fecha_hasta: cupon.fecha_hasta,
-    },
-    undefined,
-    ahora,
-  );
 }
 
 /** «HH:mm» a Date para columnas @db.Time (igual que las ofertas). */
@@ -918,7 +904,37 @@ export class OfertasService {
       },
     });
 
-    return cuponesDb.map(this.mapearCupon);
+    const items = cuponesDb.map(this.mapearCupon);
+    const asignados = items.filter((c) => c.modo === 'ASIGNADO_PERSONAL');
+    if (asignados.length > 0) {
+      const filas: { cupon_id: bigint; estado: string; _count: { _all: number } }[] = await (this.prisma.cuponEmitido as any).groupBy({
+        by: ['cupon_id', 'estado'],
+        where: { cupon_id: { in: asignados.map((c) => BigInt(c.id)) } },
+        _count: { _all: true },
+      });
+      for (const c of asignados) {
+        const suyas = filas.filter((f) => String(f.cupon_id) === c.id);
+        c.totalDados = suyas.filter((f) => f.estado !== 'ANULADO').reduce((a, f) => a + f._count._all, 0);
+        c.totalCanjeados = suyas.filter((f) => f.estado === 'CANJEADO').reduce((a, f) => a + f._count._all, 0);
+      }
+    }
+    return items;
+  }
+
+  /** Cupones «Lo da el mozo o cajero» disponibles para dar, y el que ya tiene el pedido. */
+  async cuponesParaDar(pedidoId?: string) {
+    return cuponesParaDar(this.prisma, pedidoId);
+  }
+
+  /** El mozo o cajero da un cupón al pedido (un código único, impreso en el voucher). Idempotente por pedido. */
+  async darCupon(cuponId: string, pedidoId: string, usuario?: any) {
+    const r = await darCupon({ prisma: this.prisma, auditoria: this.auditoriaService }, cuponId, pedidoId, usuario?.partyId);
+    this.eventosGateway.emitirAdmin('cupones:emitidos', { pedidoId: String(pedidoId), cantidad: 1 });
+    return r;
+  }
+
+  async quitarCuponDado(emitidoId: string, usuario?: any) {
+    return quitarCuponDado({ prisma: this.prisma, auditoria: this.auditoriaService }, emitidoId, usuario?.partyId);
   }
 
   /** Usos del cupón: resumen, por trabajador, por día e historial paginado. */
@@ -983,10 +999,11 @@ export class OfertasService {
         hora_hasta: horaCupon(dto.horaHasta),
         fecha_desde: fechaCupon(dto.fechaDesde),
         fecha_hasta: fechaCupon(dto.fechaHasta),
-        requiere_cuenta: dto.requiereCuenta ?? false,
+        requiere_cuenta: dto.modo === 'ASIGNADO_PERSONAL' ? false : (dto.requiereCuenta ?? false),
         dias_validez: dto.diasValidez ?? 15,
-        tope_usos: dto.modo === 'COMPARTIDO' ? dto.topeUsos : null,
-        max_por_cliente: dto.maxPorCliente ?? null,
+        // ASIGNADO_PERSONAL: el tope limita cuántos se pueden DAR; el código es transferible (sin cuenta ni límite por cliente)
+        tope_usos: dto.modo === 'COMPARTIDO' || dto.modo === 'ASIGNADO_PERSONAL' ? (dto.topeUsos ?? null) : null,
+        max_por_cliente: dto.modo === 'ASIGNADO_PERSONAL' ? null : (dto.maxPorCliente ?? null),
         orden: dto.orden ?? 0,
         activo: dto.activo ?? true,
       },
@@ -1075,6 +1092,10 @@ export class OfertasService {
     if (dto.diasValidez !== undefined) data.dias_validez = dto.diasValidez;
     if (dto.topeUsos !== undefined) data.tope_usos = dto.topeUsos;
     if (dto.maxPorCliente !== undefined) data.max_por_cliente = dto.maxPorCliente;
+    if (modoFinal === 'ASIGNADO_PERSONAL') {
+      data.requiere_cuenta = false;
+      data.max_por_cliente = null;
+    }
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
 
@@ -1592,6 +1613,8 @@ export class OfertasService {
             estado: 'CANJEADO',
             canjeado_en: new Date(),
             pedido_canje_id: pedido.id,
+            canjeado_canal: 'CAJA',
+            canjeado_por: usuario?.partyId != null ? BigInt(usuario.partyId) : null,
           },
         });
       } else {
@@ -1655,7 +1678,8 @@ export class OfertasService {
 
     // 1. Idempotencia estricta: si ya se emitieron cupones para este pedido, devolver los existentes (RN-CAP-135)
     const existentes = await this.prisma.cuponEmitido.findMany({
-      where: { pedido_origen_id: idBig },
+      // los cupones que da el personal (ASIGNADO_PERSONAL) no cuentan: el sorteo es aparte
+      where: { pedido_origen_id: idBig, cupon: { modo: { not: 'ASIGNADO_PERSONAL' } } },
       include: { cupon: true },
     });
 

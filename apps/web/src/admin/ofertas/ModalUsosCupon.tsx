@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { Paginacion } from '../../comun/Paginacion';
 import { Boton } from '../../comun/Boton';
-import { ofertasApi, type CuponItem, type UsosCupon } from './ofertasApi';
+import { ofertasApi, type CuponItem, type DadoCuponFila, type UsoCuponFila, type UsosCupon } from './ofertasApi';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 const CANAL: Record<string, string> = { CARTA: 'Carta', CAJA: 'Caja', MOZO: 'Mozo', BOT: 'WhatsApp' };
+const ESTADO_DADO: Record<string, string> = { VIGENTE: 'Sin usar', CANJEADO: 'Canjeado', VENCIDO: 'Vencido', ANULADO: 'Quitado' };
 const fechaHora = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 function Cifra({ titulo, valor }: { titulo: string; valor: string }) {
@@ -70,19 +71,21 @@ export function ModalUsosCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar
   ) : null;
 
   const r = datos?.resumen;
+  const asig = datos?.modo === 'ASIGNADO_PERSONAL';
   const resumen = estado ?? (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        <Cifra titulo="Usos" valor={r!.tope != null ? `${r!.usos} de ${r!.tope}` : String(r!.usos)} />
-        {r!.quedan != null && <Cifra titulo="Quedan" valor={String(r!.quedan)} />}
+        <Cifra titulo={asig ? 'Dados' : 'Usos'} valor={r!.tope != null ? `${r!.usos} de ${r!.tope}` : String(r!.usos)} />
+        {asig && <Cifra titulo="Canjeados" valor={String(r!.canjeados ?? 0)} />}
+        {r!.quedan != null && <Cifra titulo={asig ? 'Quedan por dar' : 'Quedan'} valor={String(r!.quedan)} />}
         <Cifra titulo="Descuento dado" valor={soles(r!.descuentoTotal)} />
         <Cifra titulo="Clientes distintos" valor={String(r!.clientesDistintos)} />
-        {r!.emitidos != null && <Cifra titulo="Impresos" valor={String(r!.emitidos)} />}
+        {!asig && r!.emitidos != null && <Cifra titulo="Impresos" valor={String(r!.emitidos)} />}
         {r!.vencidos != null && <Cifra titulo="Vencidos" valor={String(r!.vencidos)} />}
       </div>
       {r!.anulados > 0 && <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft)' }}>{r!.anulados} {r!.anulados === 1 ? 'pedido anulado no suma' : 'pedidos anulados no suman'} al descuento.</p>}
       <div>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Usos por día (últimos 30 días)</div>
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>{asig ? 'Cupones dados por día (últimos 30 días)' : 'Usos por día (últimos 30 días)'}</div>
         <BarrasPorDia datos={datos!.porDia} />
       </div>
     </div>
@@ -96,8 +99,9 @@ export function ModalUsosCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ textAlign: 'left', color: 'var(--cp-soft)' }}>
-              <th scope="col" style={{ padding: 6 }}>Quién lo aplicó</th>
-              <th scope="col" style={{ padding: 6 }}>Usos</th>
+              <th scope="col" style={{ padding: 6 }}>{asig ? 'Quién lo dio' : 'Quién lo aplicó'}</th>
+              <th scope="col" style={{ padding: 6 }}>{asig ? 'Dados' : 'Usos'}</th>
+              {asig && <th scope="col" style={{ padding: 6 }}>Canjeados</th>}
               <th scope="col" style={{ padding: 6 }}>Descuento dado</th>
             </tr>
           </thead>
@@ -106,6 +110,7 @@ export function ModalUsosCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar
               <tr key={t.partyId ?? 'sin'} style={{ borderTop: '1px solid var(--cp-sand)' }}>
                 <td style={{ padding: 6 }}>{t.nombre}</td>
                 <td style={{ padding: 6 }}>{t.usos}</td>
+                {asig && <td style={{ padding: 6 }}>{t.canjeados ?? 0}</td>}
                 <td style={{ padding: 6 }}>{soles(t.soles)}</td>
               </tr>
             ))}
@@ -125,13 +130,25 @@ export function ModalUsosCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--cp-soft)' }}>
-                {['Fecha', 'Pedido', 'Canal', 'Lo aplicó', 'Cliente', 'Total', 'Descuento'].map((c) => (
+                {(asig ? ['Fecha dado', 'Pedido', 'Lo dio', 'Cliente', 'Código', 'Estado', 'Pedido de canje', 'Fecha canje'] : ['Fecha', 'Pedido', 'Canal', 'Lo aplicó', 'Cliente', 'Total', 'Descuento']).map((c) => (
                   <th key={c} scope="col" style={{ padding: 6 }}>{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {h!.items.map((f) => (
+              {asig && (h!.items as DadoCuponFila[]).map((f) => (
+                <tr key={f.codigo} style={{ borderTop: '1px solid var(--cp-sand)' }}>
+                  <td style={{ padding: 6 }}>{fechaHora(f.fecha)}</td>
+                  <td style={{ padding: 6 }}>{f.pedidoOrigenCodigo ?? '—'}</td>
+                  <td style={{ padding: 6 }}>{f.otorgadoPor ?? '—'}</td>
+                  <td style={{ padding: 6 }}>{f.cliente.sinCuenta ? 'Sin cuenta' : `${f.cliente.nombre ?? 'Cliente'}${f.cliente.celular ? ` · ${f.cliente.celular}` : ''}`}</td>
+                  <td style={{ padding: 6, fontFamily: 'monospace' }}>{f.codigo}</td>
+                  <td style={{ padding: 6 }}>{ESTADO_DADO[f.estado] ?? f.estado}</td>
+                  <td style={{ padding: 6 }}>{f.pedidoCanjeCodigo ?? '—'}</td>
+                  <td style={{ padding: 6 }}>{f.canjeadoEn ? fechaHora(f.canjeadoEn) : '—'}</td>
+                </tr>
+              ))}
+              {!asig && (h!.items as UsoCuponFila[]).map((f) => (
                 <tr key={`${f.pedidoCodigo}-${f.fecha}`} style={{ borderTop: '1px solid var(--cp-sand)', opacity: f.anulado ? 0.6 : 1 }}>
                   <td style={{ padding: 6 }}>{fechaHora(f.fecha)}</td>
                   <td style={{ padding: 6 }}>

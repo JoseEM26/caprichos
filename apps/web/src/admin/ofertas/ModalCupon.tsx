@@ -48,7 +48,7 @@ export function ModalCupon({
   categoriasDisponibles = CATEGORIAS_DEF,
   categorias = [],
 }: ModalCuponProps) {
-  const [modo, setModo] = useState<'UNICO_COMPROBANTE' | 'COMPARTIDO'>('UNICO_COMPROBANTE');
+  const [modo, setModo] = useState<'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL'>('UNICO_COMPROBANTE');
   const [codigoBase, setCodigoBase] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [tipo, setTipo] = useState<'pct' | 'monto' | 'envio'>('pct');
@@ -205,8 +205,9 @@ export function ModalCupon({
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
         canales: canalesDesdeEstado(canales, 'CAJA'),
         requiereCuenta,
-        diasValidez: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
-        topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,
+        diasValidez: modo !== 'COMPARTIDO' ? (parseInt(validezDias, 10) || 15) : undefined,
+        // COMPARTIDO: tope de usos obligatorio. ASIGNADO_PERSONAL: tope de cuántos se pueden dar (vacío = sin límite)
+        topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : modo === 'ASIGNADO_PERSONAL' ? (parseInt(maxUsos, 10) || undefined) : undefined,
         maxPorCliente: modo === 'COMPARTIDO' ? (parseInt(porCliente, 10) || 1) : undefined,
         // Horario opcional: vacío = el cupón vale todo el tiempo
         dias: dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1),
@@ -306,6 +307,42 @@ export function ModalCupon({
                 Un mismo código para afiches, volantes y redes. No se imprime en el comprobante y se acaba al llegar a su tope de usos.
               </span>
             </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={modo === 'ASIGNADO_PERSONAL'}
+              onClick={() => {
+                setModo('ASIGNADO_PERSONAL');
+                setMensajeError('');
+              }}
+              style={{
+                textAlign: 'left',
+                minHeight: '88px',
+                padding: '12px 14px',
+                borderRadius: '14px',
+                border: modo === 'ASIGNADO_PERSONAL' ? '2px solid var(--cp-navy)' : '2px solid var(--cp-line)',
+                backgroundColor: modo === 'ASIGNADO_PERSONAL' ? 'var(--cp-navy)' : 'var(--cp-white)',
+                color: modo === 'ASIGNADO_PERSONAL' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px' }}>
+                Lo da el mozo o cajero
+              </span>
+              <span style={{ fontSize: '12px', lineHeight: '17px', opacity: 0.9 }}>
+                El personal elige a quién dárselo al cobrar. Sale impreso en su voucher, con un código distinto cada vez, y lo puede usar cualquiera.
+              </span>
+            </button>
+          </div>
+          <div data-testid="consejo-modo" style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
+            {modo === 'COMPARTIDO'
+              ? 'Para afiches, volantes, redes o una campaña: un mismo código que se acaba al llegar al tope. No lo uses para descuentos a criterio del personal: cualquiera que conozca el código lo puede usar.'
+              : modo === 'UNICO_COMPROBANTE'
+                ? 'Premia la siguiente compra automáticamente: cada comprobante sale con un cupón sorteado y un código distinto.'
+                : 'Para clientes que el mozo o cajero elige: sale impreso en su voucher, con un código distinto cada vez.'}
           </div>
         </div>
 
@@ -313,7 +350,7 @@ export function ModalCupon({
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 180px' }}>
             <label htmlFor="cp-c" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-              {modo === 'UNICO_COMPROBANTE' ? 'Nombre del cupón (base del código)' : 'Código del cupón'}
+              {modo !== 'COMPARTIDO' ? 'Nombre del cupón (base del código)' : 'Código del cupón'}
             </label>
             <input
               id="cp-c"
@@ -323,7 +360,7 @@ export function ModalCupon({
                 setCodigoBase(e.target.value);
                 setMensajeError('');
               }}
-              placeholder={modo === 'UNICO_COMPROBANTE' ? 'Ejemplo: DUO20' : 'Ejemplo: BIENVENIDA'}
+              placeholder={modo !== 'COMPARTIDO' ? 'Ejemplo: DUO20' : 'Ejemplo: BIENVENIDA'}
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
@@ -337,7 +374,7 @@ export function ModalCupon({
               }}
             />
             <div style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)', marginTop: '4px' }}>
-              {modo === 'UNICO_COMPROBANTE'
+              {modo !== 'COMPARTIDO'
                 ? `Cada comprobante le agrega 6 letras y números al azar: ${codigoBase ? codigoBase.toUpperCase() : 'DUO20'}-K7M2QX.`
                 : 'Los clientes escribirán este código en la carta virtual o en caja.'}
             </div>
@@ -562,11 +599,11 @@ export function ModalCupon({
             />
           </div>
 
-          {modo === 'COMPARTIDO' && (
+          {modo !== 'UNICO_COMPROBANTE' && (
             <>
               <div style={{ flex: '1 1 120px' }}>
                 <label htmlFor="cp-x" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                  Tope de usos (en total)
+                  {modo === 'ASIGNADO_PERSONAL' ? 'Cuántos se pueden dar (en total)' : 'Tope de usos (en total)'}
                 </label>
                 <input
                   id="cp-x"
@@ -586,6 +623,7 @@ export function ModalCupon({
                 />
               </div>
 
+              {modo === 'COMPARTIDO' && (
               <div style={{ flex: '1 1 120px' }}>
                 <label htmlFor="cp-p" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
                   Por cliente (con cuenta)
@@ -607,6 +645,7 @@ export function ModalCupon({
                   }}
                 />
               </div>
+              )}
             </>
           )}
         </div>
