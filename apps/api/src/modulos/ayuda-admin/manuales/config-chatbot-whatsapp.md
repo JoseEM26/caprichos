@@ -45,7 +45,7 @@ Controla el chatbot de WhatsApp: qué funciones atiende (pedidos, cobro, reserva
 2. Con Evolution rigen las mismas reglas que con Meta: la misma ventana de 24 horas (fuera de ella, el aviso sale con el texto de su plantilla) y los mismos interruptores de avisos de Parámetros.
 3. Evolution solo envía dentro del horario de trabajo del local (Configuración › Local). Lo que cae fuera de horario se descarta y no se manda al día siguiente.
 4. Si el pedido ya está pagado, "recibimos tu pedido" y "pago confirmado" llegan en un solo mensaje. Al voucher se le responde con un ✅ y a un "gracias" con un ❤️ sobre su mensaje, sin texto.
-5. Si Evolution falla 5 veces seguidas en 10 minutos o el número se desconecta, se pausa solo, los avisos pasan a Meta (si tiene credenciales) y el ADMIN recibe un aviso en la campanita. El ADMIN lo devuelve a Evolution a mano.
+5. Si Evolution falla 5 veces seguidas en 10 minutos o el número se desconecta, se pausa solo (nunca pasa a Meta por su cuenta): los avisos esperan en la cola y salen al reconectar o al reanudar, y el ADMIN recibe un aviso en la campanita. Por Evolution todo sale en texto libre, sin plantillas.
 6. Topes de Evolution: 3 por minuto, 60 por hora y 350 por día.
 
 ## Como se hace: encender o apagar un aviso automático de WhatsApp

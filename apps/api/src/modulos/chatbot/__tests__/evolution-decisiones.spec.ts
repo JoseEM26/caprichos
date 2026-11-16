@@ -308,15 +308,15 @@ describe('decisión 8: pausa automática por bloqueo o desconexión', () => {
     return { svc, prisma, auditoria, avisos };
   };
 
-  it('5 fallos seguidos pausan Evolution, pasan a Meta, se auditan y avisan al ADMIN', async () => {
+  it('5 fallos seguidos pausan Evolution (el proveedor sigue Evolution), se auditan y avisan al ADMIN', async () => {
     const { svc, prisma, auditoria, avisos } = montar();
     for (let i = 0; i < 4; i++) await svc.registrarResultadoEnvio(false, 'HTTP 500');
     expect(await svc.estaPausado()).toBe(false);
     await svc.registrarResultadoEnvio(false, 'HTTP 500');
     expect(await svc.estaPausado()).toBe(true);
-    expect(await svc.proveedor()).toBe('META');
-    expect(prisma.guardados.whatsapp_proveedor).toBe('META');
-    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'whatsapp_proveedor', accion: 'pausa_automatica', despues: expect.objectContaining({ whatsapp_proveedor: 'META', evolution_pausado: 'si', motivo: 'FALLOS' }) }));
+    expect(await svc.proveedor()).toBe('EVOLUTION');
+    expect(prisma.guardados.whatsapp_proveedor).toBe('EVOLUTION');
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'whatsapp_proveedor', accion: 'pausa_automatica', despues: expect.objectContaining({ whatsapp_proveedor: 'EVOLUTION', evolution_pausado: 'si', motivo: 'FALLOS' }) }));
     expect(avisos.enviarAvisoAdmin).toHaveBeenCalledTimes(1);
     expect(avisos.enviarAvisoAdmin.mock.calls[0][2]).toBe('/admin/configuracion');
   });
@@ -348,7 +348,7 @@ describe('decisión 8: pausa automática por bloqueo o desconexión', () => {
     for (let i = 0; i < 20; i++) await cero.svc.registrarResultadoEnvio(false, 'x');
     expect(await cero.svc.estaPausado()).toBe(false);
   });
-  it('la desconexión de la instancia también pausa y pasa a Meta (un cierre 515 de reinicio no)', async () => {
+  it('la desconexión de la instancia también pausa sin cambiar de proveedor (un cierre 515 de reinicio no)', async () => {
     const { svc } = montar();
     await svc.registrarConexion('open');
     await svc.registrarConexion('close', 515);
@@ -356,15 +356,37 @@ describe('decisión 8: pausa automática por bloqueo o desconexión', () => {
     await svc.registrarConexion('open');
     await svc.registrarConexion('close', 428);
     expect(await svc.estaPausado()).toBe(true);
-    expect(await svc.proveedor()).toBe('META');
-  });
-  it('sin credenciales de Meta se pausa pero no se cambia de proveedor, y se avisa distinto', async () => {
-    const { svc, avisos } = montar({}, false);
-    await svc.registrarConexion('open');
-    await svc.registrarConexion('close', 428);
-    expect(await svc.estaPausado()).toBe(true);
     expect(await svc.proveedor()).toBe('EVOLUTION');
-    expect(avisos.enviarAvisoAdmin.mock.calls[0][1]).toContain('Meta no tiene credenciales');
+  });
+  it('con o sin credenciales de Meta nunca cambia de proveedor y el aviso dice que esperan en la cola', async () => {
+    for (const meta of [true, false]) {
+      const { svc, avisos } = montar({}, meta);
+      await svc.registrarConexion('open');
+      await svc.registrarConexion('close', 428);
+      expect(await svc.proveedor()).toBe('EVOLUTION');
+      expect(avisos.enviarAvisoAdmin.mock.calls[0][1]).toContain('esperan en la cola');
+      expect(avisos.enviarAvisoAdmin.mock.calls[0][1]).not.toContain('Meta');
+    }
+  });
+  it('al reconectar (open) se reanuda solo la pausa automática; la manual y el baneo no', async () => {
+    const auto = montar();
+    await auto.svc.registrarConexion('open');
+    await auto.svc.registrarConexion('close', 428);
+    expect(await auto.svc.estaPausado()).toBe(true);
+    await auto.svc.registrarConexion('open');
+    expect(await auto.svc.estaPausado()).toBe(false);
+    expect(await auto.svc.proveedor()).toBe('EVOLUTION');
+
+    const manual = montar();
+    await manual.svc.fijarPausa(true);
+    await manual.svc.registrarConexion('open');
+    expect(await manual.svc.estaPausado()).toBe(true);
+
+    const baneo = montar();
+    await baneo.svc.registrarConexion('open');
+    await baneo.svc.registrarConexion('close', 401);
+    await baneo.svc.registrarConexion('open');
+    expect(await baneo.svc.estaPausado()).toBe(true);
   });
   it('si ya estaba pausado no repite la pausa ni el aviso', async () => {
     const { svc, avisos } = montar({ evolution_pausado: 'si' });

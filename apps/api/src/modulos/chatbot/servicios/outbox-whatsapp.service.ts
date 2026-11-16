@@ -550,9 +550,11 @@ export class OutboxWhatsappService {
 
       const carga = (fila.carga ?? {}) as unknown as CargaSaliente;
       const pedido = carga.pedidoCodigo ? ` del pedido ${carga.pedidoCodigo}` : '';
+      const prov = String((await this.prisma.parametro.findUnique({ where: { clave: 'whatsapp_proveedor' } }))?.valor ?? '').toUpperCase();
+      const porQue = prov === 'EVOLUTION' ? ' por Evolution' : ' por Meta';
       const titulo = 'WhatsApp: mensaje no enviado';
       const mensaje =
-        `No se pudo enviar un mensaje${pedido} (${fila.origen}) a ${enmascararTelefono(fila.telefono_destino)}: ${error}. ` +
+        `No se pudo enviar un mensaje${porQue}${pedido} (${fila.origen}) a ${enmascararTelefono(fila.telefono_destino)}: ${error}. ` +
         'Revísalo en Mensajes, pestaña Salientes, y reenvíalo o descártalo.';
 
       for (const rol of ['CAJERO', 'ADMIN']) {

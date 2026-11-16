@@ -24,7 +24,7 @@ export const DEFECTOS_EVOLUTION = {
   evolution_max_texto_identico: 2,
   /** Vacío = los mismos avisos que con Meta (rigen los interruptores whatsapp_aviso_*). Con valores, solo esos orígenes. */
   evolution_origenes_permitidos: '',
-  /** Pausa automática: fallos de envío seguidos (dentro de la ventana en minutos) que pasan a Meta. */
+  /** Pausa automática: fallos de envío seguidos (dentro de la ventana en minutos) que pausan Evolution (nunca pasa a Meta solo). */
   evolution_fallos_seguidos: 5,
   evolution_fallos_ventana_min: 10,
   evolution_pausado: 'no',
@@ -39,6 +39,8 @@ export const CLAVES_LIMITES: ClaveEvolution[] = (Object.keys(DEFECTOS_EVOLUTION)
 );
 
 const CLAVE_ESTADO = 'evolution_estado';
+/** Motivo de la última pausa automática (vacío si la pausa es manual o no hay). */
+const CLAVE_PAUSA_AUTO = 'evolution_pausa_auto';
 const CACHE_MS = 15_000;
 /** Códigos de cierre de sesión que significan baneo o sesión revocada: el envío se pausa solo. */
 const MOTIVOS_BANEO = [401, 403, 'banned', 'logged_out', 'loggedout'];
@@ -181,6 +183,7 @@ export class EvolutionConfigService implements OnModuleInit {
   /** Pausa o reanuda a mano el envío por Evolution. */
   async fijarPausa(pausado: boolean, usuario?: UsuarioAccion): Promise<void> {
     await this.guardar('evolution_pausado', pausado ? 'si' : 'no');
+    await this.guardar(CLAVE_PAUSA_AUTO, '');
     await this.auditoria?.registrar({
       categoria: 'CAMBIO',
       modulo: 'whatsapp_proveedor',
@@ -197,9 +200,10 @@ export class EvolutionConfigService implements OnModuleInit {
   }
 
   /**
-   * connection.update de Evolution. Al desconectarse: se guarda y, si Evolution era el proveedor activo, se pausa solo,
-   * pasa a Meta (si tiene credenciales) y se avisa a los ADMIN (solo en el cambio de estado). Con Meta activo solo se
-   * avisa, y un cierre por baneo o sesión revocada deja Evolution pausado hasta que un ADMIN lo reanude.
+   * connection.update de Evolution. Al desconectarse: se guarda y, si Evolution era el proveedor activo, se pausa solo
+   * (los mensajes esperan en la cola; el proveedor NO cambia) y se avisa a los ADMIN (solo en el cambio de estado).
+   * Con Meta activo solo se avisa, y un cierre por baneo o sesión revocada deja Evolution pausado hasta que un ADMIN
+   * lo reanude. Al volver a 'open' se reanuda solo la pausa automática por desconexión o fallos (no la manual ni el baneo).
    */
   async registrarConexion(state: string, codigoCierre?: string | number | null): Promise<void> {
     const conectado = String(state).toLowerCase() === 'open';
@@ -211,7 +215,11 @@ export class EvolutionConfigService implements OnModuleInit {
       actualizadoEn: new Date().toISOString(),
     };
     await this.guardar(CLAVE_ESTADO, nuevo);
-    if (conectado || previo.estado === 'DESCONECTADO') return;
+    if (conectado) {
+      await this.reanudarSiPausaAutomatica();
+      return;
+    }
+    if (previo.estado === 'DESCONECTADO') return;
     // 515 = reinicio pedido por WhatsApp (pasa al vincular): reconecta solo en segundos, no es una caída
     if (Number(codigoCierre) === 515) return;
     const baneo = codigoCierre != null && MOTIVOS_BANEO.includes(typeof codigoCierre === 'string' ? codigoCierre.toLowerCase() : codigoCierre);
@@ -231,7 +239,7 @@ export class EvolutionConfigService implements OnModuleInit {
 
   /**
    * Resultado de cada envío por Evolution (lo llama el adaptador): un éxito borra la racha; N fallos seguidos dentro
-   * de la ventana (evolution_fallos_seguidos en evolution_fallos_ventana_min minutos) pausan y pasan a Meta.
+   * de la ventana (evolution_fallos_seguidos en evolution_fallos_ventana_min minutos) pausan Evolution.
    * ponytail: la racha vive en memoria de este proceso; con varias réplicas de la API se cuenta por réplica.
    */
   async registrarResultadoEnvio(ok: boolean, detalle = ''): Promise<void> {
@@ -250,22 +258,31 @@ export class EvolutionConfigService implements OnModuleInit {
     }
   }
 
-  private metaDisponible(): boolean {
-    const g = (k: string) => (this.configService?.get<string>(k) || '').trim();
-    return !!(g('WHATSAPP_TOKEN') && g('WHATSAPP_PHONE_ID'));
+  /** Al reconectar: levanta la pausa solo si la puso el sistema (desconexión o fallos), no una manual ni un baneo. */
+  private async reanudarSiPausaAutomatica(): Promise<void> {
+    if (!(await this.estaPausado())) return;
+    const fila = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_PAUSA_AUTO } }).catch(() => null);
+    if (fila?.valor !== 'DESCONEXION' && fila?.valor !== 'FALLOS') return;
+    await this.guardar('evolution_pausado', 'no');
+    await this.guardar(CLAVE_PAUSA_AUTO, '');
+    try {
+      await this.auditoria?.registrar({ categoria: 'CAMBIO', modulo: 'whatsapp_proveedor', accion: 'reanudar_automatico', entidad: 'parametro' });
+    } catch (err: any) {
+      this.logger.error(`No se pudo auditar la reanudación: ${err?.message}`);
+    }
+    this.logger.warn(JSON.stringify({ evento: 'evolution_reanudado_al_conectar' }));
   }
 
   /**
-   * Bloqueo o caída de Evolution: pausa el envío, pasa a META si Meta tiene credenciales, deja constancia en la
-   * auditoría y avisa a los ADMIN (campana, y WhatsApp/correo si están activos). Un ADMIN lo devuelve a Evolution a mano.
+   * Bloqueo o caída de Evolution: solo pausa el envío (los mensajes esperan en la cola; NUNCA pasa a Meta), deja
+   * constancia en la auditoría y avisa a los ADMIN (campana, y WhatsApp/correo si están activos).
    * Una sola vez: si ya estaba pausado no repite nada.
    */
   async pausarAutomatico(motivo: 'BANEO' | 'DESCONEXION' | 'FALLOS', detalle: string): Promise<void> {
     if (await this.estaPausado()) return;
     const antes = await this.proveedor();
     await this.guardar('evolution_pausado', 'si');
-    const aMeta = antes === 'EVOLUTION' && this.metaDisponible();
-    if (aMeta) await this.guardar('whatsapp_proveedor', 'META');
+    await this.guardar(CLAVE_PAUSA_AUTO, motivo);
     try {
       await this.auditoria?.registrar({
         categoria: 'CAMBIO',
@@ -273,17 +290,17 @@ export class EvolutionConfigService implements OnModuleInit {
         accion: 'pausa_automatica',
         entidad: 'parametro',
         antes: { whatsapp_proveedor: antes, evolution_pausado: 'no' },
-        despues: { whatsapp_proveedor: aMeta ? 'META' : antes, evolution_pausado: 'si', motivo, detalle: detalle.slice(0, 200) },
+        despues: { whatsapp_proveedor: antes, evolution_pausado: 'si', motivo, detalle: detalle.slice(0, 200) },
       });
     } catch (err: any) {
       this.logger.error(`No se pudo auditar la pausa automática de Evolution: ${err?.message}`);
     }
-    this.logger.warn(JSON.stringify({ evento: 'evolution_pausa_automatica', motivo, aMeta }));
+    this.logger.warn(JSON.stringify({ evento: 'evolution_pausa_automatica', motivo }));
     const titulo = motivo === 'BANEO' ? 'WhatsApp: posible bloqueo del número' : 'WhatsApp: el número de Evolution falló';
-    const que = aMeta ? 'Los avisos ahora salen por Meta (WhatsApp oficial).' : 'Meta no tiene credenciales: los avisos esperan hasta que lo reanudes.';
+    const que = 'Los avisos esperan en la cola y salen cuando Evolution vuelva a conectarse o lo reanudes.';
     await this.avisarAdmin(motivo === 'BANEO', {
       titulo,
-      mensaje: `Evolution se pausó solo (${detalle.slice(0, 160)}). ${que} Revisa el número en Configuración › Chatbot y, cuando esté bien, reanuda Evolution y vuelve a elegirlo como proveedor.`,
+      mensaje: `Evolution se pausó solo (${detalle.slice(0, 160)}). ${que} Revisa el número en Configuración › WhatsApp.`,
     });
   }
 

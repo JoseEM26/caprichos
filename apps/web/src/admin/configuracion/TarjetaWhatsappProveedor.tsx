@@ -28,7 +28,7 @@ const LIMITES: Array<{ clave: string; texto: string; ayuda?: string; texto_libre
   { clave: 'evolution_escribiendo_ms_por_caracter', texto: '«Escribiendo…» (ms por letra)' },
   { clave: 'evolution_horario_desde', texto: 'Respaldo: avisos desde la hora (Lima)', ayuda: 'Solo si no se puede leer el horario del local; Evolution envía en el horario de Configuración › Local' },
   { clave: 'evolution_horario_hasta', texto: 'Respaldo: avisos hasta la hora (Lima)' },
-  { clave: 'evolution_fallos_seguidos', texto: 'Fallos seguidos que pausan Evolution y pasan a Meta', ayuda: '0 = no pausar solo' },
+  { clave: 'evolution_fallos_seguidos', texto: 'Fallos seguidos que pausan Evolution', ayuda: '0 = no pausar solo' },
   { clave: 'evolution_fallos_ventana_min', texto: 'Ventana de esos fallos (minutos)' },
   { clave: 'evolution_max_enlaces', texto: 'Máx. enlaces por mensaje' },
   { clave: 'evolution_max_texto_identico', texto: 'Mismo texto repetido antes de variar el saludo' },
@@ -192,7 +192,7 @@ export function TarjetaWhatsappProveedor({ esAdmin = false }: { esAdmin?: boolea
       )}
       <p style={{ margin: 0, fontSize: 12, color: 'var(--cp-soft)' }}>
         Con Evolution (WhatsApp no oficial) el bot manda los menús como texto numerado («Responde 1, 2 o 3») y solo avisa por su cuenta el estado del pedido y la encuesta;
-        puntos, cumpleaños, recordatorios y campañas no salen. Meta queda de respaldo: se puede volver en cualquier momento.
+        puntos, cumpleaños, recordatorios y campañas no salen. Nada sale por Meta mientras Evolution esté elegido; solo se vuelve a Meta si lo eliges a mano.
         Solo un administrador puede cambiar esto.
       </p>
       <Confirmar
