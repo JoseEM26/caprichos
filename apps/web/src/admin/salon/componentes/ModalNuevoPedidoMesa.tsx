@@ -737,6 +737,8 @@ export function ModalNuevoPedidoMesa({
     if (!abierto) {
       setIntentoEnvio(false);
       setIntentoCli(false);
+      // Al cerrar a mitad, la mesa elegida no queda «pegada» para la próxima vez
+      setMesasSeleccionadas(todasLasMesasIniciales);
       setValorComp(VALOR_COMPROBANTE_VACIO);
     }
   }, [abierto]);
@@ -917,7 +919,8 @@ export function ModalNuevoPedidoMesa({
     setAvisoMesa(null);
     setCapacidadAceptada(false);
     if (modoPlano === 'one') {
-      const nueva = ids.find((id) => !mesasSeleccionadas.includes(id));
+      // Tocar la mesa que ya estaba elegida (al volver atrás) la deselecciona en el croquis: igual se sigue con esa mesa
+      const nueva = ids.find((id) => !mesasSeleccionadas.includes(id)) ?? mesasSeleccionadas[0];
       if (nueva) {
         setMesasSeleccionadas([nueva]);
         setPaso('items');
