@@ -16,6 +16,7 @@ describe('Análisis › Clientes y WhatsApp: permisos y rutas', () => {
     ['clientes', ClientesAnalisisController, 'resumen', 'admin/analisis/clientes'],
     ['whatsapp', WhatsappAnalisisController, 'resumen', 'admin/analisis/whatsapp'],
     ['whatsapp sin respuesta', WhatsappAnalisisController, 'sinRespuesta', 'admin/analisis/whatsapp'],
+    ['whatsapp salud del bot', WhatsappAnalisisController, 'saludBot', 'admin/analisis/whatsapp'],
   ])('%s: exige analisis/ver', (_n, controlador, metodo, ruta) => {
     expect(permiso(controlador, metodo)).toEqual({ modulo: 'analisis', accion: 'ver' });
     expect(Reflect.getMetadata(PATH_METADATA, controlador)).toBe(ruta);
@@ -23,7 +24,7 @@ describe('Análisis › Clientes y WhatsApp: permisos y rutas', () => {
 
   it('el desglose por persona solo se pide cuando el usuario es ADMIN', () => {
     const resumen = jest.fn();
-    const c = new WhatsappAnalisisController({ resumen } as unknown as WhatsappAnalisisService);
+    const c = new WhatsappAnalisisController({ resumen } as unknown as WhatsappAnalisisService, {} as any);
     c.resumen({}, { usuario: { roles: ['SUPERVISOR'] } });
     c.resumen({}, { usuario: { roles: ['ADMIN'] } });
     c.resumen({}, { usuario: { rol: 'admin' } });

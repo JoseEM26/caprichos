@@ -15,6 +15,7 @@ import {
   type PropsPestanaAnalisis,
 } from '../comun';
 import { ChatsSinRespuesta } from './ChatsSinRespuesta';
+import { SaludBot } from './SaludBot';
 import type { RespuestaWhatsapp } from './tipos';
 
 const num = (n: number) => n.toLocaleString('es-PE');
@@ -38,12 +39,12 @@ export function WhatsappTab({ filtros, esAdmin }: PropsPestanaAnalisis) {
       <ChatsSinRespuesta />
       {estado === 'cargando' && !datos && <Cargando mensaje="Calculando WhatsApp" />}
       {estado === 'error' && !datos && <EstadoError titulo="No se pudo analizar WhatsApp" mensaje={mensaje || 'Prueba de nuevo en unos segundos.'} alReintentar={recargar} />}
-      {datos && <Contenido d={datos} esAdmin={esAdmin} />}
+      {datos && <Contenido d={datos} esAdmin={esAdmin} filtros={filtros} />}
     </div>
   );
 }
 
-function Contenido({ d, esAdmin }: { d: RespuestaWhatsapp; esAdmin: boolean }) {
+function Contenido({ d, esAdmin, filtros }: { d: RespuestaWhatsapp; esAdmin: boolean; filtros: PropsPestanaAnalisis['filtros'] }) {
   const [horaElegida, setHoraElegida] = useState<string | null>(null);
   const r = d.respuesta;
   const conDatos = r.porHora.filter((h) => h.n > 0);
@@ -212,6 +213,11 @@ function Contenido({ d, esAdmin }: { d: RespuestaWhatsapp; esAdmin: boolean }) {
                 </div>
               </>
             ),
+          },
+          {
+            id: 'salud-del-bot',
+            nombre: 'Salud del bot',
+            contenido: <SaludBot filtros={filtros} />,
           },
           {
             id: 'mensajes',
