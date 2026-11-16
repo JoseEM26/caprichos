@@ -9,18 +9,20 @@ import { ListaCorrecciones } from './CorreccionesMedios';
 import { PorQueNoCuadra } from './PorQueNoCuadra';
 import { ComisionPasarela, OperacionesCulqi } from './BloqueCulqi';
 import { rotuloMedioCierre } from './cuadre.util';
+import { CuponesCierre } from './CuponesCierre';
 import './detalle-cierre.css';
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 const conSigno = (n: number) => `${n > 0.004 ? '+' : n < -0.004 ? '−' : ''}S/ ${Math.abs(n).toFixed(2)}`;
 const claseDif = (n: number) => (Math.abs(n) < 0.005 ? 'dc-ok' : 'dc-mal');
 
-type Pestana = 'resumen' | 'efectivo' | 'medios' | 'movimientos' | 'porque';
+type Pestana = 'resumen' | 'efectivo' | 'medios' | 'movimientos' | 'cupones' | 'porque';
 const PESTANAS: Array<[Pestana, string]> = [
   ['resumen', 'Resumen'],
   ['efectivo', 'Efectivo'],
   ['medios', 'Medios de pago'],
   ['movimientos', 'Movimientos'],
+  ['cupones', 'Cupones'],
   ['porque', '¿Por qué no cuadra?'],
 ];
 
@@ -245,7 +247,7 @@ export function DetalleCierreModal({ cajaId, detalle, cargando, error, esAdmin, 
     return (
       <>
         <div className="dc-pestanas" role="tablist" aria-label="Secciones del cierre">
-          {PESTANAS.filter(([id]) => id !== 'porque' || esAdmin).map(([id, texto]) => (
+          {PESTANAS.filter(([id]) => (id !== 'porque' || esAdmin) && (id !== 'cupones' || !!detalle.cupones)).map(([id, texto]) => (
             <button key={id} type="button" role="tab" id={`dc-tab-${id}`} aria-selected={pestana === id} aria-controls="dc-panel" className="dc-tab" onClick={() => setPestana(id)}>
               {texto}
             </button>
@@ -258,6 +260,7 @@ export function DetalleCierreModal({ cajaId, detalle, cargando, error, esAdmin, 
             ? <SeccionMedios t={t} detalle={detalle} />
             : <p className="dc-aviso" data-testid="aviso-detalle-restringido">El desglose por medio de pago y las diferencias del sistema están reservados para el administrador (cierre ciego).</p>)}
           {pestana === 'movimientos' && <SeccionMovimientos t={t} detalle={detalle} />}
+          {pestana === 'cupones' && <CuponesCierre datos={detalle.cupones} />}
           {pestana === 'porque' && esAdmin && <PorQueNoCuadra cajaId={cajaId} />}
         </div>
       </>

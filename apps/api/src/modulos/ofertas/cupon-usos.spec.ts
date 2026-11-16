@@ -148,4 +148,28 @@ describe('canjearCuponEnCaja guarda quién y por qué canal', () => {
       data: expect.objectContaining({ cupon_id: 5n, pedido_id: 9n, canal: 'CAJA', aplicado_por: 77n }),
     });
   });
+
+  it('cupón emitido: canal MOZO y canjeado_por del operador; descuenta del total', async () => {
+    const tx: any = { cuponEmitido: { update: jest.fn() }, pedido: { update: jest.fn() } };
+    const prisma: any = {
+      pedido: { findUnique: jest.fn().mockResolvedValue({ id: 9n, subtotal: 50, envio: 0, puntos_canjeados: 0, estado: 'COLA', cliente_party_id: 5n, lineas: [] }) },
+      $transaction: (fn: any) => fn(tx),
+    };
+    const mod = await Test.createTestingModule({
+      providers: [
+        OfertasService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RedisService, useValue: { obtenerCliente: () => ({}) } },
+        { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
+        { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
+      ],
+    }).compile();
+    const servicio = mod.get(OfertasService);
+    jest.spyOn(servicio, 'validarCuponParaCarta').mockResolvedValue({ cupon: { id: '5', emitidoId: '3', descuentoCalculado: 10, canales: ['MOZO'], tipo: 'MONTO' } } as any);
+
+    const r = await servicio.canjearCuponEnCaja({ codigo: 'abc', pedidoId: 9, canal: 'MOZO' }, { partyId: 77n });
+
+    expect(tx.cuponEmitido.update).toHaveBeenCalledWith({ where: { id: 3n }, data: expect.objectContaining({ estado: 'CANJEADO', canjeado_canal: 'MOZO', canjeado_por: 77n, pedido_canje_id: 9n }) });
+    expect(r).toMatchObject({ canjeado: true, descuento: 10, totalActualizado: 40 });
+  });
 });

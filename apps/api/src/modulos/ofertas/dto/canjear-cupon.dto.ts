@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CanjearCuponDto {
   @IsString({ message: 'El código de cupón es obligatorio' })
@@ -7,4 +7,9 @@ export class CanjearCuponDto {
 
   @IsNotEmpty({ message: 'pedidoId es obligatorio' })
   pedidoId!: string | number;
+
+  /** Desde dónde se canjea; por defecto CAJA. */
+  @IsOptional()
+  @IsIn(['CAJA', 'MOZO'])
+  canal?: 'CAJA' | 'MOZO';
 }

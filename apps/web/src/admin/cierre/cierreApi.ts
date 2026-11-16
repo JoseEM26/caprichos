@@ -104,6 +104,20 @@ export interface VentaDetalle {
 }
 
 /** «Servicios y productos libres» del turno: cada cargo cobrado, su medio de pago y quién lo agregó, y el total. */
+/** Cupones dados y canjeados en el turno (solo informativo: no entra al esperado ni al cuadre). */
+export interface CuponesTurno {
+  porPersona: Array<{
+    partyId: string | null;
+    nombre: string;
+    dados: Array<{ codigo: string; cupon: string; pedido: string | null; cliente: string | null; en: string; venceEn: string | null; estado: string }>;
+    canjeados: Array<{ codigo: string; cupon: string; pedido: string | null; descuento: number; dioNombre: string | null; canal: string | null; en: string }>;
+    pendientes: Array<{ codigo: string; cupon: string; pedido: string | null; cliente: string | null; venceEn: string | null }>;
+    totales: { dados: number; canjeados: number; pendientes: number; descuento: number };
+  }>;
+  otros: { canjes: number; descuento: number };
+  totales: { dados: number; canjeados: number; pendientes: number; descuento: number };
+}
+
 export interface ServiciosLibresTurno {
   lista: Array<{ pedidoId: string; pedidoCodigo: string | null; descripcion: string; monto: number; medios: string[]; agregadoPor: string | null; agregadoEn: string | null }>;
   total: number;
@@ -162,6 +176,8 @@ export interface MontosEsperados {
   ventas?: VentaDetalle[];
   /** Cargos libres del turno (ya incluidos en los cobros); puede faltar en servidores viejos */
   serviciosLibres?: ServiciosLibresTurno;
+  /** Cupones del turno por persona (informativo); puede faltar en servidores viejos */
+  cupones?: CuponesTurno | null;
   movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;
@@ -310,6 +326,7 @@ export interface DetalleCierreCompleto {
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
   ajustesMedio?: AjusteMedio[];
+  cupones?: CuponesTurno | null;
   /** Operaciones Culqi del cierre (pedido, medio, monto, hora, nº de operación) */
   culqi?: { operaciones: OperacionCulqi[]; comision?: ComisionCulqiTurno };
   /** Todo el detalle del cierre ya armado (el mismo que se imprime); falta en respuestas de un API viejo. */

@@ -33,6 +33,7 @@ import {
 import { ArqueoDto } from './dto/arqueo.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { armarTicketCierre } from './ticket-cierre';
+import { cuponesDelTurno } from './cupones-turno';
 import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
@@ -894,6 +895,8 @@ export class CierreService {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
       cobrados: mapearCobrosCaja(cobros),
+      // Cupones dados y canjeados en el turno: informativo, no toca el esperado ni el cuadre
+      cupones: await cuponesDelTurno(this.prisma, caja).catch(() => null),
       // Detalle de cada venta (quién, tipo, categoría, repartidor…): aditivo, se une por pedidoId
       ventas: detallarVentasTurno(cobros as any, nombres),
       // «Servicios y productos libres» del turno: lista y total (ya están dentro de los cobros; solo se detallan)
@@ -1108,6 +1111,7 @@ export class CierreService {
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
       ajustesMedio: ajustes,
+      cupones: await cuponesDelTurno(this.prisma, cierre.caja).catch(() => null),
       culqi: { operaciones: opsCulqi, comision: comisionCulqi },
       ticket,
     };

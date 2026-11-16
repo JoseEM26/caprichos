@@ -9,6 +9,7 @@ import { BotonCambiarPago } from '../pedidos/CambiarPago';
 import { RecuadroPagoCulqi } from '../pedidos/RecuadroPagoCulqi';
 import { errorCelular } from '../pedidos/ModalCorregirCliente';
 import { pedidosApi, type Pedido } from '../pedidos/pedidosApi';
+import { Icono } from '../../comun/Icono';
 import { ModalDarCupon } from '../ofertas/ModalDarCupon';
 import { ModalCargoLibre, esCargoLibre, etiquetaCargoLibre, type CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import type { AreaProgreso, MiPedido } from './tipos';
@@ -88,10 +89,12 @@ export interface DetallePedidoMozoProps {
   /** Acciones que abren otro modal: el padre cierra este y abre el suyo */
   alExtra: (cargoInicial?: CargoLibreDatos) => void;
   alAnular: () => void;
+  /** Canjear cupón: abre su modal (el padre cierra este) */
+  alCanjear?: () => void;
 }
 
 /** «Ver detalle» en 3 pasos: Pedido · Cliente y pago · Estado y acciones. */
-export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alCambio, alExtra, alAnular }: DetallePedidoMozoProps) {
+export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alCambio, alExtra, alAnular, alCanjear }: DetallePedidoMozoProps) {
   const { tiene } = useSesion();
   const [paso, setPaso] = useState('pedido');
   const [completo, setCompleto] = useState<Pedido | null>(null);
@@ -134,7 +137,7 @@ export function DetallePedidoMozo({ pedido, extras = [], vouchers, alCerrar, alC
     { id: 'estado', etiqueta: PASOS[2].etiqueta, contenido: (
       <>
         <PasoEstado pedido={pedido} completo={completo} />
-        <Acciones pedido={pedido} vigente={vigente} alExtra={alExtra} alAnular={alAnular} alCambio={alCambio} />
+        <Acciones pedido={pedido} vigente={vigente} alExtra={alExtra} alAnular={alAnular} alCanjear={alCanjear} alCambio={alCambio} />
       </>
     ) },
   ];
@@ -279,7 +282,7 @@ function PasoEstado({ pedido, completo }: { pedido: MiPedido; completo: Pedido |
   );
 }
 
-function Acciones({ pedido, vigente, alExtra, alAnular, alCambio }: { pedido: MiPedido; vigente: boolean; alExtra: (cargoInicial?: CargoLibreDatos) => void; alAnular: () => void; alCambio: () => void }) {
+function Acciones({ pedido, vigente, alExtra, alAnular, alCanjear, alCambio }: { pedido: MiPedido; vigente: boolean; alCanjear?: () => void; alExtra: (cargoInicial?: CargoLibreDatos) => void; alAnular: () => void; alCambio: () => void }) {
   const { tiene } = useSesion();
   // «Servicio o producto»: sin cobrar se suma aquí mismo; cobrado, abre el pedido extra con el cargo
   const [cargoAbierto, setCargoAbierto] = useState(false);
@@ -315,6 +318,11 @@ function Acciones({ pedido, vigente, alExtra, alAnular, alCambio }: { pedido: Mi
         {puedeReimprimir && <Boton variante="secundario" onClick={() => setConfirmando(true)}>Reimprimir comprobante de pago</Boton>}
         {vigente && tiene('pedidos/extra') && <Boton variante="secundario" onClick={() => alExtra()}>+ Pedido extra</Boton>}
         {vigente && tiene('pedidos/cargo_libre') && <Boton variante="secundario" onClick={() => { setErrorCargo(''); setCargoAbierto(true); }}>+ Servicio o producto</Boton>}
+        {vigente && alCanjear && !cobrado && tiene('cupones/canjear') && (
+          <Boton variante="secundario" aria-label="Canjear un cupón en este pedido" onClick={alCanjear}>
+            <Icono nombre="cupon" tamano={18} aria-hidden="true" /> Canjear cupón
+          </Boton>
+        )}
         {vigente && tiene('cupones/dar') && <Boton variante="secundario" onClick={() => setCuponAbierto(true)}>Dar cupón</Boton>}
         {vigente && pedido.estado !== 'ENTREGADO' && tiene('pedidos/anular') && <Boton variante="peligro" onClick={alAnular}>Anular pedido</Boton>}
       </div>

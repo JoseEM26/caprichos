@@ -26,7 +26,7 @@ interface FilaUso {
 }
 
 /** Descuento que dio ESTE cupón en el pedido: su línea CUPON del detalle; si no la hay, el descuento del pedido. */
-function descuentoDelCupon(pedido: { descuento_detalle?: unknown; descuento?: unknown }): number {
+export function descuentoDelCupon(pedido: { descuento_detalle?: unknown; descuento?: unknown }): number {
   const cupones = descuentosDePedido({ descuento_detalle: pedido.descuento_detalle }).filter((d) => d.tipo === 'CUPON');
   return cupones.length > 0 ? cupones.reduce((a, d) => a + d.monto, 0) : r2(Number(pedido.descuento ?? 0));
 }

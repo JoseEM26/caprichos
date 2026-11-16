@@ -150,6 +150,13 @@ export class CuponesController {
     return this.ofertasService.validarCuponParaCaja(dto);
   }
 
+  /** Solo consulta (no consume): detalles del cupón y si aplica a este pedido. */
+  @Get('revisar')
+  @Permiso('cupones', 'canjear')
+  async revisarEnCaja(@Query('codigo') codigo: string, @Query('pedidoId') pedidoId: string, @Query('canal') canal?: string) {
+    return this.ofertasService.revisarCuponEnCaja(codigo, pedidoId, canal);
+  }
+
   @Post('canjear')
   @Permiso('cupones', 'canjear')
   async canjearEnCaja(@Body() dto: CanjearCuponDto, @Req() req: any) {

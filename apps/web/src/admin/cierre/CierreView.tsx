@@ -22,6 +22,7 @@ import { PendientesCobroCierre } from './PendientesCobroCierre';
 import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
 import { ServiciosLibresCierre } from './ServiciosLibresCierre';
+import { CuponesCierre } from './CuponesCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -909,6 +910,9 @@ export function CierreView() {
 
               {/* Servicios y productos libres del turno: de dónde salió ese dinero (ya está dentro de los cobros) */}
               {esperado && <ServiciosLibresCierre datos={esperado.serviciosLibres} />}
+
+              {/* Cupones dados y canjeados en el turno, por persona (informativo: no cambia el esperado) */}
+              {esperado && <CuponesCierre datos={esperado.cupones} />}
 
               {/* Movimientos de caja */}
               <div

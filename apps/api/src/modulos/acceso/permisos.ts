@@ -371,6 +371,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/cargo_libre', // agrega un servicio o producto libre (descripción y monto) a un pedido
     'cupones/dar', // da un cupón («Lo da el mozo o cajero») a un cliente: sale impreso en su voucher
+    'cupones/canjear', // revisa y aplica un cupón a un pedido desde la tablet (canal MOZO)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
     'creditos/cobrar_ahora', // cobra al trabajador en el momento (pedido del personal); queda quién cobró

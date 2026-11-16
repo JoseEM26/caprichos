@@ -21,6 +21,7 @@ import { juntarProgresos, progresoDePiezas } from './progresoMesa';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import { DetallePedidoMozo } from './DetallePedidoMozo';
+import { ModalCanjearCupon } from '../ofertas/ModalCanjearCupon';
 import type { EstadoMisPedidos, FiltrosMisPedidos, MiPedido, OrdenMisPedidos, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { agruparCuentas } from '../pedidos/agruparCuentas';
@@ -179,6 +180,7 @@ export function MisPedidosView() {
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
   const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
+  const [canjearDe, setCanjearDe] = useState<MiPedido | null>(null);
   const [cargoExtra, setCargoExtra] = useState<CargoLibreDatos | undefined>(undefined);
   const [anularDe, setAnularDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
@@ -724,8 +726,14 @@ export function MisPedidosView() {
             setDetalleId(null);
             setAnularDe(detalle);
           }}
+          alCanjear={() => {
+            setDetalleId(null);
+            setCanjearDe(detalle);
+          }}
         />
       )}
+
+      {canjearDe && <ModalCanjearCupon pedido={{ id: canjearDe.id, codigo: canjearDe.codigo }} canal="MOZO" alCerrar={() => setCanjearDe(null)} alAplicado={() => void cargar()} />}
 
       {anularDe && (
         <ModalAnular

@@ -295,6 +295,30 @@ export interface ReglasAcumulacionItem {
   actualizadoEn?: string;
 }
 
+export interface RevisionCupon {
+  codigo: string;
+  existe: boolean;
+  aplicable: boolean;
+  motivo: string | null;
+  estado?: 'VIGENTE' | 'CANJEADO' | 'VENCIDO' | 'ANULADO' | 'INACTIVO';
+  descuento?: number | null;
+  nuevoTotal?: number | null;
+  totalActual?: number;
+  cupon: {
+    codigoBase: string;
+    descripcion: string | null;
+    modo: string;
+    tipo: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
+    valor: number;
+    compraMinima: number | null;
+    alcance: string | null;
+    canales: string[];
+    venceEn: string | null;
+  } | null;
+  dado?: { por: string | null; en: string; pedido: string | null; cliente: string | null } | null;
+  canje?: { en: string | null; por: string | null; canal: string | null; pedido: string | null } | null;
+}
+
 export const ofertasApi = {
   // Ofertas (Promos y Descuentos)
   async listarOfertas(tipo?: string, soloActivas?: boolean, canal?: string): Promise<OfertaItem[]> {
@@ -364,6 +388,14 @@ export const ofertasApi = {
 
   async darCupon(cuponId: string, pedidoId: string): Promise<CuponDado & { yaExistia: boolean }> {
     return api.post(`/admin/cupones/${cuponId}/dar`, { pedidoId });
+  },
+
+  async revisarCupon(codigo: string, pedidoId: string, canal: 'CAJA' | 'MOZO'): Promise<RevisionCupon> {
+    return api.get(`/admin/cupones/revisar?codigo=${encodeURIComponent(codigo)}&pedidoId=${encodeURIComponent(pedidoId)}&canal=${canal}`);
+  },
+
+  async canjearCupon(codigo: string, pedidoId: string, canal: 'CAJA' | 'MOZO'): Promise<{ canjeado: boolean; descuento: number; totalActualizado: number }> {
+    return api.post('/admin/cupones/canjear', { codigo, pedidoId, canal });
   },
 
   async quitarCuponDado(emitidoId: string): Promise<any> {

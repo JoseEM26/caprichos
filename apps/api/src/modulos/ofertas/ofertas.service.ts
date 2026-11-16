@@ -1,6 +1,7 @@
 import { montoElegiblePuntos } from './puntos-elegibles.util';
 import { usosDeCupon } from './cupon-usos';
 import { cuponesParaDar, darCupon, quitarCuponDado } from './cupon-asignado';
+import { canalDeCanje, lineasParaCupon, motivoCuponNoAplica, motivoPedidoNoAdmiteCupon, PEDIDO_PARA_CUPON, revisarCupon } from './cupon-canje';
 import {
   BadRequestException,
   ConflictException,
@@ -1597,9 +1598,16 @@ export class OfertasService {
     };
   }
 
+  /** Solo consulta: detalles del cupón y si se puede aplicar a este pedido. No consume el cupón. */
+  async revisarCuponEnCaja(codigo: string, pedidoId: string, canal?: string) {
+    return revisarCupon({ prisma: this.prisma, validar: (d) => this.validarCuponInterno(d), partyCliente: partyClienteDelPedido }, codigo, pedidoId, canal);
+  }
+
   async canjearCuponEnCaja(dto: CanjearCuponDto, usuario?: any) {
+    const canal = canalDeCanje(dto.canal);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: BigInt(dto.pedidoId) },
+      include: PEDIDO_PARA_CUPON,
     });
 
     if (!pedido) {
@@ -1609,14 +1617,18 @@ export class OfertasService {
       });
     }
 
-    if (Number(pedido.puntos_canjeados ?? 0) > 0) {
-      throw new BadRequestException({ codigo: 'PUNTOS_CON_CUPON', mensaje: 'No se pueden usar puntos y un cupón en el mismo pedido' });
+    const motivoPedido = motivoPedidoNoAdmiteCupon(pedido);
+    if (motivoPedido) {
+      throw new BadRequestException({ codigo: Number(pedido.puntos_canjeados ?? 0) > 0 ? 'PUNTOS_CON_CUPON' : 'PEDIDO_NO_ADMITE_CUPON', mensaje: motivoPedido });
     }
     const validacion = await this.validarCuponParaCarta({
       codigo: dto.codigo,
       subtotal: Number(pedido.subtotal),
+      lineas: lineasParaCupon(pedido),
       clientePartyId: partyClienteDelPedido(pedido),
     });
+    const motivoCupon = motivoCuponNoAplica(validacion.cupon, canal);
+    if (motivoCupon) throw new BadRequestException({ codigo: 'CUPON_NO_APLICA', mensaje: motivoCupon });
 
     const descuento = validacion.cupon.descuentoCalculado;
     const nuevoTotal = Math.max(0, Number((Number(pedido.subtotal) - descuento + (Number(pedido.envio) || 0)).toFixed(2)));
@@ -1629,7 +1641,7 @@ export class OfertasService {
             estado: 'CANJEADO',
             canjeado_en: new Date(),
             pedido_canje_id: pedido.id,
-            canjeado_canal: 'CAJA',
+            canjeado_canal: canal,
             canjeado_por: usuario?.partyId != null ? BigInt(usuario.partyId) : null,
           },
         });
@@ -1644,7 +1656,7 @@ export class OfertasService {
             cupon_id: BigInt(validacion.cupon.id),
             pedido_id: pedido.id,
             party_id: partyClienteDelPedido(pedido),
-            canal: 'CAJA',
+            canal,
             aplicado_por: usuario?.partyId != null ? BigInt(usuario.partyId) : null,
           },
         });
@@ -1672,7 +1684,7 @@ export class OfertasService {
       accion: 'canjear',
       entidad: 'pedido',
       entidadId: pedido.id,
-      despues: { codigo: dto.codigo, descuento, nuevoTotal },
+      despues: { codigo: dto.codigo, descuento, nuevoTotal, canal },
       partyId: usuario?.partyId,
     });
 
