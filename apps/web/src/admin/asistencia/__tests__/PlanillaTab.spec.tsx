@@ -31,6 +31,7 @@ describe('PlanillaTab', () => {
     partyId: 7, nombre: 'Luis Pérez', periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, sueldo: persona.sueldo,
     estado: 'ABIERTO', periodoId: null, toleranciaMin: 5, pendientes: 0, resultado, dias: [], consumos: [], ajustes: [],
   };
+  const sig = () => fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
   const abrir = async () => fireEvent.click(await screen.findByRole('button', { name: 'Abrir la planilla de Luis Pérez' }));
 
   it('lista a la persona con tarjeta, totales y abre el detalle; los consumos pasan al siguiente período al desmarcarlos', async () => {
@@ -41,9 +42,12 @@ describe('PlanillaTab', () => {
     expect(screen.getByText('S/ 1000.00 al mes', { exact: false })).toBeInTheDocument();
     expect(within(screen.getByLabelText('Totales de la planilla')).getByText('A pagar').nextElementSibling).toHaveTextContent('S/ 560.00');
     await abrir();
-    expect(await screen.findByText('Neto a pagar')).toBeInTheDocument();
+    expect(await screen.findByText('Horas programadas')).toBeInTheDocument();
+    sig();
     fireEvent.click(await screen.findByLabelText('Cobrar en este pago el consumo P-100'));
     await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), ['1'], [], [], []));
+    sig();
+    expect(await screen.findByText('Neto a pagar')).toBeInTheDocument();
   });
 
   it('resumen por persona: penalidad, préstamos, adelantos, medio de pago, LIQUIDADO y copiar; sin ningún «50 %»', async () => {
@@ -115,6 +119,8 @@ describe('PlanillaTab', () => {
     });
     render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
     await abrir();
+    await screen.findByText('Horas programadas');
+    sig();
     expect(await screen.findByText(/capital S\/ 100\.00 \+ interés S\/ 6\.00/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Cobrar la cuota 1 del préstamo'));
     await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], [], []));
@@ -122,18 +128,78 @@ describe('PlanillaTab', () => {
     await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], ['5'], []));
   });
 
-  it('las secciones del detalle son plegables y marcar pagado pide confirmación', async () => {
+  it('los pasos llevan a un resumen y marcar pagado pide confirmación', async () => {
     listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
     detalle.mockResolvedValue(base);
     pagar.mockResolvedValue({});
     render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
     await abrir();
-    for (const t of ['Pago', 'Penalidad por tardanza', 'Asistencia del período', 'Adelantos', 'Descuentos y consumos', 'Préstamos', 'Servicios extra', 'Vínculo y vacaciones']) {
-      expect((await screen.findByText(t, { selector: '.pl-seccion-titulo' })).closest('details')).not.toBeNull();
-    }
-    fireEvent.click(await screen.findByRole('button', { name: 'Marcar pagado' }));
+    const dlg = () => screen.getByRole('dialog');
+    expect(await screen.findByText('Paso 1 de 4 · Asistencia')).toBeInTheDocument();
+    expect(within(dlg()).getByText('Asistencia del período', { selector: '.pl-seccion-titulo' })).toBeInTheDocument();
+    sig();
+    for (const t of ['Adelantos', 'Descuentos y consumos', 'Préstamos', 'Servicios extra']) expect(within(dlg()).getByText(t, { selector: '.pl-seccion-titulo' })).toBeInTheDocument();
+    sig();
+    expect(screen.getByText('Paso 3 de 4 · Pago')).toBeInTheDocument();
+    expect(within(dlg()).getByText('Vínculo y vacaciones', { selector: '.pl-seccion-titulo' })).toBeInTheDocument();
+    sig();
+    expect(screen.getByText('Paso 4 de 4 · Resumen')).toBeInTheDocument();
+    expect(screen.getByTestId('resumen-planilla')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar pagado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
     await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], []));
+  });
+
+  it('con jornadas por revisar «Siguiente» no avanza, dice qué falta y Aprobar todas pide confirmación', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue({ ...base, pendientes: 2, jornadasPorRevisar: ['2026-11-03', '2026-11-04'] });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    expect(await screen.findByTestId('banner-por-revisar')).toHaveTextContent('2 jornadas por revisar o sin evaluar');
+    sig();
+    expect(screen.getByText(/Falta resolver 2 jornadas por revisar o sin evaluar \(2026-11-03, 2026-11-04\)/)).toBeInTheDocument();
+    expect(screen.getByText('Paso 1 de 4 · Asistencia')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar todas las marcas dudosas del período' }));
+    expect(await screen.findByText('¿Aprobar todas las marcas dudosas del período?')).toBeInTheDocument();
+  });
+
+  it('Atrás no pierde lo escrito en el formulario de adelanto', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue(base);
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    await screen.findByText('Horas programadas');
+    sig();
+    fireEvent.change(await screen.findAllByLabelText(/Monto \(S\/\)/).then((x) => x[0]), { target: { value: '25' } });
+    sig();
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
+    expect((await screen.findAllByLabelText(/Monto \(S\/\)/))[0]).toHaveValue(25);
+  });
+
+  it('créditos de días anteriores sin cerrar: avisa, bloquea y se puede confirmar pagar sin descontarlos', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue({ ...base, consumos: [{ id: '3', fecha: '2026-10-20', pedido: 'P-99', monto: 12, cobrar: false, anterior: true }] });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    await screen.findByText('Horas programadas');
+    sig();
+    expect(await screen.findByTestId('aviso-creditos-anteriores')).toHaveTextContent('Tiene 1 crédito sin cerrar de días anteriores por S/ 12.00');
+    sig();
+    expect(screen.getByText('Paso 2 de 4 · Descuentos')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Confirmo pagar sin descontar los créditos anteriores'));
+    sig();
+    expect(screen.getByText('Paso 3 de 4 · Pago')).toBeInTheDocument();
+  });
+
+  it('período pagado: abre en el resumen en solo lectura, sin finalizar y con Reabrir', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'PAGADO' }] });
+    detalle.mockResolvedValue({ ...base, estado: 'PAGADO', periodoId: '5', pagadoEn: '2026-11-10T12:00:00Z' });
+    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    await abrir();
+    expect(await screen.findByText('Paso 4 de 4 · Resumen')).toBeInTheDocument();
+    expect(screen.getByText(/Pagado \(solo lectura\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Marcar pagado' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reabrir período' })).toBeInTheDocument();
   });
 
   it('selector Semana | Mes: pide la lista con el modo, avanza y retrocede de período y muestra la etiqueta', async () => {
@@ -202,12 +268,16 @@ describe('PlanillaTab', () => {
     render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
     expect(await screen.findByText('Consumos de períodos anteriores sin cobrar: S/ 12.00')).toBeInTheDocument();
     await abrir();
+    await screen.findByText('Horas programadas');
+    sig();
     expect(await screen.findByText('2 × Café (Grande)')).toBeInTheDocument();
     expect(screen.getByText(/Consumos de períodos anteriores sin cobrar · S\/ 12\.00/)).toBeInTheDocument();
     expect(screen.getByLabelText('Cobrar en este pago el consumo P-99')).not.toBeChecked();
     expect(screen.getByLabelText('Cobrar en este pago el consumo P-100')).toBeChecked();
     fireEvent.click(screen.getByLabelText('Cobrar en este pago el consumo P-99'));
     await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], [], [], ['3']));
+    fireEvent.click(screen.getByLabelText('Confirmo pagar sin descontar los créditos anteriores'));
+    sig(); sig();
     fireEvent.click(await screen.findByRole('button', { name: 'Marcar pagado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar pagado' }));
     await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], ['3']));
