@@ -125,8 +125,8 @@ networks:
 
 volumes:
   evolution_postgres_data:
-    name: caprichos_evolution_postgres_data
+    name: ${EVOLUTION_VOLUMEN_PREFIJO:-caprichos_evolution}_postgres_data
   evolution_redis_data:
-    name: caprichos_evolution_redis_data
+    name: ${EVOLUTION_VOLUMEN_PREFIJO:-caprichos_evolution}_redis_data
   evolution_instances:
-    name: caprichos_evolution_instances
+    name: ${EVOLUTION_VOLUMEN_PREFIJO:-caprichos_evolution}_instances

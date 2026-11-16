@@ -11,6 +11,9 @@ export interface OpcionTarjeta {
   etiqueta?: string;
   /** Aviso opcional (ahorro, promoción) que se muestra en la tarjeta */
   aviso?: string;
+  /** Opción realzada: ocupa todo el ancho, borde de marca e insignia (texto visible, no solo color) */
+  destacada?: boolean;
+  insignia?: string;
 }
 
 interface Props {
@@ -37,11 +40,14 @@ export function ElegirEnTarjetas({ titulo, opciones, seleccionado, deshabilitado
             aria-pressed={seleccionado === undefined ? undefined : activa}
             onClick={() => alElegir(o.id)}
             style={{
+              position: 'relative',
+              gridColumn: o.destacada ? '1 / -1' : undefined,
               minHeight: '112px',
               padding: '12px 8px',
               borderRadius: '14px',
-              border: activa ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)',
-              backgroundColor: activa ? 'var(--cp-sand)' : 'var(--cp-white)',
+              border: activa || o.destacada ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)',
+              boxShadow: o.destacada ? '0 0 0 3px var(--cp-gold, #F2B84B)' : undefined,
+              backgroundColor: activa || o.destacada ? 'var(--cp-sand)' : 'var(--cp-white)',
               color: 'var(--cp-navy)',
               display: 'flex',
               flexDirection: 'column',
@@ -52,6 +58,11 @@ export function ElegirEnTarjetas({ titulo, opciones, seleccionado, deshabilitado
               cursor: deshabilitado ? 'wait' : 'pointer',
             }}
           >
+            {o.insignia && (
+              <span data-testid="insignia-opcion" style={{ position: 'absolute', top: '8px', right: '8px', padding: '2px 8px', borderRadius: '999px', backgroundColor: 'var(--cp-orange)', color: '#fff', fontSize: '11px', fontWeight: 800 }}>
+                {o.insignia}
+              </span>
+            )}
             <span aria-hidden="true" style={{ display: 'flex', height: '36px', alignItems: 'center' }}>{o.icono}</span>
             <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px' }}>{o.nombre}</span>
             <span style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '15px' }}>{o.linea}</span>

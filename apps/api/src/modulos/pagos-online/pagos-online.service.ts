@@ -50,6 +50,9 @@ export class PagosOnlineService {
   // ---------------------------------------------------------------- configuración
 
   async estaActivo(): Promise<boolean> {
+    // Sin llaves de Culqi la pasarela es SIMULADA: solo vale en la demo o fuera de producción; en producción, apagada aunque el interruptor esté encendido
+    const simuladoPermitido = (process.env.AMBIENTE_DESPLIEGUE || '').toLowerCase() === 'demo' || process.env.NODE_ENV !== 'production';
+    if (this.pasarela.modo === 'SIMULADO' && !simuladoPermitido) return false;
     // Única fuente: el interruptor «Pago en línea» de la carta (Configuración › Pagos)
     return medioActivo(await leerMediosPagoCanal(this.prisma as any).catch(() => null), 'PAGO_EN_LINEA', 'CARTA');
   }

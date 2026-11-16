@@ -1,5 +1,5 @@
 import { montoACobrar } from '../../../comun/monto-a-cobrar';
-import { ENVIO_GRATIS_MONTO_POR_DEFECTO } from '@caprichos/compartido';
+import { ENVIO_GRATIS_MONTO_POR_DEFECTO, medioActivo } from '@caprichos/compartido';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
@@ -484,8 +484,10 @@ export class IaHerramientasService {
 
     // Número y titular reales (los mismos que recibe el cliente al pagar un pedido)
     let datosParaPagar: Record<string, string> | undefined;
+    let canal: any;
     try {
       const pub = await (this.localService as any)?.obtenerDatosPublicosLocal?.();
+      canal = pub?.mediosPagoCanal;
       const vis = pub?.mediosPagoVisibles;
       if (vis) {
         datosParaPagar = {};
@@ -497,28 +499,38 @@ export class IaHerramientasService {
       datosParaPagar = undefined;
     }
 
-    return {
-      datosParaPagar,
-      mediosDisponibles: [
+    // Solo lo encendido en el canal BOT; el pago en línea (pasarela) nunca se ofrece por WhatsApp
+    const enBot = (m: string) => !canal || medioActivo(canal, m, 'BOT');
+    const mediosDisponibles = [
         {
+          ids: ['YAPE', 'PLIN'],
           metodo: 'Yape / Plin',
           instrucciones: 'Pagos mediante código QR o número de teléfono del local.',
           titular: configPagos.yapeTitular || 'Caprichos Pastelería',
         },
         {
+          ids: ['TRANSFERENCIA'],
           metodo: 'Transferencia BCP',
           instrucciones: 'Aceptamos transferencias BCP y cuentas interbancarias CCI.',
           cuenta: configPagos.bcpCuenta ? '[DISPONIBLE EN PEDIDO]' : 'Disponible al confirmar pedido',
         },
         {
+          ids: ['EFECTIVO'],
           metodo: 'Efectivo contra entrega',
           instrucciones: 'Puedes pagar en efectivo al recibir tu pedido. Se solicita indicar monto de vuelto.',
         },
         {
+          ids: ['TARJETA'],
           metodo: 'Tarjeta POS',
           instrucciones: 'El repartidor lleva POS para pagos con tarjeta Visa o Mastercard.',
         },
-      ],
+    ]
+      .filter((m) => m.ids.some(enBot))
+      .map(({ ids, ...resto }) => (ids.length > 1 ? { ...resto, metodo: ids.filter(enBot).map((i) => i[0] + i.slice(1).toLowerCase()).join(' / ') } : resto));
+
+    return {
+      datosParaPagar: datosParaPagar && canal ? Object.fromEntries(Object.entries(datosParaPagar).filter(([k]) => enBot(k.toUpperCase()))) : datosParaPagar,
+      mediosDisponibles,
       nota: 'La IA no aprueba ni procesa pagos; el equipo de Caja valida cada comprobante.',
     };
   }

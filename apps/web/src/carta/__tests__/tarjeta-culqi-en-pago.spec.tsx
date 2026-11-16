@@ -11,6 +11,14 @@ describe('«Tarjeta / Yape en línea» en el paso de pago', () => {
     expect(nombreMedio('CULQI')).toBe('Tarjeta / Yape en línea');
   });
 
+  it('con la pasarela activa va primera, con insignia «Nuevo» y su texto corto', () => {
+    render(<TarjetasMedioPago medios={['YAPE', 'EFECTIVO', 'CULQI']} seleccionado={null} alElegir={() => {}} />);
+    const botones = screen.getAllByRole('button');
+    expect(botones[0].textContent).toContain('Tarjeta / Yape en línea');
+    expect(botones[0].textContent).toContain('Nuevo');
+    expect(botones[0].textContent).toContain('se confirma al instante, sin enviar captura');
+  });
+
   it('sin el medio CULQI (pago en línea apagado) no se ofrece', () => {
     render(<TarjetasMedioPago medios={['YAPE', 'EFECTIVO']} seleccionado={null} alElegir={() => {}} />);
     expect(screen.queryByText('Tarjeta / Yape en línea')).toBeNull();

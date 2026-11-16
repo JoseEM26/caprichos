@@ -57,14 +57,18 @@ echo "Tareas programadas de respaldo:"
 { crontab -l 2>/dev/null; sudo -n crontab -l 2>/dev/null; ls /etc/cron.d 2>/dev/null; systemctl list-timers --no-pager 2>/dev/null | grep -i "caprichos\|respald" ; } | grep -iE "respald|caprichos" | sed 's/^/  /' || true
 [[ -n "$( { crontab -l 2>/dev/null; systemctl list-timers --no-pager 2>/dev/null; } | grep -iE 'respaldar|caprichos' )" ]] || echo "  (no se encontró ninguna tarea programada visible para este usuario)"
 linea
-echo "== EVOLUTION (demo) =="
 # Solo lectura. En un repositorio público: se ocultan números (6+ dígitos), tokens y textos de mensajes.
 ocultar() { sed -E 's/[0-9]{6,}/<num>/g; s/(token|apikey|key)=[^&" ]+/\1=<oculto>/Ig; s/"(conversation|text|body)":"[^"]*"/"\1":"<texto>"/g'; }
-EVO_DIR=/opt/caprichos/evolution
-if [[ -f "$EVO_DIR/evolution.env" ]]; then
-  evo() { docker compose -p caprichos-evolution --env-file "$EVO_DIR/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml "$@"; }
-  evo ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}' 2>&1 | ocultar
-  DIAG_JS='
+# $1 = demo|prod. Prod vive aparte: carpeta evolution-prod, proyecto caprichos-evolution-prod (claves nunca se imprimen).
+evolucion_estado() {
+  local amb="$1" sufijo="" EVO_DIR
+  [[ "$amb" == "prod" ]] && sufijo="-prod"
+  echo "== EVOLUTION (${amb}) =="
+  EVO_DIR="/opt/caprichos/evolution${sufijo}"
+  if [[ -f "$EVO_DIR/evolution.env" ]]; then
+    evo() { docker compose -p "caprichos-evolution${sufijo}" --env-file "$EVO_DIR/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml "$@"; }
+    evo ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}' 2>&1 | ocultar
+    DIAG_JS='
 const k = process.env.AUTHENTICATION_API_KEY; const h = { apikey: k };
 const j = (u) => fetch(u, { headers: h }).then(async (r) => r.status + " " + (await r.text()).slice(0, 600)).catch((e) => "ERR " + e.message);
 (async () => {
@@ -73,12 +77,16 @@ const j = (u) => fetch(u, { headers: h }).then(async (r) => r.status + " " + (aw
   console.log("api salud desde evolution:", await fetch("http://api:3000/salud").then((r) => r.status).catch((e) => "ERR " + e.message));
   console.log("webhook GLOBAL url:", (process.env.WEBHOOK_GLOBAL_URL || "").replace(/\?.*/, "?<oculto>"), "enabled:", process.env.WEBHOOK_GLOBAL_ENABLED);
 })();'
-  evo exec -T evolution-api node -e "$DIAG_JS" 2>&1 | ocultar
-  echo "-- últimos registros de Evolution --"
-  evo logs --no-color --tail 60 evolution-api 2>&1 | ocultar | tail -60
-else
-  echo "  Evolution no instalado"
-fi
+    evo exec -T evolution-api node -e "$DIAG_JS" 2>&1 | ocultar
+    echo "-- últimos registros de Evolution --"
+    evo logs --no-color --tail 60 evolution-api 2>&1 | ocultar | tail -60
+  else
+    echo "  Evolution no instalado"
+  fi
+}
+evolucion_estado demo
+linea
+evolucion_estado prod
 API_DEMO=$(docker ps --format '{{.Names}}' | grep -E '^caprichos-demo-api' | head -1)
 if [[ -n "$API_DEMO" ]]; then
   echo "-- registros de la API demo sobre WhatsApp/Evolution --"

@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# instalar-evolution.sh — Levanta Evolution API (WhatsApp no oficial) SOLO en la DEMO
+# instalar-evolution.sh — Levanta Evolution API (WhatsApp no oficial) en la DEMO o en PRODUCCIÓN
 # ==============================================================================
 # Uso (los números de prueba viajan por la entrada estándar, nunca como argumentos):
-#   printf '%s\n' "WHATSAPP_SOLO_NUMEROS=51987654321,51955000111" | ./instalar-evolution.sh
+#   printf '%s\n' "WHATSAPP_SOLO_NUMEROS=51987654321,51955000111" | ./instalar-evolution.sh demo
+#   printf '%s\n' "WHATSAPP_SOLO_NUMEROS=" | ./instalar-evolution.sh prod     (prod: SIN lista blanca, responde a todos)
+# Demo y prod no comparten nada: carpeta (evolution / evolution-prod), proyecto compose
+# (caprichos-evolution / caprichos-evolution-prod), volúmenes, claves y red interna propios.
 #
 # Qué hace:
 #   1. Crea (si no existe) /opt/caprichos/evolution/evolution.env (0600, fuera de Git) con claves aleatorias:
 #      base y Redis propios de Evolution, API key y token del webhook. Nunca se imprimen.
 #   2. Comprueba la memoria libre del VPS (Evolution suma 1.4 GB de límite: no se suben límites).
 #   3. Levanta `docker compose -p caprichos-evolution -f docker-compose.evolution.yml`, conectado a la red
-#      interna de la DEMO (caprichos-demo_red_interna). Sin puertos publicados: no se expone a Internet.
+#      interna del ambiente (caprichos-<ambiente>_red_interna). Sin puertos publicados: no se expone a Internet.
 #   4. Crea la instancia de WhatsApp (Baileys) dentro de Evolution si no existe.
-#   5. Copia EVOLUTION_API_URL / EVOLUTION_API_KEY / EVOLUTION_INSTANCE / EVOLUTION_WEBHOOK_TOKEN al .env de la demo
+#   5. Copia EVOLUTION_API_URL / EVOLUTION_API_KEY / EVOLUTION_INSTANCE / EVOLUTION_WEBHOOK_TOKEN al .env del ambiente
 #      y guarda WHATSAPP_SOLO_NUMEROS (lista blanca: con celulares reales en la base, solo escribe a esos números).
-#   6. Redespliega la demo con el MISMO TAG y comprueba /salud. Si falla, restaura el .env.
+#   6. Redespliega el ambiente con el MISMO TAG y comprueba /salud. Si falla, restaura el .env.
 # Muestra al final solo el estado de los contenedores. Pruebas: CAPRICHOS_RAIZ, EVOLUCION_REINTENTOS/PAUSA.
 # ==============================================================================
 
@@ -22,16 +25,26 @@ set -euo pipefail
 umask 077
 export LC_ALL=C
 
-AMBIENTE=demo
+AMBIENTE="${1:-demo}"
+case "$AMBIENTE" in
+  demo|prod) ;;
+  *) echo "ERROR: ambiente '${AMBIENTE}' no válido (use demo o prod)." >&2; exit 1 ;;
+esac
 RAIZ="${CAPRICHOS_RAIZ:-/opt/caprichos}"
 REINTENTOS="${EVOLUCION_REINTENTOS:-30}"
 PAUSA="${EVOLUCION_PAUSA:-4}"
 MEMORIA_MIN_MB="${EVOLUCION_MEMORIA_MIN_MB:-1500}"
 INSTANCIA="caprichos"
-RED_API="caprichos-demo_red_interna"
+RED_API="caprichos-${AMBIENTE}_red_interna"
+if [[ "$AMBIENTE" == "prod" ]]; then
+  SUFIJO="-prod"; VOLUMENES="caprichos_evolution_prod"
+else
+  SUFIJO=""; VOLUMENES="caprichos_evolution"
+fi
+PROYECTO="caprichos-evolution${SUFIJO}"
 
 ENV_FILE="${RAIZ}/${AMBIENTE}/.env"
-EVO_DIR="${RAIZ}/evolution"
+EVO_DIR="${RAIZ}/evolution${SUFIJO}"
 EVO_ENV="${EVO_DIR}/evolution.env"
 COMPOSE_DIR="${RAIZ}/compose"
 EVO_COMPOSE="${COMPOSE_DIR}/docker-compose.evolution.yml"
@@ -48,6 +61,10 @@ while IFS= read -r linea || [[ -n "$linea" ]]; do
     exit 1
   fi
   v="${v//[[:space:]]/}"
+  if [[ "$AMBIENTE" == "prod" && -n "$v" ]]; then
+    echo "ERROR: en producción no hay lista blanca: WHATSAPP_SOLO_NUMEROS debe ir vacío." >&2
+    exit 1
+  fi
   if [[ -n "$v" && ! "$v" =~ ^51[0-9]{9}(,51[0-9]{9})*$ ]]; then
     echo "ERROR: WHATSAPP_SOLO_NUMEROS debe ser una lista de celulares 51XXXXXXXXX separados por comas (sin espacios ni signos)." >&2
     exit 1
@@ -83,14 +100,14 @@ fijar() { # $1 = archivo, $2 = clave, $3 = valor
 }
 
 TAG=$(leer "$ENV_FILE" TAG)
-[[ -n "$TAG" ]] || { echo "ERROR: el .env de la demo no tiene TAG; no se puede redesplegar con seguridad." >&2; exit 1; }
+[[ -n "$TAG" ]] || { echo "ERROR: el .env de ${AMBIENTE} no tiene TAG; no se puede redesplegar con seguridad." >&2; exit 1; }
 
 echo "== Evolution API (${AMBIENTE}) =="
 echo "TAG=${TAG} (no cambia)"
 
-# 1. Red interna de la demo
+# 1. Red interna del ambiente
 if ! docker network inspect "$RED_API" >/dev/null 2>&1; then
-  echo "ERROR: no existe la red ${RED_API}; la demo debe estar desplegada antes (acción desplegar en preprod)." >&2
+  echo "ERROR: no existe la red ${RED_API}; el ambiente ${AMBIENTE} debe estar desplegado antes." >&2
   exit 1
 fi
 
@@ -120,15 +137,16 @@ else
   echo "evolution.env: ya existía (se conserva)"
 fi
 fijar "$EVO_ENV" EVOLUTION_RED_API "$RED_API"
+fijar "$EVO_ENV" EVOLUTION_VOLUMEN_PREFIJO "$VOLUMENES"
 fijar "$EVO_ENV" EVOLUTION_WEBHOOK_URL "http://api:3000/whatsapp/evolution/webhook"
 for k in EVOLUTION_DB_PASSWORD EVOLUTION_REDIS_PASSWORD EVOLUTION_API_KEY EVOLUTION_WEBHOOK_TOKEN; do
   [[ -n "$(leer "$EVO_ENV" "$k")" ]] || { echo "ERROR: evolution.env no tiene ${k}." >&2; exit 1; }
 done
 
-compose_evo() { docker compose -p caprichos-evolution --env-file "$EVO_ENV" -f "$EVO_COMPOSE" "$@"; }
+compose_evo() { docker compose -p "$PROYECTO" --env-file "$EVO_ENV" -f "$EVO_COMPOSE" "$@"; }
 
 # 4. Levantar Evolution (imagen de versión fija; sin puertos publicados)
-echo "==> Levantando Evolution (proyecto caprichos-evolution)..."
+echo "==> Levantando Evolution (proyecto ${PROYECTO})..."
 compose_evo up -d >/dev/null
 
 estado_evo() { # healthy cuando los 3 contenedores lo están
@@ -171,7 +189,7 @@ esac
 COPIA="${ENV_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
 cp -p "$ENV_FILE" "$COPIA"
 chmod 600 "$COPIA"
-echo "Copia del .env de la demo: ${COPIA}"
+echo "Copia del .env de ${AMBIENTE}: ${COPIA}"
 
 restaurar() {
   cp -p "$COPIA" "$ENV_FILE"
@@ -189,15 +207,21 @@ declare -A NUEVAS=(
   [EVOLUTION_WEBHOOK_TOKEN]="$WEBHOOK_TOKEN"
 )
 [[ -n "$NUMEROS" ]] && NUEVAS[WHATSAPP_SOLO_NUMEROS]="$NUMEROS"
+# Producción: el bot responde a todos (sin lista blanca) y a quienes llegan solo como @lid
+[[ "$AMBIENTE" == "prod" ]] && NUEVAS[WHATSAPP_PERMITIR_LID_SIN_NUMERO]="si"
 for k in "${!NUEVAS[@]}"; do
   if ! fijar "$ENV_FILE" "$k" "'${NUEVAS[$k]}'"; then
-    echo "ERROR: no se pudo escribir el .env de la demo." >&2
+    echo "ERROR: no se pudo escribir el .env de ${AMBIENTE}." >&2
     restaurar
     exit 1
   fi
 done
-echo "EVOLUTION_API_URL / KEY / INSTANCE / WEBHOOK_TOKEN: guardadas en el .env de la demo"
-if [[ -n "$NUMEROS" ]]; then
+echo "EVOLUTION_API_URL / KEY / INSTANCE / WEBHOOK_TOKEN: guardadas en el .env de ${AMBIENTE}"
+if [[ "$AMBIENTE" == "prod" ]]; then
+  # Sin lista blanca: vacía = sin restricción (el compose de prod ni siquiera la pasa a la API)
+  fijar "$ENV_FILE" WHATSAPP_SOLO_NUMEROS "''"
+  echo "WHATSAPP_SOLO_NUMEROS: vacía (producción responde a todos); WHATSAPP_PERMITIR_LID_SIN_NUMERO=si"
+elif [[ -n "$NUMEROS" ]]; then
   echo "WHATSAPP_SOLO_NUMEROS: guardada ($(( $(printf '%s' "$NUMEROS" | tr -cd ',' | wc -c) + 1 )) número(s) de prueba)"
 elif [[ -z "$(leer "$ENV_FILE" WHATSAPP_SOLO_NUMEROS)" ]]; then
   echo "AVISO: no hay números de prueba; la demo no enviará ningún WhatsApp (WHATSAPP_SOLO_NUMEROS queda como «ninguno»)."
@@ -242,6 +266,6 @@ if [[ "$OK" -ne 1 ]]; then
   exit 1
 fi
 
-echo "OK: Evolution instalado en ${AMBIENTE} (TAG ${TAG}). Siguiente paso: Configuración > WhatsApp > elegir Evolution y escanear el QR."
+echo "OK: Evolution instalado en ${AMBIENTE} (TAG ${TAG}). El proveedor sigue en META: Configuración > WhatsApp > escanear el QR y luego elegir Evolution."
 echo "Estado de los contenedores:"
 compose_evo ps --format 'table {{.Service}}\t{{.Status}}'

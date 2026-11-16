@@ -9,7 +9,7 @@ export const MEDIOS_PAGO: (OpcionTarjeta & { id: MetodoPago })[] = [
   { id: 'TARJETA', nombre: 'Tarjeta', linea: 'Débito o crédito al recibir', icono: iconos.tarjeta },
   { id: 'TRANSFERENCIA', nombre: 'Transferencia', linea: 'Desde tu banco', icono: iconos.transferencia },
   // Solo la carta la ofrece, y solo si Configuración enciende el pago en línea (Culqi)
-  { id: 'CULQI', nombre: 'Tarjeta / Yape en línea', linea: 'Pagas ahora, sin recargo', icono: iconos.tarjeta },
+  { id: 'CULQI', nombre: 'Tarjeta / Yape en línea', linea: 'Tu pedido es más rápido: se confirma al instante, sin enviar captura', icono: iconos.tarjeta, destacada: true, insignia: 'Nuevo' },
 ];
 
 export const nombreMedio = (m: string) => MEDIOS_PAGO.find((x) => x.id === m)?.nombre ?? m;
@@ -35,7 +35,10 @@ export function TarjetasMedioPago({
   alElegir: (m: MetodoPago) => void;
   alDividir?: () => void;
 }) {
-  const opciones: OpcionTarjeta[] = MEDIOS_PAGO.filter((m) => medios.includes(m.id)).map((m) => ({ ...m, etiqueta: m.nombre }));
+  // La pasarela (CULQI) va primero cuando está activa
+  const opciones: OpcionTarjeta[] = MEDIOS_PAGO.filter((m) => medios.includes(m.id))
+    .sort((a, b) => Number(!!b.destacada) - Number(!!a.destacada))
+    .map((m) => ({ ...m, etiqueta: m.destacada ? `${m.nombre}. Nuevo` : m.nombre }));
   if (alDividir && medios.length >= 2) opciones.push(OPCION_DIVIDIDO);
   return (
     <ElegirEnTarjetas
