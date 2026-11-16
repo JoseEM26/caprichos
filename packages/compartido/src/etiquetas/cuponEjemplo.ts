@@ -2,7 +2,7 @@ import type { TicketPagoDatos } from '../tipos/etiquetas.js';
 
 /** Lo mínimo de un cupón para dibujar su voucher de ejemplo. */
 export interface CuponParaEjemplo {
-  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | string;
+  modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL' | string;
   codigoBase: string;
   descuentoTipo: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS' | string;
   descuentoValor: number;
@@ -45,7 +45,8 @@ export function ticketPagoEjemploCupon(c: CuponParaEjemplo): TicketPagoDatos {
     pagos: [{ medio: 'YAPE', monto: total }],
     documento: { tipo: 'SIMPLE' },
   };
-  return c.modo === 'UNICO_COMPROBANTE'
+  // UNICO_COMPROBANTE (sorteado) y ASIGNADO_PERSONAL (lo da el personal) salen impresos al pie; COMPARTIDO nunca
+  return c.modo === 'UNICO_COMPROBANTE' || c.modo === 'ASIGNADO_PERSONAL'
     ? { ...base, cuponSiguiente: { codigo: `${c.codigoBase}-A1B2C3`, descripcion: c.descripcion ?? null, vence: '15/01/2027' } }
     : base;
 }

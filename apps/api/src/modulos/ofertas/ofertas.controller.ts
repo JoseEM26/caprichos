@@ -20,6 +20,7 @@ import { CrearCuponDto } from './dto/crear-cupon.dto';
 import { ActualizarCuponDto } from './dto/actualizar-cupon.dto';
 import { AnularCuponEmitidoDto } from './dto/anular-cupon-emitido.dto';
 import { CanjearCuponDto } from './dto/canjear-cupon.dto';
+import { DarCuponDto } from './dto/dar-cupon.dto';
 import { ValidarCuponCajaDto, VistaPreviaDescuentosCajaDto } from './dto/validar-cupon-caja.dto';
 
 @Controller('admin/ofertas')
@@ -153,6 +154,25 @@ export class CuponesController {
   @Permiso('cupones', 'canjear')
   async canjearEnCaja(@Body() dto: CanjearCuponDto, @Req() req: any) {
     return this.ofertasService.canjearCuponEnCaja(dto, req.usuario);
+  }
+
+  /** Cupones que el mozo o cajero puede dar (con cupos) y el que ya tiene el pedido. */
+  @Get('para-dar')
+  @Permiso('cupones', 'dar')
+  async cuponesParaDar(@Query('pedidoId') pedidoId?: string) {
+    return this.ofertasService.cuponesParaDar(pedidoId);
+  }
+
+  @Post('dados/:emitidoId/quitar')
+  @Permiso('cupones', 'dar')
+  async quitarCuponDado(@Param('emitidoId') emitidoId: string, @Req() req: any) {
+    return this.ofertasService.quitarCuponDado(emitidoId, req.usuario);
+  }
+
+  @Post(':id/dar')
+  @Permiso('cupones', 'dar')
+  async darCupon(@Param('id') id: string, @Body() dto: DarCuponDto, @Req() req: any) {
+    return this.ofertasService.darCupon(id, String(dto.pedidoId), req.usuario);
   }
 
   @Get(':id/usos')

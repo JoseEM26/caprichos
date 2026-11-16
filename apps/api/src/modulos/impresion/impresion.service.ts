@@ -1279,20 +1279,29 @@ await this.anotarResaltadas(pedido);
    */
   async cuponParaTicket(pedido: { id: bigint }): Promise<{ codigo: string; descripcion: string | null; vence: string | null } | null> {
     try {
-      const flag = await this.prisma.parametro.findUnique({ where: { clave: 'impresion_cupon_en_ticket' } });
-      if (!['si', 'sí', 'true', '1'].includes(String(flag?.valor ?? '').trim().toLowerCase())) return null;
       const ahora = new Date();
-      const emitido: any = await this.prisma.cuponEmitido.findFirst({
-        where: {
-          pedido_origen_id: pedido.id,
-          estado: 'VIGENTE',
-          anulado_en: null,
-          OR: [{ vence_en: null }, { vence_en: { gt: ahora } }],
-          cupon: { activo: true },
-        },
+      const vigente = {
+        pedido_origen_id: pedido.id,
+        estado: 'VIGENTE',
+        anulado_en: null,
+        OR: [{ vence_en: null }, { vence_en: { gt: ahora } }],
+      };
+      // El cupón que el mozo o cajero DIO a este pedido manda sobre el sorteado y sale siempre (no depende del interruptor):
+      // el ticket solo tiene un bloque de cupón, así que si hay de los dos tipos se imprime solo el dado. También al reimprimir.
+      let emitido: any = await this.prisma.cuponEmitido.findFirst({
+        where: { ...vigente, cupon: { activo: true, modo: 'ASIGNADO_PERSONAL' } },
         include: { cupon: true },
         orderBy: { id: 'desc' },
       });
+      if (!emitido) {
+        const flag = await this.prisma.parametro.findUnique({ where: { clave: 'impresion_cupon_en_ticket' } });
+        if (!['si', 'sí', 'true', '1'].includes(String(flag?.valor ?? '').trim().toLowerCase())) return null;
+        emitido = await this.prisma.cuponEmitido.findFirst({
+          where: { ...vigente, cupon: { activo: true } },
+          include: { cupon: true },
+          orderBy: { id: 'desc' },
+        });
+      }
       if (!emitido) return null;
       return { codigo: emitido.codigo, descripcion: emitido.cupon?.descripcion ?? null, vence: emitido.vence_en ? formatearFecha(emitido.vence_en) : null };
     } catch {

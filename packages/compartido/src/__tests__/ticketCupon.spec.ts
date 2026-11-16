@@ -30,6 +30,14 @@ describe('Voucher con cupón', () => {
     expect(l[i + 1].trim()).toBe('DULCE10-A1B2C3');
   });
 
+  it('ASIGNADO_PERSONAL (lo da el mozo o cajero): el código sale al pie como el de código único', () => {
+    const t = ticketPagoEjemploCupon({ modo: 'ASIGNADO_PERSONAL', codigoBase: 'AMIGO15', descuentoTipo: 'PORCENTAJE', descuentoValor: 15 });
+    const l = texto(t);
+    const i = l.findIndex((x) => x.includes('Tu cupón para tu próxima compra'));
+    expect(i).toBeGreaterThan(l.findIndex((x) => x.startsWith('TOTAL')));
+    expect(l[i + 1].trim()).toBe('AMIGO15-A1B2C3');
+  });
+
   it('envío gratis: el ticket nombra el cupón aunque no reste soles', () => {
     const detalle = { tipo: 'CUPON', codigo: 'ENVIOFREE', descuentoTipo: 'ENVIO_GRATIS', montoDescontado: 0 };
     const d = descuentosDePedido({ descuento_detalle: detalle });

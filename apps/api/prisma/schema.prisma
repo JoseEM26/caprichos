@@ -1988,7 +1988,7 @@ model ReglaAcumulacion {
 
 model Cupon {
   id                 BigInt                  @id @default(autoincrement())
-  modo               String                  // UNICO_COMPROBANTE | COMPARTIDO
+  modo               String                  // UNICO_COMPROBANTE | COMPARTIDO | ASIGNADO_PERSONAL
   codigo_base        String                  @unique
   descripcion        String?
   descuento_tipo     String                  // PORCENTAJE | MONTO | ENVIO_GRATIS
@@ -2035,6 +2035,11 @@ model CuponEmitido {
   motivo_anulacion   String?
   anulado_en         DateTime? @db.Timestamptz
   anulado_por        BigInt?
+  /// ASIGNADO_PERSONAL: party del mozo o cajero que dio el cupón (pedido_origen_id = el pedido al que se dio)
+  otorgado_por       BigInt?
+  /// Quién (party del trabajador; null si fue el cliente en la carta) y por qué canal se canjeó
+  canjeado_por       BigInt?
+  canjeado_canal     String?
   creado_en          DateTime  @default(now()) @db.Timestamptz
 
   cupon              Cupon     @relation(fields: [cupon_id], references: [id])

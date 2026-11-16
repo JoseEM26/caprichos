@@ -1,7 +1,7 @@
 export type TipoOferta = 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'ENVIO_GRATIS';
 export type TipoDescuento = 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
 export type TipoComboParte = 'A_ELECCION' | 'UNA_DE' | 'FIJO';
-export type ModoCupon = 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+export type ModoCupon = 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL';
 export type EstadoCuponEmitido = 'VIGENTE' | 'CANJEADO' | 'VENCIDO' | 'ANULADO';
 
 export interface ComboPrecioItem {
@@ -140,6 +140,9 @@ export interface ReglaAcumulacionItem {
 export interface CuponItem {
   id: string;
   modo: ModoCupon;
+  /** ASIGNADO_PERSONAL: cuántos se han dado (sin los quitados por error) y cuántos se canjearon. */
+  totalDados?: number;
+  totalCanjeados?: number;
   codigoBase: string;
   descripcion: string | null;
   descuentoTipo: TipoDescuento;

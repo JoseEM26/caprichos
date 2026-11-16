@@ -141,6 +141,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'cupones', accion: 'crear' },
   { modulo: 'cupones', accion: 'editar' },
   { modulo: 'cupones', accion: 'canjear' },
+  { modulo: 'cupones', accion: 'dar' },
   { modulo: 'clientes', accion: 'ver' },
   { modulo: 'clientes', accion: 'editar' },
   { modulo: 'puntos', accion: 'ver' },
@@ -279,6 +280,7 @@ export const MATRIZ: Record<string, string[]> = {
     'whatsapp_salientes/reenviar',
     'whatsapp_salientes/descartar',
     'cupones/canjear', // canje en caja (antes solo lo tenía el rol CALLCENTER, eliminado)
+    'cupones/dar', // da un cupón (modo «Lo da el mozo o cajero») a un cliente: sale impreso en su voucher
     'almacen/apertura',
     'pedidos/ver',
     'pedidos/crear',
@@ -368,6 +370,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/cargo_libre', // agrega un servicio o producto libre (descripción y monto) a un pedido
+    'cupones/dar', // da un cupón («Lo da el mozo o cajero») a un cliente: sale impreso en su voucher
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
     'creditos/cobrar_ahora', // cobra al trabajador en el momento (pedido del personal); queda quién cobró
@@ -493,7 +496,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR', 'MARKETI
 MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver', 'asistencia/aprobar_reemplazos', 'caja/auditoria_pedido']),
 ].filter(
-  // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'creditos/cobrar_ahora',
+  // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea ni da cupones, ni cobra al personal al instante, ni hace el conteo de apertura
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'cupones/dar' && p !== 'creditos/cobrar_ahora',
 );
 

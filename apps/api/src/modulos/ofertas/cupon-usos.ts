@@ -47,6 +47,7 @@ export async function usosDeCupon(prisma: any, idCupon: string, pagina = 1, tama
   if (!cupon) throw new NotFoundException({ codigo: 'CUPON_NO_ENCONTRADO', mensaje: 'No se encontró el cupón' });
 
   const camposPedido = { codigo: true, canal: true, estado: true, total: true, descuento: true, descuento_detalle: true, cliente_nombre: true, cliente_telefono: true, cliente_party_id: true };
+  if (cupon.modo === 'ASIGNADO_PERSONAL') return usosDeCuponAsignado(prisma, cupon, camposPedido, pagina, tamano, hoy);
   const filas: FilaUso[] = [];
   let emision: { emitidos: number; canjeados: number; vencidos: number; anulados: number } | null = null;
 
@@ -137,5 +138,91 @@ export async function usosDeCupon(prisma: any, idCupon: string, pagina = 1, tama
     porTrabajador,
     porDia,
     historial: { items, total: filas.length, pagina: pag, tamano: tam, totalPaginas },
+  };
+}
+
+/** Lima = UTC-5 (sin horario de verano). */
+const diaLima = (d: Date) => new Date(d.getTime() - 5 * 3600_000).toISOString().slice(0, 10);
+
+/**
+ * Cupón «Lo da el mozo o cajero»: dados (cupon_emitido) frente a canjeados, por quien los dio e historial con el pedido de origen
+ * (a quién se dio) y el pedido de canje. Los dados anulados por error no cuentan como dados; el pedido de canje anulado no suma soles.
+ */
+async function usosDeCuponAsignado(prisma: any, cupon: any, camposPedido: Record<string, boolean>, pagina: number, tamano: number, hoy: Date) {
+  const todos: any[] = await prisma.cuponEmitido.findMany({
+    where: { cupon_id: cupon.id },
+    include: { pedidoOrigen: { select: camposPedido }, pedidoCanje: { select: camposPedido } },
+  });
+  const dados = todos.filter((e) => e.estado !== 'ANULADO').sort((a, b) => b.creado_en.getTime() - a.creado_en.getTime());
+  const canjeados = dados.filter((e) => e.estado === 'CANJEADO');
+  const soles = (e: any) => (e.pedidoCanje && e.pedidoCanje.estado !== 'ANULADO' ? descuentoDelCupon(e.pedidoCanje) : 0);
+  const vencidos = dados.filter((e) => e.estado === 'VENCIDO' || (e.estado === 'VIGENTE' && e.vence_en && e.vence_en < hoy)).length;
+  const tope: number | null = cupon.tope_usos ?? null;
+
+  const grupos = new Map<string, { partyId: string | null; dados: number; canjeados: number; soles: number }>();
+  for (const e of dados) {
+    const k = e.otorgado_por != null ? String(e.otorgado_por) : '';
+    const g = grupos.get(k) ?? { partyId: k || null, dados: 0, canjeados: 0, soles: 0 };
+    g.dados += 1;
+    if (e.estado === 'CANJEADO') {
+      g.canjeados += 1;
+      g.soles = r2(g.soles + soles(e));
+    }
+    grupos.set(k, g);
+  }
+  const ids = [...grupos.values()].filter((g) => g.partyId).map((g) => BigInt(g.partyId!));
+  const personas: any[] = ids.length ? await prisma.person.findMany({ where: { party_id: { in: ids } }, select: { party_id: true, nombres: true, apellidos: true } }) : [];
+  const nombres = new Map<string, string>(personas.map((p) => [String(p.party_id), `${p.nombres} ${p.apellidos ?? ''}`.trim()]));
+  const nombreDe = (id: bigint | null) => (id == null ? SIN_TRABAJADOR : (nombres.get(String(id)) ?? 'Trabajador'));
+  const porTrabajador = [...grupos.values()]
+    .map((g) => ({ partyId: g.partyId, nombre: g.partyId ? (nombres.get(g.partyId) ?? 'Trabajador') : SIN_TRABAJADOR, usos: g.dados, dados: g.dados, canjeados: g.canjeados, soles: g.soles }))
+    .sort((a, b) => b.dados - a.dados);
+
+  // Por día: cuántos se dieron cada día (últimos 30 días)
+  const mapa = new Map<string, { usos: number; soles: number }>();
+  for (let i = 29; i >= 0; i--) mapa.set(diaLima(new Date(hoy.getTime() - i * 86_400_000)), { usos: 0, soles: 0 });
+  for (const e of dados) {
+    const x = mapa.get(diaLima(e.creado_en));
+    if (x) x.usos += 1;
+  }
+  for (const e of canjeados) {
+    const x = e.canjeado_en ? mapa.get(diaLima(e.canjeado_en)) : undefined;
+    if (x) x.soles = r2(x.soles + soles(e));
+  }
+
+  const tam = Math.min(50, Math.max(1, Math.floor(tamano) || 10));
+  const totalPaginas = Math.max(1, Math.ceil(dados.length / tam));
+  const pag = Math.min(totalPaginas, Math.max(1, Math.floor(pagina) || 1));
+  const cliente = (p: any) => (p?.cliente_party_id != null ? { nombre: p.cliente_nombre ?? null, celular: celularEnmascarado(p.cliente_telefono) } : { nombre: null, celular: null, sinCuenta: true });
+  const items = dados.slice((pag - 1) * tam, pag * tam).map((e) => ({
+    fecha: e.creado_en.toISOString(),
+    codigo: e.codigo as string,
+    estado: (e.estado === 'VIGENTE' && e.vence_en && e.vence_en < hoy ? 'VENCIDO' : e.estado) as string,
+    pedidoOrigenCodigo: (e.pedidoOrigen?.codigo ?? null) as string | null,
+    otorgadoPor: e.otorgado_por != null ? nombreDe(e.otorgado_por) : null,
+    cliente: cliente(e.pedidoOrigen),
+    pedidoCanjeCodigo: (e.pedidoCanje?.codigo ?? null) as string | null,
+    canjeadoEn: e.canjeado_en ? (e.canjeado_en as Date).toISOString() : null,
+    canjeadoCanal: (e.canjeado_canal ?? null) as string | null,
+    descuento: soles(e),
+  }));
+
+  return {
+    cuponId: String(cupon.id),
+    modo: cupon.modo as string,
+    resumen: {
+      usos: dados.length,
+      tope,
+      quedan: tope != null ? Math.max(0, tope - dados.length) : null,
+      descuentoTotal: r2(canjeados.reduce((a, e) => a + soles(e), 0)),
+      clientesDistintos: new Set(dados.map((e) => (e.pedidoOrigen?.cliente_party_id != null ? String(e.pedidoOrigen.cliente_party_id) : null)).filter((k) => k != null)).size,
+      anulados: todos.length - dados.length,
+      emitidos: dados.length,
+      canjeados: canjeados.length,
+      vencidos,
+    },
+    porTrabajador,
+    porDia: [...mapa].map(([d, v]) => ({ dia: d, ...v })),
+    historial: { items, total: dados.length, pagina: pag, tamano: tam, totalPaginas },
   };
 }

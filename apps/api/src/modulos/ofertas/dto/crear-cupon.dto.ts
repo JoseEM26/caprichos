@@ -11,10 +11,10 @@ import {
 } from 'class-validator';
 
 export class CrearCuponDto {
-  @IsIn(['UNICO_COMPROBANTE', 'COMPARTIDO'], {
-    message: 'modo debe ser UNICO_COMPROBANTE o COMPARTIDO',
+  @IsIn(['UNICO_COMPROBANTE', 'COMPARTIDO', 'ASIGNADO_PERSONAL'], {
+    message: 'modo debe ser UNICO_COMPROBANTE, COMPARTIDO o ASIGNADO_PERSONAL',
   })
-  modo!: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
+  modo!: 'UNICO_COMPROBANTE' | 'COMPARTIDO' | 'ASIGNADO_PERSONAL';
 
   @IsString({ message: 'El código base es obligatorio' })
   @IsNotEmpty({ message: 'El código base no puede estar vacío' })

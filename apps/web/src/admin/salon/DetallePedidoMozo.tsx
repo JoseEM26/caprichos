@@ -9,6 +9,7 @@ import { BotonCambiarPago } from '../pedidos/CambiarPago';
 import { RecuadroPagoCulqi } from '../pedidos/RecuadroPagoCulqi';
 import { errorCelular } from '../pedidos/ModalCorregirCliente';
 import { pedidosApi, type Pedido } from '../pedidos/pedidosApi';
+import { ModalDarCupon } from '../ofertas/ModalDarCupon';
 import { ModalCargoLibre, esCargoLibre, etiquetaCargoLibre, type CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import type { AreaProgreso, MiPedido } from './tipos';
 import './detalle-pedido-mozo.css';
@@ -282,6 +283,7 @@ function Acciones({ pedido, vigente, alExtra, alAnular, alCambio }: { pedido: Mi
   const { tiene } = useSesion();
   // «Servicio o producto»: sin cobrar se suma aquí mismo; cobrado, abre el pedido extra con el cargo
   const [cargoAbierto, setCargoAbierto] = useState(false);
+  const [cuponAbierto, setCuponAbierto] = useState(false);
   const [enviandoCargo, setEnviandoCargo] = useState(false);
   const [errorCargo, setErrorCargo] = useState('');
   const cobrado = String(pedido.pagoEstado || '').toUpperCase() === 'PAGADO';
@@ -313,9 +315,11 @@ function Acciones({ pedido, vigente, alExtra, alAnular, alCambio }: { pedido: Mi
         {puedeReimprimir && <Boton variante="secundario" onClick={() => setConfirmando(true)}>Reimprimir comprobante de pago</Boton>}
         {vigente && tiene('pedidos/extra') && <Boton variante="secundario" onClick={() => alExtra()}>+ Pedido extra</Boton>}
         {vigente && tiene('pedidos/cargo_libre') && <Boton variante="secundario" onClick={() => { setErrorCargo(''); setCargoAbierto(true); }}>+ Servicio o producto</Boton>}
+        {vigente && tiene('cupones/dar') && <Boton variante="secundario" onClick={() => setCuponAbierto(true)}>Dar cupón</Boton>}
         {vigente && pedido.estado !== 'ENTREGADO' && tiene('pedidos/anular') && <Boton variante="peligro" onClick={alAnular}>Anular pedido</Boton>}
       </div>
       {aviso && <p className={aviso.ok ? 'dpm-ok' : 'dpm-error'} role={aviso.ok ? 'status' : 'alert'}>{aviso.t}</p>}
+      {cuponAbierto && <ModalDarCupon pedidoId={String(pedido.id)} alCerrar={() => setCuponAbierto(false)} />}
       {cargoAbierto && (
         <ModalCargoLibre
           productos={cobrado ? [] : pedido.lineas.filter((l) => !esCargoLibre(l) && l.id).map((l) => ({ id: String(l.id), nombre: l.nombre }))}

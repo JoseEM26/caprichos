@@ -307,3 +307,19 @@ export function idsCategoriaDto(dto: { alcanceCategoriaIds?: (string | number)[]
   const crudos = dto.alcanceCategoriaIds ?? (dto.alcanceCategoriaId ? [dto.alcanceCategoriaId] : []);
   return [...new Set(crudos.filter((x) => x !== '' && x !== null && x !== undefined).map((x) => String(x)))].map((x) => BigInt(x));
 }
+
+/** Horario del cupón con la misma regla de vigencia que las ofertas. Sin horario vale siempre. */
+export function cuponEnHorario(cupon: any, ahora: Date): boolean {
+  return estaVigente(
+    {
+      activo: true,
+      dias: cupon.dias,
+      hora_desde: cupon.hora_desde,
+      hora_hasta: cupon.hora_hasta,
+      fecha_desde: cupon.fecha_desde,
+      fecha_hasta: cupon.fecha_hasta,
+    },
+    undefined,
+    ahora,
+  );
+}
