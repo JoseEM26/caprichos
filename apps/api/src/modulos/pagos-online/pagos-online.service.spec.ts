@@ -97,6 +97,20 @@ describe('PagosOnlineService', () => {
     expect((await s.config()).activo).toBe(false);
   });
 
+  it('producción sin llaves de Culqi: interruptor encendido pero config.activo=false y no hay intento', async () => {
+    const previo = { n: process.env.NODE_ENV, a: process.env.AMBIENTE_DESPLIEGUE };
+    process.env.NODE_ENV = 'production';
+    delete process.env.AMBIENTE_DESPLIEGUE;
+    try {
+      const { s, acceso } = armar();
+      expect((await s.config()).activo).toBe(false);
+      await expect(s.crearIntento('7', acceso)).rejects.toMatchObject({ response: { codigo: 'PAGO_ONLINE_APAGADO' } });
+    } finally {
+      process.env.NODE_ENV = previo.n;
+      if (previo.a !== undefined) process.env.AMBIENTE_DESPLIEGUE = previo.a;
+    }
+  });
+
   it('el intento toma el monto del servidor (total + propina), no del cliente', async () => {
     const { s, acceso } = armar();
     const r = await s.crearIntento('7', { ...acceso });

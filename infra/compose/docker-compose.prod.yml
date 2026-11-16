@@ -49,6 +49,13 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
+      # Evolution API (WhatsApp no oficial): lo escribe la acción instalar-evolution. Sin valores = no se usa (Meta sigue activo).
+      # Producción NO lleva lista blanca (WHATSAPP_SOLO_NUMEROS no se pasa: responde a todos); los clientes pueden llegar como @lid sin número.
+      WHATSAPP_PERMITIR_LID_SIN_NUMERO: ${WHATSAPP_PERMITIR_LID_SIN_NUMERO:-si}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN:-}
       CULQI_SECRET_KEY: ${CULQI_SECRET_KEY:-}
       CULQI_PUBLIC_KEY: ${CULQI_PUBLIC_KEY:-}
       CULQI_WEBHOOK_SECRET: ${CULQI_WEBHOOK_SECRET:-}
