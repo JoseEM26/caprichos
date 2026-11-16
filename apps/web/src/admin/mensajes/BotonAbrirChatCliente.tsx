@@ -38,7 +38,8 @@ export function BotonAbrirChatCliente({ telefono, estilo, nombre, respaldoWa }: 
     listarConversaciones('todos', digitos)
       .then((res) => {
         if (!activo) return;
-        const existe = res.chats.some((c) => ultimos9Digitos(c.telefono) === digitos);
+        // Un chat sin número (LID) vinculado a este celular también cuenta
+        const existe = res.chats.some((c) => ultimos9Digitos(c.telefono) === digitos || c.celularVinculado === digitos);
         setEstado(existe ? 'existe' : 'no_existe');
       })
       .catch(() => {
@@ -94,6 +95,20 @@ export function BotonAbrirChatCliente({ telefono, estilo, nombre, respaldoWa }: 
       <a href={`/admin/mensajes?telefono=${digitos}`} target="_blank" rel="noopener noreferrer" style={base}>
         Abrir chat con el cliente
       </a>
+    );
+  }
+
+  // Sin chat vinculado a ese celular: se dice claro y se puede iniciar el chat por el número (envío a número@s.whatsapp.net)
+  if (estado === 'no_existe' && /^9\d{8}$/.test(digitos)) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <a href={`/admin/mensajes?telefono=${digitos}&iniciar=1`} target="_blank" rel="noopener noreferrer" style={base} data-testid="iniciar-chat-por-numero">
+          Iniciar chat por el número
+        </a>
+        <span style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', textAlign: 'center' }}>
+          No encontramos un chat de este cliente (puede haber escrito desde otro identificador de WhatsApp).
+        </span>
+      </div>
     );
   }
 

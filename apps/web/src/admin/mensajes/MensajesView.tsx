@@ -38,7 +38,7 @@ import { useSesion } from '../../comun/sesion';
 import { ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
-import { ChatResumen, DetalleConversacion, DiasBandeja, EventoEnvioMensaje, FiltroChat, FiltroPos, RespuestaRapida } from './mensajesTipos';
+import { ChatResumen, DetalleConversacion, DiasBandeja, EventoEnvioMensaje, FiltroChat, FiltroPos, RespuestaListarChats, RespuestaRapida } from './mensajesTipos';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
@@ -84,7 +84,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   const [cargando, setCargando] = useState(true);
   const [chats, setChats] = useState<ChatResumen[]>([]);
-  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0, sinVer: 0, bloqueadosSpam: 0 });
+  const [conteos, setConteos] = useState<RespuestaListarChats['conteos']>({ todos: 0, atender: 0, bot: 0, atendidos: 0, sinVer: 0, bloqueadosSpam: 0, porResponder: 0 });
   const [filtro, setFiltro] = useState<FiltroChat>('todos');
   const [filtroPos, setFiltroPos] = useState<FiltroPos | null>(null);
   const [soloBloqueados, setSoloBloqueados] = useState(false);
@@ -139,7 +139,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   useEffect(() => {
     const tel = telefonoDeUrl();
     const texto = textoDeUrl();
-    if (!tel || !texto) return;
+    const iniciar = new URLSearchParams(window.location.search).get('iniciar') === '1';
+    if (!tel || !(texto || iniciar)) return;
     let vivo = true;
     iniciarChat(`51${tel}`)
       .then(({ id }) => {
@@ -514,6 +515,17 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   useEffect(() => () => {
     if (recargaPendiente.current.timer) clearTimeout(recargaPendiente.current.timer);
   }, []);
+
+  // Título de la pestaña del navegador con lo que falta responder: «(3) Mensajes»
+  useEffect(() => {
+    const n = conteos.porResponder ?? 0;
+    const antes = document.title;
+    const base = antes.replace(/^\(\d+\)\s*/, '');
+    document.title = n > 0 ? `(${n}) ${base}` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [conteos.porResponder]);
 
   // Respaldo por si el canal en vivo se cae: refresca la lista cada 20 s
   useEffect(() => {

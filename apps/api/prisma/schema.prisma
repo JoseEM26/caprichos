@@ -2393,6 +2393,9 @@ model Conversacion {
   visto_en           DateTime?          @db.Timestamptz
   /// Marca manual «No visto» (como WhatsApp): compartida por todo el equipo hasta abrir el chat o «Marcar como visto»
   marcado_no_visto   Boolean            @default(false)
+  /// Celular (últimos 9 dígitos) de un chat que llegó como LID/usuario de WhatsApp sin número: sale de remoteJidAlt, de los
+  /// eventos de contactos de Evolution o del celular del pedido que el cliente hizo desde ese chat. Une el chat con sus pedidos.
+  celular_vinculado  String?            @db.VarChar(9)
   /// Cuándo y quién (user_account.id) lo archivó con «Atendido». Contrato para la reanudación del bot a las 00:01 de Lima.
   atendido_en        DateTime?          @db.Timestamptz
   atendido_por       BigInt?
@@ -2407,6 +2410,7 @@ model Conversacion {
   vouchers           VoucherPago[]
 
   @@index([atendido_en])
+  @@index([celular_vinculado])
   // Además existe (solo en la migración 20270216100000: Prisma no declara índices parciales) conversacion_espera_humana_idx:
   // (ultima_actividad) WHERE urgente OR estado = 'VALIDAR_PAGO', para el aviso «chat sin responder».
   @@map("conversacion")

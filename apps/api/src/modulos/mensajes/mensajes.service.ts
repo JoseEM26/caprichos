@@ -1,3 +1,4 @@
+import { CANAL_WHATSAPP_BUSINESS, SILENCIO_WHATSAPP_BUSINESS_MIN } from '../chatbot/utilidades/canal-whatsapp-business';
 import { CambiarEstadoDto } from '../pedidos-admin/dto/cambiar-estado.dto';
 import { PedidosEstadoService } from '../pedidos-admin/pedidos-estado.service';
 import { textoTiempoPedido } from '../repartos/eta-entrega';
@@ -55,10 +56,10 @@ const FORMATO_DIA_LIMA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/L
 export const diaLima = (d: Date): string => FORMATO_DIA_LIMA.format(d);
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar' | 'responder';
 export type FiltroPos = 'faltan' | 'procesados';
 
-const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>, EstadoChat[]> = {
+const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar' | 'responder'>, EstadoChat[]> = {
   atender: ['atencion', 'validar'],
   bot: ['bot', 'pausado'],
   atendidos: ['atendido'],
@@ -78,6 +79,21 @@ const hora = (d: Date) =>
 
 /** Un chat está «sin ver» si el cliente escribió después de la última vez que se abrió, o si alguien lo marcó a mano. */
 const sinVer = (f: { sinLeer: number; marcadoNoVisto: boolean }) => f.sinLeer > 0 || f.marcadoNoVisto;
+
+/** Quién atiende el chat: el bot, una persona (panel) o una persona desde la app WhatsApp Business (el bot calla hasta 2 h desde su último mensaje). */
+export function atiendeDe(
+  c: { duenio: string; tomado_por?: unknown; atendido_en?: Date | null },
+  mensajes: { autor: string; direccion: string; en: Date; canal?: string | null; contenido?: any }[],
+  ahora = Date.now(),
+): 'BOT' | 'PERSONA' | 'WHATSAPP_BUSINESS' {
+  if (c.tomado_por) return 'PERSONA';
+  if (c.duenio !== 'PERSONA') return 'BOT';
+  const m = mensajes.find((x) => x.autor === 'PERSONA' && x.direccion === 'SALE');
+  const canal = m ? m.canal ?? m.contenido?.canal : null;
+  const en = m ? new Date(m.en).getTime() : 0;
+  const archivado = !!c.atendido_en && new Date(c.atendido_en).getTime() > en;
+  return canal === CANAL_WHATSAPP_BUSINESS && !archivado && ahora - en < SILENCIO_WHATSAPP_BUSINESS_MIN * 60_000 ? 'WHATSAPP_BUSINESS' : 'PERSONA';
+}
 
 /** Estado que ve la consola, derivado de las columnas de `conversacion` (la tabla no tiene «pausado»). */
 export function estadoDe(
@@ -268,7 +284,9 @@ export class MensajesService {
   }
 
   /** Pedidos que pueden ligarse a estos chats, en UNA consulta: los de hoy con celular y los ligados por el flujo. */
-  private async posDeChats(chats: { id: bigint; telefono: string; flujo?: unknown }[]): Promise<Map<bigint, PosChat>> {
+  private async posDeChats(chatsCrudos: { id: bigint; telefono: string; flujo?: unknown; celular_vinculado?: string | null }[]): Promise<Map<bigint, PosChat>> {
+    // Un chat sin número (LID) se une a sus pedidos por el celular vinculado
+    const chats = chatsCrudos.map((c) => (c.celular_vinculado && /^wa-user:/.test(c.telefono) ? { ...c, telefono: `51${c.celular_vinculado}` } : c));
     const ligados = chats.map((c) => pedidoLigadoDelFlujo(c.flujo)).filter((x): x is bigint => x != null);
     const pedidos = await this.prisma.pedido.findMany({
       where: {
@@ -316,10 +334,10 @@ export class MensajesService {
     // liviano: solo lo que decide pestaña, orden y «sin leer» (sin el contenido ni el id de Meta)
     const filas = liviano
       ? await this.prisma.$queryRaw<any[]>`
-      SELECT m.id, m.conversacion_id, m.direccion, m.autor, m.en
+      SELECT m.id, m.conversacion_id, m.direccion, m.autor, m.canal, m.en
       FROM unnest(${ids}::bigint[]) AS c(id)
       CROSS JOIN LATERAL (
-        SELECT id, conversacion_id, direccion, autor, en
+        SELECT id, conversacion_id, direccion, autor, contenido->>'canal' AS canal, en
         FROM mensaje_chat WHERE conversacion_id = c.id ORDER BY id DESC LIMIT ${n}
       ) m
       ORDER BY m.conversacion_id, m.id DESC`
@@ -343,7 +361,7 @@ export class MensajesService {
   private static readonly SELECCION_LISTA = {
     id: true, telefono: true, estado: true, duenio: true, urgente: true, tomado_por: true, atendido_en: true, atendido_por: true,
     visto_en: true, marcado_no_visto: true, ultima_actividad: true, motivo_derivacion: true, nombre_contacto: true,
-    nombre_editado: true, identificador_tipo: true, flujo: true,
+    nombre_editado: true, identificador_tipo: true, flujo: true, celular_vinculado: true,
     party: { select: { persona: { select: { nombres: true, apellidos: true } } } },
   } as const;
 
@@ -370,7 +388,8 @@ export class MensajesService {
       const ult = mensajes[0];
       const posChat = posMapa.get(c.id) as PosChat;
       let sinLeer = 0;
-      if (estado === 'atencion' || estado === 'validar') {
+      // Todo chat activo cuenta lo que el cliente escribió sin que nadie lo viera (también los que lleva el bot o una persona por WhatsApp Business)
+      if (estado !== 'atendido') {
         for (const m of mensajes) {
           if (m.autor !== 'CLIENTE') break;
           if (c.visto_en && m.en <= c.visto_en) break;
@@ -378,6 +397,9 @@ export class MensajesService {
         }
       }
       const esperando = !!ult && ult.direccion === 'ENTRA' && !c.tomado_por;
+      // «Por responder»: lo último es del cliente y nadie (bot, persona del panel o de WhatsApp Business) le contestó después
+      const porResponder = !!ult && ult.direccion === 'ENTRA' && estado !== 'atendido';
+      const atiende = atiendeDe(c, mensajes);
       const fecha: Date = ult ? ult.en : c.ultima_actividad;
       return {
         c,
@@ -391,20 +413,25 @@ export class MensajesService {
         bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
         nombre: obtenerNombreMostrar(c),
         esperando,
+        porResponder,
+        atiende,
         fecha,
         dia: diaLima(fecha),
       };
     });
   }
 
-  private conteosDe(base: { estado: EstadoChat; sinLeer: number; marcadoNoVisto: boolean; porReprogramar: boolean; bloqueoSpam: any; faltaProcesar: boolean }[]) {
-    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>) => base.filter((f) => GRUPOS[g].includes(f.estado)).length;
+  private conteosDe(base: { estado: EstadoChat; porResponder: boolean; sinLeer: number; marcadoNoVisto: boolean; porReprogramar: boolean; bloqueoSpam: any; faltaProcesar: boolean }[]) {
+    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar' | 'responder'>) => base.filter((f) => GRUPOS[g].includes(f.estado)).length;
     return {
       todos: base.filter((f) => f.estado !== 'atendido').length,
       atender: cuenta('atender'),
       bot: cuenta('bot'),
       atendidos: cuenta('atendidos'),
       sinVer: base.filter(sinVer).length,
+      porResponder: base.filter((f) => f.porResponder).length,
+      /** Mensajes del cliente sin leer, sumados: la insignia del menú «Mensajes». */
+      sinLeerTotal: base.reduce((n, f) => n + f.sinLeer, 0),
       reprogramar: base.filter((f) => f.porReprogramar).length,
       bloqueadosSpam: base.filter((f) => f.bloqueoSpam?.activo).length,
       faltanProcesar: base.filter((f) => f.faltaProcesar).length,
@@ -422,6 +449,8 @@ export class MensajesService {
         ? f.estado !== 'atendido'
         : filtro === 'novistos'
           ? sinVer(f)
+          : filtro === 'responder'
+            ? f.porResponder
           : filtro === 'reprogramar'
             ? f.porReprogramar
             : GRUPOS[filtro].includes(f.estado)) &&
@@ -430,7 +459,8 @@ export class MensajesService {
       (!termino ||
         f.nombre.toLowerCase().includes(termino) ||
         (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(termino)) ||
-        (!esRemitenteSinTelefono(c) && digitos !== '' && c.telefono.replace(/\D/g, '').includes(digitos)))
+        (!esRemitenteSinTelefono(c) && digitos !== '' && c.telefono.replace(/\D/g, '').includes(digitos)) ||
+        (digitos !== '' && !!c.celular_vinculado && c.celular_vinculado.includes(digitos.slice(-9))))
     );
   }
 
@@ -442,7 +472,9 @@ export class MensajesService {
     const inv = (n: number | bigint, ancho: number) => (10n ** BigInt(ancho) - BigInt(n)).toString().padStart(ancho, '0');
     const ua = new Date(f.c.ultima_actividad).getTime();
     const id = inv(f.c.id, 19);
-    if (filtro !== 'atender') return inv(ua, 14) + id;
+    // Por responder arriba (el que más espera primero) en todas las pestañas menos «Por atender», que ya ordena por espera
+    if (filtro !== 'atender' && filtro !== 'atendidos' && f.porResponder) return '0' + new Date(f.ult.en).getTime().toString().padStart(14, '0') + id;
+    if (filtro !== 'atender') return (filtro === 'atendidos' ? '' : '1') + inv(ua, 14) + id;
     const espera = f.esperando ? new Date(f.ult.en).getTime().toString().padStart(14, '0') : inv(ua, 14);
     return inv(Number(f.dia.replace(/-/g, '')), 8) + (f.c.urgente ? '0' : '1') + (f.esperando ? '0' : '1') + espera + id;
   }
@@ -463,6 +495,8 @@ export class MensajesService {
         id: c.id.toString(),
         nombre: f.nombre,
         telefono: esRemitenteSinTelefono(c) ? enmascararTelefono(c.telefono) : c.telefono,
+        /** Celular al que se vinculó un chat sin número (LID): el botón «Abrir chat» del pedido lo encuentra por él. */
+        celularVinculado: c.celular_vinculado ?? null,
         identificador_tipo: c.identificador_tipo,
         nombre_contacto: c.nombre_contacto,
         nombre_editado: c.nombre_editado,
@@ -475,7 +509,11 @@ export class MensajesService {
         ultimaActividadDate: c.ultima_actividad,
         sinLeer: f.sinLeer,
         // El último mensaje es del cliente y nadie lo tomó: minutos que lleva sin respuesta (null si no aplica)
-        sinRespuestaMin: f.esperando ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000)) : null,
+        sinRespuestaMin: f.porResponder ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000)) : null,
+        /** El último mensaje es del cliente y nadie le contestó (bot, panel o WhatsApp Business). */
+        porResponder: f.porResponder,
+        /** Quién atiende: BOT, PERSONA (panel) o WHATSAPP_BUSINESS (una persona desde la app; el bot calla). */
+        atiende: f.atiende,
         bloqueoSpam: f.bloqueoSpam,
         numeroBloqueado: motivosNumero.get(c.telefono) === 'DESTINO_BLOQUEADO',
         numeroPropio: motivosNumero.get(c.telefono) === 'DESTINO_NUMERO_PROPIO',
@@ -651,6 +689,8 @@ export class MensajesService {
             m.direccion === 'ENTRA' && !!m.meta_id && ['IMAGEN', 'AUDIO', 'DOCUMENTO'].includes(m.tipo) &&
             !contenido.archivoId && !contenido.audio?.archivoId && !contenido.documento?.archivoId,
           ubicacion: contenido.ubicacion ?? null,
+          /** WHATSAPP_BUSINESS: lo escribió una persona del local desde la app WhatsApp Business (no el panel ni el bot). */
+          canal: contenido.canal === CANAL_WHATSAPP_BUSINESS ? CANAL_WHATSAPP_BUSINESS : undefined,
           // el que mandó la web: con él la bandeja reemplaza su mensaje «Enviando…» por el real sin duplicarlo
           idCliente: typeof contenido.idCliente === 'string' ? contenido.idCliente : undefined,
           hora: hora(m.en),
@@ -697,7 +737,9 @@ export class MensajesService {
       // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
       const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
       const condicion: any[] = [{ cliente_telefono: c.telefono }];
-      if (ultimos9.length === 9) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+      if (ultimos9.length === 9 && !esRemitenteSinTelefono(c)) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+      // Chat sin número (LID) vinculado a un celular: sus pedidos son los de ese celular
+      if (c.celular_vinculado) condicion.push({ cliente_telefono: { endsWith: c.celular_vinculado } });
       if (c.party_id) condicion.push({ party_id: c.party_id });
       // El pedido cuyo voucher llegó por este chat tiene prioridad
       const pedidoVoucherId = (c.flujo as any)?.pago?.pedidoId;
@@ -866,6 +908,9 @@ export class MensajesService {
     if (!/^519\d{8}$/.test(tel)) throw error(HttpStatus.BAD_REQUEST, 'TELEFONO_INVALIDO', 'El celular no es válido');
     const previa = await this.prisma.conversacion.findUnique({ where: { telefono: tel }, select: { id: true } });
     if (previa) return { id: previa.id.toString(), creada: false };
+    // El cliente escribió desde un chat sin número (LID) que ya está vinculado a este celular: es ese chat
+    const vinculada = await this.prisma.conversacion.findFirst({ where: { celular_vinculado: tel.slice(-9) }, orderBy: { ultima_actividad: 'desc' }, select: { id: true } });
+    if (vinculada) return { id: vinculada.id.toString(), creada: false };
     const c = await this.prisma.conversacion.create({ data: { telefono: tel, nombre_contacto: nombre?.trim() || null }, select: { id: true } });
     return { id: c.id.toString(), creada: true };
   }

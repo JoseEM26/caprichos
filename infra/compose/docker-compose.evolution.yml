@@ -85,6 +85,11 @@ services:
       WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
       WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
       WEBHOOK_EVENTS_CONNECTION_UPDATE: "true"
+      # Lectura en WhatsApp Business (chats.update) y vinculo LID a celular (contacts.*, chats.upsert)
+      WEBHOOK_EVENTS_CHATS_UPDATE: "true"
+      WEBHOOK_EVENTS_CHATS_UPSERT: "true"
+      WEBHOOK_EVENTS_CONTACTS_UPSERT: "true"
+      WEBHOOK_EVENTS_CONTACTS_UPDATE: "true"
       WEBHOOK_EVENTS_QRCODE_UPDATED: "false"
       WEBHOOK_EVENTS_MESSAGES_UPDATE: "false"
       WEBHOOK_EVENTS_MESSAGES_DELETE: "false"

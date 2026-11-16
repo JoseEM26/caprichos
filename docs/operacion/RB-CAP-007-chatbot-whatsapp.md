@@ -274,3 +274,10 @@ Si Meta presenta intermitencias o se requiere aislar el entorno para pruebas sin
 1. Elimine o vacíe las variables `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`.
 2. Reinicie el contenedor de la API.
 3. El sistema entrará en **Modo Simulado**: los mensajes saldrán con estado `SIMULADO` en la base de datos y la campana de notificaciones seguirá alertando al equipo.
+
+## Cuando una persona escribe desde WhatsApp Business (comportamiento fijo)
+
+- Si alguien del local escribe a un cliente desde la app WhatsApp Business (celular o Web), Evolution lo entrega como `fromMe`. Si el id del mensaje no es de un envío del sistema (bot, avisos, panel), el mensaje se guarda en Mensajes como «Enviado desde WhatsApp Business por el local» y el chat pasa a «atiende una persona».
+- El bot calla en ese chat 2 horas desde ese último mensaje (menús, IA y respuestas automáticas). Termina antes con «Atendido» o «Devolver al bot». Los avisos del pedido siguen saliendo.
+- Mensajes muestra «Por responder» (el último mensaje es del cliente y nadie le contestó), quién atiende (Bot, Persona, WhatsApp Business) y el tiempo de espera.
+- Evolution debe enviar los eventos `chats.update`, `chats.upsert`, `contacts.upsert` y `contacts.update` (ya en `infra/compose/docker-compose.evolution.yml`) para marcar leído y vincular chats LID con su celular.

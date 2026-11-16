@@ -50,17 +50,25 @@ describe('Botón «Abrir chat con el cliente»', () => {
     expect(screen.queryByText('Abrir en WhatsApp personal')).toBeNull();
   });
 
-  it('sin conversación muestra «Sin chat todavía» deshabilitado y el wa.me como enlace secundario', async () => {
+  it('sin conversación (ni vinculada) lo dice claro y ofrece iniciar el chat por el número', async () => {
     vi.spyOn(api, 'listarConversaciones').mockResolvedValue({
       conteos: { todos: 0, atender: 0, bot: 0, atendidos: 0 },
       chats: [],
     });
     render(<BotonAbrirChatCliente telefono="977503006" />);
-    const boton = await screen.findByRole('button', { name: 'Sin chat todavía' });
-    expect((boton as HTMLButtonElement).disabled).toBe(true);
-    const wa = screen.getByRole('link', { name: 'Abrir en WhatsApp personal' });
-    expect(wa.getAttribute('href')).toBe('https://wa.me/51977503006');
+    const ini = await screen.findByTestId('iniciar-chat-por-numero');
+    expect(ini.getAttribute('href')).toBe('/admin/mensajes?telefono=977503006&iniciar=1');
+    expect(screen.getByText(/No encontramos un chat de este cliente/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Abrir chat con el cliente' })).toBeNull();
+  });
+
+  it('un chat sin número (LID) vinculado a ese celular cuenta como existente', async () => {
+    vi.spyOn(api, 'listarConversaciones').mockResolvedValue({
+      conteos: { todos: 1, atender: 0, bot: 1, atendidos: 0 },
+      chats: [{ ...chatDeAna, telefono: 'wa-user:1***3', celularVinculado: '977503006' }],
+    } as any);
+    render(<BotonAbrirChatCliente telefono="977503006" />);
+    expect(await screen.findByRole('link', { name: 'Abrir chat con el cliente' })).toBeInTheDocument();
   });
 
   it('sin permiso mensajes/ver deshabilita el botón y deja el enlace de WhatsApp', async () => {

@@ -4,7 +4,7 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { ColaWebhookService } from '../servicios/cola-webhook.service';
 import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
 import { EvolutionConfigService } from './evolution-config.service';
-import { aRespuestaDeMenu, normalizarMensajeEvolution } from './evolution-mensaje.util';
+import { aRespuestaDeMenu, normalizarMensajeEvolution, paresLidCelular } from './evolution-mensaje.util';
 import { MenuNumeradoStore } from './menu-numerado.store';
 import { EvolutionApiCliente } from './evolution-api.cliente';
 import { extraerAdjuntoEvolution } from './evolution-mensaje.util';
@@ -48,6 +48,27 @@ export class EvolutionWebhookService {
       if (state) await this.estado.registrarConexion(state, d.statusReason ?? d.disconnectionReasonCode ?? null);
       return res;
     }
+    if (evento === 'contacts.upsert' || evento === 'contacts.update' || evento === 'chats.upsert' || evento === 'chats.update') {
+      // Evolution a veces entrega el LID junto al número: se guarda el vínculo para unir el chat con sus pedidos
+      const c0 = body?.data;
+      for (const it of Array.isArray(c0) ? c0 : c0 ? [c0] : []) {
+        for (const p of paresLidCelular(it)) await this.webhook.vincularLidConCelular(p.lid, p.celular);
+      }
+      if (evento.startsWith('contacts.')) return res;
+    }
+    if (evento === 'chats.update' || evento === 'chats.upsert') {
+      // El local leyó el chat en WhatsApp Business (celular o Web): sin mensajes por leer → queda visto en Mensajes
+      const crudoChats = body?.data;
+      const chats: any[] = Array.isArray(crudoChats) ? crudoChats : crudoChats ? [crudoChats] : [];
+      for (const ch of chats) {
+        const sinLeer = ch?.unreadCount ?? ch?.unreadMessages;
+        if (Number(sinLeer) === 0 && typeof (ch?.remoteJid ?? ch?.id) === 'string') {
+          const hecho = await this.webhook.marcarLeidoDesdeWhatsapp(String(ch.remoteJid ?? ch.id));
+          if (hecho) res.procesados++;
+        }
+      }
+      return res;
+    }
     if (evento !== 'messages.upsert') {
       res.ignorados++;
       return res;
@@ -58,12 +79,21 @@ export class EvolutionWebhookService {
     for (const data of lista) {
       const adj = extraerAdjuntoEvolution(data);
       if (adj) this.api?.recordarAdjunto(adj.id, adj);
+      if (data?.key?.fromMe === true) {
+        // Lo que el local escribe desde WhatsApp Business: se guarda en el chat y el bot calla (si no lo envió el sistema)
+        const propio = normalizarMensajeEvolution(data, { propios: true });
+        if (propio.ok && propio.lid) await this.webhook.vincularLidConCelular(propio.lid, propio.msg.from);
+        if (propio.ok && (await this.webhook.registrarMensajeDelLocal(propio.msg)) === 'GUARDADO') res.procesados++;
+        else res.ignorados++;
+        continue;
+      }
       const n = normalizarMensajeEvolution(data);
       if (!n.ok) {
         res.ignorados++;
         this.logger.debug(`Mensaje de Evolution ignorado (${n.razon})`);
         continue;
       }
+      if (n.lid) await this.webhook.vincularLidConCelular(n.lid, n.msg.from);
       const msg = aRespuestaDeMenu(n.msg, await this.menus.obtener(n.msg.from));
       // Idempotencia: el flujo de Meta ya descarta un wa_message_id repetido (whatsapp_mensaje.wa_message_id es único)
       const payload = {

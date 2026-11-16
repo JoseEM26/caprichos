@@ -1,7 +1,7 @@
 import type { UbicacionChat } from './TarjetaUbicacion';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar' | 'responder';
 export type FiltroPos = 'faltan' | 'procesados';
 
 /** Qué tan procesado está el chat en el punto de venta. */
@@ -50,6 +50,8 @@ export interface MensajeItem {
   puedeReintentar?: boolean;
   /** Id que generó esta bandeja al enviarlo: el servidor lo devuelve para reconocer el mensaje «Enviando…» sin duplicarlo. */
   idCliente?: string;
+  /** WHATSAPP_BUSINESS: lo escribió una persona del local desde la app WhatsApp Business. */
+  canal?: 'WHATSAPP_BUSINESS';
 }
 
 export interface BloqueoSpam {
@@ -77,6 +79,11 @@ export interface ChatResumen {
   esperaMin?: number | null;
   /** Minutos que el último mensaje del cliente lleva sin respuesta (sin persona que lo tomó); null si ya se respondió. */
   sinRespuestaMin?: number | null;
+  /** El último mensaje es del cliente y nadie le contestó (bot, panel o WhatsApp Business). */
+  porResponder?: boolean;
+  /** Quién atiende el chat. WHATSAPP_BUSINESS: una persona desde la app; el bot calla. */
+  atiende?: 'BOT' | 'PERSONA' | 'WHATSAPP_BUSINESS';
+  celularVinculado?: string | null;
   bloqueoSpam?: BloqueoSpam | null;
   /** Lista manual de números bloqueados / número del propio negocio: no se les envía nada. */
   numeroBloqueado?: boolean;
@@ -187,6 +194,8 @@ export interface RespuestaListarChats {
     bot: number;
     atendidos: number;
     sinVer?: number;
+    porResponder?: number;
+    sinLeerTotal?: number;
     bloqueadosSpam?: number;
     faltanProcesar?: number;
     reprogramar?: number;
@@ -218,6 +227,8 @@ export interface EventoEnvioMensaje {
   id: string;
   mensajeId: string;
   idCliente?: string;
+  /** WHATSAPP_BUSINESS: lo escribió una persona del local desde la app WhatsApp Business. */
+  canal?: 'WHATSAPP_BUSINESS';
   estado: 'ENVIADO' | 'SIMULADO' | 'FALLIDO' | 'REVISAR';
   motivoFallo?: string | null;
   puedeReintentar?: boolean;

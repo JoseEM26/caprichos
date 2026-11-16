@@ -165,7 +165,18 @@ describe('Lista de chats paginada por cursor', () => {
       ...extra,
     };
   };
-  const ordenEsperado = (lista: any[]) => [...lista].sort((a, b) => b.ultima_actividad.getTime() - a.ultima_actividad.getTime() || Number(b.id - a.id)).map((c) => c.id.toString());
+  // «Por responder» (último mensaje del cliente) arriba, el que más espera primero; luego el resto por actividad reciente
+  const porResp = (c: any) => c.mensajes[0].autor === 'CLIENTE';
+  const ordenEsperado = (lista: any[]) =>
+    [...lista]
+      .sort((a, b) =>
+        porResp(a) !== porResp(b)
+          ? (porResp(a) ? -1 : 1)
+          : porResp(a)
+            ? a.ultima_actividad.getTime() - b.ultima_actividad.getTime() || Number(b.id - a.id)
+            : b.ultima_actividad.getTime() - a.ultima_actividad.getTime() || Number(b.id - a.id),
+      )
+      .map((c) => c.id.toString());
 
   beforeEach(() => {
     filas = Array.from({ length: 95 }, (_, i) => chat(i + 1));
@@ -196,7 +207,7 @@ describe('Lista de chats paginada por cursor', () => {
     return { ids, paginas };
   };
 
-  it('recorrer todas las páginas da cada chat UNA vez, en el orden estable (última actividad desc, id desc)', async () => {
+  it('recorrer todas las páginas da cada chat UNA vez, en el orden estable (por responder arriba, luego última actividad desc, id desc)', async () => {
     const { ids, paginas } = await recorrer(30);
     expect(paginas).toHaveLength(4); // 30 + 30 + 30 + 5
     expect(paginas[0].chats).toHaveLength(30);
@@ -212,7 +223,7 @@ describe('Lista de chats paginada por cursor', () => {
     expect(r.hayMas).toBe(true);
     expect(typeof r.siguienteCursor).toBe('string');
     expect(Object.keys(r.chats[0])).toEqual(expect.arrayContaining(['id', 'nombre', 'telefono', 'estado', 'urgente', 'ultimo', 'hora', 'fecha', 'sinLeer', 'sinRespuestaMin', 'bloqueoSpam', 'pos', 'faltaProcesar', 'porReprogramar', 'clave']));
-    expect(r.conteos).toEqual(expect.objectContaining({ todos: 95, atender: 9, bot: 86, atendidos: 0, sinVer: 5 }));
+    expect(r.conteos).toEqual(expect.objectContaining({ todos: 95, atender: 9, bot: 86, atendidos: 0, sinVer: 72, porResponder: 72, sinLeerTotal: 72 }));
   });
 
   it('los conteos de las pestañas son los de TODOS los chats, igual en cualquier página', async () => {
@@ -221,8 +232,9 @@ describe('Lista de chats paginada por cursor', () => {
     const urgentes = filas.filter((f) => f.urgente).length;
     expect(paginas[0].conteos.atender).toBe(urgentes);
     expect(paginas[0].conteos.bot).toBe(95 - urgentes);
-    // sin ver = «Por atender» con el último mensaje del cliente (10, 30, 50, 70, 90)
-    expect(paginas[0].conteos.sinVer).toBe(filas.filter((f) => f.urgente && f.mensajes[0].autor === 'CLIENTE').length);
+    // sin ver = cualquier chat activo con el último mensaje del cliente sin abrir
+    expect(paginas[0].conteos.sinVer).toBe(filas.filter((f) => f.mensajes[0].autor === 'CLIENTE').length);
+    expect(paginas[0].conteos.porResponder).toBe(paginas[0].conteos.sinVer);
   });
 
   it('si entra un chat nuevo entre dos páginas, no se repite ni se salta ninguno de los que faltaban', async () => {
@@ -295,8 +307,8 @@ describe('Lista de chats paginada por cursor', () => {
       const ultimoCargado = p1.siguienteCursor!;
       const cargado = await svc.fila(p1.chats[3].id, 'todos', '', undefined, { hasta: ultimoCargado });
       expect(cargado.dentro).toBe(true);
-      const sinCargar = await svc.fila('95', 'todos', '', undefined, { hasta: ultimoCargado }); // el más antiguo
-      expect(sinCargar.chat?.id).toBe('95');
+      const sinCargar = await svc.fila('92', 'todos', '', undefined, { hasta: ultimoCargado }); // el más antiguo de los ya respondidos
+      expect(sinCargar.chat?.id).toBe('92');
       expect(sinCargar.dentro).toBe(false);
     });
 

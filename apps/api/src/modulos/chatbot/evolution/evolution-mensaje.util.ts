@@ -2,7 +2,7 @@ import { resolverRespuesta, type MenuNumerado } from './menu-numerado.util';
 
 /** Mensaje entrante de Evolution ya normalizado al formato del webhook de Meta, o la razón por la que se ignora. */
 export type ResultadoNormalizado =
-  | { ok: true; msg: Record<string, any>; contacto: { wa_id: string; profile: { name?: string } } }
+  | { ok: true; msg: Record<string, any>; contacto: { wa_id: string; profile: { name?: string } }; lid?: string }
   | { ok: false; razon: 'PROPIO' | 'GRUPO' | 'ESTADO' | 'SIN_NUMERO' | 'SIN_ID' | 'VACIO' };
 
 const soloDigitos = (v: unknown) => String(v ?? '').replace(/\D/g, '');
@@ -43,6 +43,18 @@ function numeroDe(key: any, data: any): string {
   return jid.endsWith('@lid') && soloDigitos(jid) ? `${soloDigitos(jid)}@lid` : '';
 }
 
+/**
+ * Pares LID ↔ celular que traiga un evento de contactos o chats de Evolution (contacts.upsert/update, chats.upsert/update):
+ * cualquier campo con «<digitos>@lid» junto a otro con «<digitos>@s.whatsapp.net». Sin datos sueltos: solo dígitos.
+ */
+export function paresLidCelular(item: any): Array<{ lid: string; celular: string }> {
+  const vals = [item?.remoteJid, item?.remoteJidAlt, item?.lid, item?.jid, item?.id, item?.senderPn, item?.participantAlt, item?.phoneNumber]
+    .filter((x) => typeof x === 'string') as string[];
+  const lid = vals.find((v) => /@lid$/i.test(v));
+  const cel = vals.find((v) => /@s\.whatsapp\.net$/i.test(v));
+  return lid && cel ? [{ lid: soloDigitos(lid), celular: soloDigitos(cel) }] : [];
+}
+
 /** Mensaje con adjunto: lo que hay que recordar para bajarlo después (base64 del webhook si viene, mensaje sin base64 y clave). */
 export function extraerAdjuntoEvolution(data: any): { id: string; base64?: string; mime?: string; key: any; message: any } | null {
   const id = String(data?.key?.id ?? '').trim();
@@ -52,17 +64,18 @@ export function extraerAdjuntoEvolution(data: any): { id: string; base64?: strin
   const tipo = ['imageMessage', 'audioMessage', 'documentMessage', 'videoMessage', 'stickerMessage'].find((t) => m[t]);
   if (!tipo) return null;
   const base64 = [b64Msg, data.base64, m[tipo]?.base64].find((x) => typeof x === 'string' && x.length > 0);
-  return { id, base64, mime: baseMime(m[tipo].mimetype, 'application/octet-stream'), key: { id, remoteJid: data.key.remoteJid, fromMe: false }, message: mensaje };
+  return { id, base64, mime: baseMime(m[tipo].mimetype, 'application/octet-stream'), key: { id, remoteJid: data.key.remoteJid, fromMe: data.key.fromMe === true }, message: mensaje };
 }
 
 /**
  * messages.upsert de Evolution → mensaje con la forma que ya procesa el webhook de Meta (type, text.body, image.id, ...).
  * Ignora lo propio (fromMe), los grupos, los estados y a quien no trae ni número ni LID.
  */
-export function normalizarMensajeEvolution(data: any): ResultadoNormalizado {
+export function normalizarMensajeEvolution(data: any, opciones: { propios?: boolean } = {}): ResultadoNormalizado {
   const key = data?.key ?? {};
   const jid = String(key.remoteJid ?? '');
-  if (key.fromMe === true) return { ok: false, razon: 'PROPIO' };
+  // propios: lo que el local escribe desde WhatsApp Business (fromMe); el webhook decide si fue el sistema o una persona
+  if (key.fromMe === true && !opciones.propios) return { ok: false, razon: 'PROPIO' };
   if (jid.endsWith('@g.us')) return { ok: false, razon: 'GRUPO' };
   if (jid === 'status@broadcast' || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')) return { ok: false, razon: 'ESTADO' };
   const from = numeroDe(key, data);
@@ -92,7 +105,11 @@ export function normalizarMensajeEvolution(data: any): ResultadoNormalizado {
   else if (Object.keys(m).filter((k) => k !== 'messageContextInfo').length) msg = { ...base, type: 'unsupported' };
   if (!msg) return { ok: false, razon: 'VACIO' };
 
-  return { ok: true, msg, contacto: { wa_id: from, profile: { name: data?.pushName ? String(data.pushName) : undefined } } };
+  // En lo propio, pushName es el nombre del local, no el del cliente
+  const nombre = key.fromMe === true ? undefined : data?.pushName ? String(data.pushName) : undefined;
+  // LID del chat cuando Evolution también entregó el número (remoteJidAlt, senderPn...): sirve para unir ambos chats
+  const lid = jid.endsWith('@lid') && !from.endsWith('@lid') ? soloDigitos(jid) : undefined;
+  return { ok: true, msg, contacto: { wa_id: from, profile: { name: nombre } }, ...(lid ? { lid } : {}) };
 }
 
 /**

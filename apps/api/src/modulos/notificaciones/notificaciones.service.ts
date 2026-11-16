@@ -479,6 +479,19 @@ export class NotificacionesService {
       }
     }
 
+    if (puede('mensajes/ver') && typeof (this.prisma as any).$queryRaw === 'function') {
+      // Insignia del menú «Mensajes»: chats activos cuyo último mensaje es del cliente (por responder)
+      try {
+        const filas = await this.prisma.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*)::bigint AS n FROM conversacion c
+          WHERE c.atendido_en IS NULL AND c.estado <> 'ATENDIDA'
+            AND (SELECT m.direccion FROM mensaje_chat m WHERE m.conversacion_id = c.id ORDER BY m.id DESC LIMIT 1) = 'ENTRA'`;
+        conteos.mensajes = Number(filas?.[0]?.n ?? 0);
+      } catch {
+        // sin insignia: no afecta al resto del resumen
+      }
+    }
+
     if (puede('reclamos/ver')) {
       const reclamos = await this.prisma.reclamo.findMany({
         where: { estado: { not: 'RESPONDIDO' } },
