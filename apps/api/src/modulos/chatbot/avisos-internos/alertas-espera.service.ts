@@ -258,7 +258,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
 
     let alertasVoucherEnviadas = 0;
     let avisosEsperaClienteEnviados = 0;
-    let chatsLiberados = 0;
+    const chatsLiberados = 0;
     let alertasPersonaEnviadas = 0;
     let alertasCajaEnviadas = 0;
     let alertasStockEnviadas = 0;
@@ -376,76 +376,9 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       }
 
       // =========================================================================
-      // 2) SECCIÓN 3: Chat tomado y abandonado
-      // - Si una persona toma un chat y pasan 10 min sin que envíe mensaje al cliente,
-      //   el chat se libera solo al bot y se avisa por campana a quien lo tenía.
-      // - EXCEPCIÓN ESTRICTA: conversacion con voucher sin revisar (VALIDAR_PAGO)
-      //   NUNCA se libera al bot: sigue con Caja y con las alertas.
+      // 2) Chat tomado: YA NO se libera solo al bot por inactividad (decisión del dueño, 16/11). Un chat pausado o tomado por una
+      //    persona sigue en sus manos hasta «Reanudar bot» / «Devolver al bot» o la reanudación diaria de las 00:01 (Lima).
       // =========================================================================
-      const chatsTomados = await this.prisma.conversacion.findMany({
-        where: {
-          tomado_por: { not: null },
-        },
-        include: {
-          tomadoPorUsuario: true,
-          mensajes: {
-            where: { autor: 'PERSONA', direccion: 'SALE' },
-            orderBy: { en: 'desc' },
-            take: 1,
-          },
-        },
-      });
-
-      for (const chat of chatsTomados) {
-        // EXCEPCIÓN: VALIDAR_PAGO NUNCA se libera al bot
-        if (chat.estado === 'VALIDAR_PAGO') {
-          continue;
-        }
-
-        const ultimoEnvioPersona = chat.mensajes?.[0]?.en
-          ? new Date(chat.mensajes[0].en).getTime()
-          : chat.tomado_en
-            ? new Date(chat.tomado_en).getTime()
-            : new Date(chat.ultima_actividad).getTime();
-
-        const minutosInactivo = Math.floor((ahora.getTime() - ultimoEnvioPersona) / (60 * 1000));
-
-        if (minutosInactivo >= umbrales.chatTomadoLiberarMin) {
-          const partyDestino = chat.tomadoPorUsuario?.party_id ?? undefined;
-
-          // Liberar el chat al bot
-          await this.prisma.conversacion.update({
-            where: { id: chat.id },
-            data: {
-              duenio: 'BOT',
-              tomado_por: null,
-              tomado_en: null,
-              urgente: false,
-              ultima_actividad: ahora,
-              flujo: flujoLiberadoParaBot((chat as any).flujo) as any,
-            },
-          });
-
-          // Avisar por campana a la persona que tenía el chat tomado
-          await this.avisosInternosService.emitirAvisoCampana(
-            'Chat liberado por inactividad',
-            `El chat con ${chat.nombre_contacto || chat.telefono} fue liberado al bot tras superar ${minutosInactivo} min sin respuesta.`,
-            '/admin/mensajes',
-            partyDestino,
-          );
-
-          // Emitir actualización por WebSocket
-          this.eventosGateway?.emitirAdmin('mensajes:actualizar', {
-            id: chat.id.toString(),
-            duenio: 'BOT',
-            tomado_por: null,
-            urgente: false,
-          });
-
-          chatsLiberados++;
-          this.logger.log(`Chat ${chat.id} liberado al bot por inactividad (${minutosInactivo} min).`);
-        }
-      }
 
       // =========================================================================
       // 3) SECCIÓN 2.b: Chat esperando a una persona

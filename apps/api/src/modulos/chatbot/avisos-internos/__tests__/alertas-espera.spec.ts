@@ -347,48 +347,25 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
   });
 
   describe('3) Chat tomado y abandonado vs EXCEPCIÓN VALIDAR_PAGO', () => {
-    it('libera chat normal al bot tras 10 min sin respuesta humana y avisa por campana', async () => {
+    it('un chat tomado o pausado NO se libera solo al bot por inactividad (decisión del dueño 16/11)', async () => {
       const ahora = new Date('2026-10-27T12:15:00Z');
       const tomadoEn = new Date('2026-10-27T12:00:00Z'); // 15 min sin mensaje
 
       prismaMock.conversacion.findMany.mockImplementation(({ where }: any) => {
         if (where?.tomado_por) {
           return Promise.resolve([
-            {
-              id: 202n,
-              telefono: '51911111111',
-              duenio: 'PERSONA',
-              estado: 'ABIERTA',
-              tomado_por: 5n,
-              tomado_en: tomadoEn,
-              tomadoPorUsuario: { id: 5n, party_id: 50n },
-              mensajes: [],
-            },
+            { id: 202n, telefono: '51911111111', duenio: 'PERSONA', estado: 'ABIERTA', tomado_por: 5n, tomado_en: tomadoEn, tomadoPorUsuario: { id: 5n, party_id: 50n }, mensajes: [] },
           ]);
         }
         return Promise.resolve([]);
       });
 
       const res = await service.ejecutarCiclo(ahora);
-      expect(res.chatsLiberados).toBe(1);
-
-      // Se libera al bot
-      expect(prismaMock.conversacion.update).toHaveBeenCalledWith({
-        where: { id: 202n },
-        data: expect.objectContaining({
-          duenio: 'BOT',
-          tomado_por: null,
-          tomado_en: null,
-        }),
-      });
-
-      // Avisa por campana a la persona que lo tenía
-      expect(avisosInternosMock.emitirAvisoCampana).toHaveBeenCalledWith(
-        'Chat liberado por inactividad',
-        expect.stringContaining('fue liberado al bot'),
-        '/admin/mensajes',
-        50n,
+      expect(res.chatsLiberados).toBe(0);
+      expect(prismaMock.conversacion.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ duenio: 'BOT' }) }),
       );
+      expect(avisosInternosMock.emitirAvisoCampana).not.toHaveBeenCalledWith('Chat liberado por inactividad', expect.anything(), expect.anything(), expect.anything());
     });
 
     it('EXCEPCIÓN CRÍTICA: conversación en VALIDAR_PAGO NUNCA se libera al bot', async () => {

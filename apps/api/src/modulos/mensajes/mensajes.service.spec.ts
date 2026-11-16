@@ -410,7 +410,8 @@ describe('MensajesService', () => {
     await service.pausar('2', usuarioAdmin);
     expect(prisma.conversacion.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ duenio: 'PERSONA', urgente: false }),
+        // tomado_en marca la pausa: cuenta como intervención humana y el bot calla todo el día (hasta las 00:01)
+        data: expect.objectContaining({ duenio: 'PERSONA', urgente: false, tomado_en: expect.any(Date) }),
       }),
     );
 

@@ -1443,7 +1443,9 @@ export class MensajesService {
 
   async pausar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
-    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false });
+    // Decisión del dueño (16/11): el bot pausado NO se reanuda en minutos. Se marca el momento de la pausa (tomado_en cuenta como
+    // intervención humana) y el bot calla todo el día; vuelve solo a las 00:01 o con «Reanudar bot» / «Devolver al bot».
+    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, tomado_en: new Date() });
     await this.auditar(usuario, 'PAUSAR_BOT', c.id, undefined, ip);
     return { ok: true };
   }
