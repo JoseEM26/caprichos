@@ -69,7 +69,8 @@ export class EvolutionAdminController {
   @Permiso('mensajes', 'ver')
   async estadoMensajes() {
     const proveedor = await this.config.proveedor();
-    if (proveedor !== 'EVOLUTION' || !this.api.configurado()) return { proveedor, vinculado: null, estado: null };
+    // Con Evolution instalado se informa su estado aunque el proveedor en uso sea Meta: así se puede vincular antes de cambiar
+    if (!this.api.configurado()) return { proveedor, vinculado: null, estado: null };
     const enVivo = await this.api.estado();
     return { proveedor, vinculado: enVivo ? enVivo === 'open' : null, estado: enVivo };
   }
@@ -78,7 +79,7 @@ export class EvolutionAdminController {
   @Post('mensajes/qr')
   @Permiso('mensajes', 'ver')
   async qrMensajes(@Req() req: any) {
-    if ((await this.config.proveedor()) !== 'EVOLUTION') return { disponible: false, base64: null };
+    if (!this.api.configurado()) return { disponible: false, base64: null };
     const qr = await this.api.qr();
     await this.auditoria?.registrar({
       categoria: 'ACCESO',

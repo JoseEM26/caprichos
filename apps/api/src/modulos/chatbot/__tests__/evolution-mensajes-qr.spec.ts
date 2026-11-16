@@ -30,9 +30,14 @@ describe('Mensajes: estado y QR de Evolution', () => {
     expect(JSON.stringify(r)).not.toMatch(/clave|secreta|http/);
   });
 
-  it('estado: Meta o sin respuesta no declara desvinculado', async () => {
-    expect((await montar('META').c.estadoMensajes()).vinculado).toBeNull();
+  it('estado: sin respuesta de Evolution no declara desvinculado', async () => {
     expect((await montar('EVOLUTION', null).c.estadoMensajes()).vinculado).toBeNull();
+  });
+
+  it('con Meta en uso informa el estado de Evolution y entrega el QR para vincular antes de cambiar', async () => {
+    const { c } = montar('META');
+    expect(await c.estadoMensajes()).toEqual({ proveedor: 'META', vinculado: false, estado: 'close' });
+    expect(await c.qrMensajes({ usuario: { partyId: 7 } })).toEqual({ disponible: true, base64: 'QR64' });
   });
 
   it('qr: devuelve la imagen y audita quién lo pidió', async () => {

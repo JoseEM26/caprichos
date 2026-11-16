@@ -34,6 +34,16 @@ describe('BloqueoVinculacion', () => {
     expect(screen.getByTestId('chat')).toBeTruthy();
   });
 
+  it('Meta en uso y Evolution sin vincular: QR arriba y el chat sigue', async () => {
+    estado({ proveedor: 'META', vinculado: false, estado: 'close' });
+    vi.spyOn(api, 'post').mockResolvedValue({ disponible: true, base64: 'BBB' } as any);
+    render(<BloqueoVinculacion>{chat}</BloqueoVinculacion>);
+    expect(await screen.findByTestId('qr-vincular-meta')).toBeTruthy();
+    expect((await screen.findByAltText(/QR para vincular/)).getAttribute('src')).toBe('data:image/png;base64,BBB');
+    expect(screen.getByTestId('chat')).toBeTruthy();
+    expect(screen.queryByTestId('bloqueo-vinculacion')).toBeNull();
+  });
+
   it('error de red: chat con aviso pequeño', async () => {
     vi.spyOn(api, 'get').mockRejectedValue(new Error('red'));
     render(<BloqueoVinculacion>{chat}</BloqueoVinculacion>);

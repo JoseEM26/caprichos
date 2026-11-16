@@ -103,6 +103,15 @@ export function TarjetaWhatsappProveedor({ esAdmin = false }: { esAdmin?: boolea
   };
 
   const conectado = e?.conexion.enVivo ? e.conexion.enVivo === 'open' : e?.conexion.estado === 'CONECTADO';
+  // Con el QR a la vista: se revisa la conexión cada 5 s y se pide uno nuevo cada 40 s (vence en un minuto) hasta vincular
+  const qrVisible = Boolean(qr?.base64);
+  useEffect(() => {
+    if (!qrVisible) return;
+    if (conectado) { setQr(null); return; }
+    const estado = setInterval(() => void cargar(), 5000);
+    const nuevo = setInterval(() => void pedirQr(), 40000);
+    return () => { clearInterval(estado); clearInterval(nuevo); };
+  }, [qrVisible, conectado, cargar]);
   const cambiosLimites = e ? Object.entries(valores).filter(([k, v]) => String(e.limites[k]) !== v) : [];
   const campo = { minHeight: 44, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--cp-line)', fontWeight: 700 } as const;
 
@@ -153,7 +162,7 @@ export function TarjetaWhatsappProveedor({ esAdmin = false }: { esAdmin?: boolea
           {qr?.base64 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
               <img alt="QR para vincular el número" src={qr.base64.startsWith('data:') ? qr.base64 : `data:image/png;base64,${qr.base64}`} style={{ width: 220, height: 220 }} />
-              <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>En el celular: WhatsApp, Dispositivos vinculados, Vincular un dispositivo. El QR vence en un minuto.</span>
+              <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>En el celular: WhatsApp, Dispositivos vinculados, Vincular un dispositivo. Se renueva solo hasta que quede vinculado.</span>
             </div>
           )}
 
