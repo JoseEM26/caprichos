@@ -1422,8 +1422,9 @@ export function ModalNuevoPedidoMesa({
       ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
       : null;
   const erroresEnvio: ErrorEnvio[] = [];
-  if (lineas.length === 0 && !(extra && cargos.length > 0))
-    erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
+  // Un «Servicio o producto» libre (torta por encargo, etc.) cuenta como producto: se puede enviar solo con eso
+  if (lineas.length === 0 && cargos.length === 0)
+    erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto o un «Servicio o producto» para enviarlo.', foco: [] });
   if (pideMode === 'personal' && !staffElegido)
     erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
   if (modalidad === 'local' && !extra && !enEspera && mesasSeleccionadas.length === 0)
@@ -1541,8 +1542,8 @@ export function ModalNuevoPedidoMesa({
   const handleEnviarPedido = async () => {
     if (enviando) return; // anti doble envío
     setErrorExtra(null);
-    if ((lineas.length === 0 && !(extra && cargos.length > 0)) || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
-      setErrorEnvio('Debe seleccionar al menos un producto.');
+    if ((lineas.length === 0 && cargos.length === 0) || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
+      setErrorEnvio('Debe seleccionar al menos un producto o un «Servicio o producto».');
       setConfirmarEnviar(false);
       return;
     }

@@ -466,14 +466,22 @@ describe('PedidosService', () => {
         }
       });
 
-      it('sin productos solo se admite como pedido extra (con pedidoOrigenId)', async () => {
-        const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Bola de helado extra', monto: 4 }] };
-        await expect(service.crear(solo, 'cl-s1', caja)).rejects.toMatchObject({ response: { codigo: 'LINEAS_REQUERIDAS' } });
-        prismaMock.pedido.create.mockResolvedValue({ ...creado, subtotal: 4, total: 4 });
-        await service.crear(solo, 'cl-s2', { ...caja, pedidoOrigenId: 100n });
+      it('un «Servicio o producto» libre vale como producto: Caja y mozo envían un pedido solo con eso (también como extra)', async () => {
+        const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta chocolate 10 cm corazón', monto: 29 }] };
+        prismaMock.pedido.create.mockResolvedValue({ ...creado, subtotal: 29, total: 29 });
+        await service.crear(solo, 'cl-s1', caja);
         const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
-        expect(Number(data.total)).toBe(4);
+        expect(Number(data.total)).toBe(29);
         expect(prismaMock.pedidoLinea.create.mock.calls.at(-1)[0].data.cargo_libre).toBe(true);
+        // como extra de un pedido ya cobrado sigue igual
+        await service.crear(solo, 'cl-s2', { ...caja, pedidoOrigenId: 100n });
+        expect(Number(prismaMock.pedido.create.mock.calls.at(-1)[0].data.total)).toBe(29);
+      });
+
+      it('sin productos ni cargos libres sigue rechazado; la carta/bot nunca pueden mandar cargos', async () => {
+        await expect(service.crear({ ...dtoRecoger, lineas: [] }, 'cl-s3', caja)).rejects.toMatchObject({ response: { codigo: 'LINEAS_REQUERIDAS' } });
+        const solo = { ...dtoRecoger, lineas: [], cargosLibres: [{ descripcion: 'Torta', monto: 29 }] };
+        await expect(service.crear(solo, 'cl-s4', { canal: 'CARTA' })).rejects.toBeDefined();
       });
     });
 

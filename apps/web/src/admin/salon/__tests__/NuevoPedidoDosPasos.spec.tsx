@@ -90,7 +90,7 @@ describe('Nuevo pedido en 2 pasos: Pedido y Pago', () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisos} mesasPreseleccionadasIds={['m1']} canal="MOZO" />);
     const boton = await screen.findByRole('button', { name: 'Continuar' });
     expect(boton).toBeDisabled();
-    expect(screen.getByText('Agrega al menos un producto para enviarlo.')).toBeInTheDocument();
+    expect(screen.getByText('Agrega al menos un producto o un «Servicio o producto» para enviarlo.')).toBeInTheDocument();
 
     fireEvent.click(await screen.findByText('Café Americano'));
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });

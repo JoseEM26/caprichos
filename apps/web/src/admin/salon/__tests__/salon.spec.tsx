@@ -308,7 +308,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
 
     // Sin productos, «Continuar» queda deshabilitado y dice qué falta
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
-    expect(screen.getByText('Agrega al menos un producto para enviarlo.')).toBeInTheDocument();
+    expect(screen.getByText('Agrega al menos un producto o un «Servicio o producto» para enviarlo.')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 

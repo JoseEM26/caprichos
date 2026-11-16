@@ -931,8 +931,9 @@ export class PedidosService {
     if ((dto.cargosLibres ?? []).length > 0) exigirCanalPersonal(origen?.canal, !!origen?.usuarioPartyId && !!origen?.puedeCargoLibre);
     const cargosLibres = validarCargosLibres(dto.cargosLibres, dto.lineas?.length ?? 0);
     const cargosTotal = Number(cargosLibres.reduce((a, c) => a + c.monto, 0).toFixed(2));
-    // Solo un pedido extra puede llevar únicamente cargos libres (el de un pedido ya cobrado)
-    const soloCargos = cargosLibres.length > 0 && (dto.lineas ?? []).length === 0 && origen?.pedidoOrigenId != null;
+    // Un «Servicio o producto» libre vale como producto: Caja y mozo pueden enviar un pedido solo con cargos libres
+    // (torta por encargo, etc.). exigirCanalPersonal ya garantiza que solo ellos llegan aquí con cargos.
+    const soloCargos = cargosLibres.length > 0 && (dto.lineas ?? []).length === 0;
     if (!soloCargos && (!Array.isArray(dto.lineas) || dto.lineas.length === 0)) {
       throw new BadRequestException({
         codigo: 'LINEAS_REQUERIDAS',
