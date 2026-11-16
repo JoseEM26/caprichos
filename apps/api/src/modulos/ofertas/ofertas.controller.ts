@@ -154,6 +154,12 @@ export class CuponesController {
     return this.ofertasService.canjearCuponEnCaja(dto, req.usuario);
   }
 
+  @Get(':id/usos')
+  @Permiso('cupones', 'ver')
+  async usosDelCupon(@Param('id') id: string, @Query('pagina') pagina?: string, @Query('tamano') tamano?: string) {
+    return this.ofertasService.usosDelCupon(id, Number(pagina) || 1, Number(tamano) || 10);
+  }
+
   @Get(':id')
   @Permiso('cupones', 'ver')
   async obtenerCupon(@Param('id') id: string) {

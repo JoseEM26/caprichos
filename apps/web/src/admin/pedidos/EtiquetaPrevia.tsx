@@ -86,6 +86,16 @@ function PrimitivaSvg({ p }: { p: Primitiva }) {
   return null; // 'inverso' se dibuja aparte, debajo de lo invertido
 }
 
+/** Logo de Caprichos en blanco y negro (el mismo bitmap de los stickers), para encabezar una vista previa. */
+export function LogoCaprichos({ lado = 64 }: { lado?: number }) {
+  trazoCache ??= trazoLogo();
+  return (
+    <svg viewBox={`0 0 ${LOGO_LADO} ${LOGO_LADO}`} width={lado} height={lado} role="img" aria-label="Logo de Caprichos" style={{ display: 'block', background: '#fff' }}>
+      <path d={trazoCache} fill="#000" />
+    </svg>
+  );
+}
+
 export function EtiquetaSvg({ maqueta, etiqueta, zoom = 1 }: { maqueta: Maqueta; etiqueta: string; zoom?: number }) {
   const { W, H, primitivas } = maqueta;
   return (

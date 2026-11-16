@@ -1414,9 +1414,34 @@ describe('PedidosService', () => {
       expect(pedidoCreadoData.descuento.toNumber()).toBe(5.0);
       expect(pedidoCreadoData.total.toNumber()).toBe(28.0);
       expect(pedidoCreadoData.cupon_id).toBe(10n);
+      // Auditoría: el canje compartido guarda el canal; en la carta nadie del personal lo aplicó
+      expect(prismaMock.cuponCanjeCompartido.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ cupon_id: 10n, canal: 'CARTA', aplicado_por: null }),
+      });
       expect(res.subtotal).toBe(28.0);
       expect(res.descuento).toBe(5.0);
       expect(res.total).toBe(28.0);
+    });
+
+    it('cupón compartido aplicado por el mozo: el canje guarda canal MOZO y quién lo aplicó', async () => {
+      ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValueOnce({
+        descuentoTotal: 5.0,
+        ofertaId: null,
+        cuponId: '10',
+        cuponEmitidoId: null,
+        detalles: [{ tipo: 'CUPON', nombre: 'Cupón BIENVENIDO5', descuentoTipo: 'MONTO', descuentoValor: 5.0, montoDescontado: 5.0 }],
+      });
+      prismaMock.pedido.create.mockImplementation(({ data }: any) =>
+        Promise.resolve({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: data.subtotal, descuento: data.descuento, envio: data.envio, total: data.total }),
+      );
+      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+      prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
+
+      await service.crear({ ...pedidoBaseDto, cuponCodigo: 'BIENVENIDO5' }, 'idemp-cupon-mozo', { canal: 'MOZO', usuarioPartyId: 77n });
+
+      expect(prismaMock.cuponCanjeCompartido.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ cupon_id: 10n, canal: 'MOZO', aplicado_por: 77n }),
+      });
     });
 
     describe('pedido mínimo (solo delivery, sobre subtotal de productos)', () => {
