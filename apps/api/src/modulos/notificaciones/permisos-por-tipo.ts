@@ -12,6 +12,8 @@ export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   PEDIDOS_SIN_PAGAR_TOPE: ['caja/ver', 'pedidos/ver'],
   UBICACION_PROPUESTA: ['caja/ver', 'pedidos/ver'],
   ANULACION_SIN_DEVOLUCION: ['caja/ver'],
+  CULQI_DEVOLUCION_PENDIENTE: ['caja/ver'], // devolución por la pasarela que espera aprobación del admin
+  CULQI_DEVOLUCION_FALLIDA: ['caja/ver'], // Culqi no devolvió el dinero: reintentar
   PEDIDO_ANULADO_IMPRESO: ['caja/ver', 'pedidos/ver', 'cocina/ver'],
   CAJA_CERRADA_APERTURA: ['caja/ver'],
   PAGO_EFECTIVO_MOZO: ['caja/ver'],

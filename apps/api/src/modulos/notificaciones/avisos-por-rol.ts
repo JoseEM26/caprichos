@@ -27,6 +27,8 @@ export const CATALOGO_AVISOS: TipoAviso[] = [
   { tipo: 'PEDIDOS_SIN_PAGAR_TOPE', nombre: 'Cliente con muchos pedidos sin pagar', detalle: 'Un cliente llegó al tope de pedidos sin pagar.' },
   { tipo: 'UBICACION_PROPUESTA', nombre: 'Ubicación propuesta por el cliente', detalle: 'El cliente mandó su ubicación y Caja debe aceptarla.' },
   { tipo: 'PEDIDO_ANULADO_IMPRESO', nombre: 'Pedido anulado ya impreso', detalle: 'Se anuló un pedido que ya imprimió sus stickers: avisar a barra y cocina.' },
+  { tipo: 'CULQI_DEVOLUCION_PENDIENTE', nombre: 'Devolución por Culqi pendiente', detalle: 'Un pedido anulado pagado en línea espera que apruebes la devolución.' },
+  { tipo: 'CULQI_DEVOLUCION_FALLIDA', nombre: 'Devolución por Culqi fallida', detalle: 'Culqi no devolvió el dinero de un pedido anulado: hay que reintentar.' },
   { tipo: 'ANULACION_SIN_DEVOLUCION', nombre: 'Anulación sin devolución', detalle: 'Se anuló un pedido pagado sin devolver el dinero.' },
   { tipo: 'CAJA_CERRADA_APERTURA', nombre: 'Caja cerrada con pedidos', detalle: 'Entra un pedido y la caja del día no está abierta.' },
   { tipo: 'PAGO_EFECTIVO_MOZO', nombre: 'Pago en efectivo del mozo', detalle: 'Un mozo cobró en efectivo y debe entregar el dinero.' },
