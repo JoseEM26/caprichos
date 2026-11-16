@@ -1,4 +1,4 @@
-import { detallarVentasTurno, idsDePersonas, serviciosLibresDelTurno, CobroConDetalle } from './ventas-turno.util';
+import { detallarVentasTurno, idsDePersonas, serviciosLibresDelTurno, programadosDelTurnoDe, CobroConDetalle } from './ventas-turno.util';
 
 const cobro = (o: Partial<CobroConDetalle> & { pedido?: CobroConDetalle['pedido'] } = {}): CobroConDetalle => ({
   pedido_id: 5n,
@@ -116,5 +116,21 @@ describe('serviciosLibresDelTurno (Servicios y productos libres del cierre)', ()
 
   it('idsDePersonas incluye a quien agregó el cargo', () => {
     expect(idsDePersonas([conCargo(null, 5, new Date())])).toContain(7n);
+  });
+});
+
+describe('programadosDelTurnoDe (dinero de pedidos programados recibido hoy)', () => {
+  const programado = new Date('2026-11-17T22:00:00Z');
+  it('identifica el adelanto y el cobro completo de un programado; deja fuera pedidos sin fecha pactada y cobros anulados', () => {
+    const r = programadosDelTurnoDe(
+      [
+        { pedido_id: 1n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: 29 }], pedido: { codigo: 'CP-0001', programado_para: programado } },
+        { pedido_id: 2n, anulado_en: null, pagos: [{ medio: 'YAPE', monto: 10 }], pedido: { codigo: 'CP-0002', programado_para: null } },
+        { pedido_id: 3n, anulado_en: new Date(), pagos: [{ medio: 'YAPE', monto: 5 }], pedido: { codigo: 'CP-0003', programado_para: programado } },
+      ],
+      [{ pedido_id: 4n, medio: 'TARJETA', monto: 12.5, pedido: { codigo: 'CP-0004', programado_para: programado } }],
+    );
+    expect(r.lista.map((x) => [x.pedidoCodigo, x.tipo, x.monto])).toEqual([['CP-0004', 'ADELANTO', 12.5], ['CP-0001', 'COBRO', 29]]);
+    expect(r.total).toBe(41.5);
   });
 });

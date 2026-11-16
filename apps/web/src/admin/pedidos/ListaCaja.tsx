@@ -12,6 +12,7 @@ import { esCerrado, estadoVisual } from './estadosCaja';
 import { mediosDePedido, medioPorCulqi } from './mediosFila';
 import { textoMedio } from './EtiquetaMedio';
 import { totalDe } from './resumenDia';
+import { BloqueEncargoTarjeta, ChipProgramado } from './ProgramadoInfo';
 import { MARCA_FALTA_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import './lista-caja.css';
 
@@ -155,7 +156,7 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
           <strong>{p.codigo}</strong>
           <span className="lc-tipo"><IconoModalidad modalidad={clave} tamano={18} />{MOD[clave]}{clave === 'MESA' && p.mesa_nombre ? ` · ${textoMesa(p.mesa_nombre)}` : ''}</span>
         </span>
-        <PastillaEspera creadoEn={p.creado_en} cerrado={cerrado} />
+        <PastillaEspera creadoEn={p.creado_en} cerrado={cerrado || p.estado === 'PROGRAMADO'} />
         <span className="lc-meta">{fecha} {aHora(p.creado_en)}{quien ? ` · ${quien}` : ''}</span>
       </div>
 
@@ -178,6 +179,13 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
           </Link>
         )}
       </div>
+
+      {(p.programado_para || (p.lineas ?? []).some((l) => l.cargoLibre || l.cargo_libre)) && (
+        <div className="lc-programado">
+          <ChipProgramado pedido={p} />
+          <BloqueEncargoTarjeta lineas={p.lineas ?? []} />
+        </div>
+      )}
 
       <BotonEnviarConfirmacionWhatsapp pedidoId={p.id} compacto />
 

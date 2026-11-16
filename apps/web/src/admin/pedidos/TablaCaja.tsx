@@ -7,6 +7,7 @@ import { estadoVisual } from './estadosCaja';
 import { mediosDePedido, medioPorCulqi, montosPorMedio, MEDIOS_FILTRO } from './mediosFila';
 import { EtiquetaMedio } from './EtiquetaMedio';
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
+import { paraCuandoDe } from './programado';
 
 const soles = (n: number) => `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const anulado = (p: Pedido) => ['ANULADO', 'RECHAZADO'].includes(String(p.estado).toUpperCase());
@@ -56,7 +57,16 @@ const Fila = memo(function Fila({ p, columnas, alVerDetalle }: { p: Pedido; colu
       {columnas.map((id) => {
         const c = COLUMNAS_CAJA.find((x) => x.id === id)!;
         let contenido: React.ReactNode = c.texto(p);
-        if (id === 'estado') contenido = <span className="cj2-tb-chip" style={{ background: v.bg, color: v.fg }}>{v.l}</span>;
+        if (id === 'estado') {
+          // Programado: dice para cuándo (texto, no solo color)
+          const pc = paraCuandoDe(p);
+          contenido = (
+            <>
+              <span className="cj2-tb-chip" style={{ background: v.bg, color: v.fg }}>{v.l}</span>
+              {pc?.programado && <span data-testid="tabla-programado" style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>📅 {pc.cuando}</span>}
+            </>
+          );
+        }
         if (id === 'medios') {
           const m = mediosDePedido(p);
           contenido = m.length ? m.map((x) => (

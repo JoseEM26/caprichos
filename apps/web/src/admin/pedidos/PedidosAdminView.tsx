@@ -48,6 +48,8 @@ import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { ContadorDia, enContador, filasDePedidos, resumirDia, type ResumenDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
+import { ProgramadosOtrosDias } from './ProgramadoInfo';
+import { separarProgramadosOtrosDias } from './programado';
 import { TarjetaCuentaCaja } from './TarjetaCuentaCaja';
 import { agruparCuentas } from './agruparCuentas';
 import { VentanaDetalle } from './VentanaDetalle';
@@ -633,11 +635,14 @@ export function PedidosAdminView() {
     [base, filtro, orden],
   );
 
+  // Programados para OTRO día: van al final, en su propio encabezado plegable y por fecha pactada (no cuentan en el día ni se paginan con él)
+  const { normales: pedidosDelDia, otrosDias: programadosOtrosDias } = useMemo(() => separarProgramadosOtrosDias(pedidosFiltrados), [pedidosFiltrados]);
+
   // Tarjetas: cada «cuenta» (original + extras) es UNA tarjeta; un pedido sin extras es una tarjeta como siempre.
   // La paginación y el «N de M» cuentan tarjetas; los contadores y el resumen siguen contando pedidos.
   const cuentas = useMemo(
-    () => agruparCuentas(pedidosFiltrados, [...pedidos, ...relacionados], (p) => String(p.pedido_origen?.id ?? p.id)),
-    [pedidosFiltrados, pedidos, relacionados],
+    () => agruparCuentas(pedidosDelDia, [...pedidos, ...relacionados], (p) => String(p.pedido_origen?.id ?? p.id)),
+    [pedidosDelDia, pedidos, relacionados],
   );
 
   // Atajos: lo que necesita atención no queda escondido
@@ -760,7 +765,7 @@ export function PedidosAdminView() {
 
   // Paginación: en tarjetas cuenta tarjetas (cuentas); en tabla, pedidos. Tamaño: lo elegido o el automático (50 en tabla)
   const enTabla = vista === 'tabla';
-  const unidades: Array<(typeof cuentas)[number] | Pedido> = enLista || enTabla ? pedidosFiltrados : cuentas;
+  const unidades: Array<(typeof cuentas)[number] | Pedido> = enLista || enTabla ? pedidosDelDia : cuentas;
   const porPagina = tamanoPagina(filas, unidades.length, enLista ? 25 : enTabla ? 50 : pedidosPorPagina);
   const totalPaginas = Math.max(1, Math.ceil(unidades.length / porPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
@@ -779,7 +784,7 @@ export function PedidosAdminView() {
     return unidades.slice(inicio, inicio + porPagina);
     // unidades cambia con cuentas/pedidosFiltrados/vista
      
-  }, [cuentas, pedidosFiltrados, enTabla, enLista, paginaValida, porPagina]);
+  }, [cuentas, pedidosDelDia, enTabla, enLista, paginaValida, porPagina]);
   const pedidosPaginados = pagina as typeof cuentas;
   const filasTabla = pagina as Pedido[];
   // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
@@ -1187,7 +1192,7 @@ export function PedidosAdminView() {
 
         {/* TARJETAS / TABLA / LISTA */}
         <div className="cj2-lista" ref={listaRef}>
-          {unidades.length === 0 ? (
+          {unidades.length === 0 && programadosOtrosDias.length === 0 ? (
             <div className="cj2-vacio">
               {pedidos.length > 0 ? (
                 <>
@@ -1215,7 +1220,7 @@ export function PedidosAdminView() {
             ) : enTabla ? (
               <TablaCaja
                 filas={filasTabla}
-                todas={pedidosFiltrados}
+                todas={pedidosDelDia}
                 columnas={columnasTabla}
                 alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
               />
@@ -1275,6 +1280,41 @@ export function PedidosAdminView() {
           avisoTope={avisoTope}
           carga={{ cargados: pedidos.length, totalServidor: totalDia, cargando: cargandoMas, alCargarMas: () => void cargarMas(), error: errorMas, buscando: filtrando }}
         />
+
+        {/* Programados para otros días: al final, plegable, por fecha pactada (no cuentan en el día) */}
+        <ProgramadosOtrosDias n={programadosOtrosDias.length}>
+          {enLista ? (
+            <ListaCaja
+              filas={programadosOtrosDias}
+              accionDe={accionDe}
+              resaltados={pedidosResaltados}
+              alAccion={ejecutarAccion}
+              alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
+              alAbrir={abrirDetalle}
+            />
+          ) : enTabla ? (
+            <TablaCaja filas={programadosOtrosDias} todas={programadosOtrosDias} columnas={columnasTabla} alVerDetalle={(p) => setDetalleVentaId(String(p.id))} />
+          ) : (
+            <div className="pg-otros-grid">
+              {programadosOtrosDias.map((o) => (
+                <TarjetaPedidoCaja
+                  key={o.id}
+                  pedido={o}
+                  seleccionado={pedidoSeleccionadoId === String(o.id)}
+                  resaltado={pedidosResaltados.has(String(o.id))}
+                  cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
+                  cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
+                  puedeCambiarPago={tiene('pedidos/ajustar_pago')}
+                  alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
+                  accion={accionDe(o)}
+                  alAccion={ejecutarAccion}
+                  alVerDetalle={(p) => setDetalleVentaId(String(p.id))}
+                  alComerLocal={() => void cargarDatos()}
+                />
+              ))}
+            </div>
+          )}
+        </ProgramadosOtrosDias>
       </>
     )}
 

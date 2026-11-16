@@ -151,3 +151,25 @@ export function serviciosLibresDelTurno(cobros: CobroConDetalle[], nombres: Map<
   lista.sort((a, b) => (a.agregadoEn?.getTime() ?? 0) - (b.agregadoEn?.getTime() ?? 0));
   return { lista, total: enPesos(lista.reduce((t, x) => t + aCentimos(x.monto), 0)) };
 }
+
+/**
+ * Dinero de pedidos programados que entró a la caja del turno: cada adelanto y cada cobro completo de un pedido con fecha
+ * pactada (programado_para). Solo identifica: el dinero ya está en los cobros y en los montos del cierre.
+ */
+export function programadosDelTurnoDe(
+  cobros: Array<{ pedido_id: bigint; anulado_en: Date | null; pagos: Array<{ medio: string | null; monto?: unknown }>; pedido: { codigo?: string; programado_para?: Date | null } }>,
+  adelantos: Array<{ pedido_id: bigint; medio: string; monto: unknown; pedido?: { codigo?: string; programado_para?: Date | null } | null }>,
+) {
+  const lista: Array<{ pedidoId: string; pedidoCodigo: string | null; programadoPara: Date | null; tipo: 'ADELANTO' | 'COBRO'; medios: string[]; monto: number }> = [];
+  for (const a of adelantos) {
+    lista.push({ pedidoId: String(a.pedido_id), pedidoCodigo: a.pedido?.codigo ?? null, programadoPara: a.pedido?.programado_para ?? null, tipo: 'ADELANTO', medios: [a.medio], monto: enPesos(aCentimos(a.monto)) });
+  }
+  for (const c of cobros) {
+    if (c.anulado_en || !c.pedido?.programado_para) continue;
+    lista.push({
+      pedidoId: String(c.pedido_id), pedidoCodigo: c.pedido.codigo ?? null, programadoPara: c.pedido.programado_para, tipo: 'COBRO',
+      medios: [...new Set(c.pagos.map((p) => String(p.medio ?? '')).filter(Boolean))], monto: enPesos(c.pagos.reduce((t, p) => t + aCentimos(p.monto), 0)),
+    });
+  }
+  return { lista, total: enPesos(lista.reduce((t, x) => t + aCentimos(x.monto), 0)) };
+}

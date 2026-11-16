@@ -74,6 +74,11 @@ Ver tambien: [[caja]]
 3. Un cobro anulado deja de contarse en la seccion.
 Ver tambien: [[caja]]
 
+## Como se hace: Ver el dinero de pedidos programados recibido hoy
+1. En la pestana Turno actual, bajo Servicios y productos libres, la seccion Pedidos programados lista cada adelanto y cada pago completo recibido hoy de un pedido programado, con "de pedido programado para 17/11", el medio y el monto.
+2. Ese dinero ya esta en los cobros y en los montos esperados del dia en que entro; la seccion solo lo identifica. Un programado de otro dia que aun no se cobro no bloquea el cierre ni descuadra.
+Ver tambien: [[caja]]
+
 ## Como se hace: Cuadrar los pagos en linea (Culqi) aparte del Yape y la tarjeta
 1. En el cuadre, las filas digitales dicen "Yape (manual)" y "Tarjeta POS": son solo lo que llego al Yape del local y al POS. Compara esas filas con tu app de Yape y con el POS.
 2. Lo que los clientes pagaron en linea por Culqi va en su propio bloque "Pagos en linea (Culqi)", con filas "Yape por Culqi" y "Tarjeta por Culqi", el total y la lista de operaciones (pedido, medio, monto, hora y numero de operacion). Ese dinero llega a la cuenta de Culqi, no al Yape del local: se verifica en CulqiPanel. No hay nada que escribir ahi: su visto es igual al sistema y nunca suma diferencia.

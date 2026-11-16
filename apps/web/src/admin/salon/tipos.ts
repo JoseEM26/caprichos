@@ -255,6 +255,9 @@ export interface MiPedido {
   pedidoOrigenCodigo?: string | null;
   /** Último cambio de ubicación (ISO): insignia «Dirección editada»; null si la dirección es la original */
   ubicacionEditadaEn?: string | null;
+  /** Pedido programado: fecha y hora pactadas (ISO) y lo adelantado; null/0 si no es programado */
+  programadoPara?: string | null;
+  adelantoTotal?: number;
   /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
   clienteNombre?: string | null;
   total: number;

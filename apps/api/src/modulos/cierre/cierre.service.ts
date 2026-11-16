@@ -48,7 +48,7 @@ import {
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
-import { detallarVentasTurno, idsDePersonas, nombresDeCobros, serviciosLibresDelTurno } from './ventas-turno.util';
+import { detallarVentasTurno, idsDePersonas, nombresDeCobros, programadosDelTurnoDe, serviciosLibresDelTurno } from './ventas-turno.util';
 import { armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, resumirComisionCulqi, type CulqiCierre } from './culqi-cierre.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
@@ -857,6 +857,7 @@ export class CierreService {
           select: {
             codigo: true,
             cliente_nombre: true,
+            programado_para: true,
             // Solo para el detalle de ventas del cierre (no entra en ningún cálculo)
             modalidad: true,
             canal: true,
@@ -884,6 +885,14 @@ export class CierreService {
       nombres = new Map();
     }
 
+    // Dinero de pedidos programados que entró en esta caja: adelantos y cobros completos (solo se identifican; ya están sumados)
+    const adelantosCaja =
+      (await this.prisma.pedidoAdelanto?.findMany({
+        where: { caja_id: caja.id, anulado_en: null },
+        include: { pedido: { select: { codigo: true, programado_para: true } } },
+      })) ?? [];
+    const programadosDelTurno = programadosDelTurnoDe(cobros as any, adelantosCaja as any);
+
     // Vueltos entregados en efectivo (informativo: el monto cobrado ya es neto de vuelto)
     const vueltos = cobros
       .filter((c) => !c.anulado_en)
@@ -901,6 +910,8 @@ export class CierreService {
       ventas: detallarVentasTurno(cobros as any, nombres),
       // «Servicios y productos libres» del turno: lista y total (ya están dentro de los cobros; solo se detallan)
       serviciosLibres: serviciosLibresDelTurno(cobros as any, nombres),
+      // «De pedido programado para …»: adelantos y cobros de pedidos programados recibidos hoy
+      programadosDelTurno,
       movimientos: mapearMovimientosCaja(movimientos),
       apertura: Number(caja.apertura),
       efectivoEsperado: montos.esperadoEfectivo,

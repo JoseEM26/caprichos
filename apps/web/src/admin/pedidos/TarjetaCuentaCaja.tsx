@@ -111,7 +111,7 @@ export function TarjetaCuentaCaja({ cuenta, seleccionadoId, resaltados, puedeCam
             {conMesa && <InsigniaMesa mesaNombre={raiz.mesa_nombre} grande />}
             <NombreCliente pedido={raiz} />
           </span>
-          <PastillaEspera creadoEn={raiz.creado_en} cerrado={esCerrado(raiz)} ahora={ahora} />
+          <PastillaEspera creadoEn={raiz.creado_en} cerrado={esCerrado(raiz) || raiz.estado === 'PROGRAMADO'} ahora={ahora} />
         </span>
         <span className="cj2-mod">
           <span className="cj2-mod-texto" data-modalidad={clave}>

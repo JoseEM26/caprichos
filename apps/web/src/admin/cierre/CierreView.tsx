@@ -23,6 +23,7 @@ import { PedidosSinTerminarCierre } from './PedidosSinTerminarCierre';
 import { VentasTurno } from './VentasTurno';
 import { ServiciosLibresCierre } from './ServiciosLibresCierre';
 import { CuponesCierre } from './CuponesCierre';
+import { ProgramadosCierre } from './ProgramadosCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
@@ -913,6 +914,8 @@ export function CierreView() {
 
               {/* Cupones dados y canjeados en el turno, por persona (informativo: no cambia el esperado) */}
               {esperado && <CuponesCierre datos={esperado.cupones} />}
+              {/* Pedidos programados: adelantos y pagos recibidos hoy (ya están dentro de los cobros) */}
+              {esperado && <ProgramadosCierre datos={esperado.programadosDelTurno} />}
 
               {/* Movimientos de caja */}
               <div

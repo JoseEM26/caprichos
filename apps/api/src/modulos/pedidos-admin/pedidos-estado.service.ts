@@ -405,12 +405,11 @@ export class PedidosEstadoService {
     );
 
     const mapear = (p: (typeof todos)[number]) => {
-      const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
-        p.creado_en,
-        ahora,
-        umbrales.naranjaMin,
-        umbrales.rojoMin,
-      );
+      // Un programado aún no empezó a esperar (su reloj corre desde que pasa a cocina): sin alerta de tardanza
+      const { minutosEspera, color, colorEspera } =
+        p.estado === 'PROGRAMADO'
+          ? { minutosEspera: 0, color: 'verde' as ColorEspera, colorEspera: 'verde' as ColorEspera }
+          : this.calcularMinutosYColor(p.creado_en, ahora, umbrales.naranjaMin, umbrales.rojoMin);
 
       const cobro = p.cobros?.[0];
       const cobroVigenteId = cobro?.id ? String(cobro.id) : null;
@@ -627,6 +626,9 @@ export class PedidosEstadoService {
         pasa_cocina_en: true,
         entregado_mesa_en: true,
         ubicacion_editada_en: true,
+        // Pedido programado: para cuándo y lo adelantado (la tarjeta del mozo lo dice)
+        programado_para: true,
+        adelanto_total: true,
         // «Pedido extra»: enlace al original (todos los extras cuelgan del pedido raíz); la web une la cuenta en una tarjeta
         pedido_origen_id: true,
         pedidoOrigen: { select: { codigo: true } },
@@ -732,6 +734,8 @@ export class PedidosEstadoService {
         pedidoOrigenCodigo: p.pedidoOrigen?.codigo ?? null,
         // Último cambio de ubicación (la insignia «Dirección editada»); null si la dirección es la original
         ubicacionEditadaEn: p.ubicacion_editada_en ?? null,
+        programadoPara: p.programado_para ?? null,
+        adelantoTotal: Number(p.adelanto_total ?? 0),
         // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.
         clienteNombre: p.cliente_nombre?.trim() || (p.modalidad === 'MESA' ? p.mesa_nombre : null) || null,
         total: Number(p.total),

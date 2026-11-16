@@ -81,3 +81,7 @@
   .lc-acciones .lc-btn:not(.lc-btn--ico) { flex: 1 1 0; min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .lc-fila, .lc-btn { transition: none; animation: none; } }
+
+/* Pedido programado y encargo: fila completa bajo los datos */
+.lc-programado { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.lc-programado > * { flex: 1 1 260px; }

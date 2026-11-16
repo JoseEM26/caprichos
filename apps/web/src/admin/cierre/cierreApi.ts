@@ -123,6 +123,12 @@ export interface ServiciosLibresTurno {
   total: number;
 }
 
+/** Dinero de pedidos programados recibido en el turno (adelantos y pagos completos); ya está dentro de los montos, solo se identifica. */
+export interface ProgramadosTurno {
+  lista: Array<{ pedidoId: string; pedidoCodigo: string | null; programadoPara: string | null; tipo: 'ADELANTO' | 'COBRO'; medios: string[]; monto: number }>;
+  total: number;
+}
+
 /** Pagos en línea (Culqi) del turno: llegan a la cuenta de Culqi, no al Yape ni al POS del local. */
 export interface OperacionCulqi {
   pedidoId: string;
@@ -178,6 +184,8 @@ export interface MontosEsperados {
   serviciosLibres?: ServiciosLibresTurno;
   /** Cupones del turno por persona (informativo); puede faltar en servidores viejos */
   cupones?: CuponesTurno | null;
+  /** Adelantos y cobros de pedidos programados recibidos hoy; puede faltar en servidores viejos */
+  programadosDelTurno?: ProgramadosTurno;
   movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;

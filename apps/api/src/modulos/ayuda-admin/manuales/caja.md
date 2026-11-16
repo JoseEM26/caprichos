@@ -161,6 +161,14 @@ Es una linea extra con una descripcion y un monto que escribes tu, para lo que n
 6. Suma puntos como cualquier venta. Todo queda auditado: quien, cuando, el pedido, la descripcion y el monto.
 Ver tambien: [[cierre]] [[mis-pedidos]]
 
+## Como se hace: Leer un pedido programado o un encargo (para cuando es)
+Un pedido programado es el que el cliente quiere para otro dia u otra hora (por ejemplo una torta). No entra a cocina hasta su hora de aviso.
+1. En la tarjeta, la fila de la lista y la tabla ves la franja "PROGRAMADO · para manana 17/11 · 5:00 p. m." con el icono de calendario, mas "faltan 1 d 7 h". Si es para hoy y falta menos de 2 horas se pone ambar con reloj; si ya paso la hora se pone roja con "vencido hace ...".
+2. Abajo de la franja dice el pago: "Pagado completo S/ 29.00" o "Adelanto S/ 10.00 · Saldo S/ 19.00". Un servicio o producto libre (la torta con su texto, por ejemplo) sale en su propio bloque "SERVICIO / ENCARGO" con la descripcion completa, aparte de los productos de la carta.
+3. Pulsa Ver detalle: arriba esta el bloque grande PARA CUANDO (fecha larga, hora, cuenta regresiva, modalidad, cliente y pago) con el boton Reprogramar mientras siga programado; y el bloque Servicio / encargo con el texto en letra grande (puedes seleccionarlo y copiarlo), el monto y quien lo agrego.
+4. Orden: los programados para hoy van en su lugar normal. Los de otros dias van al final, bajo "Programados para otros dias (N)" (plegable, por fecha pactada). No cuentan como pedidos activos ni por cobrar del dia, no frenan el cierre de caja y no corren tiempo de espera. Si estan pagados (o tienen adelanto), ese dinero ya entro a la caja del dia en que se cobro.
+Ver tambien: [[cierre]] [[mis-pedidos]]
+
 ## Como se hace: Dar una cortesia (producto a costo S/ 0)
 Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (SUNAT y PDF) ni da puntos, y no cuenta como merma. Descuenta stock como una venta y queda registrada con su motivo y su valor de lista.
 1. Dentro de un pedido que aun no esta cobrado ni tiene descuento: abre el pedido, en la linea del producto pulsa Dar como cortesia. Tambien se puede al armar el pedido en el local (+ Pedido en mesa), en la linea del pedido.

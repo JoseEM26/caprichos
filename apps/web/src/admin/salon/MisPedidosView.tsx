@@ -1,3 +1,4 @@
+import { ChipProgramado } from '../pedidos/ProgramadoInfo';
 import type { CargoLibreDatos } from '../pedidos/ModalCargoLibre';
 import { useSesion } from '../../comun/sesion';
 import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
@@ -381,6 +382,10 @@ export function MisPedidosView() {
                     <strong className="mp-total">{soles(p.total)}</strong>
                   </span>
                 </div>}
+
+                {p.programadoPara && (
+                  <ChipProgramado pedido={{ estado: p.estado, programado_para: p.programadoPara, total: p.total, pago_estado: p.pagoEstado, adelanto_total: p.adelantoTotal }} />
+                )}
 
                 {/* Lista del pedido siempre visible: cantidad, producto, detalle, nota y subtotal */}
                 <ul className="mp-items" id={idItems} aria-label={`Productos del pedido ${p.codigo}`}>

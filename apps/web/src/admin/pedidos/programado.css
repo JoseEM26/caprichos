@@ -1,0 +1,43 @@
+/* Pedido programado: franja de la tarjeta, bloque «Servicio / encargo» y bloques del detalle. Texto + color + icono; sin scroll horizontal. */
+.pg-franja {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; text-align: left;
+  padding: 8px 10px; border-radius: 10px; border: 1.5px solid #7C8EA3; background: #E6EEF5; color: #0B2C3E;
+  font-size: 14px; line-height: 1.3; overflow-wrap: anywhere;
+}
+.pg-franja[data-nivel='cerca'] { background: #FFE9B8; border-color: #D99E39; color: #4A3500; }
+.pg-franja[data-nivel='vencido'] { background: #FBE9DF; border-color: #B2500F; color: #7A3300; }
+.pg-linea { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; font-weight: 700; }
+.pg-faltan { font-weight: 800; }
+.pg-pago { font-weight: 700; }
+
+.pg-encargos { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.pg-encargo { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #FFF4D6; border: 1.5px solid #E8B923; color: #3F2F00; }
+.pg-encargo-rotulo { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; }
+.pg-encargo-texto { font-size: 15px; font-weight: 700; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; user-select: text; }
+
+.pg-cuando, .pg-servicio { border-radius: 14px; padding: 14px; margin-bottom: 12px; box-sizing: border-box; overflow-wrap: anywhere; }
+.pg-cuando { background: #E6EEF5; border: 2px solid #7C8EA3; color: #0B2C3E; }
+.pg-cuando[data-nivel='cerca'] { background: #FFE9B8; border-color: #D99E39; }
+.pg-cuando[data-nivel='vencido'] { background: #FBE9DF; border-color: #B2500F; }
+.pg-cuando-rotulo, .pg-servicio-rotulo { margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: 0.06em; }
+.pg-cuando-fecha { margin: 0; font-size: 22px; font-weight: 800; text-transform: capitalize; }
+.pg-cuando-hora { margin: 0; font-size: 28px; font-weight: 800; }
+.pg-cuando-faltan { margin: 4px 0 8px; font-size: 16px; font-weight: 800; }
+.pg-cuando-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin: 8px 0 0; }
+.pg-cuando-datos dt { font-size: 12px; font-weight: 700; opacity: 0.8; }
+.pg-cuando-datos dd { margin: 0; font-size: 15px; font-weight: 700; }
+.pg-reprog { margin-top: 10px; }
+.pg-reprog-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.pg-reprog-form label { display: flex; flex-direction: column; font-size: 13px; font-weight: 700; gap: 2px; }
+.pg-error { margin: 0; flex-basis: 100%; color: #B2500F; font-weight: 700; }
+
+.pg-servicio { background: #FFF4D6; border: 2px solid #E8B923; color: #3F2F00; }
+.pg-servicio-item + .pg-servicio-item { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #E8B923; }
+.pg-servicio-texto { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.35; white-space: pre-wrap; user-select: text; }
+.pg-servicio-meta { margin: 4px 0 0; font-size: 14px; }
+
+/* Programados para otros días: encabezado plegable al final de la lista */
+.pg-otros { margin: 16px 0; border: 1.5px solid #7C8EA3; border-radius: 14px; background: #F4F7FA; overflow: hidden; }
+.pg-otros-cab { display: flex; width: 100%; align-items: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 0; background: transparent; font: inherit; font-weight: 800; color: #0B2C3E; text-align: left; cursor: pointer; }
+.pg-otros-cuerpo { padding: 8px; }
+.pg-otros-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 10px; }

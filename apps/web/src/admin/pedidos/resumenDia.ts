@@ -32,10 +32,12 @@ export type ContadorDia = 'entregados' | 'anulados' | 'rechazados' | 'porcobrar'
 
 const mayus = (v: unknown) => String(v || '').toUpperCase();
 const sinValor = (e: string) => e === 'ANULADO' || e === 'RECHAZADO';
+// Un PROGRAMADO (para otro día) aún no es venta ni cobro pendiente del día: como el cierre del servidor, no cuenta como activo ni por cobrar
+const programado = (e: string) => e === 'PROGRAMADO';
 
-/** Por cobrar: pedido que sigue vivo (no anulado ni rechazado) y aún no está pagado. */
+/** Por cobrar: pedido que sigue vivo (no anulado, rechazado ni programado para otro día) y aún no está pagado. */
 export const esPorCobrar = (p: Pick<Pedido, 'estado' | 'pago_estado'>) =>
-  !sinValor(mayus(p.estado)) && mayus(p.pago_estado) !== 'PAGADO';
+  !sinValor(mayus(p.estado)) && !programado(mayus(p.estado)) && mayus(p.pago_estado) !== 'PAGADO';
 
 const ESTADO_DE: Record<Exclude<ContadorDia, 'porcobrar'>, string> = {
   entregados: 'ENTREGADO',
@@ -58,10 +60,13 @@ export function resumirDia(filas: FilaResumen[]): ResumenDia {
     if (e === 'ENTREGADO') r.entregados += f.n;
     else if (e === 'ANULADO') r.anulados += f.n;
     else if (e === 'RECHAZADO') r.rechazados += f.n;
-    else r.activos += f.n;
+    else if (!programado(e)) r.activos += f.n;
     if (!sinValor(e)) {
+      const pagado = mayus(f.pago_estado) === 'PAGADO';
+      // Programado sin pagar: ni venta del día ni por cobrar. Pagado hoy: el dinero sí entró hoy.
+      if (programado(e) && !pagado) continue;
       r.ventas += f.total;
-      if (mayus(f.pago_estado) !== 'PAGADO') { r.porCobrar += f.n; r.montoPorCobrar += f.total; }
+      if (!pagado) { r.porCobrar += f.n; r.montoPorCobrar += f.total; }
       else r.cobrado += f.total;
     }
   }

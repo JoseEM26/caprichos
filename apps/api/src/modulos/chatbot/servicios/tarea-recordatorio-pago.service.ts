@@ -121,7 +121,7 @@ export class TareaRecordatorioPagoService {
         where: {
           pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
           pago_estado: 'PENDIENTE',
-          estado: { notIn: ['ANULADO', 'ENTREGADO'] },
+          estado: { notIn: ['ANULADO', 'ENTREGADO', 'PROGRAMADO'] },
           ...pedidoVivoDeHoy(ahora),
         },
         select: {
