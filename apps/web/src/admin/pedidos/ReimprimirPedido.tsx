@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { impresionApi, type DestinoReimpresion, type PeticionReimpresionPedido, type ResultadoReimpresionPedido } from '../impresion/impresionApi';
-import { SelectorEtiquetas, type ItemElegible } from './SelectorEtiquetas';
+import { SelectorEtiquetas, clavesRepetidas, type ItemElegible } from './SelectorEtiquetas';
 import { Papel, VistaPreviaReimpresion } from './VistaPreviaReimpresion';
 import type { Pedido } from './pedidosApi';
 
@@ -45,7 +45,9 @@ const elegibles = (v: ResultadoReimpresionPedido): ItemElegible[] => {
       const k = mismos.indexOf(p) + 1;
       texto = ['Vaso ' + p.payload.bebidaIndex, p.payload.bebidaNombre + (mismos.length > 1 ? ` ${k} de ${mismos.length}` : ''), p.payload.persona].filter(Boolean).join(' · ');
     }
-    return { clave: p.clave as string, texto, grupo: GRUPO_PAPEL(p.tipo), vista: p.payload ? <Papel p={p} /> : undefined };
+    const b = p.tipo === 'ETIQUETA_BEBIDA' ? p.payload : null;
+    const rotulo = b ? [b.bebidaNombre, b.tamano ? `(${b.tamano})` : null, b.opciones?.length ? `+ ${b.opciones.join(', ')}` : null].filter(Boolean).join(' ') : undefined;
+    return { clave: p.clave as string, texto, grupo: GRUPO_PAPEL(p.tipo), identidad: rotulo, rotulo, vista: p.payload ? <Papel p={p} /> : undefined };
   });
   return items.sort((a, b) => ORDEN_GRUPO.indexOf(a.grupo) - ORDEN_GRUPO.indexOf(b.grupo));
 };
@@ -122,7 +124,7 @@ export function ReimprimirPedido({ pedido, variante, alTerminar, rotulo }: Reimp
       if (vista.cantidad === 0) setAviso({ tono: 'mal', resultado: vista });
       else {
         setVerPrevia(false);
-        setElegidas([]);
+        setElegidas(clavesRepetidas(elegibles(vista)));
         setPendiente({ opcion, vista });
       }
     } catch (e) {

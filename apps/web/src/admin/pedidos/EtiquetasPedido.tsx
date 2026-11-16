@@ -5,7 +5,7 @@ import {
   armarTicketPago,
 } from './etiquetasPedido';
 import { Confirmar } from '../../comun/Confirmar';
-import { SelectorEtiquetas } from './SelectorEtiquetas';
+import { SelectorEtiquetas, clavesRepetidas, type ItemElegible } from './SelectorEtiquetas';
 import { EtiquetaGeneral, EtiquetaArea, EtiquetaBebida, TicketPagoPrevia } from './EtiquetaPrevia';
 import { impresionApi, EtiquetaEstado, EstadoEtiquetasPedido, EstadoEtiqueta } from '../impresion/impresionApi';
 
@@ -103,8 +103,13 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
     if (a.tipo === 'todas') return etiquetas.filter((e) => e.tipo !== 'TICKET_PAGO');
     return etiquetas.filter((e) => e.clave.startsWith(PREFIJO_GRUPO[a.grupo]));
   };
+  const itemElegible = (e: EtiquetaEstado): ItemElegible => {
+    const b = resumen.bebidas.find((x) => `BEBIDA:${x.bebidaIndex}` === e.clave);
+    const rotulo = b ? [b.bebidaNombre, b.tamano ? `(${b.tamano})` : null, b.opciones?.length ? `+ ${b.opciones.join(', ')}` : null].filter(Boolean).join(' ') : undefined;
+    return { clave: e.clave, texto: etiquetaLista(e), enCola: e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO', grupo: e.clave.startsWith('AREA:') ? 'Stickers de área' : e.clave.startsWith('BEBIDA:') ? 'Stickers de bebida' : 'Sticker general', identidad: rotulo, rotulo, vista: vistaDe(e) };
+  };
   const abrirAccion = (a: Accion) => {
-    setElegidas([]);
+    setElegidas(clavesRepetidas(candidatas(a).map(itemElegible)));
     setAccion(a);
   };
   const vistaDe = (e: EtiquetaEstado): React.ReactNode => {
@@ -459,7 +464,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         >
           {eligiendo && (
             <SelectorEtiquetas
-              items={lista.map((e) => ({ clave: e.clave, texto: etiquetaLista(e), enCola: e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO', grupo: e.clave.startsWith('AREA:') ? 'Stickers de área' : e.clave.startsWith('BEBIDA:') ? 'Stickers de bebida' : 'Sticker general', vista: vistaDe(e) }))}
+              items={lista.map(itemElegible)}
               elegidas={elegidas}
               alCambiar={setElegidas}
             />
