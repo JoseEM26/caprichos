@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { jornadaActual } from '../jornada';
 
@@ -221,15 +222,14 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
       consumos: [], ajustes: [],
     });
     simples.mockResolvedValue({ total: 2, ok: 1, fallidas: 1, omitidas: 1, resultados: [{ tipo: 'MARCA', id: 5, ok: true }, { tipo: 'MARCA', id: 6, ok: false, codigo: 'PERIODO_PAGADO', mensaje: 'Período ya pagado' }] });
-    render(<PlanillaTab onError={() => undefined} onOk={() => undefined} />);
+    render(<MemoryRouter><PlanillaTab onError={() => undefined} onOk={() => undefined} /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: /Abrir la planilla de Luis/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Asistencia/ }));
     const banner = await screen.findByTestId('banner-por-revisar');
     expect(banner).toHaveTextContent('2 jornadas por revisar');
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // bloqueado: dice qué falta
-    expect(screen.getByText(/Falta resolver 2 jornadas por revisar o sin evaluar/)).toBeInTheDocument();
-    expect(screen.getByText('Paso 1 de 4 · Asistencia')).toBeInTheDocument();
 
-    fireEvent.click(within(banner).getByRole('button', { name: '2026-11-05' })); // enlace al día
+    fireEvent.click(within(banner).getByRole('button', { name: '2026-11-05' })); // enlace al día: abre su panel lateral
+    expect(await screen.findByRole('complementary', { name: 'Detalle del día 2026-11-05' })).toBeInTheDocument();
     const fila = (await screen.findByText('2026-11-05', { selector: 'td' })).closest('tr')!;
     expect(fila).toHaveTextContent('09:00 Entrada');
     expect(within(fila).getByText(/09:01 Entrada/)).toHaveStyle({ textDecoration: 'line-through' });

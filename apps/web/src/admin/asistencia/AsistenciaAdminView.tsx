@@ -66,6 +66,8 @@ export function AsistenciaAdminView() {
   }, [deUrl]);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // «Reintentar» del aviso de error: vuelve a montar la pestaña activa, que pide sus datos otra vez
+  const [intento, setIntento] = useState(0);
   const [cfg, setCfg] = useState<ConfigAsistenciaAdmin | null>(null);
   useEffect(() => {
     obtenerConfigAsistencia().then(setCfg).catch((e) => setError(mensajeDe(e, 'No pudimos cargar la configuración.')));
@@ -76,7 +78,12 @@ export function AsistenciaAdminView() {
   useEffect(() => { contar(); }, [contar, pestana]);
   const cambiar = (k: Pestana) => {
     setPestana(k);
-    setParams((prev) => { const n = new URLSearchParams(prev); n.set('pestana', k); return n; }, { replace: true });
+    setParams((prev) => {
+      // cada pestaña arranca limpia: se quitan la persona, el período y los filtros de la planilla de la URL
+      const n = new URLSearchParams(k === 'planilla' && prev.get('pestana') === 'planilla' ? prev : undefined);
+      n.set('pestana', k);
+      return n;
+    }, { replace: true });
     setMensaje(null);
     setError(null);
   };
@@ -107,11 +114,16 @@ export function AsistenciaAdminView() {
         </div>
       )}
       {mensaje && <div role="status" className="as-aviso as-aviso--ok">{mensaje}</div>}
-      {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
-      {pestana === 'hoy' && <HoyTab onError={setError} onOk={setMensaje} />}
-      {pestana === 'calendario' && <CalendarioTab onError={setError} onOk={setMensaje} alCambiar={contar} />}
-      {pestana === 'planilla' && <PlanillaTab onError={setError} onOk={setMensaje} />}
-      {pestana === 'config' && <ConfiguracionAsistenciaTab onError={setError} onOk={setMensaje} alGuardar={setCfg} />}
+      {error && (
+        <div role="alert" className="as-aviso as-aviso--error as-aviso--accion">
+          <span>{error}</span>
+          <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => { setError(null); setIntento((n) => n + 1); }}>Reintentar</Boton>
+        </div>
+      )}
+      {pestana === 'hoy' && <HoyTab key={intento} onError={setError} onOk={setMensaje} />}
+      {pestana === 'calendario' && <CalendarioTab key={intento} onError={setError} onOk={setMensaje} alCambiar={contar} />}
+      {pestana === 'planilla' && <PlanillaTab key={intento} onError={setError} onOk={setMensaje} />}
+      {pestana === 'config' && <ConfiguracionAsistenciaTab key={intento} onError={setError} onOk={setMensaje} alGuardar={setCfg} />}
     </div>
   );
 }
