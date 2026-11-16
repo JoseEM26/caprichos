@@ -127,6 +127,10 @@ export const CLAVES_NUMERICAS = [
   'aprendizaje_usd_por_millon_salida',
   // Pago en línea (Culqi)
   'pago_online_espera_min',
+  'culqi_comision_tarjeta_pct',
+  'culqi_comision_tarjeta_fijo',
+  'culqi_comision_yape_pct',
+  'culqi_comision_yape_fijo',
   // WhatsApp por Evolution (límites anti-bloqueo)
   'evolution_limite_minuto',
   'evolution_limite_hora',
@@ -184,6 +188,10 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   aprendizaje_usd_por_millon_entrada: [0, 1000, false, 'El precio debe estar entre 0 y 1000 USD por millón'],
   aprendizaje_usd_por_millon_salida: [0, 1000, false, 'El precio debe estar entre 0 y 1000 USD por millón'],
   pago_online_espera_min: [5, 120, true, 'La espera del pago en línea debe ser un entero entre 5 y 120 minutos'],
+  culqi_comision_tarjeta_pct: [0, 20, false, 'El porcentaje debe estar entre 0 y 20'],
+  culqi_comision_tarjeta_fijo: [0, 10, false, 'El monto fijo debe estar entre 0 y 10 soles'],
+  culqi_comision_yape_pct: [0, 20, false, 'El porcentaje debe estar entre 0 y 20'],
+  culqi_comision_yape_fijo: [0, 10, false, 'El monto fijo debe estar entre 0 y 10 soles'],
   evolution_limite_minuto: [0, 600, true, 'El límite por minuto debe ser un entero entre 0 y 600 (0 = sin tope)'],
   evolution_limite_hora: [0, 10000, true, 'El límite por hora debe ser un entero entre 0 y 10000 (0 = sin tope)'],
   evolution_limite_dia: [0, 100000, true, 'El límite por día debe ser un entero entre 0 y 100000 (0 = sin tope)'],

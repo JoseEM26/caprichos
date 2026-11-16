@@ -21,6 +21,7 @@ export interface FuentesTicketCierre {
   ajustes: Array<{ medio: string; montoAnterior: number; montoNuevo: number; motivo: string; porNombre: string | null; creadoEn: Date | string }>;
   liquidaciones: Array<{ repartidor_party_id: bigint | number; esperado: unknown; entregado: unknown; en: Date | string }>;
   cobrosAnulados: Array<{ pedido: { codigo: string }; total: unknown; anulado_en: Date | string | null; anulado_por: bigint | number | null }>;
+  comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number } | null;
   nombre: (id: bigint | number | null | undefined) => string | null;
 }
 
@@ -64,6 +65,7 @@ export function armarTicketCierre(f: FuentesTicketCierre): TicketCierreDatos {
     movimientos: f.movimientos.map((m) => ({ tipo: m.tipo, monto: num(m.monto), motivo: m.motivo, anulado: m.anulado_en != null })),
     correcciones: f.ajustes.map((a) => ({ medio: a.medio, anterior: a.montoAnterior, nuevo: a.montoNuevo, motivo: a.motivo, por: a.porNombre, hora: hora(a.creadoEn) })),
     liquidaciones: f.liquidaciones.map((l) => ({ repartidor: f.nombre(l.repartidor_party_id) ?? `Repartidor #${l.repartidor_party_id}`, esperado: num(l.esperado), entregado: num(l.entregado), hora: hora(l.en) })),
+    ...(f.comisionCulqi ? { comisionCulqi: { pagos: f.comisionCulqi.pagos, porConfirmar: f.comisionCulqi.porConfirmar, total: f.comisionCulqi.total, neto: f.comisionCulqi.neto } } : {}),
     anulaciones: f.cobrosAnulados.map((c) => ({ pedido: c.pedido.codigo, total: num(c.total), hora: hora(c.anulado_en), por: f.nombre(c.anulado_por) })),
   };
 }

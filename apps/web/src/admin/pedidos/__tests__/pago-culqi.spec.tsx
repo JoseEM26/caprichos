@@ -37,6 +37,17 @@ describe('Recuadro «Pagado en línea por Culqi»', () => {
     expect(enlace.target).toBe('_blank');
   });
 
+  it('muestra «Comisión Culqi: S/ X (la asume el local) · Neto: S/ Y» y «por confirmar» sin dato; sin el campo (sin permiso) no aparece', () => {
+    const { unmount } = render(<RecuadroPagoCulqi pago={pago({ comision: 1.15, neto: 23.85, comisionFuente: 'CULQI' })} />);
+    expect(screen.getByTestId('comision-culqi').textContent).toContain('S/ 1.15 (la asume el local) · Neto: S/ 23.85');
+    unmount();
+    const r2 = render(<RecuadroPagoCulqi pago={pago({ comision: null })} />);
+    expect(screen.getByTestId('comision-culqi').textContent).toContain('Por confirmar');
+    r2.unmount();
+    render(<RecuadroPagoCulqi pago={pago()} />);
+    expect(screen.queryByTestId('comision-culqi')).toBeNull();
+  });
+
   it('tarjeta devuelta en parte: «Visa ···1111» y «Devuelto parcial»', () => {
     render(<RecuadroPagoCulqi pago={pago({ medio: 'TARJETA', marca: 'Visa', ultimos4: '1111', devuelto: 10, estado: 'DEVUELTO_PARCIAL' })} />);
     expect(screen.getByText('Visa ···1111')).toBeTruthy();

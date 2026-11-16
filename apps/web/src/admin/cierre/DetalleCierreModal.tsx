@@ -7,7 +7,7 @@ import { PapelTermico } from '../impresion/facil/PanelVistaPrevia';
 import { cierreApi, DetalleCierreCompleto } from './cierreApi';
 import { ListaCorrecciones } from './CorreccionesMedios';
 import { PorQueNoCuadra } from './PorQueNoCuadra';
-import { OperacionesCulqi } from './BloqueCulqi';
+import { ComisionPasarela, OperacionesCulqi } from './BloqueCulqi';
 import { rotuloMedioCierre } from './cuadre.util';
 import './detalle-cierre.css';
 
@@ -118,6 +118,7 @@ function SeccionMedios({ t, detalle }: { t: TicketCierreDatos; detalle: DetalleC
         <h4>Pagos en línea (Culqi)</h4>
         <p className="dc-aviso">Se verifica en CulqiPanel, no en el Yape del local.</p>
         <OperacionesCulqi operaciones={ops} />
+        {detalle.culqi?.comision && <ComisionPasarela comision={detalle.culqi.comision} />}
       </section>
     )}
     </>

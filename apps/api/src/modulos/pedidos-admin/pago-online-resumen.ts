@@ -12,12 +12,16 @@ export interface PagoOnlineResumen {
   devuelto: number;
   estado: 'APROBADO' | 'DEVUELTO_PARCIAL' | 'DEVUELTO';
   modo: string;
+  /** Comisión de la pasarela con IGV (la asume el local). Solo en el panel con permiso de caja; null = por confirmar. */
+  comision?: number | null;
+  neto?: number | null;
+  comisionFuente?: 'CULQI' | 'ESTIMADA' | null;
 }
 
-type Db = { pagoOnlineIntento?: { findMany: (args: any) => Promise<any[]> } };
+type Db = { pagoOnlineIntento?: { findMany: (args: any) => Promise<any[]> }; cobroPago?: { findMany: (args: any) => Promise<any[]> } };
 
 /** Último pago en línea aprobado (o ya devuelto) de cada pedido; los pedidos sin pago Culqi no aparecen. */
-export async function pagosOnlineDe(db: Db, pedidoIds: bigint[]): Promise<Map<string, PagoOnlineResumen>> {
+export async function pagosOnlineDe(db: Db, pedidoIds: bigint[], conComision = true): Promise<Map<string, PagoOnlineResumen>> {
   const out = new Map<string, PagoOnlineResumen>();
   if (!db.pagoOnlineIntento || pedidoIds.length === 0) return out;
   const filas = await db.pagoOnlineIntento
@@ -26,7 +30,13 @@ export async function pagosOnlineDe(db: Db, pedidoIds: bigint[]): Promise<Map<st
       orderBy: { id: 'asc' },
     })
     .catch(() => [] as any[]);
+  // Comisión de la pasarela: del cobro_pago CULQI de cada pedido (nunca llega al cliente ni a roles sin caja)
+  const pagos = conComision && db.cobroPago && filas.length
+    ? await db.cobroPago.findMany({ where: { origen: 'CULQI', cobro: { pedido_id: { in: filas.map((f) => f.pedido_id) } } }, select: { comision_pasarela: true, comision_detalle: true, cobro: { select: { pedido_id: true } } } }).catch(() => [] as any[])
+    : [];
+  const comision = new Map<string, any>(pagos.map((p: any) => [String(p.cobro.pedido_id), p]));
   for (const f of filas) {
+    const cp = comision.get(String(f.pedido_id));
     const devuelto = f.devuelto_centimos ?? 0;
     out.set(String(f.pedido_id), {
       medio: f.medio ?? null,
@@ -38,6 +48,7 @@ export async function pagosOnlineDe(db: Db, pedidoIds: bigint[]): Promise<Map<st
       devuelto: enPesos(devuelto),
       estado: devuelto <= 0 ? 'APROBADO' : devuelto >= f.monto_centimos ? 'DEVUELTO' : 'DEVUELTO_PARCIAL',
       modo: f.modo,
+      ...(conComision ? { comision: cp?.comision_pasarela == null ? null : Number(cp.comision_pasarela), neto: cp?.comision_detalle?.neto_depositado ?? null, comisionFuente: cp?.comision_detalle?.fuente ?? null } : {}),
     });
   }
   return out;

@@ -19,6 +19,8 @@ export interface PedirCargo {
   autenticacion3ds?: Record<string, unknown>;
 }
 
+import type { ComisionCobro } from './comision-pasarela';
+
 /** Cargo tal como lo informa la API de Culqi (GET /charges/{id}); lo único que el webhook toma como verdad. */
 export interface CargoConsultado {
   cargoId: string;
@@ -27,6 +29,8 @@ export interface CargoConsultado {
   moneda: string;
   metadata: Record<string, unknown>;
   devueltoCentimos: number;
+  /** Comisión real que informa Culqi (null si no la manda) */
+  comision?: ComisionCobro | null;
 }
 
 export interface CargoHecho {
@@ -38,6 +42,7 @@ export interface CargoHecho {
   codigo?: string;
   /** Texto para el cliente, en español simple */
   mensaje: string;
+  comision?: ComisionCobro | null;
 }
 
 export interface PedirDevolucion {

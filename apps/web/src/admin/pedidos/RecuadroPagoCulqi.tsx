@@ -62,6 +62,16 @@ export function RecuadroPagoCulqi({ pago }: { pago: PagoOnlineResumen }) {
           <strong>{horaLima(pago.aprobadoEn)}</strong>
         </div>
       )}
+      {pago.comision !== undefined && (
+        <div className="dp-fila" data-testid="comision-culqi">
+          <span>Comisión Culqi</span>
+          <strong>
+            {pago.comision === null
+              ? 'Por confirmar (la asume el local)'
+              : `S/ ${pago.comision.toFixed(2)} (la asume el local)${pago.comisionFuente === 'ESTIMADA' ? ' · estimada' : ''}${pago.neto != null ? ` · Neto: S/ ${pago.neto.toFixed(2)}` : ''}`}
+          </strong>
+        </div>
+      )}
       <div className="dp-fila">
         <span>Estado</span>
         <strong style={{ color: colorEstado }} data-testid="estado-culqi">

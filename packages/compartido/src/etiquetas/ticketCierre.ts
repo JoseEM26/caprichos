@@ -49,6 +49,8 @@ export interface TicketCierreDatos {
   movimientos: { tipo: string; monto: number; motivo: string; anulado: boolean }[];
   correcciones: { medio: string; anterior: number; nuevo: number; motivo: string; por: string | null; hora: string }[];
   liquidaciones: { repartidor: string; esperado: number; entregado: number; hora: string }[];
+  /** Comisión de la pasarela del turno (la asume el local): solo informativa, no afecta el cuadre */
+  comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number };
   anulaciones: { pedido: string; total: number; hora: string; por: string | null }[];
 }
 
@@ -122,6 +124,12 @@ export function lineasTicketCierre(t: TicketCierreDatos, columnas: number = 48):
   for (const m of t.medios) {
     p(m.medio.replace('_CULQI', ' POR CULQI')); // pagos en línea aparte del Yape/POS del local
     p(fila(`  ${soles(m.sistema)} / ${soles(m.visto)}`, conSigno(m.diferencia), c));
+  }
+  if (t.comisionCulqi) {
+    p('COMISION CULQI (la asume el local)');
+    p(fila(`  ${t.comisionCulqi.pagos} pagos`, soles(t.comisionCulqi.total), c));
+    p(`  Neto Culqi ${soles(t.comisionCulqi.neto)}`);
+    if (t.comisionCulqi.porConfirmar > 0) p(`  ${t.comisionCulqi.porConfirmar} por confirmar`);
   }
   if (t.movimientos.length) {
     p(raya);

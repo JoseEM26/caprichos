@@ -38,6 +38,23 @@ describe('Pagos en línea (admin)', () => {
     expect(screen.getByText('Devuelto por fuera')).toBeTruthy();
   });
 
+  it('columnas Comisión y Neto por pago y totales (la asume el local)', async () => {
+    comoRol('ADMIN');
+    vi.spyOn(culqiApi, 'listar').mockResolvedValue({
+      items: [{ ...pago, comision: 1.15, neto: 23.85 }, { ...pago, id: 'g2', pedidoCodigo: 'A2', comision: null, neto: null }],
+      total: 2, totalAprobado: 50, totalDevuelto: 0, totalComision: 1.15, totalNeto: 48.85, comisionPorConfirmar: 1,
+    });
+    render(<PagosOnlineTab />);
+    await screen.findByText('#A1');
+    expect(screen.getAllByTestId('comision-fila').map((e) => e.textContent)).toEqual(['S/ 1.15', 'Por confirmar']);
+    expect(screen.getByText('S/ 23.85')).toBeTruthy();
+    const t = screen.getByTestId('total-comision-pagos-online').textContent!;
+    expect(t).toMatch(/la asume el local/);
+    expect(t).toMatch(/S\/ 1\.15/);
+    expect(t).toMatch(/S\/ 48\.85/);
+    expect(t).toMatch(/1 por confirmar/);
+  });
+
   it('otros roles no ven Devolver', async () => {
     comoRol('SUPERVISOR');
     render(<PagosOnlineTab />);

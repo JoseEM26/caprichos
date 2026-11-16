@@ -122,6 +122,21 @@ export interface OperacionCulqi {
   estado?: 'COBRADO' | 'DEVUELTO_CULQI' | 'DEVUELTO_FUERA' | 'ANULADO';
   /** Medios de la devolución por fuera (YAPE, EFECTIVO…) */
   devueltoPor?: string[];
+  /** Comisión de la pasarela con IGV (la asume el local); null = por confirmar */
+  comision?: number | null;
+}
+
+/** Comisión de la pasarela del turno: costo del local, no es faltante ni entra al esperado de efectivo o Yape. */
+export interface ComisionCulqiTurno {
+  pagos: number;
+  porConfirmar: number;
+  estimadas: number;
+  bruto: number;
+  total: number;
+  fijo: number;
+  variable: number;
+  igv: number;
+  neto: number;
 }
 
 export interface CulqiTurno {
@@ -134,6 +149,7 @@ export interface CulqiTurno {
   devueltoTarjeta: number;
   total: number;
   operaciones?: OperacionCulqi[];
+  comision?: ComisionCulqiTurno;
 }
 
 export interface MontosEsperados {
@@ -295,7 +311,7 @@ export interface DetalleCierreCompleto {
   medios: CierreMedioDetalle[];
   ajustesMedio?: AjusteMedio[];
   /** Operaciones Culqi del cierre (pedido, medio, monto, hora, nº de operación) */
-  culqi?: { operaciones: OperacionCulqi[] };
+  culqi?: { operaciones: OperacionCulqi[]; comision?: ComisionCulqiTurno };
   /** Todo el detalle del cierre ya armado (el mismo que se imprime); falta en respuestas de un API viejo. */
   ticket?: TicketCierreDatos;
 }

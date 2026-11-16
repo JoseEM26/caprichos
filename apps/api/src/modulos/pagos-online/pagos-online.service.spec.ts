@@ -6,6 +6,8 @@ import { SimuladoAdaptador, TOKEN_3DS } from './simulado.adaptador';
 import { CulqiAdaptador } from './culqi.adaptador';
 import { crearPasarela } from './pasarela.fabrica';
 import { ErrorPasarela, PasarelaPago } from './pasarela.puerto';
+import { pagosOnlineDe } from '../pedidos-admin/pago-online-resumen';
+import { comisionDeCargoCulqi, comisionEstimada } from './comision-pasarela';
 import { mensajeDeError } from './culqi.errores';
 import { PagosOnlineVencimientoService } from './pagos-online-vencimiento.service';
 import { generarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
@@ -19,6 +21,7 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
     pasa_cocina_en: null, pago_coordinado_en: null, ...opts.pedido,
   };
   const intentos: any[] = [];
+  const pagoCulqi: any = { id: 1n, origen: 'CULQI', comision_pasarela: null, comision_detalle: null };
   const eventos: any[] = [];
   let seq = 1;
   const cumple = (i: any, w: any): boolean =>
@@ -40,6 +43,11 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
     userAccount: { findFirst: jest.fn().mockResolvedValue({ party_id: 99n }) },
     cobro: { findFirst: jest.fn().mockResolvedValue({ id: 31n, caja: { estado: 'ABIERTA' } }) },
     notificacion: { create: jest.fn().mockResolvedValue({}) },
+    cobroPago: {
+      findFirst: jest.fn(async () => pagoCulqi),
+      findMany: jest.fn(async () => [{ ...pagoCulqi, cobro: { pedido_id: 7n } }]),
+      update: jest.fn(async ({ data }: any) => Object.assign(pagoCulqi, data)),
+    },
     pagoOnlineIntento: {
       findUnique: jest.fn(async ({ where }: any) => {
         const i = intentos.find((x) => Object.entries(where).every(([k, v]) => x[k] === v));
@@ -84,7 +92,7 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
   const pasarela = opts.pasarela ?? new SimuladoAdaptador();
   const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela);
   const acceso = { seguimientoToken: generarTokenSeguimiento(pedido.id) };
-  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela };
+  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela, pagoCulqi };
 }
 
 describe('PagosOnlineService', () => {
@@ -520,5 +528,78 @@ describe('llaves live en la demo', () => {
     await expect(bloqueada.devolver({} as any)).rejects.toThrow();
     expect(crearPasarela({ CULQI_SECRET_KEY: 'sk_test_x', CULQI_PUBLIC_KEY: 'pk_test_x', AMBIENTE_DESPLIEGUE: 'demo' } as any).publicKey).toBe('pk_test_x');
     expect(crearPasarela(live as any).publicKey).toBe('pk_live_x');
+  });
+});
+
+describe('Comisión de la pasarela (la asume el local)', () => {
+  // Respuesta de cargo simulada con los campos de comisión de Culqi (céntimos): 3,99 % + S/ 0,30 + IGV
+  const cargoCulqi = { amount: 5250, total_fee: 240, total_fee_taxes: 43, transfer_amount: 4967, fee_details: { fixed_fee: { total: 30 }, variable_fee: { total: 210 } } };
+
+  it('comisionDeCargoCulqi: total = monto - lo que deposita, con fijo, variable e IGV', () => {
+    expect(comisionDeCargoCulqi(cargoCulqi, 5250)).toEqual({ total: 2.83, detalle: { fijo: 0.3, variable: 2.1, igv: 0.43, neto_depositado: 49.67, fuente: 'CULQI' } });
+    expect(comisionDeCargoCulqi({ amount: 5250 }, 5250)).toBeNull();
+    expect(comisionDeCargoCulqi({ total_fee: 240, total_fee_taxes: 43 }, 5250)?.total).toBe(2.83);
+  });
+
+  it('comisionEstimada: porcentaje + fijo + IGV 18 %; sin tarifa, null', () => {
+    expect(comisionEstimada(52.5, { pct: 4, fijo: 0.3 })).toEqual({ total: 2.83, detalle: { fijo: 0.3, variable: 2.1, igv: 0.43, neto_depositado: 49.67, fuente: 'ESTIMADA' } });
+    expect(comisionEstimada(52.5, null)).toBeNull();
+  });
+
+  it('guarda la comisión REAL de la respuesta de Culqi al aprobar el cargo', async () => {
+    const base = new SimuladoAdaptador();
+    const pasarela: PasarelaPago = Object.assign(Object.create(base), {
+      cargar: async (p: any) => ({ ...(await base.cargar(p)), comision: comisionDeCargoCulqi(cargoCulqi, 5250) }),
+    });
+    const { s, acceso, pagoCulqi } = armar({ pasarela });
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
+    expect(pagoCulqi.comision_pasarela).toBe(2.83);
+    expect(pagoCulqi.comision_detalle).toMatchObject({ fuente: 'CULQI', neto_depositado: 49.67 });
+  });
+
+  it('sin dato de Culqi usa la ESTIMADA con la tarifa del ADMIN', async () => {
+    const { s, acceso, prisma, pagoCulqi } = armar();
+    prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+      where.clave === 'culqi_comision_tarjeta_pct' ? { valor: 4 } : where.clave === 'culqi_comision_tarjeta_fijo' ? { valor: 0.3 } : { valor: { CARTA: { PAGO_EN_LINEA: true } } });
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
+    expect(pagoCulqi.comision_pasarela).toBe(2.83);
+    expect(pagoCulqi.comision_detalle.fuente).toBe('ESTIMADA');
+  });
+
+  it('sin dato ni tarifa configurada queda null (por confirmar), sin inventar valores', async () => {
+    const { s, acceso, pagoCulqi } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
+    expect(pagoCulqi.comision_pasarela).toBeNull();
+  });
+
+  it('el cliente no la ve: la respuesta del cargo no lleva comisión ni neto', async () => {
+    const base = new SimuladoAdaptador();
+    const pasarela: PasarelaPago = Object.assign(Object.create(base), {
+      cargar: async (p: any) => ({ ...(await base.cargar(p)), comision: comisionDeCargoCulqi(cargoCulqi, 5250) }),
+    });
+    const { s, acceso } = armar({ pasarela });
+    const { intentoId } = await s.crearIntento('7', acceso);
+    const r = await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
+    expect(JSON.stringify(r)).not.toMatch(/comision|neto/i);
+  });
+
+  it('el detalle del pedido solo lleva comisión con permiso (el mozo no la recibe)', async () => {
+    const db: any = {
+      pagoOnlineIntento: { findMany: async () => [{ pedido_id: 7n, culqi_cargo_id: 'chr_1', monto_centimos: 5250, devuelto_centimos: 0, modo: 'REAL' }] },
+      cobroPago: { findMany: async () => [{ comision_pasarela: 2.83, comision_detalle: { neto_depositado: 49.67, fuente: 'CULQI' }, cobro: { pedido_id: 7n } }] },
+    };
+    expect((await pagosOnlineDe(db, [7n])).get('7')).toMatchObject({ comision: 2.83, neto: 49.67 });
+    expect((await pagosOnlineDe(db, [7n], false)).get('7')).not.toHaveProperty('comision');
+  });
+
+  it('una comisión real no se pisa con una estimada; el webhook posterior completa la real', async () => {
+    const { s, pagoCulqi } = armar();
+    const intento = { pedido_id: 7n, monto_centimos: 5250, medio: 'TARJETA' };
+    await s.guardarComision(intento, comisionDeCargoCulqi(cargoCulqi, 5250));
+    await s.guardarComision(intento); // sin real: no pisa
+    expect(pagoCulqi.comision_detalle.fuente).toBe('CULQI');
   });
 });

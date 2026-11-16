@@ -39,7 +39,7 @@ export function PagosOnlineTab() {
   const [hasta, setHasta] = useState('');
   const [estado, setEstado] = useState('');
   const [pagina, setPagina] = useState(1);
-  const [datos, setDatos] = useState<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number } | null>(null);
+  const [datos, setDatos] = useState<{ items: PagoOnline[]; total: number; totalAprobado?: number; totalDevuelto?: number; totalComision?: number; totalNeto?: number; comisionPorConfirmar?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aDevolver, setADevolver] = useState<PagoOnline | null>(null);
   const [motivo, setMotivo] = useState('');
@@ -110,6 +110,13 @@ export function PagosOnlineTab() {
           {(datos.totalDevuelto ?? 0) > 0 ? ` · devuelto S/ ${(datos.totalDevuelto ?? 0).toFixed(2)}` : ''}
         </p>
       )}
+      {datos && datos.items.length > 0 && datos.totalComision !== undefined && (
+        <p data-testid="total-comision-pagos-online" style={{ margin: '0 0 12px' }}>
+          Comisión de Culqi (la asume el local): <b>S/ {datos.totalComision.toFixed(2)}</b>
+          {datos.totalNeto !== undefined ? <> · Neto que deposita: <b>S/ {datos.totalNeto.toFixed(2)}</b></> : null}
+          {(datos.comisionPorConfirmar ?? 0) > 0 ? ` · ${datos.comisionPorConfirmar} por confirmar` : ''}
+        </p>
+      )}
       {error ? (
         <EstadoError mensaje={error} alReintentar={cargar} />
       ) : !datos ? (
@@ -121,7 +128,7 @@ export function PagosOnlineTab() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Hora', 'Pedido', 'Medio', 'Monto', 'N.º de operación', 'Estado', ''].map((h) => (
+                {['Hora', 'Pedido', 'Medio', 'Monto', 'Comisión', 'Neto', 'N.º de operación', 'Estado', ''].map((h) => (
                   <th key={h} scope="col" style={{ textAlign: 'left', padding: 8 }}>{h}</th>
                 ))}
               </tr>
@@ -138,6 +145,8 @@ export function PagosOnlineTab() {
                     </span>
                   </td>
                   <td style={{ padding: 8 }}>S/ {Number(p.monto).toFixed(2)}</td>
+                  <td style={{ padding: 8 }} data-testid="comision-fila">{p.comision == null ? (p.estado === 'APROBADO' || p.devuelto ? 'Por confirmar' : '—') : `S/ ${Number(p.comision).toFixed(2)}`}</td>
+                  <td style={{ padding: 8 }}>{p.neto == null ? '—' : `S/ ${Number(p.neto).toFixed(2)}`}</td>
                   <td style={{ padding: 8 }}>
                     {p.culqiId ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
