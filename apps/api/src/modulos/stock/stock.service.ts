@@ -18,7 +18,7 @@ import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { almacenConsumirAlPreparar, controlAlmacenActivo } from './control-almacen';
-import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoSabor, sincronizarAgotadoSabor } from './producto-controlado';
+import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoProducto, saldoSabor, sincronizarAgotadoProducto, sincronizarAgotadoSabor } from './producto-controlado';
 
 @Injectable()
 export class StockService {
@@ -1186,6 +1186,14 @@ export class StockService {
         } else if (a.producto_id) {
           await db.stock.updateMany({ where: { producto_id: a.producto_id, lugar_id: a.lugar_id }, data: { cantidad: { decrement: a.cantidad } } });
         } else continue;
+        // Si quien compró la última unidad mientras estuvo anulado deja el saldo en 0 o menos, el producto se marca agotado
+        if (a.sabor_id) {
+          const saldo = await saldoSabor(db, a.sabor_id);
+          if (saldo <= 0) await sincronizarAgotadoSabor(db, a.sabor_id, saldo, new Date(), porId);
+        } else if (a.producto_id && !a.insumo_id) {
+          const saldo = await saldoProducto(db, a.producto_id);
+          if (saldo <= 0) await sincronizarAgotadoProducto(db, a.producto_id, saldo, new Date());
+        }
         await db.movimientoStock.create({
           data: {
             tipo: 'VENTA',

@@ -3,15 +3,18 @@ import { StockService } from './stock.service';
 
 describe('StockService.reaplicarPorPedido (revertir una anulación)', () => {
   const anul = (id: bigint, extra: any) => ({ id, tipo: 'ANULACION', pedido_id: 10n, lugar_id: 1n, cantidad: 2, ...extra });
-  function montar(anulaciones: any[], yaReaplicado: string[] = []) {
+  function montar(anulaciones: any[], yaReaplicado: string[] = [], saldo = 5) {
     const db: any = {
       movimientoStock: {
         findMany: jest.fn().mockResolvedValue(anulaciones),
         findFirst: jest.fn(async ({ where }: any) => (yaReaplicado.includes(where.nota) ? { id: 1n } : null)),
         create: jest.fn(),
       },
-      stock: { updateMany: jest.fn() },
-      stockSabor: { updateMany: jest.fn() },
+      stock: { updateMany: jest.fn(), findMany: jest.fn(async () => [{ cantidad: saldo }]) },
+      stockSabor: { updateMany: jest.fn(), findUnique: jest.fn(async () => ({ cantidad: saldo })) },
+      producto: { findUnique: jest.fn(async () => ({ agotado_hasta: null, agotado_origen: null })), update: jest.fn() },
+      sabor: { findUnique: jest.fn(async () => ({ agotado_hasta: null, agotado_origen: null })), update: jest.fn() },
+      agotado: { create: jest.fn(), updateMany: jest.fn() },
       $transaction: jest.fn(async (fn: any) => fn(db)),
     };
     return { db, service: new StockService(db, {} as any) };
@@ -36,5 +39,18 @@ describe('StockService.reaplicarPorPedido (revertir una anulación)', () => {
     const r = await service.reaplicarPorPedido(10n, desde);
     expect(r.movimientosReaplicados).toBe(0);
     expect(db.stock.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('si al revertir la anulación el saldo queda en 0 o menos, el producto y el sabor se marcan agotados', async () => {
+    const { db, service } = montar([anul(2n, { producto_id: 6n }), anul(3n, { sabor_id: 7n })], [], 0);
+    await service.reaplicarPorPedido(10n, desde, 1n);
+    expect(db.producto.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 6n } }));
+    expect(db.sabor.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 7n } }));
+  });
+
+  it('con saldo suficiente no marca nada como agotado', async () => {
+    const { db, service } = montar([anul(2n, { producto_id: 6n })], [], 5);
+    await service.reaplicarPorPedido(10n, desde, 1n);
+    expect(db.producto.update).not.toHaveBeenCalled();
   });
 });
