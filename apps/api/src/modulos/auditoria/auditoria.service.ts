@@ -3,6 +3,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RegistroAuditoria } from './auditoria.tipos';
 import { Prisma } from '@prisma/client';
 import { inicioDiaLimaIso, sumarDiasIso, hoyLimaIso } from '../../comun/fechas-lima';
+import { describirRegistro, nombreSnapshot, TIPO_ENTIDAD } from './auditoria.descripcion';
 
 /** Máximo de días que se miran al buscar dentro del JSON (pedido/producto): no hay índice para eso. */
 export const MAX_DIAS_BUSQUEDA_JSON = 31;
@@ -86,7 +87,10 @@ export class AuditoriaService {
   private armarWhere(filtros: FiltrosAuditoria, omitir: Array<'categoria' | 'resultado'> = []) {
     const where: any = {};
     if (filtros.modulo) where.modulo = filtros.modulo;
-    if (filtros.accion) where.accion = filtros.accion;
+    // Una acción o varias separadas por coma (OCULTAR_PRODUCTO,AGOTAR_PRODUCTO)
+    const acciones = (filtros.accion ?? '').split(',').map((a) => a.trim()).filter(Boolean);
+    if (acciones.length === 1) where.accion = acciones[0];
+    else if (acciones.length > 1) where.accion = { in: acciones };
     if (filtros.partyId !== undefined && filtros.partyId !== null && filtros.partyId !== '') {
       try {
         where.party_id = BigInt(filtros.partyId);
@@ -258,7 +262,13 @@ export class AuditoriaService {
       resultado: Object.fromEntries(porResultado.map((g) => [g.resultado, g._count._all])),
     };
 
-    const datos = registros.map((reg) => ({
+    const nombres = await this.resolverNombres(registros);
+
+    const datos = registros.map((reg) => {
+      const entidadNombre = reg.entidad
+        ? nombreSnapshot(reg.antes, reg.despues) ?? nombres.entidades.get(`${reg.entidad}:${reg.entidad_id}`) ?? null
+        : null;
+      return {
       id: reg.id.toString(),
       categoria: reg.categoria,
       modulo: reg.modulo,
@@ -277,7 +287,19 @@ export class AuditoriaService {
       en: reg.en,
       hashAnterior: reg.hash_anterior ? Buffer.from(reg.hash_anterior).toString('hex') : null,
       hash: reg.hash ? Buffer.from(reg.hash).toString('hex') : '',
-    }));
+      usuarioNombre: reg.party_id ? nombres.personas.get(reg.party_id.toString()) ?? null : null,
+      entidadNombre,
+      descripcion: describirRegistro({
+        accion: reg.accion,
+        entidad: reg.entidad,
+        antes: reg.antes,
+        despues: reg.despues,
+        motivo: reg.motivo,
+        entidadNombre,
+        en: reg.en,
+      }),
+      };
+    });
 
     return {
       total,
@@ -288,6 +310,62 @@ export class AuditoriaService {
       conteos,
       aviso: json?.aviso,
     };
+  }
+
+  /** Nombres legibles en lote: una consulta de personas y una por tipo de entidad, nunca una por fila. */
+  private async resolverNombres(registros: Array<{ party_id: bigint | null; entidad: string | null; entidad_id: bigint | null; antes: unknown; despues: unknown }>) {
+    const personas = new Map<string, string>();
+    const entidades = new Map<string, string>(); // clave `${entidad}:${id}`
+    const pendientes: Record<string, Set<bigint>> = {};
+    const partyIds = new Set<bigint>();
+    for (const r of registros) {
+      if (r.party_id) partyIds.add(r.party_id);
+      if (r.entidad && r.entidad_id && r.entidad in TIPO_ENTIDAD && !nombreSnapshot(r.antes, r.despues)) {
+        (pendientes[r.entidad] ??= new Set()).add(r.entidad_id);
+      }
+    }
+    try {
+      if (partyIds.size) {
+        const filas = (await this.prisma.person.findMany({
+          where: { party_id: { in: [...partyIds] } },
+          select: { party_id: true, nombres: true, apellidos: true },
+        })) ?? [];
+        for (const f of filas) personas.set(f.party_id.toString(), `${f.nombres} ${f.apellidos ?? ''}`.trim());
+      }
+      for (const [entidad, ids] of Object.entries(pendientes)) {
+        for (const f of (await this.cargarNombres(entidad, [...ids])) ?? []) {
+          if (f.nombre) entidades.set(`${entidad}:${f.id}`, f.nombre);
+        }
+      }
+    } catch (error: any) {
+      // Sin nombres la lista sale igual (se muestra «Usuario desconocido»): no se corta la consulta.
+      this.logger.error(`No se pudieron resolver nombres de auditoría: ${error?.message}`);
+    }
+    return { personas, entidades };
+  }
+
+  private async cargarNombres(entidad: string, ids: bigint[]): Promise<Array<{ id: bigint; nombre: string | null }>> {
+    const donde = { where: { id: { in: ids } }, select: { id: true, nombre: true } } as const;
+    switch (entidad) {
+      case 'producto':
+        return this.prisma.producto.findMany(donde);
+      case 'categoria':
+        return this.prisma.categoria.findMany(donde);
+      case 'grupo_opciones':
+        return this.prisma.grupoOpciones.findMany(donde);
+      case 'lista':
+        return this.prisma.lista.findMany(donde);
+      case 'lista_valor':
+        return this.prisma.listaValor.findMany(donde);
+      case 'sabor':
+        return this.prisma.sabor.findMany(donde);
+      case 'opcion': {
+        const filas = await this.prisma.opcion.findMany({ where: { id: { in: ids } }, select: { id: true, valor: { select: { nombre: true } } } });
+        return filas.map((f) => ({ id: f.id, nombre: f.valor?.nombre ?? null }));
+      }
+      default:
+        return [];
+    }
   }
 
   /**

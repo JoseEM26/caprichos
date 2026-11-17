@@ -63,6 +63,12 @@ export interface RegistroAuditoriaItem {
   en: string;
   hashAnterior: string | null;
   hash: string;
+  /** Nombre y apellidos de quien hizo la acción; null si no se conoce. */
+  usuarioNombre?: string | null;
+  /** Nombre real de la entidad (producto, categoría...), si se conoce. */
+  entidadNombre?: string | null;
+  /** Frase en español que resume qué se hizo y sobre qué. */
+  descripcion?: string;
 }
 
 export interface RespuestaListarAuditoria {

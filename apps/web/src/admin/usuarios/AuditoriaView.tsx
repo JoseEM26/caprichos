@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
-import { Insignia } from '../../comun/Insignia';
 import { Cargando } from '../../comun/Cargando';
 import { Paginacion } from '../../comun/Paginacion';
 import type {
@@ -12,6 +11,8 @@ import type {
 } from './tipos';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { HistorialImpresiones } from './HistorialImpresiones';
+import { FilaAuditoria } from './FilaAuditoria';
+import { ATAJOS_CATALOGO, etiquetaAccion } from './accionesAuditoria';
 
 function useRetardo<T>(valor: T, ms = 400): T {
   const [v, setV] = useState(valor);
@@ -241,19 +242,25 @@ function AccionesAuditoria() {
 
   const copiarComoCsv = () => {
     if (!registros.length) return;
-    const cabecera = ['ID', 'Fecha', 'Modulo', 'Accion', 'Resultado', 'PartyId', 'IP', 'Dispositivo', 'Hash'];
-    const filas = registros.map((r) => [
-      r.id,
-      r.en,
-      r.modulo,
-      r.accion,
-      r.resultado,
-      r.partyId,
-      r.ip,
-      `"${r.dispositivo || ''}"`,
-      r.hash,
-    ]);
-    const csvContent = [cabecera.join(','), ...filas.map((f) => f.join(','))].join('\n');
+    const celda = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const cabecera = ['ID', 'Fecha', 'Modulo', 'Accion', 'Resultado', 'Usuario', 'Descripcion', 'IP', 'Dispositivo', 'Hash'];
+    const filas = registros.map((r) =>
+      [
+        r.id,
+        r.en,
+        r.modulo,
+        r.accion,
+        r.resultado,
+        r.usuarioNombre || 'Usuario desconocido',
+        r.descripcion || etiquetaAccion(r.accion),
+        r.ip,
+        r.dispositivo,
+        r.hash,
+      ]
+        .map(celda)
+        .join(','),
+    );
+    const csvContent = [cabecera.join(','), ...filas].join('\n');
     try {
       navigator.clipboard.writeText(csvContent);
       setMensajeCsv('Registros copiados al portapapeles como CSV.');
@@ -272,6 +279,22 @@ function AccionesAuditoria() {
   const totalCorrectos = conteos.resultado.OK ?? 0;
   const sumaCategorias = totalCambios + totalAccesos + totalSensibles;
   const sumaResultados = totalCorrectos + totalRechazados;
+
+  // Atajo de catálogo: fija modulo=catalogo y la acción (o la quita si ya estaba elegido)
+  const elegirAtajo = (acciones: string[]) => {
+    const codigo = acciones.join(',');
+    setFiltroAccion(filtroModulo === 'catalogo' && filtroAccion === codigo ? '' : codigo);
+    setFiltroModulo('catalogo');
+    setPagina(1);
+  };
+
+  // Acciones con etiqueta en español; si el filtro viene de un atajo o de la URL, también aparece aunque no esté en la lista
+  const accionesCombo = [
+    ...opciones.acciones.map((a) => ({ valor: a, etiqueta: etiquetaAccion(a) })),
+    ...(filtroAccion && !opciones.acciones.includes(filtroAccion)
+      ? [{ valor: filtroAccion, etiqueta: ATAJOS_CATALOGO.find((x) => x.acciones.join(',') === filtroAccion)?.etiqueta ?? etiquetaAccion(filtroAccion) }]
+      : []),
+  ].sort((x, y) => x.etiqueta.localeCompare(y.etiqueta, 'es'));
 
   if (!puedeVer) {
     return (
@@ -426,6 +449,33 @@ function AccionesAuditoria() {
           </div>
         )}
 
+        <div role="group" aria-label="Atajos de catálogo" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {ATAJOS_CATALOGO.map((atajo) => {
+            const activo = filtroModulo === 'catalogo' && filtroAccion === atajo.acciones.join(',');
+            return (
+              <button
+                key={atajo.id}
+                type="button"
+                aria-pressed={activo}
+                onClick={() => elegirAtajo(atajo.acciones)}
+                style={{
+                  minHeight: '40px',
+                  padding: '0 14px',
+                  borderRadius: '9999px',
+                  border: '1.5px solid var(--cp-navy)',
+                  background: activo ? 'var(--cp-navy)' : 'transparent',
+                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {atajo.etiqueta}
+              </button>
+            );
+          })}
+        </div>
+
         <BarraFiltros>
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
             <label htmlFor="au-q" style={{ position: 'absolute', left: '-9999px' }}>Buscar en el historial</label>
@@ -539,7 +589,7 @@ function AccionesAuditoria() {
           <FiltroCombo
             etiqueta="Acción"
             valor={filtroAccion}
-            opciones={[{ valor: '', etiqueta: 'Todas' }, ...opciones.acciones.map((a) => ({ valor: a, etiqueta: a }))]}
+            opciones={[{ valor: '', etiqueta: 'Todas' }, ...accionesCombo]}
             alCambiar={(v) => {
               setFiltroAccion(v);
               setPagina(1);
@@ -641,140 +691,9 @@ function AccionesAuditoria() {
           </div>
         )}
 
-        {registros.map((r) => {
-          const expandido = expandidos[r.id];
-          const esRechazado = r.resultado === 'RECHAZADO';
-          const fechaFormateada = new Date(r.en).toLocaleString('es-PE', {
-            hour12: true,
-            dateStyle: 'short',
-            timeStyle: 'medium',
-          });
-
-          return (
-            <div
-              key={r.id}
-              style={{
-                background: 'var(--cp-white)',
-                border: '1px solid var(--cp-line)',
-                borderLeft: esRechazado ? '6px solid var(--cp-rust)' : '6px solid var(--cp-green)',
-                borderRadius: '12px',
-                padding: '14px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                boxShadow: '0 2px 6px rgba(11, 44, 62, 0.03)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
-                    {r.modulo.toUpperCase()} · {r.accion}
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    (Cat: {r.categoria})
-                  </span>
-                </div>
-                <div>
-                  <Insignia variante={esRechazado ? 'peligro' : 'exito'}>
-                    {r.resultado}
-                  </Insignia>
-                </div>
-              </div>
-
-              <div style={{ fontSize: '13px', color: 'var(--cp-navy)', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                <span>
-                  <b>Fecha:</b> {fechaFormateada}
-                </span>
-                <span>
-                  <b>Usuario:</b> Party ID {r.partyId}
-                </span>
-                <span>
-                  <b>IP:</b> {r.ip || '127.0.0.1'}
-                </span>
-                {r.dispositivo && (
-                  <span style={{ color: 'var(--cp-soft)' }}>
-                    ({r.dispositivo})
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => alternarExpandido(r.id)}
-                  style={{
-                    minHeight: '34px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: 'transparent',
-                    color: 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {expandido ? 'Ocultar datos y huella' : 'Ver datos y huella'}
-                </button>
-              </div>
-
-              {expandido && (
-                <div
-                  style={{
-                    background: 'var(--cp-cream)',
-                    border: '1px solid var(--cp-line)',
-                    borderRadius: '10px',
-                    padding: '12px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    marginTop: '4px',
-                  }}
-                >
-                  <div>
-                    <b>HUELLA ACTUAL (SHA-256):</b>{' '}
-                    <code style={{ wordBreak: 'break-all', color: 'var(--cp-navy)', fontWeight: 700 }}>
-                      {r.hash}
-                    </code>
-                  </div>
-                  <div>
-                    <b>HUELLA PREVIA:</b>{' '}
-                    <code style={{ wordBreak: 'break-all', color: 'var(--cp-soft)' }}>
-                      {r.hashAnterior || '0000000000000000000000000000000000000000000000000000000000000000 (Génesis)'}
-                    </code>
-                  </div>
-                  {r.entidad && (
-                    <div>
-                      <b>Entidad:</b> {r.entidad} (ID: {r.entidadId || 'N/A'})
-                    </div>
-                  )}
-                  {r.motivo && (
-                    <div style={{ color: 'var(--cp-rust)', fontWeight: 600 }}>
-                      <b>Motivo de fallo:</b> {r.motivo}
-                    </div>
-                  )}
-                  {Boolean(r.antes) && (
-                    <div>
-                      <b>ESTADO ANTES:</b>
-                      <pre style={{ margin: '4px 0 0 0', padding: '8px', background: 'var(--cp-white)', borderRadius: '6px', fontSize: '12px', overflowX: 'auto' }}>
-                        {JSON.stringify(r.antes, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {Boolean(r.despues) && (
-                    <div>
-                      <b>ESTADO DESPUÉS:</b>
-                      <pre style={{ margin: '4px 0 0 0', padding: '8px', background: 'var(--cp-white)', borderRadius: '6px', fontSize: '12px', overflowX: 'auto' }}>
-                        {JSON.stringify(r.despues, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {registros.map((r) => (
+          <FilaAuditoria key={r.id} registro={r} expandido={!!expandidos[r.id]} alAlternar={() => alternarExpandido(r.id)} />
+        ))}
       </div>
 
       {/* Paginación */}

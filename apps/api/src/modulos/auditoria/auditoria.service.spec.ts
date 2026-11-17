@@ -313,6 +313,50 @@ describe('AuditoriaService', () => {
     });
   });
 
+  describe('nombres y descripción', () => {
+    const fila = (id: bigint, extra: Record<string, unknown>) => ({
+      id,
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      resultado: 'OK',
+      motivo: null,
+      con_pin_admin: false,
+      ip: null,
+      dispositivo: null,
+      request_id: null,
+      en: new Date('2026-11-16T19:32:00Z'),
+      hash_anterior: null,
+      hash: Buffer.from('ab', 'hex'),
+      antes: null,
+      despues: null,
+      ...extra,
+    });
+
+    it('resuelve usuario y producto en lote y arma la descripción', async () => {
+      prisma.auditoria.count.mockResolvedValue(2);
+      prisma.auditoria.findMany.mockResolvedValue([
+        fila(1n, { accion: 'OCULTAR_PRODUCTO', entidad: 'producto', entidad_id: 45n, antes: { oculto: false }, despues: { oculto: true }, party_id: 12n }),
+        fila(2n, { accion: 'CREAR_PRODUCTO', entidad: 'producto', entidad_id: 46n, despues: { nombre: 'Nuevo', precio: 9 }, party_id: null }),
+      ]);
+      prisma.person.findMany.mockResolvedValue([{ party_id: 12n, nombres: 'Ana', apellidos: 'Paz' }]);
+      prisma.producto.findMany.mockResolvedValue([{ id: 45n, nombre: 'Torta' }]);
+
+      const r = await service.listar({});
+
+      expect(prisma.person.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.producto.findMany).toHaveBeenCalledTimes(1);
+      expect(r.datos[0]).toEqual(expect.objectContaining({ usuarioNombre: 'Ana Paz', entidadNombre: 'Torta', descripcion: 'Desactivó (ocultó) el producto «Torta»' }));
+      expect(r.datos[1]).toEqual(expect.objectContaining({ usuarioNombre: null, entidadNombre: 'Nuevo', descripcion: 'Creó el producto «Nuevo» (S/ 9.00)' }));
+    });
+
+    it('accion acepta varias separadas por coma', async () => {
+      prisma.auditoria.count.mockResolvedValue(0);
+      prisma.auditoria.findMany.mockResolvedValue([]);
+      await service.listar({ accion: 'OCULTAR_PRODUCTO, AGOTAR_PRODUCTO' });
+      expect(prisma.auditoria.findMany.mock.calls[0][0].where).toEqual({ accion: { in: ['OCULTAR_PRODUCTO', 'AGOTAR_PRODUCTO'] } });
+    });
+  });
+
   describe('verificarCadena', () => {
     it('debe retornar valida true cuando no hay discrepancias', async () => {
       prisma.$queryRaw.mockResolvedValue([{ total: BigInt(15), discrepancias: BigInt(0) }]);

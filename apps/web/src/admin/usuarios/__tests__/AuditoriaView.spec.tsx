@@ -98,7 +98,7 @@ describe('AuditoriaView filtros al servidor', () => {
     fireEvent.change(screen.getByLabelText(/Texto del motivo/i), { target: { value: 'error' } });
     await waitFor(() => expect(ultima().get('pedido')).toBe('CP-W422'));
     expect(ultima().get('producto')).toBe('torta');
-    expect(ultima().get('motivo')).toBe('error');
+    await waitFor(() => expect(ultima().get('motivo')).toBe('error'));
     await waitFor(() => expect(ubicacion).toContain('pedido=CP-W422'));
     expect(screen.getByText(/como máximo 31 días/i)).toBeInTheDocument();
   });
@@ -108,7 +108,7 @@ describe('AuditoriaView filtros al servidor', () => {
     await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/auditoria/opciones'));
     await elegir(/^Módulo/, /^pedidos/);
     await waitFor(() => expect(ultima().get('modulo')).toBe('pedidos'));
-    await elegir(/^Acción/, /^COBRAR/);
+    await elegir(/^Acción/, /^Cobrar/);
     await waitFor(() => expect(ultima().get('accion')).toBe('COBRAR'));
     await elegir(/^Fecha/, /Este mes/);
     await waitFor(() => expect(ultima().get('desde')).toMatch(/^\d{4}-\d{2}-01$/));
@@ -121,6 +121,19 @@ describe('AuditoriaView filtros al servidor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ana Paz' }));
     await waitFor(() => expect(ultima().get('partyId')).toBe('7'));
     expect(ubicacion).toContain('persona=7');
+  });
+
+  it('los atajos de catálogo fijan modulo=catalogo y la acción, y se guardan en la URL', async () => {
+    dibujar();
+    await waitFor(() => expect(get).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivaron un producto' }));
+    await waitFor(() => expect(ultima().get('accion')).toBe('OCULTAR_PRODUCTO'));
+    expect(ultima().get('modulo')).toBe('catalogo');
+    expect(ubicacion).toContain('accion=OCULTAR_PRODUCTO');
+    expect(screen.getByRole('button', { name: 'Desactivaron un producto' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Activaron un producto' }));
+    await waitFor(() => expect(ultima().get('accion')).toBe('MOSTRAR_PRODUCTO,DISPONIBILIZAR_PRODUCTO'));
+    expect(screen.getByRole('button', { name: /^Acción: Activaron un producto/ })).toBeInTheDocument();
   });
 
   it('Los filtros se leen de la URL y «Limpiar filtros» los quita', async () => {
