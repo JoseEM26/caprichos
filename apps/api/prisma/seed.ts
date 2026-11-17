@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
-import { ROLES, PERMISOS, MATRIZ } from '../src/modulos/acceso/permisos';
+import { sembrarRolesYPermisos } from './sembrar-roles';
 
 const prisma = new PrismaClient();
 
@@ -22,54 +22,8 @@ export async function main() {
     throw new Error('La variable de entorno SEED_ADMIN_DNI es obligatoria y debe tener exactamente 8 dígitos numéricos.');
   }
 
-  // 1. Roles
-  for (const rol of ROLES) {
-    await prisma.rol.upsert({
-      where: { codigo: rol.codigo },
-      update: { nombre: rol.nombre },
-      create: { codigo: rol.codigo, nombre: rol.nombre },
-    });
-  }
-
-  // 2. Permisos
-  const mapaPermisos = new Map<string, bigint>();
-  for (const perm of PERMISOS) {
-    const p = await prisma.permiso.upsert({
-      where: {
-        modulo_accion: {
-          modulo: perm.modulo,
-          accion: perm.accion,
-        },
-      },
-      update: {},
-      create: {
-        modulo: perm.modulo,
-        accion: perm.accion,
-      },
-    });
-    mapaPermisos.set(`${perm.modulo}/${perm.accion}`, p.id);
-  }
-
-  // 3. Matriz Rol-Permiso
-  for (const [rolCodigo, listaPermisos] of Object.entries(MATRIZ)) {
-    for (const permClave of listaPermisos) {
-      const permisoId = mapaPermisos.get(permClave);
-      if (!permisoId) continue;
-      await prisma.rolPermiso.upsert({
-        where: {
-          rol_permiso_id: {
-            rol: rolCodigo,
-            permiso_id: permisoId,
-          },
-        },
-        update: {},
-        create: {
-          rol: rolCodigo,
-          permiso_id: permisoId,
-        },
-      });
-    }
-  }
+  // 1-3. Roles, permisos y matriz (compartido con crear-admin-demo.ts)
+  await sembrarRolesYPermisos(prisma);
 
   // 4. Crear Admin si no existe
   const adminExistente = await prisma.userAccount.findFirst({
