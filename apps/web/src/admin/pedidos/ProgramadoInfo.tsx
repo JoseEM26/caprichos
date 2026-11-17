@@ -1,4 +1,3 @@
-import { useId, useState, type ReactNode } from 'react';
 import type { LineaPedido, Pedido } from './pedidosApi';
 import { esCargoLibre } from './ModalCargoLibre';
 import { paraCuandoDe, textoPagoProgramado } from './programado';
