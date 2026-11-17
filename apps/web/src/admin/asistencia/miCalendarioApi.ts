@@ -44,15 +44,30 @@ export const miCalendario = (desde: string, hasta: string) =>
   api.get<MiCalendario>(`/admin/mi-asistencia/calendario?desde=${desde}&hasta=${hasta}`);
 
 export interface MiPlanilla {
+  /** false: sin sueldo configurado (o sin vínculo con una ficha: sinVinculo). */
+  conSueldo?: boolean;
+  sinVinculo?: boolean;
+  /** Jornada de hoy según el servidor (Lima). */
+  hoy?: string;
+  /** true si hoy cae dentro del período: el monto puede cambiar. */
+  enCurso?: boolean;
   periodo?: { desde: string; hasta: string; tipo?: string };
   base?: { sueldo?: number | null; tarifaHora?: number | null; valorHora?: number | null };
   horas?: { trabajadasMin?: number; extraAprobadaMin?: number; extraPendienteMin?: number; extraRechazadaMin?: number };
   ganado?: { bruto?: number; extras?: number; bonos?: number };
-  descuentos?: { id: number; fecha?: string; etiqueta?: string; concepto?: string; monto: number }[];
+  /** Se te suma (bruto + bonos) y se te descuenta (suma − neto), para «Cómo se calcula». */
+  resumen?: { seSuma: number; seDescuenta: number };
+  reglas?: { metodo?: string; valorHora?: number; toleranciaMin?: number; penalidadTardanzaPct?: number; multiplicadorExtra?: number; tercerizado?: boolean };
+  descuentos?: { id: string | number; fecha?: string; etiqueta?: string; concepto?: string; monto: number; periodicidad?: string }[];
+  consumos?: { fecha: string; pedido: string; productos: string[]; monto: number; anterior: boolean; cobrar: boolean }[];
   adelantos?: { id: number; fecha?: string; monto: number; motivo?: string | null }[];
+  bonosManuales?: { id: number; fecha: string; monto: number; motivo?: string | null }[];
   penalidadTardanza?: { total: number; detalle?: { fecha: string; minutos: number; monto: number }[] };
   prestamos?: { id: number; capital: number; interesPctMensual?: number; cuota: number; saldo: number; cuotasPagadas: number; cuotasTotales: number; estado?: string }[];
   serviciosExtra?: { nombre: string; monto: number; periodicidad?: string; activo?: boolean }[];
+  feriadosPagados?: { fecha: string; nombre: string; recargo: number; trabajadaH: number; ganado: number }[];
+  /** Un registro por día del período (para el detalle de «Mi calendario»). */
+  dias?: { fecha: string; estado: string; trabajadaMin: number; tardanzaMin: number; extraMin: number; extraAprobada: boolean; ganado: number; feriado: string | null; vacacion: boolean; penalidadTardanza: number }[];
   neto?: number;
   estadoPago?: 'PENDIENTE' | 'PAGADO';
   pagadoEn?: string | null;

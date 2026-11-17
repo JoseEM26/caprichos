@@ -878,18 +878,23 @@ export class PlanillaService {
    * para no filtrar nada ajeno: sin celular/medio de pago, sin totales generales, sin quién aprobó ni notas internas.
    * `partyId` sale siempre del token. Período futuro = el actual.
    */
-  async miPlanilla(partyId: bigint, periodoFecha?: string, ahora = new Date()) {
+  async miPlanilla(partyId: bigint | null | undefined, periodoFecha?: string, ahora = new Date()) {
     const hoy = jornadaDe(ahora).jornada;
+    // Sin vínculo con una persona (cuenta sin ficha): estado útil, nunca un error.
+    if (partyId == null) return { conSueldo: false, sinVinculo: true, hoy };
     const ref = periodoFecha ? (fechaValida(periodoFecha) > hoy ? hoy : periodoFecha) : hoy;
     const s = await this.prisma.sueldoPersonal.findUnique({ where: { party_id: partyId } });
-    if (!s) return { conSueldo: false };
+    if (!s) return { conSueldo: false, sinVinculo: false, hoy };
     const d = await this.detalle(Number(partyId), ref, [], ahora);
     const r = d.resultado;
     const tipo = d.sueldo.modalidad as Modalidad;
-    const [prestamos, servicios] = await Promise.all([
+    const [prestamos, servicios, cfg, vinculo] = await Promise.all([
       this.prisma.prestamoPersonal.findMany({ where: { party_id: partyId, estado: { not: 'ANULADO' } }, include: { cuotas: true }, orderBy: { id: 'desc' } }),
       this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: partyId }, orderBy: { id: 'asc' } }),
+      this.asistencia.obtenerConfig(),
+      this.prisma.vinculoPersonal.findMany({ where: { party_id: partyId, vigente_hasta: null } }),
     ]);
+    const tercerizado = vinculo[0]?.tipo === 'CONTRATO_TEMPORAL';
     const ajustes = ((d.ajustes ?? []) as any[]).filter((a) => !a.anulado);
     const descuentos = [
       ...((d.consumos ?? []) as any[]).filter((c) => c.cobrar).map((c) => ({ id: `consumo-${c.id}`, fecha: c.fecha as string, etiqueta: 'CONSUMO', concepto: `Consumo ${c.pedido}`, monto: c.monto as number })),
@@ -897,12 +902,40 @@ export class PlanillaService {
         .filter((a) => a.tipo === 'DESCUENTO')
         .map((a) => ({ id: `ajuste-${a.id}`, fecha: a.fecha as string, etiqueta: (CATEGORIAS_DESCUENTO as readonly string[]).includes(a.categoria) ? (a.categoria as string) : 'OTRO', concepto: a.motivo as string, monto: a.monto as number })),
       ...((d.cuotas ?? []) as any[]).filter((c) => c.cobrar).map((c) => ({ id: `cuota-${c.id}`, fecha: d.periodo.hasta as string, etiqueta: 'PRESTAMO', concepto: `Cuota ${c.numero} de ${c.numCuotas} del préstamo`, monto: c.monto as number })),
-      ...((d.recurrentes ?? []) as any[]).filter((x) => x.cobrar).map((x) => ({ id: `servicio-${x.id}`, fecha: d.periodo.hasta as string, etiqueta: x.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', concepto: x.nombre as string, monto: x.monto as number })),
+      ...((d.recurrentes ?? []) as any[]).filter((x) => x.cobrar && x.signo !== 'BONO').map((x) => ({ id: `servicio-${x.id}`, fecha: d.periodo.hasta as string, etiqueta: x.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', concepto: x.nombre as string, monto: x.monto as number, periodicidad: x.periodicidad as string })),
     ];
     const dias = (d.dias ?? []) as any[];
+    // Aditivo: para que la pantalla explique el período en curso y el neto (suma − descuento = neto, cuadra al centavo).
+    const seSuma = Math.round((r.ganado + r.adicional) * 100) / 100;
     return {
       conSueldo: true,
+      hoy,
       periodo: { desde: d.periodo.desde as string, hasta: d.periodo.hasta as string, tipo },
+      enCurso: (d.periodo.desde as string) <= hoy && hoy <= (d.periodo.hasta as string),
+      resumen: { seSuma, seDescuenta: Math.round((seSuma - r.neto) * 100) / 100 },
+      // Detalle para que el empleado vea de dónde sale cada cifra (solo lo propio).
+      reglas: {
+        metodo: d.sueldo.metodo as string,
+        valorHora: r.valorHora as number,
+        toleranciaMin: cfg.toleranciaMin,
+        penalidadTardanzaPct: tercerizado ? 0 : cfg.tardanzaPenalidadPct,
+        multiplicadorExtra: d.sueldo.metodo === 'PROGRAMADAS' ? 1 : cfg.multiplicadorExtra,
+        tercerizado,
+      },
+      consumos: ((d.consumos ?? []) as any[]).map((c) => ({ fecha: c.fecha as string, pedido: c.pedido as string, productos: (c.productos ?? []) as string[], monto: c.monto as number, anterior: !!c.anterior, cobrar: !!c.cobrar })),
+      bonosManuales: ajustes.filter((a) => a.tipo === 'BONO').map((a) => ({ id: a.id as number, fecha: a.fecha as string, monto: a.monto as number, motivo: (a.motivo ?? null) as string | null })),
+      dias: dias.map((x) => ({
+        fecha: x.jornada as string,
+        estado: x.estado as string,
+        trabajadaMin: (x.trabajadaMin ?? 0) as number,
+        tardanzaMin: (x.tardanzaMin ?? 0) as number,
+        extraMin: (x.extraMin ?? 0) as number,
+        extraAprobada: !!x.extraAprobada,
+        ganado: (x.ganado ?? 0) as number,
+        feriado: (x.feriado ?? null) as string | null,
+        vacacion: !!x.vacacion,
+        penalidadTardanza: ((r.penalidadTardanzaDetalle ?? []) as Array<{ fecha: string; monto: number }>).find((p) => p.fecha === x.jornada)?.monto ?? 0,
+      })),
       base: {
         sueldo: tipo === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual,
         tarifaHora: d.sueldo.metodo === 'TARIFA_HORA' ? d.sueldo.tarifaHora : null,

@@ -189,10 +189,12 @@ export class AsistenciaCalendarioService {
    * Extra: APROBADA si el admin la aprobó, PENDIENTE si hay minutos extra sin aprobar. ponytail: RECHAZADA no se guarda en
    * ninguna tabla hoy (aprobar/quitar aprobación), así que nunca se devuelve; añadirla cuando exista el rechazo explícito.
    */
-  async miCalendario(partyId: bigint, desde?: string, hasta?: string, ahora = new Date()): Promise<MiCalendario> {
+  async miCalendario(partyId: bigint | null | undefined, desde?: string, hasta?: string, ahora = new Date()): Promise<MiCalendario> {
     const hoy = jornadaDe(ahora).jornada;
     const d0 = desde ?? `${hoy.slice(0, 8)}01`;
     const h0 = hasta ?? isoDe(new Date(Date.UTC(Number(hoy.slice(0, 4)), Number(hoy.slice(5, 7)), 0)));
+    // Cuenta sin vínculo con una persona: calendario vacío, nunca un error.
+    if (partyId == null) return { desde: d0, hasta: h0, dias: [] } as unknown as MiCalendario;
     const dias = diasDelRango(d0, h0);
     const cfg = await this.asistencia.obtenerConfig();
     const ctx = await this.asistencia.cargarContexto(d0, h0, [partyId]);

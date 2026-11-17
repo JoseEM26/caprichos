@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Cargando } from '../../comun/Cargando';
 import { jornadaActual } from './jornada';
-import { miCalendario, type DiaCalendario, type EstadoRespuesta, type MiCalendario as Datos } from './miCalendarioApi';
+import { miCalendario, miPlanilla, type DiaCalendario, type EstadoRespuesta, type MiCalendario as Datos } from './miCalendarioApi';
 import { ETIQUETA_LINEA, horasMin, normalizarTipo } from './tiposMarca';
 import type { PedidoCorreccion } from './CorreccionesAsistencia';
 import './miAsistencia.css';
@@ -69,7 +69,10 @@ export function pasosDelDia(d: DiaCalendario): Paso[] {
   });
 }
 
-function DetalleDia({ dia, alCerrar, alPedirCorreccion, alJustificar }: { dia: DiaCalendario; alCerrar: () => void; alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void }) {
+/** Lo que pagó la planilla ese día (de «Mis pagos»: mismo cálculo que el pago). */
+export interface PagoDia { ganado: number; penalidadTardanza: number; extraAprobada: boolean; extraMin: number }
+
+function DetalleDia({ dia, pago, alCerrar, alPedirCorreccion, alJustificar }: { dia: DiaCalendario; pago?: PagoDia | null; alCerrar: () => void; alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void }) {
   const e = estadoDe(dia.estado);
   const pasos = pasosDelDia(dia);
   const extra = dia.extraMin ?? 0;
@@ -106,6 +109,13 @@ function DetalleDia({ dia, alCerrar, alPedirCorreccion, alJustificar }: { dia: D
           </div>
         )}
       </dl>
+      {pago && (
+        <dl className="mp-dia-pago" aria-label="Lo que se paga este día" data-testid="pago-dia">
+          <div><dt>Lo que ganas este día</dt><dd>{s(pago.ganado)}</dd></div>
+          {pago.penalidadTardanza > 0 && <div><dt>Descuento por tardanza</dt><dd>- {s(pago.penalidadTardanza)}</dd></div>}
+          {pago.extraMin > 0 && <div><dt>Extra {pago.extraAprobada ? 'aprobada (se paga)' : 'sin aprobar (no se paga aún)'}</dt><dd>{horasMin(pago.extraMin)}</dd></div>}
+        </dl>
+      )}
       {alJustificar && (dia.tardanzaMin ?? 0) > 0 && dia.entradaMarcaId && dia.programado && (!dia.solicitud || dia.solicitud.estado === 'RECHAZADA') && (
         <button type="button" className="mc-atajo-corr" onClick={() => alJustificar({ jornada: dia.fecha, justificar: { marcaId: dia.entradaMarcaId!, horaTurno: dia.programado!.entrada, tardanzaMin: dia.tardanzaMin! } })}>
           ¿Quieres justificar esta tardanza?
@@ -126,6 +136,8 @@ function DetalleDia({ dia, alCerrar, alPedirCorreccion, alJustificar }: { dia: D
   );
 }
 
+const s = (n: number) => `S/ ${n.toFixed(2)}`;
+
 /** Historial propio en calendario mensual: estado por día, entrada/salida chicas, feriados y detalle al tocar. */
 export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void } = {}) {
   const hoy = jornadaActual();
@@ -137,6 +149,7 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
   const [intento, setIntento] = useState(0);
   const [elegido, setElegido] = useState<string | null>(null);
   const [semana, setSemana] = useState<string | null>(null); // lunes de la semana resaltada
+  const [pagoDe, setPagoDe] = useState<{ fecha: string; pago: PagoDia | null } | null>(null);
 
   const diasMes = new Date(Date.UTC(mes.a, mes.m0 + 1, 0)).getUTCDate();
   const desde = iso(mes.a, mes.m0, 1);
@@ -152,6 +165,22 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
       .finally(() => vigente && setCargando(false));
     return () => { vigente = false; };
   }, [desde, hasta, intento]);
+
+  // Al elegir un día, se pide la planilla del período que lo contiene (si hay sueldo) para mostrar lo que se paga.
+  useEffect(() => {
+    if (!elegido) return;
+    let vigente = true;
+    (async () => {
+      let pago: PagoDia | null = null;
+      try {
+        const pl = await miPlanilla(elegido);
+        const x = pl?.dias?.find((d) => d.fecha === elegido);
+        if (x) pago = { ganado: x.ganado, penalidadTardanza: x.penalidadTardanza, extraAprobada: x.extraAprobada, extraMin: x.extraMin };
+      } catch { /* sin planilla: el detalle sigue, sin cifras de pago */ }
+      if (vigente) setPagoDe({ fecha: elegido, pago });
+    })();
+    return () => { vigente = false; };
+  }, [elegido]);
 
   const porFecha = useMemo(() => new Map((datos?.dias ?? []).map((d) => [d.fecha, d])), [datos]);
   const mover = (delta: number) => {
@@ -263,7 +292,7 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
       {!cargando && !error && (datos?.dias ?? []).length === 0 && !dia && (
         <p className="as-ayuda">Aún no hay registros en este mes. Toca un día para ver su detalle.</p>
       )}
-      {dia && <DetalleDia dia={dia} alCerrar={() => setElegido(null)} alPedirCorreccion={alPedirCorreccion} alJustificar={alJustificar} />}
+      {dia && <DetalleDia dia={dia} pago={pagoDe?.fecha === dia.fecha ? pagoDe.pago : null} alCerrar={() => setElegido(null)} alPedirCorreccion={alPedirCorreccion} alJustificar={alJustificar} />}
     </section>
   );
 }

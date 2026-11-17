@@ -109,3 +109,38 @@
 @media (max-width: 480px) { .ma-acciones { grid-template-columns: 1fr; } .ma-resumen { grid-template-columns: 1fr; } }
 .mc-atajo-corr { min-height: 44px; border-radius: 12px; border: 1.5px solid var(--cp-navy); background: var(--cp-white); color: var(--cp-navy); font-weight: 700; cursor: pointer; }
 .ma-asistente .ma-video { max-height: 46dvh; width: 100%; max-width: 420px; margin-inline: auto; }
+
+/* Mis pagos: selector de período, estado del período, reglas y desglose */
+.mp-selector { display: flex; flex-direction: column; gap: 6px; }
+.mp-segmentos { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-segmentos > button, .mp-fecha { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--cp-line); background: var(--cp-white); color: var(--cp-navy); font: inherit; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.mp-segmentos > button { cursor: pointer; }
+.mp-segmentos > button[aria-pressed='true'] { background: var(--cp-navy); color: var(--cp-cream); border-color: var(--cp-navy); }
+.mp-fecha { cursor: pointer; }
+.mp-fecha span { white-space: nowrap; }
+.mp-fecha input { font: inherit; border: none; background: transparent; color: inherit; min-height: 36px; }
+.mp-fecha--activa { background: var(--cp-navy); color: var(--cp-cream); border-color: var(--cp-navy); }
+.mp-fecha--activa input { color: var(--cp-cream); color-scheme: dark; }
+.mp-flechas { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mp-flechas > button { width: 44px; min-height: 40px; border-radius: 999px; border: 1px solid var(--cp-line); background: var(--cp-white); color: var(--cp-navy); font-size: 20px; cursor: pointer; }
+.mp-flechas > button:disabled, .mp-segmentos > button:disabled { opacity: .45; cursor: not-allowed; }
+.mp-segmentos > button:focus-visible, .mp-flechas > button:focus-visible, .mp-fecha:focus-within, .mp-reglas summary:focus-visible, .mp-calculo summary:focus-visible { outline: 3px solid var(--cp-navy); outline-offset: 2px; }
+.mp-neto > div { display: flex; flex-direction: column; gap: 2px; }
+.mp-neto > div > span { font-size: 13px; opacity: .85; }
+.mp-por-descontar { font-size: 13px; color: var(--cp-gold); font-weight: 700; }
+.mp-aviso-curso { margin: 0; padding: 8px 12px; border-radius: 12px; background: #FFF8E6; border: 1px solid var(--cp-gold); font-size: 13px; }
+.mp-explica { margin: 0; padding: 8px 12px; border-radius: 12px; background: #FBEDE9; border: 1px solid var(--cp-rust); font-size: 13px; }
+.mp-calculo p { margin: 6px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.mp-subtitulo { margin: 6px 0 0; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; color: var(--cp-soft); }
+.mp-fila { align-items: baseline; }
+.mp-fila > span { min-width: 0; overflow-wrap: anywhere; }
+.mp-detalle { color: var(--cp-soft); font-size: 12px; }
+.mp-monto { white-space: nowrap; margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
+.mp-pendiente { border-top: 1px dashed var(--cp-line); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.mp-reglas ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--cp-navy); }
+.mp-reglas summary, .mp-calculo summary { cursor: pointer; font-family: var(--fuente-titulos); font-weight: 800; font-size: 14px; min-height: 36px; display: flex; align-items: center; }
+.mp-dia-pago { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; }
+.mp-dia-pago > div { background: var(--cp-cream); border: 1px solid var(--cp-line); border-radius: 12px; padding: 6px 10px; }
+.mp-dia-pago dt { font-size: 11px; color: var(--cp-soft); }
+.mp-dia-pago dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 360px) { .mp-segmentos > button, .mp-fecha { font-size: 12px; padding: 0 10px; } }

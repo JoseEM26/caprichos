@@ -109,6 +109,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
   };
   const asistencia: any = {
     diasDePersona: jest.fn(async () => ({ dias, cfg: { toleranciaMin: 5, ...opts.cfg } })),
+    obtenerConfig: async () => ({ toleranciaMin: 5, tardanzaPenalidadPct: 100, multiplicadorExtra: 1.25, ...opts.cfg }),
   };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
   const poner = (p: Fila, montos: number[]) => {
@@ -463,6 +464,17 @@ describe('mi planilla (el trabajador ve solo lo suyo)', () => {
     expect(r.pagadoEn).toBe(AHORA.toISOString());
     expect(r.neto).toBe(600);
     expect((await m.svc.miPlanilla(LUIS, '2099-01-01', AHORA) as any).periodo.desde).toBe('2026-12-01'); // futuro = actual
+  });
+  it('indica si el período es el en curso y trae reglas, consumos y días; sin vínculo responde estado útil', async () => {
+    const m = montar();
+    const pasado: any = await m.svc.miPlanilla(LUIS, '2026-11-15', AHORA);
+    expect(pasado).toMatchObject({ hoy: '2026-12-05', enCurso: false, conSueldo: true });
+    expect(pasado.reglas).toMatchObject({ penalidadTardanzaPct: 100, toleranciaMin: 5 });
+    expect(Array.isArray(pasado.consumos)).toBe(true);
+    expect(Array.isArray(pasado.dias)).toBe(true);
+    const enCurso: any = await m.svc.miPlanilla(LUIS, undefined, AHORA);
+    expect(enCurso.enCurso).toBe(true);
+    expect(await m.svc.miPlanilla(null, undefined, AHORA)).toMatchObject({ conSueldo: false, sinVinculo: true });
   });
 });
 

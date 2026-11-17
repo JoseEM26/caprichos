@@ -127,24 +127,28 @@ describe('MisPagos', () => {
       periodo: { desde: '2026-11-09', hasta: '2026-11-15', tipo: 'SEMANAL' },
       horas: { trabajadasMin: 2400, extraAprobadaMin: 60, extraPendienteMin: 30 },
       ganado: { bruto: 400, extras: 15, bonos: 20 },
-      descuentos: [{ id: 1, fecha: '2026-11-10', etiqueta: 'Consumo', concepto: 'Café', monto: 6.5 }],
+      descuentos: [
+        { id: 1, fecha: '2026-11-10', etiqueta: 'CONSUMO', concepto: 'Consumo P-1', monto: 6.5 },
+        { id: 'servicio-5', etiqueta: 'NETFLIX', concepto: 'Netflix', monto: 10, periodicidad: 'MENSUAL' },
+      ],
       adelantos: [{ id: 2, fecha: '2026-11-11', monto: 50, motivo: 'Pasaje' }],
       penalidadTardanza: { total: 4, detalle: [{ fecha: '2026-11-10', minutos: 20, monto: 4 }] },
       prestamos: [{ id: 3, capital: 300, interesPctMensual: 2, cuota: 50, saldo: 200, cuotasPagadas: 2, cuotasTotales: 6, estado: 'ACTIVO' }],
       serviciosExtra: [{ nombre: 'Netflix', monto: 10, periodicidad: 'MENSUAL', activo: true }],
+      consumos: [{ fecha: '2026-11-10', pedido: 'P-1', productos: ['1 × Café'], monto: 6.5, anterior: false, cobrar: true }],
       neto: 369.5, estadoPago: 'PENDIENTE',
     });
     render(<MisPagos />);
     const bloque = await screen.findByTestId('mis-pagos');
     expect(bloque).toHaveTextContent('Neto estimadoS/ 369.50');
-    expect(bloque).toHaveTextContent('Por pagar');
+    expect(bloque).toHaveTextContent('Cerrado — por pagar');
+    expect(bloque).toHaveTextContent('Netflix (mensual)');
     expect(bloque).toHaveTextContent('Bonos');
     expect(bloque).toHaveTextContent('Extras pendientes de aprobar');
     expect(bloque).toHaveTextContent('- S/ 6.50');
     expect(bloque).toHaveTextContent('Penalidad por tardanza');
     expect(bloque).toHaveTextContent('2026-11-10: 20 min');
     expect(bloque).toHaveTextContent('Adelanto: Pasaje');
-    expect(bloque).toHaveTextContent('Netflix');
     expect(bloque).toHaveTextContent('interés 2 % mensual');
     expect(bloque).toHaveTextContent('pagadas 2 de 6');
     expect(bloque).toHaveTextContent('El tiempo de almuerzo se paga');
@@ -162,7 +166,7 @@ describe('MisPagos', () => {
   it('pagado muestra la etiqueta Pagado', async () => {
     miPlanilla.mockResolvedValue({ neto: 100, estadoPago: 'PAGADO', pagadoEn: '2026-11-16T10:00:00Z' });
     render(<MisPagos />);
-    expect(await screen.findByText('Pagado')).toBeInTheDocument();
+    expect(await screen.findByText('Pagado el 16 de noviembre de 2026')).toBeInTheDocument();
   });
 
   it('error: aviso', async () => {
