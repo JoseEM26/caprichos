@@ -202,8 +202,8 @@ export interface ResultadoCulqi {
 }
 
 const log = (...a: unknown[]) => console.info('[culqi]', ...a);
-/** Segundos sin ver el iframe de Culqi antes de pasar al respaldo (ventana modal de Culqi). */
-export const ESPERA_IFRAME_MS = 8000;
+/** Milisegundos sin ver el iframe de Culqi antes de pasar al respaldo (ventana modal de Culqi). */
+export const ESPERA_IFRAME_MS = 4500;
 
 /**
  * Monta Culqi Checkout Custom EMBEBIDO dentro de `anfitrion` (un nodo estable; React no es dueño de lo que

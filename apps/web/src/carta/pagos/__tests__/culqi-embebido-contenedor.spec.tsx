@@ -64,7 +64,8 @@ describe('Culqi embebido: orden de montaje', () => {
     expect(visto.selector).toMatch(/^#culqi-container-[a-z0-9]+$/);
     expect(document.querySelector('.sg-culqi')!.className).toContain('sg-culqi');
     expect(alFormulario).toHaveBeenCalledWith(true);
-    expect(screen.getByTestId('falta-pagar').textContent).toMatch(/^Pagar S\/ 16\.50 · Te quedan 1[45] min$/);
+    expect(screen.queryByTestId('falta-pagar')).toBeNull();
+    expect(screen.getByTestId('contador-pago').textContent).toMatch(/^Te quedan 1[45] min para pagar$/);
   });
 });
 

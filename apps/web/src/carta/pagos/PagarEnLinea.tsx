@@ -3,7 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
-import { abrirCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { abrirCulqi, cargarScriptCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 const MEDIOS_CAMBIO: { medio: string; nombre: string }[] = [
@@ -17,15 +17,78 @@ export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
 const VIGENCIA_MS = 15 * 60 * 1000;
 
-/** Minutos que quedan para pagar (el pedido sin pagar se anula a los 15 min); null si no se sabe la hora. */
-function useMinutosRestantes(creadoEn?: string): number | null {
+/** Milisegundos que quedan para pagar (el pedido sin pagar se anula a los 15 min); null si no se sabe la hora. Se refresca cada 30 s. */
+function useRestanteMs(creadoEn?: string): number | null {
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setAhora(Date.now()), 15000);
+    const t = setInterval(() => setAhora(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
   const inicio = creadoEn ? Date.parse(creadoEn) : NaN;
-  return Number.isNaN(inicio) ? null : Math.max(0, Math.ceil((inicio + VIGENCIA_MS - ahora) / 60000));
+  return Number.isNaN(inicio) ? null : inicio + VIGENCIA_MS - ahora;
+}
+
+/** Cinta de cuenta regresiva con el estilo de la carta. Nunca lleva el precio: el formulario de Culqi ya lo muestra. */
+function CintaTiempo({ restanteMs }: { restanteMs: number | null }) {
+  if (restanteMs === null) return null;
+  const vencido = restanteMs <= 0;
+  const urgente = restanteMs <= 3 * 60000;
+  const texto = vencido
+    ? 'El tiempo para pagar se acabó: el pedido se anula solo'
+    : restanteMs <= 60000
+      ? 'Te quedan menos de 1 min'
+      : `Te quedan ${Math.ceil(restanteMs / 60000)} min para pagar`;
+  const pct = Math.max(0, Math.min(100, (restanteMs / VIGENCIA_MS) * 100));
+  return (
+    <div
+      role="group"
+      aria-label={texto}
+      data-testid="contador-pago"
+      data-urgente={urgente ? 'si' : undefined}
+      style={{
+        display: 'inline-flex',
+        flexDirection: 'column',
+        gap: 6,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        marginTop: 4,
+        padding: '8px 14px',
+        borderRadius: 14,
+        background: urgente ? 'var(--cp-rust)' : 'var(--cp-navy)',
+        color: 'var(--cp-cream)',
+        fontSize: 14,
+        fontWeight: 700,
+        lineHeight: 1.3,
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <circle cx="12" cy="13" r="9" />
+          <path d="M12 8v5l3 2M9 2h6" />
+        </svg>
+        {texto}
+      </span>
+      <span aria-hidden="true" style={{ display: 'block', width: 'min(240px, 100%)', height: 4, borderRadius: 4, background: 'rgba(251,244,236,0.25)', overflow: 'hidden' }}>
+        <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: urgente ? 'var(--cp-cream)' : 'var(--cp-gold)', transition: 'width 30s linear' }} />
+      </span>
+    </div>
+  );
+}
+
+/** Estado de carga mientras se abre el pago: aparece al tocar Pagar y se quita cuando llega el iframe de Culqi. */
+function CargaPago() {
+  const [lenta, setLenta] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setLenta(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div role="status" aria-live="polite" data-testid="pago-cargando" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 8px', textAlign: 'center' }}>
+      <span aria-hidden="true" style={{ display: 'block', width: 44, height: 44, borderRadius: '50%', border: '4px solid var(--cp-sand)', borderTopColor: 'var(--cp-orange)', animation: 'cp-spin 0.9s linear infinite' }} />
+      <strong style={{ color: 'var(--cp-navy)', fontFamily: 'var(--fuente-titulos)', fontSize: 15 }}>Cargando tu pago seguro…</strong>
+      <span className="sg-detalle">{lenta ? 'Sigue cargando, no cierres esta ventana' : 'Esto puede tardar unos segundos'}</span>
+    </div>
+  );
 }
 const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
   { token: 'tkn_simulado_ok', medio: 'TARJETA', texto: 'Probar tarjeta aprobada' },
@@ -39,7 +102,9 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
   const [fase, setFase] = useState<Fase>('cargando');
   const [mensaje, setMensaje] = useState('');
   const [intento, setIntento] = useState<IntentoCulqi | null>(null);
-  const minutos = useMinutosRestantes(creadoEn);
+  const restanteMs = useRestanteMs(creadoEn);
+  // 'cargando' desde que se toca Pagar hasta que llega el iframe de Culqi ('lista')
+  const [pasarela, setPasarela] = useState<'inactiva' | 'cargando' | 'lista'>('inactiva');
   const enCurso = useRef(false); // evita el doble clic antes de que React deshabilite el botón
   const [configFallo, setConfigFallo] = useState(false);
   const [cambiando, setCambiando] = useState(false);
@@ -58,6 +123,11 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
       vivo = false;
     };
   }, []);
+
+  // Precarga del script de Culqi en cuanto hay pedido por pagar (idempotente): el formulario no espera la descarga
+  useEffect(() => {
+    if (config?.activo && config.modo === 'REAL') void cargarScriptCulqi().catch(() => {});
+  }, [config]);
 
   const cobrar = async (token: string, medio: MedioCulqi, email?: string, ya?: IntentoCulqi) => {
     const it = ya ?? intento;
@@ -101,6 +171,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     enCurso.current = true;
     setFase('pagando');
     setMensaje('');
+    setPasarela('cargando');
     try {
       const it = await culqiApi.intento(pedidoId, tokenSeguimiento); // cada intento es nuevo: uno rechazado no se reutiliza
       setIntento(it);
@@ -131,9 +202,21 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     document.getElementById('culqi-embebido')?.focus();
     let vivo = true;
     let cerrar = () => {};
+    let mo: MutationObserver | undefined;
     const frame = requestAnimationFrame(() => {
       if (!vivo || !anfitrion.current) return;
-      const a = abrirCulqi(intento, anfitrion.current, (v) => vivo && setRespaldo(v));
+      const nodoAnfitrion = anfitrion.current;
+      // en cuanto Culqi mete su iframe en el anfitrión, se quita el estado de carga
+      if (typeof MutationObserver !== 'undefined') {
+        mo = new MutationObserver(() => {
+          if (nodoAnfitrion.querySelector('iframe')) {
+            setPasarela('lista');
+            mo?.disconnect();
+          }
+        });
+        mo.observe(nodoAnfitrion, { childList: true, subtree: true });
+      }
+      const a = abrirCulqi(intento, nodoAnfitrion, (v) => vivo && setRespaldo(v));
       cerrar = a.cerrar;
       a.resultado
         .then((res) => {
@@ -150,6 +233,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     return () => {
       vivo = false;
       cancelAnimationFrame(frame);
+      mo?.disconnect();
       cerrar();
       setRespaldo(false);
     };
@@ -158,6 +242,11 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
   useEffect(() => {
     alFormulario?.(fase === 'formulario');
     return () => alFormulario?.(false);
+  }, [fase]);
+
+  // fuera del pago en curso no queda estado de carga pendiente (error, rechazo, listo, etc.)
+  useEffect(() => {
+    if (fase !== 'pagando' && fase !== 'formulario') setPasarela('inactiva');
   }, [fase]);
 
   const iniciado = useRef(false);
@@ -234,6 +323,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
   const simulado = config.modo === 'SIMULADO';
   const ocupado = fase === 'pagando';
   const enFormulario = fase === 'formulario';
+  const cargandoPasarela = !simulado && pasarela === 'cargando' && !respaldo && (fase === 'pagando' || enFormulario);
 
   return (
     <section className="sg-tarjeta" aria-label="Pagar en línea" data-testid="pagar-en-linea">
@@ -247,16 +337,13 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
         </p>
       ) : (
         <>
-          <strong data-testid="falta-pagar" style={{ color: 'var(--cp-navy)', fontSize: enFormulario ? 17 : undefined }}>
-            {enFormulario
-              ? `Pagar ${SOLES(monto && monto > 0 ? monto : (intento?.montoCentimos ?? 0) / 100)}${minutos !== null && minutos > 0 ? ` · Te quedan ${minutos} min` : ''}`
-              : monto && monto > 0 ? `Falta pagar ${SOLES(monto)}` : 'Pagar ahora con tarjeta o Yape'}
-          </strong>
-          {minutos !== null && !(enFormulario && minutos > 0) && (
-            <p data-testid="contador-pago" className="sg-detalle" style={{ margin: '4px 0 0', fontWeight: 700 }}>
-              {minutos > 0 ? `Te quedan ${minutos} min para pagar` : 'El tiempo para pagar se acabó: el pedido se anula solo'}
-            </p>
+          {!enFormulario && (
+            <strong data-testid="falta-pagar" style={{ color: 'var(--cp-navy)' }}>
+              {monto && monto > 0 ? `Falta pagar ${SOLES(monto)}` : 'Pagar ahora con tarjeta o Yape'}
+            </strong>
           )}
+          {/* cuenta regresiva sin precio: con el formulario de Culqi abierto, Culqi ya muestra el monto */}
+          <CintaTiempo restanteMs={restanteMs} />
           {!enFormulario && (
             <p className="sg-detalle" style={{ margin: '4px 0 8px' }}>
               Pagas el total del pedido, sin recargo. {AVISO_PAGO_EN_LINEA}
@@ -272,13 +359,21 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
               {mensaje}
             </p>
           )}
-          {ocupado && <p role="status" style={{ margin: '0 0 8px' }}>Procesando tu pago...</p>}
+          {cargandoPasarela && !enFormulario && <CargaPago />}
+          {ocupado && !cargandoPasarela && <p role="status" style={{ margin: '0 0 8px' }}>Procesando tu pago...</p>}
           {enFormulario ? (
             <div id="culqi-embebido" tabIndex={-1} data-testid="culqi-embebido" style={{ outline: 'none' }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFase('listo'); } }}>
               {/* Culqi monta aquí su formulario (iframe alojado por Culqi: la tarjeta no pasa por nuestro código) */}
               {/* Altura DEFINIDA: el iframe de Culqi mide height:100% y con solo min-height se colapsaba */}
               {respaldo && <p role="status" data-testid="culqi-respaldo" style={{ margin: 0 }}>Abriendo la ventana segura de Culqi…</p>}
-              <div ref={anfitrion} className="sg-culqi" aria-label="Formulario de pago de Culqi" style={respaldo ? { display: 'none' } : undefined} />
+              <div style={{ position: 'relative' }}>
+                {cargandoPasarela && (
+                  <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'var(--cp-cream)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CargaPago />
+                  </div>
+                )}
+                <div ref={anfitrion} className="sg-culqi" aria-label="Formulario de pago de Culqi" style={respaldo ? { display: 'none' } : undefined} />
+              </div>
               <Boton variante="secundario" onClick={() => setFase('listo')} style={{ marginTop: 8 }}>
                 Volver
               </Boton>
@@ -292,7 +387,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
                 </Boton>
               ))}
             </div>
-          ) : (
+          ) : cargandoPasarela ? null : (
             <Boton disabled={ocupado} cargando={ocupado} onClick={() => void pagar()}>
               {fase === 'rechazado' || fase === 'error' ? 'Reintentar el pago' : 'Pagar ahora'}
             </Boton>
