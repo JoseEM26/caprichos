@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nest
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { CortesiasService } from './cortesias.service';
-import { DarCortesiaLineaDto, FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
+import { AnularCortesiaDto, DarCortesiaLineaDto, FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
 
 @Controller('admin/cortesias')
 @UseGuards(AccesoGuard)
@@ -15,6 +15,14 @@ export class CortesiasController {
   async registrar(@Body() dto: RegistrarCortesiaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cortesias.registrarSeparada(dto, req.usuario, ip);
+  }
+
+  /** Anula una cortesía por separado y devuelve el stock (motivo obligatorio). Solo ADMIN y Caja. */
+  @Post(':id/anular')
+  @Permiso('cortesias', 'anular')
+  async anular(@Param('id') id: string, @Body() dto: AnularCortesiaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cortesias.anular(id, dto.motivo, req.usuario, ip);
   }
 
   /** Listado y resumen de cortesías (el mismo que el informe «Cortesías»). */

@@ -16,6 +16,10 @@ export interface FilaCortesia {
   dadaPorId: string;
   dadaPor: string;
   autorizadaPor: string | null;
+  anulada: boolean;
+  motivoAnulacion: string | null;
+  /** Cortesía por separado, vigente: se puede anular. */
+  anulable: boolean;
 }
 
 export interface Acumulado {

@@ -45,6 +45,7 @@ Ver tambien: [[comprobantes]]
 2. Arriba ves tres cifras: Cortesias, Unidades regaladas y Valor de lista regalado.
 3. La tabla va por secciones: Por motivo, Por producto, Por quien la dio y Detalle (fecha, producto y sabor, cantidad, valor de lista, motivo y nota, pedido o pedido de referencia, y quien la dio con "autoriza ..." si la autorizo un supervisor).
 4. Las cortesias no cuentan en las ventas de los informes, ni en comprobantes ni en puntos. Como darlas: ver [[caja]].
+5. Si una cortesia por separado se registro por error (solo Caja y Admin): en el Detalle pulsa Anular en su fila, escribe el motivo (minimo 5 letras) y confirma con "Si, anular". El stock que descontó vuelve (con su sabor) y la fila queda marcada "Anulada": ya no cuenta en las cifras de arriba y no se puede anular dos veces. Las cortesias dadas dentro de un pedido no tienen boton: se corrigen anulando o editando el pedido. Si la cortesia es muy antigua y el sistema no puede ligarla con lo que descontó, avisa y el stock se corrige con un ajuste manual.
 
 ## Errores y dudas comunes
 - Que significa el aviso "Desde es posterior a Hasta": aparece cuando la fecha inicial elegida en el calendario es mayor que la fecha de cierre. Corrige las fechas en los selectores para que el reporte pueda procesar los datos.

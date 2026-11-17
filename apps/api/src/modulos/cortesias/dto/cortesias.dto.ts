@@ -61,3 +61,9 @@ export class FiltroCortesiasDto {
   @IsOptional()
   productoId?: string;
 }
+
+/** Anular una cortesía por separado: el motivo (mínimo 5 letras) lo valida el servicio. */
+export class AnularCortesiaDto {
+  @IsString({ message: 'Escribe el motivo de la anulación' })
+  motivo!: string;
+}

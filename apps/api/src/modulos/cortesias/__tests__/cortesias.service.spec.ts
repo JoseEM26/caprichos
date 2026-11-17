@@ -4,10 +4,11 @@ jest.mock('../../stock/producto-controlado', () => ({
   controlaPorSabor: () => false,
   validarSaboresLinea: jest.fn(),
   descontarVentaProductos: jest.fn(async () => ({ agotados: [], saboresAgotados: [] })),
+  devolverCortesiaProductos: jest.fn(async () => 1),
 }));
 
 import { CortesiasService } from '../cortesias.service';
-import { descontarVentaProductos } from '../../stock/producto-controlado';
+import { descontarVentaProductos, devolverCortesiaProductos } from '../../stock/producto-controlado';
 
 function crearPrisma(over: Partial<Record<string, any>> = {}) {
   const prisma: any = {
@@ -89,7 +90,7 @@ describe('CortesiasService.registrarSeparada', () => {
       [expect.objectContaining({ productoId: 10n, cantidad: 3, areaId: 3n })],
       5n,
       expect.any(Date),
-      { tipo: 'CORTESIA' },
+      { tipo: 'CORTESIA', cortesiaId: 77n },
     );
     expect(r.valorLista).toBe(36);
     expect(auditoria.registrar).toHaveBeenCalled();
@@ -178,5 +179,75 @@ describe('CortesiasService.darEnLinea', () => {
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase()), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
     await expect(svc.darEnLinea('1', '999', { motivo: 'ERROR_COCINA' }, usuario)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('CortesiasService.anular', () => {
+  const vigente = (o: any = {}) => ({
+    id: 77n,
+    pedido_id: null,
+    pedido_linea_id: null,
+    anulada_en: null,
+    cantidad: 2,
+    producto: { nombre: 'Dona glaseada', controla_stock: true },
+    ...o,
+  });
+  const montar = (cortesia: any) => {
+    const prisma = crearPrisma({
+      cortesia: { findUnique: jest.fn(async () => cortesia), update: jest.fn(async () => ({})) },
+    });
+    return { prisma, svc: new CortesiasService(prisma, auditoria as any) };
+  };
+
+  it('motivo de menos de 5 letras: 400 y no toca la base', async () => {
+    const { prisma, svc } = montar(vigente());
+    await expect(svc.anular('77', 'ups', usuario)).rejects.toMatchObject({ response: { codigo: 'MOTIVO_ANULACION_REQUERIDO' } });
+    await expect(svc.anular('77', undefined, usuario)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('devuelve el stock, marca la cortesía como anulada con quién y por qué, y audita', async () => {
+    const { prisma, svc } = montar(vigente());
+    const r = await svc.anular('77', '  Se registró por error  ', usuario);
+    expect(devolverCortesiaProductos).toHaveBeenCalledWith(prisma, 77n, 5n, expect.any(Date));
+    expect(prisma.cortesia.update).toHaveBeenCalledWith({
+      where: { id: 77n },
+      data: { anulada_en: expect.any(Date), anulada_por_party_id: 5n, motivo_anulacion: 'Se registró por error' },
+    });
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ANULAR_SEPARADA', entidadId: 77n }), prisma);
+    expect(r).toEqual({ id: '77', anulada: true, movimientosDevueltos: 1 });
+  });
+
+  it('ya anulada: 409 y no devuelve nada otra vez (idempotente)', async () => {
+    const { prisma, svc } = montar(vigente({ anulada_en: new Date() }));
+    await expect(svc.anular('77', 'Segunda vez', usuario)).rejects.toMatchObject({ response: { codigo: 'CORTESIA_YA_ANULADA' } });
+    expect(devolverCortesiaProductos).not.toHaveBeenCalled();
+    expect(prisma.cortesia.update).not.toHaveBeenCalled();
+  });
+
+  it('cortesía en línea (con pedido): 409, se corrige anulando o editando el pedido', async () => {
+    const { prisma, svc } = montar(vigente({ pedido_id: 900n }));
+    await expect(svc.anular('77', 'Error de caja', usuario)).rejects.toMatchObject({ response: { codigo: 'CORTESIA_EN_LINEA' } });
+    expect(devolverCortesiaProductos).not.toHaveBeenCalled();
+    expect(prisma.cortesia.update).not.toHaveBeenCalled();
+  });
+
+  it('inexistente: 404', async () => {
+    const { svc } = montar(null);
+    await expect(svc.anular('77', 'Error de caja', usuario)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('cortesía vieja de producto controlado sin movimientos ligados: lo dice claro y no la marca anulada', async () => {
+    (devolverCortesiaProductos as jest.Mock).mockResolvedValueOnce(0);
+    const { prisma, svc } = montar(vigente());
+    await expect(svc.anular('77', 'Error de caja', usuario)).rejects.toMatchObject({ response: { codigo: 'CORTESIA_SIN_LIGA_STOCK' } });
+    expect(prisma.cortesia.update).not.toHaveBeenCalled();
+  });
+
+  it('producto sin control de stock: se anula sin movimientos', async () => {
+    (devolverCortesiaProductos as jest.Mock).mockResolvedValueOnce(0);
+    const { prisma, svc } = montar(vigente({ producto: { nombre: 'Frappe', controla_stock: false } }));
+    await expect(svc.anular('77', 'Error de caja', usuario)).resolves.toMatchObject({ anulada: true, movimientosDevueltos: 0 });
+    expect(prisma.cortesia.update).toHaveBeenCalled();
   });
 });

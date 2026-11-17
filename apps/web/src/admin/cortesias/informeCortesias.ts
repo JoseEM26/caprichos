@@ -10,8 +10,11 @@ export function filasInformeCortesias(res: ResumenInformeCortesias): {
   kpis: { n: string; v: string }[];
   cols: string[];
   rows: (string | number)[][];
+  /** Por índice de fila: la cortesía del detalle, para el botón Anular. */
+  accionesFila: Record<number, { id: string; anulada: boolean; anulable: boolean }>;
 } {
   const rows: (string | number)[][] = [];
+  const accionesFila: Record<number, { id: string; anulada: boolean; anulable: boolean }> = {};
   const seccion = (titulo: string) => rows.push([`▸ ${titulo}`, '', '', '', '', '']);
 
   seccion('Por motivo');
@@ -22,13 +25,14 @@ export function filasInformeCortesias(res: ResumenInformeCortesias): {
   for (const q of res.porQuien) rows.push([q.nombre, q.unidades, soles(q.valorLista), q.registros, '', '']);
   seccion('Detalle');
   for (const d of res.detalle) {
+    accionesFila[rows.length] = { id: d.id, anulada: d.anulada, anulable: d.anulable };
     const fecha = new Date(d.creadoEn).toLocaleDateString('es-PE', { timeZone: 'America/Lima' });
     const producto = d.sabor ? `${d.producto} (${d.sabor})` : d.producto;
     rows.push([
       `${fecha} · ${producto}`,
       d.cantidad,
       soles(d.valorLista),
-      `${d.motivoEtiqueta}${d.nota ? ` — ${d.nota}` : ''}`,
+      `${d.anulada ? 'ANULADA · ' : ''}${d.motivoEtiqueta}${d.nota ? ` — ${d.nota}` : ''}${d.anulada && d.motivoAnulacion ? ` (anulada: ${d.motivoAnulacion})` : ''}`,
       d.pedido ?? (d.pedidoReferencia ? `Ref. ${d.pedidoReferencia}` : '—'),
       d.dadaPor + (d.autorizadaPor ? ` (autoriza ${d.autorizadaPor})` : ''),
     ]);
@@ -42,5 +46,6 @@ export function filasInformeCortesias(res: ResumenInformeCortesias): {
     ],
     cols: ['Concepto', 'Cantidad', 'Valor de lista', 'Motivo / Registros', 'Pedido', 'Quién la dio'],
     rows,
+    accionesFila,
   };
 }

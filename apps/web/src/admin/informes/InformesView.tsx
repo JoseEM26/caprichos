@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { api } from '../../comun/api';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { filasInformeCortesias } from '../cortesias/informeCortesias';
+import { AnularCortesia } from '../cortesias/AnularCortesia';
+import { useSesion } from '../../comun/sesion';
 
 interface ReporteItem {
   id: string;
@@ -26,6 +28,8 @@ interface ReporteDetalleData {
   kpis: { n: string; v: string }[];
   cols: string[];
   rows: (string | number)[][];
+  /** Solo Cortesías: botón Anular por fila del detalle. */
+  accionesFila?: Record<number, { id: string; anulada: boolean; anulable: boolean }>;
   nota?: string;
   sinFecha?: boolean;
 }
@@ -100,6 +104,9 @@ export function InformesView() {
   const [reporteDetalle, setReporteDetalle] = useState<ReporteDetalleData | null>(null);
   const [cargandoReporte, setCargandoReporte] = useState(false);
   const [mensajeExportacion, setMensajeExportacion] = useState('');
+  const { tiene } = useSesion();
+  // Sube al anular una cortesía: vuelve a cargar el informe
+  const [recarga, setRecarga] = useState(0);
 
   // Catálogo
   const [catalogo, setCatalogo] = useState<ReporteItem[]>(CATALOGO_INICIAL);
@@ -213,7 +220,10 @@ export function InformesView() {
     return () => {
       montado = false;
     };
-  }, [reporteAbiertoId, desde, hasta, canal, pago, modalidad]);
+  }, [reporteAbiertoId, desde, hasta, canal, pago, modalidad, recarga]);
+
+  // Cortesías: columna «Acción» con Anular, solo para quien tiene el permiso
+  const conAcciones = !!reporteDetalle?.accionesFila && tiene('cortesias/anular');
 
   const errorFechas = useMemo(() => {
     return desde && hasta && desde > hasta;
@@ -702,12 +712,12 @@ export function InformesView() {
             {/* Tabla de resultados */}
             {reporteDetalle && (
               <div style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', overflowX: 'auto' }}>
-                <div style={{ minWidth: `${Math.max(480, reporteDetalle.cols.length * 110)}px` }}>
+                <div style={{ minWidth: `${Math.max(480, (reporteDetalle.cols.length + (conAcciones ? 1 : 0)) * 110)}px` }}>
                   {/* Encabezado */}
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: `repeat(${reporteDetalle.cols.length}, minmax(90px, 1fr))`,
+                      gridTemplateColumns: `repeat(${reporteDetalle.cols.length + (conAcciones ? 1 : 0)}, minmax(90px, 1fr))`,
                       gap: '8px',
                       padding: '10px 14px',
                       background: 'var(--cp-sand)',
@@ -718,6 +728,7 @@ export function InformesView() {
                     {reporteDetalle.cols.map((col, idx) => (
                       <span key={idx}>{col}</span>
                     ))}
+                    {conAcciones && <span>Acción</span>}
                   </div>
 
                   {/* Filas */}
@@ -726,7 +737,7 @@ export function InformesView() {
                       key={rIdx}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: `repeat(${reporteDetalle.cols.length}, minmax(90px, 1fr))`,
+                        gridTemplateColumns: `repeat(${reporteDetalle.cols.length + (conAcciones ? 1 : 0)}, minmax(90px, 1fr))`,
                         gap: '8px',
                         padding: '10px 14px',
                         borderTop: '1px solid var(--cp-sand)',
@@ -739,6 +750,18 @@ export function InformesView() {
                           {cell}
                         </span>
                       ))}
+                      {conAcciones && (
+                        <span>
+                          {reporteDetalle.accionesFila?.[rIdx] && (
+                            <AnularCortesia
+                              id={reporteDetalle.accionesFila[rIdx].id}
+                              anulada={reporteDetalle.accionesFila[rIdx].anulada}
+                              anulable={reporteDetalle.accionesFila[rIdx].anulable}
+                              alAnular={() => setRecarga((n) => n + 1)}
+                            />
+                          )}
+                        </span>
+                      )}
                     </div>
                   ))}
 

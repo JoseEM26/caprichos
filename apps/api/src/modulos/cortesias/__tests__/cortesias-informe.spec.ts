@@ -15,6 +15,9 @@ const fila = (o: Partial<FilaCortesia>): FilaCortesia => ({
   dadaPorId: '5',
   dadaPor: 'Caja Uno',
   autorizadaPor: null,
+  anulada: false,
+  motivoAnulacion: null,
+  anulable: false,
   ...o,
 });
 

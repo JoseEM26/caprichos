@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { controlaPorSabor, descontarVentaProductos, devolverCortesiaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { etiquetaMotivo, validarMotivoCortesia } from './cortesia.tipos';
 import { FilaCortesia, resumenCortesias } from './cortesias-informe';
 import { FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
@@ -96,7 +96,7 @@ export class CortesiasService {
         [{ productoId: producto.id, cantidad: unidadesStock, areaId: producto.categoria?.area_id ?? null, sabores }],
         porId,
         ahora,
-        { tipo: 'CORTESIA' },
+        { tipo: 'CORTESIA', cortesiaId: cortesia.id },
       );
       await this.auditoria.registrar(
         {
@@ -112,6 +112,60 @@ export class CortesiasService {
         tx,
       );
       return { id: cortesia.id.toString(), valorLista, cantidad, referencia: referencia.codigo };
+    });
+  }
+
+  /**
+   * Anula una cortesía por separado y devuelve exactamente lo que descontó, una sola vez. Las cortesías en línea
+   * (ligadas a un pedido) no se anulan aquí: se corrigen anulando o editando el pedido.
+   */
+  async anular(idRaw: string, motivoRaw: unknown, usuario: UsuarioAutenticado, ip?: string) {
+    const id = this.id(idRaw, 'ID_INVALIDO');
+    const motivo = typeof motivoRaw === 'string' ? motivoRaw.trim() : '';
+    if (motivo.length < 5) {
+      throw new BadRequestException({ codigo: 'MOTIVO_ANULACION_REQUERIDO', mensaje: 'Escribe el motivo de la anulación (al menos 5 letras)' });
+    }
+    const porId = usuario.partyId;
+    return this.prisma.$transaction(async (tx: any) => {
+      // La fila se bloquea: dos anulaciones a la vez se turnan y la segunda ya la ve anulada (nunca devuelve dos veces)
+      if (typeof tx.$queryRaw === 'function') await tx.$queryRaw`SELECT id FROM cortesia WHERE id = ${id} FOR UPDATE`;
+      const c = await tx.cortesia.findUnique({ where: { id }, include: { producto: { select: { nombre: true, controla_stock: true } } } });
+      if (!c) throw new NotFoundException({ codigo: 'CORTESIA_NO_ENCONTRADA', mensaje: 'No encontramos la cortesía' });
+      if (c.pedido_id !== null) {
+        throw new ConflictException({
+          codigo: 'CORTESIA_EN_LINEA',
+          mensaje: 'Esta cortesía es de una línea de pedido: corrígela anulando o editando el pedido',
+        });
+      }
+      if (c.anulada_en) {
+        throw new ConflictException({ codigo: 'CORTESIA_YA_ANULADA', mensaje: 'Esta cortesía ya fue anulada' });
+      }
+      const ahora = new Date();
+      const devueltos = await devolverCortesiaProductos(tx, c.id, porId, ahora);
+      if (devueltos === 0 && c.producto.controla_stock) {
+        throw new ConflictException({
+          codigo: 'CORTESIA_SIN_LIGA_STOCK',
+          mensaje: `No podemos ligar esta cortesía con lo que descontó de ${c.producto.nombre} (es anterior a este control). Corrige el stock con un ajuste manual.`,
+        });
+      }
+      await tx.cortesia.update({
+        where: { id: c.id },
+        data: { anulada_en: ahora, anulada_por_party_id: porId, motivo_anulacion: motivo },
+      });
+      await this.auditoria.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'cortesias',
+          accion: 'ANULAR_SEPARADA',
+          entidad: 'cortesia',
+          entidadId: c.id,
+          despues: { producto: c.producto.nombre, cantidad: c.cantidad, motivoAnulacion: motivo, movimientosDevueltos: devueltos },
+          partyId: porId,
+          ip,
+        },
+        tx,
+      );
+      return { id: c.id.toString(), anulada: true, movimientosDevueltos: devueltos };
     });
   }
 
@@ -279,12 +333,16 @@ export class CortesiasService {
       dadaPorId: c.dada_por_party_id.toString(),
       dadaPor: nombre(c.dada_por_party_id) ?? '',
       autorizadaPor: nombre(c.autorizada_por_party_id),
+      anulada: c.anulada_en !== null,
+      motivoAnulacion: c.motivo_anulacion ?? null,
+      anulable: c.pedido_id === null && c.pedido_linea_id === null && c.anulada_en === null,
     }));
 
     return {
       desde: filtro.desde ?? null,
       hasta: filtro.hasta ?? null,
-      ...resumenCortesias(detalle),
+      // Una cortesía anulada se ve en el detalle pero no cuenta en el resumen
+      ...resumenCortesias(detalle.filter((f) => !f.anulada)),
       detalle: detalle.map((f) => ({ ...f, motivoEtiqueta: etiquetaMotivo(f.motivo) })),
     };
   }

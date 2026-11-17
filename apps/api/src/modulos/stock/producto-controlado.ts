@@ -174,7 +174,7 @@ export async function descontarVentaProductos(
   por: bigint,
   ahora = new Date(),
   /** CORTESIA: salida por cortesía por separado (sin pedido propio). Por defecto VENTA. */
-  opciones: { tipo?: 'VENTA' | 'CORTESIA' } = {},
+  opciones: { tipo?: 'VENTA' | 'CORTESIA'; cortesiaId?: bigint } = {},
 ): Promise<{ agotados: bigint[]; saboresAgotados: bigint[] }> {
   const tipo = opciones.tipo ?? 'VENTA';
   const agregado = new Map<string, { productoId: bigint; cantidad: number; areaId?: bigint | null; sabores: Map<string, SaborVenta> }>();
@@ -227,7 +227,7 @@ export async function descontarVentaProductos(
       }
       const sabores = [...a.sabores.values()].sort((x, y) => (x.saborId < y.saborId ? -1 : x.saborId > y.saborId ? 1 : 0));
       for (const s of sabores) {
-        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, ahora, tipo });
+        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, ahora, tipo, cortesiaId: opciones.cortesiaId });
         if (r === 'AGOTADO') saboresAgotados.push(s.saborId);
       }
       continue;
@@ -255,6 +255,7 @@ export async function descontarVentaProductos(
         lugar_id: lugarId,
         cantidad,
         pedido_id: pedidoId,
+        cortesia_id: opciones.cortesiaId ?? null,
         por,
         nota: tipo === 'CORTESIA' ? 'Cortesía' : `Venta · pedido ${pedidoId}`,
       },
@@ -405,7 +406,7 @@ export async function ajustarVentaProductos(
  */
 async function descontarSabor(
   db: any,
-  c: { pedidoId: bigint | null; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; ahora: Date; tipo: 'VENTA' | 'CORTESIA' },
+  c: { pedidoId: bigint | null; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; ahora: Date; tipo: 'VENTA' | 'CORTESIA'; cortesiaId?: bigint },
 ): Promise<'AGOTADO' | null> {
   const { sabor } = c;
   const cantidad = new Prisma.Decimal(sabor.cantidad);
@@ -433,6 +434,7 @@ async function descontarSabor(
       lugar_id: c.lugarId,
       cantidad,
       pedido_id: c.pedidoId,
+      cortesia_id: c.cortesiaId ?? null,
       por: c.por,
       nota: c.tipo === 'CORTESIA' ? `Cortesía · ${sabor.nombre}` : `Venta · pedido ${c.pedidoId} · ${sabor.nombre}`,
     },
@@ -908,4 +910,56 @@ export async function mermarProductoControlado(
     else await sincronizarAgotadoProducto(db, c.productoId, saldo, c.ahora);
   }
   return { movimientoId: mov.id, saldo };
+}
+
+/**
+ * Anula una cortesía por separado: devuelve exactamente lo que descontó (los movimientos CORTESIA ligados por
+ * cortesia_id que aún no se revirtieron) y deja un ANULACION enlazado por cada uno. Reactiva el agotado automático
+ * si el saldo vuelve a ser mayor que 0 (el manual no se toca). Devuelve cuántos movimientos revirtió: 0 si no hay
+ * ninguno ligado (cortesía anterior a la liga o sin stock controlado); quien llama decide qué hacer.
+ */
+export async function devolverCortesiaProductos(db: any, cortesiaId: bigint, por: bigint, ahora = new Date()): Promise<number> {
+  const movs: any[] = await db.movimientoStock.findMany({
+    where: { cortesia_id: cortesiaId, tipo: 'CORTESIA', movimientosRevertidos: { none: {} } },
+  });
+  const sabores = new Set<bigint>();
+  const productos = new Set<bigint>();
+  for (const m of movs) {
+    if (m.sabor_id) {
+      sabores.add(m.sabor_id);
+      await db.stockSabor.upsert({
+        where: { sabor_id: m.sabor_id },
+        update: { cantidad: { increment: m.cantidad } },
+        create: { sabor_id: m.sabor_id, cantidad: m.cantidad },
+      });
+    } else if (m.producto_id) {
+      productos.add(m.producto_id);
+      const st = await db.stock.findFirst({ where: { producto_id: m.producto_id, lugar_id: m.lugar_id } });
+      if (st) await db.stock.update({ where: { id: st.id }, data: { cantidad: { increment: m.cantidad } } });
+      else await db.stock.create({ data: { producto_id: m.producto_id, lugar_id: m.lugar_id, cantidad: m.cantidad } });
+    } else continue;
+    await db.movimientoStock.create({
+      data: {
+        tipo: 'ANULACION',
+        producto_id: m.producto_id,
+        sabor_id: m.sabor_id ?? null,
+        lugar_id: m.lugar_id,
+        cantidad: m.cantidad,
+        pedido_id: null,
+        cortesia_id: cortesiaId,
+        movimiento_anulado_id: m.id,
+        por,
+        nota: `Anulación de cortesía ${cortesiaId}`,
+      },
+    });
+  }
+  for (const sid of sabores) {
+    const saldo = await saldoSabor(db, sid);
+    if (saldo > 0) await sincronizarAgotadoSabor(db, sid, saldo, ahora, por);
+  }
+  for (const pid of productos) {
+    const saldo = await saldoProducto(db, pid);
+    if (saldo > 0) await sincronizarAgotadoProducto(db, pid, saldo, ahora);
+  }
+  return movs.length;
 }

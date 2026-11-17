@@ -97,6 +97,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Cortesías (venta a costo 0): libres para ADMIN, SUPERVISOR, CAJERO y MOZO (sin código); motivo obligatorio y queda auditada. Ver el informe: Caja y ADMIN
   { modulo: 'cortesias', accion: 'dar' },
   { modulo: 'cortesias', accion: 'ver' },
+  // Anular una cortesía por separado (devuelve el stock): solo ADMIN y Caja; motivo obligatorio y queda auditada
+  { modulo: 'cortesias', accion: 'anular' },
   { modulo: 'repartos', accion: 'proponer_ubicacion' },
   // Cambio de forma de pago en la puerta: el repartidor solicita; Caja, Admin y Supervisor validan
   { modulo: 'repartos', accion: 'solicitar_cambio_cobro' },
@@ -297,6 +299,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/cargo_libre',
     'cortesias/dar',
     'cortesias/ver',
+    'cortesias/anular',
     'creditos/cobrar_ahora',
     'caja/abrir',
     'caja/cobrar',

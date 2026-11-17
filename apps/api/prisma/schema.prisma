@@ -1460,6 +1460,8 @@ model MovimientoStock {
   pedido_linea_id       BigInt?
   nota                  String?
   movimiento_anulado_id BigInt?
+  /// Cortesía por separado que originó este movimiento CORTESIA (NULL en las anteriores a la anulación de cortesías)
+  cortesia_id           BigInt?
   por                   BigInt
   en                    DateTime          @default(now()) @db.Timestamptz
 
@@ -1474,6 +1476,7 @@ model MovimientoStock {
   movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
 
   @@index([pedido_linea_id])
+  @@index([cortesia_id])
   @@map("movimiento_stock")
 }
 
@@ -3085,6 +3088,10 @@ model Cortesia {
   dada_por_party_id     BigInt
   autorizada_por_party_id BigInt?
   creado_en             DateTime  @default(now()) @db.Timestamptz
+  /// Anulación de una cortesía por separado: devuelve el stock; una anulada no cuenta en informes
+  anulada_en            DateTime? @db.Timestamptz
+  anulada_por_party_id  BigInt?
+  motivo_anulacion      String?
   producto              Producto  @relation(fields: [producto_id], references: [id], onDelete: Restrict)
   sabor                 Sabor?    @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
   pedido                Pedido?   @relation("CortesiaPedido", fields: [pedido_id], references: [id], onDelete: Restrict)

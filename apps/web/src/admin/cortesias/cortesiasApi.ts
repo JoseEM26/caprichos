@@ -9,6 +9,9 @@ export const MOTIVOS_CORTESIA = [
   { codigo: 'OTRO', etiqueta: 'Otro' },
 ] as const;
 
+/** Letras mínimas del motivo al anular una cortesía (igual que en el servidor). */
+export const MOTIVO_ANULACION_MINIMO = 5;
+
 export interface DatosCortesia {
   motivo: string;
   nota?: string;
@@ -43,6 +46,10 @@ export interface ResumenInformeCortesias {
     pedidoReferencia: string | null;
     dadaPor: string;
     autorizadaPor: string | null;
+    anulada: boolean;
+    motivoAnulacion: string | null;
+    /** Cortesía por separado y vigente: se puede anular. */
+    anulable: boolean;
   }[];
 }
 
@@ -55,6 +62,11 @@ export const cortesiasApi = {
   /** Cortesía por separado, con su pedido de referencia. */
   registrarSeparada(datos: RegistrarCortesiaSeparada) {
     return api.post('/admin/cortesias', datos);
+  },
+
+  /** Anula una cortesía por separado: devuelve el stock. Motivo obligatorio. */
+  anular(id: string, motivo: string) {
+    return api.post(`/admin/cortesias/${id}/anular`, { motivo });
   },
 
   /** Informe y listado: rango de fechas (AAAA-MM-DD), motivo y producto opcionales. */

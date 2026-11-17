@@ -85,6 +85,9 @@ describe('filasInformeCortesias', () => {
         pedidoReferencia: null,
         dadaPor: 'Caja Uno',
         autorizadaPor: null,
+        anulada: false,
+        motivoAnulacion: null,
+        anulable: false,
       },
     ],
   };
