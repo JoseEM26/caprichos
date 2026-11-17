@@ -15,11 +15,13 @@ interface Props {
   rango: RangoPedidos;
   /** Pedidos de días anteriores aún en curso o con pago pendiente */
   pendientesAnteriores: number;
+  /** Programados y encargos vigentes (de hoy en adelante, aún sin pasar a cola) */
+  programadosVigentes: number;
   alCambiar: (rango: RangoPedidos) => void;
 }
 
 /** Cabecera de la lista de Pedidos y caja: elige el día (o rango) que se muestra. */
-export function FiltroDiasPedidos({ rango, pendientesAnteriores, alCambiar }: Props) {
+export function FiltroDiasPedidos({ rango, pendientesAnteriores, programadosVigentes, alCambiar }: Props) {
   const idBase = useId();
   const hoy = hoyLima();
   const [panelAbierto, setPanelAbierto] = useState<boolean>(rango.modo === 'rango');
@@ -37,6 +39,7 @@ export function FiltroDiasPedidos({ rango, pendientesAnteriores, alCambiar }: Pr
     ...(pendientesAnteriores > 0 || rango.modo === 'pendientes'
       ? [{ valor: 'pendientes', etiqueta: 'Pendientes de días anteriores', cantidad: pendientesAnteriores }]
       : []),
+    { valor: 'programados', etiqueta: 'Programados / encargos', cantidad: programadosVigentes },
   ];
 
   const elegirOpcion = (v: string) => {
@@ -47,6 +50,7 @@ export function FiltroDiasPedidos({ rango, pendientesAnteriores, alCambiar }: Pr
     setPanelAbierto(false);
     if (v === 'hoy') alCambiar(rangoHoy(hoy));
     else if (v === 'pendientes') alCambiar({ modo: 'pendientes', desde: '', hasta: '' });
+    else if (v === 'programados') alCambiar({ modo: 'programados', desde: '', hasta: '' });
     else alCambiar(rangoPara(v as 'ayer' | 'semana', hoy));
   };
 

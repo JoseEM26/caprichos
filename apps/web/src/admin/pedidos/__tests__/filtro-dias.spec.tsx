@@ -74,7 +74,7 @@ describe('Filtro de días en Pedidos y caja', () => {
 
   /** Llamadas a listar que piden la lista (no el conteo ligero de pendientes, limite 1) */
   const llamadasLista = () =>
-    listar.mock.calls.map((c) => c[0]).filter((f: any) => !(f?.pendientes && f?.limite === 1));
+    listar.mock.calls.map((c) => c[0]).filter((f: any) => !(f?.pendientes && f?.limite === 1) && !(f?.programados && !f?.resumen));
 
   it('por defecto muestra hoy en Lima (desde = hasta = hoy de Lima) y el chip Hoy activo', async () => {
     render(<PedidosAdminView />);

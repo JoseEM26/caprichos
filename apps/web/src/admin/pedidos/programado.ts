@@ -92,3 +92,13 @@ export function textoPagoProgramado(p: Pick<Pedido, 'total' | 'pago_estado' | 'a
   if (adelanto > 0) return `Adelanto ${soles(adelanto)} · Saldo ${soles(Math.max(0, total - adelanto))}`;
   return `Sin pagar · Saldo ${soles(total)}`;
 }
+
+/**
+ * «Programados para otros días» de la lista: los de la lista cargada y los vigentes de «Programados / encargos»,
+ * sin repetir, por fecha pactada. Así la sección no depende del filtro de días.
+ */
+export function otrosDiasProgramados<T extends Pick<Pedido, 'id' | 'estado' | 'programado_para'>>(enLista: T[], vigentes: T[], ahora: Date = new Date()): T[] {
+  const porId = new Map<string, T>();
+  for (const p of [...separarProgramadosOtrosDias(enLista, ahora).otrosDias, ...separarProgramadosOtrosDias(vigentes, ahora).otrosDias]) porId.set(String(p.id), p);
+  return [...porId.values()].sort((a, b) => new Date(a.programado_para as string).getTime() - new Date(b.programado_para as string).getTime());
+}

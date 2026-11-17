@@ -52,7 +52,7 @@ describe('PedidosEstadoService.listar: día completo paginado y resumen', () => 
     await service.listar({ desde: '2026-10-29', hasta: '2026-10-29', limite: 100 }, cajero);
     const args = prisma.pedido.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ creado_en: 'desc' }, { id: 'desc' }]);
-    expect(args.where.creado_en).toEqual({ gte: new Date('2026-10-29T05:00:00Z'), lt: new Date('2026-10-30T05:00:00Z') });
+    expect(args.where.AND[0].OR[0].creado_en).toEqual({ gte: new Date('2026-10-29T05:00:00Z'), lt: new Date('2026-10-30T05:00:00Z') });
   });
 
   it('no filtra por estado: entran activos, entregados, anulados y rechazados', async () => {

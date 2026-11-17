@@ -2,7 +2,7 @@
 
 export const MAX_DIAS_RANGO = 31;
 
-export type ModoDias = 'hoy' | 'ayer' | 'semana' | 'rango' | 'pendientes';
+export type ModoDias = 'hoy' | 'ayer' | 'semana' | 'rango' | 'pendientes' | 'programados';
 
 export interface RangoPedidos {
   modo: ModoDias;
@@ -25,7 +25,7 @@ export function rangoHoy(hoy: string = hoyLima()): RangoPedidos {
   return { modo: 'hoy', desde: hoy, hasta: hoy };
 }
 
-export function rangoPara(modo: Exclude<ModoDias, 'rango' | 'pendientes'>, hoy: string = hoyLima()): RangoPedidos {
+export function rangoPara(modo: Exclude<ModoDias, 'rango' | 'pendientes' | 'programados'>, hoy: string = hoyLima()): RangoPedidos {
   if (modo === 'ayer') {
     const ayer = sumarDias(hoy, -1);
     return { modo, desde: ayer, hasta: ayer };
@@ -37,8 +37,9 @@ export function rangoPara(modo: Exclude<ModoDias, 'rango' | 'pendientes'>, hoy: 
 }
 
 /** Parámetros de GET /admin/pedidos para el rango elegido. */
-export function parametrosDeRango(r: RangoPedidos): { desde?: string; hasta?: string; pendientes?: boolean } {
+export function parametrosDeRango(r: RangoPedidos): { desde?: string; hasta?: string; pendientes?: boolean; programados?: boolean } {
   if (r.modo === 'pendientes') return { pendientes: true };
+  if (r.modo === 'programados') return { programados: true };
   return { desde: r.desde, hasta: r.hasta };
 }
 
@@ -67,6 +68,7 @@ export function fechaCorta(fechaIso: string): string {
 /** Texto del rango activo: «hoy, 29 oct», «ayer, 28 oct», «22 oct – 28 oct», «pendientes de días anteriores». */
 export function textoRango(r: RangoPedidos, hoy: string = hoyLima()): string {
   if (r.modo === 'pendientes') return 'pendientes de días anteriores';
+  if (r.modo === 'programados') return 'programados y encargos';
   if (r.modo === 'hoy') return `hoy, ${fechaCorta(hoy)}`;
   if (r.modo === 'ayer') return `ayer, ${fechaCorta(r.desde)}`;
   if (r.desde === r.hasta) return fechaCorta(r.desde);

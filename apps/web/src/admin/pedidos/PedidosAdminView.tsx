@@ -39,7 +39,7 @@ import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from '
 
 /** ¿El pedido nuevo cae dentro del día o rango que se ve? (los de «pendientes» son de días anteriores: uno recién creado no entra) */
 export function enRangoVisible(creadoEn: string, r: RangoPedidos): boolean {
-  if (r.modo === 'pendientes') return false;
+  if (r.modo === 'pendientes' || r.modo === 'programados') return false;
   const dia = hoyLima(new Date(creadoEn));
   const rr = r.modo === 'hoy' ? rangoHoy() : r;
   return dia >= rr.desde && dia <= rr.hasta;
@@ -48,7 +48,7 @@ import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { ContadorDia, enContador, filasDePedidos, resumirDia, type ResumenDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
-import { separarProgramadosOtrosDias } from './programado';
+import { esProgramadoOtroDia, otrosDiasProgramados, separarProgramadosOtrosDias } from './programado';
 import { TarjetaCuentaCaja } from './TarjetaCuentaCaja';
 import { agruparCuentas } from './agruparCuentas';
 import { VentanaDetalle } from './VentanaDetalle';
@@ -203,6 +203,16 @@ async function contarPendientesAnteriores(): Promise<number | null> {
   }
 }
 
+/** Programados y encargos vigentes (de hoy en adelante, aún sin pasar a cola): salen en «Programados para otros días» con cualquier filtro. */
+async function cargarProgramadosVigentes(): Promise<{ items: Pedido[]; total: number } | null> {
+  try {
+    const r = await pedidosApi.listar({ programados: true, limite: 100 });
+    return { items: r.items || [], total: r.total ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
 const TEXTO_CONTADOR: Record<ContadorDia, string> = {
   entregados: 'Solo entregados',
   anulados: 'Solo anulados',
@@ -236,6 +246,8 @@ export function PedidosAdminView() {
   // Pedido abierto por ?pedido= que no está en la lista cargada (otro día, o más allá de lo cargado)
   const [pedidoExterno, setPedidoExterno] = useState<Pedido | null>(null);
   const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
+  const [programadosVigentes, setProgramadosVigentes] = useState<Pedido[]>([]);
+  const [totalProgramados, setTotalProgramados] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
   const [cortesiaSeparadaAbierta, setCortesiaSeparadaAbierta] = useState(false);
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
@@ -347,15 +359,20 @@ export function PedidosAdminView() {
     const rangoActual = rango.modo === 'hoy' ? rangoHoy() : rango;
     try {
       // Se vuelven a leer todas las páginas ya cargadas, para que un refresco no recorte lo que ya se ve
-      const [paginas, pendientes] = await Promise.all([
+      const [paginas, pendientes, vigentes] = await Promise.all([
         Promise.all(
           Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
             pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
           ),
         ),
         contarPendientesAnteriores(),
+        cargarProgramadosVigentes(),
       ]);
       if (g !== generacion.current) return;
+      if (vigentes) {
+        setProgramadosVigentes(vigentes.items);
+        setTotalProgramados(vigentes.total);
+      }
       setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || [])));
       setRelacionados(unirSinRepetir([], paginas.flatMap((r) => r.relacionados || [])));
       setTotalDia(paginas[0].total ?? 0);
@@ -635,7 +652,17 @@ export function PedidosAdminView() {
   );
 
   // Programados para OTRO día: van al final, en su propio encabezado plegable y por fecha pactada (no cuentan en el día ni se paginan con él)
-  const { normales: pedidosDelDia, otrosDias: programadosOtrosDias } = useMemo(() => separarProgramadosOtrosDias(pedidosFiltrados), [pedidosFiltrados]);
+  // En «Programados / encargos» la lista son solo programados: no se separan. Con cualquier otro filtro, la sección sale
+  // siempre de los programados vigentes (aunque el filtro de días los excluya), sin repetir los de la lista.
+  const enModoProgramados = rango.modo === 'programados';
+  const separados = useMemo(() => separarProgramadosOtrosDias(pedidosFiltrados), [pedidosFiltrados]);
+  const pedidosDelDia = enModoProgramados ? pedidosFiltrados : separados.normales;
+  const programadosOtrosDias = useMemo(
+    () => (enModoProgramados ? [] : otrosDiasProgramados(separados.otrosDias, programadosVigentes)),
+    [enModoProgramados, separados.otrosDias, programadosVigentes],
+  );
+  // Un programado de otro día no cuenta en el resumen ni en los montos del día (solo cuando su día llegue)
+  const pedidosDelDiaCargados = useMemo(() => pedidos.filter((p) => !esProgramadoOtroDia(p)), [pedidos]);
 
   // Tarjetas: cada «cuenta» (original + extras) es UNA tarjeta; un pedido sin extras es una tarjeta como siempre.
   // La paginación y el «N de M» cuentan tarjetas; los contadores y el resumen siguen contando pedidos.
@@ -716,14 +743,14 @@ export function PedidosAdminView() {
 
   // Resumen: con toda la lista cargada se cuenta lo que se ve (en vivo con el socket); si faltan páginas, el conteo agrupado del servidor
   const resumen = useMemo(
-    () => (resumenApi && pedidos.length < totalDia ? resumirDia(resumenApi) : resumirDia(filasDePedidos(pedidos))),
-    [pedidos, totalDia, resumenApi],
+    () => (resumenApi && pedidos.length < totalDia ? resumirDia(resumenApi) : resumirDia(filasDePedidos(pedidosDelDiaCargados))),
+    [pedidos, pedidosDelDiaCargados, totalDia, resumenApi],
   );
   // Los montos siguen lo que se ve: con algún filtro (contador, estado, canal, medio, búsqueda, pastilla) suman SOLO esos pedidos
   const filtrado = pedidosFiltrados.length !== pedidos.length;
   const montos: ResumenDia = useMemo(
-    () => (filtrado ? resumirDia(filasDePedidos(pedidosFiltrados)) : resumen),
-    [filtrado, pedidosFiltrados, resumen],
+    () => (filtrado ? resumirDia(filasDePedidos(pedidosDelDia)) : resumen),
+    [filtrado, pedidosDelDia, resumen],
   );
 
   // Cerrar el panel de Filtros y el menú «Más» con un clic fuera o Escape
@@ -1076,7 +1103,7 @@ export function PedidosAdminView() {
                     setPaginaActual(1);
                   }}
                 />
-                <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
+                <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} programadosVigentes={totalProgramados} alCambiar={cambiarRango} />
                 <FiltroCombo
                   etiqueta="Canal"
                   valor={canalFiltro}

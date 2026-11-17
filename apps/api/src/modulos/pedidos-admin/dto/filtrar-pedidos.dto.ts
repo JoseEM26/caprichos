@@ -53,6 +53,20 @@ export class FiltrarPedidosDto {
   @Max(100)
   limite?: number | 'todas';
 
+  /** '1': solo pedidos PROGRAMADO («Programados / encargos»), por fecha pactada; ignora pendientes y desde/hasta. */
+  @IsOptional()
+  @IsIn(['1'])
+  programados?: string;
+
+  /** Con programados=1: fecha de entrega desde/hasta (YYYY-MM-DD de Lima). Sin ellas, desde hoy en adelante. */
+  @IsOptional()
+  @IsString()
+  entregaDesde?: string;
+
+  @IsOptional()
+  @IsString()
+  entregaHasta?: string;
+
   /** Medios de pago (uno o varios separados por coma): YAPE,PLIN,TARJETA,EFECTIVO,TRANSFERENCIA, y CULQI (pagado por la pasarela). */
   @IsOptional()
   @Matches(/^(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA|CULQI)(,(YAPE|PLIN|TARJETA|EFECTIVO|TRANSFERENCIA|CULQI))*$/, {

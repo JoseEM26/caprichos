@@ -295,6 +295,11 @@ export interface FiltrosListarPedidos {
   hasta?: string;
   /** Solo días anteriores en curso o con pago pendiente (ignora desde/hasta) */
   pendientes?: boolean;
+  /** Solo programados («Programados / encargos»), por fecha de entrega; ignora pendientes y desde/hasta */
+  programados?: boolean;
+  /** Con programados: fecha de entrega desde/hasta (YYYY-MM-DD de Lima) */
+  entregaDesde?: string;
+  entregaHasta?: string;
   /** Pide también el conteo agrupado por estado y cobro de todo el filtro */
   resumen?: boolean;
   /** Medios de pago (EFECTIVO, YAPE...); el servidor deja los pedidos pagados con alguno de ellos */
@@ -517,6 +522,9 @@ export const pedidosApi = {
     if (filtros.desde) params.append('desde', filtros.desde);
     if (filtros.hasta) params.append('hasta', filtros.hasta);
     if (filtros.pendientes) params.append('pendientes', '1');
+    if (filtros.programados) params.append('programados', '1');
+    if (filtros.entregaDesde) params.append('entregaDesde', filtros.entregaDesde);
+    if (filtros.entregaHasta) params.append('entregaHasta', filtros.entregaHasta);
     if (filtros.resumen) params.append('resumen', '1');
     if (filtros.medios?.length) params.append('medios', filtros.medios.join(','));
 

@@ -85,6 +85,17 @@ const ESTADOS_EN_CURSO_PENDIENTES = ['COLA', 'NUEVO', 'PREPARANDO', 'PREP', 'LIS
 /** Fecha sola YYYY-MM-DD (día de Lima). */
 const ES_FECHA_SOLA = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Rango de una fecha (creado_en o programado_para): YYYY-MM-DD = día de Lima, hasta inclusivo; con hora se usa tal cual. */
+function rangoFechasLima(desde?: string, hasta?: string): { gte?: Date; lt?: Date; lte?: Date } {
+  const rango: { gte?: Date; lt?: Date; lte?: Date } = {};
+  if (desde) rango.gte = ES_FECHA_SOLA.test(desde) ? inicioDiaLimaDeFecha(desde) : new Date(desde);
+  if (hasta) {
+    if (ES_FECHA_SOLA.test(hasta)) rango.lt = inicioDiaLimaDeFecha(sumarDiasFechaIso(hasta, 1));
+    else rango.lte = new Date(hasta);
+  }
+  return rango;
+}
+
 /** Estados todavía no entregados ni anulados (para el resumen de "Mis pedidos"). */
 const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
 
@@ -267,6 +278,8 @@ export class PedidosEstadoService {
    */
   async listar(filtros: FiltrarPedidosDto, usuarioActual?: UsuarioAutenticado) {
     const where: any = {};
+    // Fin del rango de días pedido: los programados para un día posterior no cuentan en el resumen de ese día
+    let finDelRango: Date | undefined;
 
     if (filtros.estado) {
       // Uno o varios estados separados por coma
@@ -279,7 +292,12 @@ export class PedidosEstadoService {
     if (filtros.modalidad) {
       where.modalidad = filtros.modalidad;
     }
-    if (filtros.pendientes === '1') {
+    if (filtros.programados === '1') {
+      // «Programados / encargos»: solo PROGRAMADO, por fecha pactada (desde hoy en adelante si no se pone rango)
+      where.estado = 'PROGRAMADO';
+      const entrega = rangoFechasLima(filtros.entregaDesde, filtros.entregaHasta);
+      where.programado_para = Object.keys(entrega).length ? entrega : { gte: obtenerInicioDiaLima() };
+    } else if (filtros.pendientes === '1') {
       // Días anteriores (hoy en Lima excluido) que siguen en curso o con pago pendiente
       where.creado_en = { lt: obtenerInicioDiaLima() };
       where.estado = { notIn: ['ANULADO', 'RECHAZADO', 'PROGRAMADO'] };
@@ -292,20 +310,20 @@ export class PedidosEstadoService {
         },
       ];
     } else if (filtros.desde || filtros.hasta) {
-      // Fechas YYYY-MM-DD = día calendario de Lima, hasta inclusivo; con hora se usa tal cual
-      where.creado_en = {};
-      if (filtros.desde) {
-        where.creado_en.gte = ES_FECHA_SOLA.test(filtros.desde)
-          ? inicioDiaLimaDeFecha(filtros.desde)
-          : new Date(filtros.desde);
-      }
-      if (filtros.hasta) {
-        if (ES_FECHA_SOLA.test(filtros.hasta)) {
-          where.creado_en.lt = inicioDiaLimaDeFecha(sumarDiasFechaIso(filtros.hasta, 1));
-        } else {
-          where.creado_en.lte = new Date(filtros.hasta);
-        }
-      }
+      const rango = rangoFechasLima(filtros.desde, filtros.hasta);
+      finDelRango = rango.lt ?? rango.lte;
+      // Los programados vigentes (aún PROGRAMADO, de hoy o de días siguientes) salen con cualquier filtro de días desde
+      // que se crean hasta que pasen a cola o se anulen: se acota por la creación hasta el fin del rango pedido.
+      const finRango = rango.lt ? { lt: rango.lt } : rango.lte ? { lte: rango.lte } : {};
+      where.AND = [
+        {
+          OR: [
+            { creado_en: rango },
+            { programado_para: rango },
+            { estado: 'PROGRAMADO', programado_para: { gte: obtenerInicioDiaLima() }, ...(Object.keys(finRango).length ? { creado_en: finRango } : {}) },
+          ],
+        },
+      ];
     }
     if (filtros.buscar) {
       const q = filtros.buscar.trim();
@@ -350,18 +368,24 @@ export class PedidosEstadoService {
       filtros.limite === 'todas' ? LIMITE_TODAS : Math.min(100, Math.max(1, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
 
+    // El resumen del día no cuenta programados para un día posterior (su adelanto ya entró a la caja del día en que se recibió)
+    const whereResumen = finDelRango
+      ? { ...where, AND: [...(Array.isArray(where.AND) ? where.AND : []), { NOT: { estado: 'PROGRAMADO', programado_para: { gte: finDelRango } } }] }
+      : where;
+
     const [total, pedidos, umbrales, grupos] = await Promise.all([
       this.prisma.pedido.count({ where }),
       this.prisma.pedido.findMany({
         where,
         skip,
         take: limite,
-        orderBy: [{ creado_en: 'desc' }, { id: 'desc' }], // id desempata: la paginación no pierde ni repite pedidos del mismo instante
+        // id desempata: la paginación no pierde ni repite pedidos del mismo instante
+        orderBy: filtros.programados === '1' ? [{ programado_para: 'asc' }, { id: 'asc' }] : [{ creado_en: 'desc' }, { id: 'desc' }],
         include: INCLUIR_LISTA,
       }),
       this.obtenerUmbrales(),
       filtros.resumen === '1'
-        ? this.prisma.pedido.groupBy({ by: ['estado', 'pago_estado'], where, _count: { _all: true }, _sum: { total: true } })
+        ? this.prisma.pedido.groupBy({ by: ['estado', 'pago_estado'], where: whereResumen, _count: { _all: true }, _sum: { total: true } })
         : Promise.resolve(null),
     ]);
 
