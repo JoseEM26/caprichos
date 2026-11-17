@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Insignia } from '../../comun/Insignia';
 import { jornadaActual } from './jornada';
@@ -14,9 +14,15 @@ type Tipo = 'ADELANTO' | 'DESCUENTO' | 'BONO';
  * Pestaña «Descuentos y créditos». Arriba lo que se descuenta este período (cada check se guarda al instante);
  * abajo, los formularios para registrar algo nuevo, plegados y cerrados por defecto.
  */
-export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
+export function PestanaDescuentos({ c, alCambiarBorrador }: { c: CtlPlanilla; alCambiarBorrador?: (sucio: boolean) => void }) {
   const { d, pagado, ocupado } = c;
   const [aj, setAj] = useState({ tipo: 'DESCUENTO' as 'ADELANTO' | 'DESCUENTO' | 'BONO', categoria: 'OTRO', fecha: jornadaActual(), monto: '', motivo: '' });
+  // el texto a medio escribir en el formulario de ajuste lo sabe la página de la persona (para pedir confirmación al cambiar)
+  useEffect(() => {
+    const sucio = aj.monto !== '' || aj.motivo !== '';
+    alCambiarBorrador?.(sucio);
+    return () => alCambiarBorrador?.(false);
+  }, [aj.monto, aj.motivo, alCambiarBorrador]);
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
   const res = resumenCalculo(d);
   const adelantos = d.ajustes.filter((a) => a.tipo === 'ADELANTO');

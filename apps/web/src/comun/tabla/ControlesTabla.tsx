@@ -41,21 +41,29 @@ export function ConmutadorVista<V extends keyof typeof ROTULO_VISTA = VistaLista
   vista,
   alCambiar,
   opciones = ['tarjetas', 'tabla'] as unknown as V[],
+  etiquetas = {},
+  titulo = 'Vista de la lista',
 }: {
   vista: V;
   alCambiar: (v: V) => void;
   opciones?: readonly V[];
+  /** Rótulo distinto para una vista (la planilla llama «Cuadrícula» a las tarjetas). */
+  etiquetas?: Partial<Record<V, string>>;
+  titulo?: string;
 }) {
   return (
-    <div className="cj2-vista" role="group" aria-label="Vista de la lista">
-      {opciones.map((v) => (
-        <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} aria-label={ROTULO_VISTA[v]} title={ROTULO_VISTA[v]} onClick={() => alCambiar(v)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d={ICONO_VISTA[v]} />
-          </svg>
-          <span className="cj2-vista-txt">{ROTULO_VISTA[v]}</span>
-        </button>
-      ))}
+    <div className="cj2-vista" role="group" aria-label={titulo}>
+      {opciones.map((v) => {
+        const rotulo = etiquetas[v] ?? ROTULO_VISTA[v];
+        return (
+          <button key={v} type="button" className="cj2-vista-op" aria-pressed={vista === v} aria-label={rotulo} title={rotulo} onClick={() => alCambiar(v)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={ICONO_VISTA[v]} />
+            </svg>
+            <span className="cj2-vista-txt">{rotulo}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
 import { Paginacion } from '../../comun/Paginacion';
+import { ConmutadorVista } from '../../comun/tabla/ControlesTabla';
 import { ETIQUETAS_ROLES } from '../usuarios/roles';
 import { jornadaActual, useUltimaPeticion } from './jornada';
 import { coincide } from './buscar';
@@ -23,6 +24,33 @@ type Orden = 'NOMBRE' | 'NETO' | 'ALERTAS';
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const POR_PAGINA = 12;
+type VistaPlanilla = 'lista' | 'tabla' | 'tarjetas';
+const VISTAS_PLANILLA: readonly VistaPlanilla[] = ['lista', 'tabla', 'tarjetas'];
+const CLAVE_VISTA = 'caprichos.asistencia.planilla.vista';
+/** Vista elegida, guardada en este equipo (el servidor solo guarda preferencias de Caja y Cierre). */
+const leerVistaGuardada = (): VistaPlanilla | null => {
+  try {
+    const v = window.localStorage.getItem(CLAVE_VISTA) as VistaPlanilla | null;
+    return v && VISTAS_PLANILLA.includes(v) ? v : null;
+  } catch {
+    return null;
+  }
+};
+const esCelular = () => {
+  try { return window.matchMedia('(max-width: 699px)').matches; } catch { return false; }
+};
+const horasDe = (f: FilaPlanilla) => (f.excel ? `${f.excel.horasLaboradas} h ${f.excel.minutosLaborados} min` : f.trabajadasH !== undefined ? `${f.trabajadasH} h` : '—');
+const descuentosDe = (f: FilaPlanilla) => f.excel?.descuentos ?? f.descuentos ?? 0;
+const modalidadDe = (f: FilaPlanilla) => (!f.sueldo ? 'Sin sueldo' : f.sueldo.metodo === 'TARIFA_HORA' ? 'Por hora' : f.sueldo.modalidad === 'SEMANAL' ? 'Semanal' : 'Mensual');
+const insigniaEstado = (f: FilaPlanilla) => (
+  <>
+    {f.estado === 'PAGADO' ? <Insignia variante="exito">LIQUIDADO</Insignia>
+      : f.pendientes ? <Insignia variante="aviso">{f.pendientes} por revisar</Insignia>
+      : f.estado ? <Insignia variante="neutro">Abierto</Insignia> : null}
+    {!!f.consumosAnterioresPendiente && <Insignia variante="peligro">Créditos pendientes</Insignia>}
+  </>
+);
+const avisoDe = (f: FilaPlanilla) => f.aviso && <small className={`pl-aviso${f.fueraDeModalidad ? ' pl-aviso--fuera' : ''}`}>{f.aviso}</small>;
 
 const penalidadDe = (f: FilaPlanilla) => f.excel?.penalidadTardanza ?? f.penalidad ?? 0;
 const prestamosDe = (f: FilaPlanilla) => f.excel?.descuentosPorCategoria?.PRESTAMO ?? 0;
@@ -58,6 +86,13 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   const personaParam = Number(params.get('persona')) || 0;
   const desdeParam = ISO.test(params.get('desde') ?? '') ? params.get('desde')! : fecha;
   const seccion = (SECCIONES.includes(params.get('seccion') as SeccionPlanilla) ? params.get('seccion') : 'resumen') as SeccionPlanilla;
+  // vista de la lista: lo elegido en este equipo; si no hay, lista en celular y tabla en escritorio
+  const [vistaGuardada, setVistaGuardada] = useState<VistaPlanilla | null>(leerVistaGuardada);
+  const formato: VistaPlanilla = vistaGuardada ?? (esCelular() ? 'lista' : 'tabla');
+  const elegirVista = (v: VistaPlanilla) => {
+    setVistaGuardada(v);
+    try { window.localStorage.setItem(CLAVE_VISTA, v); } catch { /* sin almacenamiento: vale en esta sesión */ }
+  };
 
   /** Cambia partes de la URL (null borra). `replace`: los ajustes de la misma pantalla no llenan el historial. */
   const poner = useCallback((cambios: Record<string, string | null>, replace = true) => {
@@ -104,9 +139,20 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   [filas, estado, rol, texto, orden]);
 
   if (personaParam > 0) {
+    // vecinas en la lista visible (con búsqueda, filtros y orden); cambiar de persona solo toca ?persona= (replace)
+    const posicion = visibles.findIndex((f) => f.partyId === personaParam);
+    const vecinos = posicion < 0 ? undefined : {
+      posicion: posicion + 1,
+      total: visibles.length,
+      anterior: posicion > 0 ? visibles[posicion - 1] : null,
+      siguiente: posicion < visibles.length - 1 ? visibles[posicion + 1] : null,
+    };
     return (
       <PlanillaPersona
+        key={personaParam}
         partyId={personaParam}
+        vecinos={vecinos}
+        irAPersona={(f) => poner({ persona: String(f.partyId) })}
         fecha={desdeParam}
         seccion={seccion}
         onSeccion={(s) => poner({ seccion: s === 'resumen' ? null : s })}
@@ -126,6 +172,9 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
     return errorLista ? <EstadoError titulo="No pudimos cargar la planilla" mensaje={errorLista} alReintentar={() => void cargar()} /> : <Cargando mensaje="Cargando planilla" />;
   }
   const abrir = (f: FilaPlanilla, desde: string) => poner({ persona: String(f.partyId), desde, seccion: null }, false);
+  const botonAbrir = (f: FilaPlanilla) => f.sueldo
+    ? <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Abrir la planilla de ${f.nombre}`} onClick={() => abrir(f, f.abrirFecha ?? f.periodo?.desde ?? fecha)}>Abrir</Boton>
+    : <small className="as-nota">Sin sueldo</small>;
   const quitarFiltros = () => filtrar({ estado: null, rol: null, q: null });
   const hoy = jornadaActual();
   const vista = enRango ? { desde: rd, hasta: rh } : rangoDe(modo, fecha);
@@ -192,6 +241,7 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
       )}
       <div className="pl-barra">
         <span className="as-nota">{vista.desde} a {vista.hasta}{esActual ? ' · en curso' : ''} · {enRango ? `${enTotales.length} personas` : `${pagados} de ${enTotales.length} pagados`}</span>
+        <ConmutadorVista vista={formato} opciones={VISTAS_PLANILLA} etiquetas={{ tarjetas: 'Cuadrícula' }} titulo="Vista de la planilla" alCambiar={elegirVista} />
         {!enRango && (
           <label className="as-campo pl-dia">Día del período
             <input type="date" value={fecha} onChange={(e) => e.target.value && filtrar({ fecha: e.target.value })} />
@@ -229,6 +279,72 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
         <EstadoVacio titulo="Sin personal" descripcion="Cuando haya usuarios activos, aparecerán aquí." />
       ) : visibles.length === 0 ? (
         <EstadoVacio titulo="Nadie con ese filtro" descripcion="Cambia el estado, el rol o el nombre." accion={<Boton type="button" variante="secundario" tamano="pequeno" onClick={quitarFiltros}>Quitar filtros</Boton>} />
+      ) : formato === 'lista' ? (
+        <ul className="pl-filas" aria-label="Personas de la planilla">
+          {enPagina.map((f) => (
+            <li key={f.partyId} className="pl-fila">
+              <div className="pl-fila-id">
+                <span className="pl-nombre">{f.nombre}</span>
+                <small className="as-nota">{f.rol ? nombreRol(f.rol) : 'Sin rol'}</small>
+                {insigniaEstado(f)}
+                {avisoDe(f)}
+              </div>
+              <dl className="pl-fila-cifras">
+                <div><dt>Horas</dt><dd>{horasDe(f)}</dd></div>
+                <div><dt>Bruto</dt><dd>{soles(totalDe(f))}</dd></div>
+                <div><dt>Descuentos</dt><dd>{soles(descuentosDe(f))}</dd></div>
+                <div className="pl-fila-neto"><dt>{f.fueraDeModalidad ? 'Su mes' : enRango ? 'Estimado' : 'Neto'}</dt><dd>{soles(netoDe(f))}</dd></div>
+              </dl>
+              <div className="pl-fila-accion">{botonAbrir(f)}</div>
+            </li>
+          ))}
+        </ul>
+      ) : formato === 'tabla' ? (
+        <div className="pl-tabla-wrap">
+          <table className="pl-tabla" aria-label="Planilla por persona">
+            <thead>
+              <tr>
+                <th scope="col" aria-sort={orden === 'NOMBRE' ? 'ascending' : undefined}><button type="button" onClick={() => filtrar({ orden: null })}>Persona</button></th>
+                <th scope="col">Modalidad</th>
+                <th scope="col">Horas</th>
+                <th scope="col">Ganado</th>
+                <th scope="col">Adelantos</th>
+                <th scope="col">Descuentos</th>
+                <th scope="col">Penalidad</th>
+                <th scope="col" aria-sort={orden === 'NETO' ? 'descending' : undefined}><button type="button" onClick={() => filtrar({ orden: 'NETO' })}>{enRango ? 'Estimado' : 'A pagar'}</button></th>
+                <th scope="col">Estado</th>
+                <th scope="col">Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {enPagina.map((f) => (
+                <tr key={f.partyId}>
+                  <th scope="row"><span className="pl-nombre">{f.nombre}</span>{f.rol && <small className="as-nota">{nombreRol(f.rol)}</small>}{avisoDe(f)}</th>
+                  <td>{modalidadDe(f)}</td>
+                  <td>{horasDe(f)}</td>
+                  <td className="pl-num">{soles(totalDe(f))}</td>
+                  <td className="pl-num">{soles(adelantoDe(f))}</td>
+                  <td className="pl-num">{soles(descuentosDe(f))}</td>
+                  <td className={`pl-num${penalidadDe(f) > 0 ? ' pl-malo' : ''}`}>{soles(penalidadDe(f))}</td>
+                  <td className="pl-num pl-tabla-neto">{soles(netoDe(f))}</td>
+                  <td>{insigniaEstado(f)}</td>
+                  <td>{botonAbrir(f)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row" colSpan={3}>Total de {enTotales.length} personas{visibles.length !== enTotales.length ? ' (no suman las de otro período)' : ''}</th>
+                <td className="pl-num">{soles(suma(enTotales, totalDe))}</td>
+                <td className="pl-num">{soles(suma(enTotales, adelantoDe))}</td>
+                <td className="pl-num">{soles(suma(enTotales, descuentosDe))}</td>
+                <td className="pl-num">{soles(suma(enTotales, penalidadDe))}</td>
+                <td className="pl-num pl-tabla-neto">{soles(suma(enTotales, netoDe))}</td>
+                <td colSpan={2}>{enRango ? 'Estimado del rango' : 'Pagado: ' + soles(suma(enTotales, pagadoDe))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       ) : (
         <ul className="pl-lista">
           {enPagina.map((f) => (

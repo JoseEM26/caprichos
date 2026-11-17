@@ -7,7 +7,40 @@
 .pl-total--fuerte dt, .pl-total--fuerte dd { color: var(--cp-cream); }
 .pl-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; }
 .pl-barra strong { font-family: var(--fuente-titulos); font-size: 15px; }
-.pl-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pl-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+/* Cuadrícula: 1 a 4 columnas según el ancho */
+@media (min-width: 560px) { .pl-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .pl-lista { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .pl-lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Lista: una línea por persona (en celular, las cifras bajan a una segunda línea) */
+.pl-filas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
+.pl-fila { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 12px; padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; }
+.pl-fila-id { flex: 1 1 200px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.pl-fila-id .as-nota { flex-basis: 100%; }
+.pl-fila-id .pl-aviso { flex-basis: 100%; }
+.pl-tabla .pl-aviso { display: block; white-space: normal; max-width: 260px; margin-top: 4px; }
+.pl-fila-cifras { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.pl-fila-cifras div { min-width: 0; }
+.pl-fila-cifras dt { font-size: 11px; color: var(--cp-soft); font-weight: 700; }
+.pl-fila-cifras dd { margin: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-fila-neto dd { font-size: 16px; font-weight: 900; }
+.pl-fila-accion { margin-left: auto; }
+/* Tabla: hoja ancha con scroll horizontal propio (la página no se mueve) */
+.pl-tabla-wrap { max-width: 100%; overflow-x: auto; background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 12px; }
+.pl-tabla { width: 100%; min-width: 880px; border-collapse: collapse; font-size: 13px; }
+.pl-tabla th, .pl-tabla td { padding: 8px 10px; border-bottom: 1px solid var(--cp-line); text-align: left; vertical-align: middle; white-space: nowrap; }
+.pl-tabla thead th { font-size: 12px; color: var(--cp-soft); font-weight: 800; background: var(--cp-sand); }
+.pl-tabla thead th button { all: unset; cursor: pointer; font: inherit; color: inherit; }
+.pl-tabla thead th button:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 2px; }
+.pl-tabla thead th[aria-sort] button::after { content: ' ▾'; }
+.pl-tabla thead th[aria-sort='ascending'] button::after { content: ' ▴'; }
+.pl-tabla tbody th { font-weight: 700; }
+.pl-tabla tbody th small { display: block; font-weight: 400; }
+.pl-tabla .pl-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pl-tabla .pl-malo { color: var(--cp-rust); }
+.pl-tabla-neto { font-weight: 900; }
+.pl-tabla tfoot th, .pl-tabla tfoot td { font-weight: 900; background: var(--cp-sand); border-bottom: 0; }
+
 .pl-tarjeta { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
 .pl-tarjeta-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .pl-tarjeta-cab > div { min-width: 0; }
@@ -168,3 +201,8 @@
   .pp-cifras .pp-cifra-neto dd { font-size: 24px; }
 }
 @media (max-width: 480px) { .pl-rango { flex-direction: column; align-items: stretch; } .pl-rango .as-campo { width: 100%; } }
+/* Carrusel de personas dentro del detalle: ‹ 3 de 12 › */
+.pp-vecinos { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--cp-navy); }
+.pp-vecinos button { min-width: 40px; min-height: 40px; border: 1.5px solid var(--cp-line); border-radius: 10px; background: var(--cp-white); color: var(--cp-navy); font-size: 20px; font-weight: 800; cursor: pointer; }
+.pp-vecinos button:disabled { opacity: .4; cursor: default; }
+.pp-vecinos button:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 2px; }

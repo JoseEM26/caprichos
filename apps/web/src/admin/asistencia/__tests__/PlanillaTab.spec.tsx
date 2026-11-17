@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listar = vi.fn();
 const detalle = vi.fn();
@@ -39,8 +39,12 @@ const montar = (entrada = '/') => render(<MemoryRouter initialEntries={[entrada]
 const url = () => new URLSearchParams(screen.getByTestId('url').textContent ?? '');
 const tab = async (n: string) => fireEvent.click(await screen.findByRole('tab', { name: new RegExp(`^${n}`) }));
 const cifra = (t: string) => within(screen.getByLabelText('Cifras del período')).getByText(t).nextElementSibling!;
+const CLAVE_VISTA = 'caprichos.asistencia.planilla.vista';
+/** Las pruebas de tarjetas (la cuadrícula) fijan esa vista; en jsdom sin ancho de celular la vista por defecto es Tabla. */
+const verCuadricula = () => window.localStorage.setItem(CLAVE_VISTA, 'tarjetas');
 
 describe('PlanillaTab', () => {
+  beforeEach(() => window.localStorage.clear());
   const resultado = {
     programadaMin: 3000, trabajadaMin: 1800, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 0, extraAprobadaMin: 0, valorHora: 20,
     pagoTrabajado: 600, pagoExtra: 0, ganado: 600, consumosCobrados: 40, consumosPendientes: 0, descuentos: 0, adelantos: 0, neto: 560,
@@ -57,6 +61,7 @@ describe('PlanillaTab', () => {
   };
 
   it('lista a la persona con tarjeta, totales y abre su PÁGINA (ruta propia); los consumos pasan al siguiente período al desmarcarlos', async () => {
+    verCuadricula();
     listar.mockResolvedValue({ fecha: '2026-11-09', filas: [{ ...persona, estado: 'ABIERTO', programadasH: 50, trabajadasH: 30, ganado: 600, consumos: 40, descuentos: 0, adelantos: 0, neto: 560, pendientes: 0 }] });
     detalle.mockResolvedValue({ ...base, consumos: [{ id: '1', fecha: '2026-11-10', pedido: 'P-100', monto: 40, cobrar: true }] });
     montar();
@@ -97,6 +102,7 @@ describe('PlanillaTab', () => {
   });
 
   it('resumen por persona: penalidad, préstamos, adelantos, medio de pago, LIQUIDADO y copiar; sin ningún «50 %»', async () => {
+    verCuadricula();
     const copiar = vi.fn(async () => undefined);
     Object.assign(navigator, { clipboard: { writeText: copiar } });
     const excel = {
@@ -119,6 +125,7 @@ describe('PlanillaTab', () => {
   });
 
   it('filtros siempre visibles: estado, rol, orden y buscador; viven en la URL y se pueden quitar', async () => {
+    verCuadricula();
     listar.mockResolvedValue({ fecha: 'x', filas: [
       { ...persona, estado: 'PAGADO', neto: 100 },
       { ...persona, partyId: 8, nombre: 'Ana Ríos', rol: 'COCINA', estado: 'ABIERTO', neto: 300, pendientes: 2 },
@@ -401,6 +408,7 @@ describe('PlanillaTab', () => {
   });
 
   it('paginación: 12 por página y la página vive en la URL', async () => {
+    verCuadricula();
     listar.mockResolvedValue({ fecha: 'x', filas: Array.from({ length: 14 }, (_, i) => ({ ...persona, partyId: 100 + i, nombre: `Persona ${String(i).padStart(2, '0')}`, estado: 'ABIERTO' })) });
     const { container } = montar();
     await screen.findByText('Persona 00');
@@ -429,6 +437,7 @@ describe('PlanillaTab', () => {
   });
 
   it('persona semanal en vista Mes: lista sus semanas y cada una abre su página', async () => {
+    verCuadricula();
     listar.mockResolvedValue({
       fecha: '2026-11-11',
       filas: [{ ...persona, estado: 'ABIERTO', neto: 300, aviso: 'Se paga por semana: suma de 2 semanas del mes', abrirFecha: '2026-11-09',
@@ -443,6 +452,7 @@ describe('PlanillaTab', () => {
   });
 
   it('consumos del personal: productos, los de períodos anteriores sin marcar y se piden aparte al pagar', async () => {
+    verCuadricula();
     listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO', consumosAnterioresPendiente: 12 }] });
     detalle.mockResolvedValue({
       ...base,
@@ -469,3 +479,171 @@ describe('PlanillaTab', () => {
     await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], [], { sinDescontarAnteriores: true }));
   });
 });
+
+describe('PlanillaTab: vistas Lista, Tabla y Cuadrícula', () => {
+  beforeEach(() => window.localStorage.clear());
+  const dos = {
+    fecha: 'x',
+    filas: [
+      { partyId: 7, nombre: 'Luis Pérez', rol: 'MOZO', sueldo: { modalidad: 'MENSUAL', semanal: 230.77, mensual: 1000 }, periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, estado: 'ABIERTO', pendientes: 0, ganado: 200, adelantos: 0, descuentos: 0, neto: 100, trabajadasH: 30 },
+      { partyId: 8, nombre: 'Ana Ríos', rol: 'COCINA', sueldo: { modalidad: 'SEMANAL', semanal: 300, mensual: 1300 }, periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, estado: 'PAGADO', pendientes: 0, ganado: 300, adelantos: 0, descuentos: 0, neto: 50, netoPagado: 50, trabajadasH: 20 },
+    ],
+  };
+  const totalNeto = () => within(screen.getByLabelText('Totales de la planilla')).getByText('A pagar').nextElementSibling;
+  const grupo = () => within(screen.getByRole('group', { name: 'Vista de la planilla' }));
+
+  it('aparecen los 3 botones, en el orden Lista | Tabla | Cuadrícula, y en escritorio abre en Tabla', async () => {
+    listar.mockResolvedValue(dos);
+    montar();
+    await screen.findByText('Ana Ríos');
+    expect(grupo().getAllByRole('button').map((b) => b.textContent)).toEqual(['Lista', 'Tabla', 'Cuadrícula']);
+    expect(grupo().getByRole('button', { name: 'Tabla' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('table', { name: 'Planilla por persona' })).toBeInTheDocument();
+  });
+
+  it('cambiar de vista muestra la estructura de cada una con las mismas personas, las mismas cifras y los mismos totales', async () => {
+    listar.mockResolvedValue(dos);
+    const { container } = montar();
+    await screen.findByText('Ana Ríos');
+    const totalAntes = totalNeto()!.textContent;
+    expect(totalAntes).toBe('S/ 150.00');
+    // tabla: una fila por persona y fila de totales
+    const filasTabla = () => [...container.querySelectorAll('tbody tr .pl-nombre')].map((n) => n.textContent);
+    expect(filasTabla()).toEqual(['Ana Ríos', 'Luis Pérez']);
+    expect(container.querySelector('tfoot')).toHaveTextContent('Total de 2 personas');
+    expect(container.querySelector('tfoot')).toHaveTextContent('S/ 150.00');
+
+    fireEvent.click(grupo().getByRole('button', { name: 'Lista' }));
+    expect(grupo().getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true');
+    const filas = [...container.querySelectorAll('.pl-fila')];
+    expect(filas.map((f) => f.querySelector('.pl-nombre')?.textContent)).toEqual(['Ana Ríos', 'Luis Pérez']);
+    expect(filas[1]).toHaveTextContent('Neto');
+    expect(filas[1]).toHaveTextContent('S/ 100.00');
+    expect(filas[0]).toHaveTextContent('LIQUIDADO');
+    expect(totalNeto()!.textContent).toBe(totalAntes);
+    expect(screen.getAllByRole('button', { name: /^Abrir la planilla de / })).toHaveLength(2);
+
+    fireEvent.click(grupo().getByRole('button', { name: 'Cuadrícula' }));
+    const tarjetas = [...container.querySelectorAll('.pl-tarjeta .pl-nombre')].map((n) => n.textContent);
+    expect(tarjetas).toEqual(['Ana Ríos', 'Luis Pérez']);
+    expect(totalNeto()!.textContent).toBe(totalAntes);
+  });
+
+  it('la vista elegida se recuerda en este equipo al volver a abrir la planilla', async () => {
+    listar.mockResolvedValue(dos);
+    const primera = montar();
+    await screen.findByText('Ana Ríos');
+    fireEvent.click(grupo().getByRole('button', { name: 'Cuadrícula' }));
+    expect(window.localStorage.getItem(CLAVE_VISTA)).toBe('tarjetas');
+    primera.unmount();
+    montar();
+    await screen.findByText('Ana Ríos');
+    expect(grupo().getByRole('button', { name: 'Cuadrícula' })).toHaveAttribute('aria-pressed', 'true');
+    expect(document.querySelectorAll('.pl-tarjeta')).toHaveLength(2);
+  });
+
+  it('en celular la vista por defecto es Lista; un valor guardado no válido vuelve al defecto', async () => {
+    listar.mockResolvedValue(dos);
+    const antes = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia;
+    let primera;
+    try {
+      primera = montar();
+      await screen.findByText('Ana Ríos');
+      expect(grupo().getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      window.matchMedia = antes;
+    }
+    primera.unmount();
+    window.localStorage.setItem(CLAVE_VISTA, 'raro');
+    montar();
+    await screen.findByText('Ana Ríos');
+    expect(grupo().getByRole('button', { name: 'Tabla' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('los filtros y el orden de la URL se respetan en las tres vistas', async () => {
+    listar.mockResolvedValue(dos);
+    const { container } = montar('/?estado=PAGADO');
+    await screen.findByText('Ana Ríos');
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    fireEvent.click(grupo().getByRole('button', { name: 'Lista' }));
+    expect(container.querySelectorAll('.pl-fila')).toHaveLength(1);
+    fireEvent.click(grupo().getByRole('button', { name: 'Cuadrícula' }));
+    expect(container.querySelectorAll('.pl-tarjeta')).toHaveLength(1);
+  });
+});
+
+describe('PlanillaTab: pasar de persona dentro del detalle', () => {
+  beforeEach(() => window.localStorage.clear());
+  const NOMBRES: Record<number, string> = { 7: 'Luis Pérez', 8: 'Ana Ríos', 9: 'Beto Sol' };
+  const resultado = { programadaMin: 3000, trabajadaMin: 1800, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 0, extraAprobadaMin: 0, valorHora: 20, pagoTrabajado: 600, pagoExtra: 0, ganado: 600, consumosCobrados: 0, consumosPendientes: 0, descuentos: 0, adelantos: 0, neto: 560 };
+  const fila = (id: number, estado: 'ABIERTO' | 'PAGADO', neto: number) => ({ partyId: id, nombre: NOMBRES[id], rol: 'MOZO', sueldo: { modalidad: 'MENSUAL' as const, semanal: 230.77, mensual: 1000 }, periodo: { desde: '2026-11-01', hasta: '2026-11-30' }, estado, pendientes: 0, ganado: 200, adelantos: 0, descuentos: 0, neto, trabajadasH: 10 });
+  const lista = [fila(8, 'PAGADO', 300), fila(9, 'ABIERTO', 50), fila(7, 'ABIERTO', 100)];
+  const url = () => new URLSearchParams(screen.getByTestId('url').textContent ?? '');
+  const nav = () => within(screen.getByRole('group', { name: 'Pasar a otra persona de la lista' }));
+  const sinMarcas = () => ({ estado: 'ABIERTO', periodoId: null, toleranciaMin: 5, resultado, dias: [], consumos: [], ajustes: [], pendientes: 0 });
+
+  beforeEach(() => {
+    listar.mockResolvedValue({ fecha: 'x', filas: lista });
+    detalle.mockImplementation(async (id: number) => ({ ...sinMarcas(), partyId: id, nombre: NOMBRES[id], sueldo: lista.find((f) => f.partyId === id)!.sueldo, periodo: { desde: '2026-11-01', hasta: '2026-11-30' } }));
+  });
+
+  it('muestra la posición en la lista, el anterior deshabilitado al inicio, y el siguiente cambia ?persona= conservando período y sección', async () => {
+    montar('/?persona=8&desde=2026-11-01&seccion=asistencia');
+    await screen.findByTestId('pagina-planilla-persona');
+    expect(nav().getByText('1 de 3')).toBeInTheDocument();
+    expect(nav().getByRole('button', { name: 'Anterior: no hay' })).toBeDisabled();
+    fireEvent.click(nav().getByRole('button', { name: 'Siguiente: Beto Sol' }));
+    await waitFor(() => expect(url().get('persona')).toBe('9'));
+    expect(url().get('desde')).toBe('2026-11-01');
+    expect(url().get('seccion')).toBe('asistencia');
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(9, '2026-11-01'));
+    expect(await screen.findByRole('heading', { name: 'Beto Sol' })).toBeInTheDocument();
+    expect(nav().getByText('2 de 3')).toBeInTheDocument();
+  });
+
+  it('en el último, el siguiente queda deshabilitado; el anterior lleva a la vecina de arriba', async () => {
+    montar('/?persona=7&desde=2026-11-01');
+    await screen.findByTestId('pagina-planilla-persona');
+    expect(nav().getByRole('button', { name: 'Siguiente: no hay' })).toBeDisabled();
+    fireEvent.click(nav().getByRole('button', { name: 'Anterior: Beto Sol' }));
+    await waitFor(() => expect(url().get('persona')).toBe('9'));
+  });
+
+  it('respeta el filtro de estado y el orden: los vecinos salen de la lista visible', async () => {
+    montar('/?persona=7&estado=ABIERTO&orden=NETO&desde=2026-11-01');
+    await screen.findByTestId('pagina-planilla-persona');
+    // abiertos por neto mayor primero: Luis (100), Beto (50) — Ana (pagada) no entra
+    expect(nav().getByText('1 de 2')).toBeInTheDocument();
+    expect(nav().getByRole('button', { name: 'Anterior: no hay' })).toBeDisabled();
+    fireEvent.click(nav().getByRole('button', { name: 'Siguiente: Beto Sol' }));
+    await waitFor(() => expect(url().get('persona')).toBe('9'));
+    expect(url().get('estado')).toBe('ABIERTO');
+    expect(url().get('orden')).toBe('NETO');
+  });
+
+  it('las flechas ← → cambian de persona fuera de un campo de texto', async () => {
+    montar('/?persona=8&desde=2026-11-01');
+    await screen.findByTestId('pagina-planilla-persona');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    await waitFor(() => expect(url().get('persona')).toBe('9'));
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    await waitFor(() => expect(url().get('persona')).toBe('8'));
+  });
+
+  it('con texto sin guardar en el adelanto pide confirmación: No se queda; Sí cambia', async () => {
+    montar('/?persona=8&desde=2026-11-01');
+    await screen.findByTestId('pagina-planilla-persona');
+    fireEvent.click(screen.getByRole('tab', { name: /^Descuentos y créditos/ }));
+    fireEvent.change(screen.getAllByLabelText('Monto (S/)')[0], { target: { value: '20' } });
+    fireEvent.click(nav().getByRole('button', { name: 'Siguiente: Beto Sol' }));
+    expect(await screen.findByText('¿Cambiar de persona sin guardar?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'No, quedarme' }));
+    expect(url().get('persona')).toBe('8');
+    fireEvent.click(nav().getByRole('button', { name: 'Siguiente: Beto Sol' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, cambiar' }));
+    await waitFor(() => expect(url().get('persona')).toBe('9'));
+    expect(url().get('seccion')).toBe('descuentos');
+  });
+});
+

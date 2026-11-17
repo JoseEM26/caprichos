@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
+import type { FilaPlanilla } from './planillaApi';
 import { EstadoError } from '../../comun/EstadoError';
 import { Insignia } from '../../comun/Insignia';
 import { BarraPestanas, PanelesPestanas, type PestanaModal } from '../../comun/ModalConPestanas';
@@ -64,10 +65,17 @@ function CascadaNeto({ c }: { c: CtlPlanilla }) {
  * Página de la planilla de UNA persona en UN período (ruta propia, ya no un modal): franja fija con la persona, el período y las cifras,
  * y pestañas Resumen · Asistencia · Descuentos y créditos · Pago · Historial. Toda la lógica de pago es la de antes.
  */
-export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, volver, onError, onOk }: {
+export interface VecinosPersona { posicion: number; total: number; anterior: FilaPlanilla | null; siguiente: FilaPlanilla | null }
+
+export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, volver, onError, onOk, vecinos, irAPersona }: {
   partyId: number; fecha: string; seccion: SeccionPlanilla; onSeccion: (s: SeccionPlanilla) => void; onFecha: (f: string) => void; volver: () => void; onError: Avisar; onOk: Avisar;
+  /** Lista visible alrededor de esta persona (undefined si no está en la lista filtrada). */
+  vecinos?: VecinosPersona; irAPersona?: (f: FilaPlanilla) => void;
 }) {
   const [d, setD] = useState<DetallePlanilla | null>(null);
+  // formulario con texto sin guardar (adelanto/descuento): cambiar de persona pide confirmación
+  const [borradorSucio, setBorradorSucio] = useState(false);
+  const [pendienteIr, setPendienteIr] = useState<FilaPlanilla | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
   // checks del pago (consumos, cuotas y descuentos personalizados) viven en el servidor; aquí solo cuál se está guardando
   const [guardando, setGuardando] = useState<string | null>(null);
@@ -167,6 +175,25 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
 
   const seccionActiva: SeccionPlanilla = SECCIONES.includes(seccion) ? seccion : 'resumen';
   const irA = useCallback((s: SeccionPlanilla) => onSeccion(s), [onSeccion]);
+
+  // ← → pasan a la vecina, salvo que el foco esté en un campo de texto
+  const irVecino = useCallback((f: FilaPlanilla) => {
+    if (borradorSucio) { setPendienteIr(f); return; }
+    window.scrollTo?.(0, 0);
+    irAPersona?.(f);
+  }, [borradorSucio, irAPersona]);
+  useEffect(() => {
+    if (!vecinos) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      if (e.key === 'ArrowLeft' && vecinos.anterior) irVecino(vecinos.anterior);
+      if (e.key === 'ArrowRight' && vecinos.siguiente) irVecino(vecinos.siguiente);
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [vecinos, irVecino]);
 
   if (!d || !r) {
     return (
@@ -302,7 +329,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
   const pestanas: PestanaModal[] = [
     { id: 'resumen', etiqueta: 'Resumen', insignia: pagado ? null : listo ? '✔' : '!', insigniaError: !pagado && !listo, contenido: resumen },
     { id: 'asistencia', etiqueta: 'Asistencia', insignia: faltan || null, insigniaError: faltan > 0, contenido: <PestanaAsistencia c={c} diaInicial={null} /> },
-    { id: 'descuentos', etiqueta: 'Descuentos y créditos', insignia: antSinCobrar.length || null, insigniaError: antSinCobrar.length > 0, contenido: <PestanaDescuentos c={c} /> },
+    { id: 'descuentos', etiqueta: 'Descuentos y créditos', insignia: antSinCobrar.length || null, insigniaError: antSinCobrar.length > 0, contenido: <PestanaDescuentos c={c} alCambiarBorrador={setBorradorSucio} /> },
     { id: 'pago', etiqueta: 'Pago', contenido: pago },
     { id: 'historial', etiqueta: 'Historial', insignia: pagos?.length || null, contenido: <PestanaHistorial c={c} pagos={pagos} errorPagos={errorPagos} reintentarPagos={cargarPagos} abrirPeriodo={onFecha} /> },
   ];
@@ -316,6 +343,13 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
           </nav>
           <Boton type="button" variante="secundario" tamano="pequeno" onClick={volver}>← Volver a la planilla</Boton>
         </div>
+        {vecinos && (
+          <div className="pp-vecinos" role="group" aria-label="Pasar a otra persona de la lista">
+            <button type="button" disabled={!vecinos.anterior} aria-label={vecinos.anterior ? `Anterior: ${vecinos.anterior.nombre}` : 'Anterior: no hay'} title={vecinos.anterior ? `Anterior: ${vecinos.anterior.nombre}` : undefined} onClick={() => vecinos.anterior && irVecino(vecinos.anterior)}>‹</button>
+            <span aria-live="polite">{vecinos.posicion} de {vecinos.total}</span>
+            <button type="button" disabled={!vecinos.siguiente} aria-label={vecinos.siguiente ? `Siguiente: ${vecinos.siguiente.nombre}` : 'Siguiente: no hay'} title={vecinos.siguiente ? `Siguiente: ${vecinos.siguiente.nombre}` : undefined} onClick={() => vecinos.siguiente && irVecino(vecinos.siguiente)}>›</button>
+          </div>
+        )}
         <div className="pp-franja-fila">
           <div className="pp-persona">
             <span className="pp-avatar" aria-hidden="true">{iniciales(nombre)}</span>
@@ -354,6 +388,15 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         <BarraPestanas pestanas={pestanas} activa={seccionActiva} alCambiar={(id) => onSeccion(id as SeccionPlanilla)} base={base} etiqueta="Secciones de la planilla" />
       </header>
       <PanelesPestanas pestanas={pestanas} activa={seccionActiva} base={base} />
+      <Confirmar
+        abierto={pendienteIr !== null}
+        titulo="¿Cambiar de persona sin guardar?"
+        mensaje="El formulario de esta persona tiene texto sin guardar. Si cambias de persona, se pierde."
+        textoSi="Sí, cambiar"
+        textoNo="No, quedarme"
+        alConfirmar={() => { const f = pendienteIr!; setPendienteIr(null); setBorradorSucio(false); irAPersona?.(f); }}
+        alCancelar={() => setPendienteIr(null)}
+      />
 
       <Confirmar
         abierto={confirmaPago}
