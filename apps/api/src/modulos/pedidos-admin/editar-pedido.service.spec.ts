@@ -182,6 +182,21 @@ describe('EditarPedidoService.editar', () => {
     expect(agregar).toEqual([{ productoId: BigInt(5), cantidad: 3 }]);
   });
 
+  it('en mesa, marcar una línea para llevar la rehace y queda en la auditoría como cambio', async () => {
+    const nueva = lineaNueva({ productoId: BigInt(5), nombre: 'Café', cantidad: 2, subtotal: 20, paraLlevar: true });
+    const { servicio, pedidos, auditoria } = montar(pedidoBase({ modalidad: 'MESA' }), { nuevas: [nueva], subtotalNuevo: 20, ventaNueva: [{ productoId: BigInt(5), cantidad: 2 }] });
+    await servicio.editar('100', { version: 3, lineas: [{ lineaId: '1', productoId: '5', cantidad: 2, paraLlevar: true } as any] }, usuario);
+    expect(pedidos.escribirLineasPedido).toHaveBeenCalledTimes(1);
+    const registro = auditoria.registrar.mock.calls[0][0];
+    expect(registro.despues.cambios).toEqual(expect.arrayContaining([expect.objectContaining({ tipo: 'LINEA_CAMBIADA', antes: expect.objectContaining({ paraLlevar: false }), despues: expect.objectContaining({ paraLlevar: true }) })]));
+  });
+
+  it('en mesa, sin tocar el para llevar la línea se conserva (no se reescribe)', async () => {
+    const { servicio, pedidos } = montar(pedidoBase({ modalidad: 'MESA' }));
+    await servicio.editar('100', { version: 3, lineas: [{ lineaId: '1', productoId: '5', cantidad: 2 } as any] }, usuario);
+    expect(pedidos.escribirLineasPedido).not.toHaveBeenCalled();
+  });
+
   it('409 PEDIDO_MODIFICADO si la versión que vio ya cambió', async () => {
     const { servicio, tx } = montar(pedidoBase({ version: 4 }));
     await expect(servicio.editar('100', { version: 3, lineas: [{ lineaId: '1', productoId: '5', cantidad: 2 } as any] }, usuario)).rejects.toMatchObject({

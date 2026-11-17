@@ -923,6 +923,8 @@ model ClienteFacturacion {
 
 model PedidoLinea {
   es_cortesia      Boolean            @default(false)
+  /// Comer en el local (MESA/COMER_LOCAL): esta línea se lleva empacada. Solo el personal la marca; no aplica a delivery ni a recoger.
+  para_llevar      Boolean            @default(false)
   /// «Servicio o producto» libre: descripción en `nombre`, monto en `precio_unit` (cantidad 1). Sin producto ni stock.
   cargo_libre      Boolean            @default(false)
   cargo_libre_por  BigInt?

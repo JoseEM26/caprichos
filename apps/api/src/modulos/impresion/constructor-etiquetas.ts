@@ -184,6 +184,9 @@ export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
   };
 }
 
+/** Marca de la línea que se empaca para llevar (en un pedido de mesa o de salón). */
+export const TEXTO_PARA_LLEVAR = 'PARA LLEVAR';
+
 export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
   const lineas: any[] = pedido.lineas || [];
   const modalidadPill = obtenerModalidadPill(pedido);
@@ -222,6 +225,8 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
       const opciones = opcionesConSabores(l, (l.opcionesElegidas || l.opciones || [])
         .map(nombreOpcion)
         .filter(Boolean));
+      // Línea para llevar de un pedido de mesa: se empaca aparte; el sticker lo marca primero
+      if (l.para_llevar) opciones.unshift(TEXTO_PARA_LLEVAR);
       // Pieza de combo con parte opcional: el sticker no imprime la nota, así que «SIN …» y «EXTRA +n» van como opción
       if (l.linea_combo_id != null) {
         opciones.push(...String(l.nota || '').split(' · ').filter((t) => /^(SIN |EXTRA \+)/.test(t)));
@@ -353,7 +358,10 @@ function lineaDeComanda(l: any, todas: any[], heredarNota = true): LineaComandaD
     cantidad: Number(l.cantidad) || 1,
     nombre: l.nombre,
     tamano: l.tamano || null,
-    opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map(nombreOpcion).filter(Boolean)),
+    opciones: [
+      ...(l.para_llevar ? [TEXTO_PARA_LLEVAR] : []),
+      ...opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map(nombreOpcion).filter(Boolean)),
+    ],
     // bajo su madre la parte no repite la nota del combo (ya sale arriba); suelta en la comanda de un área, la hereda
     nota: (heredarNota ? notaDeLinea(l, todas) : l.nota) || null,
     detalles: detalleLinea({ ...entrada, partes: [] }).detalles,

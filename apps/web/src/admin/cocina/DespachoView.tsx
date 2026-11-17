@@ -128,10 +128,15 @@ function Areas({
             </header>
             <ul data-testid={`lineas-${p.pedidoId}-${a.areaId}`} style={{ margin: 0, padding: 0, listStyle: 'none', color: NAVY }}>
               {a.lineas.map((l) => (
-                <li key={l.id} data-testid="linea-despacho" style={{ display: 'flex', gap: '8px', alignItems: 'baseline', padding: '8px 0', borderTop: `1px solid ${DIVISOR}`, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
+                <li key={l.id} data-testid="linea-despacho" style={{ ...(l.paraLlevar ? { background: '#FFF1E6', borderLeft: '4px solid #E67929', paddingLeft: 6 } : {}), display: 'flex', gap: '8px', alignItems: 'baseline', padding: '8px 0', borderTop: `1px solid ${DIVISOR}`, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
                   <span data-testid="linea-cantidad" style={{ flex: 'none', minWidth: '34px', fontSize: '18px', fontWeight: 900, color: OXIDO }}>{l.cantidad}×</span>
                   <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
                     <div data-testid="linea-nombre" style={{ fontSize: '17px', fontWeight: 800, lineHeight: 1.25, color: NAVY }}>{l.nombre}</div>
+                    {l.paraLlevar && (
+                      <div data-testid="linea-para-llevar" style={{ fontSize: '14px', fontWeight: 900, color: '#8A3A07', background: '#FDE9D9', border: '2px solid #E67929', display: 'inline-block', padding: '0 8px', borderRadius: '6px', margin: '2px 0' }}>
+                        🥡 PARA LLEVAR
+                      </div>
+                    )}
                     {textoSabores(l) && (
                       <div data-testid="linea-sabores" style={{ fontSize: '16px', fontWeight: 800, color: NAVY }}>
                         {textoSabores(l)}

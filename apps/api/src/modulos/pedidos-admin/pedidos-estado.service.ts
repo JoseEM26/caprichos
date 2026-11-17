@@ -452,7 +452,9 @@ export class PedidosEstadoService {
       return {
         ...p,
         lineas: p.lineas.map((l: any) =>
-          l.cargo_libre ? { ...l, cargoLibre: true, agregadoPor: l.cargo_libre_por != null ? (nombres.get(String(l.cargo_libre_por)) ?? null) : null, agregadoEn: l.cargo_libre_en } : l,
+          l.cargo_libre
+            ? { ...l, paraLlevar: false, cargoLibre: true, agregadoPor: l.cargo_libre_por != null ? (nombres.get(String(l.cargo_libre_por)) ?? null) : null, agregadoEn: l.cargo_libre_en }
+            : { ...l, paraLlevar: l.para_llevar === true },
         ),
         mediosPago: sinCobro ? mediosElegidos : mediosCobro,
         mediosPagoPendiente: sinCobro && mediosElegidos.length > 0,
@@ -686,6 +688,8 @@ export class PedidosEstadoService {
             subtotal: true,
             // Cortesía: la línea sale a S/ 0; su valor de lista se muestra aparte
             es_cortesia: true,
+            // Comer aquí con llevar: la línea sale empacada (mesa o salón)
+            para_llevar: true,
             // «Servicio o producto» libre: quién lo agregó y cuándo
             cargo_libre: true,
             cargo_libre_por: true,
@@ -1138,10 +1142,10 @@ export class PedidosEstadoService {
       ajustePago,
       lineas: pedido.lineas.map((l: any) =>
         l.es_cortesia
-          ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia }
+          ? { ...l, paraLlevar: l.para_llevar === true, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia }
           : l.cargo_libre
-            ? { ...l, cargoLibre: true, agregadoPor: nombresCargo.get(String(l.cargo_libre_por)) ?? null, agregadoEn: l.cargo_libre_en }
-            : l,
+            ? { ...l, paraLlevar: false, cargoLibre: true, agregadoPor: nombresCargo.get(String(l.cargo_libre_por)) ?? null, agregadoEn: l.cargo_libre_en }
+            : { ...l, paraLlevar: l.para_llevar === true },
       ),
       eventos: eventosPedido,
       ...resumenExtras(pedido),

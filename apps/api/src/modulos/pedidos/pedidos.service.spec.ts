@@ -553,6 +553,50 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('para llevar por línea (solo MESA y COMER_LOCAL)', () => {
+      const lineaA = { ...pedidoBaseDto.lineas[0], paraLlevar: true };
+      const lineaB = { productoId: 1, tamanoId: 10, cantidad: 1, opciones: [200], personas: ['Ana'] };
+      const dtoLocal = (modalidad: 'MESA' | 'COMER_LOCAL', lineas: any[]) =>
+        ({ ...pedidoBaseDto, modalidad, entrega: undefined, mesa: 'M-6', pago: { metodo: 'EFECTIVO', pagaCon: 100 }, lineas } as CrearPedidoDto);
+      const caja = { canal: 'CAJA' as const, usuarioPartyId: 7n, puedeCargoLibre: true };
+      const creadoLocal = (modalidad: string) => ({ id: 500n, codigo: 'CP-W500', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CAJA', modalidad });
+      const paraLlevarGuardado = () => prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data.para_llevar);
+
+      it('MESA: guarda para_llevar por línea (una para llevar y la otra para comer aquí)', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creadoLocal('MESA'));
+        await service.crear(dtoLocal('MESA', [lineaA, lineaB]), 'pll-mesa', caja);
+        expect(paraLlevarGuardado()).toEqual([true, false]);
+      });
+
+      it('COMER_LOCAL: también guarda para_llevar', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creadoLocal('COMER_LOCAL'));
+        await service.crear(dtoLocal('COMER_LOCAL', [lineaB, lineaA]), 'pll-comer', caja);
+        expect(paraLlevarGuardado()).toEqual([false, true]);
+      });
+
+      it('DELIVERY: ignora paraLlevar=true y guarda false (la marca no existe fuera del local)', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 501n, codigo: 'CP-W501', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
+        await service.crear({ ...pedidoBaseDto, lineas: [lineaA] } as CrearPedidoDto, 'pll-delivery');
+        expect(paraLlevarGuardado()).toEqual([false]);
+      });
+
+      it('RECOGER: también ignora paraLlevar (todo ya sale para llevar)', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creadoLocal('RECOGER'));
+        await service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 }, lineas: [lineaA] } as CrearPedidoDto, 'pll-recoger', caja);
+        expect(paraLlevarGuardado()).toEqual([false]);
+      });
+
+      it('combo en MESA: sus partes heredan para llevar de la línea madre', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValueOnce({
+          nota: 'Combo Dúo',
+          partes: [{ parteId: 100, productoId: 7, nombre: 'Empanada', cantidad: 1, areaId: 1n, categoriaNombre: 'Bebidas Calientes', areaNombre: 'Barra', sabores: [] }],
+        });
+        prismaMock.pedido.create.mockResolvedValue(creadoLocal('MESA'));
+        await service.crear(dtoLocal('MESA', [{ ...lineaA, ofertaId: 3, comboElecciones: [{ parteId: 100, productoId: 7 }] }]), 'pll-combo', caja);
+        expect(paraLlevarGuardado()).toEqual([true, true]);
+      });
+    });
+
     describe('delivery sin punto en el mapa (esperando ubicación)', () => {
       it('con dirección y referencia es válido: sin zona ni envío, el total no suma envío', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: null, total: 28.0 });

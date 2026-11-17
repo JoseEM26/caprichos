@@ -51,8 +51,8 @@ export function ajustarPlanAlTotal(plan: PlanPagoItem[], aCobrar: number): PlanP
 }
 
 /** Texto corto de una línea para el resumen y la auditoría. */
-const textoLinea = (l: { cantidad: number; nombre: string; tamano?: string | null }) =>
-  `${l.cantidad} × ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`;
+const textoLinea = (l: { cantidad: number; nombre: string; tamano?: string | null; para_llevar?: boolean; paraLlevar?: boolean }) =>
+  `${l.cantidad} × ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}${(l.para_llevar ?? l.paraLlevar) ? ' · para llevar' : ''}`;
 
 type LineaDb = any;
 
@@ -188,6 +188,7 @@ export class EditarPedidoService {
           })),
           sabores: l.sabores.map((s: any) => ({ saborId: String(s.sabor_id), nombre: s.sabor_nombre, cantidad: s.cantidad })),
           nota: l.nota,
+          paraLlevar: !!l.para_llevar,
           personas: l.nombres_persona,
           ofertaId: l.oferta_id != null ? String(l.oferta_id) : null,
           // Un combo no se modifica: se puede quitar o dejar tal cual (para cambiarlo, se quita y se agrega otro)
@@ -256,9 +257,16 @@ export class EditarPedidoService {
           mensaje: `El combo «${fila.nombre}» no se modifica: quítalo y agrega otro.`,
         });
       }
+      if (!!l.paraLlevar !== !!fila.para_llevar) {
+        throw new BadRequestException({
+          codigo: 'COMBO_NO_EDITABLE',
+          mensaje: `El combo «${fila.nombre}» no cambia de para llevar: quítalo y agrega otro.`,
+        });
+      }
       return true;
     }
     if (String(l.productoId) !== String(fila.producto_id ?? '')) return false;
+    if (!!l.paraLlevar !== !!fila.para_llevar) return false;
     if (Number(l.cantidad) !== fila.cantidad) return false;
     const prod = productos.get(String(fila.producto_id));
     const tam = l.tamanoId != null && l.tamanoId !== '' ? this.tamanosDe(prod).find((t) => String(t.id) === String(l.tamanoId)) : undefined;
@@ -687,6 +695,7 @@ export class EditarPedidoService {
       opciones: f.opcionesElegidas.map((o: any) => o.opcion_nombre),
       sabores: f.sabores.map((s: any) => `${s.cantidad} ${s.sabor_nombre}`),
       nota: f.nota,
+      paraLlevar: !!f.para_llevar,
       personas: f.nombres_persona,
       subtotal: Number(f.subtotal ?? 0),
     });
@@ -697,6 +706,7 @@ export class EditarPedidoService {
       opciones: l.opciones.map((o: any) => o.nombre),
       sabores: l.sabores.map((s: any) => `${s.cantidad} ${s.nombre}`),
       nota: l.nota,
+      paraLlevar: !!l.paraLlevar,
       personas: l.nombresPersona,
       subtotal: l.subtotal,
     });

@@ -87,6 +87,7 @@ export function lineasDeArea(lineas: any[], areaId: bigint, resaltado?: Resaltad
         }),
         personas: l.nombres_persona ?? [],
         nota: notaDeLinea(l, lineas),
+        paraLlevar: l.para_llevar === true,
       };
     });
 }
@@ -1408,6 +1409,7 @@ export class ComandasService {
           opciones: extraerOpciones(l),
           personas: l.nombres_persona ?? [],
           nota: notaDeLinea(l, p.lineas),
+          paraLlevar: l.para_llevar === true,
         }));
 
       const mesa = mesaDePedido(p);

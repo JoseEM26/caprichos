@@ -70,6 +70,12 @@ const sinVista: CSSProperties = {
 function DescripcionLinea({ it }: { it: LineaComanda }) {
   const opciones = (it.opciones || []).filter((o) => normalizarOpcion(o));
   const partes: ReactNode[] = [];
+  if (it.paraLlevar)
+    partes.push(
+      <span key="para-llevar" data-testid="linea-para-llevar" style={{ fontWeight: 900, color: '#8A3A07', background: '#FDE9D9', border: '2px solid #E67929', borderRadius: '6px', padding: '0 6px' }}>
+        🥡 PARA LLEVAR
+      </span>,
+    );
   if (it.tamano) partes.push(<span key="tamano">{it.tamano}</span>);
   opciones.forEach((o, i) => {
     const texto = normalizarOpcion(o);
@@ -257,7 +263,13 @@ function LineaFila({
     <div
       data-testid={`linea-${it.id}`}
       data-completa={completa ? 'true' : 'false'}
-      style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', opacity: atenuada || todoDespachado ? 0.6 : 1 }}
+      style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'flex-start',
+        opacity: atenuada || todoDespachado ? 0.6 : 1,
+        ...(it.paraLlevar ? { background: '#FFF1E6', borderLeft: '4px solid #E67929', borderRadius: '6px', padding: '2px 6px' } : {}),
+      }}
     >
       {marcar && (
         <button

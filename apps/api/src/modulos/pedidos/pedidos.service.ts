@@ -578,6 +578,8 @@ export class PedidosService {
         contenedora,
         areaId: contenedora ? null : (prodDb.categoria?.area_id ?? null),
         nota: [combo.nota, l.nota?.trim()].filter(Boolean).join(' · ') || null,
+        // Para llevar solo tiene sentido comiendo en el local: en delivery y recoger se ignora
+        paraLlevar: (modalidad === 'MESA' || modalidad === 'COMER_LOCAL') && l.paraLlevar === true,
         nombresPersona: personasAsignadas,
         personasEntrada: Array.isArray(l.personas) ? l.personas : [],
         partesCombo: combo.partes,
@@ -622,6 +624,7 @@ export class PedidosService {
           area_id: lin.areaId,
           nombres_persona: lin.nombresPersona,
           nota: lin.nota,
+          para_llevar: lin.paraLlevar === true,
           es_cortesia: !!lin.cortesia,
           opciones: lin.opciones.map((o: any) => ({
             id: o.id.toString(),
@@ -668,6 +671,7 @@ export class PedidosService {
               ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[nombreSiguiente + u]?.trim() || clienteNombre || 'Mesa')
               : [],
             nota: parte.nota,
+            para_llevar: lin.paraLlevar === true,
           },
         });
         if (esBebidaParte) nombreSiguiente += parte.cantidad;

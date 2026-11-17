@@ -31,6 +31,7 @@ import { ModalCargoLibre, type CargoLibreDatos } from '../../pedidos/ModalCargoL
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi, type DatosEdicionPedido, type LineaEdicionPedido } from '../../pedidos/pedidosApi';
+import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar } from '../../pedidos/paraLlevar';
 import { PanelEdicionPedido } from './PanelEdicionPedido';
 import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
@@ -179,6 +180,8 @@ export interface LineaPedidoMesa {
   lineaId?: string;
   /** Editar pedido: combo que solo se puede quitar o dejar */
   bloqueada?: boolean;
+  /** Comer aquí con llevar: esta línea sale empacada (solo se usa con modalidad «en el local») */
+  paraLlevar?: boolean;
 }
 
 /** Línea guardada de un pedido, convertida a la del selector (Editar pedido). */
@@ -188,6 +191,7 @@ function aLineaMesa(l: LineaEdicionPedido): LineaPedidoMesa {
     id: `ed-${l.lineaId}`,
     lineaId: l.lineaId,
     bloqueada: l.bloqueada,
+    paraLlevar: l.paraLlevar === true,
     productoId: l.productoId ?? '0',
     nombre: l.nombre,
     tamanoId: l.tamanoId ?? undefined,
@@ -1586,6 +1590,7 @@ export function ModalNuevoPedidoMesa({
           personas: personas && personas.length > 0 ? personas : lin.personas,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
           ...(lin.cortesia ? { cortesia: { motivo: lin.cortesia.motivo, nota: lin.cortesia.nota } } : {}),
+          ...(modalidad === 'local' && lin.paraLlevar ? { paraLlevar: true } : {}),
         };
       });
 
@@ -1863,6 +1868,7 @@ export function ModalNuevoPedidoMesa({
           comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+          ...(modalidad === 'local' && lin.paraLlevar ? { paraLlevar: true } : {}),
         };
       });
       const ent = edicion.datos.entrega;
@@ -3758,6 +3764,15 @@ export function ModalNuevoPedidoMesa({
                 )}
 
                 {/* Lista de líneas */}
+                {modalidad === 'local' && lineas.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 0 8px' }}>
+                    <AtajoParaLlevar
+                      onTodo={(v) => setLineas((prev) => prev.map((x) => (x.bloqueada ? x : { ...x, paraLlevar: v })))}
+                      disabled={lineas.every((x) => x.bloqueada)}
+                    />
+                    <ResumenParaLlevar lineas={lineas.map((x) => ({ cantidad: x.cantidad, paraLlevar: x.paraLlevar }))} />
+                  </div>
+                )}
                 <div className="np-lineas">
                   {lineas.length === 0 ? (
                     <div
@@ -3824,6 +3839,14 @@ export function ModalNuevoPedidoMesa({
                             Quitar
                           </button>
                         </div>
+                        {modalidad === 'local' && (
+                          <SelectorParaLlevar
+                            paraLlevar={!!lin.paraLlevar}
+                            disabled={!!lin.bloqueada}
+                            etiqueta={`Dónde se come: ${lin.nombre}`}
+                            onCambiar={(v) => setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, paraLlevar: v } : x)))}
+                          />
+                        )}
                         {lin.bloqueada && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Combo: para cambiarlo, quítalo y agrega otro.

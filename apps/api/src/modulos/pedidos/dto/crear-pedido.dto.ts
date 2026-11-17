@@ -120,6 +120,11 @@ export class LineaPedidoDto {
   @IsString()
   nota?: string;
 
+  /** Solo en MESA o COMER_LOCAL: la línea sale para llevar (empacada) y el resto se come aquí. En otras modalidades se ignora. */
+  @IsOptional()
+  @IsBoolean({ message: 'paraLlevar debe ser verdadero o falso' })
+  paraLlevar?: boolean;
+
   @IsOptional()
   @IsArray({ message: 'personas debe ser una lista de nombres' })
   personas?: string[];

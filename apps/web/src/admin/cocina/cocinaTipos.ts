@@ -45,6 +45,8 @@ export interface LineaComanda {
   opciones?: Array<string | { id?: string; nombre: string; grupo?: string; pocoPedida?: boolean; motivoResaltado?: 'MANUAL' | 'MENOS_PEDIDA' }>;
   personas?: string[];
   nota?: string | null;
+  /** Se empaca para llevar (pedido de mesa o de salón): cocina la destaca para empacarla aparte. */
+  paraLlevar?: boolean;
   area?: string;
 }
 

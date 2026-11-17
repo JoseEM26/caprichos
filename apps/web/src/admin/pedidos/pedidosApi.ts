@@ -29,6 +29,8 @@ export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 /** Línea del editor de pedidos tal como la guardó el servidor (con la selección que se eligió). */
 export interface LineaEdicionPedido {
   lineaId: string;
+  /** Comer aquí con llevar: la línea sale empacada (solo pedidos MESA o COMER_LOCAL). */
+  paraLlevar?: boolean;
   productoId: string | null;
   nombre: string;
   tamano: string | null;
@@ -121,6 +123,8 @@ export interface EventoPedido {
 
 export interface LineaPedido {
   id: string;
+  /** Para llevar dentro de un pedido de mesa o de salón (la API lo manda ya normalizado). */
+  paraLlevar?: boolean;
   pedido_id?: string;
   nombre: string;
   tamano?: string | null;

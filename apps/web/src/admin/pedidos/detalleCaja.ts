@@ -15,6 +15,8 @@ export interface ItemCaja {
   nota: string;
   /** Piezas del combo, ya con su detalle. */
   partes: ItemCaja[];
+  /** Se empaca para llevar (pedido de mesa o de salón). */
+  paraLlevar: boolean;
 }
 
 /** Línea del pedido (API de Caja) con la forma que usa Despacho, para reutilizar sus reglas. */
@@ -42,6 +44,7 @@ function item(l: LineaPedido, todas: LineaPedido[]): ItemCaja {
     sabores: textoSabores(c) ?? '',
     nota: (l.nota ?? '').trim(),
     partes: l.id == null ? [] : todas.filter((h) => h.linea_combo_id != null && String(h.linea_combo_id) === String(l.id)).map((h) => item(h, todas)),
+    paraLlevar: l.paraLlevar === true,
   };
 }
 

@@ -3,6 +3,7 @@ import { InsigniaCortesia } from './HistorialAuditoria';
 import type { LineaPedido, Pedido } from './pedidosApi';
 import { itemsCaja, type ItemCaja } from './detalleCaja';
 import { esCargoLibre, etiquetaCargoLibre } from './ModalCargoLibre';
+import { ChipParaLlevar, ResumenParaLlevar, modalidadPermiteParaLlevar } from './paraLlevar';
 
 const soles = (n: unknown) => `S/ ${Number(n || 0).toFixed(2)}`;
 
@@ -50,6 +51,7 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
     <div className="dp-grid dp-grid-2">
       <section className="dp-col" aria-label="Productos del pedido">
         <h3 className="dp-sec-titulo">Productos ({lineas.length})</h3>
+        {modalidadPermiteParaLlevar(pedido.modalidad) && <ResumenParaLlevar lineas={lineas.filter((l) => !esCargoLibre(l))} />}
         {lineas.length === 0 && <div style={{ fontSize: 14, color: 'var(--cp-soft, #2C4C5D)' }}>Sin líneas detalladas.</div>}
         {lineas.map((it, idx) => {
           const x = items[idx];
@@ -58,6 +60,7 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
               <div className="dp-linea-cant">{it.cantidad}×</div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div className="dp-linea-nombre">{it.nombre}</div>
+                {it.paraLlevar && modalidadPermiteParaLlevar(pedido.modalidad) && <div><ChipParaLlevar /></div>}
                 {esCargoLibre(it) && (
                   <div data-testid="etiqueta-cargo-libre" style={{ alignSelf: 'flex-start', background: '#FFF1C9', border: '1.5px solid #E8B923', color: '#5A4300', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 800 }}>
                     {etiquetaCargoLibre(it)}

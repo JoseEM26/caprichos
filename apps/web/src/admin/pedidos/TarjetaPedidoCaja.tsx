@@ -17,6 +17,7 @@ import { itemsCaja, textoDetalle, MAX_PRODUCTOS_TARJETA, type ItemCaja } from '.
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 import { BloqueEncargoTarjeta, ChipProgramado } from './ProgramadoInfo';
 import { esCargoLibre } from './ModalCargoLibre';
+import { ChipParaLlevar, ResumenParaLlevar, modalidadPermiteParaLlevar } from './paraLlevar';
 import { EtiquetaEsperaPagoEnLinea, TITULO_ESPERA_PAGO_EN_LINEA, esperaPagoEnLinea } from './EsperaPagoEnLinea';
 import { MotivoAnulacion } from './MotivoAnulacion';
 
@@ -64,6 +65,7 @@ function ProductoTarjeta({ it }: { it: ItemCaja }) {
     <span className="cj2-prod" data-testid="producto-tarjeta">
       <span className="cj2-prod-nombre">{it.cantidad}× {it.nombre}</span>
       {texto && <span className="cj2-prod-det" data-testid="producto-detalle">{texto}</span>}
+      {it.paraLlevar && <ChipParaLlevar compacto />}
       {it.nota && <span className="cj2-prod-nota">Nota: {it.nota}</span>}
       {it.partes.map((p) => (
         <span key={p.id} className="cj2-prod-parte" data-testid="producto-parte">→ {p.nombre}{textoDetalle(p) ? ` · ${textoDetalle(p)}` : ''}</span>
@@ -109,7 +111,9 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const nombreCompleto = o.cliente_nombre?.trim() || 'Cliente';
   const lineas = o.lineas || [];
   // Lo libre («Servicio / encargo») va en su bloque aparte; los productos de la carta, en su lista
-  const items = itemsCaja(lineas.filter((l) => !esCargoLibre(l)));
+  // Para llevar solo en pedidos de comer en el local: en delivery o recoger no hay chip ni resumen
+  const llevarOk = modalidadPermiteParaLlevar(o.modalidad);
+  const items = itemsCaja(lineas.filter((l) => !esCargoLibre(l))).map((i) => (llevarOk ? i : { ...i, paraLlevar: false }));
   const hayEncargo = lineas.some((l) => esCargoLibre(l));
   const esDelivery = clave === 'DELIVERY';
   const sinUbicacion = esDelivery && deliverySinUbicacion(o);
@@ -142,6 +146,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
             <span className="cj2-mod-txt">{insignia.rotulo}</span>
             {insignia.detalle && <span className="cj2-mod-det">· {insignia.detalle}</span>}
           </span>
+          {llevarOk && <ResumenParaLlevar lineas={lineas.filter((l) => !esCargoLibre(l))} />}
           <span className="cj2-canal" data-canal={canal}>
             <span className="cj2-cod cj2-codigo">{o.codigo}</span> ·{' '}
             <IconoCanal clave={canal} />
