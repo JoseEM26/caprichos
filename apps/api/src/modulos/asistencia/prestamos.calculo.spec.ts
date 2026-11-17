@@ -1,4 +1,4 @@
-import { interesDeCuota, interesPrestamo, PrestamoCalc, cuotaDelPeriodo, montoRecurrenteDelPeriodo, planCuotas, saldoPrestamo } from './prestamos.calculo';
+import { interesDeCuota, interesPrestamo, PrestamoCalc, cuotaDelPeriodo, descuentoPersonalDelPeriodo, montoRecurrenteDelPeriodo, planCuotas, saldoPrestamo } from './prestamos.calculo';
 
 const prestamo = (over: Partial<PrestamoCalc> = {}): PrestamoCalc => ({
   id: '1',
@@ -67,5 +67,39 @@ describe('interés simple mensual de los préstamos', () => {
     expect(montoRecurrenteDelPeriodo(40, 'SEMANAL', 'MENSUAL')).toBe(10);
     expect(montoRecurrenteDelPeriodo(2, 'MENSUAL')).toBe(8);
     expect(montoRecurrenteDelPeriodo(2, 'SEMANAL', 'SEMANAL')).toBe(2);
+  });
+});
+
+describe('descuentos y bonos personalizados del personal', () => {
+  const sueldo = { semanal: 200, mensual: 800 };
+  const sem = { desde: '2026-11-09', hasta: '2026-11-15' };
+  const mes = { desde: '2026-11-01', hasta: '2026-11-30' };
+  const base = { valorTipo: 'MONTO' as const, hasta: null };
+  it('única vez: solo en el período que contiene la fecha de inicio', () => {
+    const d = { ...base, valor: 30, periodicidad: 'UNICA' as const, desde: '2026-11-12' };
+    expect(descuentoPersonalDelPeriodo(d, 'SEMANAL', sem, sueldo)).toBe(30);
+    expect(descuentoPersonalDelPeriodo(d, 'SEMANAL', { desde: '2026-11-16', hasta: '2026-11-22' }, sueldo)).toBeNull();
+    expect(descuentoPersonalDelPeriodo(d, 'SEMANAL', { desde: '2026-11-02', hasta: '2026-11-08' }, sueldo)).toBeNull();
+    expect(descuentoPersonalDelPeriodo(d, 'MENSUAL', mes, sueldo)).toBe(30);
+  });
+  it('semanal: cada semana (×4 en planilla mensual); mensual: una vez al mes (÷4 en semanal)', () => {
+    const s = { ...base, valor: 5, periodicidad: 'SEMANAL' as const, desde: '2026-10-01' };
+    expect(descuentoPersonalDelPeriodo(s, 'SEMANAL', sem, sueldo)).toBe(5);
+    expect(descuentoPersonalDelPeriodo(s, 'MENSUAL', mes, sueldo)).toBe(20);
+    const m = { ...base, valor: 40, periodicidad: 'MENSUAL' as const, desde: '2026-10-01' };
+    expect(descuentoPersonalDelPeriodo(m, 'MENSUAL', mes, sueldo)).toBe(40);
+    expect(descuentoPersonalDelPeriodo(m, 'SEMANAL', sem, sueldo)).toBe(10);
+  });
+  it('vigencia: antes del inicio o después del fin no se aplica', () => {
+    const s = { ...base, valor: 5, periodicidad: 'SEMANAL' as const, desde: '2026-11-10', hasta: '2026-11-20' };
+    expect(descuentoPersonalDelPeriodo(s, 'SEMANAL', { desde: '2026-11-02', hasta: '2026-11-08' }, sueldo)).toBeNull();
+    expect(descuentoPersonalDelPeriodo(s, 'SEMANAL', sem, sueldo)).toBe(5);
+    expect(descuentoPersonalDelPeriodo(s, 'SEMANAL', { desde: '2026-11-16', hasta: '2026-11-22' }, sueldo)).toBe(5);
+    expect(descuentoPersonalDelPeriodo(s, 'SEMANAL', { desde: '2026-11-23', hasta: '2026-11-29' }, sueldo)).toBeNull();
+  });
+  it('porcentaje: % del sueldo semanal, mensual o del período (única vez)', () => {
+    expect(descuentoPersonalDelPeriodo({ ...base, valorTipo: 'PORCENTAJE', valor: 10, periodicidad: 'SEMANAL', desde: '2026-10-01' }, 'SEMANAL', sem, sueldo)).toBe(20);
+    expect(descuentoPersonalDelPeriodo({ ...base, valorTipo: 'PORCENTAJE', valor: 5, periodicidad: 'MENSUAL', desde: '2026-10-01' }, 'MENSUAL', mes, sueldo)).toBe(40);
+    expect(descuentoPersonalDelPeriodo({ ...base, valorTipo: 'PORCENTAJE', valor: 5, periodicidad: 'UNICA', desde: '2026-11-03' }, 'MENSUAL', mes, sueldo)).toBe(40);
   });
 });

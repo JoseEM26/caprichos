@@ -4,7 +4,7 @@ import { Insignia } from '../../comun/Insignia';
 import { jornadaActual } from './jornada';
 import { Plegable } from './Plegable';
 import { PrestamosPersona, ServiciosExtraPersona } from './PrestamosPersona';
-import { CATEGORIAS_DESCUENTO, DetallePlanilla, ETIQUETA_CATEGORIA, anularAjuste, crearAjuste, soles } from './planillaApi';
+import { CATEGORIAS_DESCUENTO, DetallePlanilla, ETIQUETA_CATEGORIA, ETIQUETA_PERIODICIDAD, anularAjuste, crearAjuste, soles } from './planillaApi';
 import type { CtlPlanilla } from './PlanillaPersonaTipos';
 
 type Tipo = 'ADELANTO' | 'DESCUENTO' | 'BONO';
@@ -104,7 +104,7 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
   const anteriores = d.consumos.filter((x) => x.anterior);
 
   return (
-    <div className="pp-seccion">
+    <div className="pp-seccion pp-seccion--2col">
       {c.antSinCobrar.length > 0 && (
         <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-creditos-anteriores">
           <strong>Tiene {c.antSinCobrar.length} {c.antSinCobrar.length === 1 ? 'crédito sin cerrar' : 'créditos sin cerrar'} de días anteriores por {soles(c.antTotal)}.</strong>
@@ -157,7 +157,7 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
         </>)}
       </Plegable>
 
-      <Plegable titulo="Servicios extra" resumen={recurrentes.length > 0 ? `${recurrentes.length} en este pago · ${soles(recurrentes.filter((x) => x.cobrar).reduce((s, x) => s + x.monto, 0))}` : 'Ninguno este pago'}>
+      <Plegable titulo="Descuentos y bonos personalizados" resumen={recurrentes.length > 0 ? `${recurrentes.length} en este pago · ${soles(recurrentes.filter((x) => x.cobrar).reduce((s, x) => s + x.monto, 0))}` : 'Ninguno este período'}>
         {(vista) => (<>
           {recurrentes.length > 0 && (
             <div style={{ display: 'grid', gap: 4 }}>
@@ -165,8 +165,8 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
               {recurrentes.map((x) => (
                 <label key={`r${x.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
                   <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar ${x.nombre} en este pago`} onChange={(e) => c.setOmitRec((v) => (e.target.checked ? v.filter((i) => i !== x.id) : [...v, x.id]))} />
-                  <span style={{ flex: 1 }}>{x.nombre}</span>
-                  <strong>{soles(x.monto)}</strong>
+                  <span style={{ flex: 1 }}>{x.nombre}{x.signo === 'BONO' ? ' (bono)' : ''}<small className="as-nota" style={{ display: 'block' }}>{x.valorTipo === 'PORCENTAJE' ? `${x.valor} % del sueldo · ` : ''}{x.periodicidad ? ETIQUETA_PERIODICIDAD[x.periodicidad] : ''}</small></span>
+                  <strong>{x.signo === 'BONO' ? '+ ' : '− '}{soles(x.monto)}</strong>
                 </label>
               ))}
             </div>

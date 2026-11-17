@@ -5,7 +5,7 @@ import { Insignia } from '../../comun/Insignia';
 import { type PestanaModal } from '../../comun/ModalConPestanas';
 import { ETIQUETA_ESTADO, ETIQUETA_TIPO, TipoMarca, corregirMarca } from './asistenciaApi';
 import { type FilaCal } from './calendarioApi';
-import { Cronograma, cronograma } from './correccionesApi';
+import { Cronograma, ajustarDia, cronograma } from './correccionesApi';
 import { SolicitudesDelDia, etiquetaDia, sumarDias } from './CronogramaTab';
 import { TarjetasMarcas } from './TarjetasMarcas';
 import { DetallePlanilla, detallePlanilla, soles } from './planillaApi';
@@ -50,6 +50,7 @@ export function useDetalleDia(fila: FilaCal | null, { onCambio, onError, onOk }:
       contenido: (
         <div className="ca-detalle-sec">
           <TarjetasMarcas fila={fila} dia={dia} cargando={cargando} error={fallo || (!cargando && !dia)} reintentar={() => { setCargando(true); void cargar(); }} onError={onError} onOk={onOk} recargar={recargar} />
+          <AjustarIngresoSalida fila={fila} onCambio={recargar} onError={onError} onOk={onOk} />
           <CorreccionManual fila={fila} onCambio={recargar} onError={onError} onOk={onOk} />
         </div>
       ),
@@ -131,6 +132,66 @@ function PagoDelPeriodo({ partyId, fecha }: { partyId: number; fecha: string }) 
       {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)}</small>}
       <small className="as-ayuda">Para pagar o ajustar, abre Planilla.</small>
     </div>
+  );
+}
+
+/** «Madrugada» (antes de las 04:00 Lima) es del día calendario siguiente: la jornada cierra a las 04:00. */
+const momentoDe = (fecha: string, hora: string) => `${hora < '04:00' ? sumarDias(fecha, 1) : fecha}T${hora}:00-05:00`;
+
+/**
+ * El ADMIN fija el ingreso y la salida del día (aunque no haya marcado) o corrige ambas de una vez. Motivo obligatorio; las marcas
+ * originales quedan anuladas en el historial con quién y el motivo, y las horas, tardanza, extras y el sueldo se recalculan.
+ */
+export function AjustarIngresoSalida({ fila, onCambio, onError, onOk }: { fila: FilaCal; onCambio: () => Promise<void>; onError: Avisar; onOk: Avisar }) {
+  const [entrada, setEntrada] = useState(fila.entrada ?? '');
+  const [salida, setSalida] = useState(fila.salida ?? '');
+  const [motivo, setMotivo] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const cambioE = !!entrada && entrada !== (fila.entrada ?? '');
+  const cambioS = !!salida && salida !== (fila.salida ?? '');
+  const ordenMal = !!entrada && !!salida && momentoDe(fila.fecha, salida) <= momentoDe(fila.fecha, entrada);
+  const valido = (cambioE || cambioS) && !ordenMal && motivo.trim().length >= 10;
+  const guardar = async () => {
+    setOcupado(true);
+    try {
+      await ajustarDia({
+        partyId: Number(fila.partyId), jornada: fila.fecha, motivo: motivo.trim(),
+        ...(cambioE ? { entrada: momentoDe(fila.fecha, entrada) } : {}),
+        ...(cambioS ? { salida: momentoDe(fila.fecha, salida) } : {}),
+      });
+      onError(null);
+      onOk('Horas del día ajustadas. Las marcas originales quedan anuladas en el historial y la planilla se recalcula.');
+      setMotivo('');
+      await onCambio();
+    } catch (e) {
+      onError(mensajeDe(e, 'No se pudieron ajustar las horas.'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+  return (
+    <fieldset className="ca-correccion" aria-label="Ajustar ingreso y salida del día">
+      <legend>Ajustar ingreso y salida del día (administrador)</legend>
+      <div className="as-form">
+        <label className="as-campo">Hora de ingreso
+          <input type="time" value={entrada} onChange={(e) => setEntrada(e.target.value)} />
+        </label>
+        <label className="as-campo">Hora de salida
+          <input type="time" value={salida} onChange={(e) => setSalida(e.target.value)} />
+        </label>
+        <label className="as-campo">Motivo (mínimo 10 caracteres)
+          <input value={motivo} maxLength={300} aria-label="Motivo del ajuste de horas" onChange={(e) => setMotivo(e.target.value)} />
+        </label>
+      </div>
+      <p className="as-ayuda" data-testid="vista-previa-ajuste">
+        Ingreso {fila.entrada ?? 'sin marca'} → {entrada || '—'} · Salida {fila.salida ?? 'sin marca'} → {salida || '—'}
+      </p>
+      {ordenMal && <small role="alert" className="as-nota">La salida debe ser posterior al ingreso.</small>}
+      <div className="as-acciones">
+        <Boton type="button" disabled={!valido || ocupado} onClick={() => void guardar()}>{ocupado ? 'Guardando…' : 'Guardar horas del día'}</Boton>
+        <small className="as-ayuda">Funciona también si no marcó. Se guarda quién lo cambió, el motivo y la hora original; si el período ya está pagado, reábrelo primero.</small>
+      </div>
+    </fieldset>
   );
 }
 

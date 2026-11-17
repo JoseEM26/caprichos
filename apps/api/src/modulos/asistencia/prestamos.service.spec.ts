@@ -93,4 +93,14 @@ describe('PrestamosService', () => {
     expect(recurrentes[0]).toMatchObject({ nombre: 'Seguro', monto: 12, periodicidad: 'MENSUAL' });
     expect(recurrentes[1]).toMatchObject({ nombre: 'Netflix', periodicidad: 'SEMANAL' });
   });
+
+  it('crea un bono por porcentaje de única vez con vigencia y valida porcentaje y fechas', async () => {
+    const { svc, recurrentes, auditoria } = montar();
+    await svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', nombre: 'Bono de campaña', monto: 8, valorTipo: 'PORCENTAJE', signo: 'BONO', periodicidad: 'UNICA', desde: '2026-11-10', hasta: '2026-11-30' }, ADMIN, undefined, AHORA);
+    expect(recurrentes[0]).toMatchObject({ nombre: 'Bono de campaña', monto: 8, valor_tipo: 'PORCENTAJE', signo: 'BONO', periodicidad: 'UNICA' });
+    expect(recurrentes[0].hasta).toEqual(new Date('2026-11-30T00:00:00Z'));
+    expect(auditoria.registrar).toHaveBeenCalled();
+    await expect(svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', nombre: 'Mal', monto: 120, valorTipo: 'PORCENTAJE' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'PORCENTAJE_INVALIDO' } });
+    await expect(svc.crearRecurrente({ partyId: 7, tipo: 'OTRO', nombre: 'Mal', monto: 5, desde: '2026-11-10', hasta: '2026-11-01' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'VIGENCIA_INVALIDA' } });
+  });
 });

@@ -501,6 +501,63 @@ describe('AsistenciaService.cambiarHoraMarca', () => {
   });
 });
 
+describe('AsistenciaService.ajustarDia', () => {
+  const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false };
+  const ts = (iso: string) => new Date(iso);
+  const J = ts('2026-11-06T00:00:00Z');
+  function base(conMarcas: boolean) {
+    const s = servicio();
+    s.b.bd.horarioTrabajo.findMany = async () => [{ party_id: 7n, dia_semana: 5, entrada: ts('1970-01-01T14:00:00Z'), salida: ts('1970-01-01T23:00:00Z'), almuerzo_inicio: null, almuerzo_fin: null }];
+    if (conMarcas) {
+      s.b.marcas.push({ id: 50n, party_id: 7n, jornada: J, tipo: 'ENTRADA', origen: 'CELULAR', momento: ts('2026-11-06T19:12:00Z'), estado: 'VALIDA' });
+      s.b.marcas.push({ id: 51n, party_id: 7n, jornada: J, tipo: 'SALIDA', origen: 'CELULAR', momento: ts('2026-11-07T03:00:00Z'), estado: 'VALIDA' });
+    }
+    return s;
+  }
+  const dia = async (svc: AsistenciaService) => (await svc.diasDePersona(7n, '2026-11-06', '2026-11-06', ts('2026-11-07T12:00:00Z'))).dias[0];
+  const dto = (over: any = {}) => ({ partyId: 7, jornada: '2026-11-06', motivo: 'Se olvidó marcar, confirmado en cámara', ...over });
+
+  it('corrige ingreso y salida a la vez: anula las originales, guarda quién y el original, y el día se recalcula', async () => {
+    const { svc, b, auditoria } = base(true);
+    expect((await dia(svc)).estado).toBe('TARDANZA');
+    await svc.ajustarDia(dto({ entrada: '2026-11-06T19:00:00.000Z', salida: '2026-11-07T04:00:00.000Z' }), admin);
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA')).toHaveLength(2);
+    const nuevas = b.marcas.filter((m) => m.origen === 'CORRECCION');
+    expect(nuevas).toHaveLength(2);
+    expect(nuevas[0]).toMatchObject({ tipo: 'ENTRADA', por_party_id: 1n, estado: 'VALIDA' });
+    expect(nuevas[0].motivo).toContain('de 14:12 a 14:00');
+    expect(auditoria.registrar).toHaveBeenCalledTimes(2);
+    const d = await dia(svc);
+    expect(d.estado).toBe('CUMPLIO');
+  });
+
+  it('pone ingreso y salida aunque no haya marcado', async () => {
+    const { svc, b } = base(false);
+    await svc.ajustarDia(dto({ entrada: '2026-11-06T19:00:00.000Z', salida: '2026-11-07T04:00:00.000Z' }), admin);
+    expect(b.marcas).toHaveLength(2);
+    expect(b.marcas[0].motivo).toContain('de sin marca a 14:00');
+    expect((await dia(svc)).estado).toBe('CUMPLIO');
+  });
+
+  it('exige alguna hora, salida posterior al ingreso, mismo día laboral y período abierto', async () => {
+    const { svc, b } = base(true);
+    expect(await error(svc.ajustarDia(dto(), admin))).toMatchObject({ codigo: 'SIN_HORAS' });
+    expect(await error(svc.ajustarDia(dto({ entrada: '2026-11-06T22:00:00.000Z', salida: '2026-11-06T20:00:00.000Z' }), admin))).toMatchObject({ codigo: 'SALIDA_ANTES_DE_ENTRADA' });
+    expect(await error(svc.ajustarDia(dto({ entrada: '2026-11-08T19:00:00.000Z' }), admin))).toMatchObject({ codigo: 'JORNADA_NO_COINCIDE' });
+    b.periodosPagados.push({ estado: 'PAGADO' });
+    expect(await error(svc.ajustarDia(dto({ entrada: '2026-11-06T19:00:00.000Z' }), admin))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(b.marcas).toHaveLength(2);
+  });
+
+  it('el motivo mínimo de 10 caracteres se valida en el DTO', async () => {
+    const { validate } = await import('class-validator');
+    const { plainToInstance } = await import('class-transformer');
+    const { AjustarDiaDto } = await import('./dto/asistencia.dto');
+    const mal = await validate(plainToInstance(AjustarDiaDto, { partyId: 7, jornada: '2026-11-06', entrada: '2026-11-06T19:00:00.000Z', motivo: 'corto' }));
+    expect(mal.some((e) => e.property === 'motivo')).toBe(true);
+  });
+});
+
 describe('mensajeMarca: entrada y salida frente al turno', () => {
   const turno = { entrada: 14 * 60, salida: 23 * 60 };
   const a = (h: number, m: number) => new Date(Date.UTC(2026, 10, 6, h + 5, m)); // hora Lima

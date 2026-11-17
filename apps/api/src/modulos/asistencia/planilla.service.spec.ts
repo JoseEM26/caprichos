@@ -287,6 +287,24 @@ describe('PlanillaService', () => {
     expect(r.vacaciones.diasTomados).toBe(0);
   });
 
+  it('descuentos y bonos personalizados: porcentaje, única vez, vigencia y bono que suma al neto', async () => {
+    const rec = [
+      { id: 11n, tipo: 'OTRO', nombre: 'Uniforme', monto: 50, periodicidad: 'UNICA', signo: 'DESCUENTO', valor_tipo: 'MONTO', desde: d('2026-11-12'), hasta: null, activo: true },
+      { id: 12n, tipo: 'OTRO', nombre: 'Seguro', monto: 5, periodicidad: 'MENSUAL', signo: 'DESCUENTO', valor_tipo: 'PORCENTAJE', desde: d('2026-10-01'), hasta: null, activo: true },
+      { id: 13n, tipo: 'OTRO', nombre: 'Movilidad', monto: 30, periodicidad: 'MENSUAL', signo: 'BONO', valor_tipo: 'MONTO', desde: d('2026-10-01'), hasta: null, activo: true },
+      { id: 14n, tipo: 'OTRO', nombre: 'Vencido', monto: 99, periodicidad: 'MENSUAL', signo: 'DESCUENTO', valor_tipo: 'MONTO', desde: d('2026-01-01'), hasta: d('2026-10-31'), activo: true },
+    ];
+    const m = montar({ recurrentes: rec });
+    const r = await m.svc.detalle(7, '2026-11-15', sinConsumos, AHORA);
+    expect(r.recurrentes.map((x: any) => [x.nombre, x.monto])).toEqual([['Uniforme', 50], ['Seguro', 50], ['Movilidad', 30]]); // 5 % de 1000; «Vencido» no aplica
+    expect(r.resultado.descuentos).toBe(100);
+    expect(r.resultado.adicional).toBe(30);
+    expect(r.resultado.netoAPagar).toBe(600 + 30 - 100);
+    // la única vez no se repite en otro período
+    const otro = await m.svc.detalle(7, '2026-12-15', sinConsumos, AHORA);
+    expect(otro.recurrentes.map((x: any) => x.nombre)).toEqual(['Seguro', 'Movilidad']);
+  });
+
   it('Netflix semanal ×1 y mensual ×4, con casilla para omitirlo, etiquetado', async () => {
     const rec = [{ id: 5n, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64 }];
     const m = montar({ recurrentes: rec });
@@ -645,3 +663,25 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     expect(despues.resultado.pagoExtra).toBe(5 * 10 * 1.25);
   });
 });
+
+describe('PlanillaService.listarRango', () => {
+  it('suma las horas y el ganado de TODO el rango libre (no del período) y no cuenta descuentos automáticos', async () => {
+    const m = montar({ recurrentes: [{ id: 5n, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64 }] });
+    // jornadas 1 a 6 de noviembre: 6 días × 5 h = 30 h; sueldo mensual 1000, 50 h programadas en el mes
+    const r = await m.svc.listar(undefined, AHORA, 'RANGO', { desde: '2026-11-01', hasta: '2026-11-06' });
+    expect(r.modo).toBe('RANGO');
+    expect(r.vista).toEqual({ desde: '2026-11-01', hasta: '2026-11-06' });
+    const f = r.filas[0];
+    expect(f.estimado).toBe(true);
+    expect(f.trabajadasH).toBe(30);
+    expect(f.excel.descuentosPorCategoria.NETFLIX).toBeUndefined();
+    expect(r.totales.aPagar).toBe(f.neto);
+  });
+
+  it('rechaza rangos invertidos o de más de 93 días', async () => {
+    const m = montar();
+    await expect(m.svc.listar(undefined, AHORA, 'RANGO', { desde: '2026-11-10', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+    await expect(m.svc.listar(undefined, AHORA, 'RANGO', { desde: '2026-01-01', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_LARGO' } });
+  });
+});
+

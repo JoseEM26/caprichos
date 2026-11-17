@@ -105,10 +105,36 @@ describe('PrestamosPersona', () => {
     expect(screen.getByLabelText('Cobrar Plan de celular')).toBeChecked();
     fireEvent.click(screen.getByLabelText('Cobrar Plan de celular'));
     await waitFor(() => expect(editarRec).toHaveBeenCalledWith(5, { activo: false }));
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Gimnasio' } });
+    fireEvent.change(screen.getByLabelText('Concepto'), { target: { value: 'Gimnasio' } });
     fireEvent.change(screen.getByLabelText(/Monto \(S\/\)/), { target: { value: '12' } });
     fireEvent.change(screen.getByLabelText('Se cobra cada'), { target: { value: 'SEMANAL' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar servicio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar descuento o bono' }));
     await waitFor(() => expect(crearRec).toHaveBeenCalledWith({ partyId: 7, tipo: 'OTRO', nombre: 'Gimnasio', monto: 12, periodicidad: 'SEMANAL' }));
+  });
+
+  it('descuento personalizado: bono en porcentaje, única vez y con vigencia; valida el rango de fechas', async () => {
+    listar.mockResolvedValue({
+      netflixSemanalDefecto: 1.64, prestamos: [],
+      recurrentes: [{ id: 8, tipo: 'OTRO', nombre: 'Seguro', monto: 5, activo: true, desde: '2026-11-01', hasta: '2026-12-31', periodicidad: 'MENSUAL', valorTipo: 'PORCENTAJE' }],
+    });
+    render(<ServiciosExtraPersona partyId={7} alCambiar={() => undefined} />);
+    expect(await screen.findByText(/5 % del sueldo por mes/)).toBeInTheDocument();
+    expect(screen.getByText(/Desde 2026-11-01 hasta 2026-12-31/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Concepto'), { target: { value: 'Premio de ventas' } });
+    fireEvent.change(screen.getByLabelText('Es un'), { target: { value: 'BONO' } });
+    fireEvent.change(screen.getByLabelText('Valor en'), { target: { value: 'PORCENTAJE' } });
+    fireEvent.change(screen.getByLabelText('Porcentaje (%)'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Se cobra cada'), { target: { value: 'UNICA' } });
+    fireEvent.change(screen.getByLabelText('Vigente desde'), { target: { value: '2026-11-20' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar descuento o bono' }));
+    await waitFor(() => expect(crearRec).toHaveBeenCalledWith({ partyId: 7, tipo: 'OTRO', nombre: 'Premio de ventas', monto: 10, periodicidad: 'UNICA', signo: 'BONO', valorTipo: 'PORCENTAJE', desde: '2026-11-20' }));
+    // vigencia al revés: bloquea el botón
+    fireEvent.change(screen.getByLabelText('Concepto'), { target: { value: 'Otro' } });
+    fireEvent.change(screen.getByLabelText('Monto (S/)'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Se cobra cada'), { target: { value: 'SEMANAL' } });
+    fireEvent.change(screen.getByLabelText('Vigente desde'), { target: { value: '2026-11-20' } });
+    fireEvent.change(screen.getByLabelText('Hasta (opcional)'), { target: { value: '2026-11-01' } });
+    expect(screen.getByRole('button', { name: 'Agregar descuento o bono' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('no puede ser anterior');
   });
 });

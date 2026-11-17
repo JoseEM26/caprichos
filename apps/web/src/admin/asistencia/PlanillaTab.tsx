@@ -14,7 +14,7 @@ import { PlanillaPersona } from './PlanillaPersona';
 import { SECCIONES, SeccionPlanilla } from './PlanillaPersonaTipos';
 import { ETIQUETA_VINCULO } from './vinculoApi';
 import { ETIQUETA_CATEGORIA, FilaPlanilla, listarPlanilla, soles } from './planillaApi';
-import { ModoPeriodo, etiquetaPeriodo, moverPeriodo, rangoDe } from './periodoVista';
+import { ModoPeriodo, ModoVista, errorRango, etiquetaPeriodo, etiquetaRango, moverPeriodo, presetsRango, rangoDe } from './periodoVista';
 import './planilla.css';
 
 type Avisar = (m: string | null) => void;
@@ -41,8 +41,15 @@ const nombreRol = (r: string) => (ETIQUETAS_ROLES[r] ?? r).replace(/ \(.*\)$/, '
  */
 export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
   const [params, setParams] = useSearchParams();
-  const modo: ModoPeriodo = params.get('modo') === 'MES' ? 'MES' : 'SEMANA';
+  const vistaModo: ModoVista = params.get('modo') === 'MES' ? 'MES' : params.get('modo') === 'RANGO' ? 'RANGO' : 'SEMANA';
+  const enRango = vistaModo === 'RANGO';
+  const modo: ModoPeriodo = vistaModo === 'MES' ? 'MES' : 'SEMANA';
   const fecha = ISO.test(params.get('fecha') ?? '') ? params.get('fecha')! : jornadaActual();
+  // rango libre: vive en la URL (?modo=RANGO&rd=…&rh=…); sin fechas parte de la semana en curso
+  const semanaActual = rangoDe('SEMANA', jornadaActual());
+  const rd = ISO.test(params.get('rd') ?? '') ? params.get('rd')! : semanaActual.desde;
+  const rh = ISO.test(params.get('rh') ?? '') ? params.get('rh')! : semanaActual.hasta;
+  const fallaRango = enRango ? errorRango(rd, rh) : null;
   const estado = (['ABIERTO', 'PAGADO', 'REVISAR'].includes(params.get('estado') ?? '') ? params.get('estado') : 'TODOS') as FiltroEstado;
   const rol = params.get('rol') ?? '';
   const texto = params.get('q') ?? '';
@@ -69,7 +76,8 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   const cargar = useCallback(async () => {
     const vigente = nueva();
     try {
-      const r = await listarPlanilla(fecha, modo);
+      if (enRango && fallaRango) { setFilas([]); return; }
+      const r = enRango ? await listarPlanilla(undefined, 'RANGO', { desde: rd, hasta: rh }) : await listarPlanilla(fecha, modo);
       if (!vigente()) return;
       setFilas(r.filas);
       setErrorLista(null);
@@ -77,7 +85,7 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
     } catch (e) {
       if (vigente()) setErrorLista(mensajeDe(e, 'No pudimos cargar la planilla.'));
     }
-  }, [fecha, modo, onError, nueva]);
+  }, [fecha, modo, enRango, rd, rh, fallaRango, onError, nueva]);
   useEffect(() => { void cargar(); }, [cargar]);
 
   // al volver de la página de una persona la lista se refresca (pudo pagarse o cambiar)
@@ -120,8 +128,8 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
   const abrir = (f: FilaPlanilla, desde: string) => poner({ persona: String(f.partyId), desde, seccion: null }, false);
   const quitarFiltros = () => filtrar({ estado: null, rol: null, q: null });
   const hoy = jornadaActual();
-  const vista = rangoDe(modo, fecha);
-  const esActual = rangoDe(modo, hoy).desde === vista.desde;
+  const vista = enRango ? { desde: rd, hasta: rh } : rangoDe(modo, fecha);
+  const esActual = !enRango && rangoDe(modo, hoy).desde === vista.desde;
   const presets: Array<[string, string]> = modo === 'SEMANA'
     ? [['Esta semana', hoy], ['Semana pasada', moverPeriodo('SEMANA', hoy, -1)]]
     : [['Este mes', hoy], ['Mes pasado', moverPeriodo('MES', hoy, -1)]];
@@ -138,9 +146,8 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
     ['Préstamos', soles(suma(enTotales, prestamosDe))],
     ['Adelantos', soles(suma(enTotales, adelantoDe))],
     ['Descuentos', soles(suma(enTotales, (f) => f.excel?.descuentos ?? f.descuentos ?? 0))],
-    ['A pagar', soles(suma(enTotales, netoDe)), true],
-    ['Pagado', soles(suma(enTotales, pagadoDe))],
-    ['Pendiente', soles(suma(enTotales, (f) => netoDe(f) - pagadoDe(f)))],
+    [enRango ? 'Estimado a pagar' : 'A pagar', soles(suma(enTotales, netoDe)), true],
+    ...(enRango ? [] : [['Pagado', soles(suma(enTotales, pagadoDe))], ['Pendiente', soles(suma(enTotales, (f) => netoDe(f) - pagadoDe(f)))]] as Array<[string, string, boolean?]>),
   ];
   const estados: Array<[FiltroEstado, string]> = [['TODOS', 'Todos'], ['ABIERTO', 'Abiertos'], ['REVISAR', 'Por revisar'], ['PAGADO', 'Pagados']];
 
@@ -148,28 +155,50 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
     <>
       <div className="pl-periodo" role="group" aria-label="Período de la planilla">
         <div className="pl-modo" role="group" aria-label="Ver por">
-          {(['SEMANA', 'MES'] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={modo === m} className={modo === m ? 'activo' : undefined} onClick={() => filtrar({ modo: m === 'MES' ? 'MES' : null })}>{m === 'SEMANA' ? 'Semana' : 'Mes'}</button>
+          {(['SEMANA', 'MES', 'RANGO'] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={vistaModo === m} className={vistaModo === m ? 'activo' : undefined}
+              onClick={() => filtrar({ modo: m === 'SEMANA' ? null : m, ...(m === 'RANGO' ? { rd: vista.desde, rh: vista.hasta } : {}) })}>
+              {m === 'SEMANA' ? 'Semana' : m === 'MES' ? 'Mes' : 'Rango libre'}
+            </button>
           ))}
         </div>
-        <div className="pl-nav">
-          <button type="button" aria-label={`${modo === 'SEMANA' ? 'Semana' : 'Mes'} anterior`} onClick={() => filtrar({ fecha: moverPeriodo(modo, fecha, -1) })}>‹</button>
-          <strong aria-live="polite" className="pl-etiqueta">{etiquetaPeriodo(modo, fecha)}</strong>
-          <button type="button" aria-label={`${modo === 'SEMANA' ? 'Semana' : 'Mes'} siguiente`} onClick={() => filtrar({ fecha: moverPeriodo(modo, fecha, 1) })}>›</button>
-        </div>
-        <div className="pl-presets">
-          {presets.map(([t, f]) => (
-            <button key={t} type="button" aria-pressed={rangoDe(modo, f).desde === vista.desde} onClick={() => filtrar({ fecha: f })}>{t}</button>
-          ))}
-        </div>
+        {!enRango && (
+          <div className="pl-nav">
+            <button type="button" aria-label={`${modo === 'SEMANA' ? 'Semana' : 'Mes'} anterior`} onClick={() => filtrar({ fecha: moverPeriodo(modo, fecha, -1) })}>‹</button>
+            <strong aria-live="polite" className="pl-etiqueta">{etiquetaPeriodo(modo, fecha)}</strong>
+            <button type="button" aria-label={`${modo === 'SEMANA' ? 'Semana' : 'Mes'} siguiente`} onClick={() => filtrar({ fecha: moverPeriodo(modo, fecha, 1) })}>›</button>
+          </div>
+        )}
+        {!enRango && (
+          <div className="pl-presets">
+            {presets.map(([t, f]) => (
+              <button key={t} type="button" aria-pressed={rangoDe(modo, f).desde === vista.desde} onClick={() => filtrar({ fecha: f })}>{t}</button>
+            ))}
+          </div>
+        )}
       </div>
+      {enRango && (
+        <div className="pl-rango" role="group" aria-label="Rango libre de fechas">
+          <label className="as-campo">Desde <input type="date" value={rd} max={rh} onChange={(e) => e.target.value && filtrar({ modo: 'RANGO', rd: e.target.value })} /></label>
+          <label className="as-campo">Hasta <input type="date" value={rh} min={rd} onChange={(e) => e.target.value && filtrar({ modo: 'RANGO', rh: e.target.value })} /></label>
+          <div className="pl-presets" role="group" aria-label="Atajos de fechas">
+            {presetsRango(hoy).map((p) => (
+              <button key={p.id} type="button" aria-pressed={p.desde === rd && p.hasta === rh} onClick={() => filtrar({ modo: 'RANGO', rd: p.desde, rh: p.hasta })}>{p.etiqueta}</button>
+            ))}
+          </div>
+          <strong className="pl-etiqueta" aria-live="polite">{fallaRango ? '' : etiquetaRango(rd, rh)}</strong>
+          {fallaRango && <div role="alert" className="as-aviso as-aviso--error">{fallaRango}</div>}
+        </div>
+      )}
       <div className="pl-barra">
-        <span className="as-nota">{vista.desde} a {vista.hasta}{esActual ? ' · en curso' : ''} · {pagados} de {enTotales.length} pagados</span>
-        <label className="as-campo pl-dia">Día del período
-          <input type="date" value={fecha} onChange={(e) => e.target.value && filtrar({ fecha: e.target.value })} />
-        </label>
+        <span className="as-nota">{vista.desde} a {vista.hasta}{esActual ? ' · en curso' : ''} · {enRango ? `${enTotales.length} personas` : `${pagados} de ${enTotales.length} pagados`}</span>
+        {!enRango && (
+          <label className="as-campo pl-dia">Día del período
+            <input type="date" value={fecha} onChange={(e) => e.target.value && filtrar({ fecha: e.target.value })} />
+          </label>
+        )}
       </div>
-      <small className="as-nota">Cada persona se paga por su semana (lunes a domingo) o por su mes. Si la vista no coincide con su modalidad se avisa en su tarjeta.</small>
+      <small className="as-nota">{enRango ? 'Rango libre: todas las cifras (horas, ganado, penalidad, bonos, descuentos y adelantos del rango) son un estimado para consultar. Para pagar, abre la semana o el mes de cada persona.' : 'Cada persona se paga por su semana (lunes a domingo) o por su mes. Si la vista no coincide con su modalidad se avisa en su tarjeta.'}</small>
       <dl className="pl-totales" aria-label="Totales de la planilla">
         {totales.map(([t, v, fuerte]) => (
           <div key={t} className={`pl-total${fuerte ? ' pl-total--fuerte' : ''}`}><dt>{t}</dt><dd>{v}</dd></div>
@@ -212,7 +241,7 @@ export function PlanillaTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }
                     {f.rol ? `${nombreRol(f.rol)} · ` : ''}{f.vinculo ? ETIQUETA_VINCULO[f.vinculo.tipo] : 'Sin vínculo'} · {f.sueldo ? (f.sueldo.metodo === 'TARIFA_HORA' ? 'Por hora' : `${soles(f.sueldo.mensual)} al mes`) : 'Sin sueldo'}
                   </small>
                 </div>
-                <div className="pl-neto"><small>{f.fueraDeModalidad ? 'Su mes' : 'A pagar'}</small>{soles(netoDe(f))}</div>
+                <div className="pl-neto"><small>{f.fueraDeModalidad ? 'Su mes' : enRango ? 'Estimado' : 'A pagar'}</small>{soles(netoDe(f))}</div>
               </div>
               {f.aviso && <small className={`pl-aviso${f.fueraDeModalidad ? ' pl-aviso--fuera' : ''}`}>{f.aviso}</small>}
               <dl className="pl-cifras">

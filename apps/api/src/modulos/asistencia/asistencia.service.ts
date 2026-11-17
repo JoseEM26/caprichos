@@ -47,7 +47,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { ConfigurarAsistenciaDto, CambiarHoraMarcaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import { AjustarDiaDto, ConfigurarAsistenciaDto, CambiarHoraMarcaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -718,6 +718,52 @@ export class AsistenciaService {
     });
     await this.auditar('CAMBIO', 'CAMBIAR_HORA_MARCA', 'OK', { de, a, marcaOriginal: Number(marca.id), tipo: nueva.tipo }, usuario.partyId, ip, 'asistencia_marca', nueva.id, motivo);
     return { ok: true, id: Number(nueva.id) };
+  }
+
+  /**
+   * El admin fija ingreso y/o salida de un día aunque la persona no haya marcado (o haya marcado mal). Append-only: las marcas
+   * vigentes de ese rol quedan ANULADAS con quién, cuándo y por qué, y se crea una CORRECCION con la hora nueva que dice la hora original.
+   * Horas, tardanza, extras, penalidad y sueldo del período se recalculan solos porque salen de las marcas que cuentan.
+   */
+  async ajustarDia(dto: AjustarDiaDto, usuario: UsuarioAutenticado, ip?: string) {
+    if (!dto.entrada && !dto.salida) throw new BadRequestException({ codigo: 'SIN_HORAS', mensaje: 'Indica la hora de ingreso, la de salida o ambas' });
+    const persona = await this.prisma.party.findUnique({ where: { id: BigInt(dto.partyId) } });
+    if (!persona) throw new NotFoundException({ codigo: 'PERSONA_NO_ENCONTRADA', mensaje: 'Persona no encontrada' });
+    const pedidas: Array<{ tipo: 'ENTRADA' | 'SALIDA'; momento: Date }> = [];
+    for (const [tipo, iso] of [['ENTRADA', dto.entrada], ['SALIDA', dto.salida]] as const) {
+      if (!iso) continue;
+      const momento = new Date(iso);
+      if (Number.isNaN(momento.getTime())) throw new BadRequestException({ codigo: 'MOMENTO_INVALIDO', mensaje: 'La hora no es válida' });
+      if (jornadaDe(momento).jornada !== dto.jornada) throw new BadRequestException({ codigo: 'JORNADA_NO_COINCIDE', mensaje: 'La hora no cae en el día laboral indicado' });
+      pedidas.push({ tipo, momento });
+    }
+    if (dto.entrada && dto.salida && new Date(dto.salida).getTime() <= new Date(dto.entrada).getTime()) {
+      throw new BadRequestException({ codigo: 'SALIDA_ANTES_DE_ENTRADA', mensaje: 'La salida debe ser posterior al ingreso' });
+    }
+    const jornada = fechaDb(dto.jornada);
+    const pagado = await this.prisma.planillaPeriodo.findFirst({ where: { party_id: persona.id, estado: 'PAGADO', desde: { lte: jornada }, hasta: { gte: jornada } } });
+    if (pagado) throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Ese período ya está pagado. Reábrelo (con motivo) para cambiar las horas de este día.' });
+    const motivo = dto.motivo.trim();
+    const quien = (await this.cuentas([usuario.partyId])).get(usuario.partyId)?.nombre ?? `usuario ${usuario.partyId}`;
+    const ids = await this.prisma.$transaction(async (tx) => {
+      const creadas: number[] = [];
+      for (const p of pedidas) {
+        const vigentes = await tx.asistenciaMarca.findMany({ where: { party_id: persona.id, jornada, tipo: p.tipo, estado: { not: 'ANULADA' } }, orderBy: { momento: 'asc' } });
+        const a = aHoraTexto(jornadaDe(p.momento).minutos);
+        const original = vigentes.length ? vigentes.map((m) => aHoraTexto(jornadaDe(m.momento).minutos)).join(', ') : 'sin marca';
+        const etiqueta = p.tipo === 'ENTRADA' ? 'Ingreso' : 'Salida';
+        for (const m of vigentes) {
+          await tx.asistenciaMarca.update({ where: { id: m.id }, data: { estado: 'ANULADA', revisado_por: usuario.partyId, revisado_en: new Date(), revisado_motivo: `${etiqueta} ajustado a ${a}: ${motivo}` } });
+        }
+        const nueva = await tx.asistenciaMarca.create({
+          data: { party_id: persona.id, jornada, tipo: p.tipo, origen: 'CORRECCION', momento: p.momento, estado: 'VALIDA', motivo: `${etiqueta} ajustado de ${original} a ${a} por ${quien}: ${motivo}`, por_party_id: usuario.partyId },
+        });
+        creadas.push(Number(nueva.id));
+        await this.auditar('CAMBIO', 'AJUSTAR_DIA', 'OK', { tipo: p.tipo, de: original, a, anuladas: vigentes.map((m) => Number(m.id)), jornada: dto.jornada }, usuario.partyId, ip, 'asistencia_marca', nueva.id, motivo);
+      }
+      return creadas;
+    });
+    return { ok: true, ids };
   }
 
   async reiniciarDispositivo(partyId: number, usuario: UsuarioAutenticado, ip?: string) {

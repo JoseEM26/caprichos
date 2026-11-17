@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
-  AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto, CambiarHoraMarcaDto,
+  AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto, AjustarDiaDto, CambiarHoraMarcaDto,
   ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto, CalendarioDto, CalendarioFilasDto,
 } from './dto/asistencia.dto';
 import { AsistenciaCalendarioService } from './asistencia-calendario.service';
@@ -114,6 +114,13 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   reasignar(@Param('id') id: string, @Body() dto: ReasignarMarcaDto, @Req() req: any) {
     return this.asistencia.reasignarMarca(Number(id), dto, req.usuario, ipDe(req));
+  }
+
+  /** Fijar el ingreso y/o la salida de un día (también si no marcó): con motivo, auditoría y el original a la vista. */
+  @Post('ajustar-dia')
+  @Permiso('asistencia', 'administrar')
+  ajustarDia(@Body() dto: AjustarDiaDto, @Req() req: any) {
+    return this.asistencia.ajustarDia(dto, req.usuario, ipDe(req));
   }
 
   /** Cambiar la HORA de una marca (p. ej. falla del sistema): anula la original y crea una corrección con la hora nueva. */

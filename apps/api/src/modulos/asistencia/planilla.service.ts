@@ -26,12 +26,18 @@ import {
   valorHoraPersona,
 } from './planilla.calculo';
 import { aplicarVacaciones, fechasDelRango } from './vacaciones.calculo';
-import { PrestamoCalc, cuotaDelPeriodo, interesDeCuota, montoRecurrenteDelPeriodo, saldoPrestamo } from './prestamos.calculo';
+import { PrestamoCalc, cuotaDelPeriodo, descuentoPersonalDelPeriodo, interesDeCuota, saldoPrestamo } from './prestamos.calculo';
 
 export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 /** Lo que se descarta del pago de este período: cuotas de préstamo y descuentos recurrentes (ids) que NO se cobran. */
 /** `incluirAnteriores`: consumos de períodos anteriores que SÍ se cobran en este pago (por defecto pasan al siguiente). */
-export interface OmitirPeriodo { cuotas?: string[]; recurrentes?: string[]; incluirAnteriores?: string[] }
+export interface OmitirPeriodo {
+  cuotas?: string[];
+  recurrentes?: string[];
+  incluirAnteriores?: string[];
+  /** Rango libre (solo consulta, no se paga): sueldo prorrateado por días y sin cuotas ni descuentos automáticos del período. */
+  rangoLibre?: boolean;
+}
 /** Confirmaciones del admin al pagar, que quedan en el pago y en la auditoría. */
 export interface ConfirmacionesPago {
   /** «Pagar igual»: motivo (mín. 10 caracteres) para pagar con jornadas pendientes. Solo ADMIN. */
@@ -189,7 +195,8 @@ export class PlanillaService {
    *  - SEMANA + persona MENSUAL: se muestra su mes (el que contiene el domingo de la semana) como referencia, con aviso
    *    «se paga por mes» y FUERA de los totales (si no, se contaría dos veces el sueldo del mes).
    */
-  async listar(fecha?: string, ahora = new Date(), modo?: 'SEMANA' | 'MES') {
+  async listar(fecha?: string, ahora = new Date(), modo?: 'SEMANA' | 'MES' | 'RANGO', rango?: { desde?: string; hasta?: string }) {
+    if (modo === 'RANGO') return this.listarRango(rango?.desde, rango?.hasta, ahora);
     const ref = fecha ? fechaValida(fecha) : jornadaDe(ahora).jornada;
     const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true, rol: true } });
     const ids = cuentas.map((c) => c.party_id);
@@ -241,6 +248,45 @@ export class PlanillaService {
       pagados: enTotales.filter((f) => f.estado === 'PAGADO').length,
     };
     return { fecha: ref, modo: modo ?? null, vista, totales, filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)) };
+  }
+
+  /**
+   * Rango libre «desde / hasta» (máx. 93 días): horas, ganado, penalidad, bonos, descuentos y adelantos manuales y consumos de TODO el
+   * rango, por persona. Es una consulta (estimado): no se paga aquí; el pago sigue siendo por la semana o el mes de cada persona
+   * (cuotas y descuentos automáticos se aplican al pagar su período). El sueldo para PROGRAMADAS se prorratea por días.
+   */
+  async listarRango(desde: string | undefined, hasta: string | undefined, ahora = new Date()) {
+    const d = fechaValida(desde ?? jornadaDe(ahora).jornada);
+    const h = fechaValida(hasta ?? d);
+    if (h < d) throw new BadRequestException({ codigo: 'RANGO_INVALIDO', mensaje: 'La fecha «hasta» no puede ser anterior a «desde»' });
+    if (fechasDelRango(d, h).length > 93) throw new BadRequestException({ codigo: 'RANGO_LARGO', mensaje: 'El rango no puede pasar de 93 días' });
+    const cuentas = await this.prisma.userAccount.findMany({ where: { activo: true, rol: { not: 'ADMIN' } }, select: { party_id: true, rol: true } });
+    const ids = cuentas.map((c) => c.party_id);
+    const rolDe = new Map(cuentas.map((c) => [c.party_id, c.rol as string]));
+    const [sueldos, personas, vinculos] = await Promise.all([
+      this.prisma.sueldoPersonal.findMany({ where: { party_id: { in: ids } } }),
+      this.prisma.person.findMany({ where: { party_id: { in: ids } } }),
+      this.prisma.vinculoPersonal.findMany({ where: { party_id: { in: ids }, vigente_hasta: null } }),
+    ]);
+    const nombre = new Map(personas.map((p) => [p.party_id, [p.nombres, p.apellidos].filter(Boolean).join(' ')]));
+    const filas: any[] = [];
+    for (const id of ids) {
+      const s = sueldos.find((x) => x.party_id === id);
+      const v = vinculos.find((x) => x.party_id === id);
+      const base = { partyId: Number(id), nombre: nombre.get(id) ?? `Persona ${id}`, rol: rolDe.get(id) ?? null, vinculo: v ? { tipo: v.tipo, fechaIngreso: isoDe(v.fecha_ingreso), fechaFin: v.fecha_fin ? isoDe(v.fecha_fin) : null } : null };
+      if (!s) { filas.push({ ...base, sueldo: null }); continue; }
+      const calc = await this.calcular(id, sueldoDe(s), { desde: d, hasta: h }, new Set(), ahora, { rangoLibre: true });
+      filas.push({
+        ...base,
+        ...this.filaDeDetalles([{ ...calc, sueldo: sueldoDe(s), pago: pagoDe(s), estado: 'ABIERTO' }]),
+        estado: 'ABIERTO',
+        estimado: true,
+        aviso: 'Rango libre: estimado. Para pagar abre su semana o su mes.',
+      });
+    }
+    const sum = (g: (f: any) => number) => redondear2(filas.filter((f) => f.sueldo).reduce((a, f) => a + (g(f) || 0), 0));
+    const totales = { personas: filas.filter((f) => f.sueldo).length, aPagar: sum((f) => f.neto), pagado: 0, pendiente: sum((f) => f.neto), pagados: 0 };
+    return { fecha: d, modo: 'RANGO' as const, vista: { desde: d, hasta: h }, totales, filas: filas.sort((a, b) => a.nombre.localeCompare(b.nombre)) };
   }
 
   /** Une 1..n detalles semanales (o uno solo) en la fila que ve la lista. Los períodos pagados ya vienen congelados. */
@@ -357,8 +403,8 @@ export class PlanillaService {
       }),
       this.prisma.person.findUnique({ where: { party_id: id } }),
       tercerizado ? Promise.resolve([] as any[]) : this.prisma.feriado.findMany({ where: { activo: true, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
-      this.prisma.prestamoPersonal.findMany({ where: { party_id: id, estado: 'ACTIVO' }, include: { cuotas: true }, orderBy: { id: 'asc' } }),
-      this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: id, activo: true, desde: { lte: fechaDb(periodo.hasta) } }, orderBy: { id: 'asc' } }),
+      omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.prestamoPersonal.findMany({ where: { party_id: id, estado: 'ACTIVO' }, include: { cuotas: true }, orderBy: { id: 'asc' } }),
+      omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: id, activo: true, desde: { lte: fechaDb(periodo.hasta) } }, orderBy: { id: 'asc' } }),
     ]);
     // Feriado activo: las horas trabajadas de esa jornada se pagan a valor hora × recargo (ver pagoDia en planilla.calculo).
     const feriados = new Map(feriadosBd.map((f) => [isoDe(f.fecha), { nombre: f.nombre, recargo: Number(f.recargo) }]));
@@ -387,7 +433,11 @@ export class PlanillaService {
     });
     const consumosAnterioresPendiente = redondear2(consumos.filter((c) => c.anterior && !c.cobrar).reduce((a, c) => a + c.monto, 0));
     const extrasSet = new Set(extras.map((e) => isoDe(e.jornada)));
-    const sueldoPeriodo = sueldo.modalidad === 'SEMANAL' ? sueldo.semanal : sueldo.mensual;
+    const sueldoCompleto = sueldo.modalidad === 'SEMANAL' ? sueldo.semanal : sueldo.mensual;
+    // Rango libre: el sueldo del período se prorratea por días (solo afecta al método PROGRAMADAS; los demás usan valor hora fijo).
+    const diasRango = fechasDelRango(periodo.desde, periodo.hasta).length;
+    const diasPeriodoCompleto = sueldo.modalidad === 'SEMANAL' ? 7 : fechasDelRango(periodoDe('MENSUAL', periodo.desde).desde, periodoDe('MENSUAL', periodo.desde).hasta).length;
+    const sueldoPeriodo = omitir.rangoLibre ? redondear2((sueldoCompleto * diasRango) / diasPeriodoCompleto) : sueldoCompleto;
     // Valor hora de la persona: DIAS_HORAS y TARIFA_HORA fijan uno propio; PROGRAMADAS usa sueldo ÷ horas programadas.
     const parametros = {
       metodo: sueldo.metodo,
@@ -438,24 +488,37 @@ export class PlanillaService {
             motivo: (p.motivo as string | null) ?? null, cobrar: !omitC.has(c.id) }]
         : [];
     });
-    const recurrentes = recurrentesBd.map((r: any) => ({
-      id: r.id.toString(),
-      tipo: r.tipo as string,
-      nombre: r.nombre as string,
-      periodicidad: (r.periodicidad ?? 'SEMANAL') as 'SEMANAL' | 'MENSUAL',
-      monto: montoRecurrenteDelPeriodo(Number(r.monto), sueldo.modalidad, r.periodicidad ?? 'SEMANAL'),
-      cobrar: !omitR.has(r.id.toString()),
-    }));
+    // Descuentos y bonos personalizados: solo los que corresponden a este período (vigencia, única vez, semanal o mensual)
+    const recurrentes = recurrentesBd.flatMap((r: any) => {
+      const monto = descuentoPersonalDelPeriodo(
+        { valor: Number(r.monto), valorTipo: r.valor_tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO', periodicidad: (r.periodicidad ?? 'SEMANAL') as 'SEMANAL' | 'MENSUAL' | 'UNICA', desde: r.desde ? isoDe(r.desde) : '1900-01-01', hasta: r.hasta ? isoDe(r.hasta) : null },
+        sueldo.modalidad, periodo, { semanal: sueldo.semanal, mensual: sueldo.mensual },
+      );
+      return monto === null ? [] : [{
+        id: r.id.toString(),
+        tipo: r.tipo as string,
+        nombre: r.nombre as string,
+        periodicidad: (r.periodicidad ?? 'SEMANAL') as 'SEMANAL' | 'MENSUAL' | 'UNICA',
+        signo: (r.signo === 'BONO' ? 'BONO' : 'DESCUENTO') as 'BONO' | 'DESCUENTO',
+        valorTipo: (r.valor_tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO') as 'MONTO' | 'PORCENTAJE',
+        valor: Number(r.monto),
+        desde: r.desde ? isoDe(r.desde) : '1900-01-01',
+        hasta: r.hasta ? isoDe(r.hasta) : null,
+        monto,
+        cobrar: !omitR.has(r.id.toString()),
+      }];
+    });
     const lineasDescuento = [
       ...vigentes.filter((a) => a.tipo === 'DESCUENTO').map((a) => ({ categoria: (CATEGORIAS_DESCUENTO as readonly string[]).includes(a.categoria) ? a.categoria : 'OTRO', monto: Number(a.monto) })),
       ...cuotas.filter((c) => c.cobrar).map((c) => ({ categoria: 'PRESTAMO', monto: c.monto })),
-      ...recurrentes.filter((r) => r.cobrar).map((r) => ({ categoria: r.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', monto: r.monto })),
+      ...recurrentes.filter((r) => r.cobrar && r.signo === 'DESCUENTO').map((r) => ({ categoria: r.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', monto: r.monto })),
     ];
+    const bonosPersonales = recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => r.monto);
     const resultado = calcularPlanilla({
       valorHora: vhFijo ?? undefined,
       multiplicadorExtra: multExtra,
       lineasDescuento,
-      bonos: vigentes.filter((a) => a.tipo === 'BONO').map((a) => Number(a.monto)),
+      bonos: [...vigentes.filter((a) => a.tipo === 'BONO').map((a) => Number(a.monto)), ...bonosPersonales],
       modalidad: sueldo.modalidad,
       sueldoPeriodo,
       dias: diasCalc,

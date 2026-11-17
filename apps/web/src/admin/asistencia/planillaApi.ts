@@ -88,7 +88,13 @@ export interface FilaPlanilla {
 }
 
 export interface CuotaPeriodoApi { id: string; prestamoId: string; numero: number; numCuotas: number; monto: number; motivo: string | null; cobrar: boolean; capital?: number; interes?: number; capitalCuota?: number; interesCuota?: number; interesPctMensual?: number }
-export interface RecurrentePeriodoApi { id: string; tipo: string; nombre: string; monto: number; cobrar: boolean; periodicidad?: 'SEMANAL' | 'MENSUAL' }
+export type PeriodicidadDescuento = 'SEMANAL' | 'MENSUAL' | 'UNICA';
+export const ETIQUETA_PERIODICIDAD: Record<PeriodicidadDescuento, string> = { SEMANAL: 'cada semana', MENSUAL: 'cada mes', UNICA: 'una sola vez' };
+/** Descuento o bono personalizado que toca en este período (monto = lo que resulta, ya convertido). */
+export interface RecurrentePeriodoApi {
+  id: string; tipo: string; nombre: string; monto: number; cobrar: boolean; periodicidad?: PeriodicidadDescuento;
+  signo?: 'DESCUENTO' | 'BONO'; valorTipo?: 'MONTO' | 'PORCENTAJE'; valor?: number; desde?: string; hasta?: string | null;
+}
 
 export interface DiaPlanillaApi {
   jornada: string;
@@ -206,8 +212,9 @@ export interface ListaPlanilla {
   totales?: { personas: number; aPagar: number; pagado: number; pendiente: number; pagados: number };
   filas: FilaPlanilla[];
 }
-export const listarPlanilla = (fecha?: string, modo?: 'SEMANA' | 'MES') => {
-  const q = [fecha ? `fecha=${fecha}` : '', modo ? `modo=${modo}` : ''].filter(Boolean).join('&');
+/** `modo` RANGO usa `rango` (desde/hasta libres, máx. 93 días): estimado, no se paga ahí. */
+export const listarPlanilla = (fecha?: string, modo?: 'SEMANA' | 'MES' | 'RANGO', rango?: { desde: string; hasta: string }) => {
+  const q = [fecha ? `fecha=${fecha}` : '', modo ? `modo=${modo}` : '', modo === 'RANGO' && rango ? `desde=${rango.desde}&hasta=${rango.hasta}` : ''].filter(Boolean).join('&');
   return api.get<ListaPlanilla>(`/admin/planilla${q ? `?${q}` : ''}`);
 };
 export const detallePlanilla = (partyId: number, fecha: string, excluir: string[], omitirCuotas: string[] = [], omitirRecurrentes: string[] = [], incluirAnteriores: string[] = []) =>
@@ -244,12 +251,12 @@ export interface PrestamoApi {
   interesPctMensual?: number; capital?: number; interesTotal?: number; interes?: number; total?: number; cuota?: number;
   estado: 'ACTIVO' | 'SALDADO' | 'ANULADO'; motivo: string | null; anuladoMotivo: string | null; saldo: number; cuotas: CuotaPrestamoApi[];
 }
-export interface RecurrenteApi { id: number; tipo: 'NETFLIX' | 'OTRO'; nombre: string; monto: number; activo: boolean; desde: string; periodicidad?: 'SEMANAL' | 'MENSUAL' }
+export interface RecurrenteApi { id: number; tipo: 'NETFLIX' | 'OTRO'; nombre: string; monto: number; activo: boolean; desde: string; hasta?: string | null; periodicidad?: PeriodicidadDescuento; signo?: 'DESCUENTO' | 'BONO'; valorTipo?: 'MONTO' | 'PORCENTAJE' }
 export const listarPrestamos = (partyId: number) => api.get<{ netflixSemanalDefecto: number; prestamos: PrestamoApi[]; recurrentes: RecurrenteApi[] }>(`/admin/planilla/persona/${partyId}/prestamos`);
 export const crearPrestamo = (d: { partyId: number; monto: number; numCuotas: number; periodicidad: 'SEMANAL' | 'MENSUAL'; fechaInicio?: string; motivo?: string; interesPctMensual?: number }) => api.post('/admin/planilla/prestamos', d);
 export const anularPrestamo = (id: number, motivo: string) => api.post(`/admin/planilla/prestamos/${id}/anular`, { motivo });
-export const crearRecurrente = (d: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL' }) => api.post('/admin/planilla/recurrentes', d);
-export const editarRecurrente = (id: number, d: { nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL'; activo?: boolean }) => api.put(`/admin/planilla/recurrentes/${id}`, d);
+export const crearRecurrente = (d: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: PeriodicidadDescuento; signo?: 'DESCUENTO' | 'BONO'; valorTipo?: 'MONTO' | 'PORCENTAJE'; desde?: string; hasta?: string }) => api.post('/admin/planilla/recurrentes', d);
+export const editarRecurrente = (id: number, d: { nombre?: string; monto?: number; periodicidad?: PeriodicidadDescuento; valorTipo?: 'MONTO' | 'PORCENTAJE'; desde?: string; hasta?: string; activo?: boolean }) => api.put(`/admin/planilla/recurrentes/${id}`, d);
 export const reabrirPlanilla = (periodoId: number, motivo: string) => api.post(`/admin/planilla/periodos/${periodoId}/reabrir`, { motivo });
 
 export interface Feriado { id: number; fecha: string; nombre: string; recargo: number; activo: boolean }

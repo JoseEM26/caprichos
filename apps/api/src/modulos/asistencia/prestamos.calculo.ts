@@ -65,3 +65,34 @@ export const saldoPrestamo = (total: number, cuotas: Array<{ monto: number; esta
  */
 export const montoRecurrenteDelPeriodo = (monto: number, modalidad: Modalidad, periodicidad: 'SEMANAL' | 'MENSUAL' = 'SEMANAL'): number =>
   redondear2(periodicidad === 'MENSUAL' ? (modalidad === 'MENSUAL' ? monto : monto / 4) : monto * (modalidad === 'MENSUAL' ? 4 : 1));
+
+export interface DescuentoPersonalCalc {
+  /** Monto en S/ (valorTipo MONTO) o porcentaje (PORCENTAJE). */
+  valor: number;
+  valorTipo: 'MONTO' | 'PORCENTAJE';
+  periodicidad: 'SEMANAL' | 'MENSUAL' | 'UNICA';
+  desde: string;
+  hasta: string | null;
+}
+
+/**
+ * Descuento/bono personalizado del personal en un período (null = no corresponde).
+ * Vigencia: debe cruzarse con el período (desde ≤ fin del período y hasta ≥ inicio). UNICA: solo en el período que contiene `desde`.
+ * SEMANAL/MENSUAL: cada semana/mes (el monto se convierte a la modalidad como montoRecurrenteDelPeriodo). PORCENTAJE: % del sueldo
+ * semanal (SEMANAL), mensual (MENSUAL) o del período (UNICA).
+ */
+export function descuentoPersonalDelPeriodo(
+  d: DescuentoPersonalCalc,
+  modalidad: Modalidad,
+  periodo: { desde: string; hasta: string },
+  sueldo: { semanal: number; mensual: number },
+): number | null {
+  if (d.desde > periodo.hasta || (d.hasta && d.hasta < periodo.desde)) return null;
+  const sueldoPeriodo = modalidad === 'SEMANAL' ? sueldo.semanal : sueldo.mensual;
+  if (d.periodicidad === 'UNICA') {
+    if (d.desde < periodo.desde) return null;
+    return redondear2(d.valorTipo === 'PORCENTAJE' ? (sueldoPeriodo * d.valor) / 100 : d.valor);
+  }
+  const base = d.valorTipo === 'PORCENTAJE' ? ((d.periodicidad === 'MENSUAL' ? sueldo.mensual : sueldo.semanal) * d.valor) / 100 : d.valor;
+  return montoRecurrenteDelPeriodo(base, modalidad, d.periodicidad);
+}

@@ -54,6 +54,9 @@ export const cronograma = (desde: string, hasta: string) => api.get<Cronograma>(
 export const separarMarca = (id: number, motivo: string) => api.post(`/admin/asistencia/marcas/${id}/separar`, { motivo });
 export const reasignarMarca = (id: number, tipo: TipoMarca, motivo: string) => api.post(`/admin/asistencia/marcas/${id}/reasignar`, { tipo, motivo });
 
+/** Fija el ingreso y/o la salida de un día (también si no marcó). `entrada`/`salida` en ISO con -05:00. */
+export const ajustarDia = (d: { partyId: number; jornada: string; entrada?: string; salida?: string; motivo: string }) => api.post('/admin/asistencia/ajustar-dia', d);
+
 export const cambiarHoraMarca = (id: number, momento: string, motivo: string, tipo?: TipoMarca | null) =>
   api.post(`/admin/asistencia/marcas/${id}/cambiar-hora`, { momento, motivo, ...(tipo ? { tipo } : {}) });
 

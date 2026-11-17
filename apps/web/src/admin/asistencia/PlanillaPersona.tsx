@@ -195,7 +195,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
   const listo = checklist.every((x) => x.ok);
 
   const resumen = (
-    <div className="pp-seccion" data-testid="resumen-planilla">
+    <div className="pp-seccion pp-seccion--2col" data-testid="resumen-planilla">
       <section aria-label="Lista de cierre" className="pp-bloque">
         <h3 className="as-sub">Lista de cierre</h3>
         <ul className="pp-check">

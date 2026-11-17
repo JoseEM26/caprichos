@@ -32,7 +32,10 @@ export class PlanillaFechaDto {
   /** Ids (coma) de consumos de períodos ANTERIORES que sí se cobran en este pago. */
   @IsOptional() @IsString() @MaxLength(2000) incluirAnteriores?: string;
   /** Vista de la lista: SEMANA (lunes a domingo) o MES (calendario). Vacío = el período de cada persona. */
-  @IsOptional() @IsIn(['SEMANA', 'MES']) modo?: 'SEMANA' | 'MES';
+  @IsOptional() @IsIn(['SEMANA', 'MES', 'RANGO']) modo?: 'SEMANA' | 'MES' | 'RANGO';
+  /** Solo con modo RANGO: rango libre de fechas (máx. 93 días). */
+  @IsOptional() @Matches(FECHA) desde?: string;
+  @IsOptional() @Matches(FECHA) hasta?: string;
 }
 
 export class PagarPlanillaDto {
@@ -77,21 +80,31 @@ export class PrestamoDto {
 export class RecurrenteDto {
   @Type(() => Number) @IsInt() @Min(1) partyId!: number;
   @IsIn(['NETFLIX', 'OTRO']) tipo!: 'NETFLIX' | 'OTRO';
-  /** OTRO: obligatorio. NETFLIX: «Netflix». */
+  /** OTRO: obligatorio (concepto). NETFLIX: «Netflix». */
   @IsOptional() @IsString() @MaxLength(80) nombre?: string;
-  /** Monto por periodicidad (por semana o por mes); vacío en NETFLIX = el valor semanal general de Configuración. */
+  /** Monto en S/ (o porcentaje si valorTipo = PORCENTAJE, máx. 100); vacío en NETFLIX = el valor semanal general de Configuración. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10_000) monto?: number;
-  /** SEMANAL (defecto): el monto es por semana (×4 en planilla mensual). MENSUAL: el monto es por mes (÷4 en planilla semanal). */
-  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL']) periodicidad?: 'SEMANAL' | 'MENSUAL';
+  /** SEMANAL (defecto): cada semana. MENSUAL: cada mes. UNICA: una sola vez, en el período de `desde`. */
+  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL', 'UNICA']) periodicidad?: 'SEMANAL' | 'MENSUAL' | 'UNICA';
+  /** DESCUENTO (defecto) o BONO (suma al neto). */
+  @IsOptional() @IsIn(['DESCUENTO', 'BONO']) signo?: 'DESCUENTO' | 'BONO';
+  /** MONTO fijo (defecto) o PORCENTAJE del sueldo. */
+  @IsOptional() @IsIn(['MONTO', 'PORCENTAJE']) valorTipo?: 'MONTO' | 'PORCENTAJE';
   @IsOptional() @Matches(FECHA) desde?: string;
+  /** Último día de vigencia (vacío = sin fin). */
+  @IsOptional() @Matches(FECHA) hasta?: string;
 }
 
 export class RecurrenteEditarDto {
-  /** Nombre del servicio (los de tipo OTRO). */
+  /** Concepto del descuento (los de tipo OTRO). */
   @IsOptional() @IsString() @MinLength(2) @MaxLength(80) nombre?: string;
-  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL']) periodicidad?: 'SEMANAL' | 'MENSUAL';
+  @IsOptional() @IsIn(['SEMANAL', 'MENSUAL', 'UNICA']) periodicidad?: 'SEMANAL' | 'MENSUAL' | 'UNICA';
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) @Max(10_000) monto?: number;
-  /** false = no cobrar (la casilla «cobrar» de la persona). */
+  @IsOptional() @IsIn(['MONTO', 'PORCENTAJE']) valorTipo?: 'MONTO' | 'PORCENTAJE';
+  @IsOptional() @Matches(FECHA) desde?: string;
+  /** '' = quitar la fecha de fin. */
+  @IsOptional() @Matches(/^(\d{4}-\d{2}-\d{2})?$/) hasta?: string;
+  /** false = no cobrar (activar / desactivar). */
   @IsOptional() @IsBoolean() activo?: boolean;
 }
 

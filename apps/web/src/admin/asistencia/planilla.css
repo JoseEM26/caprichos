@@ -1,5 +1,5 @@
 /* Planilla y Configuración de asistencia: tarjetas compactas y secciones plegables. Solo variables --cp-*. */
-.pl-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 0; }
+.pl-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
 .pl-total { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 12px; padding: 8px 10px; min-width: 0; }
 .pl-total dt { font-size: 12px; font-weight: 700; color: var(--cp-soft); }
 .pl-total dd { margin: 0; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -7,7 +7,7 @@
 .pl-total--fuerte dt, .pl-total--fuerte dd { color: var(--cp-cream); }
 .pl-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; }
 .pl-barra strong { font-family: var(--fuente-titulos); font-size: 15px; }
-.pl-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.pl-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .pl-tarjeta { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
 .pl-tarjeta-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .pl-tarjeta-cab > div { min-width: 0; }
@@ -99,7 +99,7 @@
 .pp-nombre { margin: 0; font-family: var(--fuente-titulos); font-size: 18px; overflow-wrap: anywhere; }
 .pp-periodo { flex: 1 1 320px; max-width: 520px; flex-wrap: wrap; }
 .pp-periodo input[type='date'] { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 8px; font: inherit; background: var(--cp-white); color: var(--cp-navy); }
-.pp-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.pp-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 0; }
 .pp-cifras div { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 12px; padding: 8px 10px; min-width: 0; }
 .pp-cifras dt { font-size: 12px; font-weight: 700; color: var(--cp-soft); }
 .pp-cifras dd { margin: 0; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -152,3 +152,19 @@
 .pp-periodo .pl-etiqueta { flex: 1 1 150px; min-width: 120px; }
 @media (max-width: 767px) { .pp-periodo input[type='date'] { flex: 1 1 100%; } }
 .pp-asist td.as-num { white-space: nowrap; }
+
+/* Aprovechar el ancho: rango libre, secciones de la persona a dos columnas y cifras en una fila */
+.pl-rango { background: var(--cp-sand); border: 1px solid var(--cp-line); border-radius: 12px; padding: 10px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; min-width: 0; }
+.pl-rango input[type='date'] { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 8px; font: inherit; background: var(--cp-white); color: var(--cp-navy); max-width: 100%; }
+.pl-rango .pl-presets { flex: 1 1 320px; }
+.pl-rango .pl-etiqueta { flex: 1 1 100%; text-align: left; }
+.pl-rango .as-aviso { flex: 1 1 100%; }
+@media (min-width: 1000px) {
+  .pp-seccion--2col { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .pp-seccion--2col > [role='alert'], .pp-seccion--2col > .as-aviso { grid-column: 1 / -1; }
+}
+@media (min-width: 1500px) {
+  .pl-totales { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .pp-cifras .pp-cifra-neto dd { font-size: 24px; }
+}
+@media (max-width: 480px) { .pl-rango { flex-direction: column; align-items: stretch; } .pl-rango .as-campo { width: 100%; } }

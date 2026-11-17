@@ -4,6 +4,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
 import {
+  PeriodicidadDescuento,
   PrestamoApi,
   RecurrenteApi,
   anularPrestamo,
@@ -158,24 +159,50 @@ export function PrestamosPersona({ partyId, alCambiar }: { partyId: number; alCa
   );
 }
 
-const ETIQUETA_PERIODO = { SEMANAL: 'por semana', MENSUAL: 'por mes' } as const;
+const ETIQUETA_PERIODO = { SEMANAL: 'por semana', MENSUAL: 'por mes', UNICA: 'una sola vez' } as const;
 
-/** Servicios extra (Netflix y otros pagos adicionales): check por persona, monto y periodicidad. */
+/** «S/ 25.00 por mes» · «5 % del sueldo por mes» · «S/ 30.00 una sola vez». */
+export const textoValorDescuento = (r: Pick<RecurrenteApi, 'monto' | 'periodicidad' | 'valorTipo'>) =>
+  `${r.valorTipo === 'PORCENTAJE' ? `${r.monto} % del sueldo` : soles(r.monto)} ${ETIQUETA_PERIODO[r.periodicidad ?? 'SEMANAL']}`;
+
+const FORM_VACIO = { nombre: '', monto: '', periodicidad: 'MENSUAL' as PeriodicidadDescuento, signo: 'DESCUENTO' as 'DESCUENTO' | 'BONO', valorTipo: 'MONTO' as 'MONTO' | 'PORCENTAJE', desde: '', hasta: '' };
+
+/**
+ * Descuentos y bonos personalizados de una persona (concepto, monto fijo o %, única vez / semanal / mensual, vigencia desde-hasta,
+ * activar o desactivar). Se aplican solos en la planilla del período (Netflix es uno más).
+ */
 export function ServiciosExtraPersona({ partyId, alCambiar }: { partyId: number; alCambiar: () => void }) {
   const { datos, ocupado, ejecutar, aviso } = usarDatos(partyId, alCambiar);
-  const [otro, setOtro] = useState({ nombre: '', monto: '', periodicidad: 'MENSUAL' as 'SEMANAL' | 'MENSUAL' });
-  if (!datos) return <Cargando mensaje="Cargando servicios extra" />;
+  const [otro, setOtro] = useState(FORM_VACIO);
+  if (!datos) return <Cargando mensaje="Cargando descuentos y bonos" />;
   const tieneNetflix = datos.recurrentes.some((r) => r.tipo === 'NETFLIX');
+  const pct = otro.valorTipo === 'PORCENTAJE';
+  const valor = Number(otro.monto);
+  const vigenciaMal = !!otro.hasta && !!otro.desde && otro.hasta < otro.desde;
+  const valido = otro.nombre.trim().length >= 2 && valor > 0 && (!pct || valor <= 100) && !vigenciaMal;
+  const crear = async () => {
+    await crearRecurrente({
+      partyId, tipo: 'OTRO', nombre: otro.nombre.trim(), monto: valor, periodicidad: otro.periodicidad,
+      ...(otro.signo === 'BONO' ? { signo: 'BONO' as const } : {}),
+      ...(pct ? { valorTipo: 'PORCENTAJE' as const } : {}),
+      ...(otro.desde ? { desde: otro.desde } : {}),
+      ...(otro.hasta ? { hasta: otro.hasta } : {}),
+    });
+    setOtro({ ...FORM_VACIO, periodicidad: otro.periodicidad });
+  };
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       {aviso}
-      <small className="as-nota">Pagos adicionales que se descuentan solos en cada pago (por semana o por mes). Desmarca para dejar de cobrarlos a esta persona.</small>
-      {datos.recurrentes.length === 0 && <EstadoVacio titulo="Sin servicios extra" descripcion="Esta persona no tiene pagos adicionales." />}
+      <small className="as-nota">Descuentos y bonos que se aplican solos en la planilla del período (única vez, cada semana o cada mes, dentro de su vigencia). Desmarca para desactivarlos sin borrarlos.</small>
+      {datos.recurrentes.length === 0 && <EstadoVacio titulo="Sin descuentos ni bonos personalizados" descripcion="Esta persona no tiene ninguno." />}
       {datos.recurrentes.map((r) => (
-        <label key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
-          <input type="checkbox" checked={r.activo} disabled={ocupado} aria-label={`Cobrar ${r.nombre}`} onChange={(e) => void ejecutar(() => editarRecurrente(r.id, { activo: e.target.checked }), e.target.checked ? 'Se cobrará.' : 'Ya no se cobra.')} />
-          <span style={{ flex: 1 }}>{r.nombre}</span>
-          <strong className="as-num">{soles(r.monto)} {ETIQUETA_PERIODO[r.periodicidad ?? 'SEMANAL']}</strong>
+        <label key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, flexWrap: 'wrap' }}>
+          <input type="checkbox" checked={r.activo} disabled={ocupado} aria-label={`Cobrar ${r.nombre}`} onChange={(e) => void ejecutar(() => editarRecurrente(r.id, { activo: e.target.checked }), e.target.checked ? 'Se aplicará.' : 'Ya no se aplica.')} />
+          <span style={{ flex: 1, minWidth: 140 }}>
+            {r.nombre} {r.signo === 'BONO' && <Insignia variante="exito">Bono</Insignia>}
+            <small className="as-nota" style={{ display: 'block' }}>Desde {r.desde}{r.hasta ? ` hasta ${r.hasta}` : ' sin fecha de fin'}</small>
+          </span>
+          <strong className="as-num">{textoValorDescuento(r)}</strong>
         </label>
       ))}
       {!tieneNetflix && (
@@ -184,19 +211,35 @@ export function ServiciosExtraPersona({ partyId, alCambiar }: { partyId: number;
         </div>
       )}
       <fieldset style={CAJA}>
-        <legend style={{ fontWeight: 800, fontSize: 14 }}>Agregar otro servicio</legend>
+        <legend style={{ fontWeight: 800, fontSize: 14 }}>Agregar descuento o bono</legend>
         <div className="as-form">
-          <label className="as-campo">Nombre <input placeholder="Ej. Plan de celular" value={otro.nombre} maxLength={80} onChange={(e) => setOtro({ ...otro, nombre: e.target.value })} /></label>
-          <label className="as-campo">Monto (S/) <input type="number" min="0.01" step="0.01" inputMode="decimal" value={otro.monto} onChange={(e) => setOtro({ ...otro, monto: e.target.value })} /></label>
-          <label className="as-campo">Se cobra cada
-            <select value={otro.periodicidad} onChange={(e) => setOtro({ ...otro, periodicidad: e.target.value as 'SEMANAL' | 'MENSUAL' })}>
-              <option value="SEMANAL">Semana</option>
-              <option value="MENSUAL">Mes</option>
+          <label className="as-campo">Concepto <input placeholder="Ej. Plan de celular" value={otro.nombre} maxLength={80} onChange={(e) => setOtro({ ...otro, nombre: e.target.value })} /></label>
+          <label className="as-campo">Es un
+            <select value={otro.signo} onChange={(e) => setOtro({ ...otro, signo: e.target.value as 'DESCUENTO' | 'BONO' })}>
+              <option value="DESCUENTO">Descuento (resta)</option>
+              <option value="BONO">Bono (suma)</option>
             </select>
           </label>
+          <label className="as-campo">Valor en
+            <select value={otro.valorTipo} onChange={(e) => setOtro({ ...otro, valorTipo: e.target.value as 'MONTO' | 'PORCENTAJE' })}>
+              <option value="MONTO">Monto fijo (S/)</option>
+              <option value="PORCENTAJE">Porcentaje del sueldo (%)</option>
+            </select>
+          </label>
+          <label className="as-campo">{pct ? 'Porcentaje (%)' : 'Monto (S/)'} <input type="number" min="0.01" max={pct ? 100 : undefined} step="0.01" inputMode="decimal" value={otro.monto} onChange={(e) => setOtro({ ...otro, monto: e.target.value })} /></label>
+          <label className="as-campo">Se cobra cada
+            <select value={otro.periodicidad} onChange={(e) => setOtro({ ...otro, periodicidad: e.target.value as PeriodicidadDescuento })}>
+              <option value="SEMANAL">Semana</option>
+              <option value="MENSUAL">Mes</option>
+              <option value="UNICA">Una sola vez</option>
+            </select>
+          </label>
+          <label className="as-campo">Vigente desde <input type="date" value={otro.desde} onChange={(e) => setOtro({ ...otro, desde: e.target.value })} /></label>
+          {otro.periodicidad !== 'UNICA' && <label className="as-campo">Hasta (opcional) <input type="date" value={otro.hasta} onChange={(e) => setOtro({ ...otro, hasta: e.target.value })} /></label>}
         </div>
+        {vigenciaMal && <small role="alert" className="as-nota">La fecha «hasta» no puede ser anterior a «desde».</small>}
         <div>
-          <Boton type="button" variante="secundario" disabled={ocupado || otro.nombre.trim().length < 2 || !(Number(otro.monto) > 0)} onClick={() => void ejecutar(async () => { await crearRecurrente({ partyId, tipo: 'OTRO', nombre: otro.nombre.trim(), monto: Number(otro.monto), periodicidad: otro.periodicidad }); setOtro({ ...otro, nombre: '', monto: '' }); }, 'Servicio agregado.')}>Agregar servicio</Boton>
+          <Boton type="button" variante="secundario" disabled={ocupado || !valido} onClick={() => void ejecutar(crear, otro.signo === 'BONO' ? 'Bono agregado.' : 'Descuento agregado.')}>Agregar descuento o bono</Boton>
         </div>
       </fieldset>
     </div>

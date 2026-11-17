@@ -72,7 +72,7 @@ export class PrestamosService {
           cuotas,
         };
       }),
-      recurrentes: recurrentes.map((r) => ({ id: Number(r.id), tipo: r.tipo, nombre: r.nombre, monto: Number(r.monto), periodicidad: r.periodicidad, activo: r.activo, desde: isoDe(r.desde) })),
+      recurrentes: recurrentes.map((r: any) => ({ id: Number(r.id), tipo: r.tipo, nombre: r.nombre, monto: Number(r.monto), periodicidad: r.periodicidad, activo: r.activo, desde: isoDe(r.desde), hasta: r.hasta ? isoDe(r.hasta) : null, signo: r.signo ?? 'DESCUENTO', valorTipo: r.valor_tipo ?? 'MONTO' })),
     };
   }
 
@@ -125,33 +125,55 @@ export class PrestamosService {
   }
 
   async crearRecurrente(
-    dto: { partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL'; desde?: string },
+    dto: {
+      partyId: number; tipo: 'NETFLIX' | 'OTRO'; nombre?: string; monto?: number; periodicidad?: 'SEMANAL' | 'MENSUAL' | 'UNICA';
+      signo?: 'DESCUENTO' | 'BONO'; valorTipo?: 'MONTO' | 'PORCENTAJE'; desde?: string; hasta?: string;
+    },
     usuario: UsuarioAutenticado,
     ip?: string,
     ahora = new Date(),
   ) {
     await this.exigirPersona(dto.partyId);
     const nombre = dto.tipo === 'NETFLIX' ? 'Netflix' : String(dto.nombre ?? '').trim();
-    if (nombre.length < 2) throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe el nombre del descuento' });
+    if (nombre.length < 2) throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe el concepto del descuento' });
+    const valorTipo = dto.valorTipo ?? 'MONTO';
     const monto = redondear2(dto.monto ?? (dto.tipo === 'NETFLIX' ? (await this.asistencia.obtenerConfig()).netflixSemanal : 0));
     if (!(monto > 0)) throw new BadRequestException({ codigo: 'MONTO_INVALIDO', mensaje: 'El monto debe ser mayor que cero' });
-    const r = await this.prisma.descuentoRecurrentePersonal.create({
-      data: { party_id: BigInt(dto.partyId), tipo: dto.tipo, nombre, monto, periodicidad: dto.periodicidad ?? 'SEMANAL', desde: fechaDb(dto.desde ?? jornadaDe(ahora).jornada), creado_por: usuario.partyId },
-    });
-    await this.auditar('CREAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: dto.partyId, tipo: dto.tipo, monto, periodicidad: dto.periodicidad ?? 'SEMANAL' });
+    if (valorTipo === 'PORCENTAJE' && monto > 100) throw new BadRequestException({ codigo: 'PORCENTAJE_INVALIDO', mensaje: 'El porcentaje no puede pasar de 100' });
+    const desde = dto.desde ?? jornadaDe(ahora).jornada;
+    if (dto.hasta && dto.hasta < desde) throw new BadRequestException({ codigo: 'VIGENCIA_INVALIDA', mensaje: 'La fecha «hasta» no puede ser anterior a «desde»' });
+    const periodicidad = dto.periodicidad ?? 'SEMANAL';
+    const signo = dto.signo ?? 'DESCUENTO';
+    // Los campos nuevos (migración 20270325100000) van en un objeto aparte para no depender del cliente Prisma generado antes de ella
+    const data = { party_id: BigInt(dto.partyId), tipo: dto.tipo, nombre, monto, periodicidad, signo, valor_tipo: valorTipo, desde: fechaDb(desde), hasta: dto.hasta ? fechaDb(dto.hasta) : null, creado_por: usuario.partyId };
+    const r = await this.prisma.descuentoRecurrentePersonal.create({ data: data as any });
+    await this.auditar('CREAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: dto.partyId, tipo: dto.tipo, nombre, monto, valorTipo, signo, periodicidad, desde, hasta: dto.hasta ?? null });
     return { ok: true, id: Number(r.id) };
   }
 
-  /** Cambia monto, nombre (OTRO), periodicidad o la casilla «cobrar» (activo). */
-  async editarRecurrente(id: number, dto: { monto?: number; activo?: boolean; nombre?: string; periodicidad?: 'SEMANAL' | 'MENSUAL' }, usuario: UsuarioAutenticado, ip?: string) {
-    const r = await this.prisma.descuentoRecurrentePersonal.findUnique({ where: { id: BigInt(id) } });
+  /** Cambia concepto (OTRO), monto, tipo de valor, periodicidad, vigencia o activa/desactiva. */
+  async editarRecurrente(
+    id: number,
+    dto: { monto?: number; activo?: boolean; nombre?: string; periodicidad?: 'SEMANAL' | 'MENSUAL' | 'UNICA'; valorTipo?: 'MONTO' | 'PORCENTAJE'; desde?: string; hasta?: string },
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const r: any = await this.prisma.descuentoRecurrentePersonal.findUnique({ where: { id: BigInt(id) } });
     if (!r) throw new NotFoundException({ codigo: 'RECURRENTE_NO_ENCONTRADO', mensaje: 'Descuento no encontrado' });
     const data: Record<string, unknown> = {};
     if (dto.monto !== undefined) data.monto = redondear2(dto.monto);
     if (dto.activo !== undefined) data.activo = dto.activo;
     if (dto.periodicidad !== undefined) data.periodicidad = dto.periodicidad;
+    if (dto.valorTipo !== undefined) data.valor_tipo = dto.valorTipo;
+    if (dto.desde !== undefined) data.desde = fechaDb(dto.desde);
+    if (dto.hasta !== undefined) data.hasta = dto.hasta === '' ? null : fechaDb(dto.hasta);
     if (dto.nombre !== undefined && r.tipo === 'OTRO') data.nombre = dto.nombre.trim();
-    await this.prisma.descuentoRecurrentePersonal.update({ where: { id: r.id }, data });
+    const monto = (data.monto as number | undefined) ?? Number(r.monto);
+    if (((data.valor_tipo as string | undefined) ?? r.valor_tipo) === 'PORCENTAJE' && monto > 100) throw new BadRequestException({ codigo: 'PORCENTAJE_INVALIDO', mensaje: 'El porcentaje no puede pasar de 100' });
+    const desde = dto.desde ?? isoDe(r.desde);
+    const hasta = dto.hasta !== undefined ? dto.hasta || null : r.hasta ? isoDe(r.hasta) : null;
+    if (hasta && hasta < desde) throw new BadRequestException({ codigo: 'VIGENCIA_INVALIDA', mensaje: 'La fecha «hasta» no puede ser anterior a «desde»' });
+    await this.prisma.descuentoRecurrentePersonal.update({ where: { id: r.id }, data: data as any });
     await this.auditar('EDITAR_RECURRENTE', usuario, ip, 'descuento_recurrente_personal', r.id, { partyId: Number(r.party_id), ...data });
     return { ok: true };
   }

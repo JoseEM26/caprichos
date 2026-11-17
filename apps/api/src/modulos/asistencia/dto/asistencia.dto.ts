@@ -174,6 +174,19 @@ export class ReasignarMarcaDto {
   motivo!: string;
 }
 
+/** El admin fija el ingreso y/o la salida de un día (aunque no haya marcado): anula las marcas vigentes de ese rol y crea las correcciones. */
+export class AjustarDiaDto {
+  @Type(() => Number) @IsInt() @Min(1) partyId!: number;
+  @Matches(FECHA, { message: 'La jornada debe ser AAAA-MM-DD' }) jornada!: string;
+  /** Hora de ingreso (ISO 8601). Opcional si solo se corrige la salida. */
+  @IsOptional() @IsISO8601({}, { message: 'La hora de ingreso no es válida' }) entrada?: string;
+  @IsOptional() @IsISO8601({}, { message: 'La hora de salida no es válida' }) salida?: string;
+  @IsString()
+  @MinLength(10, { message: 'El motivo debe tener al menos 10 caracteres' })
+  @MaxLength(300)
+  motivo!: string;
+}
+
 export class CambiarHoraMarcaDto {
   @IsISO8601({}, { message: 'La hora no es válida' })
   momento!: string;

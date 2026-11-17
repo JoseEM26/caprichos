@@ -3401,9 +3401,15 @@ model DescuentoRecurrentePersonal {
   tipo         String   @db.VarChar(8) // NETFLIX | OTRO
   nombre       String   @db.VarChar(80)
   monto        Decimal  @db.Decimal(10, 2) // por semana
-  periodicidad String   @default("SEMANAL") @db.VarChar(8)
+  periodicidad String   @default("SEMANAL") @db.VarChar(8) // SEMANAL | MENSUAL | UNICA
   activo       Boolean  @default(true)
   desde        DateTime @db.Date
+  /// Vigencia opcional: último día en que se aplica (NULL = sin fin)
+  hasta        DateTime? @db.Date
+  /// DESCUENTO | BONO (migración 20270325100000_descuentos_personalizados)
+  signo        String   @default("DESCUENTO") @db.VarChar(9)
+  /// MONTO (monto en S/) | PORCENTAJE (monto = % del sueldo de la periodicidad)
+  valor_tipo   String   @default("MONTO") @db.VarChar(10)
   creado_por   BigInt?
   creado_en    DateTime @default(now()) @db.Timestamptz
 

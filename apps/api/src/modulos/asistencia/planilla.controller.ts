@@ -23,7 +23,7 @@ export class PlanillaController {
   @Get()
   @Permiso('planilla', 'ver')
   listar(@Query() q: PlanillaFechaDto) {
-    return this.planilla.listar(q.fecha, new Date(), q.modo);
+    return this.planilla.listar(q.fecha, new Date(), q.modo, { desde: q.desde, hasta: q.hasta });
   }
 
   @Get('persona/:partyId')
