@@ -49,7 +49,9 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
   const [dia, setDia] = useState<string | null>(diaInicial ?? null);
   const [extraPorConfirmar, setExtraPorConfirmar] = useState<{ jornada: string; aprobar: boolean; min: number; descanso: boolean } | null>(null);
   const [extraResultado, setExtraResultado] = useState<string | null>(null);
-  const dias = d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0 || (x.marcas ?? []).length > 0);
+  // Todos los días del período (los descansos sin marcas salen en gris, para que la semana se vea completa)
+  const dias = d.dias;
+  const esDescansoVacio = (x: (typeof dias)[number]) => x.estado === 'DESCANSO' && x.extraMin === 0 && (x.marcas ?? []).length === 0;
   const faltas = d.dias.filter((x) => x.estado === 'FALTA').length;
   const abrirDia = (j: string) => {
     setDia(j);
@@ -97,7 +99,7 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
               <thead><tr><th>Jornada</th><th>Estado</th><th>Marcas</th><th>Horas (pagadas / prog.)</th><th>Tardanza (min)</th><th>Extra (min)</th><th>Aprobar extra</th><th>Ganado</th><th>Detalle</th></tr></thead>
               <tbody>
                 {dias.map((x) => (
-                  <tr key={x.jornada} id={`dia-${x.jornada}`} className={dia === x.jornada ? 'pp-fila-sel' : undefined}>
+                  <tr key={x.jornada} id={`dia-${x.jornada}`} className={[dia === x.jornada ? 'pp-fila-sel' : '', esDescansoVacio(x) ? 'pp-fila-descanso' : ''].filter(Boolean).join(' ') || undefined} style={esDescansoVacio(x) ? { opacity: 0.6 } : undefined}>
                     <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">{x.trabajadaMin > 0 ? 'Feriado trabajado' : 'Feriado'} ×{x.recargo}</Insignia></> : null}{x.descansoTrabajado ? <> <Insignia variante="aviso">Descanso trabajado</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}
                       <small style={{ display: 'block' }}>{x.horario ? `Horario ${x.horario.entrada}–${x.horario.salida}` : 'Sin horario'}{x.breakMin ? ` · break ${x.breakMin} min` : ''}</small>
                     </td>

@@ -31,4 +31,12 @@ describe('Aprobar horas extra desde la tabla', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No, cancelar' }));
     expect(ejecutar).not.toHaveBeenCalled();
   });
+
+  it('muestra también los días de descanso sin marcas, en gris', () => {
+    const descanso = { ...dia, jornada: '2026-11-12', estado: 'DESCANSO', programadaMin: 0, trabajadaMin: 0, extraMin: 0, extraPendiente: false, ganado: 0 };
+    const c: any = { d: { partyId: 15, dias: [dia, descanso] }, r: { ganado: 60, extraMin: 33, extraAprobadaMin: 0, pagoExtra: 0 }, pagado: false, ocupado: false, faltan: 0, penal: 0, detallePenal: [], ejecutar: vi.fn() };
+    const { container } = render(<PestanaAsistencia c={c} />);
+    expect(container.querySelector('#dia-2026-11-12.pp-fila-descanso')).toBeTruthy();
+    expect(container.querySelector('#dia-2026-11-10.pp-fila-descanso')).toBeNull();
+  });
 });
