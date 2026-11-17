@@ -56,6 +56,7 @@ export function VerificacionWhatsapp({
   alVerificar,
   alReenviar,
   puedeReenviar,
+  esperaSeg = 0,
 }: {
   token: string;
   enlace: string;
@@ -65,6 +66,8 @@ export function VerificacionWhatsapp({
   alReenviar: () => void;
   /** Falso mientras hay espera o un envío en curso. */
   puedeReenviar: boolean;
+  /** Segundos que faltan para poder reenviar (0 = ya se puede). */
+  esperaSeg?: number;
 }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [lento, setLento] = useState(false);
@@ -136,7 +139,7 @@ export function VerificacionWhatsapp({
         </button>
       ) : (
         <button type="button" onClick={alReenviar} disabled={!puedeReenviar} style={{ minHeight: 44, border: 0, background: 'transparent', color: 'var(--cp-orange)', fontWeight: 800, fontSize: 13, textDecoration: 'underline', alignSelf: 'flex-start' }}>
-          Reenviar
+          {esperaSeg > 0 ? `Reenviar en ${esperaSeg} s` : 'Reenviar'}
         </button>
       )}
     </div>

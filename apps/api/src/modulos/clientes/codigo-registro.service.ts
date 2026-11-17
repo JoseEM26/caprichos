@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
+import { PoliticaEvolutionService } from '../chatbot/evolution/politica-evolution.service';
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 import {
   MODO_WHATSAPP_ENTRANTE,
@@ -29,6 +30,10 @@ export const REGISTRO_MAX_INTENTOS = 5;
 // Tope de envíos por IP y hora: frena que un solo origen pida códigos para muchos celulares
 export const REGISTRO_MAX_SOLICITUDES_IP_HORA = 20;
 
+export const MENSAJE_NO_ENVIADO = 'No pudimos enviar el código por WhatsApp en este momento. Intenta de nuevo en unos minutos.';
+/** El código no salió: la web lo dice tal cual (nunca «Te enviamos un código»). */
+const noEnviado = (mensaje = MENSAJE_NO_ENVIADO) => new HttpException({ codigo: 'CODIGO_NO_ENVIADO', mensaje }, HttpStatus.SERVICE_UNAVAILABLE);
+
 export const RESPUESTA_CODIGO_REGISTRO = {
   ok: true,
   mensaje: 'Te enviamos un código por WhatsApp. Vence en 10 minutos.',
@@ -47,6 +52,8 @@ export const demasiadosCodigos = (mensaje: string) => new HttpException({ codigo
  */
 @Injectable()
 export class CodigoRegistroService {
+  private readonly logger = new Logger(CodigoRegistroService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
@@ -57,6 +64,23 @@ export class CodigoRegistroService {
   /** El outbox es del módulo del chatbot (que importa a Clientes): se busca en tiempo de ejecución para no crear un ciclo. */
   private outbox(): OutboxWhatsappService | null {
     return this.moduleRef.get(OutboxWhatsappService, { strict: false }) ?? null;
+  }
+
+  private politica(): PoliticaEvolutionService | null {
+    return this.moduleRef.get(PoliticaEvolutionService, { strict: false }) ?? null;
+  }
+
+  /**
+   * Con Evolution, la política puede descartar el envío (fuera de horario) o aplazarlo (pausa, tope).
+   * Se mira antes de guardar el código para no responder «te enviamos» a algo que no va a salir.
+   */
+  private async exigirEnvioPosible(tel: string): Promise<void> {
+    const politica = this.politica();
+    if (!politica) return;
+    const decision = await politica.evaluar({ telefono_destino: `51${tel}`, origen: 'CODIGO_CUENTA' });
+    if (decision.accion === 'ENVIAR') return;
+    const fueraDeHorario = decision.accion === 'DESCARTAR' && decision.codigo === 'FUERA_DE_HORARIO';
+    throw noEnviado(fueraDeHorario ? 'Ahora estamos fuera del horario de atención. Pide tu código en nuestro horario.' : MENSAJE_NO_ENVIADO);
   }
 
   private hashCodigo(tel: string, codigo: string): string {
@@ -135,7 +159,8 @@ export class CodigoRegistroService {
       if ((await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE) return await this.iniciarPorWhatsapp(tel);
 
       const outbox = this.outbox();
-      if (!outbox) return RESPUESTA_CODIGO_REGISTRO;
+      if (!outbox) throw noEnviado();
+      await this.exigirEnvioPosible(tel);
 
       const codigo = String(randomInt(0, 1_000_000)).padStart(6, '0');
       await redis.set(`cliente:reg:cod:${tel}`, this.hashCodigo(tel, codigo), 'EX', REGISTRO_TTL_SEG);
@@ -155,8 +180,11 @@ export class CodigoRegistroService {
       });
       outbox.despertar();
     } catch (err) {
-      // Los errores controlados llegan a la web; un fallo interno no cambia la respuesta
+      // Límites y errores de negocio llegan a la web tal cual. Cualquier otro fallo (Redis, base, cola)
+      // NO puede responder «te enviamos un código»: el código no salió.
       if (err instanceof HttpException) throw err;
+      this.logger.error(`Código de registro no encolado: ${(err as Error)?.message}`);
+      throw noEnviado();
     }
     return RESPUESTA_CODIGO_REGISTRO;
   }
