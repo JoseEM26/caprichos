@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -409,6 +410,10 @@ export class AsistenciaService {
 
   /** El admin aprueba (la marca cuenta) o anula (no cuenta) una marca; la fila se conserva con quién, cuándo y por qué. */
   async revisarMarca(id: number, accion: 'APROBAR' | 'ANULAR' | 'SEPARAR', dto: RevisarMarcaDto, usuario: UsuarioAutenticado, ip?: string) {
+    // Eliminar (anular) una entrada o salida es solo del ADMIN; queda auditado con motivo y la fila se conserva
+    if (accion === 'ANULAR' && ![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede eliminar una marca' });
+    }
     const marca = await this.prisma.asistenciaMarca.findUnique({ where: { id: BigInt(id) } });
     if (!marca) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: 'Marca no encontrada' });
     if (marca.estado === 'ANULADA') throw new ConflictException({ codigo: 'MARCA_ANULADA', mensaje: 'Esa marca ya está anulada' });

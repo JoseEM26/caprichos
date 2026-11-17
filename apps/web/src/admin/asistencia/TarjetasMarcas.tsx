@@ -6,6 +6,7 @@ import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { ETIQUETA_TIPO_CAL, type FilaCal } from './calendarioApi';
 import type { CronoDia, CronoMarca } from './correccionesApi';
 import { CambiarHoraMarca } from './CambiarHoraMarca';
+import { EliminarMarca } from './EliminarMarca';
 import { DetalleMarca } from './CronogramaTab';
 import { SelfieMarca } from './SelfieMarca';
 import { normalizarTipo, type TipoMarcaElegido } from './tiposMarca';
@@ -53,7 +54,16 @@ export function TarjetasMarcas({ fila, dia, cargando, error, reintentar, onError
 }) {
   const [abierta, setAbierta] = useState<number | null>(null);
   const [cambiando, setCambiando] = useState<CronoMarca | null>(null);
+  const [eliminando, setEliminando] = useState<CronoMarca | null>(null);
   const marcas: CronoMarca[] = dia ? [...dia.marcas].sort((a, b) => a.minutos - b.minutos) : [];
+  if (eliminando) {
+    return (
+      <div className="ca-detalle-sec">
+        <EliminarMarca marca={eliminando} alVolver={() => setEliminando(null)} onError={onError}
+          alEliminar={async () => { await recargar(); onOk('Marca eliminada: ya no cuenta. Quedó registrada en el historial y en Auditoría.'); }} />
+      </div>
+    );
+  }
   if (cambiando) {
     return (
       <div className="ca-detalle-sec">
@@ -96,6 +106,7 @@ export function TarjetasMarcas({ fila, dia, cargando, error, reintentar, onError
                     </small>
                   </div>
                   <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Cambiar hora de la marca de las ${m.hora}`} onClick={() => setCambiando(m)}>Cambiar hora</Boton>
+                  <Boton type="button" variante="peligro" tamano="pequeno" aria-label={`Eliminar la marca de las ${m.hora}`} onClick={() => setEliminando(m)}>Eliminar</Boton>
                   <Boton type="button" variante="secundario" tamano="pequeno" aria-expanded={abierta === m.id} aria-label={`Acciones de la marca de las ${m.hora}`} onClick={() => setAbierta(abierta === m.id ? null : m.id)}>
                     {abierta === m.id ? 'Ocultar' : 'Acciones'}
                   </Boton>

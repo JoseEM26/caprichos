@@ -431,6 +431,13 @@ describe('AsistenciaService.revisarMarca', () => {
     expect(b.marcas[0]).toMatchObject({ estado: 'APROBADA', revisado_por: 1n, revisado_motivo: 'Estaba en el local' });
   });
 
+  it('solo el ADMIN puede eliminar (anular) una marca', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
+    const noAdmin: UsuarioAutenticado = { partyId: 2n, rol: 'CAJERO', debeCambiar: false, roles: ['CAJERO'] };
+    expect(await error(svc.revisarMarca(Number(b.marcas[0].id), 'ANULAR', { motivo: 'Marcó por error' }, noAdmin))).toMatchObject({ codigo: 'SOLO_ADMIN' });
+  });
+
   it('una marca anulada no cuenta para el orden: se puede volver a marcar la entrada', async () => {
     const { svc, b } = servicio();
     await svc.marcar(dto({ qr: undefined, selfie: undefined as any, dispositivo: undefined as any }), LUIS, undefined, AHORA, true);
