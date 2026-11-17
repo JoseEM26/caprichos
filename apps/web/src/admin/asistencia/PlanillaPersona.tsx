@@ -18,6 +18,7 @@ import { formulaNeto, lineasAdelanto, lineasDescuento, motivoNeto, resumenCalcul
 import { PestanaAsistencia } from './PlanillaPersonaAsistencia';
 import { PestanaDescuentos } from './PlanillaPersonaDescuentos';
 import { PestanaHistorial } from './PlanillaPersonaHistorial';
+import { SeccionTarifasEspeciales } from './PlanillaPersonaTarifas';
 import { Avisar, CtlPlanilla, SECCIONES, SeccionPlanilla } from './PlanillaPersonaTipos';
 import { PestanaVinculoVacaciones } from './VinculoVacaciones';
 import './planilla.css';
@@ -320,6 +321,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
           <Boton type="button" disabled={ocupado || !!bloqueo} aria-describedby={bloqueo ? `${base}-bloqueo` : undefined} onClick={() => setConfirmaPago(true)}>Marcar pagado</Boton>
         </div>
       )}
+      <SeccionTarifasEspeciales partyId={partyId} onCambio={() => void cargar()} onError={onError} onOk={onOk} />
       <Plegable titulo="Vínculo y vacaciones" resumen="Más" perezoso>
         <PestanaVinculoVacaciones partyId={partyId} alCambiar={() => void cargar()} />
       </Plegable>

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, MiPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SeleccionDto, SueldoDto } from './dto/planilla.dto';
+import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, MiPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SeleccionDto, SueldoDto, TarifaEspecialDto } from './dto/planilla.dto';
 import { jornadaDe } from './asistencia.calculo';
 import { PlanillaService } from './planilla.service';
 import { PrestamosService } from './prestamos.service';
@@ -105,6 +105,26 @@ export class PlanillaController {
   @Permiso('planilla', 'administrar')
   reabrir(@Param('id') id: string, @Body() dto: ReabrirPlanillaDto, @Req() req: any) {
     return this.planilla.reabrir(Number(id), dto.motivo, req.usuario, ipDe(req));
+  }
+
+  // Tarifas especiales por persona (p. ej. domingos desde las 19:00 a S/ 15 la hora)
+
+  @Get('persona/:partyId/tarifas-especiales')
+  @Permiso('planilla', 'ver')
+  verTarifasEspeciales(@Param('partyId') partyId: string) {
+    return this.planilla.listarTarifasEspeciales(Number(partyId));
+  }
+
+  @Post('tarifas-especiales')
+  @Permiso('planilla', 'administrar')
+  crearTarifaEspecial(@Body() dto: TarifaEspecialDto, @Req() req: any) {
+    return this.planilla.crearTarifaEspecial(dto, req.usuario, ipDe(req));
+  }
+
+  @Put('tarifas-especiales/:id')
+  @Permiso('planilla', 'administrar')
+  editarTarifaEspecial(@Param('id') id: string, @Body() dto: TarifaEspecialDto, @Req() req: any) {
+    return this.planilla.editarTarifaEspecial(Number(id), dto, req.usuario, ipDe(req));
   }
 
   // Préstamos con cuotas y descuentos recurrentes (Netflix)

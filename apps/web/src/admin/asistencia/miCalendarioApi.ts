@@ -57,7 +57,7 @@ export interface MiPlanilla {
   ganado?: { bruto?: number; extras?: number; bonos?: number };
   /** Se te suma (bruto + bonos) y se te descuenta (suma − neto), para «Cómo se calcula». */
   resumen?: { seSuma: number; seDescuenta: number };
-  reglas?: { metodo?: string; valorHora?: number; toleranciaMin?: number; penalidadTardanzaPct?: number; multiplicadorExtra?: number; tercerizado?: boolean };
+  reglas?: { metodo?: string; valorHora?: number; toleranciaMin?: number; penalidadTardanzaPct?: number; multiplicadorExtra?: number; tercerizado?: boolean; tarifasEspeciales?: { diaSemana: number; desdeHora: string; tarifaHora: number; vigenteDesde: string; vigenteHasta: string | null }[] };
   descuentos?: { id: string | number; fecha?: string; etiqueta?: string; concepto?: string; monto: number; periodicidad?: string }[];
   consumos?: { fecha: string; pedido: string; productos: string[]; monto: number; anterior: boolean; cobrar: boolean }[];
   adelantos?: { id: number; fecha?: string; monto: number; motivo?: string | null }[];
@@ -67,7 +67,7 @@ export interface MiPlanilla {
   serviciosExtra?: { nombre: string; monto: number; periodicidad?: string; activo?: boolean }[];
   feriadosPagados?: { fecha: string; nombre: string; recargo: number; trabajadaH: number; ganado: number }[];
   /** Un registro por día del período (para el detalle de «Mi calendario»). */
-  dias?: { fecha: string; estado: string; trabajadaMin: number; tardanzaMin: number; extraMin: number; extraAprobada: boolean; ganado: number; feriado: string | null; vacacion: boolean; penalidadTardanza: number }[];
+  dias?: { fecha: string; estado: string; trabajadaMin: number; tardanzaMin: number; extraMin: number; extraAprobada: boolean; ganado: number; feriado: string | null; vacacion: boolean; penalidadTardanza: number; tarifaEspecial?: { desdeHora: string; tarifaHora: number; horasEspecialesH: number; ganadoEspecial: number } | null }[];
   neto?: number;
   estadoPago?: 'PENDIENTE' | 'PAGADO';
   pagadoEn?: string | null;

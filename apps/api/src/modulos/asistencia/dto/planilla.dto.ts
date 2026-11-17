@@ -154,3 +154,21 @@ export class VacacionMovimientoDto {
 export class MiPlanillaDto {
   @IsOptional() @Matches(FECHA) periodo?: string;
 }
+
+/** Tarifa especial de una persona (crear: todos los campos de la regla; editar: solo lo que cambia). */
+export class TarifaEspecialDto {
+  /** Solo al crear: la persona. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) partyId?: number;
+  /** 0 = domingo … 6 = sábado (igual que el horario). */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(6) diaSemana?: number;
+  /** Desde esta hora (HH:MM) del día, se paga a la tarifa especial. */
+  @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) desdeHora?: string;
+  /** Tarifa por hora en S/ (incluye gasolina, moto y servicio). */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0.01) @Max(10_000) tarifaHora?: number;
+  @IsOptional() @Matches(FECHA) vigenteDesde?: string;
+  /** Último día de vigencia ('' = sin fin). */
+  @IsOptional() @Matches(/^(\d{4}-\d{2}-\d{2})?$/) vigenteHasta?: string;
+  /** false = desactiva la regla (no se borra: queda en el historial). */
+  @IsOptional() @IsBoolean() activa?: boolean;
+  @IsOptional() @IsString() @MaxLength(200) nota?: string;
+}

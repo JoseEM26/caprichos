@@ -3417,6 +3417,27 @@ model DescuentoRecurrentePersonal {
   @@map("descuento_recurrente_personal")
 }
 
+/// Tarifa especial por persona: desde esa hora de ese día de la semana se paga a tarifa_hora (en vez del valor hora normal).
+model TarifaEspecialPersona {
+  id            BigInt    @id @default(autoincrement())
+  party_id      BigInt
+  /// 0 = domingo … 6 = sábado (igual que horario_trabajo.dia_semana)
+  dia_semana    Int       @db.SmallInt
+  /// Minutos desde medianoche desde los que rige la tarifa (19:00 = 1140)
+  desde_minutos Int       @db.SmallInt
+  tarifa_hora   Decimal   @db.Decimal(10, 2)
+  vigente_desde DateTime  @db.Date
+  /// NULL = sin fin
+  vigente_hasta DateTime? @db.Date
+  activa        Boolean   @default(true)
+  nota          String?   @db.VarChar(200)
+  creado_por    BigInt
+  creado_en     DateTime  @default(now()) @db.Timestamptz
+
+  @@index([party_id])
+  @@map("tarifa_especial_persona")
+}
+
 model PlanillaExtraAprobada {
   id           BigInt   @id @default(autoincrement())
   party_id     BigInt

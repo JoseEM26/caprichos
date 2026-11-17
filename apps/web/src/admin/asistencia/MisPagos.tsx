@@ -3,6 +3,7 @@ import { Insignia } from '../../comun/Insignia';
 import { Cargando } from '../../comun/Cargando';
 import { miPlanilla, type MiPlanilla } from './miCalendarioApi';
 import { horasMin } from './tiposMarca';
+import { DIAS_SEMANA } from './planillaApi';
 import { moverPeriodo, rangoDe } from './periodoVista';
 import './miAsistencia.css';
 
@@ -104,6 +105,9 @@ function Reglas({ p }: { p: MiPlanilla }) {
     items.push(`Tardanza: se tolera ${r.toleranciaMin ?? 0} min. Lo que llegues tarde después se descuenta al ${r.penalidadTardanzaPct ?? 0} % de su valor.`);
     items.push(`Horas extra: solo se pagan si el administrador las aprueba${r.multiplicadorExtra && r.multiplicadorExtra !== 1 ? `, a ${r.multiplicadorExtra} veces el valor hora` : ''}.`);
     items.push('Feriados: las horas trabajadas ese día se pagan con el recargo de cada feriado.');
+  }
+  for (const t of r.tarifasEspeciales ?? []) {
+    items.push(`${DIAS_SEMANA[t.diaSemana]} desde las ${t.desdeHora}: cada hora se paga a ${s(t.tarifaHora)} (tarifa especial). Las horas antes de esa hora siguen a valor hora normal. Si el día es feriado se aplica solo esta tarifa.`);
   }
   items.push('Faltas: un día sin horas trabajadas no se paga.');
   items.push('Consumos del personal, adelantos, descuentos, cuotas de préstamo y servicios (como Netflix) se descuentan en el período en que se cobran.');

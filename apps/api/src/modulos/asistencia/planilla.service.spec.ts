@@ -14,8 +14,9 @@ const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null; vigencias?: Fila[] } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null; vigencias?: Fila[]; tarifas?: Fila[] } = {}) {
   const sueldoFila = () => ({ party_id: LUIS, modalidad: 'MENSUAL', monto_semanal: 230.77, monto_mensual: 1000, ...opts.sueldo });
+  const tarifas: Fila[] = opts.tarifas ?? [];
   const prestamos: Fila[] = [];
   const cuotas: Fila[] = [];
   const consumos: Fila[] = [
@@ -86,6 +87,12 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     feriado: { findMany: async () => opts.feriados ?? [] },
     vinculoPersonal: { findMany: async () => (opts.vinculo ? [opts.vinculo] : []) },
     descuentoRecurrentePersonal: { findMany: async () => opts.recurrentes ?? [] },
+    tarifaEspecialPersona: {
+      findMany: async ({ where }: any = {}) => tarifas.filter((t) => (where?.party_id === undefined || t.party_id === where.party_id) && (where?.activa === undefined || t.activa === where.activa) && (!where?.id || t.id !== where.id.not)),
+      findUnique: async ({ where }: any) => tarifas.find((t) => t.id === where.id) ?? null,
+      create: async ({ data }: any) => { const f = { id: id++, activa: true, nota: null, ...data }; tarifas.push(f); return f; },
+      update: async ({ where, data }: any) => Object.assign(tarifas.find((t) => t.id === where.id)!, data),
+    },
     prestamoPersonal: {
       findMany: async () => prestamos.filter((p) => p.estado === 'ACTIVO').map((p) => ({ ...p, cuotas: cuotas.filter((c) => c.prestamo_id === p.id) })),
       updateMany: async ({ where, data }: any) => {
@@ -135,7 +142,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     prestamos.push(p);
     montos.forEach((m, i) => cuotas.push({ id: id++, prestamo_id: p.id, numero: i + 1, monto: m, estado: 'PENDIENTE', reprogramada_de: null, periodo_hasta: null, planilla_periodo_id: null }));
   };
-  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias, selecciones };
+  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias, selecciones, tarifas };
 }
 
 describe('PlanillaService', () => {
@@ -238,7 +245,7 @@ describe('PlanillaService', () => {
     expect(r.dias.find((x: any) => x.jornada === '2026-11-02')).toMatchObject({ feriado: 'Día de prueba', recargo: 2, ganado: 200 });
     const g: any = await svc.miGanado(LUIS, NOV);
     expect(g).toMatchObject({ conSueldo: true, estado: 'ESTIMADO', acumulado: 700, neto: null });
-    expect(g.dias.find((x: any) => x.jornada === '2026-11-02')).toEqual({ jornada: '2026-11-02', trabajadaH: 5, ganado: 200, feriado: 'Día de prueba', recargo: 2 });
+    expect(g.dias.find((x: any) => x.jornada === '2026-11-02')).toEqual({ jornada: '2026-11-02', trabajadaH: 5, ganado: 200, feriado: 'Día de prueba', recargo: 2, tarifaEspecial: null });
     expect(JSON.stringify(g)).not.toMatch(/consumo|ajuste|descuento|adelanto/i);
   });
 
@@ -775,6 +782,55 @@ describe('PlanillaService.listarRango', () => {
     const m = montar();
     await expect(m.svc.listar(undefined, AHORA, 'RANGO', { desde: '2026-11-10', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
     await expect(m.svc.listar(undefined, AHORA, 'RANGO', { desde: '2026-01-01', hasta: '2026-11-01' })).rejects.toMatchObject({ response: { codigo: 'RANGO_LARGO' } });
+  });
+});
+
+describe('PlanillaService: tarifas especiales por persona (datos ficticios)', () => {
+  // Sueldo mensual 1000 con 50 h programadas = valor hora 20. Domingo 01/11 trabajado 13:00-18:00 (5 h).
+  const regla = (over: Fila = {}): Fila => ({ id: 1n, party_id: LUIS, dia_semana: 0, desde_minutos: 17 * 60, tarifa_hora: 15, vigente_desde: d('2026-11-01'), vigente_hasta: null, activa: true, nota: null, creado_por: 1n, ...over });
+
+  it('desde las 17:00 del domingo: 4 h a valor hora normal (20) + 1 h a la tarifa especial (15) = 95 y el día lo explica', async () => {
+    const { svc } = montar({ tarifas: [regla()] });
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    const dom = r.dias.find((x: any) => x.jornada === '2026-11-01');
+    expect(dom.ganado).toBe(95);
+    expect(dom.tarifaEspecial).toEqual({ desdeHora: '17:00', tarifaHora: 15, horasEspecialesH: 1, ganadoEspecial: 15 });
+    expect(r.dias.find((x: any) => x.jornada === '2026-11-02').tarifaEspecial).toBeNull();
+  });
+
+  it('una regla que empieza después no cambia el pago del domingo', async () => {
+    const { svc } = montar({ tarifas: [regla({ vigente_desde: d('2026-11-08') })] });
+    const r = await svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.dias.find((x: any) => x.jornada === '2026-11-01')).toMatchObject({ ganado: 100, tarifaEspecial: null });
+  });
+
+  it('crear usa los valores por defecto de la pantalla (vigente desde hoy) y guarda la hora como minutos', async () => {
+    const m = montar();
+    await m.svc.crearTarifaEspecial({ partyId: 7, diaSemana: 0, desdeHora: '19:00', tarifaHora: 15 }, ADMIN, undefined, NOV);
+    expect(m.tarifas[0]).toMatchObject({ party_id: LUIS, dia_semana: 0, desde_minutos: 19 * 60, tarifa_hora: 15, activa: true });
+    expect(m.tarifas[0].vigente_desde).toEqual(d('2026-11-15'));
+    expect(m.tarifas[0].vigente_hasta).toBeNull();
+    expect(m.auditoria.registrar).toHaveBeenCalled();
+  });
+
+  it('no admite dos reglas activas del mismo día con vigencias que se cruzan', async () => {
+    const m = montar({ tarifas: [regla({ vigente_desde: d('2026-11-15') })] });
+    await expect(m.svc.crearTarifaEspecial({ partyId: 7, diaSemana: 0, desdeHora: '19:00', tarifaHora: 15, vigenteDesde: '2026-11-22' }, ADMIN, undefined, NOV))
+      .rejects.toMatchObject({ response: { codigo: 'TARIFA_INVALIDA' } });
+  });
+
+  it('valida tarifa > 0 y hora HH:MM', async () => {
+    const m = montar();
+    await expect(m.svc.crearTarifaEspecial({ partyId: 7, diaSemana: 0, desdeHora: '19:00', tarifaHora: 0 }, ADMIN, undefined, NOV)).rejects.toMatchObject({ response: { codigo: 'TARIFA_INVALIDA' } });
+    await expect(m.svc.crearTarifaEspecial({ partyId: 7, diaSemana: 0, desdeHora: '25:00', tarifaHora: 15 }, ADMIN, undefined, NOV)).rejects.toMatchObject({ response: { codigo: 'HORA_INVALIDA' } });
+  });
+
+  it('desactivar una regla la saca del cálculo sin borrarla', async () => {
+    const m = montar({ tarifas: [regla()] });
+    await m.svc.editarTarifaEspecial(1, { activa: false }, ADMIN);
+    expect(m.tarifas[0].activa).toBe(false);
+    const r = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(r.dias.find((x: any) => x.jornada === '2026-11-01')).toMatchObject({ ganado: 100, tarifaEspecial: null });
   });
 });
 

@@ -119,6 +119,8 @@ export interface DiaPlanillaApi {
   /** Descanso (sin horario) con entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */
   descansoTrabajado?: boolean;
   vacacion?: boolean;
+  /** Tarifa especial que rige ese día (null/ausente = ninguna). */
+  tarifaEspecial?: TarifaEspecialDia | null;
 }
 
 export interface ConsumoPlanillaApi {
@@ -252,6 +254,16 @@ export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { pa
   api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
+
+// Tarifas especiales por persona (p. ej. domingos desde las 19:00 a una tarifa por hora fija)
+export const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+/** Tramo de un día con tarifa especial: lo que se pagó a la tarifa de la persona desde su hora «desde». */
+export interface TarifaEspecialDia { desdeHora: string; tarifaHora: number; horasEspecialesH: number; ganadoEspecial: number }
+export interface TarifaEspecialRegla { id: number; diaSemana: number; desdeHora: string; tarifaHora: number; vigenteDesde: string; vigenteHasta: string | null; activa: boolean; nota: string | null }
+export interface DatosTarifaEspecial { diaSemana?: number; desdeHora?: string; tarifaHora?: number; vigenteDesde?: string; vigenteHasta?: string; activa?: boolean; nota?: string }
+export const listarTarifasEspeciales = (partyId: number) => api.get<{ reglas: TarifaEspecialRegla[] }>(`/admin/planilla/persona/${partyId}/tarifas-especiales`);
+export const crearTarifaEspecial = (datos: DatosTarifaEspecial & { partyId: number }) => api.post('/admin/planilla/tarifas-especiales', datos);
+export const editarTarifaEspecial = (id: number, datos: DatosTarifaEspecial) => api.put(`/admin/planilla/tarifas-especiales/${id}`, datos);
 /** Guarda (o quita) una selección del pago: el servidor la recuerda para el cálculo y para el pago. */
 export const seleccionarPlanilla = (partyId: number, fecha: string, tipo: TipoSeleccion, refId: string, activo: boolean) =>
   api.post('/admin/planilla/seleccion', { partyId, fecha, tipo, refId, activo });

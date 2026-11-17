@@ -9,6 +9,7 @@ import { Cronograma, ajustarDia, cronograma } from './correccionesApi';
 import { SolicitudesDelDia, etiquetaDia, sumarDias } from './CronogramaTab';
 import { TarjetasMarcas } from './TarjetasMarcas';
 import { DetallePlanilla, detallePlanilla, soles } from './planillaApi';
+import { InsigniaTarifaEspecial } from './PlanillaPersonaTarifas';
 
 type Avisar = (m: string | null) => void;
 const mensajeDe = (e: unknown, fallback: string) => (e as any)?.mensaje ?? (e as any)?.message ?? fallback;
@@ -112,6 +113,7 @@ function PagoDelPeriodo({ partyId, fecha }: { partyId: number; fecha: string }) 
   if (!d) return <Cargando mensaje="Cargando su pago del período" />;
   const r = d.resultado;
   const penal = r.penalidadTardanza ?? 0;
+  const tarifaDia = d.dias?.find((x) => x.jornada === fecha)?.tarifaEspecial;
   const filas: Array<[string, string, boolean?]> = [
     ['Ganado', soles(r.ganado)],
     ...(r.adicional ? [['Adicional (bonos)', `+ ${soles(r.adicional)}`] as [string, string]] : []),
@@ -129,6 +131,7 @@ function PagoDelPeriodo({ partyId, fecha }: { partyId: number; fecha: string }) 
       <ul className="pl-filas">
         {filas.map(([t, v, fuerte]) => <li key={t} className={`pl-fila${fuerte ? ' pl-fila--total' : ''}`}><span>{t}</span><span className="as-num">{v}</span></li>)}
       </ul>
+      {tarifaDia && <p className="as-ayuda"><InsigniaTarifaEspecial t={tarifaDia} /> Este día se pagó con la tarifa especial de la persona desde esa hora.</p>}
       {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)}</small>}
       <small className="as-ayuda">Para pagar o ajustar, abre Planilla.</small>
     </div>

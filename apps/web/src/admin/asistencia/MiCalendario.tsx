@@ -70,7 +70,7 @@ export function pasosDelDia(d: DiaCalendario): Paso[] {
 }
 
 /** Lo que pagó la planilla ese día (de «Mis pagos»: mismo cálculo que el pago). */
-export interface PagoDia { ganado: number; penalidadTardanza: number; extraAprobada: boolean; extraMin: number }
+export interface PagoDia { ganado: number; penalidadTardanza: number; extraAprobada: boolean; extraMin: number; tarifaEspecial?: { desdeHora: string; tarifaHora: number } | null }
 
 function DetalleDia({ dia, pago, alCerrar, alPedirCorreccion, alJustificar }: { dia: DiaCalendario; pago?: PagoDia | null; alCerrar: () => void; alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void }) {
   const e = estadoDe(dia.estado);
@@ -112,6 +112,7 @@ function DetalleDia({ dia, pago, alCerrar, alPedirCorreccion, alJustificar }: { 
       {pago && (
         <dl className="mp-dia-pago" aria-label="Lo que se paga este día" data-testid="pago-dia">
           <div><dt>Lo que ganas este día</dt><dd>{s(pago.ganado)}</dd></div>
+          {pago.tarifaEspecial && <div><dt>Tarifa especial</dt><dd>{s(pago.tarifaEspecial.tarifaHora)} por hora desde las {pago.tarifaEspecial.desdeHora}. Las horas anteriores siguen a valor hora normal.</dd></div>}
           {pago.penalidadTardanza > 0 && <div><dt>Descuento por tardanza</dt><dd>- {s(pago.penalidadTardanza)}</dd></div>}
           {pago.extraMin > 0 && <div><dt>Extra {pago.extraAprobada ? 'aprobada (se paga)' : 'sin aprobar (no se paga aún)'}</dt><dd>{horasMin(pago.extraMin)}</dd></div>}
         </dl>
@@ -175,7 +176,7 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
       try {
         const pl = await miPlanilla(elegido);
         const x = pl?.dias?.find((d) => d.fecha === elegido);
-        if (x) pago = { ganado: x.ganado, penalidadTardanza: x.penalidadTardanza, extraAprobada: x.extraAprobada, extraMin: x.extraMin };
+        if (x) pago = { ganado: x.ganado, penalidadTardanza: x.penalidadTardanza, extraAprobada: x.extraAprobada, extraMin: x.extraMin, tarifaEspecial: x.tarifaEspecial ?? null };
       } catch { /* sin planilla: el detalle sigue, sin cifras de pago */ }
       if (vigente) setPagoDe({ fecha: elegido, pago });
     })();

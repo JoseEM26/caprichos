@@ -8,6 +8,7 @@ import { useDetalleDia } from './DetalleDiaPersona';
 import { Plegable } from './Plegable';
 import { Confirmar } from '../../comun/Confirmar';
 import { aprobarExtra, soles } from './planillaApi';
+import { InsigniaTarifaEspecial } from './PlanillaPersonaTarifas';
 import type { CtlPlanilla } from './PlanillaPersonaTipos';
 import type { FilaCal } from './calendarioApi';
 
@@ -100,7 +101,7 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
               <tbody>
                 {dias.map((x) => (
                   <tr key={x.jornada} id={`dia-${x.jornada}`} className={[dia === x.jornada ? 'pp-fila-sel' : '', esDescansoVacio(x) ? 'pp-fila-descanso' : ''].filter(Boolean).join(' ') || undefined} style={esDescansoVacio(x) ? { opacity: 0.6 } : undefined}>
-                    <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">{x.trabajadaMin > 0 ? 'Feriado trabajado' : 'Feriado'} ×{x.recargo}</Insignia></> : null}{x.descansoTrabajado ? <> <Insignia variante="aviso">Descanso trabajado</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}
+                    <td data-label="Jornada" className="as-num">{x.jornada}{x.feriado && x.recargo && x.recargo !== 1 ? <> <Insignia variante="acento">{x.trabajadaMin > 0 ? 'Feriado trabajado' : 'Feriado'} ×{x.recargo}</Insignia></> : null}{x.descansoTrabajado ? <> <Insignia variante="aviso">Descanso trabajado</Insignia></> : null}{x.vacacion ? <> <Insignia variante="neutro">Vacación</Insignia></> : null}{x.tarifaEspecial ? <> <InsigniaTarifaEspecial t={x.tarifaEspecial} /></> : null}
                       <small style={{ display: 'block' }}>{x.horario ? `Horario ${x.horario.entrada}–${x.horario.salida}` : 'Sin horario'}{x.breakMin ? ` · break ${x.breakMin} min` : ''}</small>
                     </td>
                     <td data-label="Estado">

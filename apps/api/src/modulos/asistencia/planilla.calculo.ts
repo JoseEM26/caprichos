@@ -7,7 +7,8 @@
 // (defecto 100: pierde el doble; 0 = sin penalidad). Lo no trabajado por salir antes no se paga. El break SE PAGA
 // (la jornada programada es salida − entrada). La hora extra solo suma si el admin la aprueba, a valor hora × multiplicador.
 
-import { EstadoJornada, MarcaCalc, Turno, sumarDias, diaSemana } from './asistencia.calculo';
+import { EstadoJornada, MarcaCalc, Turno, aHoraTexto, sumarDias, diaSemana } from './asistencia.calculo';
+import { rangosSeCruzan } from './vacaciones.calculo';
 
 export type Modalidad = 'SEMANAL' | 'MENSUAL';
 
@@ -100,6 +101,22 @@ export interface DiaPlanilla {
   descansoTrabajado?: boolean;
   /** Valor hora vigente ESE día (sueldo con vigencia). Ausente = el de la persona para todo el período. */
   valorHora?: number;
+  /** Tramo pagable del turno (minutos del día, con tardanza y salida anticipada ya descontadas). Para partir por la hora de la tarifa especial. */
+  ventana?: { ini: number; fin: number };
+  /** Descanso trabajado: entrada y salida reales (minutos del día). La extra va entera en este tramo. */
+  descansoVentana?: { ini: number; fin: number };
+  /** Tarifa especial que rige ESE día: lo trabajado desde `desdeMin` se paga a `tarifaHora` (sin recargo de feriado). */
+  tarifaEspecial?: { desdeMin: number; tarifaHora: number };
+}
+
+/** Regla de tarifa especial de una persona (fila de tarifa_especial_persona). diaSemana: 0 = domingo. */
+export interface ReglaTarifaEspecial {
+  diaSemana: number;
+  desdeMin: number;
+  tarifaHora: number;
+  vigenteDesde: string;
+  vigenteHasta: string | null;
+  activa: boolean;
 }
 
 /**
@@ -107,15 +124,75 @@ export interface DiaPlanilla {
  * La penalidad por tardanza se calcula aparte (penalidadTardanzaDia) y se RESTA en los descuentos.
  * Única fuente de la fórmula: la usan el total de la planilla y el «ganado por día» de Mi asistencia.
  */
-export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.trabajadaMin / 60) * (d.valorHora ?? vh) * (d.recargo ?? 1);
+/** Recargo del feriado del día. Con tarifa especial NO hay recargo: la tarifa especial reemplaza al feriado ese día. */
+const recargoDe = (d: DiaPlanilla): number => (d.tarifaEspecial ? 1 : (d.recargo ?? 1));
+/** Minutos de la ventana que caen desde `desde` en adelante. */
+const minDesde = (v: { ini: number; fin: number } | undefined, desde: number): number => (v ? Math.max(0, v.fin - Math.max(v.ini, desde)) : 0);
+/** Minutos trabajados del turno que se pagan a la tarifa especial (lo que cae desde la hora configurada). */
+export const trabajadaEspecialMin = (d: DiaPlanilla): number =>
+  d.tarifaEspecial ? Math.min(d.trabajadaMin, minDesde(d.ventana, d.tarifaEspecial.desdeMin)) : 0;
+/** Minutos de extra que se pagan a la tarifa especial: en un día con turno, toda la extra; en descanso trabajado, solo desde la hora. */
+export const extraEspecialMin = (d: DiaPlanilla): number => {
+  if (!d.tarifaEspecial) return 0;
+  return d.descansoTrabajado ? Math.min(d.extraMin, minDesde(d.descansoVentana, d.tarifaEspecial.desdeMin)) : d.extraMin;
+};
+export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => {
+  const esp = trabajadaEspecialMin(d);
+  return ((d.trabajadaMin - esp) / 60) * (d.valorHora ?? vh) * recargoDe(d) + (esp / 60) * (d.tarifaEspecial?.tarifaHora ?? 0);
+};
 /** Penalidad del día = minutos de tardanza × (valor hora ÷ 60) × recargo del feriado × factor%. Proporcional, sin redondear a horas. */
 export const penalidadTardanzaDia = (d: DiaPlanilla, vh: number, factorPct: number): number =>
-  redondear2((d.tardanzaMin / 60) * (d.valorHora ?? vh) * (d.recargo ?? 1) * (factorPct / 100));
+  redondear2((d.tardanzaMin / 60) * (d.valorHora ?? vh) * recargoDe(d) * (factorPct / 100));
 export const pagoDia = (d: DiaPlanilla, vh: number, extraAprobada: boolean, multExtra = 1): number =>
   pagoTrabajadoDia(d, vh) + (extraAprobada ? pagoExtraDia(d, vh, multExtra) : 0);
 /** Extra de un día: el descanso trabajado (día sin horario) se paga a valor hora normal; el 1,25 es solo para la extra de un día con turno. */
-export const pagoExtraDia = (d: DiaPlanilla, vh: number, multExtra = 1): number =>
-  (d.extraMin / 60) * (d.valorHora ?? vh) * (d.descansoTrabajado ? 1 : multExtra);
+export const pagoExtraDia = (d: DiaPlanilla, vh: number, multExtra = 1): number => {
+  const esp = extraEspecialMin(d);
+  return ((d.extraMin - esp) / 60) * (d.valorHora ?? vh) * (d.descansoTrabajado ? 1 : multExtra) + (esp / 60) * (d.tarifaEspecial?.tarifaHora ?? 0);
+};
+
+/** Regla de tarifa especial que rige una jornada: activa, mismo día de la semana y dentro de su vigencia. */
+export function reglaTarifaDelDia(reglas: readonly ReglaTarifaEspecial[], jornada: string): ReglaTarifaEspecial | null {
+  const ds = diaSemana(jornada);
+  return reglas.find((r) => r.activa && r.diaSemana === ds && r.vigenteDesde <= jornada && (r.vigenteHasta === null || jornada <= r.vigenteHasta)) ?? null;
+}
+
+/** Marca el día con la tarifa especial que le toca (no en vacaciones). Sin regla, el día sale igual. */
+export function aplicarTarifaEspecial(d: DiaPlanilla, reglas: readonly ReglaTarifaEspecial[]): DiaPlanilla {
+  if (d.estado === 'VACACIONES') return d;
+  const r = reglaTarifaDelDia(reglas, d.jornada);
+  return r ? { ...d, tarifaEspecial: { desdeMin: r.desdeMin, tarifaHora: r.tarifaHora } } : d;
+}
+
+/** Resumen del día para la pantalla y Mis pagos. Las horas especiales de la extra cuentan solo si el admin la aprobó. */
+export function resumenTarifaEspecial(d: DiaPlanilla, extraAprobada: boolean) {
+  if (!d.tarifaEspecial) return null;
+  const { desdeMin, tarifaHora } = d.tarifaEspecial;
+  const min = trabajadaEspecialMin(d) + (extraAprobada ? extraEspecialMin(d) : 0);
+  return {
+    desdeHora: aHoraTexto(desdeMin),
+    tarifaHora,
+    horasEspecialesH: redondear2(min / 60),
+    ganadoEspecial: redondear2((min / 60) * tarifaHora),
+  };
+}
+
+/** Validación pura de una regla. `otras` = reglas de la misma persona (solo las activas chocan). Devuelve el motivo o null. */
+export function validarReglaTarifa(
+  r: ReglaTarifaEspecial,
+  otras: ReadonlyArray<{ diaSemana: number; vigenteDesde: string; vigenteHasta: string | null }>,
+): string | null {
+  if (!Number.isInteger(r.diaSemana) || r.diaSemana < 0 || r.diaSemana > 6) return 'El día de la semana no es válido';
+  if (!Number.isInteger(r.desdeMin) || r.desdeMin < 0 || r.desdeMin > 1439) return 'La hora «desde» no es válida';
+  if (!(r.tarifaHora > 0)) return 'La tarifa por hora debe ser mayor que cero';
+  if (r.vigenteHasta !== null && r.vigenteHasta < r.vigenteDesde) return 'La fecha «hasta» no puede ser anterior a «desde»';
+  if (r.activa) {
+    const hasta = (f: string | null) => f ?? '9999-12-31';
+    const choca = otras.some((o) => o.diaSemana === r.diaSemana && rangosSeCruzan({ desde: r.vigenteDesde, hasta: hasta(r.vigenteHasta) }, { desde: o.vigenteDesde, hasta: hasta(o.vigenteHasta) }));
+    if (choca) return 'Ya hay una tarifa especial activa para ese día de la semana en esas fechas';
+  }
+  return null;
+}
 
 /** Jornada de una persona: minutos programados, trabajados válidos, tardanza, salida anticipada y extra. */
 export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPlanilla {
@@ -132,7 +209,7 @@ export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPla
   if (!t && dia.estado === 'A_REVISAR' && dia.marcas.length > 0 && dia.marcas.every((m) => m.estado !== 'A_REVISAR')) {
     const e = dia.marcas.find((m) => m.tipo === 'ENTRADA');
     const sa = [...dia.marcas].reverse().find((m) => m.tipo === 'SALIDA');
-    if (e && sa && sa.minutos > e.minutos) return { ...base, extraMin: sa.minutos - e.minutos, descansoTrabajado: true };
+    if (e && sa && sa.minutos > e.minutos) return { ...base, extraMin: sa.minutos - e.minutos, descansoTrabajado: true, descansoVentana: { ini: e.minutos, fin: sa.minutos } };
   }
   if (!t || !PAGABLES.includes(dia.estado)) return base;
   const entrada = dia.marcas.find((m) => m.tipo === 'ENTRADA');
@@ -165,6 +242,7 @@ export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPla
 
   // El break se paga: no se descuenta del tiempo entre entrada y salida.
   base.trabajadaMin = Math.min(base.programadaMin, Math.max(0, fin - inicio));
+  base.ventana = { ini: inicio, fin };
   return base;
 }
 

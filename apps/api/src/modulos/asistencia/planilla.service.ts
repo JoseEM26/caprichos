@@ -15,6 +15,8 @@ import {
   PENALIDAD_TARDANZA_PCT_DEFECTO,
   MetodoValorHora,
   Modalidad,
+  ReglaTarifaEspecial,
+  aplicarTarifaEspecial,
   calcularDiaPlanilla,
   calcularPlanilla,
   horasYMinutos,
@@ -22,10 +24,13 @@ import {
   pagoPorDiaPersona,
   periodoDe,
   redondear2,
+  resumenTarifaEspecial,
   sueldoEquivalente,
+  validarReglaTarifa,
   valorHoraPersona,
 } from './planilla.calculo';
 import { aplicarVacaciones, fechasDelRango } from './vacaciones.calculo';
+import { TarifaEspecialDto } from './dto/planilla.dto';
 import { PrestamoCalc, cuotaDelPeriodo, descuentoPersonalDelPeriodo, interesDeCuota, saldoPrestamo } from './prestamos.calculo';
 
 export const MEDIOS_PAGO = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'] as const;
@@ -100,6 +105,27 @@ const ETIQUETA_PERIODICIDAD_API: Record<string, string> = { SEMANAL: 'cada seman
 const isoDe = (d: Date) => d.toISOString().slice(0, 10);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const horas = (min: number) => Math.round((min / 60) * 100) / 100;
+const HORA_HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const minutosDeHora = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+/** Fila de tarifa_especial_persona → forma de la API (fechas ISO, hora HH:MM). */
+const tarifaDeFila = (f: any) => ({
+  id: Number(f.id),
+  diaSemana: f.dia_semana as number,
+  desdeHora: aHoraTexto(f.desde_minutos as number),
+  tarifaHora: Number(f.tarifa_hora),
+  vigenteDesde: isoDe(f.vigente_desde),
+  vigenteHasta: f.vigente_hasta ? isoDe(f.vigente_hasta) : null,
+  activa: f.activa as boolean,
+  nota: (f.nota as string | null) ?? null,
+});
+const reglaDeFila = (f: any): ReglaTarifaEspecial => ({
+  diaSemana: f.dia_semana,
+  desdeMin: f.desde_minutos,
+  tarifaHora: Number(f.tarifa_hora),
+  vigenteDesde: isoDe(f.vigente_desde),
+  vigenteHasta: f.vigente_hasta ? isoDe(f.vigente_hasta) : null,
+  activa: f.activa,
+});
 
 function fechaValida(f: string): string {
   if (!FECHA.test(f) || Number.isNaN(Date.parse(`${f}T00:00:00Z`))) {
@@ -208,6 +234,73 @@ export class PlanillaService {
       despues: { modalidad: dto.modalidad, ...eq, metodo, vigenteDesde: cambioCifras ? desde : null, tarifaHora: dto.tarifaHora ?? null, diasMes: dto.diasMes ?? null, horasDia: dto.horasDia ?? null, pagoMedio: dto.pagoMedio ?? null, cambioCelular: celular !== undefined },
     });
     return { partyId, modalidad: dto.modalidad, ...eq, metodo };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tarifas especiales por persona (p. ej. domingos desde las 19:00 a S/ 15 la hora)
+  // ---------------------------------------------------------------------------
+
+  async listarTarifasEspeciales(partyId: number) {
+    const filas = await this.prisma.tarifaEspecialPersona.findMany({ where: { party_id: BigInt(partyId) }, orderBy: [{ vigente_desde: 'desc' }, { id: 'desc' }] });
+    return { reglas: filas.map(tarifaDeFila) };
+  }
+
+  async crearTarifaEspecial(dto: TarifaEspecialDto, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
+    if (dto.partyId === undefined) throw new BadRequestException({ codigo: 'PERSONA_REQUERIDA', mensaje: 'Indica la persona' });
+    const id = BigInt(dto.partyId);
+    if (!(await this.prisma.userAccount.findUnique({ where: { party_id: id } }))) {
+      throw new NotFoundException({ codigo: 'PERSONA_NO_ENCONTRADA', mensaje: 'Persona no encontrada' });
+    }
+    if (dto.diaSemana === undefined || dto.desdeHora === undefined || dto.tarifaHora === undefined) {
+      throw new BadRequestException({ codigo: 'DATOS_INCOMPLETOS', mensaje: 'Indica el día, la hora desde y la tarifa por hora' });
+    }
+    const datos = await this.datosTarifaValidos(id, {
+      diaSemana: dto.diaSemana, desdeHora: dto.desdeHora, tarifaHora: dto.tarifaHora,
+      vigenteDesde: dto.vigenteDesde ?? jornadaDe(ahora).jornada, vigenteHasta: dto.vigenteHasta || null,
+      activa: dto.activa ?? true, nota: dto.nota?.trim() || null,
+    }, null);
+    const r = await this.prisma.tarifaEspecialPersona.create({ data: { ...datos, party_id: id, creado_por: usuario.partyId } });
+    await this.auditar('CAMBIO', 'CREAR_TARIFA_ESPECIAL', usuario, ip, 'tarifa_especial_persona', r.id, {
+      partyId: dto.partyId, diaSemana: datos.dia_semana, desdeHora: dto.desdeHora, tarifaHora: datos.tarifa_hora, vigenteDesde: dto.vigenteDesde ?? null, vigenteHasta: datos.vigente_hasta ? isoDe(datos.vigente_hasta) : null, activa: datos.activa,
+    });
+    return { ok: true, id: Number(r.id) };
+  }
+
+  /** Edita una regla o la desactiva (activa = false). Lo que no llega se conserva. */
+  async editarTarifaEspecial(id: number, dto: TarifaEspecialDto, usuario: UsuarioAutenticado, ip?: string) {
+    const f: any = await this.prisma.tarifaEspecialPersona.findUnique({ where: { id: BigInt(id) } });
+    if (!f) throw new NotFoundException({ codigo: 'TARIFA_NO_ENCONTRADA', mensaje: 'Tarifa especial no encontrada' });
+    const actual = tarifaDeFila(f);
+    const datos = await this.datosTarifaValidos(f.party_id, {
+      diaSemana: dto.diaSemana ?? actual.diaSemana,
+      desdeHora: dto.desdeHora ?? actual.desdeHora,
+      tarifaHora: dto.tarifaHora ?? actual.tarifaHora,
+      vigenteDesde: dto.vigenteDesde ?? actual.vigenteDesde,
+      vigenteHasta: dto.vigenteHasta !== undefined ? dto.vigenteHasta || null : actual.vigenteHasta,
+      activa: dto.activa ?? actual.activa,
+      nota: dto.nota !== undefined ? dto.nota.trim() || null : actual.nota,
+    }, f.id);
+    await this.prisma.tarifaEspecialPersona.update({ where: { id: f.id }, data: datos });
+    await this.auditar('CAMBIO', dto.activa === false ? 'DESACTIVAR_TARIFA_ESPECIAL' : 'EDITAR_TARIFA_ESPECIAL', usuario, ip, 'tarifa_especial_persona', f.id, {
+      partyId: Number(f.party_id), diaSemana: datos.dia_semana, desdeHora: aHoraTexto(datos.desde_minutos), tarifaHora: datos.tarifa_hora, vigenteDesde: isoDe(datos.vigente_desde), vigenteHasta: datos.vigente_hasta ? isoDe(datos.vigente_hasta) : null, activa: datos.activa,
+    });
+    return { ok: true };
+  }
+
+  /** Valida una regla completa (fechas, hora, tarifa y solapes con las activas de la persona) y devuelve sus columnas. */
+  private async datosTarifaValidos(
+    id: bigint,
+    d: { diaSemana: number; desdeHora: string; tarifaHora: number; vigenteDesde: string; vigenteHasta: string | null; activa: boolean; nota: string | null },
+    excluirId: bigint | null,
+  ) {
+    fechaValida(d.vigenteDesde);
+    if (d.vigenteHasta) fechaValida(d.vigenteHasta);
+    if (!HORA_HHMM.test(d.desdeHora)) throw new BadRequestException({ codigo: 'HORA_INVALIDA', mensaje: 'La hora «desde» debe ser HH:MM' });
+    const tarifa = { dia_semana: d.diaSemana, desde_minutos: minutosDeHora(d.desdeHora), tarifa_hora: redondear2(d.tarifaHora), vigente_desde: fechaDb(d.vigenteDesde), vigente_hasta: d.vigenteHasta ? fechaDb(d.vigenteHasta) : null, activa: d.activa, nota: d.nota };
+    const otras = await this.prisma.tarifaEspecialPersona.findMany({ where: { party_id: id, activa: true, ...(excluirId !== null ? { id: { not: excluirId } } : {}) } });
+    const motivo = validarReglaTarifa({ diaSemana: d.diaSemana, desdeMin: tarifa.desde_minutos, tarifaHora: tarifa.tarifa_hora, vigenteDesde: d.vigenteDesde, vigenteHasta: d.vigenteHasta, activa: d.activa }, otras.map(reglaDeFila));
+    if (motivo) throw new BadRequestException({ codigo: 'TARIFA_INVALIDA', mensaje: motivo });
+    return tarifa;
   }
 
   // ---------------------------------------------------------------------------
@@ -446,7 +539,7 @@ export class PlanillaService {
       ? { fechasVac: new Set<string>(), vacPagadas: [] as Array<{ id: bigint; fecha_desde: Date; dias: unknown; monto: unknown }> }
       : await this.vacacionesDelPeriodo(id, periodo);
     const diasBase = aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac);
-    const [extras, ajustes, consumosBd, persona, feriadosBd, prestamosBd, recurrentesBd] = await Promise.all([
+    const [extras, ajustes, consumosBd, persona, feriadosBd, prestamosBd, recurrentesBd, tarifasBd] = await Promise.all([
       this.prisma.planillaExtraAprobada.findMany({ where: { party_id: id, jornada: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       this.prisma.planillaAjuste.findMany({
         where: { party_id: id, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } },
@@ -462,13 +555,17 @@ export class PlanillaService {
       tercerizado ? Promise.resolve([] as any[]) : this.prisma.feriado.findMany({ where: { activo: true, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.prestamoPersonal.findMany({ where: { party_id: id, estado: 'ACTIVO' }, include: { cuotas: true }, orderBy: { id: 'asc' } }),
       omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: id, activo: true }, orderBy: { id: 'asc' } }),
+      this.prisma.tarifaEspecialPersona.findMany({ where: { party_id: id, activa: true } }),
     ]);
     // Feriado activo: las horas trabajadas de esa jornada se pagan a valor hora × recargo (ver pagoDia en planilla.calculo).
     const feriados = new Map(feriadosBd.map((f) => [isoDe(f.fecha), { nombre: f.nombre, recargo: Number(f.recargo) }]));
+    // Tarifa especial de la persona (regla por día de la semana y vigencia): reemplaza el feriado ese día (sin recargo).
+    const reglasEsp = tarifasBd.map(reglaDeFila);
     const diasCalc = diasBase.map((c) => {
       const f = feriados.get(c.jornada);
+      const conTarifa = aplicarTarifaEspecial(c, reglasEsp);
       // un día de vacación tomada se paga normal (sin recargo)
-      return f && f.recargo !== 1 && c.estado !== 'VACACIONES' ? { ...c, recargo: f.recargo } : c;
+      return f && f.recargo !== 1 && c.estado !== 'VACACIONES' && !conTarifa.tarifaEspecial ? { ...conTarifa, recargo: f.recargo } : conTarifa;
     });
     const vigentes = ajustes.filter((a) => !a.anulado_en);
     // Mismo origen que Admin › Créditos (consumo_personal sin pagado_en). Los del período se cobran salvo que se excluyan;
@@ -681,6 +778,7 @@ export class PlanillaService {
         extraAprobada: porDia.has(d.jornada),
         extraAprobadaPor: porDia.has(d.jornada) ? Number(porDia.get(d.jornada)!.aprobado_por) : null,
         extraAprobadaEn: porDia.has(d.jornada) ? porDia.get(d.jornada)!.aprobado_en.toISOString() : null,
+        tarifaEspecial: resumenTarifaEspecial(d, porDia.has(d.jornada)),
       })),
       consumos,
       consumosAnterioresPendiente,
@@ -957,6 +1055,7 @@ export class PlanillaService {
         ganado: x.ganado ?? 0,
         feriado: x.feriado ?? null,
         recargo: x.recargo ?? 1,
+        tarifaEspecial: x.tarifaEspecial ?? null,
       })),
       acumulado: d.resultado.ganado,
       neto: d.estado === 'PAGADO' ? d.resultado.neto : null,
@@ -978,12 +1077,14 @@ export class PlanillaService {
     const d = await this.detalle(Number(partyId), ref, [], ahora);
     const r = d.resultado;
     const tipo = d.sueldo.modalidad as Modalidad;
-    const [prestamos, servicios, cfg, vinculo] = await Promise.all([
+    const [prestamos, servicios, cfg, vinculo, tarifasFilas] = await Promise.all([
       this.prisma.prestamoPersonal.findMany({ where: { party_id: partyId, estado: { not: 'ANULADO' } }, include: { cuotas: true }, orderBy: { id: 'desc' } }),
       this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: partyId }, orderBy: { id: 'asc' } }),
       this.asistencia.obtenerConfig(),
       this.prisma.vinculoPersonal.findMany({ where: { party_id: partyId, vigente_hasta: null } }),
+      this.prisma.tarifaEspecialPersona.findMany({ where: { party_id: partyId, activa: true }, orderBy: { id: 'asc' } }),
     ]);
+    const tarifas = tarifasFilas.map(reglaDeFila);
     const tercerizado = vinculo[0]?.tipo === 'CONTRATO_TEMPORAL';
     const ajustes = ((d.ajustes ?? []) as any[]).filter((a) => !a.anulado);
     const descuentos = [
@@ -1011,6 +1112,8 @@ export class PlanillaService {
         penalidadTardanzaPct: tercerizado ? 0 : cfg.tardanzaPenalidadPct,
         multiplicadorExtra: d.sueldo.metodo === 'PROGRAMADAS' ? 1 : cfg.multiplicadorExtra,
         tercerizado,
+        // Solo las activas: lo que la persona ve en «Reglas de descuento y pago»
+        tarifasEspeciales: tarifas.filter((t) => t.activa).map((t) => ({ diaSemana: t.diaSemana, desdeHora: aHoraTexto(t.desdeMin), tarifaHora: t.tarifaHora, vigenteDesde: t.vigenteDesde, vigenteHasta: t.vigenteHasta })),
       },
       consumos: ((d.consumos ?? []) as any[]).map((c) => ({ fecha: c.fecha as string, pedido: c.pedido as string, productos: (c.productos ?? []) as string[], monto: c.monto as number, anterior: !!c.anterior, cobrar: !!c.cobrar })),
       bonosManuales: ajustes.filter((a) => a.tipo === 'BONO').map((a) => ({ id: a.id as number, fecha: a.fecha as string, monto: a.monto as number, motivo: (a.motivo ?? null) as string | null })),
@@ -1022,6 +1125,7 @@ export class PlanillaService {
         extraMin: (x.extraMin ?? 0) as number,
         extraAprobada: !!x.extraAprobada,
         ganado: (x.ganado ?? 0) as number,
+        tarifaEspecial: (x.tarifaEspecial ?? null) as { desdeHora: string; tarifaHora: number; horasEspecialesH: number; ganadoEspecial: number } | null,
         feriado: (x.feriado ?? null) as string | null,
         vacacion: !!x.vacacion,
         penalidadTardanza: ((r.penalidadTardanzaDetalle ?? []) as Array<{ fecha: string; monto: number }>).find((p) => p.fecha === x.jornada)?.monto ?? 0,
