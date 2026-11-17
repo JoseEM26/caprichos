@@ -11,6 +11,8 @@ const REGISTROS_MOCK = [
     categoria: 'CAMBIO',
     modulo: 'usuarios',
     accion: 'CREAR',
+    descripcion: 'Creó el usuario Ana García (CAJERO)',
+    usuarioNombre: 'Admin Test',
     resultado: 'OK',
     entidad: 'user_account',
     entidadId: '4',
@@ -31,6 +33,8 @@ const REGISTROS_MOCK = [
     categoria: 'ACCESO',
     modulo: 'acceso',
     accion: 'INGRESO_FALLIDO',
+    descripcion: 'Intento de ingreso rechazado (motivo: CREDENCIALES_INVALIDAS)',
+    usuarioNombre: null,
     resultado: 'RECHAZADO',
     entidad: null,
     entidadId: null,
@@ -92,8 +96,8 @@ describe('AuditoriaView (/admin/historial)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/USUARIOS · CREAR/i)).toBeInTheDocument();
-      expect(screen.getByText(/ACCESO · INGRESO_FALLIDO/i)).toBeInTheDocument();
+      expect(screen.getByText('Creó el usuario Ana García (CAJERO)')).toBeInTheDocument();
+      expect(screen.getByText('Intento de ingreso rechazado (motivo: CREDENCIALES_INVALIDAS)')).toBeInTheDocument();
     });
 
     // Insignias OK y RECHAZADO
@@ -101,7 +105,7 @@ describe('AuditoriaView (/admin/historial)', () => {
     expect(screen.getByText('RECHAZADO')).toBeInTheDocument();
 
     // Ver detalle expandible
-    const botonDetalle = screen.getAllByRole('button', { name: /Ver datos y huella/i })[0];
+    const botonDetalle = screen.getAllByRole('button', { name: /Detalle técnico/i })[0];
     fireEvent.click(botonDetalle);
 
     await waitFor(() => {

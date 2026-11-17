@@ -36,7 +36,7 @@ export const MIGRAR: string[] = [
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_estado_historial', 'secuencia_pedido', 'pedido_cambio_ubicacion', 'solicitud_cambio_cobro', 'cortesia', 'contador_diario', 'pedido_adelanto',
-    'pedido_mesa', 'comprobante', 'comprobante_cambio_pendiente', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
+    'pedido_mesa', 'pedido_borrador_mesa', 'comprobante', 'comprobante_cambio_pendiente', 'comprobante_archivo', 'factura_whatsapp_envio', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'pago_online_intento', 'pago_online_evento', 'incidente_entrega', 'incidente_entrega_foto', 'ruc_consulta', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto', 'ubicacion_repartidor',
   ]],
   ['caja y cierres: dinero real del día', [
@@ -70,7 +70,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'propina_reparto', 'propina_reparto_detalle',
   ]],
   ['planilla del personal: sueldos, adelantos, descuentos y períodos pagados (dinero real, historial propio de cada base)', [
-    'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'prestamo_personal', 'prestamo_cuota', 'descuento_recurrente_personal',
+    'sueldo_personal', 'sueldo_vigencia', 'tarifa_especial_persona', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'planilla_seleccion', 'prestamo_personal', 'prestamo_cuota', 'descuento_recurrente_personal',
     'vinculo_personal', 'vacacion_movimiento',
   ]],
   ['feriados: los precarga la migración y el ADMIN los edita en cada base, no se migran', [

@@ -87,7 +87,7 @@ export const CONSERVAR: string[] = [
   'propina_reparto', 'propina_reparto_detalle',
   'sueldo_personal', 'planilla_ajuste', 'planilla_extra_aprobada', 'planilla_periodo', 'feriado', 'prestamo_personal', 'prestamo_cuota', 'descuento_recurrente_personal',
   'vinculo_personal', 'vacacion_movimiento',
-  'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio', 'opcion_requiere',
+  'cobertura_turno', 'cobro', 'sueldo_vigencia', 'tarifa_especial_persona', 'planilla_seleccion', 'pedido_borrador_mesa', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio', 'opcion_requiere',
   'compra', 'compra_linea', 'consumo_personal', 'contador_diario', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta', 'equipo_impresion_config',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
@@ -131,6 +131,7 @@ export const FK_PARTY_PERSONAL = [
   'asistencia_solicitud.party_id', 'asistencia_solicitud.resuelta_por',
   'propina_reparto.calculado_por', 'propina_reparto.aprobado_por', 'propina_reparto.pagado_por', 'propina_reparto.anulado_por',
   'propina_reparto_detalle.party_id',
+  'pedido_borrador_mesa.party_id', // quien guardó el borrador (mozo/caja), no el cliente
 ];
 
 /**

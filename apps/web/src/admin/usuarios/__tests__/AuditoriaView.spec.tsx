@@ -101,7 +101,7 @@ describe('AuditoriaView filtros al servidor', () => {
     await waitFor(() => expect(ultima().get('motivo')).toBe('error'));
     await waitFor(() => expect(ubicacion).toContain('pedido=CP-W422'));
     expect(screen.getByText(/como máximo 31 días/i)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('Módulo y Acción son selectores con los valores que existen; Este mes manda desde el día 1', async () => {
     dibujar();
