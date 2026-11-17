@@ -77,6 +77,7 @@ export { calcularPagoPedido } from './etiquetas/pagoPedido.js';
 export { PAGOS_EJEMPLO } from './etiquetas/pagosEjemplo.js';
 export type { EntradaPagoPedido } from './etiquetas/pagoPedido.js';
 export { lineasTicketPago } from './etiquetas/ticketPago.js';
+export { lineasCuponCine, textoValorCupon, type DatosCuponCine } from './etiquetas/cuponCine.js';
 export { detalleLinea, entradaDeLineaPedido, descuentosDePedido, resumenAntesDelTotal, solesTexto } from './etiquetas/detalleLinea.js';
 export type { LineaDetalleEntrada, DetalleLinea, DescuentoTicket } from './etiquetas/detalleLinea.js';
 export { lineasTicketComandaSalon } from './etiquetas/ticketComanda.js';

@@ -452,7 +452,7 @@ export function construirTicketPago(
   ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null,
   igvPct?: number | null,
   /** Cupón REAL y vigente del pedido; solo se pasa si el interruptor «Imprimir cupón en el ticket» está encendido. */
-  cupon?: { codigo: string; descripcion?: string | null; vence?: string | null } | null,
+  cupon?: { codigo: string; valor?: string | null; alcance?: string | null; vence?: string | null; numero?: number | null; tope?: number | null } | null,
 ): TicketPagoDatos & { propina?: number; ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);

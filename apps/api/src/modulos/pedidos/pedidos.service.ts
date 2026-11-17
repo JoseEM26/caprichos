@@ -25,6 +25,7 @@ import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { darCuponAlCrear, type ResultadoCuponAlCrear } from './cupon-al-crear';
 import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
 import { esGrupoBebidaDuplicado } from '../ofertas/combo-grupos.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -119,6 +120,8 @@ export interface OrigenPedido {
   puedeCortesia?: boolean;
   /** Quien agrega «Servicio o producto» libre (permiso pedidos/cargo_libre); la carta y el bot nunca lo traen. */
   puedeCargoLibre?: boolean;
+  /** Permiso cupones/dar: puede dar un cupón «Lo da el personal» al crear el pedido (cuponDarId) */
+  puedeDarCupon?: boolean;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -776,6 +779,11 @@ export class PedidosService {
 
     const claveIdempotencia = idempotencyKey.trim();
 
+    // Cupón «Lo da el personal» al crear: solo con permiso cupones/dar (403 y no se crea nada, como la cortesía)
+    if (dto.cuponDarId && !origen?.puedeDarCupon) {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO_CUPON_DAR', mensaje: 'No tienes permiso para dar cupones' });
+    }
+
     // 1. Idempotencia: si ya existe un pedido con esa clave, se devuelve el pedido existente (RQ-PED-03-09)
     const pedidoExistente = await this.prisma.pedido.findUnique({
       where: { clave_idempotencia: claveIdempotencia },
@@ -783,6 +791,8 @@ export class PedidosService {
 
     if (pedidoExistente) {
       return {
+        // reintento: el cupón se da una sola vez (darCupon devuelve el que ya tenga el pedido)
+        ...(await this.cuponAlCrear(pedidoExistente.id, dto.cuponDarId, origen)),
         id: pedidoExistente.id.toString(),
         codigo: pedidoExistente.codigo,
         estado: pedidoExistente.estado,
@@ -1754,8 +1764,12 @@ export class PedidosService {
       this.avisosPedidoService.despertar();
     }
 
-    // 11. Respuesta 201
+    // 11. Cupón «Lo da el personal» elegido en la ventana de nuevo pedido: después del commit, así el pedido nunca falla por él
+    const cuponCreado = await this.cuponAlCrear(pedidoCreado.id, dto.cuponDarId, origen);
+
+    // 12. Respuesta 201
     return {
+      ...cuponCreado,
       id: pedidoCreado.id.toString(),
       codigo: pedidoCreado.codigo,
       estado: pedidoCreado.estado,
@@ -1778,6 +1792,12 @@ export class PedidosService {
             ? 'Pedido enviado a cocina'
             : 'Un asesor te escribirá para coordinar el pago',
     };
+  }
+
+  /** Da el cupón «Lo da el personal» elegido al crear el pedido (ver darCuponAlCrear: nunca falla el pedido). */
+  private async cuponAlCrear(pedidoId: bigint, cuponDarId: string | undefined, origen?: OrigenPedido): Promise<ResultadoCuponAlCrear> {
+    if (!cuponDarId) return {};
+    return darCuponAlCrear((c, p, u) => this.ofertasService.darCupon(c, p, u), pedidoId, cuponDarId, origen?.usuarioPartyId);
   }
 
   /**

@@ -36,6 +36,7 @@ import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
+import { BloqueDarCuponNuevo } from './BloqueDarCuponNuevo';
 import { CanjePuntosLocal } from './CanjePuntosLocal';
 import { motivoSinCanje, puntosDeTexto, topeCanjeLocal } from './puntosLocal';
 import { PasoPagoPedido, MAX_METODOS_PAGO, type CuandoPaga } from './PasoPagoPedido';
@@ -129,6 +130,15 @@ function usePuedeSaldarPersonal(): boolean {
 function usePuedeCargoLibre(): boolean {
   try {
     return Boolean(useSesion().tiene('pedidos/cargo_libre'));
+  } catch {
+    return false;
+  }
+}
+
+/** Permiso de dar cupones «Lo da el personal» sin romper fuera del contexto de sesión (pruebas sueltas). */
+function usePuedeDarCupon(): boolean {
+  try {
+    return Boolean(useSesion().tiene('cupones/dar'));
   } catch {
     return false;
   }
@@ -651,6 +661,11 @@ export function ModalNuevoPedidoMesa({
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>(() => (edicion ? edicion.datos.lineas.map(aLineaMesa) : []));
   const { puede: puedeCortesia } = usePermisosCortesia();
+  const puedeDarCupon = usePuedeDarCupon();
+  // Cupón «Lo da el personal» que se da a este cliente con el pedido (sale impreso en su ticket)
+  const [cuponDarId, setCuponDarId] = useState<string | null>(null);
+  // Pedido creado pero con el cupón no dado: se avisa y el pedido no se vuelve a enviar
+  const [avisoCupon, setAvisoCupon] = useState<string | null>(null);
   const puedeSaldarPersonal = usePuedeSaldarPersonal();
   // Pedido del personal: se carga a su crédito (se paga en su cuenta) o paga en el momento
   const [pagoPersonal, setPagoPersonal] = useState<'credito' | 'ahora'>('credito');
@@ -1609,6 +1624,7 @@ export function ModalNuevoPedidoMesa({
             reservaId: reservaIdPreseleccionada,
             cuponCodigo: cuponAplicado?.codigo,
             ...(puntosCanje > 0 ? { puntosCanje } : {}),
+            ...(!extra && !programando && cuponDarId ? { cuponDarId } : {}),
             canal: canalEnvio,
             // Personas (opcional): el servidor valida los asientos; confirmarCapacidad la deja pasar si el local lo aceptó
             personas: personasNum,
@@ -1684,6 +1700,7 @@ export function ModalNuevoPedidoMesa({
             nota: notaGeneral.trim() || undefined,
             cuponCodigo: cuponAplicado?.codigo,
             ...(puntosCanje > 0 ? { puntosCanje } : {}),
+            ...(!extra && !programando && cuponDarId ? { cuponDarId } : {}),
             esPersonal: pideMode === 'personal',
             ...(personalPide
               ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Math.round(Number(cliPagaCon) * 100) / 100 : undefined } : {}) } }
@@ -1700,6 +1717,9 @@ export function ModalNuevoPedidoMesa({
       }
 
       setConfirmarEnviar(false);
+      const avisoCuponNuevo = res?.cuponNoDado ? `El pedido se creó, pero el cupón no se pudo dar: ${res.cuponNoDado.motivo}` : null;
+      setAvisoCupon(avisoCuponNuevo);
+      setCuponDarId(null);
       const pedidoNuevo = res?.id != null ? { id: String(res.id), codigo: String(res.codigo ?? '') } : null;
       const planPago: PlanPagoItem[] = pagaAhora ? planAhora : [];
       const digitales = digitalesDelPlan(planPago);
@@ -1740,7 +1760,7 @@ export function ModalNuevoPedidoMesa({
       }
       alExitoPedido?.(res);
       await alRefrescarMesas?.();
-      alCerrar();
+      if (!avisoCuponNuevo) alCerrar();
     } catch (err: any) {
       if (extra) {
         // Extra: la ventana sigue abierta con el error y «Reintentar»; el carrito no se toca
@@ -1892,7 +1912,7 @@ export function ModalNuevoPedidoMesa({
     setCapturasPago(null);
     alExitoPedido?.(res);
     await alRefrescarMesas?.();
-    alCerrar();
+    if (!avisoCupon) alCerrar();
   };
 
   // Cierra el flujo de un pedido digital (con voucher subido o dejado para después)
@@ -2113,6 +2133,17 @@ export function ModalNuevoPedidoMesa({
           )}
 
           {/* Error de envío global si hay */}
+          {avisoCupon && (
+            <div role="alert" style={{ background: '#FFF6DD', border: '1.5px solid var(--cp-gold, #C9A227)', borderRadius: '12px', padding: '10px 14px', fontSize: '13px', fontWeight: 700 }}>
+              {avisoCupon}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="np-quitar" onClick={() => { setAvisoCupon(null); alCerrar(); }}>
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
+
           {errorEnvio && (
             <div
               role="alert"
@@ -3189,6 +3220,9 @@ export function ModalNuevoPedidoMesa({
                 }
                 comprobante={<SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} guardada={cuenta?.facturacion ?? null} />}
               />
+              {puedeDarCupon && !extra && !programando && (
+                <BloqueDarCuponNuevo cuponId={cuponDarId} onCambiar={setCuponDarId} />
+              )}
               <div className="np2-pie">
                 <button type="button" className="np2-atras" onClick={() => setFase('pedido')}>
                   ← Atrás
@@ -3196,7 +3230,7 @@ export function ModalNuevoPedidoMesa({
                 <button
                   type="button"
                   className="np2-enviar"
-                  disabled={erroresEnvio.length > 0}
+                  disabled={erroresEnvio.length > 0 || avisoCupon !== null}
                   onClick={intentarEnviar}
                   aria-label={etiquetaEnviar}
                 >

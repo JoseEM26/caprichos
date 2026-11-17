@@ -93,8 +93,9 @@ import { EquipoConfigService } from './equipo-config.service';
 import { DkLite, destinoDeTrabajoParaCola, motivoTipoSinAsignar, NOMBRE_TIPO_PAPEL, textoConexion, rolDeTipo } from './destinos-impresion';
 import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { maquetarEtiqueta, tamanoEfectivo } from '@caprichos/compartido';
+import { maquetarEtiqueta, tamanoEfectivo, textoValorCupon } from '@caprichos/compartido';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
+import { alcanceCupon } from '../ofertas/cupon-asignado';
 import { datosOrigen, deducirOrigen } from './origen-impresion';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
@@ -1291,7 +1292,7 @@ await this.anotarResaltadas(pedido);
    * Cupón REAL para imprimir en el ticket: solo con el interruptor `impresion_cupon_en_ticket` en «Sí» y si el pedido
    * generó un cupón emitido VIGENTE (no canjeado, no vencido) de un cupón activo. Sin eso: null y el ticket no lleva sección.
    */
-  async cuponParaTicket(pedido: { id: bigint }): Promise<{ codigo: string; descripcion: string | null; vence: string | null } | null> {
+  async cuponParaTicket(pedido: { id: bigint }): Promise<{ codigo: string; valor: string | null; alcance: string; vence: string | null; numero: number | null; tope: number | null } | null> {
     try {
       const ahora = new Date();
       const vigente = {
@@ -1304,7 +1305,7 @@ await this.anotarResaltadas(pedido);
       // el ticket solo tiene un bloque de cupón, así que si hay de los dos tipos se imprime solo el dado. También al reimprimir.
       let emitido: any = await this.prisma.cuponEmitido.findFirst({
         where: { ...vigente, cupon: { activo: true, modo: 'ASIGNADO_PERSONAL' } },
-        include: { cupon: true },
+        include: { cupon: { include: { producto: true, categoria: true } } },
         orderBy: { id: 'desc' },
       });
       if (!emitido) {
@@ -1312,12 +1313,25 @@ await this.anotarResaltadas(pedido);
         if (!['si', 'sí', 'true', '1'].includes(String(flag?.valor ?? '').trim().toLowerCase())) return null;
         emitido = await this.prisma.cuponEmitido.findFirst({
           where: { ...vigente, cupon: { activo: true } },
-          include: { cupon: true },
+          include: { cupon: { include: { producto: true, categoria: true } } },
           orderBy: { id: 'desc' },
         });
       }
       if (!emitido) return null;
-      return { codigo: emitido.codigo, descripcion: emitido.cupon?.descripcion ?? null, vence: emitido.vence_en ? formatearFecha(emitido.vence_en) : null };
+      const cupon = emitido.cupon ?? {};
+      // Número entre los dados de este cupón (N.º 0002 de 0200): solo cuenta los no anulados hasta este código
+      // Un fallo al contar no debe quitar el cupón del ticket: sin número no sale el talón numerado
+      const numero = await Promise.resolve()
+        .then(() => this.prisma.cuponEmitido.count({ where: { cupon_id: emitido.cupon_id, estado: { not: 'ANULADO' }, id: { lte: emitido.id } } }))
+        .catch(() => null);
+      return {
+        codigo: emitido.codigo,
+        valor: cupon.descuento_tipo ? textoValorCupon(cupon.descuento_tipo, Number(cupon.descuento_valor)) : null,
+        alcance: alcanceCupon(cupon),
+        vence: emitido.vence_en ? formatearFecha(emitido.vence_en) : null,
+        numero,
+        tope: cupon.modo === 'ASIGNADO_PERSONAL' ? cupon.tope_usos ?? null : null,
+      };
     } catch {
       return null;
     }

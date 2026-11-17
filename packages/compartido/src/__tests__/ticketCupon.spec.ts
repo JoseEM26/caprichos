@@ -25,17 +25,19 @@ describe('Voucher con cupón', () => {
     const t = ticketPagoEjemploCupon({ modo: 'UNICO_COMPROBANTE', codigoBase: 'DULCE10', descuentoTipo: 'MONTO', descuentoValor: 10 });
     const l = texto(t);
     expect(l.find((x) => x.startsWith('Cupón DULCE10'))).toMatch(/-S\/ 10\.00$/);
-    const i = l.findIndex((x) => x.includes('Tu cupón para tu próxima compra'));
+    const i = l.findIndex((x) => x.includes('CUPÓN DE COLECCIÓN'));
     expect(i).toBeGreaterThan(l.findIndex((x) => x.startsWith('TOTAL')));
-    expect(l[i + 1].trim()).toBe('DULCE10-A1B2C3');
+    expect(l.join('\n')).toContain('DULCE10-A1B2C3');
+    expect(l.join('\n')).toContain('S/ 10.00 DE DESCUENTO');
   });
 
   it('ASIGNADO_PERSONAL (lo da el mozo o cajero): el código sale al pie como el de código único', () => {
     const t = ticketPagoEjemploCupon({ modo: 'ASIGNADO_PERSONAL', codigoBase: 'AMIGO15', descuentoTipo: 'PORCENTAJE', descuentoValor: 15 });
     const l = texto(t);
-    const i = l.findIndex((x) => x.includes('Tu cupón para tu próxima compra'));
+    const i = l.findIndex((x) => x.includes('CUPÓN DE COLECCIÓN'));
     expect(i).toBeGreaterThan(l.findIndex((x) => x.startsWith('TOTAL')));
-    expect(l[i + 1].trim()).toBe('AMIGO15-A1B2C3');
+    expect(l.join('\n')).toContain('AMIGO15-A1B2C3');
+    expect(l.join('\n')).toContain('15 % DE DESCUENTO');
   });
 
   it('envío gratis: el ticket nombra el cupón aunque no reste soles', () => {

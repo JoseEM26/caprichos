@@ -85,7 +85,7 @@ describe('ModalVistaPreviaCupon', () => {
     render(<ModalVistaPreviaCupon cupon={cupon({ modo: 'UNICO_COMPROBANTE', codigoBase: 'DULCE10', descuentoTipo: 'MONTO', descuentoValor: 10 })} onCerrar={() => {}} />);
     const ticket = screen.getByTestId('pv-ticket').textContent ?? '';
     expect(ticket).toMatch(/Cupón DULCE10\s+-S\/ 10\.00/);
-    expect(ticket).toContain('Tu cupón para tu próxima compra');
+    expect(ticket).toContain('CUPÓN DE COLECCIÓN');
     expect(ticket).toContain('DULCE10-A1B2C3');
   });
 

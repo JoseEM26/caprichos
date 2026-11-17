@@ -217,7 +217,7 @@ export interface TicketPagoDatos {
    */
   personal?: { trabajador?: string | null; pagado?: boolean } | null;
   /** Cupón real y vigente del cliente para su próxima compra (solo si el dueño activó «Imprimir cupón en el ticket»). */
-  cuponSiguiente?: { codigo: string; descripcion?: string | null; vence?: string | null } | null;
+  cuponSiguiente?: { codigo: string; valor?: string | null; alcance?: string | null; vence?: string | null; numero?: number | null; tope?: number | null } | null;
   /**
    * Tipo de comprobante que se imprime y los datos del cliente de ESE comprobante (nunca de su cuenta).
    * SIMPLE = ticket interno sin SUNAT; BOLETA y FACTURA muestran cliente, documento y desglose del IGV.

@@ -7,6 +7,14 @@ import { PapelTermico } from '../impresion/facil/PanelVistaPrevia';
 import '../impresion/facil/panel-previa.css';
 import type { CuponItem } from './ofertasApi';
 
+/** Fecha dd/mm/aaaa dentro de `dias` días (la vigencia que saldría impresa). */
+export function fechaDentroDe(dias: number, desde: Date = new Date()): string {
+  const f = new Date(desde.getTime() + dias * 86_400_000);
+  const dd = String(f.getDate()).padStart(2, '0');
+  const mm = String(f.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${f.getFullYear()}`;
+}
+
 /** «Ver cómo se imprime»: el voucher de ejemplo con el descuento de ESTE cupón (mismo dibujo que el ticket real). */
 export function ModalVistaPreviaCupon({ cupon, onCerrar }: { cupon: CuponItem; onCerrar: () => void }) {
   const imprime = cupon.modo !== 'COMPARTIDO';
@@ -20,6 +28,10 @@ export function ModalVistaPreviaCupon({ cupon, onCerrar }: { cupon: CuponItem; o
           descuentoTipo: cupon.descuentoTipo ?? (cupon.tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO'),
           descuentoValor: Number(cupon.descuentoValor ?? cupon.valor ?? 0),
           descripcion: cupon.descripcion,
+          alcance: cupon.productoNombre ? `Solo ${cupon.productoNombre}` : cupon.categoriaNombre ? `Solo ${cupon.categoriaNombre}` : 'Toda la carta',
+          vence: fechaDentroDe(cupon.diasValidezImpreso ?? cupon.diasValidez ?? 15),
+          dados: cupon.totalDados ?? null,
+          tope: cupon.topeUsos ?? null,
         }),
         48,
       ),
@@ -43,6 +55,11 @@ export function ModalVistaPreviaCupon({ cupon, onCerrar }: { cupon: CuponItem; o
                     ? 'Este cupón sale impreso al pie del ticket, con un código distinto en cada comprobante (aquí uno de ejemplo).'
                     : 'Este cupón no imprime su código: solo aparece el descuento.'}
               </p>
+              {asignado && cupon.topeUsos != null && (
+                <p data-testid="dados-cupon" style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>
+                  Dados {cupon.totalDados ?? 0} de {cupon.topeUsos}
+                </p>
+              )}
               <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
                 <LogoCaprichos />
                 <PapelTermico lineas={lineas} columnas={48} zoom={1} etiqueta={`Ejemplo del voucher con el cupón ${cupon.codigoBase}`} />

@@ -61,6 +61,8 @@ export interface AbrirPedidoMesaPayload {
   nota?: string;
   reservaId?: string;
   cuponCodigo?: string;
+  /** Cupón «Lo da el personal» que se da al cliente con este pedido (sale impreso en su ticket) */
+  cuponDarId?: string;
   /** Propina de monto libre, aparte de la venta (el servidor la ignora si el canal la tiene apagada) */
   propina?: number;
   canal?: 'MOZO' | 'CAJA';

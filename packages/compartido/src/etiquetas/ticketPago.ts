@@ -1,5 +1,6 @@
 import type { TicketPagoDatos } from '../tipos/etiquetas.js';
 import { detalleLinea, resumenAntesDelTotal, type DetalleLinea } from './detalleLinea.js';
+import { lineasCuponCine } from './cuponCine.js';
 
 /** Una linea del ticket de pago ya maquetada al ancho del papel (58 mm = 32 columnas, 80 mm = 48). */
 export interface LineaTicket {
@@ -183,10 +184,7 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   // Cupón: solo si viene uno REAL y vigente (el servidor no lo manda mientras el interruptor esté apagado)
   if (t.cuponSiguiente?.codigo) {
     p(linea);
-    p(centrar('Tu cupón para tu próxima compra', c), { centrado: true, negrita: true });
-    p(centrar(t.cuponSiguiente.codigo, c), { centrado: true, negrita: true });
-    if (t.cuponSiguiente.descripcion) for (const r of envolver(t.cuponSiguiente.descripcion, c)) p(r, { centrado: true });
-    if (t.cuponSiguiente.vence) p(centrar(`Vence ${t.cuponSiguiente.vence}`, c), { centrado: true });
+    for (const r of lineasCuponCine(t.cuponSiguiente, c)) o.push(r);
   }
   p(linea);
   p(centrar('Gracias por tu visita', c));

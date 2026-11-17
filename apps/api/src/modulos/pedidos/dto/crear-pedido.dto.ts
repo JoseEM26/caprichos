@@ -287,6 +287,11 @@ export class CrearPedidoDto {
   @IsString()
   cuponCodigo?: string;
 
+  /** Cupón «Lo da el personal» que el mozo o cajero da a este cliente al crear el pedido (sale impreso en su ticket). Solo con permiso cupones/dar. */
+  @IsOptional()
+  @IsString()
+  cuponDarId?: string;
+
   /** Puntos de la cuenta que se canjean como descuento; solo con sesión de cliente */
   @IsOptional()
   @Type(() => Number)

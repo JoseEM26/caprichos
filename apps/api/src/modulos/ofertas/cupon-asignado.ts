@@ -1,5 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { cuponEnHorario, generarCodigoCuponUnico } from './ofertas.util';
+import { MATRIZ } from '../acceso/permisos';
+import { rolesDelUsuario } from '../acceso/roles-usuario';
 
 /**
  * Cupón «Lo da el mozo o cajero» (modo ASIGNADO_PERSONAL): cada vez que el personal lo da se crea un código único de un solo uso
@@ -40,8 +42,19 @@ function cuponDadoDelPedido(prisma: any, pedidoId: bigint) {
   });
 }
 
+/** Alcance del cupón para el ticket y la lista: «Solo <producto>», «Solo <categoría>» o «Toda la carta». */
+export function alcanceCupon(c: { producto?: { nombre?: string } | null; categoria?: { nombre?: string } | null }): string {
+  if (c.producto?.nombre) return `Solo ${c.producto.nombre}`;
+  if (c.categoria?.nombre) return `Solo ${c.categoria.nombre}`;
+  return 'Toda la carta';
+}
+
 export async function cuponesParaDar(prisma: any, pedidoId?: string, ahora = new Date()) {
-  const cupones: any[] = await prisma.cupon.findMany({ where: { modo: MODO_ASIGNADO, activo: true }, orderBy: [{ orden: 'asc' }, { id: 'asc' }] });
+  const cupones: any[] = await prisma.cupon.findMany({
+    where: { modo: MODO_ASIGNADO, activo: true },
+    include: { producto: true, categoria: true },
+    orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+  });
   const dados = await dadosPorCupon(prisma, cupones.map((c) => c.id));
   const disponibles = cupones
     .filter((c) => cuponEnHorario(c, ahora))
@@ -52,6 +65,7 @@ export async function cuponesParaDar(prisma: any, pedidoId?: string, ahora = new
       descuentoTipo: c.descuento_tipo as string,
       descuentoValor: Number(c.descuento_valor),
       diasValidez: (c.dias_validez ?? 15) as number,
+      alcance: alcanceCupon(c),
       quedan: c.tope_usos != null ? Math.max(0, c.tope_usos - (dados.get(String(c.id)) ?? 0)) : null,
     }))
     .filter((c) => c.quedan !== 0);
@@ -109,6 +123,11 @@ export async function darCupon({ prisma, auditoria }: Deps, cuponId: string, ped
     partyId: partyId ?? undefined,
   });
   return { ...vista(creado), yaExistia: false };
+}
+
+/** Quien puede dar un cupón «Lo da el personal» (mismo permiso cupones/dar que el botón del detalle). */
+export function puedeDarCupon(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+  return rolesDelUsuario(usuario).some((r) => (MATRIZ[r] ?? []).includes('cupones/dar'));
 }
 
 /** Quita un cupón dado por error: lo anula, solo si nadie lo canjeó. */

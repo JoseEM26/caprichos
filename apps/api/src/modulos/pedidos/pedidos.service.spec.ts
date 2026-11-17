@@ -426,6 +426,50 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('cupón «Lo da el personal» al crear (cuponDarId)', () => {
+      const dtoRecoger: CrearPedidoDto = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 } };
+      const creado = { id: 600n, codigo: 'CP-W600', estado: 'COLA', subtotal: 20, envio: null, total: 20, canal: 'CAJA', modalidad: 'RECOGER' };
+      const caja = { canal: 'CAJA' as const, usuarioPartyId: 7n, puedeDarCupon: true };
+
+      it('sin permiso cupones/dar: 403 y no se crea nada', async () => {
+        await expect(service.crear({ ...dtoRecoger, cuponDarId: '3' }, 'cup-sin', { canal: 'CAJA', usuarioPartyId: 7n })).rejects.toMatchObject({
+          response: { codigo: 'SIN_PERMISO_CUPON_DAR' },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('con permiso: el cupón queda dado al pedido recién creado y la respuesta lo trae', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado);
+        ofertasServiceMock.darCupon = jest.fn().mockResolvedValue({ codigo: 'AMIGO15-ABC123', descripcion: 'Amigo', venceEn: '2027-01-10T00:00:00.000Z', yaExistia: false });
+        const r: any = await service.crear({ ...dtoRecoger, cuponDarId: '3' }, 'cup-ok', caja);
+        expect(ofertasServiceMock.darCupon).toHaveBeenCalledWith('3', '600', { partyId: 7n });
+        expect(r).toMatchObject({ id: '600', cuponDado: { codigo: 'AMIGO15-ABC123', yaExistia: false } });
+        expect(r).not.toHaveProperty('cuponNoDado');
+      });
+
+      it('sin cupo: el pedido se crea igual y la respuesta dice por qué no se dio el cupón', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado);
+        ofertasServiceMock.darCupon = jest.fn().mockRejectedValue(
+          new BadRequestException({ codigo: 'CUPON_AGOTADO', mensaje: 'Ya se dieron todos los cupones de este tipo' }),
+        );
+        const r: any = await service.crear({ ...dtoRecoger, cuponDarId: '3' }, 'cup-agotado', caja);
+        expect(prismaMock.pedido.create).toHaveBeenCalledTimes(1);
+        expect(r).toMatchObject({ id: '600', cuponNoDado: { motivo: 'Ya se dieron todos los cupones de este tipo' } });
+      });
+
+      it('reintento con la misma clave: no crea otro pedido y el cupón no se duplica', async () => {
+        prismaMock.pedido.create.mockResolvedValue(creado);
+        ofertasServiceMock.darCupon = jest.fn().mockResolvedValue({ codigo: 'AMIGO15-ABC123', descripcion: null, venceEn: null, yaExistia: false });
+        await service.crear({ ...dtoRecoger, cuponDarId: '3' }, 'cup-reint', caja);
+        // el reintento encuentra el pedido por su clave; darCupon responde con el que ya tiene
+        prismaMock.pedido.findUnique.mockResolvedValueOnce({ id: 600n, codigo: 'CP-W600', estado: 'COLA', subtotal: 20, descuento: 0, envio: null, total: 20 });
+        ofertasServiceMock.darCupon = jest.fn().mockResolvedValue({ codigo: 'AMIGO15-ABC123', descripcion: null, venceEn: null, yaExistia: true });
+        const r: any = await service.crear({ ...dtoRecoger, cuponDarId: '3' }, 'cup-reint', caja);
+        expect(prismaMock.pedido.create).toHaveBeenCalledTimes(1);
+        expect(r).toMatchObject({ id: '600', cuponDado: { codigo: 'AMIGO15-ABC123', yaExistia: true } });
+      });
+    });
+
     describe('«Servicio o producto» libre (cargosLibres)', () => {
       const dtoRecoger: CrearPedidoDto = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 } };
       const creado = { id: 400n, codigo: 'CP-W400', estado: 'COLA', subtotal: 31.5, envio: null, total: 31.5, canal: 'CAJA', modalidad: 'RECOGER' };
@@ -2025,7 +2069,7 @@ describe('PedidosService', () => {
           expect(Number(data.propina)).toBe(7.5);
           // la venta no cambia: total 28 sin propina
           expect(Number(data.total)).toBe(28);
-          expect(res.propina).toBe(7.5);
+          expect((res as any).propina).toBe(7.5);
         });
 
         it.each(['MOZO', 'CAJA'] as const)('canal %s apagado: la propina se ignora (0) y el plan debe cubrir solo la venta', async (canal) => {

@@ -24,6 +24,7 @@ import { descuentosDePedido, lineaDetalleTicket } from '../impresion/constructor
 import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { puedeCargoLibre } from '../pedidos/cargo-libre';
+import { puedeDarCupon } from '../ofertas/cupon-asignado';
 import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa, TEXTO_EN_ESPERA } from './mesas-pedido.util';
 
@@ -363,6 +364,7 @@ export class SalonService {
       nota: dto.nota,
       mesa: mesaNombre,
       cuponCodigo: dto.cuponCodigo,
+      cuponDarId: dto.cuponDarId,
       puntosCanje: dto.puntosCanje,
       clienteTelefono: dto.clienteTelefono,
       clientePartyId: dto.clientePartyId,
@@ -388,6 +390,7 @@ export class SalonService {
         // Cortesías en mesa: mismo permiso cortesias/dar que en Pedidos (Caja y ADMIN; el MOZO no)
         puedeCortesia: puedeDarCortesia(usuario),
         puedeCargoLibre: puedeCargoLibre(usuario),
+        puedeDarCupon: puedeDarCupon(usuario),
         enTransaccion: async (tx, pedido) => {
           if (enEspera) {
             await tx.pedido.update({

@@ -71,13 +71,18 @@ describe('cupón en el ticket', () => {
   it('con un cupón real se imprime su código y vigencia', () => {
     const t = construirTicketPago(pedidoPersonal({ es_personal: false, consumoPersonal: null }), {}, null, null, null, {
       codigo: 'VUELVE-ABC1',
-      descripcion: '10% en tu próxima compra',
+      valor: '10 % DE DESCUENTO',
+      alcance: 'Toda la carta',
       vence: '30/11/2026',
+      numero: 2,
+      tope: 200,
     });
     const out = texto(t);
-    expect(out).toContain('Tu cupón para tu próxima compra');
+    expect(out).toContain('C A P R I C H O S');
+    expect(out).toContain('10 % DE DESCUENTO');
     expect(out).toContain('VUELVE-ABC1');
-    expect(out).toContain('Vence 30/11/2026');
+    expect(out).toContain('Válido hasta 30/11/2026');
+    expect(out).toContain('N.º 0002 de 0200');
   });
 });
 
@@ -168,13 +173,13 @@ describe('ImpresionService: ticket del personal', () => {
 
   it('cupón dado por el mozo o cajero: sale aunque el interruptor esté apagado y manda sobre el sorteado', async () => {
     prisma.cuponEmitido.findFirst.mockResolvedValueOnce({ codigo: 'AMIGO15-K7M2PQ', vence_en: null, cupon: { descripcion: '15% para ti' } });
-    expect(await service.cuponParaTicket({ id: 9n })).toMatchObject({ codigo: 'AMIGO15-K7M2PQ', descripcion: '15% para ti' });
+    expect(await service.cuponParaTicket({ id: 9n })).toMatchObject({ codigo: 'AMIGO15-K7M2PQ', alcance: 'Toda la carta' });
     expect(prisma.cuponEmitido.findFirst).toHaveBeenCalledTimes(1);
   });
 
   it('cupón: encendido y con cupón real vigente se devuelve', async () => {
     flags.impresion_cupon_en_ticket = 'SI';
     prisma.cuponEmitido.findFirst.mockResolvedValue({ codigo: 'VUELVE-1', vence_en: new Date('2026-12-01T12:00:00Z'), cupon: { descripcion: '10%' } });
-    expect(await service.cuponParaTicket({ id: 9n })).toMatchObject({ codigo: 'VUELVE-1', descripcion: '10%' });
+    expect(await service.cuponParaTicket({ id: 9n })).toMatchObject({ codigo: 'VUELVE-1', alcance: 'Toda la carta' });
   });
 });

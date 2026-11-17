@@ -232,6 +232,8 @@ export interface CuponParaDar {
   descuentoValor: number;
   diasValidez: number;
   quedan: number | null;
+  /** «Toda la carta», «Solo <producto>» o «Solo <categoría>» */
+  alcance: string;
 }
 
 export interface CuponDado {
@@ -382,8 +384,9 @@ export const ofertasApi = {
     return api.post(`/admin/cupones/emitidos/${id}/anular`, { motivo });
   },
 
-  async cuponesParaDar(pedidoId: string): Promise<{ cupones: CuponParaDar[]; dado: CuponDado | null }> {
-    return api.get(`/admin/cupones/para-dar?pedidoId=${encodeURIComponent(pedidoId)}`);
+  /** Sin pedidoId: la lista para la ventana de nuevo pedido (dado = null). Con pedidoId: también el cupón que ya tiene el pedido. */
+  async cuponesParaDar(pedidoId?: string): Promise<{ cupones: CuponParaDar[]; dado: CuponDado | null }> {
+    return api.get(pedidoId ? `/admin/cupones/para-dar?pedidoId=${encodeURIComponent(pedidoId)}` : '/admin/cupones/para-dar');
   },
 
   async darCupon(cuponId: string, pedidoId: string): Promise<CuponDado & { yaExistia: boolean }> {

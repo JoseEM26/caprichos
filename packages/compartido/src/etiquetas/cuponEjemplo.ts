@@ -1,4 +1,5 @@
 import type { TicketPagoDatos } from '../tipos/etiquetas.js';
+import { textoValorCupon } from './cuponCine.js';
 
 /** Lo mínimo de un cupón para dibujar su voucher de ejemplo. */
 export interface CuponParaEjemplo {
@@ -7,6 +8,13 @@ export interface CuponParaEjemplo {
   descuentoTipo: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS' | string;
   descuentoValor: number;
   descripcion?: string | null;
+  /** Alcance real: «Toda la carta», o el nombre del producto o la categoría */
+  alcance?: string | null;
+  /** Vencimiento real ya formateado dd/mm/aaaa */
+  vence?: string | null;
+  /** Dados hasta hoy y tope (solo ASIGNADO_PERSONAL): «Dados 2 de 200» */
+  dados?: number | null;
+  tope?: number | null;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -14,7 +22,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 /**
  * Ticket de pago de ejemplo con el descuento de ESTE cupón (no es un pedido real; nombres inventados).
  * Lleva los mismos datos que el pedido real guarda (`descuento_detalle` tipo CUPON), así que
- * `lineasTicketPago` lo imprime igual que el ticket de verdad. UNICO_COMPROBANTE añade el bloque del cupón al pie.
+ * `lineasTicketPago` lo imprime igual que el ticket de verdad. UNICO_COMPROBANTE y ASIGNADO_PERSONAL añaden el cupón
+ * de colección al pie (la misma plantilla que el ticket real).
  */
 export function ticketPagoEjemploCupon(c: CuponParaEjemplo): TicketPagoDatos {
   const lineas = [
@@ -46,7 +55,18 @@ export function ticketPagoEjemploCupon(c: CuponParaEjemplo): TicketPagoDatos {
     documento: { tipo: 'SIMPLE' },
   };
   // UNICO_COMPROBANTE (sorteado) y ASIGNADO_PERSONAL (lo da el personal) salen impresos al pie; COMPARTIDO nunca
-  return c.modo === 'UNICO_COMPROBANTE' || c.modo === 'ASIGNADO_PERSONAL'
-    ? { ...base, cuponSiguiente: { codigo: `${c.codigoBase}-A1B2C3`, descripcion: c.descripcion ?? null, vence: '15/01/2027' } }
-    : base;
+  if (c.modo !== 'UNICO_COMPROBANTE' && c.modo !== 'ASIGNADO_PERSONAL') return base;
+  const dadosHoy = c.dados ?? null;
+  return {
+    ...base,
+    cuponSiguiente: {
+      codigo: `${c.codigoBase}-A1B2C3`,
+      valor: textoValorCupon(c.descuentoTipo, c.descuentoValor),
+      alcance: c.alcance?.trim() || 'Toda la carta',
+      vence: c.vence ?? '15/01/2027',
+      // La vista previa dibuja el siguiente cupón que se daría: N.º dados + 1 de tope
+      numero: dadosHoy != null ? dadosHoy + 1 : null,
+      tope: c.tope ?? null,
+    },
+  };
 }

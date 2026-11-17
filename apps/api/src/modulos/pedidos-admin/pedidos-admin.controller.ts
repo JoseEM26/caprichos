@@ -2,6 +2,7 @@ import { esSoloMozo, rolesDelUsuario } from '../acceso/roles-usuario';
 import { exigirPuedeProgramar } from '../pedidos/programado.util';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { puedeCargoLibre } from '../pedidos/cargo-libre';
+import { puedeDarCupon } from '../ofertas/cupon-asignado';
 import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import {
   BadRequestException,
@@ -97,6 +98,7 @@ export class PedidosAdminController {
       omitirChequeoCarta: true,
       puedeCortesia: puedeDarCortesia(req.usuario),
       puedeCargoLibre: puedeCargoLibre(req.usuario),
+      puedeDarCupon: puedeDarCupon(req.usuario),
     };
     const ipCrear = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     const res = dto.programadoPara

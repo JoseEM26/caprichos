@@ -707,6 +707,8 @@ export const pedidosApi = {
       };
       nota?: string;
       cuponCodigo?: string;
+      /** Cupón «Lo da el personal» que se da al cliente con este pedido (sale impreso en su ticket) */
+      cuponDarId?: string;
       /** Cliente con cuenta (celular de 9 dígitos): el pedido suma puntos y guarda la dirección en su libreta */
       clienteTelefono?: string;
       /** Cliente con cuenta elegido en «¿Quién pide?» (id del party), si no va clienteTelefono */

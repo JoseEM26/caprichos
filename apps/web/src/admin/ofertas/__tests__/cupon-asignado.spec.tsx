@@ -56,7 +56,7 @@ describe('ModalDarCupon', () => {
 
   it('lista los cupones con cupos, da uno y muestra el código; luego permite quitarlo', async () => {
     vi.spyOn(ofertasApi, 'cuponesParaDar').mockResolvedValue({
-      cupones: [{ id: '3', codigoBase: 'AMIGO15', descripcion: '15% para ti', descuentoTipo: 'PORCENTAJE', descuentoValor: 15, diasValidez: 10, quedan: 4 }],
+      cupones: [{ id: '3', codigoBase: 'AMIGO15', descripcion: '15% para ti', descuentoTipo: 'PORCENTAJE', descuentoValor: 15, diasValidez: 10, quedan: 4, alcance: 'Toda la carta' }],
       dado: null,
     });
     const dar = vi.spyOn(ofertasApi, 'darCupon').mockResolvedValue({ id: '50', cuponId: '3', codigo: 'AMIGO15-K7M2PQ', codigoBase: 'AMIGO15', descripcion: null, venceEn: '2027-03-29T20:00:00Z', estado: 'VIGENTE', yaExistia: false });
@@ -81,7 +81,7 @@ describe('ModalDarCupon', () => {
   });
 
   it('muestra el error del servidor al dar', async () => {
-    vi.spyOn(ofertasApi, 'cuponesParaDar').mockResolvedValue({ cupones: [{ id: '3', codigoBase: 'AMIGO15', descripcion: null, descuentoTipo: 'MONTO', descuentoValor: 5, diasValidez: 10, quedan: null }], dado: null });
+    vi.spyOn(ofertasApi, 'cuponesParaDar').mockResolvedValue({ cupones: [{ id: '3', codigoBase: 'AMIGO15', descripcion: null, descuentoTipo: 'MONTO', descuentoValor: 5, diasValidez: 10, quedan: null, alcance: 'Toda la carta' }], dado: null });
     vi.spyOn(ofertasApi, 'darCupon').mockRejectedValue(new Error('Ya se dieron todos los cupones de este tipo'));
     render(<ModalDarCupon pedidoId="9" alCerrar={() => {}} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Dar' }));
@@ -120,7 +120,7 @@ describe('Ver usos y vista previa de ASIGNADO_PERSONAL', () => {
     render(<ModalVistaPreviaCupon cupon={cupon()} onCerrar={() => {}} />);
     expect(screen.getByTestId('nota-cupon-voucher').textContent).toMatch(/lo da el mozo o cajero/);
     const ticket = screen.getByTestId('pv-ticket').textContent ?? '';
-    expect(ticket).toContain('Tu cupón para tu próxima compra');
+    expect(ticket).toContain('CUPÓN DE COLECCIÓN');
     expect(ticket).toContain('AMIGO15-A1B2C3');
   });
 });
