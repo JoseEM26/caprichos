@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as cuentaModulo from '../CuentaContext';
 import { FormularioAcceso } from '../FormularioAcceso';
-import { VerificacionWhatsapp } from '../VerificacionWhatsapp';
+import { AYUDA_REENVIO, VerificacionWhatsapp } from '../VerificacionWhatsapp';
 import { api } from '../../../comun/api';
 import { comprobantesApi } from '../../../admin/comprobantes/comprobantesApi';
 
@@ -149,6 +149,47 @@ describe('FormularioAcceso en modo WHATSAPP_ENTRANTE (recuperar contraseña)', (
 });
 
 describe('VerificacionWhatsapp: si el mensaje no llega', () => {
+  it('junto al reenvío aparece la línea de ayuda y la cuenta regresiva llega a «Reenviar» sin pasar de 60 s', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ estado: 'pendiente' });
+    const { rerender } = render(
+      <VerificacionWhatsapp token="ABCD2345" enlace="https://wa.me/51914244077" alVerificar={vi.fn()} alReenviar={vi.fn()} puedeReenviar={false} esperaSeg={60} />,
+    );
+    expect(screen.getByText(AYUDA_REENVIO)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reenviar en 60 s' })).toBeDisabled();
+    rerender(<VerificacionWhatsapp token="ABCD2345" enlace="https://wa.me/51914244077" alVerificar={vi.fn()} alReenviar={vi.fn()} puedeReenviar esperaSeg={0} />);
+    expect(screen.getByRole('button', { name: 'Reenviar' })).toBeEnabled();
+  });
+
+  it('en el registro por WhatsApp, el reenvío se habilita a los 60 s y la línea de ayuda queda visible', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(api, 'post').mockResolvedValue(RESPUESTA_WA('ABCD2345'));
+      vi.spyOn(api, 'get').mockResolvedValue({ estado: 'pendiente' });
+      render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
+      escribirCelular('914244077');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+      });
+      await act(async () => {});
+      expect(screen.getByText(AYUDA_REENVIO)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reenviar en 60 s' })).toBeDisabled();
+      // Un tick por segundo: cada tick reprograma la cuenta regresiva al re-renderizar
+      for (let i = 0; i < 59; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1_000);
+        });
+      }
+      expect(screen.getByRole('button', { name: 'Reenviar en 1 s' })).toBeDisabled();
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(screen.getByRole('button', { name: 'Reenviar' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('tras 60 s sin verificar explica qué revisar, en vez de quedarse mudo', async () => {
     vi.useFakeTimers();
     try {

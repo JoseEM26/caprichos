@@ -126,6 +126,20 @@ describe('política de envío con Evolution', () => {
     expect(await politica.evaluar(aviso, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
     for (const origen of ['VOUCHER', 'AUTORESPUESTA']) expect(await politica.evaluar({ ...aviso, origen }, FUERA)).toEqual({ accion: 'ENVIAR' });
   });
+  // Decisión del dueño: el código de cuenta (lo pide la propia persona para entrar) sí sale fuera de horario
+  it('CODIGO_CUENTA fuera de horario sí se envía; otro origen fuera de horario sigue diferido/descartado', async () => {
+    const { politica } = crear();
+    expect(await politica.evaluar({ ...aviso, origen: 'CODIGO_CUENTA' }, FUERA)).toEqual({ accion: 'ENVIAR' });
+    expect(await politica.evaluar({ ...aviso, origen: 'RESERVA' }, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+    expect(await politica.evaluar({ ...aviso, origen: 'ENCUESTA' }, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+  });
+  it('CODIGO_CUENTA fuera de horario mantiene la pausa, la desconexión y los topes', async () => {
+    const codigo = { ...aviso, origen: 'CODIGO_CUENTA' };
+    expect(await crear({ evolution_pausado: 'si' }).politica.evaluar(codigo, FUERA)).toMatchObject({ accion: 'DIFERIR' });
+    expect(await crear({ evolution_estado: { estado: 'DESCONECTADO' } }).politica.evaluar(codigo, FUERA)).toMatchObject({ accion: 'DIFERIR' });
+    const topado = crear({ evolution_limite_minuto: 3 }, { salienteWhatsapp: { count: jest.fn(async () => 3) } });
+    expect(await topado.politica.evaluar(codigo, FUERA)).toMatchObject({ accion: 'DIFERIR', motivo: expect.stringContaining('por minuto') });
+  });
   it('el horario es el del local en Configuración; el evolution_horario_* solo es respaldo', async () => {
     const prisma = prismaFalso({ whatsapp_proveedor: 'EVOLUTION' });
     const cerrado = { obtenerEstadoCarta: jest.fn(async () => ({ abierta: false, motivo: 'HORARIO', abre: '15:00' })) } as any;

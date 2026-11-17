@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
 import * as cuentaModulo from '../CuentaContext';
 import { FormularioAcceso } from '../FormularioAcceso';
 import { api, ErrorApi } from '../../../comun/api';
@@ -64,6 +64,35 @@ describe('FormularioAcceso: estados de crear cuenta', () => {
     const campo = await screen.findByLabelText('Código de 6 dígitos (llega por WhatsApp)');
     expect(campo).toHaveFocus();
     expect(screen.getByRole('button', { name: /Reenviar código en \d+ s/ })).toBeDisabled();
+  });
+
+  it('código de 6 dígitos: la línea de ayuda queda junto al reenvío y el reenvío se habilita a los 60 s', async () => {
+    vi.useFakeTimers();
+    try {
+      mockCuenta();
+      vi.spyOn(api, 'post').mockResolvedValue({ ok: true, mensaje: 'Te enviamos un código por WhatsApp. Vence en 10 minutos.' });
+      render(<FormularioAcceso alSeguirInvitado={() => {}} />);
+      irAPasoCelular();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+      });
+      await act(async () => {});
+      expect(screen.getByText('Si no te llega en 1 minuto, pide otro código.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reenviar código en 60 s' })).toBeDisabled();
+      // Un tick por segundo: cada tick reprograma la cuenta regresiva al re-renderizar
+      for (let i = 0; i < 59; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1_000);
+        });
+      }
+      expect(screen.getByRole('button', { name: 'Reenviar código en 1 s' })).toBeDisabled();
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(screen.getByRole('button', { name: 'Reenviar código' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('crear cuenta: al terminar avisa del éxito al padre y registra con el celular verificado', async () => {

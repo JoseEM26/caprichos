@@ -25,6 +25,9 @@ export interface RespuestaVerificacionWa {
 export const esRespuestaWhatsappEntrante = (r: unknown): r is RespuestaVerificacionWa =>
   (r as { modo?: string } | null)?.modo === 'WHATSAPP_ENTRANTE';
 
+/** Ayuda junto al botón de reenvío (WhatsApp entrante y código de 6 dígitos). */
+export const AYUDA_REENVIO = 'Si no te llega en 1 minuto, pide otro código.';
+
 /** Cada 2 s, como máximo 10 minutos (lo que dura el token). */
 const INTERVALO_MS = 2000;
 const MAX_SONDEOS = 300;
@@ -138,9 +141,12 @@ export function VerificacionWhatsapp({
           Pedir un enlace nuevo
         </button>
       ) : (
-        <button type="button" onClick={alReenviar} disabled={!puedeReenviar} style={{ minHeight: 44, border: 0, background: 'transparent', color: 'var(--cp-orange)', fontWeight: 800, fontSize: 13, textDecoration: 'underline', alignSelf: 'flex-start' }}>
-          {esperaSeg > 0 ? `Reenviar en ${esperaSeg} s` : 'Reenviar'}
-        </button>
+        <>
+          <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
+          <button type="button" onClick={alReenviar} disabled={!puedeReenviar} style={{ minHeight: 44, border: 0, background: 'transparent', color: 'var(--cp-orange)', fontWeight: 800, fontSize: 13, textDecoration: 'underline', alignSelf: 'flex-start' }}>
+            {esperaSeg > 0 ? `Reenviar en ${esperaSeg} s` : 'Reenviar'}
+          </button>
+        </>
       )}
     </div>
   );
