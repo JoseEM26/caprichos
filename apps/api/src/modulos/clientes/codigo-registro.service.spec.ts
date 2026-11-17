@@ -218,10 +218,12 @@ describe('CodigoRegistroService', () => {
     expect(redis.datos.size).toBe(0);
   });
 
-  it('Evolution fuera de horario: 503 con el aviso de horario, sin guardar código ni encolar', async () => {
-    politica.evaluar.mockResolvedValueOnce({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO', motivo: 'fuera de horario' });
+  // Antes había un 503 «fuera de horario» aquí; por decisión del dueño el código de cuenta ya no depende del horario
+  // (la política lo deja salir), así que la política solo puede descartarlo por lista blanca del ADMIN.
+  it('Evolution descarta el código (lista blanca del ADMIN): 503 CODIGO_NO_ENVIADO, sin guardar código ni encolar', async () => {
+    politica.evaluar.mockResolvedValueOnce({ accion: 'DESCARTAR', codigo: 'PROACTIVO_BLOQUEADO', motivo: 'bloqueado' });
     const error = await noEnviado(service.solicitar('987654321'));
-    expect(respuestaDe(error).mensaje).toMatch(/horario/);
+    expect(respuestaDe(error)).toEqual({ codigo: 'CODIGO_NO_ENVIADO', mensaje: MENSAJE_NO_ENVIADO });
     expect(outbox.encolar).not.toHaveBeenCalled();
     expect(redis.datos.size).toBe(0);
   });

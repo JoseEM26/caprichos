@@ -71,16 +71,15 @@ export class CodigoRegistroService {
   }
 
   /**
-   * Con Evolution, la política puede descartar el envío (fuera de horario) o aplazarlo (pausa, tope).
+   * Con Evolution, la política puede descartar el envío (lista blanca del ADMIN) o aplazarlo (pausa, tope).
+   * El código de cuenta no depende del horario del local: la política lo deja salir también fuera de horario.
    * Se mira antes de guardar el código para no responder «te enviamos» a algo que no va a salir.
    */
   private async exigirEnvioPosible(tel: string): Promise<void> {
     const politica = this.politica();
     if (!politica) return;
     const decision = await politica.evaluar({ telefono_destino: `51${tel}`, origen: 'CODIGO_CUENTA' });
-    if (decision.accion === 'ENVIAR') return;
-    const fueraDeHorario = decision.accion === 'DESCARTAR' && decision.codigo === 'FUERA_DE_HORARIO';
-    throw noEnviado(fueraDeHorario ? 'Ahora estamos fuera del horario de atención. Pide tu código en nuestro horario.' : MENSAJE_NO_ENVIADO);
+    if (decision.accion !== 'ENVIAR') throw noEnviado();
   }
 
   private hashCodigo(tel: string, codigo: string): string {

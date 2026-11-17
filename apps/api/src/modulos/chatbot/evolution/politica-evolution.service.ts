@@ -30,7 +30,7 @@ const MIN = 60_000;
  * con Meta no hace nada; con Evolution salen los mismos avisos que con Meta (rigen los mismos interruptores
  * whatsapp_aviso_*), exige contacto previo, solo envía dentro del horario de trabajo del local (lo de fuera de horario
  * se descarta, no se manda al día siguiente) y respeta desconexión/pausa y los topes por minuto, hora y día
- * (lo que excede un tope espera, no se pierde). Las respuestas a un mensaje del cliente siempre pasan.
+ * (lo que excede un tope espera, no se pierde). Las respuestas a un mensaje del cliente siempre pasan, y el código de cuenta sale también fuera de horario.
  */
 @Injectable()
 export class PoliticaEvolutionService {
@@ -74,13 +74,16 @@ export class PoliticaEvolutionService {
     if ((await this.config.estaPausado()) || (await this.config.estadoConexion()).estado === 'DESCONECTADO') {
       return { accion: 'DIFERIR', esperaMs: 5 * MIN, motivo: 'El número de WhatsApp está desconectado o en pausa; se reintenta luego' };
     }
-    const horario = await horarioDelLocal(this.local, this.prisma, ahora, { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
-    if (!horario.abierto) {
-      return {
-        accion: 'DESCARTAR',
-        codigo: 'FUERA_DE_HORARIO',
-        motivo: 'Descartado: con WhatsApp no oficial no se escribe fuera del horario de trabajo del local, y este aviso no se manda al día siguiente.',
-      };
+    // El código de cuenta lo pide la propia persona para entrar a su cuenta: sale también fuera de horario
+    if (fila.origen !== 'CODIGO_CUENTA') {
+      const horario = await horarioDelLocal(this.local, this.prisma, ahora, { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
+      if (!horario.abierto) {
+        return {
+          accion: 'DESCARTAR',
+          codigo: 'FUERA_DE_HORARIO',
+          motivo: 'Descartado: con WhatsApp no oficial no se escribe fuera del horario de trabajo del local, y este aviso no se manda al día siguiente.',
+        };
+      }
     }
 
     const topes: Array<[number, number, number, string]> = [

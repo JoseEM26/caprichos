@@ -4,7 +4,7 @@ import { api } from '../../comun/api';
 import { comprobantesApi } from '../../admin/comprobantes/comprobantesApi';
 import type { CartaLegalInfo } from '../../admin/comprobantes/tipos';
 import { useCuenta } from './CuentaContext';
-import { VerificacionWhatsapp, esRespuestaWhatsappEntrante, type RespuestaVerificacionWa } from './VerificacionWhatsapp';
+import { AYUDA_REENVIO, VerificacionWhatsapp, esRespuestaWhatsappEntrante, type RespuestaVerificacionWa } from './VerificacionWhatsapp';
 import { celularAlEscribir } from '../../comun/celular';
 
 export const campo: CSSProperties = {
@@ -429,6 +429,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
             <label htmlFor="ac-cr" style={etiqueta}>Código de 6 dígitos (llega por WhatsApp)</label>
             <input id="ac-cr" autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
           </div>
+          <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
           <button type="button" onClick={enviarCodigoRegistro} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
             {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
           </button>
@@ -456,9 +457,12 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
           )}
           <CampoClave id="ac-pn" etiquetaTexto="Contraseña nueva" valor={contrasena} alCambiar={setContrasena} nueva />
           {!verifWa && (
-            <button type="button" onClick={pedirCodigo} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
-              {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
-            </button>
+            <>
+              <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
+              <button type="button" onClick={pedirCodigo} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
+                {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
+              </button>
+            </>
           )}
         </>
       )}
