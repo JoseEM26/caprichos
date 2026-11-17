@@ -6,6 +6,12 @@ import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
 import { abrirCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
+const MEDIOS_CAMBIO: { medio: string; nombre: string }[] = [
+  { medio: 'EFECTIVO', nombre: 'Efectivo' },
+  { medio: 'YAPE', nombre: 'Yape' },
+  { medio: 'PLIN', nombre: 'Plin' },
+  { medio: 'TRANSFERENCIA', nombre: 'Transferencia' },
+];
 export const AVISO_PAGO_EN_LINEA = 'Tu pedido pasa a cocina cuando se apruebe el pago. Si no pagas en 15 minutos, se anula solo.';
 
 const SOLES = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -35,13 +41,19 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
   const [intento, setIntento] = useState<IntentoCulqi | null>(null);
   const minutos = useMinutosRestantes(creadoEn);
   const enCurso = useRef(false); // evita el doble clic antes de que React deshabilite el botón
+  const [configFallo, setConfigFallo] = useState(false);
+  const [cambiando, setCambiando] = useState(false);
+  const [medioNuevo, setMedioNuevo] = useState<string | null>(null);
+  const [enviandoCambio, setEnviandoCambio] = useState(false);
+  const [avisoCambio, setAvisoCambio] = useState('');
+  const [avisoOk, setAvisoOk] = useState('');
 
   useEffect(() => {
     let vivo = true;
     culqiApi
       .config()
       .then((c) => vivo && (setConfig(c), setFase('listo')))
-      .catch(() => vivo && setConfig(null)); // sin config no se ofrece: los medios de siempre siguen
+      .catch(() => vivo && (setConfig(null), setConfigFallo(true))); // sin config no se cobra en línea, pero el cliente siempre puede cambiar el medio
     return () => {
       vivo = false;
     };
@@ -156,7 +168,67 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
     }
   }, [auto, config]);
 
-  if (!config?.activo) return null;
+  // Cambiar el medio (E1): el pedido deja de ser «en línea» y pasa a cocina según el medio elegido
+  const confirmarCambio = async () => {
+    if (!medioNuevo) return;
+    setEnviandoCambio(true);
+    setAvisoCambio('');
+    setAvisoOk('');
+    try {
+      const r = await culqiApi.cambiarMedio(pedidoId, medioNuevo, tokenSeguimiento);
+      setCambiando(false);
+      setMedioNuevo(null);
+      setAvisoOk(r.mensaje);
+      alPagado?.();
+    } catch (e) {
+      setAvisoCambio(e instanceof Error ? e.message : 'No pudimos cambiar el medio. Reintenta.');
+    } finally {
+      setEnviandoCambio(false);
+    }
+  };
+  const bloqueCambio = (
+    <div data-testid="cambio-medio" style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+      {!cambiando ? (
+        <Boton variante="secundario" onClick={() => { setCambiando(true); setAvisoCambio(''); setAvisoOk(''); }}>
+          Cambiar medio de pago
+        </Boton>
+      ) : (
+        <>
+          <span className="sg-detalle">Elige otro medio. Tu pedido pasa a cocina según el medio que elijas.</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {MEDIOS_CAMBIO.map((m) => (
+              <Boton key={m.medio} variante={medioNuevo === m.medio ? 'primario' : 'secundario'} onClick={() => setMedioNuevo(m.medio)}>
+                {m.nombre}
+              </Boton>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <Boton disabled={!medioNuevo || enviandoCambio} cargando={enviandoCambio} onClick={() => void confirmarCambio()}>
+              Confirmar el cambio
+            </Boton>
+            <Boton variante="secundario" onClick={() => { setCambiando(false); setMedioNuevo(null); }}>
+              No cambiar
+            </Boton>
+          </div>
+        </>
+      )}
+      {avisoCambio && <p role="alert" style={{ color: 'var(--cp-rust)', margin: 0 }}>{avisoCambio}</p>}
+      {avisoOk && <p role="status" style={{ color: 'var(--cp-navy)', fontWeight: 700, margin: 0 }}>{avisoOk}</p>}
+    </div>
+  );
+
+  // Sin pago en línea disponible (apagado, caja cerrada o sin conexión): se dice, sin pantalla muerta, y puede cambiar el medio
+  if (!config && !configFallo) return null;
+  if (!config?.activo) {
+    return (
+      <section className="sg-tarjeta" aria-label="Pagar en línea" data-testid="pagar-en-linea">
+        <p className="sg-detalle" style={{ margin: 0 }} data-testid="pago-no-disponible">
+          Ahora no podemos cobrarte con tarjeta o Yape. Puedes elegir otro medio de pago.
+        </p>
+        {bloqueCambio}
+      </section>
+    );
+  }
   if (fase === 'cargando') return <Cargando />;
 
   const simulado = config.modo === 'SIMULADO';
@@ -226,6 +298,7 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
             </Boton>
           )}
           {intento && !enFormulario && <span className="sg-detalle" style={{ display: 'block', marginTop: 6 }}>Monto: {SOLES(intento.montoCentimos / 100)}</span>}
+          {!enFormulario && !ocupado && bloqueCambio}
         </>
       )}
     </section>

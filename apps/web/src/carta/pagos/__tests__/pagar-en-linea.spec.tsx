@@ -13,12 +13,12 @@ beforeEach(() => {
 });
 
 describe('PagarEnLinea', () => {
-  it('no aparece si activo=false', async () => {
+  it('con activo=false no ofrece pagar, pero dice qué hacer (cambiar el medio)', async () => {
     vi.spyOn(culqiApi, 'config').mockResolvedValue({ ...config, activo: false });
-    const { container } = render(<PagarEnLinea pedidoId="p1" />);
-    await waitFor(() => expect(culqiApi.config).toHaveBeenCalled());
-    await new Promise((r) => setTimeout(r, 0));
-    expect(container.textContent).toBe('');
+    render(<PagarEnLinea pedidoId="p1" />);
+    expect(await screen.findByTestId('pago-no-disponible')).toBeTruthy();
+    expect(screen.queryByText('Pagar ahora')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cambiar medio de pago' })).toBeTruthy();
   });
 
   it('pago aprobado muestra que ya está en cocina', async () => {

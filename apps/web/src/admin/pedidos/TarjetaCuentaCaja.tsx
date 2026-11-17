@@ -30,9 +30,12 @@ export function totalesCuenta(miembros: Pedido[]) {
   };
 }
 
-function chipPago(o: Pedido): { texto: string; clase: string } {
+import { EtiquetaEsperaPagoEnLinea, TITULO_ESPERA_PAGO_EN_LINEA, esperaPagoEnLinea } from './EsperaPagoEnLinea';
+
+function chipPago(o: Pedido): { texto: string; clase: string; espera?: boolean } {
   const pag = String(o.pago_estado || '').toUpperCase();
   if (o.es_personal) return { texto: 'Crédito del personal', clase: 'info' };
+  if (esperaPagoEnLinea(o)) return { texto: 'Esperando pago en línea (Culqi)', clase: 'info', espera: true };
   if (pag === 'PAGADO') return { texto: 'Pagado', clase: 'ok' };
   if (pag === 'COORDINADO') return { texto: 'Pago coordinado', clase: 'info' };
   return { texto: 'Por cobrar', clase: 'pend' };
@@ -152,7 +155,7 @@ export function TarjetaCuentaCaja({ cuenta, seleccionadoId, resaltados, puedeCam
                 </span>
                 <span className="cj2-chips">
                   <span className="cj-pc-chip" data-testid="chip-estado" style={{ background: v.bg, color: v.fg, border: v.clave === 'anulado' ? '1.5px solid var(--cp-rust, #B2500F)' : undefined }}>{v.clave === 'anulado' ? v.l.toUpperCase() : v.l}</span>
-                  <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`}>{pago.texto}</span>
+                  <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`} {...(pago.espera ? { 'data-testid': 'espera-pago-en-linea', title: TITULO_ESPERA_PAGO_EN_LINEA } : {})}>{pago.espera ? <EtiquetaEsperaPagoEnLinea /> : pago.texto}</span>
                   <ChipCobroMozo cobro={m.cobroMozo} />
                   {cajaCerradaEspera?.(m) && <span className="cj-pc-chip" style={{ background: '#FFF4D6', color: '#0B2C3E' }}>Caja cerrada</span>}
                   {!incluido && <span className="cj2-cta-fuera" data-testid="fuera-filtro">no incluido en este filtro</span>}

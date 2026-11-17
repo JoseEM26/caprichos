@@ -713,7 +713,7 @@ describe('ComandasService', () => {
 
       expect(lista).toEqual([]);
       const where = prisma.comandaArea.findMany.mock.calls[0][0].where;
-      expect(where.pedido.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
+      expect(where.pedido.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO', 'POR_PAGAR'] });
       expect(pedido.comandas.every((c: any) => c.estado === 'DESPEJADA')).toBe(true);
     });
 

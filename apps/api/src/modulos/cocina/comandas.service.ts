@@ -47,7 +47,7 @@ const MODALIDADES_DESPACHO = ['MESA', 'RECOGER', 'LLEVAR', 'COMER_LOCAL'];
  * La cocina ve un pedido mientras no esté anulado o rechazado. Que Caja lo pase a LISTO o ENTREGADO
  * no lo quita de cocina: solo la comanda despejada o despachada sale.
  */
-const ESTADOS_FUERA_DE_COCINA = ['ANULADO', 'RECHAZADO'];
+const ESTADOS_FUERA_DE_COCINA = ['ANULADO', 'RECHAZADO', 'POR_PAGAR'];
 /** Estados en los que despejar la última área pasa el pedido a LISTO (con historial y avisos). */
 const ESTADOS_PARA_LISTO = ['COLA', 'PREPARANDO'];
 /** Ventana para deshacer un despeje: bajar unidades en esos segundos (mismo usuario) reabre el área. */

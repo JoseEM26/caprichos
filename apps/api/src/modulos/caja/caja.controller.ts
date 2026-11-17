@@ -48,7 +48,8 @@ export class CajaController {
   ])
   async cobrar(@Body() dto: CobrarDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.cobrosService.cobrar(dto, req.usuario, ip);
+    // El origen CULQI solo lo pone la pasarela; nunca lo manda el cuerpo de la petición
+    return this.cobrosService.cobrar({ ...dto, origen: undefined }, req.usuario, ip);
   }
 
   @Post('pedidos/:id/rechazar-cobro-mozo')

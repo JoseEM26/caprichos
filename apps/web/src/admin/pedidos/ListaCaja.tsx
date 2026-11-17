@@ -8,6 +8,8 @@ import { IconoModalidad, claveModalidad, textoMesa } from './InsigniaModalidad';
 import { BotonEnviarConfirmacionWhatsapp } from '../mensajes/BotonEnviarConfirmacionWhatsapp';
 import { ReimprimirPedido } from './ReimprimirPedido';
 import { CANAL, MOD, aHora, textoPago } from './columnasCaja';
+import { MotivoAnulacion } from './MotivoAnulacion';
+import { EtiquetaEsperaPagoEnLinea, esperaPagoEnLinea } from './EsperaPagoEnLinea';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import { mediosDePedido, medioPorCulqi } from './mediosFila';
 import { textoMedio } from './EtiquetaMedio';
@@ -166,7 +168,8 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
 
       <div className="lc-total">
         <strong className={v.clave === 'anulado' ? 'lc-anulado' : undefined}>{soles(totalDe(p))}</strong>
-        <span className="lc-pago" data-pago={textoPago(p)}>{textoPago(p)}</span>
+        <span className="lc-pago" data-pago={textoPago(p)}>{esperaPagoEnLinea(p) ? <EtiquetaEsperaPagoEnLinea /> : textoPago(p)}</span>
+        <MotivoAnulacion pedido={p} />
         {medios.length > 0 && <span className="lc-medios">{medios.map((m) => textoMedio(m, medioPorCulqi(p, m))).join(' + ')}</span>}
       </div>
 

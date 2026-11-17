@@ -7,11 +7,11 @@ import { InsigniaNumeroDia } from '../InsigniaNumeroDia';
 import { InsigniaDireccionEditada } from '../InsigniaDireccionEditada';
 
 describe('InsigniaNumeroDia (número del día en cocina, referencial)', () => {
-  it('muestra «#7 del día» y «—» si el pedido no tiene número', () => {
+  it('muestra «#7 del día» y nada (ni «—») si el pedido no tiene número', () => {
     const { rerender } = render(<InsigniaNumeroDia numero={7} />);
     expect(screen.getByText('#7 del día')).toBeInTheDocument();
     rerender(<InsigniaNumeroDia numero={null} />);
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('—')).toBeNull();
     expect(screen.queryByText(/del día/)).toBeNull();
   });
 });

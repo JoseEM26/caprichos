@@ -617,3 +617,81 @@ describe('Comisión de la pasarela (la asume el local)', () => {
     expect(pagoCulqi.comision_detalle.fuente).toBe('CULQI');
   });
 });
+
+// Cambio de medio de un pedido que espera Culqi (E1/E2) y webhook tardío tras el cambio
+describe('PagosOnlineService: cambio de medio y webhook tardío', () => {
+  const admin: any = { partyId: '1', rol: 'ADMIN', roles: ['ADMIN'] };
+  const conTxReal = (ctx: any) => {
+    ctx.prisma.$transaction = jest.fn(async (fn: any) => fn(ctx.prisma));
+    ctx.prisma.pedidoPagoPlan = { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) };
+    return ctx;
+  };
+
+  it('cliente cambia de Culqi a Yape: el pedido llega a COLA, el intento queda FALLIDO y se audita', async () => {
+    const ctx = conTxReal(armar());
+    const { s, acceso, pedido, intentos, auditoria, prisma } = ctx;
+    await s.crearIntento('7', acceso);
+    const r = await s.cambiarMedioInvitado('7', { ...acceso }, { medio: 'YAPE' });
+    expect(r).toMatchObject({ ok: true, estado: 'COLA', medio: 'YAPE' });
+    expect(pedido).toMatchObject({ estado: 'COLA', pago_estado: 'PENDIENTE', pago_preferido: 'YAPE' });
+    expect(pedido.pasa_cocina_en).toBeInstanceOf(Date);
+    expect(intentos[0].estado).toBe('FALLIDO');
+    expect(intentos[0].mensaje).toBe('Cambió el medio de pago');
+    expect(prisma.pedidoEstadoHistorial.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estado_anterior: 'POR_PAGAR', estado_nuevo: 'COLA', motivo: expect.stringContaining('Cambió el medio de pago') }) });
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'PAGO_ONLINE_CAMBIO_MEDIO' }));
+  });
+
+  it('Caja (ADMIN) cambia a efectivo por el mismo camino', async () => {
+    const ctx = conTxReal(armar());
+    await ctx.s.crearIntento('7', ctx.acceso);
+    await ctx.s.cambiarMedioAdmin('7', { medio: 'EFECTIVO' }, admin, '10.0.0.1');
+    expect(ctx.pedido).toMatchObject({ estado: 'COLA', pago_preferido: 'EFECTIVO' });
+    expect(ctx.auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'PAGO_ONLINE_CAMBIO_MEDIO', ip: '10.0.0.1' }));
+  });
+
+  it('rechaza con un cargo en curso o aprobado (409 PAGO_EN_CURSO) y no cambia nada', async () => {
+    for (const estado of ['PROCESANDO', 'PENDIENTE', 'APROBADO']) {
+      const ctx = conTxReal(armar());
+      await ctx.s.crearIntento('7', ctx.acceso);
+      ctx.intentos[0].estado = estado;
+      await expect(ctx.s.cambiarMedioInvitado('7', { ...ctx.acceso }, { medio: 'YAPE' })).rejects.toMatchObject({ response: { codigo: 'PAGO_EN_CURSO' } });
+      expect(ctx.pedido.estado).toBe('POR_PAGAR');
+      expect(ctx.intentos[0].estado).toBe(estado);
+    }
+  });
+
+  it('rechaza si el pedido está anulado (409 PEDIDO_ANULADO)', async () => {
+    const ctx = conTxReal(armar({ pedido: { estado: 'ANULADO' } }));
+    await expect(ctx.s.cambiarMedioInvitado('7', { ...ctx.acceso }, { medio: 'YAPE' })).rejects.toMatchObject({ response: { codigo: 'PEDIDO_ANULADO' } });
+    expect(ctx.pedido.estado).toBe('ANULADO');
+  });
+
+  it('sin token de seguimiento ni sesión del dueño: 403', async () => {
+    const ctx = conTxReal(armar());
+    await expect(ctx.s.cambiarMedioInvitado('7', {}, { medio: 'YAPE' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('medio que no es de la lista (p. ej. tarjeta) rechazado con 400', async () => {
+    const ctx = conTxReal(armar());
+    await expect(ctx.s.cambiarMedioInvitado('7', { ...ctx.acceso }, { medio: 'TARJETA' })).rejects.toMatchObject({ response: { codigo: 'MEDIO_INVALIDO' } });
+    expect(ctx.pedido.estado).toBe('POR_PAGAR');
+  });
+
+  it('webhook tardío de un cargo del intento anterior (ya cambiado de medio) no cobra ni revive el pedido', async () => {
+    const ctx = conTxReal(armar());
+    const { s, acceso, pedido, intentos, cobros, pasarela, prisma } = ctx;
+    const { intentoId } = await s.crearIntento('7', acceso);
+    pasarela.sembrarCargo({ cargoId: 'chr_tarde', estado: 'APROBADO', montoCentimos: 5250, moneda: 'PEN', metadata: { intento: intentoId }, devueltoCentimos: 0 });
+    await s.cambiarMedioInvitado('7', { ...acceso }, { medio: 'YAPE' });
+    expect(intentos[0].estado).toBe('FALLIDO');
+    await s.recibirWebhook({ id: 'evt_tarde', type: 'charge.creation.succeeded', data: JSON.stringify({ id: 'chr_tarde', amount: 5250, metadata: { intento: intentoId } }) });
+    expect(cobros.cobrar).not.toHaveBeenCalled();
+    expect(pedido).toMatchObject({ estado: 'COLA', pago_preferido: 'YAPE' });
+    // Si el cargo llegara a aprobarse por el intento ya cambiado, la guarda de cobrarPedido no cobra y avisa
+    intentos[0].estado = 'APROBADO';
+    await s.cobrarPedido(intentos[0].id);
+    expect(cobros.cobrar).not.toHaveBeenCalled();
+    expect(intentos[0].cobro_error).toMatch(/^PEDIDO_YA_NO_EN_LINEA/);
+    expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'PAGO_ONLINE_A_DEVOLVER' }) });
+  });
+});

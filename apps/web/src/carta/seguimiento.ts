@@ -105,6 +105,8 @@ export interface EstadoSeguimiento {
   resumenPago?: ResumenPagoSeguimiento;
   /** Desglose para «Mi pedido». */
   detalle?: DetalleSeguimiento;
+  /** Pedido de «Tarjeta / Yape en línea» con el pago pendiente o vencido: la fuente para pagar (no la copia del navegador) */
+  pagoEnLinea?: { pedidoId: string; creadoEn: string };
 }
 
 export type ResultadoLote = EstadoSeguimiento | { codigo: string; noEncontrado: true };

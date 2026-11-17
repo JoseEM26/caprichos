@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
+import { EtiquetaEsperaPagoEnLinea, TITULO_ESPERA_PAGO_EN_LINEA, esperaPagoEnLinea } from './EsperaPagoEnLinea';
 import { useSesion } from '../../comun/sesion';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
@@ -299,7 +300,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
     ? { t: 'Pagado', bg: 'var(--cp-greenbg, #DFF3E3)', fg: '#1F5C33' }
     : tienePagoCoordinado
       ? { t: 'Pago coordinado', bg: '#E3EEF8', fg: 'var(--cp-navy, #0B2C3E)' }
-      : { t: 'Por cobrar', bg: '#FFF0E6', fg: 'var(--cp-rust, #B2500F)' };
+      : esperaPagoEnLinea(pedido)
+        ? { t: 'Esperando pago en línea (Culqi)', bg: '#E3EEF8', fg: 'var(--cp-navy, #0B2C3E)', espera: true }
+        : { t: 'Por cobrar', bg: '#FFF0E6', fg: 'var(--cp-rust, #B2500F)' };
 
   const panelCoordinar = !esPorConfirmar && esPagoPorCoordinar && (
     <section aria-label="Entrega fallida" style={{ border: '2px solid var(--cp-rust, #B2500F)', borderRadius: 16, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, background: '#FBE9DF' }}>
@@ -387,8 +390,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
             <span className="dp-chip" style={{ background: stBadge.bg, color: stBadge.fg }}>
               {stBadge.l}
             </span>
-            <span className="dp-chip" style={{ background: pagoChip.bg, color: pagoChip.fg }}>
-              {pagoChip.t}
+            <span className="dp-chip" style={{ background: pagoChip.bg, color: pagoChip.fg }} {...('espera' in pagoChip ? { 'data-testid': 'espera-pago-en-linea', title: TITULO_ESPERA_PAGO_EN_LINEA } : {})}>
+              {'espera' in pagoChip ? <EtiquetaEsperaPagoEnLinea /> : pagoChip.t}
             </span>
             {esperaCajaCerrada(pedido, cajaAbierta ?? null) && <EtiquetaCajaCerrada />}
             {pedido.pedido_origen && (

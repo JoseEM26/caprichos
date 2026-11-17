@@ -173,6 +173,8 @@ export interface Pedido {
   id: string;
   codigo: string;
   prueba_entrega?: PruebaEntregaFallida | null;
+  /** Motivo de la anulación (también la automática por vencimiento) */
+  motivo_anulacion?: string | null;
   canal: string;
   modalidad: string;
   repartidor_party_id?: string | number | null;
@@ -588,6 +590,9 @@ export const pedidosApi = {
   },
 
   /** Cambia o agrega medios de pago (siempre disponible, sin código de supervisor ni aprobación). */
+  cambiarMedioEnLinea: (id: string, medio: string) =>
+    api.post<{ ok: boolean; estado: string; medio: string; mensaje: string }>(`/admin/pagos-online/pedidos/${id}/cambiar-medio`, { medio }),
+
   async ajustarPago(
     id: string | number,
     dto: { plan: Array<{ medio: string; monto: number }>; pagaCon?: number | null; motivo?: string },

@@ -15,6 +15,7 @@ import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import './seguimiento-modal.css';
 
 type IdPestana = 'estado' | 'pedido' | 'pago';
+const VENCIDO_TITULO = 'Se venció el tiempo para pagar este pedido. Haz uno nuevo';
 const SOLES = (n: number) => `S/ ${Number(n).toFixed(2)}`;
 
 export function PantallaConfirmacion() {
@@ -123,7 +124,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'pago',
       etiqueta: 'Pago',
       insignia: marca('pago'),
-      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} creadoEn={pedido.creadoEn} alFormulario={setPagando} />,
+      contenido: <PanelPago pedido={pedido} estado={estado} total={total} onSubida={refrescar} pedidoId={estado?.pagoEnLinea?.pedidoId ?? creacion?.id ?? pedido.id} token={pedido.token} auto={Boolean(creacion && pedido.enLinea)} creadoEn={estado?.pagoEnLinea?.creadoEn ?? pedido.creadoEn} alFormulario={setPagando} />,
     },
   ];
   const cambiosTexto = [...cambiadas].map((id) => ({ estado: 'Estado', pedido: 'Mi pedido', pago: 'Pago' })[id]).join(', ');
@@ -181,6 +182,7 @@ function PanelEstado({
   const anulado = estado?.anulado === true;
   let titulo = etapa.titulo;
   let detalle = etapa.detalle;
+  if (anulado && estado?.pagoEnLinea) titulo = VENCIDO_TITULO;
   if (error === 'NO_ENCONTRADO') {
     titulo = 'No encontramos este pedido';
     detalle = 'Puede que ya no esté disponible.';
@@ -380,6 +382,10 @@ function PanelPago({
 }) {
   const [pagandoForm, setPagandoForm] = useState(false); // formulario de Culqi abierto: el resto del panel se oculta
   if (!estado) return <p className="sg-detalle">Consultando el pago de tu pedido...</p>;
+  // Pago en línea vencido: ya no hay nada que pagar aquí; el aviso y «Volver a la carta» dicen qué hacer
+  if (estado.anulado && estado.pagoEnLinea) {
+    return <p className="sg-detalle" style={{ margin: 0 }} data-testid="pago-vencido">Este pedido ya no se puede pagar en línea. Vuelve a la carta y haz uno nuevo.</p>;
+  }
   const resumen = estado.resumenPago;
   const pagos = resumen?.pagos ?? [];
   const porPagar = pagos.filter((p) => p.digital && (p.estado === 'SIN_VOUCHER' || p.estado === 'RECHAZADO'));
@@ -397,7 +403,7 @@ function PanelPago({
       {resumen && !pagandoForm && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">
           <div className="sg-fila" data-testid="resumen-pagado">
-            <span>Pagado</span>
+            <span>{pagado > 0 ? 'Pagado' : 'Pagado hasta ahora'}</span>
             <span>{SOLES(pagado)} de {SOLES(totalCobrable)}</span>
           </div>
           <div className="sg-barra" role="progressbar" aria-label="Pago del pedido" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>

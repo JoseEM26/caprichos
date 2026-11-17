@@ -323,7 +323,7 @@ describe('ComandasService: listo por producto y despacho', () => {
     prisma.comandaArea.findMany.mockResolvedValue([]);
     await service.listarComandas('5', false);
     const where = prisma.comandaArea.findMany.mock.calls[0][0].where;
-    expect(where.pedido.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
+    expect(where.pedido.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO', 'POR_PAGAR'] });
   });
 
   it('el permiso cocina/despachar va a COCINA, MOZO y SUPERVISOR (ADMIN lo tiene todo)', () => {

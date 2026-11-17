@@ -4,6 +4,7 @@ import { claveModalidad } from './InsigniaModalidad';
 import { mediosDePedido, medioPorCulqi } from './mediosFila';
 import { textoMedio } from './EtiquetaMedio';
 import { totalDe } from './resumenDia';
+import { TEXTO_ESPERA_PAGO_EN_LINEA, esperaPagoEnLinea } from './EsperaPagoEnLinea';
 
 export const aHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) : '';
@@ -14,6 +15,7 @@ export const CANAL: Record<string, string> = { CARTA: 'Web', WEB: 'Web', BOT: 'W
 export function textoPago(p: Pedido): string {
   const pag = String(p.pago_estado || '').toUpperCase();
   if (p.es_personal) return 'Crédito personal';
+  if (esperaPagoEnLinea(p)) return TEXTO_ESPERA_PAGO_EN_LINEA;
   if (pag === 'PAGADO') return 'Pagado';
   if (pag === 'COORDINADO') return 'Coordinado';
   return 'Por cobrar';

@@ -136,6 +136,8 @@ export interface SeguimientoPedido {
   resumenPago?: ResumenPago;
   /** Desglose del pedido para la pestaña «Mi pedido» (aditivo). Solo en obtener(). */
   detalle?: DetallePedidoSeguimiento;
+  /** Pedido de «Tarjeta / Yape en línea» con el pago pendiente o vencido (aditivo). Solo en obtener(). */
+  pagoEnLinea?: { pedidoId: string; creadoEn: string };
 }
 
 export interface DetallePedidoSeguimiento {
@@ -329,6 +331,7 @@ export class SeguimientoService {
     const base = {
       ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
       pagoDigital,
+      ...(pedido.pago_estado === 'PENDIENTE_ONLINE' ? { pagoEnLinea: { pedidoId: pedido.id.toString(), creadoEn: pedido.creado_en.toISOString() } } : {}),
       ...(pagoDigital ? { medioPago: medioPreferido } : {}),
       ...(pagoDigital && montoDigital !== null
         ? { montoDigital, montoContraentrega: Math.round((totalCobrable - montoDigital) * 100) / 100 }

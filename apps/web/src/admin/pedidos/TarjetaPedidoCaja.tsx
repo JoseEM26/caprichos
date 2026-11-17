@@ -17,6 +17,8 @@ import { itemsCaja, textoDetalle, MAX_PRODUCTOS_TARJETA, type ItemCaja } from '.
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 import { BloqueEncargoTarjeta, ChipProgramado } from './ProgramadoInfo';
 import { esCargoLibre } from './ModalCargoLibre';
+import { EtiquetaEsperaPagoEnLinea, TITULO_ESPERA_PAGO_EN_LINEA, esperaPagoEnLinea } from './EsperaPagoEnLinea';
+import { MotivoAnulacion } from './MotivoAnulacion';
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
@@ -31,10 +33,11 @@ export function NombreCliente({ pedido }: { pedido: Pick<Pedido, 'cliente_nombre
   );
 }
 
-function chipPago(o: Pedido): { texto: string; clase: string } {
+function chipPago(o: Pedido): { texto: string; clase: string; espera?: boolean } {
   const pag = String(o.pago_estado || '').toUpperCase();
   // Consumo del personal: se carga al crédito del trabajador, no se cobra en caja
   if (o.es_personal) return { texto: 'Crédito del personal', clase: 'info' };
+  if (esperaPagoEnLinea(o)) return { texto: 'Esperando pago en línea (Culqi)', clase: 'info', espera: true };
   // Crédito del personal con delivery: los productos van a su crédito y solo el envío se cobra
   const credito = Number(o.monto_credito || 0);
   if (credito > 0 && pag !== 'PAGADO') return { texto: `Crédito S/ ${credito.toFixed(2)} · Por cobrar S/ ${montoPorCobrar(o).toFixed(2)}`, clase: 'pend' };
@@ -176,9 +179,10 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
         )}
 
         <span className="cj2-pie-info">
+          <MotivoAnulacion pedido={o} />
           <span className="cj2-chips">
             <span className="cj-pc-chip" data-testid="chip-estado" style={{ background: visual.bg, color: visual.fg, border: visual.clave === 'anulado' ? '1.5px solid var(--cp-rust, #B2500F)' : undefined }}>{visual.clave === 'anulado' ? visual.l.toUpperCase() : visual.l}</span>
-            <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`}>{pago.texto}</span>
+            <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`} {...(pago.espera ? { 'data-testid': 'espera-pago-en-linea', title: TITULO_ESPERA_PAGO_EN_LINEA } : {})}>{pago.espera ? <EtiquetaEsperaPagoEnLinea /> : pago.texto}</span>
             {o.total_con_extras != null && <span className="cj-pc-chip" data-testid="total-con-extras" style={{ background: '#FFF4D6', color: 'var(--cp-navy)' }}>Total con extras S/ {o.total_con_extras.toFixed(2)}</span>}
           </span>
           <span className={`cj2-total${visual.clave === 'anulado' ? ' cj2-total--anulado' : ''}`}>S/ {totalDe(o).toFixed(2)}{visual.clave === 'anulado' && <span className="cj2-nosuma"> no suma</span>}</span>

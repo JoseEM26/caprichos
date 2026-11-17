@@ -5,7 +5,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { inicioDiaLimaIso, sumarDiasIso } from '../../comun/fechas-lima';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
-import { leerMediosPagoCanal } from '../../comun/medios-pago-canal';
+import { exigirMediosActivos, leerMediosPagoCanal } from '../../comun/medios-pago-canal';
 import { medioActivo } from '@caprichos/compartido';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
@@ -18,6 +18,12 @@ import { DevolucionCulqiService, ErrorReembolso, Devolucion } from './devolucion
 import { usuarioSistema } from './usuario-sistema';
 import { ErrorPasarela, MedioPagoOnline, PASARELA_PAGO, PasarelaPago, ResultadoCargo } from './pasarela.puerto';
 import { ComisionCobro, comisionEstimada, leerTarifaCulqi } from './comision-pasarela';
+import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
+import type { UsuarioAutenticado } from '../acceso/acceso.tipos';
+
+/** Medios a los que el cliente puede cambiar un pedido que espera Culqi (sin tarjeta: el cargo lo haría Culqi) */
+export const MEDIOS_CAMBIO_EN_LINEA = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'];
+const NOMBRE_CAMBIO: Record<string, string> = { EFECTIVO: 'efectivo', YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'transferencia' };
 
 export const MEDIOS_ONLINE: MedioPagoOnline[] = ['TARJETA', 'YAPE'];
 const ESTADOS_VIVOS = ['CREADO', 'PROCESANDO', 'PENDIENTE', 'APROBADO'];
@@ -158,6 +164,84 @@ export class PagosOnlineService {
     }
   }
 
+  // ---------------------------------------------------------------- cambio de medio (pedido en línea sin pagar)
+
+  private idPedido(texto: string | number): bigint {
+    try {
+      return BigInt(texto);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'El pedido no es válido' });
+    }
+  }
+
+  /** La carta: el cliente cambia el medio de su pedido en línea con su token de seguimiento (o su sesión). */
+  async cambiarMedioInvitado(pedidoIdTexto: string | number, acceso: { seguimientoToken?: string; clientePartyId?: bigint | null }, dto: { medio?: unknown; pagaCon?: unknown }) {
+    const pedidoId = this.idPedido(pedidoIdTexto);
+    const previo = await this.prisma.pedido.findUnique({ where: { id: pedidoId }, select: { id: true, cliente_party_id: true } });
+    if (!previo) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No encontramos tu pedido' });
+    const esDuenoPorSesion = acceso.clientePartyId != null && previo.cliente_party_id != null && BigInt(previo.cliente_party_id) === BigInt(acceso.clientePartyId);
+    if (!verificarTokenSeguimiento(previo.id, acceso.seguimientoToken) && !esDuenoPorSesion) {
+      throw new ForbiddenException({ codigo: 'SIN_ACCESO', mensaje: 'No puedes cambiar este pedido desde aquí' });
+    }
+    return this.cambiarMedioPendiente(pedidoId, dto, 'CARTA', {});
+  }
+
+  /** Caja/ADMIN: cambia el medio de un pedido que espera Culqi (E2). */
+  async cambiarMedioAdmin(pedidoIdTexto: string | number, dto: { medio?: unknown; pagaCon?: unknown }, usuario: UsuarioAutenticado, ip?: string) {
+    return this.cambiarMedioPendiente(this.idPedido(pedidoIdTexto), dto, 'CARTA', { partyId: BigInt(usuario.partyId), ip });
+  }
+
+  /**
+   * Pasa el pedido de «en línea sin pagar» (POR_PAGAR) a COLA con otro medio: el flujo normal de ese medio
+   * (voucher o cobro en Caja). Los intentos Culqi aún creados quedan FALLIDOS. Rechaza si hay un cargo en curso o aprobado.
+   */
+  private async cambiarMedioPendiente(pedidoId: bigint, dto: { medio?: unknown; pagaCon?: unknown }, canal: string, quien: { partyId?: bigint; ip?: string }) {
+    const medio = String(dto?.medio ?? '').toUpperCase().trim();
+    if (!MEDIOS_CAMBIO_EN_LINEA.includes(medio)) {
+      throw error(400, 'MEDIO_INVALIDO', 'Elige efectivo, Yape, Plin o transferencia');
+    }
+    const r = await this.prisma.$transaction(async (tx) => {
+      const p = await tx.pedido.findUnique({ where: { id: pedidoId } });
+      if (!p) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'No encontramos tu pedido' });
+      if (p.estado === 'ANULADO') throw error(409, 'PEDIDO_ANULADO', 'Este pedido fue anulado: no tiene pago que cambiar');
+      if (!(p.estado === 'POR_PAGAR' && p.pago_estado === 'PENDIENTE_ONLINE')) {
+        throw error(409, 'SIN_PAGO_EN_LINEA', 'Este pedido no espera un pago en línea');
+      }
+      const vivo = await tx.pagoOnlineIntento.findFirst({ where: { pedido_id: pedidoId, estado: { in: ['PROCESANDO', 'PENDIENTE', 'APROBADO'] } } });
+      if (vivo) throw error(409, 'PAGO_EN_CURSO', 'Hay un pago en curso o aprobado; espera unos segundos o revisa el cobro');
+      await exigirMediosActivos(tx, [medio], canal, pedidoId);
+      const total = Math.round((montoACobrar(p) + Number(p.propina ?? 0)) * 100) / 100;
+      if (medio === 'EFECTIVO' && dto?.pagaCon != null && String(dto.pagaCon).trim() !== '' && !(Number(dto.pagaCon) >= total)) {
+        throw error(400, 'PAGA_CON_INVALIDO', `Con cuánto paga debe ser al menos S/ ${total.toFixed(2)}`);
+      }
+      const ahora = new Date();
+      await tx.pagoOnlineIntento.updateMany({ where: { pedido_id: pedidoId, estado: 'CREADO' }, data: { estado: 'FALLIDO', mensaje: 'Cambió el medio de pago' } });
+      await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: pedidoId } });
+      await tx.pedido.update({
+        where: { id: pedidoId },
+        data: { estado: 'COLA', pago_estado: 'PENDIENTE', pago_preferido: medio, pago_metodo: medio, pasa_cocina_en: p.pasa_cocina_en ?? ahora },
+      });
+      await tx.pedidoEstadoHistorial.create({
+        data: { pedido_id: pedidoId, estado_anterior: 'POR_PAGAR', estado_nuevo: 'COLA', motivo: `Cambió el medio de pago a ${NOMBRE_CAMBIO[medio]}`, por_party_id: quien.partyId ?? null, en: ahora },
+      });
+      return { codigo: p.codigo };
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_CAMBIO_MEDIO', resultado: 'OK',
+      entidad: 'pedido', entidadId: pedidoId,
+      antes: { estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE', medio: 'CULQI' },
+      despues: { estado: 'COLA', pago_estado: 'PENDIENTE', medio },
+      ...(quien.partyId != null ? { partyId: quien.partyId } : {}),
+      ...(quien.ip ? { ip: quien.ip } : {}),
+    });
+    try {
+      this.eventos?.emitirAdmin('pedido:estado', { id: pedidoId.toString(), codigo: r.codigo, estado: 'COLA' });
+    } catch {
+      // accesorio
+    }
+    return { ok: true, estado: 'COLA', medio, mensaje: `Cambiaste el pago a ${NOMBRE_CAMBIO[medio]}. Tu pedido ya pasa a cocina según ese pago.` };
+  }
+
   // ---------------------------------------------------------------- cargo
 
   private resultado(i: { estado: string; mensaje: string | null; cobro_error?: string | null }, pedidoCodigo: string) {
@@ -272,6 +356,16 @@ export class PagosOnlineService {
     const intento = await this.prisma.pagoOnlineIntento.findUniqueOrThrow({ where: { id: intentoId } });
     try {
       const pedido = await this.prisma.pedido.findUniqueOrThrow({ where: { id: intento.pedido_id } });
+      if (pedido.estado !== 'ANULADO' && !esPendienteDePagoOnline(pedido)) {
+        // El pedido ya no espera pago en línea (cambió de medio o salió de ese flujo): no se cobra otra vez; queda para revisar
+        const motivo = 'PEDIDO_YA_NO_EN_LINEA: el pedido cambió de medio de pago antes de aprobarse el cargo';
+        await this.prisma.pagoOnlineIntento.update({ where: { id: intentoId }, data: { cobro_error: motivo } });
+        await this.prisma.notificacion
+          .create({ data: { tipo: 'PAGO_ONLINE_A_DEVOLVER', rol_destino: 'ADMIN', titulo: 'Pago en línea tardío de un pedido que cambió de medio', mensaje: `El pedido ${pedido.codigo} cambió de medio de pago y llegó un cobro de Culqi por S/ ${enPesos(intento.monto_centimos).toFixed(2)}. Revísalo en Pagos en línea.`, enlace: '/admin/pagos-online' } })
+          .catch(() => undefined);
+        await this.auditoria.registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_TARDIO_IGNORADO', resultado: 'OK', entidad: 'pedido', entidadId: pedido.id, despues: { cargo: intento.culqi_cargo_id, monto_centimos: intento.monto_centimos } });
+        return;
+      }
       if (pedido.estado === 'ANULADO') {
         // Pagó cuando el pedido ya se había anulado (p. ej. por tiempo): no se revive; queda marcado para devolver y se avisa al ADMIN
         const motivo = 'PEDIDO_ANULADO_DEVOLVER: el cliente pagó con el pedido ya anulado';

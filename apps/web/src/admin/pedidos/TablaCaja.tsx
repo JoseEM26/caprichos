@@ -5,6 +5,7 @@ import type { Pedido } from './pedidosApi';
 import { COLUMNAS_CAJA } from './columnasCaja';
 import { estadoVisual } from './estadosCaja';
 import { mediosDePedido, medioPorCulqi, montosPorMedio, MEDIOS_FILTRO } from './mediosFila';
+import { MotivoAnulacion } from './MotivoAnulacion';
 import { EtiquetaMedio } from './EtiquetaMedio';
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
 import { paraCuandoDe } from './programado';
@@ -63,6 +64,7 @@ const Fila = memo(function Fila({ p, columnas, alVerDetalle }: { p: Pedido; colu
           contenido = (
             <>
               <span className="cj2-tb-chip" style={{ background: v.bg, color: v.fg }}>{v.l}</span>
+              <MotivoAnulacion pedido={p} />
               {pc?.programado && <span data-testid="tabla-programado" style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>📅 {pc.cuando}</span>}
             </>
           );

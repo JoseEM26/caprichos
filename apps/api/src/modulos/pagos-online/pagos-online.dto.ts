@@ -11,6 +11,25 @@ export class IntentoDto {
   seguimientoToken?: string;
 }
 
+/** Cambio de medio de un pedido que espera Culqi: el cliente (con su token) o Caja */
+export class CambioMedioDto {
+  @IsNotEmpty({ message: 'El pedido es requerido' })
+  pedidoId!: string | number;
+
+  @IsOptional()
+  @IsString()
+  seguimientoToken?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Elige el medio de pago' })
+  @MaxLength(20)
+  medio!: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El monto con el que paga no es válido' })
+  pagaCon?: number;
+}
+
 export class CargoDto {
   @IsString()
   @IsNotEmpty({ message: 'El intento es requerido' })

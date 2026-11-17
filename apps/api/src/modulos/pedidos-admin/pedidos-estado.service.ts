@@ -1,3 +1,4 @@
+import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
 import { AnulacionPagadoService } from './anulacion-pagado.service';
 import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
@@ -1161,6 +1162,11 @@ export class PedidosEstadoService {
     const nuevoEstado = dto.estado.toUpperCase().trim();
     const ahora = new Date();
 
+    // Pedido de pago en línea sin pagar: solo se puede anular; pasar a cocina lo hace el pago aprobado
+    if (nuevoEstado !== 'ANULADO' && esPendienteDePagoOnline(pedido)) {
+      throw new BadRequestException({ codigo: CODIGO_PAGO_ONLINE_PENDIENTE, mensaje: MENSAJE_PAGO_ONLINE_PENDIENTE });
+    }
+
     const roles = rolesDelUsuario(usuarioActual);
 
     // 1. Manejo de Anulación (DT-61): todos los roles de pedidos, cada uno en su alcance (mozo: sus pedidos; repartidor: los asignados)
@@ -1602,6 +1608,11 @@ export class PedidosEstadoService {
           mensaje: 'Este pedido no está asignado a tu usuario',
         });
       }
+    }
+
+    // Pago en línea sin pagar: no se cobra a mano (ni siquiera ADMIN); el cliente paga o se anula
+    if (esPendienteDePagoOnline(pedido)) {
+      throw new BadRequestException({ codigo: CODIGO_PAGO_ONLINE_PENDIENTE, mensaje: MENSAJE_PAGO_ONLINE_PENDIENTE });
     }
 
     const metodoUpper = dto.metodo.toUpperCase().trim();

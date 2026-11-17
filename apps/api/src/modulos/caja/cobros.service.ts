@@ -1,3 +1,4 @@
+import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
 import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { type QuitaPromoMedio, evaluarQuitaPromoMedio, errorPromoSeQuita, aplicarQuitaPromoMedio } from '../ofertas/promo-medio.util';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
@@ -271,6 +272,11 @@ export class CobrosService {
           },
           HttpStatus.NOT_FOUND,
         );
+      }
+
+      // Pago en línea sin pagar: no se cobra a mano; solo lo registra la pasarela al aprobarse (origen CULQI)
+      if (dto.origen !== 'CULQI' && esPendienteDePagoOnline(pedido)) {
+        throw new BadRequestException({ codigo: CODIGO_PAGO_ONLINE_PENDIENTE, mensaje: MENSAJE_PAGO_ONLINE_PENDIENTE });
       }
 
       if (pedido.estado === 'ANULADO') {

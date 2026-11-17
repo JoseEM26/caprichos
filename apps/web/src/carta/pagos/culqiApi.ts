@@ -75,6 +75,12 @@ export const culqiApi = {
     api.post<IntentoCulqi>('/carta/pagos/culqi/intento', { pedidoId, ...(seguimientoToken ? { seguimientoToken } : {}) }),
   cargo: (cuerpo: { intentoId: string; token: string; medio: MedioCulqi; email?: string; autenticacion3ds?: unknown; deviceId?: string }) =>
     api.post<ResultadoCargo>('/carta/pagos/culqi/cargo', cuerpo),
+  cambiarMedio: (pedidoId: string, medio: string, seguimientoToken?: string) =>
+    api.post<{ ok: boolean; estado: string; medio: string; mensaje: string }>('/carta/pagos/culqi/cambiar-medio', {
+      pedidoId,
+      medio,
+      ...(seguimientoToken ? { seguimientoToken } : {}),
+    }),
   listar: (f: FiltrosPagosOnline) => {
     const q = new URLSearchParams();
     (['desde', 'hasta', 'estado'] as const).forEach((k) => f[k] && q.set(k, f[k]!));
