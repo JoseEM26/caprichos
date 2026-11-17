@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
-import { Pestanas } from '../../comun/ModalConPestanas';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { ETIQUETA_ESTADO } from './asistenciaApi';
 import { ETIQUETA_ROL } from './correccionesApi';
 import { useDetalleDia } from './DetalleDiaPersona';
@@ -18,29 +18,31 @@ const Fila = ({ t, v, fuerte }: { t: string; v: string; fuerte?: boolean }) => (
   <li className={`pl-fila${fuerte ? ' pl-fila--total' : ''}`}><span>{t}</span><span className="as-num">{v}</span></li>
 );
 
-/** Panel lateral con el detalle de UN día (marcas, solicitudes, cambiar hora): reutiliza el mismo contenido del modal del calendario. */
+/** Detalle de UN día (marcas, solicitudes, cambiar hora) en una ventana: no ensancha ni satura la página. Mismo contenido del modal del calendario. */
 function PanelDia({ c, fila, jornada, cerrar }: { c: CtlPlanilla; fila: FilaCal | null; jornada: string; cerrar: () => void }) {
   const det = useDetalleDia(fila, { onCambio: () => { void c.cargar(); void c.recargarCal(); }, onError: c.onError, onOk: c.onOk });
-  return (
-    <aside className="pp-panel" aria-label={`Detalle del día ${jornada}`} data-testid="panel-dia">
-      <div className="pp-panel-cab">
-        <div>
-          <h3 className="as-sub">{det ? det.titulo : `Día ${jornada}`}</h3>
-          {det && <div className="as-nota">{det.subtitulo}</div>}
-        </div>
-        <Boton type="button" variante="secundario" tamano="pequeno" onClick={cerrar}>Cerrar detalle</Boton>
+  const sinDatos = {
+    id: 'sin-datos',
+    etiqueta: 'Día',
+    contenido: (
+      <div role="status" className="as-aviso as-aviso--alerta" data-testid="panel-dia">
+        {c.errorCal ? 'No pudimos cargar las marcas de ese día.' : 'Ese día no tiene registro de marcas (descanso o sin horario).'}{' '}
+        {c.errorCal && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void c.recargarCal()}>Reintentar</Boton>}
       </div>
-      {det ? <Pestanas pestanas={det.pestanas} etiqueta="Detalle del día" /> : (
-        <div role="status" className="as-aviso as-aviso--alerta">
-          {c.errorCal ? 'No pudimos cargar las marcas de ese día.' : 'Ese día no tiene registro de marcas (descanso o sin horario).'}{' '}
-          {c.errorCal && <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => void c.recargarCal()}>Reintentar</Boton>}
-        </div>
-      )}
-    </aside>
+    ),
+  };
+  return (
+    <ModalConPestanas
+      titulo={det ? det.titulo : `Día ${jornada}`}
+      subtitulo={det?.subtitulo}
+      pestanas={det ? det.pestanas : [sinDatos]}
+      alCerrar={cerrar}
+      ancho={1040}
+    />
   );
 }
 
-/** Pestaña «Asistencia»: banner de dudosas, resumen del período, penalidad y la tabla por día; un clic en el día abre su detalle al costado. */
+/** Pestaña «Asistencia»: banner de dudosas, resumen del período, penalidad y la tabla por día; un clic en el día abre su detalle en una ventana. */
 export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicial?: string | null }) {
   const { d, r, pagado, ocupado } = c;
   const [dia, setDia] = useState<string | null>(diaInicial ?? null);
@@ -48,7 +50,6 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
   const faltas = d.dias.filter((x) => x.estado === 'FALTA').length;
   const abrirDia = (j: string) => {
     setDia(j);
-    setTimeout(() => document.getElementById('pp-panel-dia')?.scrollIntoView?.({ block: 'nearest' }), 50);
   };
   return (
     <div className="pp-seccion">
@@ -132,9 +133,7 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
           </div>
         </section>
         {dia && (
-          <div id="pp-panel-dia">
-            <PanelDia key={dia} c={c} jornada={dia} fila={c.filasCal?.find((f) => f.fecha === dia) ?? null} cerrar={() => setDia(null)} />
-          </div>
+          <PanelDia key={dia} c={c} jornada={dia} fila={c.filasCal?.find((f) => f.fecha === dia) ?? null} cerrar={() => setDia(null)} />
         )}
       </div>
     </div>

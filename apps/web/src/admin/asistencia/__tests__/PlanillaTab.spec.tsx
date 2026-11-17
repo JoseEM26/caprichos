@@ -305,17 +305,17 @@ describe('PlanillaTab', () => {
     expect(screen.getByLabelText('Aprobar el descanso trabajado del 2026-11-11')).not.toBeChecked();
   });
 
-  it('«Ver detalle» abre el panel del día dentro de la misma página', async () => {
+  it('«Ver detalle» abre el detalle del día en una ventana (no ensancha la página)', async () => {
     listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
     detalle.mockResolvedValue({ ...base, dias: [{ jornada: '2026-11-11', estado: 'CUMPLIO', programadaMin: 480, trabajadaMin: 480, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 0, extraAprobada: false, ganado: 40, marcas: [] }] });
     montar();
     await abrir();
     await tab('Asistencia');
     fireEvent.click(await screen.findByRole('button', { name: 'Ver el detalle del día 2026-11-11' }));
-    const panel = await screen.findByRole('complementary', { name: 'Detalle del día 2026-11-11' });
-    expect(within(panel).getByText(/Ese día no tiene registro de marcas/)).toBeInTheDocument();
-    fireEvent.click(within(panel).getByRole('button', { name: 'Cerrar detalle' }));
-    expect(screen.queryByRole('complementary', { name: 'Detalle del día 2026-11-11' })).toBeNull();
+    const ventana = await screen.findByRole('dialog');
+    expect(within(ventana).getByText(/Ese día no tiene registro de marcas/)).toBeInTheDocument();
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('lo escrito en el formulario de adelanto no se pierde al cambiar de pestaña', async () => {

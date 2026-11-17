@@ -229,7 +229,7 @@ describe('Planilla: banner de jornadas por revisar y aprobar dudosas', () => {
     expect(banner).toHaveTextContent('2 jornadas por revisar');
 
     fireEvent.click(within(banner).getByRole('button', { name: '2026-11-05' })); // enlace al día: abre su panel lateral
-    expect(await screen.findByRole('complementary', { name: 'Detalle del día 2026-11-05' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
     const fila = (await screen.findByText('2026-11-05', { selector: 'td' })).closest('tr')!;
     expect(fila).toHaveTextContent('09:00 Entrada');
     expect(within(fila).getByText(/09:01 Entrada/)).toHaveStyle({ textDecoration: 'line-through' });
