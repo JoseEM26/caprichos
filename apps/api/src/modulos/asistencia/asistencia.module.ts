@@ -16,11 +16,13 @@ import { AsistenciaCorreccionesService } from './asistencia-correcciones.service
 import { AsistenciaSelfiesTarea } from './asistencia-selfies.tarea';
 import { AsistenciaTurnosService } from './asistencia-turnos.service';
 import { AsistenciaTurnosTarea } from './asistencia-turnos.tarea';
-import { MisTurnosController, TurnosAprobacionController } from './asistencia-turnos.controller';
+import { MiEquipoController, MisTurnosController, TurnosAprobacionController } from './asistencia-turnos.controller';
+import { ChatbotModule } from '../chatbot/chatbot.module';
+import { CorreoModule } from '../correo/correo.module';
 
 @Module({
-  imports: [ArchivosModule],
-  controllers: [AsistenciaController, MiAsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, MiPlanillaController, FeriadosController, VinculoController, MisTurnosController, TurnosAprobacionController],
+  imports: [ArchivosModule, ChatbotModule, CorreoModule],
+  controllers: [AsistenciaController, MiAsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, MiPlanillaController, FeriadosController, VinculoController, MisTurnosController, TurnosAprobacionController, MiEquipoController],
   providers: [AsistenciaService, AsistenciaCalendarioService, AsistenciaCorreccionesService, PlanillaService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea, AsistenciaTurnosService, AsistenciaTurnosTarea],
   exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, VacacionesService],
 })

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = {
   misTurnos: vi.fn(), candidatosTurno: vi.fn(), turnosParaDevolver: vi.fn(), crearTurno: vi.fn(),
@@ -21,6 +21,14 @@ vi.mock('../turnosApi', async (orig) => ({
 }));
 const miCalendario = vi.fn();
 vi.mock('../miCalendarioApi', () => ({ miCalendario: (...a: any[]) => miCalendario(...a) }));
+
+const sesion = vi.hoisted(() => ({ actual: null as any }));
+vi.mock('../../../comun/sesion', () => ({
+  useSesion: () => {
+    if (!sesion.actual) throw new Error('useSesion debe usarse dentro de un SesionProvider');
+    return sesion.actual;
+  },
+}));
 
 import { ReemplazosTurno } from '../ReemplazosTurno';
 import { PorAprobarTurnos } from '../PorAprobarTurnos';
@@ -200,9 +208,15 @@ describe('Mis pedidos y los que me piden', () => {
 });
 
 describe('Supervisión: reemplazos y cambios por aprobar', () => {
-  const datos = { toleranciaMin: 5, solicitudes: [pedido({ estado: 'PENDIENTE_APRUEBA', validacion: { ok: true, problema: null, areaYRol: ['Misma área: Salado'] } })] };
+  // Quien mira es una supervisora que no participa; falta ambas partes de la doble aprobación
+  const APR_LIBRE = { supervision: null, administracion: null, faltan: ['SUPERVISION', 'ADMINISTRACION'] };
+  const datos = { toleranciaMin: 5, solicitudes: [pedido({ estado: 'PENDIENTE_APRUEBA', aprobacion: APR_LIBRE, validacion: { ok: true, problema: null, areaYRol: ['Misma área: Salado'] } })] };
 
-  beforeEach(() => { api.turnosPorAprobar.mockResolvedValue(datos); });
+  beforeEach(() => {
+    sesion.actual = { usuario: { partyId: '60', nombres: 'Supervisora', rol: 'SUPERVISOR', roles: ['SUPERVISOR'] }, tiene: () => true };
+    api.turnosPorAprobar.mockResolvedValue(datos);
+  });
+  afterEach(() => { sesion.actual = null; });
 
   it('muestra el resumen de validación: área, horario libre y tolerancia', async () => {
     render(<PorAprobarTurnos />);
@@ -236,7 +250,7 @@ describe('Supervisión: reemplazos y cambios por aprobar', () => {
   });
 
   it('si ya no se cumplen las condiciones, no deja aprobar y dice por qué; un 409 se muestra', async () => {
-    api.turnosPorAprobar.mockResolvedValue({ toleranciaMin: 5, solicitudes: [pedido({ estado: 'PENDIENTE_APRUEBA', validacion: { ok: false, problema: 'Ya tiene turno ese día', areaYRol: [] } })] });
+    api.turnosPorAprobar.mockResolvedValue({ toleranciaMin: 5, solicitudes: [pedido({ estado: 'PENDIENTE_APRUEBA', aprobacion: APR_LIBRE, validacion: { ok: false, problema: 'Ya tiene turno ese día', areaYRol: [] } })] });
     render(<PorAprobarTurnos />);
     expect(await screen.findByText('Ya tiene turno ese día')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();

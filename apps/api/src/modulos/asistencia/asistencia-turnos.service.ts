@@ -9,10 +9,16 @@ import { HORA_CIERRE_MIN, CoberturaFila, HorarioFila, ReemplazoFila, jornadaDe, 
 import { AsistenciaService } from './asistencia.service';
 import { TURNOS_DIAS_ADELANTO_MAX, TURNOS_MAX_PEDIDOS_DIA } from './asistencia.config';
 import { etiquetaDia, momentoDeHora } from './asistencia-correcciones.service';
-import { CrearTurnoDto } from './dto/turnos.dto';
+import { ConfigurarAvisoTurnoDto, CrearTurnoDto } from './dto/turnos.dto';
+import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
+import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
+import { CorreoService } from '../correo/correo.service';
 
 export const ESTADOS_TURNO = ['PENDIENTE_ACEPTA', 'PENDIENTE_APRUEBA', 'APROBADA', 'RECHAZADA', 'CANCELADA', 'VENCIDA', 'SIN_MARCA'] as const;
 export type EstadoTurno = (typeof ESTADOS_TURNO)[number];
+/** Partes de la doble aprobación: la supervisora y el administrador. */
+export type Parte = 'SUPERVISION' | 'ADMINISTRACION';
+type EventoAvisoTurno = 'PIDE' | 'ACEPTA' | 'APRUEBA' | 'RECHAZA';
 const ACTIVAS: EstadoTurno[] = ['PENDIENTE_ACEPTA', 'PENDIENTE_APRUEBA'];
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -22,6 +28,8 @@ const isoDe = (d: Date) => d.toISOString().slice(0, 10);
 const horaDb = (hhmm: string) => new Date(`1970-01-01T${hhmm}:00.000Z`);
 const hhmmDe = (d: Date) => d.toISOString().slice(11, 16);
 const nombreRol = (codigo: string) => ROLES.find((r) => r.codigo === codigo)?.nombre ?? codigo;
+/** Minutos de la jornada (pueden pasar de 1440 si cruzan la medianoche) a «HH:MM». */
+const hhmmMin = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 /** Minutos de una hora «HH:MM» de la jornada: de 00:00 a 03:59 es la madrugada siguiente. */
 const norm = (hhmm: string) => {
@@ -69,6 +77,8 @@ export class AsistenciaTurnosService {
     private readonly asistencia: AsistenciaService,
     @Optional() private readonly auditoria?: AuditoriaService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
+    @Optional() private readonly correo?: CorreoService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -315,6 +325,7 @@ export class AsistenciaTurnosService {
     await this.auditar('SOLICITAR_TURNO', usuario.partyId, ip, fila, motivo);
     const nombres = await this.nombres([yo, otro]);
     await this.avisar('TURNO_PEDIDO', { party: otro }, `${nombres.get(yo)} te pide ${dto.tipo === 'CAMBIO_TURNO' ? 'cambiar un turno' : 'cubrir su turno'} el ${etiquetaDia(a.fecha)}`, `${a.desde} a ${a.hasta}. Entra a Mi asistencia para aceptar o rechazar.`);
+    await this.avisarEquipo('PIDE', fila);
     return { ok: true, id: Number(fila.id) };
   }
 
@@ -350,6 +361,8 @@ export class AsistenciaTurnosService {
     await this.auditar('ACEPTAR_TURNO', usuario.partyId, ip, { ...s, estado: 'PENDIENTE_APRUEBA' });
     const n = await this.nombres([s.solicitante_party_id, s.reemplazo_party_id]);
     await this.avisar('TURNO_POR_APROBAR', { rol: 'SUPERVISOR' }, `${n.get(s.reemplazo_party_id)} aceptó cubrir a ${n.get(s.solicitante_party_id)} el ${etiquetaDia(isoDe(s.fecha))}`, 'Espera tu aprobación en Mi asistencia o en Asistencia › Solicitudes.');
+    await this.avisar('TURNO_POR_APROBAR', { rol: 'ADMIN' }, `${n.get(s.reemplazo_party_id)} aceptó cubrir a ${n.get(s.solicitante_party_id)} el ${etiquetaDia(isoDe(s.fecha))}`, 'Espera tu aprobación en Mi asistencia o en Asistencia › Solicitudes.');
+    await this.avisarEquipo('ACEPTA', { ...s, estado: 'PENDIENTE_APRUEBA', aceptada_en: ahora });
     return { ok: true };
   }
 
@@ -387,19 +400,58 @@ export class AsistenciaTurnosService {
     }
   }
 
+  /** Partes que puede firmar quien aprueba: SUPERVISOR firma Supervisión; ADMIN firma Administración (puede tener las dos). */
+  private partesQue(usuario: UsuarioAutenticado): Parte[] {
+    const roles = [usuario.rol, ...(usuario.roles ?? [])];
+    return [...(roles.includes('SUPERVISOR') ? (['SUPERVISION'] as Parte[]) : []), ...(roles.includes('ADMIN') ? (['ADMINISTRACION'] as Parte[]) : [])];
+  }
+
+  /** Partes que todavía no aprobaron el pedido. Vacío = aprobado por las dos. */
+  private faltan(s: any): Parte[] {
+    return [...(s.aprobado_sup_por == null ? (['SUPERVISION'] as Parte[]) : []), ...(s.aprobado_adm_por == null ? (['ADMINISTRACION'] as Parte[]) : [])];
+  }
+
+  private exigirAprobador(usuario: UsuarioAutenticado) {
+    if (this.partesQue(usuario).length === 0) {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO_APROBAR', mensaje: 'Solo Supervisión o Administración aprueba o rechaza estos pedidos' });
+    }
+  }
+
+  /**
+   * Doble aprobación: una supervisora y un administrador, en cualquier orden. Cada parte la firma una persona distinta.
+   * Con las dos, se crean las coberturas (lo que ya usan calendario, asistencia y planilla). Mientras falte una, sigue PENDIENTE_APRUEBA.
+   */
   async aprobar(id: number, nota: string | undefined, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
     const s0 = await this.cargar(id);
     this.exigirNoInvolucrado(s0, usuario);
     this.exigirEstado(s0, ['PENDIENTE_APRUEBA'], 'Ese pedido no está esperando aprobación');
+    this.exigirAprobador(usuario);
+    if (s0.aprobado_sup_por === usuario.partyId || s0.aprobado_adm_por === usuario.partyId) {
+      throw new ConflictException({ codigo: 'YA_APROBASTE', mensaje: 'Ya aprobaste este pedido. Falta la aprobación de la otra parte.' });
+    }
+    const libres = this.faltan(s0).filter((p) => this.partesQue(usuario).includes(p));
+    if (libres.length === 0) throw new ConflictException({ codigo: 'PARTE_YA_APROBADA', mensaje: 'Esa parte ya la aprobó otra persona.' });
+    const parte = libres[0];
     await this.exigirVigente(s0, ahora, usuario);
-    let ids: number[];
+
+    const esSup = parte === 'SUPERVISION';
+    const cond = esSup ? { aprobado_sup_por: null } : { aprobado_adm_por: null };
+    const datos = esSup ? { aprobado_sup_por: usuario.partyId, aprobado_sup_en: ahora } : { aprobado_adm_por: usuario.partyId, aprobado_adm_en: ahora };
+    const notaTxt = (nota ?? '').trim() || null;
+    let res: { completa: boolean; ids: number[]; estado: any };
     try {
-      ids = await this.prisma.$transaction(
+      res = await this.prisma.$transaction(
         async (tx: any) => {
           const s = await tx.solicitudTurno.findUnique({ where: { id: s0.id } });
           if (!s || s.estado !== 'PENDIENTE_APRUEBA') throw new ConflictException({ codigo: 'ESTADO_NO_PERMITIDO', mensaje: 'Ese pedido ya cambió' });
+          // updateMany condicionado a que la parte siga libre: dos clics a la vez no firman dos veces
+          const r = await tx.solicitudTurno.updateMany({ where: { id: s.id, estado: 'PENDIENTE_APRUEBA', ...cond }, data: datos });
+          if (r.count === 0) throw new ConflictException({ codigo: 'PARTE_YA_APROBADA', mensaje: 'Esa parte ya la aprobó otra persona. Revisa el pedido.' });
+          const actual = { ...s, ...datos };
           const { a, b } = this.pierna(s);
           await this.exigir(tx, { tipo: s.tipo, solicitante: s.solicitante_party_id, reemplazo: s.reemplazo_party_id, a, b, excluirId: s.id });
+          if (this.faltan(actual).length > 0) return { completa: false, ids: [] as number[], estado: actual };
+
           const creadas: number[] = [];
           const cobertura = async (p: Pierna, cubre: bigint, reemplaza: bigint) => {
             const c = await tx.coberturaTurno.create({
@@ -409,11 +461,9 @@ export class AsistenciaTurnosService {
           };
           await cobertura(a, s.reemplazo_party_id, s.solicitante_party_id);
           if (b) await cobertura(b, s.solicitante_party_id, s.reemplazo_party_id);
-          await tx.solicitudTurno.update({
-            where: { id: s.id },
-            data: { estado: 'APROBADA', resuelta_por: usuario.partyId, resuelta_en: ahora, motivo_resolucion: (nota ?? '').trim() || null, cobertura_ids: creadas as any },
-          });
-          return creadas;
+          const fin = { resuelta_por: usuario.partyId, resuelta_en: ahora, motivo_resolucion: notaTxt, cobertura_ids: creadas as any };
+          await tx.solicitudTurno.update({ where: { id: s.id }, data: { estado: 'APROBADA', ...fin } });
+          return { completa: true, ids: creadas, estado: { ...actual, estado: 'APROBADA', ...fin } };
         },
         { isolationLevel: 'Serializable' },
       );
@@ -422,12 +472,18 @@ export class AsistenciaTurnosService {
       if (e?.code === 'P2034') throw new ConflictException({ codigo: 'CONDICIONES_CAMBIARON', mensaje: 'Las condiciones cambiaron mientras aprobabas. Revisa el pedido y vuelve a intentar.' });
       throw e;
     }
-    await this.auditar('APROBAR_TURNO', usuario.partyId, ip, { ...s0, estado: 'APROBADA' }, (nota ?? '').trim() || undefined, { coberturas: ids });
-    const n = await this.nombres([s0.solicitante_party_id, s0.reemplazo_party_id]);
-    const f = etiquetaDia(isoDe(s0.fecha));
-    await this.avisar('TURNO_RESUELTO', { party: s0.solicitante_party_id }, `Aprobado: ${n.get(s0.reemplazo_party_id)} te cubre el ${f}`, null);
-    await this.avisar('TURNO_RESUELTO', { party: s0.reemplazo_party_id }, `Aprobado: cubres a ${n.get(s0.solicitante_party_id)} el ${f}`, `${hhmmDe(s0.desde)} a ${hhmmDe(s0.hasta)}. Si no marcas a tiempo, será tu falta.`);
-    return { ok: true, coberturas: ids };
+
+    if (res.completa) {
+      await this.auditar('APROBAR_TURNO', usuario.partyId, ip, { ...s0, estado: 'APROBADA' }, notaTxt ?? undefined, { coberturas: res.ids });
+      const n = await this.nombres([s0.solicitante_party_id, s0.reemplazo_party_id]);
+      const f = etiquetaDia(isoDe(s0.fecha));
+      await this.avisar('TURNO_RESUELTO', { party: s0.solicitante_party_id }, `Aprobado: ${n.get(s0.reemplazo_party_id)} te cubre el ${f}`, null);
+      await this.avisar('TURNO_RESUELTO', { party: s0.reemplazo_party_id }, `Aprobado: cubres a ${n.get(s0.solicitante_party_id)} el ${f}`, `${hhmmDe(s0.desde)} a ${hhmmDe(s0.hasta)}. Si no marcas a tiempo, será tu falta.`);
+      await this.avisarEquipo('APRUEBA', res.estado);
+    } else {
+      await this.auditar('APROBAR_TURNO_PARCIAL', usuario.partyId, ip, { ...s0, estado: 'PENDIENTE_APRUEBA' }, notaTxt ?? undefined, { parte });
+    }
+    return { ok: true, completa: res.completa, falta: this.faltan(res.estado), coberturas: res.ids };
   }
 
   async rechazarAdmin(id: number, motivoTxt: string, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
@@ -435,7 +491,9 @@ export class AsistenciaTurnosService {
     if (motivo.length < 5) throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo del rechazo (mínimo 5 caracteres)' });
     const s = await this.cargar(id);
     this.exigirNoInvolucrado(s, usuario);
+    this.exigirAprobador(usuario);
     this.exigirEstado(s, ['PENDIENTE_APRUEBA'], 'Ese pedido no está esperando aprobación');
+    // Basta un rechazo (de Supervisión o de Administración) para que el pedido quede RECHAZADA
     const r = await this.prisma.solicitudTurno.updateMany({
       where: { id: s.id, estado: 'PENDIENTE_APRUEBA' },
       data: { estado: 'RECHAZADA', resuelta_por: usuario.partyId, resuelta_en: ahora, motivo_resolucion: motivo },
@@ -446,6 +504,7 @@ export class AsistenciaTurnosService {
     for (const quien of [s.solicitante_party_id, s.reemplazo_party_id]) {
       await this.avisar('TURNO_RESUELTO', { party: quien }, `Supervisión rechazó el pedido de turno del ${f}`, motivo);
     }
+    await this.avisarEquipo('RECHAZA', { ...s, estado: 'RECHAZADA', motivo_resolucion: motivo }, { quien: usuario.partyId });
     return { ok: true };
   }
 
@@ -454,7 +513,7 @@ export class AsistenciaTurnosService {
   // ---------------------------------------------------------------------------
 
   private async plano(filas: any[], conValidacion = false) {
-    const ids = [...new Set(filas.flatMap((s) => [s.solicitante_party_id, s.reemplazo_party_id]))];
+    const ids = [...new Set(filas.flatMap((s) => [s.solicitante_party_id, s.reemplazo_party_id, s.aprobado_sup_por, s.aprobado_adm_por]).filter((x) => x != null))] as bigint[];
     const cuentas = ids.length ? await this.cuentas(this.prisma, ids) : new Map<bigint, Cuenta>();
     const nombres = await this.nombres(ids);
     const salida = [];
@@ -477,6 +536,11 @@ export class AsistenciaTurnosService {
         reemplazo: { partyId: Number(s.reemplazo_party_id), nombre: nombres.get(s.reemplazo_party_id) ?? '' },
         area: sol ? (sol.areas.length ? sol.areas.map((x) => x.nombre).join(', ') : sol.roles.map(nombreRol).join(', ')) : '',
         motivoResolucion: s.motivo_resolucion ?? null,
+        aprobacion: {
+          supervision: s.aprobado_sup_por != null ? { porId: Number(s.aprobado_sup_por), nombre: nombres.get(s.aprobado_sup_por) ?? '', en: s.aprobado_sup_en?.toISOString() ?? null } : null,
+          administracion: s.aprobado_adm_por != null ? { porId: Number(s.aprobado_adm_por), nombre: nombres.get(s.aprobado_adm_por) ?? '', en: s.aprobado_adm_en?.toISOString() ?? null } : null,
+          faltan: this.faltan(s),
+        },
         creadaEn: s.creada_en.toISOString(),
         validacion,
       });
@@ -554,6 +618,167 @@ export class AsistenciaTurnosService {
       await this.avisar('TURNO_SIN_MARCA', { party: s.solicitante_party_id }, `El reemplazo no marcó: el turno del ${etiquetaDia(falto.fecha)} quedó sin cubrir`, null);
     }
     return { vencidas, sinMarca };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tablero «Equipo de hoy» (todo el personal que marca) y destinatarios de avisos
+  // ---------------------------------------------------------------------------
+
+  /** Solo nombres, áreas/roles y horarios del día laboral. Nada de sueldos, pagos ni datos de contacto. */
+  async equipoHoy(ahora = new Date()) {
+    const hoy = jornadaDe(ahora).jornada;
+    const d = await this.datosRango(this.prisma, hoy, hoy);
+    const cuentas = await this.cuentas(this.prisma);
+    const cambiosHoy = await this.prisma.solicitudTurno.findMany({
+      where: { estado: 'APROBADA', tipo: 'CAMBIO_TURNO', OR: [{ fecha: fechaDb(hoy) }, { fecha_devolucion: fechaDb(hoy) }] },
+    });
+    const nombreDe = (id: bigint) => cuentas.get(id)?.nombre ?? 'Alguien';
+    const areaDe = (id: bigint) => {
+      const c = cuentas.get(id);
+      if (!c) return '';
+      return c.areas.length ? c.areas.map((x) => x.nombre).join(', ') : c.roles.map(nombreRol).join(', ');
+    };
+    const enHorario = new Set(d.ctx.horarios.map((h) => h.partyId));
+    const trabajan: Array<{ partyId: number; nombre: string; area: string; desde: string; hasta: string; cubreA: string[]; cubiertoParcialmentePor: string[] }> = [];
+    const descansan: Array<{ partyId: number; nombre: string; area: string; motivo: string }> = [];
+    for (const c of cuentas.values()) {
+      if (c.roles.every((r) => r === 'ADMIN')) continue;
+      const fin = d.ceses.get(c.partyId);
+      if (fin && fin < hoy) continue;
+      const { turno, motivoDescanso } = resolverTurno(c.partyId, hoy, d.ctx);
+      const cubreA = d.ctx.coberturas.filter((x) => x.fecha === hoy && x.cubreId === c.partyId && x.reemplazaId).map((x) => nombreDe(x.reemplazaId as bigint));
+      const cubiertoPor = d.ctx.coberturas.filter((x) => x.fecha === hoy && x.reemplazaId === c.partyId).map((x) => nombreDe(x.cubreId));
+      if (turno) {
+        trabajan.push({ partyId: Number(c.partyId), nombre: c.nombre, area: areaDe(c.partyId), desde: hhmmMin(turno.entrada), hasta: hhmmMin(turno.salida), cubreA, cubiertoParcialmentePor: cubiertoPor });
+      } else if (enHorario.has(c.partyId)) {
+        const vacaciones = d.vacaciones.some((v) => v.partyId === c.partyId && v.desde <= hoy && v.hasta >= hoy);
+        const motivo = vacaciones ? 'Vacaciones o licencia' : cubiertoPor.length ? `Cubierto por ${cubiertoPor.join(', ')}` : (motivoDescanso ?? 'Día libre');
+        descansan.push({ partyId: Number(c.partyId), nombre: c.nombre, area: areaDe(c.partyId), motivo });
+      }
+    }
+    trabajan.sort((x, y) => x.desde.localeCompare(y.desde) || x.nombre.localeCompare(y.nombre));
+    descansan.sort((x, y) => x.nombre.localeCompare(y.nombre));
+    const cambios = cambiosHoy.map((s: any) => ({ texto: `${nombreDe(s.solicitante_party_id)} y ${nombreDe(s.reemplazo_party_id)} cambiaron turno` }));
+    return { jornada: hoy, ahora: ahora.toISOString(), trabajan, cambios, descansan };
+  }
+
+  /** Quién recibe los avisos de reemplazos y cambios: ADMIN y SUPERVISOR activos, con la casilla y los canales (sin los números). */
+  async avisosEquipo() {
+    const filas: any[] = await this.prisma.userAccount.findMany({
+      where: { activo: true, rol: { in: ['ADMIN', 'SUPERVISOR'] } },
+      include: {
+        party: {
+          include: {
+            persona: { select: { nombres: true, apellidos: true, correo: true } },
+            contactos: { where: { tipo: 'WHATSAPP', activo: true }, select: { valor: true } },
+          },
+        },
+      },
+    });
+    return filas
+      .map((u) => {
+        const persona = u.party?.persona;
+        const nombre = [persona?.nombres, persona?.apellidos].filter(Boolean).join(' ') || `Persona ${u.party_id}`;
+        const celular = (u.party?.contactos ?? []).some((c: any) => normalizarCelularPeru(c.valor).valido);
+        return { partyId: Number(u.party_id), nombre, rol: u.rol as string, avisos: !!u.avisos_turnos, canal: { celular, correo: !!persona?.correo } };
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  async configurarAvisoEquipo(partyId: number, activo: boolean, usuario: UsuarioAutenticado, ip?: string) {
+    if (![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo Administración elige quién recibe estos avisos' });
+    }
+    const cuenta = await this.prisma.userAccount.findUnique({ where: { party_id: BigInt(partyId) }, select: { rol: true, activo: true } });
+    if (!cuenta || !cuenta.activo || !['ADMIN', 'SUPERVISOR'].includes(cuenta.rol)) {
+      throw new BadRequestException({ codigo: 'SIN_AVISOS', mensaje: 'Solo Administración y Supervisión pueden recibir estos avisos' });
+    }
+    await this.prisma.userAccount.update({ where: { party_id: BigInt(partyId) }, data: { avisos_turnos: activo } });
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO' as any,
+      modulo: 'asistencia',
+      accion: 'AVISOS_TURNO_DESTINATARIO',
+      resultado: 'OK',
+      entidad: 'user_account',
+      entidadId: partyId,
+      despues: { avisos_turnos: activo },
+      partyId: usuario.partyId,
+      ip,
+    } as any);
+    return { ok: true };
+  }
+
+  /**
+   * Aviso a quienes eligió Administración, en 4 momentos: pide, acepta, aprueba (las dos partes) o rechaza.
+   * WhatsApp por la cola de salida (respeta ventana de 24 h y plantilla); si no hay celular, correo.
+   * Best-effort: nunca lanza. La campanita de Supervisión/Admin sigue por su lado.
+   */
+  private async avisarEquipo(evento: EventoAvisoTurno, s: any, extra: { quien?: bigint } = {}) {
+    try {
+      const destinos: any[] = await this.prisma.userAccount.findMany({
+        where: { activo: true, avisos_turnos: true },
+        include: {
+          party: {
+            include: {
+              persona: { select: { correo: true } },
+              contactos: { where: { tipo: 'WHATSAPP', activo: true }, orderBy: { principal: 'desc' }, select: { valor: true } },
+            },
+          },
+        },
+      });
+      if (destinos.length === 0) return;
+      const { titulo, detalle } = await this.textoAviso(evento, s, extra);
+      for (const u of destinos) {
+        const clave = `turno:${s.id}:${evento}:${u.party_id}`;
+        const celular = (u.party?.contactos ?? []).map((c: any) => normalizarCelularPeru(c.valor)).find((n: any) => n.valido)?.celularE164;
+        const correo = u.party?.persona?.correo?.trim().toLowerCase();
+        try {
+          if (celular && this.outbox) {
+            await this.outbox.encolar({
+              telefono: celular,
+              tipo: 'TEXTO',
+              clave,
+              origen: 'ALERTA_ADMIN',
+              carga: { textoLibre: `*${titulo}*\n\n${detalle}`, plantillaClave: 'AVISO_INTERNO', variablesPlantilla: [titulo, detalle], autor: 'BOT', etapa: 'AVISO_TURNO' },
+            });
+          } else if (correo && this.correo) {
+            await this.correo.enviar({ clave, origen: 'ALERTA_ADMIN', asunto: titulo, texto: detalle, destinatarios: [correo] });
+          } else {
+            this.logger.warn(`Aviso de turno ${evento} sin canal para una persona elegida (sin celular ni correo)`);
+          }
+        } catch (e) {
+          this.logger.error(`Aviso de turno ${evento} no enviado: ${(e as Error).message}`);
+        }
+      }
+    } catch (e) {
+      this.logger.error(`Avisos de turnos (${evento}) no enviados: ${(e as Error).message}`);
+    }
+  }
+
+  private async textoAviso(evento: EventoAvisoTurno, s: any, extra: { quien?: bigint }) {
+    const ids = [s.solicitante_party_id, s.reemplazo_party_id, s.aprobado_sup_por, s.aprobado_adm_por, extra.quien].filter((x) => x != null) as bigint[];
+    const n = await this.nombres(ids);
+    const sol = n.get(s.solicitante_party_id) ?? 'Alguien';
+    const rep = n.get(s.reemplazo_party_id) ?? 'Alguien';
+    const cuando = `el ${etiquetaDia(isoDe(s.fecha))} de ${hhmmDe(s.desde)} a ${hhmmDe(s.hasta)}`;
+    const pedido =
+      s.tipo === 'CAMBIO_TURNO' && s.fecha_devolucion
+        ? `Cambio de turno: ${rep} cubre a ${sol} ${cuando}, y ${sol} cubre a ${rep} el ${etiquetaDia(isoDe(s.fecha_devolucion))} de ${hhmmDe(s.desde_devolucion)} a ${hhmmDe(s.hasta_devolucion)}.`
+        : `Reemplazo: ${rep} cubre a ${sol} ${cuando}.`;
+    const aprob = `Supervisión: ${s.aprobado_sup_por != null ? `aprobó ${n.get(s.aprobado_sup_por)}` : 'falta'}. Administración: ${s.aprobado_adm_por != null ? `aprobó ${n.get(s.aprobado_adm_por)}` : 'falta'}.`;
+    const motivo = `Motivo: ${s.motivo}`;
+    if (evento === 'PIDE') {
+      return {
+        titulo: `Pedido de ${s.tipo === 'CAMBIO_TURNO' ? 'cambio de turno' : 'reemplazo'} de ${sol}`,
+        detalle: `${pedido}\n${motivo}\nFalta que ${rep} acepte, y después Supervisión y Administración.`,
+      };
+    }
+    if (evento === 'ACEPTA') return { titulo: `${rep} aceptó el pedido de ${sol}`, detalle: `${pedido}\n${motivo}\n${aprob}` };
+    if (evento === 'APRUEBA') return { titulo: `Turno aprobado: ${sol} y ${rep}`, detalle: `${pedido}\n${motivo}\n${aprob}` };
+    return {
+      titulo: `Turno rechazado: ${sol} y ${rep}`,
+      detalle: `${pedido}\n${motivo}\nRechazó ${n.get(extra.quien as bigint) ?? 'Alguien'}: ${s.motivo_resolucion ?? 'sin motivo'}`,
+    };
   }
 
   // ---------------------------------------------------------------------------

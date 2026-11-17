@@ -7,6 +7,8 @@ import { useSesion } from '../../comun/sesion';
 import { jornadaActual } from './jornada';
 import { miCalendario } from './miCalendarioApi';
 import { PorAprobarTurnos } from './PorAprobarTurnos';
+import { ChipsAprobacion } from './AprobacionTurno';
+import { textoAprobacion } from './aprobacionTurno';
 import {
   aceptarTurno, cancelarTurno, candidatosTurno, crearTurno, ETIQUETA_ESTADO_TURNO, misTurnos, rechazarTurno, turnosParaDevolver,
   type Candidato, type Candidatos, type EstadoTurno, type SolicitudTurno, type TipoTurno, type TurnoDevolver,
@@ -335,6 +337,8 @@ export function ReemplazosTurno() {
               <b>{s.tipo === 'CAMBIO_TURNO' ? 'Cambio con' : 'Te cubre'} {s.reemplazo.nombre}</b>
               <small>{detalle(s)}</small>
               {s.motivoResolucion && <small>Respuesta: {s.motivoResolucion}</small>}
+              <ChipsAprobacion s={s} />
+              {textoAprobacion(s) && <small>{textoAprobacion(s)}</small>}
             </span>
             <Insignia variante={VARIANTE[s.estado]}>{ETIQUETA_ESTADO_TURNO[s.estado]}</Insignia>
             {ACTIVA(s.estado) && <Boton type="button" variante="texto" onClick={() => { setErrorAccion(null); setAccion({ tipo: 'cancelar', s }); }}>Cancelar pedido</Boton>}

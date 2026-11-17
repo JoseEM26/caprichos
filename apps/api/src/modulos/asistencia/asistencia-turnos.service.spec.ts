@@ -1,6 +1,6 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { AsistenciaTurnosService } from './asistencia-turnos.service';
 import { AsistenciaTurnosTarea } from './asistencia-turnos.tarea';
 
@@ -62,8 +62,20 @@ function armar(opts: { extraCuentas?: any[] } = {}) {
       if (v && typeof v === 'object') return true; // rangos y not: la prueba fija el contexto
       return fila[k] === v;
     });
+  // Filtro de where de Prisma: null = campo vacío; {in} = lista; objetos sin soporte (OR, rangos) se dan por buenos
+  const coincide = (fila: any, where: any) =>
+    Object.entries(where).every(([k, v]: [string, any]) => {
+      if (v === null) return fila[k] == null;
+      if (v && typeof v === 'object' && 'in' in v) return v.in.includes(fila[k]);
+      if (v && typeof v === 'object') return true;
+      return fila[k] === v;
+    });
   const prisma: any = {
-    userAccount: { findMany: jest.fn(async ({ where }: any) => bd.cuentas.filter((c) => c.activo && cumple(c, where?.party_id ? { party_id: where.party_id } : {}))) },
+    userAccount: {
+      findMany: jest.fn(async ({ where }: any) => bd.cuentas.filter((c) => coincide(c, where ?? {}))),
+      findUnique: jest.fn(async ({ where }: any) => bd.cuentas.find((c) => c.party_id === where.party_id) ?? null),
+      update: jest.fn(async ({ where, data }: any) => { const c = bd.cuentas.find((x) => x.party_id === where.party_id); Object.assign(c, data); return c; }),
+    },
     person: { findMany: jest.fn(async ({ where }: any) => bd.cuentas.filter((c) => where.party_id.in.includes(c.party_id)).map((c) => ({ party_id: c.party_id, nombres: `P${c.party_id}`, apellidos: '' }))) },
     horarioTrabajo: { findMany: jest.fn(async () => bd.horarios) },
     coberturaTurno: {
@@ -82,7 +94,7 @@ function armar(opts: { extraCuentas?: any[] } = {}) {
       create: jest.fn(async ({ data }: any) => { const s = { id: BigInt(bd.solicitudes.length + 1), aceptada_en: null, resuelta_por: null, resuelta_en: null, motivo_resolucion: null, cobertura_ids: null, sin_marca_en: null, creada_en: AHORA, fecha_devolucion: null, desde_devolucion: null, hasta_devolucion: null, ...data }; bd.solicitudes.push(s); return s; }),
       update: jest.fn(async ({ where, data }: any) => { const s = bd.solicitudes.find((x) => x.id === where.id); Object.assign(s, data); return s; }),
       updateMany: jest.fn(async ({ where, data }: any) => {
-        const hit = bd.solicitudes.filter((s) => s.id === where.id && (typeof where.estado === 'string' ? s.estado === where.estado : where.estado.in.includes(s.estado)));
+        const hit = bd.solicitudes.filter((s) => coincide(s, where));
         hit.forEach((s) => Object.assign(s, data));
         return { count: hit.length };
       }),
@@ -94,8 +106,10 @@ function armar(opts: { extraCuentas?: any[] } = {}) {
     cuentas: jest.fn(async (ids: bigint[]) => new Map(ids.map((i) => [i, { nombre: `P${i}` }]))),
   };
   const auditoria = { registrar: jest.fn(async () => undefined) };
-  const servicio = new AsistenciaTurnosService(prisma, asistencia as any, auditoria as any, undefined);
-  return { servicio, prisma, bd, auditoria };
+  const outbox: any = { encolar: jest.fn(async (..._a: any[]) => true), despertar: jest.fn() };
+  const correo: any = { enviar: jest.fn(async (..._a: any[]) => ({ ok: true })) };
+  const servicio = new AsistenciaTurnosService(prisma, asistencia as any, auditoria as any, undefined, outbox as any, correo as any);
+  return { servicio, prisma, bd, auditoria, outbox, correo };
 }
 
 const dto = (extra: Record<string, unknown> = {}) => ({
@@ -235,7 +249,10 @@ describe('flujo: aceptar, rechazar, cancelar, aprobar', () => {
     expect(await codigo(servicio.aprobar(1, undefined, usuario(SUP, 'SUPERVISOR'), undefined, AHORA))).toBe('ESTADO_NO_PERMITIDO');
     await servicio.aceptar(1, usuario(B), undefined, AHORA);
     expect(bd.solicitudes[0].estado).toBe('PENDIENTE_APRUEBA');
-    expect(bd.notificaciones).toEqual([expect.objectContaining({ tipo: 'TURNO_POR_APROBAR', rol_destino: 'SUPERVISOR' })]);
+    expect(bd.notificaciones).toEqual([
+      expect.objectContaining({ tipo: 'TURNO_POR_APROBAR', rol_destino: 'SUPERVISOR' }),
+      expect.objectContaining({ tipo: 'TURNO_POR_APROBAR', rol_destino: 'ADMIN' }),
+    ]);
     expect(await codigo(servicio.aceptar(1, usuario(B), undefined, AHORA))).toBe('ESTADO_NO_PERMITIDO');
   });
 
@@ -252,6 +269,7 @@ describe('flujo: aceptar, rechazar, cancelar, aprobar', () => {
     expect(await codigo(servicio.cancelar(1, usuario(B), undefined, AHORA))).toBe('TURNO_AJENO');
     await servicio.aceptar(1, usuario(B), undefined, AHORA);
     await servicio.aprobar(1, undefined, usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
+    await servicio.aprobar(1, undefined, usuario(ADM, 'ADMIN'), undefined, AHORA);
     expect(await codigo(servicio.cancelar(1, usuario(A), undefined, AHORA))).toBe('ESTADO_NO_PERMITIDO');
     expect(bd.solicitudes[0].estado).toBe('APROBADA');
   });
@@ -267,16 +285,18 @@ describe('flujo: aceptar, rechazar, cancelar, aprobar', () => {
     const { servicio, bd } = await conPedido();
     await servicio.aceptar(1, usuario(B), undefined, AHORA);
     bd.notificaciones.length = 0;
-    const r = await servicio.aprobar(1, 'ok', usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
+    await servicio.aprobar(1, 'ok', usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
+    const r = await servicio.aprobar(1, undefined, usuario(ADM, 'ADMIN'), undefined, AHORA);
     expect(r.coberturas).toHaveLength(1);
-    expect(bd.coberturas).toEqual([expect.objectContaining({ fecha: d(LUNES), cubre_party_id: B, reemplaza_party_id: A, por: SUP })]);
-    expect(bd.solicitudes[0]).toMatchObject({ estado: 'APROBADA', resuelta_por: SUP, cobertura_ids: [100] });
+    expect(bd.coberturas).toEqual([expect.objectContaining({ fecha: d(LUNES), cubre_party_id: B, reemplaza_party_id: A, por: ADM })]);
+    expect(bd.solicitudes[0]).toMatchObject({ estado: 'APROBADA', resuelta_por: ADM, cobertura_ids: [100] });
     expect(bd.notificaciones.map((n) => n.party_destino).sort()).toEqual([A, B]);
   });
 
   it('un cambio de turno aprobado crea DOS coberturas, una en cada dirección', async () => {
     const { servicio, bd } = await conPedido({ tipo: 'CAMBIO_TURNO', fechaDevolucion: MARTES, desdeDevolucion: '10:00', hastaDevolucion: '18:00' });
     await servicio.aceptar(1, usuario(B), undefined, AHORA);
+    await servicio.aprobar(1, undefined, usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
     await servicio.aprobar(1, undefined, usuario(ADM, 'ADMIN'), undefined, AHORA);
     expect(bd.coberturas).toHaveLength(2);
     expect(bd.coberturas[0]).toMatchObject({ fecha: d(LUNES), cubre_party_id: B, reemplaza_party_id: A });
@@ -348,6 +368,7 @@ describe('tarea: vencimientos y reemplazo que no marcó', () => {
     await ctx.servicio.crear(dto(extra), usuario(A), undefined, AHORA);
     await ctx.servicio.aceptar(1, usuario(B), undefined, AHORA);
     await ctx.servicio.aprobar(1, undefined, usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
+    await ctx.servicio.aprobar(1, undefined, usuario(ADM, 'ADMIN'), undefined, AHORA);
     ctx.bd.notificaciones.length = 0;
     return ctx;
   }
@@ -406,3 +427,219 @@ describe('tarea: vencimientos y reemplazo que no marcó', () => {
   });
 });
 
+describe('doble aprobación: supervisión y administración', () => {
+  const SUP2 = 51n; // otra supervisora
+  const ADM2 = 52n; // otro administrador
+  const sup = usuario(SUP, 'SUPERVISOR');
+  const adm = usuario(ADM, 'ADMIN');
+  async function listo(extra: Record<string, unknown> = {}) {
+    const ctx = armar({
+      extraCuentas: [
+        { party_id: SUP2, rol: 'SUPERVISOR', activo: true, rolesExtra: [], areasCocina: [] },
+        { party_id: ADM2, rol: 'ADMIN', activo: true, rolesExtra: [], areasCocina: [] },
+      ],
+    });
+    await ctx.servicio.crear(dto(extra), usuario(A), undefined, AHORA);
+    await ctx.servicio.aceptar(1, usuario(B), undefined, AHORA);
+    return ctx;
+  }
+
+  it('solo la supervisora no aprueba del todo: falta administración y no hay coberturas', async () => {
+    const { servicio, bd } = await listo();
+    expect(await servicio.aprobar(1, undefined, sup, undefined, AHORA)).toMatchObject({ completa: false, falta: ['ADMINISTRACION'] });
+    expect(bd.solicitudes[0]).toMatchObject({ estado: 'PENDIENTE_APRUEBA', aprobado_sup_por: SUP });
+    expect(bd.coberturas).toHaveLength(0);
+  });
+
+  it('solo el administrador no aprueba del todo: falta supervisión y no hay coberturas', async () => {
+    const { servicio, bd } = await listo();
+    expect(await servicio.aprobar(1, undefined, adm, undefined, AHORA)).toMatchObject({ completa: false, falta: ['SUPERVISION'] });
+    expect(bd.coberturas).toHaveLength(0);
+  });
+
+  it.each([
+    ['supervisión primero', ['sup', 'adm']],
+    ['administración primero', ['adm', 'sup']],
+  ])('con las dos partes, %s, queda APROBADA y crea la cobertura una sola vez', async (_t, orden) => {
+    const { servicio, bd } = await listo();
+    for (const quien of orden) await servicio.aprobar(1, undefined, quien === 'sup' ? sup : adm, undefined, AHORA);
+    expect(bd.solicitudes[0]).toMatchObject({ estado: 'APROBADA', aprobado_sup_por: SUP, aprobado_adm_por: ADM });
+    expect(bd.coberturas).toEqual([expect.objectContaining({ cubre_party_id: B, reemplaza_party_id: A })]);
+    // idempotencia: aprobar otra vez un pedido ya aprobado no crea nada
+    expect(await codigo(servicio.aprobar(1, undefined, sup, undefined, AHORA))).toBe('ESTADO_NO_PERMITIDO');
+    expect(bd.coberturas).toHaveLength(1);
+  });
+
+  it('una misma persona con los dos roles no cuenta dos veces: necesita a otra persona para la otra parte', async () => {
+    const { servicio, bd } = await listo();
+    const doble = { partyId: ADM, rol: 'ADMIN', roles: ['ADMIN', 'SUPERVISOR'], debeCambiar: false } as any;
+    expect(await servicio.aprobar(1, undefined, doble, undefined, AHORA)).toMatchObject({ completa: false, falta: ['ADMINISTRACION'] });
+    expect(await codigo(servicio.aprobar(1, undefined, doble, undefined, AHORA))).toBe('YA_APROBASTE');
+    expect(await codigo(servicio.aprobar(1, undefined, sup, undefined, AHORA))).toBe('PARTE_YA_APROBADA');
+    expect(bd.coberturas).toHaveLength(0);
+    expect(await servicio.aprobar(1, undefined, usuario(ADM2, 'ADMIN'), undefined, AHORA)).toMatchObject({ completa: true });
+    expect(bd.coberturas).toHaveLength(1);
+  });
+
+  it('la misma parte no se firma dos veces: otra supervisora no puede si ya aprobó una', async () => {
+    const { servicio } = await listo();
+    await servicio.aprobar(1, undefined, sup, undefined, AHORA);
+    expect(await codigo(servicio.aprobar(1, undefined, usuario(SUP2, 'SUPERVISOR'), undefined, AHORA))).toBe('PARTE_YA_APROBADA');
+    expect(await codigo(servicio.aprobar(1, undefined, sup, undefined, AHORA))).toBe('YA_APROBASTE');
+  });
+
+  it('quien no es supervisora ni administrador no aprueba ni rechaza', async () => {
+    const { servicio, bd } = await listo();
+    expect(await codigo(servicio.aprobar(1, undefined, usuario(C, 'CAJERO'), undefined, AHORA))).toBe('SIN_PERMISO_APROBAR');
+    expect(await codigo(servicio.rechazarAdmin(1, 'Motivo válido', usuario(C, 'CAJERO'), undefined, AHORA))).toBe('SIN_PERMISO_APROBAR');
+    expect(bd.solicitudes[0].estado).toBe('PENDIENTE_APRUEBA');
+  });
+
+  it('un rechazo de cualquiera de las dos partes deja RECHAZADA, con motivo y sin coberturas', async () => {
+    const { servicio, bd } = await listo();
+    await servicio.aprobar(1, undefined, sup, undefined, AHORA);
+    await servicio.rechazarAdmin(1, 'Falta personal ese día', adm, undefined, AHORA);
+    expect(bd.solicitudes[0]).toMatchObject({ estado: 'RECHAZADA', motivo_resolucion: 'Falta personal ese día' });
+    expect(bd.coberturas).toHaveLength(0);
+    expect(await codigo(servicio.aprobar(1, undefined, adm, undefined, AHORA))).toBe('ESTADO_NO_PERMITIDO');
+  });
+
+  it('la supervisora también puede rechazar sin aprobación previa', async () => {
+    const { servicio, bd } = await listo();
+    await servicio.rechazarAdmin(1, 'Motivo válido', sup, undefined, AHORA);
+    expect(bd.solicitudes[0].estado).toBe('RECHAZADA');
+  });
+});
+
+describe('avisos de reemplazos y cambios a quien eligió Administración', () => {
+  const eligidos = (bd: any) => {
+    const adm = bd.cuentas.find((c: any) => c.party_id === ADM);
+    adm.avisos_turnos = true;
+    adm.party = { persona: { nombres: 'Administradora', apellidos: 'Prueba', correo: 'admin@ejemplo.com' }, contactos: [{ valor: '999000111' }] };
+    const sup = bd.cuentas.find((c: any) => c.party_id === SUP);
+    sup.avisos_turnos = true;
+    sup.party = { persona: { nombres: 'Supervisora', apellidos: 'Prueba', correo: 'sup@ejemplo.com' }, contactos: [] };
+  };
+  const sup = usuario(SUP, 'SUPERVISOR');
+  const adm = usuario(ADM, 'ADMIN');
+
+  it('avisa en los cuatro momentos: pide, acepta, aprueba (cuando quedan las dos partes) y rechaza', async () => {
+    const { servicio, bd, outbox, correo } = armar();
+    eligidos(bd);
+    const cuenta = (ev: string) => [...outbox.encolar.mock.calls, ...correo.enviar.mock.calls].filter((c: any) => c[0].clave.split(':')[2] === ev).length;
+    await servicio.crear(dto(), usuario(A), undefined, AHORA);
+    expect(cuenta('PIDE')).toBe(2);
+    await servicio.aceptar(1, usuario(B), undefined, AHORA);
+    expect(cuenta('ACEPTA')).toBe(2);
+    await servicio.aprobar(1, undefined, sup, undefined, AHORA);
+    expect(cuenta('APRUEBA')).toBe(0); // falta administración: todavía no se avisa como aprobado
+    await servicio.aprobar(1, undefined, adm, undefined, AHORA);
+    expect(cuenta('APRUEBA')).toBe(2);
+  });
+
+  it('con celular va por WhatsApp (cola de salida, con plantilla de respaldo); sin celular, por correo', async () => {
+    const { servicio, bd, outbox, correo } = armar();
+    eligidos(bd);
+    await servicio.crear(dto(), usuario(A), undefined, AHORA);
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+    expect(outbox.encolar.mock.calls[0][0]).toMatchObject({ telefono: '51999000111', tipo: 'TEXTO', carga: { plantillaClave: 'AVISO_INTERNO' } });
+    expect(correo.enviar).toHaveBeenCalledTimes(1);
+    expect(correo.enviar.mock.calls[0][0].destinatarios).toEqual(['sup@ejemplo.com']);
+  });
+
+  it('el rechazo lleva el motivo a quienes avisa', async () => {
+    const { servicio, bd, outbox, correo } = armar();
+    eligidos(bd);
+    await servicio.crear(dto(), usuario(A), undefined, AHORA);
+    await servicio.aceptar(1, usuario(B), undefined, AHORA);
+    await servicio.rechazarAdmin(1, 'Falta personal ese día', adm, undefined, AHORA);
+    expect(JSON.stringify([...outbox.encolar.mock.calls, ...correo.enviar.mock.calls])).toContain('Falta personal ese día');
+  });
+
+  it('un fallo del aviso no tumba la solicitud', async () => {
+    const { servicio, bd, outbox, correo } = armar();
+    eligidos(bd);
+    outbox.encolar.mockRejectedValueOnce(new Error('cola caída'));
+    correo.enviar.mockRejectedValueOnce(new Error('correo caído'));
+    await expect(servicio.crear(dto(), usuario(A), undefined, AHORA)).resolves.toMatchObject({ ok: true });
+    expect(bd.solicitudes[0].estado).toBe('PENDIENTE_ACEPTA');
+  });
+
+  it('sin destinatarios elegidos no envía nada', async () => {
+    const { servicio, outbox, correo } = armar();
+    await servicio.crear(dto(), usuario(A), undefined, AHORA);
+    expect(outbox.encolar).not.toHaveBeenCalled();
+    expect(correo.enviar).not.toHaveBeenCalled();
+  });
+});
+
+describe('destinatarios de los avisos (Configuración)', () => {
+  it('lista solo ADMIN y SUPERVISOR con su casilla y canales, sin números ni correos', async () => {
+    const { servicio, bd } = armar();
+    const adm = bd.cuentas.find((c: any) => c.party_id === ADM);
+    adm.avisos_turnos = true;
+    adm.party = { persona: { nombres: 'Administradora', apellidos: 'Prueba', correo: 'admin@ejemplo.com' }, contactos: [{ valor: '999000111' }] };
+    const lista = await servicio.avisosEquipo();
+    expect(lista.map((x) => x.rol).sort()).toEqual(['ADMIN', 'SUPERVISOR']);
+    expect(lista.find((x) => x.rol === 'ADMIN')).toMatchObject({ avisos: true, canal: { celular: true, correo: true }, nombre: 'Administradora Prueba' });
+    expect(JSON.stringify(lista)).not.toMatch(/999000111|ejemplo/);
+  });
+
+  it('solo Administración cambia la casilla, y solo a ADMIN o SUPERVISOR', async () => {
+    const { servicio, bd } = armar();
+    await expect(servicio.configurarAvisoEquipo(Number(SUP), false, usuario(SUP, 'SUPERVISOR'))).rejects.toBeInstanceOf(ForbiddenException);
+    await servicio.configurarAvisoEquipo(Number(SUP), true, usuario(ADM, 'ADMIN'));
+    expect(bd.cuentas.find((c: any) => c.party_id === SUP).avisos_turnos).toBe(true);
+    expect(await codigo(servicio.configurarAvisoEquipo(Number(A), true, usuario(ADM, 'ADMIN')))).toBe('SIN_AVISOS');
+  });
+});
+
+describe('tablero Equipo de hoy', () => {
+  const LUNES_10 = new Date('2026-11-16T15:00:00Z'); // lunes 10:00 en Lima
+
+  it('lista quién trabaja hoy con su horario y área, y quién descansa; solo nombre, área y horario', async () => {
+    const { servicio } = armar();
+    const hoy = await servicio.equipoHoy(LUNES_10);
+    expect(hoy.jornada).toBe(LUNES);
+    expect(hoy.trabajan.map((x) => [x.nombre, x.desde, x.hasta, x.area])).toEqual([
+      ['P10', '08:00', '16:00', 'Salado'],
+      ['P1', '09:00', '17:00', 'Mozo'],
+    ]);
+    expect(hoy.descansan.map((x) => [x.nombre, x.motivo])).toEqual([['P2', 'Día libre']]);
+    expect(Object.keys(hoy.trabajan[0]).sort()).toEqual(['area', 'cubiertoParcialmentePor', 'cubreA', 'desde', 'hasta', 'nombre', 'partyId']);
+    expect(JSON.stringify(hoy)).not.toMatch(/sueldo|pago|monto|correo|telefono/i);
+  });
+
+  it('muestra el reemplazo aprobado: quien cubre aparece con a quién cubre; a quien cubren, descansando', async () => {
+    const { servicio } = armar();
+    await servicio.crear(dto(), usuario(A), undefined, AHORA);
+    await servicio.aceptar(1, usuario(B), undefined, AHORA);
+    await servicio.aprobar(1, undefined, usuario(SUP, 'SUPERVISOR'), undefined, AHORA);
+    await servicio.aprobar(1, undefined, usuario(ADM, 'ADMIN'), undefined, AHORA);
+    const hoy = await servicio.equipoHoy(LUNES_10);
+    expect(hoy.trabajan.find((x) => x.partyId === Number(B))).toMatchObject({ desde: '09:00', hasta: '17:00', cubreA: ['P1'] });
+    expect(hoy.descansan.find((x) => x.partyId === Number(A))).toMatchObject({ motivo: 'Cubierto por P2' });
+  });
+
+  it('muestra los cambios de turno aprobados de hoy', async () => {
+    const { servicio, bd } = armar();
+    bd.solicitudes.push({ id: 77n, tipo: 'CAMBIO_TURNO', estado: 'APROBADA', solicitante_party_id: A, reemplazo_party_id: B, fecha: d(LUNES), fecha_devolucion: d(MARTES) });
+    const hoy = await servicio.equipoHoy(LUNES_10);
+    expect(hoy.cambios).toEqual([{ texto: 'P1 y P2 cambiaron turno' }]);
+  });
+
+  it('distingue vacaciones de un día libre', async () => {
+    const { servicio, bd } = armar();
+    bd.vacaciones.push({ party_id: B, fecha_desde: d(LUNES), fecha_hasta: d(LUNES) });
+    const hoy = await servicio.equipoHoy(LUNES_10);
+    expect(hoy.descansan).toEqual([expect.objectContaining({ partyId: Number(B), motivo: 'Vacaciones o licencia' })]);
+  });
+
+  it('vacío: si nadie tiene turno hoy, las listas salen vacías', async () => {
+    const { servicio, bd } = armar();
+    bd.horarios.length = 0;
+    const hoy = await servicio.equipoHoy(LUNES_10);
+    expect(hoy.trabajan).toEqual([]);
+    expect(hoy.descansan).toEqual([]);
+  });
+});

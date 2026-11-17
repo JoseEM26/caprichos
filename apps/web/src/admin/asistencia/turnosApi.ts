@@ -36,6 +36,36 @@ export interface SolicitudTurno {
   creadaEn: string;
   soyYoSolicitante?: boolean;
   validacion?: { ok: boolean; problema: string | null; areaYRol: string[] } | null;
+  /** Doble aprobación: quién firmó cada parte y lo que falta (null en pedidos anteriores a la doble aprobación). */
+  aprobacion?: AprobacionTurno | null;
+}
+
+export type ParteAprobacion = 'SUPERVISION' | 'ADMINISTRACION';
+export interface FirmaAprobacion { porId: number; nombre: string; en: string | null }
+export interface AprobacionTurno {
+  supervision: FirmaAprobacion | null;
+  administracion: FirmaAprobacion | null;
+  faltan: ParteAprobacion[];
+}
+
+export interface ResultadoAprobacion { ok: boolean; completa: boolean; falta: ParteAprobacion[] }
+
+/** Tablero «Equipo de hoy»: solo nombres, áreas y horarios. */
+export interface EquipoHoy {
+  jornada: string;
+  ahora: string;
+  trabajan: Array<{ partyId: number; nombre: string; area: string; desde: string; hasta: string; cubreA: string[]; cubiertoParcialmentePor: string[] }>;
+  cambios: Array<{ texto: string }>;
+  descansan: Array<{ partyId: number; nombre: string; area: string; motivo: string }>;
+}
+
+/** Quién recibe los avisos de reemplazos y cambios de turno (sin números ni correos). */
+export interface DestinatarioAviso {
+  partyId: number;
+  nombre: string;
+  rol: string;
+  avisos: boolean;
+  canal: { celular: boolean; correo: boolean };
 }
 
 export interface Candidato { partyId: number; nombre: string; motivos: string[] }
@@ -67,5 +97,9 @@ export const rechazarTurno = (id: number) => api.post(`${MI}/solicitudes/${id}/r
 export const cancelarTurno = (id: number) => api.post(`${MI}/solicitudes/${id}/cancelar`);
 
 export const turnosPorAprobar = () => api.get<{ toleranciaMin: number; solicitudes: SolicitudTurno[] }>(`${ADM}/solicitudes`);
-export const aprobarTurno = (id: number) => api.post(`${ADM}/solicitudes/${id}/aprobar`, {});
+export const aprobarTurno = (id: number) => api.post<ResultadoAprobacion>(`${ADM}/solicitudes/${id}/aprobar`, {});
 export const rechazarTurnoAdmin = (id: number, motivo: string) => api.post(`${ADM}/solicitudes/${id}/rechazar`, { motivo });
+
+export const equipoHoy = () => api.get<EquipoHoy>('/admin/asistencia/mi/equipo/hoy');
+export const avisosTurnos = () => api.get<DestinatarioAviso[]>(`${ADM}/avisos`);
+export const configurarAvisoTurno = (partyId: number, activo: boolean) => api.put(`${ADM}/avisos/${partyId}`, { activo });

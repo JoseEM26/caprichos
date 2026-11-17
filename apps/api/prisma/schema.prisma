@@ -243,6 +243,8 @@ model UserAccount {
   alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
   /// Recibe los avisos del sistema al equipo por correo (dentro de su horario).
   avisos_correo         Boolean                @default(false)
+  /// Recibe los avisos de reemplazos y cambios de turno (WhatsApp, o correo si no hay celular). Lo elige Administración.
+  avisos_turnos         Boolean                @default(false)
   /// Cierre de TODAS las sesiones: ningún token de acceso emitido antes de este instante sigue valiendo.
   sesiones_cerradas_en  DateTime?              @db.Timestamptz
   party                 Party                  @relation(fields: [party_id], references: [id])
@@ -3189,6 +3191,11 @@ model SolicitudTurno {
   motivo_resolucion    String?
   cobertura_ids        Json?
   sin_marca_en         DateTime? @db.Timestamptz
+  /// Doble aprobación (migración 20270328100000): una supervisora y un administrador, en cualquier orden.
+  aprobado_sup_por     BigInt?
+  aprobado_sup_en      DateTime? @db.Timestamptz
+  aprobado_adm_por     BigInt?
+  aprobado_adm_en      DateTime? @db.Timestamptz
   creada_en            DateTime  @default(now()) @db.Timestamptz
 
   @@index([reemplazo_party_id, estado])

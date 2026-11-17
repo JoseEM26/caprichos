@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { AsistenciaTurnosService } from './asistencia-turnos.service';
-import { AprobarTurnoDto, CandidatosTurnoDto, CrearTurnoDto, ListarTurnosDto, RechazarTurnoDto } from './dto/turnos.dto';
+import { AprobarTurnoDto, CandidatosTurnoDto, ConfigurarAvisoTurnoDto, CrearTurnoDto, ListarTurnosDto, RechazarTurnoDto } from './dto/turnos.dto';
 
 const ipDe = (req: any): string | undefined => {
   const raw = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
@@ -81,5 +81,31 @@ export class TurnosAprobacionController {
   @Permiso('asistencia', 'aprobar_reemplazos')
   rechazar(@Param('id', ParseIntPipe) id: number, @Body() dto: RechazarTurnoDto, @Req() req: any) {
     return this.turnos.rechazarAdmin(id, dto.motivo, req.usuario, ipDe(req));
+  }
+
+  /** Quién recibe los avisos de reemplazos y cambios de turno (los elige Administración). */
+  @Get('avisos')
+  @Permiso('asistencia', 'aprobar_reemplazos')
+  avisos() {
+    return this.turnos.avisosEquipo();
+  }
+
+  @Put('avisos/:partyId')
+  @Permiso('asistencia', 'aprobar_reemplazos')
+  configurarAviso(@Param('partyId', ParseIntPipe) partyId: number, @Body() dto: ConfigurarAvisoTurnoDto, @Req() req: any) {
+    return this.turnos.configurarAvisoEquipo(partyId, dto.activo, req.usuario, ipDe(req));
+  }
+}
+
+/** Tablero «Equipo de hoy» en Mi asistencia: solo lectura para todo el personal que marca. */
+@Controller('admin/asistencia/mi/equipo')
+@UseGuards(AccesoGuard)
+export class MiEquipoController {
+  constructor(private readonly turnos: AsistenciaTurnosService) {}
+
+  @Get('hoy')
+  @Permiso('asistencia', 'marcar')
+  hoy() {
+    return this.turnos.equipoHoy();
   }
 }

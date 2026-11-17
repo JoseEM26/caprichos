@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -71,4 +71,9 @@ export class ListarTurnosDto {
   @IsString()
   @MaxLength(20)
   estado?: string;
+}
+
+export class ConfigurarAvisoTurnoDto {
+  @IsBoolean({ message: 'Indica si recibe o no los avisos' })
+  activo!: boolean;
 }

@@ -14,6 +14,7 @@ import { MiCalendario } from './MiCalendario';
 import { MisPagos } from './MisPagos';
 import { Plegable } from './Plegable';
 import { ReemplazosTurno } from './ReemplazosTurno';
+import { EquipoHoy } from './EquipoHoy';
 import { MarcarAsistente } from './MarcarAsistente';
 import { miInconsistencias } from './correccionesApi';
 import { ETIQUETA_ACCION, ETIQUETA_LINEA, horasMin, normalizarTipo, sugerirSiguiente, type TipoMarcaElegido } from './tiposMarca';
@@ -149,6 +150,7 @@ export function MiAsistenciaView() {
 
   const panelMarcar = (
     <>
+      <EquipoHoy />
       {sinUbicacion && (
         <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-sin-ubicacion">
           El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.

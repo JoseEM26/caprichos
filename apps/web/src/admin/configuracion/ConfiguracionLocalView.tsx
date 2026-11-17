@@ -24,6 +24,7 @@ import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
 import { TarjetaNotificacionesConfiguracion } from './TarjetaNotificacionesConfiguracion';
 import { TarjetaAvisosPorRol } from './TarjetaAvisosPorRol';
+import { TarjetaAvisosTurnos } from './TarjetaAvisosTurnos';
 import { CorreosAvisoTab } from './CorreosAvisoTab';
 import { TarjetaCumpleanosBannerConfiguracion } from './TarjetaCumpleanosBannerConfiguracion';
 import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespejarConfiguracion';
@@ -983,6 +984,7 @@ export function ConfiguracionLocalView() {
               {tabId === 'operacion' && <TarjetaControlAlmacenConfiguracion />}
               {tabId === 'operacion' && <TarjetaNotificacionesConfiguracion />}
               {tabId === 'operacion' && esAdmin && <TarjetaAvisosPorRol />}
+              {tabId === 'operacion' && esAdmin && <TarjetaAvisosTurnos />}
               {tabId === 'operacion' && <TarjetaCumpleanosBannerConfiguracion />}
               {tabId === 'operacion' && esAdmin && (
                 <div data-testid="atajo-correos-aviso" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '12px 14px', background: '#FFFFFF' }}>
