@@ -6,6 +6,7 @@ import { ETIQUETA_ESTADO } from './asistenciaApi';
 import { ETIQUETA_ROL } from './correccionesApi';
 import { useDetalleDia } from './DetalleDiaPersona';
 import { Plegable } from './Plegable';
+import { Confirmar } from '../../comun/Confirmar';
 import { aprobarExtra, soles } from './planillaApi';
 import type { CtlPlanilla } from './PlanillaPersonaTipos';
 import type { FilaCal } from './calendarioApi';
@@ -46,6 +47,8 @@ function PanelDia({ c, fila, jornada, cerrar }: { c: CtlPlanilla; fila: FilaCal 
 export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicial?: string | null }) {
   const { d, r, pagado, ocupado } = c;
   const [dia, setDia] = useState<string | null>(diaInicial ?? null);
+  const [extraPorConfirmar, setExtraPorConfirmar] = useState<{ jornada: string; aprobar: boolean; min: number; descanso: boolean } | null>(null);
+  const [extraResultado, setExtraResultado] = useState<string | null>(null);
   const dias = d.dias.filter((x) => x.estado !== 'DESCANSO' || x.extraMin > 0 || (x.marcas ?? []).length > 0);
   const faltas = d.dias.filter((x) => x.estado === 'FALTA').length;
   const abrirDia = (j: string) => {
@@ -116,7 +119,7 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
                       {x.extraMin > 0 ? (
                         <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
                           <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={x.descansoTrabajado ? `Aprobar el descanso trabajado del ${x.jornada}` : `Aprobar las horas extra del ${x.jornada}`}
-                            onChange={(e) => void c.ejecutar(() => aprobarExtra(d.partyId, x.jornada, e.target.checked), e.target.checked ? 'Horas extra aprobadas.' : 'Aprobación de horas extra quitada.')} />
+                            onChange={(e) => setExtraPorConfirmar({ jornada: x.jornada, aprobar: e.target.checked, min: x.extraMin, descanso: !!x.descansoTrabajado })} />
                           {x.extraAprobada ? 'Aprobada' : x.descansoTrabajado ? 'Aprobar descanso trabajado' : 'Sin aprobar'}
                         </label>
                       ) : '—'}
@@ -132,6 +135,29 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
             </table>
           </div>
         </section>
+        <Confirmar
+          abierto={extraPorConfirmar !== null}
+          titulo={extraPorConfirmar?.aprobar ? 'Aprobar horas extra' : 'Quitar la aprobación'}
+          mensaje={extraPorConfirmar
+            ? extraPorConfirmar.aprobar
+              ? `Se aprobarán ${extraPorConfirmar.min} min ${extraPorConfirmar.descanso ? 'de descanso trabajado' : 'de horas extra'} del ${extraPorConfirmar.jornada} y se sumarán al sueldo.`
+              : `Se quitará la aprobación de los ${extraPorConfirmar.min} min del ${extraPorConfirmar.jornada}: dejarán de pagarse.`
+            : ''}
+          textoConfirmar={extraPorConfirmar?.aprobar ? 'Sí, aprobar' : 'Sí, quitar'}
+          cargando={ocupado}
+          alCancelar={() => setExtraPorConfirmar(null)}
+          alConfirmar={() => {
+            const e = extraPorConfirmar;
+            if (!e) return;
+            setExtraPorConfirmar(null);
+            void c.ejecutar(async () => {
+              await aprobarExtra(d.partyId, e.jornada, e.aprobar);
+              setExtraResultado(e.aprobar ? `✓ Horas extra aprobadas correctamente (${e.min} min del ${e.jornada}). Ya cuentan en el sueldo.` : `Aprobación quitada (${e.min} min del ${e.jornada}). Ya no se pagan.`);
+            }, e.aprobar ? 'Horas extra aprobadas.' : 'Aprobación de horas extra quitada.');
+          }}
+        />
+        <Confirmar abierto={extraResultado !== null} titulo="Listo" mensaje={extraResultado ?? ''} textoConfirmar="Entendido" textoNo="Cerrar"
+          alConfirmar={() => setExtraResultado(null)} alCancelar={() => setExtraResultado(null)} />
         {dia && (
           <PanelDia key={dia} c={c} jornada={dia} fila={c.filasCal?.find((f) => f.fecha === dia) ?? null} cerrar={() => setDia(null)} />
         )}
