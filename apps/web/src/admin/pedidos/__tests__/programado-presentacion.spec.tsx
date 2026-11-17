@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { TarjetaPedidoCaja } from '../TarjetaPedidoCaja';
 import { ListaCaja } from '../ListaCaja';
 import { PedidoDetalle } from '../PedidoDetalle';
-import { ProgramadosOtrosDias } from '../ProgramadoInfo';
 import { esProgramadoOtroDia, paraCuandoDe, separarProgramadosOtrosDias, textoFaltan, textoPagoProgramado } from '../programado';
 import { resumirDia, filasDePedidos } from '../resumenDia';
 import type { Pedido } from '../pedidosApi';
@@ -99,22 +98,6 @@ describe('lista de Caja con un pedido programado', () => {
     );
     expect(screen.getByTestId('chip-programado')).toHaveTextContent('PROGRAMADO');
     expect(screen.getByTestId('encargos-tarjeta')).toHaveTextContent('SERVICIO / ENCARGO');
-  });
-});
-
-describe('«Programados para otros días»', () => {
-  it('encabezado con el conteo, plegable', () => {
-    render(<ProgramadosOtrosDias n={2}><p>contenido</p></ProgramadosOtrosDias>);
-    const cab = screen.getByRole('button', { name: /Programados para otros días \(2\)/ });
-    expect(cab).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('contenido')).toBeInTheDocument();
-    fireEvent.click(cab);
-    expect(cab).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText('contenido')).toBeNull();
-  });
-  it('sin programados no se dibuja', () => {
-    const { container } = render(<ProgramadosOtrosDias n={0}><p>x</p></ProgramadosOtrosDias>);
-    expect(container).toBeEmptyDOMElement();
   });
 });
 

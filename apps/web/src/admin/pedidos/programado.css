@@ -44,3 +44,6 @@
 
 /* Al cerrar el detalle el foco vuelve a la tarjeta: que el navegador la deje por debajo de la barra fija de arriba (cj2-control), no tapada por ella */
 .cj2-lista button, .cj2-lista [tabindex], .cj2-lista a, .pg-otros-cab { scroll-margin-top: 200px; }
+
+/* Programados para otros días: tarjetas normales al final de la lista, en gris; sin encabezado ni sección aparte */
+.pg-gris { margin-top: 10px; filter: grayscale(1); opacity: 0.8; }

@@ -48,7 +48,6 @@ import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { ContadorDia, enContador, filasDePedidos, resumirDia, type ResumenDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
-import { ProgramadosOtrosDias } from './ProgramadoInfo';
 import { separarProgramadosOtrosDias } from './programado';
 import { TarjetaCuentaCaja } from './TarjetaCuentaCaja';
 import { agruparCuentas } from './agruparCuentas';
@@ -1264,26 +1263,9 @@ export function PedidosAdminView() {
             </div>
             )
           )}
-        </div>
-
-        {/* PAGINADOR: al final de la lista, pequeño y sin posición fija */}
-        <PaginadorCaja
-          total={unidades.length}
-          desde={desde}
-          hasta={hasta}
-          pagina={paginaValida}
-          totalPaginas={totalPaginas}
-          alIr={setPaginaActual}
-          filas={filas === null && (enTabla || enLista) ? (enLista ? 25 : 50) : filas}
-          alCambiarFilas={(f) => { setFilas(f); setPaginaActual(1); }}
-          conAuto={!enTabla && !enLista}
-          avisoTope={avisoTope}
-          carga={{ cargados: pedidos.length, totalServidor: totalDia, cargando: cargandoMas, alCargarMas: () => void cargarMas(), error: errorMas, buscando: filtrando }}
-        />
-
-        {/* Programados para otros días: al final, plegable, por fecha pactada (no cuentan en el día) */}
-        <ProgramadosOtrosDias n={programadosOtrosDias.length}>
-          {enLista ? (
+          {programadosOtrosDias.length > 0 && paginaValida === totalPaginas && (
+            <div className="pg-gris" data-testid="programados-otros-dias">
+              {enLista ? (
             <ListaCaja
               filas={programadosOtrosDias}
               accionDe={accionDe}
@@ -1295,7 +1277,7 @@ export function PedidosAdminView() {
           ) : enTabla ? (
             <TablaCaja filas={programadosOtrosDias} todas={programadosOtrosDias} columnas={columnasTabla} alVerDetalle={(p) => setDetalleVentaId(String(p.id))} />
           ) : (
-            <div className="pg-otros-grid">
+            <div className="cj2-cuadricula" data-columnas={columnas} style={{ ['--cj2-cols' as string]: columnas }}>
               {programadosOtrosDias.map((o) => (
                 <TarjetaPedidoCaja
                   key={o.id}
@@ -1314,7 +1296,25 @@ export function PedidosAdminView() {
               ))}
             </div>
           )}
-        </ProgramadosOtrosDias>
+            </div>
+          )}
+        </div>
+
+        {/* PAGINADOR: al final de la lista, pequeño y sin posición fija */}
+        <PaginadorCaja
+          total={unidades.length}
+          desde={desde}
+          hasta={hasta}
+          pagina={paginaValida}
+          totalPaginas={totalPaginas}
+          alIr={setPaginaActual}
+          filas={filas === null && (enTabla || enLista) ? (enLista ? 25 : 50) : filas}
+          alCambiarFilas={(f) => { setFilas(f); setPaginaActual(1); }}
+          conAuto={!enTabla && !enLista}
+          avisoTope={avisoTope}
+          carga={{ cargados: pedidos.length, totalServidor: totalDia, cargando: cargandoMas, alCargarMas: () => void cargarMas(), error: errorMas, buscando: filtrando }}
+        />
+
       </>
     )}
 

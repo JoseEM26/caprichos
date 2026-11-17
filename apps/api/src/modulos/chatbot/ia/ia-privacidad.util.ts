@@ -49,7 +49,9 @@ export function enmascararDatosSensibles(texto: string | null | undefined): stri
  */
 export function extraerPrimerNombre(nombreCompleto?: string | null): string {
   if (!nombreCompleto) return 'Cliente';
-  const limpio = nombreCompleto.trim();
+  // «Usuario de WhatsApp (𝓐𝓵𝓮💫)» → el nombre del perfil entre paréntesis; NFKC vuelve normales las letras decorativas (𝓐𝓵𝓮 → Ale)
+  const sinPrefijo = nombreCompleto.normalize('NFKC').replace(/^\s*Usuario de WhatsApp\s*\(?/i, '').replace(/\)\s*$/, '');
+  const limpio = sinPrefijo.trim();
   if (!limpio) return 'Cliente';
 
   // Si el nombre parece un teléfono o BSUID, no usarlo

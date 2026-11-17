@@ -53,19 +53,3 @@ export function BloqueEncargoTarjeta({ lineas }: { lineas: LineaPedido[] }) {
     </span>
   );
 }
-
-/** Encabezado plegable «Programados para otros días (N)» al final de Caja: no cuentan en el día; van por fecha pactada. */
-export function ProgramadosOtrosDias({ n, children }: { n: number; children: ReactNode }) {
-  const [abierto, setAbierto] = useState(true);
-  const id = useId();
-  if (n === 0) return null;
-  return (
-    <section className="pg-otros" data-testid="programados-otros-dias" aria-label="Programados para otros días">
-      <button type="button" className="pg-otros-cab" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto(!abierto)}>
-        <span aria-hidden="true">{abierto ? '▾' : '▸'}</span>
-        <span>📅 Programados para otros días ({n})</span>
-      </button>
-      {abierto && <div id={id} className="pg-otros-cuerpo">{children}</div>}
-    </section>
-  );
-}

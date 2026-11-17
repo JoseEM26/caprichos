@@ -89,7 +89,7 @@ export const TIPOS_AUDIO_PERMITIDOS = ['audio/ogg', 'audio/mpeg', 'audio/mp4', '
 export const TEXTO_NOTA_DE_VOZ = 'Recibí tu nota de voz 🎧; una persona del equipo la va a escuchar y te responde en breve';
 export const MOTIVO_DERIVACION_NOTA_DE_VOZ = 'NOTA_DE_VOZ';
 /** Imagen sin pedido esperando pago: la IA no la analiza; una persona la revisa (un solo aviso por ráfaga). */
-export const TEXTO_IMAGEN_RECIBIDA = '¡Gracias, cariño! 💛 Recibimos tu imagen. Una persona del equipo la revisa y te escribe en un momento (si estamos cerrados, apenas abramos) 🥰';
+export const TEXTO_IMAGEN_RECIBIDA = '¡Gracias! 💛 Recibimos tu imagen. Una persona del equipo la revisa y te escribe en un momento (si estamos cerrados, apenas abramos) 🥰';
 export const MOTIVO_DERIVACION_IMAGEN = 'IMAGEN_RECIBIDA';
 export const TIPOS_MEDIA_PERMITIDOS = [
   'image/jpeg',
