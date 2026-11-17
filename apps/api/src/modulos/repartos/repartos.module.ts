@@ -5,10 +5,11 @@ import { RutaService } from './ruta.service';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { MensajesModule } from '../mensajes/mensajes.module';
 import { UbicacionRepartidorService } from './ubicacion-repartidor.service';
+import { StockModule } from '../stock/stock.module';
 import { RepartosChatService } from './repartos-chat.service';
 
 @Module({
-  imports: [ChatbotModule, MensajesModule],
+  imports: [ChatbotModule, MensajesModule, StockModule],
   controllers: [RepartosController],
   providers: [RepartosService, RutaService, RepartosChatService, UbicacionRepartidorService],
   exports: [RepartosService, RutaService],

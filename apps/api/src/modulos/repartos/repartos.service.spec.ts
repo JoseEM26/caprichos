@@ -5,6 +5,7 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({
   },
 }));
 
+import { StockService } from '../stock/stock.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -20,6 +21,8 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+
+const stockMock = { revertirPorPedido: jest.fn().mockResolvedValue({ ok: true }) };
 
 describe('RepartosService', () => {
   let service: RepartosService;
@@ -123,6 +126,7 @@ describe('RepartosService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: AvisosPedidoService, useValue: avisosMock },
+        { provide: StockService, useValue: stockMock },
       ],
     }).compile();
 
@@ -668,6 +672,28 @@ describe('RepartosService', () => {
           }),
         }),
       );
+    });
+
+    it('cierre DEVUELTO anula el pedido y devuelve el stock (donas e insumos) una vez', async () => {
+      stockMock.revertirPorPedido.mockClear();
+      (prismaMock as any).cobro = { findMany: jest.fn().mockResolvedValue([]) };
+      const pedidoMock = { id: 53n, codigo: 'CP-0109', estado: 'LISTO', pago_estado: 'PENDIENTE', motivo_falla: 'NO_CONTESTA', total: new Prisma.Decimal(40), envio: null };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.incidenteEntrega.findFirst.mockResolvedValue({ id: 503n, pedido_id: 53n });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, motivo_falla: null, estado: 'ANULADO' });
+      await service.resolverFalla('53', { nota: 'El cliente no recibió el pedido', cierre: 'DEVUELTO' }, adminAuth);
+      expect(stockMock.revertirPorPedido).toHaveBeenCalledTimes(1);
+      expect(stockMock.revertirPorPedido.mock.calls[0][0]).toBe(53n);
+    });
+
+    it('cierre REPROGRAMADO no toca el stock', async () => {
+      stockMock.revertirPorPedido.mockClear();
+      const pedidoMock = { id: 54n, codigo: 'CP-0110', estado: 'LISTO', motivo_falla: 'NO_CONTESTA', total: new Prisma.Decimal(40), envio: null };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.incidenteEntrega.findFirst.mockResolvedValue({ id: 504n, pedido_id: 54n });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, motivo_falla: null, estado: 'LISTO' });
+      await service.resolverFalla('54', { nota: 'Reprogramado para mañana', cierre: 'REPROGRAMADO' }, adminAuth);
+      expect(stockMock.revertirPorPedido).not.toHaveBeenCalled();
     });
   });
 

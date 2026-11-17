@@ -1,3 +1,4 @@
+import { StockService } from '../stock/stock.service';
 import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
@@ -105,6 +106,7 @@ export class RepartosService {
     private readonly rutaService: RutaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly avisos?: AvisosPedidoService,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -2111,6 +2113,9 @@ export class RepartosService {
       where: { id: pedidoId },
       data: dataActualizacion,
     });
+
+    // «Devuelto» anula el pedido: lo descontado (donas controladas, insumos) vuelve al stock; idempotente
+    if (cierre === 'DEVUELTO') await this.stockService?.revertirPorPedido(pedidoId, undefined, partyId);
 
     // Historial
     await db.pedidoEstadoHistorial.create({
