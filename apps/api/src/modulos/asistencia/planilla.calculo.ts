@@ -112,7 +112,10 @@ export const pagoTrabajadoDia = (d: DiaPlanilla, vh: number): number => (d.traba
 export const penalidadTardanzaDia = (d: DiaPlanilla, vh: number, factorPct: number): number =>
   redondear2((d.tardanzaMin / 60) * (d.valorHora ?? vh) * (d.recargo ?? 1) * (factorPct / 100));
 export const pagoDia = (d: DiaPlanilla, vh: number, extraAprobada: boolean, multExtra = 1): number =>
-  pagoTrabajadoDia(d, vh) + (extraAprobada ? (d.extraMin / 60) * (d.valorHora ?? vh) * multExtra : 0);
+  pagoTrabajadoDia(d, vh) + (extraAprobada ? pagoExtraDia(d, vh, multExtra) : 0);
+/** Extra de un día: el descanso trabajado (día sin horario) se paga a valor hora normal; el 1,25 es solo para la extra de un día con turno. */
+export const pagoExtraDia = (d: DiaPlanilla, vh: number, multExtra = 1): number =>
+  (d.extraMin / 60) * (d.valorHora ?? vh) * (d.descansoTrabajado ? 1 : multExtra);
 
 /** Jornada de una persona: minutos programados, trabajados válidos, tardanza, salida anticipada y extra. */
 export function calcularDiaPlanilla(dia: DiaEntrada, tolerancia: number): DiaPlanilla {
@@ -240,7 +243,7 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
   const mult = e.multiplicadorExtra ?? 1;
   // Las horas del período para el valor hora NO cambian por feriado; solo el pago de esas horas lleva recargo.
   const pagoTrabajado = redondear2(e.dias.reduce((a, d) => a + pagoTrabajadoDia(d, vh), 0));
-  const pagoExtra = redondear2(e.dias.filter((d) => e.extrasAprobadas.has(d.jornada)).reduce((a, d) => a + (d.extraMin / 60) * (d.valorHora ?? vh) * mult, 0));
+  const pagoExtra = redondear2(e.dias.filter((d) => e.extrasAprobadas.has(d.jornada)).reduce((a, d) => a + pagoExtraDia(d, vh, mult), 0));
   const total = (xs: number[]) => redondear2(xs.reduce((a, x) => a + x, 0));
   const pagoVacaciones = total(e.vacacionesPagadas ?? []);
   const ganado = redondear2(pagoTrabajado + pagoExtra + pagoVacaciones);

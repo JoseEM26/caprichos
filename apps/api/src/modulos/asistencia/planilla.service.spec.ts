@@ -660,7 +660,7 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     await m.svc.aprobarExtra(7, '2026-11-11', true, ADMIN);
     const despues = await m.svc.detalle(7, '2026-11-15', [], AHORA);
     expect(despues.pendientes).toBe(0);
-    expect(despues.resultado.pagoExtra).toBe(5 * 10 * 1.25);
+    expect(despues.resultado.pagoExtra).toBe(5 * 10); // descanso trabajado: valor hora normal, sin el 1,25 de la extra
   });
 });
 

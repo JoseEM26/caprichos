@@ -280,3 +280,15 @@ describe('turno que cruza la medianoche (22:00-06:00) en planilla semanal', () =
     expect(r.ganado).toBe(400);
   });
 });
+
+describe('descanso trabajado: se paga a valor hora normal, sin el 1,25 de la extra', () => {
+  const vh = 1500 / 24 / 9; // 6,94 por hora
+  const dia = (descansoTrabajado: boolean) =>
+    ({ jornada: '2026-11-10', programadaMin: 0, trabajadaMin: 0, tardanzaMin: 0, salidaAnticipadaMin: 0, extraMin: 523, descansoTrabajado }) as any;
+  it('523 min de descanso trabajado = 523/60 × valor hora (no × 1,25)', () => {
+    expect(pagoDia(dia(true), vh, true, 1.25)).toBeCloseTo((523 / 60) * vh, 2);
+  });
+  it('la extra de un día con turno sigue pagando ×1,25', () => {
+    expect(pagoDia(dia(false), vh, true, 1.25)).toBeCloseTo((523 / 60) * vh * 1.25, 2);
+  });
+});
