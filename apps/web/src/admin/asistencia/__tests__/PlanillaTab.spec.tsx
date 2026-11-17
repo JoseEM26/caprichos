@@ -8,11 +8,13 @@ const pagar = vi.fn();
 const historial = vi.fn(async () => []);
 const sueldoApi = vi.fn(async () => ({ sueldo: null, historial: [] }));
 const filasCal = vi.fn(async () => ({ total: 0, pagina: 1, limite: 0, filas: [], totales: { trabajadaMin: 0, tardanzaMin: 0, extraMin: 0, faltas: 0 } }));
+const seleccionar = vi.fn(async () => ({ ok: true, activo: true }));
 vi.mock('../planillaApi', async (orig) => ({
   ...(await orig<any>()),
   listarPlanilla: (...a: any[]) => listar(...a),
   detallePlanilla: (...a: any[]) => detalle(...a),
   pagarPlanilla: (...a: any[]) => pagar(...a),
+  seleccionarPlanilla: (...a: any[]) => (seleccionar as any)(...a),
   historialPagos: (...a: any[]) => (historial as any)(...a),
   obtenerSueldo: (...a: any[]) => (sueldoApi as any)(...a),
 }));
@@ -74,7 +76,8 @@ describe('PlanillaTab', () => {
     expect(cifra('Horas trabajadas / programadas')).toHaveTextContent('30.00 h de 50.00 h');
     await tab('Descuentos y créditos');
     fireEvent.click(await screen.findByLabelText('Cobrar en este pago el consumo P-100'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), ['1'], [], [], []));
+    await waitFor(() => expect(seleccionar).toHaveBeenCalledWith(7, expect.any(String), 'CONSUMO_EXCLUIDO', '1', true));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String)));
   });
 
   it('las 5 pestañas de la página, con Resumen primero, y la cascada del neto con cifras en texto', async () => {
@@ -148,7 +151,7 @@ describe('PlanillaTab', () => {
     montar('/?modo=MES&fecha=2026-10-15&q=luis&estado=ABIERTO&persona=7&desde=2026-11-01&seccion=pago');
     expect(await screen.findByTestId('pagina-planilla-persona')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^Pago/ })).toHaveAttribute('aria-selected', 'true');
-    expect(detalle).toHaveBeenCalledWith(7, '2026-11-01', [], [], [], []);
+    expect(detalle).toHaveBeenCalledWith(7, '2026-11-01');
     fireEvent.click(screen.getAllByRole('button', { name: '← Volver a la planilla' })[0]);
     expect(await screen.findByText('Luis Díaz')).toBeInTheDocument();
     expect(screen.queryByText('Ana Ríos')).toBeNull();
@@ -166,12 +169,12 @@ describe('PlanillaTab', () => {
     montar('/?persona=7&desde=2026-11-01');
     await screen.findByTestId('pagina-planilla-persona');
     fireEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-10-01', [], [], [], []));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-10-01'));
     expect(url().get('desde')).toBe('2026-10-01');
     fireEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-11-01', [], [], [], []));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-11-01'));
     fireEvent.change(screen.getByLabelText('Día del período'), { target: { value: '2026-09-15' } });
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-09-15', [], [], [], []));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, '2026-09-15'));
     expect(url().get('persona')).toBe('7');
   });
 
@@ -233,9 +236,10 @@ describe('PlanillaTab', () => {
     await tab('Descuentos y créditos');
     expect(await screen.findByText(/capital S\/ 100\.00 \+ interés S\/ 6\.00/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Cobrar la cuota 1 del préstamo'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], [], []));
+    await waitFor(() => expect(seleccionar).toHaveBeenCalledWith(7, expect.any(String), 'CUOTA_OMITIDA', '90', true));
     fireEvent.click(screen.getByLabelText('Cobrar Netflix en este pago'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], ['90'], ['5'], []));
+    await waitFor(() => expect(seleccionar).toHaveBeenCalledWith(7, expect.any(String), 'RECURRENTE_OMITIDO', '5', true));
+    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String)));
   });
 
   it('checklist de cierre listo: lleva a Pago y marcar pagado pide confirmación', async () => {
@@ -434,7 +438,7 @@ describe('PlanillaTab', () => {
     montar();
     expect(await screen.findByRole('button', { name: 'Abrir la semana del 2026-11-02 de Luis Pérez' })).toHaveTextContent('Pagada');
     fireEvent.click(screen.getByRole('button', { name: 'Abrir la semana del 2026-11-09 de Luis Pérez' }));
-    await waitFor(() => expect(detalle).toHaveBeenCalledWith(7, '2026-11-09', [], [], [], []));
+    await waitFor(() => expect(detalle).toHaveBeenCalledWith(7, '2026-11-09'));
     expect(url().get('desde')).toBe('2026-11-09');
   });
 
@@ -458,10 +462,10 @@ describe('PlanillaTab', () => {
     expect(screen.getByLabelText('Cobrar en este pago el consumo P-99')).not.toBeChecked();
     expect(screen.getByLabelText('Cobrar en este pago el consumo P-100')).toBeChecked();
     fireEvent.click(screen.getByLabelText('Cobrar en este pago el consumo P-99'));
-    await waitFor(() => expect(detalle).toHaveBeenLastCalledWith(7, expect.any(String), [], [], [], ['3']));
+    await waitFor(() => expect(seleccionar).toHaveBeenCalledWith(7, expect.any(String), 'CONSUMO_ANTERIOR_INCLUIDO', '3', true));
     fireEvent.click(screen.getByLabelText('Confirmo pagar sin descontar los créditos anteriores'));
     await tab('Pago');
     pagarOk();
-    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], ['3'], { sinDescontarAnteriores: true }));
+    await waitFor(() => expect(pagar).toHaveBeenCalledWith(7, expect.any(String), [], [], [], [], { sinDescontarAnteriores: true }));
   });
 });

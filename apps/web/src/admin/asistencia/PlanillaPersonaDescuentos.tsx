@@ -4,20 +4,28 @@ import { Insignia } from '../../comun/Insignia';
 import { jornadaActual } from './jornada';
 import { Plegable } from './Plegable';
 import { PrestamosPersona, ServiciosExtraPersona } from './PrestamosPersona';
-import { CATEGORIAS_DESCUENTO, DetallePlanilla, ETIQUETA_CATEGORIA, ETIQUETA_PERIODICIDAD, anularAjuste, crearAjuste, soles } from './planillaApi';
+import { CATEGORIAS_DESCUENTO, DetallePlanilla, ETIQUETA_CATEGORIA, ETIQUETA_PERIODICIDAD, TipoSeleccion, anularAjuste, claveSeleccion, crearAjuste, soles } from './planillaApi';
+import { resumenCalculo, textoFuera } from './planillaExplicacion';
 import type { CtlPlanilla } from './PlanillaPersonaTipos';
 
 type Tipo = 'ADELANTO' | 'DESCUENTO' | 'BONO';
 
-/** Pestaña «Descuentos y créditos»: créditos anteriores sin cerrar, adelantos, descuentos/consumos/bonos, préstamos y servicios extra. */
+/**
+ * Pestaña «Descuentos y créditos». Arriba lo que se descuenta este período (cada check se guarda al instante);
+ * abajo, los formularios para registrar algo nuevo, plegados y cerrados por defecto.
+ */
 export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
-  const { d, r, pagado, ocupado } = c;
+  const { d, pagado, ocupado } = c;
   const [aj, setAj] = useState({ tipo: 'DESCUENTO' as 'ADELANTO' | 'DESCUENTO' | 'BONO', categoria: 'OTRO', fecha: jornadaActual(), monto: '', motivo: '' });
   const [anulando, setAnulando] = useState<{ id: number; motivo: string } | null>(null);
+  const res = resumenCalculo(d);
   const adelantos = d.ajustes.filter((a) => a.tipo === 'ADELANTO');
   const descuentos = d.ajustes.filter((a) => a.tipo !== 'ADELANTO');
   const cuotas = d.cuotas ?? [];
   const recurrentes = d.recurrentes ?? [];
+  const fuera = d.recurrentesFueraDePeriodo ?? [];
+  const enCurso = (tipo: TipoSeleccion, id: string) => c.guardando === claveSeleccion(tipo, id);
+  const marcar = (tipo: TipoSeleccion, id: string, activo: boolean) => void c.seleccionar(tipo, id, activo);
 
   const formAjuste = (tipos: Tipo[]) => !pagado && (
     <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: 10 }}>
@@ -87,24 +95,25 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
     </ul>
   );
 
-  const filaConsumo = (x: DetallePlanilla['consumos'][number]) => (
-    <label key={x.id} className="pp-consumo">
-      <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar en este pago el consumo ${x.pedido}`}
-        onChange={(e) => (x.anterior
-          ? c.setIncluirAnt((v) => (e.target.checked ? [...v, x.id] : v.filter((i) => i !== x.id)))
-          : c.setExcluidos((v) => (e.target.checked ? v.filter((i) => i !== x.id) : [...v, x.id])))} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        {x.pedido} · {x.fecha}
-        {x.productos && x.productos.length > 0 && <small className="as-nota" style={{ display: 'block' }}>{x.productos.join(', ')}</small>}
-      </span>
-      <strong>{soles(x.monto)}</strong>
-    </label>
-  );
+  const filaConsumo = (x: DetallePlanilla['consumos'][number]) => {
+    const tipo: TipoSeleccion = x.anterior ? 'CONSUMO_ANTERIOR_INCLUIDO' : 'CONSUMO_EXCLUIDO';
+    return (
+      <label key={x.id} className="pp-consumo">
+        <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado || enCurso(tipo, x.id)} aria-label={`Cobrar en este pago el consumo ${x.pedido}`}
+          onChange={(e) => marcar(tipo, x.id, x.anterior ? e.target.checked : !e.target.checked)} />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          {x.pedido} · {x.fecha}
+          {x.productos && x.productos.length > 0 && <small className="as-nota" style={{ display: 'block' }}>{x.productos.join(', ')}</small>}
+        </span>
+        <strong>{soles(x.monto)}</strong>
+      </label>
+    );
+  };
   const delPeriodo = d.consumos.filter((x) => !x.anterior);
   const anteriores = d.consumos.filter((x) => x.anterior);
 
   return (
-    <div className="pp-seccion pp-seccion--2col">
+    <div className="pp-seccion">
       {c.antSinCobrar.length > 0 && (
         <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-creditos-anteriores">
           <strong>Tiene {c.antSinCobrar.length} {c.antSinCobrar.length === 1 ? 'crédito sin cerrar' : 'créditos sin cerrar'} de días anteriores por {soles(c.antTotal)}.</strong>
@@ -116,15 +125,15 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
           </label>
         </div>
       )}
-      <Plegable titulo="Adelantos" resumen={r.adelantos > 0 ? `− ${soles(r.adelantos)}` : 'Sin adelantos'}>
-        {formAjuste(['ADELANTO'])}
-        {listaAjustes(adelantos, 'En este período no hay adelantos.')}
-      </Plegable>
 
-      <Plegable titulo="Descuentos y consumos" resumen={`− ${soles(r.descuentos + r.consumosCobrados)}`} abierta>
+      <section aria-label="Lo que se descuenta este período" className="pp-bloque" data-testid="lo-que-se-descuenta">
+        <strong data-testid="total-descontar">Total a descontar este período: {soles(res.totalRestas)}</strong>
+        <small className="as-nota">Incluye tardanza, consumos, adelantos, préstamos y descuentos personalizados. Cada check se guarda al instante y se aplica al cálculo y al pago.</small>
+
+        <h4 className="as-sub">Consumos del personal</h4>
         {d.consumos.length > 0 ? (
           <div style={{ display: 'grid', gap: 6 }}>
-            <p className="as-ayuda">Consumos del personal (los mismos de Admin › Créditos): marca los que se cobran en este pago. Los del período vienen marcados; los que dejes sin marcar pasan al siguiente. Al marcar pagado quedan como «Cobrado» en Créditos.</p>
+            <p className="as-ayuda">Mismos consumos que Admin › Créditos. Los del período vienen marcados; los que dejes sin marcar pasan al siguiente. Al marcar pagado quedan como «Cobrado» en Créditos.</p>
             {delPeriodo.map(filaConsumo)}
             {anteriores.length > 0 && (
               <>
@@ -135,45 +144,66 @@ export function PestanaDescuentos({ c }: { c: CtlPlanilla }) {
             )}
           </div>
         ) : <small className="as-nota">No tiene consumos del personal por cobrar.</small>}
-        {formAjuste(['DESCUENTO', 'BONO'])}
+
+        <h4 className="as-sub">Préstamos</h4>
+        {cuotas.length > 0 ? (
+          <div style={{ display: 'grid', gap: 4 }}>
+            <small className="as-nota">Cuotas de este pago. Desmarca una para saltarla: pasa al final del plan.</small>
+            {cuotas.map((x) => (
+              <label key={`c${x.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+                <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado || enCurso('CUOTA_OMITIDA', x.id)} aria-label={`Cobrar la cuota ${x.numero} del préstamo`} onChange={(e) => marcar('CUOTA_OMITIDA', x.id, !e.target.checked)} />
+                <span style={{ flex: 1 }}>Cuota {x.numero} de {x.numCuotas}{(x.interesCuota ?? x.interes) ? <small className="as-nota">capital {soles(x.capitalCuota ?? x.capital)} + interés {soles(x.interesCuota ?? x.interes)}</small> : null}</span>
+                <strong>{soles(x.monto)}</strong>
+              </label>
+            ))}
+          </div>
+        ) : <small className="as-nota">Sin cuota de préstamo este pago.</small>}
+
+        <h4 className="as-sub">Descuentos y bonos personalizados</h4>
+        {recurrentes.length > 0 && (
+          <div style={{ display: 'grid', gap: 4 }}>
+            <small className="as-nota">Desmarca para no cobrarlo solo esta vez.</small>
+            {recurrentes.map((x) => (
+              <label key={`r${x.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+                <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado || enCurso('RECURRENTE_OMITIDO', x.id)} aria-label={`Cobrar ${x.nombre} en este pago`} onChange={(e) => marcar('RECURRENTE_OMITIDO', x.id, !e.target.checked)} />
+                <span style={{ flex: 1 }}>{x.nombre}{x.signo === 'BONO' ? ' (bono)' : ''}<small className="as-nota" style={{ display: 'block' }}>{x.valorTipo === 'PORCENTAJE' ? `${x.valor} % del sueldo · ` : ''}{x.periodicidad ? ETIQUETA_PERIODICIDAD[x.periodicidad] : ''}</small></span>
+                <strong>{x.signo === 'BONO' ? '+ ' : '− '}{soles(x.monto)}</strong>
+              </label>
+            ))}
+          </div>
+        )}
+        {fuera.length > 0 && (
+          <ul className="pl-filas" data-testid="personalizados-fuera">
+            {fuera.map((x) => <li key={`f${x.id}`} className="as-nota">{textoFuera(x)}</li>)}
+          </ul>
+        )}
+        {recurrentes.length === 0 && fuera.length === 0 && <small className="as-nota">No hay descuentos ni bonos personalizados para esta persona.</small>}
+
+        <h4 className="as-sub">Adelantos de este período</h4>
+        {listaAjustes(adelantos, 'En este período no hay adelantos.')}
+        <h4 className="as-sub">Descuentos y bonos registrados</h4>
         {listaAjustes(descuentos, 'En este período no hay descuentos ni bonos.')}
-      </Plegable>
+      </section>
 
-      <Plegable titulo="Préstamos" resumen={cuotas.length > 0 ? `${cuotas.length} cuota(s) este pago · ${soles(cuotas.filter((x) => x.cobrar).reduce((s, x) => s + x.monto, 0))}` : 'Sin cuota este pago'}>
-        {(vista) => (<>
-          {cuotas.length > 0 && (
-            <div style={{ display: 'grid', gap: 4 }}>
-              <small className="as-nota">Cuotas de este pago. Desmarca una para saltarla: pasa al final del plan.</small>
-              {cuotas.map((x) => (
-                <label key={`c${x.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
-                  <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar la cuota ${x.numero} del préstamo`} onChange={(e) => c.setOmitCuotas((v) => (e.target.checked ? v.filter((i) => i !== x.id) : [...v, x.id]))} />
-                  <span style={{ flex: 1 }}>Cuota {x.numero} de {x.numCuotas}{(x.interesCuota ?? x.interes) ? <small className="as-nota">capital {soles(x.capitalCuota ?? x.capital)} + interés {soles(x.interesCuota ?? x.interes)}</small> : null}</span>
-                  <strong>{soles(x.monto)}</strong>
-                </label>
-              ))}
-            </div>
-          )}
-          {vista && <PrestamosPersona partyId={d.partyId} alCambiar={() => void c.cargar()} />}
-        </>)}
-      </Plegable>
-
-      <Plegable titulo="Descuentos y bonos personalizados" resumen={recurrentes.length > 0 ? `${recurrentes.length} en este pago · ${soles(recurrentes.filter((x) => x.cobrar).reduce((s, x) => s + x.monto, 0))}` : 'Ninguno este período'}>
-        {(vista) => (<>
-          {recurrentes.length > 0 && (
-            <div style={{ display: 'grid', gap: 4 }}>
-              <small className="as-nota">Descuentos de este pago. Desmarca para no cobrarlo solo esta vez.</small>
-              {recurrentes.map((x) => (
-                <label key={`r${x.id}`} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
-                  <input type="checkbox" checked={x.cobrar} disabled={pagado || ocupado} aria-label={`Cobrar ${x.nombre} en este pago`} onChange={(e) => c.setOmitRec((v) => (e.target.checked ? v.filter((i) => i !== x.id) : [...v, x.id]))} />
-                  <span style={{ flex: 1 }}>{x.nombre}{x.signo === 'BONO' ? ' (bono)' : ''}<small className="as-nota" style={{ display: 'block' }}>{x.valorTipo === 'PORCENTAJE' ? `${x.valor} % del sueldo · ` : ''}{x.periodicidad ? ETIQUETA_PERIODICIDAD[x.periodicidad] : ''}</small></span>
-                  <strong>{x.signo === 'BONO' ? '+ ' : '− '}{soles(x.monto)}</strong>
-                </label>
-              ))}
-            </div>
-          )}
-          {vista && <ServiciosExtraPersona partyId={d.partyId} alCambiar={() => void c.cargar()} />}
-        </>)}
-      </Plegable>
+      <section aria-label="Registrar algo nuevo" className="pp-bloque" style={{ display: 'grid', gap: 8 }}>
+        <h4 className="as-sub">Registrar</h4>
+        {!pagado && (
+          <Plegable titulo="＋ Registrar adelanto" resumen={res.totalAdelantos > 0 ? `${soles(res.totalAdelantos)} este período` : undefined}>
+            {formAjuste(['ADELANTO'])}
+          </Plegable>
+        )}
+        {!pagado && (
+          <Plegable titulo="＋ Registrar descuento o bono" resumen="Merma, daño, responsabilidad o bono">
+            {formAjuste(['DESCUENTO', 'BONO'])}
+          </Plegable>
+        )}
+        <Plegable titulo="＋ Registrar préstamo" resumen="Plan de cuotas">
+          {(vista) => vista && <PrestamosPersona partyId={d.partyId} alCambiar={() => void c.cargar()} />}
+        </Plegable>
+        <Plegable titulo="＋ Agregar descuento o bono personalizado" resumen="Netflix u otro, por semana, mes o una vez">
+          {(vista) => vista && <ServiciosExtraPersona partyId={d.partyId} alCambiar={() => void c.cargar()} />}
+        </Plegable>
+      </section>
     </div>
   );
 }

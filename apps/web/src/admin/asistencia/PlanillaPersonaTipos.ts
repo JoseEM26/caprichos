@@ -1,7 +1,6 @@
-import type { Dispatch, SetStateAction } from 'react';
 import type { FilaCal } from './calendarioApi';
 import type { ResultadoLote } from './correccionesApi';
-import type { DetallePlanilla } from './planillaApi';
+import type { DetallePlanilla, TipoSeleccion } from './planillaApi';
 
 export type Avisar = (m: string | null) => void;
 export type SeccionPlanilla = 'resumen' | 'asistencia' | 'descuentos' | 'pago' | 'historial';
@@ -39,10 +38,10 @@ export interface CtlPlanilla {
   sinDescontarAnt: boolean;
   setSinDescontarAnt: (v: boolean) => void;
   faltaCredito: boolean;
-  setIncluirAnt: Dispatch<SetStateAction<string[]>>;
-  setExcluidos: Dispatch<SetStateAction<string[]>>;
-  setOmitCuotas: Dispatch<SetStateAction<string[]>>;
-  setOmitRec: Dispatch<SetStateAction<string[]>>;
+  /** Guarda en el servidor un check del pago (consumo, cuota o descuento personalizado) y recarga el detalle. */
+  seleccionar: (tipo: TipoSeleccion, refId: string, activo: boolean) => Promise<void>;
+  /** Clave (claveSeleccion) del check que se está guardando, o null. */
+  guardando: string | null;
   /** Motivo claro por el que «Marcar pagado» está bloqueado (null = se puede pagar). */
   bloqueo: { texto: string; seccion: SeccionPlanilla } | null;
   alPagar: () => void;

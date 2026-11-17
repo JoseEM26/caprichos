@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, MiPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SueldoDto } from './dto/planilla.dto';
+import { AjusteDto, AnularAjusteDto, ExtraDto, PagarPlanillaDto, MiPlanillaDto, PlanillaFechaDto, PrestamoDto, ReabrirPlanillaDto, RecurrenteDto, RecurrenteEditarDto, SeleccionDto, SueldoDto } from './dto/planilla.dto';
 import { jornadaDe } from './asistencia.calculo';
 import { PlanillaService } from './planilla.service';
 import { PrestamosService } from './prestamos.service';
@@ -82,6 +82,13 @@ export class PlanillaController {
   @Permiso('planilla', 'administrar')
   extra(@Body() dto: ExtraDto, @Req() req: any) {
     return this.planilla.aprobarExtra(dto.partyId, dto.jornada, dto.aprobada, req.usuario, ipDe(req));
+  }
+
+  /** Guarda o quita una selección del pago (consumo, cuota o descuento personalizado) de un período abierto. */
+  @Post('seleccion')
+  @Permiso('planilla', 'administrar')
+  seleccion(@Body() dto: SeleccionDto, @Req() req: any) {
+    return this.planilla.seleccionar(dto.partyId, dto.fecha, dto.tipo, dto.refId, dto.activo, req.usuario, ipDe(req));
   }
 
   @Post('pagar')

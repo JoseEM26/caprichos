@@ -270,7 +270,7 @@ describe('Calendario: detalle de la persona y lote', () => {
     const det = await screen.findByRole('dialog', { name: /Ana Pérez ·/ });
     fireEvent.click(within(det).getByRole('tab', { name: 'Pago del período' }));
     expect(await within(det).findByText('S/ 195.00')).toBeInTheDocument();
-    expect(detallePago).toHaveBeenCalledWith(1, HOY, []);
+    expect(detallePago).toHaveBeenCalledWith(1, HOY);
     expect(within(det).getByText('− S/ 40.00')).toBeInTheDocument();
     expect(within(det).getByText(/Consumos de períodos anteriores sin cobrar: S\/ 12\.00/)).toBeInTheDocument();
   });

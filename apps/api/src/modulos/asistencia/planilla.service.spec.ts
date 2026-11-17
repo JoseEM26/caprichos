@@ -1,7 +1,7 @@
 jest.mock('@nestjs/jwt', () => ({ JwtService: class {} }));
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { turnoDe } from './asistencia.calculo';
-import { PlanillaService } from './planilla.service';
+import { PlanillaService, unirSelecciones } from './planilla.service';
 import { MiPlanillaController } from './planilla.controller';
 
 // Servicio con BD en memoria mínima. Cubre reglas (congelar, consumos, ajustes), no el SQL.
@@ -25,6 +25,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
   ];
   const periodos: Fila[] = [];
   const extrasAprob: Fila[] = [];
+  const selecciones: Fila[] = [];
   const vigencias: Fila[] = opts.vigencias ?? [];
   const ajustes: Fila[] = [];
   const vacaciones: Fila[] = [];
@@ -63,6 +64,24 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       findMany: async () => extrasAprob,
       upsert: async ({ create }: any) => { extrasAprob.push({ aprobado_en: AHORA, ...create }); return create; },
       deleteMany: async () => ({}),
+    },
+    planillaSeleccion: {
+      findMany: async ({ where }: any = {}) => selecciones.filter((s) => s.party_id === where.party_id && s.periodo_desde.getTime() === where.periodo_desde.getTime()),
+      upsert: async ({ where, create }: any) => {
+        const w = where.party_id_periodo_desde_tipo_ref_id;
+        const ex = selecciones.find((s) => s.party_id === w.party_id && s.periodo_desde.getTime() === w.periodo_desde.getTime() && s.tipo === w.tipo && s.ref_id === w.ref_id);
+        if (ex) return ex;
+        selecciones.push({ ...create });
+        return create;
+      },
+      deleteMany: async ({ where }: any) => {
+        const antes = selecciones.length;
+        for (let i = selecciones.length - 1; i >= 0; i--) {
+          const s = selecciones[i];
+          if (s.party_id === where.party_id && s.periodo_desde.getTime() === where.periodo_desde.getTime() && s.tipo === where.tipo && s.ref_id === where.ref_id) selecciones.splice(i, 1);
+        }
+        return { count: antes - selecciones.length };
+      },
     },
     feriado: { findMany: async () => opts.feriados ?? [] },
     vinculoPersonal: { findMany: async () => (opts.vinculo ? [opts.vinculo] : []) },
@@ -116,7 +135,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     prestamos.push(p);
     montos.forEach((m, i) => cuotas.push({ id: id++, prestamo_id: p.id, numero: i + 1, monto: m, estado: 'PENDIENTE', reprogramada_de: null, periodo_hasta: null, planilla_periodo_id: null }));
   };
-  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias };
+  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias, selecciones };
 }
 
 describe('PlanillaService', () => {
@@ -673,6 +692,68 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     const despues = await m.svc.detalle(7, '2026-11-15', [], AHORA);
     expect(despues.pendientes).toBe(0);
     expect(despues.resultado.pagoExtra).toBe(5 * 10); // descanso trabajado: valor hora normal, sin el 1,25 de la extra
+  });
+});
+
+describe('selecciones del pago guardadas por persona y período', () => {
+  it('unirSelecciones: une la query con lo guardado sin duplicar y cada tipo cae en su lista', () => {
+    const r = unirSelecciones(['1'], { cuotas: ['c1'] }, [
+      { tipo: 'CONSUMO_EXCLUIDO', ref_id: '1' },
+      { tipo: 'CONSUMO_EXCLUIDO', ref_id: '2' },
+      { tipo: 'CUOTA_OMITIDA', ref_id: 'c2' },
+      { tipo: 'RECURRENTE_OMITIDO', ref_id: '5' },
+      { tipo: 'CONSUMO_ANTERIOR_INCLUIDO', ref_id: '9' },
+    ]);
+    expect(r.excluir).toEqual(['1', '2']);
+    expect(r.omitir.cuotas).toEqual(['c1', 'c2']);
+    expect(r.omitir.recurrentes).toEqual(['5']);
+    expect(r.omitir.incluirAnteriores).toEqual(['9']);
+  });
+
+  it('marcar un consumo lo deja fuera del cobro y quitarlo lo vuelve a cobrar; queda en auditoría', async () => {
+    const m = montar();
+    await m.svc.seleccionar(7, '2026-11-15', 'CONSUMO_EXCLUIDO', '1', true, ADMIN);
+    expect(m.selecciones).toHaveLength(1);
+    const marcado = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(marcado.consumos.find((c: any) => c.id === '1').cobrar).toBe(false);
+    expect(m.auditoria.registrar).toHaveBeenCalled();
+    await m.svc.seleccionar(7, '2026-11-15', 'CONSUMO_EXCLUIDO', '1', false, ADMIN);
+    expect(m.selecciones).toHaveLength(0);
+    const quitado = await m.svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(quitado.consumos.find((c: any) => c.id === '1').cobrar).toBe(true);
+  });
+
+  it('el pago usa las selecciones guardadas sin que lleguen por query', async () => {
+    const m = montar();
+    await m.svc.seleccionar(7, '2026-11-15', 'CONSUMO_EXCLUIDO', '1', true, ADMIN);
+    const { periodoId } = await m.svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA);
+    expect(m.consumos.find((c) => c.id === 1n)!.pagado_en).toBeNull();
+    expect(m.consumos.find((c) => c.id === 2n)!.planilla_periodo_id).toBe(BigInt(periodoId));
+  });
+
+  it('un período pagado no admite cambios de selección', async () => {
+    const m = montar();
+    m.periodos.push({ id: 50n, party_id: LUIS, estado: 'PAGADO', desde: d('2026-11-01'), hasta: d('2026-11-30') });
+    await expect(m.svc.seleccionar(7, '2026-11-15', 'CONSUMO_EXCLUIDO', '1', true, ADMIN)).rejects.toThrow();
+    expect(m.selecciones).toHaveLength(0);
+  });
+
+  it('un descuento personalizado que empieza después: no entra y se explica con el próximo período', async () => {
+    const m = montar({ sueldo: { modalidad: 'SEMANAL' }, recurrentes: [{ id: 5n, party_id: LUIS, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64, periodicidad: 'SEMANAL', signo: 'DESCUENTO', valor_tipo: 'MONTO', desde: d('2026-11-16'), hasta: null }] });
+    const r = await m.svc.detalle(7, '2026-11-09', [], AHORA);
+    expect(r.recurrentes).toEqual([]);
+    expect(r.recurrentesFueraDePeriodo).toEqual([expect.objectContaining({ nombre: 'Netflix', estado: 'EMPIEZA', desde: '2026-11-16', proximoPeriodo: { desde: '2026-11-16', hasta: '2026-11-22' } })]);
+    expect(r.desglose.find((x: any) => x.concepto === 'Netflix')).toBeUndefined();
+  });
+
+  it('el desglose suma lo que resta el neto (tardanza, consumos, descuentos y recurrentes)', async () => {
+    const m = montar({ sueldo: { modalidad: 'SEMANAL' }, recurrentes: [{ id: 5n, party_id: LUIS, tipo: 'NETFLIX', nombre: 'Netflix', monto: 1.64, periodicidad: 'SEMANAL', signo: 'DESCUENTO', valor_tipo: 'MONTO', desde: d('2026-11-16'), hasta: null }] });
+    await m.svc.crearAjuste('DESCUENTO', { partyId: 7, fecha: '2026-11-17', monto: 10, motivo: 'Vaso roto', categoria: 'DANO' }, ADMIN);
+    const r = await m.svc.detalle(7, '2026-11-16', [], AHORA);
+    expect(r.desglose.find((x: any) => x.concepto === 'Netflix')).toEqual(expect.objectContaining({ grupo: 'RECURRENTE', monto: 1.64 }));
+    expect(r.desglose.find((x: any) => x.concepto === 'Daño')).toEqual(expect.objectContaining({ grupo: 'DESCUENTO', monto: 10, detalle: 'Vaso roto' }));
+    const restas = r.desglose.filter((x: any) => ['TARDANZA', 'CONSUMO', 'DESCUENTO', 'PRESTAMO', 'RECURRENTE'].includes(x.grupo)).reduce((a: number, x: any) => a + x.monto, 0);
+    expect(Math.round(restas * 100) / 100).toBe(Math.round((r.resultado.descuentos + r.resultado.consumosCobrados + r.resultado.penalidadTardanza) * 100) / 100);
   });
 });
 

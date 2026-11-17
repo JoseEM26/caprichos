@@ -38,6 +38,31 @@ export interface OmitirPeriodo {
   /** Rango libre (solo consulta, no se paga): sueldo prorrateado por días y sin cuotas ni descuentos automáticos del período. */
   rangoLibre?: boolean;
 }
+export const TIPOS_SELECCION = ['CONSUMO_EXCLUIDO', 'CONSUMO_ANTERIOR_INCLUIDO', 'CUOTA_OMITIDA', 'RECURRENTE_OMITIDO'] as const;
+export type TipoSeleccion = (typeof TIPOS_SELECCION)[number];
+
+/**
+ * Une lo que llega por query con las selecciones guardadas. Cada tipo tiene un solo sentido (excluir, omitir o incluir),
+ * así que la unión nunca se contradice; desmarcar una selección la borra de la tabla.
+ */
+export function unirSelecciones(
+  excluir: string[],
+  omitir: OmitirPeriodo,
+  guardadas: Array<{ tipo: string; ref_id: string }>,
+): { excluir: string[]; omitir: OmitirPeriodo } {
+  const de = (t: TipoSeleccion) => guardadas.filter((g) => g.tipo === t).map((g) => g.ref_id);
+  const unir = (a: string[] = [], b: string[]) => [...new Set([...a, ...b])];
+  return {
+    excluir: unir(excluir, de('CONSUMO_EXCLUIDO')),
+    omitir: {
+      ...omitir,
+      cuotas: unir(omitir.cuotas, de('CUOTA_OMITIDA')),
+      recurrentes: unir(omitir.recurrentes, de('RECURRENTE_OMITIDO')),
+      incluirAnteriores: unir(omitir.incluirAnteriores, de('CONSUMO_ANTERIOR_INCLUIDO')),
+    },
+  };
+}
+
 /** Confirmaciones del admin al pagar, que quedan en el pago y en la auditoría. */
 export interface ConfirmacionesPago {
   /** «Pagar igual»: motivo (mín. 10 caracteres) para pagar con jornadas pendientes. Solo ADMIN. */
@@ -70,6 +95,8 @@ const DESDE_SIEMPRE = '1900-01-01';
 const pagoDe = (s: any) => ({ celular: (s.pago_celular as string | null) ?? null, medio: (s.pago_medio as string | null) ?? null });
 
 const fechaDb = (iso: string) => new Date(`${iso}T00:00:00Z`);
+const ETIQUETA_DESCUENTO: Record<string, string> = { CONSUMO: 'Consumo', MERMA: 'Merma', DANO: 'Daño', PRESTAMO: 'Préstamo', NETFLIX: 'Netflix', OTRO: 'Otro' };
+const ETIQUETA_PERIODICIDAD_API: Record<string, string> = { SEMANAL: 'cada semana', MENSUAL: 'cada mes', UNICA: 'una sola vez' };
 const isoDe = (d: Date) => d.toISOString().slice(0, 10);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const horas = (min: number) => Math.round((min / 60) * 100) / 100;
@@ -358,8 +385,38 @@ export class PlanillaService {
     if (pagado) {
       return { ...(pagado.detalle as object), sueldo, pago, estado: 'PAGADO', periodoId: Number(pagado.id), pagadoEn: pagado.pagado_en.toISOString(), pagadoPor: Number(pagado.pagado_por) };
     }
-    const calc = await this.calcular(id, sueldo, periodo, new Set(excluirConsumoIds), ahora, omitir);
+    // Lo marcado en pantallas anteriores queda guardado por persona y período; el pago usa la misma unión
+    const guardadas = omitir.rangoLibre
+      ? []
+      : await this.prisma.planillaSeleccion.findMany({ where: { party_id: id, periodo_desde: fechaDb(periodo.desde) } });
+    const u = unirSelecciones(excluirConsumoIds, omitir, guardadas);
+    const calc = await this.calcular(id, sueldo, periodo, new Set(u.excluir), ahora, u.omitir);
     return { ...calc, sueldo, pago, estado: 'ABIERTO', periodoId: null };
+  }
+
+  /**
+   * Guarda (o quita) una selección del pago de un período abierto: consumos, cuotas y descuentos personalizados.
+   * Los pagos ya hechos no cambian; reabrir el período vuelve a usar las selecciones guardadas.
+   */
+  async seleccionar(partyId: number, fecha: string, tipo: TipoSeleccion, refId: string, activo: boolean, usuario: UsuarioAutenticado, ip?: string) {
+    const id = BigInt(partyId);
+    fechaValida(fecha);
+    const s = await this.prisma.sueldoPersonal.findUnique({ where: { party_id: id } });
+    if (!s) throw new NotFoundException({ codigo: 'SIN_SUELDO', mensaje: 'Esa persona todavía no tiene sueldo configurado' });
+    const periodo = periodoDe(s.modalidad as Modalidad, fecha);
+    await this.exigirPeriodoAbierto(id, fecha);
+    const clave = { party_id: id, periodo_desde: fechaDb(periodo.desde), tipo, ref_id: refId };
+    if (activo) {
+      await this.prisma.planillaSeleccion.upsert({
+        where: { party_id_periodo_desde_tipo_ref_id: clave },
+        create: { ...clave, creado_por: usuario.partyId },
+        update: {},
+      });
+    } else {
+      await this.prisma.planillaSeleccion.deleteMany({ where: clave });
+    }
+    await this.auditar('CAMBIO', activo ? 'MARCAR_SELECCION_PLANILLA' : 'QUITAR_SELECCION_PLANILLA', usuario, ip, 'party', id, { periodo: periodo.desde, tipo, refId });
+    return { ok: true, activo };
   }
 
   private async vacacionesDelPeriodo(id: bigint, periodo: { desde: string; hasta: string }) {
@@ -404,7 +461,7 @@ export class PlanillaService {
       this.prisma.person.findUnique({ where: { party_id: id } }),
       tercerizado ? Promise.resolve([] as any[]) : this.prisma.feriado.findMany({ where: { activo: true, fecha: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.prestamoPersonal.findMany({ where: { party_id: id, estado: 'ACTIVO' }, include: { cuotas: true }, orderBy: { id: 'asc' } }),
-      omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: id, activo: true, desde: { lte: fechaDb(periodo.hasta) } }, orderBy: { id: 'asc' } }),
+      omitir.rangoLibre ? Promise.resolve([] as any[]) : this.prisma.descuentoRecurrentePersonal.findMany({ where: { party_id: id, activo: true }, orderBy: { id: 'asc' } }),
     ]);
     // Feriado activo: las horas trabajadas de esa jornada se pagan a valor hora × recargo (ver pagoDia en planilla.calculo).
     const feriados = new Map(feriadosBd.map((f) => [isoDe(f.fecha), { nombre: f.nombre, recargo: Number(f.recargo) }]));
@@ -513,6 +570,26 @@ export class PlanillaService {
       ...cuotas.filter((c) => c.cobrar).map((c) => ({ categoria: 'PRESTAMO', monto: c.monto })),
       ...recurrentes.filter((r) => r.cobrar && r.signo === 'DESCUENTO').map((r) => ({ categoria: r.tipo === 'NETFLIX' ? 'NETFLIX' : 'OTRO', monto: r.monto })),
     ];
+    // Descuentos personalizados que NO caen en este período (empiezan después o ya terminaron): se explica en pantalla
+    const recurrentesFueraDePeriodo = recurrentesBd.flatMap((r: any) => {
+      const desde = r.desde ? isoDe(r.desde) : '1900-01-01';
+      const hasta = r.hasta ? isoDe(r.hasta) : null;
+      const empieza = desde > periodo.hasta;
+      if (!empieza && !(hasta && hasta < periodo.desde)) return [];
+      const proximoPeriodo: { desde: string; hasta: string } | null = empieza ? periodoDe(sueldo.modalidad as Modalidad, desde) : null;
+      return [{
+        id: r.id.toString(),
+        nombre: r.nombre as string,
+        signo: (r.signo === 'BONO' ? 'BONO' : 'DESCUENTO') as 'BONO' | 'DESCUENTO',
+        periodicidad: (r.periodicidad ?? 'SEMANAL') as 'SEMANAL' | 'MENSUAL' | 'UNICA',
+        valorTipo: (r.valor_tipo === 'PORCENTAJE' ? 'PORCENTAJE' : 'MONTO') as 'MONTO' | 'PORCENTAJE',
+        valor: Number(r.monto),
+        estado: (empieza ? 'EMPIEZA' : 'TERMINO') as 'EMPIEZA' | 'TERMINO',
+        desde,
+        hasta,
+        proximoPeriodo,
+      }];
+    });
     const bonosPersonales = recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => r.monto);
     const resultado = calcularPlanilla({
       valorHora: vhFijo ?? undefined,
@@ -529,6 +606,17 @@ export class PlanillaService {
       adelantos: vigentes.filter((a) => a.tipo === 'ADELANTO').map((a) => Number(a.monto)),
       vacacionesPagadas: vacPagadas.map((v) => Number(v.monto ?? 0)),
     });
+    // Desglose legible de cada parte del neto (mismas cifras que resultado; el neto no cambia)
+    const desglose: Array<{ grupo: 'TARDANZA' | 'CONSUMO' | 'ADELANTO' | 'DESCUENTO' | 'PRESTAMO' | 'RECURRENTE' | 'BONO'; concepto: string; monto: number; detalle?: string }> = [
+      ...(resultado.penalidadTardanza > 0 ? [{ grupo: 'TARDANZA' as const, concepto: `Tardanza (${resultado.tardanzaMin} min)`, monto: resultado.penalidadTardanza, detalle: 'La hora tarde no se paga y además se descuenta su penalidad' }] : []),
+      ...(resultado.consumosCobrados > 0 ? [{ grupo: 'CONSUMO' as const, concepto: `Consumos del personal (${consumos.filter((c) => c.cobrar).length})`, monto: resultado.consumosCobrados }] : []),
+      ...vigentes.filter((a) => a.tipo === 'ADELANTO').map((a) => ({ grupo: 'ADELANTO' as const, concepto: 'Adelanto', monto: Number(a.monto), detalle: a.motivo as string })),
+      ...vigentes.filter((a) => a.tipo === 'DESCUENTO').map((a) => ({ grupo: 'DESCUENTO' as const, concepto: ETIQUETA_DESCUENTO[(CATEGORIAS_DESCUENTO as readonly string[]).includes(a.categoria) ? a.categoria : 'OTRO'], monto: Number(a.monto), detalle: a.motivo as string })),
+      ...cuotas.filter((c) => c.cobrar).map((c) => ({ grupo: 'PRESTAMO' as const, concepto: `Cuota ${c.numero} de ${c.numCuotas} del préstamo`, monto: c.monto })),
+      ...recurrentes.filter((r) => r.cobrar && r.signo === 'DESCUENTO').map((r) => ({ grupo: 'RECURRENTE' as const, concepto: r.nombre, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
+      ...vigentes.filter((a) => a.tipo === 'BONO').map((a) => ({ grupo: 'BONO' as const, concepto: 'Bono', monto: Number(a.monto), detalle: a.motivo as string })),
+      ...recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => ({ grupo: 'BONO' as const, concepto: r.nombre, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
+    ];
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
     // Pendiente = jornada que bloquea el pago. Un descanso trabajado que el admin ya aprobó deja de bloquear.
     const diasPendientes = diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado) && !(d.descansoTrabajado && porDia.has(d.jornada)));
@@ -562,6 +650,8 @@ export class PlanillaService {
       },
       cuotas,
       recurrentes,
+      recurrentesFueraDePeriodo,
+      desglose,
       pendientes: diasPendientes.length,
       /** Jornadas que bloquean «Marcar pagado» (para el banner y su enlace al día). */
       jornadasPorRevisar: diasPendientes.map((d) => d.jornada),

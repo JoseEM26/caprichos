@@ -103,7 +103,7 @@ function PagoDelPeriodo({ partyId, fecha }: { partyId: number; fecha: string }) 
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let vivo = true;
-    detallePlanilla(partyId, fecha, [])
+    detallePlanilla(partyId, fecha)
       .then((r) => { if (vivo) setD(r); })
       .catch((e) => { if (vivo) setError(mensajeDe(e, 'No pudimos cargar su pago del período.')); });
     return () => { vivo = false; };

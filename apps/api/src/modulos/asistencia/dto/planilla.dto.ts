@@ -118,6 +118,14 @@ export class ExtraDto {
   @IsBoolean() aprobada!: boolean;
 }
 
+export class SeleccionDto {
+  @Type(() => Number) @IsInt() @Min(1) partyId!: number;
+  @Matches(FECHA) fecha!: string;
+  @IsIn(['CONSUMO_EXCLUIDO', 'CONSUMO_ANTERIOR_INCLUIDO', 'CUOTA_OMITIDA', 'RECURRENTE_OMITIDO']) tipo!: 'CONSUMO_EXCLUIDO' | 'CONSUMO_ANTERIOR_INCLUIDO' | 'CUOTA_OMITIDA' | 'RECURRENTE_OMITIDO';
+  @IsString() @MinLength(1) @MaxLength(64) refId!: string;
+  @IsBoolean() activo!: boolean;
+}
+
 export class VinculoDto {
   @IsIn(['PLANILLA', 'CONTRATO_TEMPORAL']) tipo!: 'PLANILLA' | 'CONTRATO_TEMPORAL';
   @Matches(FECHA) fechaIngreso!: string;

@@ -3429,6 +3429,20 @@ model PlanillaExtraAprobada {
   @@map("planilla_extra_aprobada")
 }
 
+/// Selecciones del pago de un período (consumos, cuotas y descuentos omitidos o cobrados fuera de lo normal). Se guardan al marcarlas.
+model PlanillaSeleccion {
+  id            BigInt   @id @default(autoincrement())
+  party_id      BigInt
+  periodo_desde DateTime @db.Date
+  tipo          String   @db.VarChar(24) // CONSUMO_EXCLUIDO | CONSUMO_ANTERIOR_INCLUIDO | CUOTA_OMITIDA | RECURRENTE_OMITIDO
+  ref_id        String   @db.VarChar(64)
+  creado_por    BigInt
+  creado_en     DateTime @default(now()) @db.Timestamptz
+
+  @@unique([party_id, periodo_desde, tipo, ref_id])
+  @@map("planilla_seleccion")
+}
+
 model PlanillaPeriodo {
   id             BigInt    @id @default(autoincrement())
   party_id       BigInt

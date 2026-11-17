@@ -195,7 +195,22 @@ export interface DetallePlanilla {
   consumos: ConsumoPlanillaApi[];
   consumosAnterioresPendiente?: number;
   ajustes: AjustePlanillaApi[];
+  /** Cada parte del neto con su razón (lo manda el servidor desde la versión con desglose; en períodos pagados antes puede faltar). */
+  desglose?: LineaDesglose[];
+  /** Descuentos y bonos personalizados que no caen en este período: empiezan después o ya terminaron. */
+  recurrentesFueraDePeriodo?: RecurrenteFueraApi[];
 }
+
+export type GrupoDesglose = 'TARDANZA' | 'CONSUMO' | 'ADELANTO' | 'DESCUENTO' | 'PRESTAMO' | 'RECURRENTE' | 'BONO';
+export interface LineaDesglose { grupo: GrupoDesglose; concepto: string; monto: number; detalle?: string }
+export interface RecurrenteFueraApi {
+  id: string; nombre: string; signo: 'DESCUENTO' | 'BONO'; periodicidad: PeriodicidadDescuento; valorTipo: 'MONTO' | 'PORCENTAJE'; valor: number;
+  estado: 'EMPIEZA' | 'TERMINO'; desde: string; hasta: string | null; proximoPeriodo: { desde: string; hasta: string } | null;
+}
+/** Selección del pago que se guarda por persona y período (consumo, cuota o descuento personalizado). */
+export type TipoSeleccion = 'CONSUMO_EXCLUIDO' | 'CONSUMO_ANTERIOR_INCLUIDO' | 'CUOTA_OMITIDA' | 'RECURRENTE_OMITIDO';
+/** Clave de una selección en curso (un consumo y una cuota pueden tener el mismo id). */
+export const claveSeleccion = (tipo: TipoSeleccion, refId: string) => `${tipo}:${refId}`;
 
 /** Misma fórmula del servidor: semanal = mensual×12/52; mensual = semanal×52/12 (a céntimos). */
 export function sueldoEquivalente(modalidad: Modalidad, monto: number): { semanal: number; mensual: number } {
@@ -217,10 +232,8 @@ export const listarPlanilla = (fecha?: string, modo?: 'SEMANA' | 'MES' | 'RANGO'
   const q = [fecha ? `fecha=${fecha}` : '', modo ? `modo=${modo}` : '', modo === 'RANGO' && rango ? `desde=${rango.desde}&hasta=${rango.hasta}` : ''].filter(Boolean).join('&');
   return api.get<ListaPlanilla>(`/admin/planilla${q ? `?${q}` : ''}`);
 };
-export const detallePlanilla = (partyId: number, fecha: string, excluir: string[], omitirCuotas: string[] = [], omitirRecurrentes: string[] = [], incluirAnteriores: string[] = []) =>
-  api.get<DetallePlanilla>(
-    `/admin/planilla/persona/${partyId}?fecha=${fecha}${excluir.length ? `&excluir=${excluir.join(',')}` : ''}${omitirCuotas.length ? `&omitirCuotas=${omitirCuotas.join(',')}` : ''}${omitirRecurrentes.length ? `&omitirRecurrentes=${omitirRecurrentes.join(',')}` : ''}${incluirAnteriores.length ? `&incluirAnteriores=${incluirAnteriores.join(',')}` : ''}`,
-  );
+/** Las selecciones del pago (consumos, cuotas, descuentos personalizados) las guarda el servidor por persona y período. */
+export const detallePlanilla = (partyId: number, fecha: string) => api.get<DetallePlanilla>(`/admin/planilla/persona/${partyId}?fecha=${fecha}`);
 export interface SueldoHistorial extends SueldoPersona { /** null = desde siempre */ vigenteDesde: string | null; creadoEn: string }
 export const obtenerSueldo = (partyId: number) => api.get<{ sueldo: SueldoPersona | null; pago?: PagoPersona | null; celularUsuario?: string; historial?: SueldoHistorial[] }>(`/admin/planilla/sueldo/${partyId}`);
 export interface DatosSueldoExtra {
@@ -239,6 +252,9 @@ export const crearAjuste = (tipo: 'ADELANTO' | 'DESCUENTO' | 'BONO', datos: { pa
   api.post(`/admin/planilla/${tipo === 'ADELANTO' ? 'adelantos' : tipo === 'BONO' ? 'bonos' : 'descuentos'}`, datos);
 export const anularAjuste = (id: number, motivo: string) => api.post(`/admin/planilla/ajustes/${id}/anular`, { motivo });
 export const aprobarExtra = (partyId: number, jornada: string, aprobada: boolean) => api.post('/admin/planilla/extras', { partyId, jornada, aprobada });
+/** Guarda (o quita) una selección del pago: el servidor la recuerda para el cálculo y para el pago. */
+export const seleccionarPlanilla = (partyId: number, fecha: string, tipo: TipoSeleccion, refId: string, activo: boolean) =>
+  api.post('/admin/planilla/seleccion', { partyId, fecha, tipo, refId, activo });
 /** `confirma`: «Pagar igual» (solo ADMIN, con motivo) y la confirmación de pagar sin descontar créditos anteriores. */
 export const pagarPlanilla = (partyId: number, fecha: string, excluirConsumoIds: string[], omitirCuotaIds: string[] = [], omitirRecurrenteIds: string[] = [], incluirConsumoIds: string[] = [], confirma: { pagarIgualMotivo?: string; sinDescontarAnteriores?: boolean } = {}) =>
   api.post('/admin/planilla/pagar', { partyId, fecha, excluirConsumoIds, omitirCuotaIds, omitirRecurrenteIds, incluirConsumoIds, ...confirma });

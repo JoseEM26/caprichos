@@ -12,7 +12,8 @@ import { DatosPago } from './DatosPago';
 import { useUltimaPeticion } from './jornada';
 import { ModoPeriodo, etiquetaPeriodo, moverPeriodo } from './periodoVista';
 import { Plegable } from './Plegable';
-import { ETIQUETA_CATEGORIA, DetallePlanilla, PagoHistorial, detallePlanilla, historialPagos, pagarPlanilla, reabrirPlanilla, soles, totalPenalidad } from './planillaApi';
+import { DetallePlanilla, PagoHistorial, TipoSeleccion, claveSeleccion, detallePlanilla, historialPagos, pagarPlanilla, reabrirPlanilla, seleccionarPlanilla, soles, totalPenalidad } from './planillaApi';
+import { formulaNeto, lineasAdelanto, lineasDescuento, motivoNeto, resumenCalculo } from './planillaExplicacion';
 import { PestanaAsistencia } from './PlanillaPersonaAsistencia';
 import { PestanaDescuentos } from './PlanillaPersonaDescuentos';
 import { PestanaHistorial } from './PlanillaPersonaHistorial';
@@ -68,11 +69,8 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
 }) {
   const [d, setD] = useState<DetallePlanilla | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
-  const [excluidos, setExcluidos] = useState<string[]>([]);
-  const [omitCuotas, setOmitCuotas] = useState<string[]>([]);
-  const [omitRec, setOmitRec] = useState<string[]>([]);
-  // consumos de períodos anteriores que se marcan para cobrar en este pago (por defecto pasan al siguiente)
-  const [incluirAnt, setIncluirAnt] = useState<string[]>([]);
+  // checks del pago (consumos, cuotas y descuentos personalizados) viven en el servidor; aquí solo cuál se está guardando
+  const [guardando, setGuardando] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [confirmaPago, setConfirmaPago] = useState(false);
   const [reabrir, setReabrir] = useState<string | null>(null);
@@ -94,7 +92,6 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
   useEffect(() => {
     if (fechaPrevia.current === fecha) return;
     fechaPrevia.current = fecha;
-    setExcluidos((x) => (x.length ? [] : x)); setOmitCuotas((x) => (x.length ? [] : x)); setOmitRec((x) => (x.length ? [] : x)); setIncluirAnt((x) => (x.length ? [] : x));
     setSinDescontarAnt(false); setPagarIgual(null); setBorradorIgual(null); setResSimples(null); setReabrir(null);
   }, [fecha]);
 
@@ -103,7 +100,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
   const cargar = useCallback(async () => {
     const vigente = nueva();
     try {
-      const r = await detallePlanilla(partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt);
+      const r = await detallePlanilla(partyId, fecha);
       if (vigente()) { tieneD.current = true; setD(r); setFallo(null); }
     } catch (e) {
       if (!vigente()) return;
@@ -111,8 +108,23 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
       setFallo(m);
       if (tieneD.current) onError(m); // sin datos todavía, el error se muestra en la propia página con «Reintentar»
     }
-  }, [partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt, onError, nueva]);
+  }, [partyId, fecha, onError, nueva]);
   useEffect(() => { void cargar(); }, [cargar]);
+
+  // Cada check se guarda en el servidor al marcarlo; mientras guarda se deshabilita ese check y al terminar se recarga el cálculo
+  const seleccionar = useCallback(async (tipo: TipoSeleccion, refId: string, activo: boolean) => {
+    setGuardando(claveSeleccion(tipo, refId));
+    try {
+      await seleccionarPlanilla(partyId, fecha, tipo, refId, activo);
+      onError(null);
+      onOk('Guardado ✓ — el descuento se actualizó.');
+      await cargar();
+    } catch (e) {
+      onError(mensajeDe(e, 'No se pudo guardar el cambio. Intenta de nuevo.'));
+    } finally {
+      setGuardando(null);
+    }
+  }, [partyId, fecha, cargar, onError, onOk]);
 
   // marcas del período (rol de la persona y detalle de cada día): una sola pregunta por período
   const desdeP = d?.periodo.desde;
@@ -176,10 +188,12 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
     porRevisar, faltan, penal, detallePenal, setConfirmaSimples, resSimples,
     pagarIgual, setPagarIgual, borradorIgual, setBorradorIgual,
     antSinCobrar, antTotal, sinDescontarAnt, setSinDescontarAnt, faltaCredito,
-    setIncluirAnt, setExcluidos, setOmitCuotas, setOmitRec, bloqueo, alPagar: () => setConfirmaPago(true),
+    seleccionar, guardando, bloqueo, alPagar: () => setConfirmaPago(true),
   };
 
   const nombre = d.nombre;
+  const res = resumenCalculo(d);
+  const lineasFranja = [...lineasDescuento(d), ...lineasAdelanto(d)];
   const rol = nombreRol(filasCal?.[0]?.rol);
   const modo: ModoPeriodo = d.sueldo.modalidad === 'SEMANAL' ? 'SEMANA' : 'MES';
   const unidad = modo === 'SEMANA' ? 'Semana' : 'Mes';
@@ -218,9 +232,17 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         <h3 className="as-sub">Cómo se llega al neto a pagar</h3>
         <CascadaNeto c={c} />
         <small className="as-nota">{horas(r.trabajadaMin)} h trabajadas de {horas(r.programadaMin)} h programadas · {cuotasCobrar} cuota(s) de préstamo y servicio(s) extra en este pago.</small>
-        {r.descuentosPorCategoria && Object.keys(r.descuentosPorCategoria).length > 0 && (
-          <small className="as-nota">Se descuenta: {Object.entries(r.descuentosPorCategoria).map(([k, m]) => `${ETIQUETA_CATEGORIA[k] ?? (k === 'TARDANZA' ? 'Tardanza' : k)}: ${soles(m)}`).join(' · ')}</small>
-        )}
+        <details className="pp-explica" data-testid="como-se-calcula">
+          <summary>¿Cómo se calcula?</summary>
+          <ol className="pp-explica-pasos">
+            <li>Bruto (lo ganado): horas trabajadas a {soles(r.valorHora)} la hora = {soles(r.pagoTrabajado)}{r.pagoExtra > 0 ? `, más horas extra aprobadas ${soles(r.pagoExtra)}` : ''}{(r.pagoVacaciones ?? 0) > 0 ? `, más vacaciones pagadas ${soles(r.pagoVacaciones ?? 0)}` : ''}. Bruto: {soles(res.bruto)}.</li>
+            {res.bonos > 0 && <li>Más bonos: {soles(res.bonos)}.</li>}
+            {res.descuentos.length > 0 && <li>Se descuenta: {res.descuentos.map((x) => `${x.concepto} ${soles(x.monto)}`).join(' + ')} = {soles(res.totalDescuentos)}.</li>}
+            {res.adelantos.length > 0 && <li>Adelantos: {soles(res.totalAdelantos)}.</li>}
+            <li>Neto a pagar = bruto{res.bonos > 0 ? ' + bonos' : ''} − descuentos{res.adelantos.length > 0 ? ' − adelantos' : ''}.</li>
+            <li className="pp-formula"><strong>{formulaNeto(d)}</strong></li>
+          </ol>
+        </details>
         {r.consumosPendientes > 0 && <small className="as-nota">Consumos que pasan al siguiente período: {soles(r.consumosPendientes)}</small>}
         {!!d.consumosAnterioresPendiente && <small className="as-nota">Consumos de períodos anteriores sin cobrar: {soles(d.consumosAnterioresPendiente)} (se marcan en «Descuentos y créditos»).</small>}
       </section>
@@ -229,7 +251,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
 
   const pago = (
     <div className="pp-seccion">
-      {r.neto < 0 && <div role="alert" className="as-aviso as-aviso--alerta">El neto es negativo: los descuentos superan lo ganado.</div>}
+      {motivoNeto(d) && <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-neto-negativo">{motivoNeto(d)}</div>}
       <p className="as-ayuda">
         Período {d.periodo.desde} a {d.periodo.hasta} · Sueldo {d.sueldo.modalidad === 'SEMANAL' ? 'semanal' : 'mensual'} {soles(d.sueldo.modalidad === 'SEMANAL' ? d.sueldo.semanal : d.sueldo.mensual)} · Valor hora {soles(r.valorHora)}
         {d.tercerizado && <> · <Insignia variante="acento">Tercerizado: sin feriado ×2 ni vacaciones</Insignia></>}
@@ -312,7 +334,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         <dl className="pp-cifras" aria-label="Cifras del período">
           <div><dt>Horas trabajadas / programadas</dt><dd>{horas(r.trabajadaMin)} h de {horas(r.programadaMin)} h</dd></div>
           <div><dt>Bruto (ganado)</dt><dd>{soles(r.ganado)}</dd></div>
-          <div><dt>Descuentos</dt><dd>− {soles(penal + r.adelantos + r.descuentos + r.consumosCobrados)}</dd></div>
+          <div><dt>Descuentos</dt><dd>− {soles(res.totalRestas)}{lineasFranja.length > 0 && <small className="pp-desglose" data-testid="desglose-descuentos">{lineasFranja.map((x) => `${x.concepto}: ${soles(x.monto)}`).join(' · ')}</small>}</dd></div>
           <div className="pp-cifra-neto"><dt>Neto a pagar</dt><dd>{soles(r.neto)}</dd></div>
         </dl>
         {pagado && d.pagadoEn && (
@@ -340,7 +362,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         textoSi="Sí, marcar pagado"
         textoNo="No"
         cargando={ocupado}
-        alConfirmar={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, excluidos, omitCuotas, omitRec, incluirAnt, { ...(pagarIgual !== null ? { pagarIgualMotivo: pagarIgual } : {}), ...(sinDescontarAnt && antSinCobrar.length > 0 ? { sinDescontarAnteriores: true } : {}) }); setConfirmaPago(false); setExcluidos([]); setOmitCuotas([]); setOmitRec([]); setIncluirAnt([]); cargarPagos(); }, 'Período marcado como pagado.')}
+        alConfirmar={() => void ejecutar(async () => { await pagarPlanilla(d.partyId, fecha, [], [], [], [], { ...(pagarIgual !== null ? { pagarIgualMotivo: pagarIgual } : {}), ...(sinDescontarAnt && antSinCobrar.length > 0 ? { sinDescontarAnteriores: true } : {}) }); setConfirmaPago(false); cargarPagos(); }, 'Período marcado como pagado.')}
         alCancelar={() => setConfirmaPago(false)}
       />
       <Confirmar
