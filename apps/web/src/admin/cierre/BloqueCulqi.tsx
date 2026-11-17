@@ -1,5 +1,5 @@
 import { IconoMedioPago } from '../../comun/IconoMedioPago';
-import type { ComisionCulqiTurno, CulqiTurno, OperacionCulqi } from './cierreApi';
+import type { AlertaCobroCulqi, ComisionCulqiTurno, CulqiTurno, OperacionCulqi } from './cierreApi';
 import { soles } from './cuadre.util';
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
@@ -9,10 +9,32 @@ const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANS
 
 /** Estado de la operación en Culqi; «Devuelto por fuera» = el dinero sigue en Culqi y salió del medio del local. */
 export function estadoOperacionCulqi(o: OperacionCulqi): string {
+  const devCulqi = o.devueltoCulqi ?? (o.estado === 'DEVUELTO_CULQI' ? o.monto : 0);
+  const parte = devCulqi > 0 && devCulqi < o.monto ? ` (parcial: ${soles(devCulqi)})` : '';
   if (o.estado === 'DEVUELTO_FUERA') return `Devuelto por fuera (${(o.devueltoPor ?? []).map((m) => NOMBRE_MEDIO[m] ?? m).join(', ')} del local)`;
-  if (o.estado === 'DEVUELTO_CULQI') return 'Devuelto por Culqi';
+  if (o.estado === 'DEVUELTO_CULQI') return devCulqi >= o.monto ? 'Devuelto por Culqi' : `Devuelto por Culqi${parte}`;
   if (o.estado === 'ANULADO') return 'Cobro anulado, sin devolver';
   return 'Cobrado';
+}
+
+/** Alertas de cobros Culqi por revisar: visibles, no bloquean el cierre ni tocan el efectivo. */
+export function AlertasCulqi({ alertas }: { alertas: AlertaCobroCulqi[] }) {
+  if (!alertas || alertas.length === 0) return null;
+  return (
+    <div role="alert" data-testid="alertas-culqi" style={{ border: '1.5px solid var(--cp-rust, #B2500F)', borderRadius: 10, padding: 10, margin: '8px 0', background: '#FFF6EE' }}>
+      <strong style={{ color: 'var(--cp-rust, #B2500F)' }}>
+        Cobro Culqi para revisar ({alertas.length})
+      </strong>
+      <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+        {alertas.map((a) => (
+          <li key={`${a.pedidoId}-${a.tipo}`} data-testid="alerta-culqi">
+            <b>{a.pedidoCodigo}</b> · {soles(a.monto)} · {a.mensaje}
+          </li>
+        ))}
+      </ul>
+      <p className="cc-peq" style={{ margin: '6px 0 0' }}>No cambia el efectivo esperado. Resuélvelo en Pagos en línea.</p>
+    </div>
+  );
 }
 
 export function OperacionesCulqi({ operaciones }: { operaciones: OperacionCulqi[] }) {
@@ -46,7 +68,10 @@ export function ComisionPasarela({ comision }: { comision: ComisionCulqiTurno })
   return (
     <div data-testid="comision-pasarela" style={{ marginTop: 12, borderTop: '1px dashed var(--cp-line)', paddingTop: 8 }}>
       <h4 className="cc-h3" style={{ fontSize: '1rem' }}>Comisión de la pasarela (la asume el local)</h4>
-      <div className="cc-dig"><div className="cc-dig-nom">Cobrado bruto (sin devueltos)</div><div className="cc-dig-sis"><b>{soles(comision.bruto)}</b></div></div>
+      <div className="cc-dig"><div className="cc-dig-nom">Cobrado bruto (sin lo devuelto por Culqi)</div><div className="cc-dig-sis"><b>{soles(comision.bruto)}</b></div></div>
+      {comision.devueltoCulqi != null && comision.devueltoCulqi > 0 && (
+        <div className="cc-dig" data-testid="comision-devuelto"><div className="cc-dig-nom">Devuelto por Culqi</div><div className="cc-dig-sis"><b>- {soles(comision.devueltoCulqi)}</b></div></div>
+      )}
       <div className="cc-dig" data-testid="comision-total">
         <div className="cc-dig-nom">Comisión de {comision.pagos - comision.porConfirmar} de {comision.pagos} pagos</div>
         <div className="cc-dig-sis"><b>- {soles(comision.total)}</b></div>
@@ -73,6 +98,7 @@ export function ComisionPasarela({ comision }: { comision: ComisionCulqiTurno })
  * no se compara con tu app: su visto es el del sistema y se verifica en CulqiPanel.
  */
 export function BloqueCulqi({ culqi }: { culqi: CulqiTurno }) {
+  const cobros = culqi.comision?.pagos ?? culqi.operaciones?.length ?? 0;
   const filas = [
     { medio: 'YAPE', nombre: 'Yape por Culqi', monto: culqi.yape, devuelto: culqi.devueltoYape, hay: culqi.cobradoYape > 0 },
     { medio: 'TARJETA', nombre: 'Tarjeta por Culqi', monto: culqi.tarjeta, devuelto: culqi.devueltoTarjeta, hay: culqi.cobradoTarjeta > 0 },
@@ -84,6 +110,13 @@ export function BloqueCulqi({ culqi }: { culqi: CulqiTurno }) {
         <span>Pagos en línea (Culqi)</span>
       </h3>
       <p className="cc-peq">Se verifica en CulqiPanel, no en el Yape del local.</p>
+      <AlertasCulqi alertas={culqi.alertas ?? []} />
+      {cobros > 0 && (
+        <div className="cc-dig" data-testid="culqi-cobros">
+          <div className="cc-dig-nom">Cobros por Culqi</div>
+          <div className="cc-dig-sis"><b>{cobros}</b></div>
+        </div>
+      )}
       {filas.filter((f) => f.hay).map((f) => (
         <div key={f.medio} className="cc-dig" data-testid={`culqi-${f.medio.toLowerCase()}`}>
           <div className="cc-dig-nom" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -97,8 +130,14 @@ export function BloqueCulqi({ culqi }: { culqi: CulqiTurno }) {
           <div className="cc-dig-dif">Visto = sistema ✓</div>
         </div>
       ))}
+      {culqi.devueltoYape + culqi.devueltoTarjeta > 0 && (
+        <div className="cc-dig" data-testid="culqi-devuelto">
+          <div className="cc-dig-nom">Devuelto por Culqi</div>
+          <div className="cc-dig-sis"><b>- {soles(culqi.devueltoYape + culqi.devueltoTarjeta)}</b></div>
+        </div>
+      )}
       <div className="cc-dig" data-testid="culqi-total">
-        <div className="cc-dig-nom"><strong>Total Culqi</strong></div>
+        <div className="cc-dig-nom"><strong>Total Culqi (cobrado menos devuelto)</strong></div>
         <div className="cc-dig-sis"><b>{soles(culqi.total)}</b></div>
       </div>
       {culqi.comision && <ComisionPasarela comision={culqi.comision} />}

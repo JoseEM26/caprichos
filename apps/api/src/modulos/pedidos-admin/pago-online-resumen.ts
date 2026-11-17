@@ -10,6 +10,8 @@ export interface PagoOnlineResumen {
   monto: number;
   aprobadoEn: Date | null;
   devuelto: number;
+  /** Fecha de la última devolución (ISO); null si no hubo */
+  devueltoEn: string | null;
   estado: 'APROBADO' | 'DEVUELTO_PARCIAL' | 'DEVUELTO';
   modo: string;
   /** Comisión de la pasarela con IGV (la asume el local). Solo en el panel con permiso de caja; null = por confirmar. */
@@ -38,6 +40,7 @@ export async function pagosOnlineDe(db: Db, pedidoIds: bigint[], conComision = t
   for (const f of filas) {
     const cp = comision.get(String(f.pedido_id));
     const devuelto = f.devuelto_centimos ?? 0;
+    const ultima = ((f.devoluciones as any[]) ?? []).reduce<string | null>((m, d) => (d?.en && (!m || String(d.en) > m) ? String(d.en) : m), null);
     out.set(String(f.pedido_id), {
       medio: f.medio ?? null,
       marca: f.marca ?? null,
@@ -46,6 +49,7 @@ export async function pagosOnlineDe(db: Db, pedidoIds: bigint[], conComision = t
       monto: enPesos(f.monto_centimos),
       aprobadoEn: f.aprobado_en ?? null,
       devuelto: enPesos(devuelto),
+      devueltoEn: devuelto > 0 ? ultima : null,
       estado: devuelto <= 0 ? 'APROBADO' : devuelto >= f.monto_centimos ? 'DEVUELTO' : 'DEVUELTO_PARCIAL',
       modo: f.modo,
       ...(conComision ? { comision: cp?.comision_pasarela == null ? null : Number(cp.comision_pasarela), neto: cp?.comision_detalle?.neto_depositado ?? null, comisionFuente: cp?.comision_detalle?.fuente ?? null } : {}),

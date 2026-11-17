@@ -35,9 +35,13 @@ const sinValor = (e: string) => e === 'ANULADO' || e === 'RECHAZADO';
 // Un PROGRAMADO (para otro día) aún no es venta ni cobro pendiente del día: como el cierre del servidor, no cuenta como activo ni por cobrar
 const programado = (e: string) => e === 'PROGRAMADO';
 
-/** Por cobrar: pedido que sigue vivo (no anulado, rechazado ni programado para otro día) y aún no está pagado. */
+/** Pedido «Tarjeta / Yape en línea» que espera el pago del cliente: no es venta ni cobro del día todavía (igual que el API). */
+export const esEsperandoPagoEnLinea = (p: Pick<Pedido, 'estado' | 'pago_estado'>) =>
+  mayus(p.estado) === 'POR_PAGAR' || mayus(p.pago_estado) === 'PENDIENTE_ONLINE';
+
+/** Por cobrar: pedido que sigue vivo (no anulado, rechazado ni programado para otro día), no aún pagado y no esperando pago en línea. */
 export const esPorCobrar = (p: Pick<Pedido, 'estado' | 'pago_estado'>) =>
-  !sinValor(mayus(p.estado)) && !programado(mayus(p.estado)) && mayus(p.pago_estado) !== 'PAGADO';
+  !sinValor(mayus(p.estado)) && !programado(mayus(p.estado)) && !esEsperandoPagoEnLinea(p) && mayus(p.pago_estado) !== 'PAGADO';
 
 const ESTADO_DE: Record<Exclude<ContadorDia, 'porcobrar'>, string> = {
   entregados: 'ENTREGADO',
@@ -56,6 +60,8 @@ export function resumirDia(filas: FilaResumen[]): ResumenDia {
   const r: ResumenDia = { total: 0, activos: 0, entregados: 0, anulados: 0, rechazados: 0, porCobrar: 0, ventas: 0, cobrado: 0, montoPorCobrar: 0 };
   for (const f of filas) {
     const e = mayus(f.estado);
+    // Esperando pago en línea: ni activo, ni venta, ni por cobrar (el local no lo ve hasta que Culqi apruebe)
+    if (e === 'POR_PAGAR' || mayus(f.pago_estado) === 'PENDIENTE_ONLINE') continue;
     r.total += f.n;
     if (e === 'ENTREGADO') r.entregados += f.n;
     else if (e === 'ANULADO') r.anulados += f.n;

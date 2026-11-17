@@ -50,7 +50,7 @@ export interface TicketCierreDatos {
   correcciones: { medio: string; anterior: number; nuevo: number; motivo: string; por: string | null; hora: string }[];
   liquidaciones: { repartidor: string; esperado: number; entregado: number; hora: string }[];
   /** Comisión de la pasarela del turno (la asume el local): solo informativa, no afecta el cuadre */
-  comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number };
+  comisionCulqi?: { pagos: number; porConfirmar: number; total: number; neto: number; bruto?: number; devueltoCulqi?: number };
   anulaciones: { pedido: string; total: number; hora: string; por: string | null }[];
   /**
    * Cupones del turno (solo informativo: no afecta el cuadre). Opcional: un agente de impresión antiguo no lo conoce y lo ignora.
@@ -139,6 +139,8 @@ export function lineasTicketCierre(t: TicketCierreDatos, columnas: number = 48):
   if (t.comisionCulqi) {
     p('COMISION CULQI (la asume el local)');
     p(fila(`  ${t.comisionCulqi.pagos} pagos`, soles(t.comisionCulqi.total), c));
+    if (t.comisionCulqi.bruto != null) p(fila('  Cobrado Culqi (sin devueltos)', soles(t.comisionCulqi.bruto), c));
+    if (t.comisionCulqi.devueltoCulqi) p(fila('  Devuelto por Culqi', `- ${soles(t.comisionCulqi.devueltoCulqi)}`, c));
     p(`  Neto Culqi ${soles(t.comisionCulqi.neto)}`);
     if (t.comisionCulqi.porConfirmar > 0) p(`  ${t.comisionCulqi.porConfirmar} por confirmar`);
   }

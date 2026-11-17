@@ -50,7 +50,7 @@ import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-p
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { detallarVentasTurno, idsDePersonas, nombresDeCobros, programadosDelTurnoDe, serviciosLibresDelTurno } from './ventas-turno.util';
-import { armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, resumirComisionCulqi, type CulqiCierre } from './culqi-cierre.util';
+import { alertasCobroCulqi, armarCulqiCierre, devueltoCulqiDelDia, operacionesCulqiDeCaja, resumirComisionCulqi, type CulqiCierre } from './culqi-cierre.util';
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -278,7 +278,8 @@ export class CierreService {
     });
     const cuenta: Record<ClaveDigital, number> = { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 };
     for (const c of cobros) {
-      const medios = new Set(c.pagos.map((p) => (p.medio || '').trim().toUpperCase()));
+      // Pagos en línea (Culqi) van en su propio bloque: no cuentan como cobros de Yape/tarjeta del local
+      const medios = new Set(c.pagos.filter((p) => p.origen !== 'CULQI').map((p) => (p.medio || '').trim().toUpperCase()));
       for (const m of MEDIOS_DIGITALES) {
         if (medios.has(m)) cuenta[CLAVE_DIGITAL[m]] += 1;
       }
@@ -1095,7 +1096,7 @@ export class CierreService {
     const cupones = await cuponesDelTurno(this.prisma, cierre.caja).catch(() => null);
     const ticket = armarTicketCierre({
       cupones,
-      comisionCulqi: comisionCulqi.pagos > 0 ? comisionCulqi : null,
+      comisionCulqi: comisionCulqi.pagos > 0 ? { ...comisionCulqi } : null,
       localNombre: ((local?.valor as any)?.nombre as string) || 'Caprichos',
       caja: cierre.caja,
       cierre,
@@ -1134,7 +1135,9 @@ export class CierreService {
   /** Bloque Culqi del cuadre: operaciones + comisión de la pasarela (aparte; no es faltante). */
   private async culqiConOperaciones(culqi: CulqiCierre, cajaId: bigint) {
     const operaciones = await operacionesCulqiDeCaja(this.prisma, cajaId);
-    return { ...culqi, operaciones, comision: resumirComisionCulqi(operaciones) };
+    // Cobros de Culqi aprobados y sin registrar en Caja (de cualquier día): visibles en el cierre, no bloquean
+    const alertas = await alertasCobroCulqi(this.prisma as any).catch(() => []);
+    return { ...culqi, operaciones, comision: resumirComisionCulqi(operaciones), alertas };
   }
 
   /** Encola el ticket de cierre de una caja ya cerrada en la ticketera de Caja. Solo administrador. */

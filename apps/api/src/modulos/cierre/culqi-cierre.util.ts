@@ -32,6 +32,23 @@ export interface OperacionCulqi {
   /** Comisión de la pasarela con IGV (la asume el local); null = por confirmar */
   comision: number | null;
   comisionDetalle: unknown;
+  /** Lo que Culqi ya devolvió de este cobro (total o parcial). Culqi no devuelve la comisión. */
+  devueltoCulqi: number;
+  /** Hora de la última devolución hecha por Culqi (null si no hubo) */
+  devueltoCulqiEn: Date | null;
+}
+
+/** Devoluciones hechas por Culqi (medio CULQI o sin medio) de un intento; el resto (Yape, efectivo… del local) no cuenta. */
+function devueltoPorCulqi(lista: any[]): { monto: number; en: Date | null } {
+  let centimos = 0;
+  let en: Date | null = null;
+  for (const d of lista) {
+    if (d?.medio && String(d.medio).toUpperCase() !== 'CULQI') continue;
+    centimos += Math.round(Number(d?.monto_centimos) || 0);
+    const f = d?.en ? new Date(d.en) : null;
+    if (f && (!en || f > en)) en = f;
+  }
+  return { monto: enPesos(centimos), en };
 }
 
 type Db = { pagoOnlineIntento: { findMany: (args: any) => Promise<any[]> }; cobro: { findMany: (args: any) => Promise<any[]> } };
@@ -111,6 +128,8 @@ export async function operacionesCulqiDeCaja(db: Pick<Db, 'cobro' | 'pagoOnlineI
         devueltoPor: fuera,
         comision: p.comision_pasarela == null ? null : Number(p.comision_pasarela),
         comisionDetalle: p.comision_detalle ?? null,
+        devueltoCulqi: devueltoPorCulqi(lista).monto,
+        devueltoCulqiEn: devueltoPorCulqi(lista).en,
       }));
   });
 }
@@ -124,7 +143,10 @@ export interface ComisionCulqiCierre {
   pagos: number;
   porConfirmar: number;
   estimadas: number;
+  /** Cobrado menos lo que Culqi devolvió (parcial o total) */
   bruto: number;
+  /** Lo devuelto por Culqi por su API (parcial o total) */
+  devueltoCulqi: number;
   total: number;
   fijo: number;
   variable: number;
@@ -132,11 +154,16 @@ export interface ComisionCulqiCierre {
   neto: number;
 }
 
-export function resumirComisionCulqi(ops: Array<Pick<OperacionCulqi, 'monto' | 'estado'> & { comision?: number | null; comisionDetalle?: any }>): ComisionCulqiCierre {
-  let bruto = 0, total = 0, fijo = 0, variable = 0, igv = 0, porConfirmar = 0, estimadas = 0;
+export function resumirComisionCulqi(
+  ops: Array<Pick<OperacionCulqi, 'monto' | 'estado'> & { devueltoCulqi?: number; comision?: number | null; comisionDetalle?: any }>,
+): ComisionCulqiCierre {
+  let bruto = 0, total = 0, fijo = 0, variable = 0, igv = 0, porConfirmar = 0, estimadas = 0, devuelto = 0;
   for (const o of ops) {
-    const vigente = o.estado === 'COBRADO' || o.estado === 'ANULADO';
-    if (vigente) bruto += aCentimos(o.monto);
+    // Legado: sin el dato por operación, una DEVUELTO_CULQI se da por devuelta entera
+    const devCulqi = aCentimos(o.devueltoCulqi ?? (o.estado === 'DEVUELTO_CULQI' ? o.monto : 0));
+    devuelto += devCulqi;
+    // Culqi deposita lo cobrado menos lo que devolvió por su propia API; lo devuelto por Yape/efectivo del local sigue en Culqi
+    bruto += aCentimos(o.monto) - devCulqi;
     if (o.comision == null) { porConfirmar++; continue; }
     total += aCentimos(o.comision);
     fijo += aCentimos(o.comisionDetalle?.fijo ?? 0);
@@ -144,5 +171,36 @@ export function resumirComisionCulqi(ops: Array<Pick<OperacionCulqi, 'monto' | '
     igv += aCentimos(o.comisionDetalle?.igv ?? 0);
     if (o.comisionDetalle?.fuente === 'ESTIMADA') estimadas++;
   }
-  return { pagos: ops.length, porConfirmar, estimadas, bruto: enPesos(bruto), total: enPesos(total), fijo: enPesos(fijo), variable: enPesos(variable), igv: enPesos(igv), neto: enPesos(bruto - total) };
+  return { pagos: ops.length, porConfirmar, estimadas, bruto: enPesos(bruto), devueltoCulqi: enPesos(devuelto), total: enPesos(total), fijo: enPesos(fijo), variable: enPesos(variable), igv: enPesos(igv), neto: enPesos(bruto - total) };
+}
+
+/**
+ * Cobros Culqi que el cierre no pudo registrar o que quedaron por revisar. No bloquean el cierre (no tocan el efectivo):
+ * salen como alerta visible para que el ADMIN los resuelva. Mira todo lo aún abierto, de cualquier día.
+ */
+export interface AlertaCobroCulqi {
+  pedidoId: string;
+  pedidoCodigo: string;
+  monto: number;
+  tipo: 'SIN_REGISTRAR' | 'EN_CURSO' | 'ERROR' | 'TARDIO' | 'DEVOLVER';
+  mensaje: string;
+}
+
+export async function alertasCobroCulqi(db: { pagoOnlineIntento: { findMany: (args: any) => Promise<any[]> } }): Promise<AlertaCobroCulqi[]> {
+  const filas = await db.pagoOnlineIntento.findMany({
+    // Aprobado por Culqi y aún sin cobro registrado en Caja (cobrado_en null)
+    where: { estado: 'APROBADO', cobrado_en: null },
+    select: { pedido_id: true, monto_centimos: true, cobro_error: true, pedido: { select: { codigo: true } } },
+    orderBy: { id: 'asc' },
+    take: 100,
+  });
+  return filas.map((f) => {
+    const e = String(f.cobro_error ?? '');
+    const base = { pedidoId: String(f.pedido_id), pedidoCodigo: f.pedido?.codigo ?? '', monto: enPesos(f.monto_centimos) };
+    if (e.startsWith('PEDIDO_ANULADO_DEVOLVER')) return { ...base, tipo: 'DEVOLVER' as const, mensaje: 'Pagó con el pedido ya anulado: hay que devolverle el dinero (Pagos en línea › Devolver).' };
+    if (e.startsWith('PEDIDO_YA_NO_EN_LINEA')) return { ...base, tipo: 'TARDIO' as const, mensaje: 'Llegó el cobro de Culqi de un pedido que ya había cambiado de medio: revísalo y devuelve o cobra según corresponda.' };
+    if (e === 'EN_CURSO') return { ...base, tipo: 'EN_CURSO' as const, mensaje: 'El cobro de Culqi quedó a medias (EN_CURSO). Revisa Pagos en línea.' };
+    if (e) return { ...base, tipo: 'ERROR' as const, mensaje: `El cobro de Culqi no se registró en Caja: ${e.slice(0, 120)}` };
+    return { ...base, tipo: 'SIN_REGISTRAR' as const, mensaje: 'Culqi aprobó el pago y el cobro no se registró en Caja.' };
+  });
 }

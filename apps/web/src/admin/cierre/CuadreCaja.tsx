@@ -538,7 +538,7 @@ export function CuadreCaja({
       </section>
 
       {/* 3b. Pagos en línea (Culqi): fuera del esperado de Yape y tarjeta del local; sin diferencia que cuadrar */}
-      {esperado.culqi && (esperado.culqi.cobradoYape > 0 || esperado.culqi.cobradoTarjeta > 0) && <BloqueCulqi culqi={esperado.culqi} />}
+      {esperado.culqi && (esperado.culqi.cobradoYape > 0 || esperado.culqi.cobradoTarjeta > 0 || (esperado.culqi.alertas?.length ?? 0) > 0) && <BloqueCulqi culqi={esperado.culqi} />}
 
       {/* 4. Pie fijo: diferencia total + cerrar */}
       <div className="cc-pie" data-testid="cc-pie">

@@ -9,7 +9,7 @@ describe('Comisión de la pasarela en el cuadre', () => {
       { monto: 30, estado: 'DEVUELTO_CULQI', comision: 1.77, comisionDetalle: det(0.3, 1.2, 0.27, 'ESTIMADA') },
       { monto: 20, estado: 'COBRADO', comision: null },
     ]);
-    expect(r).toEqual({ pagos: 3, porConfirmar: 1, estimadas: 1, bruto: 72.5, total: 4.6, fijo: 0.6, variable: 3.3, igv: 0.7, neto: 67.9 });
+    expect(r).toEqual({ pagos: 3, porConfirmar: 1, estimadas: 1, bruto: 72.5, devueltoCulqi: 30, total: 4.6, fijo: 0.6, variable: 3.3, igv: 0.7, neto: 67.9 });
   });
 
   it('las operaciones traen su comisión del cobro_pago, sin tocar el monto cobrado', async () => {

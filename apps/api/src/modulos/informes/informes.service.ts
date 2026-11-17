@@ -326,7 +326,8 @@ export class InformesService {
     // Solo ADMIN: por cobrar (aceptados sin entregar ni cobro vigente), medios de pago, categorías y el día pico
     const porCobrar = sumar(
       pedidos
-        .filter((p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && !(p.cobros || []).some((c: any) => !c.anulado_en))
+        // POR_PAGAR (pago en línea sin pagar) no es cobro pendiente: el cliente todavía no pagó y el local no lo ve
+        .filter((p) => p.estado !== 'RECHAZADO' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && p.estado !== 'POR_PAGAR' && p.pago_estado !== 'PENDIENTE_ONLINE' && !(p.cobros || []).some((c: any) => !c.anulado_en))
         .map((p) => Number(p.total || 0)),
     );
     const diaPico = porDiaLista.reduce<(typeof porDiaLista)[number] | null>((m, d) => (!m || (d.valor ?? 0) > (m.valor ?? 0) ? d : m), null);

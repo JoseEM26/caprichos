@@ -144,6 +144,19 @@ export interface OperacionCulqi {
   devueltoPor?: string[];
   /** Comisión de la pasarela con IGV (la asume el local); null = por confirmar */
   comision?: number | null;
+  /** Lo que Culqi ya devolvió de este cobro (parcial o total); ausente en servidores viejos */
+  devueltoCulqi?: number;
+  /** Hora de la última devolución por Culqi */
+  devueltoCulqiEn?: string | null;
+}
+
+/** Cobro de Culqi que quedó por revisar (aprobado y sin registrar en Caja, o con devolución pendiente) */
+export interface AlertaCobroCulqi {
+  pedidoId: string;
+  pedidoCodigo: string;
+  monto: number;
+  tipo: 'SIN_REGISTRAR' | 'EN_CURSO' | 'ERROR' | 'TARDIO' | 'DEVOLVER';
+  mensaje: string;
 }
 
 /** Comisión de la pasarela del turno: costo del local, no es faltante ni entra al esperado de efectivo o Yape. */
@@ -157,6 +170,8 @@ export interface ComisionCulqiTurno {
   variable: number;
   igv: number;
   neto: number;
+  /** Lo devuelto por Culqi por su API (parcial o total); ausente en servidores viejos */
+  devueltoCulqi?: number;
 }
 
 export interface CulqiTurno {
@@ -170,6 +185,8 @@ export interface CulqiTurno {
   total: number;
   operaciones?: OperacionCulqi[];
   comision?: ComisionCulqiTurno;
+  /** Cobros de Culqi por revisar (no bloquean el cierre) */
+  alertas?: AlertaCobroCulqi[];
 }
 
 export interface MontosEsperados {

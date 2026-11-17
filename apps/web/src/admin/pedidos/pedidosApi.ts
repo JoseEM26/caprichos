@@ -839,6 +839,8 @@ export interface PagoOnlineResumen {
   monto: number;
   aprobadoEn: string | null;
   devuelto: number;
+  /** Fecha de la última devolución (ISO); null si no hubo */
+  devueltoEn?: string | null;
   estado: 'APROBADO' | 'DEVUELTO_PARCIAL' | 'DEVUELTO';
   modo: string;
   /** Comisión de la pasarela (la asume el local). Solo llega al panel con permiso de caja; null = por confirmar. */

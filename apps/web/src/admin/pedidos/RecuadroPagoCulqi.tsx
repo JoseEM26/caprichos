@@ -79,6 +79,12 @@ export function RecuadroPagoCulqi({ pago }: { pago: PagoOnlineResumen }) {
           {pago.devuelto > 0 ? ` · S/ ${pago.devuelto.toFixed(2)}` : ''}
         </strong>
       </div>
+      {pago.devuelto > 0 && pago.devueltoEn && (
+        <div className="dp-fila" data-testid="devuelto-culqi-en">
+          <span>Devuelto el</span>
+          <strong>{horaLima(pago.devueltoEn)}</strong>
+        </div>
+      )}
       <div className="dp-fila" style={{ flexWrap: 'wrap', gap: 8 }}>
         <span>N.º de operación</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
