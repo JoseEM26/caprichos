@@ -1,9 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type {
-  CalendarioFilas, CalendarioFila, CalendarioResumen, MiCalendario, MiCalendarioDia, TipoMarca as TipoMarcaQr,
+  CalendarioFilas, CalendarioFila, CalendarioResumen, CoberturaDiaCalendario, MiCalendario, MiCalendarioDia, ProgramadoCalendario,
+  TipoDiaCalendario, TipoMarca as TipoMarcaQr,
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { aHoraTexto, cierreJornada, jornadaDe, sumarDias } from './asistencia.calculo';
+import {
+  aHoraTexto, cierreJornada, CoberturaFila, jornadaDe, minutosPagados, resolverTurno, sumarDias, Turno,
+} from './asistencia.calculo';
 import { almuerzoMarcadoMin, detectarInconsistencia, rolEfectivo } from './asistencia.interpretacion';
 import { AsistenciaCorreccionesService, etiquetaDia } from './asistencia-correcciones.service';
 import { AsistenciaService } from './asistencia.service';
@@ -44,6 +47,48 @@ function horasDelDia(d: Dia) {
 
 const turnoSimple = (d: Dia) => (d.turnoTexto ? { entrada: d.turnoTexto.entrada, salida: d.turnoTexto.salida } : null);
 
+/** Días hacia adelante que se miran para «Próximo descanso / feriado». */
+const PROXIMOS_DIAS = 60;
+
+/** Horario programado con almuerzo (si lo hay) y duración que se paga (el almuerzo cuenta). */
+function programadoDe(t: Turno | null): ProgramadoCalendario | null {
+  if (!t) return null;
+  return {
+    entrada: aHoraTexto(t.entrada),
+    salida: aHoraTexto(t.salida),
+    almuerzo: t.almuerzoIni != null && t.almuerzoFin != null ? { desde: aHoraTexto(t.almuerzoIni), hasta: aHoraTexto(t.almuerzoFin) } : null,
+    duracionMin: minutosPagados(t),
+  };
+}
+
+/** Cobertura de un día para la persona (sin nombres de otras personas). */
+export function coberturaDe(pid: bigint, jornada: string, coberturas: CoberturaFila[], turno: Turno | null): CoberturaDiaCalendario | null {
+  if (coberturas.some((c) => c.fecha === jornada && c.cubreId === pid)) return { rol: 'COBRE', parcial: false };
+  if (coberturas.some((c) => c.fecha === jornada && c.reemplazaId === pid)) return { rol: 'CUBIERTO', parcial: turno !== null };
+  return null;
+}
+
+export interface InfoDia {
+  turno: Turno | null;
+  motivoDescanso?: string;
+  cobertura: CoberturaDiaCalendario | null;
+  vacacion: boolean;
+  feriado: { nombre: string; recargo: number } | null;
+}
+
+/**
+ * Tipo de día para la persona. Vacaciones solo si hay turno (como en la planilla); el feriado tapa al resto
+ * para que se vea el recargo; luego cobertura, trabajo, reemplazo y descanso.
+ */
+export function tipoDelDia(i: InfoDia): TipoDiaCalendario {
+  if (i.vacacion && i.turno) return 'VACACIONES';
+  if (i.feriado) return 'FERIADO';
+  if (i.cobertura?.rol === 'COBRE') return 'COBERTURA';
+  if (i.turno) return 'TRABAJA';
+  if (i.cobertura?.rol === 'CUBIERTO' || i.motivoDescanso === 'Reemplazado ese día') return 'REEMPLAZO';
+  return 'DESCANSO';
+}
+
 /** Calendario de asistencia: vista del admin (todos) y vista propia (solo la cuenta del token). Reutiliza evaluarDia/cronograma. */
 @Injectable()
 export class AsistenciaCalendarioService {
@@ -53,9 +98,31 @@ export class AsistenciaCalendarioService {
     private readonly correcciones: AsistenciaCorreccionesService,
   ) {}
 
-  private async feriadosDe(desde: string, hasta: string): Promise<Map<string, string>> {
+  private async feriadosDe(desde: string, hasta: string): Promise<Map<string, { nombre: string; recargo: number }>> {
     const fs = await this.prisma.feriado.findMany({ where: { activo: true, fecha: { gte: fechaDb(desde), lte: fechaDb(hasta) } } });
-    return new Map(fs.map((f) => [isoDe(f.fecha), f.nombre]));
+    return new Map(fs.map((f) => [isoDe(f.fecha), { nombre: f.nombre, recargo: Number(f.recargo) }]));
+  }
+
+  /** Fechas en que la persona tomó vacaciones (movimientos TOMADAS vigentes que se cruzan con el rango). */
+  private async vacacionesDe(partyId: bigint, desde: string, hasta: string): Promise<Set<string>> {
+    const vacs = await this.prisma.vacacionMovimiento.findMany({
+      where: { party_id: partyId, anulado_en: null, tipo: 'TOMADAS', fecha_desde: { lte: fechaDb(hasta) }, fecha_hasta: { gte: fechaDb(desde) } },
+    });
+    const out = new Set<string>();
+    for (const v of vacs) for (let j = isoDe(v.fecha_desde); j <= isoDe(v.fecha_hasta); j = sumarDias(j, 1)) out.add(j);
+    return out;
+  }
+
+  /** Tipo de día y horario de una fecha para una persona, con lo que ya calcula resolverTurno. */
+  private infoDia(pid: bigint, fecha: string, ctx: Awaited<ReturnType<AsistenciaService['cargarContexto']>>, feriados: Map<string, { nombre: string; recargo: number }>, vacs: Set<string>): InfoDia {
+    const r = resolverTurno(pid, fecha, ctx);
+    return {
+      turno: r.turno,
+      motivoDescanso: r.motivoDescanso,
+      cobertura: coberturaDe(pid, fecha, ctx.coberturas, r.turno),
+      vacacion: vacs.has(fecha),
+      feriado: feriados.get(fecha) ?? null,
+    };
   }
 
   /** Evalúa a todas las personas (sin ADMIN) con actividad en el rango. Una sola pasada para resumen y filas. */
@@ -114,7 +181,7 @@ export class AsistenciaCalendarioService {
   async resumen(desde: string, hasta: string, ahora = new Date()): Promise<CalendarioResumen> {
     const { dias, items, feriados, solicitudes } = await this.evaluarTodos(desde, hasta, ahora);
     const res = new Map(dias.map((f) => [f, {
-      fecha: f, feriado: feriados.get(f) ?? null, programadas: 0, presentes: 0, tardanzas: 0, faltas: 0, aRevisar: 0,
+      fecha: f, feriado: feriados.get(f)?.nombre ?? null, programadas: 0, presentes: 0, tardanzas: 0, faltas: 0, aRevisar: 0,
       solicitudesPendientes: solicitudes.filter((s) => s.estado === 'PENDIENTE' && isoDe(s.jornada) === f).length, inconsistencias: 0,
     }]));
     for (const { fecha, d, inc, noAsistido } of items) {
@@ -188,6 +255,7 @@ export class AsistenciaCalendarioService {
    * Calendario propio. SIEMPRE de `partyId` (la cuenta del token). Sin fotos, coordenadas, dispositivo ni notas internas.
    * Extra: APROBADA si el admin la aprobó, PENDIENTE si hay minutos extra sin aprobar. ponytail: RECHAZADA no se guarda en
    * ninguna tabla hoy (aprobar/quitar aprobación), así que nunca se devuelve; añadirla cuando exista el rechazo explícito.
+   * Tipo de día, horario, feriado con recargo, cobertura y descanso: solo de la propia persona (sin nombres de otros).
    */
   async miCalendario(partyId: bigint | null | undefined, desde?: string, hasta?: string, ahora = new Date()): Promise<MiCalendario> {
     const hoy = jornadaDe(ahora).jornada;
@@ -197,36 +265,56 @@ export class AsistenciaCalendarioService {
     if (partyId == null) return { desde: d0, hasta: h0, dias: [] } as unknown as MiCalendario;
     const dias = diasDelRango(d0, h0);
     const cfg = await this.asistencia.obtenerConfig();
-    const ctx = await this.asistencia.cargarContexto(d0, h0, [partyId]);
+    // Contexto del mes pedido y de los próximos días desde hoy (para «Próximo descanso / feriado»)
+    const hastaScan = sumarDias(hoy, PROXIMOS_DIAS);
+    const ini = d0 < hoy ? d0 : hoy;
+    const fin = h0 > hastaScan ? h0 : hastaScan;
+    const ctx = await this.asistencia.cargarContexto(ini, fin, [partyId]);
     const rango = { gte: fechaDb(d0), lte: fechaDb(h0) };
-    const [extras, solicitudes, feriados] = await Promise.all([
+    const [extras, solicitudes, feriados, vacs] = await Promise.all([
       this.prisma.planillaExtraAprobada.findMany({ where: { party_id: partyId, jornada: rango } }),
       this.prisma.asistenciaSolicitud.findMany({
         where: { party_id: partyId, estado: { in: ['PENDIENTE', 'APROBADA', 'RECHAZADA'] }, jornada: rango },
         orderBy: { creada_en: 'asc' },
       }),
-      this.feriadosDe(d0, h0),
+      this.feriadosDe(ini, fin),
+      this.vacacionesDe(partyId, ini, fin),
     ]);
     const aprobadas = new Set(extras.map((e) => isoDe(e.jornada)));
-    const resumen = { diasTrabajados: 0, horasTrabajadasMin: 0, tardanzaMin: 0, extraAprobadaMin: 0, extraPendienteMin: 0, faltas: 0 };
+    const resumen = {
+      diasTrabajados: 0, horasTrabajadasMin: 0, tardanzaMin: 0, extraAprobadaMin: 0, extraPendienteMin: 0, faltas: 0,
+      diasProgramados: 0, diasDescanso: 0, feriadosConRecargo: 0, horasProgramadasMin: 0,
+    };
     const out: MiCalendarioDia[] = dias.map((fecha) => {
       const d = this.asistencia.evaluarDia(partyId, fecha, ctx, ahora, cfg);
       const r = d.resultado;
+      const info = this.infoDia(partyId, fecha, ctx, feriados, vacs);
+      const tipo = tipoDelDia(info);
+      const estado = tipo === 'VACACIONES' ? 'VACACIONES' : r.estado;
       const extraEstado = r.extraMin > 0 ? (aprobadas.has(fecha) ? 'APROBADA' : 'PENDIENTE') : null;
       const sol = [...solicitudes].reverse().find((s) => isoDe(s.jornada) === fecha);
       if (r.trabajadaMin > 0) { resumen.diasTrabajados++; resumen.horasTrabajadasMin += r.trabajadaMin; }
       resumen.tardanzaMin += r.tardanzaMin;
-      if (r.estado === 'FALTA') resumen.faltas++;
+      if (estado === 'FALTA') resumen.faltas++;
       if (extraEstado === 'APROBADA') resumen.extraAprobadaMin += r.extraMin;
       if (extraEstado === 'PENDIENTE') resumen.extraPendienteMin += r.extraMin;
+      if (d.turno) { resumen.diasProgramados++; resumen.horasProgramadasMin += minutosPagados(d.turno); }
+      if (tipo === 'DESCANSO') resumen.diasDescanso++;
       const { almuerzoMin, ...horas } = horasDelDia(d);
       const entradaM = d.interp.marcas.find((m) => m.duplicadaDe === null && rolEfectivo(d.interp, m) === 'ENTRADA');
+      const feriado = info.feriado;
       return {
         fecha,
         entradaMarcaId: entradaM?.id && entradaM.id > 0 ? entradaM.id : null,
-        feriado: feriados.get(fecha) ?? null,
-        programado: turnoSimple(d),
-        estado: r.estado,
+        feriado: feriado?.nombre ?? null,
+        programado: programadoDe(d.turno),
+        tipoDia: tipo,
+        recargo: feriado ? feriado.recargo : null,
+        pagaRecargo: Boolean(feriado) && feriado!.recargo !== 1 && tipo !== 'VACACIONES',
+        cobertura: info.cobertura,
+        motivoDescanso: tipo === 'DESCANSO' || tipo === 'REEMPLAZO' ? (info.motivoDescanso ?? 'Descanso semanal') : null,
+        trabajoEnDescanso: !d.turno && d.interp.marcas.length > 0,
+        estado,
         entrada: horas.entrada,
         almuerzoSalida: horas.almuerzoSalida,
         almuerzoVuelta: horas.almuerzoVuelta,
@@ -243,6 +331,14 @@ export class AsistenciaCalendarioService {
           : null,
       };
     });
-    return { desde: d0, hasta: h0, dias: out, resumen };
+    resumen.feriadosConRecargo = dias.filter((f) => { const x = feriados.get(f); return x !== undefined && x.recargo !== 1; }).length;
+    // Próximo descanso y próximo feriado desde hoy (aunque el mes mostrado sea otro)
+    const proximos: NonNullable<MiCalendario['proximos']> = { descanso: null, feriado: null };
+    for (let j = hoy; j <= hastaScan && (!proximos.descanso || !proximos.feriado); j = sumarDias(j, 1)) {
+      const info = this.infoDia(partyId, j, ctx, feriados, vacs);
+      if (!proximos.feriado && info.feriado) proximos.feriado = { fecha: j, nombre: info.feriado.nombre, recargo: info.feriado.recargo };
+      if (!proximos.descanso && tipoDelDia(info) === 'DESCANSO') proximos.descanso = { fecha: j };
+    }
+    return { desde: d0, hasta: h0, dias: out, resumen, proximos };
   }
 }

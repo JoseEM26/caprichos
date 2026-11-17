@@ -144,3 +144,28 @@
 .mp-dia-pago dt { font-size: 11px; color: var(--cp-soft); }
 .mp-dia-pago dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 @media (max-width: 360px) { .mp-segmentos > button, .mp-fecha { font-size: 12px; padding: 0 10px; } }
+
+/* Calendario propio: tipo de día, horario, leyenda plegable y próximos (variables --cp-*). */
+.mc-tipo { display: inline-flex; align-items: center; justify-content: center; gap: 2px; max-width: 100%; padding: 1px 3px; border-radius: 6px; font-size: 9px; line-height: 10px; font-weight: 800; color: var(--cp-navy); overflow-wrap: anywhere; text-align: center; }
+.mc-tipo-trabaja { background: #EAF4F6; }
+.mc-tipo-descanso { background: #F1F1EE; }
+.mc-tipo-feriado { background: #FFF1CC; color: #6B4A00; }
+.mc-tipo-vac { background: #E7F1FA; }
+.mc-tipo-cobertura { background: #E6F4EC; }
+.mc-tipo-reemplazo { background: #F4E9F6; }
+.mc-leyenda-plegable { border: 1px solid var(--cp-line); border-radius: 12px; background: var(--cp-white); padding: 6px 12px; }
+.mc-leyenda-plegable > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; font-weight: 800; color: var(--cp-navy); font-size: 14px; }
+.mc-leyenda-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+.mc-leyenda-cuerpo .mc-leyenda { flex-direction: column; }
+.mc-leyenda-cuerpo .mc-leyenda li { font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--cp-navy); }
+.mc-leyenda-sub { margin: 0; font-size: 13px; font-weight: 800; color: var(--cp-navy); }
+.mc-proximos { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; font-weight: 700; color: var(--cp-navy); }
+.mc-bloque-dia { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.mc-tipo-linea { margin: 0; }
+.mc-aviso-tipo { margin: 0; border-radius: 10px; padding: 8px 10px; background: var(--cp-cream); color: var(--cp-navy); font-size: 14px; }
+.mc-aviso-tipo p { margin: 0; }
+.mc-aviso-tipo p + p { margin-top: 4px; }
+.mc-horario { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin: 0; }
+.mc-horario dt { font-size: 11px; color: var(--cp-soft); }
+.mc-horario dd { margin: 0; font-weight: 700; }
+.mc-subtitulo { margin: 4px 0 0; font-size: 13px; font-weight: 800; color: var(--cp-navy); }

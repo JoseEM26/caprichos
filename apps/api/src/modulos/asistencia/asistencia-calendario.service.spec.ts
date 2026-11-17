@@ -38,11 +38,19 @@ function armar() {
   ];
   const extras: any[] = [];
   const turnos: any[] = [];
+  const coberturas: any[] = [];
+  // Feriados inventados: 13 nov con recargo ×2 (ya usado en otras pruebas) y 8 dic ×3
+  const feriados: any[] = [
+    { fecha: d('2026-11-13'), nombre: 'Día de prueba', recargo: 2, activo: true },
+    { fecha: d('2026-12-08'), nombre: 'Feriado de prueba largo', recargo: 3, activo: true },
+  ];
+  // Vacaciones inventadas: Luis (7) toma el 20 y 21 de noviembre (viernes y sábado)
+  const vacaciones: any[] = [{ party_id: 7n, tipo: 'TOMADAS', anulado_en: null, fecha_desde: d('2026-11-20'), fecha_hasta: d('2026-11-21') }];
   const horario = (p: bigint) => ({ party_id: p, dia_semana: 5, entrada: hora('09:00'), salida: hora('18:00'), almuerzo_inicio: null, almuerzo_fin: null });
   const bd: any = {
     parametro: { findUnique: async () => null },
     horarioTrabajo: { findMany: async () => [7n, 8n, 9n].map(horario) },
-    coberturaTurno: { findMany: async () => [] },
+    coberturaTurno: { findMany: async ({ where }: any) => coberturas.filter((c) => c.fecha >= where.fecha.gte && c.fecha <= where.fecha.lte) },
     reemplazoDia: { findMany: async () => [] },
     asistenciaMarca: {
       findMany: async ({ where }: any) =>
@@ -50,7 +58,11 @@ function armar() {
           .filter((m) => (!where.party_id?.in || where.party_id.in.includes(m.party_id)) && m.jornada >= where.jornada.gte && m.jornada <= where.jornada.lte)
           .map((m) => ({ ...m, selfie: m.party_id === 7n && m.tipo_marca === 'ENTRADA' ? { marca_id: m.id } : null })),
     },
-    feriado: { findMany: async () => [{ fecha: d('2026-11-13'), nombre: 'Día de prueba', activo: true }] },
+    feriado: { findMany: async ({ where }: any) => feriados.filter((f) => f.fecha >= where.fecha.gte && f.fecha <= where.fecha.lte) },
+    vacacionMovimiento: {
+      findMany: async ({ where }: any) => vacaciones.filter((v) => v.party_id === where.party_id
+        && v.fecha_desde <= where.fecha_desde.lte && v.fecha_hasta >= where.fecha_hasta.gte),
+    },
     person: { findMany: async ({ where }: any) => ([[7n, 'Luis', 'Pérez'], [8n, 'Ana', 'Rojas'], [9n, 'Pedro', 'Díaz'], [10n, 'Jefa', 'Admin']] as Array<[bigint, string, string]>)
       .filter(([p]) => where.party_id.in.includes(p)).map(([p, a, b]) => ({ party_id: p, nombres: a, apellidos: b })) },
     userAccount: { findMany: async ({ where }: any) => ([[7n, 'MOZO'], [8n, 'COCINA'], [9n, 'COCINA'], [10n, 'ADMIN']] as Array<[bigint, string]>)
@@ -65,7 +77,9 @@ function armar() {
   const asistencia = new AsistenciaService(bd, { get: (_k: string, def: string) => def } as any);
   const correcciones = new AsistenciaCorreccionesService(bd, asistencia);
   const cal = new AsistenciaCalendarioService(bd, asistencia, correcciones);
-  return { cal, asistencia, correcciones, turnos, aprobarExtra: (p: bigint, f: string) => extras.push({ party_id: p, jornada: d(f) }), solicitudes };
+  return {
+    cal, asistencia, correcciones, turnos, coberturas, vacaciones, marcas, aprobarExtra: (p: bigint, f: string) => extras.push({ party_id: p, jornada: d(f) }), solicitudes,
+  };
 }
 
 describe('calendario del admin: resumen por día', () => {
@@ -206,9 +220,11 @@ describe('mi calendario (cuenta del token)', () => {
   });
 
   it('nunca incluye datos de otros ni campos sensibles', async () => {
-    const { cal } = armar();
+    const { cal, coberturas } = armar();
+    coberturas.push({ fecha: d('2026-11-06'), cubre_party_id: 9n, reemplaza_party_id: 8n, desde: hora('09:00'), hasta: hora('13:00') });
     const texto = JSON.stringify(await cal.miCalendario(7n, '2026-11-01', '2026-11-30', AHORA));
-    for (const prohibido of ['selfie', 'lat', 'lng', 'precision', 'dispositivo', 'huella', 'distancia', 'url', 'party', 'Ana', 'Pedro', 'Me olvidé']) {
+    // Nombres de otras personas de los datos inventados (no «ana» suelta: aparece dentro de «semanal»)
+    for (const prohibido of ['selfie', 'lat', 'lng', 'precision', 'dispositivo', 'huella', 'distancia', 'url', 'party', 'Ana Rojas', 'Pedro', 'Díaz', 'Me olvidé']) {
       expect(texto.toLowerCase()).not.toContain(prohibido.toLowerCase());
     }
   });
@@ -230,6 +246,86 @@ describe('mi calendario (cuenta del token)', () => {
     await ctl.calendarioPropio(req, { desde: '2026-11-06', hasta: '2026-11-06', partyId: 8 } as any);
     await ctl2.miCalendario(req, { desde: '2026-11-06', hasta: '2026-11-06', partyId: 8 } as any);
     expect(espia.mock.calls.map((c) => c[0])).toEqual([7n, 7n]);
+  });
+});
+
+describe('mi calendario: tipo de día, horario, feriado, vacaciones y cobertura', () => {
+  it('feriado con recargo: tipo FERIADO, recargo ×2 que se paga, y su horario', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(7n, '2026-11-13', '2026-11-13', AHORA);
+    expect(r.dias[0]).toMatchObject({
+      fecha: '2026-11-13', tipoDia: 'FERIADO', feriado: 'Día de prueba', recargo: 2, pagaRecargo: true,
+      programado: { entrada: '09:00', salida: '18:00', almuerzo: null, duracionMin: 540 }, cobertura: null,
+    });
+  });
+
+  it('feriado sin turno sigue siendo FERIADO con recargo, sin horario', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(9n, '2026-12-08', '2026-12-08', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'FERIADO', feriado: 'Feriado de prueba largo', recargo: 3, pagaRecargo: true, programado: null });
+  });
+
+  it('descanso: sin horario, con el motivo y sin recargo', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(7n, '2026-11-07', '2026-11-07', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'DESCANSO', motivoDescanso: 'Descanso semanal', programado: null, recargo: null, pagaRecargo: false, trabajoEnDescanso: false });
+  });
+
+  it('día con turno: TRABAJA con su horario de entrada a salida', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(7n, '2026-11-06', '2026-11-06', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'TRABAJA', programado: { entrada: '09:00', salida: '18:00' }, motivoDescanso: null });
+  });
+
+  it('horario con almuerzo programado y duración que cuenta el almuerzo', async () => {
+    const { cal, asistencia } = armar();
+    const horarioConAlmuerzo = (p: bigint) => ({ partyId: p, dia: 5, entrada: 14 * 60, salida: 22 * 60, almuerzoIni: 18 * 60, almuerzoFin: 18 * 60 + 30 }); // HorarioFila: minutos
+    jest.spyOn(asistencia, 'cargarContexto').mockImplementationOnce(async (desde: string, hasta: string, ids?: bigint[]) => {
+      const real = await (AsistenciaService.prototype as any).cargarContexto.call(asistencia, desde, hasta, ids);
+      return { ...real, horarios: [horarioConAlmuerzo(7n)] };
+    });
+    const r = await cal.miCalendario(7n, '2026-11-06', '2026-11-06', AHORA);
+    expect(r.dias[0].programado).toEqual({ entrada: '14:00', salida: '22:00', almuerzo: { desde: '18:00', hasta: '18:30' }, duracionMin: 480 });
+  });
+
+  it('vacaciones con turno: VACACIONES; el mismo día sin turno (sábado) sigue como descanso', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(7n, '2026-11-20', '2026-11-21', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'VACACIONES', estado: 'VACACIONES', pagaRecargo: false });
+    expect(r.dias[1]).toMatchObject({ tipoDia: 'DESCANSO', motivoDescanso: 'Descanso semanal' });
+  });
+
+  it('cobertura: quien cubre tiene COBERTURA con el horario cubierto; quien fue cubierto y queda una parte trabaja el resto', async () => {
+    const { cal, coberturas } = armar();
+    coberturas.push({ fecha: d('2026-11-06'), cubre_party_id: 9n, reemplaza_party_id: 8n, desde: hora('09:00'), hasta: hora('13:00') });
+    const cubre = await cal.miCalendario(9n, '2026-11-06', '2026-11-06', AHORA);
+    expect(cubre.dias[0]).toMatchObject({ tipoDia: 'COBERTURA', programado: { entrada: '09:00', salida: '13:00' }, cobertura: { rol: 'COBRE', parcial: false } });
+    const cubierto = await cal.miCalendario(8n, '2026-11-06', '2026-11-06', AHORA);
+    expect(cubierto.dias[0]).toMatchObject({ tipoDia: 'TRABAJA', programado: { entrada: '13:00', salida: '18:00' }, cobertura: { rol: 'CUBIERTO', parcial: true } });
+  });
+
+  it('turno cubierto entero: REEMPLAZO sin horario y con motivo, sin nombres de quien cubre', async () => {
+    const { cal, coberturas } = armar();
+    coberturas.push({ fecha: d('2026-11-27'), cubre_party_id: 9n, reemplaza_party_id: 7n, desde: hora('09:00'), hasta: hora('18:00') });
+    const r = await cal.miCalendario(7n, '2026-11-27', '2026-11-27', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'REEMPLAZO', motivoDescanso: 'Cubierto por otra persona', programado: null, cobertura: { rol: 'CUBIERTO', parcial: false } });
+    expect(JSON.stringify(r)).not.toMatch(/Pedro|Díaz/);
+  });
+
+  it('día sin turno con marcas: trabajoEnDescanso, para que el admin lo apruebe', async () => {
+    const { cal, marcas } = armar();
+    marcas.push(marca(7n, '2026-11-07', '10:00', 'ENTRADA'), marca(7n, '2026-11-07', '14:00', 'SALIDA'));
+    const r = await cal.miCalendario(7n, '2026-11-07', '2026-11-07', AHORA);
+    expect(r.dias[0]).toMatchObject({ tipoDia: 'DESCANSO', trabajoEnDescanso: true, programado: null });
+  });
+
+  it('resumen del mes: días con turno, descansos, feriados con recargo y horas programadas; próximos descanso y feriado', async () => {
+    const { cal } = armar();
+    const r = await cal.miCalendario(7n, '2026-11-06', '2026-11-13', AHORA);
+    expect(r.resumen).toMatchObject({ diasProgramados: 2, diasDescanso: 6, feriadosConRecargo: 1, horasProgramadasMin: 1080 });
+    // AHORA cae el sábado 14: hoy es día de descanso y el próximo feriado es el 8 de diciembre
+    expect(r.proximos).toEqual({ descanso: { fecha: '2026-11-14' }, feriado: { fecha: '2026-12-08', nombre: 'Feriado de prueba largo', recargo: 3 } });
+    expect((await cal.miCalendario(7n, '2026-11-01', '2026-11-30', AHORA)).resumen.feriadosConRecargo).toBe(1);
   });
 });
 

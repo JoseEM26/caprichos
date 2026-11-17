@@ -5,43 +5,16 @@ import { jornadaActual } from './jornada';
 import { miCalendario, miPlanilla, type DiaCalendario, type EstadoRespuesta, type MiCalendario as Datos } from './miCalendarioApi';
 import { ETIQUETA_LINEA, horasMin, normalizarTipo } from './tiposMarca';
 import type { PedidoCorreccion } from './CorreccionesAsistencia';
+import { BloqueTipoDia } from './BloqueTipoDia';
+import { LeyendaCalendario } from './LeyendaCalendario';
+import { ResumenMesCalendario } from './ResumenMesCalendario';
+import { ESTADO_DIA, MESES, TIPO_DIA, diaSemanaLun, etiquetaFecha, iso, marcaDia, parse, sumarDias, textoRecargo } from './calendarioDia';
 import './miAsistencia.css';
 
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const DIAS_SEMANA = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-const DIAS_LARGOS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
-/** Cada estado lleva color + icono + texto (nunca solo color). */
-export const ESTADO_DIA: Record<string, { icono: string; texto: string; clase: string }> = {
-  CUMPLIO: { icono: '✓', texto: 'Cumplió', clase: 'ok' },
-  SALIO_DESPUES: { icono: '✓', texto: 'Salió después', clase: 'ok' },
-  TARDANZA: { icono: '⏱', texto: 'Tardanza', clase: 'aviso' },
-  SALIO_ANTES: { icono: '↩', texto: 'Salió antes', clase: 'aviso' },
-  FALTA: { icono: '✕', texto: 'Falta', clase: 'mal' },
-  INCOMPLETO: { icono: '!', texto: 'Incompleto', clase: 'mal' },
-  A_REVISAR: { icono: '?', texto: 'En revisión', clase: 'rev' },
-  DESCANSO: { icono: '–', texto: 'Descanso', clase: 'neutro' },
-  VACACIONES: { icono: '☀', texto: 'Vacaciones', clase: 'vac' },
-  SIN_EVALUAR: { icono: '•', texto: 'En curso', clase: 'neutro' },
-  POR_EMPEZAR: { icono: '•', texto: 'Por empezar', clase: 'neutro' },
-  SIN_MARCAR_ENTRADA: { icono: '!', texto: 'Sin marcar entrada', clase: 'aviso' },
-  SIN_SALIDA: { icono: '!', texto: 'No marcó salida', clase: 'mal' },
-};
-const sinEstadoFuturo = (e?: string) => e === 'SIN_EVALUAR' || e === 'POR_EMPEZAR';
 const estadoDe = (e: string) => ESTADO_DIA[e] ?? { icono: '•', texto: e, clase: 'neutro' };
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const iso = (a: number, m0: number, d: number) => `${a}-${pad(m0 + 1)}-${pad(d)}`;
-const parse = (f: string) => { const [a, m, d] = f.split('-').map(Number); return { a, m0: m - 1, d }; };
-const sumarDias = (f: string, n: number) => {
-  const { a, m0, d } = parse(f);
-  return new Date(Date.UTC(a, m0, d + n)).toISOString().slice(0, 10);
-};
-const diaSemanaLun = (f: string) => { const { a, m0, d } = parse(f); return (new Date(Date.UTC(a, m0, d)).getUTCDay() + 6) % 7; };
-const etiquetaFecha = (f: string) => {
-  const { a, m0, d } = parse(f);
-  return `${DIAS_LARGOS[new Date(Date.UTC(a, m0, d)).getUTCDay()]} ${d} de ${MESES[m0]} de ${a}`;
-};
+const sinEstadoFuturo = (e?: string) => e === 'SIN_EVALUAR' || e === 'POR_EMPEZAR';
 
 const VAR_SOLICITUD: Record<EstadoRespuesta, VarianteInsignia> = { PENDIENTE: 'aviso', APROBADA: 'exito', RECHAZADA: 'peligro' };
 const TXT_RESPUESTA: Record<EstadoRespuesta, string> = { PENDIENTE: 'Pendiente', APROBADA: 'Aprobada', RECHAZADA: 'Rechazada' };
@@ -82,21 +55,23 @@ function DetalleDia({ dia, pago, alCerrar, alPedirCorreccion, alJustificar }: { 
         <div>
           <h4>{etiquetaFecha(dia.fecha)}</h4>
           <span className={`mc-chip mc-${e.clase}`}><span aria-hidden="true">{e.icono}</span> {e.texto}</span>
-          {dia.feriado && <span className="mc-chip mc-vac">Feriado: {dia.feriado}</span>}
         </div>
         <button type="button" className="mc-cerrar" onClick={alCerrar} aria-label="Cerrar detalle">×</button>
       </header>
-      {dia.programado && <p className="mc-sub">Tu horario: {dia.programado.entrada} a {dia.programado.salida}</p>}
+      <BloqueTipoDia dia={dia} />
       {pasos.length === 0
         ? <p className="mc-sub" data-testid="sin-marcas">{dia.programado ? 'No hay marcas este día.' : 'Sin turno ni marcas este día.'}</p>
         : (
-          <ol className="mc-linea" aria-label="Línea de tiempo del día">
-            {pasos.map((p) => (
-              <li key={p.clave}>
-                <b>{p.hora}</b> {p.texto}{p.nota && <small> ({p.nota})</small>}
-              </li>
-            ))}
-          </ol>
+          <>
+            <h5 className="mc-subtitulo">Tus marcas</h5>
+            <ol className="mc-linea" aria-label="Línea de tiempo del día">
+              {pasos.map((p) => (
+                <li key={p.clave}>
+                  <b>{p.hora}</b> {p.texto}{p.nota && <small> ({p.nota})</small>}
+                </li>
+              ))}
+            </ol>
+          </>
         )}
       <dl className="mc-datos">
         <div><dt>Horas trabajadas</dt><dd>{horasMin(dia.trabajadaMin)}</dd></div>
@@ -139,7 +114,23 @@ function DetalleDia({ dia, pago, alCerrar, alPedirCorreccion, alJustificar }: { 
 
 const s = (n: number) => `S/ ${n.toFixed(2)}`;
 
-/** Historial propio en calendario mensual: estado por día, entrada/salida chicas, feriados y detalle al tocar. */
+/** Texto de la celda para lectores de pantalla: fecha, tipo, feriado, turno, estado y horas. */
+function etiquetaDia(f: string, d: DiaCalendario | undefined, e: { texto: string } | null, futuro: boolean): string {
+  const tipo = d?.tipoDia;
+  const tipoTexto = tipo && tipo !== 'TRABAJA' && tipo !== 'FERIADO' ? TIPO_DIA[tipo]?.texto.toLowerCase() : null;
+  return [
+    etiquetaFecha(f),
+    tipoTexto,
+    d?.feriado ? `feriado ${d.feriado}` : null,
+    d?.pagaRecargo && d.recargo ? `se paga ${textoRecargo(d.recargo)}` : null,
+    d?.programado ? `turno ${d.programado.entrada} a ${d.programado.salida}` : null,
+    e && !(futuro && sinEstadoFuturo(d?.estado)) ? e.texto : futuro ? 'aún no llega' : 'sin registro',
+    d?.entrada ? `entrada ${d.entrada}` : null,
+    d?.salida ? `salida ${d.salida}` : null,
+  ].filter(Boolean).join(', ');
+}
+
+/** Historial propio en calendario mensual: tipo de día, horario, feriados con recargo y detalle al tocar. */
 export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorreccion?: (fecha: string) => void; alJustificar?: (p: PedidoCorreccion) => void } = {}) {
   const hoy = jornadaActual();
   const inicial = parse(hoy);
@@ -227,16 +218,7 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
         <button type="button" onClick={() => mover(1)} aria-label="Mes siguiente">›</button>
       </div>
 
-      {r && (
-        <dl className="mc-resumen" aria-label="Resumen del mes" data-testid="resumen-mes">
-          <div><dt>Días trabajados</dt><dd>{r.diasTrabajados ?? '—'}</dd></div>
-          <div><dt>Horas</dt><dd>{r.horasTrabajadasMin != null ? (r.horasTrabajadasMin / 60).toFixed(1) : '—'}</dd></div>
-          <div><dt>Tardanzas</dt><dd>{r.tardanzaMin != null ? `${r.tardanzaMin} min` : '—'}</dd></div>
-          <div><dt>Faltas</dt><dd>{r.faltas ?? '—'}</dd></div>
-          <div><dt>Extras aprobadas</dt><dd>{horasMin(r.extraAprobadaMin ?? 0)}</dd></div>
-          <div><dt>Extras pendientes</dt><dd>{horasMin(r.extraPendienteMin ?? 0)}</dd></div>
-        </dl>
-      )}
+      {r && <ResumenMesCalendario resumen={r} proximos={datos?.proximos} />}
 
       {cargando && <Cargando mensaje="Cargando tu calendario…" />}
       {error && !cargando && <p role="alert" className="as-aviso as-aviso--alerta">No pudimos cargar tu calendario. Intenta otra vez.</p>}
@@ -249,28 +231,26 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
             if (!f) return <span key={`v${i}`} />;
             const d = porFecha.get(f);
             const e = d ? estadoDe(d.estado) : null;
+            const marca = d ? marcaDia(d) : null;
             const futuro = f > hoy;
             const enSemana = semana !== null && f >= semana && f <= sumarDias(semana, 6);
-            const etiqueta = [
-              etiquetaFecha(f),
-              d?.feriado ? `feriado ${d.feriado}` : null,
-              e && !(futuro && sinEstadoFuturo(d?.estado)) ? e.texto : futuro ? 'aún no llega' : 'sin registro',
-              d?.entrada ? `entrada ${d.entrada}` : null,
-              d?.salida ? `salida ${d.salida}` : null,
-            ].filter(Boolean).join(', ');
             return (
               <button
                 key={f}
                 type="button"
                 data-fecha={f}
                 className={`mc-dia mc-${futuro && sinEstadoFuturo(d?.estado) ? 'futuro' : e?.clase ?? 'vacio'}${f === hoy ? ' mc-hoy' : ''}${enSemana ? ' mc-semana' : ''}`}
-                aria-label={etiqueta}
+                aria-label={etiquetaDia(f, d, e, futuro)}
                 aria-pressed={elegido === f}
+                aria-current={f === hoy ? 'date' : undefined}
                 onClick={() => setElegido(elegido === f ? null : f)}
                 onKeyDown={(ev) => teclas(ev, f)}
               >
                 <span className="mc-num">{parse(f).d}</span>
-                {d?.feriado && <span className="mc-fer" title={d.feriado}>★</span>}
+                {d?.feriado && marca?.clase !== 'feriado' && <span className="mc-fer" title={d.feriado}>★</span>}
+                {marca && (
+                  <span className={`mc-tipo mc-tipo-${marca.clase}`}><span aria-hidden="true">{marca.icono}</span> <span className="mc-tipo-texto">{marca.texto}</span></span>
+                )}
                 {e && !(futuro && sinEstadoFuturo(d?.estado)) && (
                   <span className="mc-estado"><span aria-hidden="true">{e.icono}</span><span className="mc-txt">{e.texto}</span></span>
                 )}
@@ -283,12 +263,7 @@ export function MiCalendario({ alPedirCorreccion, alJustificar }: { alPedirCorre
         </div>
       )}
 
-      <ul className="mc-leyenda" aria-label="Leyenda">
-        {['CUMPLIO', 'TARDANZA', 'FALTA', 'A_REVISAR', 'DESCANSO', 'VACACIONES'].map((k) => (
-          <li key={k}><span className={`mc-chip mc-${ESTADO_DIA[k].clase}`}><span aria-hidden="true">{ESTADO_DIA[k].icono}</span> {ESTADO_DIA[k].texto}</span></li>
-        ))}
-        <li><span className="mc-chip mc-vac"><span aria-hidden="true">★</span> Feriado</span></li>
-      </ul>
+      <LeyendaCalendario />
 
       {!cargando && !error && (datos?.dias ?? []).length === 0 && !dia && (
         <p className="as-ayuda">Aún no hay registros en este mes. Toca un día para ver su detalle.</p>

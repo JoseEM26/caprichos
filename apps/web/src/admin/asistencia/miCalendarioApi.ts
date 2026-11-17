@@ -3,12 +3,24 @@ import { api } from '../../comun/api';
 /** Contratos de «Mi asistencia» (calendario) y «Mis pagos». Solo estado, horas y resultados: nunca foto, GPS ni datos ajenos. */
 export type EstadoRespuesta = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
 
+export type TipoDia = 'TRABAJA' | 'DESCANSO' | 'FERIADO' | 'VACACIONES' | 'COBERTURA' | 'REEMPLAZO';
+
 export interface DiaCalendario {
   fecha: string;
   /** Marca de entrada que cuenta (para justificar una tardanza). */
   entradaMarcaId?: number | null;
   feriado?: string | null;
-  programado?: { entrada: string; salida: string } | null;
+  /** Horario del turno; almuerzo y duración (que cuenta el almuerzo) si el API los trae. */
+  programado?: { entrada: string; salida: string; almuerzo?: { desde: string; hasta: string } | null; duracionMin?: number } | null;
+  tipoDia?: TipoDia;
+  /** Recargo del feriado (×N); null si no es feriado. */
+  recargo?: number | null;
+  /** Las horas trabajadas ese día se pagan con recargo. */
+  pagaRecargo?: boolean;
+  cobertura?: { rol: 'COBRE' | 'CUBIERTO'; parcial: boolean } | null;
+  motivoDescanso?: string | null;
+  /** Hay marcas en un día sin turno: se paga solo si el admin lo aprueba. */
+  trabajoEnDescanso?: boolean;
   estado: string;
   entrada?: string | null;
   almuerzoSalida?: string | null;
@@ -31,6 +43,15 @@ export interface ResumenCalendario {
   extraAprobadaMin?: number;
   extraPendienteMin?: number;
   faltas?: number;
+  diasProgramados?: number;
+  diasDescanso?: number;
+  feriadosConRecargo?: number;
+  horasProgramadasMin?: number;
+}
+
+export interface Proximos {
+  descanso: { fecha: string } | null;
+  feriado: { fecha: string; nombre: string; recargo: number } | null;
 }
 
 export interface MiCalendario {
@@ -38,6 +59,7 @@ export interface MiCalendario {
   hasta: string;
   dias: DiaCalendario[];
   resumen?: ResumenCalendario;
+  proximos?: Proximos;
 }
 
 export const miCalendario = (desde: string, hasta: string) =>
