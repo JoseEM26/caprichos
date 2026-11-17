@@ -369,6 +369,32 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
     }
   };
 
+  /** «Diseño desde el servidor (prueba)»: por PC, apagado de fábrica. Apagarlo vuelve al instante al diseño del programa. */
+  const cambiarDisenoServidor = async (encender: boolean) => {
+    setGuardando(true);
+    try {
+      await impresionApi.guardarConfigEquipo(equipo.deviceKeyId, { disenoServidor: encender });
+      alAviso('ok', encender ? `${equipo.nombre} ahora recibe el diseño desde el servidor. Pulsa «Imprimir prueba» para verlo en papel.` : `${equipo.nombre} volvió al diseño del programa.`);
+      alRecargar();
+    } catch (err: any) {
+      alAviso('error', `No se pudo cambiar el diseño. ${err?.message ?? ''}`.trim());
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const probarDisenoServidor = async () => {
+    setGuardando(true);
+    try {
+      const r = await impresionApi.pruebaDisenoServidor(equipo.deviceKeyId);
+      alAviso('ok', r.mensaje);
+    } catch (err: any) {
+      alAviso('error', `No se pudo imprimir la prueba. ${err?.message ?? ''}`.trim());
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const usarGeneral = async () => {
     setConfirmar(null);
     try {
@@ -583,6 +609,32 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
             <button type="button" className="if-sec ie-peligro" data-testid={`desvincular-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => setConfirmar('desvincular')}>
               Desvincular
             </button>
+          </div>
+          <div className="ie-aviso ie-aviso--gris" data-testid={`diseno-servidor-${equipo.deviceKeyId}`}>
+            <strong>Diseño desde el servidor (prueba)</strong>{' '}
+            <span className={`ic-chip ${servidor.disenoServidor ? 'ic-chip--ok' : ''}`} data-testid={`diseno-estado-${equipo.deviceKeyId}`}>
+              {servidor.disenoServidor ? 'Encendido' : 'Apagado'}
+            </span>
+            <p>
+              Apagado: el programa imprime con su propio diseño, como siempre. Encendido: el sistema arma lo que se imprime en esta PC y
+              los cambios de diseño llegan sin reinstalar el programa (necesita la versión nueva del programa; si falla, vuelve solo al diseño del programa).
+            </p>
+            <div className="ie-fila">
+              {!servidor.disenoServidor ? (
+                <button type="button" className="if-sec" data-testid={`diseno-encender-${equipo.deviceKeyId}`} disabled={bloqueado || !puedeEditar} onClick={() => void cambiarDisenoServidor(true)}>
+                  Encender diseño desde el servidor
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="if-sec" data-testid={`diseno-probar-${equipo.deviceKeyId}`} disabled={bloqueado || !puedeEditar} onClick={() => void probarDisenoServidor()}>
+                    Imprimir prueba
+                  </button>
+                  <button type="button" className="if-sec" data-testid={`diseno-apagar-${equipo.deviceKeyId}`} disabled={bloqueado || !puedeEditar} onClick={() => void cambiarDisenoServidor(false)}>
+                    Volver al diseño del programa
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

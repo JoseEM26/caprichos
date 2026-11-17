@@ -172,6 +172,26 @@ En el panel administrativo (`/admin/pedidos`):
 
 ---
 
+## 5 bis. Diseño desde el servidor (el .exe solo conecta)
+
+**Qué es.** Desde el programa de impresión nuevo, el diseño final (los bytes TSPL de las etiquetas y ESC/POS de los tickets) lo arma el **servidor** con el mismo código compartido (`packages/compartido/src/impresora`: `generarComandosTrabajo`) y el programa solo los **envía** a la impresora (USB/red/COM) y reporta el resultado. Un cambio de diseño ya no exige descargar otro `.exe`.
+
+**Cómo viaja.** El programa declara sus capacidades al pedir trabajos (`POST /agente-impresion/tomar`, campo `capacidades`: `comandosServidor`, `ticketColumnas`, `etiqueta` con rollo/gap/orientación). El servidor responde con el `payload` de siempre (idéntico) y, **solo si** la PC tiene encendido «Diseño desde el servidor (prueba)» (`equipo_impresion_config.tamanos.disenoServidor`, apagado por defecto) **y** el programa declaró la capacidad, añade al trabajo `comandos: { formato: 'TSPL'|'ESCPOS', base64 }`. El programa valida (formato conocido, base64, ≤ 2 MB, formato acorde a la máquina) y lo escribe tal cual; nunca registra su contenido en logs.
+
+**Compatibilidad.** Un `.exe` viejo no manda `capacidades` y ignora `comandos`: recibe exactamente lo de hoy y maqueta él mismo. Un `.exe` nuevo con el interruptor apagado también recibe lo de hoy. El programa nuevo conserva el generador (el mismo código compartido) como **respaldo**: si el trabajo no trae `comandos`, o no sirven, o la impresora los rechaza, reintenta UNA vez con su diseño y reporta `diseno: 'respaldo'` (el trabajo queda «Impreso con diseño de respaldo»). Con 2 respaldos seguidos el servidor apaga solo el interruptor de esa PC y avisa a CAJERO y ADMIN en la campanita (tipo `ERROR_IMPRESORA`).
+
+**Una sola fuente de verdad.** Las vistas previas del panel y los bytes salen de las mismas funciones (`maquetarEtiqueta`, `lineasTicketPago`, `lineasTicketComandaSalon`, `lineasTicketCierre`). Las **pruebas de oro** (`packages/compartido/src/impresora/__tests__/oro.spec.ts` + `oro.json`) comparan, byte a byte, los comandos del servidor con los que imprimía el programa antes de moverlos (fixtures inventados: 3 tamaños de columnas, 4 orientaciones de rollo, todos los tipos). Un cambio **intencional** de diseño: `ACTUALIZAR_ORO=1 pnpm --filter @caprichos/compartido test`, revisar el diff y commitear `oro.json`.
+
+**Despliegue por etapas.**
+1. Desplegar el servidor con todo apagado (nadie cambia).
+2. Instalar el `.exe` nuevo en UNA PC (`--detener-todo`, reemplazar, abrir una vez).
+3. Encender el interruptor de esa PC (Configuración › Impresoras › PC › General), «Imprimir prueba» y comparar el papel con el de siempre; «Volver al diseño del programa» apaga al instante.
+4. Repetir en el resto de PC. La versión que lo trae queda marcada en `version-agente.json` (`disenoServidor: true`) y la franja del panel la ofrece como «la última que necesitas instalar».
+
+**Por verificar con impresora real** (no hay prueba física en CI): que la TSC/4BARCODE y la ticketera acepten los bytes enviados sin pasar por el diseño interno (son los mismos bytes que antes, pero no se probó en papel).
+
+---
+
 ## 6. Resolución de problemas frecuentes
 
 | Síntoma | Causa probable | Solución |

@@ -114,6 +114,22 @@ describe('TarjetaEquipo', () => {
     expect(screen.getByTestId('pausar-10')).toHaveTextContent('Reanudar PC');
   });
 
+  it('«Diseño desde el servidor»: apagado de fábrica; encender, probar y volver al diseño del programa', async () => {
+    const guardar = vi.spyOn(impresionApi, 'guardarConfigEquipo').mockResolvedValue({ ok: true, config: CFG as any });
+    const prueba = vi.spyOn(impresionApi, 'pruebaDisenoServidor').mockResolvedValue({ ok: true, trabajos: ['1'], mensaje: 'Prueba enviada: sale con el diseño del servidor' });
+    const { rerender, alRecargar, alAviso } = montar();
+    expect(screen.getByTestId('diseno-estado-10')).toHaveTextContent('Apagado');
+    expect(screen.queryByTestId('diseno-probar-10')).toBeNull();
+    fireEvent.click(screen.getByTestId('diseno-encender-10'));
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith('10', { disenoServidor: true }));
+    rerender(<TarjetaEquipo equipo={equipo({ config: { ...CFG, disenoServidor: true } })} areas={AREAS} tamanosLocal={LOCAL} puedeEditar alRecargar={alRecargar} alAviso={alAviso} />);
+    expect(screen.getByTestId('diseno-estado-10')).toHaveTextContent('Encendido');
+    fireEvent.click(screen.getByTestId('diseno-probar-10'));
+    await waitFor(() => expect(prueba).toHaveBeenCalledWith('10'));
+    fireEvent.click(screen.getByTestId('diseno-apagar-10'));
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith('10', { disenoServidor: false }));
+  });
+
   it('«Usar lo general» pide confirmar y rellena la PC con las reglas del local', async () => {
     const general = vi.spyOn(impresionApi, 'usarGeneralEquipo').mockResolvedValue({ ok: true, config: { ...CFG, ticketera: true, ticketPago: true } as any });
     montar();

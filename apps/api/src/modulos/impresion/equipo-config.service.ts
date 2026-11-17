@@ -25,7 +25,8 @@ import { aplicarCambio, configAFila, configDesdeComportamientoActual, configDesd
 import { leerReglasImpresion } from './reglas-impresion';
 import { FilaEquipo, IdentidadEquipo, clasificarEquipos, claveHost, reconocerEquipo } from './identidad-equipo';
 import { datosOrigen } from './origen-impresion';
-import { construirEtiquetaBebidaPrueba, construirEtiquetaPrueba } from './constructor-etiquetas';
+import { construirEtiquetaPrueba, construirEtiquetaBebidaPrueba, construirTicketPrueba } from './constructor-etiquetas';
+import { FALLOS_PARA_APAGAR } from './diseno-servidor';
 
 const ESPERA_PRUEBA_MS = 10 * 1000;
 const claveIgual = (a: FilaEquipo, b: FilaEquipo) => claveHost(a.latido_hostname, a.latido_sistema) === claveHost(b.latido_hostname, b.latido_sistema);
@@ -152,12 +153,108 @@ export class EquipoConfigService {
     return { ok: true, config: nueva };
   }
 
+  /**
+   * El programa avisa con qué diseño imprimió un trabajo de esta PC. Con el diseño del servidor encendido: «servidor» pone el
+   * contador de fallos en 0; «respaldo» (el programa tuvo que usar el suyo) lo sube y, al llegar a 2 seguidos, la PC vuelve
+   * SOLA al diseño del programa y avisa en la campanita. Con el interruptor apagado no hay nada que contar.
+   */
+  async anotarDisenoServidor(deviceKeyId: bigint, diseno: 'servidor' | 'respaldo'): Promise<void> {
+    const f = await this.prisma.equipoImpresionConfig.findUnique({ where: { device_key_id: deviceKeyId } });
+    if (!f) return;
+    const t = { ...((f.tamanos ?? {}) as Record<string, unknown>) };
+    if (t.disenoServidor !== true) return;
+    const fallos = Number(t.disenoFallos) || 0;
+    const guardar = (nuevo: Record<string, unknown>) =>
+      this.prisma.equipoImpresionConfig.update({ where: { device_key_id: deviceKeyId }, data: { tamanos: nuevo as any } });
+    if (diseno === 'servidor') {
+      if (fallos > 0) await guardar({ ...t, disenoFallos: 0 });
+      return;
+    }
+    if (fallos + 1 < FALLOS_PARA_APAGAR) {
+      await guardar({ ...t, disenoFallos: fallos + 1 });
+      return;
+    }
+    const { disenoServidor: _apagado, ...resto } = t;
+    await guardar({ ...resto, disenoFallos: 0 });
+    const e = await this.prisma.deviceKey.findUnique({ where: { id: deviceKeyId } }).catch(() => null);
+    const nombre = e?.nombre ?? 'una computadora';
+    for (const rol of ['CAJERO', 'ADMIN']) {
+      await this.prisma.notificacion
+        .create({
+          data: {
+            tipo: 'ERROR_IMPRESORA',
+            rol_destino: rol,
+            titulo: 'Diseño desde el servidor apagado',
+            mensaje: `${nombre} volvió sola al diseño del programa de impresión tras 2 fallos seguidos. Lo que se imprime sigue saliendo igual.`,
+            enlace: '/admin/configuracion',
+          },
+        })
+        .catch((err: any) => this.logger.warn(`No se pudo crear el aviso: ${err.message}`));
+    }
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'APAGAR_DISENO_SERVIDOR_AUTOMATICO',
+      entidad: 'device_key',
+      entidadId: deviceKeyId,
+      despues: { equipo: nombre, motivo: '2 fallos seguidos con diseño de respaldo' },
+    });
+    this.eventos?.emitirAdmin('impresion:config', { equipoId: deviceKeyId.toString() });
+  }
+
+  /**
+   * «Imprimir prueba» del diseño desde el servidor: un ticket y una etiqueta de ejemplo (datos de prueba, sin pedido) a
+   * ESTA PC. Solo con el interruptor encendido: así se ve en papel el camino nuevo antes de fiarse de él.
+   */
+  async pruebaDisenoServidor(idInput: string | number, usuario?: UsuarioAutenticado, ip?: string) {
+    const e = await this.equipo(idInput);
+    const cfg = await this.configDe(e.id);
+    if (!cfg.disenoServidor) {
+      throw new BadRequestException({ codigo: 'DISENO_SERVIDOR_APAGADO', mensaje: 'Enciende «Diseño desde el servidor» en esta computadora para probarlo' });
+    }
+    const reciente = await this.prisma.printJob.findFirst({
+      where: { pedido_id: null, destino_equipo_id: e.id, en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) } },
+      select: { id: true },
+    });
+    if (reciente) {
+      throw new HttpException({ codigo: 'PRUEBA_FRECUENTE', mensaje: 'Espera unos segundos antes de otra prueba' }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
+    const ids: string[] = [];
+    const piezas: Array<[string, any]> = [];
+    if (cfg.ticketera) piezas.push(['TICKET_PAGO', construirTicketPrueba(local?.valor, 'prueba')]);
+    if (cfg.etiquetera) {
+      piezas.push(['ETIQUETA_GENERAL', construirEtiquetaPrueba(local?.valor, 'prueba')]);
+      piezas.push(['ETIQUETA_BEBIDA', construirEtiquetaBebidaPrueba('prueba')]);
+    }
+    if (!piezas.length) {
+      throw new BadRequestException({ codigo: 'SIN_MAQUINAS', mensaje: 'Esta computadora no tiene ticketera ni etiquetera encendida' });
+    }
+    for (const [tipo, payload] of piezas) {
+      const t = await this.prisma.printJob.create({
+        data: { pedido_id: null, tipo, payload: payload as any, copia: false, estado: 'PENDIENTE', ...datosOrigen('PRUEBA', usuario), destino_equipo_id: e.id, destino_area_id: e.area_id },
+      });
+      ids.push(t.id.toString());
+    }
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'IMPRESION_PRUEBA_DISENO_SERVIDOR',
+      entidad: 'device_key',
+      entidadId: e.id,
+      partyId: usuario?.partyId,
+      despues: { equipo: e.nombre, trabajos: ids.length },
+      ip,
+    });
+    return { ok: true, trabajos: ids, mensaje: 'Prueba enviada: sale con el diseño del servidor' };
+  }
+
   /** «Usar lo general»: rellena la PC con las reglas del local (conserva pausa y tamaños propios). */
   async usarGeneral(idInput: string | number, usuario?: UsuarioAutenticado, ip?: string) {
     const e = await this.equipo(idInput);
     const [actual, areas, reglas] = await Promise.all([this.configDe(e.id), this.areasActivas(), leerReglasImpresion(this.prisma)]);
     const base = configDesdeGeneral(reglas, areas, areas.find((a) => a.nombre === AREA_BEBIDAS)?.id ?? null);
-    const nueva = { ...base, pausado: actual.pausado, tamanoGeneral: actual.tamanoGeneral, tamanoBebida: actual.tamanoBebida };
+    const nueva = { ...base, pausado: actual.pausado, tamanoGeneral: actual.tamanoGeneral, tamanoBebida: actual.tamanoBebida, ...(actual.disenoServidor ? { disenoServidor: true } : {}) };
     await this.persistir(e, actual, nueva, {}, usuario, ip, 'USAR_LO_GENERAL_EQUIPO_IMPRESION');
     return { ok: true, config: nueva };
   }

@@ -31,4 +31,13 @@ describe('versionPrograma', () => {
     expect(screen.queryByTestId('version-nueva')).toBeNull();
     expect(screen.queryByTestId('version-actualizada')).toBeNull();
   });
+
+  it('si la versión nueva trae el diseño desde el servidor, la marca como la última que hay que instalar', () => {
+    const { rerender } = render(<InsigniaVersion instalada="0.1.10" ultima={{ ...ultima, disenoServidor: true }} />);
+    expect(screen.getByTestId('version-ultima-necesaria').textContent).toContain('última que necesitas instalar');
+    rerender(<InsigniaVersion instalada="0.1.10" ultima={ultima} />);
+    expect(screen.queryByTestId('version-ultima-necesaria')).toBeNull();
+    rerender(<InsigniaVersion instalada="0.1.57" ultima={{ ...ultima, disenoServidor: true }} />);
+    expect(screen.queryByTestId('version-ultima-necesaria')).toBeNull();
+  });
 });

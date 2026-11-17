@@ -142,3 +142,4 @@ export {
   textoCondicionMedios,
 } from './mediosPago.js';
 export type { MedioPagoCanal, CanalMedioPago, MediosPagoPorCanal } from './mediosPago.js';
+export * from './impresora/index.js';

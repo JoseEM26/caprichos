@@ -1,4 +1,5 @@
 import type { TamanoEtiquetaPc } from '../constantes/tamanoPc.js';
+import type { CapacidadesAgente, ComandosTrabajo } from '../impresora/comandos.js';
 import type { Maqueta } from '../etiquetas/maquetaEtiquetas.js';
 import type { LineaDetalleEntrada, DescuentoTicket } from '../etiquetas/detalleLinea.js';
 
@@ -144,6 +145,11 @@ export interface ConfigEquipoImpresion {
   tamanoBebida: TamanoEtiquetaPc | null;
   pausado: boolean;
   configurado: boolean;
+  /**
+   * «Diseño desde el servidor (prueba)»: el servidor arma los bytes de la impresora para ESTA PC. Apagado por defecto:
+   * sin esto el programa imprime con su propio diseño, igual que siempre. Se apaga solo tras 2 fallos seguidos.
+   */
+  disenoServidor?: boolean;
 }
 
 /** Estado de una máquina tal como lo ve el admin (con el motivo si no está bien). */
@@ -387,6 +393,12 @@ export interface TrabajoImpresion {
   payload: PayloadEtiqueta;
   copia: boolean;
   intentos: number;
+  /**
+   * Bytes de la impresora ya armados por el servidor (solo si esta PC tiene encendido «Diseño desde el servidor» y el
+   * programa declaró `comandosServidor`). El programa los envía tal cual; sin ellos, usa su propio diseño. Un programa
+   * viejo ignora el campo.
+   */
+  comandos?: ComandosTrabajo;
 }
 
 export interface PeticionTomarTrabajos {
@@ -395,6 +407,8 @@ export interface PeticionTomarTrabajos {
   roles?: RolImpresora[];
   /** Además, pruebas dirigidas a una impresora concreta (payload.prueba.impresoraId), aunque no haya máquina lista. */
   pruebas?: boolean;
+  /** Qué sabe hacer el programa y cómo está montada su impresora (aditivo: uno viejo no lo manda). */
+  capacidades?: CapacidadesAgente;
 }
 
 /** Marca de una prueba dirigida a una impresora concreta del equipo (dentro del payload del trabajo). */
@@ -413,6 +427,11 @@ export interface PeticionResultadoTrabajo {
   id: string;
   ok: boolean;
   error?: string;
+  /**
+   * Con qué diseño salió: 'servidor' = los comandos que mandó el servidor; 'respaldo' = el programa los rechazó o falló
+   * al imprimirlos y imprimió con su diseño interno (`error` dice por qué, sin datos del pedido). Sin campo: programa viejo.
+   */
+  diseno?: 'servidor' | 'respaldo';
 }
 
 export interface PeticionLatido {

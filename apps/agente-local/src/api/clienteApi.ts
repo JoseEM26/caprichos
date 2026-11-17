@@ -10,11 +10,12 @@ import type {
   ImpresoraCandidata,
   InfoEquipoLatido,
   RespuestaLatido,
+  CapacidadesAgente,
 } from '@caprichos/compartido';
 
 export interface IClienteApiImpresion {
-  tomarTrabajos(max?: number, roles?: RolImpresora[], pruebas?: boolean): Promise<TrabajoImpresion[]>;
-  reportarResultado(id: string, ok: boolean, error?: string): Promise<void>;
+  tomarTrabajos(max?: number, roles?: RolImpresora[], pruebas?: boolean, capacidades?: CapacidadesAgente): Promise<TrabajoImpresion[]>;
+  reportarResultado(id: string, ok: boolean, error?: string, diseno?: 'servidor' | 'respaldo'): Promise<void>;
   enviarLatido(
     version: string,
     impresora: EstadoImpresora,
@@ -135,8 +136,8 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     }
   }
 
-  async tomarTrabajos(max: number = 10, roles?: RolImpresora[], pruebas?: boolean): Promise<TrabajoImpresion[]> {
-    const peticion: PeticionTomarTrabajos = { max, ...(roles ? { roles } : {}), ...(pruebas ? { pruebas } : {}) };
+  async tomarTrabajos(max: number = 10, roles?: RolImpresora[], pruebas?: boolean, capacidades?: CapacidadesAgente): Promise<TrabajoImpresion[]> {
+    const peticion: PeticionTomarTrabajos = { max, ...(roles ? { roles } : {}), ...(pruebas ? { pruebas } : {}), ...(capacidades ? { capacidades } : {}) };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/tomar',
       'POST',
@@ -155,9 +156,10 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
   async reportarResultado(
     id: string,
     ok: boolean,
-    error?: string
+    error?: string,
+    diseno?: 'servidor' | 'respaldo'
   ): Promise<void> {
-    const peticion: PeticionResultadoTrabajo = { id, ok, error };
+    const peticion: PeticionResultadoTrabajo = { id, ok, error, ...(diseno ? { diseno } : {}) };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/resultado',
       'POST',

@@ -25,7 +25,7 @@ export class AgenteImpresionController {
   async tomar(@Body() dto: TomarTrabajosDto, @Req() req: any) {
     const deviceKeyId = req.deviceKey?.id ? BigInt(req.deviceKey.id) : undefined;
     // Cada PC toma solo lo que su configuración le asigna
-    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId, dto.roles, null, dto.pruebas === true);
+    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId, dto.roles, null, dto.pruebas === true, dto.capacidades);
   }
 
   @Post('resultado')

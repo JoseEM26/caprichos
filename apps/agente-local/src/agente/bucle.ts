@@ -1,6 +1,6 @@
 import * as os from 'os';
-import { rolDeTrabajo, tamanoEfectivo, TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '@caprichos/compartido';
-import type { ConfigEquipoParaAgente, EstadoImpresora, ImpresoraReportada, InfoEquipoLatido, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
+import { rolDeTrabajo, tamanoEfectivo, validarComandos, TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '@caprichos/compartido';
+import type { CapacidadesAgente, ConfigEquipoParaAgente, EstadoImpresora, ImpresoraReportada, InfoEquipoLatido, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
 import type { ConfiguracionAgente } from '../config';
 import { ErrorRespuestaApi } from '../api/clienteApi';
 import type { IClienteApiImpresion } from '../api/clienteApi';
@@ -194,6 +194,43 @@ export class AgenteLocalServicio {
     this.ultimoLatidoTs = 0; // que el panel vea la máquina nueva en el próximo ciclo
   }
 
+  /** Qué sabe hacer este programa y cómo está montada su impresora: el servidor decide con eso si manda `comandos`. */
+  private capacidades(): CapacidadesAgente {
+    return { comandosServidor: true, ticketColumnas: this.config.ticketColumnas, etiqueta: this.config.etiqueta };
+  }
+
+  /** Trabajos impresos pendientes de confirmar que salieron con el diseño de respaldo (o con el del servidor). */
+  private readonly disenoDeTrabajo = new Map<string, { diseno: 'servidor' | 'respaldo'; motivo?: string }>();
+
+  /**
+   * Escribe en la impresora los `comandos` que mandó el servidor, tal cual. Sin comandos, o si no sirven (formato que no
+   * es el de la máquina, base64 roto, demasiado grandes) o la impresora los rechaza, usa el diseño propio del programa
+   * UNA vez (`respaldo`) y lo reporta. Nunca registra el contenido de los comandos.
+   */
+  private async escribirTrabajo(trabajo: TrabajoImpresion, rol: RolImpresora, dispositivo: IDispositivoImpresora, respaldo: () => Buffer): Promise<void> {
+    if (trabajo.comandos === undefined) {
+      await dispositivo.escribir(respaldo()); // programa sin servidor que diseñe: exactamente lo de siempre
+      return;
+    }
+    const v = validarComandos(trabajo.comandos);
+    const formatoEsperado = rol === 'TICKETERA' ? 'ESCPOS' : 'TSPL';
+    let motivo: string | undefined;
+    if (!v) motivo = 'comandos del servidor no válidos';
+    else if (v.formato !== formatoEsperado) motivo = `comandos ${v.formato} para una ${rol.toLowerCase()}`;
+    else {
+      try {
+        await dispositivo.escribir(Buffer.from(v.bytes));
+        this.disenoDeTrabajo.set(trabajo.id, { diseno: 'servidor' });
+        return;
+      } catch (err: any) {
+        motivo = `la impresora rechazó los comandos del servidor: ${err?.message ?? err}`.slice(0, 300);
+      }
+    }
+    this.logger('warn', `Trabajo ${trabajo.id}: ${motivo}; imprimo con el diseño de respaldo del programa.`);
+    await dispositivo.escribir(respaldo());
+    this.disenoDeTrabajo.set(trabajo.id, { diseno: 'respaldo', motivo });
+  }
+
   /** Sticker sin tamaño en el trabajo: el propio de esta PC o el de fábrica (el servidor ya lo manda normalmente). */
   private conTamanoLocal(trabajo: TrabajoImpresion): TrabajoImpresion {
     const p = trabajo.payload as any;
@@ -314,9 +351,9 @@ export class AgenteLocalServicio {
         ? this.rolesListos.length === 0 && !this.equipo
           ? []
           : this.equipo
-            ? await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos, true)
-            : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos)
-        : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote);
+            ? await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos, true, this.capacidades())
+            : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos, undefined, this.capacidades())
+        : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, undefined, undefined, this.capacidades());
       // Conexión exitosa: restablecemos la espera
       this.fallosRed = 0;
       this.necesitaVincular = false;
@@ -378,11 +415,11 @@ export class AgenteLocalServicio {
           throw new ErrorImpresora(`Impresora no encontrada: ${(trabajo.payload as any)?.prueba?.nombre ?? dirigida}`, 'desconectada');
         }
         const marca = (trabajo.payload as any)?.prueba?.marca as string | undefined;
-        const bytes =
+        const bytes = () =>
           rol === 'TICKETERA'
             ? generarPruebaTicket(c.nombre, rol, this.config.ticketColumnas, undefined, marca)
             : generarPruebaEtiqueta(c.nombre, rol, this.config.etiqueta, undefined, marca);
-        await this.equipo!.crear(c, rol).escribir(bytes);
+        await this.escribirTrabajo(trabajo, rol, this.equipo!.crear(c, rol), bytes);
         this.reportesPendientes.push(trabajo.id);
         await this.vaciarReportes();
         return;
@@ -391,7 +428,7 @@ export class AgenteLocalServicio {
       if (!dispositivo) {
         throw new ErrorImpresora(`La ${rol.toLowerCase()} no está configurada en este equipo`, 'desconectada');
       }
-      const bytes =
+      const bytes = () =>
         trabajo.tipo === 'TICKET_PAGO'
           ? generarTicketEscPos(trabajo.payload as any, this.config.ticketColumnas)
           : trabajo.tipo === 'TICKET_CIERRE'
@@ -399,7 +436,7 @@ export class AgenteLocalServicio {
           : trabajo.tipo === 'TICKET_COMANDA_SALON' || trabajo.tipo === 'TICKET_COMANDA_AREA'
             ? generarComandaSalonEscPos(trabajo.payload as any, this.config.ticketColumnas)
             : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);
-      await dispositivo.escribir(bytes);
+      await this.escribirTrabajo(trabajo, rol, dispositivo, bytes);
     } catch (err: any) {
       const mensajeError = err.message || 'Error desconocido al imprimir';
 
@@ -451,12 +488,16 @@ export class AgenteLocalServicio {
     while (this.reportesPendientes.length > 0) {
       const id = this.reportesPendientes[0];
       try {
-        await this.clienteApi.reportarResultado(id, true);
+        const d = this.disenoDeTrabajo.get(id);
+        if (d) await this.clienteApi.reportarResultado(id, true, d.motivo, d.diseno);
+        else await this.clienteApi.reportarResultado(id, true);
+        this.disenoDeTrabajo.delete(id);
         this.reportesPendientes.shift();
         this.logger('info', `Trabajo ${id} impreso y confirmado con éxito`);
       } catch (err: any) {
         if (err instanceof ErrorRespuestaApi && err.status >= 400 && err.status < 500) {
           this.reportesPendientes.shift();
+          this.disenoDeTrabajo.delete(id);
           this.logger('warn', `El servidor rechazó la confirmación del trabajo ${id} (${err.status}): se descarta`);
           continue;
         }

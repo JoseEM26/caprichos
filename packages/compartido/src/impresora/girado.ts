@@ -1,7 +1,8 @@
-import { maquetarEtiqueta } from '@caprichos/compartido';
-import type { EtiquetaAreaDatos, Primitiva } from '@caprichos/compartido';
-import { limpiarParaTspl } from './codepage1252';
-import { comandosInicio, comandoLogo, type FormatoEtiqueta } from './formato';
+import { maquetarEtiqueta } from '../etiquetas/maquetaStickers.js';
+import type { EtiquetaAreaDatos } from '../tipos/etiquetas.js';
+import type { Primitiva } from '../etiquetas/maquetaEtiquetas.js';
+import { limpiarParaTspl } from './codepage1252.js';
+import { comandosInicio, comandoLogo, type FormatoEtiqueta } from './formato.js';
 
 /**
  * Sticker 'vertical-girado': el rollo sigue apaisado (101.6 x 63.5 mm) pero el contenido se maqueta en

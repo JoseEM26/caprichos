@@ -411,6 +411,11 @@ export const impresionApi = {
     return api.post(`/admin/impresion/equipos/${equipoId}/prueba-etiqueta`, { tipo, ...(tamano ? { tamano } : {}) });
   },
 
+  /** «Imprimir prueba» con el diseño desde el servidor (solo si está encendido en esa PC). */
+  pruebaDisenoServidor: async (equipoId: string): Promise<{ ok: boolean; trabajos: string[]; mensaje: string }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/prueba-diseno-servidor`, {});
+  },
+
   reintentarTrabajo: async (id: string): Promise<{ ok: boolean; mensaje: string }> => {
     return api.post(`/admin/impresion/trabajos/${id}/reintentar`);
   },

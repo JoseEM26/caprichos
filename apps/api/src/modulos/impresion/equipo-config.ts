@@ -49,6 +49,8 @@ export function filaAConfig(f: any | null | undefined): ConfigEquipoImpresion {
     tamanoBebida: tamanoPcValido(t.bebida),
     pausado: !!f.pausado,
     configurado: !!f.configurado,
+    // Sin migración: vive en el JSON `tamanos`; ausente = apagado (el programa imprime con su diseño de siempre)
+    ...(t.disenoServidor === true ? { disenoServidor: true } : {}),
   };
 }
 
@@ -65,11 +67,11 @@ export function configAFila(c: ConfigEquipoImpresion) {
     sticker_general: c.stickerGeneral,
     sticker_areas: c.stickerAreas as any,
     sticker_bebida_areas: c.stickerBebidaAreas as any,
-    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null, bebidaCategorias: c.stickerBebidaCategorias ?? null, bebidaCategoriasPorModalidad: c.stickerBebidaCategoriasPorModalidad ?? null } as any,
+    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null, bebidaCategorias: c.stickerBebidaCategorias ?? null, bebidaCategoriasPorModalidad: c.stickerBebidaCategoriasPorModalidad ?? null, ...(c.disenoServidor ? { disenoServidor: true } : {}) } as any,
   };
 }
 
-const BOOLEANOS = ['ticketera', 'etiquetera', 'ticketPago', 'comandaSalon', 'stickerGeneral', 'pausado'] as const;
+const BOOLEANOS = ['ticketera', 'etiquetera', 'ticketPago', 'comandaSalon', 'stickerGeneral', 'pausado', 'disenoServidor'] as const;
 const LISTAS = ['comandaAreas', 'stickerAreas', 'stickerBebidaAreas'] as const;
 
 /** Mezcla un cambio parcial sobre la configuración y lo valida (400 con mensaje claro). `configurado` queda en true. */

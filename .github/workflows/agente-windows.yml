@@ -39,7 +39,8 @@ jobs:
       - run: pnpm --filter @caprichos/agente-local empaquetar:linux
       - name: Archivo version-agente.json
         run: |
-          printf '{"version":"%s","commit":"%s","fecha":"%s"}\n' "$AGENTE_VERSION" "$AGENTE_COMMIT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > apps/agente-local/dist-exe/version-agente.json
+          # disenoServidor: desde esta versión el diseño de etiquetas y tickets viene del sistema; ya no hay que reinstalar por cambios de diseño
+          printf '{"version":"%s","commit":"%s","fecha":"%s","disenoServidor":true}\n' "$AGENTE_VERSION" "$AGENTE_COMMIT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > apps/agente-local/dist-exe/version-agente.json
           cat apps/agente-local/dist-exe/version-agente.json
       # Humo: el binario Linux (mismo código que el .exe) debe imprimir su salida y terminar; si queda mudo, falla el pipeline
       - name: Prueba de humo del programa

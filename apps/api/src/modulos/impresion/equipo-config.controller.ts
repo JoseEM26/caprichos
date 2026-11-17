@@ -72,4 +72,12 @@ export class EquipoConfigController {
   async pruebaEtiqueta(@Param('id') id: string, @Body() body: { tipo?: string; tamano?: unknown }, @Req() req: any) {
     return this.equipos.pruebaEtiqueta(id, body?.tipo as any, body?.tamano, req.usuario, this.ip(req));
   }
+
+  /** «Imprimir prueba» con el diseño desde el servidor (solo si está encendido en esa PC). */
+  @Post(':id/prueba-diseno-servidor')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('configuracion', 'editar')
+  async pruebaDisenoServidor(@Param('id') id: string, @Req() req: any) {
+    return this.equipos.pruebaDisenoServidor(id, req.usuario, this.ip(req));
+  }
 }

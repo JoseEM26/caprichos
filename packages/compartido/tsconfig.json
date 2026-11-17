@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
+  "exclude": ["src/impresora/__tests__"],
   "include": [
     "src/**/*"
   ]

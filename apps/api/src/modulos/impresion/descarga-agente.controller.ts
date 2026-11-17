@@ -18,7 +18,7 @@ export const PROGRAMAS: Record<string, { ruta: () => string; nombre: string; eti
   },
 };
 
-/** version-agente.json lo sube el pipeline junto al programa: {version, commit, fecha}. */
+/** version-agente.json lo sube el pipeline junto al programa: {version, commit, fecha, disenoServidor}. */
 export function rutaVersionPrograma(): string {
   return process.env.AGENTE_VERSION_RUTA || path.join(path.dirname(PROGRAMAS.windows.ruta()), 'version-agente.json');
 }
@@ -34,7 +34,7 @@ export class DescargaAgenteController {
     try {
       const j = JSON.parse(fs.readFileSync(rutaVersionPrograma(), 'utf-8'));
       if (typeof j?.version !== 'string') return { publicada: null };
-      return { publicada: { version: j.version, commit: j.commit ?? null, fecha: j.fecha ?? null } };
+      return { publicada: { version: j.version, commit: j.commit ?? null, fecha: j.fecha ?? null, ...(j.disenoServidor === true ? { disenoServidor: true } : {}) } };
     } catch {
       return { publicada: null };
     }

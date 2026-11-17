@@ -1,7 +1,7 @@
-import type { EtiquetaAreaDatos } from '@caprichos/compartido';
-import { medirAnchoTexto, truncar, ajustarLineas, generarComandoTexto as T, FUENTES_TSPL } from './tipografia';
-import { generarSeparadorRombos } from './rombos';
-import { comandosInicio, comandoLogo, MM_A_DOTS, type FormatoEtiqueta } from './formato';
+import type { EtiquetaAreaDatos } from '../tipos/etiquetas.js';
+import { medirAnchoTexto, truncar, ajustarLineas, generarComandoTexto as T, FUENTES_TSPL } from './tipografia.js';
+import { generarSeparadorRombos } from './rombos.js';
+import { comandosInicio, comandoLogo, MM_A_DOTS, type FormatoEtiqueta } from './formato.js';
 
 /**
  * Sticker apaisado (101.6 x 63.5 mm = 812 x 508 dots). Misma identidad que el vertical (marco doble,

@@ -99,6 +99,15 @@ Antes de abrir una versión nueva, ciérrala siempre: dos copias a la vez pueden
 4. Ábrelo UNA vez (doble clic): queda en segundo plano y arranca solo con Windows. El programa nuevo también cierra solo las copias anteriores que encuentre.
 Otros comandos (en la misma ventana): `--estado` (versión en uso, última disponible, cuántas copias hay y desde dónde arranca con Windows), `--copias` (lista las copias corriendo), `--version` (solo la versión), `autoinicio desactivar` y `autoinicio activar` (quitar o poner el inicio con Windows).
 
+## Como se hace: diseño desde el servidor (para no reinstalar el programa)
+El programa de impresión solo hace la conexión con las impresoras. El diseño de los stickers (general, de área, de bebida) y de los tickets (pago, precuenta, comanda, cierre, nota de venta, pruebas) vive en el sistema: así un cambio de diseño no obliga a descargar el programa otra vez. Se activa por computadora, y viene APAGADO: mientras esté apagado, nada cambia y el programa imprime con su propio diseño, como siempre.
+1. Instala UNA vez la versión nueva del programa (la franja "Hay una versión nueva" dice "Es la última que necesitas instalar"). Hazlo primero en una sola PC.
+2. En esa PC, pestaña General, bloque "Diseño desde el servidor (prueba)": pulsa "Encender diseño desde el servidor".
+3. Pulsa "Imprimir prueba": sale un ticket y stickers de ejemplo con el diseño del sistema. Compáralos con lo que salía antes: deben verse igual.
+4. Si algo no te gusta, pulsa "Volver al diseño del programa": se apaga al instante, sin reinstalar nada.
+5. Si todo está bien, repite en las demás PC.
+Respaldo automático: si el programa nuevo no puede imprimir con el diseño del sistema, reintenta UNA vez con su diseño propio y deja anotado en el trabajo "Impreso con diseño de respaldo". Si pasa 2 veces seguidas, el sistema apaga solo el interruptor de esa PC y te avisa en la campanita; lo que se imprime sigue saliendo igual. Las PC que no actualicen el programa siguen imprimiendo como siempre, sin cortes.
+
 ## Errores y dudas comunes
 - ¿Se configura por cada PC o una para todas? Las reglas (Paso 2) son una sola para todo el local. Cada PC solo elige sus impresoras y su área (Paso 1).
 - Me sale un papel que no pedí: mira la tabla del Paso 2 y apaga esa pieza en esa columna. En el local no debe salir ningún sticker.

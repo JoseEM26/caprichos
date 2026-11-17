@@ -97,6 +97,7 @@ import { maquetarEtiqueta, tamanoEfectivo, textoValorCupon } from '@caprichos/co
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 import { alcanceCupon } from '../ofertas/cupon-asignado';
 import { datosOrigen, deducirOrigen } from './origen-impresion';
+import { comandosSeguros, sanearCapacidades } from './diseno-servidor';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
 const TIPOS_ETIQUETA = ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
@@ -195,6 +196,7 @@ export class ImpresionService {
     roles?: RolImpresora[],
     _areaIdObsoleto: bigint | null = null,
     pruebas = false,
+    capacidadesCrudas?: unknown,
   ): Promise<RespuestaTomarTrabajos> {
     // Cada PC toma SOLO lo que se le asignó (destino_equipo_id) y solo si está configurada, no en pausa y el trabajo
     // es de una máquina que tiene encendida. Las pruebas (sin pedido) salen siempre en la máquina que las pidió.
@@ -314,14 +316,22 @@ export class ImpresionService {
         return p;
       };
 
+      // «Diseño desde el servidor»: solo si ESTA PC lo tiene encendido (apagado por defecto) y el programa declara que sabe usarlo.
+      // El payload no cambia nunca: los comandos van aparte, así un programa viejo recibe exactamente lo de siempre.
+      const capDiseno = cfg?.disenoServidor === true ? sanearCapacidades(capacidadesCrudas) : null;
       return {
-        trabajos: actualizados.map((t) => ({
-          id: t.id.toString(),
-          tipo: t.tipo as TipoTrabajoImpresion,
-          payload: conTamano(t),
-          copia: t.copia,
-          intentos: t.intentos,
-        })),
+        trabajos: actualizados.map((t) => {
+          const payload = conTamano(t);
+          const comandos = capDiseno ? comandosSeguros(t.tipo, payload, t.copia, capDiseno) : undefined;
+          return {
+            id: t.id.toString(),
+            tipo: t.tipo as TipoTrabajoImpresion,
+            payload,
+            copia: t.copia,
+            intentos: t.intentos,
+            ...(comandos ? { comandos } : {}),
+          };
+        }),
       };
     });
   }
@@ -355,14 +365,21 @@ export class ImpresionService {
     if (trabajo.estado === 'DESCARTADO') return;
 
     if (dto.ok) {
+      // Impreso con el diseño de respaldo del programa: queda anotado en el trabajo (sin datos del pedido en el motivo)
+      const respaldo = dto.diseno === 'respaldo';
       await this.prisma.printJob.update({
         where: { id: bigId },
         data: {
           estado: 'IMPRESO',
           impreso_en: new Date(),
-          error: null,
+          error: respaldo ? `Impreso con diseño de respaldo: ${(dto.error ?? 'sin detalle').slice(0, 200)}` : null,
         },
       });
+      if (dto.diseno && trabajo.device_key_id) {
+        await this.equipos
+          .anotarDisenoServidor(trabajo.device_key_id, dto.diseno)
+          .catch((err: any) => this.logger.warn(`No se pudo anotar el diseño del trabajo: ${err.message}`));
+      }
       return;
     }
 

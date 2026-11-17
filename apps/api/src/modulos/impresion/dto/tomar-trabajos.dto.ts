@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, Max, Min } from 'class-validator';
 
 export class TomarTrabajosDto {
   @IsOptional()
@@ -19,4 +19,9 @@ export class TomarTrabajosDto {
   @IsOptional()
   @IsBoolean()
   pruebas?: boolean;
+
+  /** Qué sabe el programa y cómo está montada su impresora (rollo, columnas). Se sanea en el servicio; uno viejo no lo manda. */
+  @IsOptional()
+  @IsObject()
+  capacidades?: Record<string, unknown>;
 }

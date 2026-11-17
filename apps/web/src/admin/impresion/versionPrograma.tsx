@@ -4,6 +4,8 @@ export interface VersionPublicada {
   version: string;
   commit?: string | null;
   fecha?: string | null;
+  /** Esta versión ya recibe el diseño desde el sistema: es la última que hay que instalar a mano por cambios de diseño. */
+  disenoServidor?: boolean;
 }
 
 /** N de «0.1.N» (también «0.1.57 (ab12cd3)»); 0 para la antigua 0.1.0 o una compilación de desarrollo. */
@@ -38,6 +40,9 @@ export function InsigniaVersion({ instalada, ultima, enlace = true }: { instalad
         <a className="ic-chip ic-chip--aviso" data-testid="version-nueva" href="/api/agente-impresion/descargar/windows" download>
           Hay una versión nueva (v{ultima!.version}): descargar
         </a>
+      )}
+      {est === 'nueva' && ultima?.disenoServidor && (
+        <span className="ic-chip" data-testid="version-ultima-necesaria">Es la última que necesitas instalar: el diseño se actualiza desde el sistema</span>
       )}
     </>
   );
