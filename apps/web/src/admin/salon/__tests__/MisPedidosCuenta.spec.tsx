@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { abrirTodas } from './abrirTodas';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { filtrarComoServidor } from './filtrarComoServidor';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
 
@@ -69,14 +70,15 @@ describe('Mis pedidos: una tarjeta por cuenta (original + extras)', () => {
     expect(screen.getByText('Pedidos').previousSibling).toHaveTextContent('4');
   });
 
-  it('buscar por el código de un extra encuentra la cuenta y marca los que no coinciden', async () => {
+  it('buscar por el código de un extra trae solo ese pedido del servidor', async () => {
+    vi.mocked(salonApi.misPedidos).mockImplementation((f: any) => Promise.resolve(filtrarComoServidor(respuesta, f)));
     render(<MisPedidosView />);
-    await screen.findByTestId('tarjeta-cuenta');
+    await abrirTodas();
     fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, código o mesa'), { target: { value: 'cpw122' } });
-    const cuenta = screen.getByTestId('tarjeta-cuenta');
-    expect(within(cuenta).getByText('CP-W120')).toBeTruthy();
-    expect(within(cuenta).getAllByTestId('fuera-filtro')).toHaveLength(2);
-    expect(screen.queryByText('CP-W105')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('CP-W105')).toBeNull());
+    await abrirTodas('CP-W122');
+    expect(screen.getByText('CP-W122')).toBeTruthy();
+    expect(screen.queryByText('CP-W120')).toBeNull();
     expect(screen.getByText('1 resultado')).toBeTruthy();
   });
 

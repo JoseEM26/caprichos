@@ -199,14 +199,15 @@ describe('MisPedidosView: nombre del cliente y filtro Falta captura', () => {
     expect(nombre.getAttribute('title')).toBe('Ana López');
   });
 
-  it('la opción Falta captura del combo Estado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
+  it('la casilla Falta captura del panel avanzado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
-    // El filtro Estado es un combo; la opción «Falta captura» lleva la cantidad
-    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
-    expect(screen.getByRole('option', { name: /Falta captura/ })).toHaveTextContent('1');
-    fireEvent.click(screen.getByRole('option', { name: /Falta captura/ }));
-    expect(screen.getByRole('button', { name: 'Estado: Falta captura' })).toBeInTheDocument();
+    // En el panel avanzado, la casilla «Falta captura» lleva la cantidad
+    fireEvent.click(screen.getByRole('button', { name: /Filtros avanzados/ }));
+    const casilla = screen.getByRole('checkbox', { name: /Falta captura/ });
+    expect(casilla.closest('label')).toHaveTextContent('(1)');
+    fireEvent.click(casilla);
+    expect(screen.getByRole('button', { name: 'Filtros avanzados (1)' })).toBeInTheDocument();
 
     expect(screen.getByText('CP-W021')).toBeDefined();
     expect(screen.queryByText('CP-W022')).toBeNull();

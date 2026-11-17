@@ -42,13 +42,18 @@ export function parametrosDeRango(r: RangoPedidos): { desde?: string; hasta?: st
   return { desde: r.desde, hasta: r.hasta };
 }
 
-/** Error de validación del rango personalizado, o null si es válido. */
-export function errorRangoPersonalizado(desde: string, hasta: string, hoy: string = hoyLima()): string | null {
+/** Error de validación del rango personalizado, o null si es válido. `maxDias` por defecto es el de Pedidos (31). */
+export function errorRangoPersonalizado(
+  desde: string,
+  hasta: string,
+  hoy: string = hoyLima(),
+  maxDias: number = MAX_DIAS_RANGO,
+): string | null {
   if (!desde || !hasta) return 'Elige la fecha de inicio y la de fin.';
   if (desde > hasta) return 'La fecha de inicio no puede ser posterior a la de fin.';
   if (hasta > hoy) return 'La fecha de fin no puede ser posterior a hoy.';
   const dias = Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86400000) + 1;
-  if (dias > MAX_DIAS_RANGO) return `El rango no puede pasar de ${MAX_DIAS_RANGO} días.`;
+  if (dias > maxDias) return `El rango no puede pasar de ${maxDias} días.`;
   return null;
 }
 

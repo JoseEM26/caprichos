@@ -731,6 +731,21 @@
 .mp-fechas input { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--cp-navy); }
 .mp-fechas input:focus-visible { outline: 2px solid var(--cp-navy); outline-offset: 1px; }
 
+/* ---- Filtros avanzados (plegables), encabezado de resultados y errores de filtro ---- */
+.mpf-toggle { min-height: 44px; padding: 0 14px; border: 1.5px solid var(--cp-line); border-radius: 999px; background: var(--cp-white); color: var(--cp-navy); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.mpf-toggle[aria-expanded='true'] { border-color: var(--cp-navy); }
+.mpf-toggle:focus-visible { outline: 3px solid var(--cp-gold); outline-offset: 2px; }
+.mpf-panel { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--cp-line); border-radius: 16px; background: var(--cp-white); min-width: 0; }
+.mpf-grupo { border: 0; margin: 0; padding: 0; min-width: 0; }
+.mpf-grupo legend { padding: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--cp-soft); }
+.mpf-casillas { display: flex; flex-wrap: wrap; gap: 8px; }
+.mpf-casilla { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 10px; border: 1.5px solid var(--cp-line); border-radius: 999px; font-size: 14px; color: var(--cp-navy); cursor: pointer; }
+.mpf-combos, .mpf-montos { display: flex; flex-wrap: wrap; gap: 8px; }
+.mpf-montos label { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; font-size: 12px; font-weight: 700; color: var(--cp-soft); }
+.mpf-montos input { min-height: 44px; border: 1.5px solid var(--cp-line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--cp-navy); }
+.mpf-error { margin: 0; font-size: 13px; color: var(--cp-rust); }
+.mpf-encabezado { margin: 4px 0 0; font-size: 14px; font-weight: 700; color: var(--cp-navy); }
+
 /* ---- Lista compacta con acordeón: una fila de altura casi uniforme por cuenta ---- */
 .mp-acc { list-style: none; min-width: 0; background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 16px; overflow: hidden; }
 .mp-acc-cab { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 100%; min-height: 84px; padding: 10px 48px 10px 14px; box-sizing: border-box; background: transparent; border: 0; text-align: left; font: inherit; color: var(--cp-navy); cursor: pointer; }

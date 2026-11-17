@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { abrirTodas } from './abrirTodas';
+import { filtrarComoServidor } from './filtrarComoServidor';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -51,65 +52,78 @@ const respuesta = {
 const codigosVisibles = () =>
   screen.queryAllByText(/^CP-W\d{3}$/).map((el) => el.textContent);
 
-describe('MisPedidosView: buscador en cliente', () => {
+const CAJA = 'Buscar por nombre, código o mesa';
+
+describe('MisPedidosView: buscador en el servidor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [] });
-    vi.mocked(salonApi.misPedidos).mockResolvedValue(respuesta as any);
+    // Imita a la API: la búsqueda llega como q y el servidor devuelve solo las coincidencias
+    vi.mocked(salonApi.misPedidos).mockImplementation((f: any) => Promise.resolve(filtrarComoServidor(respuesta, f)));
   });
 
   it('la caja de búsqueda tiene el placeholder pedido', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
-    expect(screen.getByPlaceholderText('Buscar por nombre, código o mesa')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(CAJA)).toBeInTheDocument();
   });
 
-  it('filtra por código sin importar mayúsculas ni el guion, y muestra el conteo', async () => {
+  it('busca en el servidor 400 ms después de la última tecla y muestra el conteo', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
 
-    fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, código o mesa'), { target: { value: 'cpw022' } });
+    fireEvent.change(screen.getByPlaceholderText(CAJA), { target: { value: 'cpw022' } });
+    expect(salonApi.misPedidos).not.toHaveBeenLastCalledWith(expect.objectContaining({ q: 'cpw022' }));
 
-    expect(codigosVisibles()).toEqual(['CP-W022']);
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'cpw022' })));
+    await waitFor(() => expect(codigosVisibles()).toEqual(['CP-W022']));
     expect(screen.getByText('1 resultado')).toBeInTheDocument();
+  });
+
+  it('filtra por código sin importar mayúsculas ni el guion', async () => {
+    render(<MisPedidosView />);
+    await abrirTodas('CP-W021');
+
+    fireEvent.change(screen.getByPlaceholderText(CAJA), { target: { value: 'CP-W023' } });
+    await waitFor(() => expect(codigosVisibles()).toEqual(['CP-W023']));
   });
 
   it('filtra por nombre del cliente y por nombre de la mesa', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
-    const caja = screen.getByPlaceholderText('Buscar por nombre, código o mesa');
+    const caja = screen.getByPlaceholderText(CAJA);
 
     fireEvent.change(caja, { target: { value: 'quispe' } });
-    expect(codigosVisibles()).toEqual(['CP-W021']);
+    await waitFor(() => expect(codigosVisibles()).toEqual(['CP-W021']));
 
     fireEvent.change(caja, { target: { value: 'TERRAZA' } });
-    expect(codigosVisibles()).toEqual(['CP-W022']);
+    await waitFor(() => expect(codigosVisibles()).toEqual(['CP-W022']));
   });
 
-  it('sin coincidencias muestra el estado vacío con Limpiar, que devuelve la lista', async () => {
+  it('sin coincidencias muestra «No hay pedidos con estos filtros», con Limpiar filtros que devuelve la lista', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
-    const caja = screen.getByPlaceholderText('Buscar por nombre, código o mesa');
+    const caja = screen.getByPlaceholderText(CAJA);
 
     fireEvent.change(caja, { target: { value: 'zzz' } });
-    expect(screen.getByText('Ningún pedido coincide con tu búsqueda')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('No hay pedidos con estos filtros')).toBeInTheDocument());
     expect(codigosVisibles()).toEqual([]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
     await waitFor(() => expect(codigosVisibles()).toHaveLength(3));
     expect((caja as HTMLInputElement).value).toBe('');
   });
 
-  it('se combina con el filtro de estado', async () => {
+  it('se combina con el filtro de estado del panel de filtros avanzados', async () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-W021');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));
-    fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, código o mesa'), { target: { value: 'juan' } });
+    fireEvent.click(screen.getByRole('button', { name: /Filtros avanzados/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Entregados' }));
+    fireEvent.change(screen.getByPlaceholderText(CAJA), { target: { value: 'juan' } });
 
     // Juan está en PREPARANDO: el filtro Entregados lo deja fuera
+    await waitFor(() => expect(screen.getByText('No hay pedidos con estos filtros')).toBeInTheDocument());
     expect(codigosVisibles()).toEqual([]);
-    expect(screen.getByText('Ningún pedido coincide con tu búsqueda')).toBeInTheDocument();
   });
 });

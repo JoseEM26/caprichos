@@ -56,6 +56,8 @@ export const LIMITE_TODAS = 2000;
 import { pagosOnlineDe } from './pago-online-resumen';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { FiltrosMisPedidos, RangoMisPedidos } from './dto/mis-pedidos-query.dto';
+import { MAX_FILAS_MIS_PEDIDOS, ventanaMisPedidos } from './mis-pedidos-rango.util';
+import { coincideTexto, normalizarBusqueda } from '../../comun/normalizar-busqueda';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
@@ -575,34 +577,38 @@ export class PedidosEstadoService {
    * (canal MOZO y party_id propio) en el rango pedido, por día de Lima. El resumen no cuenta los anulados.
    */
   async misPedidos(usuario: UsuarioAutenticado, rango: RangoMisPedidos = 'hoy', filtros: FiltrosMisPedidos = {}) {
-    const inicioHoy = obtenerInicioDiaLima();
-    const DIA = 24 * 60 * 60 * 1000;
-    // `desde`/`hasta` (YYYY-MM-DD, día Lima, inclusivos) mandan sobre `rango`; Lima es UTC-5 todo el año
-    const diaLima = (f: string) => new Date(`${f}T05:00:00.000Z`);
-    const conFechas = Boolean(
-      (filtros.desde && ES_FECHA_SOLA.test(filtros.desde)) || (filtros.hasta && ES_FECHA_SOLA.test(filtros.hasta)),
-    );
-    let creado_en: { gte?: Date; lt?: Date } | undefined;
-    if (conFechas) {
-      creado_en = {};
-      if (filtros.desde && ES_FECHA_SOLA.test(filtros.desde)) creado_en.gte = diaLima(filtros.desde);
-      if (filtros.hasta && ES_FECHA_SOLA.test(filtros.hasta)) creado_en.lt = new Date(diaLima(filtros.hasta).getTime() + DIA);
-    } else if (rango === 'todas') creado_en = undefined;
-    else if (rango === 'ayer') creado_en = { gte: new Date(inicioHoy.getTime() - DIA), lt: inicioHoy };
-    else if (rango === '7dias') creado_en = { gte: new Date(inicioHoy.getTime() - 6 * DIA) };
-    else if (rango === '30dias') creado_en = { gte: new Date(inicioHoy.getTime() - 29 * DIA) };
-    else creado_en = { gte: inicioHoy };
+    // Ventana por día de Lima: desde/hasta mandan; con q sin fechas, 92 días; si no, el rango (ver mis-pedidos-rango.util)
+    // Texto vacío (o solo espacios o guiones) no es búsqueda: no cambia la ventana ni filtra
+    const busqueda = normalizarBusqueda(filtros.q) !== '' ? filtros.q!.trim() : undefined;
+    const ventana = ventanaMisPedidos(rango, { ...filtros, q: busqueda });
+    const creado_en = ventana.gte || ventana.lt ? { ...(ventana.gte && { gte: ventana.gte }), ...(ventana.lt && { lt: ventana.lt }) } : undefined;
 
     // ADMIN y SUPERVISOR ven los pedidos de todos los mozos; el resto (mozo, caja) solo los suyos y `mozo` se ignora
     const veTodos = rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR');
     const mozoFiltro = veTodos && filtros.mozo && /^\d+$/.test(filtros.mozo) ? BigInt(filtros.mozo) : null;
-    const estadoFiltro =
-      filtros.estado === 'EN_CURSO' ? { in: ESTADOS_EN_CURSO } : filtros.estado ? filtros.estado : undefined;
+    // Listas separadas por coma; EN_CURSO agrupa los activos. Un solo valor va exacto, varios con «in».
+    const valoresDe = (s?: string) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : []);
+    const condicion = (valores: string[]) => (valores.length === 1 ? valores[0] : { in: valores });
+    const estados = [...new Set(valoresDe(filtros.estado).flatMap((e) => (e === 'EN_CURSO' ? ESTADOS_EN_CURSO : [e])))];
+    const modalidades = valoresDe(filtros.modalidad);
+    const pagos = valoresDe(filtros.pago);
+    const metodos = valoresDe(filtros.metodo);
+    const montoMin = filtros.montoMin != null ? Number(filtros.montoMin) : null;
+    const montoMax = filtros.montoMax != null ? Number(filtros.montoMax) : null;
+    if (montoMin != null && montoMax != null && montoMin > montoMax) {
+      throw new BadRequestException('montoMin no puede ser mayor que montoMax.');
+    }
     const where: Prisma.PedidoWhereInput = {
       canal: 'MOZO',
       ...(veTodos ? (mozoFiltro != null ? { party_id: mozoFiltro } : {}) : { party_id: BigInt(usuario.partyId) }),
       ...(creado_en ? { creado_en } : {}),
-      ...(estadoFiltro ? { estado: estadoFiltro } : {}),
+      ...(estados.length ? { estado: condicion(estados) } : {}),
+      ...(modalidades.length ? { modalidad: condicion(modalidades) } : {}),
+      ...(pagos.length ? { pago_estado: condicion(pagos) } : {}),
+      ...(metodos.length ? { pago_metodo: condicion(metodos) } : {}),
+      ...(montoMin != null || montoMax != null
+        ? { total: { ...(montoMin != null && { gte: montoMin }), ...(montoMax != null && { lte: montoMax }) } }
+        : {}),
     };
 
     const pedidos = await this.prisma.pedido.findMany({
@@ -674,15 +680,31 @@ export class PedidosEstadoService {
       },
     });
 
-    const validos = pedidos.filter((p) => p.estado !== 'ANULADO');
+    // Texto: cliente, código o mesa, sin tildes ni mayúsculas y con o sin guion (la ventana ya está acotada)
+    const filtrados = busqueda ? pedidos.filter((p) => coincideTexto(busqueda, p.codigo, p.cliente_nombre, p.mesa_nombre)) : pedidos;
+    // El resumen cuenta todas las coincidencias (sin anulados); la lista muestra como mucho MAX_FILAS
+    const validos = filtrados.filter((p) => p.estado !== 'ANULADO');
     const total = validos.reduce((suma, p) => suma + Number(p.total), 0);
     // Parámetros del tiempo (una lectura) para el «llega en» de los pedidos en camino
     const cfg = await leerConfigEta(this.prisma).catch(() => ({ ...CONFIG_ETA_DEFECTO, respaldoMin: 30 }));
     const ahora = new Date();
+    const conEspera = filtrados.map((p) => {
+      const enEspera = !['LISTO', 'ENTREGADO', 'ANULADO'].includes(p.estado);
+      const desdeEspera = p.pasa_cocina_en ?? p.creado_en;
+      return {
+        p,
+        esperaMinutos: enEspera ? Math.max(0, Math.floor((ahora.getTime() - desdeEspera.getTime()) / 60000)) : null,
+      };
+    });
+    if (filtros.orden === 'mas_espera') {
+      // Más tiempo esperando primero; los que ya no esperan al final, por reciente (el orden base ya es reciente)
+      conEspera.sort((a, b) => (b.esperaMinutos ?? -1) - (a.esperaMinutos ?? -1));
+    }
+    const lista = conEspera.slice(0, MAX_FILAS_MIS_PEDIDOS);
     // Tiempos de preparación por producto (promedio de 30 días o el defecto) para el «Listo en ~N min»
     const preparacion = await tiemposPreparacion(
       this.prisma,
-      [...new Set(pedidos.flatMap((p) => p.lineas.map((l) => l.producto_id)).filter((id) => id != null).map(String))],
+      [...new Set(lista.flatMap(({ p }) => p.lineas.map((l) => l.producto_id)).filter((id) => id != null).map(String))],
       ahora,
     );
 
@@ -694,7 +716,7 @@ export class PedidosEstadoService {
           _count: { _all: true },
         })
       : [];
-    const idsMozo = [...new Set([...pedidos.map((p) => p.party_id), ...conteoMozos.map((c) => c.party_id), ...pedidos.flatMap((p) => p.lineas.map((l) => l.cargo_libre_por))].filter((i): i is bigint => i != null))];
+    const idsMozo = [...new Set([...lista.map(({ p }) => p.party_id), ...conteoMozos.map((c) => c.party_id), ...lista.flatMap(({ p }) => p.lineas.map((l) => l.cargo_libre_por))].filter((i): i is bigint => i != null))];
     const personas = idsMozo.length
       ? await this.prisma.person
           .findMany({ where: { party_id: { in: idsMozo } }, select: { party_id: true, nombres: true, apellidos: true } })
@@ -702,20 +724,11 @@ export class PedidosEstadoService {
       : [];
     const nombreMozo = new Map(personas.map((x) => [String(x.party_id), [x.nombres, x.apellidos].filter(Boolean).join(' ')]));
 
-    const lista = pedidos.map((p) => {
-      const enEspera = !['LISTO', 'ENTREGADO', 'ANULADO'].includes(p.estado);
-      const desdeEspera = p.pasa_cocina_en ?? p.creado_en;
-      return {
-        p,
-        esperaMinutos: enEspera ? Math.max(0, Math.floor((ahora.getTime() - desdeEspera.getTime()) / 60000)) : null,
-      };
-    });
-    if (filtros.orden === 'mas_espera') {
-      // Más tiempo esperando primero; los que ya no esperan al final, por reciente (el orden base ya es reciente)
-      lista.sort((a, b) => (b.esperaMinutos ?? -1) - (a.esperaMinutos ?? -1));
-    }
-
     return {
+      // Rango efectivo (día Lima, inclusivo; desde null = sin límite) y coincidencias antes de cortar en MAX_FILAS
+      rango: { desde: ventana.desde, hasta: ventana.hasta },
+      total: filtrados.length,
+      truncado: filtrados.length > MAX_FILAS_MIS_PEDIDOS,
       mozos: veTodos
         ? conteoMozos
             .map((c) => ({ partyId: String(c.party_id), nombre: nombreMozo.get(String(c.party_id)) || `Mozo ${c.party_id}`, pedidos: c._count._all }))

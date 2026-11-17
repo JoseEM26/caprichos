@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { abrirTodas } from './abrirTodas';
+import { filtrarComoServidor } from './filtrarComoServidor';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
@@ -74,20 +75,20 @@ describe('MisPedidosView', () => {
     expect(salonApi.misPedidos).toHaveBeenCalledWith({ rango: 'hoy' });
   });
 
-  it('el filtro por estado deja solo los entregados o los en curso', async () => {
+  it('el filtro por estado (panel avanzado) deja solo los entregados o los en curso', async () => {
+    vi.mocked(salonApi.misPedidos).mockImplementation((f: any) => Promise.resolve(filtrarComoServidor(respuesta, f)));
     render(<MisPedidosView />);
     await abrirTodas('CP-M012');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));
-    expect(screen.getByRole('button', { name: 'Estado: Entregados' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Filtros avanzados/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Entregados' }));
+    await waitFor(() => expect(screen.queryByText('CP-M011')).not.toBeInTheDocument());
     expect(screen.getByText('CP-M012')).toBeInTheDocument();
-    expect(screen.queryByText('CP-M011')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Estado: Entregados' }));
-    fireEvent.click(screen.getByRole('option', { name: 'En curso' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Entregados' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'En curso' }));
+    await waitFor(() => expect(screen.queryByText('CP-M012')).not.toBeInTheDocument());
     expect(screen.getByText('CP-M011')).toBeInTheDocument();
-    expect(screen.queryByText('CP-M012')).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay pedidos en el rango', async () => {
@@ -147,8 +148,7 @@ describe('MisPedidosView', () => {
     render(<MisPedidosView />);
     await abrirTodas('CP-M012');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Periodo: Hoy' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Ayer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ayer' }));
 
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: 'ayer' }));
   });

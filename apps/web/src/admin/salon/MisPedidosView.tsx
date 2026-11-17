@@ -25,7 +25,27 @@ import { DetallePedidoMozo } from './DetallePedidoMozo';
 import { ModalCanjearCupon } from '../ofertas/ModalCanjearCupon';
 import { esElegible } from '../ofertas/SelectorPedidoCanje';
 import { Icono } from '../../comun/Icono';
-import type { EstadoMisPedidos, FiltrosMisPedidos, MiPedido, OrdenMisPedidos, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
+import type { FiltrosMisPedidos, MiPedido, OrdenMisPedidos, PisoSalon, RespuestaMisPedidos } from './tipos';
+import { hoyLima, sumarDias } from '../pedidos/filtroDias';
+import { FiltrosAvanzadosMisPedidos } from './FiltrosAvanzadosMisPedidos';
+import {
+  CHIPS_RANGO,
+  MAX_DIAS_MIS_PEDIDOS,
+  SIN_AVANZADOS,
+  chipDeUrl,
+  contarAvanzados,
+  errorDeRango,
+  errorMontos,
+  valorDeOpcion,
+  parametrosDeChip,
+  textoPeriodo,
+  type ChipRango,
+  type FiltrosAvanzados,
+  METODOS_FILTRO,
+  MODALIDADES_FILTRO,
+  PAGOS_FILTRO,
+  ESTADOS_FILTRO,
+} from './misPedidosFiltros';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { agruparCuentas } from '../pedidos/agruparCuentas';
 import './mis-pedidos.css';
@@ -43,47 +63,37 @@ function pestanaGuardada(): Pestana {
   }
 }
 
-type RangoElegido = RangoMisPedidos | 'rango';
-const RANGOS: Array<{ valor: RangoElegido; etiqueta: string }> = [
-  { valor: 'hoy', etiqueta: 'Hoy' },
-  { valor: 'ayer', etiqueta: 'Ayer' },
-  { valor: '7dias', etiqueta: 'Últimos 7 días' },
-  { valor: '30dias', etiqueta: 'Últimos 30 días' },
-  { valor: 'todas', etiqueta: 'Todas' },
-  { valor: 'rango', etiqueta: 'Desde / hasta' },
-];
-
-/** `faltaVoucher` solo filtra en la web; el resto de valores se manda a la API como `estado`. */
-type FiltroEstado = 'todos' | EstadoMisPedidos | 'faltaVoucher';
-const FILTROS: Array<{ valor: FiltroEstado; etiqueta: string }> = [
-  { valor: 'todos', etiqueta: 'Todos' },
-  { valor: 'EN_CURSO', etiqueta: 'En curso' },
-  { valor: 'COLA', etiqueta: 'En cola' },
-  { valor: 'PREPARANDO', etiqueta: 'Preparando' },
-  { valor: 'LISTO', etiqueta: 'Listo' },
-  { valor: 'ENTREGADO', etiqueta: 'Entregados' },
-  { valor: 'ANULADO', etiqueta: 'Anulado' },
-  { valor: 'faltaVoucher', etiqueta: 'Falta captura' },
-];
 const ORDENES: Array<{ valor: OrdenMisPedidos; etiqueta: string }> = [
   { valor: 'recientes', etiqueta: 'Más recientes' },
   { valor: 'mas_espera', etiqueta: 'Más tiempo en espera' },
 ];
 
-/** Filtros recordados en la URL (?rango=&mozo=&estado=&orden=&desde=&hasta=) para compartir o recargar. */
+/**
+ * Filtros recordados en la URL para compartir o recargar:
+ * ?rango=&desde=&hasta=&q=&estado=COLA,LISTO&falta=1&modalidad=&pago=&metodo=&montoMin=&montoMax=&mozo=&orden=
+ */
 function filtrosDeUrl() {
-  const q = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
-  const rango = q.get('rango');
-  const estado = q.get('estado');
-  const desde = q.get('desde') ?? '';
-  const hasta = q.get('hasta') ?? '';
+  const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
+  const desde = params.get('desde') ?? '';
+  const hasta = params.get('hasta') ?? '';
+  const hoy = hoyLima();
   return {
-    rango: (desde || hasta ? 'rango' : RANGOS.some((r) => r.valor === rango) && rango !== 'rango' ? rango : 'hoy') as RangoElegido,
-    estado: (FILTROS.some((f) => f.valor === estado) ? estado : 'todos') as FiltroEstado,
-    mozo: q.get('mozo') ?? 'todos',
-    orden: (q.get('orden') === 'mas_espera' ? 'mas_espera' : 'recientes') as OrdenMisPedidos,
-    desde,
-    hasta,
+    chip: (desde || hasta ? 'rango' : chipDeUrl(params.get('rango'))) as ChipRango,
+    // Rango personalizado sin fechas: los últimos 7 días, igual que el chip
+    desde: desde || sumarDias(hoy, -6),
+    hasta: hasta || hoy,
+    q: params.get('q') ?? '',
+    avanzados: {
+      estados: (params.get('estado') ?? '').split(',').filter((e) => ESTADOS_FILTRO.some((f) => f.valor === e)),
+      faltaVoucher: params.get('falta') === '1',
+      modalidad: valorDeOpcion(params.get('modalidad'), MODALIDADES_FILTRO),
+      pago: valorDeOpcion(params.get('pago'), PAGOS_FILTRO),
+      metodo: valorDeOpcion(params.get('metodo'), METODOS_FILTRO),
+      montoMin: params.get('montoMin') ?? '',
+      montoMax: params.get('montoMax') ?? '',
+    } satisfies FiltrosAvanzados,
+    mozo: params.get('mozo') ?? 'todos',
+    orden: (params.get('orden') === 'mas_espera' ? 'mas_espera' : 'recientes') as OrdenMisPedidos,
   };
 }
 
@@ -137,13 +147,6 @@ function mediosVoucher(p: MiPedido): Array<{ medio: 'YAPE' | 'PLIN' | 'TRANSFERE
   );
 }
 
-/** Coincide por nombre del cliente, código o nombre de la mesa. Búsqueda vacía: todo coincide. */
-function coincideBusqueda(p: MiPedido, busqueda: string): boolean {
-  const q = normalizarBusqueda(busqueda);
-  if (q === '') return true;
-  return [p.clienteNombre, p.codigo, p.mesaNombre].some((campo) => normalizarBusqueda(campo).includes(q));
-}
-
 function nombreMedioPlan(medio: string): string {
   return medio === 'EFECTIVO' ? 'Efectivo' : medio === 'YAPE' ? 'Yape' : medio === 'PLIN' ? 'Plin' : medio === 'TARJETA' ? 'Tarjeta' : 'Transferencia';
 }
@@ -151,13 +154,20 @@ function nombreMedioPlan(medio: string): string {
 export function MisPedidosView() {
   const { tiene } = useSesion();
   const [inicial] = useState(filtrosDeUrl);
-  const [rango, setRango] = useState<RangoElegido>(inicial.rango);
-  const [filtro, setFiltro] = useState<FiltroEstado>(inicial.estado);
+  const [chip, setChip] = useState<ChipRango>(inicial.chip);
   const [mozo, setMozo] = useState(inicial.mozo);
   const [orden, setOrden] = useState<OrdenMisPedidos>(inicial.orden);
   const [desde, setDesde] = useState(inicial.desde);
   const [hasta, setHasta] = useState(inicial.hasta);
-  const [busqueda, setBusqueda] = useState('');
+  // `busqueda` es lo que se escribe; `q` es lo que viaja al servidor, 400 ms después de la última tecla
+  const [busqueda, setBusqueda] = useState(inicial.q);
+  const [q, setQ] = useState(inicial.q.trim());
+  const [avanzados, setAvanzados] = useState<FiltrosAvanzados>(inicial.avanzados);
+  const [avanzadosAbierto, setAvanzadosAbierto] = useState(false);
+  useEffect(() => {
+    const espera = setTimeout(() => setQ(busqueda.trim()), 400);
+    return () => clearTimeout(espera);
+  }, [busqueda]);
   const [datos, setDatos] = useState<RespuestaMisPedidos | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
@@ -211,16 +221,22 @@ export function MisPedidosView() {
   };
 
   const cargar = useCallback(async () => {
-    // Solo cuenta la última respuesta: si cambia el rango mientras llega otra, la vieja se descarta
+    const rangoApi = parametrosDeChip(chip, desde, hasta);
+    // Rango o montos incompletos o invertidos: no se pide nada; la pantalla muestra el motivo
+    if (!rangoApi || errorMontos(avanzados.montoMin, avanzados.montoMax)) return;
+    // Solo cuenta la última respuesta: si cambia un filtro mientras llega otra, la vieja se descarta
     const id = ++ultimaSolicitud.current;
     setCargando(true);
     try {
-      const filtros: FiltrosMisPedidos =
-        rango === 'rango'
-          ? { ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) }
-          : { rango };
+      const filtros: FiltrosMisPedidos = { ...rangoApi };
+      if (q) filtros.q = q;
       if (mozo !== 'todos') filtros.mozo = mozo;
-      if (filtro !== 'todos' && filtro !== 'faltaVoucher') filtros.estado = filtro;
+      if (avanzados.estados.length) filtros.estado = avanzados.estados.join(',');
+      if (avanzados.modalidad !== 'todos') filtros.modalidad = avanzados.modalidad;
+      if (avanzados.pago !== 'todos') filtros.pago = avanzados.pago;
+      if (avanzados.metodo !== 'todos') filtros.metodo = avanzados.metodo;
+      if (avanzados.montoMin) filtros.montoMin = avanzados.montoMin;
+      if (avanzados.montoMax) filtros.montoMax = avanzados.montoMax;
       if (orden === 'mas_espera') filtros.orden = orden;
       const res = await salonApi.misPedidos(filtros);
       if (id !== ultimaSolicitud.current) return;
@@ -231,25 +247,32 @@ export function MisPedidosView() {
     } finally {
       if (id === ultimaSolicitud.current) setCargando(false);
     }
-  }, [rango, desde, hasta, mozo, filtro, orden]);
+  }, [chip, desde, hasta, q, mozo, avanzados, orden]);
 
   // Los filtros quedan en la URL sin recargar ni ensuciar el historial
   useEffect(() => {
     try {
-      const q = new URLSearchParams(window.location.search);
-      const poner = (k: string, val: string, porDefecto: string) => (val && val !== porDefecto ? q.set(k, val) : q.delete(k));
-      poner('rango', rango === 'rango' ? '' : rango, 'hoy');
-      poner('desde', rango === 'rango' ? desde : '', '');
-      poner('hasta', rango === 'rango' ? hasta : '', '');
-      poner('estado', filtro, 'todos');
+      const params = new URLSearchParams(window.location.search);
+      const poner = (k: string, val: string, porDefecto: string) => (val && val !== porDefecto ? params.set(k, val) : params.delete(k));
+      poner('rango', chip === 'rango' ? '' : chip, 'hoy');
+      poner('desde', chip === 'rango' ? desde : '', '');
+      poner('hasta', chip === 'rango' ? hasta : '', '');
+      poner('q', q, '');
+      poner('estado', avanzados.estados.join(','), '');
+      poner('falta', avanzados.faltaVoucher ? '1' : '', '');
+      poner('modalidad', avanzados.modalidad, 'todos');
+      poner('pago', avanzados.pago, 'todos');
+      poner('metodo', avanzados.metodo, 'todos');
+      poner('montoMin', avanzados.montoMin, '');
+      poner('montoMax', avanzados.montoMax, '');
       poner('mozo', mozo, 'todos');
       poner('orden', orden, 'recientes');
-      const s = q.toString();
+      const s = params.toString();
       window.history.replaceState(window.history.state, '', `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`);
     } catch {
       // Sin acceso a la URL: los filtros valen solo para esta sesión
     }
-  }, [rango, desde, hasta, filtro, mozo, orden]);
+  }, [chip, desde, hasta, q, avanzados, mozo, orden]);
 
   useEffect(() => {
     void cargar();
@@ -277,13 +300,25 @@ export function MisPedidosView() {
   const faltanVoucher = (p: MiPedido) => p.estado !== 'ANULADO' && mediosVoucher(p).some((m) => !m.subido);
   const cuantosFaltan = pedidos.filter(faltanVoucher).length;
   const buscando = normalizarBusqueda(busqueda) !== '';
-  const visibles = pedidos.filter((p) => {
-    if (!coincideBusqueda(p, busqueda)) return false;
-    if (filtro === 'todos') return true;
-    if (filtro === 'EN_CURSO') return ESTADOS_EN_CURSO.includes(p.estado);
-    if (filtro === 'faltaVoucher') return faltanVoucher(p);
-    return p.estado === filtro;
-  });
+  // Periodo, texto, estado, modalidad, pago, método y monto los filtra el servidor; «Falta captura» es solo de la web
+  const visibles = pedidos.filter((p) => !avanzados.faltaVoucher || faltanVoucher(p));
+  const hayFiltros = buscando || contarAvanzados(avanzados) > 0 || mozo !== 'todos';
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setQ('');
+    setMozo('todos');
+    setAvanzados(SIN_AVANZADOS);
+  };
+  const errorRango = errorDeRango(chip, desde, hasta);
+  const errorFiltros = errorRango ?? errorMontos(avanzados.montoMin, avanzados.montoMax);
+  const elegirChip = (v: ChipRango) => {
+    setChip(v);
+    if (v === 'rango' && (!desde || !hasta)) {
+      const hoy = hoyLima();
+      setDesde(sumarDias(hoy, -6));
+      setHasta(hoy);
+    }
+  };
   if (orden === 'mas_espera') visibles.sort((a, b) => (b.esperaMinutos ?? -1) - (a.esperaMinutos ?? -1));
   const mozos = datos?.mozos ?? [];
   const detalle = detalleId ? pedidos.find((p) => p.id === detalleId) ?? null : null;
@@ -294,6 +329,17 @@ export function MisPedidosView() {
   const unicaEnCurso = pendientes.length === 1 ? pendientes[0].raizId : null;
   const resumen = datos?.resumen ?? RESUMEN_VACIO;
   const valor = (n: number) => (datos ? String(n) : '—');
+  // «N pedidos · del 3 al 9 nov · total S/ X (sin anulados)»
+  const textoEncabezado = datos
+    ? [
+        `${resumen.cantidad} ${resumen.cantidad === 1 ? 'pedido' : 'pedidos'}`,
+        datos.rango ? textoPeriodo(datos.rango) : null,
+        `total ${soles(resumen.total)} (sin anulados)`,
+        datos.truncado ? `se muestran ${pedidos.length} de ${datos.total}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
 
   // Voucher por medio digital del plan. Dentro del modal de detalle, abrir otro modal cierra primero el detalle
   const bloqueVoucher = (p: MiPedido, enModal: boolean) => {
@@ -533,24 +579,15 @@ export function MisPedidosView() {
         </div>
       </section>
 
+      <div className="mp-chips" role="group" aria-label="Periodo">
+        {CHIPS_RANGO.map((c) => (
+          <button key={c.valor} type="button" className="mp-chip" aria-pressed={chip === c.valor} onClick={() => elegirChip(c.valor)}>
+            {c.etiqueta}
+          </button>
+        ))}
+      </div>
+
       <BarraFiltros>
-        <FiltroCombo
-          etiqueta="Periodo"
-          valor={rango}
-          valorPorDefecto="hoy"
-          opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
-          alCambiar={(v) => setRango(v as RangoElegido)}
-        />
-        <FiltroCombo
-          etiqueta="Estado"
-          valor={filtro}
-          opciones={FILTROS.map((f) =>
-            f.valor === 'faltaVoucher'
-              ? { valor: f.valor, etiqueta: f.etiqueta, cantidad: cuantosFaltan }
-              : { valor: f.valor, etiqueta: f.etiqueta },
-          )}
-          alCambiar={(v) => setFiltro(v as FiltroEstado)}
-        />
         <FiltroCombo
           etiqueta="Orden"
           valor={orden}
@@ -569,19 +606,44 @@ export function MisPedidosView() {
             alCambiar={setMozo}
           />
         )}
+        <button
+          type="button"
+          className="mpf-toggle"
+          aria-expanded={avanzadosAbierto}
+          aria-controls="mpf-panel"
+          onClick={() => setAvanzadosAbierto((abierto) => !abierto)}
+        >
+          Filtros avanzados{contarAvanzados(avanzados) > 0 ? ` (${contarAvanzados(avanzados)})` : ''}
+        </button>
       </BarraFiltros>
 
-      {rango === 'rango' && (
+      {avanzadosAbierto && (
+        <FiltrosAvanzadosMisPedidos
+          id="mpf-panel"
+          valor={avanzados}
+          cuantosFaltan={cuantosFaltan}
+          alCambiar={(cambio) => setAvanzados((previo) => ({ ...previo, ...cambio }))}
+          alLimpiar={() => setAvanzados(SIN_AVANZADOS)}
+        />
+      )}
+
+      {chip === 'rango' && (
         <div className="mp-fechas">
           <label>
             Desde
-            <input type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)} />
+            <input type="date" value={desde} max={hasta || hoyLima()} onChange={(e) => setDesde(e.target.value)} />
           </label>
           <label>
             Hasta
-            <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} />
+            <input type="date" value={hasta} min={desde || undefined} max={hoyLima()} onChange={(e) => setHasta(e.target.value)} />
           </label>
         </div>
+      )}
+      {errorFiltros && (
+        <p className="mpf-error" role="alert">
+          {errorFiltros}
+          {errorRango && <span> Máximo {MAX_DIAS_MIS_PEDIDOS} días y hasta hoy.</span>}
+        </p>
       )}
 
       {error && (
@@ -591,23 +653,25 @@ export function MisPedidosView() {
         />
       )}
 
-      {!datos && !error && <Cargando mensaje="Cargando tus pedidos" />}
+      {!datos && !error && !errorFiltros && <Cargando mensaje="Cargando tus pedidos" />}
 
-      {datos && pedidos.length === 0 && (
+      {datos && (
+        <p className="mpf-encabezado" aria-live="polite">
+          {textoEncabezado}
+        </p>
+      )}
+
+      {datos && pedidos.length === 0 && !hayFiltros && (
         <EstadoVacio titulo="Aún no tomaste pedidos en este rango" descripcion="Toca Nuevo pedido para registrar el primero." />
       )}
 
-      {datos && pedidos.length > 0 && visibles.length === 0 && buscando && (
+      {datos && visibles.length === 0 && hayFiltros && (
         <div className="mpv-vacio">
-          <p className="mpv-vacio-texto">Ningún pedido coincide con tu búsqueda</p>
-          <button type="button" className="mpv-boton" onClick={() => setBusqueda('')}>
-            Limpiar
+          <p className="mpv-vacio-texto">No hay pedidos con estos filtros</p>
+          <button type="button" className="mpv-boton" onClick={limpiarFiltros}>
+            Limpiar filtros
           </button>
         </div>
-      )}
-
-      {datos && pedidos.length > 0 && visibles.length === 0 && !buscando && (
-        <EstadoVacio titulo="No hay pedidos con este estado" descripcion="Prueba con Todos para ver el resto." />
       )}
 
       {cuentas.length > 0 && (

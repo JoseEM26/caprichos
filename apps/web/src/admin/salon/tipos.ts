@@ -174,8 +174,16 @@ export interface FiltrosMisPedidos {
   hasta?: string;
   /** Solo ADMIN/SUPERVISOR: partyId del mozo */
   mozo?: string;
-  estado?: EstadoMisPedidos;
+  /** Estados separados por coma (EN_CURSO agrupa los activos) */
+  estado?: string;
   orden?: OrdenMisPedidos;
+  /** Cliente, código o mesa (la API busca sin tildes, sin mayúsculas y sin guion) */
+  q?: string;
+  modalidad?: string;
+  pago?: string;
+  metodo?: string;
+  montoMin?: string;
+  montoMax?: string;
 }
 
 /** Progreso en cocina y entrega (mismo contrato que la API: progresoDelPedido). */
@@ -302,6 +310,11 @@ export interface MozoFiltro {
 export interface RespuestaMisPedidos {
   /** Solo para ADMIN/SUPERVISOR */
   mozos?: MozoFiltro[];
+  /** Rango efectivo (día Lima, inclusivo); desde null = sin límite inferior */
+  rango?: { desde: string | null; hasta: string };
+  /** Coincidencias antes de cortar la lista (la lista trae como mucho 200) */
+  total?: number;
+  truncado?: boolean;
   pedidos: MiPedido[];
   resumen: { cantidad: number; total: number; enCurso: number; entregados: number };
 }

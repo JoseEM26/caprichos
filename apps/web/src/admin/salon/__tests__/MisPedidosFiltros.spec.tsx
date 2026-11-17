@@ -49,27 +49,51 @@ describe('Mis pedidos: filtros', () => {
     expect(window.location.search).toContain('mozo=8');
   });
 
-  it('estado, periodo y orden viajan a la API', async () => {
+  it('periodo (chip), estado (panel avanzado) y orden viajan a la API', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
     await abrirTodas('CP-A');
-    elegir('Estado: Todos', 'Preparando');
-    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: 'hoy', estado: 'PREPARANDO' }));
-    elegir('Periodo: Hoy', 'Últimos 30 días');
-    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: '30dias', estado: 'PREPARANDO' }));
+    fireEvent.click(screen.getByRole('button', { name: '7 días' }));
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: '7dias' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros avanzados' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Preparando' }));
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: '7dias', estado: 'PREPARANDO' }));
     elegir(/^Orden:/, 'Más tiempo en espera');
-    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: '30dias', estado: 'PREPARANDO', orden: 'mas_espera' }));
-    expect(window.location.search).toMatch(/rango=30dias/);
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ rango: '7dias', estado: 'PREPARANDO', orden: 'mas_espera' }));
+    // La URL guarda el nombre del chip (semana); la API recibe 7dias
+    expect(window.location.search).toMatch(/rango=semana/);
+    expect(window.location.search).toMatch(/estado=PREPARANDO/);
+  });
+
+  it('el chip «Este mes» pide desde el día 1 hasta hoy, en Lima', async () => {
+    vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
+    render(<MisPedidosView />);
+    await abrirTodas('CP-A');
+    fireEvent.click(screen.getByRole('button', { name: 'Este mes' }));
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ desde: `${hoy.slice(0, 8)}01`, hasta: hoy }));
   });
 
   it('rango Desde/hasta pide por fechas', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
     await abrirTodas('CP-A');
-    elegir('Periodo: Hoy', 'Desde / hasta');
+    fireEvent.click(screen.getByRole('button', { name: 'Rango' }));
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-15' } });
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith({ desde: '2026-10-01', hasta: '2026-10-15' }));
+  });
+
+  it('rango de más de 92 días: avisa y no pide nada', async () => {
+    vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
+    render(<MisPedidosView />);
+    await abrirTodas('CP-A');
+    fireEvent.click(screen.getByRole('button', { name: 'Rango' }));
+    const llamadas = vi.mocked(salonApi.misPedidos).mock.calls.length;
+    fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-01-01' } });
+    fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-15' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('El rango no puede pasar de 92 días.');
+    expect(vi.mocked(salonApi.misPedidos).mock.calls.length).toBe(llamadas);
   });
 
   it('«Más tiempo en espera» ordena de mayor a menor y muestra los minutos con su nivel', async () => {
@@ -92,6 +116,8 @@ describe('Mis pedidos: filtros', () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(base as any);
     render(<MisPedidosView />);
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenCalledWith({ rango: 'ayer', mozo: '8', estado: 'LISTO' }));
-    expect(screen.getByRole('button', { name: 'Estado: Listo' })).toBeInTheDocument();
+    // El chip de la URL queda marcado y el panel avanzado cuenta el estado de la URL
+    expect(screen.getByRole('button', { name: 'Ayer' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Filtros avanzados (1)' })).toBeInTheDocument();
   });
 });

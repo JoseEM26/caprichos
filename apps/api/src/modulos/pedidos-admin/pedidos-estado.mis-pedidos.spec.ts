@@ -273,6 +273,9 @@ describe('PedidosEstadoService.misPedidos', () => {
     const res = await service.misPedidos(mozo, 'ayer');
 
     expect(res).toEqual({
+      rango: { desde: '2026-10-28', hasta: '2026-10-28' },
+      total: 0,
+      truncado: false,
       pedidos: [],
       resumen: { cantidad: 0, total: 0, enCurso: 0, entregados: 0 },
     });
