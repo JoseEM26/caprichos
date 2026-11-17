@@ -190,3 +190,34 @@ describe('etapaActual', () => {
     expect(etapaActual(pedido({ estado: 'ANULADO' }))).toBeNull();
   });
 });
+
+describe('programado: no infla las etapas con la creación de ayer', () => {
+  // Creado ~26 h antes de su hora pactada (t(1400)); pasó a cocina 20 min antes de la hora
+  const prog = pedido({
+    programado_para: t(1400),
+    creado_en: t(-1500),
+    pago_coordinado_en: t(-1490),
+    pasa_cocina_en: t(1380),
+    listo_en: t(1400),
+    entregado_en: t(1402),
+    entregado_mesa_en: null,
+    comandas: [
+      { area_id: 1n, estado: 'DESPEJADA', despejada_en: t(1390), area: { nombre: 'Cocina' } },
+      { area_id: 2n, estado: 'DESPEJADA', despejada_en: t(1396), area: { nombre: 'Barra' } },
+    ],
+    lineas: [{ despachado_en: t(1398) }],
+    cobros: [{ en: t(1395), caja: { cerrada_en: null } }],
+  });
+
+  it('aprobación y a cocina sin dato; cocina se mide desde que pasó a cocina', () => {
+    const { minutos } = calcularEtapas(prog);
+    expect(minutos.aprobacion).toBeNull();
+    expect(minutos.a_cocina).toBeNull();
+    expect(minutos.cocina).toBe(16);
+  });
+
+  it('en cola, la etapa actual corre desde que pasó a cocina (no desde la creación)', () => {
+    const enCola = pedido({ ...prog, estado: 'COLA', entregado_en: null, listo_en: null, comandas: [], lineas: [], cobros: [] });
+    expect(etapaActual(enCola)).toMatchObject({ codigo: 'a_cocina', desde: t(1380) });
+  });
+});

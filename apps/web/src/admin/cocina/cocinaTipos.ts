@@ -77,6 +77,8 @@ export interface Comanda {
   colorEspera?: ColorComanda;
   llego_en?: string;
   creado_en: string;
+  /** Desde cuándo corre la espera (la hora pactada si es programado); lo manda el servidor. */
+  espera_desde?: string | null;
   lineas: LineaComanda[];
   /** La propia área ya despejó: la comanda es solo seguimiento (sin Despejar). */
   despejada?: boolean;
@@ -237,6 +239,8 @@ export interface PedidoDespacho {
   pedidoOrigenId?: string | null;
   extraDe?: string | null;
   creado_en: string;
+  /** Desde cuándo corre la espera (la hora pactada si es programado); lo manda el servidor. */
+  espera_desde?: string | null;
   minutos: number;
   direccion: string | null;
   referencia: string | null;

@@ -20,6 +20,7 @@ const SELECCION = {
   creado_en: true,
   pago_coordinado_en: true,
   pasa_cocina_en: true,
+  programado_para: true,
   listo_en: true,
   entregado_mesa_en: true,
   entregado_en: true,

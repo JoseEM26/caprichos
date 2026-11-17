@@ -602,7 +602,7 @@ export function ComandaTarjeta({
           <strong data-testid="comanda-etiqueta-parte" style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', color: comanda.extraDe ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>{enGrupo}</strong>
           <span data-testid="comanda-codigo" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>{comanda.ticket || comanda.codigo}</span>
           <span style={{ marginLeft: 'auto' }}>
-            <TiempoEspera desde={comanda.creado_en} minutosRespaldo={comanda.minutos ?? 0} umbrales={comanda.umbrales} />
+            <TiempoEspera desde={comanda.espera_desde ?? comanda.creado_en} minutosRespaldo={comanda.minutos ?? 0} umbrales={comanda.umbrales} />
           </span>
         </div>
       ) : (
@@ -663,7 +663,7 @@ export function ComandaTarjeta({
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <NumeroDia numero={comanda.numeroDia} />
           <TiempoEspera
-            desde={comanda.creado_en}
+            desde={comanda.espera_desde ?? comanda.creado_en}
             minutosRespaldo={comanda.minutos ?? 0}
             umbrales={comanda.umbrales}
           />

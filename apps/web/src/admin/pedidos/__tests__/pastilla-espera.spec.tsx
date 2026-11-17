@@ -57,6 +57,49 @@ describe('PastillaEspera en vivo', () => {
   });
 });
 
+describe('programado: la espera cuenta desde la hora pactada', () => {
+  // Creado ayer 17:40 para hoy 17:00 (Lima): el reloj es la hora pactada, nunca «22 h»
+  const ayer = '2026-11-08T12:40:00Z'; // hace ~26 h
+  const pactada = (minDentro: number) => new Date(T0 + minDentro * 60000).toISOString();
+
+  it('antes de la hora pactada: verde y «faltan 20 min»', () => {
+    render(<PastillaEspera creadoEn={ayer} programadoPara={pactada(20)} cerrado={false} />);
+    const p = screen.getByRole('timer');
+    expect(p).toHaveTextContent('faltan 20 min');
+    expect(p).toHaveAttribute('data-nivel', 'verde');
+    expect(p).not.toHaveTextContent(/h/);
+  });
+
+  it('pasada la hora pactada +12 min: texto de retraso y nivel por umbral (verde < 35)', () => {
+    render(<PastillaEspera creadoEn={ayer} programadoPara={pactada(-12)} cerrado={false} />);
+    const p = screen.getByRole('timer');
+    expect(p).toHaveTextContent('+12 min');
+    expect(p).toHaveAttribute('data-nivel', 'verde');
+  });
+
+  it('+36 min de retraso: óxido «Atención»; +50 min: rojo «Tarde»', () => {
+    const { unmount } = render(<PastillaEspera creadoEn={ayer} programadoPara={pactada(-36)} cerrado={false} />);
+    expect(screen.getByRole('timer')).toHaveAttribute('data-nivel', 'oxido');
+    unmount();
+    render(<PastillaEspera creadoEn={ayer} programadoPara={pactada(-50)} cerrado={false} />);
+    expect(screen.getByRole('timer')).toHaveAttribute('data-nivel', 'rojo');
+    expect(screen.getByRole('timer')).toHaveTextContent('+50 min');
+  });
+
+  it('en vivo: pasa de «faltan» a «+» cuando llega la hora pactada', () => {
+    render(<PastillaEspera creadoEn={ayer} programadoPara={pactada(1)} cerrado={false} />);
+    expect(screen.getByRole('timer')).toHaveTextContent('faltan 1 min');
+    act(() => { vi.advanceTimersByTime(2 * 60000); });
+    expect(screen.getByRole('timer')).toHaveTextContent('+1 min');
+  });
+
+  it('sin programado_para sigue contando desde creado_en', () => {
+    render(<PastillaEspera creadoEn={creado(40)} programadoPara={null} cerrado={false} />);
+    expect(screen.getByRole('timer')).toHaveTextContent('40 min');
+    expect(screen.getByRole('timer')).toHaveAttribute('data-nivel', 'oxido');
+  });
+});
+
 describe('jerarquía de la tarjeta', () => {
   it('el nombre lleva cj2-nombre (22 px), el código cj2-codigo (12.5 px) y sigue presente', () => {
     render(

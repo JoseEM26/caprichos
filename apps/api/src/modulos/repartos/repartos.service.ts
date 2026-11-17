@@ -71,6 +71,7 @@ import {
   NUMERO_PREGUNTA_REPROG,
 } from '../chatbot/servicios/reprogramacion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { inicioEspera } from '../../comun/inicio-espera';
 import { estadoAreasDePedido } from '../cocina/areas-pedido';
 import { efectivoDelPedido } from '../pedidos/pago-plan.service';
 
@@ -295,7 +296,7 @@ export class RepartosService {
     usuarioActual?: UsuarioAutenticado,
   ) {
     const { minutosEspera, color } = this.calcularMinutosYColor(
-      p.creado_en,
+      inicioEspera(p),
       ahora,
       config.retrasadoMin,
       config.tardeMin,
@@ -553,7 +554,7 @@ export class RepartosService {
         lat: Number(p.entrega_lat),
         lng: Number(p.entrega_lng),
         minutosEspera: this.calcularMinutosYColor(
-          p.creado_en,
+          inicioEspera(p),
           ahora,
           config.retrasadoMin,
           config.tardeMin,
@@ -568,7 +569,7 @@ export class RepartosService {
       lat: Number(p.entrega_lat),
       lng: Number(p.entrega_lng),
       minutosEspera: this.calcularMinutosYColor(
-        p.creado_en,
+        inicioEspera(p),
         ahora,
         config.retrasadoMin,
         config.tardeMin,
@@ -2902,7 +2903,7 @@ export class RepartosService {
       lng: Number(p.entrega_lng),
       zona: p.zona?.codigo ?? null,
       ...this.estadoProximo(p),
-      minutosEspera: this.calcularMinutosYColor(p.creado_en, ahora).minutosEspera,
+      minutosEspera: this.calcularMinutosYColor(inicioEspera(p), ahora).minutosEspera,
       creadoEn: p.creado_en,
       cantidadProductos: lineasDeCuenta(p.lineas).reduce((a, l) => a + (Number(l.cantidad) || 0), 0),
     }));
@@ -3004,7 +3005,7 @@ export class RepartosService {
     }
 
     const prox = esProximo ? this.estadoProximo(p) : null;
-    const minutosEspera = this.calcularMinutosYColor(p.creado_en).minutosEspera;
+    const minutosEspera = this.calcularMinutosYColor(inicioEspera(p)).minutosEspera;
     return {
       id: String(p.id),
       codigo: p.codigo,

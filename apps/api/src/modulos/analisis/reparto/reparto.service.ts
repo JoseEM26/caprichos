@@ -5,6 +5,7 @@ import { AsistenciaCorreccionesService, AsistenciaService } from '../../asistenc
 import { efectivoDelRepartidor } from '../../caja';
 import { enTurno, resolverFiltros, TURNOS, MAX_DIAS_ANALISIS, type FiltrosAnalisis } from '../comun/filtros';
 import { minutosEntre, resumirMinutos } from '../comun/estadistica';
+import { inicioOperativo } from '../../../comun/inicio-espera';
 import { jornadasDelRango } from '../equipo/jornadas';
 
 export const MAX_PEDIDOS_REPARTO = 5000;
@@ -29,7 +30,7 @@ export class RepartoService {
       this.prisma.zonaReparto.findMany({ select: { id: true, codigo: true, tarifa: true, minutos_max: true, activa: true }, orderBy: { codigo: 'asc' }, take: 200 }),
       this.prisma.pedido.findMany({
         where: { modalidad: 'DELIVERY', estado: { not: 'ANULADO' }, creado_en: { gte: rango.inicio, lt: rango.fin }, ...(rango.canal ? { canal: rango.canal } : {}) },
-        select: { zona_id: true, estado: true, creado_en: true, entregado_en: true, salio_en: true, llego_en: true, repartidor_party_id: true },
+        select: { zona_id: true, estado: true, creado_en: true, pasa_cocina_en: true, programado_para: true, entregado_en: true, salio_en: true, llego_en: true, repartidor_party_id: true },
         orderBy: { creado_en: 'desc' },
         take: MAX_PEDIDOS_REPARTO + 1,
       }),
@@ -53,7 +54,7 @@ export class RepartoService {
       a.pedidos++;
       if (p.estado === 'ENTREGADO') {
         a.entregados++;
-        a.min.push(minutosEntre(p.creado_en, p.entregado_en));
+        a.min.push(minutosEntre(inicioOperativo(p), p.entregado_en));
       }
       const t = turnos.findIndex((x) => enTurno(p.creado_en, x));
       if (t >= 0) a.turnos[t]++;

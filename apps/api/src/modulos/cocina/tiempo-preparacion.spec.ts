@@ -56,4 +56,23 @@ describe('tiemposPreparacion', () => {
     expect(findMany).toHaveBeenCalledTimes(1);
     expect(res.porProducto.get('301')).toBe(9);
   });
+
+  it('programado creado ayer: mide desde que pasó a cocina (10 min), no desde su creación (~26 h)', async () => {
+    const prisma: any = {
+      pedidoLinea: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            listo_en: minAntes(20),
+            area_id: 5n,
+            producto_id: 401n,
+            producto: { categoria: { area_id: 5n } },
+            pedido: { creado_en: minAntes(26 * 60), programado_para: minAntes(-20), pasa_cocina_en: minAntes(30), comandas: [] },
+          },
+        ]),
+      },
+      parametro: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const res = await tiemposPreparacion(prisma, ['401'], AHORA);
+    expect(res.porProducto.get('401')).toBe(10);
+  });
 });

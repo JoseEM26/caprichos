@@ -32,6 +32,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { inicioEspera } from '../../comun/inicio-espera';
 import { RedisService } from '../../comun/redis/redis.service';
 import { esSoloMozo, puedeAnularPedido, rolesDelUsuario } from '../acceso/roles-usuario';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -439,7 +440,7 @@ export class PedidosEstadoService {
       const { minutosEspera, color, colorEspera } =
         p.estado === 'PROGRAMADO'
           ? { minutosEspera: 0, color: 'verde' as ColorEspera, colorEspera: 'verde' as ColorEspera }
-          : this.calcularMinutosYColor(p.creado_en, ahora, umbrales.naranjaMin, umbrales.rojoMin);
+          : this.calcularMinutosYColor(inicioEspera(p), ahora, umbrales.naranjaMin, umbrales.rojoMin);
 
       const cobro = p.cobros?.[0];
       const cobroVigenteId = cobro?.id ? String(cobro.id) : null;
@@ -718,7 +719,8 @@ export class PedidosEstadoService {
     const ahora = new Date();
     const conEspera = filtrados.map((p) => {
       const enEspera = !['LISTO', 'ENTREGADO', 'ANULADO'].includes(p.estado);
-      const desdeEspera = p.pasa_cocina_en ?? p.creado_en;
+      // Programado: desde su hora pactada; el resto, desde que pasó a cocina (o su creación)
+      const desdeEspera = p.programado_para ?? p.pasa_cocina_en ?? p.creado_en;
       return {
         p,
         esperaMinutos: enEspera ? Math.max(0, Math.floor((ahora.getTime() - desdeEspera.getTime()) / 60000)) : null,
@@ -892,7 +894,7 @@ export class PedidosEstadoService {
       });
       // Desempate por id en caso de misma hora de llegada
       pedidos.sort((a, b) => {
-        const diff = new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime();
+        const diff = new Date(inicioEspera(a)).getTime() - new Date(inicioEspera(b)).getTime();
         if (diff !== 0) return diff;
         return Number(a.id - b.id);
       });
@@ -901,7 +903,7 @@ export class PedidosEstadoService {
     // Cocina solo ve qué preparar y para quién: sin teléfono, dirección, pago ni comprobante (Ley 29733)
     return pedidos.map((p) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
-        p.creado_en,
+        inicioEspera(p),
         ahora,
         umbrales.naranjaMin,
         umbrales.rojoMin,
@@ -916,6 +918,8 @@ export class PedidosEstadoService {
         cliente_nombre: p.cliente_nombre,
         nota: p.nota,
         creado_en: p.creado_en,
+        // Desde cuándo corre el reloj de cocina (la hora pactada si es programado): la pantalla lo usa en vivo
+        espera_desde: inicioEspera(p),
         listo_en: p.listo_en,
         lineas: lineasDeCuenta(p.lineas),
         minutosEspera,
@@ -1064,7 +1068,7 @@ export class PedidosEstadoService {
 
     const umbrales = await this.obtenerUmbrales();
     const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
-      pedido.creado_en,
+      inicioEspera(pedido),
       new Date(),
       umbrales.naranjaMin,
       umbrales.rojoMin,

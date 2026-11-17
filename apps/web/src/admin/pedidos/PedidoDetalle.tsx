@@ -380,7 +380,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                 <span className="dp-codigo">{pedido.codigo}</span> · {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)} · {hora}
               </div>
             </div>
-            <PastillaEspera creadoEn={pedido.creado_en} cerrado={esCerrado(pedido) || est === 'PROGRAMADO'} />
+            <PastillaEspera creadoEn={pedido.creado_en} programadoPara={pedido.programado_para} cerrado={esCerrado(pedido) || est === 'PROGRAMADO'} />
             <div className="dp-total-cab" aria-label="Total del pedido">
               S/ {totalNum.toFixed(2)}
             </div>

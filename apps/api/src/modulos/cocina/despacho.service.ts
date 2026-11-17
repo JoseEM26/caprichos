@@ -9,6 +9,7 @@ import { obtenerInicioDiaLima } from './cocina.util';
 import { resaltadoDeLineas } from './opcion-menos-pedida';
 import { resumenPagoDespacho } from './resumen-pago-despacho';
 import { mesaDePedido } from './mesa-comanda.util';
+import { inicioEspera } from '../../comun/inicio-espera';
 
 const FUERA = ['ANULADO', 'RECHAZADO'];
 /** Pedidos que esperan a Despacho: cocina ya los tiene en curso y aún no pasan a LISTO. */
@@ -85,7 +86,9 @@ export class DespachoService {
         extraDe: (p as any).pedidoOrigen?.codigo ?? null,
         nota: p.nota ?? null,
         creado_en: p.creado_en,
-        minutos: Math.max(0, Math.floor((ahora.getTime() - new Date(p.creado_en).getTime()) / 60000)),
+        // Programado: los minutos cuentan desde su hora pactada (espera_desde), no desde su creación
+        espera_desde: inicioEspera(p).toISOString(),
+        minutos: Math.max(0, Math.floor((ahora.getTime() - inicioEspera(p).getTime()) / 60000)),
         // Solo delivery: lo que el despachador necesita para entregar al repartidor
         direccion: delivery ? (p.entrega_direccion ?? null) : null,
         referencia: delivery ? (p.entrega_referencia ?? null) : null,

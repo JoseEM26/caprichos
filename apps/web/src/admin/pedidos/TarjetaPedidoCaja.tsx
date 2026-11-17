@@ -133,7 +133,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
             {conMesa && <InsigniaMesa mesaNombre={o.mesa_nombre} grande />}
             <NombreCliente pedido={o} />
           </span>
-          <PastillaEspera creadoEn={o.creado_en} cerrado={cerrado || o.estado === 'PROGRAMADO'} ahora={ahora} />
+          <PastillaEspera creadoEn={o.creado_en} programadoPara={o.programado_para} cerrado={cerrado || o.estado === 'PROGRAMADO'} ahora={ahora} />
         </span>
 
         <span className="cj2-mod">

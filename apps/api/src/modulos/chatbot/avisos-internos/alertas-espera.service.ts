@@ -26,6 +26,7 @@ import { controlAlmacenActivo } from '../../stock/control-almacen';
 import { LocalService } from '../../local/local.service';
 import { pedidoVivoDeHoy } from '../../../comun/fechas-lima';
 import { MarcaEscalado, TEXTOS_ESCALADO } from '../conversacion/escalado-ia.util';
+import { inicioEspera } from '../../../comun/inicio-espera';
 
 export interface UmbralesAlertasEspera {
   alertaVoucherMin1: number;
@@ -449,7 +450,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         : [];
 
       for (const ped of pedidosSinConfirmar) {
-        const minutosCreado = Math.floor((ahora.getTime() - new Date(ped.creado_en).getTime()) / (60 * 1000));
+        const minutosCreado = Math.floor((ahora.getTime() - inicioEspera(ped).getTime()) / (60 * 1000));
         if (minutosCreado >= UMBRAL_SIN_ATENDER_MIN) {
           const claveIdempPed = `idemp:alerta:pedido:caja:${ped.id}`;
           const esPrimero = await this.adquirirIdempotencia(claveIdempPed);

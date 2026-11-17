@@ -158,7 +158,7 @@ const FilaLista = memo(function FilaLista({ pedido: p, accion, resaltado, alAcci
           <strong>{p.codigo}</strong>
           <span className="lc-tipo"><IconoModalidad modalidad={clave} tamano={18} />{MOD[clave]}{clave === 'MESA' && p.mesa_nombre ? ` · ${textoMesa(p.mesa_nombre)}` : ''}</span>
         </span>
-        <PastillaEspera creadoEn={p.creado_en} cerrado={cerrado || p.estado === 'PROGRAMADO'} />
+        <PastillaEspera creadoEn={p.creado_en} programadoPara={p.programado_para} cerrado={cerrado || p.estado === 'PROGRAMADO'} />
         <span className="lc-meta">{fecha} {aHora(p.creado_en)}{quien ? ` · ${quien}` : ''}</span>
       </div>
 

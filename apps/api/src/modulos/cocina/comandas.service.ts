@@ -1,4 +1,5 @@
 import { pedidoVivoDeHoy } from '../../comun/fechas-lima';
+import { inicioEspera } from '../../comun/inicio-espera';
 import { SalonService } from '../salon/salon.service';
 import { pedidoDebeEstarCobrado } from '../pedidos';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
@@ -391,8 +392,8 @@ export class ComandasService {
       const listas = await Promise.all(areas.map((a) => this.listarComandas(a.id.toString(), false)));
       return listas.flat().sort((x: any, y: any) => {
         if (x.despejada !== y.despejada) return x.despejada ? 1 : -1;
-        const tX = new Date(x.creado_en || x.llego_en).getTime();
-        const tY = new Date(y.creado_en || y.llego_en).getTime();
+        const tX = new Date(x.espera_desde || x.llego_en).getTime();
+        const tY = new Date(y.espera_desde || y.llego_en).getTime();
         if (tX !== tY) return tX - tY;
         return Number(BigInt(x.pedidoId) - BigInt(y.pedidoId));
       });
@@ -458,8 +459,9 @@ export class ComandasService {
 
     const lista = comandas.map((c) => {
       const p = c.pedido;
-      const creadoEn = new Date(p.creado_en);
-      const diffMs = ahora.getTime() - creadoEn.getTime();
+      // Programado: la espera cuenta desde su hora pactada, no desde que se creó (puede ser de ayer)
+      const esperaDesde = inicioEspera(p);
+      const diffMs = ahora.getTime() - esperaDesde.getTime();
       const minutos = Math.max(0, Math.floor(diffMs / 60000));
       const color: ColorEspera = calcularColor(minutos, umbrales.naranjaMin, umbrales.rojoMin);
 
@@ -505,6 +507,7 @@ export class ComandasService {
         umbrales,
         llego_en: c.llego_en,
         creado_en: p.creado_en,
+        espera_desde: esperaDesde.toISOString(),
         lineas: lineasDeArea(p.lineas, area.id, marcadas),
         // Aditivo: la propia área ya despejó (solo seguimiento) y el estado de las áreas del pedido
         despejada: c.estado === 'DESPEJADA',

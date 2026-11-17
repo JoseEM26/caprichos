@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { ahoraServidorMs } from '../cocina/tiempoEnVivo';
 import { ESTILO_ESPERA, nivelEspera } from './estadosCaja';
+import { textoFaltan } from './programado';
 
 const PERIODO_MS = 30000;
 
@@ -54,23 +55,48 @@ const horaLima = (iso: string) =>
 
 interface Props {
   creadoEn?: string | null;
+  /** Hora pactada de un programado: la espera se cuenta desde ahí (faltan antes, retraso después). */
+  programadoPara?: string | null;
   cerrado: boolean;
   /** Para pruebas: instante en ms; si falta se usa el reloj compartido en vivo. */
   ahora?: number;
 }
 
-/** Pastilla semáforo de espera (verde < 35 min, óxido 35–49, rojo ≥ 50); neutra con la hora en pedidos cerrados. */
-export function PastillaEspera({ creadoEn, cerrado, ahora }: Props) {
+/**
+ * Pastilla semáforo de espera (verde < 35 min, óxido 35–49, rojo ≥ 50); neutra con la hora en pedidos cerrados.
+ * Programado (con hora pactada, abierto): antes de la hora dice «faltan N min» en verde; después «+N min» de
+ * retraso desde esa hora, con los mismos umbrales. Sin programado_para no cambia.
+ */
+export function PastillaEspera({ creadoEn, programadoPara, cerrado, ahora }: Props) {
   const vivo = useAhora();
-  if (!creadoEn) return null;
-  const min = minutosDesde(creadoEn, ahora ?? vivo);
-  const nivel = nivelEspera(min, cerrado);
+  const t = ahora ?? vivo;
+  const pactada = programadoPara ? new Date(programadoPara).getTime() : NaN;
+  const conPactada = !cerrado && !Number.isNaN(pactada);
+  if (!creadoEn && !conPactada) return null;
+
+  let nivel: ReturnType<typeof nivelEspera>;
+  let texto: string;
+  let aria: string;
+  if (conPactada && pactada > t) {
+    // Aún no es la hora pactada: en tiempo, con lo que falta
+    nivel = 'verde';
+    texto = textoFaltan(new Date(pactada), new Date(t));
+    aria = `${texto}, en tiempo`;
+  } else if (conPactada) {
+    const tarde = Math.floor((t - pactada) / 60000);
+    nivel = nivelEspera(tarde, false);
+    texto = `+${textoMinutos(tarde)}`;
+    aria = `${tarde === 0 ? 'En la hora pactada' : `${tarde} ${tarde === 1 ? 'minuto' : 'minutos'} de retraso`}, ${ROTULO[nivel].toLowerCase()}`;
+  } else {
+    const min = minutosDesde(creadoEn, t);
+    nivel = nivelEspera(min, cerrado);
+    texto = cerrado ? horaLima(creadoEn as string) : textoMinutos(min ?? 0);
+    aria = cerrado
+      ? `Pedido de las ${horaLima(creadoEn as string)}`
+      : `Hace ${min === 1 ? '1 minuto' : `${min} minutos`}, ${ROTULO[nivel].toLowerCase()}`;
+  }
   const color = ESTILO_ESPERA[nivel];
-  const texto = cerrado ? horaLima(creadoEn) : textoMinutos(min ?? 0);
   const rotulo = ROTULO[nivel];
-  const aria = cerrado
-    ? `Pedido de las ${horaLima(creadoEn)}`
-    : `Hace ${min === 1 ? '1 minuto' : `${min} minutos`}, ${rotulo.toLowerCase()}`;
   return (
     <span className="cj2-espera" data-nivel={nivel} role="timer" aria-label={aria} style={{ background: color.bg, color: color.fg }}>
       <span className="cj2-espera-hora">

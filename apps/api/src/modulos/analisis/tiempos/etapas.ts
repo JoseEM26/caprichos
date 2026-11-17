@@ -12,6 +12,8 @@ export interface PedidoParaTiempos {
   modalidad: string;
   pago_estado?: string | null;
   creado_en: Date;
+  /** Programado: la espera antes de cocina es la hora pactada, no cuenta como aprobación ni «a cocina» */
+  programado_para?: Date | null;
   pago_coordinado_en: Date | null;
   pasa_cocina_en: Date | null;
   listo_en: Date | null;
@@ -55,9 +57,11 @@ export function calcularEtapas(p: PedidoParaTiempos): EtapasDePedido {
 
   // 2. Aprobación: solo cuenta si el pago coordinado se aprobó ANTES de pasar a cocina (después es cobro, no espera)
   const aprobadoAntes = !!p.pago_coordinado_en && (!p.pasa_cocina_en || p.pago_coordinado_en <= p.pasa_cocina_en);
-  m.aprobacion = aprobadoAntes ? minutosEntre(p.creado_en, p.pago_coordinado_en) : null;
+  // Programado: se creó antes y espera a su hora pactada; medir desde la creación inflaría estas dos etapas (sin dato)
+  const programado = !!p.programado_para;
+  m.aprobacion = aprobadoAntes && !programado ? minutosEntre(p.creado_en, p.pago_coordinado_en) : null;
   // 3. A cocina
-  m.a_cocina = minutosEntre(aprobadoAntes ? p.pago_coordinado_en : p.creado_en, p.pasa_cocina_en);
+  m.a_cocina = programado ? null : minutosEntre(aprobadoAntes ? p.pago_coordinado_en : p.creado_en, p.pasa_cocina_en);
 
   // 4. Cocina por área y general (hasta que TODAS las áreas marcaron Listo)
   const areas = p.comandas
@@ -120,6 +124,8 @@ export function etapaActual(p: PedidoParaTiempos): EtapaActual | null {
   if (estado === 'ANULADO' || estado === 'RECHAZADO') return null;
 
   if (estado === 'COLA' || estado === 'NUEVO') {
+    // Programado en cola: la espera corre desde que pasó a cocina (o su hora pactada), no desde que se creó
+    if (p.programado_para) return { codigo: 'a_cocina', desde: p.pasa_cocina_en ?? p.programado_para };
     if (!p.pago_coordinado_en && (p.pago_estado ?? 'PENDIENTE') !== 'PAGADO') return { codigo: 'aprobacion', desde: p.creado_en };
     return { codigo: 'a_cocina', desde: p.pago_coordinado_en ?? p.creado_en };
   }

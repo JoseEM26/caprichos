@@ -1,4 +1,5 @@
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { inicioOperativo } from '../../comun/inicio-espera';
 
 /** Ventana móvil de días para el promedio de preparación (igual que las opciones menos pedidas). */
 export const VENTANA_DIAS_PREPARACION = 30;
@@ -64,6 +65,8 @@ export async function promedioPreparacionPorProducto(
       pedido: {
         select: {
           creado_en: true,
+          programado_para: true,
+          pasa_cocina_en: true,
           comandas: { select: { area_id: true, llego_en: true } },
         },
       },
@@ -75,7 +78,8 @@ export async function promedioPreparacionPorProducto(
     if (!f.listo_en || f.producto_id === null) continue;
     const area = f.area_id ?? f.producto?.categoria?.area_id ?? null;
     const comanda = area !== null ? f.pedido.comandas.find((c) => c.area_id === area) : undefined;
-    const llegada = comanda?.llego_en ?? f.pedido.creado_en;
+    // Programado: desde que pasó a cocina (no desde su creación, que puede ser de días antes)
+    const llegada = comanda?.llego_en ?? inicioOperativo(f.pedido);
     const minutos = (new Date(f.listo_en).getTime() - new Date(llegada).getTime()) / 60000;
     if (minutos <= 0) continue;
     const id = String(f.producto_id);

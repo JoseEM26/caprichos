@@ -345,7 +345,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                     👤 PERSONAL
                   </span>
                 )}
-                <TiempoEspera desde={p.creado_en} minutosRespaldo={p.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '16px' }} />
+                <TiempoEspera desde={p.espera_desde ?? p.creado_en} minutosRespaldo={p.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '16px' }} />
               </header>
               <InsigniaMesa modalidad={p.modalidad} mesa={p.mesa} enEsperaMesa={p.enEsperaMesa} testId={`mesa-${p.pedidoId}`} />
               <div data-testid={`nombre-${p.pedidoId}`} title={destino(p) || 'Sin nombre'} style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '24px', fontWeight: 900, lineHeight: 1.15, color: NAVY, ...clamp2 }}>{destino(p) || 'Sin nombre'}</div>
@@ -369,7 +369,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong data-testid={`etiqueta-parte-${x.pedidoId}`} style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', color: x.pedidoOrigenId ? OXIDO : NAVY }}>{etiqueta}</strong>
                         <span style={{ fontWeight: 700, fontSize: '14px', color: SUAVE }}>{x.codigo}</span>
-                        <TiempoEspera desde={x.creado_en} minutosRespaldo={x.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '14px' }} />
+                        <TiempoEspera desde={x.espera_desde ?? x.creado_en} minutosRespaldo={x.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '14px' }} />
                       </div>
                     )}
                     {x.nota && <div style={{ fontSize: '15px', fontWeight: 700, background: '#FFF3C4', color: NAVY, padding: '4px 8px', borderRadius: '6px' }}>Nota: {x.nota}</div>}
