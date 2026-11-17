@@ -15,13 +15,16 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 
-function useSesionSegura() {
+export function useSesionSegura() {
   try {
     return useSesion();
   } catch {
     return null;
   }
 }
+
+/** Aviso entre las dos tarjetas de medios de pago (Pagos y esta tabla): tras guardar, la otra recarga. */
+export const EVENTO_MEDIOS_PAGO_CANAL = 'caprichos:medios-pago-canal';
 
 const NOMBRE_CANAL: Record<CanalMedioPago, string> = { CARTA: 'Carta web', CAJA: 'Caja', MOZO: 'Mozo', BOT: 'WhatsApp' };
 
@@ -55,6 +58,9 @@ export function TarjetaMediosPagoCanal({ esAdmin: esAdminProp }: { esAdmin?: boo
   }, []);
   useEffect(() => {
     void cargar();
+    const alCambiar = () => void cargar();
+    window.addEventListener(EVENTO_MEDIOS_PAGO_CANAL, alCambiar);
+    return () => window.removeEventListener(EVENTO_MEDIOS_PAGO_CANAL, alCambiar);
   }, [cargar]);
 
   const hayCambios = JSON.stringify(config) !== JSON.stringify(guardado);
@@ -72,6 +78,7 @@ export function TarjetaMediosPagoCanal({ esAdmin: esAdminProp }: { esAdmin?: boo
       await api.put('/admin/configuracion/medios_pago_canal', { valor: config });
       setConfirmar(false);
       setExito('Listo: los medios de pago quedaron guardados.');
+      window.dispatchEvent(new Event(EVENTO_MEDIOS_PAGO_CANAL));
       await cargar();
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar');
@@ -115,19 +122,25 @@ export function TarjetaMediosPagoCanal({ esAdmin: esAdminProp }: { esAdmin?: boo
                   {NOMBRE_MEDIO_PAGO[m]}
                   {m === 'PAGO_EN_LINEA' && <div style={{ fontSize: 11, color: 'var(--cp-soft)', fontWeight: 400 }}>Tarjeta y Yape por Culqi (solo carta)</div>}
                 </td>
-                {CANALES_MEDIO_PAGO.map((c) => (
-                  <td key={c} style={{ textAlign: 'center', padding: '4px' }}>
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={config[c][m]}
-                      disabled={!esAdmin || guardando}
-                      onChange={() => alternar(c, m)}
-                      aria-label={`${NOMBRE_MEDIO_PAGO[m]} en ${NOMBRE_CANAL[c]}`}
-                      style={{ width: 24, height: 24 }}
-                    />
-                  </td>
-                ))}
+                {CANALES_MEDIO_PAGO.map((c) =>
+                  m === 'PAGO_EN_LINEA' && c !== 'CARTA' ? (
+                    <td key={c} style={{ textAlign: 'center', padding: '4px', color: 'var(--cp-soft)', fontSize: 12 }}>
+                      No aplica
+                    </td>
+                  ) : (
+                    <td key={c} style={{ textAlign: 'center', padding: '4px' }}>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={config[c][m]}
+                        disabled={!esAdmin || guardando}
+                        onChange={() => alternar(c, m)}
+                        aria-label={`${NOMBRE_MEDIO_PAGO[m]} en ${NOMBRE_CANAL[c]}`}
+                        style={{ width: 24, height: 24 }}
+                      />
+                    </td>
+                  ),
+                )}
               </tr>
             ))}
           </tbody>

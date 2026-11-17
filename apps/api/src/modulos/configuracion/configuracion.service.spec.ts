@@ -169,6 +169,13 @@ describe('ConfiguracionService', () => {
       expect(guardado.BOT.PLIN).toBe(false);
       expect(guardado.BOT.YAPE).toBe(true);
       expect(guardado.CAJA.EFECTIVO).toBe(true);
+      // Pago en línea solo vive en la carta: en Caja/Mozo/WhatsApp se guarda apagado aunque venga true
+      await service.actualizar('medios_pago_canal', { CAJA: { PAGO_EN_LINEA: true }, MOZO: { PAGO_EN_LINEA: true }, BOT: { PAGO_EN_LINEA: true }, CARTA: { PAGO_EN_LINEA: true } }, adminAuth);
+      const conLinea = prismaMock.parametro.upsert.mock.calls.at(-1)[0].create.valor;
+      expect(conLinea.CARTA.PAGO_EN_LINEA).toBe(true);
+      expect(conLinea.CAJA.PAGO_EN_LINEA).toBe(false);
+      expect(conLinea.MOZO.PAGO_EN_LINEA).toBe(false);
+      expect(conLinea.BOT.PAGO_EN_LINEA).toBe(false);
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'configuracion', accion: 'PARAMETRO', despues: expect.objectContaining({ clave: 'medios_pago_canal' }) }));
     });
 

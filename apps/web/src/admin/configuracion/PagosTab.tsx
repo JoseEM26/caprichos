@@ -9,6 +9,7 @@ import { Insignia } from '../../comun/Insignia';
 import { AyudaBloque } from './AyudaBloque';
 import { CampoAyuda } from './AyudaCampo';
 import { propsAyuda } from './catalogo/propsAyuda';
+import { PagoEnLineaCheck } from './PagoEnLineaCheck';
 
 export interface PagosLocal {
   efectivo: { activo: boolean };
@@ -320,6 +321,9 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
             {pagos.tarjeta.activo ? 'Activo' : 'Desactivado'}
           </button>
         </div>
+
+        {/* Pago en línea (Culqi): solo carta web, mismo dato que la tabla medio × canal */}
+        <PagoEnLineaCheck />
 
         {/* Yape */}
         <div

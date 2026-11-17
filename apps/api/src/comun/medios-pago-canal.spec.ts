@@ -23,6 +23,14 @@ describe('medios de pago por canal', () => {
     }
   });
 
+  it('Pago en línea guardado como encendido en Caja, Mozo o WhatsApp sigue rechazado; en Carta pasa', async () => {
+    const db = dbCon(config({ CAJA: { PAGO_EN_LINEA: true }, MOZO: { PAGO_EN_LINEA: true }, BOT: { PAGO_EN_LINEA: true }, CARTA: { PAGO_EN_LINEA: true } }));
+    for (const canal of ['CAJA', 'MOZO', 'BOT']) {
+      await expect(exigirMediosActivos(db, ['PAGO_EN_LINEA'], canal)).rejects.toMatchObject({ response: { codigo: 'MEDIO_NO_DISPONIBLE' } });
+    }
+    await expect(exigirMediosActivos(db, ['PAGO_EN_LINEA'], 'CARTA')).resolves.toBeUndefined();
+  });
+
   it('un medio apagado en un canal sigue permitido en los otros', async () => {
     const db = dbCon(config({ CARTA: { PLIN: false } }));
     await expect(exigirMediosActivos(db, ['PLIN'], 'CARTA')).rejects.toBeDefined();

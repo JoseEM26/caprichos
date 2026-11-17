@@ -37,7 +37,10 @@ export function canalMedioPago(canal: string | null | undefined): CanalMedioPago
   return (CANALES_MEDIO_PAGO as readonly string[]).includes(c) ? (c as CanalMedioPago) : null;
 }
 
-/** Completa lo que falte con los valores de fábrica; solo un booleano explícito cambia el valor. */
+/**
+ * Completa lo que falte con los valores de fábrica; solo un booleano explícito cambia el valor.
+ * PAGO_EN_LINEA (Culqi) vive solo en CARTA: en CAJA, MOZO y BOT se fuerza a false aunque venga true.
+ */
 export function normalizarMediosPagoCanal(valor: unknown): MediosPagoPorCanal {
   const r = mediosPagoPorDefecto();
   if (!valor || typeof valor !== 'object') return r;
@@ -46,17 +49,22 @@ export function normalizarMediosPagoCanal(valor: unknown): MediosPagoPorCanal {
     if (!fila || typeof fila !== 'object') continue;
     for (const m of MEDIOS_PAGO_CANAL) {
       const v = (fila as Record<string, unknown>)[m];
-      if (typeof v === 'boolean') r[c][m] = v;
+      if (typeof v !== 'boolean') continue;
+      r[c][m] = m === 'PAGO_EN_LINEA' && c !== 'CARTA' ? false : v;
     }
   }
   return r;
 }
 
-/** ¿El medio está encendido en el canal? Canal sin interruptor: sí. Medio desconocido: no. */
+/**
+ * ¿El medio está encendido en el canal? Canal sin interruptor: sí (salvo PAGO_EN_LINEA). Medio desconocido: no.
+ * PAGO_EN_LINEA solo mira CARTA: es el único canal donde existe.
+ */
 export function medioActivo(config: unknown, medio: string | null | undefined, canal: string | null | undefined): boolean {
   const m = String(medio ?? '').trim().toUpperCase() as MedioPagoCanal;
   if (!(MEDIOS_PAGO_CANAL as readonly string[]).includes(m)) return false;
   const c = canalMedioPago(canal);
+  if (m === 'PAGO_EN_LINEA') return c === 'CARTA' && normalizarMediosPagoCanal(config).CARTA.PAGO_EN_LINEA;
   if (!c) return true;
   return normalizarMediosPagoCanal(config)[c][m];
 }
@@ -64,7 +72,7 @@ export function medioActivo(config: unknown, medio: string | null | undefined, c
 /** Medios encendidos del canal, en el orden de MEDIOS_PAGO_CANAL. */
 export function mediosActivos(config: unknown, canal: string | null | undefined): MedioPagoCanal[] {
   const c = canalMedioPago(canal);
-  if (!c) return [...MEDIOS_PAGO_CANAL];
+  if (!c) return MEDIOS_PAGO_CANAL.filter((m) => m !== 'PAGO_EN_LINEA');
   const n = normalizarMediosPagoCanal(config)[c];
   return MEDIOS_PAGO_CANAL.filter((m) => n[m]);
 }

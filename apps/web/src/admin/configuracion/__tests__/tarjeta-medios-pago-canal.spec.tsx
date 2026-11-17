@@ -6,13 +6,18 @@ import { TarjetaMediosPagoCanal } from '../TarjetaMediosPagoCanal';
 describe('Medios de pago por canal (Configuración)', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('por defecto todo encendido salvo Pago en línea, en los 4 canales', async () => {
+  it('por defecto todo encendido salvo Pago en línea; Pago en línea solo tiene interruptor en Carta web', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({ canales: undefined });
     render(<TarjetaMediosPagoCanal esAdmin />);
     const yape = await screen.findByRole('switch', { name: 'Yape en Carta web' });
     expect((yape as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole('switch', { name: 'Plin en WhatsApp' }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole('switch', { name: 'Pago en línea en Caja' }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole('switch', { name: 'Pago en línea en Carta web' }) as HTMLInputElement).checked).toBe(false);
+    for (const c of ['Caja', 'Mozo', 'WhatsApp']) {
+      expect(screen.queryByRole('switch', { name: `Pago en línea en ${c}` })).toBeNull();
+    }
+    expect(screen.getAllByText('No aplica')).toHaveLength(3);
+    expect(screen.getByText('Tarjeta y Yape por Culqi (solo carta)')).toBeInTheDocument();
   });
 
   it('apagar un medio pide confirmación Sí/No y guarda la tabla completa', async () => {
