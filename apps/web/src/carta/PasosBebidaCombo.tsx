@@ -13,6 +13,8 @@ interface Props {
   deshabilitar?: boolean;
   /** Unidades ya comprometidas por sabor (este combo + carrito). */
   usos?: Record<string, number>;
+  /** Asistente por pasos: solo se muestra la bebida de este índice, siempre abierta. */
+  soloIndice?: number;
 }
 
 interface Candidata {
@@ -49,7 +51,7 @@ export const etiquetaBebida = (parte: ParteEleccion, clave: string): string => c
  * abierta, buscador, categorías (si las hay) y una rejilla compacta. Al elegir se cierra y abre la siguiente pendiente.
  * Sin precio extra (el combo ya lo incluye).
  */
-export function PasosBebidaCombo({ parte, unidades, valor, onCambio, deshabilitar = false, usos = {} }: Props) {
+export function PasosBebidaCombo({ parte, unidades, valor, onCambio, deshabilitar = false, usos = {}, soloIndice }: Props) {
   const total = parte.cantidad * unidades;
   const base = useId();
   const refs = useRef<(HTMLDivElement | null)[]>([]);
@@ -86,9 +88,10 @@ export function PasosBebidaCombo({ parte, unidades, valor, onCambio, deshabilita
   return (
     <div data-testid={`bebidas-combo-${parte.parteId}`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {Array.from({ length: total }, (_, i) => {
+        if (soloIndice !== undefined && i !== soloIndice) return null;
         const actual = valor[i] ?? '';
         const elegida = todas.find((c) => c.clave === actual);
-        const open = abierta === i;
+        const open = soloIndice !== undefined ? true : abierta === i;
         const idCuerpo = `${base}-b${i}`;
         const lista = todas.filter((c) => (!q || plano(c.etiqueta).includes(q) || c.clave === actual) && (!cat || c.categoria === cat || c.clave === actual));
         const primera = valor[0] ? todas.find((c) => c.clave === valor[0]) : undefined;
@@ -103,7 +106,7 @@ export function PasosBebidaCombo({ parte, unidades, valor, onCambio, deshabilita
             className="ca-tarjeta"
             data-pendiente={elegida ? 'no' : 'si'}
           >
-            <button type="button" className="ca-cab" aria-expanded={open} aria-controls={idCuerpo} disabled={deshabilitar} onClick={() => abrir(open ? null : i)}>
+            <button type="button" className="ca-cab" aria-expanded={open} aria-controls={idCuerpo} disabled={deshabilitar || soloIndice !== undefined} onClick={() => abrir(open ? null : i)}>
               <span style={{ flex: 'none', width: 28, height: 28, borderRadius: 14, background: elegida ? 'var(--cp-green)' : 'var(--cp-line)', color: elegida ? '#FFFFFF' : 'var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>
                 {elegida ? '✓' : i + 1}
               </span>
@@ -114,14 +117,14 @@ export function PasosBebidaCombo({ parte, unidades, valor, onCambio, deshabilita
                   {elegida ? elegida.etiqueta : `Elige tu bebida ${i + 1}`}
                 </span>
               </span>
-              <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, color: 'var(--cp-rust)' }}>{open ? 'Cerrar' : elegida ? 'Cambiar' : 'Elegir'}</span>
+              <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, color: 'var(--cp-rust)' }}>{soloIndice === undefined && open ? 'Cerrar' : elegida ? 'Cambiar' : 'Elegir'}</span>
             </button>
             <div id={idCuerpo} className="ca-cuerpo" hidden={!open}>
               {open && (
                 <>
                   {i > 0 && primera && primera.ok && actual !== primera.clave && (
                     <button type="button" className="ca-chip" disabled={deshabilitar} onClick={() => fijar(i, primera.clave)} style={{ alignSelf: 'flex-start' }}>
-                      {`Misma que la bebida 1 · ${primera.etiqueta}`}
+                      {`Igual que la bebida 1 · ${primera.etiqueta}`}
                     </button>
                   )}
                   {todas.length > 8 && (

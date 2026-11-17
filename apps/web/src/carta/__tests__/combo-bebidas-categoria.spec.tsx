@@ -53,40 +53,43 @@ const duo = (): OfertaItem =>
 
 const abrir = () => render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo()} />);
 const paso = (n: number) => within(screen.getByRole('group', { name: `Bebida ${n}` }));
+// Asistente por pasos: «Siguiente» avanza un paso (los pasos ya listos no bloquean)
+const siguiente = () => fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
 describe('Combo Dúo con bebidas por categoría', () => {
-  it('muestra «Bebida 1» y «Bebida 2» con las bebidas de las categorías y oculta los grupos «Bebida N · Sabor» del anfitrión', () => {
+  it('muestra «Bebida 1» y luego «Bebida 2» con las bebidas de las categorías y oculta los grupos «Bebida N · Sabor» del anfitrión', () => {
     abrir();
+    // un paso a la vez: primero la bebida 1, la 2 aparece cuando toca
     expect(screen.getByRole('group', { name: 'Bebida 1' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Bebida 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Bebida 2' })).toBeNull();
     // Las bebidas del editor (Frappes + Iced + Calientes), no las 6 fijas del producto viejo
     expect(paso(1).getByRole('button', { name: /FRAPPE OREO/ })).toBeInTheDocument();
     expect(paso(1).queryByRole('button', { name: /LATTE COFFE/ })).toBeNull();
     expect(paso(1).getByRole('button', { name: /CAFE AGOTADO/ })).toBeDisabled();
-    fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getAllByRole('button')[0]); // abrir la tarjeta de la bebida 2
+    fireEvent.click(paso(1).getByRole('button', { name: /FRAPPE OREO/ })); // avanza sola a la bebida 2
     expect(paso(2).getByRole('button', { name: /CAPUCCINO/ })).toBeInTheDocument();
     // Los grupos duplicados no salen; las otras preguntas del anfitrión se mantienen
     expect(screen.queryByText('Bebida 1 · Sabor')).toBeNull();
     expect(screen.queryAllByText('Sabor')).toHaveLength(0);
-    expect(screen.getByText('Endulzante')).toBeInTheDocument();
   });
 
   it('conserva el complemento con paquetes y exige elegir las 2 bebidas, el complemento y el endulzante', () => {
     agregarLinea.mockClear();
     abrir();
-    expect(screen.getByText('Elige tu complemento')).toBeInTheDocument();
-    expect(botonAgregar()).toBeDisabled();
+    fireEvent.click(paso(1).getByRole('button', { name: /FRAPPE OREO/ }));
+    fireEvent.click(paso(2).getByRole('button', { name: /CAPUCCINO/ }));
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu complemento');
     fireEvent.click(screen.getByRole('radio', { name: '2 donas artesanales' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
-    expect(botonAgregar()).toBeDisabled(); // faltan las bebidas
-
-    fireEvent.click(paso(1).getByRole('button', { name: /FRAPPE OREO/ }));
-    expect(botonAgregar()).toBeDisabled();
-    fireEvent.click(paso(2).getByRole('button', { name: /CAPUCCINO/ }));
-    expect(botonAgregar()).toBeEnabled();
-
+    siguiente(); // pregunta «Complemento» (opcional, ya lista)
+    siguiente(); // «Endulzante»: la opción por defecto ya está elegida
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Endulzante');
+    siguiente(); // nombres de los vasos
     nombrarVasos();
+    siguiente(); // nota
+    siguiente(); // resumen
     fireEvent.click(botonAgregar());
     const linea = agregarLinea.mock.calls[0][0];
     expect(linea.ofertaId).toBe('4');
@@ -105,12 +108,17 @@ describe('Combo Dúo con bebidas por categoría', () => {
   it('permite la misma bebida en los dos pasos', () => {
     agregarLinea.mockClear();
     abrir();
+    fireEvent.click(paso(1).getByRole('button', { name: /ICED COFFE/ }));
+    fireEvent.click(paso(2).getByRole('button', { name: /^ICED COFFE$/ }));
     fireEvent.click(screen.getByRole('radio', { name: '2 donas artesanales' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
-    fireEvent.click(paso(1).getByRole('button', { name: /ICED COFFE/ }));
-    fireEvent.click(paso(2).getByRole('button', { name: /^ICED COFFE$/ }));
+    siguiente(); // Complemento
+    siguiente(); // Endulzante
+    siguiente(); // nombres
     nombrarVasos();
+    siguiente(); // nota
+    siguiente(); // resumen
     fireEvent.click(botonAgregar());
     expect(agregarLinea.mock.calls[0][0].comboElecciones.filter((e: { parteId: string }) => e.parteId === '1')).toEqual([
       { parteId: '1', productoId: '102' },

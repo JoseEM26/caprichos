@@ -35,13 +35,18 @@ describe('Mozo/caja: combo con bebidas por categoría', () => {
     render(<VentanaOpcionesProducto producto={producto} oferta={oferta} alCerrar={() => {}} alAgregar={alAgregar} />);
     expect(screen.queryByText(/Bebida 1 · Sabor/)).toBeNull();
     expect(screen.queryByRole('button', { name: /LATTE COFFE/ })).toBeNull();
-    const agregar = () => screen.getByRole('button', { name: /Agregar|Añadir|Falta elegir/i });
-    expect(agregar()).toBeDisabled();
+    // un paso a la vez: la bebida 1 primero; al elegirla, la 2 (y así hasta el resumen)
+    expect(screen.getByRole('group', { name: 'Bebida 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Bebida 2' })).toBeNull();
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 1' })).getByRole('button', { name: /FRAPPE OREO/ }));
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /ICED COFFE/ }));
-    expect(agregar()).toBeEnabled();
+    // ahora el paso de los nombres de los vasos
     nombrarVasos();
-    fireEvent.click(agregar());
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
+    const agregar = screen.getByRole('button', { name: /Agregar al pedido/ });
+    expect(agregar).toBeEnabled();
+    fireEvent.click(agregar);
     expect(alAgregar.mock.calls[0][0].comboElecciones).toEqual([
       { parteId: '1', productoId: '101' },
       { parteId: '1', productoId: '102' },

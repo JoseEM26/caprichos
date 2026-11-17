@@ -33,23 +33,27 @@ describe('Nuevo pedido: Dúo sin bebidas duplicadas', () => {
     render(<VentanaOpcionesProducto producto={producto} oferta={duo(true)} alCerrar={() => {}} alAgregar={alAgregar} />);
     expect(screen.queryByText(/Bebida \d · Sabor/)).toBeNull();
     expect(screen.queryByText(/Elige 2 opciones/)).toBeNull();
-    const boton = () => screen.getByRole('button', { name: /Falta elegir|Agregar al pedido/ });
-    expect(boton()).toBeDisabled();
-    expect(boton().textContent).toMatch(/Falta elegir: Bebida 1 · Bebida 2/);
+    // asistente: un paso por bebida; «Siguiente» dice qué falta en cada uno
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 1');
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 1' })).getByRole('button', { name: /ICED COFFE/ }));
-    expect(boton().textContent).toMatch(/Falta elegir: Bebida 2/);
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 2');
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /LATTE COFFE/ }));
-    expect(boton()).toBeEnabled();
     nombrarVasos();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
+    const boton = () => screen.getByRole('button', { name: /Agregar al pedido/ });
+    expect(boton()).toBeEnabled();
     fireEvent.click(boton());
     const linea = alAgregar.mock.calls[0][0];
     expect(linea.comboElecciones).toEqual([{ parteId: '1', productoId: '101' }, { parteId: '1', productoId: '102' }]);
     expect(linea.opcionesGlobales).toEqual([]);
   });
 
-  it('sin la marca (API vieja, causa del duplicado) salen los grupos viejos Y el contador a la vez', () => {
+  it('sin la marca (API vieja, causa del duplicado) los grupos viejos salen como pasos propios y el contador va primero', () => {
     render(<VentanaOpcionesProducto producto={producto} oferta={duo(false)} alCerrar={() => {}} alAgregar={() => {}} />);
-    expect(screen.getAllByText(/Bebida \d · Sabor/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Elige 2 opci/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Paso 2: Bebida 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Paso 3: Bebida 2/ })).toBeInTheDocument();
   });
 });

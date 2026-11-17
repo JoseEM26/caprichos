@@ -41,24 +41,23 @@ const duo = (conBandera: boolean): OfertaItem =>
 const abrir = (p: ProductoCarta, o: OfertaItem | null, movil = true) =>
   render(<VentanaProductoCarta producto={p} esBebida={false} onCerrar={() => {}} oferta={o} esMovilPreview={movil} />);
 
-const botonAgregar = () => Array.from(screen.getByTestId('barra-agregar').querySelectorAll('button')).at(-1) as HTMLButtonElement;
 
 describe('Dúo en celular', () => {
-  it('con la parte de bebidas marcada no hay doble interfaz: solo los pasos «Bebida N» y el botón se habilita al completarlos', () => {
+  it('con la parte de bebidas marcada: un paso por bebida y el nombre del vaso en su paso; Agregar llega desde el resumen', () => {
     abrir(producto(), duo(true));
     expect(screen.queryByText(/Arma tu combo/)).toBeNull();
     expect(screen.queryByText(/Elige 2 opciones/)).toBeNull();
-    expect(botonAgregar().disabled).toBe(true);
-    expect(botonAgregar().textContent).toMatch(/Falta elegir: Bebida 1 · Bebida 2/);
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 1');
     fireEvent.click(screen.getAllByRole('button', { name: /ICED COFFE/ })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[0]);
-    expect(botonAgregar().disabled).toBe(false);
-    // sin nombres de vaso no agrega y dice cuál falta
-    fireEvent.click(botonAgregar());
-    expect(agregarLinea).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
+    // llega al paso de nombres sin nombres: «Siguiente» dice cuál falta
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nombres para el vaso');
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
     nombrarVasos();
-    fireEvent.click(botonAgregar());
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
+    fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     expect(agregarLinea).toHaveBeenCalledTimes(1);
   });
 
@@ -68,8 +67,10 @@ describe('Dúo en celular', () => {
     expect(screen.getAllByLabelText(/Nombre para el envase/)).toHaveLength(2);
   });
 
-  it('el nombre aparece también con la parte de bebidas en pasos', () => {
+  it('el nombre aparece también con la parte de bebidas en pasos (en su paso, con una etiqueta por vaso)', () => {
     abrir(producto(), duo(true));
+    fireEvent.click(screen.getAllByRole('button', { name: /ICED COFFE/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[0]);
     expect(screen.getAllByLabelText(/Nombre para el envase/)).toHaveLength(2);
   });
 
@@ -85,10 +86,13 @@ describe('Dúo en celular', () => {
     expect(screen.getAllByText('Complemento').length).toBeGreaterThan(0);
   });
 
-  it('sin bandera (API vieja) el botón dice cuál contador falta y «Ver qué falta» está disponible', () => {
+  it('sin bandera (API vieja) el paso dice cuál contador falta y «Siguiente» lo explica', () => {
     abrir(producto([]), duo(false));
-    expect(screen.getByTestId('barra-agregar')).toHaveTextContent(/Falta elegir: .*Elige 2 opción\(es\)/);
-    expect(screen.getByRole('button', { name: /Ver qué falta/ })).toBeInTheDocument();
+    // primero el complemento (sus lugares), luego los grupos viejos «Bebida N · Sabor» como pasos propios
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Complemento');
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige 2 lugar(es) más');
+    expect(screen.getByRole('button', { name: /Paso 2: Bebida 1/ })).toBeDisabled();
   });
 
   it('en celular la ventana es una hoja con cabecera y barra fijas; en PC conserva la ventana centrada', () => {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import '../salon.css';
 import {
   ProductoCarta,
@@ -35,9 +35,13 @@ import {
   unirElecciones,
   usosDeSabor,
 } from '../../../carta/ReemplazoCombo';
-import { PasosBebidaCombo } from '../../../carta/PasosBebidaCombo';
-import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
+import { PasosBebidaCombo, etiquetaBebida } from '../../../carta/PasosBebidaCombo';
+import { SelectorEleccionCombo, resumenReparto } from '../../../carta/SelectorEleccionCombo';
 import { useUmbralesStock } from '../../../carta/umbralesStock';
+import { AsistenteCombo } from '../../../comun/combo/AsistenteCombo';
+import { agruparSecciones, claveSeccion, decisionesDe, pasosCombo, UMBRAL_ASISTENTE, type EntradaPasos } from '../../../comun/combo/pasosCombo';
+import { Confirmar } from '../../../comun/Confirmar';
+import { useDialogoAccesible } from '../../../comun/useDialogoAccesible';
 import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
 import { maximoMezclas, totalElegido } from '../../../comun/saboresMezcla';
 
@@ -185,6 +189,10 @@ export function VentanaOpcionesProducto({
 
   // Búsqueda en grupos
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
+  // Asistente por pasos del armado (combos con 3 o más decisiones, igual que la carta)
+  const [indicePaso, setIndicePaso] = useState(0);
+  const [confirmarSalida, setConfirmarSalida] = useState(false);
+  const dialogoRef = useRef<HTMLDivElement>(null);
 
   // Bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre de envase, opcional
   const gruposBebida = useMemo(
@@ -364,8 +372,47 @@ export function VentanaOpcionesProducto({
     alCerrar();
   };
 
+  // Pasos del armado: regla compartida con la carta (comun/combo/pasosCombo)
+  const seccionesMozo = agruparSecciones(gruposVisibles, (g) => {
+    const minimo = g.obligatorio || (g.minimo && g.minimo > 0) ? g.minimo || 1 : 0;
+    return minimo === 0 || opcionesActuales.filter((o) => g.opciones.some((go) => go.id === o.id)).length >= minimo;
+  });
+  const entradaPasos: EntradaPasos = {
+    tamano: { hay: tamanos.length > 0, elegido: tamanoSeleccionado !== null },
+    grupoPaquete: gruposPaquetes(oferta).map((g) => g.grupo).join(' / '),
+    paqueteElegido: !faltaElegirPaquete(oferta, paquetes),
+    alternativas: partesRe.map((p) => ({ parteId: p.parteId, faltante: p.faltanteNombre, elegida: !!reemplazos[p.parteId] })),
+    bebidas: partesJug.filter((p) => p.bebidas).map((p) => ({ parteId: p.parteId, slots: Array.from({ length: p.cantidad * cantidad }, (_, i) => ({ indice: i, hecho: !!(bebidas[p.parteId] ?? [])[i] })) })),
+    piezas: partesJug.filter((p) => !p.bebidas).map((p) => ({ parteId: p.parteId, faltan: p.cantidad * cantidad - lugaresElegidos(p, elegido[p.parteId] ?? {}) })),
+    secciones: seccionesMozo,
+    nombres: {
+      total: nB > 0 ? cantidad * nB : 0,
+      faltan: nombresFaltantes.length,
+      primera: nombresFaltantes.length > 0 ? textoFaltaNombre(nombresFaltantes[0]) : '',
+    },
+    opcionales: partesOpcionales(ofertaCombo).length > 0,
+  };
+  const pasosAsistente = oferta && !comboAgotado && !saborMode ? pasosCombo(entradaPasos) : [];
+  const asistente = pasosAsistente.length > 0 && decisionesDe(pasosAsistente) >= UMBRAL_ASISTENTE;
+  const pasoActual = asistente ? pasosAsistente[Math.min(indicePaso, pasosAsistente.length)]?.id : undefined;
+  // En modo asistente, cada bloque se muestra solo cuando es su paso
+  const vis = (id: string): boolean => !asistente || pasoActual === id;
+  const hayElecciones =
+    Object.values(opcionesPorUnidad).some((a) => (a ?? []).length > 0) ||
+    Object.values(nombresCombo).some((n) => (n ?? '').trim() !== '') ||
+    notaCocina.trim() !== '' ||
+    Object.values(bebidas).some((a) => a.some(Boolean));
+  // Esc y la X piden confirmación si ya hay elecciones; sin elecciones cierran directo
+  const pedirCierre = () => {
+    if (!hayElecciones) alCerrar();
+    else setConfirmarSalida(true);
+  };
+  const alTeclear = useDialogoAccesible(dialogoRef, pedirCierre);
+
   return (
     <div
+      ref={dialogoRef}
+      onKeyDown={alTeclear}
       role="dialog"
       aria-modal="true"
       aria-label="Opciones del producto"
@@ -381,7 +428,7 @@ export function VentanaOpcionesProducto({
     >
       {/* Fondo oscuro */}
       <div
-        onClick={alCerrar}
+        onClick={pedirCierre}
         style={{
           position: 'absolute',
           inset: 0,
@@ -397,8 +444,8 @@ export function VentanaOpcionesProducto({
           position: 'relative',
           zIndex: 70,
           width: 'min(760px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
+          maxHeight: asistente ? 'min(90dvh, calc(100% - 24px))' : 'calc(100% - 24px)',
+          overflowY: asistente ? 'hidden' : 'auto',
           background: 'var(--cp-cream)',
           borderRadius: '20px',
           boxShadow: '0 20px 50px rgba(11, 44, 62, 0.45)',
@@ -443,7 +490,7 @@ export function VentanaOpcionesProducto({
           </div>
           <button
             type="button"
-            onClick={alCerrar}
+            onClick={pedirCierre}
             aria-label="Cerrar"
             style={{
               flex: 'none',
@@ -462,7 +509,33 @@ export function VentanaOpcionesProducto({
           </button>
         </div>
 
-        {avisoStock && (
+        <AsistenteCombo
+          activo={asistente}
+          pasos={pasosAsistente}
+          indice={Math.min(indicePaso, pasosAsistente.length)}
+          alCambiarIndice={setIndicePaso}
+          titulo={producto.nombre}
+          precio={precioTotal}
+          resumen={[tamanoSeleccionado?.nombre ?? '', ...partesJug.map((p) => (p.bebidas ? '' : resumenReparto(p, elegido[p.parteId] ?? {}, undefined, ' + '))), ...partesJug.filter((p) => p.bebidas).map((p) => (bebidas[p.parteId] ?? []).slice(0, p.cantidad * cantidad).filter(Boolean).map((c) => etiquetaBebida(p, c)).join(' + '))].filter(Boolean).join(' · ')}
+          puedeAgregar={puedeAgregar && nombresFaltantes.length === 0}
+          textoAgregar={nombresFaltantes.length > 0 ? textoFaltaNombre(nombresFaltantes[0]) : faltaTexto ? `Falta elegir: ${faltaTexto}` : 'Revisa las opciones'}
+          alAgregar={handleAgregar}
+          avisosPie={
+            <>
+              {avisoStock && (
+                <div role="alert" data-testid="aviso-stock" style={{ background: sinStock ? 'var(--cp-rust)' : '#FFF3C4', color: sinStock ? '#FFFFFF' : 'var(--cp-navy)', fontWeight: 800, fontSize: '13px', borderRadius: '12px', padding: '8px 12px' }}>
+                  {avisoStock}
+                </div>
+              )}
+              {saborMode && !saboresListos && (
+                <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+                  {libre ? 'Elige al menos un sabor' : `Elige los sabores: faltan ${faltanUnidades(valorSaboresOk, total)}`}
+                </div>
+              )}
+            </>
+          }
+        >
+        {avisoStock && !asistente && (
           <div role="alert" data-testid="aviso-stock" style={{ background: sinStock ? 'var(--cp-rust)' : '#FFF3C4', color: sinStock ? '#FFFFFF' : 'var(--cp-navy)', fontWeight: 800, fontSize: '14px', borderRadius: '12px', padding: '10px 14px' }}>
             {avisoStock}
           </div>
@@ -475,7 +548,7 @@ export function VentanaOpcionesProducto({
           </div>
         )}
 
-        {tamanos.length > 0 && (
+        {tamanos.length > 0 && vis('tamano') && (
           <div>
             <div style={{ fontWeight: 800, marginBottom: '6px', color: 'var(--cp-navy)' }}>
               Tamaño o presentación
@@ -522,6 +595,7 @@ export function VentanaOpcionesProducto({
 
         {/* Grupos de opciones */}
         {gruposVisibles.map((g) => {
+          if (asistente && !vis(`sec-${claveSeccion(g.nombre)}`)) return null;
           const qBuscada = (busquedaGrupo[g.id] || '').toLowerCase().trim();
           const opcionesVisibles = qBuscada
             ? g.opciones.filter((o) => o.nombre.toLowerCase().includes(qBuscada))
@@ -693,7 +767,7 @@ export function VentanaOpcionesProducto({
           );
         })}
 
-        {nB > 0 && (
+        {nB > 0 && vis('nombres') && (
           <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--cp-white)' }}>
             <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>Nombre para el vaso</div>
             {Array.from({ length: cantidad * nB }, (_, i) => {
@@ -729,7 +803,7 @@ export function VentanaOpcionesProducto({
         )}
 
         {/* ¿Para quién es?: una etiqueta simulada por cada bebida, como en la carta (el nombre es obligatorio) */}
-        {esBebida && (
+        {esBebida && !asistente && (
           <div
             style={{
               border: '1.5px solid var(--cp-line)',
@@ -864,13 +938,14 @@ export function VentanaOpcionesProducto({
             Agotado
           </div>
         )}
-        {!comboAgotado && <ResumenPartesFijas oferta={ofertaCombo} />}
-        {!comboAgotado &&
+        {!comboAgotado && vis('tamano') && <ResumenPartesFijas oferta={ofertaCombo} />}
+        {!comboAgotado && vis('opc') &&
           partesOpcionales(ofertaCombo).map((o) => (
             <ParteOpcionalTarjeta key={o.parteId} parte={o} valor={llevadasOpcional(o, opcionales)} onCambio={(n) => setOpcionales((prev) => ({ ...prev, [o.parteId]: n }))} />
           ))}
-        {!comboAgotado && (
+        {!comboAgotado && vis('comp') && (
           <SelectorPaqueteCombo
+            tarjetas={asistente}
             grupos={gruposPaquetes(oferta)}
             elegidos={paquetes}
             onElegir={(grupo, paquete) => {
@@ -881,7 +956,7 @@ export function VentanaOpcionesProducto({
           />
         )}
         <AvisoAlternativasCombo
-          partes={comboAgotado ? [] : partesRe}
+          partes={comboAgotado ? [] : partesRe.filter((p) => vis(`alt-${p.parteId}`))}
           elegidos={reemplazos}
           onElegir={(parteId, alt) => {
             setReemplazos((prev) => ({ ...prev, [parteId]: alt.id }));
@@ -891,15 +966,32 @@ export function VentanaOpcionesProducto({
         {!comboAgotado &&
           partesJug.map((parte) =>
             parte.bebidas ? (
-              <PasosBebidaCombo
-                key={parte.parteId}
-                parte={parte}
-                unidades={cantidad}
-                valor={bebidas[parte.parteId] ?? []}
-                onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
-                usos={usosDeSabor([], elegido)}
-              />
-            ) : (
+              asistente ? (
+                // En el asistente cada bebida es su propio paso: se muestra solo la de este paso
+                Array.from({ length: parte.cantidad * cantidad }, (_, i) =>
+                  vis(`beb-${parte.parteId}-${i}`) ? (
+                    <PasosBebidaCombo
+                      key={`${parte.parteId}-${i}`}
+                      parte={parte}
+                      unidades={cantidad}
+                      soloIndice={i}
+                      valor={bebidas[parte.parteId] ?? []}
+                      onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
+                      usos={usosDeSabor([], elegido)}
+                    />
+                  ) : null,
+                )
+              ) : (
+                <PasosBebidaCombo
+                  key={parte.parteId}
+                  parte={parte}
+                  unidades={cantidad}
+                  valor={bebidas[parte.parteId] ?? []}
+                  onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
+                  usos={usosDeSabor([], elegido)}
+                />
+              )
+            ) : vis('comp') ? (
             <SelectorEleccionCombo
               key={parte.parteId}
               parte={parte}
@@ -908,11 +1000,11 @@ export function VentanaOpcionesProducto({
               onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
               usos={usosDeSabor([], elegido)}
             />
-            ),
+            ) : null,
           )}
 
         {/* Nota para cocina */}
-        <div>
+        <div style={vis('nota') ? undefined : { display: 'none' }}>
           <label
             htmlFor="cfg-note"
             style={{ fontWeight: 800, display: 'block', marginBottom: '6px', color: 'var(--cp-navy)' }}
@@ -939,7 +1031,7 @@ export function VentanaOpcionesProducto({
         </div>
 
         {/* Advertencia si faltan opciones obligatorias */}
-        {gruposFaltantes.length > 0 && (
+        {!asistente && gruposFaltantes.length > 0 && (
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
             Falta elegir: {gruposFaltantes.join(', ')}.
           </div>
@@ -951,7 +1043,7 @@ export function VentanaOpcionesProducto({
         )}
 
         {/* DT-62: Personalización por unidad */}
-        {cantidad > 1 && (producto.grupos || []).length > 0 && !saborMode && (
+        {vis('nota') && cantidad > 1 && (producto.grupos || []).length > 0 && !saborMode && (
           <button
             type="button"
             onClick={() => {
@@ -975,7 +1067,7 @@ export function VentanaOpcionesProducto({
           </button>
         )}
 
-        {personalizarPorUnidad && cantidad > 1 && (
+        {vis('nota') && personalizarPorUnidad && cantidad > 1 && (
           <div
             role="status"
             style={{
@@ -1051,6 +1143,7 @@ export function VentanaOpcionesProducto({
         {/* Pie: Stepper de cantidad y Botón Agregar */}
         <div
           className="salon-pie-fijo"
+          hidden={asistente}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1145,7 +1238,19 @@ export function VentanaOpcionesProducto({
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
         </div>
+        </AsistenteCombo>
       </div>
+      <Confirmar
+        abierto={confirmarSalida}
+        titulo="¿Salir sin agregar el combo?"
+        mensaje="Se perderán las opciones que ya elegiste."
+        textoSi="Sí, salir"
+        textoNo="Seguir armando"
+        peligro
+        focoInicialNo
+        alConfirmar={alCerrar}
+        alCancelar={() => setConfirmarSalida(false)}
+      />
     </div>
   );
 }

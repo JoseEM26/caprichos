@@ -106,13 +106,15 @@ interface PropsPaquetes {
   grupos: GrupoPaquetes[];
   elegidos: Record<string, string>;
   onElegir: (grupo: string, paquete: string) => void;
+  /** Asistente por pasos: una tarjeta grande por alternativa (2 columnas, ≥ 64 px) en vez de chips. */
+  tarjetas?: boolean;
 }
 
 /** Nombre corto para el chip: sin aclaraciones entre paréntesis; el nombre completo va en title y en el resumen. */
 export const nombreCortoPaquete = (nombre: string): string => nombre.replace(/\s*\([^)]*\)/g, '').trim() || nombre;
 
 /** «Elige tu complemento»: una fila de chips (radiogroup, flechas); los que no se pueden armar por stock quedan bloqueados. */
-export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquetes) {
+export function SelectorPaqueteCombo({ grupos, elegidos, onElegir, tarjetas = false }: PropsPaquetes) {
   const [cambio, setCambio] = useState<string | null>(null);
   if (grupos.length === 0) return null;
   return (
@@ -147,7 +149,11 @@ export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquet
               role="radiogroup"
               aria-labelledby={`paq-${g.grupo}`}
               onKeyDown={mover}
-              style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, minWidth: 0 }}
+              style={
+                tarjetas
+                  ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, minWidth: 0 }
+                  : { display: 'flex', gap: 8, overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, minWidth: 0 }
+              }
             >
               {g.paquetes.map((pq) => {
                 const on = elegido === pq.nombre;
@@ -163,18 +169,18 @@ export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquet
                     tabIndex={foco?.nombre === pq.nombre ? 0 : -1}
                     onClick={() => elegir(g.grupo, pq.nombre)}
                     style={{
-                      flex: g.paquetes.length <= 2 ? '1 1 0' : '0 0 auto',
+                      flex: tarjetas ? 'none' : g.paquetes.length <= 2 ? '1 1 0' : '0 0 auto',
                       scrollSnapAlign: 'start',
-                      minHeight: 44,
-                      maxWidth: 230,
+                      minHeight: tarjetas ? 64 : 44,
+                      maxWidth: tarjetas ? 'none' : 230,
                       padding: '0 12px',
                       borderRadius: 12,
                       border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`,
                       background: on ? 'var(--cp-orange)' : 'var(--cp-white)',
                       color: 'var(--cp-navy)',
                       fontWeight: 700,
-                      fontSize: 13,
-                      whiteSpace: 'nowrap',
+                      fontSize: tarjetas ? 15 : 13,
+                      whiteSpace: tarjetas ? 'normal' : 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       opacity: pq.disponible ? 1 : 0.5,

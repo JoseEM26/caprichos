@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 sessionStorage.setItem('caprichos.nombreInvitado', 'Invitado'); // el invitado ya dijo su nombre (si no, la carta lo pide primero)
-import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 import { ProductoCarta } from '../tipos';
@@ -49,24 +49,32 @@ const duo = (): OfertaItem =>
 const abrir = () => render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo()} />);
 const tarjeta = (n: number) => within(screen.getByRole('group', { name: `Bebida ${n}` }));
 const cabecera = (n: number) => tarjeta(n).getAllByRole('button')[0];
+// Asistente por pasos: «Siguiente» avanza un paso; el chip «Paso N» vuelve a un paso ya hecho
+const siguiente = () => fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+const irPaso = (n: number) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Paso ${n}:`) }));
 
-describe('Armado interactivo del combo', () => {
+describe('Armado interactivo del combo (asistente por pasos)', () => {
   beforeEach(() => agregarLinea.mockClear());
 
-  it('la tarjeta abierta cierra sola al elegir, muestra la elegida y abre la siguiente pendiente', () => {
+  it('un paso a la vez: el tamaño sigue con «Siguiente»; cada bebida es su paso y la elegida avanza sola', () => {
     abrir();
+    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 1 de 7');
+    expect(screen.queryByRole('group', { name: 'Bebida 1' })).toBeNull();
+    siguiente();
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Bebida 1');
     expect(cabecera(1)).toHaveAttribute('aria-expanded', 'true');
-    expect(cabecera(2)).toHaveAttribute('aria-expanded', 'false');
-    expect(cabecera(2)).toHaveTextContent('Elige tu bebida 2');
     fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
-    expect(cabecera(1)).toHaveAttribute('aria-expanded', 'false');
+    // la bebida 1 ya está lista: avanza sola a la bebida 2, sin saltarse nada
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Bebida 2');
+    expect(screen.queryByRole('group', { name: 'Bebida 1' })).toBeNull();
+    irPaso(2);
     expect(cabecera(1)).toHaveTextContent('FRAPPE OREO');
     expect(cabecera(1)).toHaveTextContent('Cambiar');
-    expect(cabecera(2)).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('los chips de categoría filtran y el buscador filtra sin acentos', () => {
     abrir();
+    siguiente();
     fireEvent.click(tarjeta(1).getByRole('button', { name: 'ICED' }));
     expect(tarjeta(1).queryByRole('button', { name: /CAPUCCINO/ })).toBeNull();
     expect(tarjeta(1).getByRole('button', { name: /ICED CAFÉ/ })).toBeInTheDocument();
@@ -79,23 +87,30 @@ describe('Armado interactivo del combo', () => {
     const p = o.combosParte![0] as unknown as { opcionesDetalle: unknown[] };
     for (let i = 0; i < 8; i++) p.opcionesDetalle.push(op(`x${i}`, `RELLENO ${i}`));
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={o} />);
+    siguiente();
     fireEvent.change(screen.getByLabelText('Buscar bebida'), { target: { value: 'cafe' } });
     expect(tarjeta(1).getByRole('button', { name: /ICED CAFÉ/ })).toBeInTheDocument();
     expect(tarjeta(1).queryByRole('button', { name: /CAPUCCINO/ })).toBeNull();
   });
 
-  it('«Misma que la bebida 1» copia la elección y la bebida agotada se ve deshabilitada con «Agotado»', () => {
+  it('«Igual que la bebida 1» copia la elección y la bebida agotada se ve deshabilitada con «Agotado»', () => {
     abrir();
+    siguiente();
     expect(tarjeta(1).getByRole('button', { name: /CAFE AGOTADO/ })).toBeDisabled();
     expect(tarjeta(1).getByText('Agotado')).toBeInTheDocument();
     fireEvent.click(tarjeta(1).getByRole('button', { name: /CAPUCCINO/ }));
-    fireEvent.click(tarjeta(2).getByRole('button', { name: /Misma que la bebida 1/ }));
+    // ya está en la bebida 2: el atajo copia la bebida 1
+    fireEvent.click(tarjeta(2).getByRole('button', { name: /Igual que la bebida 1/ }));
+    irPaso(3);
     expect(cabecera(2)).toHaveTextContent('CAPUCCINO');
-    expect(cabecera(2)).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('el complemento muestra contador, progreso, topes y «Completo ✓»; los agotados dicen «No hay stock»', () => {
     abrir();
+    siguiente();
+    fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
+    fireEvent.click(tarjeta(2).getByRole('button', { name: /CAPUCCINO/ }));
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Complemento');
     const bloque = within(screen.getByTestId('eleccion-combo-2'));
     expect(bloque.getByText('0 de 2 elegidas')).toBeInTheDocument();
     expect(bloque.getByText('Faltan 2')).toBeInTheDocument();
@@ -112,56 +127,67 @@ describe('Armado interactivo del combo', () => {
     expect(bloque.getByText('No hay stock')).toBeInTheDocument();
   });
 
-  it('la barra de progreso lista los pasos con su estado y «Faltan N» se actualiza', () => {
+  it('la barra de pasos lista cada paso con su estado y el número de paso se actualiza', () => {
     abrir();
-    const barra = within(screen.getByTestId('progreso-combo'));
-    expect(barra.getByText('Faltan 3')).toBeInTheDocument();
+    const barra = within(screen.getByTestId('progreso-asistente'));
     expect(barra.getByRole('button', { name: 'Paso 1: Tamaño, listo' })).toBeInTheDocument();
     expect(barra.getByRole('button', { name: 'Paso 2: Bebida 1, pendiente' })).toBeInTheDocument();
+    siguiente();
     fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
-    expect(barra.getByText('Faltan 2')).toBeInTheDocument();
+    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 3 de 7');
     expect(barra.getByRole('button', { name: 'Paso 2: Bebida 1, listo' })).toBeInTheDocument();
+    expect(barra.getByRole('button', { name: 'Paso 3: Bebida 2, pendiente' })).toHaveAttribute('aria-current', 'step');
   });
 
-  it('el botón deshabilitado dice el motivo y el toque lleva al primer faltante abriéndolo', () => {
-    vi.useFakeTimers();
+  it('«Siguiente» bloqueado dice qué falta; Atrás no pierde lo elegido', () => {
     abrir();
-    expect(screen.getByRole('button', { name: /Falta elegir: Bebida 1/ })).toBeDisabled();
-    fireEvent.click(cabecera(1)); // la plegamos
-    expect(cabecera(1)).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(screen.getByRole('button', { name: /Ver qué falta/ }));
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(cabecera(1)).toHaveAttribute('aria-expanded', 'true');
-    vi.useRealTimers();
+    siguiente();
+    const sig = screen.getByRole('button', { name: 'Siguiente' });
+    expect(sig).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 1');
+    fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Bebida 1');
+    expect(cabecera(1)).toHaveTextContent('FRAPPE OREO');
   });
 
-  it('los nombres y la nota son plegables (cerrados al inicio) con contador de letras', () => {
+  it('los nombres son obligatorios en su paso y la nota es un paso opcional', () => {
     abrir();
-    const cab = screen.getByRole('button', { name: /Nombres para el vaso/ });
-    expect(cab).toHaveAttribute('aria-expanded', 'false');
-    expect(cab).toHaveAttribute('aria-controls', 'cuerpo-nombres-envase');
-    fireEvent.click(cab);
-    expect(cab).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
-    expect(screen.getByText('5/14')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Nota para cocina/ })).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('el pie resume el combo y el payload es el de siempre (bebidas, sabores, nombres, nota, cantidad)', () => {
-    abrir();
+    siguiente();
     fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
     fireEvent.click(tarjeta(2).getByRole('button', { name: /CAPUCCINO/ }));
     const bloque = within(screen.getByTestId('eleccion-combo-2'));
     fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Fresa' }));
     fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Manjar' }));
-    expect(screen.getByTestId('resumen-combo')).toHaveTextContent('Tu combo: Regular 12 oz · FRAPPE OREO + CAPUCCINO · 1 Fresa + 1 Manjar');
-    fireEvent.click(screen.getByRole('button', { name: /Nombres para el vaso/ }));
+    siguiente();
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nombres para el vaso');
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
+    fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
+    expect(screen.getByText('5/14')).toBeInTheDocument();
+    fireEvent.change(document.getElementById('nombre-bebida-1') as HTMLInputElement, { target: { value: 'Pedro' } });
+    siguiente();
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nota para cocina');
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeEnabled();
+  });
+
+  it('el resumen muestra lo elegido y el payload es el de siempre (bebidas, sabores, nombres, nota, cantidad)', () => {
+    abrir();
+    siguiente();
+    fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
+    fireEvent.click(tarjeta(2).getByRole('button', { name: /CAPUCCINO/ }));
+    const bloque = within(screen.getByTestId('eleccion-combo-2'));
+    fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Fresa' }));
+    fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Manjar' }));
+    siguiente();
     fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
     fireEvent.change(document.getElementById('nombre-bebida-1') as HTMLInputElement, { target: { value: 'Pedro' } });
+    siguiente();
     fireEvent.click(screen.getByRole('button', { name: /Nota para cocina/ }));
     fireEvent.change(screen.getByLabelText(/Nota para cocina/, { selector: 'input' }), { target: { value: 'sin hielo' } });
+    siguiente();
+    expect(screen.getByTestId('resumen-pasos')).toBeInTheDocument();
+    expect(screen.getByTestId('resumen-asistente')).toHaveTextContent('Regular 12 oz · FRAPPE OREO + CAPUCCINO · 1 Fresa + 1 Manjar');
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     const l = agregarLinea.mock.calls[0][0];
     expect(l.cantidad).toBe(1);

@@ -1,0 +1,33 @@
+/* Asistente por pasos del armado de combos (carta y mozo). Colores de marca: --cp-* del proyecto. */
+.ac-progreso { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px; background: var(--cp-cream, #FBF4EC); border-bottom: 1px solid var(--cp-line, #E3D6C6); }
+.ac-linea { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 12px; color: var(--cp-navy, #0B2C3E); }
+.ac-titulo-producto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cp-soft, #6B5D4F); min-width: 0; }
+.ac-chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ac-chips::-webkit-scrollbar { display: none; }
+.ac-chips li { flex: none; }
+.ac-chip { min-height: 44px; border-radius: 9999px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); padding: 0 12px; font-weight: 700; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.ac-chip[data-hecho='si'] { border-color: #2F7A45; background: #DFF3E3; }
+.ac-chip[aria-current='step'] { border-color: var(--cp-orange, #E67929); background: var(--cp-orange, #E67929); color: #FFFFFF; }
+.ac-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.ac-barra { height: 6px; border-radius: 9999px; background: var(--cp-line, #E3D6C6); overflow: hidden; }
+.ac-barra > span { display: block; height: 100%; background: var(--cp-gold, #D99E39); border-radius: 9999px; transition: width 200ms ease; }
+.ac-cuerpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.ac-h { margin: 0; font-family: var(--fuente-titulos, inherit); font-weight: 800; font-size: 17px; color: var(--cp-navy, #0B2C3E); }
+.ac-lista-resumen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ac-lista-resumen li { display: flex; align-items: center; gap: 10px; min-height: 48px; border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 12px; padding: 6px 10px; background: var(--cp-white, #FFFFFF); }
+.ac-estado { flex: none; width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; background: var(--cp-line, #E3D6C6); color: var(--cp-navy, #0B2C3E); }
+.ac-estado[data-hecho='si'] { background: #2F7A45; color: #FFFFFF; }
+.ac-nombre-paso { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; color: var(--cp-navy, #0B2C3E); overflow-wrap: anywhere; }
+.ac-cambiar { flex: none; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font-weight: 800; font-size: 12px; cursor: pointer; }
+.ac-pie { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--cp-cream, #FBF4EC); border-top: 1px solid var(--cp-line, #E3D6C6); box-shadow: 0 -4px 12px rgba(11, 44, 62, 0.08); }
+.ac-resumen-linea { font-size: 12px; font-weight: 700; line-height: 16px; color: var(--cp-navy, #0B2C3E); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-motivo { font-size: 12px; font-weight: 700; line-height: 17px; color: var(--cp-rust, #B2500F); }
+.ac-botones { display: flex; gap: 10px; align-items: stretch; }
+.ac-sec { flex: none; min-height: 48px; min-width: 88px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: var(--cp-white, #FFFFFF); color: var(--cp-navy, #0B2C3E); font-weight: 800; font-size: 14px; cursor: pointer; }
+.ac-sec:disabled { opacity: 0.4; cursor: not-allowed; }
+.ac-pri { flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--cp-orange, #E67929); color: #FFFFFF; font-weight: 800; font-size: 14px; cursor: pointer; }
+.ac-pri:disabled { background: var(--cp-line, #E3D6C6); color: var(--cp-soft, #6B5D4F); cursor: not-allowed; }
+.ac-chip:focus-visible, .ac-sec:focus-visible, .ac-pri:focus-visible, .ac-cambiar:focus-visible { outline: 3px solid var(--cp-navy, #0B2C3E); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .ac-barra > span { transition: none; }
+}
