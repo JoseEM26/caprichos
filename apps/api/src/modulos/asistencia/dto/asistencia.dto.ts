@@ -187,6 +187,20 @@ export class AjustarDiaDto {
   motivo!: string;
 }
 
+/** El admin elige la marca que cuenta como ENTRADA y la que cuenta como SALIDA de un día con varias marcas. */
+export class ResolverMarcasDto {
+  @Type(() => Number) @IsInt() @Min(1) partyId!: number;
+  @Matches(FECHA, { message: 'La jornada debe ser AAAA-MM-DD' }) jornada!: string;
+  @Type(() => Number) @IsInt() @Min(1) entradaMarcaId!: number;
+  @Type(() => Number) @IsInt() @Min(1) salidaMarcaId!: number;
+  /** Qué pasa con las demás: IGNORAR (no cuentan) o BREAK (las dos del medio son salida y regreso del break). */
+  @IsIn(['IGNORAR', 'BREAK'], { message: 'Indica qué hacer con las demás marcas' }) otras!: 'IGNORAR' | 'BREAK';
+  @IsString()
+  @MinLength(10, { message: 'El motivo debe tener al menos 10 caracteres' })
+  @MaxLength(300)
+  motivo!: string;
+}
+
 export class CambiarHoraMarcaDto {
   @IsISO8601({}, { message: 'La hora no es válida' })
   momento!: string;

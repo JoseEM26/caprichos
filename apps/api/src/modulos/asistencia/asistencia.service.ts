@@ -48,7 +48,7 @@ import {
   verificarCodigo,
   verificarPayload,
 } from './asistencia.qr';
-import { AjustarDiaDto, ConfigurarAsistenciaDto, CambiarHoraMarcaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, RevisarMarcaDto } from './dto/asistencia.dto';
+import { AjustarDiaDto, ConfigurarAsistenciaDto, CambiarHoraMarcaDto, CorregirMarcaDto, MarcarDto, ReasignarMarcaDto, ResolverMarcasDto, RevisarMarcaDto } from './dto/asistencia.dto';
 import {
   CLAVE_ENLACE_PANTALLA,
   EnlacePantalla,
@@ -769,6 +769,74 @@ export class AsistenciaService {
       return creadas;
     });
     return { ok: true, ids };
+  }
+
+  /**
+   * El admin decide cuál marca del día es la ENTRADA y cuál la SALIDA, y qué hacer con las demás. Append-only: cada marca elegida
+   * se anula y se crea una CORRECCION (rol fijo) a la misma hora; las demás quedan ANULADAS («No cuenta»). Con `otras: 'BREAK'`,
+   * las dos marcas que quedan entre la entrada y la salida son salida a break y regreso. Cada marca tocada se audita.
+   */
+  async resolverMarcas(dto: ResolverMarcasDto, usuario: UsuarioAutenticado, ip?: string) {
+    if (![usuario.rol, ...(usuario.roles ?? [])].includes('ADMIN')) {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede resolver las marcas de un día.' });
+    }
+    if (dto.entradaMarcaId === dto.salidaMarcaId) {
+      throw new BadRequestException({ codigo: 'MARCAS_IGUALES', mensaje: 'La entrada y la salida deben ser marcas distintas' });
+    }
+    const persona = await this.prisma.party.findUnique({ where: { id: BigInt(dto.partyId) } });
+    if (!persona) throw new NotFoundException({ codigo: 'PERSONA_NO_ENCONTRADA', mensaje: 'Persona no encontrada' });
+    const jornada = fechaDb(dto.jornada);
+    const pagado = await this.prisma.planillaPeriodo.findFirst({ where: { party_id: persona.id, estado: 'PAGADO', desde: { lte: jornada }, hasta: { gte: jornada } } });
+    if (pagado) throw new ConflictException({ codigo: 'PERIODO_PAGADO', mensaje: 'Ese período ya está pagado. Reábrelo (con motivo) para cambiar las marcas de este día.' });
+    const vigentes = (await this.prisma.asistenciaMarca.findMany({ where: { party_id: persona.id, jornada, estado: { not: 'ANULADA' } } }))
+      .sort((a, b) => a.momento.getTime() - b.momento.getTime());
+    const buscar = (id: number, rol: string) => {
+      const m = vigentes.find((x) => x.id === BigInt(id));
+      if (!m) throw new NotFoundException({ codigo: 'MARCA_NO_ENCONTRADA', mensaje: `La marca elegida como ${rol} no está vigente en ese día` });
+      return m;
+    };
+    const entrada = buscar(dto.entradaMarcaId, 'entrada');
+    const salida = buscar(dto.salidaMarcaId, 'salida');
+    if (salida.momento.getTime() <= entrada.momento.getTime()) {
+      throw new BadRequestException({ codigo: 'SALIDA_ANTES_DE_ENTRADA', mensaje: 'La salida debe ser posterior a la entrada' });
+    }
+    const entre = vigentes.filter((m) => m.momento.getTime() > entrada.momento.getTime() && m.momento.getTime() < salida.momento.getTime());
+    if (dto.otras === 'BREAK' && entre.length !== 2) {
+      throw new BadRequestException({ codigo: 'BREAK_REQUIERE_DOS_MARCAS', mensaje: `Para usarlas como break debe haber exactamente 2 marcas entre la entrada y la salida (hay ${entre.length})` });
+    }
+    const roles = new Map<bigint, 'ENTRADA' | 'SALIDA' | 'SALIDA_ALMUERZO' | 'ENTRADA_ALMUERZO'>([[entrada.id, 'ENTRADA'], [salida.id, 'SALIDA']]);
+    if (dto.otras === 'BREAK') {
+      roles.set(entre[0].id, 'SALIDA_ALMUERZO');
+      roles.set(entre[1].id, 'ENTRADA_ALMUERZO');
+    }
+    const motivo = dto.motivo.trim();
+    const nuevas = await this.prisma.$transaction(async (tx) => {
+      const creadas: Partial<Record<'ENTRADA' | 'SALIDA' | 'SALIDA_ALMUERZO' | 'ENTRADA_ALMUERZO', number>> = {};
+      for (const m of vigentes) {
+        const rol = roles.get(m.id) ?? null;
+        await tx.asistenciaMarca.update({
+          where: { id: m.id },
+          data: {
+            estado: 'ANULADA', revisado_por: usuario.partyId, revisado_en: new Date(),
+            revisado_motivo: rol ? `Rol asignado a ${rol} por el administrador: ${motivo}` : `No cuenta: criterio del administrador: ${motivo}`,
+          },
+        });
+        let nuevaId: number | null = null;
+        if (rol) {
+          const nueva = await tx.asistenciaMarca.create({
+            data: {
+              party_id: m.party_id, jornada, tipo: rol, origen: 'CORRECCION', momento: m.momento, estado: 'VALIDA',
+              motivo: `Marca #${m.id} elegida como ${rol} por el administrador: ${motivo}`, por_party_id: usuario.partyId,
+            },
+          });
+          nuevaId = Number(nueva.id);
+          creadas[rol] = nuevaId;
+        }
+        await this.auditar('CAMBIO', 'RESOLVER_MARCA', 'OK', { marcaOriginal: Number(m.id), rol: rol ?? 'NO_CUENTA', criterio: dto.otras, jornada: dto.jornada, nueva: nuevaId }, usuario.partyId, ip, 'asistencia_marca', m.id, motivo);
+      }
+      return creadas;
+    });
+    return { ok: true, entrada: nuevas.ENTRADA ?? null, salida: nuevas.SALIDA ?? null };
   }
 
   async reiniciarDispositivo(partyId: number, usuario: UsuarioAutenticado, ip?: string) {

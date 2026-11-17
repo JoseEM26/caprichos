@@ -57,6 +57,10 @@ export const reasignarMarca = (id: number, tipo: TipoMarca, motivo: string) => a
 /** Fija el ingreso y/o la salida de un día (también si no marcó). `entrada`/`salida` en ISO con -05:00. */
 export const ajustarDia = (d: { partyId: number; jornada: string; entrada?: string; salida?: string; motivo: string }) => api.post('/admin/asistencia/ajustar-dia', d);
 
+/** Criterio del administrador con varias marcas: cuál es la entrada, cuál la salida y qué hacer con las demás. */
+export const resolverMarcas = (d: { partyId: number; jornada: string; entradaMarcaId: number; salidaMarcaId: number; otras: 'IGNORAR' | 'BREAK'; motivo: string }) =>
+  api.post('/admin/asistencia/resolver-marcas', d);
+
 export const cambiarHoraMarca = (id: number, momento: string, motivo: string, tipo?: TipoMarca | null) =>
   api.post(`/admin/asistencia/marcas/${id}/cambiar-hora`, { momento, motivo, ...(tipo ? { tipo } : {}) });
 

@@ -5,6 +5,7 @@ import { MarcarDto } from './dto/asistencia.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import * as argon2 from 'argon2';
 import { MOTIVO_MARCA_MANUAL } from './asistencia.service';
+import { calcularDiaPlanilla } from './planilla.calculo';
 
 // Prueba del servicio con una BD en memoria mínima. Cubre reglas, no el SQL (eso lo prueba la migración en Postgres).
 
@@ -71,7 +72,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
       findFirst: async ({ where }: any) => filtrar(marcas, where)[0] ?? null,
       findMany: async ({ where = {} }: any) => {
         let res = filtrar(marcas, where);
-        if (where.jornada && where.jornada.gte) res = marcas.filter((m) => m.jornada >= where.jornada.gte && m.jornada <= where.jornada.lte);
+        if (where.jornada && where.jornada.gte) res = marcas.filter((m) => m.jornada >= where.jornada.gte && m.jornada <= where.jornada.lte && (!where.estado?.not || m.estado !== where.estado.not));
         return res.map((m) => ({ ...m, selfie: selfies.find((s) => s.marca_id === m.id) ? {} : null }));
       },
       create: async ({ data }: any) => {
@@ -582,5 +583,112 @@ describe('mensajeMarca: entrada y salida frente al turno', () => {
     expect(m('SALIDA', 22, 30)).toContain('Saliste 30 min antes');
     expect(m('SALIDA', 23, 0)).toContain('Saliste a tiempo');
     expect(m('SALIDA', 23, 20)).toContain('Saliste 20 min después');
+  });
+});
+
+describe('AsistenciaService.resolverMarcas (criterio del administrador con varias marcas)', () => {
+  const admin: UsuarioAutenticado = { partyId: 1n, rol: 'ADMIN', debeCambiar: false, roles: ['ADMIN'] };
+  const J = new Date('2026-11-06T00:00:00Z');
+  // Hora Lima del 2026-11-06 (UTC-5), como las marcas reales
+  const lima = (hora: string) => { const [h, m] = hora.split(':').map(Number); return new Date(Date.UTC(2026, 10, 6, h + 5, m)); };
+  // Viernes, turno 10:00-18:00
+  function conCuatroMarcas() {
+    const s = servicio();
+    s.b.bd.horarioTrabajo.findMany = async () => [{ party_id: 7n, dia_semana: 5, entrada: new Date('1970-01-01T10:00:00Z'), salida: new Date('1970-01-01T18:00:00Z'), almuerzo_inicio: null, almuerzo_fin: null }];
+    const marca = (id: bigint, hora: string, tipo: string, declarado: string | null) =>
+      s.b.marcas.push({ id, party_id: 7n, jornada: J, tipo, tipo_marca: declarado, origen: 'CELULAR', momento: lima(hora), estado: 'VALIDA' });
+    marca(50n, '10:51', 'ENTRADA', 'ENTRADA');
+    marca(51n, '15:12', 'SALIDA', 'SALIDA');
+    marca(52n, '16:35', 'ENTRADA', 'ENTRADA');
+    marca(53n, '17:33', 'SALIDA', 'SALIDA');
+    return s;
+  }
+  const dia = async (svc: AsistenciaService) => (await svc.diasDePersona(7n, '2026-11-06', '2026-11-06', lima('23:00'))).dias[0];
+  const pagarDia = async (svc: AsistenciaService) => calcularDiaPlanilla((await dia(svc)) as any, 5);
+  const req = (over: Partial<Parameters<AsistenciaService['resolverMarcas']>[0]> = {}) => ({
+    partyId: 7, jornada: '2026-11-06', entradaMarcaId: 50, salidaMarcaId: 53, otras: 'IGNORAR' as const,
+    motivo: 'Marcó de más por el break; se toma la primera entrada y la última salida', ...over,
+  });
+
+  it('sin resolver, el día de 4 marcas queda A_REVISAR y no paga horas', async () => {
+    const { svc } = conCuatroMarcas();
+    expect((await dia(svc)).estado).toBe('A_REVISAR');
+    expect((await pagarDia(svc)).trabajadaMin).toBe(0);
+  });
+
+  it('1.ª entrada y última salida: el día cuadra y paga 6 h 42 min (402 min) con tardanza de 51 min', async () => {
+    const { svc, b, auditoria } = conCuatroMarcas();
+    await svc.resolverMarcas(req(), admin);
+    const d = await dia(svc);
+    expect(d.estado).not.toBe('A_REVISAR');
+    expect(d.alertas).toEqual([]);
+    const pago = await pagarDia(svc);
+    expect(pago.trabajadaMin).toBe(402); // 10:51 → 17:33
+    expect(pago.tardanzaMin).toBe(51);
+    expect(pago.salidaAnticipadaMin).toBe(27);
+    // Las dos del medio no cuentan; las elegidas quedan como CORRECCION fija a su hora
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA').map((m) => Number(m.id)).sort()).toEqual([50, 51, 52, 53]);
+    const nuevas = b.marcas.filter((m) => m.origen === 'CORRECCION');
+    expect(nuevas.map((m) => m.tipo)).toEqual(['ENTRADA', 'SALIDA']);
+    expect(nuevas[0].motivo).toContain('elegida como ENTRADA por el administrador');
+    expect(b.marcas[1].revisado_motivo).toContain('No cuenta: criterio del administrador');
+    expect(auditoria.registrar).toHaveBeenCalledTimes(4);
+  });
+
+  it('2.ª entrada y 2.ª salida (criterio distinto): paga solo el tramo 16:35 → 17:33 (58 min)', async () => {
+    const { svc } = conCuatroMarcas();
+    await svc.resolverMarcas(req({ entradaMarcaId: 52, salidaMarcaId: 53 }), admin);
+    const pago = await pagarDia(svc);
+    expect(pago.trabajadaMin).toBe(58);
+    expect(pago.tardanzaMin).toBe(395); // 16:35 frente a las 10:00
+  });
+
+  it('BREAK: con 2 marcas entre la entrada y la salida, son salida y regreso del break y el día cuadra', async () => {
+    const { svc, b } = conCuatroMarcas();
+    await svc.resolverMarcas(req({ otras: 'BREAK' }), admin);
+    const nuevas = b.marcas.filter((m) => m.origen === 'CORRECCION').map((m) => m.tipo);
+    expect(nuevas).toEqual(['ENTRADA', 'SALIDA_ALMUERZO', 'ENTRADA_ALMUERZO', 'SALIDA']);
+    const d = await dia(svc);
+    expect(d.estado).not.toBe('A_REVISAR');
+    expect(d.interp.breaks).toEqual([{ sale: 15 * 60 + 12, regresa: 16 * 60 + 35 }]);
+  });
+
+  it('BREAK exige exactamente 2 marcas entre la entrada y la salida elegidas', async () => {
+    const { svc, b } = conCuatroMarcas();
+    expect(await error(svc.resolverMarcas(req({ otras: 'BREAK', entradaMarcaId: 52, salidaMarcaId: 53 }), admin))).toMatchObject({ codigo: 'BREAK_REQUIERE_DOS_MARCAS' });
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA')).toHaveLength(0);
+  });
+
+  it('valida: misma marca como entrada y salida, salida antes que entrada y marca inexistente', async () => {
+    const { svc, b } = conCuatroMarcas();
+    expect(await error(svc.resolverMarcas(req({ salidaMarcaId: 50 }), admin))).toMatchObject({ codigo: 'MARCAS_IGUALES' });
+    expect(await error(svc.resolverMarcas(req({ entradaMarcaId: 53, salidaMarcaId: 50 }), admin))).toMatchObject({ codigo: 'SALIDA_ANTES_DE_ENTRADA' });
+    expect(await error(svc.resolverMarcas(req({ entradaMarcaId: 999 }), admin))).toMatchObject({ codigo: 'MARCA_NO_ENCONTRADA' });
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA')).toHaveLength(0);
+  });
+
+  it('un período pagado bloquea la resolución y no toca nada', async () => {
+    const { svc, b } = conCuatroMarcas();
+    b.periodosPagados.push({ estado: 'PAGADO' });
+    expect(await error(svc.resolverMarcas(req(), admin))).toMatchObject({ codigo: 'PERIODO_PAGADO' });
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA')).toHaveLength(0);
+  });
+
+  it('solo el ADMIN puede resolver: otro rol recibe SOLO_ADMIN (403) y no cambia nada', async () => {
+    const { svc, b } = conCuatroMarcas();
+    const mozo = { partyId: 9n, rol: 'MOZO', debeCambiar: false, roles: ['MOZO'] } as UsuarioAutenticado;
+    const e = await error(svc.resolverMarcas(req(), mozo));
+    expect(e).toMatchObject({ codigo: 'SOLO_ADMIN' });
+    expect(b.marcas.filter((m) => m.estado === 'ANULADA')).toHaveLength(0);
+  });
+
+  it('el motivo mínimo de 10 caracteres se valida en el DTO', async () => {
+    const { validate } = await import('class-validator');
+    const { plainToInstance } = await import('class-transformer');
+    const { ResolverMarcasDto } = await import('./dto/asistencia.dto');
+    const base = { partyId: 7, jornada: '2026-11-06', entradaMarcaId: 50, salidaMarcaId: 53, otras: 'IGNORAR' };
+    expect((await validate(plainToInstance(ResolverMarcasDto, { ...base, motivo: 'corto' }))).some((e) => e.property === 'motivo')).toBe(true);
+    expect((await validate(plainToInstance(ResolverMarcasDto, { ...base, otras: 'OTRA', motivo: 'Criterio del administrador' }))).some((e) => e.property === 'otras')).toBe(true);
+    expect(await validate(plainToInstance(ResolverMarcasDto, { ...base, motivo: 'Criterio del administrador' }))).toHaveLength(0);
   });
 });

@@ -8,7 +8,9 @@ import type { CronoDia, CronoMarca } from './correccionesApi';
 import { CambiarHoraMarca } from './CambiarHoraMarca';
 import { EliminarMarca } from './EliminarMarca';
 import { DetalleMarca } from './CronogramaTab';
+import { ResolverMarcas } from './ResolverMarcas';
 import { SelfieMarca } from './SelfieMarca';
+import { necesitaCriterio } from './resolverMarcas';
 import { normalizarTipo, type TipoMarcaElegido } from './tiposMarca';
 import './tarjetas-marcas.css';
 
@@ -75,6 +77,9 @@ export function TarjetasMarcas({ fila, dia, cargando, error, reintentar, onError
   return (
     <div className="ca-detalle-sec">
       <Franja fila={fila} />
+      {!cargando && !error && dia && necesitaCriterio(dia) && (
+        <ResolverMarcas key={`${fila.partyId}|${fila.fecha}`} partyId={fila.partyId} fecha={fila.fecha} dia={dia} onError={onError} onOk={onOk} recargar={recargar} />
+      )}
       {cargando ? <Cargando mensaje="Cargando marcas" /> : error || !dia ? (
         <div role="alert" className="tm-error">
           <p>No pudimos cargar las marcas de este día.</p>

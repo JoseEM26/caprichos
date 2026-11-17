@@ -4,7 +4,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
   AprobarSimplesDto, LoteDto, ConfigurarAsistenciaDto, CorregirMarcaDto, CronogramaDto, ListarMarcasDto, RechazarSolicitudDto, ReasignarMarcaDto, AjustarDiaDto, CambiarHoraMarcaDto,
-  ReporteMesDto, ResolverSolicitudDto, RevisarMarcaDto, CalendarioDto, CalendarioFilasDto,
+  ReporteMesDto, ResolverMarcasDto, ResolverSolicitudDto, RevisarMarcaDto, CalendarioDto, CalendarioFilasDto,
 } from './dto/asistencia.dto';
 import { AsistenciaCalendarioService } from './asistencia-calendario.service';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
@@ -121,6 +121,13 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'administrar')
   ajustarDia(@Body() dto: AjustarDiaDto, @Req() req: any) {
     return this.asistencia.ajustarDia(dto, req.usuario, ipDe(req));
+  }
+
+  /** El admin elige qué marca es la entrada y cuál la salida de un día con varias marcas (y qué hacer con las demás). */
+  @Post('resolver-marcas')
+  @Permiso('asistencia', 'administrar')
+  resolverMarcas(@Body() dto: ResolverMarcasDto, @Req() req: any) {
+    return this.asistencia.resolverMarcas(dto, req.usuario, ipDe(req));
   }
 
   /** Cambiar la HORA de una marca (p. ej. falla del sistema): anula la original y crea una corrección con la hora nueva. */
