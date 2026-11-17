@@ -6,6 +6,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { esAdminOSupervisor } from '../acceso/roles-usuario';
 import { PuntosService } from '../clientes/puntos.service';
 import { StockService } from '../stock/stock.service';
+import { CODIGO_PAGO_ONLINE_NUNCA_PAGADO, MENSAJE_PAGO_ONLINE_NUNCA_PAGADO, WHERE_ABANDONADO_EN_LINEA } from '../../comun/pago-online-pendiente';
 
 const PREFIJO_ANULACION_COBRO = 'Pedido anulado:';
 
@@ -48,6 +49,10 @@ export class RevertirAnulacionService {
     }
 
     // Devolución por Culqi: el dinero ya salió (o está por salir) por la pasarela; revertir dejaría el pedido vivo y sin cobro
+    // Pago en línea que nunca se pagó (venció): no hay venta que devolver ni reactivar; el cliente hace un pedido nuevo
+    if (await this.prisma.pedido.count({ where: { id, ...WHERE_ABANDONADO_EN_LINEA } })) {
+      throw new BadRequestException({ codigo: CODIGO_PAGO_ONLINE_NUNCA_PAGADO, mensaje: MENSAJE_PAGO_ONLINE_NUNCA_PAGADO });
+    }
     const culqi = await this.prisma.devolucionPedido.findUnique({ where: { pedido_id: id }, select: { medio: true, estado: true } });
     if (culqi?.medio === 'CULQI') {
       throw new ConflictException({

@@ -10,6 +10,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CobrosService } from '../caja/cobros.service';
 import { ArqueoDto } from './dto/arqueo.dto';
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 
 jest.mock('../../comun/socket/eventos.gateway', () => ({
@@ -752,7 +753,7 @@ describe('CierreService', () => {
       prismaMock.pedido.findMany.mockResolvedValue([]);
       await service.cerrar(cerrarDto, mockUsuarioCajero);
       expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] } } }),
+        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA } }),
       );
     });
 

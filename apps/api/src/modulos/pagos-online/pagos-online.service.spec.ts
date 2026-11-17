@@ -90,9 +90,10 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
   const cobros = { cobrar: jest.fn().mockResolvedValue({}), anularCobro: jest.fn().mockResolvedValue({}), anularCobroCajaCerrada: jest.fn().mockResolvedValue({}) };
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const pasarela = opts.pasarela ?? new SimuladoAdaptador();
-  const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela);
+  const gateway: any = { emitirAdmin: jest.fn() };
+  const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela, gateway);
   const acceso = { seguimientoToken: generarTokenSeguimiento(pedido.id) };
-  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela, pagoCulqi };
+  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela, pagoCulqi, gateway };
 }
 
 describe('PagosOnlineService', () => {
@@ -141,8 +142,9 @@ describe('PagosOnlineService', () => {
   });
 
   it('cargo aprobado: cobra con el flujo de Caja, medio TARJETA, y el pedido queda aprobado para cocina', async () => {
-    const { s, acceso, cobros, pedido, intentos } = armar();
+    const { s, acceso, cobros, pedido, intentos, gateway } = armar();
     const { intentoId } = await s.crearIntento('7', acceso);
+    expect(gateway.emitirAdmin).not.toHaveBeenCalledWith('pedido:nuevo', expect.anything());
     const r = await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
     expect(r).toMatchObject({ estado: 'APROBADO', pedidoCodigo: 'P-0007' });
     expect(cobros.cobrar).toHaveBeenCalledTimes(1);
@@ -154,6 +156,7 @@ describe('PagosOnlineService', () => {
     expect(pedido.pago_coordinado_en).toBeInstanceOf(Date);
     expect(pedido.pasa_cocina_en).toBeInstanceOf(Date);
     expect(pedido.estado).toBe('COLA');
+    expect(gateway.emitirAdmin).toHaveBeenCalledWith('pedido:nuevo', expect.objectContaining({ codigo: 'P-0007', estado: 'COLA' }));
     expect(intentos[0]).toMatchObject({ estado: 'APROBADO', ultimos4: '1111' });
     expect(intentos[0].cobrado_en).toBeInstanceOf(Date);
   });

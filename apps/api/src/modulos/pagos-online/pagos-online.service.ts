@@ -384,6 +384,7 @@ export class PagosOnlineService {
       );
       await this.guardarComision(intento, comision).catch((e) => this.logger.warn(`Comisión no guardada (intento ${intentoId}): ${e?.message}`));
       const ahora = new Date();
+      const estabaPorPagar = pedido.estado === 'POR_PAGAR';
       await this.prisma.pedido.update({
         where: { id: pedido.id },
         data: {
@@ -391,10 +392,10 @@ export class PagosOnlineService {
           pago_coordinado_por: BigInt(partyId),
           pasa_cocina_en: pedido.pasa_cocina_en ?? ahora,
           // Recién ahora el pedido entra a cocina (la sincronización de comandas lo toma como a cualquier pedido en cola)
-          ...(pedido.estado === 'POR_PAGAR' ? { estado: 'COLA' } : {}),
+          ...(estabaPorPagar ? { estado: 'COLA' } : {}),
         },
       });
-      if (pedido.estado === 'POR_PAGAR') {
+      if (estabaPorPagar) {
         await this.prisma.pedidoEstadoHistorial
           .create({ data: { pedido_id: pedido.id, estado_anterior: 'POR_PAGAR', estado_nuevo: 'COLA', motivo: 'Pago en línea aprobado', por_party_id: BigInt(partyId) } })
           .catch(() => undefined);
@@ -403,6 +404,7 @@ export class PagosOnlineService {
           .catch(() => undefined);
         try {
           this.eventos?.emitirAdmin('pedido:estado', { id: pedido.id.toString(), codigo: pedido.codigo, estado: 'COLA' });
+          this.eventos?.emitirAdmin('pedido:nuevo', { id: pedido.id.toString(), codigo: pedido.codigo, estado: 'COLA' });
         } catch {
           // accesorio
         }

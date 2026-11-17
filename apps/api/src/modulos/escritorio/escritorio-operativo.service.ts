@@ -1,3 +1,4 @@
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { esCumpleanosHoy, horaLimaEntera } from '../../comun/fechas-lima';
@@ -113,7 +114,7 @@ export class EscritorioOperativoService {
         _count: { _all: true },
       }),
       this.prisma.pedido.findMany({
-        where: { creado_en: { gte: inicioDia, lt: finDia }, es_personal: false, estado: { notIn: ['RECHAZADO', 'ANULADO'] } },
+        where: { creado_en: { gte: inicioDia, lt: finDia }, es_personal: false, estado: { notIn: ['RECHAZADO', 'ANULADO'] }, ...SIN_ABANDONADOS_EN_LINEA },
         select: { creado_en: true, pasa_cocina_en: true, listo_en: true },
       }),
       this.prisma.pedido.count({

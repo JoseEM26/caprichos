@@ -36,6 +36,11 @@ export class FiltrarPedidosDto {
   @IsIn(['1'])
   resumen?: string;
 
+  /** '1': auditoría de pagos en línea que nunca se pagaron (POR_PAGAR y vencidos sin pago). Sin él, Caja no los ve. */
+  @IsOptional()
+  @IsIn(['1'])
+  abandonadosEnLinea?: string;
+
   /** Página (desde 1). Con el límite de abajo, «Cargar más» de Caja pide la siguiente hasta cubrir `total`. */
   @IsOptional()
   @Type(() => Number)

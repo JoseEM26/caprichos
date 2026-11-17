@@ -72,9 +72,9 @@ describe('Filtro de días en Pedidos y caja', () => {
     fireEvent.click(screen.getByRole('option', { name: opcion }));
   };
 
-  /** Llamadas a listar que piden la lista (no el conteo ligero de pendientes, limite 1) */
+  /** Llamadas a listar que piden la lista (no los conteos ligeros de pendientes ni de pagos en línea sin completar, limite 1) */
   const llamadasLista = () =>
-    listar.mock.calls.map((c) => c[0]).filter((f: any) => !(f?.pendientes && f?.limite === 1) && !(f?.programados && !f?.resumen));
+    listar.mock.calls.map((c) => c[0]).filter((f: any) => !(f?.pendientes && f?.limite === 1) && !(f?.abandonadosEnLinea && f?.limite === 1) && !(f?.programados && !f?.resumen));
 
   it('por defecto muestra hoy en Lima (desde = hasta = hoy de Lima) y el chip Hoy activo', async () => {
     render(<PedidosAdminView />);

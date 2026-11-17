@@ -1,4 +1,4 @@
-import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
+import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, SIN_ABANDONADOS_EN_LINEA, WHERE_ABANDONADO_EN_LINEA, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
 import { AnulacionPagadoService } from './anulacion-pagado.service';
 import { exigirMediosActivos } from '../../comun/medios-pago-canal';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
@@ -358,6 +358,9 @@ export class PedidosEstadoService {
         },
       ];
     }
+
+    // Pago en línea que el cliente nunca pagó (esperando o vencido) no es de Caja: solo sale con el filtro de auditoría
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), filtros.abandonadosEnLinea === '1' ? WHERE_ABANDONADO_EN_LINEA : SIN_ABANDONADOS_EN_LINEA];
 
     if (usuarioActual && usuarioActual.rol === 'REPARTIDOR') {
       where.repartidor_party_id = BigInt(usuarioActual.partyId);

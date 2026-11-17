@@ -1725,8 +1725,8 @@ export class PedidosService {
       });
     }
 
-    // 10. Emitir evento en tiempo real por WebSocket
-    try {
+    // 10. Emitir evento en tiempo real por WebSocket (un pedido en línea que espera el pago no avisa: lo avisa pagos-online al aprobarse)
+    if (pedidoCreado.estado !== 'POR_PAGAR') try {
       this.eventosGateway.emitirAdmin('pedido:nuevo', {
         id: pedidoCreado.id.toString(),
         codigo: pedidoCreado.codigo,

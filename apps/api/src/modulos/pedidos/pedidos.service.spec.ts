@@ -371,6 +371,8 @@ describe('PedidosService', () => {
         await service.crear(conCulqi(), 'idemp-culqi-1');
         const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
         expect(data).toMatchObject({ estado: 'POR_PAGAR', pago_estado: 'PENDIENTE_ONLINE', pago_preferido: 'CULQI', pasa_cocina_en: null });
+        // Sin pagar no hay aviso de pedido nuevo (ni en vivo ni en la campana): lo avisa pagos-online al aprobarse
+        expect(eventosGatewayMock.emitirAdmin).not.toHaveBeenCalledWith('pedido:nuevo', expect.anything());
       });
 
       it('apagado (por defecto): se rechaza antes de crear el pedido', async () => {

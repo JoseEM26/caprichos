@@ -14,6 +14,7 @@ function montar(extra: { cobro?: any; devolucion?: any; baja?: number; canje?: a
       findUnique: jest.fn().mockResolvedValue({ id: 10n, codigo: 'CP-W010', estado: 'ANULADO', anulado_en: anuladoEn, anulado_por: 5n, motivo_anulacion: 'x', pago_estado: 'PENDIENTE' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0), // pago en línea nunca pagado (WHERE_ABANDONADO_EN_LINEA)
     },
     pedidoEstadoHistorial: {
       findFirst: jest.fn().mockResolvedValue({ estado_anterior: extra.previo === undefined ? 'PREPARANDO' : extra.previo, en: anuladoEn }),
@@ -38,6 +39,21 @@ function montar(extra: { cobro?: any; devolucion?: any; baja?: number; canje?: a
 const cobroAnulado = (caja = 'ABIERTA') => ({ id: 5n, caja: { estado: caja } });
 
 describe('RevertirAnulacionService', () => {
+  it('pago en línea que venció sin pagar: 400 PAGO_ONLINE_NUNCA_PAGADO y no toca el pedido', async () => {
+    const { service, prisma } = montar();
+    prisma.pedido.count.mockResolvedValue(1);
+    const err: any = await service.revertir('10', 'Se anuló por error', admin).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect(err.getResponse()).toMatchObject({ codigo: 'PAGO_ONLINE_NUNCA_PAGADO', mensaje: 'Este pedido de pago en línea venció sin pagar. Pide al cliente que haga uno nuevo.' });
+    expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('pago en línea que sí se pagó y luego se anuló: la reversión sigue permitida', async () => {
+    const { service, prisma } = montar();
+    prisma.pedido.count.mockResolvedValue(0);
+    await expect(service.revertir('10', 'Se anuló por error', admin)).resolves.toMatchObject({ estado: 'PREPARANDO' });
+  });
+
   it('solo ADMIN y SUPERVISOR (también como rol extra); Caja recibe 403', async () => {
     const { service, prisma } = montar();
     await expect(service.revertir('10', 'Se anuló por error', cajero)).rejects.toBeInstanceOf(ForbiddenException);

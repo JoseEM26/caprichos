@@ -33,6 +33,8 @@ import { BannerCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './Banner
 import './pedidos.css';
 import './caja-lista.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
+import { PagosEnLineaSinCompletar } from './PagosEnLineaSinCompletar';
+import { esperaPagoEnLinea } from './EsperaPagoEnLinea';
 import { ModalCanjearCupon } from '../ofertas/ModalCanjearCupon';
 import { Icono } from '../../comun/Icono';
 import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
@@ -203,6 +205,16 @@ async function contarPendientesAnteriores(): Promise<number | null> {
   }
 }
 
+/** Pagos en línea que el cliente no completó: solo el conteo para el chip (la lista va aparte, en solo lectura). */
+async function contarAbandonados(): Promise<number | null> {
+  try {
+    const r = await pedidosApi.listar({ abandonadosEnLinea: true, limite: 1 });
+    return r.total;
+  } catch {
+    return null;
+  }
+}
+
 /** Programados y encargos vigentes (de hoy en adelante, aún sin pasar a cola): salen en «Programados para otros días» con cualquier filtro. */
 async function cargarProgramadosVigentes(): Promise<{ items: Pedido[]; total: number } | null> {
   try {
@@ -246,6 +258,8 @@ export function PedidosAdminView() {
   // Pedido abierto por ?pedido= que no está en la lista cargada (otro día, o más allá de lo cargado)
   const [pedidoExterno, setPedidoExterno] = useState<Pedido | null>(null);
   const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
+  const [abandonadosTotal, setAbandonadosTotal] = useState<number>(0);
+  const [verAbandonados, setVerAbandonados] = useState<boolean>(false);
   const [programadosVigentes, setProgramadosVigentes] = useState<Pedido[]>([]);
   const [totalProgramados, setTotalProgramados] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
@@ -359,7 +373,7 @@ export function PedidosAdminView() {
     const rangoActual = rango.modo === 'hoy' ? rangoHoy() : rango;
     try {
       // Se vuelven a leer todas las páginas ya cargadas, para que un refresco no recorte lo que ya se ve
-      const [paginas, pendientes, vigentes] = await Promise.all([
+      const [paginas, pendientes, vigentes, abandonados] = await Promise.all([
         Promise.all(
           Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
             pedidosApi.listar({ ...parametrosDeRango(rangoActual), ...(mediosFiltro.length ? { medios: mediosFiltro } : {}), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
@@ -367,17 +381,20 @@ export function PedidosAdminView() {
         ),
         contarPendientesAnteriores(),
         cargarProgramadosVigentes(),
+        contarAbandonados(),
       ]);
       if (g !== generacion.current) return;
       if (vigentes) {
         setProgramadosVigentes(vigentes.items);
         setTotalProgramados(vigentes.total);
       }
-      setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || [])));
+      // El servidor ya no manda los pagos en línea sin pagar; por si acaso, la lista de Caja tampoco los pinta como fila normal
+      setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || []).filter((p) => !esperaPagoEnLinea(p))));
       setRelacionados(unirSinRepetir([], paginas.flatMap((r) => r.relacionados || [])));
       setTotalDia(paginas[0].total ?? 0);
       setResumenApi(paginas[0].resumen ?? null);
       if (pendientes !== null) setPendientesAnteriores(pendientes);
+      if (abandonados !== null) setAbandonadosTotal(abandonados);
     } catch (err: any) {
       if (g === generacion.current) setErrorCarga(err?.message || 'Error al cargar los pedidos');
     } finally {
@@ -1103,7 +1120,13 @@ export function PedidosAdminView() {
                     setPaginaActual(1);
                   }}
                 />
-                <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} programadosVigentes={totalProgramados} alCambiar={cambiarRango} />
+                <FiltroDiasPedidos
+                  rango={rango}
+                  pendientesAnteriores={pendientesAnteriores}
+                  programadosVigentes={totalProgramados}
+                  alCambiar={cambiarRango}
+                  abandonados={{ visible: tiene('pedidos/ver') && tieneRolUsuario(usuario, 'ADMIN'), cantidad: abandonadosTotal, activo: verAbandonados, alAlternar: () => setVerAbandonados((v) => !v) }}
+                />
                 <FiltroCombo
                   etiqueta="Canal"
                   valor={canalFiltro}
@@ -1217,7 +1240,8 @@ export function PedidosAdminView() {
         </section>
 
         {/* TARJETAS / TABLA / LISTA */}
-        <div className="cj2-lista" ref={listaRef}>
+        {verAbandonados && <PagosEnLineaSinCompletar />}
+        <div className="cj2-lista" ref={listaRef} hidden={verAbandonados}>
           {unidades.length === 0 && programadosOtrosDias.length === 0 ? (
             <div className="cj2-vacio">
               {pedidos.length > 0 ? (

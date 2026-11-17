@@ -5,6 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 
 describe('PedidosEstadoService.listar: medio de pago, limite y columnas', () => {
   let prisma: any;
@@ -38,12 +39,13 @@ describe('PedidosEstadoService.listar: medio de pago, limite y columnas', () => 
 
   it('medios convive con pendientes (no pisa su AND)', async () => {
     await service.listar({ medios: 'EFECTIVO', pendientes: '1' } as any, cajero);
-    expect(llamada().where.AND).toHaveLength(2);
+    // Tres: pendientes, medios y el filtro que deja fuera los pagos en línea que nunca se pagaron
+    expect(llamada().where.AND).toHaveLength(3);
   });
 
   it('sin medios no agrega condición', async () => {
     await service.listar({} as any, cajero);
-    expect(llamada().where.AND).toBeUndefined();
+    expect(llamada().where.AND).toEqual([SIN_ABANDONADOS_EN_LINEA]);
   });
 
   it('fila: mediosPago de cobros vigentes (mixto), cobrador, mozo y tiempo total', async () => {

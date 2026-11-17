@@ -297,6 +297,8 @@ export interface FiltrosListarPedidos {
   pendientes?: boolean;
   /** Solo programados («Programados / encargos»), por fecha de entrega; ignora pendientes y desde/hasta */
   programados?: boolean;
+  /** Solo pagos en línea que el cliente no completó (auditoría; Caja no los muestra por defecto) */
+  abandonadosEnLinea?: boolean;
   /** Con programados: fecha de entrega desde/hasta (YYYY-MM-DD de Lima) */
   entregaDesde?: string;
   entregaHasta?: string;
@@ -523,6 +525,7 @@ export const pedidosApi = {
     if (filtros.hasta) params.append('hasta', filtros.hasta);
     if (filtros.pendientes) params.append('pendientes', '1');
     if (filtros.programados) params.append('programados', '1');
+    if (filtros.abandonadosEnLinea) params.append('abandonadosEnLinea', '1');
     if (filtros.entregaDesde) params.append('entregaDesde', filtros.entregaDesde);
     if (filtros.entregaHasta) params.append('entregaHasta', filtros.entregaHasta);
     if (filtros.resumen) params.append('resumen', '1');

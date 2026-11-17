@@ -2,6 +2,7 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
 import { PedidosEstadoService } from './pedidos-estado.service';
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 
 describe('PedidosEstadoService.listar: filtro de días en hora de Lima', () => {
   let prisma: any;
@@ -67,6 +68,8 @@ describe('PedidosEstadoService.listar: filtro de días en hora de Lima', () => {
           { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] } },
         ],
       },
+      // Pagos en línea que nunca se pagaron no entran a Caja (se agrega siempre, después de los filtros de día)
+      SIN_ABANDONADOS_EN_LINEA,
     ]);
   });
 });
@@ -78,6 +81,7 @@ describe('PedidosEstadoService.listar: programados por día de entrega', () => {
     if (Array.isArray(where)) return where.every((w) => cumple(fila, w));
     return Object.entries(where).every(([k, v]: [string, any]) => {
       if (k === 'AND') return cumple(fila, v);
+      if (k === 'NOT') return !cumple(fila, v);
       if (k === 'OR') return v.some((w: any) => cumple(fila, w));
       if (v && typeof v === 'object' && ('gte' in v || 'lt' in v || 'lte' in v)) {
         const t = fila[k]?.getTime?.();

@@ -144,3 +144,7 @@
     padding: 0 18px;
   }
 }
+
+/* Chip de auditoría «Pagos en línea sin completar» */
+.fd-chip-abandonados { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px dashed currentColor; background: transparent; cursor: pointer; }
+.fd-chip-abandonados[aria-pressed='true'] { font-weight: 700; }

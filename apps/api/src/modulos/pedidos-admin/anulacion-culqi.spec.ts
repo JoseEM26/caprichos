@@ -177,7 +177,7 @@ describe('Camino de Pagos en línea (/devolver) y revertir', () => {
   it('no se revierte la anulación de un pedido con devolución por Culqi (hecha o sin completar)', async () => {
     for (const estado of ['HECHA', 'PENDIENTE']) {
       const prisma: any = {
-        pedido: { findUnique: jest.fn().mockResolvedValue({ id: 50n, estado: 'ANULADO' }) },
+        pedido: { findUnique: jest.fn().mockResolvedValue({ id: 50n, estado: 'ANULADO' }), count: jest.fn().mockResolvedValue(0) },
         devolucionPedido: { findUnique: jest.fn().mockResolvedValue({ medio: 'CULQI', estado }) },
       };
       const s = new RevertirAnulacionService(prisma, { registrar: jest.fn() } as any);

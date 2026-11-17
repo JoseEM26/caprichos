@@ -18,10 +18,12 @@ interface Props {
   /** Programados y encargos vigentes (de hoy en adelante, aún sin pasar a cola) */
   programadosVigentes: number;
   alCambiar: (rango: RangoPedidos) => void;
+  /** Chip «Pagos en línea sin completar»: solo para quien puede auditarlos */
+  abandonados?: { visible: boolean; cantidad: number; activo: boolean; alAlternar: () => void };
 }
 
 /** Cabecera de la lista de Pedidos y caja: elige el día (o rango) que se muestra. */
-export function FiltroDiasPedidos({ rango, pendientesAnteriores, programadosVigentes, alCambiar }: Props) {
+export function FiltroDiasPedidos({ rango, pendientesAnteriores, programadosVigentes, alCambiar, abandonados }: Props) {
   const idBase = useId();
   const hoy = hoyLima();
   const [panelAbierto, setPanelAbierto] = useState<boolean>(rango.modo === 'rango');
@@ -58,6 +60,11 @@ export function FiltroDiasPedidos({ rango, pendientesAnteriores, programadosVige
     <div className="fd" aria-label="Filtro de días">
       <div className="fd-chips">
         <FiltroCombo etiqueta="Mostrar" valor={valorCombo} valorPorDefecto="hoy" opciones={opciones} alCambiar={elegirOpcion} />
+        {abandonados?.visible && (
+          <button type="button" className="fd-chip-abandonados" aria-pressed={abandonados.activo} onClick={abandonados.alAlternar}>
+            Pagos en línea sin completar <b>{abandonados.cantidad}</b>
+          </button>
+        )}
       </div>
 
       {panelAbierto && (

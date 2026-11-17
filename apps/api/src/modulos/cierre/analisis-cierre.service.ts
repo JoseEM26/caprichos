@@ -1,3 +1,4 @@
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
@@ -63,7 +64,7 @@ export class AnalisisCierreService {
       this.prisma.movimientoCaja.findMany({ where: { caja_id: cajaId }, orderBy: { id: 'asc' }, take: TOPE }),
       this.prisma.liquidacion.findMany({ where: { caja_id: cajaId } }),
       this.prisma.pedido.findMany({
-        where: { estado: { not: 'ANULADO' }, creado_en: { gte: inicio, lt: fin }, OR: [{ monto_credito: { gt: 0 } }, { es_personal: true }, { pago_metodo: 'CREDITO_PERSONAL' }] },
+        where: { estado: { not: 'ANULADO' }, ...SIN_ABANDONADOS_EN_LINEA, creado_en: { gte: inicio, lt: fin }, OR: [{ monto_credito: { gt: 0 } }, { es_personal: true }, { pago_metodo: 'CREDITO_PERSONAL' }] },
         select: { codigo: true, total: true, monto_credito: true },
         take: TOPE,
       }),

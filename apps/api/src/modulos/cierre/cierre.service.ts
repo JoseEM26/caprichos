@@ -1,3 +1,4 @@
+import { SIN_ABANDONADOS_EN_LINEA } from '../../comun/pago-online-pendiente';
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import {
   HttpException,
@@ -1328,7 +1329,7 @@ export class CierreService {
    */
   async pedidosSinTerminar(db: any = this.prisma) {
     const pedidos = await db.pedido.findMany({
-      where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] } },
+      where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA },
       orderBy: { creado_en: 'asc' },
       select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, total: true, creado_en: true, cliente_nombre: true },
     });
