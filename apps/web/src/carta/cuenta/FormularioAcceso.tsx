@@ -37,7 +37,12 @@ type Paso = 1 | 2 | 3;
 const TITULOS_PASO = ['Tu celular', 'Código', 'Tus datos'] as const;
 type Legal = 'terminos' | 'privacidad';
 
-const mensajeDe = (err: unknown, defecto: string): string => (err instanceof Error && err.message ? err.message : defecto);
+const MENSAJE_SIN_CONEXION = 'No hay conexión. Revisa tu internet e inténtalo de nuevo.';
+/** Un fallo de red llega como TypeError («Failed to fetch»): se dice en español, sin el texto técnico. */
+const mensajeDe = (err: unknown, defecto: string): string => {
+  if (err instanceof TypeError || (err as { codigo?: string } | null)?.codigo === 'ERROR_RED') return MENSAJE_SIN_CONEXION;
+  return err instanceof Error && err.message ? err.message : defecto;
+};
 const codigoDe = (err: unknown): string => (err as { codigo?: string } | null)?.codigo ?? '';
 
 /** Fortaleza simple: 0 débil, 1 media, 2 buena. */
@@ -128,7 +133,7 @@ function VentanaLegal({ info, cual, alCerrar }: { info: CartaLegalInfo | null; c
 }
 
 /** Acceso de quien no tiene sesión: ingresar, crear cuenta (en 2 pasos) y recuperar contraseña (celular + contraseña, sin DNI). */
-export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }: { alSeguirInvitado: () => void; invitadoPermitido?: boolean }) {
+export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, alCrearCuenta }: { alSeguirInvitado: () => void; invitadoPermitido?: boolean; alCrearCuenta?: () => void }) {
   const { ingresar, registrar } = useCuenta();
   const [modo, setModo] = useState<Modo>('in');
   const [paso, setPaso] = useState<Paso>(1);
@@ -265,6 +270,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         aceptaDatos: true,
       });
       setContrasena('');
+      alCrearCuenta?.();
     }, 'No se pudo crear la cuenta. Intenta de nuevo.');
   };
 
@@ -413,6 +419,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
           alVerificar={celularVerificado}
           alReenviar={enviarCodigoRegistro}
           puedeReenviar={espera <= 0 && !enviando}
+          esperaSeg={espera}
         />
       )}
 
@@ -420,7 +427,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         <>
           <div>
             <label htmlFor="ac-cr" style={etiqueta}>Código de 6 dígitos (llega por WhatsApp)</label>
-            <input id="ac-cr" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
+            <input id="ac-cr" autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
           </div>
           <button type="button" onClick={enviarCodigoRegistro} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
             {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
@@ -439,11 +446,12 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
               alVerificar={() => setVerificadoWa(true)}
               alReenviar={pedirCodigo}
               puedeReenviar={espera <= 0 && !enviando}
+              esperaSeg={espera}
             />
           ) : (
             <div>
               <label htmlFor="ac-c" style={etiqueta}>Código de 6 dígitos</label>
-              <input id="ac-c" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
+              <input id="ac-c" autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
             </div>
           )}
           <CampoClave id="ac-pn" etiquetaTexto="Contraseña nueva" valor={contrasena} alCambiar={setContrasena} nueva />

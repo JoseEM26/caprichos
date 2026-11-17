@@ -1,7 +1,9 @@
 jest.mock('@nestjs/jwt', () => ({ JwtService: class {}, JwtModule: { register: jest.fn().mockReturnValue({ module: class {} }) } }));
 
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { CodigoRegistroService, REGISTRO_MAX_SOLICITUDES_IP_HORA } from './codigo-registro.service';
+import { CodigoRegistroService, MENSAJE_NO_ENVIADO, REGISTRO_MAX_SOLICITUDES_IP_HORA, RESPUESTA_CODIGO_REGISTRO } from './codigo-registro.service';
+import { PoliticaEvolutionService } from '../chatbot/evolution/politica-evolution.service';
+import { atenderMensajeVerificacion, claveMarcaVerificacion, iniciarVerificacion, RESPUESTA_NO_VERIFICADO, RESPUESTA_VERIFICADO } from './verificacion-whatsapp.util';
 
 const respuestaDe = (err: any) => err?.getResponse?.();
 
@@ -37,9 +39,12 @@ describe('CodigoRegistroService', () => {
   let prisma: any;
   let redis: ReturnType<typeof redisFalso>;
   let outbox: any;
+  let politica: any;
 
   beforeEach(() => {
     redis = redisFalso();
+    // Política de Evolution: por defecto deja pasar el envío
+    politica = { evaluar: jest.fn().mockResolvedValue({ accion: 'ENVIAR' }) };
     // Estos tests son del modo CODIGO_PLANTILLA (código de 6 dígitos); el modo por defecto es WHATSAPP_ENTRANTE
     prisma = {
       customerAccount: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -50,7 +55,7 @@ describe('CodigoRegistroService', () => {
       prisma,
       { obtenerCliente: () => redis } as any,
       { get: () => 'secreto-de-prueba' } as any,
-      { get: () => outbox } as any,
+      { get: (clase: unknown) => (clase === PoliticaEvolutionService ? politica : outbox) } as any,
     );
   });
 
@@ -185,5 +190,70 @@ describe('CodigoRegistroService', () => {
       await expect(service.consumir('912345678', '000000')).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
     }
     await expect(service.consumir('912345678', codigo)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+  });
+
+  /** Error de solicitar(): debe ser HttpException 503 con CODIGO_NO_ENVIADO (nunca un «te enviamos»). */
+  const noEnviado = async (promesa: Promise<unknown>) => {
+    const error: any = await promesa.then(() => null, (e) => e);
+    expect(error).not.toBeNull();
+    expect(error.getStatus()).toBe(503);
+    expect(respuestaDe(error).codigo).toBe('CODIGO_NO_ENVIADO');
+    return error;
+  };
+
+  it('Redis caído: no responde «te enviamos» ni encola; responde 503 CODIGO_NO_ENVIADO', async () => {
+    redis.incr.mockRejectedValueOnce(new Error('redis caído'));
+    await noEnviado(service.solicitar('987654321'));
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
+  it('sin outbox (el chatbot no está cargado): 503, no finge el envío', async () => {
+    const sinOutbox = new CodigoRegistroService(
+      prisma,
+      { obtenerCliente: () => redis } as any,
+      { get: () => 'secreto-de-prueba' } as any,
+      { get: (clase: unknown) => (clase === PoliticaEvolutionService ? politica : undefined) } as any,
+    );
+    await noEnviado(sinOutbox.solicitar('987654321'));
+    expect(redis.datos.size).toBe(0);
+  });
+
+  it('Evolution fuera de horario: 503 con el aviso de horario, sin guardar código ni encolar', async () => {
+    politica.evaluar.mockResolvedValueOnce({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO', motivo: 'fuera de horario' });
+    const error = await noEnviado(service.solicitar('987654321'));
+    expect(respuestaDe(error).mensaje).toMatch(/horario/);
+    expect(outbox.encolar).not.toHaveBeenCalled();
+    expect(redis.datos.size).toBe(0);
+  });
+
+  it('Evolution en pausa o con tope (DIFERIR): 503 genérico y sin encolar', async () => {
+    politica.evaluar.mockResolvedValueOnce({ accion: 'DIFERIR', esperaMs: 300000, motivo: 'pausa' });
+    const error = await noEnviado(service.solicitar('987654321'));
+    expect(respuestaDe(error).mensaje).toBe(MENSAJE_NO_ENVIADO);
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
+  it('si la cola falla al encolar: 503, no responde éxito', async () => {
+    outbox.encolar.mockRejectedValueOnce(new Error('base caída'));
+    const resultado = await service.solicitar('987654321').catch((e) => e);
+    expect(resultado).not.toEqual(RESPUESTA_CODIGO_REGISTRO);
+    expect(resultado.getStatus()).toBe(503);
+  });
+
+  it('el celular se normaliza (+51 y espacios) antes de la política y del envío', async () => {
+    await service.solicitar('+51 987 654 321');
+    expect(politica.evaluar).toHaveBeenCalledWith({ telefono_destino: '51987654321', origen: 'CODIGO_CUENTA' });
+    expect(outbox.encolar.mock.calls[0][0].telefono).toBe('51987654321');
+  });
+
+  it('token de WhatsApp: el mismo celular (con +51 y espacios) verifica; un @lid no verifica nada', async () => {
+    const secreto = 'secreto-de-prueba';
+    const token = await iniciarVerificacion(redis as any, secreto, '987654321', 'REGISTRO');
+    expect(await atenderMensajeVerificacion(redis as any, secreto, `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`, '+51 987 654 321')).toBe(RESPUESTA_VERIFICADO);
+    expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', '987654321'))).toBe('1');
+
+    const otro = await iniciarVerificacion(redis as any, secreto, '912345678', 'REGISTRO');
+    expect(await atenderMensajeVerificacion(redis as any, secreto, `Mi código: ${otro}`, '123456789012345@lid')).toBe(RESPUESTA_NO_VERIFICADO);
+    expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', '912345678'))).toBeUndefined();
   });
 });

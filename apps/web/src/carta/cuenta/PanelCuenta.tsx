@@ -120,6 +120,8 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
   const [perfil, setPerfil] = useState({ nombre: '', correo: '', cumple: '' });
   const [mensajePerfil, setMensajePerfil] = useState('');
   const [mensajeExito, setMensajeExito] = useState('');
+  /** Cuenta recién creada en esta visita: se muestra un aviso de éxito arriba del panel. */
+  const [creada, setCreada] = useState(false);
   const [confirmarPerfil, setConfirmarPerfil] = useState(false);
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
 
@@ -206,6 +208,11 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
           </button>
         </div>
 
+        {creada && cliente && (
+          <div role="status" style={{ fontSize: 14, fontWeight: 700, color: 'var(--cp-ok)', background: 'var(--cp-sand)', borderRadius: 12, padding: '10px 12px' }}>
+            ¡Tu cuenta fue creada! Ya tienes sesión iniciada y tus puntos se suman a tu celular.
+          </div>
+        )}
         {cliente ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -306,7 +313,7 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
             />
           </>
         ) : (
-          <FormularioAcceso alSeguirInvitado={cerrarPanel} invitadoPermitido={invitadoPermitido} />
+          <FormularioAcceso alSeguirInvitado={cerrarPanel} invitadoPermitido={invitadoPermitido} alCrearCuenta={() => setCreada(true)} />
         )}
       </div>
     </>

@@ -164,7 +164,7 @@ export const esMensajeVerificacion = (texto: string): boolean =>
   REGEX_TOKEN_MENSAJE.test(String(texto || '').normalize('NFC'));
 
 export const RESPUESTA_SIN_NUMERO =
-  'No pudimos ver tu número de WhatsApp (tu cuenta lo tiene oculto), así que no podemos verificarlo por aquí. Vuelve a la carta y elige recibir el código por mensaje, o avísanos y te ayudamos 🙏';
+  'No pudimos ver tu número de WhatsApp (tu cuenta lo tiene oculto), así que no podemos verificarlo por aquí. Revisa en WhatsApp que tu número pueda verse, o avísanos y te ayudamos 🙏';
 
 /**
  * Atiende un mensaje entrante de texto. Devuelve la frase a responder, o null si el texto no trae un token
