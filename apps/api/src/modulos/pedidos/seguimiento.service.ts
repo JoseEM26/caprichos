@@ -35,6 +35,7 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   EN_CAMINO: 'En camino',
   ENTREGADO: 'Entregado',
   ANULADO: 'Anulado',
+  PROGRAMADO: 'Programado',
 };
 
 interface PasoDef {
@@ -103,6 +104,8 @@ export interface SeguimientoPedido {
   codigo: string;
   estado: string;
   estadoEtiqueta: string;
+  /** Pedido programado que aún no entra a cocina: el instante ISO pactado (aditivo). */
+  programadoPara?: string;
   modalidad: Modalidad;
   /**
    * Solo «Comer en el local» de la carta: SIN_MESA (se llama por nombre), EN_ESPERA (Caja busca mesa) o
@@ -213,6 +216,7 @@ const SELECCION_SEGUIMIENTO = {
   propina: true,
   creado_en: true,
   pasa_cocina_en: true,
+  programado_para: true,
   listo_en: true,
   despachado_en: true,
   llego_en: true,
@@ -257,6 +261,7 @@ type PedidoSeguimiento = {
   propina?: { toString(): string } | null;
   creado_en: Date;
   pasa_cocina_en: Date | null;
+  programado_para?: Date | null;
   listo_en: Date | null;
   despachado_en: Date | null;
   llego_en?: Date | null;
@@ -536,6 +541,7 @@ export class SeguimientoService {
             ? { ubicacion: 'EN_ESPERA' as const }
             : { ubicacion: 'ASIGNADA' as const, mesa: pedido.mesa_nombre ?? undefined }
         : {}),
+      ...(pedido.estado === 'PROGRAMADO' && pedido.programado_para ? { programadoPara: pedido.programado_para.toISOString() } : {}),
       total: Number(pedido.total.toString()),
       // Propina aparte de la venta (0 = sin propina)
       propina: Number(pedido.propina?.toString() ?? 0),

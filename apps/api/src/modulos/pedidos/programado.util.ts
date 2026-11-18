@@ -6,6 +6,7 @@ export const ROLES_PROGRAMAR = ['CAJERO', 'MOZO', 'ADMIN', 'SUPERVISOR'] as cons
 
 export const PARAM_PROGRAMADO_DIAS_MAX = 'programado_dias_max';
 export const PARAM_PROGRAMADO_AVISO_MIN = 'programado_aviso_min';
+export const PARAM_PROGRAMAR_FUERA_HORARIO = 'pedidos_programados_fuera_horario';
 export const DIAS_MAX_DEFECTO = 7;
 export const AVISO_MIN_DEFECTO = 30;
 
@@ -14,6 +15,8 @@ export interface ConfigProgramados {
   diasMax: number;
   /** Minutos antes de la hora pactada en que el pedido pasa a cocina o a la cola de reparto. */
   avisoMin: number;
+  /** El cliente (carta y bot) puede programar PARA LLEVAR o DELIVERY con el local cerrado. Apagado por defecto. */
+  fueraHorario: boolean;
 }
 
 function entero(valor: unknown, defecto: number, min: number, max: number): number {
@@ -23,11 +26,12 @@ function entero(valor: unknown, defecto: number, min: number, max: number): numb
 
 /** Lee los dos parámetros (con sus valores por defecto si faltan o son inválidos). */
 export async function leerConfigProgramados(db: { parametro: { findMany: (args: any) => Promise<Array<{ clave: string; valor: unknown }>> } }): Promise<ConfigProgramados> {
-  const filas = await db.parametro.findMany({ where: { clave: { in: [PARAM_PROGRAMADO_DIAS_MAX, PARAM_PROGRAMADO_AVISO_MIN] } } });
+  const filas = await db.parametro.findMany({ where: { clave: { in: [PARAM_PROGRAMADO_DIAS_MAX, PARAM_PROGRAMADO_AVISO_MIN, PARAM_PROGRAMAR_FUERA_HORARIO] } } });
   const mapa = new Map(filas.map((f) => [f.clave, f.valor]));
   return {
     diasMax: entero(mapa.get(PARAM_PROGRAMADO_DIAS_MAX), DIAS_MAX_DEFECTO, 1, 60),
     avisoMin: entero(mapa.get(PARAM_PROGRAMADO_AVISO_MIN), AVISO_MIN_DEFECTO, 0, 480),
+    fueraHorario: ['si', true].includes(mapa.get(PARAM_PROGRAMAR_FUERA_HORARIO) as any),
   };
 }
 

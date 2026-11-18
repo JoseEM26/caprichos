@@ -362,6 +362,123 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('programar con el local cerrado (carta y bot, parámetro pedidos_programados_fuera_horario)', () => {
+      const manana = () => new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const dtoRecoger: CrearPedidoDto = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, pago: { metodo: 'EFECTIVO', pagaCon: 100 } };
+      const creado = (estado: string) => ({ id: 310n, codigo: 'CP-W310', estado, subtotal: 28.0, envio: null, total: 28.0, programado_para: manana(), canal: 'CARTA', modalidad: 'RECOGER' });
+      const cerrado = { abierta: false, motivo: 'HORARIO', texto: 'Abrimos hoy a las 14:00' };
+      const parametro = (valor: string) => prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'pedidos_programados_fuera_horario', valor }]);
+
+      beforeEach(() => {
+        localServiceMock.obtenerEstadoCarta.mockResolvedValue(cerrado);
+        localServiceMock.obtenerEstadoCartaSeguro = jest.fn().mockImplementation(() => localServiceMock.obtenerEstadoCarta());
+        localServiceMock.exigirAbiertoEn = jest.fn().mockResolvedValue(undefined);
+      });
+
+      it('parámetro apagado: cerrado + programadoCliente se rechaza como siempre (CARTA_CERRADA)', async () => {
+        parametro('no');
+        await expect(service.crear(dtoRecoger, 'pf-1', { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({ response: { codigo: 'CARTA_CERRADA' } });
+        expect(localServiceMock.exigirAbiertoEn).not.toHaveBeenCalled();
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('sin parámetro en la base también queda apagado', async () => {
+        await expect(service.crear(dtoRecoger, 'pf-1b', { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({ response: { codigo: 'CARTA_CERRADA' } });
+      });
+
+      it.each([
+        ['CARTA', { canal: 'CARTA' }],
+        ['WHATSAPP (bot)', { canal: 'WHATSAPP', telefonoRemitente: '999000111' }],
+      ])('encendido + cerrado + para llevar + hora dentro del horario (%s): nace PROGRAMADO y no entra a cocina', async (_n, origen: any) => {
+        parametro('si');
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        const fecha = manana();
+        const res = await service.crear(dtoRecoger, `pf-2-${_n}`, { ...origen, programadoCliente: fecha });
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(localServiceMock.exigirAbiertoEn).toHaveBeenCalledWith(fecha);
+        expect(localServiceMock.exigirLocalAbierto).not.toHaveBeenCalled();
+        expect(data.estado).toBe('PROGRAMADO');
+        expect(data.pasa_cocina_en).toBeNull();
+        expect(data.programado_para).toEqual(fecha);
+        expect(res.programadoPara).toBeTruthy();
+        expect(prismaMock.pedidoEstadoHistorial.create.mock.calls.at(-1)[0].data.estado_nuevo).toBe('PROGRAMADO');
+      });
+
+      it('delivery también se programa', async () => {
+        parametro('si');
+        prismaMock.pedido.create.mockResolvedValue({ ...creado('PROGRAMADO'), modalidad: 'DELIVERY' });
+        await service.crear(pedidoBaseDto, 'pf-3', { canal: 'CARTA', programadoCliente: manana() });
+        expect(prismaMock.pedido.create.mock.calls.at(-1)[0].data.estado).toBe('PROGRAMADO');
+      });
+
+      it('hora fuera del horario de atención: se rechaza con el mensaje claro y no se crea nada', async () => {
+        parametro('si');
+        localServiceMock.exigirAbiertoEn.mockRejectedValue(new BadRequestException({ codigo: 'PROGRAMADO_FUERA_DE_HORARIO', mensaje: 'Ese día atendemos de 14:00 a 22:00. Elige una hora dentro de ese horario.' }));
+        await expect(service.crear(dtoRecoger, 'pf-4', { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({
+          response: { codigo: 'PROGRAMADO_FUERA_DE_HORARIO', mensaje: expect.stringContaining('Ese día atendemos de 14:00 a 22:00') },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it.each(['COMER_LOCAL', 'MESA'] as const)('%s nunca se programa fuera de horario', async (modalidad) => {
+        parametro('si');
+        await expect(service.crear({ ...dtoRecoger, modalidad } as any, `pf-5-${modalidad}`, { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({
+          response: { codigo: 'PROGRAMADO_SOLO_LLEVAR_DELIVERY' },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('sin programadoCliente y cerrado: sigue rechazado (CARTA_CERRADA)', async () => {
+        parametro('si');
+        await expect(service.crear(dtoRecoger, 'pf-6', { canal: 'CARTA' })).rejects.toMatchObject({ response: { codigo: 'CARTA_CERRADA' } });
+      });
+
+      it('respeta los días máximos y no acepta una hora pasada', async () => {
+        parametro('si');
+        await expect(service.crear(dtoRecoger, 'pf-7', { canal: 'CARTA', programadoCliente: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000) })).rejects.toMatchObject({ response: { codigo: 'PROGRAMADO_MUY_LEJOS' } });
+        await expect(service.crear(dtoRecoger, 'pf-7b', { canal: 'CARTA', programadoCliente: new Date(Date.now() - 60_000) })).rejects.toMatchObject({ response: { codigo: 'PROGRAMADO_EN_EL_PASADO' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('Culqi (pago en línea) no se acepta fuera de horario', async () => {
+        parametro('si');
+        await expect(service.crear({ ...dtoRecoger, pago: { metodo: 'CULQI' } }, 'pf-8', { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({
+          response: { codigo: 'PAGO_ONLINE_FUERA_HORARIO' },
+        });
+      });
+
+      it('pausa por alta demanda: no se programa (sigue CARTA_CERRADA)', async () => {
+        parametro('si');
+        localServiceMock.obtenerEstadoCarta.mockResolvedValue({ abierta: false, motivo: 'PAUSA', texto: 'Muchos pedidos' });
+        await expect(service.crear(dtoRecoger, 'pf-9', { canal: 'CARTA', programadoCliente: manana() })).rejects.toMatchObject({ response: { codigo: 'CARTA_CERRADA' } });
+      });
+
+      it('local abierto: la programación del cliente se ignora y el pedido entra a cocina como siempre', async () => {
+        parametro('si');
+        localServiceMock.obtenerEstadoCarta.mockResolvedValue({ abierta: true, motivo: 'OK', texto: 'Abierto' });
+        prismaMock.pedido.create.mockResolvedValue(creado('COLA'));
+        await service.crear(dtoRecoger, 'pf-10', { canal: 'CARTA', programadoCliente: manana() });
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data.estado).toBe('COLA');
+        expect(data.programado_para).toBeNull();
+      });
+
+      it('voucher: «dejarlo pagado» con Yape se crea sin tocar la caja (no hay cobro ni adelanto al crear)', async () => {
+        parametro('si');
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        // si el servicio intentara abrir/leer la caja o escribir un cobro, estos accesos romperían la prueba
+        prismaMock.caja = { findUnique: jest.fn(), findFirst: jest.fn() };
+        prismaMock.cobro = { create: jest.fn() };
+        prismaMock.pedidoAdelanto = { create: jest.fn() };
+        await service.crear({ ...dtoRecoger, pago: { metodo: 'YAPE' } }, 'pf-11', { canal: 'CARTA', programadoCliente: manana() });
+        expect(prismaMock.pedido.create.mock.calls.at(-1)[0].data.estado).toBe('PROGRAMADO');
+        expect(prismaMock.caja.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.caja.findFirst).not.toHaveBeenCalled();
+        expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+        expect(prismaMock.pedidoAdelanto.create).not.toHaveBeenCalled();
+      });
+    });
+
     describe('Tarjeta / Yape en línea (CULQI)', () => {
       const conCulqi = () => ({ ...pedidoBaseDto, pago: { metodo: 'CULQI' } }) as any;
 

@@ -130,6 +130,12 @@ export interface OrigenPedido {
   enTransaccion?: (tx: Prisma.TransactionClient, pedido: any) => Promise<void>;
   /** Pedido programado (solo Caja y mozo: lo fija el controlador del panel tras validar el rol). Nace PROGRAMADO y no entra a cocina hasta su hora de aviso. */
   programadoPara?: Date | string;
+  /**
+   * Carta web y bot: el cliente pide programar su pedido para una hora futura. Solo se honra con el parámetro
+   * `pedidos_programados_fuera_horario` encendido Y el local cerrado, para llevar o delivery y dentro del horario de atención.
+   * Con el local abierto se ignora (el pedido entra normal); con el parámetro apagado, el guard de horario rechaza como siempre.
+   */
+  programadoCliente?: Date | string;
   /** Adelanto recibido hoy al programar (efectivo o tarjeta); entra a la caja de hoy. */
   adelanto?: AdelantoEntrada;
 }
@@ -805,6 +811,7 @@ export class PedidosService {
         descuento: Number(pedidoExistente.descuento || 0),
         envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
         total: Number(pedidoExistente.total),
+        programadoPara: pedidoExistente.programado_para ? pedidoExistente.programado_para.toISOString() : null,
         mensaje:
           origen?.canal === 'MOZO'
             ? 'Pedido enviado a cocina'
@@ -831,9 +838,34 @@ export class PedidosService {
     // 2. Horario: el guard único. Solo el personal (Mozo/Caja o pedido del panel) puede saltarlo;
     // carta, WhatsApp, bot e IA jamás, aunque alguien pase omitirChequeoCarta.
     const canalCliente = !origen?.canal || origen.canal === 'CARTA' || origen.canal === 'WHATSAPP' || origen.canal === 'BOT';
+    // 2a. Excepción única: el cliente programa para llevar o delivery con el local cerrado (parámetro encendido).
+    // Entonces no se exige el local abierto AHORA, sino que la hora elegida caiga dentro del horario de ese día.
+    let programadoPorCliente = false;
+    if (origen?.programadoCliente && canalCliente && !programadoPara) {
+      const cfg = await leerConfigProgramados(this.prisma);
+      if (cfg.fueraHorario) {
+        const estadoLocal = await this.localService.obtenerEstadoCartaSeguro();
+        // Pausa por alta demanda: sigue bloqueando (cae al guard de abajo)
+        if (!estadoLocal.abierta && estadoLocal.motivo !== 'PAUSA') {
+          if (dto.modalidad !== 'DELIVERY' && dto.modalidad !== 'RECOGER') {
+            throw new BadRequestException({ codigo: 'PROGRAMADO_SOLO_LLEVAR_DELIVERY', mensaje: 'Con el local cerrado solo puedes programar pedidos para llevar o delivery' });
+          }
+          if (origen.esPersonal || dto.esPersonal || dto.pagoEquipo === 'CREDITO') {
+            throw new BadRequestException({ codigo: 'PROGRAMADO_NO_PERSONAL', mensaje: 'Un pedido del personal no se programa' });
+          }
+          if (dto.pago?.metodo === 'CULQI') {
+            throw new BadRequestException({ codigo: 'PAGO_ONLINE_FUERA_HORARIO', mensaje: 'El pago en línea está disponible dentro del horario; puedes pagar al recibir o dejar tu Yape con captura' });
+          }
+          const fecha = validarProgramadoPara(origen.programadoCliente, new Date(), cfg.diasMax);
+          await this.localService.exigirAbiertoEn(fecha);
+          programadoPara = fecha;
+          programadoPorCliente = true;
+        }
+      }
+    }
     const omitirCarta =
       !canalCliente && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA' || origen?.omitirChequeoCarta === true);
-    if (!omitirCarta) {
+    if (!omitirCarta && !programadoPorCliente) {
       await this.localService.exigirLocalAbierto();
     }
 

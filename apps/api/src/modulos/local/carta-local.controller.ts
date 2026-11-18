@@ -2,6 +2,7 @@ import { Controller, Get, Header } from '@nestjs/common';
 import { mediosPagoActivosCanal } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { leerMediosPagoCanal } from '../../comun/medios-pago-canal';
+import { leerConfigProgramados } from '../pedidos/programado.util';
 import { LocalService } from './local.service';
 
 /**
@@ -18,6 +19,18 @@ export class CartaLocalController {
   @Header('Cache-Control', 'no-store')
   async obtenerEstado() {
     return this.localService.obtenerEstadoCartaSeguro();
+  }
+
+  /**
+   * Con el local cerrado: ¿el cliente puede programar su pedido (llevar o delivery) y para cuándo?
+   * Apagado (parámetro «no») responde habilitado:false y sin días: la carta queda como siempre.
+   */
+  @Get('programar-horas')
+  @Header('Cache-Control', 'no-store')
+  async programarHoras() {
+    const { fueraHorario } = await leerConfigProgramados(this.prisma);
+    if (!fueraHorario) return { habilitado: false, diasMax: 0, dias: [] };
+    return { habilitado: true, ...(await this.localService.horasProgramables()) };
   }
 
   @Get('local')

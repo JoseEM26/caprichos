@@ -181,6 +181,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'S/',
   },
+  pedidos_programados_fuera_horario: {
+    nombre: 'Clientes pueden programar con el local cerrado',
+    descripcion: 'En «Sí», con el local cerrado la carta y el bot reciben pedidos para llevar o delivery programados dentro del horario. En «No» (por defecto) siguen cerradas.',
+    tipo: 'sino',
+  },
   programado_dias_max: {
     nombre: 'Días máximos para programar un pedido',
     descripcion: 'Hasta cuántos días adelante pueden programar un pedido Caja y mozo (la carta virtual y el bot no programan).',

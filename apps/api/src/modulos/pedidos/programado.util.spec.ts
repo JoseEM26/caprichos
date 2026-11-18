@@ -29,8 +29,8 @@ describe('programado.util', () => {
 
   it('los parámetros inválidos o ausentes usan los valores por defecto', async () => {
     const db = (filas: any[]) => ({ parametro: { findMany: jest.fn().mockResolvedValue(filas) } });
-    expect(await leerConfigProgramados(db([]))).toEqual({ diasMax: 7, avisoMin: 30 });
-    expect(await leerConfigProgramados(db([{ clave: 'programado_dias_max', valor: 3 }, { clave: 'programado_aviso_min', valor: 45 }]))).toEqual({ diasMax: 3, avisoMin: 45 });
-    expect(await leerConfigProgramados(db([{ clave: 'programado_dias_max', valor: -1 }, { clave: 'programado_aviso_min', valor: 'x' }]))).toEqual({ diasMax: 7, avisoMin: 30 });
+    expect(await leerConfigProgramados(db([]))).toEqual({ diasMax: 7, avisoMin: 30, fueraHorario: false });
+    expect(await leerConfigProgramados(db([{ clave: 'programado_dias_max', valor: 3 }, { clave: 'programado_aviso_min', valor: 45 }]))).toEqual({ diasMax: 3, avisoMin: 45, fueraHorario: false });
+    expect(await leerConfigProgramados(db([{ clave: 'programado_dias_max', valor: -1 }, { clave: 'programado_aviso_min', valor: 'x' }]))).toEqual({ diasMax: 7, avisoMin: 30, fueraHorario: false });
   });
 });
