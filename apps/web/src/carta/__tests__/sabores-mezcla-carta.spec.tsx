@@ -43,6 +43,7 @@ const dona: ProductoCarta = {
 const sinSabores: ProductoCarta = { ...dona, id: '20', nombre: 'Torta', saboresConStock: false, sabores: [], tamanos: [], precio: 9 };
 
 const linea = (id: string, productoId: string, cantidad: number, extra: Partial<LineaCarrito> = {}): LineaCarrito => ({
+  llevar: 0,
   id,
   productoId,
   nombre: 'Dona',

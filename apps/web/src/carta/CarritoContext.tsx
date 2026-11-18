@@ -4,7 +4,7 @@ import { api } from '../comun/api';
 import { emitirEventoCarta } from './eventosCarta';
 import { CategoriaCarta, LineaCarrito, PedidoConfirmado, ProductoCarta, SaborLinea } from './tipos';
 import type { PedidoGuardado } from './seguimiento';
-import { INTERVALO_REFRESCO_STOCK_MS, InfoStock, InventarioCarta, infoStockDe, recortarLineasProducto, recortarSaboresAlTotal } from './stock';
+import { INTERVALO_REFRESCO_STOCK_MS, InfoStock, InventarioCarta, acotarLlevar, infoStockDe, recortarLineasProducto, recortarSaboresAlTotal } from './stock';
 
 const CLAVE_SESSION_STORAGE = 'caprichos_carrito';
 
@@ -18,12 +18,12 @@ interface CarritoContextoValor {
   lineas: LineaCarrito[];
   cantidadTotal: number;
   subtotal: number;
-  agregarLinea: (linea: Omit<LineaCarrito, 'id'>) => void;
+  agregarLinea: (linea: Omit<LineaCarrito, 'id' | 'llevar'> & { llevar?: number }) => void;
   actualizarCantidad: (id: string, delta: number) => void;
   eliminarLinea: (id: string) => void;
-  /** Marca o desmarca «para llevar» en una línea (solo importa con Comer en el local). */
-  marcarParaLlevar: (id: string, paraLlevar: boolean) => void;
-  /** Marca o desmarca «para llevar» en todas las líneas. */
+  /** Fija cuántas unidades de la línea van para llevar (0..cantidad; solo importa con Comer en el local). */
+  marcarParaLlevar: (id: string, llevar: number) => void;
+  /** Todo para llevar (true) o todo aquí (false) en todas las líneas. */
   marcarTodoParaLlevar: (paraLlevar: boolean) => void;
   limpiarCarrito: () => void;
   cajonAbierto: boolean;
@@ -64,6 +64,14 @@ interface CarritoContextoValor {
 
 const CarritoContext = createContext<CarritoContextoValor | undefined>(undefined);
 
+/** Migra la línea guardada antes de «para llevar por unidad» (booleano paraLlevar): true → todas, false/ausente → 0. */
+function migrarLinea(guardada: any): LineaCarrito {
+  const { paraLlevar, ...resto } = guardada ?? {};
+  const cantidad = Number(resto.cantidad) || 0;
+  const llevar = typeof resto.llevar === 'number' ? resto.llevar : paraLlevar === true ? cantidad : 0;
+  return { ...resto, llevar: acotarLlevar(llevar, cantidad) } as LineaCarrito;
+}
+
 function cargarLineasIniciales(): LineaCarrito[] {
   if (typeof window === 'undefined' || !window.sessionStorage) {
     return [];
@@ -72,7 +80,7 @@ function cargarLineasIniciales(): LineaCarrito[] {
     const raw = window.sessionStorage.getItem(CLAVE_SESSION_STORAGE);
     if (!raw) return [];
     const parseado = JSON.parse(raw);
-    return Array.isArray(parseado) ? parseado : [];
+    return Array.isArray(parseado) ? parseado.map(migrarLinea) : [];
   } catch {
     return [];
   }
@@ -102,9 +110,9 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     }
   }, [lineas]);
 
-  const agregarLinea = (nueva: Omit<LineaCarrito, 'id'>) => {
+  const agregarLinea = (nueva: Omit<LineaCarrito, 'id' | 'llevar'> & { llevar?: number }) => {
     const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const lineaCompleta: LineaCarrito = { ...nueva, id };
+    const lineaCompleta: LineaCarrito = { ...nueva, llevar: acotarLlevar(nueva.llevar ?? 0, nueva.cantidad), id };
 
     setLineas((prev) => [...prev, lineaCompleta]);
     emitirEventoCarta('CARRITO');
@@ -135,6 +143,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
           return {
             ...lin,
             cantidad: nuevaCant,
+            llevar: acotarLlevar(lin.llevar, nuevaCant),
             subtotal: nuevoSubtotal,
             sabores,
           };
@@ -147,12 +156,12 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     setLineas((prev) => prev.filter((l) => l.id !== id));
   };
 
-  const marcarParaLlevar = (id: string, paraLlevar: boolean) => {
-    setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, paraLlevar } : l)));
+  const marcarParaLlevar = (id: string, llevar: number) => {
+    setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, llevar: acotarLlevar(llevar, l.cantidad) } : l)));
   };
 
   const marcarTodoParaLlevar = (paraLlevar: boolean) => {
-    setLineas((prev) => prev.map((l) => ({ ...l, paraLlevar })));
+    setLineas((prev) => prev.map((l) => ({ ...l, llevar: paraLlevar ? l.cantidad : 0 })));
   };
 
   const limpiarCarrito = () => {
@@ -204,7 +213,13 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     setLineas((prev) =>
       prev.map((lin) =>
         lin.id === id
-          ? { ...lin, cantidad: cambios.cantidad, sabores: cambios.sabores, subtotal: Number((lin.precioUnitario * cambios.cantidad).toFixed(2)) }
+          ? {
+              ...lin,
+              cantidad: cambios.cantidad,
+              llevar: acotarLlevar(lin.llevar, cambios.cantidad),
+              sabores: cambios.sabores,
+              subtotal: Number((lin.precioUnitario * cambios.cantidad).toFixed(2)),
+            }
           : lin,
       ),
     );

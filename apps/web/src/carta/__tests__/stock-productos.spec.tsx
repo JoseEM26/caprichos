@@ -48,6 +48,7 @@ const conStock = (quedan: number | null, extra: Partial<ProductoCarta> = {}): Pr
 });
 
 const linea = (id: string, productoId: string, cantidad: number, nombre = 'Dona de chocolate'): LineaCarrito => ({
+  llevar: 0,
   id,
   productoId,
   nombre,

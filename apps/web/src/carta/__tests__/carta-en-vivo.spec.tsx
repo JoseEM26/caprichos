@@ -16,6 +16,7 @@ const estado = (extra: Partial<EstadoLocalCarta> = {}): EstadoLocalCarta => ({
   abierta: true, motivo: 'OK', texto: 'Abierto', abre: '10:00', cierra: '22:00', pausaAltaDemanda: false, tiempoPrometidoMin: null, altaDemandaMin: 0, ...extra,
 });
 const linea = (cantidad: number): LineaCarrito => ({
+  llevar: 0,
   id: 'l1', productoId: '1', nombre: 'Dona glaseada', precioBase: 6, cantidad, opciones: [], precioUnitario: 6, subtotal: 6 * cantidad,
 });
 

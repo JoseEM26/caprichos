@@ -5,6 +5,7 @@ import { LineaCarrito, DatosLocalCarta } from '../tipos';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 
 const lineaIced1: LineaCarrito = {
+  llevar: 0,
   id: 'l1',
   productoId: '101',
   nombre: 'Iced Coffee',
@@ -127,6 +128,7 @@ describe('Aviso de «Te falta poco» en el carrito', () => {
   it('2. Aviso DESCUENTO con compra mínima: muestra lo que falta y desaparece al alcanzar el mínimo', () => {
     // Subtotal 42 con compra mínima de 50 -> faltan S/ 8
     const linea42: LineaCarrito = {
+  llevar: 0,
       id: 'l_postre',
       productoId: '202',
       nombre: 'Postres Varios',
@@ -165,6 +167,7 @@ describe('Aviso de «Te falta poco» en el carrito', () => {
   it('3. Aviso ENVÍO GRATIS: respeta envio_gratis_monto y modos (mas_de y desde), y desaparece al aplicar', () => {
     // Con modo 'mas_de' y monto 70: subtotal 62 -> faltan S/ 8
     const linea62: LineaCarrito = {
+  llevar: 0,
       id: 'l_comida',
       productoId: '303',
       nombre: 'Waffle Familiar',

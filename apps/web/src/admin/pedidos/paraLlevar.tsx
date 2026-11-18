@@ -150,7 +150,7 @@ export function SelectorParaLlevar({
           flex: 1,
           border: 'none',
           borderRadius: 0,
-          minHeight: 40,
+          minHeight: 44,
           background: activa ? (valor ? TOKEN.naranja : TOKEN.navy) : TOKEN.crema,
           color: activa ? '#fff' : TOKEN.navy,
           opacity: disabled ? 0.55 : 1,

@@ -38,6 +38,7 @@ import {
   DatosLocalCarta,
   DireccionCliente,
   EstadoLocalCarta,
+  LineaCarrito,
   MetodoPago,
   ModalidadEntrega,
   TipoComprobante,
@@ -63,10 +64,17 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
 
 import { AvisoComerEnLocal } from './AvisoComerEnLocal';
 import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
-import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar } from '../admin/pedidos/paraLlevar';
+import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar, puedeRepartirLinea, repartirParaLlevar, unidadesParaLlevar } from '../admin/pedidos/paraLlevar';
 import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
 import { celularAlEscribir } from '../comun/celular';
 import { DatosTransferencia } from '../comun/DatosTransferencia';
+
+/** Unidades que salen para llevar al enviar: las del selector si la línea se reparte por unidades; si va completa (combo, mezcla, oferta), todo o nada. */
+function llevarEnviarCarta(l: LineaCarrito): number {
+  const k = unidadesParaLlevar(l);
+  if (puedeRepartirLinea(l)) return k;
+  return k >= l.cantidad ? l.cantidad : 0;
+}
 
 export function FormularioCheckout({
   estadoLocal,
@@ -866,12 +874,16 @@ export function FormularioCheckout({
     setEnviando(true);
     peticionEnCursoRef.current = true;
 
+    // Para llevar solo existe con Comer en el local: en otra modalidad no se envía. Con k de N unidades para llevar
+    // (1 ≤ k ≤ N−1) la línea sale en dos: N−k aquí y k para llevar (mismo reparto que la mesa).
+    const enLocal = modalidad === 'COMER_LOCAL';
     const lineasDto: any[] = [];
     for (const lin of lineas) {
-      // Para llevar solo existe con Comer en el local: en otra modalidad no se envía
-      const paraLlevarDto = modalidad === 'COMER_LOCAL' ? { paraLlevar: !!lin.paraLlevar } : {};
+      const llevar = enLocal ? llevarEnviarCarta(lin) : 0;
       if (lin.unidades && lin.unidades.length > 1) {
-        for (const u of lin.unidades) {
+        // Unidades con opciones propias: cada una es una línea de 1; las últimas k van para llevar
+        const total = lin.unidades.length;
+        lin.unidades.forEach((u, i) => {
           lineasDto.push({
             productoId: lin.productoId,
             tamanoId: lin.tamanoId,
@@ -881,22 +893,31 @@ export function FormularioCheckout({
             nota: lin.nota,
             ofertaId: lin.ofertaId,
             comboElecciones: lin.comboElecciones,
-            ...paraLlevarDto,
+            ...(enLocal ? { paraLlevar: i >= total - llevar } : {}),
+          });
+        });
+      } else {
+        const partes = repartirParaLlevar(
+          {
+            productoId: lin.productoId,
+            tamanoId: lin.tamanoId,
+            cantidad: lin.cantidad,
+            opciones: (lin.opciones || []).map((o) => o.id),
+            personas: lin.personas,
+            nota: lin.nota,
+            ofertaId: lin.ofertaId,
+            comboElecciones: lin.comboElecciones,
+            ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+          },
+          llevar,
+        );
+        for (const p of partes) {
+          lineasDto.push({
+            ...p,
+            personas: p.personas && p.personas.length > 0 ? p.personas : [nombre.trim()],
+            ...(enLocal ? { paraLlevar: !!p.paraLlevar } : {}),
           });
         }
-      } else {
-        lineasDto.push({
-          productoId: lin.productoId,
-          tamanoId: lin.tamanoId,
-          cantidad: lin.cantidad,
-          opciones: (lin.opciones || []).map((o) => o.id),
-          personas: lin.personas && lin.personas.length > 0 ? lin.personas : [nombre.trim()],
-          nota: lin.nota,
-          ofertaId: lin.ofertaId,
-          comboElecciones: lin.comboElecciones,
-          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
-          ...paraLlevarDto,
-        });
       }
     }
 
@@ -1359,7 +1380,13 @@ export function FormularioCheckout({
                             <span style={{ fontSize: '13px', color: 'var(--cp-navy)', overflowWrap: 'anywhere' }}>
                               <b>{`${l.cantidad} × ${l.nombre}`}</b>{l.tamanoNombre ? ` (${l.tamanoNombre})` : ''}
                             </span>
-                            <SelectorParaLlevar paraLlevar={!!l.paraLlevar} onCambiar={(v) => marcarParaLlevar(l.id, v)} etiqueta={`Dónde se come ${l.nombre}`} />
+                            <SelectorParaLlevar
+                              cantidad={l.cantidad}
+                              llevar={l.llevar}
+                              dividible={puedeRepartirLinea(l)}
+                              onCambiar={(k) => marcarParaLlevar(l.id, k)}
+                              etiqueta={`Dónde se come ${l.nombre}`}
+                            />
                           </div>
                         ))}
                         <ResumenParaLlevar lineas={lineas} />

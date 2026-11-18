@@ -177,6 +177,11 @@ export function excesosDeStock(lineas: LineaCarrito[], inventario: InventarioCar
 }
 
 /** Recorta las líneas de un producto para que sumen como mucho `maximo`, quitando desde la última; las de 0 salen. */
+/** Unidades para llevar acotadas a 0..cantidad (entero). */
+export function acotarLlevar(llevar: number, cantidad: number): number {
+  return Math.min(Math.max(0, Math.trunc(Number(llevar)) || 0), Math.max(0, Math.trunc(Number(cantidad)) || 0));
+}
+
 export function recortarLineasProducto(lineas: LineaCarrito[], productoId: string, maximo: number): LineaCarrito[] {
   // `maximo` son unidades (no tamaños): una línea de 1/2 docena consume 6 por cada cantidad
   let restan = Math.max(0, maximo);
@@ -197,6 +202,7 @@ export function recortarLineasProducto(lineas: LineaCarrito[], productoId: strin
     nuevas.push({
       ...l,
       cantidad,
+      llevar: acotarLlevar(l.llevar, cantidad),
       subtotal: Number((l.precioUnitario * cantidad).toFixed(2)),
       unidades: l.unidades?.slice(0, cantidad),
       sabores: l.sabores && l.unidadesPorMezcla !== undefined ? recortarSaboresAlTotal(l.sabores, l.unidadesPorMezcla * cantidad) : l.sabores,

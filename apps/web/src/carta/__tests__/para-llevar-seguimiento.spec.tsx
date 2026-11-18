@@ -43,6 +43,30 @@ describe('Seguimiento: productos para llevar', () => {
     expect(screen.getByTestId('resumen-para-llevar')).toHaveTextContent('2 para llevar · 1 aquí');
   });
 
+  it('un pedido repartido (2 frappés: 1 para llevar y 1 aquí) llega como dos líneas con su chip y el resumen', () => {
+    estado = {
+      ...base,
+      detalle: {
+        subtotal: 29,
+        descuento: 0,
+        envio: null,
+        puntosCanjeados: 0,
+        nota: null,
+        lineas: [
+          { nombre: 'Frappé', cantidad: 1, nota: null, paraLlevar: false },
+          { nombre: 'Frappé', cantidad: 1, nota: null, paraLlevar: true },
+        ],
+      },
+    };
+    render(<PantallaConfirmacion />);
+    fireEvent.click(screen.getByRole('tab', { name: /Mi pedido/ }));
+    const productos = screen.getAllByTestId('producto-seguimiento');
+    expect(productos).toHaveLength(2);
+    expect(within(productos[0]).queryByTestId('chip-para-llevar')).not.toBeInTheDocument();
+    expect(within(productos[1]).getByTestId('chip-para-llevar')).toBeInTheDocument();
+    expect(screen.getByTestId('resumen-para-llevar')).toHaveTextContent('1 para llevar · 1 aquí');
+  });
+
   it('sin ninguna marca no hay chip ni resumen', () => {
     estado = {
       ...base,
