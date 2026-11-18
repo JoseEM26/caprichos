@@ -146,8 +146,7 @@ export function cargarScriptCulqi(): Promise<void> {
 export function configCulqi(intento: Pick<IntentoCulqi, 'moneda' | 'montoCentimos' | 'medios'>) {
   const paymentMethods = {
     tarjeta: intento.medios.includes('TARJETA'),
-    // Yape exige una orden creada por el servidor (POST /v2/orders); el intento todavía no la crea: apagado
-    yape: false,
+    yape: intento.medios.includes('YAPE'),
     bancaMovil: false,
     agente: false,
     billetera: false,

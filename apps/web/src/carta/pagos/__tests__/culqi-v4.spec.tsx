@@ -22,8 +22,8 @@ describe('Culqi Checkout Custom embebido', () => {
     expect(c.options.modal).toBe(false);
     expect(c.options.container).toBe('#culqi-container');
     // Yape apagado: necesita una orden del servidor (POST /v2/orders) que el intento aún no crea
-    expect(c.options.paymentMethods).toEqual({ tarjeta: true, yape: false, bancaMovil: false, agente: false, billetera: false, cuotealo: false });
-    expect(c.options.paymentMethodsSort).toEqual(['tarjeta']);
+    expect(c.options.paymentMethods).toEqual({ tarjeta: true, yape: true, bancaMovil: false, agente: false, billetera: false, cuotealo: false });
+    expect(c.options.paymentMethodsSort).toEqual(['tarjeta', 'yape']);
     expect(c.settings).toEqual({ title: 'Caprichos', currency: 'PEN', amount: 2500 });
     expect(c.appearance.defaultStyle.buttonBackground).toBe('#E67929');
     expect(c.appearance.defaultStyle.bannerColor).toBe('#0B2C3E');
