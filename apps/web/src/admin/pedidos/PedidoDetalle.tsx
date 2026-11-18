@@ -191,6 +191,15 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
     !tieneCobroVigente &&
     !pedido.cobroMozo;
   // Extra: con permiso y mientras el pedido no esté anulado ni rechazado (entregado o pagado sí)
+  // Para llevar por unidad: con permiso de editar mientras el pedido no esté cerrado ni cobrado
+  const puedeCambiarLlevar = tiene('pedidos/editar') && !['ENTREGADO', 'ANULADO', 'RECHAZADO'].includes(est) && !tieneCobroVigente && !pedido.cobroMozo;
+  const cambiarLlevar = async (linea: LineaPedido, llevar: number) => {
+    // La versión vigente sale del GET de edición: si alguien cambió el pedido, el servidor responde 409
+    const datos = await pedidosApi.obtenerParaEditar(pedido.id);
+    await pedidosApi.cambiarParaLlevar(pedido.id, linea.id, { version: datos.version, llevar });
+    setMensajeExito(llevar > 0 ? `${linea.nombre}: ${llevar} de ${linea.cantidad} para llevar` : `${linea.nombre}: se come aquí`);
+    alActualizar();
+  };
   const puedeAgregarExtra = !!alAgregarExtra && tiene('pedidos/extra') && est !== 'ANULADO' && est !== 'RECHAZADO';
   const puedeCargoLibre = tiene('pedidos/cargo_libre') && est !== 'ANULADO' && est !== 'RECHAZADO' && !(estaPagadoCargo(pedido) && !alAgregarExtra);
   // Corregir datos del cliente: con permiso y en cualquier estado salvo anulado o rechazado (entregado o cobrado sí)
@@ -439,7 +448,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
             />
           )}
           {capa === 'productos' && (
-            <CapaProductos pedido={pedido} puedeDarCortesia={tiene('cortesias/dar')} alCortesia={setLineaCortesia} alAbrirPedido={alAbrirPedido} />
+            <CapaProductos
+              pedido={pedido}
+              puedeDarCortesia={tiene('cortesias/dar')}
+              alCortesia={setLineaCortesia}
+              alAbrirPedido={alAbrirPedido}
+              puedeCambiarLlevar={puedeCambiarLlevar}
+              alCambiarLlevar={cambiarLlevar}
+            />
           )}
           {capa === 'pago' && (
             <>

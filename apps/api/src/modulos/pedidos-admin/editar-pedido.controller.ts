@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { EditarPedidoService } from './editar-pedido.service';
-import { EditandoPedidoDto, EditarPedidoDto } from './dto/editar-pedido.dto';
+import { CambiarParaLlevarDto, EditandoPedidoDto, EditarPedidoDto } from './dto/editar-pedido.dto';
 
 /**
  * «Editar pedido» en Caja: productos y datos de un pedido sin cobrar. Permiso pedidos/editar (ADMIN, SUPERVISOR,
@@ -24,6 +24,14 @@ export class EditarPedidoController {
   async guardar(@Param('id') id: string, @Body() dto: EditarPedidoDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.editar.editar(id, dto, req.usuario, ip);
+  }
+
+  /** Para llevar de unas unidades de una línea (Caja): cambia la marca o divide la línea. */
+  @Post(':id/lineas/:lineaId/para-llevar')
+  @Permiso('pedidos', 'editar')
+  async paraLlevar(@Param('id') id: string, @Param('lineaId') lineaId: string, @Body() dto: CambiarParaLlevarDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.editar.cambiarParaLlevar(id, lineaId, dto, req.usuario, ip);
   }
 
   /** Aviso de presencia: «Ana está editando este pedido» (vale 2 minutos si no se repite). */

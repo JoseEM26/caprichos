@@ -844,3 +844,110 @@
   overflow-x: hidden;
   overflow-wrap: anywhere;
 }
+
+/* ---- Ampliación: panel casi a pantalla completa, filtros en una línea y pedido compacto ----
+   PC (contenedor >= 860 px): botones de 36 px. Celular (< 420 px): táctiles de 44 px. */
+.salon-panel.np-panel {
+  height: 96vh;
+  height: 96dvh;
+}
+
+/* Categorías y buscador en una misma línea (PC); en celular el buscador baja a su propia fila */
+.np-filtros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.np-filtros > .np-categorias-wrap {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.np-filtros > .np-buscador {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+.np-filtros .np-buscador-input,
+.np-filtros .np-toggle-img {
+  min-height: 40px;
+}
+
+.np-chip-cat {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* Fila de la línea: nombre, selector, precio y acciones en un renglón; el selector baja si no cabe */
+.np-linea-nombre {
+  font-size: 13px;
+}
+
+.np-linea-llevar {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.np-linea-acciones {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.np-accion {
+  flex: none;
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--cp-line);
+  border-radius: 10px;
+  background: var(--cp-white);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.np-accion--texto {
+  width: auto;
+  min-width: 0;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--cp-navy);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@container np (min-width: 860px) {
+  .np-qty button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .np-accion {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+@container np (max-width: 419px) {
+  .np-filtros > .np-buscador {
+    flex: 1 1 100%;
+  }
+
+  .np-accion {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .np-linea-llevar {
+    flex-basis: 100%;
+    order: 5;
+  }
+}

@@ -31,7 +31,7 @@ import { ModalCargoLibre, type CargoLibreDatos } from '../../pedidos/ModalCargoL
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi, type DatosEdicionPedido, type LineaEdicionPedido } from '../../pedidos/pedidosApi';
-import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar } from '../../pedidos/paraLlevar';
+import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar, puedeRepartirLinea, repartirParaLlevar } from '../../pedidos/paraLlevar';
 import { PanelEdicionPedido } from './PanelEdicionPedido';
 import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
@@ -180,8 +180,17 @@ export interface LineaPedidoMesa {
   lineaId?: string;
   /** Editar pedido: combo que solo se puede quitar o dejar */
   bloqueada?: boolean;
-  /** Comer aquí con llevar: esta línea sale empacada (solo se usa con modalidad «en el local») */
-  paraLlevar?: boolean;
+  /** Comer aquí con llevar: cuántas unidades salen empacadas (solo con modalidad «en el local»; al enviar se reparten en líneas) */
+  llevar?: number;
+}
+
+/** Unidades que la línea manda para llevar al enviar: solo en «en el local»; combos, mezclas y ofertas van completas. */
+function llevarAEnviar(lin: LineaPedidoMesa, modalidad: string): number {
+  if (modalidad !== 'local') return 0;
+  const n = lin.cantidad;
+  const k = Math.min(n, Math.max(0, lin.llevar ?? 0));
+  if (puedeRepartirLinea(lin)) return k;
+  return k >= n ? n : 0;
 }
 
 /** Línea guardada de un pedido, convertida a la del selector (Editar pedido). */
@@ -191,7 +200,7 @@ function aLineaMesa(l: LineaEdicionPedido): LineaPedidoMesa {
     id: `ed-${l.lineaId}`,
     lineaId: l.lineaId,
     bloqueada: l.bloqueada,
-    paraLlevar: l.paraLlevar === true,
+    llevar: l.paraLlevar === true ? l.cantidad : 0,
     productoId: l.productoId ?? '0',
     nombre: l.nombre,
     tamanoId: l.tamanoId ?? undefined,
@@ -1174,6 +1183,7 @@ export function ModalNuevoPedidoMesa({
               ...lin,
               cantidad: nuevaCantidad,
               precioTotal: lin.precioUnitario * nuevaCantidad,
+              llevar: Math.min(lin.llevar ?? 0, nuevaCantidad),
             };
           }
           return lin;
@@ -1576,10 +1586,10 @@ export function ModalNuevoPedidoMesa({
         : `ped-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     try {
-      const payloadLineas = lineas.map((lin) => {
+      const payloadLineas = lineas.flatMap((lin) => {
         const opcionesIds = (lin.opciones || []).map((o) => o.id);
         const personas = lin.unidades?.map((u) => u.persona || '').filter(Boolean);
-        return {
+        return repartirParaLlevar({
           productoId: lin.productoId,
           tamanoId: lin.tamanoId,
           cantidad: lin.cantidad,
@@ -1590,8 +1600,7 @@ export function ModalNuevoPedidoMesa({
           personas: personas && personas.length > 0 ? personas : lin.personas,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
           ...(lin.cortesia ? { cortesia: { motivo: lin.cortesia.motivo, nota: lin.cortesia.nota } } : {}),
-          ...(modalidad === 'local' && lin.paraLlevar ? { paraLlevar: true } : {}),
-        };
+        }, llevarAEnviar(lin, modalidad));
       });
 
       // «Servicio o producto» libre: el texto acompaña al producto elegido (posición en `lineas`); sin producto, va suelto
@@ -1855,9 +1864,9 @@ export function ModalNuevoPedidoMesa({
     setErrorEnvio(null);
     guardandoEdicion.current = true;
     try {
-      const payloadLineas = lineas.map((lin) => {
+      const payloadLineas = lineas.flatMap((lin) => {
         const personas = lin.unidades?.map((u) => u.persona || '').filter(Boolean);
-        return {
+        return repartirParaLlevar({
           lineaId: lin.lineaId,
           productoId: lin.productoId,
           tamanoId: lin.tamanoId,
@@ -1868,8 +1877,7 @@ export function ModalNuevoPedidoMesa({
           comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
-          ...(modalidad === 'local' && lin.paraLlevar ? { paraLlevar: true } : {}),
-        };
+        }, llevarAEnviar(lin, modalidad)).map((p, k) => (k === 0 ? p : { ...p, lineaId: undefined }));
       });
       const ent = edicion.datos.entrega;
       const mismoPunto = cliPuntoMapa !== null && cliPuntoMapa.lat === ent.lat && cliPuntoMapa.lng === ent.lng;
@@ -1970,7 +1978,7 @@ export function ModalNuevoPedidoMesa({
     }
     if (paso === 'items') {
       return modalidad === 'local'
-        ? `${textoMesas}${pisosActivos.length > 1 ? ` · ${pisoActual?.nombre || 'Piso 1'}` : ''}`
+        ? `Comer aquí · ${textoMesas}${pisosActivos.length > 1 ? ` · ${pisoActual?.nombre || 'Piso 1'}` : ''}`
         : `${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'} · ${cliNombre || 'Cliente'}`;
     }
     return '';
@@ -2026,14 +2034,14 @@ export function ModalNuevoPedidoMesa({
           style={{
             position: 'relative',
             zIndex: 60,
-            width: 'min(1120px, calc(100% - 24px))',
+            width: 'min(1280px, 96vw)',
             background: 'var(--cp-cream)',
             borderRadius: '20px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-            padding: '20px',
+            padding: '14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
+            gap: '10px',
           }}
         >
           {/* Barra superior con volver y cerrar */}
@@ -3256,6 +3264,7 @@ export function ModalNuevoPedidoMesa({
               {/* IZQUIERDA: Catálogo de productos */}
               <div className="np-catalogo">
                 {/* Categorías en tira horizontal (sticky) */}
+                <div className="np-filtros">
                 <BarraCategorias
                   categorias={categorias}
                   activaId={categoriaActivaId}
@@ -3279,6 +3288,8 @@ export function ModalNuevoPedidoMesa({
                   >
                     {conImagenes ? 'Con imagen' : 'Sin imagen'}
                   </button>
+                </div>
+
                 </div>
 
                 {/* Grilla de productos */}
@@ -3767,10 +3778,10 @@ export function ModalNuevoPedidoMesa({
                 {modalidad === 'local' && lineas.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 0 8px' }}>
                     <AtajoParaLlevar
-                      onTodo={(v) => setLineas((prev) => prev.map((x) => (x.bloqueada ? x : { ...x, paraLlevar: v })))}
+                      onTodo={(v) => setLineas((prev) => prev.map((x) => (x.bloqueada ? x : { ...x, llevar: v ? x.cantidad : 0 })))}
                       disabled={lineas.every((x) => x.bloqueada)}
                     />
-                    <ResumenParaLlevar lineas={lineas.map((x) => ({ cantidad: x.cantidad, paraLlevar: x.paraLlevar }))} />
+                    <ResumenParaLlevar lineas={lineas} />
                   </div>
                 )}
                 <div className="np-lineas">
@@ -3812,41 +3823,54 @@ export function ModalNuevoPedidoMesa({
                             {lin.cantidad} x {lin.nombre}
                             {lin.tamanoNombre && <small> · {lin.tamanoNombre}</small>}
                           </span>
-                          <span className="np-linea-precio">S/ {(lin.cortesia ? 0 : lin.precioTotal).toFixed(2)}</span>
-                          {edicion && !lin.bloqueada && (
-                            <button
-                              type="button"
-                              className="np-quitar"
-                              onClick={() => {
-                                // Reabre el producto para cambiar tamaño, opciones, sabores, nota o nombres; la línea sigue hasta que se agregue la nueva
-                                const prod = categorias.flatMap((c) => c.productos || []).find((x) => String(x.id) === String(lin.productoId));
-                                if (!prod) {
-                                  setErrorEnvio(`No se encontró «${lin.nombre}» en la carta. Quita la línea y agrega otro producto.`);
-                                  return;
-                                }
-                                setLineaEnCambio(lin.id);
-                                setProductoSeleccionado(prod);
-                              }}
-                            >
-                              Cambiar
-                            </button>
+                          {modalidad === 'local' && (
+                            <span className="np-linea-llevar">
+                              <SelectorParaLlevar
+                                cantidad={lin.cantidad}
+                                llevar={lin.llevar ?? 0}
+                                disabled={!!lin.bloqueada}
+                                dividible={puedeRepartirLinea(lin)}
+                                etiqueta={`Dónde se come: ${lin.nombre}`}
+                                onCambiar={(v) => setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, llevar: v } : x)))}
+                              />
+                            </span>
                           )}
-                          <button
-                            type="button"
-                            className="np-quitar"
-                            onClick={() => quitarLinea(lin.id)}
-                          >
-                            Quitar
-                          </button>
+                          <span className="np-linea-precio">S/ {(lin.cortesia ? 0 : lin.precioTotal).toFixed(2)}</span>
+                          <span className="np-linea-acciones">
+                            {edicion && !lin.bloqueada && (
+                              <button
+                                type="button"
+                                className="np-accion np-accion--texto"
+                                onClick={() => {
+                                  // Reabre el producto para cambiar tamaño, opciones, sabores, nota o nombres; la línea sigue hasta que se agregue la nueva
+                                  const prod = categorias.flatMap((c) => c.productos || []).find((x) => String(x.id) === String(lin.productoId));
+                                  if (!prod) {
+                                    setErrorEnvio(`No se encontró «${lin.nombre}» en la carta. Quita la línea y agrega otro producto.`);
+                                    return;
+                                  }
+                                  setLineaEnCambio(lin.id);
+                                  setProductoSeleccionado(prod);
+                                }}
+                              >
+                                Cambiar
+                              </button>
+                            )}
+                            <button type="button" className="np-accion" aria-label="Quitar" title="Quitar" onClick={() => quitarLinea(lin.id)}>
+                              🗑
+                            </button>
+                            {puedeCortesia && !edicion && !extra && !lin.ofertaId && !(lin.comboElecciones ?? []).length && !lin.cortesia && (
+                              <button
+                                type="button"
+                                className="np-accion"
+                                aria-label="Dar como cortesía"
+                                title="Dar como cortesía"
+                                onClick={() => setLineaCortesiaId(lin.id)}
+                              >
+                                🎁
+                              </button>
+                            )}
+                          </span>
                         </div>
-                        {modalidad === 'local' && (
-                          <SelectorParaLlevar
-                            paraLlevar={!!lin.paraLlevar}
-                            disabled={!!lin.bloqueada}
-                            etiqueta={`Dónde se come: ${lin.nombre}`}
-                            onCambiar={(v) => setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, paraLlevar: v } : x)))}
-                          />
-                        )}
                         {lin.bloqueada && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Combo: para cambiarlo, quítalo y agrega otro.
@@ -3867,11 +3891,7 @@ export function ModalNuevoPedidoMesa({
                                   Quitar cortesía
                                 </button>
                               </>
-                            ) : (
-                              <button type="button" className="np-quitar" onClick={() => setLineaCortesiaId(lin.id)}>
-                                Dar como cortesía
-                              </button>
-                            )}
+                            ) : null}
                           </div>
                         )}
                         {lineaCortesiaId === lin.id && (

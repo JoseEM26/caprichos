@@ -32,4 +32,23 @@ describe('layout del modal Nuevo pedido', () => {
     expect(css).toMatch(/\.np-qty button\s*\{[^}]*width:\s*44px[^}]*height:\s*44px[^}]*border-radius:\s*50%/);
     expect(tsx).toContain('np-enviar');
   });
+
+  // Ampliación: ancho casi total, filtros en una línea y fila de línea compacta (360 / 768 / 1280 px por contenedor)
+  it('el panel ocupa hasta 1280 px (96vw) y casi todo el alto (96dvh)', () => {
+    expect(tsx).toContain("width: 'min(1280px, 96vw)'");
+    expect(css).toMatch(/\.salon-panel\.np-panel\s*\{\s*height:\s*96vh;\s*height:\s*96dvh;/);
+  });
+
+  it('categorías y buscador comparten una fila; en celular (< 420 px) el buscador baja a su propia fila', () => {
+    expect(tsx).toMatch(/<div className="np-filtros">\s*<BarraCategorias/);
+    expect(css).toMatch(/\.np-filtros\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/@container np \(max-width: 419px\)\s*\{\s*\.np-filtros > \.np-buscador\s*\{\s*flex:\s*1 1 100%/);
+  });
+
+  it('la línea compacta: acciones en iconos con aria-label; a 36 px en PC y 44 px en celular', () => {
+    expect(tsx).toContain('aria-label="Quitar" title="Quitar"');
+    expect(tsx).toContain('aria-label="Dar como cortesía"');
+    expect(css).toMatch(/@container np \(min-width: 860px\)\s*\{\s*\.np-qty button\s*\{\s*width:\s*36px/);
+    expect(css).toMatch(/@container np \(max-width: 419px\)[\s\S]*?\.np-accion\s*\{\s*min-width:\s*44px/);
+  });
 });

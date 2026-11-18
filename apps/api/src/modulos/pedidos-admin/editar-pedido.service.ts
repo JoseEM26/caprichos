@@ -15,10 +15,12 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones } from '../stock/opcion-requiere';
 import { LineaVentaProducto, ajustarVentaProductos } from '../stock/producto-controlado';
-import { EditarPedidoDto, LineaEdicionDto } from './dto/editar-pedido.dto';
+import { CambiarParaLlevarDto, EditarPedidoDto, LineaEdicionDto } from './dto/editar-pedido.dto';
 
 /** Estados en que todavía se puede editar un pedido (y solo si no está cobrado). */
 export const ESTADOS_EDITABLES = ['COLA', 'PREPARANDO', 'LISTO'];
+/** Modalidades en las que una línea puede ir para llevar (comer en el local). */
+export const MODALIDADES_PARA_LLEVAR = ['MESA', 'COMER_LOCAL'];
 /** Una persona «está editando» hasta 2 minutos después de su última señal. */
 export const EXPIRA_EDITANDO_MS = 2 * 60 * 1000;
 
@@ -554,6 +556,156 @@ export class EditarPedidoService {
       cambios: resultado.cambios.resumen,
       mensaje: 'Pedido actualizado',
     };
+  }
+
+  /**
+   * Marca «para llevar» de unas unidades de una línea ya creada (Caja). Con 0 o con todas las unidades cambia la marca
+   * de la línea en su sitio. Con unas pocas la divide en dos líneas: N−k aquí y k para llevar, copiando opciones, nota,
+   * nombres y precio unitario, y repartiendo el subtotal sin tocar el total ni los descuentos. Si ya hay unidades listas
+   * o despachadas no se divide (409): la línea nueva saldría sin preparar y la vieja perdería su avance.
+   */
+  async cambiarParaLlevar(idRaw: string, lineaRaw: string, dto: CambiarParaLlevarDto, usuario: UsuarioAutenticado, ip?: string) {
+    const id = this.parseId(idRaw);
+    const lineaId = this.parseId(lineaRaw);
+    const pedido: any = await this.prisma.pedido.findUnique({ where: { id }, include: this.incluirPedido() });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    this.exigirVersion(pedido.version, dto.version);
+    this.exigirEditable(pedido, pedido.cobros.length > 0);
+    if (!MODALIDADES_PARA_LLEVAR.includes(pedido.modalidad)) {
+      throw new ConflictException({ codigo: 'PARA_LLEVAR_NO_APLICA', mensaje: 'Para llevar por línea solo aplica a pedidos de mesa o de comer en el local.' });
+    }
+    const fila: LineaDb | undefined = pedido.lineas.find((l: LineaDb) => l.id === lineaId && l.linea_combo_id == null && !l.cargo_libre);
+    if (!fila) throw new BadRequestException({ codigo: 'LINEA_INVALIDA', mensaje: 'La línea no pertenece a este pedido. Vuelve a abrir el detalle.' });
+    if (fila.oferta_id != null && fila.lineasComboHijas.length > 0) {
+      throw new BadRequestException({ codigo: 'COMBO_NO_EDITABLE', mensaje: `El combo «${fila.nombre}» no cambia de para llevar: quítalo y agrega otro.` });
+    }
+    const n: number = fila.cantidad;
+    const k = Number(dto.llevar);
+    if (k > n) throw new BadRequestException({ codigo: 'UNIDADES_INVALIDAS', mensaje: `«${fila.nombre}» tiene ${n} unidad${n === 1 ? '' : 'es'}.` });
+    const dividir = k > 0 && k < n;
+    if (dividir && fila.sabores.length > 0) {
+      throw new BadRequestException({ codigo: 'MEZCLA_NO_DIVIDE', mensaje: `«${fila.nombre}» lleva mezcla de sabores: se marca completa, no por unidades.` });
+    }
+    if (!dividir && (k === n) === !!fila.para_llevar) {
+      return { id: String(id), codigo: pedido.codigo, version: pedido.version, estado: pedido.estado, mensaje: 'Sin cambios' };
+    }
+
+    const etiquetasAntes = (await this.impresion?.capturarEtiquetas(id)) ?? new Map<string, string>();
+    const foto = (cantidad: number, paraLlevar: boolean, personas: string[], subtotal: number) => ({
+      nombre: fila.nombre,
+      tamano: fila.tamano ?? null,
+      cantidad,
+      paraLlevar,
+      personas,
+      subtotal,
+    });
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM pedido WHERE id = ${id} FOR UPDATE`;
+      const vivo: any = await tx.pedido.findUnique({ where: { id }, include: this.incluirPedido() });
+      if (!vivo) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+      this.exigirVersion(vivo.version, dto.version);
+      this.exigirEditable(vivo, vivo.cobros.length > 0);
+      const linea: LineaDb | undefined = vivo.lineas.find((l: LineaDb) => l.id === lineaId);
+      if (!linea) throw new BadRequestException({ codigo: 'LINEA_INVALIDA', mensaje: 'La línea no pertenece a este pedido. Vuelve a abrir el detalle.' });
+      if (dividir && (linea.listas > 0 || linea.despachadas > 0)) {
+        throw new ConflictException({
+          codigo: 'UNIDADES_YA_PREPARADAS',
+          mensaje: `Ya hay unidades de «${fila.nombre}» listas o entregadas en cocina: no se pueden repartir. Marca la línea completa o espera a que se haya despachado el pedido.`,
+        });
+      }
+      const subtotalTotal = Number(linea.subtotal ?? Number(linea.precio_unit) * n);
+      const nombres: string[] = linea.nombres_persona ?? [];
+      const antes = foto(n, !!linea.para_llevar, nombres, subtotalTotal);
+      let detalle: any[];
+      let resumen: string;
+      let estadoNuevo = vivo.estado as string;
+
+      if (!dividir) {
+        await tx.pedidoLinea.update({ where: { id: lineaId }, data: { para_llevar: k === n } });
+        const despues = foto(n, k === n, nombres, subtotalTotal);
+        detalle = [{ tipo: 'LINEA_CAMBIADA', antes, despues }];
+        resumen = k === n ? `«${fila.nombre}» pasa a para llevar` : `«${fila.nombre}» pasa a comer aquí`;
+      } else {
+        // Reparto: las primeras N−k unidades se quedan aquí y las últimas k van para llevar
+        const subA = redondear((subtotalTotal * (n - k)) / n);
+        const subB = redondear(subtotalTotal - subA);
+        const nombresA = nombres.slice(0, n - k);
+        const nombresB = nombres.slice(n - k);
+        await tx.pedidoLinea.update({
+          where: { id: lineaId },
+          data: { cantidad: n - k, para_llevar: false, subtotal: new Prisma.Decimal(subA), nombres_persona: nombresA },
+        });
+        const nueva = await tx.pedidoLinea.create({
+          data: {
+            pedido_id: id,
+            producto_id: linea.producto_id,
+            oferta_id: linea.oferta_id,
+            nombre: linea.nombre,
+            tamano: linea.tamano,
+            opciones: linea.opciones,
+            sabor: linea.sabor,
+            nota: linea.nota,
+            cantidad: k,
+            precio_unit: linea.precio_unit,
+            subtotal: new Prisma.Decimal(subB),
+            area_id: linea.area_id,
+            adicional: linea.adicional,
+            nombres_persona: nombresB,
+            para_llevar: true,
+          },
+        });
+        const opciones = (linea.opcionesElegidas ?? []).map(({ id: _id, pedido_linea_id: _pl, ...o }: any) => ({ ...o, pedido_linea_id: nueva.id }));
+        if (opciones.length > 0) await tx.pedidoLineaOpcion.createMany({ data: opciones });
+        detalle = [
+          { tipo: 'LINEA_CAMBIADA', antes, despues: foto(n - k, false, nombresA, subA) },
+          { tipo: 'LINEA_AGREGADA', despues: foto(k, true, nombresB, subB) },
+        ];
+        resumen = `Dividió «${fila.nombre}»: ${n - k} aquí y ${k} para llevar`;
+        // La unidad que va para llevar es una línea nueva sin preparar: comanda y estado al día
+        estadoNuevo = await this.sincronizarCocina(tx, id, vivo, true, usuario);
+      }
+
+      const actualizado = await tx.pedido.update({ where: { id }, data: { version: { increment: 1 } } });
+      await this.auditoria.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'pedidos',
+          accion: 'EDITAR_PEDIDO',
+          resultado: 'OK',
+          entidad: 'pedido',
+          entidadId: id,
+          antes: { version: vivo.version, linea: { lineaId: String(lineaId), cantidad: n, paraLlevar: !!linea.para_llevar } },
+          despues: { version: actualizado.version, cambios: detalle, resumen: [resumen] },
+          partyId: usuario.partyId,
+          ip,
+        },
+        tx,
+      );
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: id,
+          estado_anterior: vivo.estado,
+          estado_nuevo: estadoNuevo,
+          motivo: `Pedido editado: ${resumen}`.slice(0, 480),
+          por_party_id: BigInt(usuario.partyId),
+        },
+      });
+      return { actualizado, estadoNuevo };
+    });
+
+    await this.impresion?.encolarEtiquetasEditadas(id, etiquetasAntes);
+    this.emitir('pedido:editado', {
+      id: String(id),
+      codigo: pedido.codigo,
+      estado: resultado.estadoNuevo,
+      version: resultado.actualizado.version,
+      por: String(usuario.partyId),
+    });
+    if (resultado.estadoNuevo !== pedido.estado) {
+      this.emitir('pedido:estado', { id: String(id), codigo: pedido.codigo, estado: resultado.estadoNuevo });
+    }
+    return { id: String(id), codigo: pedido.codigo, version: resultado.actualizado.version, estado: resultado.estadoNuevo, mensaje: 'Pedido actualizado' };
   }
 
   private exigirVersion(actual: number, vista: number) {

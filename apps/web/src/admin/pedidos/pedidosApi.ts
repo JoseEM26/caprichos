@@ -662,6 +662,11 @@ export const pedidosApi = {
     return api.post(`/admin/pedidos/${id}/editar`, dto);
   },
 
+  /** Para llevar de unas unidades de una línea: 0 = aquí, cantidad = todas; si quedan unas pocas, la línea se divide. */
+  async cambiarParaLlevar(id: string | number, lineaId: string, dto: { version: number; llevar: number }): Promise<{ id: string; codigo: string; version: number; estado: string; mensaje: string }> {
+    return api.post(`/admin/pedidos/${id}/lineas/${lineaId}/para-llevar`, dto);
+  },
+
   /** Avisa a las demás pantallas que este usuario abrió (true) o cerró (false) el editor del pedido. */
   async avisarEditando(id: string | number, activo: boolean): Promise<void> {
     await api.post(`/admin/pedidos/${id}/editando`, { activo });

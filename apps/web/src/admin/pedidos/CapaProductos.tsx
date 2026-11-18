@@ -3,7 +3,8 @@ import { InsigniaCortesia } from './HistorialAuditoria';
 import type { LineaPedido, Pedido } from './pedidosApi';
 import { itemsCaja, type ItemCaja } from './detalleCaja';
 import { esCargoLibre, etiquetaCargoLibre } from './ModalCargoLibre';
-import { ChipParaLlevar, ResumenParaLlevar, modalidadPermiteParaLlevar } from './paraLlevar';
+import { useState } from 'react';
+import { ChipParaLlevar, DialogoCuantosLlevar, ResumenParaLlevar, modalidadPermiteParaLlevar, unidadesParaLlevar } from './paraLlevar';
 
 const soles = (n: unknown) => `S/ ${Number(n || 0).toFixed(2)}`;
 
@@ -37,16 +38,43 @@ export interface CapaProductosProps {
   puedeDarCortesia: boolean;
   alCortesia: (linea: LineaPedido) => void;
   alAbrirPedido?: (id: string) => void;
+  /** Permiso de editar y estado que lo permiten: el chip «Para llevar» se vuelve control táctil */
+  puedeCambiarLlevar?: boolean;
+  /** Cambia cuántas unidades de la línea van para llevar (la API divide la línea si hace falta) */
+  alCambiarLlevar?: (linea: LineaPedido, llevar: number) => Promise<void>;
 }
 
+/** Mensaje legible de un error de la API (o uno genérico). */
+const mensajeLlevar = (e: unknown) => (e instanceof Error && e.message ? e.message : 'No se pudo cambiar. Intenta de nuevo.');
+
 /** Capa 1: cada línea como tarjeta grande y, al lado (PC) o debajo (celular), el resumen con el total. */
-export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPedido }: CapaProductosProps) {
+export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPedido, puedeCambiarLlevar = false, alCambiarLlevar }: CapaProductosProps) {
   const estaPagado = String(pedido.pago_estado || '').toUpperCase() === 'PAGADO';
   const todas = pedido.lineas ?? [];
   const lineas = todas.filter((l) => l.linea_combo_id == null);
   const items = itemsCaja(todas);
   const descuentos = descuentosDePedido(pedido);
   const extras = pedido.extras ?? [];
+  const [dialogoLlevar, setDialogoLlevar] = useState<LineaPedido | null>(null);
+  const [enviandoLlevar, setEnviandoLlevar] = useState(false);
+  const [errorLlevar, setErrorLlevar] = useState<string | null>(null);
+  // Un combo guardado no cambia de para llevar (va completo); tampoco los cargos libres ni las cortesías
+  const esCombo = (it: LineaPedido) => todas.some((h) => h.linea_combo_id === it.id);
+  const marcable = (it: LineaPedido) =>
+    !!alCambiarLlevar && puedeCambiarLlevar && modalidadPermiteParaLlevar(pedido.modalidad) && !esCombo(it) && !esCargoLibre(it) && !it.es_cortesia;
+  const cambiarLlevar = async (it: LineaPedido, llevar: number) => {
+    if (!alCambiarLlevar) return;
+    setEnviandoLlevar(true);
+    setErrorLlevar(null);
+    try {
+      await alCambiarLlevar(it, llevar);
+      setDialogoLlevar(null);
+    } catch (e) {
+      setErrorLlevar(mensajeLlevar(e));
+    } finally {
+      setEnviandoLlevar(false);
+    }
+  };
   return (
     <div className="dp-grid dp-grid-2">
       <section className="dp-col" aria-label="Productos del pedido">
@@ -60,7 +88,36 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
               <div className="dp-linea-cant">{it.cantidad}×</div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div className="dp-linea-nombre">{it.nombre}</div>
-                {it.paraLlevar && modalidadPermiteParaLlevar(pedido.modalidad) && <div><ChipParaLlevar /></div>}
+                {marcable(it) ? (
+                  <div>
+                    <button
+                      type="button"
+                      data-testid="cambiar-para-llevar"
+                      aria-label={`Dónde se come ${it.nombre}: cambiar`}
+                      title="Cambiar dónde se come"
+                      disabled={enviandoLlevar}
+                      onClick={() => (it.cantidad >= 2 ? setDialogoLlevar(it) : cambiarLlevar(it, unidadesParaLlevar(it) > 0 ? 0 : 1))}
+                      style={{ minHeight: 40, padding: '0 12px', borderRadius: 10, border: '2px solid #0B2C3E', background: it.paraLlevar ? '#E67929' : '#fff', color: it.paraLlevar ? '#fff' : '#0B2C3E', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                    >
+                      {it.paraLlevar ? '🥡 Para llevar' : 'Comer aquí'} ✎
+                    </button>
+                  </div>
+                ) : (
+                  it.paraLlevar && modalidadPermiteParaLlevar(pedido.modalidad) && <div><ChipParaLlevar /></div>
+                )}
+                {dialogoLlevar?.id === it.id && (
+                  <DialogoCuantosLlevar
+                    nombre={it.nombre}
+                    cantidad={it.cantidad}
+                    llevar={unidadesParaLlevar(it)}
+                    enviando={enviandoLlevar}
+                    onConfirmar={(k) => cambiarLlevar(it, k)}
+                    onCerrar={() => {
+                      setDialogoLlevar(null);
+                      setErrorLlevar(null);
+                    }}
+                  />
+                )}
                 {esCargoLibre(it) && (
                   <div data-testid="etiqueta-cargo-libre" style={{ alignSelf: 'flex-start', background: '#FFF1C9', border: '1.5px solid #E8B923', color: '#5A4300', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 800 }}>
                     {etiquetaCargoLibre(it)}
@@ -91,6 +148,11 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
             </div>
           );
         })}
+        {errorLlevar && (
+          <div role="alert" style={{ fontSize: 13, fontWeight: 800, color: '#8A3A07' }}>
+            {errorLlevar}
+          </div>
+        )}
       </section>
 
       <div className="dp-col">

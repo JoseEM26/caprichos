@@ -52,3 +52,15 @@ export class EditandoPedidoDto {
   @IsBoolean({ message: 'activo debe ser verdadero o falso' })
   activo!: boolean;
 }
+
+export class CambiarParaLlevarDto {
+  /** Versión del pedido que vio quien edita (409 PEDIDO_MODIFICADO si cambió). */
+  @IsInt({ message: 'La versión del pedido debe ser un número entero' })
+  @Min(0)
+  version!: number;
+
+  /** Cuántas unidades de la línea van para llevar: 0 = ninguna, la cantidad = todas. */
+  @IsInt({ message: 'Las unidades para llevar deben ser un número entero' })
+  @Min(0)
+  llevar!: number;
+}
