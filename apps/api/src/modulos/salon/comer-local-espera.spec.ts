@@ -65,14 +65,12 @@ describe('Comer en el local de la carta en la lista de espera', () => {
     ]);
   });
 
-  it('consulta solo COMER_LOCAL de la carta, de hoy, vivos, sin cobrar y con alguna unidad aquí', async () => {
+  it('consulta solo COMER_LOCAL de la carta, de hoy, vivos y con alguna unidad aquí', async () => {
     porModalidad([], []);
     await service.listarEspera(mozo);
     const where = prisma.pedido.findMany.mock.calls.find((c: any) => c[0].where.modalidad === 'COMER_LOCAL')[0].where;
     expect(where).toMatchObject({ modalidad: 'COMER_LOCAL', canal: 'CARTA', estado: { in: ['COLA', 'PREPARANDO', 'LISTO'] }, lineas: { some: { para_llevar: false } } });
     expect(where.creado_en.gte).toBeInstanceOf(Date);
-    expect(where.cobros).toEqual({ none: { anulado_en: null } });
-    expect(where.OR).toEqual([{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }]);
   });
 
   it('todo para llevar no aparece aunque la consulta lo traiga', async () => {
@@ -106,6 +104,25 @@ describe('Comer en el local de la carta en la lista de espera', () => {
     await expect(service.asignarEspera('6', '9', mozo, undefined, false, true)).rejects.toMatchObject({ response: { codigo: 'SOLO_PARA_LLEVAR' } });
     expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
     expect(prisma.pedidoMesa.create).not.toHaveBeenCalled();
+  });
+
+  it('un pedido ya pagado (en línea) aparece en la lista y el filtro no mira el pago ni los cobros', async () => {
+    porModalidad([], [{ ...carta(7n, 'CP-W007', 4, [{ nombre: 'Torta', cantidad: 1, para_llevar: false }]), pago_estado: 'PAGADO' }]);
+    const r: any = await service.listarEspera(mozo);
+    expect(r.items.map((i: any) => i.codigo)).toEqual(['CP-W007']);
+    const where = prisma.pedido.findMany.mock.calls.find((c: any) => c[0].where.modalidad === 'COMER_LOCAL')[0].where;
+    expect(where).not.toHaveProperty('cobros');
+    expect(where).not.toHaveProperty('OR');
+  });
+
+  it('asignar mesa a un pedido pagado conserva su cobro y su pago_estado', async () => {
+    prisma.pedido.findUnique.mockResolvedValue({ id: 8n, codigo: 'CP-W008', modalidad: 'COMER_LOCAL', canal: 'CARTA', estado: 'COLA', pago_estado: 'PAGADO', espera_mesa_desde: null, cliente_nombre: 'Rosa' });
+    prisma.cobro.findFirst.mockResolvedValue({ id: 3n });
+    await service.asignarEspera('8', '9', mozo, undefined, false, true);
+    const data = prisma.pedido.updateMany.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('pago_estado');
+    expect(prisma.cobro.findFirst).not.toHaveBeenCalled();
+    expect(prisma.cobro.update).toBeUndefined();
   });
 
   it('un pedido ya sentado no se asigna otra vez', async () => {

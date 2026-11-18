@@ -86,12 +86,23 @@ describe('Comer en el local: Caja asigna mesa o manda a la lista', () => {
       prisma.pedido.findUnique.mockResolvedValue({ ...pedido, estado });
       await expect(service.asignarEspera('5', '9', caja, undefined, false, true)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_MOVIBLE' } });
     });
-    it('cobrado (PAGADO o cobro vigente): 409 PEDIDO_NO_MOVIBLE', async () => {
+    it('pagado (PAGADO o cobro vigente): se sienta y no toca su cobro ni su pago', async () => {
       prisma.pedido.findUnique.mockResolvedValue({ ...pedido, pago_estado: 'PAGADO' });
-      await expect(service.asignarEspera('5', '9', caja, undefined, false, true)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_MOVIBLE' } });
-      prisma.pedido.findUnique.mockResolvedValue(pedido);
       prisma.cobro.findFirst.mockResolvedValue({ id: 1n });
-      await expect(service.asignarEspera('5', '9', caja, undefined, false, true)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_MOVIBLE' } });
+      const r: any = await service.asignarEspera('5', '9', caja, undefined, false, true);
+      expect(r.ok).toBe(true);
+      expect(prisma.cobro.findFirst).not.toHaveBeenCalled();
+      expect(prisma.cobro.update).toBeUndefined();
+      const data = prisma.pedido.updateMany.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('pago_estado');
+      expect(data).not.toHaveProperty('pago_metodo');
+      expect(prisma.pedido.updateMany.mock.calls[0][0].data.modalidad).toBe('MESA');
+    });
+    it('anulado o entregado sigue rechazado', async () => {
+      for (const estado of ['ANULADO', 'ENTREGADO']) {
+        prisma.pedido.findUnique.mockResolvedValue({ ...pedido, estado });
+        await expect(service.asignarEspera('5', '9', caja, undefined, false, true)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_MOVIBLE' } });
+      }
     });
     it('concurrencia: otro cajero lo convirtió antes (updateMany 0): 409 y no ocupa la mesa', async () => {
       prisma.pedido.updateMany.mockResolvedValue({ count: 0 });

@@ -573,8 +573,6 @@ export class SalonService {
         canal: 'CARTA',
         creado_en: { gte: inicioHoy },
         estado: { in: ['COLA', 'PREPARANDO', 'LISTO'] },
-        OR: [{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }],
-        cobros: { none: { anulado_en: null } },
         lineas: { some: { para_llevar: false } },
       },
       orderBy: [{ creado_en: 'asc' }, { id: 'asc' }],
@@ -770,10 +768,11 @@ export class SalonService {
         mensaje: 'Este pedido ya no es de «Comer en el local» sin mesa (ya tiene mesa, está en espera o es de otra modalidad)',
       });
     }
-    if (!['COLA', 'PREPARANDO', 'LISTO'].includes(pedido.estado) || pedido.pago_estado === 'PAGADO') {
+    // El pago no decide dónde se sienta: un pedido ya pagado (p. ej. en línea) también se puede sentar
+    if (!['COLA', 'PREPARANDO', 'LISTO'].includes(pedido.estado)) {
       throw new ConflictException({
         codigo: 'PEDIDO_NO_MOVIBLE',
-        mensaje: `El pedido ${pedido.codigo} está anulado, entregado, cobrado o finalizado: no se puede asignar mesa ni mandar a la lista`,
+        mensaje: `El pedido ${pedido.codigo} está anulado, entregado o finalizado: no se puede asignar mesa ni mandar a la lista`,
       });
     }
   }
@@ -794,8 +793,6 @@ export class SalonService {
     if (aqui === 0) {
       throw new ConflictException({ codigo: 'SOLO_PARA_LLEVAR', mensaje: `El pedido ${fresco.codigo} es todo para llevar: no necesita mesa` });
     }
-    const cobro = await tx.cobro.findFirst({ where: { pedido_id: pId, anulado_en: null }, select: { id: true } });
-    if (cobro) this.exigirComerLocalMovible({ ...fresco, pago_estado: 'PAGADO' });
     const r = await tx.pedido.updateMany({
       where: { id: pId, modalidad: 'COMER_LOCAL', estado: fresco.estado },
       data: {
