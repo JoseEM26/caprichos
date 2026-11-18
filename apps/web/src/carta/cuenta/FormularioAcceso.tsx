@@ -133,6 +133,9 @@ function VentanaLegal({ info, cual, alCerrar }: { info: CartaLegalInfo | null; c
 }
 
 /** Acceso de quien no tiene sesión: ingresar, crear cuenta (en 2 pasos) y recuperar contraseña (celular + contraseña, sin DNI). */
+/** Aviso junto al campo del código cuando WhatsApp oculta el número del cliente. */
+const AVISO_SIN_NUMERO = 'Tu WhatsApp oculta tu número. Te mandamos un código por WhatsApp.';
+
 export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, alCrearCuenta }: { alSeguirInvitado: () => void; invitadoPermitido?: boolean; alCrearCuenta?: () => void }) {
   const { ingresar, registrar } = useCuenta();
   const [modo, setModo] = useState<Modo>('in');
@@ -160,6 +163,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
   const [verifWa, setVerifWa] = useState<RespuestaVerificacionWa | null>(null);
   /** Modo WHATSAPP_ENTRANTE al recuperar: el celular ya llegó por WhatsApp y se puede poner la contraseña nueva. */
   const [verificadoWa, setVerificadoWa] = useState(false);
+  /** WhatsApp oculta el número del cliente: desde aquí los envíos piden el código de 6 dígitos (forzarCodigo). */
+  const [codigoForzado, setCodigoForzado] = useState(false);
 
   const paso1 = modo === 'new' && paso === 1;
   const paso2 = modo === 'new' && paso === 2;
@@ -188,6 +193,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
     setCodigo('');
     setVerifWa(null);
     setVerificadoWa(false);
+    setCodigoForzado(false);
     if (m !== 'in') setAviso('');
   };
 
@@ -247,7 +253,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
         setContrasena('');
       }, 'Celular o contraseña incorrectos.');
     }
-    if (paso === 1) return enviarCodigoRegistro();
+    if (paso === 1) return enviarCodigoRegistro(codigoForzado);
     if (paso === 2) {
       if (!/^\d{6}$/.test(codigo)) return setMensaje('El código tiene 6 dígitos.');
       return correr(async () => {
@@ -278,10 +284,10 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
    * Paso 1: se pide el registro. En WHATSAPP_ENTRANTE el servidor devuelve el enlace y el cliente escribe primero;
    * en CODIGO_PLANTILLA el código de 6 dígitos llega por WhatsApp (flujo anterior).
    */
-  const enviarCodigoRegistro = () =>
+  const enviarCodigoRegistro = (forzar: boolean) =>
     correr(async () => {
-      const r = await api.post<unknown>('/carta/cuenta/registro/codigo', { telefono });
-      setAviso('');
+      const r = await api.post<unknown>('/carta/cuenta/registro/codigo', { telefono, ...(forzar ? { forzarCodigo: true } : {}) });
+      setAviso(forzar ? AVISO_SIN_NUMERO : '');
       setVerifWa(esRespuestaWhatsappEntrante(r) ? r : null);
       setPaso(2);
       setEspera(60);
@@ -294,22 +300,31 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
     setPaso(3);
   };
 
-  const pedirCodigo = async () => {
+  const pedirCodigo = async (forzar: boolean) => {
     if (!TELEFONO_VALIDO.test(telefono)) return setMensaje(MENSAJE_TELEFONO);
     await correr(async () => {
-      const r = await api.post<{ mensaje?: string }>('/carta/cuenta/recuperar/solicitar', { telefono });
+      const r = await api.post<{ mensaje?: string }>('/carta/cuenta/recuperar/solicitar', { telefono, ...(forzar ? { forzarCodigo: true } : {}) });
       if (esRespuestaWhatsappEntrante(r)) {
         setVerifWa(r);
         setAviso('');
       } else {
         setVerifWa(null);
-        setAviso(r?.mensaje ?? 'Si ese celular tiene cuenta, te enviamos un código por WhatsApp.');
+        setAviso(forzar ? AVISO_SIN_NUMERO : (r?.mensaje ?? 'Si ese celular tiene cuenta, te enviamos un código por WhatsApp.'));
       }
       setVerificadoWa(false);
       setCodigo('');
       setEspera(60);
       setModo('rec2');
     }, 'No se pudo enviar el código. Intenta de nuevo.');
+  };
+
+  /** WhatsApp no mostró el número: se pasa al código de 6 dígitos al celular que escribió (misma prueba: lo recibe y lo escribe). */
+  const pasarACodigo = () => {
+    setCodigoForzado(true);
+    setVerificadoWa(false);
+    setMensaje('');
+    if (modo === 'rec2') return pedirCodigo(true);
+    return enviarCodigoRegistro(true);
   };
 
   const confirmar = async () => {
@@ -417,7 +432,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
           enlace={verifWa.enlace}
           mensaje={verifWa.mensaje}
           alVerificar={celularVerificado}
-          alReenviar={enviarCodigoRegistro}
+          alSinNumero={pasarACodigo}
+          alReenviar={() => enviarCodigoRegistro(codigoForzado)}
           puedeReenviar={espera <= 0 && !enviando}
           esperaSeg={espera}
         />
@@ -430,7 +446,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
             <input id="ac-cr" autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
           </div>
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
-          <button type="button" onClick={enviarCodigoRegistro} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
+          <button type="button" onClick={() => enviarCodigoRegistro(codigoForzado)} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
             {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
           </button>
         </>
@@ -445,7 +461,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
               enlace={verifWa.enlace}
               mensaje={verifWa.mensaje}
               alVerificar={() => setVerificadoWa(true)}
-              alReenviar={pedirCodigo}
+              alSinNumero={pasarACodigo}
+              alReenviar={() => pedirCodigo(codigoForzado)}
               puedeReenviar={espera <= 0 && !enviando}
               esperaSeg={espera}
             />
@@ -459,7 +476,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
           {!verifWa && (
             <>
               <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
-              <button type="button" onClick={pedirCodigo} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
+              <button type="button" onClick={() => pedirCodigo(codigoForzado)} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
                 {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
               </button>
             </>
@@ -484,7 +501,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
         {/* En WHATSAPP_ENTRANTE el paso de celular avanza solo al llegar el mensaje: no hay botón que pulsar */}
         {!(paso2 && verifWa) && (
           <button
-            onClick={modo === 'rec1' ? pedirCodigo : modo === 'rec2' ? confirmar : enviar}
+            onClick={modo === 'rec1' ? () => pedirCodigo(false) : modo === 'rec2' ? confirmar : enviar}
             disabled={enviando || (modo === 'rec2' && !!verifWa && !verificadoWa)}
             style={{ ...botonPrincipal, flex: 1 }}
           >

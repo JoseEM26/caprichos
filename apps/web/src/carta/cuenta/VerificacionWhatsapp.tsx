@@ -34,7 +34,7 @@ const MAX_SONDEOS = 300;
 /** Tras este tiempo sin verificar, se explica qué revisar (si no, el cliente no sabe si el envío llegó). */
 const SONDEOS_AVISO = 30; // 60 s
 
-type Estado = 'pendiente' | 'verificado' | 'vencido';
+type Estado = 'pendiente' | 'verificado' | 'vencido' | 'sin_numero';
 
 const botonWa: CSSProperties = {
   display: 'flex',
@@ -57,6 +57,7 @@ export function VerificacionWhatsapp({
   enlace,
   mensaje,
   alVerificar,
+  alSinNumero,
   alReenviar,
   puedeReenviar,
   esperaSeg = 0,
@@ -66,6 +67,8 @@ export function VerificacionWhatsapp({
   mensaje?: string;
   /** Se llama una vez, cuando el servidor confirma que el celular es el que escribió. */
   alVerificar: () => void;
+  /** WhatsApp oculta el número (LID) y el servidor no pudo probarlo: el padre pasa al código de 6 dígitos. */
+  alSinNumero?: () => void;
   alReenviar: () => void;
   /** Falso mientras hay espera o un envío en curso. */
   puedeReenviar: boolean;
@@ -77,6 +80,8 @@ export function VerificacionWhatsapp({
   // La referencia evita que un cambio de función reinicie el sondeo
   const alVerificarRef = useRef(alVerificar);
   alVerificarRef.current = alVerificar;
+  const alSinNumeroRef = useRef(alSinNumero);
+  alSinNumeroRef.current = alSinNumero;
 
   useEffect(() => {
     setEstado('pendiente');
@@ -97,6 +102,7 @@ export function VerificacionWhatsapp({
         clearInterval(timer);
         setEstado(r.estado);
         if (r.estado === 'verificado') alVerificarRef.current();
+        if (r.estado === 'sin_numero') alSinNumeroRef.current?.();
       } catch {
         // Un fallo puntual de red no corta el sondeo
       }
@@ -111,6 +117,14 @@ export function VerificacionWhatsapp({
     return (
       <div role="status" style={{ fontSize: 14, fontWeight: 700, color: 'var(--cp-ok)' }}>
         Celular verificado. Seguimos con el siguiente paso...
+      </div>
+    );
+  }
+
+  if (estado === 'sin_numero') {
+    return (
+      <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)' }}>
+        Tu WhatsApp oculta tu número. Te mandamos un código por WhatsApp.
       </div>
     );
   }

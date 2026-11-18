@@ -125,7 +125,7 @@ export class CodigoRegistroService {
    * Se acepta porque el cliente necesita saber qué hacer; se mitiga con los límites por celular e IP.
    * recuperar-clave.service NO cambia: sigue respondiendo igual exista o no la cuenta.
    */
-  async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_CODIGO_REGISTRO | RespuestaVerificacionWhatsapp> {
+  async solicitar(telefono: string, ip?: string, forzarCodigo = false): Promise<typeof RESPUESTA_CODIGO_REGISTRO | RespuestaVerificacionWhatsapp> {
     const tel = this.celular(telefono);
     if (!tel) {
       throw new BadRequestException({
@@ -155,7 +155,8 @@ export class CodigoRegistroService {
         });
       }
 
-      if ((await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE) return await this.iniciarPorWhatsapp(tel);
+      // forzarCodigo: WhatsApp no mostró el número del cliente (sin_numero): va el código de 6 dígitos al celular que escribió
+      if (!forzarCodigo && (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE) return await this.iniciarPorWhatsapp(tel);
 
       const outbox = this.outbox();
       if (!outbox) throw noEnviado();

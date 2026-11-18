@@ -64,7 +64,7 @@ export class RecuperarClaveService {
    * En WHATSAPP_ENTRANTE la respuesta tampoco depende de la cuenta (mismo formato, con token), y el exceso de
    * envíos responde 429: el conteo es por celular e IP, no revela si existe la cuenta.
    */
-  async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_SOLICITUD | RespuestaVerificacionWhatsapp> {
+  async solicitar(telefono: string, ip?: string, forzarCodigo = false): Promise<typeof RESPUESTA_SOLICITUD | RespuestaVerificacionWhatsapp> {
     const tel = celular9De(telefono);
     if (!tel) {
       throw new BadRequestException({
@@ -74,7 +74,8 @@ export class RecuperarClaveService {
     }
     const redis = this.redisService.obtenerCliente();
     try {
-      const entrante = (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE;
+      // forzarCodigo: WhatsApp no mostró el número del cliente (sin_numero): va el código de 6 dígitos
+      const entrante = !forzarCodigo && (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE;
       const claveSol = `cliente:rec:sol:${tel}`;
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);

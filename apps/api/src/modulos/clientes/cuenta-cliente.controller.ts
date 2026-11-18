@@ -61,9 +61,9 @@ export class CuentaClienteController {
   /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Errores: CUENTA_EXISTENTE (409) y DEMASIADOS_CODIGOS (429). */
   @Post('registro/codigo')
   @HttpCode(200)
-  async solicitarCodigoRegistro(@Body('telefono') telefono: string, @Req() req: Request) {
+  async solicitarCodigoRegistro(@Body('telefono') telefono: string, @Req() req: Request, @Body('forzarCodigo') forzarCodigo?: boolean) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.codigoRegistro.solicitar(telefono, ip);
+    return this.codigoRegistro.solicitar(telefono, ip, forzarCodigo === true);
   }
 
   /**
@@ -107,9 +107,9 @@ export class CuentaClienteController {
   /** Pide un código de 6 dígitos por WhatsApp. Responde siempre lo mismo, exista o no la cuenta. */
   @Post('recuperar/solicitar')
   @HttpCode(200)
-  async solicitarRecuperacion(@Body('telefono') telefono: string, @Req() req: Request) {
+  async solicitarRecuperacion(@Body('telefono') telefono: string, @Req() req: Request, @Body('forzarCodigo') forzarCodigo?: boolean) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.recuperar.solicitar(telefono, ip);
+    return this.recuperar.solicitar(telefono, ip, forzarCodigo === true);
   }
 
   @Post('recuperar/confirmar')

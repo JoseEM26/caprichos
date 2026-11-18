@@ -222,14 +222,14 @@ describe('CuentaClienteController', () => {
 
   it('recuperar/solicitar y recuperar/confirmar delegan al servicio de recuperación', async () => {
     await controller.solicitarRecuperacion('912345678', { ip: '1.1.1.1' } as any);
-    expect(recuperarMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1');
+    expect(recuperarMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1', false);
     const dto = { telefono: '912345678', codigo: '123456', contrasenaNueva: 'NuevaClave2026' };
     await controller.confirmarRecuperacion(dto, { ip: '1.1.1.1' } as any);
     expect(recuperarMock.confirmar).toHaveBeenCalledWith(dto, '1.1.1.1');
   });
   it('registro/codigo envía el código y responde sin revelar si el celular existe', async () => {
     const r = await controller.solicitarCodigoRegistro('912345678', { ip: '1.1.1.1' } as any);
-    expect(codigoRegistroMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1');
+    expect(codigoRegistroMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1', false);
     expect(r).toMatchObject({ ok: true });
   });
   it('registro/verificar pasa el código al servicio de registro', async () => {

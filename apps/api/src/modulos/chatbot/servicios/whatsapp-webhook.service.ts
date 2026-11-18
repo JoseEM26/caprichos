@@ -48,7 +48,17 @@ import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
 import { ModuleRef } from '@nestjs/core';
 import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
 import { DireccionesService } from '../../direcciones/direcciones.service';
-import { atenderMensajeVerificacion, esMensajeVerificacion, RESPUESTA_NO_VERIFICADO, RESPUESTA_SIN_NUMERO, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
+import {
+  atenderMensajeVerificacion,
+  atenderVerificacionSinNumero,
+  claveParLidCelular,
+  esMensajeVerificacion,
+  PAR_LID_TTL_SEG,
+  PuenteLid,
+  RESPUESTA_NO_VERIFICADO,
+  secretoVerificacion,
+} from '../../clientes/verificacion-whatsapp.util';
+import { WhatsAppEvolutionAdaptador } from '../adaptadores/whatsapp-evolution.adaptador';
 import { textoGraciasEncuesta, textoPreguntaMotivo, TEXTO_PIDE_MOTIVO_LIBRE } from '../conversacion/textos-encuesta';
 import { etiquetaMotivo, interpretarMotivoEncuesta, MOTIVO_TEXTO_MAX, MOTIVO_VENCE_MS } from './encuesta-motivo.util';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
@@ -136,6 +146,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly numeros?: NumerosWhatsappService,
     @Optional() private readonly evolutionApi?: EvolutionApiCliente,
     @Optional() private readonly autorespuesta?: AutorespuestaWhatsappService,
+    @Optional() private readonly evolutionAdaptador?: WhatsAppEvolutionAdaptador,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -796,8 +807,10 @@ export class WhatsappWebhookService {
       if (telefonoNorm) {
         await this.atenderVerificacionCelular(telefonoNorm, texto);
       } else {
-        this.logger.warn(`[verificacion] remitente sin número visible (${telMask}): se explica, no se verifica`);
-        await this.responderVerificacion(identificador, RESPUESTA_SIN_NUMERO);
+        // LID sin número en el evento: se intenta averiguar el celular (tabla, Evolution); si no, el código de 6 dígitos
+        const lid = /^wa-user:(\d+)@lid$/i.exec(identificador)?.[1] ?? null;
+        this.logger.warn(`[verificacion] remitente sin número visible (${telMask}): se intenta resolver el celular`);
+        await this.responderVerificacion(identificador, await this.resolverVerificacionSinNumero(texto, lid));
       }
       return true;
     }
@@ -1330,6 +1343,46 @@ export class WhatsappWebhookService {
       this.logger.error(`[verificacion] error al verificar (Redis): ${err.message}`);
     }
     await this.responderVerificacion(telefonoNorm, respuesta);
+  }
+
+  /** Remitente sin número (LID): nunca lanza y siempre devuelve la frase a responder. */
+  private async resolverVerificacionSinNumero(texto: string, lid: string | null): Promise<string> {
+    const diagnostico = (evento: string, datos: Record<string, string | number | boolean> = {}) =>
+      this.logger.log(`[verificacion] ${evento} ${JSON.stringify(datos)}`);
+    try {
+      if (!this.redis) {
+        this.logger.error('[verificacion] Redis no disponible en el webhook: no se puede verificar este mensaje');
+        return RESPUESTA_NO_VERIFICADO;
+      }
+      return await atenderVerificacionSinNumero(
+        this.redis.obtenerCliente(),
+        secretoVerificacion(this.configService),
+        texto,
+        lid,
+        lid ? this.puenteLid(this.redis) : null,
+        diagnostico,
+      );
+    } catch (err: any) {
+      this.logger.error(`[verificacion] error al resolver el remitente sin número (Redis): ${err.message}`);
+      return RESPUESTA_NO_VERIFICADO;
+    }
+  }
+
+  /** Pares LID ↔ celular: primero lo aprendido (Redis, o el chat con celular vinculado), luego Evolution. */
+  private puenteLid(redis: RedisService): PuenteLid {
+    return {
+      aprendido: async (lid) => {
+        const guardado = await redis.obtenerCliente().get(claveParLidCelular(lid)).catch(() => null);
+        if (guardado) return guardado;
+        const chat = await this.prisma.conversacion.findUnique({ where: { telefono: `wa-user:${lid}@lid` }, select: { celular_vinculado: true } });
+        return chat?.celular_vinculado ?? null;
+      },
+      numeroDeLid: async (lid) => (await this.evolutionAdaptador?.resolverLid(lid)) ?? null,
+      confirmaLid: async (numero, lid) => (await this.evolutionAdaptador?.confirmarLid(numero, lid)) ?? 'NO_RESUELTO',
+      aprender: async (lid, celular9) => {
+        await this.vincularLidConCelular(lid, celular9);
+      },
+    };
   }
 
   /** Respuesta de la verificación por el puerto (Meta o Evolution). Nunca lanza; deja en el log si no salió y por qué. */
@@ -1939,6 +1992,8 @@ export class WhatsappWebhookService {
       const dc = String(celular).replace(/\D/g, '');
       if (!dl || !/^\d{9,15}$/.test(dc) || dl === dc) return false;
       const tel = normalizarTelefono(dc);
+      // El par se guarda aunque todavía no haya chat con ese LID: la próxima verificación sin número lo encuentra
+      if (this.redis) await this.redis.obtenerCliente().set(claveParLidCelular(dl), tel.slice(-9), 'EX', PAR_LID_TTL_SEG).catch(() => undefined);
       const delLid = await this.prisma.conversacion.findUnique({ where: { telefono: `wa-user:${dl}@lid` }, select: { id: true, celular_vinculado: true } });
       if (!delLid) return false;
       const delTel = await this.prisma.conversacion.findUnique({ where: { telefono: tel }, select: { id: true } });

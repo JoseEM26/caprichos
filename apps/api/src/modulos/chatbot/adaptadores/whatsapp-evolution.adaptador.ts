@@ -4,7 +4,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmascarar.util';
 import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { textoDePlantilla } from '../catalogo/texto-plantilla';
-import { destinoEvolution } from '../evolution/evolution-mensaje.util';
+import { destinoEvolution, paresLidCelular } from '../evolution/evolution-mensaje.util';
 import { aTextoNumerado, completarEscalaEncuesta } from '../evolution/menu-numerado.util';
 import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
 import { escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
@@ -20,9 +20,12 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import type { CargaCarrusel } from '../servicios/carrusel.util';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
+import type { ResultadoConfirmacionLid } from '../../clientes/verificacion-whatsapp.util';
 import { aplanarEnlacesMarkdown, textoSinBotonPedirEste } from '../utilidades/texto-whatsapp.util';
 
 const PREFIJO_MEDIA = 'evo:';
+/** Consultas de LID (verificación sin número): corta, el cliente espera la respuesta. */
+const TIMEOUT_LID_MS = 5000;
 const MEDIA_TTL_MS = 15 * 60_000;
 const VENTANA_IDENTICOS_MS = 60 * 60_000;
 
@@ -238,5 +241,49 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
   /** Evolution marca como leído por su cuenta al recibir; no se pide nada más. */
   async marcarLeido(): Promise<boolean> {
     return true;
+  }
+
+  /**
+   * Celular (dígitos) que Evolution asocia a un LID, o null si no lo sabe. Para verificar un mensaje sin número visible.
+   * HIPÓTESIS, no verificada contra la API real (la documentación v2 no fue accesible): POST /chat/findContacts/{instancia}
+   * con body { where: { id: "<lid>@lid" } }; del array de contactos se toma el par LID↔celular que traiga cada uno
+   * (paresLidCelular: un campo «<dígitos>@lid» junto a otro «<dígitos>@s.whatsapp.net», p. ej. remoteJid, remoteJidAlt, senderPn).
+   * Si el formato no coincide, devuelve null y la verificación pasa al código de 6 dígitos (no se verifica por eso).
+   * Timeout corto; nunca lanza.
+   */
+  async resolverLid(lid: string): Promise<string | null> {
+    if (!this.api.configurado()) return null;
+    const dl = String(lid ?? '').replace(/\D/g, '');
+    if (!dl) return null;
+    const r = await this.api.llamar('POST', `/chat/findContacts/${encodeURIComponent(this.api.instancia)}`, { where: { id: `${dl}@lid` } }, TIMEOUT_LID_MS);
+    if (!r.ok || !Array.isArray(r.data)) return null;
+    for (const item of r.data) {
+      const par = paresLidCelular(item).find((x) => x.lid === dl);
+      if (par) return par.celular;
+    }
+    return null;
+  }
+
+  /**
+   * Prueba de propiedad: ¿Evolution confirma que ese número tiene ese LID?
+   * Documentado (v2): POST /chat/whatsappNumbers/{instancia} con body { numbers: ["51…"] }, respuesta [{ exists, jid, number }].
+   * HIPÓTESIS: que la respuesta traiga el LID del número en algún campo «<dígitos>@lid» (lid o jid). Si hay LID y coincide →
+   * CONFIRMADO; si hay LID y es otro → OTRO; si no hay ningún LID en la respuesta, error o timeout → NO_RESUELTO (nunca se
+   * verifica por esto: el llamador pasa al código de 6 dígitos).
+   */
+  async confirmarLid(numero: string, lid: string): Promise<ResultadoConfirmacionLid> {
+    if (!this.api.configurado()) return 'NO_RESUELTO';
+    const dl = String(lid ?? '').replace(/\D/g, '');
+    const dn = String(numero ?? '').replace(/\D/g, '');
+    if (!dl || !dn) return 'NO_RESUELTO';
+    const r = await this.api.llamar('POST', `/chat/whatsappNumbers/${encodeURIComponent(this.api.instancia)}`, { numbers: [dn] }, TIMEOUT_LID_MS);
+    if (!r.ok || !Array.isArray(r.data)) return 'NO_RESUELTO';
+    const lids = r.data.flatMap((it: any) =>
+      Object.values(it ?? {})
+        .filter((v): v is string => typeof v === 'string' && /@lid$/i.test(v))
+        .map((v) => v.replace(/\D/g, '')),
+    );
+    if (lids.includes(dl)) return 'CONFIRMADO';
+    return lids.length ? 'OTRO' : 'NO_RESUELTO';
   }
 }

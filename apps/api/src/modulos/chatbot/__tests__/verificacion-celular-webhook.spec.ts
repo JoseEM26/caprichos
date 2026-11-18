@@ -259,11 +259,12 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 
-  it('un LID sin número visible: se explica (RESPUESTA_SIN_NUMERO) a su identificador y no se verifica ni va al bot', async () => {
+  it('un LID sin número visible con token inexistente: no verifica (RESPUESTA_NO_VERIFICADO) y no va al bot', async () => {
     const lid = '123456789012345@lid';
     await webhook.procesarPayload(mensajeTexto('wamid.D1', lid, 'Mi código: ABCDEFGH'));
 
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(`wa-user:${lid}`, RESPUESTA_SIN_NUMERO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(`wa-user:${lid}`, RESPUESTA_NO_VERIFICADO);
+    expect(RESPUESTA_SIN_NUMERO).not.toBe(RESPUESTA_NO_VERIFICADO);
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 

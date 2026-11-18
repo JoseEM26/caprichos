@@ -49,7 +49,7 @@ export interface RedisVerificacion {
   del(...claves: string[]): Promise<unknown>;
 }
 
-export type EstadoVerificacion = 'pendiente' | 'verificado' | 'vencido';
+export type EstadoVerificacion = 'pendiente' | 'verificado' | 'vencido' | 'sin_numero';
 export type PropositoVerificacion = 'REGISTRO' | 'RECUPERAR';
 
 export interface RespuestaVerificacionWhatsapp {
@@ -152,7 +152,9 @@ export async function estadoVerificacion(redis: RedisVerificacion, secreto: stri
   if (!/^[A-Z2-9]{8}$/.test(t)) return 'vencido';
   const valor = await redis.get(claveToken(t, secreto));
   if (!valor) return 'vencido';
-  return valor.endsWith('|V') ? 'verificado' : 'pendiente';
+  if (valor.endsWith('|V')) return 'verificado';
+  // S: WhatsApp no mostró el número del remitente; la web pasa al código de 6 dígitos
+  return valor.endsWith('|S') ? 'sin_numero' : 'pendiente';
 }
 
 /**
@@ -178,8 +180,93 @@ export type DiagnosticoVerificacion = (evento: string, datos?: Record<string, st
 const enmascararToken = (t: string) => `${t.slice(0, 2)}******`;
 const ultimos3 = (d: string) => (d ? `***${d.slice(-3)}` : 'sin-numero');
 
+/** Número oculto (LID) y no se pudo averiguar: el token pasa a «sin_numero» y la web pide el código de 6 dígitos. */
 export const RESPUESTA_SIN_NUMERO =
-  'No pudimos ver tu número de WhatsApp (tu cuenta lo tiene oculto), así que no podemos verificarlo por aquí. Revisa en WhatsApp que tu número pueda verse, o avísanos y te ayudamos 🙏';
+  'No pudimos ver tu número desde WhatsApp. Vuelve a la página: te enviaremos un código de 6 dígitos a tu celular para verificarlo 🙏';
+
+/** Pares LID ↔ celular aprendidos (Redis). 90 días: un número cambia poco y el par se vuelve a aprender al escribir. */
+export const PAR_LID_TTL_SEG = 90 * 24 * 3600;
+export const claveParLidCelular = (lid: string) => `cliente:wa:lid:${String(lid ?? '').replace(/\D/g, '')}`;
+
+export type ResultadoConfirmacionLid = 'CONFIRMADO' | 'OTRO' | 'NO_RESUELTO';
+
+/**
+ * Lo que el webhook sabe de un LID (identificador anónimo de WhatsApp, sin número en el evento) para averiguar su celular.
+ * Cada método puede fallar o no saber: el llamador trata null / NO_RESUELTO como «no sé» y nunca verifica por eso.
+ */
+export interface PuenteLid {
+  /** Celular ya aprendido para este LID (tabla o caché), o null. */
+  aprendido(lid: string): Promise<string | null>;
+  /** Celular que Evolution asocia a este LID, o null. */
+  numeroDeLid(lid: string): Promise<string | null>;
+  /** Prueba de propiedad: ¿Evolution confirma que ese número (51…) tiene este LID? */
+  confirmaLid(numero51: string, lid: string): Promise<ResultadoConfirmacionLid>;
+  /** Guarda el par aprendido para la próxima vez. */
+  aprender(lid: string, celular9: string): Promise<void>;
+}
+
+/**
+ * Mensaje de verificación de un remitente sin número visible. Orden:
+ *  1. token inexistente o vencido → RESPUESTA_NO_VERIFICADO (sin consultar nada);
+ *  2. par ya aprendido, o celular que Evolution asocia al LID → se verifica como un mensaje normal (si el celular no es el del token, no marca);
+ *  3. si no hay celular: Evolution confirma que el número del token tiene ese LID → se verifica; si dice que no → no marca;
+ *  4. no se pudo probar → el token pasa a «sin_numero» (la web pide el código de 6 dígitos) y se responde RESPUESTA_SIN_NUMERO.
+ * Sin LID (p. ej. identificador de usuario de Meta) se va directo al paso 4.
+ */
+export async function atenderVerificacionSinNumero(
+  redis: RedisVerificacion,
+  secreto: string,
+  texto: string,
+  lid: string | null,
+  puente: PuenteLid | null,
+  diagnostico?: DiagnosticoVerificacion,
+): Promise<string> {
+  const m = REGEX_TOKEN_MENSAJE.exec(normalizarTextoVerificacion(texto));
+  if (!m) return RESPUESTA_NO_VERIFICADO;
+  const token = m[1].toUpperCase();
+  const clave = claveToken(token, secreto);
+  const valor = await redis.get(clave);
+  const datos = { token: enmascararToken(token), lid: lid ? `***${lid.slice(-3)}` : 'sin-lid' };
+  if (!valor) {
+    diagnostico?.('TOKEN_NO_ENCONTRADO', datos);
+    return RESPUESTA_NO_VERIFICADO;
+  }
+  const [tel9, proposito, estado] = valor.split('|');
+  if (estado === 'V') {
+    diagnostico?.('YA_VERIFICADO', datos);
+    return RESPUESTA_VERIFICADO;
+  }
+
+  if (lid && puente) {
+    const aprendido = await puente.aprendido(lid).catch(() => null);
+    if (aprendido) {
+      diagnostico?.('LID_RESUELTO_TABLA', datos);
+      return (await atenderMensajeVerificacion(redis, secreto, texto, `51${aprendido}`, diagnostico)) ?? RESPUESTA_NO_VERIFICADO;
+    }
+    const numero = await puente.numeroDeLid(lid).catch(() => null);
+    const celular9 = numero ? normalizarCelularPeru(numero).celular9 : null;
+    if (celular9) {
+      diagnostico?.('LID_RESUELTO_EVOLUTION', datos);
+      await puente.aprender(lid, celular9).catch(() => undefined);
+      return (await atenderMensajeVerificacion(redis, secreto, texto, `51${celular9}`, diagnostico)) ?? RESPUESTA_NO_VERIFICADO;
+    }
+    const confirmacion = await puente.confirmaLid(`51${tel9}`, lid).catch((): ResultadoConfirmacionLid => 'NO_RESUELTO');
+    if (confirmacion === 'CONFIRMADO') {
+      diagnostico?.('LID_CONFIRMADO_EVOLUTION', datos);
+      await puente.aprender(lid, tel9).catch(() => undefined);
+      return (await atenderMensajeVerificacion(redis, secreto, texto, `51${tel9}`, diagnostico)) ?? RESPUESTA_NO_VERIFICADO;
+    }
+    if (confirmacion === 'OTRO') {
+      diagnostico?.('LID_NO_CORRESPONDE', datos);
+      return RESPUESTA_NO_VERIFICADO;
+    }
+  }
+
+  // No se pudo probar que el remitente es el celular del token: se pasa al código de 6 dígitos
+  await redis.set(clave, `${tel9}|${proposito}|S`, 'EX', TOKEN_TTL_SEG);
+  diagnostico?.('LID_SIN_NUMERO', datos);
+  return RESPUESTA_SIN_NUMERO;
+}
 
 /**
  * Atiende un mensaje entrante de texto. Devuelve la frase a responder, o null si el texto no trae un token
