@@ -114,10 +114,16 @@ describe('TarjetaEquipo', () => {
     expect(screen.getByTestId('pausar-10')).toHaveTextContent('Reanudar PC');
   });
 
+  it('«Diseño desde el servidor»: sin el programa nuevo (no declara la capacidad) el interruptor no se puede encender', () => {
+    montar(equipo({ programaDisenoServidor: false }));
+    expect(screen.getByTestId('diseno-encender-10')).toBeDisabled();
+    expect(screen.getByTestId('diseno-requiere-programa-10')).toHaveTextContent('Instala el programa nuevo para activarlo');
+  });
+
   it('«Diseño desde el servidor»: apagado de fábrica; encender, probar y volver al diseño del programa', async () => {
     const guardar = vi.spyOn(impresionApi, 'guardarConfigEquipo').mockResolvedValue({ ok: true, config: CFG as any });
     const prueba = vi.spyOn(impresionApi, 'pruebaDisenoServidor').mockResolvedValue({ ok: true, trabajos: ['1'], mensaje: 'Prueba enviada: sale con el diseño del servidor' });
-    const { rerender, alRecargar, alAviso } = montar();
+    const { rerender, alRecargar, alAviso } = montar(equipo({ programaDisenoServidor: true }));
     expect(screen.getByTestId('diseno-estado-10')).toHaveTextContent('Apagado');
     expect(screen.queryByTestId('diseno-probar-10')).toBeNull();
     fireEvent.click(screen.getByTestId('diseno-encender-10'));

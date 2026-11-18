@@ -619,9 +619,14 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
               Apagado: el programa imprime con su propio diseño, como siempre. Encendido: el sistema arma lo que se imprime en esta PC y
               los cambios de diseño llegan sin reinstalar el programa (necesita la versión nueva del programa; si falla, vuelve solo al diseño del programa).
             </p>
+            {!servidor.disenoServidor && !equipo.programaDisenoServidor && (
+              <p data-testid={`diseno-requiere-programa-${equipo.deviceKeyId}`}>
+                Instala el programa nuevo para activarlo. Sin él, esta PC sigue con el diseño del programa.
+              </p>
+            )}
             <div className="ie-fila">
               {!servidor.disenoServidor ? (
-                <button type="button" className="if-sec" data-testid={`diseno-encender-${equipo.deviceKeyId}`} disabled={bloqueado || !puedeEditar} onClick={() => void cambiarDisenoServidor(true)}>
+                <button type="button" className="if-sec" data-testid={`diseno-encender-${equipo.deviceKeyId}`} disabled={bloqueado || !puedeEditar || !equipo.programaDisenoServidor} onClick={() => void cambiarDisenoServidor(true)}>
                   Encender diseño desde el servidor
                 </button>
               ) : (

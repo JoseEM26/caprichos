@@ -176,6 +176,12 @@ export class ImpresionService {
   private readonly logger = new Logger(ImpresionService.name);
   /** Configuración por computadora (cada PC manda): ruteo, tomar y latido leen de aquí. */
   private readonly equipos: EquipoConfigService;
+  /**
+   * PCs cuyo programa declaró en su último pedido de trabajos que sabe usar `comandos` (diseño desde el servidor).
+   * Se actualiza en cada pedido (cada pocos segundos): si el programa vuelve a una versión vieja, la entrada se borra.
+   * ponytail: memoria del proceso; con varias instancias del API la PC puede aparecer sin capacidad hasta su siguiente pedido.
+   */
+  private readonly programasConDiseno = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -201,6 +207,11 @@ export class ImpresionService {
     // Cada PC toma SOLO lo que se le asignó (destino_equipo_id) y solo si está configurada, no en pausa y el trabajo
     // es de una máquina que tiene encendida. Las pruebas (sin pedido) salen siempre en la máquina que las pidió.
     const cfg = deviceKeyId !== undefined ? await this.equipos.configDe(deviceKeyId) : null;
+    const capPrograma = sanearCapacidades(capacidadesCrudas);
+    if (deviceKeyId !== undefined) {
+      if (capPrograma) this.programasConDiseno.add(deviceKeyId.toString());
+      else this.programasConDiseno.delete(deviceKeyId.toString());
+    }
     const rolesAgente: RolImpresora[] = roles ?? ['ETIQUETERA', 'TICKETERA'];
     const tiposAgente = tiposDeRoles(rolesAgente);
     const tiposConfig = cfg ? tiposDeConfig(cfg, rolesAgente) : [];
@@ -318,7 +329,7 @@ export class ImpresionService {
 
       // «Diseño desde el servidor»: solo si ESTA PC lo tiene encendido (apagado por defecto) y el programa declara que sabe usarlo.
       // El payload no cambia nunca: los comandos van aparte, así un programa viejo recibe exactamente lo de siempre.
-      const capDiseno = cfg?.disenoServidor === true ? sanearCapacidades(capacidadesCrudas) : null;
+      const capDiseno = cfg?.disenoServidor === true ? capPrograma : null;
       return {
         trabajos: actualizados.map((t) => {
           const payload = conTamano(t);
@@ -567,6 +578,7 @@ export class ImpresionService {
             hostname: e.latido_hostname ?? null,
             sistema: e.latido_sistema ?? null,
             version: e.latido_version ?? null,
+            programaDisenoServidor: this.programasConDiseno.has(e.id.toString()),
             antigua: clas.get(e.id)?.antigua ?? false,
             repetidaDe: (() => {
               const r = clas.get(e.id)?.repetidaDe;

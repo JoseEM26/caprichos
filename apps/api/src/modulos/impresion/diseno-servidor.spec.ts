@@ -213,3 +213,41 @@ describe('«Imprimir prueba» del diseño desde el servidor', () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe('diseño desde el servidor: el mismo tope de cabezal (104 mm) y la medida de cada PC', () => {
+  const porId = (r: { trabajos: any[] }, id: string) => r.trabajos.find((t) => t.id === id)!;
+  const generalDe = (tamanos: any) => {
+    const trabajos = [{ id: 1n, tipo: 'ETIQUETA_GENERAL', payload: { codigo: 'G-1', titulo: 'Torta', fecha: '16/11/2026' }, copia: false, intentos: 0 }];
+    const prisma: any = {
+      printJob: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn().mockResolvedValue(trabajos) },
+      parametro: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      equipoImpresionConfig: { findUnique: jest.fn().mockResolvedValue(fila(tamanos)) },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 1n }]),
+      $transaction: jest.fn(async (cb: any) => cb(prisma)),
+    };
+    return new ImpresionService(prisma);
+  };
+
+  it('un sticker de mas de 104 mm no sale con comandos (saldria cortado): el trabajo va sin ellos y el programa da el motivo', async () => {
+    const r = await generalDe({ disenoServidor: true, general: { anchoMm: 115, altoMm: 59.8 } }).tomarTrabajos(10, 10n, undefined, null, false, CAP);
+    expect(porId(r, '1').comandos).toBeUndefined();
+    expect(porId(r, '1').payload.tamanoMm.anchoMm).toBe(115);
+  });
+
+  it('104 mm exactos (el maximo) si salen con comandos, con el tamano y el margen de esa PC', async () => {
+    const r = await generalDe({ disenoServidor: true, general: { anchoMm: 104, altoMm: 59.8, margenMm: 3 } }).tomarTrabajos(10, 10n, undefined, null, false, CAP);
+    const t = porId(r, '1');
+    expect(t.comandos?.formato).toBe('TSPL');
+    expect(t.comandos).toEqual(comandosDeTrabajo('ETIQUETA_GENERAL', t.payload, false, { etiqueta: CAP.etiqueta as any }));
+    const script = Buffer.from(t.comandos!.base64, 'base64').toString('latin1');
+    expect(script).toContain('SIZE 104 mm,59.8 mm');
+  });
+
+  it('el programa que declara la capacidad queda marcado; uno viejo (o que deja de declararla) se desmarca', async () => {
+    const svc = montar({});
+    await svc.tomarTrabajos(10, 10n, undefined, null, false, CAP);
+    expect((svc as any).programasConDiseno.has('10')).toBe(true);
+    await svc.tomarTrabajos(10, 10n, undefined, null, false, {});
+    expect((svc as any).programasConDiseno.has('10')).toBe(false);
+  });
+});

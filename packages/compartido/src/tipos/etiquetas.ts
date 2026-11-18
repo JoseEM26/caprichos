@@ -468,6 +468,8 @@ export interface EquipoEstadoImpresion {
   hostname?: string | null;
   sistema?: string | null;
   version?: string | null;
+  /** El programa declaró que sabe usar `comandos` del servidor (diseño desde el servidor). */
+  programaDisenoServidor?: boolean;
   /** PC apagada con otra más nueva del mismo nombre: el panel la guarda en «Antiguas». */
   antigua?: boolean;
   /** Otra PC con la que se confunde: «¿es la misma que ...?» */
