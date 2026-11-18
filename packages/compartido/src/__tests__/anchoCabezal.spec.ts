@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { anchoPcExcedeCabezal, tamanoPcValido, ANCHO_CABEZAL_MM } from '../index';
+import { anchoPcExcedeCabezal, tamanoPcValido, ANCHO_CABEZAL_MM } from '../index.js';
 
 describe('ancho que cruza el cabezal de la etiquetera', () => {
   it('apaisado: el lado largo es el ancho que cruza el cabezal', () => {

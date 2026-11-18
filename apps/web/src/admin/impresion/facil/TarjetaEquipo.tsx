@@ -258,7 +258,7 @@ export function EditorTamano({
               </button>
             ))}
           </div>
-          {personalizado && anchoPcExcedeCabezal(base) && (
+          {personalizado && !invalida && anchoPcExcedeCabezal(base) && (
             <p role="alert" style={{ margin: '6px 0', color: '#9B2C2C', fontSize: 13 }}>
               La etiquetera imprime hasta {ANCHO_CABEZAL_MM} mm de ancho (cabezal de 4 pulgadas). Con esta orientación el ancho pasa de ese máximo: el sticker saldría cortado y no se imprime.
             </p>
