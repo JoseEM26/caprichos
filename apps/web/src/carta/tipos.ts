@@ -118,6 +118,8 @@ export interface DatosLocalCarta {
   mediosPago: Record<string, MedioPagoInfo>;
   /** Interruptores medio × canal (Configuración); la carta usa los de CARTA. Sin dato = todos como siempre. */
   mediosPagoCanal?: unknown;
+  /** Orden, tamaño e insignia de los medios de pago (Configuración › Pagos) */
+  mediosPagoPresentacion?: unknown;
   envioGratisDesde: number | null;
   envioGratisModo?: 'desde' | 'mas_de' | string;
   pedidoMinimo: number | null;

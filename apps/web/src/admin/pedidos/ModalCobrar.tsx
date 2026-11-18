@@ -12,7 +12,8 @@ import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import type { QuitaPromoMedio } from './pedidosApi';
-import { useMediosEncendidos } from './mediosCanal';
+import { useMediosCanal, segunOrdenMedios } from './mediosCanal';
+import { InsigniaMedio, resaltoMedio } from './InsigniaMedio';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { AvisoSinCelular, tieneCelularReal, TEXTO_SIN_CELULAR_PEDIDO } from '../../comun/AvisoSinCelular';
 
@@ -48,7 +49,7 @@ export function ModalCobrar({
   alCobrarExitoso,
   cobrar = pedidosApi.cobrar,
 }: ModalCobrarProps) {
-  const encendidos = useMediosEncendidos('CAJA');
+  const { medios: encendidos, presentacion } = useMediosCanal('CAJA');
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
   const propinaGuardada = Number(pedido.propina) || 0;
@@ -503,7 +504,7 @@ export function ModalCobrar({
 
               {/* Botones de medio de pago */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {MEDIOS_PAGO.filter((m) => encendidos.includes(m.toUpperCase())).map((m) => {
+                {segunOrdenMedios(MEDIOS_PAGO, encendidos, (m) => m).map((m) => {
                   const seleccionado = mismoMedio(fila.medio, m);
                   return (
                     <button
@@ -521,6 +522,7 @@ export function ModalCobrar({
                         color: seleccionado
                           ? 'var(--cp-cream, #FBF4EC)'
                           : 'var(--cp-navy, #0B2C3E)',
+                        ...(seleccionado ? {} : resaltoMedio(presentacion, m, false)),
                         fontWeight: 700,
                         fontSize: 13,
                         display: 'inline-flex',
@@ -530,6 +532,7 @@ export function ModalCobrar({
                     >
                       <IconoMedioPago medio={m.toUpperCase()} tamano={18} ariaHidden />
                       <span>{m}</span>
+                      <InsigniaMedio presentacion={presentacion} medio={m} />
                     </button>
                   );
                 })}

@@ -1,4 +1,4 @@
-import { medioActivo, NOMBRE_MEDIO_PAGO } from '@caprichos/compartido';
+import { medioActivo, NOMBRE_MEDIO_PAGO, ordenarMediosPresentacion } from '@caprichos/compartido';
 import { Fragment, useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -638,8 +638,12 @@ export function FormularioCheckout({
     efectivo: { activo: true },
     tarjeta: { activo: true },
   };
-  const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
-    (m) => medioOk(m) && (m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false),
+  // En el orden que el dueño configuró (Configuración › Pagos): sirve a las tarjetas y al pago dividido
+  const mediosDisponibles = ordenarMediosPresentacion(
+    (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
+      (m) => medioOk(m) && (m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false),
+    ),
+    datosLocal?.mediosPagoPresentacion,
   );
   // Medios con datos para copiar (Yape, Plin, cuenta): el elegido, o los digitales del plan dividido
   const mediosDatos: MetodoPago[] = dividirPago ? filasDiv.map((f) => f.medio) : [metodoPago];
@@ -2029,6 +2033,7 @@ export function FormularioCheckout({
                       )}
                       <TarjetasMedioPago
                         medios={culqiActivo ? [...mediosDisponibles, METODO_CULQI] : mediosDisponibles}
+                        presentacion={datosLocal?.mediosPagoPresentacion}
                         seleccionado={null}
                         alElegir={(m) => {
                           setDividirPago(false);

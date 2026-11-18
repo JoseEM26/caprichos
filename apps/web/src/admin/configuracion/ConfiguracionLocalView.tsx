@@ -6,6 +6,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
 import { PagosTab } from './PagosTab';
 import { TarjetaMediosPagoCanal } from './TarjetaMediosPagoCanal';
+import { TarjetaPresentacionMediosPago } from './TarjetaPresentacionMediosPago';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
 import { SeccionAltaDemanda } from './SeccionAltaDemanda';
@@ -929,6 +930,7 @@ export function ConfiguracionLocalView() {
             <>
               <PagosTab puedeEditar={puedeEditar} />
               <TarjetaMediosPagoCanal />
+              <TarjetaPresentacionMediosPago />
             </>
           )}
 

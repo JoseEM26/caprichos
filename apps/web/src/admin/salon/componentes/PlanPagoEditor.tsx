@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { useMediosCanal, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { InsigniaMedio, resaltoMedio } from '../../pedidos/InsigniaMedio';
 import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 import {
   MAX_MEDIOS_PLAN,
@@ -46,7 +47,8 @@ export function PlanPagoEditor({
   pagaConInvalido = false,
   canal = 'MOZO',
 }: PlanPagoEditorProps) {
-  const MEDIOS_PLAN = mediosPlanEncendidos(useMediosEncendidos(canal));
+  const { medios: mediosCanal, presentacion } = useMediosCanal(canal);
+  const MEDIOS_PLAN = mediosPlanEncendidos(mediosCanal);
   // La vista siempre sale de ajustarPlan (no depende de que el padre ya haya aplicado el ajuste)
   const vista = ajustarPlan(total, filas);
 
@@ -137,6 +139,7 @@ export function PlanPagoEditor({
                       borderRadius: '10px',
                       border: activo ? '2px solid var(--cp-navy)' : '1.5px solid var(--cp-line)',
                       background: activo ? 'var(--cp-navy)' : 'var(--cp-white)',
+                      ...resaltoMedio(presentacion, m.id, activo),
                       color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
                       fontFamily: 'Montserrat, sans-serif',
                       fontWeight: 700,
@@ -150,6 +153,7 @@ export function PlanPagoEditor({
                   >
                     <IconoMedioPago medio={m.id} tamano={18} ariaHidden />
                     <span>{m.nombre}</span>
+                    <InsigniaMedio presentacion={presentacion} medio={m.id} />
                   </button>
                 );
               })}

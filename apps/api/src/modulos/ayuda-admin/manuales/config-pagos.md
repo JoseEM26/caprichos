@@ -23,6 +23,14 @@ Decide qué medios de pago ofrece Caprichos (efectivo, tarjeta con POS al entreg
 2. Marca o desmarca los interruptores "Aceptar efectivo", "Aceptar tarjeta (POS al entregar)", "Aceptar Yape", "Aceptar Plin" y "Aceptar transferencia bancaria".
 3. Pulsa "Guardar medios de pago" y confirma con "Sí, guardar" en "¿Guardar medios de pago?". Los pedidos ya creados no cambian.
 
+## Como se hace: cambiar el orden, el tamaño y la insignia de los medios
+1. En la pestaña "Pagos", baja hasta la tarjeta "Cómo se muestran los medios de pago" ([ir a la tarjeta](/admin/mirest?tab=pagos&campo=pagos-presentacion)).
+2. Con las flechas ↑ y ↓ sube o baja cada medio: el de arriba sale primero. Elige "Normal" o "Grande" y una insignia ("Ninguna", "Nuevo", "Recomendado", "Al toque" u "Otro texto…" de hasta 14 letras).
+3. Mira la "Vista previa en la carta": es la grilla "¿Cómo pagas?" tal como la verá el cliente, con datos de ejemplo.
+4. Pulsa "Guardar presentación" y confirma con "Sí, guardar". "Restablecer valores" deja el orden de fábrica: Yape, Plin, Efectivo, Tarjeta, Transferencia y "Tarjeta / Yape en línea" al final, todo normal y sin insignia.
+- En la carta, "Grande" ocupa todo el ancho de la fila y "Normal" es una tarjeta cuadrada. En Caja y mozo se respeta el mismo orden, la insignia sale como una etiqueta pequeña y "Grande" solo resalta el botón.
+- No enciende ni apaga medios (eso se hace en "Medios de pago por canal"). "Tarjeta / Yape en línea" solo sale en la carta y solo si el pago en línea está activo.
+
 ## Como se hace: poner el número de Yape y Plin
 1. En la pestaña "Pagos", con Yape o Plin activo, escribe el número de celular al que el cliente debe enviar el pago.
 2. Sale en el paso de pago de la carta y en las indicaciones del bot, con el nombre del local como titular. Si lo dejas vacío, se muestra el teléfono del local.
@@ -43,6 +51,7 @@ Decide qué medios de pago ofrece Caprichos (efectivo, tarjeta con POS al entreg
 - **Aceptar transferencia bancaria** (local_pagos.transferencia.activo): Pago por depósito o transferencia a la cuenta del negocio. La carta, el bot de WhatsApp y las pantallas de cobro solo ofrecen los medios activos. valor por defecto Activo. Riesgo alto: toca dinero o deja de atender clientes. [Aceptar transferencia bancaria](/admin/mirest?tab=pagos&campo=pagos-pg-transf)
 - **Banco de la cuenta** (local_pagos.transferencia.banco): Nombre del banco que ve el cliente cuando elige transferencia. Si queda vacío la carta muestra BCP. Ejemplo: BCP. Riesgo alto: toca dinero o deja de atender clientes. [Banco de la cuenta](/admin/mirest?tab=pagos&campo=pagos-banco)
 - **Número de cuenta o CCI** (local_pagos.transferencia.cuenta): Cuenta o CCI a la que el cliente transfiere. Sale en el paso de pago de la carta con botón para copiar, junto al banco. Ejemplo: 191-12345678-0-12. Riesgo alto: toca dinero o deja de atender clientes. [Número de cuenta o CCI](/admin/mirest?tab=pagos&campo=pagos-cuenta)
+- **Orden, tamaño e insignia de los medios de pago** (medios_pago_presentacion): Define en qué orden salen Yape, Plin, Efectivo, Tarjeta, Transferencia y el pago en línea, si cada uno se ve normal o grande y si lleva una insignia como «Nuevo». Se ve igual en la carta, en Caja y en mozo. Trae vista previa y restablecer. Ejemplo: Para destacar Yape: ponlo primero, tamaño Grande e insignia «Nuevo». Sin cambios, el pago en línea sale al final, normal y sin insignia. valor por defecto Yape, Plin, Efectivo, Tarjeta, Transferencia y pago en línea al final; todos normales y sin insignia. [Orden, tamaño e insignia de los medios de pago](/admin/mirest?tab=pagos&campo=pagos-presentacion)
 - **Guardar medios de pago**: Aplica los medios activos y sus datos de cobro a la carta, el bot y la caja. Pide confirmación Sí/No. Los pedidos ya creados no cambian. Riesgo alto: toca dinero o deja de atender clientes. [Guardar medios de pago](/admin/mirest?tab=pagos&campo=pagos-guardar)
 
 ## Medios de pago por canal
@@ -56,6 +65,7 @@ Debajo de los medios del local hay la tabla «Medios de pago por canal»: filas 
 
 ## Errores y dudas comunes
 - El cliente no ve un medio de pago: está apagado en esta pestaña.
+- Un medio sale en otro lugar o sin la insignia que esperaba: revisa «Cómo se muestran los medios de pago»; el orden, el tamaño y la insignia se guardan con «Guardar presentación».
 - La carta muestra mi teléfono como Yape o Plin: el número de ese medio está vacío; escríbelo.
 - Cambié el número y el voucher sale como dudoso: el número y el titular que compara la IA al leer vouchers se guardan aparte en [Lectura de vouchers con IA](/admin/mirest?tab=vouchers).
 

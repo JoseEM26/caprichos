@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { useMediosEncendidos, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { useMediosCanal, mediosPlanEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { InsigniaMedio, resaltoMedio } from '../../pedidos/InsigniaMedio';
 import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 import {
   MAX_MEDIOS_PLAN,
@@ -91,7 +92,8 @@ export function PasoPagoPedido({
   canal = 'MOZO',
   ahorrosPorMedio = [],
 }: PasoPagoPedidoProps) {
-  const MEDIOS_PLAN = mediosPlanEncendidos(useMediosEncendidos(canal));
+  const { medios: mediosCanal, presentacion } = useMediosCanal(canal);
+  const MEDIOS_PLAN = mediosPlanEncendidos(mediosCanal);
   const conDetalle = bloquePersonal ? false : cuandoPaga !== 'final';
   const propinaNum = Math.max(0, Math.round((aPagar - total) * 100) / 100);
 
@@ -196,10 +198,11 @@ export function PasoPagoPedido({
                       disabled={usado}
                       className={activo ? 'np2-medio np2-medio--on' : 'np2-medio'}
                       onClick={() => cambiarFila(i, { medio: m.id as MedioPlan })}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', ...resaltoMedio(presentacion, m.id, activo) }}
                     >
                       <IconoMedioPago medio={m.id} tamano={20} ariaHidden />
                       <span>{m.nombre}</span>
+                      <InsigniaMedio presentacion={presentacion} medio={m.id} />
                     </button>
                   );
                 })}

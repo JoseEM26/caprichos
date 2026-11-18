@@ -22,4 +22,16 @@ describe('Caja y mozo ocultan los medios apagados', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Yape' })).toBeNull());
     expect(get).toHaveBeenCalledWith('/admin/medios-pago/CAJA');
   });
+
+  it('respeta el orden configurado y marca la insignia; grande solo resalta', async () => {
+    const presentacion = { TRANSFERENCIA: { orden: 1, tamano: 'normal', insignia: null }, YAPE: { orden: 2, tamano: 'grande', insignia: 'Al toque' } };
+    vi.spyOn(api, 'get').mockResolvedValue({ medios: ['TRANSFERENCIA', 'YAPE', 'EFECTIVO'], presentacion });
+    render(<PlanPagoEditor {...props} canal="CAJA" />);
+    await waitFor(() => expect(screen.getByTestId('insignia-medio').textContent).toBe('Al toque'));
+    const nombres = screen.getAllByRole('button').map((b) => b.textContent ?? '').filter((t) => /Transferencia|Yape|Efectivo/.test(t));
+    expect(nombres[0]).toContain('Transferencia');
+    expect(nombres[1]).toContain('Yape');
+    expect(nombres[2]).toContain('Efectivo');
+    expect(screen.getByRole('button', { name: /Yape/ }).style.border).toContain('2px');
+  });
 });
