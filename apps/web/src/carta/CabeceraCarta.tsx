@@ -6,6 +6,7 @@ import { useEsMovil } from './useEsMovil';
 import { usePedidosGuardados } from './seguimiento';
 import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
 import { BotonReservar } from './reservas/BotonReservar';
+import { TEXTO_CERRADO_PROGRAMAR, type ProgramarCarta } from './ProgramarPedido';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
 
@@ -23,6 +24,8 @@ interface CabeceraCartaProps {
   mostrarInstalar?: boolean;
   /** Botón «Reservar mesa» (false en la vista previa del diseñador) */
   mostrarReservar?: boolean;
+  /** Local cerrado con «programar fuera de horario»: el aviso invita a programar en vez de decir que no se puede pedir. */
+  programar?: ProgramarCarta | null;
 }
 
 const PAGINAS: [PaginaCarta, string][] = [
@@ -68,6 +71,7 @@ export function CabeceraCarta({
   onCategoria,
   mostrarInstalar = true,
   mostrarReservar = true,
+  programar = null,
 }: CabeceraCartaProps) {
   const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
   const { cliente, abrirPanel } = useCuenta();
@@ -86,6 +90,8 @@ export function CabeceraCarta({
   const lema = [datosLocal?.lema || 'Cafetería artesanal', estadoLocal?.texto].filter(Boolean).join(' · ');
   const esCarta = pagina === 'carta';
   const cerrado = estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda);
+  // Cerrado por horario pero se puede programar: aviso amable en vez del aviso de «no se puede pedir»
+  const puedeProgramar = Boolean(cerrado && programar && !estadoLocal?.pausaAltaDemanda);
   // Pedidos guardados en este navegador (el más reciente va primero) y cuántos siguen activos
   const guardados = usePedidosGuardados();
   const activos = guardados.filter((p) => !p.terminado).length;
@@ -102,7 +108,16 @@ export function CabeceraCarta({
   return (
     <>
       {/* El aviso de cierre se desplaza con la página; solo la cabecera queda fija */}
-      {cerrado && (
+      {puedeProgramar && (
+        <div
+          role="status"
+          data-testid="banner-programar"
+          style={{ backgroundColor: 'var(--cp-navy)', color: '#FFFFFF', padding: '8px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}
+        >
+          {TEXTO_CERRADO_PROGRAMAR}
+        </div>
+      )}
+      {cerrado && !puedeProgramar && (
         <div
           role="status"
           style={{ backgroundColor: 'var(--cp-rust)', color: '#FFFFFF', padding: '8px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}

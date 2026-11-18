@@ -633,6 +633,23 @@ describe('AlmacenService', () => {
       );
     });
 
+    it('POST: la apertura agrega separadosProgramados (unidades por producto de pedidos PROGRAMADOS) solo si hay', async () => {
+      const llamada = () => auditoria.registrar.mock.calls.find((c: any[]) => c[0].accion === 'REGISTRAR_APERTURA')![0].despues;
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([
+        { producto_id: 50n, cantidad: 3, producto: { nombre: 'Dona de prueba' } },
+        { producto_id: 50n, cantidad: 2, producto: { nombre: 'Dona de prueba' } },
+      ]);
+      await service.registrarApertura({ items: [{ productoId: '50', saborId: '11', cantidad: 6 }] } as any, mockUsuario);
+      expect(prisma.movimientoStock.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tipo: 'VENTA', pedido: { estado: 'PROGRAMADO' } }) }),
+      );
+      expect(llamada().separadosProgramados).toEqual([{ productoId: '50', producto: 'Dona de prueba', unidades: 5 }]);
+      auditoria.registrar.mockClear();
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([]);
+      await service.registrarApertura({ items: [{ productoId: '50', saborId: '11', cantidad: 6 }] } as any, mockUsuario);
+      expect(llamada()).not.toHaveProperty('separadosProgramados');
+    });
+
     it('POST: un sabor ajeno al producto o un producto sin sabores con saborId responde 400', async () => {
       await expect(
         service.registrarApertura({ items: [{ productoId: '50', saborId: '99', cantidad: 1 }] } as any, mockUsuario),

@@ -25,6 +25,14 @@ import { ActualizarFechaEspecialDto } from './dto/actualizar-fecha-especial.dto'
 import { ActualizarDatosLocalDto } from './dto/actualizar-datos-local.dto';
 import { ActualizarPagosDto } from './dto/actualizar-pagos.dto';
 import { SubirFotoLocalDto } from './dto/foto-local.dto';
+import { leerConfigProgramados } from '../pedidos/programado.util';
+import { diaCalendarioLima, sumarDiasIso } from '../../comun/fechas-lima';
+
+/** Cada cuántos minutos se ofrece una hora para programar un pedido. */
+export const PASO_HORA_PROGRAMADA_MIN = 30;
+
+const aMinutos = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const aHHmm = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 export const PAGOS_DEFAULT = {
   efectivo: { activo: true },
@@ -118,6 +126,60 @@ export class LocalService {
       throw new HttpException({ codigo: 'CARTA_CERRADA', mensaje: estado.texto }, HttpStatus.CONFLICT);
     }
     return estado;
+  }
+
+  /**
+   * Horario de atención de un día calendario de Lima (fecha especial manda sobre el día de la semana).
+   * null = cerrado todo ese día. No mira la pausa por alta demanda: es el horario, no el momento.
+   */
+  async horarioDelDia(fechaIso: string): Promise<{ abre: string; cierra: string } | null> {
+    const { diaSemana } = obtenerFechaHoraLima(new Date(`${fechaIso}T12:00:00.000-05:00`));
+    const especial = await this.prisma.fechaEspecial.findUnique({ where: { fecha: new Date(`${fechaIso}T00:00:00.000Z`) } });
+    const fila = especial ?? (await this.prisma.horarioDia.findUnique({ where: { dia_semana: diaSemana } }));
+    if (!fila || fila.cerrado) return null;
+    const abre = formatearHora(fila.abre);
+    const cierra = formatearHora(fila.cierra);
+    return abre && cierra ? { abre, cierra } : null;
+  }
+
+  /**
+   * Pedido programado por el cliente: la hora elegida debe caer DENTRO del horario de atención de ese día
+   * (respeta días cerrados y fechas especiales). 400 PROGRAMADO_FUERA_DE_HORARIO si no.
+   */
+  async exigirAbiertoEn(fecha: Date) {
+    const { fechaIso, horaMinutos } = obtenerFechaHoraLima(fecha);
+    const h = await this.horarioDelDia(fechaIso);
+    if (!h || horaMinutos < h.abre || horaMinutos >= h.cierra) {
+      throw new BadRequestException({
+        codigo: 'PROGRAMADO_FUERA_DE_HORARIO',
+        mensaje: h
+          ? `Ese día atendemos de ${h.abre} a ${h.cierra}. Elige una hora dentro de ese horario.`
+          : 'Ese día no atendemos. Elige otro día.',
+      });
+    }
+  }
+
+  /**
+   * Días y horas que el cliente puede elegir para programar (carta y bot): de hoy hasta los días máximos de
+   * programados, cada 30 minutos desde que abrimos hasta media hora antes de cerrar, siempre a futuro.
+   * Los días cerrados no salen. Cada hora lleva su instante ISO para enviarlo tal cual como programadoPara.
+   */
+  async horasProgramables(ahora: Date = new Date()): Promise<{ diasMax: number; dias: { fecha: string; horas: { hora: string; iso: string }[] }[] }> {
+    const { diasMax } = await leerConfigProgramados(this.prisma);
+    const hoy = diaCalendarioLima(ahora);
+    const dias: { fecha: string; horas: { hora: string; iso: string }[] }[] = [];
+    for (let i = 0; i <= diasMax; i++) {
+      const fecha = sumarDiasIso(hoy, i);
+      const h = await this.horarioDelDia(fecha);
+      if (!h) continue;
+      const horas: { hora: string; iso: string }[] = [];
+      for (let m = aMinutos(h.abre); m + PASO_HORA_PROGRAMADA_MIN <= aMinutos(h.cierra); m += PASO_HORA_PROGRAMADA_MIN) {
+        const iso = new Date(`${fecha}T${aHHmm(m)}:00.000-05:00`);
+        if (iso.getTime() > ahora.getTime()) horas.push({ hora: aHHmm(m), iso: iso.toISOString() });
+      }
+      if (horas.length) dias.push({ fecha, horas });
+    }
+    return { diasMax, dias };
   }
 
   /**

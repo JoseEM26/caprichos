@@ -917,6 +917,8 @@ export const TEXTOS_BOT = {
     tiempoMin: number;
     tiempoMax: number;
     avisoDemanda?: string;
+    /** Pedido programado: reemplaza la línea de tiempo estimado por «Programado para…». */
+    programadoTexto?: string;
   }): string => {
     const {
       lineasTexto,
@@ -932,6 +934,7 @@ export const TEXTOS_BOT = {
       tiempoMin,
       tiempoMax,
       avisoDemanda,
+      programadoTexto,
     } = params;
 
     const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
@@ -947,7 +950,7 @@ export const TEXTOS_BOT = {
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +
       `Pago: ${pagoTexto}\n` +
-      `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n` +
+      (programadoTexto ? `${programadoTexto}\n\n` : `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n`) +
       `¿Confirmo tu pedido?`
     );
   },

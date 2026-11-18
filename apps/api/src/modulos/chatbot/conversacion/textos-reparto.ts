@@ -4,6 +4,7 @@
  * Las variables de la plantilla deben coincidir, en orden, con `variables` de CATALOGO_PLANTILLAS.
  * Tono cálido y con emojis: esto se lee en WhatsApp, no en el admin.
  */
+import { etiquetaDiaHora } from './textos-programar';
 export type EtapaAvisoReparto =
   | 'ACEPTADO'
   | 'LISTO'
@@ -75,7 +76,12 @@ export interface ResumenRecibido {
   comprobanteRazon?: string | null;
   /** Rango o minutos ya formateado, ej. «25 a 30» */
   tiempoEstimado?: string | null;
+  /** Pedido programado: instante ISO pactado. Con él, el aviso dice el día y la hora y no da tiempo estimado. */
+  programadoPara?: string | null;
 }
+
+/** «lunes 3 de noviembre a las 10:30» (hora de Lima) para decirle al cliente cuándo lo atendemos. */
+const textoDiaHoraProgramado = etiquetaDiaHora;
 
 /** Contexto del aviso para armar el resumen completo. */
 export interface ContextoResumenRecibido {
@@ -123,6 +129,7 @@ export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenR
   const secciones: string[] = [];
   const digital = !!c.medioDigital;
   secciones.push(`¡Hola ${c.nombre}! 😊\nRecibimos tu pedido *${c.codigo}*, ¡muchas gracias! 🎉`);
+  if (r.programadoPara) secciones.push(`📅 Tu pedido quedó programado para el *${textoDiaHoraProgramado(r.programadoPara)}*. Te avisaremos por WhatsApp. 💛`);
 
   // Tipo de pedido y dónde se entrega
   const tipo = r.modalidad ? TIPO_PEDIDO[r.modalidad] : null;
@@ -181,7 +188,7 @@ export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenR
   if (digital && dividido && c.datosPago) cola.push(`*Datos para tu pago por ${c.medioDigital}*\n${c.datosPago}`);
   if (digital) cola.push('📸 Envíanos la captura de tu pago por aquí cuando puedas (opcional). Un asesor la revisará. 🙏');
   if (comprobante) cola.push(comprobante);
-  if (r.tiempoEstimado) cola.push(`⏱️ Tiempo estimado: ${r.tiempoEstimado} minutos`);
+  if (r.tiempoEstimado && !r.programadoPara) cola.push(`⏱️ Tiempo estimado: ${r.tiempoEstimado} minutos`);
   if (c.enlace) cola.push(`Sigue tu pedido aquí: ${c.enlace}`);
 
   // Productos: si el pedido es enorme se recorta la lista, nunca el total ni el pago

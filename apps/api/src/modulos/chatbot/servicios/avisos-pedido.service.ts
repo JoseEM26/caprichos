@@ -364,7 +364,7 @@ export class AvisosPedidoService {
         entrega_lat: true, entrega_lng: true, zona_id: true, entrega_direccion: true, entrega_referencia: true, mesa_nombre: true,
         cliente_nombre: true, cliente_telefono: true, pago_estado: true,
         comprobante_tipo: true, comprobante_doc: true, comprobante_razon: true, eta_min: true, eta_max: true,
-        pago_metodo: true, pago_preferido: true, paga_con: true,
+        pago_metodo: true, pago_preferido: true, paga_con: true, programado_para: true,
         planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' } },
         lineas: {
           orderBy: { id: 'asc' },
@@ -426,6 +426,7 @@ export class AvisosPedidoService {
       aCredito: Number(p.monto_credito) > 0 ? Number(p.monto_credito) : null,
       medioPago: nombresMedio[metodo] ?? (metodo ? metodo.toLowerCase() : 'por coordinar'),
       envioPorConfirmar: sinUbicar,
+      programadoPara: p.programado_para ? p.programado_para.toISOString() : null,
       envio: delivery && !sinUbicar && p.envio != null ? Number(p.envio) : null,
       modalidad: p.modalidad,
       direccion: p.entrega_direccion?.trim() || null,

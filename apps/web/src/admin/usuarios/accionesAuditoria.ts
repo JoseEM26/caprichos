@@ -18,6 +18,8 @@ const ETIQUETAS: Record<string, string> = {
   ABRIR_CAJA: 'Abrir caja',
   CERRAR_CAJA: 'Cerrar caja',
   REGISTRAR_APERTURA: 'Apertura del día',
+  SEPARAR_STOCK_PROGRAMADO: 'Stock separado por pedido programado',
+  DEVOLVER_STOCK_PROGRAMADO: 'Stock devuelto de pedido programado',
   EDITAR_CATEGORIA: 'Editar categoría',
   OCULTAR_CATEGORIA: 'Desactivar categoría',
   MOSTRAR_CATEGORIA: 'Activar categoría',

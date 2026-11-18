@@ -107,6 +107,12 @@ describe('PagosOnlineService', () => {
     expect((await s.config()).activo).toBe(false);
   });
 
+  it('sin la caja de hoy abierta (local cerrado): la carta no ofrece el pago en línea aunque el interruptor esté encendido', async () => {
+    const { s } = armar({ cajaAbierta: false });
+    expect((await s.config()).activo).toBe(false);
+    expect((await armar({ cajaAbierta: true }).s.config()).activo).toBe(true);
+  });
+
   it('producción sin llaves de Culqi: interruptor encendido pero config.activo=false y no hay intento', async () => {
     const previo = { n: process.env.NODE_ENV, a: process.env.AMBIENTE_DESPLIEGUE };
     process.env.NODE_ENV = 'production';

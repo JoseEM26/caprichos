@@ -16,9 +16,12 @@ import {
   unidadesEnCarrito,
 } from './stock';
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
+import { AvisoProgramar, type ProgramarCarta } from './ProgramarPedido';
 
 export interface CajonCarritoProps {
   estadoLocal: EstadoLocalCarta | null;
+  /** Local cerrado con «programar fuera de horario»: el pedido se puede seguir (programado). */
+  programar?: ProgramarCarta | null;
   datosLocal?: DatosLocalCarta | null;
   ofertas?: OfertaItem[];
   categorias?: CategoriaCarta[];
@@ -26,6 +29,7 @@ export interface CajonCarritoProps {
 
 export function CajonCarrito({
   estadoLocal,
+  programar = null,
   datosLocal = null,
   ofertas = [],
   categorias = [],
@@ -97,8 +101,10 @@ export function CajonCarrito({
 
   if (!cajonAbierto) return null;
 
+  // Cerrado por horario pero se puede programar: no se bloquea (se avisa con amabilidad)
+  const programando = Boolean(programar && estadoLocal && !estadoLocal.abierta && !estadoLocal.pausaAltaDemanda);
   const localBloqueado = Boolean(
-    estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda),
+    estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda) && !programando,
   );
   const stockBloqueado = excesos.length > 0 || pendientesSabor.length > 0;
 
@@ -643,6 +649,8 @@ export function CajonCarrito({
                 </div>
               )}
             </div>
+
+            {programando && <AvisoProgramar compacto />}
 
             {localBloqueado && (
               <div

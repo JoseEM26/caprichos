@@ -7,6 +7,7 @@ import { ModalConPestanas } from '../comun/ModalConPestanas';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { EstadoSeguimiento, PasoSeguimiento, PedidoGuardado } from './seguimiento';
 import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
+import { ConfirmacionProgramado } from './ProgramarPedido';
 import { PagarEnLinea } from './pagos/PagarEnLinea';
 import { EstadoVoucherPedido } from './EstadoVoucherPedido';
 import { avancePedido, etapaCliente, firmasPestanas, NOMBRE_MEDIO, NOMBRE_MODALIDAD, textoPagoMedio } from './seguimiento-textos';
@@ -235,6 +236,8 @@ function PanelEstado({
           <p className="sg-local" data-testid="texto-comer-local">{textoLocal}.</p>
         )}
       </section>
+
+      {!anulado && (creacion?.programadoPara || estado?.programadoPara) && <ConfirmacionProgramado iso={(creacion?.programadoPara ?? estado?.programadoPara) as string} />}
 
       <dl className="sg-meta" style={{ margin: 0 }}>
         {fila('Pedido', `#${pedido.codigo}`)}

@@ -160,6 +160,8 @@ export interface AccionCrearPedido {
   tiempoEstimadoMax: number;
   esPagoDigital: boolean;
   datosPagoTexto?: string;
+  /** Pedido programado fuera de horario: instante ISO pactado (el mensaje de confirmación lo dice). */
+  programadoPara?: string;
   /** Carrito tal como estaba al confirmar: si el servidor rechaza por stock, el bot vuelve a él sin perderlo. */
   carrito?: EstadoCarritoPedido;
 }
@@ -339,6 +341,10 @@ export interface ContextoConversacion {
   cartaUrlPublica?: string;
   datosLocal?: DatosHorarioLocal;
   datosLocalPublicos?: any;
+  /** Local cerrado con «pedidos programados fuera de horario» encendido: el bot solo atiende para programar un pedido (llevar o delivery). */
+  soloProgramar?: boolean;
+  /** Días y horas que se ofrecen para programar (LocalService.horasProgramables). */
+  programacion?: { dias: { fecha: string; horas: { hora: string; iso: string }[] }[] };
   categoriasCarta?: any[];
   ofertas?: any[];
   /** Promociones vigentes que valen en la carta web y NO por WhatsApp (el bot las nombra, no las vende). */

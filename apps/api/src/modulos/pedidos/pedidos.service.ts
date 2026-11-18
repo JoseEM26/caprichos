@@ -46,6 +46,7 @@ import { RucService, rucValido } from '../ruc';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { StockService } from '../stock/stock.service';
+import { lineasSeparadasDelPedido } from '../stock/separado-programado.util';
 import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -130,6 +131,12 @@ export interface OrigenPedido {
   enTransaccion?: (tx: Prisma.TransactionClient, pedido: any) => Promise<void>;
   /** Pedido programado (solo Caja y mozo: lo fija el controlador del panel tras validar el rol). Nace PROGRAMADO y no entra a cocina hasta su hora de aviso. */
   programadoPara?: Date | string;
+  /**
+   * Carta web y bot: el cliente pide programar su pedido para una hora futura. Solo se honra con el parámetro
+   * `pedidos_programados_fuera_horario` encendido Y el local cerrado, para llevar o delivery y dentro del horario de atención.
+   * Con el local abierto se ignora (el pedido entra normal); con el parámetro apagado, el guard de horario rechaza como siempre.
+   */
+  programadoCliente?: Date | string;
   /** Adelanto recibido hoy al programar (efectivo o tarjeta); entra a la caja de hoy. */
   adelanto?: AdelantoEntrada;
 }
@@ -760,6 +767,28 @@ export class PedidosService {
     ];
   }
 
+  /** Historial de almacén: qué productos y sabores separó un pedido programado. Nunca rompe el pedido. */
+  private async auditarStockSeparado(tx: Prisma.TransactionClient, pedidoId: bigint, codigo: string, programadoPara: Date, usuarioPartyId?: bigint | string | number) {
+    try {
+      const productos = await lineasSeparadasDelPedido(tx, pedidoId);
+      if (productos.length === 0) return;
+      await this.auditoria?.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'almacen',
+          accion: 'SEPARAR_STOCK_PROGRAMADO',
+          entidad: 'pedido',
+          entidadId: pedidoId,
+          despues: { pedido: codigo, programadoPara: programadoPara.toISOString(), productos },
+          partyId: usuarioPartyId !== undefined ? BigInt(usuarioPartyId) : undefined,
+        },
+        tx,
+      );
+    } catch (err: any) {
+      this.logger.warn(`No se pudo auditar el stock separado del pedido ${codigo}: ${err?.message}`);
+    }
+  }
+
   /** Descuenta el stock de los productos que lo controlan (y de las opciones ligadas a stock) de las líneas calculadas. */
   async descontarStockLineas(tx: Prisma.TransactionClient, pedidoId: bigint, por: bigint, lineasCalculadas: any[]) {
     // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
@@ -805,6 +834,7 @@ export class PedidosService {
         descuento: Number(pedidoExistente.descuento || 0),
         envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
         total: Number(pedidoExistente.total),
+        programadoPara: pedidoExistente.programado_para ? pedidoExistente.programado_para.toISOString() : null,
         mensaje:
           origen?.canal === 'MOZO'
             ? 'Pedido enviado a cocina'
@@ -831,9 +861,34 @@ export class PedidosService {
     // 2. Horario: el guard único. Solo el personal (Mozo/Caja o pedido del panel) puede saltarlo;
     // carta, WhatsApp, bot e IA jamás, aunque alguien pase omitirChequeoCarta.
     const canalCliente = !origen?.canal || origen.canal === 'CARTA' || origen.canal === 'WHATSAPP' || origen.canal === 'BOT';
+    // 2a. Excepción única: el cliente programa para llevar o delivery con el local cerrado (parámetro encendido).
+    // Entonces no se exige el local abierto AHORA, sino que la hora elegida caiga dentro del horario de ese día.
+    let programadoPorCliente = false;
+    if (origen?.programadoCliente && canalCliente && !programadoPara) {
+      const cfg = await leerConfigProgramados(this.prisma);
+      if (cfg.fueraHorario) {
+        const estadoLocal = await this.localService.obtenerEstadoCartaSeguro();
+        // Pausa por alta demanda: sigue bloqueando (cae al guard de abajo)
+        if (!estadoLocal.abierta && estadoLocal.motivo !== 'PAUSA') {
+          if (dto.modalidad !== 'DELIVERY' && dto.modalidad !== 'RECOGER') {
+            throw new BadRequestException({ codigo: 'PROGRAMADO_SOLO_LLEVAR_DELIVERY', mensaje: 'Con el local cerrado solo puedes programar pedidos para llevar o delivery' });
+          }
+          if (origen.esPersonal || dto.esPersonal || dto.pagoEquipo === 'CREDITO') {
+            throw new BadRequestException({ codigo: 'PROGRAMADO_NO_PERSONAL', mensaje: 'Un pedido del personal no se programa' });
+          }
+          if (dto.pago?.metodo === 'CULQI') {
+            throw new BadRequestException({ codigo: 'PAGO_ONLINE_FUERA_HORARIO', mensaje: 'El pago en línea está disponible dentro del horario; puedes pagar al recibir o dejar tu Yape con captura' });
+          }
+          const fecha = validarProgramadoPara(origen.programadoCliente, new Date(), cfg.diasMax);
+          await this.localService.exigirAbiertoEn(fecha);
+          programadoPara = fecha;
+          programadoPorCliente = true;
+        }
+      }
+    }
     const omitirCarta =
       !canalCliente && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA' || origen?.omitirChequeoCarta === true);
-    if (!omitirCarta) {
+    if (!omitirCarta && !programadoPorCliente) {
       await this.localService.exigirLocalAbierto();
     }
 
@@ -1488,6 +1543,9 @@ export class PedidosService {
       const ventaProductos = await this.descontarStockLineas(tx, pedido.id, pedido.party_id ?? BigInt(1), lineasCalculadas);
       agotadosPorVenta = ventaProductos.agotados;
       saboresAgotadosPorVenta = ventaProductos.saboresAgotados;
+
+      // Pedido programado: lo que se separó de stock queda a la vista en el historial de almacén (una línea por pedido)
+      if (programadoPara) await this.auditarStockSeparado(tx, pedido.id, pedido.codigo, programadoPara, origen?.usuarioPartyId);
 
       // Historial de estado inicial
       await tx.pedidoEstadoHistorial.create({

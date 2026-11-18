@@ -23,6 +23,7 @@ import {
   TITULO_SECCION_MENU,
   TITULO_SECCION_PREGUNTAS,
 } from './textos-bot';
+import { BOTON_PROGRAMAR_PEDIDO, TEXTOS_PROGRAMAR } from './textos-programar';
 import {
   AccionEnviarLista,
   AccionMensaje,
@@ -1995,6 +1996,22 @@ function transicionarSoloMenusNucleo(
       acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoExpiradoInactividad(), botones: BOTONES_MENU_PRINCIPAL }],
       nuevoFlujo: { ...flujo, estado: 'MENU', pedido: null, repreguntasFallidas: 0 },
     };
+  }
+
+  // Local cerrado con «Pedidos programados fuera de horario»: el bot solo ofrece programar un pedido para llevar o delivery.
+  // Un pedido en curso, un pago, una persona atendiendo, «mi pedido», una queja o pedir una persona siguen su camino de siempre.
+  if (contexto.soloProgramar && !enPedido && !enPago && !enPersona) {
+    const otroTema =
+      esId('persona', 'btn_persona', 'btn_asi_persona', 'btn_esp_persona', 'mipedido', 'btn_mipedido', 'btn_asi_pedido', 'c_eta') ||
+      id.startsWith('ord_') ||
+      /CP-\d{4}/i.test(entrada.textoOriginal || '') ||
+      entrada.tipo === 'ubicacion' ||
+      hay([...PALABRAS_PERSONA_SOLO, ...PALABRAS_QUEJA, ...PALABRAS_MI_PEDIDO, ...PALABRAS_ETA]);
+    const quierePedir = esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido', 'programar']);
+    if (!otroTema && !quierePedir) {
+      const nombreReal = nombreParaSaludo(contexto.nombreCliente);
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.bienvenida(nombreReal ? nombreReal.split(/\s+/)[0] : null), botones: [BOTON_PROGRAMAR_PEDIDO] }]);
+    }
   }
 
   // Con conversación reciente, pedido de hoy o chat atendido, un «hola»/«gracias» no vuelve a abrir la bienvenida con menú

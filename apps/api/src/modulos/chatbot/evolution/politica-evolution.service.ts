@@ -40,7 +40,17 @@ export class PoliticaEvolutionService {
     @Optional() private readonly local?: LocalService,
   ) {}
 
-  async evaluar(fila: { telefono_destino: string; origen: string }, ahora = new Date()): Promise<DecisionEnvio> {
+  /**
+   * Excepción única al horario: el aviso «recibido» de un pedido PROGRAMADO que el cliente hizo desde la carta o el bot con el
+   * local cerrado. Es la confirmación de lo que acaba de pedir; el resto de avisos fuera de horario se descarta como siempre.
+   */
+  private async esRecibidoDeProgramado(fila: { origen: string; pedido_id?: bigint | null; carga?: unknown }): Promise<boolean> {
+    if (fila.origen !== 'AVISO_PEDIDO' || fila.pedido_id == null || (fila.carga as any)?.etapa !== 'RECIBIDO') return false;
+    const p = await this.prisma.pedido.findUnique({ where: { id: fila.pedido_id }, select: { estado: true, canal: true } }).catch(() => null);
+    return p?.estado === 'PROGRAMADO' && ['CARTA', 'WHATSAPP', 'BOT'].includes(String(p.canal));
+  }
+
+  async evaluar(fila: { telefono_destino: string; origen: string; pedido_id?: bigint | null; carga?: unknown }, ahora = new Date()): Promise<DecisionEnvio> {
     const cfg = await this.config.obtener();
     if (cfg.whatsapp_proveedor !== 'EVOLUTION') return { accion: 'ENVIAR' };
     if (ORIGENES_RESPUESTA.has(fila.origen)) return { accion: 'ENVIAR' };
@@ -75,7 +85,7 @@ export class PoliticaEvolutionService {
       return { accion: 'DIFERIR', esperaMs: 5 * MIN, motivo: 'El número de WhatsApp está desconectado o en pausa; se reintenta luego' };
     }
     // El código de cuenta lo pide la propia persona para entrar a su cuenta: sale también fuera de horario
-    if (fila.origen !== 'CODIGO_CUENTA') {
+    if (fila.origen !== 'CODIGO_CUENTA' && !(await this.esRecibidoDeProgramado(fila))) {
       const horario = await horarioDelLocal(this.local, this.prisma, ahora, { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
       if (!horario.abierto) {
         return {

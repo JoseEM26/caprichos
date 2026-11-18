@@ -204,9 +204,39 @@ const FRASES: Record<string, (d: DatosDescripcion) => string> = {
     const o = obj(d.despues);
     const productos = Number(o.productos) || 0;
     const mermas = Array.isArray(o.mermas) ? o.mermas.length : 0;
-    return `Hizo la apertura del día: ${productos} ${productos === 1 ? 'producto contado' : 'productos contados'}` + (mermas ? `, ${mermas} con merma` : '');
+    const separadas = unidadesSeparadas(o.separadosProgramados);
+    return (
+      `Hizo la apertura del día: ${productos} ${productos === 1 ? 'producto contado' : 'productos contados'}` +
+      (mermas ? `, ${mermas} con merma` : '') +
+      (separadas > 0 ? `; ${separadas} ${separadas === 1 ? 'unidad separada' : 'unidades separadas'} para pedidos programados` : '')
+    );
   },
+  SEPARAR_STOCK_PROGRAMADO: (d) => `Separó ${listaSeparada(obj(d.despues).productos)} para el pedido ${texto(obj(d.despues).pedido) ?? 'programado'}${cuandoProgramado(obj(d.despues).programadoPara)}`,
+  DEVOLVER_STOCK_PROGRAMADO: (d) => `Devolvió el stock separado (${listaSeparada(obj(d.despues).productos)}) del pedido ${texto(obj(d.despues).pedido) ?? ''}${cuandoProgramado(obj(d.despues).programadoPara)}`,
 };
+
+/** Unidades separadas para pedidos programados que trae la apertura (`separadosProgramados`: [{ unidades }]). */
+function unidadesSeparadas(v: unknown): number {
+  return Array.isArray(v) ? v.reduce((a, x) => a + (Number(obj(x).unidades) || 0), 0) : 0;
+}
+
+/** «3 de Dona de chocolate, 2 de Galleta (Avena)» a partir de [{ producto, sabor, cantidad }]. */
+function listaSeparada(v: unknown): string {
+  const items = (Array.isArray(v) ? v : []).map((x) => {
+    const o = obj(x);
+    const nombre = texto(o.producto) ?? 'producto';
+    const sabor = texto(o.sabor);
+    return `${Number(o.cantidad) || 0} de ${sabor ? `${nombre} (${sabor})` : nombre}`;
+  });
+  return items.length > 1 ? `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}` : (items[0] ?? 'productos');
+}
+
+/** « (programado para el 20/11 10:00)» o vacío si no hay fecha. */
+function cuandoProgramado(v: unknown): string {
+  const f = typeof v === 'string' ? new Date(v) : null;
+  if (!f || isNaN(f.getTime())) return '';
+  return ` (programado para el ${fechaLima(f, { day: '2-digit', month: '2-digit' })} ${fechaLima(f, { hour: '2-digit', minute: '2-digit', hour12: false })})`;
+}
 
 /** Respaldo legible para acciones sin frase propia: «Anular venta (motivo: …)». */
 function generica(d: DatosDescripcion): string {

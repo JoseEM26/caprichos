@@ -265,6 +265,8 @@ export class AlmacenService {
           });
         }
       }
+      // Lo que al momento de la apertura ya estaba separado por pedidos PROGRAMADOS aún no atendidos (por producto contado)
+      const separados = await this.separadosPorProgramados(tx, dto.items.map((i) => this.parsearId(i.productoId, 'producto')));
       await this.auditoria.registrar(
         {
           categoria: 'CAMBIO',
@@ -272,7 +274,7 @@ export class AlmacenService {
           accion: 'REGISTRAR_APERTURA',
           entidad: 'conteo_apertura',
           partyId: usuario.partyId,
-          despues: { fecha, productos: dto.items.length, mermas },
+          despues: { fecha, productos: dto.items.length, mermas, ...(separados.length ? { separadosProgramados: separados } : {}) },
           ip,
         },
         tx,
@@ -284,6 +286,26 @@ export class AlmacenService {
       await this.stockService.verificarYReactivarAgotados([], ids);
     }
     return { ok: true, registrados: dto.items.length, mermas: mermas.length };
+  }
+
+  /** Unidades por producto que siguen descontadas por pedidos PROGRAMADOS (ventas vigentes de pedidos aún no atendidos). Solo lee. */
+  private async separadosPorProgramados(db: any, productoIds: bigint[]): Promise<Array<{ productoId: string; producto: string; unidades: number }>> {
+    try {
+      const movs: any[] = await db.movimientoStock.findMany({
+        where: { tipo: 'VENTA', producto_id: { in: productoIds }, movimientosRevertidos: { none: {} }, pedido: { estado: 'PROGRAMADO' } },
+        select: { producto_id: true, cantidad: true, producto: { select: { nombre: true } } },
+      });
+      const por = new Map<string, { productoId: string; producto: string; unidades: number }>();
+      for (const m of movs) {
+        const k = m.producto_id.toString();
+        const f = por.get(k) ?? { productoId: k, producto: m.producto?.nombre ?? 'Producto', unidades: 0 };
+        f.unidades += Number(m.cantidad);
+        por.set(k, f);
+      }
+      return [...por.values()].filter((f) => f.unidades > 0);
+    } catch {
+      return []; // informativo: nunca frena la apertura
+    }
   }
 
   // ==========================================

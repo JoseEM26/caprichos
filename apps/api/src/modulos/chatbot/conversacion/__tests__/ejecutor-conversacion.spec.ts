@@ -512,6 +512,32 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
     });
 
+    it('(b2) Cerrado con «Pedidos programados fuera de horario» encendido: el bot atiende y ofrece programar (llevar o delivery)', async () => {
+      mockLocalService.obtenerEstadoCarta.mockResolvedValueOnce({ abierta: false, motivo: 'HORARIO', abre: '18:00', cierra: '23:00', texto: 'Cerrado', pausaAltaDemanda: false });
+      mockPrisma.parametro.findMany = jest.fn().mockResolvedValue([{ clave: 'pedidos_programados_fuera_horario', valor: 'si' }]);
+      mockLocalService.horasProgramables = jest.fn().mockResolvedValue({ diasMax: 7, dias: [{ fecha: '2027-03-01', horas: [{ hora: '18:00', iso: '2027-03-01T23:00:00.000Z' }] }] });
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({ id: 22n, telefono: '+51987654321', duenio: 'BOT', tomado_por: null, flujo: { version: 1, estado: 'INICIO', repreguntasFallidas: 0 } });
+
+      await service.procesarMensajeEntrante(22n, { texto: 'hola' });
+      expect(mockLocalService.horasProgramables).toHaveBeenCalled();
+      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining('programarte tu pedido para llevar o delivery'),
+        [expect.objectContaining({ id: 'pedir' })],
+        expect.anything(),
+      );
+    });
+
+    it('(b3) Cerrado por pausa de alta demanda con el parámetro encendido: no ofrece programar', async () => {
+      mockLocalService.obtenerEstadoCarta.mockResolvedValueOnce({ abierta: false, motivo: 'PAUSA', abre: null, cierra: null, texto: 'Pausa', pausaAltaDemanda: true });
+      mockPrisma.parametro.findMany = jest.fn().mockResolvedValue([{ clave: 'pedidos_programados_fuera_horario', valor: 'si' }]);
+      mockLocalService.horasProgramables = jest.fn();
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({ id: 23n, telefono: '+51987654321', duenio: 'BOT', tomado_por: null, flujo: { version: 1, estado: 'INICIO', repreguntasFallidas: 0 } });
+
+      await service.procesarMensajeEntrante(23n, { texto: 'hola' });
+      expect(mockLocalService.horasProgramables).not.toHaveBeenCalled();
+    });
+
     it('(f) Fallo de servicio/BD notifica a Caja por la campana y responde con mensaje honesto', async () => {
       mockCatalogoService.obtenerCarta.mockRejectedValueOnce(new Error('Conexión perdida a PostgreSQL'));
 

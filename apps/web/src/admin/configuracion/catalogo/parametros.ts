@@ -32,7 +32,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'entrega', titulo: 'Tiempo prometido de entrega', claves: ['tiempo_prometido_min', 'tiempo_max_min', 'eta_factor_urbano', 'eta_productos_desde', 'eta_extra_por_producto_min', 'eta_parada_min', 'eta_margen_min', 'eta_paso_min', 'eta_base_sin_zona_min'] },
   { id: 'envio', titulo: 'Envío gratis y pedido mínimo', claves: ['envio_gratis_monto', 'envio_gratis_modo', 'pedido_minimo'] },
   { id: 'caja', titulo: 'Caja', claves: ['caja_monto_inicial'] },
-  { id: 'programados', titulo: 'Pedidos programados (Caja y mozo)', claves: ['programado_dias_max', 'programado_aviso_min'] },
+  { id: 'programados', titulo: 'Pedidos programados', claves: ['programado_dias_max', 'programado_aviso_min', 'pedidos_programados_fuera_horario'] },
   { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'puntos_combos_suman', 'puntos_ofertas_suman', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_recordatorio_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
   { id: 'stock', titulo: 'Avisos de «se está acabando» (stock de productos)', claves: ['aviso_stock_quedan_desde', 'aviso_stock_ultimas_desde'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
@@ -195,6 +195,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 30: un pedido para las 8:00 llega a cocina a las 7:30.',
     efecto: 'Subirlo adelanta la llegada a cocina; con 0 llega justo a la hora pactada. Aplica también a lo ya programado.',
     porDefecto: '30', unidad: 'minutos', rango: 'entero de 0 a 480', palabras: ['programar', 'pedido programado', 'pasa a cocina', 'anticipacion', 'aviso', 'minutos antes'], peligro: 'medio',
+  },
+  pedidos_programados_fuera_horario: {
+    grupo: 'programados', titulo: 'Clientes pueden programar pedidos con el local cerrado',
+    descripcion: 'En «Sí», con el local cerrado el cliente puede enviar desde la carta o el bot de WhatsApp un pedido para llevar o delivery, siempre que lo programe para un día y una hora dentro del horario de atención. Comer en el local nunca se programa. Usa los días máximos de «Pedidos programados».',
+    ejemplo: 'Son las 11 de la noche: el cliente elige mañana a las 10:30, paga al recibir o deja su Yape con captura, y el pedido llega a Caja como programado.',
+    efecto: 'En «No» (por defecto) la carta y el bot siguen sin recibir pedidos con el local cerrado. El pago en línea con tarjeta no se ofrece fuera de horario.',
+    porDefecto: 'No', rango: SI_NO, palabras: ['programar', 'local cerrado', 'fuera de horario', 'pedido para mañana', 'carta', 'bot', 'whatsapp', 'delivery', 'para llevar', 'encargo'], peligro: 'medio',
   },
   reserva_tolerancia_min: {
     grupo: 'clientes', titulo: 'Tolerancia de reservas',

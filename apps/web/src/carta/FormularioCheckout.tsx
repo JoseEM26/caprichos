@@ -53,6 +53,8 @@ import { TarjetasFormaUbicacion, tituloForma, type FormaUbicacion } from './Form
 interface FormularioCheckoutProps {
   estadoLocal: EstadoLocalCarta | null;
   datosLocal: DatosLocalCarta | null;
+  /** Con el local cerrado y «Pedidos programados fuera de horario» encendido: días y horas para programar (llevar o delivery). */
+  programar?: ProgramarCarta | null;
 }
 
 /** Línea de envío con zona y tarifa; si el monto la deja en gratis, lo dice y cuánto sería sin la promo. */
@@ -68,6 +70,7 @@ import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar, puedeRepartirLi
 import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
 import { celularAlEscribir } from '../comun/celular';
 import { DatosTransferencia } from '../comun/DatosTransferencia';
+import { AvisoProgramar, MEDIOS_DEJAR_PAGADO, SelectorCaminoPago, SelectorCuando, textoDiaHora, type CaminoPago, type ProgramarCarta } from './ProgramarPedido';
 
 /** Unidades que salen para llevar al enviar: las del selector si la línea se reparte por unidades; si va completa (combo, mezcla, oferta), todo o nada. */
 function llevarEnviarCarta(l: LineaCarrito): number {
@@ -79,6 +82,7 @@ function llevarEnviarCarta(l: LineaCarrito): number {
 export function FormularioCheckout({
   estadoLocal,
   datosLocal,
+  programar = null,
 }: FormularioCheckoutProps) {
   const {
     lineas,
@@ -105,7 +109,11 @@ export function FormularioCheckout({
   const pendientesSabor = lineasSaborIncompletas(lineas);
   const enviarBloqueadoPorStock = excesos.length > 0 || pendientesSabor.length > 0;
   // La carta se actualiza sola: si cierra (o entra en pausa) con el checkout abierto, se avisa y no se deja enviar
-  const localCerrado = Boolean(estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda));
+  // Cerrado por horario con «programar fuera de horario»: no se bloquea; el pedido se programa (solo llevar o delivery)
+  const programando = Boolean(programar && estadoLocal && !estadoLocal.abierta && !estadoLocal.pausaAltaDemanda);
+  const localCerrado = Boolean(estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda) && !programando);
+  const [programadoPara, setProgramadoPara] = useState('');
+  const [caminoPago, setCaminoPago] = useState<CaminoPago | null>(null);
   const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string; saborId?: string } | null>(null);
   useEffect(() => {
     if (!checkoutAbierto) setStockRechazado(null);
@@ -215,7 +223,9 @@ export function FormularioCheckout({
     culqiApi.config().then((c) => { if (vivo) { setCulqiActivo(Boolean(c.activo)); setCulqiReal(c.modo === 'REAL'); } }).catch(() => {});
     return () => { vivo = false; };
   }, []);
-  const pagaEnLinea = culqiActivo && metodoPago === METODO_CULQI && !dividirPago;
+  // El pago en línea solo existe dentro del horario: con el local cerrado se programa y se paga al recibir o con captura
+  const culqiPermitido = culqiActivo && !programando;
+  const pagaEnLinea = culqiPermitido && metodoPago === METODO_CULQI && !dividirPago;
   // Al elegir el medio se baja el script de Culqi: al enviar, la ventana abre sin esperar descargas.
   useEffect(() => {
     if (pagaEnLinea && culqiReal) void cargarScriptCulqi().catch(() => {});
@@ -225,6 +235,27 @@ export function FormularioCheckout({
     if (primerMedioActivo && !medioOk(metodoPago)) setMetodoPago(primerMedioActivo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datosLocal?.mediosPagoCanal]);
+  // Con el local cerrado solo se programa para llevar o delivery, sin pago dividido ni en línea
+  useEffect(() => {
+    if (!programando) {
+      setProgramadoPara('');
+      setCaminoPago(null);
+      return;
+    }
+    if (modalidad === 'COMER_LOCAL') setModalidad('DELIVERY');
+    if (dividirPago) setDividirPago(false);
+    if (metodoPago === METODO_CULQI) setMetodoPago(primerMedioActivo ?? 'YAPE');
+  }, [programando, modalidad, dividirPago, metodoPago]);
+  const elegirCaminoPago = (c: CaminoPago) => {
+    setCaminoPago(c);
+    setDividirPago(false);
+    setVistaPago('medios');
+    // «Dejarlo pagado» no admite efectivo ni tarjeta: si estaba elegido, se vuelve a pedir el medio
+    if (c === 'PAGADO' && !(MEDIOS_DEJAR_PAGADO as readonly string[]).includes(metodoPago)) {
+      const digital = MEDIOS_DEJAR_PAGADO.find((m) => medioOk(m as MetodoPago));
+      if (digital) setMetodoPago(digital as MetodoPago);
+    }
+  };
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -254,7 +285,7 @@ export function FormularioCheckout({
   const equipoCuenta = clienteCuenta ? (cuentaCtx?.equipo ?? null) : null;
   const [pagoEquipo, setPagoEquipo] = useState<PagoEquipo>('CONTADO');
   // Crédito: cubre los productos. Con delivery el envío NUNCA va a crédito: se paga ahora, al contado
-  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO';
+  const conCredito = !!equipoCuenta?.puedeCredito && pagoEquipo === 'CREDITO' && !programando;
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
   const pideCumple = cumpleFaltaCuenta;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
@@ -639,7 +670,11 @@ export function FormularioCheckout({
     tarjeta: { activo: true },
   };
   const mediosDisponibles = (['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[]).filter(
-    (m) => medioOk(m) && (m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false),
+    (m) =>
+      medioOk(m) &&
+      (m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false) &&
+      // «Dejarlo pagado»: solo Yape, Plin o transferencia (con captura)
+      (!(programando && caminoPago === 'PAGADO') || (MEDIOS_DEJAR_PAGADO as readonly string[]).includes(m)),
   );
   // Medios con datos para copiar (Yape, Plin, cuenta): el elegido, o los digitales del plan dividido
   const mediosDatos: MetodoPago[] = dividirPago ? filasDiv.map((f) => f.medio) : [metodoPago];
@@ -676,6 +711,8 @@ export function FormularioCheckout({
     if (telLimpio && (!/^9\d{8}$/.test(telLimpio) || telLimpio === '999999999')) {
       return 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
     }
+    if (programando && modalidad === 'COMER_LOCAL') return 'Con el local cerrado solo se puede programar para llevar o delivery';
+    if (programando && !programadoPara) return 'Elige el día y la hora para tu pedido';
     return null;
   };
 
@@ -700,6 +737,7 @@ export function FormularioCheckout({
   };
 
   const validarPaso3 = (): string | null => {
+    if (programando && !caminoPago) return 'Elige si pagas al recibir o dejas tu pago listo';
     if (conCredito && !pagaEnvio) return null; // a crédito no hay comprobante, medio de pago ni propina (salvo el medio del envío)
     if (tarjetasPago) return 'Elige cómo pagas';
     if (conCredito) {
@@ -831,7 +869,7 @@ export function FormularioCheckout({
       return;
     }
 
-    if (estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda)) {
+    if (localCerrado) {
       setErrorEnvio('La carta se encuentra cerrada o en pausa: no se pueden enviar pedidos.');
       return;
     }
@@ -941,6 +979,7 @@ export function FormularioCheckout({
               }
           : undefined,
       lineas: lineasDto,
+      ...(programando && programadoPara ? { programadoPara } : {}),
       ...(equipoCuenta ? { pagoEquipo: conCredito ? 'CREDITO' : 'CONTADO' } : {}),
       pago: conCredito && !pagaEnvio
         ? { metodo: 'EFECTIVO' as const }
@@ -991,6 +1030,7 @@ export function FormularioCheckout({
         total: respuesta.total,
         propina: respuesta.propina,
         mensaje: respuesta.mensaje,
+        programadoPara: respuesta.programadoPara ?? undefined,
         clienteNombre: nombre.trim(),
         modalidad,
         seguimientoToken: respuesta.seguimientoToken,
@@ -1014,6 +1054,13 @@ export function FormularioCheckout({
           setErrorEnvio(err.message || 'Uno de los productos seleccionados se encuentra agotado.');
         } else if (err.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
           setErrorEnvio(`${err.message} Tu carrito sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
+        } else if (typeof err.codigo === 'string' && err.codigo.startsWith('PROGRAMADO_')) {
+          // el servidor explica el motivo con amabilidad (hora fuera de horario, día muy lejano...): se vuelve a elegir
+          setPaso(1);
+          setProgramadoPara('');
+          setErrorEnvio(err.message || 'Esa hora ya no está disponible. Elige otra.');
+        } else if (err.codigo === 'PAGO_ONLINE_FUERA_HORARIO') {
+          setErrorEnvio(err.message);
         } else if (err.codigo === 'CARTA_CERRADA') {
           setErrorEnvio(`${err.message || 'La carta se encuentra cerrada'}. No es posible enviar pedidos ahora.`);
         } else if (err.codigo === 'FUERA_DE_COBERTURA') {
@@ -1288,6 +1335,8 @@ export function FormularioCheckout({
               {/* ================= APARTADO 1: TUS DATOS ================= */}
               {paso === 1 && (
                 <>
+                  {programando && <AvisoProgramar />}
+
                   {/* Modalidad de entrega */}
                   <div
                     style={{
@@ -1353,7 +1402,9 @@ export function FormularioCheckout({
                       type="button"
                       data-testid="modalidad-comer-local"
                       onClick={() => setModalidad('COMER_LOCAL')}
+                      disabled={programando}
                       style={{
+                        opacity: programando ? 0.55 : 1,
                         marginTop: '8px',
                         width: '100%',
                         minHeight: '44px',
@@ -1367,6 +1418,11 @@ export function FormularioCheckout({
                     >
                       <span aria-hidden="true">🍽️ </span>Comer en el local
                     </button>
+                    {programando && (
+                      <div data-testid="explicacion-comer-local-cerrado" style={{ marginTop: '6px', fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
+                        Comer en el local no se puede programar. Con el local cerrado solo recibimos pedidos para llevar o delivery.
+                      </div>
+                    )}
                     {modalidad === 'COMER_LOCAL' && <AvisoComerEnLocal nombre={nombre} />}
                     {modalidad === 'COMER_LOCAL' && lineas.length > 0 && (
                       <div
@@ -1393,6 +1449,8 @@ export function FormularioCheckout({
                       </div>
                     )}
                   </div>
+
+                  {programando && programar && <SelectorCuando programar={programar} valor={programadoPara} alCambiar={setProgramadoPara} />}
 
                   {/* Acceso (cuenta o invitado) */}
                   {!clienteCuenta && !comoInvitado && invitadoPermitido && (
@@ -1986,7 +2044,17 @@ export function FormularioCheckout({
               {paso === 3 && (
                 <>
                   {!tarjetasPago && <TituloBloque id="bloque-como-pagas">Cómo pagas</TituloBloque>}
-                  {equipoCuenta && (
+                  {programando && (
+                    <>
+                      {programadoPara && (
+                        <div data-testid="resumen-programado-pago" style={{ fontSize: '13px', color: 'var(--cp-navy)', fontWeight: 700 }}>
+                          <span aria-hidden="true">📅 </span>Tu pedido será el {textoDiaHora(programadoPara)}
+                        </div>
+                      )}
+                      <SelectorCaminoPago valor={caminoPago} alCambiar={elegirCaminoPago} />
+                    </>
+                  )}
+                  {equipoCuenta && !programando && (
                     <SelectorPagoEquipo valor={pagoEquipo} alCambiar={setPagoEquipo} puedeCredito={equipoCuenta.puedeCredito} esDelivery={modalidad === 'DELIVERY'} />
                   )}
                   {conCredito && (
@@ -2014,28 +2082,30 @@ export function FormularioCheckout({
                       )}
                     </div>
                   )}
-                  {tarjetasPago && (
+                  {tarjetasPago && (!programando || caminoPago) && (
                     <div style={{ backgroundColor: 'var(--cp-white)', padding: '14px', borderRadius: '14px', border: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>¿Cómo pagas?</div>
+                      <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
+                        {programando ? (caminoPago === 'PAGADO' ? '¿Con qué lo dejas pagado?' : '¿Con qué pagarás al recibir?') : '¿Cómo pagas?'}
+                      </div>
                       {promos.ahorros.map((a) => (
                         <div key={a.medio} data-testid="ahorro-por-medio" role="status" style={{ fontSize: '13px', fontWeight: 700, color: '#92400E' }}>
                           Ahorras S/ {a.ahorro.toFixed(2)} si pagas con {NOMBRE_MEDIO_PAGO[a.medio as keyof typeof NOMBRE_MEDIO_PAGO] ?? a.medio}
                         </div>
                       ))}
-                      {mediosDisponibles.length === 0 && !culqiActivo && (
+                      {mediosDisponibles.length === 0 && !culqiPermitido && (
                         <div role="status" data-testid="sin-medios-pago" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
                           Por ahora no podemos recibir pagos desde la carta. Escríbenos por WhatsApp y te ayudamos.
                         </div>
                       )}
                       <TarjetasMedioPago
-                        medios={culqiActivo ? [...mediosDisponibles, METODO_CULQI] : mediosDisponibles}
+                        medios={culqiPermitido ? [...mediosDisponibles, METODO_CULQI] : mediosDisponibles}
                         seleccionado={null}
                         alElegir={(m) => {
                           setDividirPago(false);
                           setMetodoPago(m);
                           setVistaPago('detalle');
                         }}
-                        alDividir={() => {
+                        alDividir={programando ? undefined : () => {
                           setDividirPago(true);
                           if (filasDiv.length < 2) setFilasDiv(mediosDisponibles.slice(0, 2).map((medio) => ({ medio, monto: '' })));
                           setMetodoPago(filasDiv[0]?.medio ?? mediosDisponibles[0]);
@@ -2949,6 +3019,8 @@ export function FormularioCheckout({
                         ? 'Ajusta tu pedido para enviar'
                         : pagaEnLinea
                         ? `Pagar S/ ${aCobrar.toFixed(2)} con tarjeta o Yape`
+                        : programando
+                        ? `Programar pedido · S/ ${aCobrar.toFixed(2)}`
                         : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>
                 )}

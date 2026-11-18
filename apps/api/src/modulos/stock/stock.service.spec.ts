@@ -435,6 +435,42 @@ describe('StockService', () => {
       });
     });
 
+    describe('pedido programado: «Devolvió el stock separado»', () => {
+      const venta = { id: 703n, tipo: 'VENTA', insumo_id: null, producto_id: 55n, sabor_id: null, lugar_id: 20n, cantidad: new Prisma.Decimal(2) };
+      const preparar = (programado: Date | null) => {
+        prisma.movimientoStock.findMany.mockResolvedValueOnce([venta]);
+        prisma.stock.findFirst.mockResolvedValue({ id: 802n, cantidad: new Prisma.Decimal(0) });
+        prisma.pedido = { ...(prisma.pedido ?? {}), findUnique: jest.fn().mockResolvedValue({ codigo: 'CP-0009', programado_para: programado }) };
+        prisma.producto = { ...(prisma.producto ?? {}), findMany: jest.fn().mockResolvedValue([{ id: 55n, nombre: 'Dona de prueba' }]) };
+      };
+
+      it('deja una línea en almacén con pedido, fecha y producto devuelto', async () => {
+        preparar(new Date('2026-11-20T15:00:00Z'));
+        await service.revertirPorPedido('100', undefined, 4n);
+        expect(auditoria.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            modulo: 'almacen',
+            accion: 'DEVOLVER_STOCK_PROGRAMADO',
+            entidadId: 100n,
+            partyId: 4n,
+            despues: { pedido: 'CP-0009', programadoPara: '2026-11-20T15:00:00.000Z', productos: [{ producto: 'Dona de prueba', sabor: null, cantidad: 2 }] },
+          }),
+        );
+      });
+
+      it('un pedido que nunca fue programado no deja línea', async () => {
+        preparar(null);
+        await service.revertirPorPedido('100');
+        expect(auditoria.registrar.mock.calls.filter((c: any[]) => c[0].accion === 'DEVOLVER_STOCK_PROGRAMADO')).toHaveLength(0);
+      });
+
+      it('al anular solo el cobro (soloInsumos) no audita', async () => {
+        preparar(new Date());
+        await service.revertirPorPedido('100', undefined, undefined, { soloInsumos: true });
+        expect(auditoria.registrar.mock.calls.filter((c: any[]) => c[0].accion === 'DEVOLVER_STOCK_PROGRAMADO')).toHaveLength(0);
+      });
+    });
+
     it('es idempotente: las ventas ya revertidas no se vuelven a reponer', async () => {
       // Antes la marca era «hay alguna ANULACION del pedido»; ahora se mira movimiento a movimiento
       // (un cobro anulado revierte solo insumos y la anulación del pedido repone después los productos).

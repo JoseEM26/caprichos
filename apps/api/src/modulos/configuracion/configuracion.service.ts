@@ -275,6 +275,7 @@ export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_
  * Un parámetro booleano nuevo se agrega SOLO aquí (la validación y la lista permitida salen de esta lista).
  */
 export const CLAVES_SI_NO = [
+  'pedidos_programados_fuera_horario',
   'voucher_ia_activo',
   'carta_aviso_entrada',
   'aviso_pc_impresion_activo',

@@ -245,4 +245,6 @@ export interface PedidoConfirmado {
   /** Se pidió con «Tarjeta / Yape en línea»: la confirmación abre el pago sola */
   enLinea?: boolean;
   creadoEn?: string;
+  /** Pedido programado con el local cerrado: instante ISO pactado (la confirmación lo dice). */
+  programadoPara?: string;
 }
