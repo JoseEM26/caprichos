@@ -1,3 +1,4 @@
+import { ordenarMediosPresentacion, presentacionDeMedio } from '@caprichos/compartido';
 import { ElegirEnTarjetas, iconos, type OpcionTarjeta } from './ElegirEnTarjetas';
 import type { MetodoPago } from './tipos';
 
@@ -8,8 +9,8 @@ export const MEDIOS_PAGO: (OpcionTarjeta & { id: MetodoPago })[] = [
   { id: 'EFECTIVO', nombre: 'Efectivo', linea: 'Contra entrega', icono: iconos.efectivo },
   { id: 'TARJETA', nombre: 'Tarjeta', linea: 'Débito o crédito al recibir', icono: iconos.tarjeta },
   { id: 'TRANSFERENCIA', nombre: 'Transferencia', linea: 'Desde tu banco', icono: iconos.transferencia },
-  // Solo la carta la ofrece, y solo si Configuración enciende el pago en línea (Culqi)
-  { id: 'CULQI', nombre: 'Tarjeta / Yape en línea', linea: 'Tu pedido es más rápido: se confirma al instante, sin enviar captura', icono: iconos.tarjeta, destacada: true, insignia: 'Nuevo' },
+  // Solo la carta la ofrece, y solo si Configuración enciende el pago en línea (Culqi). Orden, tamaño e insignia: Configuración › Pagos
+  { id: 'CULQI', nombre: 'Tarjeta / Yape en línea', linea: 'Tu pedido es más rápido: se confirma al instante, sin enviar captura', icono: iconos.tarjeta },
 ];
 
 export const nombreMedio = (m: string) => MEDIOS_PAGO.find((x) => x.id === m)?.nombre ?? m;
@@ -23,22 +24,37 @@ const OPCION_DIVIDIDO: OpcionTarjeta = {
   etiqueta: 'Pagar con 2 o 3 medios',
 };
 
-/** «¿Cómo pagas?»: una tarjeta grande por medio disponible y, con 2 o más medios, la de pago dividido. */
+/**
+ * Opciones de la grilla en el orden, tamaño e insignia configurados (`medios_pago_presentacion`).
+ * «Grande» ocupa todo el ancho de la fila; «normal» es tarjeta cuadrada. Una sola función para la carta y la vista previa.
+ */
+export function opcionesMedioPago(medios: MetodoPago[], presentacion?: unknown): OpcionTarjeta[] {
+  return ordenarMediosPresentacion(
+    MEDIOS_PAGO.filter((m) => medios.includes(m.id)).map((m) => m.id),
+    presentacion,
+  ).map((id) => {
+    const m = MEDIOS_PAGO.find((x) => x.id === id)!;
+    const { tamano, insignia } = presentacionDeMedio(presentacion, id);
+    return { ...m, destacada: tamano === 'grande', insignia: insignia ?? undefined, etiqueta: insignia ? `${m.nombre}. ${insignia}` : m.nombre };
+  });
+}
+
+/** «¿Cómo pagas?»: una tarjeta por medio disponible y, con 2 o más medios, la de pago dividido. */
 export function TarjetasMedioPago({
   medios,
   seleccionado,
   alElegir,
   alDividir,
+  presentacion,
 }: {
   medios: MetodoPago[];
   seleccionado: MetodoPago | null;
   alElegir: (m: MetodoPago) => void;
   alDividir?: () => void;
+  /** `medios_pago_presentacion` de la configuración pública; sin ella, valores de fábrica (Culqi al final) */
+  presentacion?: unknown;
 }) {
-  // La pasarela (CULQI) va primero cuando está activa
-  const opciones: OpcionTarjeta[] = MEDIOS_PAGO.filter((m) => medios.includes(m.id))
-    .sort((a, b) => Number(!!b.destacada) - Number(!!a.destacada))
-    .map((m) => ({ ...m, etiqueta: m.destacada ? `${m.nombre}. Nuevo` : m.nombre }));
+  const opciones = opcionesMedioPago(medios, presentacion);
   if (alDividir && medios.length >= 2) opciones.push(OPCION_DIVIDIDO);
   return (
     <ElegirEnTarjetas

@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { umbralesAvisoStock } from '@caprichos/compartido';
-import { normalizarMediosPagoCanal } from '@caprichos/compartido';
+import { normalizarMediosPagoCanal, normalizarPresentacionMedios } from '@caprichos/compartido';
 import { topePropina } from '../propinas/propinas.util';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -415,6 +415,7 @@ export class LocalService {
               'carta_invitado_activo',
               'propina_activa',
               'medios_pago_canal',
+              'medios_pago_presentacion',
               'propina_tope',
               'aviso_stock_quedan_desde',
               'aviso_stock_ultimas_desde',
@@ -477,6 +478,8 @@ export class LocalService {
       mediosPagoVisibles,
       // Interruptores medio × canal (CARTA, CAJA, MOZO, BOT); el bot lee de aquí los medios de su canal
       mediosPagoCanal: normalizarMediosPagoCanal(parametros.find((p) => p.clave === 'medios_pago_canal')?.valor),
+      // Orden, tamaño e insignia de los medios de pago (Configuración › Pagos); lectura pública para la carta
+      mediosPagoPresentacion: normalizarPresentacionMedios(parametros.find((p) => p.clave === 'medios_pago_presentacion')?.valor),
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,

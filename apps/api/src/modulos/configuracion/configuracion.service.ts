@@ -13,6 +13,9 @@ import {
   RANGOS_METAS_TIEMPOS,
   medidaEtiquetaValida,
   CLAVE_MEDIOS_PAGO_CANAL,
+  CLAVE_MEDIOS_PAGO_PRESENTACION,
+  errorPresentacionMedios,
+  normalizarPresentacionMedios,
   CANALES_MEDIO_PAGO,
   MEDIOS_PAGO_CANAL,
   normalizarMediosPagoCanal,
@@ -347,6 +350,8 @@ export const CLAVES_OBJETO = [
   'local_pagos',
   // Medios de pago encendidos por canal (CARTA, CAJA, MOZO, BOT): solo el ADMIN los cambia
   CLAVE_MEDIOS_PAGO_CANAL,
+  // Orden, tamaño e insignia de los medios de pago (carta, Caja, mozo): solo el ADMIN
+  CLAVE_MEDIOS_PAGO_PRESENTACION,
 ] as const;
 
 export const CLAVES_PERMITIDAS = [
@@ -583,6 +588,14 @@ export class ConfiguracionService {
         if (!MEDIOS_PAGO_CANAL.some((m) => (valor as any).CAJA[m])) {
           throw new BadRequestException({ codigo: 'CAJA_SIN_MEDIOS', mensaje: 'Caja debe tener al menos un medio de pago encendido' });
         }
+      } else if (clave === CLAVE_MEDIOS_PAGO_PRESENTACION) {
+        if (usuarioActual?.rol !== 'ADMIN') {
+          throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador cambia cómo se muestran los medios de pago' });
+        }
+        const error = errorPresentacionMedios(valor);
+        if (error) throw new BadRequestException({ codigo: 'VALOR_INVALIDO', mensaje: error });
+        // Se guarda completo y con la insignia saneada
+        valor = normalizarPresentacionMedios(valor);
       } else if (clave === 'propina_activa') {
         // Interruptor por canal: carta y bot (obligatorios) y mozo y caja (opcionales; sin valor = encendido)
         const v = valor as Record<string, unknown>;

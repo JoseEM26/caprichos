@@ -1,4 +1,5 @@
-import { useMediosEncendidos, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { useMediosCanal, segunOrdenMedios, type CanalPersonal } from '../../pedidos/mediosCanal';
+import { InsigniaMedio, resaltoMedio } from '../../pedidos/InsigniaMedio';
 import { IconoMedioPago } from '../../../comun/IconoMedioPago';
 /** Cómo paga el trabajador su pedido del personal: a su crédito (por defecto) o «Pagar ahora» con medio. */
 export type ModoPagoPersonal = 'credito' | 'ahora';
@@ -48,7 +49,7 @@ const tarjeta = (activa: boolean): React.CSSProperties => ({
 });
 
 export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCon, onPagaCon, puedeCobrarAhora, error, mostrarError, canal = 'MOZO' }: Props) {
-  const encendidos = useMediosEncendidos(canal);
+  const { medios: encendidos, presentacion } = useMediosCanal(canal);
   const vuelto = Number(pagaCon) - total;
   return (
     <div id="np-pago-personal" data-testid="pago-personal" role="group" aria-label="¿Cómo lo paga el trabajador?" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -68,17 +69,18 @@ export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCo
       {modo === 'ahora' && puedeCobrarAhora && (
         <>
           <div role="radiogroup" aria-label="Medio de pago" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {MEDIOS_PAGO_PERSONAL.filter((m) => encendidos.includes(m)).map((m) => (
+            {segunOrdenMedios(MEDIOS_PAGO_PERSONAL, encendidos, (m) => m).map((m) => (
               <button
                 key={m}
                 type="button"
                 role="radio"
                 aria-checked={medio === m}
                 onClick={() => onMedio(m)}
-                style={{ ...tarjeta(medio === m), flex: '0 0 auto', minWidth: 80, minHeight: 44, textAlign: 'center', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                style={{ ...tarjeta(medio === m), ...resaltoMedio(presentacion, m, medio === m), flex: '0 0 auto', minWidth: 80, minHeight: 44, textAlign: 'center', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 <IconoMedioPago medio={m} tamano={18} ariaHidden />
                 <span>{ETIQUETA_MEDIO[m]}</span>
+                <InsigniaMedio presentacion={presentacion} medio={m} />
               </button>
             ))}
           </div>

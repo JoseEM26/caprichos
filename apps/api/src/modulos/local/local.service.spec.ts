@@ -544,6 +544,16 @@ describe('LocalService', () => {
       expect(res.horario[1].dia).toBe('Martes');
     });
 
+    it('obtenerDatosPublicosLocal expone la presentación de medios de pago: Culqi al final sin insignia por defecto y lo configurado si existe', async () => {
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      const def = (await service.obtenerDatosPublicosLocal()).mediosPagoPresentacion;
+      expect(def.CULQI).toEqual({ orden: 6, tamano: 'normal', insignia: null });
+      expect(def.YAPE).toEqual({ orden: 1, tamano: 'normal', insignia: null });
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'medios_pago_presentacion', valor: { YAPE: { orden: 1, tamano: 'grande', insignia: 'Nuevo' } } }]);
+      expect((await service.obtenerDatosPublicosLocal()).mediosPagoPresentacion.YAPE).toEqual({ orden: 1, tamano: 'grande', insignia: 'Nuevo' });
+    });
+
     it('obtenerDatosPublicosLocal expone los umbrales de aviso de stock (5 y 3 si no existen)', async () => {
       prismaMock.horarioDia.findMany.mockResolvedValue([]);
       prismaMock.parametro.findMany.mockResolvedValue([]);

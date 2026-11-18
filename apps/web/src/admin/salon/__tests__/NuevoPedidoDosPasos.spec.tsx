@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -42,10 +42,13 @@ const pisos = [
   },
 ] as any;
 
+/** Estas pruebas son del plan de pago, no del orden de los medios: se usa el orden clásico (Efectivo primero) */
+const respuestaBase = (ruta: string) => (ruta.startsWith('/admin/medios-pago/') ? { medios: ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] } : { items: [] });
+
 /** Interruptor de propina por canal que devuelve la carta pública (/carta/local) */
 function conPropina(canales: { mozo?: boolean; caja?: boolean }, tope = 50) {
   vi.mocked(api.get).mockImplementation((async (ruta: string) =>
-    ruta === '/carta/local' ? { propina: { carta: false, bot: false, mozo: false, caja: false, ...canales, tope } } : { items: [] }) as any);
+    ruta === '/carta/local' ? { propina: { carta: false, bot: false, mozo: false, caja: false, ...canales, tope } } : respuestaBase(ruta)) as any);
 }
 
 const elegirBoleta = () => {
@@ -73,6 +76,7 @@ const elegirMedio = (nombre: string, indice = 0) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(api.get).mockImplementation((async (ruta: string) => respuestaBase(ruta)) as any);
   vi.mocked(salonApi.obtenerCarta).mockResolvedValue(carta as any);
   vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
   vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos } as any);
@@ -363,6 +367,7 @@ describe('Propina de monto libre en el paso Pago', () => {
     continuar();
     fireEvent.click(screen.getByRole('button', { name: /Pagar ahora/ }));
     fireEvent.change(screen.getByLabelText(/Propina para el equipo/), { target: { value: '5' } });
+    await act(async () => {}); // deja llegar el orden de los medios del canal
     elegirMedio('Tarjeta');
     fireEvent.change(montoDe('Tarjeta'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: /Añadir otro método/ }));
