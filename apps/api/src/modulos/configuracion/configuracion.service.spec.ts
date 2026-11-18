@@ -233,6 +233,31 @@ describe('ConfiguracionService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'configuracion', accion: 'PARAMETRO', despues: expect.objectContaining({ clave: 'medios_pago_canal' }) }));
     });
 
+    it('medios_pago_presentacion: solo ADMIN, valida medios/orden/tamaño/insignia, se guarda completo y saneado; queda auditado', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'medios_pago_presentacion', valor: {} });
+      const ok = { YAPE: { orden: 1, tamano: 'grande', insignia: 'Nuevo' } };
+
+      await expect(service.actualizar('medios_pago_presentacion', ok, { ...adminAuth, rol: 'SUPERVISOR' } as any)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      for (const malo of [
+        { BITCOIN: { orden: 1, tamano: 'normal', insignia: null } },
+        { YAPE: { orden: 1.5, tamano: 'normal', insignia: null } },
+        { YAPE: { orden: 1, tamano: 'enorme', insignia: null } },
+        { YAPE: { orden: 1, tamano: 'normal', insignia: 'x'.repeat(15) } },
+        { YAPE: { orden: 1, tamano: 'normal', insignia: '<b>Hola</b>' } },
+        { YAPE: 'grande' },
+      ]) {
+        await expect(service.actualizar('medios_pago_presentacion', malo, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      }
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+
+      await service.actualizar('medios_pago_presentacion', ok, adminAuth);
+      const guardado = prismaMock.parametro.upsert.mock.calls[0][0].create.valor;
+      expect(guardado.YAPE).toEqual({ orden: 1, tamano: 'grande', insignia: 'Nuevo' });
+      expect(guardado.CULQI).toEqual({ orden: 6, tamano: 'normal', insignia: null });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'configuracion', accion: 'PARAMETRO', despues: expect.objectContaining({ clave: 'medios_pago_presentacion' }) }));
+    });
+
     it('propina_tope: entre S/ 1 y S/ 1000', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue(null);
       prismaMock.parametro.upsert.mockResolvedValue({ clave: 'propina_tope', valor: 50 });

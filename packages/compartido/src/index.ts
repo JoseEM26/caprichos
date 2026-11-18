@@ -140,6 +140,17 @@ export {
   medioActivo,
   mediosActivos as mediosPagoActivosCanal,
   textoCondicionMedios,
+  MEDIOS_PRESENTACION,
+  CLAVE_MEDIOS_PAGO_PRESENTACION,
+  INSIGNIA_MAX,
+  INSIGNIAS_SUGERIDAS,
+  NOMBRE_MEDIO_PRESENTACION,
+  presentacionPorDefecto,
+  sanearInsignia,
+  normalizarPresentacionMedios,
+  errorPresentacionMedios,
+  ordenarMediosPresentacion,
+  presentacionDeMedio,
 } from './mediosPago.js';
-export type { MedioPagoCanal, CanalMedioPago, MediosPagoPorCanal } from './mediosPago.js';
+export type { MedioPagoCanal, CanalMedioPago, MediosPagoPorCanal, MedioPresentacion, TamanoMedio, PresentacionMedio, PresentacionMedios } from './mediosPago.js';
 export * from './impresora/index.js';

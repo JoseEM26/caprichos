@@ -84,3 +84,95 @@ export function textoCondicionMedios(medios: ReadonlyArray<string> | null | unde
   const lista = n.length === 1 ? n[0] : `${n.slice(0, -1).join(', ')} o ${n[n.length - 1]}`;
   return `pagando con ${lista}`;
 }
+
+/**
+ * Presentación de los medios de pago (cómo se ven y en qué orden): parámetro `medios_pago_presentacion`.
+ * Misma función para carta, Caja y mozo. Sin parámetro: Yape, Plin, Efectivo, Tarjeta, Transferencia y Culqi al final,
+ * todo normal y sin insignia. CULQI solo se muestra en la carta (y solo si el pago en línea está encendido).
+ */
+export const MEDIOS_PRESENTACION = ['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CULQI'] as const;
+export type MedioPresentacion = (typeof MEDIOS_PRESENTACION)[number];
+export type TamanoMedio = 'normal' | 'grande';
+export interface PresentacionMedio {
+  orden: number;
+  tamano: TamanoMedio;
+  insignia: string | null;
+}
+export type PresentacionMedios = Record<MedioPresentacion, PresentacionMedio>;
+
+export const CLAVE_MEDIOS_PAGO_PRESENTACION = 'medios_pago_presentacion';
+export const INSIGNIA_MAX = 14;
+export const INSIGNIAS_SUGERIDAS = ['Nuevo', 'Recomendado', 'Al toque'] as const;
+
+export const NOMBRE_MEDIO_PRESENTACION: Record<MedioPresentacion, string> = {
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  EFECTIVO: 'Efectivo',
+  TARJETA: 'Tarjeta',
+  TRANSFERENCIA: 'Transferencia',
+  CULQI: 'Tarjeta / Yape en línea',
+};
+
+export function presentacionPorDefecto(): PresentacionMedios {
+  const r = {} as PresentacionMedios;
+  MEDIOS_PRESENTACION.forEach((m, i) => {
+    r[m] = { orden: i + 1, tamano: 'normal', insignia: null };
+  });
+  return r;
+}
+
+/** Texto de insignia sin HTML ni espacios de más y de hasta 14 caracteres; null si queda vacío. */
+export function sanearInsignia(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, INSIGNIA_MAX).trim();
+  return t || null;
+}
+
+/** Completa con los valores de fábrica; lo inválido de un medio vuelve a su valor de fábrica. Nunca lanza. */
+export function normalizarPresentacionMedios(valor: unknown): PresentacionMedios {
+  const r = presentacionPorDefecto();
+  if (!valor || typeof valor !== 'object') return r;
+  for (const m of MEDIOS_PRESENTACION) {
+    const f = (valor as Record<string, unknown>)[m];
+    if (!f || typeof f !== 'object') continue;
+    const { orden, tamano, insignia } = f as Record<string, unknown>;
+    if (typeof orden === 'number' && Number.isInteger(orden) && orden >= 0 && orden <= 999) r[m].orden = orden;
+    if (tamano === 'normal' || tamano === 'grande') r[m].tamano = tamano;
+    r[m].insignia = sanearInsignia(insignia);
+  }
+  return r;
+}
+
+/** Mensaje de error si el valor a guardar no es válido (para el servidor); null si está bien. */
+export function errorPresentacionMedios(valor: unknown): string | null {
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return 'La presentación debe ser un objeto por medio de pago';
+  for (const [m, f] of Object.entries(valor as Record<string, unknown>)) {
+    if (!(MEDIOS_PRESENTACION as readonly string[]).includes(m)) return `Medio de pago desconocido: ${m}`;
+    if (!f || typeof f !== 'object' || Array.isArray(f)) return `${m}: debe llevar orden, tamaño e insignia`;
+    const { orden, tamano, insignia } = f as Record<string, unknown>;
+    if (typeof orden !== 'number' || !Number.isInteger(orden) || orden < 0 || orden > 999) return `${m}: el orden es un número entero de 0 a 999`;
+    if (tamano !== 'normal' && tamano !== 'grande') return `${m}: el tamaño es normal o grande`;
+    if (insignia !== null && insignia !== undefined) {
+      if (typeof insignia !== 'string' || insignia.length > INSIGNIA_MAX || /[<>]/.test(insignia)) return `${m}: la insignia es texto corto (máx ${INSIGNIA_MAX} letras) sin símbolos < >`;
+    }
+  }
+  return null;
+}
+
+/** Ordena ids de medios según la presentación (empates y desconocidos: orden de fábrica, desconocidos al final). */
+export function ordenarMediosPresentacion<T extends string>(ids: ReadonlyArray<T>, presentacion: unknown): T[] {
+  const p = normalizarPresentacionMedios(presentacion);
+  const pos = (id: string) => {
+    const i = (MEDIOS_PRESENTACION as readonly string[]).indexOf(id.toUpperCase());
+    return i < 0 ? { o: 1e6, i: 0 } : { o: p[MEDIOS_PRESENTACION[i]].orden, i };
+  };
+  return [...ids].sort((a, b) => pos(a).o - pos(b).o || pos(a).i - pos(b).i);
+}
+
+/** Presentación de un medio (el desconocido toma un medio normal sin insignia). */
+export function presentacionDeMedio(presentacion: unknown, medio: string): PresentacionMedio {
+  const m = String(medio).toUpperCase();
+  return (MEDIOS_PRESENTACION as readonly string[]).includes(m)
+    ? normalizarPresentacionMedios(presentacion)[m as MedioPresentacion]
+    : { orden: 999, tamano: 'normal', insignia: null };
+}

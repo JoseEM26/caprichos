@@ -5,6 +5,9 @@ import {
   canalMedioPago,
   medioActivo,
   normalizarMediosPagoCanal,
+  normalizarPresentacionMedios,
+  CLAVE_MEDIOS_PAGO_PRESENTACION,
+  type PresentacionMedios,
   type MediosPagoPorCanal,
   type MedioPagoCanal,
 } from '@caprichos/compartido';
@@ -22,6 +25,12 @@ const MEDIOS_CON_VOUCHER = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 export async function leerMediosPagoCanal(db: DbParametro): Promise<MediosPagoPorCanal> {
   const p = await db.parametro?.findUnique?.({ where: { clave: CLAVE_MEDIOS_PAGO_CANAL } });
   return normalizarMediosPagoCanal(p?.valor);
+}
+
+/** Orden, tamaño e insignia de los medios (completo; sin parámetro, valores de fábrica). */
+export async function leerPresentacionMedios(db: DbParametro): Promise<PresentacionMedios> {
+  const p = await db.parametro?.findUnique?.({ where: { clave: CLAVE_MEDIOS_PAGO_PRESENTACION } });
+  return normalizarPresentacionMedios(p?.valor);
 }
 
 /**
