@@ -615,6 +615,16 @@ describe('PedidosService', () => {
         expect(paraLlevarGuardado()).toEqual([false]);
       });
 
+      it('COMER_LOCAL de la carta con una unidad aquí: avisa a la lista de espera del mozo; todo para llevar no', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 514n, codigo: 'CP-W514', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CARTA', modalidad: 'COMER_LOCAL' });
+        await service.crear({ ...pedidoBaseDto, modalidad: 'COMER_LOCAL', entrega: undefined, lineas: [lineaA, lineaB] } as CrearPedidoDto, 'pll-carta-espera', cartaComerAqui);
+        expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:espera', { pedidoId: '514', accion: 'ENTRA' });
+        eventosGatewayMock.emitirAdmin.mockClear();
+        prismaMock.pedido.create.mockResolvedValue({ id: 515n, codigo: 'CP-W515', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CARTA', modalidad: 'COMER_LOCAL' });
+        await service.crear({ ...pedidoBaseDto, modalidad: 'COMER_LOCAL', entrega: undefined, lineas: [lineaA] } as CrearPedidoDto, 'pll-carta-solo-llevar', cartaComerAqui);
+        expect(eventosGatewayMock.emitirAdmin).not.toHaveBeenCalledWith('salon:espera', expect.anything());
+      });
+
       it('DELIVERY desde la carta: ignora la marca aunque llegue', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 512n, codigo: 'CP-W512', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
         await service.crear({ ...pedidoBaseDto, lineas: [lineaA] } as CrearPedidoDto, 'pll-carta-delivery', cartaComerAqui);

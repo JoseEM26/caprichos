@@ -422,6 +422,10 @@ export class PagosOnlineService {
         try {
           this.eventos?.emitirAdmin('pedido:estado', { id: pedido.id.toString(), codigo: pedido.codigo, estado: 'COLA' });
           this.eventos?.emitirAdmin('pedido:nuevo', { id: pedido.id.toString(), codigo: pedido.codigo, estado: 'COLA' });
+          // «Comer en el local» de la carta con unidades «aquí»: entra a la lista de espera del mozo
+          if (pedido.modalidad === 'COMER_LOCAL' && pedido.canal === 'CARTA' && (await this.prisma.pedidoLinea.count({ where: { pedido_id: pedido.id, para_llevar: false } })) > 0) {
+            this.eventos?.emitirAdmin('salon:espera', { pedidoId: pedido.id.toString(), accion: 'ENTRA' });
+          }
         } catch {
           // accesorio
         }

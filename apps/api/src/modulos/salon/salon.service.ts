@@ -540,29 +540,83 @@ export class SalonService {
       },
     });
     const ahora = Date.now();
+    const celularVisible = (telefono: string | null) => {
+      const tel = String(telefono ?? '').replace(/\D/g, '');
+      return verCompleto ? tel || null : tel.length >= 4 ? `${'*'.repeat(tel.length - 3)}${tel.slice(-3)}` : null;
+    };
     // Orden: primero los desplazados de una mesa (ya esperaron antes), por hora de desplazamiento; luego los demás FIFO
     const ordenadas = [...filas].sort((a, b) => {
       const da = a.espera_desplazado_de ? 0 : 1;
       const db = b.espera_desplazado_de ? 0 : 1;
       return da - db || a.espera_mesa_desde!.getTime() - b.espera_mesa_desde!.getTime() || Number(a.id - b.id);
     });
-    const items = ordenadas.map((p) => {
-      const tel = String(p.cliente_telefono ?? '').replace(/\D/g, '');
+    const itemsMesa = ordenadas.map((p) => ({
+      pedidoId: p.id.toString(),
+      codigo: p.codigo,
+      estado: p.estado,
+      nombre: p.cliente_nombre,
+      celular: celularVisible(p.cliente_telefono),
+      personas: p.espera_personas,
+      productos: p.lineas.reduce((a, l) => a + Number(l.cantidad ?? 0), 0),
+      total: Number(p.total),
+      desde: p.espera_mesa_desde!.toISOString(),
+      movidoDesde: p.espera_desplazado_de ?? null,
+      pedidoDesde: p.creado_en.toISOString(),
+      minutos: Math.max(0, Math.floor((ahora - p.espera_mesa_desde!.getTime()) / 60000)),
+      origen: 'MESA' as const,
+    }));
+    // «Comer en el local» de la carta sin mesa: el mozo lo sienta. Solo de hoy, vivo, sin cobrar y con al menos
+    // una unidad «aquí» (un pedido todo para llevar no pide mesa).
+    const comerLocal = await this.prisma.pedido.findMany({
+      where: {
+        modalidad: 'COMER_LOCAL',
+        canal: 'CARTA',
+        creado_en: { gte: inicioHoy },
+        estado: { in: ['COLA', 'PREPARANDO', 'LISTO'] },
+        OR: [{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }],
+        cobros: { none: { anulado_en: null } },
+        lineas: { some: { para_llevar: false } },
+      },
+      orderBy: [{ creado_en: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        codigo: true,
+        estado: true,
+        cliente_nombre: true,
+        cliente_telefono: true,
+        creado_en: true,
+        total: true,
+        lineas: { select: { nombre: true, cantidad: true, para_llevar: true } },
+      },
+    });
+    const itemsCarta = comerLocal
+      .map((p) => {
+      const llevar = p.lineas.filter((l) => l.para_llevar).reduce((a, l) => a + Number(l.cantidad ?? 0), 0);
+      const aqui = p.lineas.filter((l) => !l.para_llevar).reduce((a, l) => a + Number(l.cantidad ?? 0), 0);
       return {
         pedidoId: p.id.toString(),
         codigo: p.codigo,
         estado: p.estado,
         nombre: p.cliente_nombre,
-        celular: verCompleto ? tel || null : tel.length >= 4 ? `${'*'.repeat(tel.length - 3)}${tel.slice(-3)}` : null,
-        personas: p.espera_personas,
-        productos: p.lineas.reduce((a, l) => a + Number(l.cantidad ?? 0), 0),
+        celular: celularVisible(p.cliente_telefono),
+        personas: null,
+        productos: llevar + aqui,
         total: Number(p.total),
-        desde: p.espera_mesa_desde!.toISOString(),
-        movidoDesde: p.espera_desplazado_de ?? null,
+        desde: p.creado_en.toISOString(),
+        movidoDesde: null,
         pedidoDesde: p.creado_en.toISOString(),
-        minutos: Math.max(0, Math.floor((ahora - p.espera_mesa_desde!.getTime()) / 60000)),
+        minutos: Math.max(0, Math.floor((ahora - p.creado_en.getTime()) / 60000)),
+        origen: 'CARTA_COMER_LOCAL' as const,
+        paraLlevar: llevar,
+        aqui,
+        lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: Number(l.cantidad), paraLlevar: l.para_llevar })),
       };
-    });
+      })
+      .filter((x) => x.aqui > 0);
+    // Un solo orden FIFO para las dos fuentes (los desplazados de mesa van primero, como antes)
+    const items = [...itemsMesa, ...itemsCarta].sort(
+      (a, b) => (a.movidoDesde ? 0 : 1) - (b.movidoDesde ? 0 : 1) || new Date(a.desde).getTime() - new Date(b.desde).getTime(),
+    );
     return { total: items.length, items };
   }
 
@@ -736,6 +790,10 @@ export class SalonService {
     const fresco = await tx.pedido.findUnique({ where: { id: pId }, select: { modalidad: true, estado: true, pago_estado: true, codigo: true } });
     if (!fresco) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     this.exigirComerLocalMovible(fresco);
+    const aqui = await tx.pedidoLinea.count({ where: { pedido_id: pId, para_llevar: false } });
+    if (aqui === 0) {
+      throw new ConflictException({ codigo: 'SOLO_PARA_LLEVAR', mensaje: `El pedido ${fresco.codigo} es todo para llevar: no necesita mesa` });
+    }
     const cobro = await tx.cobro.findFirst({ where: { pedido_id: pId, anulado_en: null }, select: { id: true } });
     if (cobro) this.exigirComerLocalMovible({ ...fresco, pago_estado: 'PAGADO' });
     const r = await tx.pedido.updateMany({

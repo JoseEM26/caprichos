@@ -247,3 +247,6 @@
   max-height: 90vh;
   overflow: auto;
 }
+
+/* Comer en el local de la carta dentro de la lista de espera */
+.le-detalle { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }

@@ -82,6 +82,7 @@ export interface ListaEsperaMesaProps {
 }
 
 const nombreMesa = (m: MesaSalon) => m.nombre || `Mesa ${m.numero}`;
+const horaLima = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
 
 /**
  * Panel «Lista de espera (N)»: pedidos de mesa que esperan afuera, en orden de llegada.
@@ -96,6 +97,8 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
   const [confirmar, setConfirmar] = useState<{ pedido: PedidoEnEspera; mesaId: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [errorAsignar, setErrorAsignar] = useState<string | null>(null);
+  // Pedido de «Comer en el local» cuyo detalle está abierto («Ver pedido»)
+  const [verPedido, setVerPedido] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 30000);
@@ -128,8 +131,10 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
     setEnviando(true);
     setErrorAsignar(null);
     try {
-      if (ocupadaConfirmar) await salonApi.asignarEspera(confirmar.pedido.pedidoId, confirmar.mesaId, true);
-      else await salonApi.asignarEspera(confirmar.pedido.pedidoId, confirmar.mesaId);
+      // «Comer en el local» de la carta se sienta por su propio endpoint; el resto de la lista por el de espera
+      const asignarPedido = confirmar.pedido.origen === 'CARTA_COMER_LOCAL' ? salonApi.asignarComerLocal : salonApi.asignarEspera;
+      if (ocupadaConfirmar) await asignarPedido(confirmar.pedido.pedidoId, confirmar.mesaId, true);
+      else await asignarPedido(confirmar.pedido.pedidoId, confirmar.mesaId);
       cerrarTodo();
       descartarAviso();
       alCerrarOferta?.();
@@ -193,6 +198,55 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
         <ol className="le-lista">
           {items.map((p, i) => {
             const min = minutosEspera(p.desde, ahora);
+            if (p.origen === 'CARTA_COMER_LOCAL') {
+              const abierto = verPedido === p.pedidoId;
+              return (
+                <li key={p.pedidoId} className="le-tarjeta le-tarjeta--carta" data-testid="le-comer-local">
+                  <div className="le-datos">
+                    <span className="le-nombre">
+                      {i === 0 && <span className="le-primero">Sigue</span>}
+                      {p.nombre || 'Cliente'}
+                      <span className="le-movido">Comer en el local · {horaLima(p.pedidoDesde ?? p.desde)}</span>
+                    </span>
+                    <span className="le-meta">
+                      🥡 {p.paraLlevar ?? 0} para llevar · {p.aqui ?? 0} aquí · {p.codigo}
+                    </span>
+                    {abierto && (
+                      <ul className="le-detalle">
+                        {(p.lineas ?? []).map((l, j) => (
+                          <li key={j}>
+                            {l.cantidad} × {l.nombre} · {l.paraLlevar ? 'para llevar' : 'aquí'}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <span className={`le-min le-min--${colorEspera(min)}`} aria-label={`Espera ${min} minutos`}>
+                    {min} min
+                  </span>
+                  <button
+                    type="button"
+                    className="le-btn"
+                    aria-expanded={abierto}
+                    onClick={() => setVerPedido(abierto ? null : p.pedidoId)}
+                  >
+                    Ver pedido
+                  </button>
+                  <button
+                    type="button"
+                    className="le-btn le-btn--principal"
+                    aria-label={`Asignar mesa a ${p.nombre || 'Cliente'}`}
+                    onClick={() => {
+                      setErrorAsignar(null);
+                      setSeleccion([]);
+                      setElegir(p);
+                    }}
+                  >
+                    Asignar mesa
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={p.pedidoId} className="le-tarjeta">
                 <div className="le-datos">

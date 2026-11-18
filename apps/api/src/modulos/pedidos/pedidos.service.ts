@@ -1740,6 +1740,15 @@ export class PedidosService {
       // Ignorar si el servidor de websocket no está listo en pruebas
     }
 
+    // «Comer en el local» de la carta con unidades «aquí»: el mozo ve la tarjeta para asignarle mesa (lista de espera)
+    if (pedidoCreado.estado !== 'POR_PAGAR' && pedidoCreado.modalidad === 'COMER_LOCAL' && pedidoCreado.canal === 'CARTA' && (dto.lineas ?? []).some((l) => l.paraLlevar !== true)) {
+      try {
+        this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: pedidoCreado.id.toString(), accion: 'ENTRA' });
+      } catch {
+        // accesorio: la lista se refresca cada 30 s
+      }
+    }
+
     // 10.1. Aviso en la campana: cada pedido nuevo (carta, mozo o WhatsApp) es su propia notificación
     // (el pedido que espera pago en línea avisa cuando se aprueba el pago)
     if (pedidoCreado.estado !== 'POR_PAGAR') try {

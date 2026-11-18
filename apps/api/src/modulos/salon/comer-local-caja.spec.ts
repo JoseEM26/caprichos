@@ -26,6 +26,7 @@ describe('Comer en el local: Caja asigna mesa o manda a la lista', () => {
       elementoPlano: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
       pedidoMesa: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0), update: jest.fn() },
       cobro: { findFirst: jest.fn().mockResolvedValue(null) },
+      pedidoLinea: { count: jest.fn().mockResolvedValue(1) },
       rolPermiso: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) },
       reservaMesa: { findMany: jest.fn().mockResolvedValue([]) },
       pedido: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), update: jest.fn() },
@@ -132,10 +133,10 @@ describe('Comer en el local: Caja asigna mesa o manda a la lista', () => {
     });
     it('aparece en GET espera (FIFO por hora de entrada)', async () => {
       const t = (min: number) => new Date(Date.now() - min * 60000);
-      prisma.pedido.findMany.mockResolvedValue([
+      prisma.pedido.findMany.mockImplementation(async (a: any) => (a.where.modalidad === 'MESA' ? [
         { id: 5n, codigo: 'CP-5', estado: 'COLA', cliente_nombre: 'Rosa', cliente_telefono: '987654321', espera_desplazado_de: null, creado_en: t(9), espera_mesa_desde: t(2), espera_personas: 3, total: 10, lineas: [] },
         { id: 4n, codigo: 'CP-4', estado: 'COLA', cliente_nombre: 'Ana', cliente_telefono: '987654322', espera_desplazado_de: null, creado_en: t(9), espera_mesa_desde: t(8), espera_personas: null, total: 10, lineas: [] },
-      ]);
+      ] : []));
       const r = await service.listarEspera(caja);
       expect(r.items.map((i) => i.codigo)).toEqual(['CP-4', 'CP-5']);
     });

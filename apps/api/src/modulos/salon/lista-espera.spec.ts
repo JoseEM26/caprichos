@@ -107,7 +107,7 @@ describe('Lista de espera de mesa', () => {
       espera_mesa_desde: new Date(Date.now() - min * 60000), creado_en: new Date(), espera_desplazado_de: null, espera_personas: 2, total: 30, lineas: [{ cantidad: 2 }, { cantidad: 1 }],
     });
     it('devuelve FIFO, minutos, productos y contador; celular completo solo Caja/Admin', async () => {
-      prisma.pedido.findMany.mockResolvedValue([fila(1n, 12), fila(2n, 3)]);
+      prisma.pedido.findMany.mockImplementation(async (a: any) => (a.where.modalidad === 'MESA' ? [fila(1n, 12), fila(2n, 3)] : []));
       const c: any = await service.listarEspera(caja);
       expect(prisma.pedido.findMany.mock.calls[0][0].orderBy[0]).toEqual({ espera_mesa_desde: 'asc' });
       expect(c.total).toBe(2);
@@ -225,7 +225,7 @@ describe('Lista de espera de mesa', () => {
         id, codigo: `C${id}`, estado: 'COLA', cliente_nombre: 'X', cliente_telefono: '987654321', espera_desplazado_de: dep,
         creado_en: new Date(), espera_mesa_desde: new Date(Date.now() - min * 60000), espera_personas: null, total: 1, lineas: [],
       });
-      prisma.pedido.findMany.mockResolvedValue([f(1n, 30, null), f(2n, 5, 'Mesa 2'), f(3n, 8, 'Mesa 7'), f(4n, 10, null)]);
+      prisma.pedido.findMany.mockImplementation(async (a: any) => (a.where.modalidad === 'MESA' ? [f(1n, 30, null), f(2n, 5, 'Mesa 2'), f(3n, 8, 'Mesa 7'), f(4n, 10, null)] : []));
       const r: any = await service.listarEspera(caja);
       expect(r.items.map((i: any) => i.pedidoId)).toEqual(['3', '2', '1', '4']);
       expect(r.items[0].movidoDesde).toBe('Mesa 7');

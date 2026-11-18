@@ -334,6 +334,14 @@ export interface PedidoEnEspera {
   minutos: number;
   /** «Mesa 4»: de dónde lo movieron para dar su lugar a otro; null = esperó desde el inicio. */
   movidoDesde?: string | null;
+  /** MESA: pedido de mesa que espera. CARTA_COMER_LOCAL: «Comer en el local» de la carta sin mesa (el mozo lo sienta). */
+  origen?: 'MESA' | 'CARTA_COMER_LOCAL';
+  /** Hora del pedido (ISO). */
+  pedidoDesde?: string;
+  /** Solo CARTA_COMER_LOCAL: unidades para llevar y «aquí» (las que necesitan mesa) y el detalle de líneas. */
+  paraLlevar?: number;
+  aqui?: number;
+  lineas?: { nombre: string; cantidad: number; paraLlevar: boolean }[];
 }
 
 export interface RespuestaEspera {
