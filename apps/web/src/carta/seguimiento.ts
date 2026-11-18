@@ -79,6 +79,8 @@ export interface EstadoSeguimiento {
   codigo: string;
   estado: string;
   estadoEtiqueta: string;
+  /** Pedido programado que aún no entra a cocina: instante ISO pactado (aditivo). */
+  programadoPara?: string;
   modalidad: ModalidadEntrega;
   /** Solo «Comer en el local»: dónde está el pedido para el cliente (aditivo). */
   ubicacion?: 'SIN_MESA' | 'EN_ESPERA' | 'ASIGNADA';

@@ -32,6 +32,7 @@ import { VentanaProductoCarta } from './VentanaProductoCarta';
 import { comboDeProducto } from './ReemplazoCombo';
 import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
+import { useProgramarFueraHorario } from './ProgramarPedido';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
 import { MisPedidos } from './MisPedidos';
 import { NotificacionAgregado } from './NotificacionAgregado';
@@ -110,6 +111,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
   const [ofertasBase, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
+  // Con el local cerrado y «pedidos programados fuera de horario» encendido: días y horas para programar (null = apagado)
+  const programar = useProgramarFueraHorario(vistaPrevia ? null : estadoLocal);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
   const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
   const [visor, setVisor] = useState<number | null>(null);
@@ -808,6 +811,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       <DecoracionAnimada tema={contenido?.decoracion ?? 'NINGUNO'} />
       {/* Cabecera pegajosa con las categorías dentro */}
       <CabeceraCarta
+        programar={programar}
         busqueda={busqueda}
         onCambioBusqueda={setBusqueda}
         estadoLocal={estadoLocal}
@@ -1001,6 +1005,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         <>
       {/* Cajón lateral del carrito */}
       <CajonCarrito
+        programar={programar}
         estadoLocal={estadoLocal}
         datosLocal={datosLocal}
         ofertas={ofertas}
@@ -1017,6 +1022,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
 
       {/* Formulario de Checkout */}
       <FormularioCheckout
+        programar={programar}
         estadoLocal={estadoLocal}
         datosLocal={datosLocal}
       />
