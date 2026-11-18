@@ -26,7 +26,7 @@ export function pasoDeError(codigo?: string): number | null {
 
 /**
  * Cortesía por separado, en pasos: qué regalas, por qué y a qué pedido corresponde (puede ser de un día anterior).
- * Descuenta stock como una venta (lo hace el servidor). Lo ven quienes tienen el permiso de cortesías (queda auditada).
+ * Descuenta stock como una venta (lo hace el servidor). Lo ven quienes tienen el permiso cortesias/dar_separada: Caja y Mozo (queda auditada).
  */
 export function RegistrarCortesiaModal({ alCerrar, alRegistrar }: RegistrarCortesiaModalProps) {
 

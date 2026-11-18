@@ -63,4 +63,26 @@ describe('Barra de Pedidos y caja', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Más acciones' }));
     expect(within(screen.getByRole('menu', { name: 'Más acciones' })).getByRole('menuitem', { name: 'Registrar cortesía' })).toBeInTheDocument();
   });
+
+  it('«Registrar cortesía» solo aparece con cortesias/dar_separada (no con cortesias/dar, que es la de dentro del pedido)', async () => {
+    const sesion = (permisos: string[]) => ({
+      usuario: { partyId: '1', nombres: 'Mozo Test', rol: 'MOZO' },
+      permisos,
+      debeCambiar: false,
+      cargando: false,
+      autenticado: true,
+      tiene: (p: string) => permisos.includes(p),
+    });
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['caja/ver', 'pedidos/ver', 'cortesias/dar']) as any);
+    const { unmount } = render(<PedidosAdminView />);
+    await screen.findByRole('button', { name: 'Nuevo pedido' });
+    expect(screen.queryByRole('button', { name: 'Registrar cortesía' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Más acciones' })).not.toBeInTheDocument();
+    unmount();
+
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['caja/ver', 'pedidos/ver', 'cortesias/dar_separada']) as any);
+    render(<PedidosAdminView />);
+    await screen.findByRole('button', { name: 'Nuevo pedido' });
+    expect(screen.getAllByRole('button', { name: 'Registrar cortesía' })).toHaveLength(1);
+  });
 });

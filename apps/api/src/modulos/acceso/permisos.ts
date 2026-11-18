@@ -94,8 +94,10 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'liquidar' },
   // Cambio de ubicación de un delivery: Caja aprueba/cambia; el repartidor propone
   { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
-  // Cortesías (venta a costo 0): libres para ADMIN, SUPERVISOR, CAJERO y MOZO (sin código); motivo obligatorio y queda auditada. Ver el informe: Caja y ADMIN
+  // Cortesía DENTRO de un pedido (venta a costo 0, en su línea): ADMIN, SUPERVISOR, CAJERO y MOZO (sin código); motivo obligatorio y queda auditada. Ver el informe: Caja y ADMIN
   { modulo: 'cortesias', accion: 'dar' },
+  // Cortesía POR SEPARADO (sin pedido propio, con pedido de referencia): solo CAJERO y MOZO (y ADMIN, que tiene todo). Ni SUPERVISOR ni ningún otro rol
+  { modulo: 'cortesias', accion: 'dar_separada' },
   { modulo: 'cortesias', accion: 'ver' },
   // Anular una cortesía por separado (devuelve el stock): solo ADMIN y Caja; motivo obligatorio y queda auditada
   { modulo: 'cortesias', accion: 'anular' },
@@ -298,6 +300,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/extra',
     'pedidos/cargo_libre',
     'cortesias/dar',
+    'cortesias/dar_separada',
     'cortesias/ver',
     'cortesias/anular',
     'creditos/cobrar_ahora',
@@ -377,6 +380,7 @@ export const MATRIZ: Record<string, string[]> = {
     'cupones/canjear', // revisa y aplica un cupón a un pedido desde la tablet (canal MOZO)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
+    'cortesias/dar_separada', // cortesía por separado (sin pedido propio): solo Caja y Mozo
     'creditos/cobrar_ahora', // cobra al trabajador en el momento (pedido del personal); queda quién cobró
     'plano/ver',
     'mesas/ver',
@@ -501,6 +505,6 @@ MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'escritorio/cumpleanos', 'iniciativas/cambiar_estado', 'mensajes/bloquear_numeros', 'analisis/ver', 'asistencia/aprobar_reemplazos', 'caja/auditoria_pedido']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea ni da cupones, ni cobra al personal al instante, ni hace el conteo de apertura
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'cupones/dar' && p !== 'creditos/cobrar_ahora',
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'cupones/dar' && p !== 'creditos/cobrar_ahora' && p !== 'cortesias/dar_separada',
 );
 

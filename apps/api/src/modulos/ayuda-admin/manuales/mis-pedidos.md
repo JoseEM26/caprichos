@@ -54,4 +54,4 @@ Ver tambien: [[caja]]
 - Para armar un pedido nuevo en una mesa usa el [[plano]]; para varias mesas ver ese manual.
 
 ## Quien puede hacerlo
-Mozo, Cajero, Supervisor y Administrador (permiso pedidos/crear). Ve los pedidos que el usuario tomo; Caja y Administrador ven todos en [[caja]]. El mozo no cierra el cobro (Caja lo verifica) ni da cortesias.
+Mozo, Cajero, Supervisor y Administrador (permiso pedidos/crear). Ve los pedidos que el usuario tomo; Caja y Administrador ven todos en [[caja]]. El mozo no cierra el cobro (Caja lo verifica). Puede dar cortesias dentro de su pedido y registrar cortesias por separado (solo Caja, Mozo y Administrador).

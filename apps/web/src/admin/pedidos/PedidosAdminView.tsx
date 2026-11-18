@@ -876,7 +876,8 @@ export function PedidosAdminView() {
   const enProgramados = grupoEstado === 'prog';
   const enNoEntregados = grupoEstado === 'noent' || enProgramados;
   const totalNoEntregados = noEntregados?.total ?? 0;
-  const puedeCortesia = tiene('cortesias/dar');
+  // Cortesía por separado (sin pedido propio): solo Caja y Mozo (y ADMIN). La de dentro de un pedido sigue con cortesias/dar
+  const puedeCortesia = tiene('cortesias/dar_separada');
 
   const filtrosActivos = (
     <>

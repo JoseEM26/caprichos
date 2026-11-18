@@ -111,8 +111,9 @@ describe('acciones antes protegidas por el código del supervisor: ahora solo po
     }
   });
 
-  it('el SUPERVISOR entra a cortesías, devolución y cambiar estado sin código (anular lo acota el servicio por rol y alcance, sin código)', async () => {
-    expect(await entra('SUPERVISOR', CortesiasController, 'registrar')).toBe(true);
+  it('el SUPERVISOR no registra cortesías por separado (solo Caja y Mozo); sí entra a su cortesía de línea, devolución y cambiar estado, sin código', async () => {
+    expect(await entra('SUPERVISOR', CortesiasController, 'registrar')).toBe(false);
+    expect(await entra('SUPERVISOR', CortesiaLineaController, 'darEnLinea')).toBe(true);
     expect(await entra('SUPERVISOR', PedidosAdminController, 'registrarDevolucion')).toBe(true);
     expect(await entra('SUPERVISOR', PedidosAdminController, 'cambiarEstado')).toBe(true);
   });

@@ -9,9 +9,9 @@ import { AnularCortesiaDto, DarCortesiaLineaDto, FiltroCortesiasDto, RegistrarCo
 export class CortesiasController {
   constructor(private readonly cortesias: CortesiasService) {}
 
-  /** Cortesía por separado. Quien tenga el permiso cortesias/dar (queda auditada). */
+  /** Cortesía por separado (sin pedido propio). Solo Caja y Mozo (cortesias/dar_separada); queda auditada. */
   @Post()
-  @Permiso('cortesias', 'dar')
+  @Permiso('cortesias', 'dar_separada')
   async registrar(@Body() dto: RegistrarCortesiaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cortesias.registrarSeparada(dto, req.usuario, ip);
