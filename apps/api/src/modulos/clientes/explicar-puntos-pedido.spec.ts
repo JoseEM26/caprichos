@@ -53,4 +53,29 @@ describe('explicarPuntosPedido', () => {
   it('cobrado sin puntos registrados se señala como anomalía', () => {
     expect(explicarPuntosPedido(base({ pago_estado: 'PAGADO' }), ctx).motivo).toBe('NO_REGISTRADO');
   });
+
+  describe('interruptores de puntos en combos y ofertas', () => {
+    const soloCombo = () => base({ lineas: [linea(33, { linea_combo_id: 9n })] });
+    const soloOferta = () => base({ lineas: [linea(20, { oferta_id: 1n })] });
+    it('apagados: mensaje SOLO_PROMOCION como siempre', () => {
+      expect(explicarPuntosPedido(soloCombo(), { ...ctx, suman: { combos: false, ofertas: true } }).motivo).toBe('SOLO_PROMOCION');
+      expect(explicarPuntosPedido(soloOferta(), { ...ctx, suman: { combos: true, ofertas: false } }).motivo).toBe('SOLO_PROMOCION');
+    });
+    it('combos encendido: estima sobre lo cobrado del combo y no dice SOLO_PROMOCION', () => {
+      const r = explicarPuntosPedido(soloCombo(), { ...ctx, suman: { combos: true } });
+      expect(r).toMatchObject({ estado: 'PENDIENTE_DE_COBRO', estimado: 1.65 });
+    });
+    it('ofertas encendido: estima la oferta', () => {
+      expect(explicarPuntosPedido(soloOferta(), { ...ctx, suman: { ofertas: true } })).toMatchObject({ estado: 'PENDIENTE_DE_COBRO', estimado: 1 });
+    });
+    it('madre de combo (sin producto) suma con combos encendido', () => {
+      const madre = base({ lineas: [{ id: 1n, producto_id: null, oferta_id: 4n, subtotal: 40, cantidad: 1, producto: null }] });
+      expect(explicarPuntosPedido(madre, ctx).motivo).toBe('SOLO_PROMOCION');
+      expect(explicarPuntosPedido(madre, { ...ctx, suman: { combos: true } }).estimado).toBe(2);
+    });
+    it('combo con producto «no suma» sigue sin sumar', () => {
+      const r = explicarPuntosPedido(base({ lineas: [linea(33, { linea_combo_id: 9n, producto: { no_suma_beneficios: true } })] }), { ...ctx, suman: { combos: true } });
+      expect(r.motivo).toBe('SIN_BENEFICIOS');
+    });
+  });
 });

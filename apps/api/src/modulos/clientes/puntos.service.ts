@@ -1,4 +1,5 @@
-import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
+import type { PuntosPromoSuman } from '../ofertas/puntos-elegibles.util';
+import { esMadreCombo, leerPuntosPromoSuman, montoElegiblePuntos, tipoPromoLinea } from '../ofertas/puntos-elegibles.util';
 import {
   BadRequestException,
   Injectable,
@@ -73,7 +74,7 @@ export class PuntosService {
   }
 
   /** Productos sin descuento ni promoción de un pedido: la base que suma y que se puede canjear. */
-  private async montoElegiblePedido(pId: bigint, descuentoDetalle: unknown, db: Pick<Prisma.TransactionClient, 'pedidoLinea'> = this.prisma): Promise<number> {
+  private async montoElegiblePedido(pId: bigint, descuentoDetalle: unknown, db: Pick<Prisma.TransactionClient, 'pedidoLinea'> = this.prisma, suman?: PuntosPromoSuman): Promise<number> {
     const lineas = await db.pedidoLinea.findMany({
       where: { pedido_id: pId },
       include: { producto: { select: { no_suma_beneficios: true } } },
@@ -84,10 +85,13 @@ export class PuntosService {
         subtotal: Number(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
         // Una cortesía no suma puntos ni se canjea
         // «Servicio o producto» libre: suma puntos como cualquier venta (sin producto no hay marca «no suma»)
-        noSumaBeneficios: l.cargo_libre ? false : (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia,
+        // La línea madre de un combo no tiene producto: su marca «no suma» no se conoce y no la excluye
+        noSumaBeneficios: l.cargo_libre ? false : (l.producto?.no_suma_beneficios ?? !esMadreCombo(l)) || l.es_cortesia,
         enPromocion: l.oferta_id !== null || l.linea_combo_id !== null,
+        tipoPromo: tipoPromoLinea(l),
       })),
       (descuentoDetalle as any) ?? [],
+      suman,
     );
   }
 
@@ -188,7 +192,7 @@ export class PuntosService {
     }
 
     // 4. Base: solo productos sin descuento ni promoción, sin envío ni lo pagado con puntos (DT-73, DT-65)
-    const elegible = await this.montoElegiblePedido(pId, pedido.descuento_detalle);
+    const elegible = await this.montoElegiblePedido(pId, pedido.descuento_detalle, this.prisma, await leerPuntosPromoSuman(this.prisma));
     const montoCanje = Number(pedido.puntos_canjeados || 0);
     const baseCalculo = Math.max(0, elegible - montoCanje);
 

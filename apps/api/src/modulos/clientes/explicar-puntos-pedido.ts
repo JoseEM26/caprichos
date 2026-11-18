@@ -1,4 +1,5 @@
-import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
+import type { PuntosPromoSuman } from '../ofertas/puntos-elegibles.util';
+import { esMadreCombo, montoElegiblePuntos, promoExcluyePuntos, tipoPromoLinea } from '../ofertas/puntos-elegibles.util';
 import { partyClienteDelPedido } from './cliente-del-pedido';
 
 export type MotivoSinPuntos =
@@ -50,6 +51,8 @@ export interface ContextoPuntos {
   porcentaje: number;
   /** el cliente del pedido tiene rol CLIENTE activo */
   tieneRolCliente: boolean;
+  /** puntos_combos_suman / puntos_ofertas_suman (apagados si faltan) */
+  suman?: PuntosPromoSuman;
 }
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
@@ -83,16 +86,18 @@ export function explicarPuntosPedido(pedido: PedidoParaPuntos, ctx: ContextoPunt
     productoId: l.producto_id ?? `linea-${l.id}`,
     subtotal: Number(l.subtotal ?? Number(l.precio_unit ?? 0) * l.cantidad),
     // «Servicio o producto» libre: suma puntos como cualquier venta (sin producto no hay marca «no suma»)
-    noSumaBeneficios: l.cargo_libre === true ? false : (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia === true,
+    // La línea madre de un combo no tiene producto: su marca «no suma» no se conoce y no la excluye
+    noSumaBeneficios: l.cargo_libre === true ? false : (l.producto?.no_suma_beneficios ?? !esMadreCombo(l)) || l.es_cortesia === true,
     enPromocion: l.oferta_id != null || l.linea_combo_id != null,
+    tipoPromo: tipoPromoLinea(l),
   }));
-  const elegible = montoElegiblePuntos(lineas, (pedido.descuento_detalle as any) ?? []);
+  const elegible = montoElegiblePuntos(lineas, (pedido.descuento_detalle as any) ?? [], ctx.suman);
   const base = Math.max(0, elegible - Number(pedido.puntos_canjeados ?? 0));
   const estimado = redondear(base * (ctx.porcentaje / 100));
 
   if (estimado <= 0) {
     if (elegible > 0) return no('CANJE_TOTAL', 'Pagaste todo con puntos: no queda monto para sumar puntos nuevos');
-    if (lineas.length > 0 && lineas.every((l) => l.enPromocion)) {
+    if (lineas.length > 0 && lineas.every((l) => promoExcluyePuntos(l, ctx.suman))) {
       return no('SOLO_PROMOCION', 'Los combos y promociones no suman puntos');
     }
     return no('SIN_BENEFICIOS', 'Los productos de este pedido no suman puntos (promoción, descuento o marcados sin beneficios)');

@@ -291,6 +291,8 @@ export const CLAVES_SI_NO = [
   'chatbot_pago_recordatorio_activo',
   'chatbot_avisos_equipo_activo',
   'reserva_web_activa',
+  'puntos_combos_suman',
+  'puntos_ofertas_suman',
   'chatbot_funcion_pedido',
   'chatbot_funcion_pago',
   'chatbot_funcion_reservas',

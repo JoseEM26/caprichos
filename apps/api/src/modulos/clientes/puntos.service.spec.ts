@@ -58,6 +58,42 @@ describe('PuntosService', () => {
   });
 
   describe('acumularPorPedido (DT-55, RN-CAP-072)', () => {
+    describe('puntos de combos y ofertas (puntos_combos_suman / puntos_ofertas_suman)', () => {
+      const simular = async (interruptores: Record<string, string>) => {
+        prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+        prismaMock.pedido.findUnique.mockResolvedValue({
+          id: 140n, canal: 'CARTA', party_id: null, cliente_party_id: 300n, total: '100.00', envio: '0.00',
+          cupon_id: null, cupon_emitido_id: null, puntos_canjeados: '0',
+        });
+        prismaMock.partyRole.findFirst.mockResolvedValue({ id: 60n, party_id: 300n, customer_detail: { party_role_id: 60n, puntos: '0' } });
+        prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+        prismaMock.parametro.findMany = jest.fn().mockResolvedValue(Object.entries(interruptores).map(([clave, valor]) => ({ clave, valor })));
+        prismaMock.pedidoLinea.findMany.mockResolvedValue([
+          { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 1, precio_unit: '20.00', subtotal: '20.00', producto: { no_suma_beneficios: false } },
+          // madre de combo: sin producto, con la oferta y el cobro
+          { id: 2n, producto_id: null, oferta_id: 4n, linea_combo_id: null, cantidad: 1, precio_unit: '60.00', subtotal: '60.00', producto: null },
+          // parte del combo: sin cobro
+          { id: 3n, producto_id: 8n, oferta_id: null, linea_combo_id: 2n, cantidad: 1, precio_unit: '0', subtotal: '0', producto: { no_suma_beneficios: false } },
+          // oferta suelta (no combo)
+          { id: 4n, producto_id: 9n, oferta_id: 5n, linea_combo_id: null, cantidad: 1, precio_unit: '20.00', subtotal: '20.00', producto: { no_suma_beneficios: false } },
+        ]);
+        return service.acumularPorPedido(140n, { simular: true });
+      };
+      it('apagados (o sin parámetros): solo suma lo normal, como hoy', async () => {
+        expect((await simular({})).puntos).toBe(1); // 20 x 5 %
+        expect((await simular({ puntos_combos_suman: 'no', puntos_ofertas_suman: 'no' })).puntos).toBe(1);
+      });
+      it('combos encendido: suma el combo cobrado (60) además de lo normal', async () => {
+        expect((await simular({ puntos_combos_suman: 'si' })).puntos).toBe(4); // (20+60) x 5 %
+      });
+      it('ofertas encendido: suma la oferta (20) y el combo sigue fuera', async () => {
+        expect((await simular({ puntos_ofertas_suman: 'si' })).puntos).toBe(2); // (20+20) x 5 %
+      });
+      it('ambos encendidos', async () => {
+        expect((await simular({ puntos_combos_suman: 'si', puntos_ofertas_suman: 'si' })).puntos).toBe(5); // 100 x 5 %
+      });
+    });
+
     it('pedido de MOZO con cliente identificado por DNI: suma al cliente, no al mozo', async () => {
       prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({

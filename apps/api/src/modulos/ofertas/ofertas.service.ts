@@ -1,4 +1,4 @@
-import { montoElegiblePuntos } from './puntos-elegibles.util';
+import { leerPuntosPromoSuman, montoElegiblePuntos } from './puntos-elegibles.util';
 import { usosDeCupon } from './cupon-usos';
 import { cuponesParaDar, darCupon, quitarCuponDado } from './cupon-asignado';
 import { canalDeCanje, lineasParaCupon, motivoCuponNoAplica, motivoPedidoNoAdmiteCupon, PEDIDO_PARA_CUPON, revisarCupon } from './cupon-canje';
@@ -1834,6 +1834,14 @@ export class OfertasService {
       select: { id: true, nombre: true, categoria_id: true, no_suma_beneficios: true },
     });
     const porId = new Map(productos.map((p) => [String(p.id), p]));
+    // Tipo de cada oferta de las líneas: puntos_combos_suman / puntos_ofertas_suman distinguen combo de oferta
+    const sumanPromo = await leerPuntosPromoSuman(this.prisma);
+    const idsOferta = !sumanPromo.combos && !sumanPromo.ofertas ? [] : [...new Set(validas.map((l) => l.ofertaId).filter((x): x is string => !!x && /^\d+$/.test(String(x))))];
+    const tiposOferta = new Map<string, string>(
+      idsOferta.length
+        ? (await this.prisma.oferta.findMany({ where: { id: { in: idsOferta.map((x) => BigInt(x)) } }, select: { id: true, tipo: true } })).map((o) => [String(o.id), o.tipo])
+        : [],
+    );
     const lineasCalc = validas.map((l) => {
       const prod = porId.get(String(l.productoId));
       return {
@@ -1845,6 +1853,7 @@ export class OfertasService {
         noSumaBeneficios: prod?.no_suma_beneficios ?? false,
         nombre: prod?.nombre ?? '',
         enPromocion: Boolean(l.ofertaId),
+        tipoPromo: l.ofertaId ? ((tiposOferta.get(String(l.ofertaId)) === 'COMBO' ? 'COMBO' : 'OFERTA') as 'COMBO' | 'OFERTA') : undefined,
       };
     });
     const subtotal = Number(lineasCalc.reduce((a, l) => a + l.subtotal, 0).toFixed(2));
@@ -1886,7 +1895,9 @@ export class OfertasService {
     let detallesVista = (desglose.detalles || []).map((d: any) => ({ tipo: String(d.tipo ?? ''), nombre: String(d.nombre ?? ''), monto: Number(d.montoDescontado ?? 0) }));
     let descuentoTotalVista = desglose.descuentoTotal;
     let montoCanjeableVista = montoCanjeable;
-    let puntosEstimadosVista = conCupon ? 0 : Math.round(montoCanjeable * (puntosPorcentaje / 100) * 100) / 100;
+    // Lo que SUMA puede incluir combos/ofertas según los interruptores; lo que se CANJEA no (montoCanjeable)
+    const montoGanable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles, sumanPromo);
+    let puntosEstimadosVista = conCupon ? 0 : Math.round(montoGanable * (puntosPorcentaje / 100) * 100) / 100;
     if (!colaboradorPartyId && canal === 'CARTA' && clientePartyId) {
       const dp = await descuentoPersonalDeCuenta(this.prisma, clientePartyId);
       if (dp) {

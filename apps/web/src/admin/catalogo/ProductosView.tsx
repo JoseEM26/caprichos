@@ -1239,7 +1239,7 @@ export function ProductosView() {
                 {esAdmin && !(p.promociones?.length) && (
                   <button
                     className={p.noSumaBeneficios ? 'pt-btn pt-btn--ancho pt-btn--alerta' : 'pt-btn pt-btn--ancho'}
-                    title="En combos no suma puntos, pero vendido suelto sí"
+                    title="En combos y ofertas suma solo si Parámetros lo permite; vendido suelto sí"
                     onClick={() => toggleNoSuma(p)}
                   >
                     {p.noSumaBeneficios

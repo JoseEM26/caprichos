@@ -105,3 +105,48 @@ describe('vistaPreviaDescuentos con colaboradorPartyId', () => {
     await expect(vista([linea('1', 28)], '9', 'CARTA')).rejects.toMatchObject({ response: { codigo: 'CANAL_NO_PERMITIDO' } });
   });
 });
+
+/** Puntos estimados de la carta: puntos_combos_suman / puntos_ofertas_suman cambian lo que SUMA, nunca lo que se CANJEA. */
+describe('vistaPreviaDescuentos: puntos estimados con combos y ofertas', () => {
+  let s: any;
+  const productos = [
+    { id: 1n, nombre: 'Americano', categoria_id: 1n, no_suma_beneficios: false },
+    { id: 3n, nombre: 'Dúo', categoria_id: 2n, no_suma_beneficios: false },
+    { id: 5n, nombre: 'Torta', categoria_id: 2n, no_suma_beneficios: false },
+  ];
+  const lineas = [
+    { productoId: '1', cantidad: 1, subtotal: 20, precioUnitario: 20 },
+    { productoId: '3', cantidad: 1, subtotal: 60, precioUnitario: 60, ofertaId: '7' }, // combo
+    { productoId: '5', cantidad: 1, subtotal: 20, precioUnitario: 20, ofertaId: '8' }, // oferta
+  ];
+  const armar = (interruptores: Record<string, string>) => {
+    s = Object.create(OfertasService.prototype);
+    s.prisma = {
+      parametro: {
+        findUnique: jest.fn().mockResolvedValue({ valor: 5 }),
+        findMany: jest.fn().mockResolvedValue(Object.entries(interruptores).map(([clave, valor]) => ({ clave, valor }))),
+      },
+      producto: { findMany: jest.fn().mockResolvedValue(productos) },
+      oferta: { findMany: jest.fn().mockResolvedValue([{ id: 7n, tipo: 'COMBO' }, { id: 8n, tipo: 'DESCUENTO' }]) },
+    };
+    s.calcularDescuentosParaPedido = jest.fn().mockResolvedValue({ descuentoTotal: 0, detalles: [], envioGratisCupon: false });
+    return s.vistaPreviaDescuentos(lineas, undefined, null, 'CARTA', 'COMER_LOCAL');
+  };
+
+  it('apagados: solo lo normal suma y se canjea (20 → 1 punto)', async () => {
+    const r = await armar({});
+    expect(r.puntosEstimados).toBe(1);
+    expect(r.montoCanjeable).toBe(20);
+  });
+  it('combos encendido: suma el combo (80 → 4) y el canje no cambia', async () => {
+    const r = await armar({ puntos_combos_suman: 'si' });
+    expect(r.puntosEstimados).toBe(4);
+    expect(r.montoCanjeable).toBe(20);
+  });
+  it('ofertas encendido: suma la oferta (40 → 2)', async () => {
+    expect((await armar({ puntos_ofertas_suman: 'si' })).puntosEstimados).toBe(2);
+  });
+  it('ambos encendidos (100 → 5)', async () => {
+    expect((await armar({ puntos_combos_suman: 'si', puntos_ofertas_suman: 'si' })).puntosEstimados).toBe(5);
+  });
+});

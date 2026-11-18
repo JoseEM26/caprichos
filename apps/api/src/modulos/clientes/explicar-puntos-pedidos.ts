@@ -1,3 +1,4 @@
+import { leerPuntosPromoSuman } from '../ofertas/puntos-elegibles.util';
 import type { PrismaService } from '../../comun/prisma/prisma.service';
 import { partyClienteDelPedido } from './cliente-del-pedido';
 import { ExplicacionPuntos, explicarPuntosPedido } from './explicar-puntos-pedido';
@@ -25,6 +26,7 @@ export async function explicarPedidosPorId(
     }),
     prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } }).catch(() => null),
   ]);
+  const suman = await leerPuntosPromoSuman(prisma);
   const porcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
   const partys = [...new Set(pedidos.map((p) => partyClienteDelPedido(p)).filter((x): x is bigint => !!x))];
   const roles = partys.length
@@ -33,7 +35,7 @@ export async function explicarPedidosPorId(
   const conRol = new Set(roles.map((r) => String(r.party_id)));
   for (const p of pedidos) {
     const cli = partyClienteDelPedido(p);
-    salida.set(String(p.id), explicarPuntosPedido(p as any, { porcentaje, tieneRolCliente: !!cli && conRol.has(String(cli)) }));
+    salida.set(String(p.id), explicarPuntosPedido(p as any, { porcentaje, tieneRolCliente: !!cli && conRol.has(String(cli)), suman }));
   }
   return salida;
 }

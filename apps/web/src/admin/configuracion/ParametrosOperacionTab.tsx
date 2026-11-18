@@ -240,6 +240,16 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'unidades',
   },
+  puntos_combos_suman: {
+    nombre: 'Los combos suman puntos',
+    descripcion: 'En «Sí», lo cobrado por un combo suma puntos con el mismo porcentaje. En «No» (por defecto) los combos no suman.',
+    tipo: 'sino',
+  },
+  puntos_ofertas_suman: {
+    nombre: 'Las ofertas suman puntos',
+    descripcion: 'En «Sí», lo cobrado por una oferta (que no es combo) suma puntos con el mismo porcentaje. En «No» (por defecto) no suman.',
+    tipo: 'sino',
+  },
   puntos_porcentaje: {
     nombre: 'Porcentaje de puntos',
     descripcion: 'Porcentaje del monto consumido que el cliente acumula en puntos fidelidad.',
