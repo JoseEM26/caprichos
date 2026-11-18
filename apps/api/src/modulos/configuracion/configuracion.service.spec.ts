@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ConfiguracionService, CLAVES_SI_NO, CLAVES_PERMITIDAS } from './configuracion.service';
+import { leerTarifaCulqi, comisionEstimada } from '../pagos-online/comision-pasarela';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -49,9 +50,62 @@ describe('ConfiguracionService', () => {
 
       const res = await service.listar();
 
-      expect(res).toHaveLength(2);
+      expect(res).toHaveLength(6);
       expect(res[0]).toEqual({ clave: 'tiempo_prometido_min', valor: 35 });
       expect(res[1]).toEqual({ clave: 'pedido_minimo', valor: 25 });
+    });
+
+    it('incluye las 4 tarifas de Culqi con valor null cuando no tienen fila, sin duplicar las que sí existen', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'culqi_comision_yape_pct', valor: 3.5 }]);
+
+      const res = await service.listar();
+      const culqi = res.filter((p) => p.clave.startsWith('culqi_comision_'));
+
+      expect(culqi).toHaveLength(4);
+      expect(culqi.find((p) => p.clave === 'culqi_comision_yape_pct')).toEqual({ clave: 'culqi_comision_yape_pct', valor: 3.5 });
+      expect(culqi.find((p) => p.clave === 'culqi_comision_tarjeta_pct')).toEqual({ clave: 'culqi_comision_tarjeta_pct', valor: null });
+      expect(culqi.find((p) => p.clave === 'culqi_comision_tarjeta_fijo')).toEqual({ clave: 'culqi_comision_tarjeta_fijo', valor: null });
+      expect(culqi.find((p) => p.clave === 'culqi_comision_yape_fijo')).toEqual({ clave: 'culqi_comision_yape_fijo', valor: null });
+    });
+
+    it('la tarifa de Culqi guardada (3.99) crea la fila y leerTarifaCulqi ya la usa para estimar la comisión', async () => {
+      const tabla = new Map<string, number>();
+      prismaMock.parametro.findMany.mockImplementation(async () =>
+        [...tabla.entries()].map(([clave, valor]) => ({ clave, valor })),
+      );
+      prismaMock.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        tabla.has(where.clave) ? { clave: where.clave, valor: tabla.get(where.clave) } : null,
+      );
+      prismaMock.parametro.upsert.mockImplementation(async (a: any) => {
+        tabla.set(a.where.clave, a.update.valor);
+        return { clave: a.where.clave, valor: a.update.valor };
+      });
+
+      expect(await leerTarifaCulqi(prismaMock, 'TARJETA')).toBeNull();
+      await service.actualizar('culqi_comision_tarjeta_pct', 3.99, adminAuth);
+      await service.actualizar('culqi_comision_tarjeta_fijo', 0.5, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalledWith({
+        where: { clave: 'culqi_comision_tarjeta_pct' },
+        update: { valor: 3.99 },
+        create: { clave: 'culqi_comision_tarjeta_pct', valor: 3.99 },
+      });
+      expect(await leerTarifaCulqi(prismaMock, 'TARJETA')).toEqual({ pct: 3.99, fijo: 0.5 });
+      expect(comisionEstimada(100, await leerTarifaCulqi(prismaMock, 'TARJETA'))?.total).toBe(5.3);
+      const listado = await service.listar();
+      expect(listado.find((p) => p.clave === 'culqi_comision_tarjeta_pct')).toEqual({ clave: 'culqi_comision_tarjeta_pct', valor: 3.99 });
+    });
+
+    it('tarifas de Culqi: rechaza vacío (null) y texto como número inválido, y fuera de rango con mensaje claro', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      await expect(service.actualizar('culqi_comision_tarjeta_pct', null, adminAuth)).rejects.toMatchObject({
+        response: { codigo: 'VALOR_INVALIDO', mensaje: 'El valor debe ser un número mayor o igual a 0' },
+      });
+      await expect(service.actualizar('culqi_comision_yape_pct', '3.5', adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await expect(service.actualizar('culqi_comision_yape_pct', 21, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('culqi_comision_tarjeta_fijo', 10.5, adminAuth)).rejects.toMatchObject({
+        response: { codigo: 'RANGO_INVALIDO', mensaje: 'El monto fijo debe estar entre 0 y 10 soles' },
+      });
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
     });
   });
 

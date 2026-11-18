@@ -61,6 +61,8 @@ const OPCIONES_RECARGO_REPROG = [
 
 /** Claves que ya no se muestran: duplicado muerto (las reservas leen reserva_tolerancia_min). El valor sigue en el servidor. */
 const CLAVES_OCULTAS = ['tolerancia_reserva_min'];
+/** Tarifas de Culqi: pueden venir sin configurar (null). El fijo vacío se guarda como 0. */
+const TARIFAS_CULQI = ['culqi_comision_tarjeta_pct', 'culqi_comision_tarjeta_fijo', 'culqi_comision_yape_pct', 'culqi_comision_yape_fijo'];
 
 const OPCIONES_PROVEEDOR_WHATSAPP = [
   { valor: 'META', etiqueta: 'Meta (conexión oficial)', ayuda: 'Los avisos salen por la API oficial de WhatsApp. Es el valor seguro.' },
@@ -952,6 +954,8 @@ export function ParametrosOperacionTab({
       setNuevoValorInput(String(item.valor));
     } else if (typeof item.valor === 'string') {
       setNuevoValorInput(item.valor);
+    } else if (item.valor === null || item.valor === undefined) {
+      setNuevoValorInput('');
     } else {
       setNuevoValorInput(JSON.stringify(item.valor));
     }
@@ -962,7 +966,12 @@ export function ParametrosOperacionTab({
     const tipo = tipoParametro(parametroEditando.clave, parametroEditando.valor);
 
     if (tipo === 'numero') {
-      const num = Number(nuevoValorInput.trim());
+      const crudo = nuevoValorInput.trim();
+      if (crudo === '' && TARIFAS_CULQI.includes(parametroEditando.clave) && !parametroEditando.clave.endsWith('_fijo')) {
+        setErrorValidacion('Escribe el porcentaje (de 0 a 20)');
+        return;
+      }
+      const num = Number(crudo);
       if (isNaN(num) || num < 0) {
         setErrorValidacion('El valor debe ser un número mayor o igual a 0');
         return;
@@ -1062,6 +1071,7 @@ export function ParametrosOperacionTab({
   };
 
   const formatearValorVisual = (clave: string, valor: any) => {
+    if (valor === null || valor === undefined) return 'Sin configurar';
     if (clave === 'pausa_alta_demanda') {
       const activa = typeof valor === 'boolean' ? valor : Boolean(valor?.activa);
       return activa ? 'Activa (cocina pausada)' : 'Desactivada (operando)';

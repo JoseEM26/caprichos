@@ -145,6 +145,14 @@ export const CLAVES_NUMERICAS = [
   ...CLAVES_METAS_TIEMPOS,
 ] as const;
 
+/** Tarifa de Culqi (comisión por tarjeta y Yape): sin fila hasta que el ADMIN la guarda. */
+export const CLAVES_TARIFA_CULQI = [
+  'culqi_comision_tarjeta_pct',
+  'culqi_comision_tarjeta_fijo',
+  'culqi_comision_yape_pct',
+  'culqi_comision_yape_fijo',
+] as const;
+
 /** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
 export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]> = {
   eta_factor_urbano: [1, 3, false, 'El factor de calles debe estar entre 1 y 3'],
@@ -362,10 +370,17 @@ export class ConfiguracionService {
       orderBy: { clave: 'asc' },
     });
 
-    return parametros.map((p) => ({
-      clave: p.clave,
-      valor: p.valor,
-    }));
+    // Las tarifas de Culqi no tienen fila hasta que el ADMIN las guarda: se listan como «sin configurar» (valor null)
+    const conFila = new Set(parametros.map((p) => p.clave));
+    const sinFila = CLAVES_TARIFA_CULQI.filter((clave) => !conFila.has(clave)).map((clave) => ({ clave, valor: null }));
+
+    return [
+      ...parametros.map((p) => ({
+        clave: p.clave,
+        valor: p.valor,
+      })),
+      ...sinFila,
+    ];
   }
 
   /**
