@@ -1,0 +1,21 @@
+/* Nombres de los vasos: una fila por vaso (carta y mozo). */
+.cv { display: flex; flex-direction: column; gap: 8px; background: var(--cp-white, #FFFFFF); border: 1.5px solid var(--cp-line, #E3D6C6); border-radius: 16px; padding: 12px 14px; }
+.cv-cab { display: flex; flex-direction: column; gap: 2px; }
+.cv-titulo { font-family: var(--fuente-titulos, inherit); font-weight: 800; font-size: 15px; color: var(--cp-navy, #0B2C3E); }
+.cv-ayuda { font-size: 12px; line-height: 16px; color: var(--cp-soft, #6B5D4F); }
+.cv-fila { display: grid; grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.4fr); align-items: center; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--cp-line, #E3D6C6); }
+.cv-fila:first-of-type { border-top: 0; }
+.cv-fila[data-invalido='si'] .cv-campo input { border-color: var(--cp-rust, #B2500F); }
+.cv-etiqueta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cv-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; min-height: 24px; padding: 2px 10px; border-radius: 9999px; background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.cv-bebida { font-size: 12px; font-weight: 700; color: var(--cp-soft, #6B5D4F); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-campo { position: relative; display: block; min-width: 0; }
+.cv-campo input { display: block; width: 100%; box-sizing: border-box; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-cream, #FBF4EC); color: var(--cp-navy, #0B2C3E); padding: 0 56px 0 12px; font-size: 14px; }
+.cv-campo input:focus-visible { outline: 3px solid var(--cp-navy, #0B2C3E); outline-offset: 2px; }
+.cv-contador { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 800; color: var(--cp-soft, #6B5D4F); pointer-events: none; }
+.cv-contador[data-pasado='si'] { color: var(--cp-rust, #B2500F); }
+.cv-aviso { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--cp-rust, #B2500F); background: var(--cp-sand, #F3E7D8); border-radius: 8px; padding: 8px 10px; }
+
+@media (max-width: 420px) {
+  .cv-fila { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}

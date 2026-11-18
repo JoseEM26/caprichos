@@ -10,13 +10,20 @@ export interface AsistenteComboProps {
   /** Paso actual; pasos.length = resumen. Controlado por la ventana. */
   indice: number;
   alCambiarIndice: (i: number) => void;
+  /** Bebida dentro de un paso con varias (sub-progreso). Controlado por la ventana. */
+  subIndice?: number;
+  alCambiarSub?: (k: number) => void;
   /** Nombre del producto (cabecera del paso). */
   titulo: string;
   precio: number;
-  /** Línea «Regular 12 oz · Frappe Moca · …» de lo elegido hasta ahora. */
+  /** Una línea corta de lo elegido hasta ahora (se trunca con puntos suspensivos). */
   resumen: string;
+  /** Tarjeta de resumen en texto (solo en el último paso). */
+  resumenTexto?: ReactNode;
+  /** Selector de cantidad (solo en el último paso). */
+  cantidad?: ReactNode;
   puedeAgregar: boolean;
-  /** Texto del botón de agregar en el resumen (o el motivo si no se puede). */
+  /** Texto del botón de agregar cuando no se puede (el motivo). */
   textoAgregar: string;
   alAgregar: () => void;
   /** Avisos del pie (stock, sabores) que ya calcula la ventana. */
@@ -26,58 +33,86 @@ export interface AsistenteComboProps {
 }
 
 /**
- * Asistente por pasos del armado de un combo (carta y mozo): progreso fijo arriba, un paso a la vez,
- * «Siguiente» que dice qué falta, avance automático en una selección única, volver sin perder nada y un
- * resumen final con el precio. No guarda estado de las elecciones: lo tiene la ventana.
+ * Asistente por pasos del armado de un combo (carta y mozo): cabecera con el nombre y «Paso N de M», stepper con
+ * círculos, un paso a la vez, «Siguiente» que dice qué falta, avance automático en una selección única, volver sin
+ * perder nada y un resumen final en texto con el precio. No guarda las elecciones: las tiene la ventana.
  */
 export function AsistenteCombo({
-  activo, pasos, indice, alCambiarIndice, titulo, precio, resumen, puedeAgregar, textoAgregar, alAgregar, avisosPie, children,
+  activo, pasos, indice, alCambiarIndice, subIndice = 0, alCambiarSub, titulo, precio, resumen, resumenTexto, cantidad,
+  puedeAgregar, textoAgregar, alAgregar, avisosPie, children,
 }: AsistenteComboProps) {
   const previos = useRef<Record<string, boolean>>({});
   const total = pasos.length + 1; // + resumen
   const idx = Math.min(indice, pasos.length);
   const enResumen = idx === pasos.length;
   const actual = enResumen ? undefined : pasos[idx];
+  const slots = actual?.slots && actual.slots.length > 1 ? actual.slots : undefined;
+  const sub = slots ? Math.min(subIndice, slots.length - 1) : 0;
+  const slotActual = slots?.[sub];
+  const hechoActual = slotActual ? slotActual.hecho : !!actual?.hecho;
+  const faltaActual = slotActual ? slotActual.falta : actual?.falta;
+  const siguienteOk = !actual || hechoActual || !!actual.opcional;
+  const motivo = actual && !siguienteOk ? faltaActual : null;
+  const pendientes = pasos.map((p, i) => ({ p, i })).filter(({ p }) => !p.hecho && !p.opcional);
 
-  // Una selección única completada pasa sola al siguiente paso (solo cuando el paso pasa de pendiente a hecho).
+  // Una selección única completada pasa sola al siguiente paso (o a la siguiente bebida): solo cuando pasa de pendiente a hecha.
   useEffect(() => {
     if (!activo) return;
     const antes = previos.current;
-    if (actual?.avanzaSolo && antes[actual.id] === false && actual.hecho) alCambiarIndice(Math.min(idx + 1, pasos.length));
-    previos.current = Object.fromEntries(pasos.map((p) => [p.id, p.hecho]));
+    const ahora: Record<string, boolean> = {};
+    for (const p of pasos) {
+      if (p.slots) for (const s of p.slots) ahora[s.id] = s.hecho;
+      else ahora[p.id] = p.hecho;
+    }
+    const clave = slotActual ? slotActual.id : actual?.id;
+    if (actual?.avanzaSolo && clave && antes[clave] === false && hechoActual) {
+      if (slots && sub < slots.length - 1 && alCambiarSub) alCambiarSub(sub + 1);
+      else alCambiarIndice(Math.min(idx + 1, pasos.length));
+    }
+    previos.current = ahora;
   });
 
   if (!activo) return <>{children}</>;
 
   const alcanzable = (i: number): boolean => i <= idx || pasos.slice(0, i).every((p) => p.hecho || p.opcional);
-  const siguienteOk = !actual || actual.hecho || !!actual.opcional;
-  const motivo = actual && !siguienteOk ? actual.falta : null;
+  const items = [
+    ...pasos.map((p) => ({ id: p.id, etiqueta: p.etiqueta, hecho: p.hecho, opcional: !!p.opcional })),
+    { id: 'resumen', etiqueta: 'Resumen', hecho: false, opcional: false },
+  ];
+  const atras = () => {
+    if (slots && sub > 0 && alCambiarSub) alCambiarSub(sub - 1);
+    else alCambiarIndice(Math.max(idx - 1, 0));
+  };
+  const siguiente = () => {
+    if (slots && sub < slots.length - 1 && alCambiarSub) alCambiarSub(sub + 1);
+    else alCambiarIndice(Math.min(idx + 1, pasos.length));
+  };
+  const primeraSinHacer = slots ? slots.findIndex((s) => !s.hecho) : -1;
 
   return (
     <>
       <nav className="ac-progreso" aria-label="Pasos del armado" data-testid="progreso-asistente">
-        <div className="ac-linea">
-          <strong data-testid="paso-texto">{`Paso ${idx + 1} de ${total}`}</strong>
-          <span className="ac-titulo-producto">{titulo}</span>
+        <div className="ac-cabecera">
+          <span className="ac-nombre-combo" title={titulo}>{titulo}</span>
+          <strong className="ac-paso-n" data-testid="paso-texto">{`Paso ${idx + 1} de ${total}`}</strong>
         </div>
-        <ol className="ac-chips">
-          {[...pasos.map((p) => ({ id: p.id, etiqueta: p.etiqueta, hecho: p.hecho, opcional: !!p.opcional })), { id: 'resumen', etiqueta: 'Resumen', hecho: false, opcional: false }].map((p, i) => {
+        <ol className="ac-stepper">
+          {items.map((p, i) => {
             const esActual = i === idx;
-            const hecho = p.hecho;
+            const estado = p.hecho ? 'hecho' : esActual ? 'actual' : 'pendiente';
             return (
-              <li key={p.id}>
+              <li key={p.id} className="ac-step" data-estado={estado}>
                 <button
                   type="button"
-                  className="ac-chip"
-                  data-hecho={hecho ? 'si' : 'no'}
+                  className="ac-circulo"
                   aria-current={esActual ? 'step' : undefined}
-                  aria-label={`Paso ${i + 1}: ${p.etiqueta}${hecho ? ', listo' : p.opcional ? ', opcional' : ', pendiente'}`}
+                  aria-label={`Paso ${i + 1}: ${p.etiqueta}${p.hecho ? ', listo' : p.opcional ? ', opcional' : ', pendiente'}`}
                   disabled={!alcanzable(i)}
                   onClick={() => alCambiarIndice(i)}
                 >
-                  {hecho ? '✓ ' : ''}
-                  {p.etiqueta}
+                  {p.hecho ? '✓' : i + 1}
                 </button>
+                <span className="ac-etiqueta" aria-hidden="true">{p.etiqueta}</span>
               </li>
             );
           })}
@@ -89,34 +124,75 @@ export function AsistenteCombo({
 
       <div className="ac-cuerpo" data-testid="cuerpo-asistente">
         {enResumen ? (
-          <section aria-label="Resumen de tu combo" data-testid="resumen-pasos">
+          <section aria-label="Resumen de tu combo" data-testid="resumen-pasos" className="ac-resumen" aria-live="polite">
             <h3 className="ac-h">Revisa tu combo</h3>
-            <ul className="ac-lista-resumen">
+            {pendientes.length > 0 && (
+              <div role="status" className="ac-falta" data-testid="falta-resumen">
+                <span>{`Falta: ${pendientes.slice(0, 2).map(({ p }) => p.falta ?? p.titulo).join(' · ')}${pendientes.length > 2 ? ` +${pendientes.length - 2} más` : ''}`}</span>
+                <button type="button" className="ac-link" onClick={() => alCambiarIndice(pendientes[0].i)}>Completar</button>
+              </div>
+            )}
+            <div className="ac-tarjeta-pedido" data-testid="texto-resumen">{resumenTexto ?? <p>{resumen}</p>}</div>
+            {cantidad && (
+              <div className="ac-fila-cantidad">
+                <span>Cantidad</span>
+                {cantidad}
+              </div>
+            )}
+            <div className="ac-cambiar-fila">
               {pasos.map((p, i) => (
-                <li key={p.id}>
-                  <span className="ac-estado" data-hecho={p.hecho ? 'si' : 'no'}>{p.hecho ? '✓' : p.opcional ? '·' : '!'}</span>
-                  <span className="ac-nombre-paso">{p.titulo}</span>
-                  <button type="button" className="ac-cambiar" onClick={() => alCambiarIndice(i)}>Cambiar</button>
-                </li>
+                <button key={p.id} type="button" className="ac-cambiar" onClick={() => alCambiarIndice(i)}>
+                  {`Cambiar ${p.etiqueta.toLowerCase()}`}
+                </button>
               ))}
-            </ul>
+            </div>
+            <div className="ac-total">
+              <span>Total</span>
+              <strong data-testid="total-resumen">{`S/ ${precio.toFixed(2)}`}</strong>
+            </div>
           </section>
         ) : (
           <>
             <h3 className="ac-h" data-testid="titulo-paso">{actual?.titulo}</h3>
+            {slots && (
+              <div className="ac-sub" data-testid="sub-progreso">
+                <span className="ac-sub-texto">{`Bebida ${sub + 1} de ${slots.length}`}</span>
+                <div className="ac-puntos">
+                  {slots.map((s, k) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="ac-punto"
+                      data-hecho={s.hecho ? 'si' : 'no'}
+                      aria-current={k === sub ? 'step' : undefined}
+                      aria-label={`${s.etiqueta}${s.hecho ? ', lista' : ', pendiente'}`}
+                      disabled={!alCambiarSub || (primeraSinHacer >= 0 && k > primeraSinHacer)}
+                      onClick={() => alCambiarSub?.(k)}
+                    >
+                      {s.hecho ? '✓' : k + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {children}
           </>
         )}
       </div>
 
       <div className="ac-pie" data-testid="pie-asistente">
-        <div className="ac-resumen-linea" title={resumen} data-testid="resumen-asistente">
-          {resumen || 'Aún no has elegido nada'}
-        </div>
+        {!enResumen && (
+          <div className="ac-fila-resumen">
+            <p className="ac-resumen-linea" title={resumen} data-testid="resumen-asistente">
+              {resumen || 'Aún no has elegido nada'}
+            </p>
+            <strong className="ac-precio">{`S/ ${precio.toFixed(2)}`}</strong>
+          </div>
+        )}
         {motivo && <div role="status" className="ac-motivo" data-testid="motivo-siguiente">{motivo}</div>}
         {avisosPie}
         <div className="ac-botones">
-          <button type="button" className="ac-sec" disabled={idx === 0} onClick={() => alCambiarIndice(idx - 1)}>
+          <button type="button" className="ac-sec" disabled={idx === 0 && sub === 0} onClick={atras}>
             Atrás
           </button>
           {enResumen ? (
@@ -124,7 +200,7 @@ export function AsistenteCombo({
               {puedeAgregar ? 'Agregar al pedido' : textoAgregar} · S/ {precio.toFixed(2)}
             </button>
           ) : (
-            <button type="button" className="ac-pri" disabled={!siguienteOk} onClick={() => alCambiarIndice(Math.min(idx + 1, pasos.length))}>
+            <button type="button" className="ac-pri" disabled={!siguienteOk} onClick={siguiente}>
               Siguiente
             </button>
           )}

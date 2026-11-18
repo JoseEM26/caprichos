@@ -42,7 +42,6 @@ describe('Mozo/caja: combo con bebidas por categoría', () => {
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /ICED COFFE/ }));
     // ahora el paso de los nombres de los vasos
     nombrarVasos();
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
     const agregar = screen.getByRole('button', { name: /Agregar al pedido/ });
     expect(agregar).toBeEnabled();

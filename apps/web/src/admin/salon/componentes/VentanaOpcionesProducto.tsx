@@ -39,6 +39,8 @@ import { PasosBebidaCombo, etiquetaBebida } from '../../../carta/PasosBebidaComb
 import { SelectorEleccionCombo, resumenReparto } from '../../../carta/SelectorEleccionCombo';
 import { useUmbralesStock } from '../../../carta/umbralesStock';
 import { AsistenteCombo } from '../../../comun/combo/AsistenteCombo';
+import { CamposVasos } from '../../../comun/combo/CamposVasos';
+import { TextoResumenCombo, type DatosResumenCombo } from '../../../comun/combo/TextoResumenCombo';
 import { agruparSecciones, claveSeccion, decisionesDe, pasosCombo, UMBRAL_ASISTENTE, type EntradaPasos } from '../../../comun/combo/pasosCombo';
 import { Confirmar } from '../../../comun/Confirmar';
 import { useDialogoAccesible } from '../../../comun/useDialogoAccesible';
@@ -191,6 +193,12 @@ export function VentanaOpcionesProducto({
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
   // Asistente por pasos del armado (combos con 3 o más decisiones, igual que la carta)
   const [indicePaso, setIndicePaso] = useState(0);
+  // Bebida dentro de un paso de bebidas con varias («Bebida 2 de 4»)
+  const [subPaso, setSubPaso] = useState(0);
+  const irPaso = (i: number) => {
+    setIndicePaso(i);
+    setSubPaso(0);
+  };
   const [confirmarSalida, setConfirmarSalida] = useState(false);
   const dialogoRef = useRef<HTMLDivElement>(null);
 
@@ -394,9 +402,12 @@ export function VentanaOpcionesProducto({
   };
   const pasosAsistente = oferta && !comboAgotado && !saborMode ? pasosCombo(entradaPasos) : [];
   const asistente = pasosAsistente.length > 0 && decisionesDe(pasosAsistente) >= UMBRAL_ASISTENTE;
-  const pasoActual = asistente ? pasosAsistente[Math.min(indicePaso, pasosAsistente.length)]?.id : undefined;
-  // En modo asistente, cada bloque se muestra solo cuando es su paso
-  const vis = (id: string): boolean => !asistente || pasoActual === id;
+  const pasoObj = asistente ? pasosAsistente[Math.min(indicePaso, pasosAsistente.length)] : undefined;
+  const pasoActual = pasoObj?.id;
+  const subIdx = Math.min(subPaso, (pasoObj?.slots?.length ?? 1) - 1);
+  const slotActual = pasoObj?.slots?.[subIdx];
+  // En modo asistente, cada bloque se muestra solo en su paso (o en el paso que lo hospeda: extras, nombres, nota)
+  const vis = (id: string): boolean => !asistente || pasoActual === id || !!pasoObj?.incluye?.includes(id);
   const hayElecciones =
     Object.values(opcionesPorUnidad).some((a) => (a ?? []).length > 0) ||
     Object.values(nombresCombo).some((n) => (n ?? '').trim() !== '') ||
@@ -408,6 +419,75 @@ export function VentanaOpcionesProducto({
     else setConfirmarSalida(true);
   };
   const alTeclear = useDialogoAccesible(dialogoRef, pedirCierre);
+
+  const controlCantidad = (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (cantidad > 1) {
+                  setCantidad((c) => c - 1);
+                  if (unidadActualIdx >= cantidad - 1) {
+                    setUnidadActualIdx(Math.max(0, cantidad - 2));
+                  }
+                }
+              }}
+              aria-label="Menos cantidad"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '22px',
+                border: '1.5px solid var(--cp-navy)',
+                background: 'transparent',
+                fontWeight: 800,
+                fontSize: '20px',
+                cursor: 'pointer',
+              }}
+            >
+              −
+            </button>
+            <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '16px' }}>
+              {cantidad}
+            </b>
+            <button
+              type="button"
+              onClick={() => setCantidad((c) => (enTopeStock ? c : c + 1))}
+              disabled={enTopeStock}
+              aria-label="Más cantidad"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '22px',
+                border: '1.5px solid var(--cp-navy)',
+                background: 'transparent',
+                fontWeight: 800,
+                fontSize: '20px',
+                opacity: enTopeStock ? 0.35 : 1,
+                cursor: enTopeStock ? 'not-allowed' : 'pointer',
+              }}
+            >
+              +
+            </button>
+          </div>
+  );
+
+  // Lo elegido en texto para el resumen final (tarjeta de pedido)
+  const datosResumen: DatosResumenCombo = {
+    nombre: producto.nombre,
+    tamano: tamanoSeleccionado?.nombre,
+    bebidas: partesJug.filter((p) => p.bebidas).flatMap((p) => (bebidas[p.parteId] ?? []).slice(0, p.cantidad * cantidad).filter(Boolean).map((c) => etiquetaBebida(p, c))),
+    secciones: Array.from(new Set(gruposVisibles.map((g) => claveSeccion(g.nombre)))).map((k) => ({
+      titulo: k,
+      elegidos: gruposVisibles.filter((g) => claveSeccion(g.nombre) === k).flatMap((g) => g.opciones.filter((o) => opcionesActuales.some((a) => a.id === o.id)).map((o) => o.nombre)),
+    })),
+    otros: partesJug.filter((p) => !p.bebidas).map((p) => resumenReparto(p, elegido[p.parteId] ?? {}, undefined, ' + ')).filter(Boolean),
+    extras: partesOpcionales(ofertaCombo).flatMap((o) => {
+      const extras = Math.max(0, llevadasOpcional(o, opcionales) - o.incluidas);
+      return extras > 0 ? [`${extras} ${o.nombre} extra (S/ ${(extras * o.precioExtra).toFixed(2)})`] : [];
+    }),
+    vasos: nB > 0 ? Array.from({ length: cantidad * nB }, (_, i) => (nombresCombo[i] ?? '').trim()).filter(Boolean) : [],
+    nota: notaCocina,
+  };
 
   return (
     <div
@@ -513,7 +593,11 @@ export function VentanaOpcionesProducto({
           activo={asistente}
           pasos={pasosAsistente}
           indice={Math.min(indicePaso, pasosAsistente.length)}
-          alCambiarIndice={setIndicePaso}
+          alCambiarIndice={irPaso}
+          subIndice={subIdx}
+          alCambiarSub={setSubPaso}
+          resumenTexto={<TextoResumenCombo d={datosResumen} />}
+          cantidad={!libre ? controlCantidad : undefined}
           titulo={producto.nombre}
           precio={precioTotal}
           resumen={[tamanoSeleccionado?.nombre ?? '', ...partesJug.map((p) => (p.bebidas ? '' : resumenReparto(p, elegido[p.parteId] ?? {}, undefined, ' + '))), ...partesJug.filter((p) => p.bebidas).map((p) => (bebidas[p.parteId] ?? []).slice(0, p.cantidad * cantidad).filter(Boolean).map((c) => etiquetaBebida(p, c)).join(' + '))].filter(Boolean).join(' · ')}
@@ -768,37 +852,28 @@ export function VentanaOpcionesProducto({
         })}
 
         {nB > 0 && vis('nombres') && (
-          <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--cp-white)' }}>
-            <div style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>Nombre para el vaso</div>
-            {Array.from({ length: cantidad * nB }, (_, i) => {
-              const g = gruposBebida[i % nB];
-              const elegidas = opcionesPorUnidad[personalizarPorUnidad ? Math.floor(i / nB) : 0] || [];
-              const bebida = g
-                ? (g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1])
-                : (envases[i] ?? `Bebida ${i + 1}`);
-              return (
-                <label key={i} style={{ fontSize: '12px', fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
-                  {`${bebida} · Nombre para el envase (obligatorio, máx. 14 letras se ven completas)`}
-                  <input
-                    type="text"
-                    value={nombresCombo[i] ?? ''}
-                    onChange={(e) => setNombresCombo((prev) => ({ ...prev, [i]: e.target.value }))}
-                    id={`nombre-bebida-${i}`}
-                    required
-                    aria-invalid={avisoNombres && !(nombresCombo[i] ?? '').trim()}
-                    placeholder="Ej.: Lucía o Mesa 4"
-                    maxLength={30}
-                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', minHeight: '42px', marginTop: '4px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 10px', fontSize: '14px' }}
-                  />
-                </label>
-              );
-            })}
-            {avisoNombres && nombresFaltantes.length > 0 && (
-              <div role="alert" style={{ fontSize: '12px', lineHeight: '16px', fontWeight: 700, color: 'var(--cp-rust)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px' }}>
-                {textoFaltaNombre(nombresFaltantes[0])}
-              </div>
-            )}
-            {botonNombreCliente}
+          <div data-testid="nombre-envase">
+            <CamposVasos
+              titulo="Nombres para el vaso"
+              ayuda="Obligatorio · máx. 14 letras se ven completas en el vaso"
+              placeholder="Ej.: Lucía o Mesa 4"
+              filas={Array.from({ length: cantidad * nB }, (_, i) => {
+                const g = gruposBebida[i % nB];
+                const elegidas = opcionesPorUnidad[personalizarPorUnidad ? Math.floor(i / nB) : 0] || [];
+                const bebida = g
+                  ? (g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1])
+                  : (envases[i] ?? `Bebida ${i + 1}`);
+                return {
+                  etiqueta: `Bebida ${(i % nB) + 1}`,
+                  bebida,
+                  valor: nombresCombo[i] ?? '',
+                  invalido: avisoNombres && !(nombresCombo[i] ?? '').trim(),
+                  onChange: (v: string) => setNombresCombo((prev) => ({ ...prev, [i]: v })),
+                };
+              })}
+              aviso={avisoNombres && nombresFaltantes.length > 0 ? textoFaltaNombre(nombresFaltantes[0]) : null}
+              accion={botonNombreCliente}
+            />
           </div>
         )}
 
@@ -967,20 +1042,18 @@ export function VentanaOpcionesProducto({
           partesJug.map((parte) =>
             parte.bebidas ? (
               asistente ? (
-                // En el asistente cada bebida es su propio paso: se muestra solo la de este paso
-                Array.from({ length: parte.cantidad * cantidad }, (_, i) =>
-                  vis(`beb-${parte.parteId}-${i}`) ? (
-                    <PasosBebidaCombo
-                      key={`${parte.parteId}-${i}`}
-                      parte={parte}
-                      unidades={cantidad}
-                      soloIndice={i}
-                      valor={bebidas[parte.parteId] ?? []}
-                      onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
-                      usos={usosDeSabor([], elegido)}
-                    />
-                  ) : null,
-                )
+                // En el asistente se muestra solo la bebida del sub-paso actual
+                slotActual && slotActual.parteId === parte.parteId ? (
+                  <PasosBebidaCombo
+                    key={slotActual.id}
+                    parte={parte}
+                    unidades={cantidad}
+                    soloIndice={slotActual.indice}
+                    valor={bebidas[parte.parteId] ?? []}
+                    onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
+                    usos={usosDeSabor([], elegido)}
+                  />
+                ) : null
               ) : (
                 <PasosBebidaCombo
                   key={parte.parteId}
@@ -1141,9 +1214,8 @@ export function VentanaOpcionesProducto({
         )}
 
         {/* Pie: Stepper de cantidad y Botón Agregar */}
-        <div
+        {!asistente && <div
           className="salon-pie-fijo"
-          hidden={asistente}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1153,56 +1225,7 @@ export function VentanaOpcionesProducto({
             marginTop: '8px',
           }}
         >
-          {!libre && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                if (cantidad > 1) {
-                  setCantidad((c) => c - 1);
-                  if (unidadActualIdx >= cantidad - 1) {
-                    setUnidadActualIdx(Math.max(0, cantidad - 2));
-                  }
-                }
-              }}
-              aria-label="Menos cantidad"
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '22px',
-                border: '1.5px solid var(--cp-navy)',
-                background: 'transparent',
-                fontWeight: 800,
-                fontSize: '20px',
-                cursor: 'pointer',
-              }}
-            >
-              −
-            </button>
-            <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '16px' }}>
-              {cantidad}
-            </b>
-            <button
-              type="button"
-              onClick={() => setCantidad((c) => (enTopeStock ? c : c + 1))}
-              disabled={enTopeStock}
-              aria-label="Más cantidad"
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '22px',
-                border: '1.5px solid var(--cp-navy)',
-                background: 'transparent',
-                fontWeight: 800,
-                fontSize: '20px',
-                opacity: enTopeStock ? 0.35 : 1,
-                cursor: enTopeStock ? 'not-allowed' : 'pointer',
-              }}
-            >
-              +
-            </button>
-          </div>
-          )}
+          {!libre && controlCantidad}
 
           <button
             type="button"
@@ -1237,7 +1260,7 @@ export function VentanaOpcionesProducto({
             </span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
-        </div>
+        </div>}
         </AsistenteCombo>
       </div>
       <Confirmar

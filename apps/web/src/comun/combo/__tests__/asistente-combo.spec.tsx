@@ -17,11 +17,34 @@ const base: EntradaPasos = {
 };
 
 describe('pasosCombo (regla compartida carta y mozo)', () => {
-  it('un paso por decisión: tamaño, cada bebida, nombres y la nota al final (opcional)', () => {
+  it('un paso por decisión: tamaño, cada bebida (con 1 o 2) y un único paso final «Detalles» (nombres, extras y nota)', () => {
     const pasos = pasosCombo(base);
-    expect(pasos.map((p) => p.id)).toEqual(['tamano', 'beb-1-0', 'beb-1-1', 'nombres', 'nota']);
+    expect(pasos.map((p) => p.id)).toEqual(['tamano', 'beb-1-0', 'beb-1-1', 'detalles']);
     expect(pasos[1]).toMatchObject({ etiqueta: 'Bebida 1', avanzaSolo: true, hecho: false, falta: 'Elige tu bebida 1' });
-    expect(pasos[4].opcional).toBe(true);
+    expect(pasos[3]).toMatchObject({ etiqueta: 'Detalles', opcional: false, incluye: ['nombres', 'nota'] });
+  });
+
+  it('con 3 o más bebidas: una sola etapa «Bebidas» con un sub-paso por bebida', () => {
+    const pasos = pasosCombo({
+      ...base,
+      bebidas: [{ parteId: '1', slots: [0, 1, 2, 3].map((indice) => ({ indice, hecho: indice < 2 })) }],
+    });
+    expect(pasos.map((p) => p.id)).toEqual(['tamano', 'bebidas', 'detalles']);
+    const bebidas = pasos[1];
+    expect(bebidas).toMatchObject({ etiqueta: 'Bebidas', hecho: false, falta: 'Elige tu bebida 3' });
+    expect(bebidas.slots).toHaveLength(4);
+    expect(bebidas.slots?.[2]).toMatchObject({ etiqueta: 'Bebida 3', hecho: false, parteId: '1', indice: 2 });
+  });
+
+  it('los extras van con el complemento o la última sección; sin ellos, con Detalles; nunca son un paso propio', () => {
+    const conComp = pasosCombo({ ...base, opcionales: true, bebidas: [], nombres: { total: 0, faltan: 0, primera: '' }, grupoPaquete: '', piezas: [{ parteId: '3', faltan: 0 }] });
+    expect(conComp.find((p) => p.id === 'comp')?.incluye).toEqual(['opc']);
+    expect(conComp.find((p) => p.id === 'detalles')?.incluye).toEqual(['nombres', 'nota']);
+    const conSeccion = pasosCombo({ ...base, opcionales: true, bebidas: [], nombres: { total: 0, faltan: 0, primera: '' }, secciones: [{ clave: 'Cremas', completa: false, unica: false, falta: 'Elige en Cremas' }] });
+    expect(conSeccion.find((p) => p.id === 'sec-Cremas')?.incluye).toEqual(['opc']);
+    const solo = pasosCombo({ ...base, opcionales: true, bebidas: [], nombres: { total: 0, faltan: 0, primera: '' } });
+    expect(solo.find((p) => p.id === 'detalles')?.incluye).toEqual(['nombres', 'nota', 'opc']);
+    expect(solo.some((p) => p.id === 'opc' || p.id === 'nota')).toBe(false);
   });
 
   it('el complemento con paquete pide el paquete antes que sus lugares', () => {
@@ -48,7 +71,7 @@ describe('pasosCombo (regla compartida carta y mozo)', () => {
 
   it('la regla de asistente cuenta solo las decisiones (no la nota ni los extras)', () => {
     const pasos = pasosCombo({ ...base, bebidas: [{ parteId: '1', slots: [{ indice: 0, hecho: true }] }], nombres: { total: 0, faltan: 0, primera: '' } });
-    expect(decisionesDe(pasos)).toBe(2); // tamaño + bebida 1
+    expect(decisionesDe(pasos)).toBe(2); // tamaño + bebida 1 (Detalles, sin nombres, es opcional)
     expect(decisionesDe(pasos)).toBeLessThan(UMBRAL_ASISTENTE);
   });
 });
@@ -108,7 +131,9 @@ describe('AsistenteCombo', () => {
     expect(screen.getByRole('button', { name: /Paso 2: Bebida 1, listo/ })).toBeInTheDocument();
     // el resumen: lo elegido y el precio; el botón de agregar dice qué falta si algo no está listo
     fireEvent.click(screen.getByRole('button', { name: /Paso 4: Resumen/ }));
-    expect(screen.getByTestId('resumen-asistente')).toHaveTextContent('Regular 12 oz');
+    // en el resumen la línea corta se oculta: lo elegido va en la tarjeta de texto (una sola vez)
+    expect(screen.queryByTestId('resumen-asistente')).toBeNull();
+    expect(screen.getByTestId('texto-resumen')).toHaveTextContent('Regular 12 oz');
     expect(screen.getByRole('button', { name: /Agregar al pedido/ })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     expect(alAgregar).toHaveBeenCalledTimes(1);

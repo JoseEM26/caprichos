@@ -51,11 +51,10 @@ describe('Dúo en celular', () => {
     expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 1');
     fireEvent.click(screen.getAllByRole('button', { name: /ICED COFFE/ })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[0]);
-    // llega al paso de nombres sin nombres: «Siguiente» dice cuál falta
-    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nombres para el vaso');
+    // llega al paso final «Detalles» sin nombres: «Siguiente» dice cuál falta
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Detalles');
     expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
     nombrarVasos();
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     expect(agregarLinea).toHaveBeenCalledTimes(1);
@@ -63,7 +62,7 @@ describe('Dúo en celular', () => {
 
   it('el campo de nombre del vaso aparece con el motivo aunque el combo use grupos «Bebida N · Sabor» (antes desaparecía)', () => {
     abrir(producto(), null);
-    expect(screen.getByTestId('nombre-envase')).toHaveTextContent(/Obligatorio: el nombre de cada vaso/);
+    expect(screen.getByTestId('nombre-envase')).toHaveTextContent(/Obligatorio · máx. 14 letras/);
     expect(screen.getAllByLabelText(/Nombre para el envase/)).toHaveLength(2);
   });
 
@@ -100,7 +99,7 @@ describe('Dúo en celular', () => {
     expect(screen.getByRole('dialog')).toHaveAttribute('data-movil', 'si');
     expect(screen.getByTestId('cabecera-ventana')).toHaveTextContent('Dúo Irresistible');
     expect(screen.getByTestId('cuerpo-ventana')).toBeInTheDocument();
-    expect(screen.getByTestId('barra-agregar')).toBeInTheDocument();
+    expect(screen.getByTestId('pie-asistente')).toBeInTheDocument(); // con el asistente, el pie es el del paso (no hay barra vieja duplicada)
     expect(screen.getByRole('dialog').style.height).toBe('95%');
     unmount();
     abrir(producto(), duo(true), false);

@@ -58,7 +58,7 @@ describe('Armado interactivo del combo (asistente por pasos)', () => {
 
   it('un paso a la vez: el tamaño sigue con «Siguiente»; cada bebida es su paso y la elegida avanza sola', () => {
     abrir();
-    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 1 de 7');
+    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 1 de 6'); // tamaño, 2 bebidas, complemento, Detalles y resumen
     expect(screen.queryByRole('group', { name: 'Bebida 1' })).toBeNull();
     siguiente();
     expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Bebida 1');
@@ -134,7 +134,7 @@ describe('Armado interactivo del combo (asistente por pasos)', () => {
     expect(barra.getByRole('button', { name: 'Paso 2: Bebida 1, pendiente' })).toBeInTheDocument();
     siguiente();
     fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
-    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 3 de 7');
+    expect(screen.getByTestId('paso-texto')).toHaveTextContent('Paso 3 de 6');
     expect(barra.getByRole('button', { name: 'Paso 2: Bebida 1, listo' })).toBeInTheDocument();
     expect(barra.getByRole('button', { name: 'Paso 3: Bebida 2, pendiente' })).toHaveAttribute('aria-current', 'step');
   });
@@ -151,7 +151,7 @@ describe('Armado interactivo del combo (asistente por pasos)', () => {
     expect(cabecera(1)).toHaveTextContent('FRAPPE OREO');
   });
 
-  it('los nombres son obligatorios en su paso y la nota es un paso opcional', () => {
+  it('los nombres son obligatorios en el paso final «Detalles», donde también va la nota', () => {
     abrir();
     siguiente();
     fireEvent.click(tarjeta(1).getByRole('button', { name: /FRAPPE OREO/ }));
@@ -160,14 +160,14 @@ describe('Armado interactivo del combo (asistente por pasos)', () => {
     fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Fresa' }));
     fireEvent.click(bloque.getByRole('button', { name: 'Agregar DONAS ARTESANALES · Manjar' }));
     siguiente();
-    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nombres para el vaso');
+    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Detalles');
+    expect(screen.getByText('Nombres para el vaso')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
     expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Escribe el nombre del vaso de la Bebida 1');
     fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
     expect(screen.getByText('5/14')).toBeInTheDocument();
     fireEvent.change(document.getElementById('nombre-bebida-1') as HTMLInputElement, { target: { value: 'Pedro' } });
-    siguiente();
-    expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Nota para cocina');
+    expect(screen.getByRole('button', { name: /Nota para cocina/ })).toBeInTheDocument(); // la nota va plegada en el mismo paso
     expect(screen.getByRole('button', { name: 'Siguiente' })).toBeEnabled();
   });
 
@@ -182,12 +182,18 @@ describe('Armado interactivo del combo (asistente por pasos)', () => {
     siguiente();
     fireEvent.change(document.getElementById('nombre-bebida-0') as HTMLInputElement, { target: { value: 'Lucía' } });
     fireEvent.change(document.getElementById('nombre-bebida-1') as HTMLInputElement, { target: { value: 'Pedro' } });
-    siguiente();
     fireEvent.click(screen.getByRole('button', { name: /Nota para cocina/ }));
     fireEvent.change(screen.getByLabelText(/Nota para cocina/, { selector: 'input' }), { target: { value: 'sin hielo' } });
     siguiente();
     expect(screen.getByTestId('resumen-pasos')).toBeInTheDocument();
-    expect(screen.getByTestId('resumen-asistente')).toHaveTextContent('Regular 12 oz · FRAPPE OREO + CAPUCCINO · 1 Fresa + 1 Manjar');
+    // el resumen es una tarjeta en texto (una sola vez); la línea corta del pie no se repite aquí
+    expect(screen.queryByTestId('resumen-asistente')).toBeNull();
+    const textoResumen = screen.getByTestId("texto-resumen");
+    expect(textoResumen).toHaveTextContent('Regular 12 oz');
+    expect(textoResumen).toHaveTextContent('incluye 2 bebidas: FRAPPE OREO, CAPUCCINO');
+    expect(textoResumen).toHaveTextContent('Vasos a nombre de: Lucía, Pedro');
+    expect(textoResumen).toHaveTextContent('Nota para cocina: sin hielo');
+    expect(screen.getByRole('button', { name: 'Cambiar detalles' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/ }));
     const l = agregarLinea.mock.calls[0][0];
     expect(l.cantidad).toBe(1);

@@ -88,7 +88,6 @@ describe('Combo Dúo con bebidas por categoría', () => {
     expect(screen.getByTestId('titulo-paso')).toHaveTextContent('Endulzante');
     siguiente(); // nombres de los vasos
     nombrarVasos();
-    siguiente(); // nota
     siguiente(); // resumen
     fireEvent.click(botonAgregar());
     const linea = agregarLinea.mock.calls[0][0];
@@ -117,7 +116,6 @@ describe('Combo Dúo con bebidas por categoría', () => {
     siguiente(); // Endulzante
     siguiente(); // nombres
     nombrarVasos();
-    siguiente(); // nota
     siguiente(); // resumen
     fireEvent.click(botonAgregar());
     expect(agregarLinea.mock.calls[0][0].comboElecciones.filter((e: { parteId: string }) => e.parteId === '1')).toEqual([

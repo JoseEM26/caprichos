@@ -130,7 +130,9 @@ describe('Combo con bebidas pide nombre por envase', () => {
     render(<VentanaProductoCarta producto={duo} esBebida={false} onCerrar={() => {}} />);
     const campos = screen.getAllByLabelText(/Nombre para el envase \(obligatorio/i);
     expect(campos).toHaveLength(2);
-    expect(screen.getByText("Bebida 1 · Frappe Moca")).toBeInTheDocument();
+    // fila por vaso: la etiqueta «Bebida 1» con la bebida debajo (antes era una sola línea «Bebida 1 · Frappe Moca»)
+    expect(document.querySelector('.cv-chip')).toHaveTextContent('Bebida 1');
+    expect(document.querySelector('.cv-bebida')).toHaveTextContent('Frappe Moca');
     fireEvent.change(campos[0], { target: { value: 'Lucía' } });
     fireEvent.change(campos[1], { target: { value: 'Pedro' } });
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));

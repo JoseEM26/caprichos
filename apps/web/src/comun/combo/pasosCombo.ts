@@ -3,20 +3,35 @@
  * qué pasos hay, cuáles están hechos y qué falta en cada uno. La UI (AsistenteCombo) solo la pinta.
  */
 
-/** Un paso del asistente: una decisión. El resumen final lo agrega AsistenteCombo, no esta lista. */
+/** Una bebida dentro de un paso de bebidas (sub-paso «Bebida 2 de 4»). */
+export interface SlotAsistente {
+  id: string;
+  etiqueta: string;
+  hecho: boolean;
+  /** Qué falta en esa bebida; aparece junto a «Siguiente» deshabilitado. */
+  falta: string;
+  parteId: string;
+  indice: number;
+}
+
+/** Un paso del asistente: una decisión (o un grupo de bebidas). El resumen final lo agrega AsistenteCombo. */
 export interface PasoAsistente {
   id: string;
-  /** Texto corto del indicador de progreso («Bebida 1»). */
+  /** Texto corto del indicador de progreso («Bebidas», «Cremas»). */
   etiqueta: string;
   /** Título del paso. */
   titulo: string;
   hecho: boolean;
   /** Qué falta, en palabras; aparece junto a «Siguiente» deshabilitado. */
   falta?: string;
-  /** Una selección única basta: al completarse avanza solo al paso siguiente. */
+  /** Una selección única basta: al completarse avanza solo al paso siguiente (o a la siguiente bebida). */
   avanzaSolo?: boolean;
-  /** Paso que no bloquea «Siguiente» (nota para cocina, extras). */
+  /** Paso que no bloquea «Siguiente» (detalles sin nombres obligatorios). */
   opcional?: boolean;
+  /** Bebidas del paso: una por sub-paso. Un paso con 1 o 2 bebidas tiene un slot; 3 o más, un paso con varios. */
+  slots?: SlotAsistente[];
+  /** Bloques que se muestran en este paso además del suyo: «opc» (extras), «nombres», «nota». */
+  incluye?: string[];
 }
 
 /** Lo que la ventana ya sabe de sus propios estados (carta o mozo), en datos planos. */
@@ -70,6 +85,9 @@ function faltaComplemento(e: EntradaPasos): string {
   return sobran > 0 ? `Quita ${sobran} opción(es)` : `Elige ${faltan} lugar(es) más`;
 }
 
+/** Desde 3 bebidas, todas van en un solo paso «Bebidas» con sub-progreso (con 1 o 2, un paso por bebida). */
+export const UMBRAL_BEBIDAS_EN_UN_PASO = 3;
+
 /** Pasos de la ventana de un combo, en el orden en que se eligen. */
 export function pasosCombo(e: EntradaPasos): PasoAsistente[] {
   const pasos: PasoAsistente[] = [];
@@ -79,11 +97,13 @@ export function pasosCombo(e: EntradaPasos): PasoAsistente[] {
   for (const a of e.alternativas) {
     pasos.push({ id: `alt-${a.parteId}`, etiqueta: 'Alternativa', titulo: `Sin stock de ${a.faltante}`, hecho: a.elegida, falta: `Elige una alternativa de ${a.faltante}`, avanzaSolo: true });
   }
-  for (const b of e.bebidas) {
-    for (const s of b.slots) {
-      const n = s.indice + 1;
-      pasos.push({ id: `beb-${b.parteId}-${s.indice}`, etiqueta: `Bebida ${n}`, titulo: `Bebida ${n}`, hecho: s.hecho, falta: `Elige tu bebida ${n}`, avanzaSolo: true });
-    }
+  const slots: SlotAsistente[] = e.bebidas.flatMap((b) =>
+    b.slots.map((s) => ({ id: `beb-${b.parteId}-${s.indice}`, etiqueta: `Bebida ${s.indice + 1}`, hecho: s.hecho, falta: `Elige tu bebida ${s.indice + 1}`, parteId: b.parteId, indice: s.indice })),
+  );
+  if (slots.length >= UMBRAL_BEBIDAS_EN_UN_PASO) {
+    pasos.push({ id: 'bebidas', etiqueta: 'Bebidas', titulo: 'Bebidas', hecho: slots.every((s) => s.hecho), falta: slots.find((s) => !s.hecho)?.falta ?? 'Elige tus bebidas', avanzaSolo: true, slots });
+  } else {
+    for (const s of slots) pasos.push({ id: s.id, etiqueta: s.etiqueta, titulo: s.etiqueta, hecho: s.hecho, falta: s.falta, avanzaSolo: true, slots: [s] });
   }
   if (e.grupoPaquete || e.piezas.length > 0) {
     pasos.push({
@@ -97,11 +117,20 @@ export function pasosCombo(e: EntradaPasos): PasoAsistente[] {
   for (const s of e.secciones) {
     pasos.push({ id: `sec-${s.clave}`, etiqueta: s.clave, titulo: s.clave, hecho: s.completa, falta: s.falta, avanzaSolo: s.unica });
   }
-  if (e.nombres.total > 0) {
-    pasos.push({ id: 'nombres', etiqueta: 'Nombres', titulo: 'Nombres para el vaso', hecho: e.nombres.faltan === 0, falta: e.nombres.primera });
-  }
-  if (e.opcionales) pasos.push({ id: 'opc', etiqueta: 'Extras', titulo: 'Extras del combo', hecho: true, opcional: true });
-  pasos.push({ id: 'nota', etiqueta: 'Nota', titulo: 'Nota para cocina', hecho: true, opcional: true });
+  // Extras (partes opcionales, p. ej. papas): van en el complemento o, si no hay, en la última sección (cremas);
+  // si no hay ninguna de las dos, en Detalles. Nunca son un paso propio.
+  const hospedaje = pasos.find((p) => p.id === 'comp') ?? [...pasos].reverse().find((p) => p.id.startsWith('sec-'));
+  if (e.opcionales && hospedaje) hospedaje.incluye = ['opc'];
+  // Un solo paso final «Detalles»: nombres de los vasos (obligatorios) y, en su caso, extras y nota (opcionales)
+  pasos.push({
+    id: 'detalles',
+    etiqueta: 'Detalles',
+    titulo: 'Detalles',
+    hecho: e.nombres.faltan === 0,
+    falta: e.nombres.primera || 'Revisa los detalles',
+    opcional: e.nombres.total === 0,
+    incluye: ['nombres', 'nota', ...(e.opcionales && !hospedaje ? ['opc'] : [])],
+  });
   return pasos;
 }
 

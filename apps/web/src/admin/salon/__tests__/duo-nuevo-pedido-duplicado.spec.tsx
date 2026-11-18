@@ -40,7 +40,6 @@ describe('Nuevo pedido: Dúo sin bebidas duplicadas', () => {
     expect(screen.getByTestId('motivo-siguiente')).toHaveTextContent('Elige tu bebida 2');
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /LATTE COFFE/ }));
     nombrarVasos();
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // nota
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); // resumen
     const boton = () => screen.getByRole('button', { name: /Agregar al pedido/ });
     expect(boton()).toBeEnabled();
