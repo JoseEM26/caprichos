@@ -3,7 +3,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RegistroAuditoria } from './auditoria.tipos';
 import { Prisma } from '@prisma/client';
 import { inicioDiaLimaIso, sumarDiasIso, hoyLimaIso } from '../../comun/fechas-lima';
-import { describirRegistro, nombreSnapshot, TIPO_ENTIDAD } from './auditoria.descripcion';
+import { describirRegistro, nombreModulo, nombreSnapshot, TIPO_ENTIDAD } from './auditoria.descripcion';
 
 /** Máximo de días que se miran al buscar dentro del JSON (pedido/producto): no hay índice para eso. */
 export const MAX_DIAS_BUSQUEDA_JSON = 31;
@@ -208,13 +208,23 @@ export class AuditoriaService {
     };
   }
 
-  /** Valores que existen, para los selectores de módulo y acción. */
-  async opciones() {
+  /**
+   * Valores que existen, para los selectores de módulo y acción, con su conteo.
+   * Sin `modulo`, las acciones son las de todo el historial; con `modulo`, solo las de ese módulo.
+   */
+  async opciones(modulo?: string) {
     const [modulos, acciones] = await Promise.all([
-      this.prisma.auditoria.groupBy({ by: ['modulo'], _count: { _all: true }, orderBy: { modulo: 'asc' } }),
-      this.prisma.auditoria.groupBy({ by: ['accion'], _count: { _all: true }, orderBy: { accion: 'asc' } }),
+      this.prisma.auditoria.groupBy({ by: ['modulo'], _count: { _all: true } }),
+      this.prisma.auditoria.groupBy({ by: ['accion'], where: modulo ? { modulo } : undefined, _count: { _all: true } }),
     ]);
-    return { modulos: modulos.map((m) => m.modulo), acciones: acciones.map((a) => a.accion) };
+    return {
+      modulos: modulos
+        .map((m) => ({ valor: m.modulo, etiqueta: nombreModulo(m.modulo), cantidad: m._count._all }))
+        .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es')),
+      acciones: acciones
+        .map((a) => ({ valor: a.accion, cantidad: a._count._all }))
+        .sort((a, b) => a.valor.localeCompare(b.valor, 'es')),
+    };
   }
 
   /** Buscador de personas por nombre (para filtrar quién hizo la acción). */
@@ -272,6 +282,7 @@ export class AuditoriaService {
       id: reg.id.toString(),
       categoria: reg.categoria,
       modulo: reg.modulo,
+      moduloNombre: nombreModulo(reg.modulo),
       accion: reg.accion,
       resultado: reg.resultado,
       entidad: reg.entidad,

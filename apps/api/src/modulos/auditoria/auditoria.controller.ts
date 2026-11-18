@@ -47,8 +47,8 @@ export class AuditoriaController {
 
   @Get('opciones')
   @Permiso('auditoria', 'ver')
-  async opciones() {
-    return this.auditoriaService.opciones();
+  async opciones(@Query('modulo') modulo?: string) {
+    return this.auditoriaService.opciones(modulo?.trim() || undefined);
   }
 
   @Get('personas')

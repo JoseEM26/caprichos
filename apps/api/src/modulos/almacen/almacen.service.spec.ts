@@ -618,6 +618,21 @@ describe('AlmacenService', () => {
       );
     });
 
+    it('POST: la apertura del día se audita en la misma transacción (almacen / REGISTRAR_APERTURA)', async () => {
+      await service.registrarApertura({ items: [{ productoId: '50', saborId: '11', cantidad: 6 }] } as any, mockUsuario, '10.0.0.7');
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoria: 'CAMBIO',
+          modulo: 'almacen',
+          accion: 'REGISTRAR_APERTURA',
+          partyId: 1n,
+          ip: '10.0.0.7',
+          despues: expect.objectContaining({ productos: 1 }),
+        }),
+        expect.anything(),
+      );
+    });
+
     it('POST: un sabor ajeno al producto o un producto sin sabores con saborId responde 400', async () => {
       await expect(
         service.registrarApertura({ items: [{ productoId: '50', saborId: '99', cantidad: 1 }] } as any, mockUsuario),

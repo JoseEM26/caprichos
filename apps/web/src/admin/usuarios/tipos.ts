@@ -48,6 +48,8 @@ export interface RegistroAuditoriaItem {
   id: string;
   categoria: string;
   modulo: string;
+  /** Nombre en español del módulo (lo arma el servidor). */
+  moduloNombre?: string;
   accion: string;
   resultado: 'OK' | 'RECHAZADO' | string;
   entidad: string | null;

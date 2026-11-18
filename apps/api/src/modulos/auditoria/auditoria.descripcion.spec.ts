@@ -1,4 +1,4 @@
-import { describirRegistro } from './auditoria.descripcion';
+import { describirRegistro, nombreModulo } from './auditoria.descripcion';
 
 const EN_TARDE = '2026-11-16T19:00:00Z'; // 14:00 en Lima
 
@@ -102,5 +102,29 @@ describe('describirRegistro', () => {
         motivo: 'error',
       }),
     ).toBe('Anular venta rara (motivo: error)');
+  });
+});
+
+describe('apertura de caja y apertura del día', () => {
+  it('ABRIR_CAJA dice el monto y avisa si no es el oficial', () => {
+    expect(describirRegistro({ accion: 'ABRIR_CAJA', entidad: 'caja', despues: { apertura: 150, distintoDelOficial: false } })).toBe('Abrió la caja con S/ 150.00');
+    expect(describirRegistro({ accion: 'ABRIR_CAJA', entidad: 'caja', despues: { apertura: 90, distintoDelOficial: true } })).toBe(
+      'Abrió la caja con S/ 90.00 (distinto del monto oficial)',
+    );
+  });
+
+  it('REGISTRAR_APERTURA cuenta productos y mermas', () => {
+    expect(describirRegistro({ accion: 'REGISTRAR_APERTURA', entidad: 'conteo_apertura', despues: { productos: 1, mermas: [] } })).toBe(
+      'Hizo la apertura del día: 1 producto contado',
+    );
+    expect(describirRegistro({ accion: 'REGISTRAR_APERTURA', entidad: 'conteo_apertura', despues: { productos: 4, mermas: [{}, {}] } })).toBe(
+      'Hizo la apertura del día: 4 productos contados, 2 con merma',
+    );
+  });
+
+  it('nombreModulo: conocido en español; desconocido capitalizado', () => {
+    expect(nombreModulo('almacen')).toBe('Almacén');
+    expect(nombreModulo('pagos_online')).toBe('Pagos en línea');
+    expect(nombreModulo('nuevo_modulo')).toBe('Nuevo modulo');
   });
 });

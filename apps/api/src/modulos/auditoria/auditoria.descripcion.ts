@@ -114,6 +114,50 @@ function editar(d: DatosDescripcion): string {
   return `${con('Editó', d)}: ${partes.join(', ')}`;
 }
 
+/** Nombre en español de cada módulo de auditoría; el que no está en la tabla se muestra con su código capitalizado. */
+export const NOMBRE_MODULO: Record<string, string> = {
+  acceso: 'Acceso',
+  almacen: 'Almacén',
+  asistencia: 'Asistencia',
+  auditoria: 'Auditoría',
+  auth: 'Ingreso',
+  caja: 'Caja',
+  catalogo: 'Catálogo',
+  cierre: 'Cierre',
+  clientes: 'Clientes',
+  cocina: 'Cocina',
+  comprobantes: 'Comprobantes',
+  compras: 'Compras',
+  configuracion: 'Configuración',
+  cortesias: 'Cortesías',
+  cupones: 'Cupones',
+  creditos: 'Créditos',
+  impresion: 'Impresión',
+  iniciativas: 'Iniciativas',
+  local: 'Local',
+  mensajes: 'Mensajes',
+  mesas: 'Mesas',
+  ofertas: 'Ofertas',
+  pagos_online: 'Pagos en línea',
+  pedidos: 'Pedidos',
+  planilla: 'Planilla',
+  reclamos: 'Reclamos',
+  repartos: 'Repartos',
+  reservas: 'Reservas',
+  salon: 'Salón',
+  stock: 'Stock',
+  usuarios: 'Usuarios',
+  vouchers: 'Vouchers',
+  zonas: 'Zonas',
+};
+
+/** «Caja», «Almacén»… o, si no está en la tabla, el código técnico en minúsculas con la primera letra en mayúscula. */
+export function nombreModulo(codigo: string): string {
+  if (NOMBRE_MODULO[codigo]) return NOMBRE_MODULO[codigo];
+  const texto = codigo.replace(/_/g, ' ').trim();
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 const FRASES: Record<string, (d: DatosDescripcion) => string> = {
   CREAR_PRODUCTO: (d) => con('Creó', d, d.despues && obj(d.despues).precio != null ? ` (${money(obj(d.despues).precio)})` : ''),
   EDITAR_PRODUCTO: editar,
@@ -151,6 +195,17 @@ const FRASES: Record<string, (d: DatosDescripcion) => string> = {
   ACTIVAR_VALOR_LISTA: (d) => con('Volvió a activar', d),
   DESACTIVAR_VALOR_LISTA: (d) => con('Desactivó', d),
   ASIGNAR_GRUPO_CATEGORIAS: (d) => `Asignó categorías a ${deRef(d)}`,
+  ABRIR_CAJA: (d) => {
+    const o = obj(d.despues);
+    const monto = o.apertura != null ? ` con ${money(o.apertura)}` : '';
+    return `Abrió la caja${monto}` + (o.distintoDelOficial ? ' (distinto del monto oficial)' : '');
+  },
+  REGISTRAR_APERTURA: (d) => {
+    const o = obj(d.despues);
+    const productos = Number(o.productos) || 0;
+    const mermas = Array.isArray(o.mermas) ? o.mermas.length : 0;
+    return `Hizo la apertura del día: ${productos} ${productos === 1 ? 'producto contado' : 'productos contados'}` + (mermas ? `, ${mermas} con merma` : '');
+  },
 };
 
 /** Respaldo legible para acciones sin frase propia: «Anular venta (motivo: …)». */

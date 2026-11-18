@@ -304,9 +304,53 @@ describe('AuditoriaService', () => {
       expect(dondeUsado()).toEqual({ id: { in: [2n] } });
     });
 
+    it('opciones: módulos con nombre y conteo; acciones de todo el historial sin módulo', async () => {
+      prisma.auditoria.groupBy
+        .mockResolvedValueOnce([
+          { modulo: 'pedidos', _count: { _all: 9 } },
+          { modulo: 'almacen', _count: { _all: 2 } },
+          { modulo: 'modulo_raro', _count: { _all: 1 } },
+        ])
+        .mockResolvedValueOnce([{ accion: 'ANULAR', _count: { _all: 4 } }]);
+      expect(await service.opciones()).toEqual({
+        modulos: [
+          { valor: 'almacen', etiqueta: 'Almacén', cantidad: 2 },
+          { valor: 'modulo_raro', etiqueta: 'Modulo raro', cantidad: 1 },
+          { valor: 'pedidos', etiqueta: 'Pedidos', cantidad: 9 },
+        ],
+        acciones: [{ valor: 'ANULAR', cantidad: 4 }],
+      });
+      expect(prisma.auditoria.groupBy).toHaveBeenLastCalledWith(expect.objectContaining({ by: ['accion'], where: undefined }));
+    });
+
+    it('opciones con módulo: las acciones salen solo de ese módulo', async () => {
+      prisma.auditoria.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([{ accion: 'REGISTRAR_APERTURA', _count: { _all: 3 } }]);
+      expect(await service.opciones('almacen')).toEqual({
+        modulos: [],
+        acciones: [{ valor: 'REGISTRAR_APERTURA', cantidad: 3 }],
+      });
+      expect(prisma.auditoria.groupBy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ by: ['accion'], where: { modulo: 'almacen' } }),
+      );
+    });
+
+    it('listar: cada fila trae el nombre del módulo', async () => {
+      prisma.auditoria.count.mockResolvedValue(1);
+      prisma.auditoria.findMany.mockResolvedValue([
+        { id: 1n, modulo: 'caja', accion: 'ABRIR_CAJA', entidad: 'caja', entidad_id: 5n, antes: null, despues: { apertura: 150 }, motivo: null, party_id: null, en: new Date('2026-11-17T13:00:00Z') },
+      ]);
+      prisma.auditoria.groupBy.mockResolvedValue([]);
+      const r = await service.listar({ modulo: 'caja' });
+      expect(r.datos[0].moduloNombre).toBe('Caja');
+      expect(r.datos[0].descripcion).toBe('Abrió la caja con S/ 150.00');
+    });
+
     it('opciones y personas', async () => {
-      prisma.auditoria.groupBy.mockResolvedValueOnce([{ modulo: 'caja' }]).mockResolvedValueOnce([{ accion: 'ANULAR' }]);
-      expect(await service.opciones()).toEqual({ modulos: ['caja'], acciones: ['ANULAR'] });
+      prisma.auditoria.groupBy.mockResolvedValueOnce([{ modulo: 'caja', _count: { _all: 1 } }]).mockResolvedValueOnce([{ accion: 'ANULAR', _count: { _all: 1 } }]);
+      expect(await service.opciones()).toEqual({
+        modulos: [{ valor: 'caja', etiqueta: 'Caja', cantidad: 1 }],
+        acciones: [{ valor: 'ANULAR', cantidad: 1 }],
+      });
       prisma.person.findMany.mockResolvedValue([{ party_id: 4n, nombres: 'Ana', apellidos: 'Paz' }]);
       expect(await service.personas('an')).toEqual([{ id: '4', nombre: 'Ana Paz' }]);
       expect(await service.personas('a')).toEqual([]);

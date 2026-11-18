@@ -5,6 +5,11 @@ import { AuditoriaView } from '../AuditoriaView';
 import * as sesionModulo from '../../../comun/sesion';
 import * as apiModulo from '../../../comun/api';
 
+const MODULOS = [
+  { valor: 'caja', etiqueta: 'Caja', cantidad: 3 },
+  { valor: 'pedidos', etiqueta: 'Pedidos', cantidad: 9 },
+];
+
 const respuesta = (pagina = 1) => ({
   total: 45,
   pagina,
@@ -27,7 +32,11 @@ describe('AuditoriaView filtros al servidor', () => {
     vi.restoreAllMocks();
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ tiene: () => true } as any);
     get = vi.fn().mockImplementation(async (url: string) => {
-      if (url.startsWith('/admin/auditoria/opciones')) return { modulos: ['caja', 'pedidos'], acciones: ['ANULAR', 'COBRAR'] };
+      if (url.startsWith('/admin/auditoria/opciones')) {
+        const modulo = new URLSearchParams(url.split('?')[1] ?? '').get('modulo');
+        if (modulo === 'caja') return { modulos: MODULOS, acciones: [{ valor: 'ABRIR_CAJA', cantidad: 4 }] };
+        return { modulos: MODULOS, acciones: [{ valor: 'ANULAR', cantidad: 1 }, { valor: 'COBRAR', cantidad: 2 }] };
+      }
       if (url.startsWith('/admin/auditoria/personas')) return [{ id: '7', nombre: 'Ana Paz' }];
       return respuesta(Number(new URLSearchParams(url.split('?')[1]).get('pagina')));
     });
@@ -106,12 +115,40 @@ describe('AuditoriaView filtros al servidor', () => {
   it('Módulo y Acción son selectores con los valores que existen; Este mes manda desde el día 1', async () => {
     dibujar();
     await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/auditoria/opciones'));
-    await elegir(/^Módulo/, /^pedidos/);
+    await elegir(/^Módulo/, /^Pedidos/);
     await waitFor(() => expect(ultima().get('modulo')).toBe('pedidos'));
     await elegir(/^Acción/, /^Cobrar/);
     await waitFor(() => expect(ultima().get('accion')).toBe('COBRAR'));
     await elegir(/^Fecha/, /Este mes/);
     await waitFor(() => expect(ultima().get('desde')).toMatch(/^\d{4}-\d{2}-01$/));
+  });
+
+  it('Módulo muestra nombre y conteo; al elegir uno, Acción solo trae sus acciones y se reinicia', async () => {
+    dibujar('/admin/historial?accion=ANULAR');
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/auditoria/opciones'));
+    fireEvent.click(screen.getByRole('button', { name: /^Módulo/ }));
+    expect(within(await screen.findByRole('listbox')).getByRole('option', { name: /Caja/ })).toHaveTextContent('3');
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /^Caja/ }));
+    await waitFor(() => expect(ultima().get('modulo')).toBe('caja'));
+    expect(ultima().get('accion')).toBeNull();
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/auditoria/opciones?modulo=caja'));
+    fireEvent.click(await screen.findByRole('button', { name: /^Acción/ }));
+    const opcionesAccion = within(await screen.findByRole('listbox')).getAllByRole('option');
+    expect(opcionesAccion.map((o) => o.textContent)).toEqual(expect.arrayContaining([expect.stringMatching(/Abrir caja/)]));
+    expect(opcionesAccion.some((o) => /Cobrar/.test(o.textContent ?? ''))).toBe(false);
+  });
+
+  it('URL con modulo y accion: se leen y se mandan al servidor', async () => {
+    dibujar('/admin/historial?modulo=caja&accion=ABRIR_CAJA');
+    await waitFor(() => expect(listas().length).toBeGreaterThan(0));
+    expect(ultima().get('modulo')).toBe('caja');
+    expect(ultima().get('accion')).toBe('ABRIR_CAJA');
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admin/auditoria/opciones?modulo=caja'));
+  });
+
+  it('módulo sin registros en el rango muestra el estado vacío del módulo', async () => {
+    dibujar('/admin/historial?modulo=caja');
+    expect(await screen.findByText('Sin acciones de este módulo en el rango')).toBeInTheDocument();
   });
 
   it('Persona se busca por nombre y manda su id', async () => {

@@ -84,7 +84,7 @@ export function FilaAuditoria({ registro: r, expandido, alAlternar }: FilaAudito
             </code>
           </div>
           <div>
-            <b>Acción:</b> {r.accion} · <b>Módulo:</b> {r.modulo} · <b>Categoría:</b> {r.categoria} · <b>Resultado:</b> {r.resultado}
+            <b>Acción:</b> {r.accion} · <b>Módulo:</b> {r.moduloNombre ?? r.modulo} · <b>Categoría:</b> {r.categoria} · <b>Resultado:</b> {r.resultado}
           </div>
           {r.entidad && (
             <div>

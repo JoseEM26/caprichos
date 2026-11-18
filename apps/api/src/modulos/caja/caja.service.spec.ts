@@ -96,6 +96,30 @@ describe('CajaService', () => {
       );
     });
 
+    it('la auditoría de ABRIR_CAJA guarda monto, quién abrió y si difiere del oficial', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(null);
+      prismaMock.caja.create.mockResolvedValue({
+        id: 10n,
+        fecha: new Date('2026-10-21T00:00:00.000Z'),
+        apertura: new Prisma.Decimal(150),
+        estado: 'ABIERTA',
+        abierta_por: 2n,
+        cerrada_por: null,
+        cerrada_en: null,
+      });
+      await service.abrirCaja({ apertura: 150 }, cajeroUsuario, '10.0.0.5');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modulo: 'caja',
+          accion: 'ABRIR_CAJA',
+          entidadId: 10n,
+          partyId: 2n,
+          ip: '10.0.0.5',
+          despues: expect.objectContaining({ id: '10', apertura: 150, abiertaPor: '2', distintoDelOficial: false }),
+        }),
+      );
+    });
+
     describe('monto inicial oficial', () => {
       const cajaCreada = (monto: number) => ({
         id: 11n, fecha: new Date('2026-10-21T00:00:00.000Z'), apertura: new Prisma.Decimal(monto),

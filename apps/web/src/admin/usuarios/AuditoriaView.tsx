@@ -54,6 +54,12 @@ function rangoPreset(preset: string): { desde: string; hasta: string } | null {
   return null;
 }
 
+/** Respuesta de /admin/auditoria/opciones: módulos con conteo y, con ?modulo=, las acciones de ese módulo. */
+interface OpcionesAuditoria {
+  modulos: Array<{ valor: string; etiqueta: string; cantidad: number }>;
+  acciones: Array<{ valor: string; cantidad: number }>;
+}
+
 const CATEGORIA_API: Record<string, string> = { cambio: 'CAMBIO', acceso: 'ACCESO', sensible: 'LECTURA_SENSIBLE' };
 
 function AccionesAuditoria() {
@@ -82,7 +88,7 @@ function AccionesAuditoria() {
   const pedidoA = useRetardo(pedido.trim());
   const productoA = useRetardo(producto.trim());
   const motivoA = useRetardo(motivo.trim());
-  const [opciones, setOpciones] = useState<{ modulos: string[]; acciones: string[] }>({ modulos: [], acciones: [] });
+  const [opciones, setOpciones] = useState<OpcionesAuditoria>({ modulos: [], acciones: [] });
   const [aviso, setAviso] = useState('');
   const [pagina, setPagina] = useState(Number(p('pag', '1')) || 1);
   const limite = 20;
@@ -129,10 +135,21 @@ function AccionesAuditoria() {
     setParams(n, { replace: true });
   }, [busquedaAplicada, filtroTipo, filtroModulo, filtroAccion, filtroResultado, filtroFecha, desde, hasta, persona, personaNombre, pedidoA, productoA, motivoA, pagina, setParams]);
 
+  // Módulos con conteo; las acciones dependen del módulo elegido (sin módulo, las de todo el historial)
   useEffect(() => {
     if (!puedeVer) return;
-    api.get<{ modulos: string[]; acciones: string[] }>('/admin/auditoria/opciones').then((o) => setOpciones({ modulos: o?.modulos ?? [], acciones: o?.acciones ?? [] })).catch(() => {});
-  }, [puedeVer]);
+    let vigente = true;
+    const ruta = filtroModulo ? `/admin/auditoria/opciones?modulo=${encodeURIComponent(filtroModulo)}` : '/admin/auditoria/opciones';
+    api
+      .get<OpcionesAuditoria>(ruta)
+      .then((o) => {
+        if (vigente) setOpciones({ modulos: o?.modulos ?? [], acciones: o?.acciones ?? [] });
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [puedeVer, filtroModulo]);
 
   const buscaPersonaA = useRetardo(buscaPersona.trim(), 300);
   useEffect(() => {
@@ -290,11 +307,17 @@ function AccionesAuditoria() {
 
   // Acciones con etiqueta en español; si el filtro viene de un atajo o de la URL, también aparece aunque no esté en la lista
   const accionesCombo = [
-    ...opciones.acciones.map((a) => ({ valor: a, etiqueta: etiquetaAccion(a) })),
-    ...(filtroAccion && !opciones.acciones.includes(filtroAccion)
+    ...opciones.acciones.map((a) => ({ valor: a.valor, etiqueta: etiquetaAccion(a.valor), cantidad: a.cantidad })),
+    ...(filtroAccion && !opciones.acciones.some((a) => a.valor === filtroAccion)
       ? [{ valor: filtroAccion, etiqueta: ATAJOS_CATALOGO.find((x) => x.acciones.join(',') === filtroAccion)?.etiqueta ?? etiquetaAccion(filtroAccion) }]
       : []),
   ].sort((x, y) => x.etiqueta.localeCompare(y.etiqueta, 'es'));
+
+  // Módulos: los del servidor con su conteo; si la URL trae uno que no está en la lista, se muestra igual
+  const modulosCombo = [
+    ...opciones.modulos.map((m) => ({ valor: m.valor, etiqueta: m.etiqueta, cantidad: m.cantidad })),
+    ...(filtroModulo && !opciones.modulos.some((m) => m.valor === filtroModulo) ? [{ valor: filtroModulo, etiqueta: filtroModulo }] : []),
+  ];
 
   if (!puedeVer) {
     return (
@@ -579,9 +602,10 @@ function AccionesAuditoria() {
           <FiltroCombo
             etiqueta="Módulo"
             valor={filtroModulo}
-            opciones={[{ valor: '', etiqueta: 'Todos' }, ...opciones.modulos.map((m) => ({ valor: m, etiqueta: m }))]}
+            opciones={[{ valor: '', etiqueta: 'Todos' }, ...modulosCombo]}
             alCambiar={(v) => {
               setFiltroModulo(v);
+              setFiltroAccion(''); // la acción era de otro módulo
               setPagina(1);
             }}
           />
@@ -687,7 +711,7 @@ function AccionesAuditoria() {
 
         {!cargando && registros.length === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--cp-soft)', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px' }}>
-            No hay registros de auditoría que coincidan con los filtros aplicados.
+            {filtroModulo ? 'Sin acciones de este módulo en el rango' : 'No hay registros de auditoría que coincidan con los filtros aplicados.'}
           </div>
         )}
 
