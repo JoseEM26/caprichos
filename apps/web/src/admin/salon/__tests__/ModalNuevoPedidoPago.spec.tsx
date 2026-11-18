@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { continuarYEnviar, irAlPago } from './continuarYEnviar';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
+import { api } from '../../../comun/api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import { llenarPagaCon } from './ayudaPagaCon';
@@ -93,6 +94,8 @@ async function confirmarRegistro() {
 describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Estas pruebas son del plan de pago, no del orden: orden clásico (Efectivo primero)
+    vi.spyOn(api, 'get').mockResolvedValue({ medios: ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] } as any);
     vi.mocked(salonApi.obtenerCarta).mockResolvedValue(cartaMock as any);
     vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
     vi.mocked(pedidosApi.crearPedidoAdmin).mockResolvedValue(pedidoCreado as any);
@@ -123,12 +126,13 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     expect(await screen.findByRole('group', { name: '¿Cómo paga?' })).toBeInTheDocument();
   });
 
-  it('en llevar muestra Efectivo, Yape, Plin y Transferencia con Efectivo por defecto', async () => {
+  it('en llevar muestra los medios en el orden configurado (de fábrica: Yape, Plin, Efectivo, Tarjeta, Transferencia) con Efectivo elegido por defecto', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ medios: ['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] } as any);
     await llegarAResumen('Para llevar');
 
     const grupo = await screen.findByRole('group', { name: '¿Cómo paga?' });
     const opciones = within(grupo).getAllByRole('button');
-    expect(opciones.map((b) => b.textContent)).toEqual(['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']);
+    expect(opciones.map((b) => b.textContent)).toEqual(['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia']);
     expect(within(grupo).getByRole('button', { name: 'Efectivo' })).toHaveAttribute('aria-pressed', 'true');
     // El campo «con cuánto paga» aparece con efectivo en llevar también (para el vuelto)
     expect(screen.getByText('¿Con cuánto paga?')).toBeInTheDocument();

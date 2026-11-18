@@ -89,7 +89,8 @@ describe('Pedido del personal en Nuevo pedido: bloque propio de pago', () => {
     await llegarAlFormularioFinal();
     fireEvent.click(await screen.findByRole('button', { name: /Pagar ahora/ }));
     const medios = within(screen.getByRole('radiogroup', { name: 'Medio de pago' })).getAllByRole('radio').map((r) => r.textContent);
-    expect(medios).toEqual(['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia']);
+    // Orden de fábrica de los medios: Yape, Plin, Efectivo, Tarjeta, Transferencia
+    expect(medios).toEqual(['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia']);
     expect(screen.getByRole('button', { name: /^Enviar a cocina/ })).toHaveTextContent('paga ahora en efectivo');
 
     continuarYEnviar();
