@@ -15,6 +15,8 @@ export class CartaLocalController {
     private readonly prisma: PrismaService,
   ) {}
 
+  private cacheProgramar: { valor: unknown; hasta: number } | null = null;
+
   @Get('estado')
   @Header('Cache-Control', 'no-store')
   async obtenerEstado() {
@@ -28,9 +30,13 @@ export class CartaLocalController {
   @Get('programar-horas')
   @Header('Cache-Control', 'no-store')
   async programarHoras() {
+    // Caché de 30 s en memoria (endpoint público): evita repetir las consultas de horario por cada visita.
+    // ponytail: por instancia; un cambio de horario o del parámetro tarda hasta 30 s en verse.
+    if (this.cacheProgramar && this.cacheProgramar.hasta > Date.now()) return this.cacheProgramar.valor;
     const { fueraHorario } = await leerConfigProgramados(this.prisma);
-    if (!fueraHorario) return { habilitado: false, diasMax: 0, dias: [] };
-    return { habilitado: true, ...(await this.localService.horasProgramables()) };
+    const valor = fueraHorario ? { habilitado: true, ...(await this.localService.horasProgramables()) } : { habilitado: false, diasMax: 0, dias: [] };
+    this.cacheProgramar = { valor, hasta: Date.now() + 30_000 };
+    return valor;
   }
 
   @Get('local')

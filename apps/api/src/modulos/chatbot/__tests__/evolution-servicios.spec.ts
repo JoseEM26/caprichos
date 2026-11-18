@@ -156,6 +156,20 @@ describe('política de envío con Evolution', () => {
     expect(await con(pausa).evaluar(aviso, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
     expect(await con(roto).evaluar(aviso, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
   });
+  it('fuera de horario: el «recibido» de un pedido PROGRAMADO de la carta o el bot sale; los demás avisos se descartan como hoy', async () => {
+    const pedido = (estado: string, canal = 'CARTA') => ({ pedido: { count: jest.fn(async () => 0), findUnique: jest.fn(async () => ({ estado, canal })) } });
+    const recibido = { ...aviso, pedido_id: 7n, carga: { etapa: 'RECIBIDO' } };
+    expect(await crear({}, pedido('PROGRAMADO')).politica.evaluar(recibido, FUERA)).toEqual({ accion: 'ENVIAR' });
+    expect(await crear({}, pedido('PROGRAMADO', 'WHATSAPP')).politica.evaluar(recibido, FUERA)).toEqual({ accion: 'ENVIAR' });
+    // no programado + cerrado = se descarta como hoy
+    expect(await crear({}, pedido('COLA')).politica.evaluar(recibido, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+    // programado por Caja: no es de cliente
+    expect(await crear({}, pedido('PROGRAMADO', 'CAJA')).politica.evaluar(recibido, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
+    // otro aviso del mismo programado (p. ej. aceptado) fuera de horario: se descarta
+    expect(await crear({}, pedido('PROGRAMADO')).politica.evaluar({ ...recibido, carga: { etapa: 'ACEPTADO' } }, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
+    // sin pedido_id (aviso suelto): se descarta
+    expect(await crear({}, pedido('PROGRAMADO')).politica.evaluar(aviso, FUERA)).toMatchObject({ codigo: 'FUERA_DE_HORARIO' });
+  });
   it('pausado o desconectado espera', async () => {
     expect(await crear({ evolution_pausado: 'si' }).politica.evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DIFERIR' });
     expect(await crear({ evolution_estado: { estado: 'DESCONECTADO' } }).politica.evaluar(aviso, DENTRO)).toMatchObject({ accion: 'DIFERIR' });
