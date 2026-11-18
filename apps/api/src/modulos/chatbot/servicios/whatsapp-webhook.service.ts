@@ -48,7 +48,7 @@ import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
 import { ModuleRef } from '@nestjs/core';
 import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
 import { DireccionesService } from '../../direcciones/direcciones.service';
-import { atenderMensajeVerificacion, esMensajeVerificacion, RESPUESTA_SIN_NUMERO, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
+import { atenderMensajeVerificacion, esMensajeVerificacion, RESPUESTA_NO_VERIFICADO, RESPUESTA_SIN_NUMERO, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
 import { textoGraciasEncuesta, textoPreguntaMotivo, TEXTO_PIDE_MOTIVO_LIBRE } from '../conversacion/textos-encuesta';
 import { etiquetaMotivo, interpretarMotivoEncuesta, MOTIVO_TEXTO_MAX, MOTIVO_VENCE_MS } from './encuesta-motivo.util';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
@@ -395,7 +395,15 @@ export class WhatsappWebhookService {
     const de = String(msg?.from || msg?.from_user_id || contacts?.[0]?.wa_id || msg?.id || '').replace(/\D/g, '') || String(msg?.from_user_id || msg?.id || 'anon');
     let redisCliente: any = null;
     try { redisCliente = this.redis?.obtenerCliente() ?? null; } catch { redisCliente = null; }
-    return ejecutarEnSerie(`wa:${de}`, redisCliente, () => this.procesarMensajeEntranteSerie(msg, contacts, receptor));
+    const ejecucion = ejecutarEnSerie(`wa:${de}`, redisCliente, () => this.procesarMensajeEntranteSerie(msg, contacts, receptor));
+    // Diagnóstico: si un mensaje de verificación revienta antes de llegar a su rama, queda constancia (el error sigue su curso)
+    if (msg?.type === 'text' && esMensajeVerificacion(String(msg.text?.body ?? ''))) {
+      return ejecucion.catch((err: any) => {
+        this.logger.error(`[verificacion] el mensaje falló antes de verificarse: ${err?.message}`);
+        throw err;
+      });
+    }
+    return ejecucion;
   }
 
   private async procesarMensajeEntranteSerie(msg: any, contacts: any[] = [], receptor?: ReceptorWhatsapp) {
@@ -521,6 +529,10 @@ export class WhatsappWebhookService {
       if (tipo === 'audio' && msg.audio?.id) {
         audioGuardado = await this.guardarAudio(msg.audio.id, String(msg.audio.mime_type || 'audio/ogg'));
       }
+    }
+
+    if (clasificacion.clase === 'TEXTO' && esMensajeVerificacion(texto)) {
+      this.logger.log(`[verificacion] mensaje de verificación recibido (${telMask}, identificador ${tipoIdentificador}, wa_id ${waMessageId ? 'sí' : 'no'})`);
     }
 
     // Asociar a conversación existente o crearla de forma defensiva
@@ -780,16 +792,14 @@ export class WhatsappWebhookService {
     // Sin bloqueo por spam: verificar es de un solo uso y ya tiene su propio límite de intentos.
     // Sin número visible (cuenta con usuario de WhatsApp): se explica, no se manda al bot ni se escala a una persona.
     if (clasificacion.clase === 'TEXTO' && esMensajeVerificacion(texto)) {
+      // Un mensaje de verificación es del sistema: nunca pasa al bot (ni a su horario, pausa o chat tomado), aunque falle.
       if (telefonoNorm) {
-        if (await this.atenderVerificacionCelular(telefonoNorm, texto)) return true;
+        await this.atenderVerificacionCelular(telefonoNorm, texto);
       } else {
-        try {
-          await this.mensajeria.enviarTexto(identificador, RESPUESTA_SIN_NUMERO);
-        } catch (err: any) {
-          this.logger.warn(`No se pudo avisar que falta el número para verificar: ${err.message}`);
-        }
-        return true;
+        this.logger.warn(`[verificacion] remitente sin número visible (${telMask}): se explica, no se verifica`);
+        await this.responderVerificacion(identificador, RESPUESTA_SIN_NUMERO);
       }
+      return true;
     }
 
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
@@ -1296,25 +1306,45 @@ export class WhatsappWebhookService {
   }
 
   /**
-   * Responde a un mensaje de verificación del celular. Devuelve true si el mensaje era de verificación (y ya
-   * se respondió), false si es un mensaje normal. Un fallo interno no pasa el mensaje al bot: no se contesta nada.
+   * Verifica el celular con el token del mensaje. La marca se escribe ANTES de responder (la web la ve al instante),
+   * y un fallo al responder no la deshace. Siempre termina con una respuesta al cliente, salvo que no haya número.
    */
-  private async atenderVerificacionCelular(telefonoNorm: string, texto: string): Promise<boolean> {
-    if (!this.redis) return false;
+  private async atenderVerificacionCelular(telefonoNorm: string, texto: string): Promise<void> {
+    const diagnostico = (evento: string, datos: Record<string, string | number | boolean> = {}) =>
+      this.logger.log(`[verificacion] ${evento} ${JSON.stringify(datos)}`);
+    let respuesta: string = RESPUESTA_NO_VERIFICADO;
     try {
-      const respuesta = await atenderMensajeVerificacion(
-        this.redis.obtenerCliente(),
-        secretoVerificacion(this.configService),
-        texto,
-        telefonoNorm,
-      );
-      if (!respuesta) return false;
-      // Dentro de la ventana de 24 h (el cliente acaba de escribir): texto libre, sin plantilla
-      await this.mensajeria.enviarTexto(telefonoNorm, respuesta);
+      if (!this.redis) {
+        this.logger.error('[verificacion] Redis no disponible en el webhook: no se puede verificar este mensaje');
+      } else {
+        const r = await atenderMensajeVerificacion(
+          this.redis.obtenerCliente(),
+          secretoVerificacion(this.configService),
+          texto,
+          telefonoNorm,
+          diagnostico,
+        );
+        if (r) respuesta = r;
+      }
     } catch (err: any) {
-      this.logger.warn(`No se pudo atender la verificación del celular: ${err.message}`);
+      this.logger.error(`[verificacion] error al verificar (Redis): ${err.message}`);
     }
-    return true;
+    await this.responderVerificacion(telefonoNorm, respuesta);
+  }
+
+  /** Respuesta de la verificación por el puerto (Meta o Evolution). Nunca lanza; deja en el log si no salió y por qué. */
+  private async responderVerificacion(destino: string, texto: string): Promise<void> {
+    const sufijo = `a ***${String(destino).replace(/\D/g, '').slice(-3)}`;
+    try {
+      const r: any = await this.mensajeria.enviarTexto(destino, texto);
+      if (r && r.exito === false) {
+        this.logger.warn(`[verificacion] respuesta NO enviada ${sufijo}: ${r.estado} ${r.errorCodigo ?? ''} ${String(r.errorDetalle ?? '').slice(0, 160)}`);
+      } else {
+        this.logger.log(`[verificacion] respuesta ${r?.estado ?? 'entregada'} ${sufijo}`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`[verificacion] respuesta NO enviada ${sufijo}: excepción ${err?.message}`);
+    }
   }
 
   /** true si el contacto tiene un bloqueo temporal por spam vigente. Si Redis no responde, no bloquea (fail-open). */

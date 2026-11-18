@@ -155,13 +155,28 @@ export async function estadoVerificacion(redis: RedisVerificacion, secreto: stri
   return valor.endsWith('|V') ? 'verificado' : 'pendiente';
 }
 
+/**
+ * Texto tal como llega de WhatsApp para buscar el token: NFC, sin caracteres de ancho cero y con los espacios raros
+ * (no separable, fino, ideográfico...) convertidos en espacio normal. Un espacio no estándar no debe ocultar el token.
+ */
+export const normalizarTextoVerificacion = (texto: string): string =>
+  String(texto ?? '')
+    .normalize('NFC')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+
 /** Busca «Mi código: TOKEN» en el mensaje (8 caracteres alfanuméricos). */
 // Tolera espacio antes de los dos puntos ("código :") y la falta de dos puntos.
-const REGEX_TOKEN_MENSAJE = /mi c[oó]digo\s*:?\s*([A-Za-z0-9]{8})(?![A-Za-z0-9])/i;
+const REGEX_TOKEN_MENSAJE = /mi\s+c[oó]digo\s*:?\s*([A-Za-z0-9]{8})(?![A-Za-z0-9])/i;
 
 /** true si el texto es un mensaje de verificación («Mi código: TOKEN»). */
 export const esMensajeVerificacion = (texto: string): boolean =>
-  REGEX_TOKEN_MENSAJE.test(String(texto || '').normalize('NFC'));
+  REGEX_TOKEN_MENSAJE.test(normalizarTextoVerificacion(texto));
+
+/** Diagnóstico para los logs: nunca recibe el token completo ni el número completo. */
+export type DiagnosticoVerificacion = (evento: string, datos?: Record<string, string | number | boolean>) => void;
+const enmascararToken = (t: string) => `${t.slice(0, 2)}******`;
+const ultimos3 = (d: string) => (d ? `***${d.slice(-3)}` : 'sin-numero');
 
 export const RESPUESTA_SIN_NUMERO =
   'No pudimos ver tu número de WhatsApp (tu cuenta lo tiene oculto), así que no podemos verificarlo por aquí. Revisa en WhatsApp que tu número pueda verse, o avísanos y te ayudamos 🙏';
@@ -175,29 +190,38 @@ export async function atenderMensajeVerificacion(
   secreto: string,
   texto: string,
   remitenteRaw: string,
+  diagnostico?: DiagnosticoVerificacion,
 ): Promise<string | null> {
-  // NFC: una «ó» escrita como o + tilde combinada también cuenta
-  const m = REGEX_TOKEN_MENSAJE.exec(String(texto || '').normalize('NFC'));
+  const m = REGEX_TOKEN_MENSAJE.exec(normalizarTextoVerificacion(texto));
   if (!m) return null;
   const token = m[1].toUpperCase();
   const clave = claveToken(token, secreto);
+  const remitente = normalizarCelularPeru(remitenteRaw).celular9 ?? '';
   const valor = await redis.get(clave);
-  if (!valor) return RESPUESTA_NO_VERIFICADO; // venció o nunca existió
+  if (!valor) {
+    // venció o nunca existió (o el secreto de firma es otro: ver secretoVerificacion)
+    diagnostico?.('TOKEN_NO_ENCONTRADO', { token: enmascararToken(token), remitente: ultimos3(remitente) });
+    return RESPUESTA_NO_VERIFICADO;
+  }
 
   const [tel9, proposito, estado] = valor.split('|');
-  const remitente = normalizarCelularPeru(remitenteRaw).celular9;
   if (!remitente || remitente !== tel9) {
     // Otro celular: no marca nada. Tras varios intentos el token se invalida.
     const claveIntentos = claveToken(token, secreto, 'int');
     const n = await redis.incr(claveIntentos);
     if (n === 1) await redis.expire(claveIntentos, TOKEN_TTL_SEG);
     if (n >= TOKEN_MAX_INTENTOS) await redis.del(clave);
+    diagnostico?.('REMITENTE_DISTINTO', { token: enmascararToken(token), remitente: ultimos3(remitente), esperado: ultimos3(tel9 ?? ''), intento: n });
     return RESPUESTA_NO_VERIFICADO;
   }
 
   // Mismo celular que pidió el token: si ya estaba verificado, se responde lo mismo sin volver a marcar.
-  if (estado === 'V') return RESPUESTA_VERIFICADO;
+  if (estado === 'V') {
+    diagnostico?.('YA_VERIFICADO', { token: enmascararToken(token), remitente: ultimos3(remitente) });
+    return RESPUESTA_VERIFICADO;
+  }
   await redis.set(clave, `${tel9}|${proposito}|V`, 'EX', TOKEN_TTL_SEG);
   await redis.set(claveMarcaVerificacion(proposito as PropositoVerificacion, tel9), '1', 'EX', MARCA_TTL_SEG);
+  diagnostico?.('MARCADO', { token: enmascararToken(token), remitente: ultimos3(remitente), proposito });
   return RESPUESTA_VERIFICADO;
 }
