@@ -3,7 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { ErrorApi } from '../../comun/api';
 import { autenticar3ds, obtenerDeviceId } from './culqi3ds';
-import { abrirCulqi, cargarScriptCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
+import { abrirCulqi, cargarScriptCulqi, culqiApi, ErrorAperturaCulqi, ESTADO_3DS, logCulqi, mensajeRechazo, type ConfigCulqi, type IntentoCulqi, type MedioCulqi } from './culqiApi';
 
 type Fase = 'cargando' | 'listo' | 'formulario' | 'pagando' | 'aprobado' | 'rechazado' | 'pendiente' | 'error';
 const MEDIOS_CAMBIO: { medio: string; nombre: string }[] = [
@@ -29,7 +29,13 @@ function useRestanteMs(creadoEn?: string): number | null {
 }
 
 /** Cinta de cuenta regresiva con el estilo de la carta. Nunca lleva el precio: el formulario de Culqi ya lo muestra. */
-function CintaTiempo({ restanteMs }: { restanteMs: number | null }) {
+export function CintaTiempo({ restanteMs }: { restanteMs: number | null }) {
+  // La barra nace ya en su ancho real: la transición de 30 s se activa tras el primer pintado,
+  // así al montar no anima desde 0 y solo anima los cambios posteriores.
+  const [conTransicion, setConTransicion] = useState(false);
+  useEffect(() => {
+    setConTransicion(true);
+  }, []);
   if (restanteMs === null) return null;
   const vencido = restanteMs <= 0;
   const urgente = restanteMs <= 3 * 60000;
@@ -69,7 +75,7 @@ function CintaTiempo({ restanteMs }: { restanteMs: number | null }) {
         {texto}
       </span>
       <span aria-hidden="true" style={{ display: 'block', width: 'min(240px, 100%)', height: 4, borderRadius: 4, background: 'rgba(251,244,236,0.25)', overflow: 'hidden' }}>
-        <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: urgente ? 'var(--cp-cream)' : 'var(--cp-gold)', transition: 'width 30s linear' }} />
+        <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: urgente ? 'var(--cp-cream)' : 'var(--cp-gold)', transition: conTransicion ? 'width 30s linear' : 'none' }} />
       </span>
     </div>
   );
@@ -97,7 +103,7 @@ const TOKENS_PRUEBA: { token: string; medio: MedioCulqi; texto: string }[] = [
 ];
 
 /** «Pagar ahora con tarjeta o Yape» (Culqi). No pinta nada si la pasarela no está activa. */
-export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado, monto, creadoEn, alFormulario }: { pedidoId: string; token?: string; /** lo que falta pagar */ monto?: number; /** ISO de creación del pedido, para el contador de 15 min */ creadoEn?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void; /** avisa si el formulario de pago está abierto, para que el modal le dé todo el espacio */ alFormulario?: (abierto: boolean) => void }) {
+export function PagarEnLinea({ pedidoId, pedidoCodigo, token: tokenSeguimiento, auto, alPagado, monto, creadoEn, alFormulario }: { pedidoId: string; token?: string; /** código del pedido (CP-…), para el diagnóstico */ pedidoCodigo?: string; /** lo que falta pagar */ monto?: number; /** ISO de creación del pedido, para el contador de 15 min */ creadoEn?: string; /** abre el pago solo al mostrarse (pedido recién hecho con este medio) */ auto?: boolean; alPagado?: () => void; /** avisa si el formulario de pago está abierto, para que el modal le dé todo el espacio */ alFormulario?: (abierto: boolean) => void }) {
   const [config, setConfig] = useState<ConfigCulqi | null>(null);
   const [fase, setFase] = useState<Fase>('cargando');
   const [mensaje, setMensaje] = useState('');
@@ -112,6 +118,10 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
   const [enviandoCambio, setEnviandoCambio] = useState(false);
   const [avisoCambio, setAvisoCambio] = useState('');
   const [avisoOk, setAvisoOk] = useState('');
+  // Culqi sin respuesta: a los 10 s sin formulario usable se ofrece salida (reintentar, ventana aparte, otro medio)
+  const [reintento, setReintento] = useState(0);
+  const [ventanaAparte, setVentanaAparte] = useState(false);
+  const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -209,14 +219,19 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
       // en cuanto Culqi mete su iframe en el anfitrión, se quita el estado de carga
       if (typeof MutationObserver !== 'undefined') {
         mo = new MutationObserver(() => {
-          if (nodoAnfitrion.querySelector('iframe')) {
+          const iframe = nodoAnfitrion.querySelector('iframe');
+          if (!iframe) return;
+          mo?.disconnect();
+          // «lista» solo cuando el iframe terminó de cargar: un iframe vacío no quita el estado de carga
+          iframe.addEventListener('load', () => {
+            if (!vivo) return;
             setPasarela('lista');
-            mo?.disconnect();
-          }
+            logCulqi('iframe cargado: formulario listo');
+          }, { once: true });
         });
         mo.observe(nodoAnfitrion, { childList: true, subtree: true });
       }
-      const a = abrirCulqi(intento, nodoAnfitrion, (v) => vivo && setRespaldo(v));
+      const a = abrirCulqi(intento, nodoAnfitrion, (v) => vivo && setRespaldo(v), undefined, ventanaAparte);
       cerrar = a.cerrar;
       a.resultado
         .then((res) => {
@@ -237,18 +252,47 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
       cerrar();
       setRespaldo(false);
     };
-  }, [fase, intento]);
+  }, [fase, intento, reintento, ventanaAparte]);
 
   useEffect(() => {
     alFormulario?.(fase === 'formulario');
     return () => alFormulario?.(false);
   }, [fase]);
 
-  // fuera del pago en curso no queda estado de carga pendiente (error, rechazo, listo, etc.)
+  // Sin formulario usable a los 10 s: se ofrece salida dentro del mismo recuadro (con el código para soporte)
   useEffect(() => {
-    if (fase !== 'pagando' && fase !== 'formulario') setPasarela('inactiva');
-  }, [fase]);
-
+    if (fase !== 'formulario' || respaldo || pasarela === 'lista') return;
+    const t = setTimeout(() => {
+      const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setDiagnostico(`Culqi sin respuesta · pedido ${pedidoCodigo ?? pedidoId} · ${hora}`);
+      logCulqi('sin respuesta a los 10 s: se ofrece reintentar');
+    }, 10000);
+    return () => {
+      clearTimeout(t);
+      setDiagnostico(null);
+    };
+  }, [fase, respaldo, pasarela, reintento, ventanaAparte]);
+  const reintentarCulqi = () => {
+    logCulqi('reintento pedido por el cliente');
+    setDiagnostico(null);
+    setVentanaAparte(false);
+    setPasarela('cargando');
+    setReintento((n) => n + 1);
+  };
+  const cambiarMedioAhora = () => {
+    setDiagnostico(null);
+    setCambiando(true);
+    setAvisoCambio('');
+    setAvisoOk('');
+    setFase('listo');
+  };
+  const copiarDiagnostico = () => {
+    try {
+      void navigator.clipboard.writeText(diagnostico ?? '').catch(() => {});
+    } catch {
+      /* sin portapapeles: el código se puede seleccionar a mano */
+    }
+  };
   const iniciado = useRef(false);
   useEffect(() => {
     if (auto && config?.activo && config.modo === 'REAL' && !iniciado.current) {
@@ -374,6 +418,20 @@ export function PagarEnLinea({ pedidoId, token: tokenSeguimiento, auto, alPagado
                 )}
                 <div ref={anfitrion} className="sg-culqi" aria-label="Formulario de pago de Culqi" style={respaldo ? { display: 'none' } : undefined} />
               </div>
+              {diagnostico && (
+                <div role="alert" data-testid="culqi-ayuda" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'var(--cp-cream)', border: '1px solid var(--cp-sand)', display: 'grid', gap: 8 }}>
+                  <strong style={{ color: 'var(--cp-navy)' }}>¿No carga el pago? Prueba otra vez</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <Boton variante="secundario" onClick={reintentarCulqi}>Reintentar</Boton>
+                    <Boton variante="secundario" onClick={() => { setVentanaAparte(true); setPasarela('cargando'); }}>Abrir en ventana aparte</Boton>
+                    <Boton variante="secundario" onClick={cambiarMedioAhora}>Cambiar medio de pago</Boton>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                    <code data-testid="culqi-diagnostico" className="sg-detalle" style={{ fontSize: 12, wordBreak: 'break-all', userSelect: 'all' }}>{diagnostico}</code>
+                    <button type="button" onClick={copiarDiagnostico} style={{ fontSize: 12, background: 'none', border: 0, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>Copiar código</button>
+                  </div>
+                </div>
+              )}
               <Boton variante="secundario" onClick={() => setFase('listo')} style={{ marginTop: 8 }}>
                 Volver
               </Boton>

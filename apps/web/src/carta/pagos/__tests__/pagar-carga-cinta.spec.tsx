@@ -65,8 +65,20 @@ describe('Pago en línea: estado de carga al tocar Pagar', () => {
     expect(carga.textContent).toMatch(/Cargando tu pago seguro…/);
     expect(carga.textContent).toMatch(/Esto puede tardar unos segundos/);
 
+    // jsdom dispara «load» en los iframes por su cuenta: el de Culqi solo carga cuando la prueba lo dice
+    let cargado = false;
+    const addOriginal = HTMLIFrameElement.prototype.addEventListener;
+    vi.spyOn(HTMLIFrameElement.prototype, 'addEventListener').mockImplementation(function (this: HTMLIFrameElement, tipo: string, fn: any, opts?: any) {
+      if (tipo !== 'load') return addOriginal.call(this, tipo, fn, opts);
+      const { once: _una, ...resto } = typeof opts === 'object' && opts ? opts : {};
+      return addOriginal.call(this, tipo, (ev: Event) => { if (cargado) fn(ev); }, resto);
+    } as any);
     await act(async () => liberar());
     await waitFor(() => expect(document.querySelector('.sg-culqi iframe')).not.toBeNull());
+    // un iframe recién insertado no basta: sigue «Cargando» hasta que el iframe termina de cargar
+    expect(screen.queryByTestId('pago-cargando')).not.toBeNull();
+    cargado = true;
+    await act(async () => document.querySelector('.sg-culqi iframe')!.dispatchEvent(new Event('load')));
     expect(screen.queryByTestId('pago-cargando')).toBeNull();
   });
 

@@ -398,7 +398,7 @@ function PanelPago({
   return (
     <>
       {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
-        <PagarEnLinea pedidoId={String(pedidoId)} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} alFormulario={(a) => { setPagandoForm(a); alFormulario?.(a); }} />
+        <PagarEnLinea pedidoId={String(pedidoId)} pedidoCodigo={pedido.codigo} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} alFormulario={(a) => { setPagandoForm(a); alFormulario?.(a); }} />
       )}
       {resumen && !pagandoForm && (
         <section className="sg-tarjeta" aria-label="Resumen del pago">

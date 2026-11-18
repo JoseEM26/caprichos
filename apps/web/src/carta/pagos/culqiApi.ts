@@ -98,6 +98,12 @@ export const ID_CONTENEDOR_CULQI = 'culqi-container';
 const COLOR_AZUL = '#0B2C3E';
 const COLOR_CREMA = '#FBF4EC';
 const COLOR_NARANJA = '#E67929';
+/** Diagnóstico en consola (prefijo [culqi]): nunca lleva llaves completas ni datos de tarjeta. */
+export const logCulqi = (...a: unknown[]) => console.info('[culqi]', ...a);
+const si = (v: unknown) => (v ? 'sí' : 'no');
+/** Solo el prefijo de la llave (pk_test_ / pk_live_). */
+const prefijoLlave = (pk?: string | null) => /^pk_(test|live)_/.exec(pk ?? '')?.[0] ?? 'desconocida';
+const detalleErrorCulqi = (e: any) => ({ codigo: e?.code ?? e?.decline_code, mensaje: e?.merchant_message });
 
 /** Carga un script externo una sola vez y bajo demanda. */
 export function cargarScript(url: string, memo?: { p: Promise<void> | null }): Promise<void> {
@@ -118,13 +124,30 @@ export function cargarScript(url: string, memo?: { p: Promise<void> | null }): P
   return m.p;
 }
 const memoCulqi = { p: null as Promise<void> | null };
-export const cargarScriptCulqi = () => cargarScript(URL_CULQI, memoCulqi);
+let inicioScript = 0;
+let scriptLogueado = false;
+export function cargarScriptCulqi(): Promise<void> {
+  if (!memoCulqi.p) inicioScript = performance.now();
+  return cargarScript(URL_CULQI, memoCulqi).then(
+    () => {
+      if (!scriptLogueado) {
+        scriptLogueado = true;
+        logCulqi(`script cargado en ${Math.round(performance.now() - inicioScript)} ms`);
+      }
+    },
+    (e) => {
+      logCulqi('no se pudo cargar el script de Culqi (red o bloqueo)');
+      throw e;
+    },
+  );
+}
 
 /** Configuración de Culqi Checkout Custom embebido: solo tarjeta y Yape; los medios con orden quedan apagados. */
 export function configCulqi(intento: Pick<IntentoCulqi, 'moneda' | 'montoCentimos' | 'medios'>) {
   const paymentMethods = {
     tarjeta: intento.medios.includes('TARJETA'),
-    yape: intento.medios.includes('YAPE'),
+    // Yape exige una orden creada por el servidor (POST /v2/orders); el intento todavía no la crea: apagado
+    yape: false,
     bancaMovil: false,
     agente: false,
     billetera: false,
@@ -201,7 +224,6 @@ export interface ResultadoCulqi {
   email?: string;
 }
 
-const log = (...a: unknown[]) => console.info('[culqi]', ...a);
 /** Milisegundos sin ver el iframe de Culqi antes de pasar al respaldo (ventana modal de Culqi). */
 export const ESPERA_IFRAME_MS = 4500;
 
@@ -218,6 +240,8 @@ export function abrirCulqi(
   anfitrion: HTMLElement,
   alRespaldo?: (activo: boolean) => void,
   esperaMs = ESPERA_IFRAME_MS,
+  /** true: se salta el formulario embebido y abre la ventana segura de Culqi (botón «Abrir en ventana aparte») */
+  forzarModal = false,
 ): { resultado: Promise<ResultadoCulqi | null>; cerrar: () => void } {
   let instancia: any = null;
   let nodo: HTMLElement | null = null;
@@ -227,6 +251,14 @@ export function abrirCulqi(
   const resultado = new Promise<ResultadoCulqi | null>((resolver, rechazar) => {
     terminar = (r, e) => (e ? rechazar(e) : resolver(r));
   });
+  // Mensajes que Culqi envía por postMessage: solo se registra origen y forma, nunca su contenido
+  const alMensaje = (e: MessageEvent) => {
+    if (!/^https:\/\/[^/]*culqi\.com$/.test(e.origin)) return;
+    const d = e.data;
+    const forma = typeof d === 'string' ? `texto de ${d.length} caracteres` : d && typeof d === 'object' ? `claves: ${Object.keys(d).slice(0, 10).join(', ')}` : typeof d;
+    logCulqi('mensaje de Culqi', e.origin, forma);
+  };
+  window.addEventListener('message', alMensaje);
   const soltar = () => {
     clearTimeout(timer);
     try { instancia?.close(); } catch { /* ya cerrado */ }
@@ -236,6 +268,7 @@ export function abrirCulqi(
   };
   const cerrar = () => {
     cerrado = true;
+    window.removeEventListener('message', alMensaje);
     soltar();
     terminar(null);
   };
@@ -254,33 +287,47 @@ export function abrirCulqi(
       cfg = { ...cfg, options: { ...cfg.options, container: `#${nodo.id}` } };
     }
     instancia = new CC(intento.publicKey, cfg);
-    log('instancia creada', modal ? 'modal' : cfg.options.container);
+    const s = cfg.settings as Record<string, unknown>;
+    logCulqi('instancia nueva', modal ? 'ventana aparte' : 'embebida', 'llave', prefijoLlave(intento.publicKey));
+    logCulqi('settings enviado', { title: si(s.title), currency: si(s.currency), amount: si(s.amount), order: si(s.order) });
     instancia.culqi = () => {
       const C = instancia;
       if (C.token?.id) {
         const tk = C.token;
+        logCulqi('token recibido (no se muestra)');
         C.close();
         terminar({ token: tk.id, medio: tk.type === 'yape' || String(tk.id).startsWith('ype_') ? 'YAPE' : 'TARJETA', email: tk.email });
       } else if (C.error) {
+        logCulqi('Culqi.error', detalleErrorCulqi(C.error));
         C.close();
         terminar(null, new Error(mensajeRechazo(C.error.code ?? C.error.decline_code, C.error.merchant_message)));
       } else {
+        logCulqi('formulario cerrado sin token');
         C.close();
         terminar(null);
       }
     };
-    instancia.closeCheckout = () => terminar(null);
+    instancia.closeCheckout = () => {
+      logCulqi('cierre pedido por Culqi');
+      terminar(null);
+    };
     instancia.open();
-    log('open', modal ? 'modal' : 'embebido');
+    logCulqi('open', modal ? 'ventana aparte' : 'embebido');
   };
   const hayIframe = (modal: boolean) =>
     !!(modal ? document.querySelector('iframe[name="checkout_frame"]') : nodo?.querySelector('iframe'));
   const vigilar = (modal: boolean) => {
     timer = setTimeout(() => {
       if (cerrado) return;
-      if (hayIframe(modal)) return log('iframe visto', modal ? 'modal' : 'embebido');
-      if (modal) return terminar(null, new ErrorAperturaCulqi());
-      log('sin iframe: respaldo modal');
+      const modo = modal ? 'ventana aparte' : 'embebido';
+      if (hayIframe(modal)) return logCulqi('iframe visto', modo);
+      const errorCulqi = instancia?.error ?? (window as any).Culqi?.error;
+      if (errorCulqi) logCulqi('Culqi.error al abrir', detalleErrorCulqi(errorCulqi));
+      if (modal) {
+        logCulqi('iframe no visto', modo);
+        return terminar(null, new ErrorAperturaCulqi());
+      }
+      logCulqi(`iframe no visto a los ${esperaMs} ms: respaldo en ventana aparte`);
       soltar();
       try {
         alRespaldo?.(true);
@@ -295,9 +342,15 @@ export function abrirCulqi(
   cargarScriptCulqi()
     .then(() => {
       if (cerrado) return;
-      log('script cargado');
-      crear(false);
-      vigilar(false);
+      if (forzarModal) {
+        logCulqi('ventana aparte pedida por el cliente');
+        alRespaldo?.(true);
+        crear(true);
+        vigilar(true);
+      } else {
+        crear(false);
+        vigilar(false);
+      }
     })
     .catch(() => terminar(null, new ErrorAperturaCulqi()));
   return { resultado, cerrar };
