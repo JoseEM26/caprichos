@@ -2,6 +2,9 @@
  * Estados específicos del flujo transaccional de Pedido por WhatsApp (Ola 2, Agente C).
  */
 export type EstadoPedidoFlujo =
+  | 'PEDIDO_PROG_DIA'
+  | 'PEDIDO_PROG_HORA'
+  | 'PEDIDO_PAGO_CAMINO'
   | 'PEDIDO_MODALIDAD'
   | 'PEDIDO_UBICACION'
   | 'PEDIDO_CATEGORIAS'
@@ -208,6 +211,14 @@ export interface EstadoCarritoPedido {
   /** Propina opcional en soles (aparte de la venta). undefined = aún no se preguntó. */
   propina?: number;
   modalidad?: 'DELIVERY' | 'RECOGER';
+  /** Local cerrado: instante ISO (hora de Lima) para el que el cliente programó su pedido. */
+  programadoPara?: string;
+  /** Día elegido (AAAA-MM-DD) mientras se escoge la hora. */
+  programadoFecha?: string;
+  /** Página de la lista de días u horas (el bot muestra pocas filas por vez). */
+  paginaProg?: number;
+  /** Pedido programado: «Pagar al recibir» o «Dejarlo pagado» (Yape, Plin o transferencia con captura). */
+  pagoCamino?: 'AL_RECIBIR' | 'DEJAR_PAGADO';
   entrega?: DatosEntregaBot;
   cliente?: DatosClienteBot;
   items: LineaCarritoBot[];

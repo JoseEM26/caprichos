@@ -7,6 +7,8 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { LocalService } from '../../local/local.service';
+import { leerConfigProgramados } from '../../pedidos/programado.util';
+import { TEXTOS_PROGRAMAR } from './textos-programar';
 import { CatalogoService } from '../../catalogo/catalogo.service';
 import { aplanarEnlacesMarkdown } from '../utilidades/texto-whatsapp.util';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
@@ -120,12 +122,13 @@ export class EjecutorConversacionService {
    * Origen del pedido de WhatsApp: los puntos van SIEMPRE al celular de quien escribe. El bot no acepta otro número
    * (el de contacto para la entrega nunca suma puntos) ni ofrece canjear.
    */
-  private origenPedidoWhatsapp(conversacion: { telefono: string }): {
+  private origenPedidoWhatsapp(conversacion: { telefono: string }, programadoCliente?: string): {
     canal: 'WHATSAPP';
     telefonoRemitente: string;
     telefonoPuntos: string;
+    programadoCliente?: string;
   } {
-    return { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono, telefonoPuntos: conversacion.telefono };
+    return { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono, telefonoPuntos: conversacion.telefono, ...(programadoCliente ? { programadoCliente } : {}) };
   }
 
   /**
@@ -1024,6 +1027,9 @@ export class EjecutorConversacionService {
     let ventasProductos: Record<string, number> = {};
     let pedidoActivo: any = null;
     let limiteConsultasExcedido = false;
+    // Local cerrado con «Pedidos programados fuera de horario» encendido: el bot solo atiende para programar (llevar o delivery)
+    let soloProgramar = false;
+    let programacion: ContextoConversacion['programacion'];
 
     try {
       // a) Consulta de datos del local y estado de apertura
@@ -1075,6 +1081,18 @@ export class EjecutorConversacionService {
         telefono: datosPublicos?.telefono || datosPublicos?.whatsapp || '9XX XXX XXX',
         altaDemandaMinutosExtra: altaDemandaExtra,
       };
+
+      // Cerrado por horario o fecha especial (una pausa por alta demanda sigue sin recibir pedidos)
+      if (!estadoCarta.abierta && estadoCarta.motivo !== 'PAUSA') {
+        try {
+          if ((await leerConfigProgramados(this.prisma)).fueraHorario) {
+            programacion = await this.localService.horasProgramables();
+            soloProgramar = true;
+          }
+        } catch (err: any) {
+          this.logger.warn(`Sin horarios para programar fuera de horario: ${err?.message}`);
+        }
+      }
 
       // b) Búsqueda y validación estricta de "Mi pedido" (requisito d)
       const matchCodigo =
@@ -1148,7 +1166,7 @@ export class EjecutorConversacionService {
     // Excepción: pedido en curso (últimas 24 h, no terminado) o pago por validar.
     const terminado = ['ENTREGADO', 'ANULADO', 'CANCELADO', 'FINALIZADO', 'RECHAZADO'];
     const enCursoCerrado = esValidarPago || String((flujoPrevio as any)?.estado ?? '').startsWith('PAGO') || (pedidoActivo && !terminado.includes(String(pedidoActivo.estado)));
-    if (!errorServicio && datosLocal && datosLocal.abierta === false && !datosLocal.pausaAltaDemanda && !enCursoCerrado) {
+    if (!errorServicio && datosLocal && datosLocal.abierta === false && !datosLocal.pausaAltaDemanda && !enCursoCerrado && !soloProgramar) {
       await this.registrarSilencio(conversacion.id, 'Local cerrado: el bot no conversa fuera del horario (ya se avisó la hora de apertura).');
       return false;
     }
@@ -1377,6 +1395,8 @@ export class EjecutorConversacionService {
       vistaPreviaPedido,
       datosLocal,
       datosLocalPublicos,
+      soloProgramar,
+      programacion,
       categoriasCarta,
       ofertas,
       ofertasSoloWeb: promosFuera.soloWeb,
@@ -2205,7 +2225,7 @@ export class EjecutorConversacionService {
             const pedidoCreado = await this.pedidosService.crear(
               await this.conCalleDeLaUbicacion(accion.dto, conversacion.id),
               accion.claveIdempotencia,
-              this.origenPedidoWhatsapp(conversacion),
+              this.origenPedidoWhatsapp(conversacion, accion.dto?.programadoPara),
             );
             codigoFinal = pedidoCreado.codigo;
             // Chat sin número (LID): el celular que el cliente dio para su pedido vincula el chat con sus pedidos
@@ -2236,8 +2256,11 @@ export class EjecutorConversacionService {
             continue;
           }
           // Local cerrado (o en pausa) al confirmar: no se toma el pedido; se avisa el horario, sin escalar a una persona
-          if (err?.response?.codigo === 'CARTA_CERRADA') {
-            const texto = `${err.response.mensaje ?? 'Ahora no estamos recibiendo pedidos'} 🙏 Tu pedido no se envió; escríbenos de nuevo cuando estemos atendiendo.`;
+          const codigoErr = String(err?.response?.codigo ?? '');
+          if (codigoErr === 'CARTA_CERRADA' || codigoErr.startsWith('PROGRAMADO_') || codigoErr === 'PAGO_ONLINE_FUERA_HORARIO') {
+            const texto = codigoErr === 'CARTA_CERRADA'
+              ? `${err.response.mensaje ?? 'Ahora no estamos recibiendo pedidos'} 🙏 Tu pedido no se envió; escríbenos de nuevo cuando estemos atendiendo.`
+              : TEXTOS_PROGRAMAR.noSePudoProgramar(err.response.mensaje);
             let metaId: string | null = null;
             if (destinoEnvio) {
               const res = await this.mensajeria.enviarTexto(destinoEnvio, texto, {
@@ -2308,8 +2331,9 @@ export class EjecutorConversacionService {
         }
 
         // Una línea con la carta virtual al confirmar (sin repetirla en cada mensaje)
-        const textoConfirmacion =
-          TEXTOS_BOT.pedidoConfirmadoExito({
+        const textoConfirmacion = (accion.programadoPara
+          ? TEXTOS_PROGRAMAR.confirmacion(codigoFinal, accion.programadoPara, accion.carrito?.pagoCamino === 'DEJAR_PAGADO', accion.datosPagoTexto)
+          : TEXTOS_BOT.pedidoConfirmadoExito({
             codigo: codigoFinal,
             tiempoMin: accion.tiempoEstimadoMin,
             tiempoMax: accion.tiempoEstimadoMax,
@@ -2318,7 +2342,7 @@ export class EjecutorConversacionService {
               ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
             ),
             datosPago: accion.datosPagoTexto,
-          }) + `\n\n${TEXTOS_SOLO_MENUS.lineaCartaConfirmacion(cartaUrlPublica)}`;
+          })) + `\n\n${TEXTOS_SOLO_MENUS.lineaCartaConfirmacion(cartaUrlPublica)}`;
 
         let metaId: string | null = null;
         if (destinoEnvio) {

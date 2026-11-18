@@ -65,6 +65,13 @@ import {
   textoPago,
 } from './pago-bot.util';
 import { MedioPagoBot } from './tipos-pedido';
+import {
+  BOTONES_PEDIDO_CAMINO_PAGO,
+  FILAS_PROGRAMAR_POR_PAGINA,
+  BOTON_PROGRAMAR_PEDIDO,
+  TEXTOS_PROGRAMAR,
+  tituloFilaDia,
+} from '../../textos-programar';
 import { esGrupoBebidaDuplicado } from '../../../../ofertas/combo-grupos.util';
 import { celularPuntosEnmascarado } from '../../../utilidades/enmascarar.util';
 
@@ -480,7 +487,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         };
       }
 
-      if (contexto.datosLocal && !contexto.datosLocal.abierta) {
+      if (contexto.datosLocal && !contexto.datosLocal.abierta && !contexto.soloProgramar) {
         const horarioTexto = contexto.datosLocal.textoEstado || 'de 14:00 a 22:00';
         return {
           nuevoEstado: 'MENU',
@@ -505,6 +512,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         idempotenciaPaso: `step_${Date.now()}`,
         timestampUltimaAccion: Date.now(),
       };
+
+      // Local cerrado con «programar fuera de horario»: primero se elige el día y la hora; luego el pedido sigue igual
+      if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) {
+        return this.mostrarDiasProgramar(flujo, { ...pedidoInicial, estadoInterno: 'PEDIDO_PROG_DIA' }, contexto, 0);
+      }
 
       return {
         nuevoEstado: 'PEDIDO_MODALIDAD',
@@ -541,6 +553,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             ...flujo,
             estado: 'MENU',
           },
+        };
+      }
+
+      // Cerrado con «programar fuera de horario»: no se pierde al cliente; se le ofrece programar el pedido completo
+      if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) {
+        return {
+          nuevoEstado: 'MENU',
+          acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.bienvenida(), botones: [BOTON_PROGRAMAR_PEDIDO] }],
+          nuevoFlujo: { ...flujo, estado: 'MENU' },
         };
       }
 
@@ -593,6 +614,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion | null {
     estado = normalizarEstadoUbicacion(estado);
     switch (estado) {
+      case 'PEDIDO_PROG_DIA':
+        return this.pasoProgDia(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PROG_HORA':
+        return this.pasoProgHora(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PAGO_CAMINO':
+        return this.pasoPagoCamino(flujo, pedido, entrada, contexto);
+
       case 'PEDIDO_MODALIDAD':
         return this.pasoModalidad(flujo, pedido, entrada, contexto);
 
@@ -686,6 +716,116 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       default:
         return this.renderizarEstado('PEDIDO_CATEGORIAS', flujo, pedido, contexto);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // PASO 0 (solo local cerrado con «programar fuera de horario»): ¿para qué día y hora?
+  // -------------------------------------------------------------------------
+  private mostrarDiasProgramar(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+    pagina: number,
+  ): ResultadoTransicion {
+    const dias = contexto.programacion?.dias ?? [];
+    if (dias.length === 0) {
+      return {
+        nuevoEstado: 'MENU',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.sinHorarios(), botones: [BOTON_VOLVER_MENU] }],
+        nuevoFlujo: { ...flujo, estado: 'MENU', pedido: null },
+      };
+    }
+    const inicio = pagina * FILAS_PROGRAMAR_POR_PAGINA;
+    const filas: FilaLista[] = dias.slice(inicio, inicio + FILAS_PROGRAMAR_POR_PAGINA).map((d) => ({ id: `ped_prog_dia_${d.fecha}`, titulo: tituloFilaDia(d.fecha), descripcion: `${d.horas.length} horarios disponibles` }));
+    if (dias.length > inicio + FILAS_PROGRAMAR_POR_PAGINA) filas.push({ id: 'ped_prog_dia_mas', titulo: 'Ver más días', descripcion: 'Ver los días siguientes' });
+    return {
+      nuevoEstado: 'PEDIDO_PROG_DIA',
+      acciones: [{ tipo: 'enviarLista', texto: TEXTOS_PROGRAMAR.preguntaDia(), botonTexto: 'Elegir día', filas }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PROG_DIA', pedido: { ...pedido, estadoInterno: 'PEDIDO_PROG_DIA', paginaProg: pagina } },
+    };
+  }
+
+  private pasoProgDia(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, entrada: EntradaNormalizada, contexto: ContextoConversacion): ResultadoTransicion {
+    const dias = contexto.programacion?.dias ?? [];
+    const id = entrada.id ?? '';
+    if (id === 'ped_prog_dia_mas') return this.mostrarDiasProgramar(flujo, pedido, contexto, (pedido.paginaProg ?? 0) + 1);
+    const elegido = id.startsWith('ped_prog_dia_') ? dias.find((d) => d.fecha === id.slice('ped_prog_dia_'.length)) : undefined;
+    if (!elegido) {
+      const r = this.mostrarDiasProgramar(flujo, pedido, contexto, pedido.paginaProg ?? 0);
+      r.acciones = [{ tipo: 'enviarTexto', texto: TEXTOS_PROGRAMAR.diaNoValido() }, ...r.acciones];
+      return r;
+    }
+    return this.mostrarHorasProgramar(flujo, { ...pedido, programadoFecha: elegido.fecha, estadoInterno: 'PEDIDO_PROG_HORA' }, contexto, 0);
+  }
+
+  private mostrarHorasProgramar(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+    pagina: number,
+  ): ResultadoTransicion {
+    const fecha = pedido.programadoFecha!;
+    const horas = contexto.programacion?.dias.find((d) => d.fecha === fecha)?.horas ?? [];
+    if (horas.length === 0) return this.mostrarDiasProgramar(flujo, { ...pedido, programadoFecha: undefined, estadoInterno: 'PEDIDO_PROG_DIA' }, contexto, 0);
+    const inicio = pagina * FILAS_PROGRAMAR_POR_PAGINA;
+    const filas: FilaLista[] = horas.slice(inicio, inicio + FILAS_PROGRAMAR_POR_PAGINA).map((h) => ({ id: `ped_prog_hora_${h.hora}`, titulo: h.hora }));
+    if (horas.length > inicio + FILAS_PROGRAMAR_POR_PAGINA) filas.push({ id: 'ped_prog_hora_mas', titulo: 'Ver más horas' });
+    filas.push({ id: 'ped_prog_otro_dia', titulo: 'Elegir otro día' });
+    return {
+      nuevoEstado: 'PEDIDO_PROG_HORA',
+      acciones: [{ tipo: 'enviarLista', texto: TEXTOS_PROGRAMAR.preguntaHora(fecha), botonTexto: 'Elegir hora', filas }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PROG_HORA', pedido: { ...pedido, estadoInterno: 'PEDIDO_PROG_HORA', paginaProg: pagina } },
+    };
+  }
+
+  private pasoProgHora(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, entrada: EntradaNormalizada, contexto: ContextoConversacion): ResultadoTransicion {
+    const id = entrada.id ?? '';
+    if (id === 'ped_prog_otro_dia') return this.mostrarDiasProgramar(flujo, { ...pedido, programadoFecha: undefined, estadoInterno: 'PEDIDO_PROG_DIA' }, contexto, 0);
+    if (id === 'ped_prog_hora_mas') return this.mostrarHorasProgramar(flujo, pedido, contexto, (pedido.paginaProg ?? 0) + 1);
+    const horas = contexto.programacion?.dias.find((d) => d.fecha === pedido.programadoFecha)?.horas ?? [];
+    const elegida = id.startsWith('ped_prog_hora_') ? horas.find((h) => h.hora === id.slice('ped_prog_hora_'.length)) : undefined;
+    if (!elegida) {
+      const r = this.mostrarHorasProgramar(flujo, pedido, contexto, pedido.paginaProg ?? 0);
+      r.acciones = [{ tipo: 'enviarTexto', texto: TEXTOS_PROGRAMAR.horaNoValida() }, ...r.acciones];
+      return r;
+    }
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, programadoPara: elegida.iso, programadoFecha: undefined, paginaProg: undefined, estadoInterno: 'PEDIDO_MODALIDAD' };
+    return {
+      nuevoEstado: 'PEDIDO_MODALIDAD',
+      acciones: [
+        { tipo: 'enviarTexto', texto: TEXTOS_PROGRAMAR.programadoOk(elegida.iso) },
+        { tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoModalidad(), botones: BOTONES_PEDIDO_MODALIDAD },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_MODALIDAD', pedido: nuevoPedido },
+    };
+  }
+
+  /** Pedido programado: «Pagar al recibir» o «Dejarlo pagado» (Yape, Plin o transferencia con captura). */
+  private preguntarCaminoPago(flujo: FlujoConversacion, pedido: EstadoCarritoPedido): ResultadoTransicion {
+    return {
+      nuevoEstado: 'PEDIDO_PAGO_CAMINO',
+      acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.preguntaCaminoPago(), botones: BOTONES_PEDIDO_CAMINO_PAGO }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PAGO_CAMINO', pedido: { ...pedido, estadoInterno: 'PEDIDO_PAGO_CAMINO' } },
+    };
+  }
+
+  private pasoPagoCamino(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, entrada: EntradaNormalizada, contexto: ContextoConversacion): ResultadoTransicion {
+    const t = entrada.texto || '';
+    const pagado = entrada.id === 'ped_camino_pagado' || t.includes('pagado');
+    const recibir = entrada.id === 'ped_camino_recibir' || t.includes('recibir');
+    if (!pagado && !recibir) return this.preguntarCaminoPago(flujo, pedido);
+    if (pagado && this.mediosDelPedido({ ...pedido, pagoCamino: 'DEJAR_PAGADO' }, contexto).length === 0) {
+      const r = this.mostrarOpcionesPago(flujo, { ...pedido, pagoCamino: 'AL_RECIBIR' }, contexto);
+      r.acciones = [{ tipo: 'enviarTexto', texto: TEXTOS_PROGRAMAR.sinMediosDigitales() }, ...r.acciones];
+      return r;
+    }
+    return this.mostrarOpcionesPago(flujo, { ...pedido, pagoCamino: pagado ? 'DEJAR_PAGADO' : 'AL_RECIBIR' }, contexto);
+  }
+
+  /** Medios que puede elegir: los del bot; en un pedido programado que se deja pagado, solo Yape, Plin y transferencia. */
+  private mediosDelPedido(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): MedioPagoBot[] {
+    const activos = mediosActivos(contexto.datosLocalPublicos);
+    return pedido.programadoPara && pedido.pagoCamino === 'DEJAR_PAGADO' ? activos.filter((m) => MEDIOS_DIGITALES.includes(m)) : activos;
   }
 
   // -------------------------------------------------------------------------
@@ -1994,14 +2134,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    if (entrada.id === 'ped_pago_dividir' || entrada.texto.includes('2 medios') || entrada.texto.includes('dividir')) {
+    // Un pedido programado no divide el pago (se elige uno de los dos caminos y un solo medio)
+    if (!pedido.programadoPara && (entrada.id === 'ped_pago_dividir' || entrada.texto.includes('2 medios') || entrada.texto.includes('dividir'))) {
       return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, { ...pedido, pago: undefined }, contexto);
     }
     const metodo = this.medioDesdeEntrada(entrada);
     if (!metodo) {
       return this.mostrarOpcionesPago(flujo, pedido, contexto, false);
     }
-    const activos = mediosActivos(contexto.datosLocalPublicos);
+    const activos = this.mediosDelPedido(pedido, contexto);
     if (!activos.includes(metodo)) {
       // Medio apagado en el bot: no se acepta; se responde amable y se vuelven a mostrar los disponibles
       const res = this.mostrarOpcionesPago(flujo, pedido, contexto, false);
@@ -2535,6 +2676,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       },
       modalidad: pedido.modalidad || 'RECOGER',
       ...(pedido.propina ? { propina: pedido.propina } : {}),
+      // Local cerrado: el pedido nace PROGRAMADO para el día y la hora elegidos (el servidor lo valida contra el horario)
+      ...(pedido.programadoPara ? { programadoPara: pedido.programadoPara } : {}),
       entrega:
         pedido.modalidad === 'DELIVERY'
           ? {
@@ -2605,6 +2748,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
           esPagoDigital,
+          ...(pedido.programadoPara ? { programadoPara: pedido.programadoPara } : {}),
           datosPagoTexto: this.formatearDatosPago((contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago), montoDigital, r2(total - montoDigital)),
         },
       ],
@@ -2916,6 +3060,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             tiempoMin,
             tiempoMax,
             avisoDemanda,
+            programadoTexto: pedido.programadoPara ? TEXTOS_PROGRAMAR.lineaResumen(pedido.programadoPara) : undefined,
           }),
           botones: BOTONES_PEDIDO_CONFIRMAR_FINAL,
         },
@@ -2937,7 +3082,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
     conResumen = true,
   ): ResultadoTransicion {
-    const activos = mediosActivos(contexto.datosLocalPublicos);
+    // Pedido programado: primero el camino (pagar al recibir o dejarlo pagado)
+    if (pedido.programadoPara && !pedido.pagoCamino) return this.preguntarCaminoPago(flujo, pedido);
+    const activos = this.mediosDelPedido(pedido, contexto);
     if (activos.length === 0) {
       // Ningún medio encendido en el bot: lo atiende una persona
       return {
@@ -2959,7 +3106,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       id: m === 'TRANSFERENCIA' ? 'ped_pago_transf' : `ped_pago_${m.toLowerCase()}`,
       titulo: m === 'TARJETA' ? 'Tarjeta (POS)' : NOMBRE_MEDIO[m],
     }));
-    if (opciones.length >= 2) opciones.push({ id: 'ped_pago_dividir', titulo: 'Dividir el pago' });
+    if (opciones.length >= 2 && !pedido.programadoPara) opciones.push({ id: 'ped_pago_dividir', titulo: 'Dividir el pago' });
 
     const op = opcionesMedios(opciones);
     const nuevoPedido: EstadoCarritoPedido = {
@@ -3381,6 +3528,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     estado = normalizarEstadoUbicacion(estado);
     pedido.estadoInterno = estado;
     switch (estado) {
+      case 'PEDIDO_PROG_DIA':
+        return this.mostrarDiasProgramar(flujo, pedido, contexto, pedido.paginaProg ?? 0);
+      case 'PEDIDO_PROG_HORA':
+        return pedido.programadoFecha
+          ? this.mostrarHorasProgramar(flujo, pedido, contexto, pedido.paginaProg ?? 0)
+          : this.mostrarDiasProgramar(flujo, pedido, contexto, 0);
+      case 'PEDIDO_PAGO_CAMINO':
+        return this.preguntarCaminoPago(flujo, pedido);
       case 'PEDIDO_MODALIDAD':
         return {
           nuevoEstado: 'PEDIDO_MODALIDAD',

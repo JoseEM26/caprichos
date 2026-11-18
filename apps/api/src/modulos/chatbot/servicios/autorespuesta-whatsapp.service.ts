@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { LocalService } from '../../local/local.service';
+import { leerConfigProgramados } from '../../pedidos/programado.util';
 import { armarBienvenida, nombreParaSaludo } from '../conversacion/bienvenida.util';
 import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esSaludo } from '../conversacion/cortesia-entrante.util';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
@@ -109,6 +110,9 @@ export class AutorespuestaWhatsappService {
     if (!horario.abierto) {
       const enCurso = estadoFlujo.startsWith('PAGO') || e.conversacion.estado === 'VALIDAR_PAGO' || (await this.pedidoDesde(e.telefono, 24 * 3_600_000, true));
       if (enCurso) return false;
+      // «Pedidos programados fuera de horario» encendido: si el bot va a contestar, él ofrece programar (llevar o delivery);
+      // para otros temas el propio bot da el aviso de cerrado. Apagado: el aviso único de siempre.
+      if (e.puedeProcesarMotor && (await this.botActivo()) && (await this.puedeProgramarFueraHorario())) return false;
       return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', await this.avisoCerrado(nombre, horario.apertura, link));
     }
     if (!evolution) return false; // con el local abierto, Meta sigue exactamente como antes
@@ -127,6 +131,18 @@ export class AutorespuestaWhatsappService {
   private async avisoCerrado(nombre: string, apertura: string | null, link: string): Promise<string> {
     const textos = (await this.configuracionBot?.obtenerTextosBot().catch(() => null)) ?? null;
     return armarBienvenida(nombre, { abierta: false, aperturaTexto: apertura }, { textos, linkCarta: link });
+  }
+
+  /** Parámetro encendido y local cerrado por horario o fecha especial (una pausa por alta demanda no se programa). */
+  private async puedeProgramarFueraHorario(): Promise<boolean> {
+    if (!this.local) return false;
+    try {
+      if (!(await leerConfigProgramados(this.prisma)).fueraHorario) return false;
+      const estado = await this.local.obtenerEstadoCartaSeguro();
+      return !estado.abierta && estado.motivo !== 'PAUSA';
+    } catch {
+      return false;
+    }
   }
 
   private async esEvolution(): Promise<boolean> {

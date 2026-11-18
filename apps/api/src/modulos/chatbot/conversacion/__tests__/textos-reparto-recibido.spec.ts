@@ -202,3 +202,19 @@ describe('recibidoDigital / recibidoEfectivo con resumen', () => {
     expect(t).toContain('\n\nYa sumas puntos con este número. Ve tus puntos aquí: https://x/?puntos=1');
   });
 });
+
+describe('aviso «Recibimos tu pedido» de un pedido programado', () => {
+  it('dice el día y la hora pactados (hora de Lima), no da tiempo estimado y no promete cocina inmediata', () => {
+    const r: ResumenRecibido = { ...delivery, modalidad: 'RECOJO', envioPorConfirmar: false, tiempoEstimado: '25 a 35', programadoPara: '2027-03-01T15:30:00.000Z' };
+    const t = textoResumenRecibido(r, { nombre: 'Ana', codigo: 'CP-1' });
+    expect(t).toContain('quedó programado para el *lunes 1 de marzo a las 10:30*');
+    expect(t).toContain('Te avisaremos por WhatsApp');
+    expect(t).not.toContain('Tiempo estimado');
+  });
+
+  it('un pedido normal no cambia: sin línea de programado y con su tiempo estimado', () => {
+    const t = textoResumenRecibido({ ...delivery, modalidad: 'RECOJO', envioPorConfirmar: false, tiempoEstimado: '25 a 35' }, { nombre: 'Ana', codigo: 'CP-1' });
+    expect(t).not.toContain('programado');
+    expect(t).toContain('Tiempo estimado: 25 a 35 minutos');
+  });
+});
