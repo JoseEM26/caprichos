@@ -29,6 +29,11 @@ export interface CargoConsultado {
   moneda: string;
   metadata: Record<string, unknown>;
   devueltoCentimos: number;
+  /** Marca y últimos 4 de la tarjeta, según el cargo (null si no hay) */
+  marca?: string | null;
+  ultimos4?: string | null;
+  /** Medio que confirma el cargo de Culqi; null si el cargo no lo dice */
+  medioReal?: MedioPagoOnline | null;
   /** Comisión real que informa Culqi (null si no la manda) */
   comision?: ComisionCobro | null;
 }
@@ -38,6 +43,8 @@ export interface CargoHecho {
   cargoId: string | null;
   marca: string | null;
   ultimos4: string | null;
+  /** Medio que confirma el cargo de Culqi (tarjeta o Yape); null si el cargo no lo dice */
+  medioReal?: MedioPagoOnline | null;
   /** Código de error de Culqi cuando es RECHAZADO (insufficient_funds, incorrect_cvv...) */
   codigo?: string;
   /** Texto para el cliente, en español simple */

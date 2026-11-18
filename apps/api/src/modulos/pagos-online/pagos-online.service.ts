@@ -18,6 +18,7 @@ import { DevolucionCulqiService, ErrorReembolso, Devolucion } from './devolucion
 import { usuarioSistema } from './usuario-sistema';
 import { ErrorPasarela, MedioPagoOnline, PASARELA_PAGO, PasarelaPago, ResultadoCargo } from './pasarela.puerto';
 import { ComisionCobro, comisionEstimada, leerTarifaCulqi } from './comision-pasarela';
+import { medioDelToken } from './medio-real';
 import { CODIGO_PAGO_ONLINE_PENDIENTE, MENSAJE_PAGO_ONLINE_PENDIENTE, esPendienteDePagoOnline } from '../../comun/pago-online-pendiente';
 import type { UsuarioAutenticado } from '../acceso/acceso.tipos';
 
@@ -268,6 +269,8 @@ export class PagosOnlineService {
     if (!MEDIOS_ONLINE.includes(medio)) throw error(400, 'MEDIO_INVALIDO', 'Elige tarjeta o Yape');
     const token = String(dto.token ?? '').trim();
     if (token.length < 5 || token.length > 200) throw error(400, 'TOKEN_INVALIDO', 'No pudimos leer los datos de tu pago. Intenta de nuevo.');
+    // El medio lo decide el servidor: el prefijo del token (ype_ Yape, tkn_ tarjeta); lo que mande el navegador solo se compara
+    const medioServidor: MedioPagoOnline = medioDelToken(token) ?? medio;
 
     const intento = await this.prisma.pagoOnlineIntento.findUnique({ where: { clave: String(dto.intentoId ?? '') }, include: { pedido: { select: { id: true, codigo: true } } } });
     if (!intento) throw new NotFoundException({ codigo: 'INTENTO_NO_ENCONTRADO', mensaje: 'Este pago ya no existe. Vuelve a intentarlo.' });
@@ -289,7 +292,7 @@ export class PagosOnlineService {
     }
 
     // Toma el intento: de dos pedidos a la vez solo uno pasa a PROCESANDO y llama a Culqi
-    const tomado = await this.prisma.pagoOnlineIntento.updateMany({ where: { id: intento.id, estado: 'CREADO' }, data: { estado: 'PROCESANDO', medio } });
+    const tomado = await this.prisma.pagoOnlineIntento.updateMany({ where: { id: intento.id, estado: 'CREADO' }, data: { estado: 'PROCESANDO', medio: medioServidor } });
     if (tomado.count === 0) {
       const actual = await this.prisma.pagoOnlineIntento.findUnique({ where: { id: intento.id } });
       return this.resultado(actual ?? intento, codigo);
@@ -301,7 +304,7 @@ export class PagosOnlineService {
         montoCentimos: intento.monto_centimos,
         moneda: 'PEN',
         token,
-        medio,
+        medio: medioServidor,
         email: this.correo(dto.email),
         descripcion: `Pedido ${codigo} - Caprichos`,
         metadata: { intento: intento.clave, pedido: codigo },
@@ -317,14 +320,18 @@ export class PagosOnlineService {
 
     if (cargo.estado === 'REQUIERE_3DS') {
       // No es rechazo ni cobro: el intento vuelve a CREADO para un segundo /cargo con autenticacion3ds (mismo token)
-      await this.prisma.pagoOnlineIntento.update({ where: { id: intento.id }, data: { estado: 'CREADO', medio, mensaje: cargo.mensaje } });
+      await this.prisma.pagoOnlineIntento.update({ where: { id: intento.id }, data: { estado: 'CREADO', medio: medioServidor, mensaje: cargo.mensaje } });
       return { estado: 'REQUIERE_3DS' as const, mensaje: cargo.mensaje, pedidoCodigo: codigo, datos3ds: { montoCentimos: intento.monto_centimos, moneda: 'PEN', email: this.correo(dto.email), publicKey: this.pasarela.publicKey } };
     }
 
+    // Lo que confirma Culqi en el cargo manda sobre el prefijo; si el navegador informó otro medio, queda auditado
+    const medioFinal = cargo.medioReal ?? medioServidor;
+    await this.avisarMedioCorregido(intento.id, medio, medioFinal);
     const actualizado = await this.prisma.pagoOnlineIntento.update({
       where: { id: intento.id },
       data: {
         estado: cargo.estado,
+        medio: medioFinal,
         mensaje: cargo.mensaje,
         culqi_cargo_id: cargo.cargoId,
         marca: cargo.marca,
@@ -336,6 +343,16 @@ export class PagosOnlineService {
     const final = await this.prisma.pagoOnlineIntento.findUnique({ where: { id: intento.id } });
     const res = this.resultado(final ?? actualizado, codigo);
     return cargo.estado === 'RECHAZADO' && cargo.codigo ? { ...res, codigo: cargo.codigo } : res;
+  }
+
+  /** Medio que informó el navegador distinto del que confirma el servidor: log y auditoría (no falla el cobro). */
+  async avisarMedioCorregido(intentoId: bigint, medioNavegador: string | null, medioCulqi: string): Promise<void> {
+    if (!medioNavegador || medioNavegador === medioCulqi) return;
+    const motivo = `El medio informado por el navegador (${medioNavegador}) no coincide con Culqi (${medioCulqi})`;
+    this.logger.warn(`Intento ${intentoId}: ${motivo}`);
+    await this.auditoria
+      .registrar({ categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'MEDIO_CORREGIDO_CULQI', resultado: 'OK', entidad: 'pago_online_intento', entidadId: intentoId, motivo, despues: { medio_navegador: medioNavegador, medio_culqi: medioCulqi } })
+      .catch((e) => this.logger.error(`Auditoría del medio no guardada (intento ${intentoId}): ${e?.message}`));
   }
 
   private correo(e?: string): string {
@@ -527,9 +544,11 @@ export class PagosOnlineService {
       if (c.estado === 'APROBADO') {
         // Nunca se aprueba un monto o moneda distintos de los que fijó el servidor
         if (c.montoCentimos !== intento.monto_centimos || c.moneda !== intento.moneda) throw new Error('Monto o moneda del cargo distintos a los del intento');
+        const medioFinal = c.medioReal ?? intento.medio ?? 'TARJETA';
+        await this.avisarMedioCorregido(intento.id, intento.medio, medioFinal);
         await this.prisma.pagoOnlineIntento.update({
           where: { id: intento.id },
-          data: { estado: 'APROBADO', culqi_cargo_id: intento.culqi_cargo_id ?? c.cargoId, medio: intento.medio ?? 'TARJETA', aprobado_en: new Date(), mensaje: 'Pago aprobado.' },
+          data: { estado: 'APROBADO', culqi_cargo_id: intento.culqi_cargo_id ?? c.cargoId, medio: medioFinal, marca: c.marca ?? intento.marca, ultimos4: c.ultimos4 ?? intento.ultimos4, aprobado_en: new Date(), mensaje: 'Pago aprobado.' },
         });
         await this.cobrarPedido(intento.id, c.comision);
         return 'PROCESADO';

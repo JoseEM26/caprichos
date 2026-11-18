@@ -11,6 +11,7 @@ import { comisionDeCargoCulqi, comisionEstimada } from './comision-pasarela';
 import { mensajeDeError } from './culqi.errores';
 import { PagosOnlineVencimientoService } from './pagos-online-vencimiento.service';
 import { generarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
+import { medioDelToken, medioDeFuenteCulqi, tarjetaDeFuenteCulqi } from './medio-real';
 
 // Datos sintéticos: nada real
 function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Partial<any>; cajaAbierta?: boolean } = {}) {
@@ -696,5 +697,78 @@ describe('PagosOnlineService: cambio de medio y webhook tardío', () => {
     expect(cobros.cobrar).not.toHaveBeenCalled();
     expect(intentos[0].cobro_error).toMatch(/^PEDIDO_YA_NO_EN_LINEA/);
     expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'PAGO_ONLINE_A_DEVOLVER' }) });
+  });
+});
+
+describe('medio de pago lo decide el servidor (prefijo del token y cargo de Culqi)', () => {
+  const culqiTarjeta = (source: any) =>
+    jest.fn().mockResolvedValue({ status: 201, json: async () => ({ object: 'charge', id: 'chr_live_t1', outcome: { type: 'venta_exitosa' }, amount: 5250, currency_code: 'PEN', source }) });
+
+  it('token tkn_ con medio YAPE del navegador: se registra TARJETA, se cobra TARJETA y queda el aviso', async () => {
+    const { s, acceso, cobros, intentos, auditoria } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    expect((await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'YAPE' })).estado).toBe('APROBADO');
+    expect(intentos[0].medio).toBe('TARJETA');
+    expect(cobros.cobrar.mock.calls[0][0].pagos[0].medio).toBe('TARJETA');
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'MEDIO_CORREGIDO_CULQI', motivo: 'El medio informado por el navegador (YAPE) no coincide con Culqi (TARJETA)' }),
+    );
+  });
+
+  it('token ype_ con medio TARJETA del navegador: se registra YAPE y queda el aviso', async () => {
+    const { s, acceso, cobros, intentos, auditoria } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'ype_simulado_ok', medio: 'TARJETA' });
+    expect(intentos[0].medio).toBe('YAPE');
+    expect(cobros.cobrar.mock.calls[0][0].pagos[0].medio).toBe('YAPE');
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'MEDIO_CORREGIDO_CULQI' }));
+  });
+
+  it('navegador y servidor coinciden (simulado): sin aviso', async () => {
+    const { s, acceso, auditoria } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'ype_simulado_ok', medio: 'YAPE' });
+    expect(auditoria.registrar).not.toHaveBeenCalledWith(expect.objectContaining({ accion: 'MEDIO_CORREGIDO_CULQI' }));
+  });
+
+  it('cargo de Culqi con datos de tarjeta manda aunque el token sea ype_: TARJETA, con marca y últimos 4', async () => {
+    const pasarela = new CulqiAdaptador({ secretKey: 'sk_test_x', publicKey: 'pk_test_x', fetchFn: culqiTarjeta({ type: 'card', card_number: '455788******6476', iin: { card_brand: 'Visa' } }) as any });
+    const { s, acceso, cobros, intentos } = armar({ pasarela });
+    const { intentoId } = await s.crearIntento('7', acceso);
+    expect((await s.cargar({ intentoId, token: 'ype_token_ambiguo', medio: 'YAPE' })).estado).toBe('APROBADO');
+    expect(intentos[0]).toMatchObject({ medio: 'TARJETA', marca: 'Visa', ultimos4: '6476' });
+    expect(cobros.cobrar.mock.calls[0][0].pagos[0].medio).toBe('TARJETA');
+  });
+
+  it('cargo de Culqi con source tipo yape sin datos de tarjeta: YAPE aunque el token sea tkn_', async () => {
+    const pasarela = new CulqiAdaptador({ secretKey: 'sk_test_x', publicKey: 'pk_test_x', fetchFn: culqiTarjeta({ type: 'yape' }) as any });
+    const { s, acceso, cobros, intentos } = armar({ pasarela });
+    const { intentoId } = await s.crearIntento('7', acceso);
+    await s.cargar({ intentoId, token: 'tkn_token_ambiguo', medio: 'TARJETA' });
+    expect(intentos[0].medio).toBe('YAPE');
+    expect(cobros.cobrar.mock.calls[0][0].pagos[0].medio).toBe('YAPE');
+  });
+
+  it('webhook: el cargo confirma TARJETA aunque el intento decía YAPE; guarda marca y últimos 4 y cobra como TARJETA', async () => {
+    const { s, acceso, cobros, intentos, pasarela } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    (pasarela as SimuladoAdaptador).sembrarCargo({ cargoId: 'chr_m1', estado: 'APROBADO', montoCentimos: 5250, moneda: 'PEN', metadata: { intento: intentoId }, devueltoCentimos: 0, medioReal: 'TARJETA', marca: 'Visa', ultimos4: '6476' });
+    intentos[0].estado = 'PENDIENTE';
+    intentos[0].medio = 'YAPE';
+    intentos[0].culqi_cargo_id = 'chr_m1';
+    await s.recibirWebhook({ id: 'evt_m1', type: 'charge.creation.succeeded', data: JSON.stringify({ id: 'chr_m1', metadata: { intento: intentoId } }) });
+    expect(intentos[0]).toMatchObject({ estado: 'APROBADO', medio: 'TARJETA', marca: 'Visa', ultimos4: '6476' });
+    expect(cobros.cobrar.mock.calls[0][0].pagos[0].medio).toBe('TARJETA');
+  });
+
+  it('derivación: prefijo del token y fuente del cargo; sin dato, null', () => {
+    expect(medioDelToken('tkn_abc')).toBe('TARJETA');
+    expect(medioDelToken('ype_abc')).toBe('YAPE');
+    expect(medioDelToken('otro_abc')).toBeNull();
+    expect(medioDeFuenteCulqi({ iin: { card_brand: 'Visa' } })).toBe('TARJETA');
+    expect(medioDeFuenteCulqi({ last_four: '6476' })).toBe('TARJETA');
+    expect(medioDeFuenteCulqi({ type: 'yape' })).toBe('YAPE');
+    expect(medioDeFuenteCulqi(undefined)).toBeNull();
+    expect(tarjetaDeFuenteCulqi({ card_number: '455788******6476', iin: { card_brand: 'Visa' } })).toEqual({ marca: 'Visa', ultimos4: '6476' });
   });
 });

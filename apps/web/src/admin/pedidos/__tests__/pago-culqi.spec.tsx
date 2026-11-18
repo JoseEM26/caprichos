@@ -54,6 +54,24 @@ describe('Recuadro «Pagado en línea por Culqi»', () => {
     expect(screen.getByTestId('estado-culqi').textContent).toMatch(/Devuelto parcial/);
   });
 
+  it('tarjeta con marca y últimos 4 del cargo: «Visa ···6476», nunca «Yape»', () => {
+    render(<RecuadroPagoCulqi pago={pago({ medio: 'TARJETA', marca: 'Visa', ultimos4: '6476' })} />);
+    const r = screen.getByTestId('recuadro-culqi');
+    expect(within(r).getByText('Visa ···6476')).toBeTruthy();
+    expect(within(r).queryByText('Yape')).toBeNull();
+  });
+
+  it('tarjeta sin marca: «Tarjeta ···6476»', () => {
+    render(<RecuadroPagoCulqi pago={pago({ medio: 'TARJETA', marca: null, ultimos4: '6476' })} />);
+    expect(screen.getByText('Tarjeta ···6476')).toBeTruthy();
+  });
+
+  it('Yape muestra «Yape» aunque traiga marca o últimos 4 guardados', () => {
+    render(<RecuadroPagoCulqi pago={pago({ medio: 'YAPE', marca: 'Visa', ultimos4: '6476' })} />);
+    expect(within(screen.getByTestId('recuadro-culqi')).getByText('Yape')).toBeTruthy();
+    expect(screen.queryByText(/Visa ···6476/)).toBeNull();
+  });
+
   it('el botón Copiar deja el número de operación en el portapapeles', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
