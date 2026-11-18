@@ -43,6 +43,21 @@ export function aplicarOrientacion(t: TamanoEtiquetaPc): TamanoEtiquetaPc {
   return t;
 }
 
+/**
+ * Ancho máximo que la etiquetera 4BARCODE 4B-2054TH puede imprimir (cabezal de 4"; 832 dots a 203 dpi).
+ * Es un tope de HARDWARE: lo que pase de aquí sale cortado. Confirmar con la ficha del modelo.
+ */
+export const ANCHO_CABEZAL_MM = 104;
+
+/**
+ * Ancho que cruza el cabezal con la orientación elegida (apaisado: lado largo; vertical: lado corto).
+ * Sin orientación, el ancho guardado. Usar para validar al guardar o al pedir la prueba.
+ */
+export function anchoPcExcedeCabezal(t: TamanoEtiquetaPc): boolean {
+  const a = aplicarOrientacion(t).anchoMm;
+  return a > ANCHO_CABEZAL_MM + 1e-9;
+}
+
 /** Tamaño que sale en esa PC: el propio (con orientación y margen) o, si no tiene, el general del local. */
 export function tamanoEfectivo(propio: unknown, general: TamanoMm): TamanoEtiquetaPc {
   const p = tamanoPcValido(propio);

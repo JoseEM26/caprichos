@@ -8,6 +8,8 @@ import {
   MODALIDADES_BEBIDA,
   ModalidadBebida,
   tamanoPcValido,
+  anchoPcExcedeCabezal,
+  ANCHO_CABEZAL_MM,
 } from '@caprichos/compartido';
 import { CONFIG_EQUIPO_NUEVO } from './ruteo-impresion';
 
@@ -128,6 +130,7 @@ export function aplicarCambio(
     }
     const t = tamanoPcValido(cambio[k]);
     if (!t) throw new BadRequestException({ codigo: 'TAMANO_INVALIDO', mensaje: 'El tamaño debe estar entre 30 y 200 mm y el margen entre 0 y 10 mm' });
+    if (anchoPcExcedeCabezal(t)) throw new BadRequestException({ codigo: 'TAMANO_INVALIDO', mensaje: `El ancho no puede pasar de ${ANCHO_CABEZAL_MM} mm: la etiquetera 4BARCODE imprime hasta ese ancho (cabezal de 4 pulgadas)` });
     r[k] = t;
   }
   return r;

@@ -37,8 +37,9 @@ function marcoYCabecera(L: Lienzo, titulo: string, subtitulo: string): string {
     `BOX 16,16,${L.W - 16},${L.H - 16},4,16\r\n` +
     `BOX 26,26,${L.W - 26},${L.H - 26},2,10\r\n` +
     comandoLogo(34, 34) +
-    T(112, 40, '4', 1, 1, truncar(titulo.toUpperCase(), 24)) +
-    T(112, 76, '2', 1, 1, truncar(subtitulo, 40)) +
+    // Título y subtítulo caben entre el logo (x 34..98) y el borde derecho de la banda: en stickers angostos se recortan
+    T(112, 40, '4', 1, 1, truncar(titulo.toUpperCase(), Math.min(24, Math.floor((L.W - 156) / 24)))) +
+    T(112, 76, '2', 1, 1, truncar(subtitulo, Math.min(40, Math.floor((L.W - 156) / 12)))) +
     // Invierte la banda: fondo negro, texto blanco y logo como disco blanco
     `REVERSE 28,28,${L.W - 56},76\r\n`
   );

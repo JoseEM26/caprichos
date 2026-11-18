@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
-  PRESETS_TAMANO_ETIQUETA,
+  PRESETS_TAMANO_ETIQUETA, anchoPcExcedeCabezal, ANCHO_CABEZAL_MM,
   esAreaBebidas,
   tamanoEfectivo,
   type ConfigEquipoImpresion,
@@ -258,6 +258,11 @@ export function EditorTamano({
               </button>
             ))}
           </div>
+          {personalizado && !invalida && anchoPcExcedeCabezal(base) && (
+            <p role="alert" style={{ margin: '6px 0', color: '#9B2C2C', fontSize: 13 }}>
+              La etiquetera imprime hasta {ANCHO_CABEZAL_MM} mm de ancho (cabezal de 4 pulgadas). Con esta orientación el ancho pasa de ese máximo: el sticker saldría cortado y no se imprime.
+            </p>
+          )}
           <label className="if-campo">
             <span>Margen (mm)</span>
             <input type="number" inputMode="decimal" min={0} max={10} step={0.5} value={base.margenMm ?? 0} disabled={deshabilitado} data-testid={`tamano-${tipo}-margen`} onChange={(e) => poner({ margenMm: Math.min(10, Math.max(0, num(e.target.value) || 0)) || undefined })} />
