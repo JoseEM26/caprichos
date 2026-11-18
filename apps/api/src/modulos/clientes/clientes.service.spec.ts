@@ -323,6 +323,107 @@ describe('ClientesService', () => {
       });
     });
 
+    describe('sorteo: filtros, exclusiones y sin cortar', () => {
+      const cuenta = (activo = true) => ({ hash: 'h', activo, clave_cambiada_en: null });
+      const conCuenta = (r: any, activo = true) => ({ ...r, party: { ...r.party, cuentaCliente: cuenta(activo) } });
+      const pedidosHoy = (ids: number[]) =>
+        prismaMock.pedido.groupBy.mockImplementation(async (args: any) =>
+          args.by[0] !== 'cliente_party_id'
+            ? []
+            : ids.map((id) => ({ cliente_party_id: BigInt(id), _count: { _all: 1 }, _sum: { total: 10 }, _max: { creado_en: new Date() } })),
+        );
+      const nombres = (r: any) => r.participantes.map((p: any) => p.nombre);
+
+      it('«Todos» incluye registrados y de mostrador, pero excluye personal, bloqueados, sin nombre y sin celular', async () => {
+        const personal: any = rol(1, 'Empleada', '911111111');
+        personal.party.usuario = { rol: 'MOZO' };
+        const bloqueado = conCuenta(rol(2, 'Bloqueado', '922222222'), false);
+        const sinNombre: any = rol(3, 'Sin nombre', '933333333');
+        sinNombre.party.persona = null;
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+          personal,
+          bloqueado,
+          sinNombre,
+          conCuenta(rol(4, 'Ana', '944444444')),
+          rol(5, 'Luis', '955555555'),
+          rol(6, 'Sin', '—'),
+        ]);
+        const r = await service.participantesSorteo({});
+        expect(r.total).toBe(2);
+        expect(nombres(r).sort()).toEqual(['Ana T.', 'Luis T.']);
+      });
+
+      it('«Solo registrados» = cuenta de cliente con contraseña', async () => {
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+          conCuenta(rol(1, 'Ana', '944444444')),
+          rol(2, 'Mostrador', '955555555'),
+        ]);
+        const r = await service.participantesSorteo({ alcance: 'registrados' });
+        expect(nombres(r)).toEqual(['Ana T.']);
+        expect(JSON.stringify(r)).not.toMatch(/944444444|Mostrador/);
+      });
+
+      it('«Solo de hoy» = pedido pagado hoy (día de Lima), y se combina con «registrados»', async () => {
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+          conCuenta(rol(1, 'Ana', '944444444')),
+          conCuenta(rol(2, 'Beto', '955555555')),
+          rol(3, 'Carla', '966666666'),
+        ]);
+        pedidosHoy([1, 3]);
+        expect(nombres(await service.participantesSorteo({ alcance: 'hoy' })).sort()).toEqual(['Ana T.', 'Carla T.']);
+        // el rango de «hoy» va desde el inicio del día de Lima
+        const rango = prismaMock.pedido.groupBy.mock.calls[0][0].where.creado_en.gte;
+        expect(rango).toBeInstanceOf(Date);
+        expect(Date.now() - rango.getTime()).toBeLessThan(24 * 3600 * 1000);
+        // combinado: solo registrados y de hoy → Ana
+        const combinado = await service.participantesSorteo({ alcance: 'registrados', periodo: 'hoy' });
+        expect(nombres(combinado)).toEqual(['Ana T.']);
+      });
+
+      it('sin duplicados: una persona con dos roles de cliente sale una vez', async () => {
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([rol(7, 'Ana', '944444444'), rol(7, 'Ana', '944444444')]);
+        const r = await service.participantesSorteo({});
+        expect(r.total).toBe(1);
+      });
+
+      it('inactivos solo si el filtro de registro los pide', async () => {
+        const inactivo: any = { ...rol(8, 'Ina', '977777777'), hasta: new Date('2026-01-01') };
+        const todos = [inactivo, rol(9, 'Act', '988888888')];
+        // la base filtra por «hasta» según el registro pedido; el mock lo imita
+        prismaMock.partyRole.findMany = jest.fn().mockImplementation(async (args: any) =>
+          todos.filter((r) => (args.where.hasta?.not === null ? r.hasta !== null : args.where.hasta === null ? r.hasta === null : true)),
+        );
+        expect(nombres(await service.participantesSorteo({}))).toEqual(['Act T.']);
+        expect(nombres(await service.participantesSorteo({ estado: 'inactivos' }))).toEqual(['Ina T.']);
+      });
+
+      it('sin cortar en silencio: 5000 entran completos; más de 5000 se niega con mensaje', async () => {
+        const muchos = Array.from({ length: 5000 }, (_, i) => rol(i + 1, `Cli${i}`, `9${String(i).padStart(8, '0')}`));
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue(muchos);
+        const r = await service.participantesSorteo({});
+        expect(r.total).toBe(5000);
+        expect(r.participantes).toHaveLength(5000);
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([...muchos, rol(5001, 'Extra', '911111111')]);
+        await expect(service.participantesSorteo({})).rejects.toMatchObject({ response: { codigo: 'SORTEO_DEMASIADOS' } });
+      });
+
+      it('auditoría: filtro, cantidad y ganadores enmascarados; sin búsqueda libre ni datos completos', async () => {
+        const r = await service.registrarSorteo(
+          { q: '987654321', alcance: 'registrados', tipo: 'Persona' },
+          { juego: 'ruleta', participantes: 12, ganadores: ['María G. ···321'] },
+          { rol: 'ADMIN', partyId: 7n },
+          '1.1.1.1',
+        );
+        expect(r).toEqual({ ok: true });
+        const reg = auditoriaMock.registrar.mock.calls[0][0];
+        expect(reg).toMatchObject({ accion: 'SORTEO_REALIZADO', despues: { filtros: { alcance: 'registrados', hayBusqueda: true }, participantes: 12 } });
+        expect(JSON.stringify(reg, (_k, v) => (typeof v === 'bigint' ? String(v) : v))).not.toMatch(/987654321/);
+        await expect(
+          service.registrarSorteo({}, { ganadores: ['María García López 987654321'] }, { rol: 'ADMIN' }),
+        ).rejects.toMatchObject({ response: { codigo: 'SORTEO_GANADORES_INVALIDOS' } });
+      });
+    });
+
     describe('verificación del celular', () => {
       const nov = new Date('2026-11-05T12:00:00Z');
       const con = (id: number, nombre: string, party: any, puntos = 5) => {

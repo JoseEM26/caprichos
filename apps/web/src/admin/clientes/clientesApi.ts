@@ -30,6 +30,8 @@ export interface FiltrosClientes {
   sinCompraDias?: number;
   cumpleMes?: boolean;
   canal?: 'CARTA' | 'WHATSAPP' | 'CAJA' | 'MOZO';
+  /** Quiénes entran: todos, solo registrados (con contraseña) o solo de hoy (pedido de hoy, Lima) */
+  alcance?: 'todos' | 'registrados' | 'hoy';
   orden?: 'reciente' | 'pedidos' | 'consumo' | 'puntos' | 'ultima' | 'nombre';
   pagina?: number;
   limite?: number;
@@ -98,6 +100,7 @@ export function paramsClientes(filtros: FiltrosClientes = {}): URLSearchParams {
   if (filtros.conPuntos) params.set('conPuntos', filtros.conPuntos);
   if (filtros.cumpleMes) params.set('cumpleMes', 'si');
   if (filtros.canal) params.set('canal', filtros.canal);
+  if (filtros.alcance && filtros.alcance !== 'todos') params.set('alcance', filtros.alcance);
   if (filtros.orden && filtros.orden !== 'reciente') params.set('orden', filtros.orden);
   return params;
 }
@@ -112,6 +115,15 @@ export async function listarParticipantesSorteo(filtros: FiltrosClientes = {}): 
   const p = paramsClientes({ ...filtros, pagina: undefined, limite: undefined });
   const query = p.toString();
   return api.get(`/admin/clientes/participantes${query ? `?${query}` : ''}`);
+}
+
+/** Deja constancia en la auditoría de un sorteo terminado: filtro, cantidad y ganadores ya enmascarados. */
+export async function registrarSorteoRealizado(
+  filtros: FiltrosClientes,
+  cuerpo: { juego: string; participantes: number; ganadores: string[] },
+): Promise<{ ok: boolean }> {
+  const query = paramsClientes({ ...filtros, pagina: undefined, limite: undefined }).toString();
+  return api.post<{ ok: boolean }>(`/admin/clientes/sorteo-realizado${query ? `?${query}` : ''}`, cuerpo);
 }
 
 /** Descarga el Excel de TODA la lista filtrada (solo ADMIN). Devuelve un enlace temporal al archivo. */

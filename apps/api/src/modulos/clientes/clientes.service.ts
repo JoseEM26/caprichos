@@ -917,7 +917,8 @@ export class ClientesService {
       orderBy: { id: 'desc' },
     });
 
-    const rango = rangoPedidos(filtros);
+    // «Solo de hoy» usa el día de hoy (Lima) aunque haya otro periodo o fechas elegidas
+    const rango = rangoPedidos(filtros.alcance === 'hoy' ? { periodo: 'hoy' } : filtros);
     const hayRango = Boolean(rango.desde || rango.hasta);
     const [enRango, historico] = await Promise.all([
       this.resumenPedidosPorCliente(rango, filtros.canal),
@@ -926,8 +927,16 @@ export class ClientesService {
     const mesActual = mesLima();
     const ahoraMs = Date.now();
 
-    type Fila = { item: ClienteAdminListItem; apellidos: string | null; ultimaCompra: Date | null; cumpleMes: number | null };
-    let filas: Fila[] = roles.map((r) => {
+    type Fila = { item: ClienteAdminListItem; apellidos: string | null; ultimaCompra: Date | null; cumpleMes: number | null; bloqueada: boolean };
+    // Una persona, una fila: si tiene varios roles de cliente, cuenta el más reciente (la consulta va por id desc)
+    const vistos = new Set<string>();
+    const unicos = roles.filter((r) => {
+      const k = r.party.id.toString();
+      if (vistos.has(k)) return false;
+      vistos.add(k);
+      return true;
+    });
+    let filas: Fila[] = unicos.map((r) => {
       const p = r.party;
       // Solo el RUC sirve para reconocer una empresa; el DNI de un cliente no se lee ni se devuelve
       const docNum = p.documentos.find((d: any) => d.tipo === 'RUC')?.numero || '';
@@ -967,6 +976,7 @@ export class ClientesService {
         apellidos: p.persona?.apellidos ?? null,
         ultimaCompra: hist?.ultima ?? null,
         cumpleMes: p.persona?.cumple_mes ?? null,
+        bloqueada: Boolean(cuenta && !cuenta.activo),
         item: {
           id,
           nombre: p.persona?.nombres || 'Sin nombre',
@@ -988,6 +998,7 @@ export class ClientesService {
     });
 
     // Filtros de memoria (rápidos y homogéneos con la maqueta)
+    if (filtros.alcance === 'registrados') filas = filas.filter((f) => f.item.tieneContrasena);
     if (filtros.tipo && filtros.tipo !== 'Todos') {
       filas = filas.filter((f) => f.item.tipo === filtros.tipo);
     }
@@ -1030,6 +1041,8 @@ export class ClientesService {
     if (filtros.cumpleMes === 'si') filas = filas.filter((f) => f.cumpleMes === mesActual);
     // Con un canal elegido, solo quienes compraron por ese canal en el rango
     if (filtros.canal) filas = filas.filter((f) => f.item.pedidos > 0);
+    // Un periodo (hoy, semana, mes o fechas propias) o «solo de hoy» deja solo a quienes compraron en ese rango
+    if (hayRango) filas = filas.filter((f) => f.item.pedidos > 0);
 
     const orden = filtros.orden;
     if (orden && orden !== 'reciente') {
@@ -1119,15 +1132,63 @@ export class ClientesService {
    */
   async participantesSorteo(filtros: FiltrosClientes): Promise<{ total: number; participantes: Array<{ id: string; nombre: string; detalle: string }> }> {
     const { filas } = await this.filtrarAdmin(filtros);
-    const elegibles = filas.filter((f) => f.item.activo && f.item.telefono.replace(/\D/g, '').length >= 9);
+    // Inactivos solo si el filtro de registro los pide; personal, cuentas bloqueadas, sin nombre y sin celular, nunca
+    const pideInactivos = ['desactivados', 'inactivos'].includes((filtros.estado ?? '').toLowerCase());
+    const elegibles = filas.filter(
+      (f) =>
+        (f.item.activo || pideInactivos) &&
+        f.item.tipo !== 'Personal' &&
+        !f.bloqueada &&
+        f.item.nombre !== 'Sin nombre' &&
+        f.item.telefono.replace(/\D/g, '').length >= 9,
+    );
+    // Sin cortar en silencio: si pasa del tope, el sorteo se niega y pide afinar los filtros
+    if (elegibles.length > LIMITE_PARTICIPANTES_SORTEO) {
+      throw new BadRequestException({
+        codigo: 'SORTEO_DEMASIADOS',
+        mensaje: `Son ${elegibles.length} participantes; el sorteo admite hasta ${LIMITE_PARTICIPANTES_SORTEO}. Afina los filtros.`,
+      });
+    }
     return {
       total: elegibles.length,
-      participantes: elegibles.slice(0, LIMITE_PARTICIPANTES_SORTEO).map((f) => ({
+      participantes: elegibles.map((f) => ({
         id: f.item.id,
         nombre: nombreParaSorteo(f.item.nombre, f.apellidos),
         detalle: detalleCelularSorteo(f.item.telefono),
       })),
     };
+  }
+
+  /**
+   * Auditoría del sorteo: filtro usado, cantidad de participantes y ganadores ya enmascarados («María G. ···123»).
+   * Sin búsqueda libre (puede traer un celular o un nombre completo).
+   */
+  async registrarSorteo(
+    filtros: FiltrosClientes,
+    cuerpo: { juego?: unknown; participantes?: unknown; ganadores?: unknown },
+    usuarioAutenticado: any,
+    ip?: string,
+  ): Promise<{ ok: true }> {
+    const MASCARA = /^[\p{L} .]{1,40} ···(\d{3})?$/u;
+    const ganadores = Array.isArray(cuerpo?.ganadores) ? cuerpo.ganadores : [];
+    if (ganadores.length < 1 || ganadores.length > 10 || !ganadores.every((g) => typeof g === 'string' && MASCARA.test(g))) {
+      throw new BadRequestException({ codigo: 'SORTEO_GANADORES_INVALIDOS', mensaje: 'Ganadores no válidos: solo nombre corto y últimos 3 dígitos.' });
+    }
+    const { q: _q, pagina: _p, limite: _l, ...sinBusqueda } = filtros;
+    await this.auditoria.registrar({
+      categoria: 'ACCESO',
+      modulo: 'clientes',
+      accion: 'SORTEO_REALIZADO',
+      despues: {
+        filtros: { ...sinBusqueda, hayBusqueda: Boolean(filtros.q?.trim()) },
+        juego: typeof cuerpo.juego === 'string' ? cuerpo.juego.slice(0, 20) : null,
+        participantes: Number(cuerpo.participantes) || 0,
+        ganadores,
+      },
+      partyId: usuarioAutenticado?.partyId,
+      ip,
+    });
+    return { ok: true };
   }
 
   /**

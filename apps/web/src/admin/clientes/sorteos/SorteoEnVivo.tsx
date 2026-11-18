@@ -254,12 +254,15 @@ export function SorteoEnVivo({
   participantes,
   filtrosTexto,
   alCerrar,
+  alGanar,
   azar = azarSeguro,
   factorTiempo = 1,
 }: {
   participantes: ParticipanteSorteo[];
   filtrosTexto: string;
   alCerrar: () => void;
+  /** Se llama al terminar cada ronda, con los ganadores ya enmascarados (para la auditoría) */
+  alGanar?: (ganadores: ParticipanteSorteo[], juego: string) => void;
   /** Solo para pruebas */
   azar?: Azar;
   /** Solo para pruebas: multiplica las duraciones */
@@ -344,6 +347,7 @@ export function SorteoEnVivo({
     setCorriendo(false);
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     setHistorial((h) => [...h, { juego: plan.juego, ganadores: plan.ganadores, hora }]);
+    alGanar?.(plan.ganadores, plan.juego);
   };
 
   const copiar = async () => {

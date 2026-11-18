@@ -3,6 +3,7 @@ import type { ClienteItem } from './tipos';
 import {
   listarClientes,
   listarParticipantesSorteo,
+  registrarSorteoRealizado,
   exportarClientesExcel,
   cambiarEstadoCliente,
   type FiltrosClientes,
@@ -39,6 +40,14 @@ const guardarLocal = (clave: string, valor: string) => {
 };
 
 /** Todos los filtros de la pantalla. Los números van como texto para poder escribirlos con calma. */
+/** Quiénes entran (y el sorteo): todos, solo registrados (cuenta con contraseña) o solo de hoy */
+type Alcance = 'todos' | 'registrados' | 'hoy';
+const ALCANCES: Record<Alcance, { etiqueta: string; ayuda: string }> = {
+  todos: { etiqueta: 'Todos', ayuda: 'Todos los clientes que cumplan los demás filtros: con cuenta y de mostrador.' },
+  registrados: { etiqueta: 'Solo registrados', ayuda: 'Solo clientes con cuenta de cliente (con contraseña creada en la carta o con código de WhatsApp).' },
+  hoy: { etiqueta: 'Solo de hoy', ayuda: 'Solo clientes con un pedido pagado hoy (día de Lima).' },
+};
+
 interface EstadoFiltros {
   tipo: string;
   credito: string;
@@ -58,6 +67,7 @@ interface EstadoFiltros {
   sinCompraDias: string;
   cumpleMes: boolean;
   canal: string;
+  alcance: Alcance;
   orden: string;
 }
 
@@ -80,6 +90,7 @@ const SIN_FILTROS: EstadoFiltros = {
   sinCompraDias: '',
   cumpleMes: false,
   canal: 'todos',
+  alcance: 'todos',
   orden: 'reciente',
 };
 
@@ -110,6 +121,7 @@ function aFiltrosApi(f: EstadoFiltros, busqueda: string): FiltrosClientes {
     sinCompraDias: num(f.sinCompraDias),
     cumpleMes: f.cumpleMes || undefined,
     canal: f.canal !== 'todos' ? (f.canal as FiltrosClientes['canal']) : undefined,
+    alcance: f.alcance !== 'todos' ? f.alcance : undefined,
     orden: f.orden !== 'reciente' ? (f.orden as FiltrosClientes['orden']) : undefined,
   };
 }
@@ -242,7 +254,9 @@ export function ClientesAdminView() {
   const [exportando, setExportando] = useState(false);
   const [preparandoSorteo, setPreparandoSorteo] = useState(false);
   const [aviso, setAviso] = useState('');
-  const [sorteo, setSorteo] = useState<{ participantes: ParticipanteSorteo[]; filtrosTexto: string } | null>(null);
+  const [sorteo, setSorteo] = useState<{ participantes: ParticipanteSorteo[]; filtrosTexto: string; filtros: FiltrosClientes } | null>(null);
+  // Cuántos entran al sorteo con el filtro actual (se pide al servidor con los mismos parámetros que la lista)
+  const [conteoSorteo, setConteoSorteo] = useState<number | null>(null);
 
   const filtrosApi = useMemo(() => aFiltrosApi(f, busqueda), [f, busqueda]);
   const claveFiltros = JSON.stringify(filtrosApi);
@@ -283,6 +297,19 @@ export function ClientesAdminView() {
     return () => clearTimeout(t);
   }, [claveFiltros, limite]);
 
+  useEffect(() => {
+    let vigente = true;
+    const t = setTimeout(() => {
+      listarParticipantesSorteo(filtrosApi)
+        .then((r) => vigente && setConteoSorteo(r.total))
+        .catch(() => vigente && setConteoSorteo(null));
+    }, 300);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [claveFiltros]);
+
   // Etiquetas de lo que está filtrado, cada una con su forma de quitarla
   const activos = useMemo(() => {
     const l: Array<{ id: string; texto: string; quitar: Partial<EstadoFiltros> }> = [];
@@ -299,6 +326,7 @@ export function ClientesAdminView() {
     if (f.puntosMin || f.puntosMax) l.push({ id: 'puntos', texto: `Puntos: ${f.puntosMin || '0'} a ${f.puntosMax || 'más'}`, quitar: { puntosMin: '', puntosMax: '' } });
     if (f.conPuntos !== 'todos') l.push({ id: 'conPuntos', texto: f.conPuntos === 'si' ? 'Con puntos' : 'Sin puntos', quitar: { conPuntos: 'todos' } });
     if (f.sinCompraDias) l.push({ id: 'dormidos', texto: `Sin comprar hace más de ${f.sinCompraDias} días`, quitar: { sinCompraDias: '' } });
+    if (f.alcance !== 'todos') l.push({ id: 'alcance', texto: ALCANCES[f.alcance].etiqueta, quitar: { alcance: 'todos' } });
     if (f.cumpleMes) l.push({ id: 'cumple', texto: 'Cumplen años este mes', quitar: { cumpleMes: false } });
     if (f.canal !== 'todos') l.push({ id: 'canal', texto: `Canal: ${CANALES[f.canal]}`, quitar: { canal: 'todos' } });
     return l;
@@ -344,8 +372,9 @@ export function ClientesAdminView() {
     setAviso('');
     try {
       const r = await listarParticipantesSorteo(filtrosApi);
-      if (!r.participantes.length) setAviso('Nadie con celular cumple estos filtros. No hay a quién sortear.');
-      else setSorteo({ participantes: r.participantes, filtrosTexto: textoFiltros });
+      setConteoSorteo(r.total);
+      if (!r.participantes.length) setAviso('Con este filtro no hay participantes.');
+      else setSorteo({ participantes: r.participantes, filtrosTexto: textoFiltros, filtros: filtrosApi });
     } catch {
       setAviso('No se pudo preparar el sorteo. Prueba otra vez.');
     } finally {
@@ -652,12 +681,25 @@ export function ClientesAdminView() {
           </BarraFiltros>
         </div>
 
+        <div role="radiogroup" aria-label="Quiénes entran al sorteo" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Sortear entre:</span>
+          {(Object.keys(ALCANCES) as Alcance[]).map((a) => (
+            <button key={a} type="button" role="radio" aria-checked={f.alcance === a} onClick={() => cambiar({ alcance: a })} style={estiloChip(f.alcance === a)}>
+              {ALCANCES[a].etiqueta}
+            </button>
+          ))}
+        </div>
+        <p style={{ margin: '4px 0 8px', fontSize: 13 }}>
+          {ALCANCES[f.alcance].ayuda}{' '}
+          {conteoSorteo !== null &&
+            (conteoSorteo === 0 ? <b>Con este filtro no hay participantes.</b> : <>Participan <b>{conteoSorteo}</b> con este filtro.</>)}
+        </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <button
             type="button"
             onClick={abrirSorteo}
-            disabled={total === 0 || preparandoSorteo}
-            style={{ ...estiloChip(false), borderColor: 'var(--cp-orange)', background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, opacity: total === 0 ? 0.45 : 1, cursor: total === 0 ? 'not-allowed' : 'pointer' }}
+            disabled={total === 0 || preparandoSorteo || conteoSorteo === 0}
+            style={{ ...estiloChip(false), borderColor: 'var(--cp-orange)', background: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, opacity: total === 0 || conteoSorteo === 0 ? 0.45 : 1, cursor: total === 0 || conteoSorteo === 0 ? 'not-allowed' : 'pointer' }}
           >
             {preparandoSorteo ? 'Preparando…' : '🎉 Sorteo en vivo'}
           </button>
@@ -832,7 +874,18 @@ export function ClientesAdminView() {
 
       {sorteo && (
         <Suspense fallback={null}>
-          <SorteoEnVivo participantes={sorteo.participantes} filtrosTexto={sorteo.filtrosTexto} alCerrar={() => setSorteo(null)} />
+          <SorteoEnVivo
+            participantes={sorteo.participantes}
+            filtrosTexto={sorteo.filtrosTexto}
+            alCerrar={() => setSorteo(null)}
+            alGanar={(ganadores, juego) =>
+              registrarSorteoRealizado(sorteo.filtros, {
+                juego,
+                participantes: sorteo.participantes.length,
+                ganadores: ganadores.map((g) => `${g.nombre} ${g.detalle}`),
+              }).catch(() => setAviso('No se pudo dejar constancia del sorteo en la auditoría.'))
+            }
+          />
         </Suspense>
       )}
 

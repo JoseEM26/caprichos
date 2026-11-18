@@ -38,6 +38,11 @@ export class FiltrosClientesDto {
   @IsOptional() @IsIn(['si']) cumpleMes?: 'si';
   /** Solo cuentan los pedidos de ese canal */
   @IsOptional() @IsIn(['CARTA', 'WHATSAPP', 'CAJA', 'MOZO']) canal?: 'CARTA' | 'WHATSAPP' | 'CAJA' | 'MOZO';
+  /**
+   * Quiénes entran: todos; solo los registrados (cuenta de cliente con contraseña); o solo los de hoy
+   * (con pedido pagado hoy en día de Lima). Manda sobre «periodo».
+   */
+  @IsOptional() @IsIn(['todos', 'registrados', 'hoy']) alcance?: 'todos' | 'registrados' | 'hoy';
 
   @IsOptional() @IsIn(['reciente', 'pedidos', 'consumo', 'puntos', 'ultima', 'nombre']) orden?: 'reciente' | 'pedidos' | 'consumo' | 'puntos' | 'ultima' | 'nombre';
 

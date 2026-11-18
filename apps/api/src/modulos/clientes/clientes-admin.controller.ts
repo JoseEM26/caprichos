@@ -91,6 +91,14 @@ export class ClientesAdminController {
     return this.clientesService.participantesSorteo(filtros);
   }
 
+  /** Al terminar un sorteo: deja constancia en la auditoría (filtro, cantidad y ganadores enmascarados). */
+  @Post('sorteo-realizado')
+  @Permiso('clientes', 'ver')
+  async registrarSorteo(@Query() filtros: FiltrosClientesDto, @Body() cuerpo: any, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.clientesService.registrarSorteo(filtros, cuerpo ?? {}, req.usuario, ip);
+  }
+
   @Get(':id')
   @Permiso('clientes', 'ver')
   async obtenerFicha(@Param('id') id: string, @Req() req: any) {
