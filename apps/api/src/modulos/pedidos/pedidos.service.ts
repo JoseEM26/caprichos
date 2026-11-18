@@ -46,6 +46,7 @@ import { RucService, rucValido } from '../ruc';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { StockService } from '../stock/stock.service';
+import { lineasSeparadasDelPedido } from '../stock/separado-programado.util';
 import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -764,6 +765,28 @@ export class PedidosService {
         })),
       ),
     ];
+  }
+
+  /** Historial de almacén: qué productos y sabores separó un pedido programado. Nunca rompe el pedido. */
+  private async auditarStockSeparado(tx: Prisma.TransactionClient, pedidoId: bigint, codigo: string, programadoPara: Date, usuarioPartyId?: bigint | string | number) {
+    try {
+      const productos = await lineasSeparadasDelPedido(tx, pedidoId);
+      if (productos.length === 0) return;
+      await this.auditoria?.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'almacen',
+          accion: 'SEPARAR_STOCK_PROGRAMADO',
+          entidad: 'pedido',
+          entidadId: pedidoId,
+          despues: { pedido: codigo, programadoPara: programadoPara.toISOString(), productos },
+          partyId: usuarioPartyId !== undefined ? BigInt(usuarioPartyId) : undefined,
+        },
+        tx,
+      );
+    } catch (err: any) {
+      this.logger.warn(`No se pudo auditar el stock separado del pedido ${codigo}: ${err?.message}`);
+    }
   }
 
   /** Descuenta el stock de los productos que lo controlan (y de las opciones ligadas a stock) de las líneas calculadas. */
@@ -1520,6 +1543,9 @@ export class PedidosService {
       const ventaProductos = await this.descontarStockLineas(tx, pedido.id, pedido.party_id ?? BigInt(1), lineasCalculadas);
       agotadosPorVenta = ventaProductos.agotados;
       saboresAgotadosPorVenta = ventaProductos.saboresAgotados;
+
+      // Pedido programado: lo que se separó de stock queda a la vista en el historial de almacén (una línea por pedido)
+      if (programadoPara) await this.auditarStockSeparado(tx, pedido.id, pedido.codigo, programadoPara, origen?.usuarioPartyId);
 
       // Historial de estado inicial
       await tx.pedidoEstadoHistorial.create({

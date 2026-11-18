@@ -10,6 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { agruparSeparadas } from './separado-programado.util';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { MovimientoManualDto } from './dto/movimiento-manual.dto';
@@ -1135,6 +1136,9 @@ export class StockService {
 
     if (ventas.length === 0) return { ok: true, movimientosRevertidos: 0 };
 
+    // Pedido programado que devuelve productos con control: queda en el historial de almacén (única vía de devolución)
+    if (!opciones.soloInsumos) await this.auditarDevolucionProgramado(runner, id, ventas, porId);
+
     // Reactivar disponibilidad si corresponde (insumo o producto repuesto)
     await this.verificarYReactivarAgotados(insumosRevertidos, productosRevertidos);
     for (const sid of saboresRevertidos) {
@@ -1160,6 +1164,34 @@ export class StockService {
     }
 
     return { ok: true, movimientosRevertidos: ventas.length };
+  }
+
+  /** «Devolvió el stock separado…»: solo pedidos que fueron programados y solo productos (no insumos). Nunca rompe la devolución. */
+  private async auditarDevolucionProgramado(db: any, pedidoId: bigint, ventas: any[], porId: bigint) {
+    try {
+      const productos = ventas.filter((m) => !m.insumo_id && m.producto_id);
+      if (productos.length === 0) return;
+      const pedido = await db.pedido.findUnique({ where: { id: pedidoId }, select: { codigo: true, programado_para: true } });
+      if (!pedido?.programado_para) return;
+      const ids = [...new Set(productos.map((m) => m.producto_id))];
+      const saborIds = [...new Set(productos.filter((m) => m.sabor_id).map((m) => m.sabor_id))];
+      const nombres = new Map<string, string>((await db.producto.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true } })).map((p: any) => [p.id.toString(), p.nombre]));
+      const sabores = new Map<string, string>(saborIds.length ? (await db.sabor.findMany({ where: { id: { in: saborIds } }, select: { id: true, nombre: true } })).map((s: any) => [s.id.toString(), s.nombre]) : []);
+      const lineas = agruparSeparadas(
+        productos.map((m) => ({ producto: nombres.get(m.producto_id.toString()) ?? 'Producto', sabor: m.sabor_id ? (sabores.get(m.sabor_id.toString()) ?? null) : null, cantidad: Number(m.cantidad) })),
+      );
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'almacen',
+        accion: 'DEVOLVER_STOCK_PROGRAMADO',
+        entidad: 'pedido',
+        entidadId: pedidoId,
+        despues: { pedido: pedido.codigo, programadoPara: new Date(pedido.programado_para).toISOString(), productos: lineas },
+        partyId: porId,
+      });
+    } catch {
+      // la auditoría no frena la devolución
+    }
   }
 
   /**

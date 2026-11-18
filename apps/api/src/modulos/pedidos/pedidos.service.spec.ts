@@ -313,6 +313,33 @@ describe('PedidosService', () => {
         expect(prismaMock.pedidoEstadoHistorial.create.mock.calls.at(-1)[0].data.estado_nuevo).toBe('PROGRAMADO');
       });
 
+      it('programado: audita en almacén lo que separó (una línea por pedido); un pedido normal no audita', async () => {
+        const registrar = jest.fn();
+        (service as any).auditoria = { registrar };
+        prismaMock.movimientoStock = { findMany: jest.fn().mockResolvedValue([{ cantidad: 3, producto: { nombre: 'Dona de prueba' }, sabor: { nombre: 'Fresa' } }]) };
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        const fecha = manana();
+        await service.crear(dtoRecoger, 'prog-aud-1', { canal: 'CAJA', usuarioPartyId: 7n, programadoPara: fecha });
+        expect(registrar).toHaveBeenCalledTimes(1);
+        expect(registrar.mock.calls[0][0]).toMatchObject({
+          modulo: 'almacen', accion: 'SEPARAR_STOCK_PROGRAMADO', entidad: 'pedido', entidadId: 300n,
+          despues: { pedido: 'CP-W300', programadoPara: fecha.toISOString(), productos: [{ producto: 'Dona de prueba', sabor: 'Fresa', cantidad: 3 }] },
+        });
+        registrar.mockClear();
+        prismaMock.pedido.create.mockResolvedValue(creado('COLA'));
+        await service.crear(dtoRecoger, 'prog-aud-2', { canal: 'CAJA', usuarioPartyId: 7n });
+        expect(registrar.mock.calls.filter((c) => c[0].accion === 'SEPARAR_STOCK_PROGRAMADO')).toHaveLength(0);
+      });
+
+      it('programado sin productos controlados: no audita nada', async () => {
+        const registrar = jest.fn();
+        (service as any).auditoria = { registrar };
+        prismaMock.movimientoStock = { findMany: jest.fn().mockResolvedValue([]) };
+        prismaMock.pedido.create.mockResolvedValue(creado('PROGRAMADO'));
+        await service.crear(dtoRecoger, 'prog-aud-3', { canal: 'CAJA', usuarioPartyId: 7n, programadoPara: manana() });
+        expect(registrar.mock.calls.filter((c) => c[0].accion === 'SEPARAR_STOCK_PROGRAMADO')).toHaveLength(0);
+      });
+
       it('sin programadoPara nace COLA y llega a cocina de inmediato (como siempre)', async () => {
         prismaMock.pedido.create.mockResolvedValue(creado('COLA'));
         await service.crear(dtoRecoger, 'prog-2', { canal: 'CAJA', usuarioPartyId: 7n });

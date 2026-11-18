@@ -122,6 +122,26 @@ describe('apertura de caja y apertura del día', () => {
     );
   });
 
+  it('REGISTRAR_APERTURA suma las unidades separadas por programados solo si N>0 (con 0 queda idéntico)', () => {
+    const base = { accion: 'REGISTRAR_APERTURA', entidad: 'conteo_apertura' };
+    expect(describirRegistro({ ...base, despues: { productos: 4, mermas: [], separadosProgramados: [] } })).toBe('Hizo la apertura del día: 4 productos contados');
+    expect(describirRegistro({ ...base, despues: { productos: 4, mermas: [], separadosProgramados: [{ unidades: 0 }] } })).toBe('Hizo la apertura del día: 4 productos contados');
+    expect(describirRegistro({ ...base, despues: { productos: 4, mermas: [{}], separadosProgramados: [{ unidades: 3 }, { unidades: 2 }] } })).toBe(
+      'Hizo la apertura del día: 4 productos contados, 1 con merma; 5 unidades separadas para pedidos programados',
+    );
+    expect(describirRegistro({ ...base, despues: { productos: 1, separadosProgramados: [{ unidades: 1 }] } })).toBe('Hizo la apertura del día: 1 producto contado; 1 unidad separada para pedidos programados');
+  });
+
+  it('SEPARAR_STOCK_PROGRAMADO y DEVOLVER_STOCK_PROGRAMADO se leen en español con pedido y fecha (hora de Lima)', () => {
+    const despues = { pedido: 'CP-0001', programadoPara: '2026-11-20T15:00:00.000Z', productos: [{ producto: 'Dona de chocolate', sabor: null, cantidad: 3 }, { producto: 'Galleta', sabor: 'Avena', cantidad: 2 }] };
+    expect(describirRegistro({ accion: 'SEPARAR_STOCK_PROGRAMADO', entidad: 'pedido', despues })).toBe(
+      'Separó 3 de Dona de chocolate y 2 de Galleta (Avena) para el pedido CP-0001 (programado para el 20/11 10:00)',
+    );
+    expect(describirRegistro({ accion: 'DEVOLVER_STOCK_PROGRAMADO', entidad: 'pedido', despues: { ...despues, productos: [despues.productos[0]] } })).toBe(
+      'Devolvió el stock separado (3 de Dona de chocolate) del pedido CP-0001 (programado para el 20/11 10:00)',
+    );
+  });
+
   it('nombreModulo: conocido en español; desconocido capitalizado', () => {
     expect(nombreModulo('almacen')).toBe('Almacén');
     expect(nombreModulo('pagos_online')).toBe('Pagos en línea');
