@@ -181,6 +181,8 @@ export interface LineaCarrito {
   opciones: OpcionElegida[];
   nota?: string;
   personas?: string[];
+  /** Solo con «Comer en el local»: la línea sale para llevar; el resto se come aquí. */
+  paraLlevar?: boolean;
   /** Combo con parte fija: el combo y qué producto se eligió en cada parte (principal o reemplazo) */
   ofertaId?: string;
   comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];

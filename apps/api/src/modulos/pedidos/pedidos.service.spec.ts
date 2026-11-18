@@ -597,6 +597,37 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('para llevar por línea desde la carta (canal CARTA)', () => {
+      const lineaA = { ...pedidoBaseDto.lineas[0], paraLlevar: true };
+      const lineaB = { productoId: 1, tamanoId: 10, cantidad: 1, opciones: [200], personas: ['Ana'] };
+      const paraLlevarGuardado = () => prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data.para_llevar);
+      const cartaComerAqui = { canal: 'CARTA' as const };
+
+      it('COMER_LOCAL: el cliente marca cuál línea sale para llevar y la guarda por línea', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 510n, codigo: 'CP-W510', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CARTA', modalidad: 'COMER_LOCAL' });
+        await service.crear({ ...pedidoBaseDto, modalidad: 'COMER_LOCAL', entrega: undefined, lineas: [lineaA, lineaB] } as CrearPedidoDto, 'pll-carta-comer', cartaComerAqui);
+        expect(paraLlevarGuardado()).toEqual([true, false]);
+      });
+
+      it('COMER_LOCAL sin marca: todo se come aquí (false)', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 511n, codigo: 'CP-W511', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CARTA', modalidad: 'COMER_LOCAL' });
+        await service.crear({ ...pedidoBaseDto, modalidad: 'COMER_LOCAL', entrega: undefined, lineas: [lineaB] } as CrearPedidoDto, 'pll-carta-sin-marca', cartaComerAqui);
+        expect(paraLlevarGuardado()).toEqual([false]);
+      });
+
+      it('DELIVERY desde la carta: ignora la marca aunque llegue', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 512n, codigo: 'CP-W512', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
+        await service.crear({ ...pedidoBaseDto, lineas: [lineaA] } as CrearPedidoDto, 'pll-carta-delivery', cartaComerAqui);
+        expect(paraLlevarGuardado()).toEqual([false]);
+      });
+
+      it('RECOGER desde la carta: ignora la marca aunque llegue', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 513n, codigo: 'CP-W513', estado: 'COLA', subtotal: 28, envio: null, total: 28, canal: 'CARTA', modalidad: 'RECOGER' });
+        await service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined, lineas: [lineaA] } as CrearPedidoDto, 'pll-carta-recoger', cartaComerAqui);
+        expect(paraLlevarGuardado()).toEqual([false]);
+      });
+    });
+
     describe('delivery sin punto en el mapa (esperando ubicación)', () => {
       it('con dirección y referencia es válido: sin zona ni envío, el total no suma envío', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: null, total: 28.0 });

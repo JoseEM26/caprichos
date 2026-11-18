@@ -21,6 +21,10 @@ interface CarritoContextoValor {
   agregarLinea: (linea: Omit<LineaCarrito, 'id'>) => void;
   actualizarCantidad: (id: string, delta: number) => void;
   eliminarLinea: (id: string) => void;
+  /** Marca o desmarca «para llevar» en una línea (solo importa con Comer en el local). */
+  marcarParaLlevar: (id: string, paraLlevar: boolean) => void;
+  /** Marca o desmarca «para llevar» en todas las líneas. */
+  marcarTodoParaLlevar: (paraLlevar: boolean) => void;
   limpiarCarrito: () => void;
   cajonAbierto: boolean;
   abrirCajon: () => void;
@@ -143,6 +147,14 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     setLineas((prev) => prev.filter((l) => l.id !== id));
   };
 
+  const marcarParaLlevar = (id: string, paraLlevar: boolean) => {
+    setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, paraLlevar } : l)));
+  };
+
+  const marcarTodoParaLlevar = (paraLlevar: boolean) => {
+    setLineas((prev) => prev.map((l) => ({ ...l, paraLlevar })));
+  };
+
   const limpiarCarrito = () => {
     setLineas([]);
     if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -234,6 +246,8 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
         agregarLinea,
         actualizarCantidad,
         eliminarLinea,
+        marcarParaLlevar,
+        marcarTodoParaLlevar,
         limpiarCarrito,
         cajonAbierto,
         abrirCajon,

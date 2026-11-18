@@ -72,7 +72,7 @@ export interface DetalleSeguimiento {
   envio: number | null;
   puntosCanjeados: number;
   nota: string | null;
-  lineas: { nombre: string; cantidad: number; nota: string | null }[];
+  lineas: { nombre: string; cantidad: number; nota: string | null; paraLlevar?: boolean }[];
 }
 
 export interface EstadoSeguimiento {

@@ -147,7 +147,7 @@ export interface DetallePedidoSeguimiento {
   envio: number | null;
   puntosCanjeados: number;
   nota: string | null;
-  lineas: { nombre: string; cantidad: number; nota: string | null }[];
+  lineas: { nombre: string; cantidad: number; nota: string | null; paraLlevar: boolean }[];
 }
 
 export type EstadoPagoMedio = EstadoVoucherSeguimiento | 'AL_RECIBIR' | 'COBRADO_MOZO' | 'PAGADO';
@@ -308,7 +308,7 @@ export class SeguimientoService {
         lineas: {
           where: { linea_combo_id: null },
           orderBy: { id: 'asc' as const },
-          select: { nombre: true, cantidad: true, nota: true, ...SELECCION_AREA_LINEA },
+          select: { nombre: true, cantidad: true, nota: true, para_llevar: true, ...SELECCION_AREA_LINEA },
         },
         planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' as const } },
       },
@@ -342,7 +342,7 @@ export class SeguimientoService {
         envio: pedido.envio == null ? null : Number(pedido.envio),
         puntosCanjeados: Number(pedido.puntos_canjeados ?? 0),
         nota: pedido.nota ?? null,
-        lineas: (pedido.lineas ?? []).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, nota: l.nota ?? null })),
+        lineas: (pedido.lineas ?? []).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, nota: l.nota ?? null, paraLlevar: l.para_llevar === true })),
       },
     };
 

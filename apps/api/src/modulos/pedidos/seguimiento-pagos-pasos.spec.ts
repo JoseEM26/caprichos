@@ -154,7 +154,7 @@ describe('SeguimientoService: pasos por modalidad y pago dividido', () => {
       ['PLIN', 22.5, 'SIN_VOUCHER'],
     ]);
     expect(r.voucher?.estado).toBe('SIN_VOUCHER');
-    expect(r.detalle?.lineas).toEqual([{ nombre: 'Waffle', cantidad: 1, nota: 'Sin crema' }]);
+    expect(r.detalle?.lineas).toEqual([{ nombre: 'Waffle', cantidad: 1, nota: 'Sin crema', paraLlevar: false }]);
   });
 
   it('pedido en efectivo: resumen sin captura y sin bloque voucher', async () => {

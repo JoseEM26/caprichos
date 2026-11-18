@@ -63,6 +63,7 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
 
 import { AvisoComerEnLocal } from './AvisoComerEnLocal';
 import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
+import { AtajoParaLlevar, ResumenParaLlevar, SelectorParaLlevar } from '../admin/pedidos/paraLlevar';
 import { cabeceraSesionCarta, useEventoCarta } from './eventosCarta';
 import { celularAlEscribir } from '../comun/celular';
 import { DatosTransferencia } from '../comun/DatosTransferencia';
@@ -86,6 +87,8 @@ export function FormularioCheckout({
     ajustarCantidadProducto,
     lineaAjustandoId,
     abrirAjusteLinea,
+    marcarParaLlevar,
+    marcarTodoParaLlevar,
   } = useCarrito();
 
   // Productos que superan lo que queda (el saldo cambió) y el 409 del último envío.
@@ -865,6 +868,8 @@ export function FormularioCheckout({
 
     const lineasDto: any[] = [];
     for (const lin of lineas) {
+      // Para llevar solo existe con Comer en el local: en otra modalidad no se envía
+      const paraLlevarDto = modalidad === 'COMER_LOCAL' ? { paraLlevar: !!lin.paraLlevar } : {};
       if (lin.unidades && lin.unidades.length > 1) {
         for (const u of lin.unidades) {
           lineasDto.push({
@@ -876,6 +881,7 @@ export function FormularioCheckout({
             nota: lin.nota,
             ofertaId: lin.ofertaId,
             comboElecciones: lin.comboElecciones,
+            ...paraLlevarDto,
           });
         }
       } else {
@@ -889,6 +895,7 @@ export function FormularioCheckout({
           ofertaId: lin.ofertaId,
           comboElecciones: lin.comboElecciones,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+          ...paraLlevarDto,
         });
       }
     }
@@ -1340,6 +1347,24 @@ export function FormularioCheckout({
                       <span aria-hidden="true">🍽️ </span>Comer en el local
                     </button>
                     {modalidad === 'COMER_LOCAL' && <AvisoComerEnLocal nombre={nombre} />}
+                    {modalidad === 'COMER_LOCAL' && lineas.length > 0 && (
+                      <div
+                        data-testid="bloque-para-llevar"
+                        style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', borderRadius: '12px', border: '1px solid var(--cp-line)', background: 'var(--cp-white)' }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>¿Cuáles te llevas y cuáles comes aquí?</div>
+                        <AtajoParaLlevar onTodo={marcarTodoParaLlevar} />
+                        {lineas.map((l) => (
+                          <div key={l.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--cp-navy)', overflowWrap: 'anywhere' }}>
+                              <b>{`${l.cantidad} × ${l.nombre}`}</b>{l.tamanoNombre ? ` (${l.tamanoNombre})` : ''}
+                            </span>
+                            <SelectorParaLlevar paraLlevar={!!l.paraLlevar} onCambiar={(v) => marcarParaLlevar(l.id, v)} etiqueta={`Dónde se come ${l.nombre}`} />
+                          </div>
+                        ))}
+                        <ResumenParaLlevar lineas={lineas} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Acceso (cuenta o invitado) */}

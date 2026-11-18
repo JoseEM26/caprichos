@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCarrito } from './CarritoContext';
+import { ChipParaLlevar, ResumenParaLlevar } from '../admin/pedidos/paraLlevar';
 import { Icono } from '../comun/Icono';
 import { IconoMedioPago } from '../comun/IconoMedioPago';
 import { ModalConPestanas } from '../comun/ModalConPestanas';
@@ -321,10 +322,12 @@ function PanelPedido({
         ))
       ) : detalle && detalle.lineas.length > 0 ? (
         <section className="sg-tarjeta" aria-label="Productos del pedido">
+          <ResumenParaLlevar lineas={detalle.lineas} />
           <ul className="sg-lista">
             {detalle.lineas.map((l, i) => (
               <li key={i} className="sg-fila" data-testid="producto-seguimiento">
                 <span>{l.cantidad} × {l.nombre}</span>
+                {l.paraLlevar && <ChipParaLlevar compacto />}
                 {!anulado && <span className="sg-chip">Recibido</span>}
               </li>
             ))}
