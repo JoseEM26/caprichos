@@ -845,13 +845,8 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- Ampliación: panel casi a pantalla completa, filtros en una línea y pedido compacto ----
+/* ---- Ampliación: filtros en una línea y pedido compacto (el tamaño del panel queda como estaba) ----
    PC (contenedor >= 860 px): botones de 36 px. Celular (< 420 px): táctiles de 44 px. */
-.salon-panel.np-panel {
-  height: 96vh;
-  height: 96dvh;
-}
-
 /* Categorías y buscador en una misma línea (PC); en celular el buscador baja a su propia fila */
 .np-filtros {
   display: flex;

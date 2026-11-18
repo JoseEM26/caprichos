@@ -34,9 +34,9 @@ describe('layout del modal Nuevo pedido', () => {
   });
 
   // Ampliación: ancho casi total, filtros en una línea y fila de línea compacta (360 / 768 / 1280 px por contenedor)
-  it('el panel ocupa hasta 1280 px (96vw) y casi todo el alto (96dvh)', () => {
-    expect(tsx).toContain("width: 'min(1280px, 96vw)'");
-    expect(css).toMatch(/\.salon-panel\.np-panel\s*\{\s*height:\s*96vh;\s*height:\s*96dvh;/);
+  it('el tamaño del panel queda como estaba (hasta 1120 px y alto original)', () => {
+    expect(tsx).toContain("width: 'min(1120px, calc(100% - 24px))'");
+    expect(css).not.toMatch(/height:\s*96dvh/);
   });
 
   it('categorías y buscador comparten una fila; en celular (< 420 px) el buscador baja a su propia fila', () => {

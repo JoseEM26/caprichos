@@ -2034,7 +2034,7 @@ export function ModalNuevoPedidoMesa({
           style={{
             position: 'relative',
             zIndex: 60,
-            width: 'min(1280px, 96vw)',
+            width: 'min(1120px, calc(100% - 24px))',
             background: 'var(--cp-cream)',
             borderRadius: '20px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
