@@ -11,7 +11,7 @@ const RESPUESTA_WA = (token: string) => ({
   ok: true,
   modo: 'WHATSAPP_ENTRANTE',
   token,
-  enlace: `https://wa.me/51914244077?text=${encodeURIComponent(`Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`)}`,
+  enlace: `https://wa.me/51999000111?text=${encodeURIComponent(`Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`)}`,
   vence_seg: 600,
   mensaje: 'Toca el botón, envía el mensaje en WhatsApp y vuelve aquí. Vence en 10 minutos.',
 });
@@ -43,7 +43,7 @@ describe('VerificacionWhatsapp: sondeo con sin_numero', () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue({ estado: 'sin_numero' });
     const alSinNumero = vi.fn();
     render(
-      <VerificacionWhatsapp token="ABCD2345" enlace="https://wa.me/51914244077" alVerificar={vi.fn()} alSinNumero={alSinNumero} alReenviar={vi.fn()} puedeReenviar={false} esperaSeg={0} />,
+      <VerificacionWhatsapp token="ABCD2345" enlace="https://wa.me/51999000111" alVerificar={vi.fn()} alSinNumero={alSinNumero} alReenviar={vi.fn()} puedeReenviar={false} esperaSeg={0} />,
     );
     await waitFor(() => expect(alSinNumero).toHaveBeenCalledTimes(1), ESPERA_SONDEO);
     expect(screen.getByText(AVISO)).toBeInTheDocument();
@@ -70,13 +70,13 @@ describe('FormularioAcceso: WhatsApp oculta el número (sin_numero) pasa al cód
     vi.spyOn(api, 'get').mockResolvedValue({ estado: 'sin_numero' });
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
-    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '914244077' } });
+    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '999000111' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
 
     expect(await screen.findByLabelText('Código de 6 dígitos (llega por WhatsApp)', {}, ESPERA_SONDEO)).toBeInTheDocument();
     expect(screen.getByText(AVISO)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Abrir WhatsApp y enviar mensaje' })).toBeNull();
-    expect(post).toHaveBeenCalledWith('/carta/cuenta/registro/codigo', { telefono: '914244077', forzarCodigo: true });
+    expect(post).toHaveBeenCalledWith('/carta/cuenta/registro/codigo', { telefono: '999000111', forzarCodigo: true });
   });
 
   it('con el código de 6 dígitos el registro sigue: verifica y pasa a «Crea tu contraseña»', async () => {
@@ -88,13 +88,13 @@ describe('FormularioAcceso: WhatsApp oculta el número (sin_numero) pasa al cód
     vi.spyOn(api, 'get').mockResolvedValue({ estado: 'sin_numero' });
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
-    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '914244077' } });
+    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '999000111' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
 
     fireEvent.change(await screen.findByLabelText('Código de 6 dígitos (llega por WhatsApp)', {}, ESPERA_SONDEO), { target: { value: '428193' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/carta/cuenta/registro/verificar', { telefono: '914244077', codigo: '428193' }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/carta/cuenta/registro/verificar', { telefono: '999000111', codigo: '428193' }));
     expect(await screen.findByLabelText('Crea tu contraseña')).toBeInTheDocument();
   });
 
@@ -108,7 +108,7 @@ describe('FormularioAcceso: WhatsApp oculta el número (sin_numero) pasa al cód
     vi.spyOn(api, 'get').mockResolvedValue({ estado: 'sin_numero' });
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
-    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '914244077' } });
+    fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '999000111' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
 
     expect(await screen.findByRole('alert', {}, ESPERA_SONDEO)).toHaveTextContent('No pudimos enviar el código por WhatsApp');
