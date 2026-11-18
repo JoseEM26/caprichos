@@ -4,6 +4,8 @@ import {
   ConfigEquipoImpresion,
   aplicarOrientacion,
   tamanoPcValido,
+  anchoPcExcedeCabezal,
+  ANCHO_CABEZAL_MM,
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -479,6 +481,9 @@ export class EquipoConfigService {
     const t = tamano === undefined || tamano === null ? null : tamanoPcValido(tamano);
     if (tamano !== undefined && tamano !== null && !t) {
       throw new BadRequestException({ codigo: 'TAMANO_INVALIDO', mensaje: 'El tamaño debe estar entre 30 y 200 mm' });
+    }
+    if (t && anchoPcExcedeCabezal(t)) {
+      throw new BadRequestException({ codigo: 'TAMANO_INVALIDO', mensaje: `El ancho no puede pasar de ${ANCHO_CABEZAL_MM} mm: la etiquetera 4BARCODE imprime hasta ese ancho (cabezal de 4 pulgadas)` });
     }
     const reciente = await this.prisma.printJob.findFirst({
       where: { pedido_id: null, destino_equipo_id: e.id, en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) } },

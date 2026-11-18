@@ -147,8 +147,8 @@ describe('generadorTspl', () => {
     it('genera cabecera con el nombre de área e índice', () => {
       const tspl = generarEtiquetaArea(datosArea, V);
       expect(tspl).toContain('COCINA');
-      expect(tspl).toContain('Area 1 de 2');
-      expect(tspl).toContain('REVERSE 28,28,452,78\r\n');
+      expect(tspl).toContain('AREA 1 de 2 - COCINA');
+      expect(tspl).toContain('REVERSE 28,28,452,84\r\n');
       expect(tspl).toContain('PED-101');
       expect(tspl).toContain('MESA 4');
       expect(tspl).toContain('PRINT 1,1\r\n');

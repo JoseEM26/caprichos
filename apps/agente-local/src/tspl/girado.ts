@@ -41,10 +41,17 @@ function generar(
   tipo: 'ETIQUETA_AREA',
   d: EtiquetaAreaDatos,
   copias: number,
-  f: FormatoEtiqueta
+  f: FormatoEtiqueta,
+  giro: 0 | 90 | 270 = f.giro
 ): string {
-  const m = maquetarEtiqueta(tipo, d, { anchoMm: f.anchoMm, altoMm: f.altoMm });
-  return comandosInicio(f) + primitivasATspl(m.primitivas, m.W, m.H, f.giro) + `PRINT 1,${copias}\r\n`;
+  // La maqueta de área es retrato lógico: W = altoMm y H = anchoMm. Con giro 90/270 el lienzo es el del rollo
+  // girado; sin giro (rollo de canto) el lienzo ya es el físico (ancho cruza el cabezal, alto avanza).
+  const dims = giro === 0 ? { anchoMm: f.altoMm, altoMm: f.anchoMm } : { anchoMm: f.anchoMm, altoMm: f.altoMm };
+  const m = maquetarEtiqueta(tipo, d, dims);
+  return comandosInicio(f) + primitivasATspl(m.primitivas, m.W, m.H, giro) + `PRINT 1,${copias}\r\n`;
 }
 
 export const generarAreaG = (d: EtiquetaAreaDatos, copias: number, f: FormatoEtiqueta) => generar('ETIQUETA_AREA', d, copias, f);
+
+/** Rollo cargado de canto ('vertical'): la maqueta en retrato tal cual, sin girar, con su propio ancho x alto. */
+export const generarAreaV = (d: EtiquetaAreaDatos, copias: number, f: FormatoEtiqueta) => generar('ETIQUETA_AREA', d, copias, f, 0);

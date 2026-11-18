@@ -1,3 +1,4 @@
+import { ANCHO_CABEZAL_MM } from '@caprichos/compartido';
 import { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './logoBitmap';
 
 /**
@@ -59,6 +60,13 @@ export function formatoDesdeConfig(
 export const MM_A_DOTS = 8; // 203 dpi
 
 export function comandosInicio(f: FormatoEtiqueta): string {
+  // Un solo punto de control para todo lo que imprime la etiquetera (stickers, prueba de tamaño, hoja de prueba)
+  if (f.anchoMm > ANCHO_CABEZAL_MM + 1e-9) {
+    throw new Error(
+      `El sticker mide ${f.anchoMm} mm de ancho y la etiquetera imprime como máximo ${ANCHO_CABEZAL_MM} mm (cabezal de 4"). ` +
+        'Usa un ancho menor o carga un rollo más angosto; el alto sí puede ser mayor.',
+    );
+  }
   return (
     `SIZE ${f.anchoMm} mm,${f.altoMm} mm\r\n` +
     `GAP ${f.gapMm} mm,0 mm\r\n` +

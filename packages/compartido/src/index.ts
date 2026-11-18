@@ -24,6 +24,8 @@ export {
   tamanoPcValido,
   aplicarOrientacion,
   tamanoEfectivo,
+  anchoPcExcedeCabezal,
+  ANCHO_CABEZAL_MM,
 } from './constantes/index.js';
 export { MODULOS_ROL, coincideMinimo, moduloRolVisible, permisosAConceder } from './constantes/index.js';
 export type { ModuloRolCatalogo } from './constantes/index.js';
