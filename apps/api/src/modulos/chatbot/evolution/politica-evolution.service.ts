@@ -5,6 +5,7 @@ import { hashTelefono } from '../utilidades/enmascarar.util';
 import { LocalService } from '../../local/local.service';
 import { horarioDelLocal } from './horario-local';
 import { EvolutionConfigService } from './evolution-config.service';
+import { controlAlmacenActivo } from '../../stock/control-almacen';
 
 /** Orígenes del outbox que son respuesta a algo que el cliente acaba de escribir: siempre se permiten. */
 export const ORIGENES_RESPUESTA = new Set(['VOUCHER', 'BOT_ERROR', 'TOPE_SIN_PAGAR', 'AUTORESPUESTA', ORIGEN_NO_COMPATIBLE]);
@@ -24,6 +25,10 @@ export type DecisionEnvio =
   | { accion: 'DIFERIR'; esperaMs: number; motivo: string };
 
 const MIN = 60_000;
+/** Aviso de stock al equipo: fuera de horario se difiere (no se descarta) hasta que abra el local. */
+export const ORIGEN_ALMACEN_EQUIPO = 'EQUIPO_ALERTA_ALMACEN';
+/** Cada cuánto vuelve a mirar un aviso de stock diferido por horario. */
+const ESPERA_HORARIO_ALMACEN_MS = 10 * MIN;
 
 /**
  * Política de envío con Evolution (WhatsApp no oficial). El outbox la consulta antes de cada envío:
@@ -51,6 +56,10 @@ export class PoliticaEvolutionService {
   }
 
   async evaluar(fila: { telefono_destino: string; origen: string; pedido_id?: bigint | null; carga?: unknown }, ahora = new Date()): Promise<DecisionEnvio> {
+    // Con el control de almacén apagado no sale ningún aviso de stock, ni los que quedaron en cola antes de apagarlo
+    if (fila.origen === ORIGEN_ALMACEN_EQUIPO && !(await controlAlmacenActivo(this.prisma))) {
+      return { accion: 'DESCARTAR', codigo: 'CONTROL_APAGADO', motivo: 'Control de almacén apagado: no se avisa de stock.' };
+    }
     const cfg = await this.config.obtener();
     if (cfg.whatsapp_proveedor !== 'EVOLUTION') return { accion: 'ENVIAR' };
     if (ORIGENES_RESPUESTA.has(fila.origen)) return { accion: 'ENVIAR' };
@@ -88,6 +97,10 @@ export class PoliticaEvolutionService {
     if (fila.origen !== 'CODIGO_CUENTA' && !(await this.esRecibidoDeProgramado(fila))) {
       const horario = await horarioDelLocal(this.local, this.prisma, ahora, { desde: cfg.evolution_horario_desde, hasta: cfg.evolution_horario_hasta });
       if (!horario.abierto) {
+        // El aviso de stock espera a que abra el local (se reintenta cada rato); el resto de avisos fuera de horario se descarta
+        if (fila.origen === ORIGEN_ALMACEN_EQUIPO) {
+          return { accion: 'DIFERIR', esperaMs: ESPERA_HORARIO_ALMACEN_MS, motivo: 'Fuera del horario del local: el aviso de almacén sale cuando abra' };
+        }
         return {
           accion: 'DESCARTAR',
           codigo: 'FUERA_DE_HORARIO',

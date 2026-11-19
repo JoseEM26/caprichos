@@ -618,8 +618,9 @@ export class OutboxWhatsappService {
 
   /** Antigüedad en segundos del PENDIENTE más viejo: el retraso (lag) de la cola. 0 si no hay. */
   async lagSegundos(ahora = new Date()): Promise<number> {
+    // Un aviso de almacén diferido por horario no es atraso: espera a que abra el local
     const viejo = await this.prisma.salienteWhatsapp.findFirst({
-      where: { estado: 'PENDIENTE' },
+      where: { estado: 'PENDIENTE', NOT: { origen: 'EQUIPO_ALERTA_ALMACEN', proximo_intento_en: { gt: ahora } } },
       orderBy: { creado_en: 'asc' },
       select: { creado_en: true },
     });

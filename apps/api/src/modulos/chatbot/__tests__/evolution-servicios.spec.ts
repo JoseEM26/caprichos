@@ -92,8 +92,21 @@ describe('política de envío con Evolution', () => {
     expect(await politica.evaluar(aviso, DENTRO)).toEqual({ accion: 'ENVIAR' });
   });
   it('los avisos al equipo no exigen contacto previo (sus números no escriben primero)', async () => {
-    const { politica } = crear({}, { whatsappMensaje: { count: jest.fn(async () => 0) } });
+    const { politica } = crear({ stock_control_activo: 'si' }, { whatsappMensaje: { count: jest.fn(async () => 0) } });
     for (const origen of ['ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'EQUIPO_ALERTA_ALMACEN']) expect(await politica.evaluar({ ...aviso, origen }, DENTRO)).toEqual({ accion: 'ENVIAR' });
+  });
+
+  it('un aviso de almacén fuera de horario se DIFIERE hasta que abra (no se descarta); otros avisos sí se descartan', async () => {
+    const { politica } = crear({ stock_control_activo: 'si' });
+    const decision = await politica.evaluar({ telefono_destino: '51900000001', origen: 'EQUIPO_ALERTA_ALMACEN' }, FUERA);
+    expect(decision).toMatchObject({ accion: 'DIFERIR' });
+    expect((decision as any).esperaMs).toBeGreaterThan(0);
+    expect(await politica.evaluar({ ...aviso, origen: 'ALERTA_ADMIN' }, FUERA)).toMatchObject({ accion: 'DESCARTAR', codigo: 'FUERA_DE_HORARIO' });
+  });
+
+  it('con el control de almacén apagado no sale ningún aviso de stock, ni los que quedaron en cola', async () => {
+    const { politica } = crear({ stock_control_activo: 'no' });
+    expect(await politica.evaluar({ telefono_destino: '51900000001', origen: 'EQUIPO_ALERTA_ALMACEN' }, DENTRO)).toMatchObject({ accion: 'DESCARTAR', codigo: 'CONTROL_APAGADO' });
   });
   it('permite aviso del pedido y encuesta, y siempre las respuestas a un mensaje del cliente', async () => {
     const { politica } = crear();
