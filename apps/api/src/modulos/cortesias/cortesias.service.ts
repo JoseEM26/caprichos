@@ -226,12 +226,6 @@ export class CortesiasService {
 
     const valorLista = Number(linea.subtotal ?? Number(linea.precio_unit) * linea.cantidad);
     const subtotalNuevo = Number((Number(pedido.subtotal) - valorLista).toFixed(2));
-    if (subtotalNuevo <= 0) {
-      throw new ConflictException({
-        codigo: 'PEDIDO_SOLO_CORTESIA',
-        mensaje: 'Un pedido solo de cortesías no se puede cobrar: registra la cortesía por separado',
-      });
-    }
     const totalNuevo = totalPedido({ subtotal: subtotalNuevo, descuento: pedido.descuento, envio: pedido.envio, puntosCanjeados: pedido.puntos_canjeados });
     const delta = Number((totalNuevo - Number(pedido.total)).toFixed(2));
     const porId = usuario.partyId;
@@ -256,9 +250,11 @@ export class CortesiasService {
       });
       await tx.pedido.update({
         where: { id: pedido.id },
-        data: { subtotal: subtotalNuevo, total: totalNuevo },
+        // Todo cortesía y sin envío: total S/ 0, no hay nada que cobrar y el pedido queda pagado
+        data: { subtotal: subtotalNuevo, total: totalNuevo, ...(totalNuevo <= 0 ? { pago_estado: 'PAGADO' } : {}) },
       });
-      if (delta !== 0) await this.ajustarPlanPago(tx, pedido.id, delta);
+      if (totalNuevo <= 0) await tx.pedidoPagoPlan.deleteMany({ where: { pedido_id: pedido.id } });
+      else if (delta !== 0) await this.ajustarPlanPago(tx, pedido.id, delta);
       await this.auditoria.registrar(
         {
           categoria: 'CAMBIO',

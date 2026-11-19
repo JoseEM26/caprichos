@@ -599,12 +599,6 @@ export class PedidosService {
     }
 
     subtotalCalculado = Number(subtotalCalculado.toFixed(2));
-    if (lineasCalculadas.every((l) => l.cortesia)) {
-      throw new BadRequestException({
-        codigo: 'PEDIDO_SOLO_CORTESIA',
-        mensaje: 'Un pedido solo de cortesías no se cobra: regístralas por separado',
-      });
-    }
     return { lineasCalculadas, subtotalCalculado };
   }
 
@@ -1443,7 +1437,7 @@ export class PedidosService {
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
           pago_metodo: personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
-          pago_estado: personal ? 'PAGADO' : enLinea ? 'PENDIENTE_ONLINE' : 'PENDIENTE',
+          pago_estado: personal || (totalCalculado <= 0 && !enLinea) ? 'PAGADO' : enLinea ? 'PENDIENTE_ONLINE' : 'PENDIENTE',
           pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
