@@ -20,6 +20,7 @@ import { convertirAUnidadAlmacen, insumosDeVentaLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { almacenConsumirAlPreparar, controlAlmacenActivo } from './control-almacen';
+import { CruceStock, evaluarCrucesStock } from './alertas-stock';
 import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoProducto, saldoSabor, sincronizarAgotadoProducto, sincronizarAgotadoSabor } from './producto-controlado';
 
 @Injectable()
@@ -242,6 +243,7 @@ export class StockService {
           saldo: resultado.nuevoStockOrigen,
         });
       }
+      await this.avisarCruces(await this.evaluarAlertasInsumos(this.prisma, [insumoId]));
 
       return {
         ok: true,
@@ -343,6 +345,7 @@ export class StockService {
     if (delta.greaterThan(0)) {
       await this.verificarYReactivarAgotados([insumoId]);
     }
+    await this.avisarCruces(await this.evaluarAlertasInsumos(this.prisma, [insumoId]));
 
     return {
       ok: true,
@@ -533,6 +536,27 @@ export class StockService {
   }
 
   /**
+   * Cruces de alerta de insumos tocados (venta, consumo por receta, movimiento manual, traslado). Compara el saldo TOTAL
+   * del insumo con su umbral y reclama el cambio de nivel dentro de `db`. Con el control apagado no evalúa nada.
+   * El llamador avisa con AvisosInternosService.avisarCruces (fuera de la transacción si puede).
+   */
+  async evaluarAlertasInsumos(db: any, insumoIds: Array<bigint | string>): Promise<CruceStock[]> {
+    if (!(await this.controlActivo(db))) return [];
+    return evaluarCrucesStock(db, { insumoIds: insumoIds.map((x) => BigInt(x)) });
+  }
+
+  /** Apaga (agotado automático) los productos que usan estos insumos. Lo usa el consumo por receta de Cocina. */
+  async apagarProductosAgotados(db: any, insumoIds: Iterable<string>): Promise<void> {
+    await this.apagarProductosDeInsumos(db, insumoIds, new Date());
+  }
+
+  /** Avisa cruces ya evaluados fuera de una transacción (movimiento manual, traslado). Nunca lanza. */
+  private async avisarCruces(cruces: CruceStock[]): Promise<void> {
+    if (cruces.length === 0 || !this.avisosInternosService) return;
+    await this.avisosInternosService.avisarCruces(cruces).catch(() => {});
+  }
+
+  /**
    * Estado del control para la pantalla de Configuración: si está encendido y cuántos insumos con receta
    * no tienen stock cargado (esos productos se agotarían al primer cobro al encenderlo).
    */
@@ -659,6 +683,7 @@ export class StockService {
     const productosModificados = new Set<string>();
     const alertasNegativo: Array<{ insumoId?: string; productoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
     const alertasBajo: Array<{ insumoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
+    let crucesStock: CruceStock[] = [];
 
     let yaDescontadoEnTx = false;
     await this.enTransaccion(txExterno, async (tx: any) => {
@@ -913,6 +938,9 @@ export class StockService {
           await this.apagarProductoAutomatico(db, BigInt(prodIdStr), ahora);
         }
       }
+
+      // Alertas por cruce con el saldo TOTAL del insumo: el cambio de nivel se reclama dentro de esta transacción
+      crucesStock = await this.evaluarAlertasInsumos(db, [...insumosModificados]);
     });
     if (yaDescontadoEnTx) return { ok: true, yaDescontado: true };
 
@@ -959,30 +987,15 @@ export class StockService {
       }
     }
 
-    // Avisos al equipo (Almacén). Con transacción externa se encolan dentro de ella (el llamador
-    // despierta el envío tras el commit); sin ella cada aviso se encola por su cuenta, en segundo plano.
-    if (this.avisosInternosService) {
+    // Avisos al equipo (Almacén), uno por cruce. Con transacción externa se encolan dentro de ella (el llamador despierta
+    // el envío tras el commit); sin ella van en segundo plano.
+    if (this.avisosInternosService && crucesStock.length > 0) {
       if (txExterno) {
-        for (const insIdStr of insumosAgotadosDetectados) {
-          await this.avisosInternosService.notificarInsumoAgotado(insIdStr, txExterno);
-        }
-        for (const alerta of alertasBajo) {
-          if (alerta.insumoId) await this.avisosInternosService.notificarInsumoBajoStock(alerta.insumoId, txExterno);
-        }
+        await this.avisosInternosService.avisarCruces(crucesStock, txExterno);
       } else {
-        for (const insIdStr of insumosAgotadosDetectados) {
-          setImmediate(() => {
-            this.avisosInternosService?.notificarInsumoAgotado(insIdStr).catch(() => {});
-          });
-        }
-        for (const alerta of alertasBajo) {
-          if (alerta.insumoId) {
-            const insId = alerta.insumoId;
-            setImmediate(() => {
-              this.avisosInternosService?.notificarInsumoBajoStock(insId).catch(() => {});
-            });
-          }
-        }
+        setImmediate(() => {
+          this.avisosInternosService?.avisarCruces(crucesStock).catch(() => {});
+        });
       }
     }
 

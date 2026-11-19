@@ -20,7 +20,12 @@ function crearPrisma() {
     parametro: {
       findUnique: jest.fn(async ({ where }: any) => ({ valor: where?.clave === 'almacen_consumir_al_preparar' ? 'no' : 'si' })),
     },
-    insumo: { findUnique: jest.fn(async ({ where }: any) => ({ id: where.id, nombre: `Insumo ${where.id}`, factor_compra: D(1), factor_receta: D(1), minimo: D(0), lugar_consumo_id: 20n })) },
+    insumo: {
+      findUnique: jest.fn(async ({ where }: any) => ({ id: where.id, nombre: `Insumo ${where.id}`, factor_compra: D(1), factor_receta: D(1), minimo: D(0), lugar_consumo_id: 20n })),
+      // Evaluación de cruces de alerta tras el cobro: sin insumos a evaluar
+      findMany: jest.fn(async () => []),
+      updateMany: jest.fn(async () => ({ count: 1 })),
+    },
     lugarStock: { findFirst: jest.fn(async () => null), findMany: jest.fn(async () => []) },
     stock: {
       findFirst: jest.fn(async () => null),

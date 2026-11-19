@@ -1,8 +1,12 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Type } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { StockService } from '../stock/stock.service';
+import { CruceStock } from '../stock/alertas-stock';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { almacenConsumirAlPreparar, almacenPermitirCocinaNegativa, controlAlmacenActivo, insumosDeLinea } from '../stock';
 import {
   consumoRealConMerma,
@@ -46,7 +50,20 @@ export class ConsumoRecetaService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /**
+   * Alertas y agotado automático de Stock y de Avisos. Se piden al vuelo para que este módulo no importe a Stock ni a
+   * Chatbot en su arranque (ciclos entre módulos). Sin ModuleRef (pruebas unitarias) no hay alertas.
+   */
+  private servicioDe<T>(token: Type<T>): T | null {
+    try {
+      return this.moduleRef?.get(token, { strict: false }) ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /** ¿Control de almacén encendido? Es la ÚNICA consulta que hace el sistema con el almacén apagado. */
   activo(): Promise<boolean> {
@@ -192,44 +209,53 @@ export class ConsumoRecetaService {
 
     let fallo: any = null;
     let cambio = false;
+    const cruces: CruceStock[] = [];
     for (const l of aProcesar) {
       try {
-        const hizo = await this.prisma.$transaction((tx) => this.aplicarLinea(tx, pid, l.id, ctx, por, devolverTodo));
-        cambio = cambio || hizo;
+        const r = await this.prisma.$transaction((tx) => this.aplicarLinea(tx, pid, l.id, ctx, por, devolverTodo));
+        cambio = cambio || r.movio;
+        cruces.push(...r.cruces);
       } catch (e) {
         fallo = e; // una línea que falla no frena a las demás
         this.logger.error(`Consumo por receta de la línea ${l.id}: ${(e as any)?.message}`);
       }
     }
     if (cambio) this.eventosGateway?.emitirAdmin('stock:cambio', {});
+    // Avisos de los cruces ya reclamados en cada transacción (fuera de ellas: un fallo de aviso no deshace el consumo)
+    if (cruces.length > 0) await this.servicioDe(AvisosInternosService)?.avisarCruces(cruces).catch(() => {});
     if (fallo) throw fallo;
   }
 
-  /** Reconcilia UNA línea dentro de su propia transacción (con la fila de la línea bloqueada). Devuelve si movió stock. */
-  private async aplicarLinea(tx: Tx, pedidoId: bigint, lineaId: bigint, ctx: any, por: bigint, devolverTodo: boolean): Promise<boolean> {
+  /**
+   * Reconcilia UNA línea dentro de su propia transacción (con la fila de la línea bloqueada). Devuelve si movió stock y
+   * los cruces de alerta de los insumos tocados (se reclaman aquí, dentro de la transacción).
+   */
+  private async aplicarLinea(tx: Tx, pedidoId: bigint, lineaId: bigint, ctx: any, por: bigint, devolverTodo: boolean): Promise<{ movio: boolean; cruces: CruceStock[] }> {
     await tx.$queryRaw`SELECT id FROM pedido_linea WHERE id = ${lineaId} FOR UPDATE`;
     const linea = await tx.pedidoLinea.findUnique({
       where: { id: lineaId },
       select: { producto_id: true, tamano: true, sabor: true, cantidad: true, listas: true, despachadas: true, area_id: true, opcionesElegidas: { select: { opcion_id: true } }, sabores: { select: { sabor_id: true, sabor_nombre: true, cantidad: true } } },
     });
     const ped = await tx.pedido.findUnique({ where: { id: pedidoId }, select: { estado: true } });
-    if (!linea || !ped || !linea.producto_id) return false;
+    if (!linea || !ped || !linea.producto_id) return { movio: false, cruces: [] };
     const anulado = ESTADOS_ANULADOS.includes(ped.estado);
-    if (anulado && !devolverTodo) return false;
+    if (anulado && !devolverTodo) return { movio: false, cruces: [] };
     const objetivo = devolverTodo ? 0 : Math.min(linea.listas, linea.cantidad);
     const fila = await tx.consumoLinea.findUnique({ where: { pedido_linea_id: lineaId } });
     const actual = fila?.unidades ?? 0;
     const delta = objetivo - actual;
-    if (delta === 0) return false;
+    if (delta === 0) return { movio: false, cruces: [] };
 
     const nota = (txt: string) => `${txt} · pedido ${pedidoId} · línea ${lineaId}`;
     let movio = false;
+    const tocados = new Set<string>();
+    const agotados = new Set<string>();
 
     if (delta > 0) {
       const items = this.insumosDeLaLinea(linea, delta, ctx);
       const lugarId = (await lugarCocina(tx)).id;
       for (const it of items.sort((a, b) => (a.insumo.id < b.insumo.id ? -1 : 1))) {
-        const { antes } = await moverInsumo(tx, {
+        const { antes, despues } = await moverInsumo(tx, {
           insumoId: it.insumo.id, lugarId, delta: -it.cantidad, tipo: 'CONSUMO_RECETA', por,
           pedidoId, lineaId, nota: nota(`Preparado ×${delta}`),
         });
@@ -239,6 +265,8 @@ export class ConsumoRecetaService {
           origen: { tipo: 'LINEA', pedidoId, lineaId }, nota: nota('Faltante al preparar'),
         });
         movio = true;
+        tocados.add(it.insumo.id.toString());
+        if (despues <= 0) agotados.add(it.insumo.id.toString());
       }
     } else if (actual > 0) {
       // Se devuelve la parte proporcional de lo que de verdad se descontó (aunque la receta haya cambiado después)
@@ -263,6 +291,7 @@ export class ConsumoRecetaService {
         });
         await reducirPendientes(tx, { insumoId: e.insumoId, devuelto: devolver, origen: { tipo: 'LINEA', lineaId }, por });
         movio = true;
+        tocados.add(e.insumoId.toString());
       }
     }
 
@@ -271,7 +300,16 @@ export class ConsumoRecetaService {
       update: { unidades: objetivo, actualizado_en: new Date() },
       create: { pedido_linea_id: lineaId, unidades: objetivo },
     });
-    return movio;
+
+    // Mismo criterio que la venta: al llegar a 0 en el lugar consumido se apagan los productos que lo usan, y el aviso
+    // evalúa el saldo total del insumo (dentro de esta transacción, para que el cruce quede con el consumo)
+    let cruces: CruceStock[] = [];
+    const stock = movio ? this.servicioDe(StockService) : null;
+    if (stock && tocados.size > 0) {
+      if (agotados.size > 0) await stock.apagarProductosAgotados(tx, agotados);
+      cruces = await stock.evaluarAlertasInsumos(tx, [...tocados]);
+    }
+    return { movio, cruces };
   }
 
   /**

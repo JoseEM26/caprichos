@@ -4,6 +4,7 @@ import { StockService } from './stock.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { Prisma } from '@prisma/client';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
@@ -19,6 +20,7 @@ describe('StockService', () => {
   let prisma: any;
   let auditoria: any;
   let eventosGateway: any;
+  const avisosMock = { avisarCruces: jest.fn(async (cruces: any[]) => cruces.length) };
 
   const mockUsuario: UsuarioAutenticado = {
     partyId: 1n,
@@ -41,7 +43,8 @@ describe('StockService', () => {
       parametro: { findUnique: jest.fn(async ({ where }: any) => ({ valor: where?.clave === 'almacen_consumir_al_preparar' ? 'no' : 'si' })) },
       insumo: {
         findUnique: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       lugarStock: {
         findUnique: jest.fn(),
@@ -100,10 +103,50 @@ describe('StockService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditoriaService, useValue: auditoria },
         { provide: EventosGateway, useValue: eventosGateway },
+        { provide: AvisosInternosService, useValue: avisosMock },
       ],
     }).compile();
 
     service = module.get<StockService>(StockService);
+  });
+
+  describe('alertas por cruce en movimientos manuales (H7)', () => {
+    it('un traslado que deja el insumo por pedir avisa el cruce con el saldo total (no solo el del origen)', async () => {
+      avisosMock.avisarCruces.mockClear();
+      prisma.insumo.findUnique.mockResolvedValue({
+        id: 1n,
+        nombre: 'Café en grano',
+        factor_compra: new Prisma.Decimal(1),
+        factor_receta: new Prisma.Decimal(1000),
+        minimo: new Prisma.Decimal(10),
+        maximo: new Prisma.Decimal(0),
+      });
+      prisma.lugarStock.findUnique
+        .mockResolvedValueOnce({ id: 10n, nombre: 'Almacén central' })
+        .mockResolvedValueOnce({ id: 20n, nombre: 'Barra' });
+      prisma.stock.findFirst
+        .mockResolvedValueOnce({ id: 101n, insumo_id: 1n, lugar_id: 10n, cantidad: new Prisma.Decimal(9) })
+        .mockResolvedValueOnce({ id: 102n, insumo_id: 1n, lugar_id: 20n, cantidad: new Prisma.Decimal(1) });
+      prisma.stock.update
+        .mockResolvedValueOnce({ id: 101n, cantidad: new Prisma.Decimal(4) })
+        .mockResolvedValueOnce({ id: 102n, cantidad: new Prisma.Decimal(6) });
+      prisma.movimientoStock.create
+        .mockResolvedValueOnce({ id: 501n, tipo: 'TRASLADO_SALIDA' })
+        .mockResolvedValueOnce({ id: 502n, tipo: 'TRASLADO_ENTRADA' });
+      // Evaluación de cruces: el saldo total del insumo (4 + 6 = 10) está en el umbral: POR_PEDIR
+      prisma.insumo.findMany.mockResolvedValueOnce([
+        { id: 1n, nombre: 'Café en grano', unidad_almacen: 'KG', minimo: 10, maximo: 0, alerta_stock: null, lugarConsumo: null, stocks: [{ cantidad: 4 }, { cantidad: 6 }] },
+      ]);
+
+      await service.registrarMovimientoManual(
+        { insumoId: '1', lugarId: '10', lugarDestinoId: '20', tipo: 'TRASLADO', cantidad: 5, unidad: 'almacen', motivo: 'Reposición' },
+        mockUsuario,
+      );
+
+      expect(avisosMock.avisarCruces).toHaveBeenCalledWith([
+        expect.objectContaining({ insumoId: 1n, tipo: 'POR_PEDIR', total: 10 }),
+      ]);
+    });
   });
 
   describe('motivo obligatorio en ajustes y mermas', () => {
