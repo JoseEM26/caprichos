@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -7,6 +7,7 @@ import { etiquetaMotivo, validarMotivoCortesia } from './cortesia.tipos';
 import { FilaCortesia, resumenCortesias } from './cortesias-informe';
 import { FiltroCortesiasDto, RegistrarCortesiaDto } from './dto/cortesias.dto';
 import { totalPedido } from '../../comun/total-pedido';
+import { StockService } from '../stock/stock.service';
 
 /** Fecha de Lima (UTC-5, sin horario de verano) a instante, para filtrar creado_en por día. */
 function inicioDiaLima(fecha: string): Date {
@@ -24,6 +25,7 @@ export class CortesiasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    @Optional() private readonly stock?: StockService,
   ) {}
 
   /** Cortesía por separado (sin pedido propio): descuenta stock como una venta y queda ligada a su pedido de referencia. */
@@ -53,6 +55,7 @@ export class CortesiasService {
 
     let precioBase = Number(producto.precio);
     let unidades = 1;
+    let tamanoValorId: bigint | null = null;
     if (producto.tamanos.length > 0) {
       if (!dto.tamanoId) {
         throw new BadRequestException({ codigo: 'TAMANO_REQUERIDO', mensaje: `Elige el tamaño de ${producto.nombre}` });
@@ -63,6 +66,7 @@ export class CortesiasService {
       }
       precioBase = Number(tam.precio);
       unidades = tam.unidades ?? 1;
+      tamanoValorId = tam.tamano_valor_id;
     }
 
     const ahora = new Date();
@@ -98,6 +102,17 @@ export class CortesiasService {
         ahora,
         { tipo: 'CORTESIA', cortesiaId: cortesia.id },
       );
+      // Con el control de almacén encendido, la cortesía también consume los insumos de su receta (con su sabor)
+      await this.stock?.descontarInsumosCortesia(tx, {
+        cortesiaId: cortesia.id,
+        productoId: producto.id,
+        areaId: producto.categoria?.area_id ?? null,
+        tamanoValorId,
+        cantidad,
+        sabores,
+        por: porId,
+        ahora,
+      });
       await this.auditoria.registrar(
         {
           categoria: 'CAMBIO',
@@ -142,6 +157,8 @@ export class CortesiasService {
       }
       const ahora = new Date();
       const devueltos = await devolverCortesiaProductos(tx, c.id, porId, ahora);
+      const insumosDevueltos = await this.stock?.revertirInsumosCortesia(tx, c.id, porId);
+      if (insumosDevueltos?.length) await this.stock?.verificarYReactivarAgotados(insumosDevueltos, [], tx);
       if (devueltos === 0 && c.producto.controla_stock) {
         throw new ConflictException({
           codigo: 'CORTESIA_SIN_LIGA_STOCK',
@@ -230,7 +247,7 @@ export class CortesiasService {
     const delta = Number((totalNuevo - Number(pedido.total)).toFixed(2));
     const porId = usuario.partyId;
 
-    return this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       await tx.pedidoLinea.update({
         where: { id: linea.id },
         data: { es_cortesia: true, precio_unit: 0, subtotal: 0 },
@@ -271,6 +288,9 @@ export class CortesiasService {
       );
       return { cortesiaId: cortesia.id.toString(), subtotal: subtotalNuevo, total: totalNuevo, valorLista };
     });
+    // Todo cortesía y sin envío: el pedido nace pagado sin cobro, así que sus insumos se descuentan aquí (idempotente)
+    if (totalNuevo <= 0) await this.stock?.descontarPorPedidoSeguro(pedido.id, porId);
+    return resultado;
   }
 
   /** Listado con filtros de fecha (día de Lima), motivo y producto, con el resumen del informe. */

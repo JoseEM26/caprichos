@@ -1,5 +1,11 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
+jest.mock('../../../comun/socket/eventos.gateway', () => ({
+  EventosGateway: class {
+    emitirAdmin = jest.fn();
+  },
+}));
+
 jest.mock('../../stock/producto-controlado', () => ({
   controlaPorSabor: () => false,
   validarSaboresLinea: jest.fn(),
