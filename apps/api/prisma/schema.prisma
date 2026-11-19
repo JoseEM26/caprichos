@@ -1416,6 +1416,8 @@ model Insumo {
   proveedor_b           BigInt?
   proveedor_c           BigInt?
   activo                Boolean                @default(true)
+  /// Nivel de aviso de stock por cruce: null = normal, POR_PEDIR o AGOTADO (ver stock/alertas-stock.ts)
+  alerta_stock          String?
 
   lugarConsumo          LugarStock?            @relation("InsumoLugarConsumo", fields: [lugar_consumo_id], references: [id])
   stocks                Stock[]

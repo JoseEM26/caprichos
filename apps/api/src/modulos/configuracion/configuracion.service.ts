@@ -39,6 +39,8 @@ export const CLAVES_NUMERICAS = [
   'pedido_minimo',
   'tolerancia_reserva_min',
   'puntos_porcentaje',
+  // Umbral de aviso de stock de insumos: % del máximo (entero 1 a 100; por defecto 20)
+  'stock_alerta_porcentaje',
   'descuento_personal_pct',
   'rep_naranja_min',
   'rep_rojo_min',
@@ -159,6 +161,7 @@ export const CLAVES_TARIFA_CULQI = [
 /** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
 export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]> = {
   eta_factor_urbano: [1, 3, false, 'El factor de calles debe estar entre 1 y 3'],
+  stock_alerta_porcentaje: [1, 100, true, 'El porcentaje de aviso de stock debe ser un entero entre 1 y 100'],
   eta_productos_desde: [1, 50, true, 'La cantidad de unidades debe ser un entero entre 1 y 50'],
   eta_extra_por_producto_min: [0.5, 30, false, 'Los minutos de empaque por unidad deben estar entre 0.5 y 30'],
   eta_parada_min: [0.5, 30, false, 'Los minutos por parada previa deben estar entre 0.5 y 30'],

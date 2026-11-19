@@ -34,7 +34,8 @@ export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   VOUCHER_IA_CAIDA: ['caja/ver', 'vouchers/ver'],
   VOUCHER_IA_RECUPERADA: ['caja/ver', 'vouchers/ver'],
   VOUCHER_IA_TOPE: ['caja/ver', 'vouchers/ver'],
-  STOCK_BAJO: ['stock/ver', 'compras/ver'],
+  // Campanita de stock por cruce: la ven los roles de almacén (ver o movimientos) y compras
+  STOCK_BAJO: ['stock/ver', 'almacen/ver', 'almacen/movimientos', 'compras/ver'],
   DELIVERY_POR_CONFIRMAR: ['repartos/ver'],
   REPROGRAMACION_DELIVERY: ['repartos/ver', 'caja/ver'],
   REPROGRAMACION_CANCELADA: ['repartos/ver', 'caja/ver'],
