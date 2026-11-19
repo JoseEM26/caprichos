@@ -29,6 +29,8 @@ export interface DatosAvisoAlmacen {
   stockMinimo: number;
   unidadMedida?: string | null;
   lugarNombre?: string | null;
+  /** Clave base de los avisos (correo y WhatsApp); por defecto, insumo + tipo + día de Lima. */
+  clave?: string;
 }
 
 export interface ResultadoEnvioEquipo {

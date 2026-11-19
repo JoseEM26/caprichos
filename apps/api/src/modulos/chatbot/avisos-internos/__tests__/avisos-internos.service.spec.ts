@@ -11,6 +11,7 @@ import { Ventana24hService } from '../../servicios/ventana-24h.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from '../../puerto/whatsapp-mensajeria.puerto';
 import { EventosGateway } from '../../../../comun/socket/eventos.gateway';
 import { OutboxWhatsappService } from '../../servicios/outbox-whatsapp.service';
+import { CruceStock } from '../../../stock/alertas-stock';
 
 
 const outboxMock = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn(), limpiar: jest.fn(), resumen: jest.fn() };
@@ -245,104 +246,104 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
     });
   });
 
-  describe('Avisos de Almacén (Insumos Agotados y Por Pedir)', () => {
-    it('con el control de almacén apagado no crea aviso de insumo agotado ni de bajo stock', async () => {
+  describe('Avisos de Almacén (cruces de stock de insumos y productos agotados)', () => {
+    const cruce = (over: Partial<CruceStock> = {}): CruceStock => ({
+      insumoId: 55n,
+      nombre: 'Leche Evaporada',
+      unidad: 'UND',
+      minimo: 10,
+      total: 0,
+      tipo: 'AGOTADO' as const,
+      lugarNombre: 'Almacén Central',
+      marca: '1700000000001',
+      ...over,
+    });
+
+    beforeEach(() => {
       outboxMock.encolar.mockClear();
       auditoriaServiceMock.registrar.mockClear();
+      prismaMock.notificacion = { create: jest.fn().mockResolvedValue({ id: 9n }) };
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' });
+    });
+
+    it('con el control de almacén apagado no avisa ningún cruce (ni WhatsApp, ni correo, ni campanita)', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'no' });
 
-      const agotado = await service.notificarInsumoAgotado(55n);
-      const bajo = await service.notificarInsumoBajoStock(55n);
+      const avisados = await service.avisarCruces([cruce(), cruce({ insumoId: 56n, tipo: 'POR_PEDIR', marca: '2' })]);
 
-      expect(agotado).toMatchObject({ omitido: true, motivo: 'DESACTIVADO', enviosExitosos: 0 });
-      expect(bajo).toMatchObject({ omitido: true, motivo: 'DESACTIVADO', enviosExitosos: 0 });
-      expect(prismaMock.insumo.findUnique).not.toHaveBeenCalled();
+      expect(avisados).toBe(0);
       expect(outboxMock.encolar).not.toHaveBeenCalled();
-      expect(auditoriaServiceMock.registrar).not.toHaveBeenCalled();
-
-      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' });
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
     });
 
-    it('con el control de almacén encendido sí crea el aviso de insumo agotado', async () => {
-      outboxMock.encolar.mockClear();
-      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' });
+    it('un solo cruce: un WhatsApp por número con la clave por ID, tipo, día de Lima y marca', async () => {
+      const avisados = await service.avisarCruces([cruce({ total: 30, tipo: 'POR_PEDIR' })]);
 
-      const resultado = await service.notificarInsumoAgotado(55n);
-
-      expect(resultado.omitido).toBe(false);
-      expect(outboxMock.encolar).toHaveBeenCalled();
-    });
-
-    it('encola la alerta de insumo agotado con botones para cada número del equipo', async () => {
-      outboxMock.encolar.mockClear();
-      const resultado = await service.notificarInsumoAgotado(55n);
-
-      expect(resultado.omitido).toBe(false);
-      expect(resultado.enviosExitosos).toBe(2);
+      expect(avisados).toBe(1);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(2);
       expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
           origen: 'EQUIPO_ALERTA_ALMACEN',
-          clave: expect.stringMatching(/^almacen:55:AGOTADO:\d{4}-\d{2}-\d{2}:/),
-          carga: expect.objectContaining({
-            textoLibre: expect.stringContaining('Insumo Agotado'),
-            botones: expect.arrayContaining([expect.objectContaining({ id: 'alm_ok_55' })]),
-          }),
+          clave: expect.stringMatching(/^almacen:55:POR_PEDIR:\d{4}-\d{2}-\d{2}:1700000000001:/),
         }),
         undefined,
       );
-      expect(auditoriaServiceMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ accion: 'WHATSAPP_AVISO_EQUIPO_ALMACEN', entidad: 'insumo' }),
-      );
     });
 
-    it('encola la alerta de bajo stock con la plantilla de almacén como respaldo', async () => {
-      outboxMock.encolar.mockClear();
-      prismaMock.insumo.findUnique.mockResolvedValueOnce({
-        id: 55n,
-        nombre: 'Café Grano',
-        unidad_almacen: 'KG',
-        minimo: 5,
-        stocks: [{ cantidad: 3.5 }],
+    it('el aviso muestra el saldo TOTAL que decidió el cruce (no el de un solo lugar)', async () => {
+      await service.avisarCruces([cruce({ total: 30, tipo: 'POR_PEDIR' })]);
+
+      const texto = outboxMock.encolar.mock.calls[0][0].carga.textoLibre as string;
+      expect(texto).toContain('Insumo por pedir');
+      expect(texto).toContain('30.00');
+    });
+
+    it('un cruce AGOTADO queda con su propia campanita (tipo STOCK_BAJO, para roles de almacén)', async () => {
+      await service.avisarCruces([cruce()]);
+
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'STOCK_BAJO', rol_destino: null, enlace: '/admin/stock' }),
       });
+    });
 
-      const resultado = await service.notificarInsumoBajoStock(55n);
+    it('varios cruces a la vez salen como UN resumen por número, no uno por insumo', async () => {
+      const avisados = await service.avisarCruces([
+        cruce(),
+        cruce({ insumoId: 56n, nombre: 'Café Grano', tipo: 'POR_PEDIR', total: 3, marca: '2' }),
+        cruce({ insumoId: 57n, nombre: 'Azúcar', tipo: 'AGOTADO', total: -1, marca: '3' }),
+      ]);
 
-      expect(resultado.omitido).toBe(false);
+      expect(avisados).toBe(3);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(2); // dos números del equipo, un mensaje cada uno
       expect(outboxMock.encolar).toHaveBeenCalledWith(
         expect.objectContaining({
+          origen: 'EQUIPO_ALERTA_ALMACEN',
           carga: expect.objectContaining({
+            textoLibre: expect.stringContaining('Café Grano'),
             plantillaClave: 'EQUIPO_ALERTA_ALMACEN',
-            variablesPlantilla: ['Café Grano', 'Por pedir', '3.50 KG'],
           }),
         }),
         undefined,
       );
+      expect(prismaMock.notificacion.create).toHaveBeenCalledTimes(1);
     });
 
-    it('aplica idempotencia diaria en alertas de almacén para no saturar al equipo', async () => {
-      outboxMock.encolar
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(false);
-      await service.notificarInsumoAgotado(55n);
-      const res2 = await service.notificarInsumoAgotado(55n);
+    it('un producto de carta agotado usa clave propia (no choca con un insumo del mismo ID)', async () => {
+      await service.notificarElementoAgotado('PRODUCTO', 10n);
 
-      expect(res2.detalles[0].modo).toBe('OMITIDO_IDEMPOTENTE');
-      expect(res2.detalles[1].modo).toBe('OMITIDO_IDEMPOTENTE');
-    });
-
-    it('encola la alerta cuando un producto de carta se agota manualmente', async () => {
-      outboxMock.encolar.mockClear();
-      const resultado = await service.notificarElementoAgotado('PRODUCTO', 10n);
-      expect(resultado.omitido).toBe(false);
-      expect(resultado.enviosExitosos).toBe(2);
       expect(outboxMock.encolar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          carga: expect.objectContaining({ textoLibre: expect.stringContaining('Torta de Chocolate') }),
-        }),
+        expect.objectContaining({ clave: expect.stringMatching(/^carta:PRODUCTO:10:\d{4}-\d{2}-\d{2}:/) }),
         undefined,
       );
+    });
+
+    it('con el control apagado, un producto agotado a mano tampoco avisa al equipo', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'no' });
+
+      const resultado = await service.notificarElementoAgotado('PRODUCTO', 10n);
+
+      expect(resultado).toMatchObject({ omitido: true, motivo: 'DESACTIVADO' });
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
     });
   });
 

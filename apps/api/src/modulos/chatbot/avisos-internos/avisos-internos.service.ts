@@ -6,6 +6,8 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { controlAlmacenActivo } from '../../stock/control-almacen';
+import { CruceStock } from '../../stock/alertas-stock';
+import { hoyLimaIso } from '../../../comun/fechas-lima';
 import { ConfiguracionService } from '../../configuracion/configuracion.service';
 import {
   BotonAccion,
@@ -415,9 +417,13 @@ export class AvisosInternosService {
    * Notifica al equipo cuando Almacén debe saber algo (insumo agotado o por pedir).
    */
   async notificarAlmacen(datos: DatosAvisoAlmacen, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
+    // Único punto de salida de los avisos de stock (insumos y productos agotados a mano): con el control apagado, nada
+    if (!(await controlAlmacenActivo(this.prisma))) return sinAvisoAlmacenApagado();
     const etiqueta = datos.tipoAlerta === 'AGOTADO' ? 'agotado' : 'por pedir';
+    // Clave por ID, tipo y día de Lima; el cruce (marca) la hace única: nunca se comparte con otro insumo ni con otro día
+    const base = datos.clave ?? `almacen:${datos.insumoId}:${datos.tipoAlerta}:${hoyLimaIso()}`;
     this.correoAlEquipo({
-      clave: `almacen:${datos.nombreInsumo.slice(0, 100)}:${datos.tipoAlerta}:${new Date().toISOString().slice(0, 10)}`,
+      clave: base,
       origen: 'ALMACEN',
       tipo: 'STOCK',
       asunto: `Almacén: ${datos.nombreInsumo} (${etiqueta})`,
@@ -454,7 +460,6 @@ export class AvisosInternosService {
       : TEXTOS_AVISOS.almacenInsumoPorPedir(datos);
 
     const botones = BOTONES_AVISO_ALMACEN(datos.insumoId);
-    const fechaHoy = new Date().toISOString().slice(0, 10);
 
     const detalles: ResultadoEnvioEquipo[] = [];
     let exitosos = 0;
@@ -462,12 +467,12 @@ export class AvisosInternosService {
     for (const telefono of numerosEquipo) {
       const telMask = enmascararTelefono(telefono);
       const telHash = hashTelefono(telefono);
-      // Una alerta por insumo, tipo y día por número: la clave del outbox lo garantiza (sin Redis)
+      // Un mensaje por número y cruce: la clave del outbox lo garantiza (sin Redis)
       const nuevo = await this.outbox.encolar(
         {
           telefono,
           tipo: 'TEXTO',
-          clave: `almacen:${datos.insumoId}:${datos.tipoAlerta}:${fechaHoy}:${telHash}`,
+          clave: `${base}:${telHash}`,
           origen: 'EQUIPO_ALERTA_ALMACEN',
           carga: {
             textoLibre: textoCuerpo,
@@ -512,75 +517,83 @@ export class AvisosInternosService {
   }
 
   /**
-   * Helper conveniente para notificar cuando un insumo ha llegado a stock 0 o negativo.
+   * Avisa a Almacén de los cruces de stock (ver stock/alertas-stock.ts). Un cruce = un aviso por canal: un WhatsApp por
+   * número, un correo y una campanita. Si llegan varios a la vez (ráfaga al encender el control), sale UN resumen por canal.
+   * Con el control apagado no sale nada. Devuelve cuántos cruces se avisaron.
    */
-  async notificarInsumoAgotado(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
-    if (!(await controlAlmacenActivo(this.prisma))) return sinAvisoAlmacenApagado();
-    const insumo = await this.prisma.insumo.findUnique({
-      where: { id: BigInt(insumoId) },
-      include: {
-        lugarConsumo: true,
-        stocks: true,
-      },
-    });
-
-    if (!insumo) {
-      return {
-        omitido: true,
-        motivo: 'PROCESADO',
-        destinatariosTotal: 0,
-        enviosExitosos: 0,
-        detalles: [],
-      };
+  async avisarCruces(cruces: CruceStock[], tx?: Prisma.TransactionClient): Promise<number> {
+    if (cruces.length === 0 || !(await controlAlmacenActivo(this.prisma))) return 0;
+    if (cruces.length === 1) {
+      const c = cruces[0];
+      const etiqueta = c.tipo === 'AGOTADO' ? 'agotado' : 'por pedir';
+      await this.notificarAlmacen(
+        {
+          insumoId: c.insumoId,
+          nombreInsumo: c.nombre,
+          tipoAlerta: c.tipo,
+          stockActual: c.total,
+          stockMinimo: c.minimo,
+          unidadMedida: c.unidad,
+          lugarNombre: c.lugarNombre,
+          clave: `almacen:${c.insumoId}:${c.tipo}:${hoyLimaIso()}:${c.marca}`,
+        },
+        tx,
+      );
+      await this.emitirAvisoCampana(
+        `Almacén: ${c.nombre} (${etiqueta})`,
+        `${c.nombre}: stock total ${c.total.toFixed(2)} ${c.unidad || 'UND'} (mínimo ${c.minimo.toFixed(2)}).`,
+        '/admin/stock',
+        undefined,
+        'STOCK_BAJO',
+        null,
+      );
+      return 1;
     }
-
-    const stockActual = insumo.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0);
-
-    return this.notificarAlmacen({
-      insumoId: insumo.id,
-      nombreInsumo: insumo.nombre,
-      tipoAlerta: 'AGOTADO',
-      stockActual,
-      stockMinimo: Number(insumo.minimo),
-      unidadMedida: insumo.unidad_almacen,
-      lugarNombre: insumo.lugarConsumo?.nombre ?? null,
-    }, tx);
+    await this.notificarResumenAlmacen(cruces, tx);
+    return cruces.length;
   }
 
-  /**
-   * Helper conveniente para notificar cuando un insumo se encuentra por debajo de su stock mínimo.
-   */
-  async notificarInsumoBajoStock(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
-    if (!(await controlAlmacenActivo(this.prisma))) return sinAvisoAlmacenApagado();
-    const insumo = await this.prisma.insumo.findUnique({
-      where: { id: BigInt(insumoId) },
-      include: {
-        lugarConsumo: true,
-        stocks: true,
-      },
+  /** Resumen de varios cruces a la vez: un correo, un WhatsApp por número y una campanita. */
+  private async notificarResumenAlmacen(cruces: CruceStock[], tx?: Prisma.TransactionClient): Promise<void> {
+    const marca = cruces[cruces.length - 1].marca;
+    const lineas = cruces.map(
+      (c) => `• ${c.nombre}: ${c.tipo === 'AGOTADO' ? 'agotado' : 'por pedir'} (stock ${c.total.toFixed(2)} ${c.unidad || 'UND'})`,
+    );
+    const titulo = `Almacén: ${cruces.length} insumos por pedir o agotados`;
+    const detalle = lineas.join('\n');
+    this.correoAlEquipo({
+      clave: `almacen:resumen:${hoyLimaIso()}:${marca}`,
+      origen: 'ALMACEN',
+      tipo: 'STOCK',
+      asunto: titulo,
+      texto: `${detalle}\n\nVer en el panel: /admin/stock`,
     });
+    await this.emitirAvisoCampana(titulo, detalle, '/admin/stock', undefined, 'STOCK_BAJO', null);
 
-    if (!insumo) {
-      return {
-        omitido: true,
-        motivo: 'PROCESADO',
-        destinatariosTotal: 0,
-        enviosExitosos: 0,
-        detalles: [],
-      };
+    if (!(await this.estanAvisosActivos())) return;
+    const numerosEquipo = await this.obtenerDestinatariosAlertas();
+    if (numerosEquipo.length === 0) return;
+
+    const nombres = cruces.map((c) => c.nombre).join(', ').slice(0, 300);
+    for (const telefono of numerosEquipo) {
+      await this.outbox.encolar(
+        {
+          telefono,
+          tipo: 'TEXTO',
+          clave: `almacen:resumen:${marca}:${hashTelefono(telefono)}`,
+          origen: 'EQUIPO_ALERTA_ALMACEN',
+          carga: {
+            textoLibre: `📦 *[ALERTA DE ALMACÉN]* ⚠️\n\n*${titulo}*\n\n${detalle}\n\n👉 Ver en el panel: /admin/stock`,
+            plantillaClave: 'EQUIPO_ALERTA_ALMACEN',
+            variablesPlantilla: [`${cruces.length} insumos (${nombres})`, 'Por pedir o agotado', 'ver panel de Almacén'],
+            autor: 'BOT',
+            etapa: 'ALMACEN',
+          },
+        },
+        tx,
+      );
     }
-
-    const stockActual = insumo.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0);
-
-    return this.notificarAlmacen({
-      insumoId: insumo.id,
-      nombreInsumo: insumo.nombre,
-      tipoAlerta: 'POR_PEDIR',
-      stockActual,
-      stockMinimo: Number(insumo.minimo),
-      unidadMedida: insumo.unidad_almacen,
-      lugarNombre: insumo.lugarConsumo?.nombre ?? null,
-    }, tx);
+    if (!tx) this.outbox.despertar();
   }
 
   /**
@@ -613,6 +626,8 @@ export class AvisosInternosService {
       stockActual: 0,
       stockMinimo: 0,
       unidadMedida: 'UND',
+      // Prefijo propio: un producto y un insumo con el mismo ID no comparten clave de aviso
+      clave: `carta:${tipo}:${id}:${hoyLimaIso()}`,
     }, tx);
   }
 
@@ -759,12 +774,14 @@ export class AvisosInternosService {
     mensaje: string,
     enlace = '/admin/mensajes',
     partyDestino?: bigint,
+    tipo: 'ALERTA_INTERNA' | 'STOCK_BAJO' = 'ALERTA_INTERNA',
+    rolDestino: string | null = 'ADMIN',
   ): Promise<void> {
     try {
       const notif = await this.prisma.notificacion.create({
         data: {
-          tipo: 'ALERTA_INTERNA',
-          rol_destino: 'ADMIN',
+          tipo,
+          rol_destino: rolDestino,
           party_destino: partyDestino || null,
           titulo,
           mensaje,

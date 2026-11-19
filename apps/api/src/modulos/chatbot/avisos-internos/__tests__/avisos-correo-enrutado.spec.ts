@@ -9,7 +9,11 @@ describe('Avisos al equipo: enrutado a correo con el WhatsApp apagado', () => {
 
   beforeEach(() => {
     correo = { avisar: jest.fn().mockResolvedValue(null) };
-    prisma = { notificacion: { create: jest.fn().mockResolvedValue({ id: 1n }) } };
+    prisma = {
+      notificacion: { create: jest.fn().mockResolvedValue({ id: 1n }) },
+      // Control de almacén encendido: el aviso de stock sale
+      parametro: { findUnique: jest.fn().mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' }) },
+    };
     const configuracion = { obtener: jest.fn().mockResolvedValue('false') };
     const outbox = { encolar: jest.fn(), despertar: jest.fn() };
     const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
@@ -42,7 +46,7 @@ describe('Avisos al equipo: enrutado a correo con el WhatsApp apagado', () => {
     expect(correo.avisar).not.toHaveBeenCalled();
   });
 
-  it('notificarAlmacen (stock agotado o por pedir) va por correo con clave diaria', async () => {
+  it('notificarAlmacen (stock agotado o por pedir) va por correo con clave por ID y día de Lima', async () => {
     await servicio.notificarAlmacen({
       insumoId: 12n,
       nombreInsumo: 'Queso Cheddar',
@@ -51,10 +55,10 @@ describe('Avisos al equipo: enrutado a correo con el WhatsApp apagado', () => {
       stockMinimo: 5,
       unidadMedida: 'KG',
     });
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
     expect(correo.avisar).toHaveBeenCalledWith(
       expect.objectContaining({
-        clave: `almacen:Queso Cheddar:POR_PEDIR:${hoy}`,
+        clave: `almacen:12:POR_PEDIR:${hoyLima}`,
         origen: 'ALMACEN',
         texto: expect.stringContaining('2.00 KG'),
       }),

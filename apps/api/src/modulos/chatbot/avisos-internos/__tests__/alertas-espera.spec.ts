@@ -48,6 +48,7 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       },
       insumo: {
         findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       printJob: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -69,6 +70,7 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
     avisosInternosMock = {
       enviarAvisoAdmin: jest.fn().mockResolvedValue({ enviosExitosos: 1 }),
       emitirAvisoCampana: jest.fn().mockResolvedValue(undefined),
+      avisarCruces: jest.fn((cruces: any[]) => Promise.resolve(cruces.length)),
     };
 
     mensajeriaMock = {
@@ -491,11 +493,12 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
 
       expect(res.alertasStockEnviadas).toBe(0);
       expect(prismaMock.insumo.findMany).not.toHaveBeenCalled();
+      expect(avisosInternosMock.avisarCruces).not.toHaveBeenCalled();
       const avisos = avisosInternosMock.enviarAvisoAdmin.mock.calls.map((c: any[]) => String(c[0]));
       expect(avisos.some((t: string) => t.startsWith('Alerta de Stock'))).toBe(false);
     });
 
-    it('2.d: alerta de stock bajo una vez al día por insumo y de falla de impresora', async () => {
+    it('2.d: el cron avisa los cruces de stock (no una vez al día) y mantiene la falla de impresora', async () => {
       const ahora = new Date('2026-10-27T12:00:00Z');
 
       prismaMock.insumo.findMany.mockResolvedValueOnce([
@@ -522,14 +525,14 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       expect(res.alertasStockEnviadas).toBe(1);
       expect(res.alertasImpresoraEnviadas).toBe(1);
 
-      expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
-        'Alerta de Stock: Queso Cheddar (POR_PEDIR)',
-        expect.stringContaining('2.00 KG'),
-        '/admin/stock',
-        undefined,
-        'almacen:Queso Cheddar:POR_PEDIR:2026-10-27',
-        { correo: true },
-      );
+      // Cruce normal -> POR_PEDIR con el saldo total del insumo; el aviso lo decide AvisosInternosService.avisarCruces
+      expect(avisosInternosMock.avisarCruces).toHaveBeenCalledWith([
+        expect.objectContaining({ insumoId: 606n, nombre: 'Queso Cheddar', tipo: 'POR_PEDIR', total: 2 }),
+      ]);
+      expect(prismaMock.insumo.updateMany).toHaveBeenCalledWith({
+        where: { id: 606n, alerta_stock: null },
+        data: { alerta_stock: 'POR_PEDIR' },
+      });
 
       expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
         'Falla de Impresora: Trabajo #707',

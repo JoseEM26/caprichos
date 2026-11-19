@@ -23,6 +23,7 @@ import { BOTONES_AVISO_PEDIDO } from './avisos-internos.textos';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
 import { controlAlmacenActivo } from '../../stock/control-almacen';
+import { evaluarCrucesStock } from '../../stock/alertas-stock';
 import { LocalService } from '../../local/local.service';
 import { pedidoVivoDeHoy } from '../../../comun/fechas-lima';
 import { MarcaEscalado, TEXTOS_ESCALADO } from '../conversacion/escalado-ia.util';
@@ -469,37 +470,13 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       }
 
       // =========================================================================
-      // 5) SECCIÓN 2.d: Stock bajo (una vez al día por insumo) y falla de impresora
+      // 5) SECCIÓN 2.d: Stock de insumos por cruce y falla de impresora
       // =========================================================================
-      // a) Stock bajo diario: solo con el «Control de almacén» encendido (apagado, no hay aviso de insumos)
-      const fechaHoy = ahora.toISOString().slice(0, 10);
-      const insumos = (await controlAlmacenActivo(this.prisma))
-        ? await this.prisma.insumo.findMany({
-            where: { activo: true },
-            include: { stocks: true },
-          })
-        : [];
-
-      for (const insumo of insumos) {
-        const stockTotal = insumo.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0);
-        const minimo = Number(insumo.minimo);
-        if (stockTotal <= minimo) {
-          const claveIdempStock = `idemp:alerta:stock:${insumo.id}:${fechaHoy}`;
-          const esPrimero = await this.adquirirIdempotencia(claveIdempStock);
-          if (esPrimero) {
-            const estadoTexto = stockTotal <= 0 ? 'AGOTADO' : 'POR_PEDIR';
-            // Misma clave que el aviso instantáneo de almacén: el correo de un insumo y día no se repite
-            await this.avisosInternosService.enviarAvisoAdmin(
-              `Alerta de Stock: ${insumo.nombre} (${estadoTexto})`,
-              `El insumo ${insumo.nombre} tiene stock ${stockTotal.toFixed(2)} ${insumo.unidad_almacen} (Mínimo: ${minimo.toFixed(2)}).`,
-              '/admin/stock',
-              undefined,
-              `almacen:${insumo.nombre.slice(0, 100)}:${estadoTexto}:${fechaHoy}`,
-              { correo: true },
-            );
-            alertasStockEnviadas++;
-          }
-        }
+      // a) Stock: red de seguridad del aviso instantáneo (venta, movimiento, traslado, consumo). Evalúa el saldo total de
+      // cada insumo y avisa solo los cruces que aún no salieron; si son varios, un resumen. Apagado, no evalúa nada.
+      if (await controlAlmacenActivo(this.prisma)) {
+        const cruces = await evaluarCrucesStock(this.prisma, {});
+        alertasStockEnviadas += await this.avisosInternosService.avisarCruces(cruces);
       }
 
       // b) Falla de impresora
