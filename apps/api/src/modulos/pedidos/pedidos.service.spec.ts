@@ -24,6 +24,7 @@ import { PagoPlanService } from './pago-plan.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
+import { StockService } from '../stock/stock.service';
 
 describe('PedidosService', () => {
   let service: PedidosService;
@@ -37,6 +38,7 @@ describe('PedidosService', () => {
   let partyPuntosMock: any;
   let redisMock: any;
   let auditoriaMock: any;
+  let stockMock: { descontarPorPedidoSeguro: jest.Mock };
   let facturacionMock: any;
   let crearSinRelleno: PedidosService['crear'];
 
@@ -228,6 +230,7 @@ describe('PedidosService', () => {
     redisMock = { incr: jest.fn().mockResolvedValue(1), expire: jest.fn().mockResolvedValue(1) };
 
     auditoriaMock = { registrar: jest.fn().mockResolvedValue(undefined) };
+    stockMock = { descontarPorPedidoSeguro: jest.fn().mockResolvedValue({ ok: true }) };
     facturacionMock = { asignarSiFalta: jest.fn().mockResolvedValue(true) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -244,6 +247,7 @@ describe('PedidosService', () => {
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: OfertasService, useValue: ofertasServiceMock },
         { provide: PuntosService, useValue: puntosServiceMock },
+        { provide: StockService, useValue: stockMock },
         PagoPlanService,
       ],
     }).compile();
@@ -974,6 +978,12 @@ describe('PedidosService', () => {
         prismaMock.pedido.create.mockImplementation(async ({ data }: any) => ({
           id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: data.subtotal, descuento: data.descuento, envio: data.envio, total: data.total,
         }));
+      });
+
+      it('nace PAGADO y descuenta sus insumos al crear (sin pasar por Caja), con reintento y auditoría del servicio de stock', async () => {
+        await service.crear(dtoPersonal, 'idemp-personal-stock', origen);
+
+        expect(stockMock.descontarPorPedidoSeguro).toHaveBeenCalledWith(100n, 5n);
       });
 
       it('aplica el 25 % al crear: total con descuento, pagado a crédito y consumo acumulado en la cuenta del trabajador', async () => {

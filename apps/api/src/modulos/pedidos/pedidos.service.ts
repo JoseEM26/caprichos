@@ -1398,6 +1398,8 @@ export class PedidosService {
     let agotadosPorVenta: bigint[] = [];
     let saboresAgotadosPorVenta: bigint[] = [];
     let totalFinal = 0;
+    // Nace PAGADO sin pasar por el cobro de Caja: pedido del personal, o todo cortesía/cupón (total S/ 0)
+    const nacePagado = personal || (totalCalculado <= 0 && !enLinea);
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###
       let codigo: string;
@@ -1437,7 +1439,7 @@ export class PedidosService {
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
           pago_metodo: personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
-          pago_estado: personal || (totalCalculado <= 0 && !enLinea) ? 'PAGADO' : enLinea ? 'PENDIENTE_ONLINE' : 'PENDIENTE',
+          pago_estado: nacePagado ? 'PAGADO' : enLinea ? 'PENDIENTE_ONLINE' : 'PENDIENTE',
           pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
@@ -1744,15 +1746,9 @@ export class PedidosService {
       }
     }
 
-    // Pedido del personal: nace PAGADO y no pasa por el cobro de Caja (que es quien descuenta los insumos por receta).
-    // Lo consumido sale del almacén igual; idempotente, y si falla no deshace el pedido.
-    if (personal) {
-      try {
-        await this.stockService?.descontarPorPedido(pedidoCreado.id);
-      } catch {
-        // el consumo del personal se puede regularizar con el descuento por receta
-      }
-    }
+    // Nace PAGADO sin pasar por el cobro de Caja (que es quien descuenta los insumos por receta): sus insumos salen aquí.
+    // Idempotente; si falla, se reintenta y queda en auditoría, sin deshacer el pedido.
+    if (nacePagado) await this.stockService?.descontarPorPedidoSeguro(pedidoCreado.id, origen?.usuarioPartyId);
 
     // Productos que esta venta dejó agotados: aviso al equipo y carta al día (fuera de la transacción)
     if (agotadosPorVenta.length > 0 || saboresAgotadosPorVenta.length > 0) {

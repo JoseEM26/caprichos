@@ -505,7 +505,7 @@ export class CobrosService {
     //   puntos del cliente (5 %, DT-55), descuento de stock por receta (FT-STK-03) y cupones impresos (DT-56)
     for (const paso of [
       () => this.puntosService?.acumularPorPedido(cobro.pedido_id),
-      () => this.stockService?.descontarPorPedido(cobro.pedido_id),
+      () => this.stockService?.descontarPorPedidoSeguro(cobro.pedido_id, usuario?.partyId),
       () => this.ofertasService?.emitirCuponesParaPedido(cobro.pedido_id),
     ]) {
       try {
@@ -704,11 +704,7 @@ export class CobrosService {
    * Es el mismo descuento del cobro: idempotente, y si falla no deshace nada.
    */
   async descontarInsumosSinCobro(pedidoId: bigint) {
-    try {
-      await this.stockService?.descontarPorPedido(pedidoId);
-    } catch {
-      // se puede reintentar
-    }
+    await this.stockService?.descontarPorPedidoSeguro(pedidoId);
   }
 
   /**
