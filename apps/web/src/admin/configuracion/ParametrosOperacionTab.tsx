@@ -233,6 +233,12 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'personas',
   },
+  stock_alerta_porcentaje: {
+    nombre: 'Aviso de stock bajo de insumos (% del máximo)',
+    descripcion: 'Un insumo queda «por pedir» cuando su saldo total baja a este porcentaje de su máximo (o a su mínimo, si es mayor). Se avisa al equipo una vez por cruce.',
+    tipo: 'numero',
+    sufijo: '%',
+  },
   aviso_stock_quedan_desde: {
     nombre: 'Avisar «Quedan N» desde (unidades)',
     descripcion: 'Desde cuántas unidades el cliente ve «Quedan N» en un producto con stock controlado. 0 = sin aviso.',

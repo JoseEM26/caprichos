@@ -35,6 +35,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'programados', titulo: 'Pedidos programados', claves: ['programado_dias_max', 'programado_aviso_min', 'pedidos_programados_fuera_horario'] },
   { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'puntos_combos_suman', 'puntos_ofertas_suman', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_recordatorio_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
   { id: 'stock', titulo: 'Avisos de «se está acabando» (stock de productos)', claves: ['aviso_stock_quedan_desde', 'aviso_stock_ultimas_desde'] },
+  { id: 'almacen', titulo: 'Avisos de stock de insumos (Almacén)', claves: ['stock_alerta_porcentaje'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
@@ -237,6 +238,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 30: el cliente puede pedir mesa para hoy o hasta dentro de 30 días.',
     efecto: 'Subirlo deja reservar con más meses de anticipación; bajarlo acorta las fechas que se ofrecen en la carta.',
     porDefecto: '30', unidad: 'días', rango: 'entero de 1 a 365', palabras: ['reserva', 'anticipacion', 'dias', 'fecha', 'futuro'], peligro: 'bajo',
+  },
+  stock_alerta_porcentaje: {
+    grupo: 'almacen', titulo: 'Aviso de stock bajo de insumos (% del máximo)',
+    descripcion: 'Porcentaje del máximo de cada insumo que marca «por pedir». El umbral es el mayor entre este porcentaje del máximo y el mínimo del insumo. Al bajar a ese nivel sale un aviso al equipo; al volver por encima, se vuelve a avisar la próxima vez que baje.',
+    ejemplo: 'Con 20 y un máximo de 100, un insumo queda «por pedir» al bajar a 20 (si su mínimo es menor).',
+    efecto: 'Solo cambia cuándo se avisa. Los insumos nunca bloquean ventas: el aviso no frena nada. Con el control de almacén apagado no sale ningún aviso.',
+    porDefecto: '20', unidad: '%', rango: 'entero de 1 a 100', palabras: ['stock', 'insumo', 'por pedir', 'agotado', 'umbral', 'maximo', 'minimo', 'almacen', 'aviso'], peligro: 'bajo',
   },
   aviso_stock_quedan_desde: {
     grupo: 'stock', titulo: 'Avisar «Quedan N» desde (unidades)',
