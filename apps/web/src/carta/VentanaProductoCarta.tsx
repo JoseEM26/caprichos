@@ -17,6 +17,8 @@ import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
   AvisoAlternativasCombo,
   bebidasElegidas,
+  bebidasFijasCombo,
+  envasesCombo,
   comboConBebidas,
   eleccionesCombo,
   ParteOpcionalTarjeta,
@@ -160,8 +162,10 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       })
     : [];
   // Sin esos grupos, cada paso de la parte de bebidas es una bebida con su envase
-  const nB = gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0);
-  const envases = bebidasElegidas(partesJug, elegido);
+  // Las bebidas fijas del combo (siempre incluidas) también llevan nombre de vaso: el servidor lo exige
+  const nFijas = bebidasFijasCombo(ofertaCombo).reduce((a, b) => a + b.cantidad, 0);
+  const nB = (gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0)) + nFijas;
+  const envases = nFijas > 0 ? envasesCombo(ofertaCombo, partesJug, elegido) : bebidasElegidas(partesJug, elegido);
   const secciones = useMemo(() => {
     const claves: string[] = [];
     const mapa: Record<string, GrupoOpcionesCarta[]> = {};
@@ -999,7 +1003,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   ayuda="Obligatorio · máx. 14 letras se ven completas en el vaso"
                   filas={Array.from({ length: cantidad * nB }, (_, i) => {
                     const g = gruposBebida[i % nB];
-                    const bebida = g ? (g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g)) : (envases[i] ?? `Bebida ${i + 1}`);
+                    const bebida = g ? (g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g)) : (envases[i] || `Bebida ${i + 1}`);
                     return {
                       etiqueta: `Bebida ${(i % nB) + 1}`,
                       bebida,

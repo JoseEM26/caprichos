@@ -46,6 +46,7 @@ import {
   calcularDisponibilidadCombo,
   conSaboresDeParte,
   esParteBebidas,
+  esBebidaPorNombres,
   parteArmable,
   productoDisponible,
   motivoProductoBloqueado,
@@ -2920,7 +2921,12 @@ export class OfertasService {
         p.disponible = rp.disponible;
         p.opcionesDisponibles = rp.opcionesDisponibles;
         p.alternativasActivas = rp.alternativasActivas;
-        if (p.tipo === 'FIJO') p.principalNombre = productos.find((x) => x.id === p.productos[0])?.nombre ?? '';
+        if (p.tipo === 'FIJO') {
+          const principal = productos.find((x) => x.id === p.productos[0]);
+          p.principalNombre = principal?.nombre ?? '';
+          // Bebida siempre incluida (p. ej. el frappé de la cajita): también lleva nombre de vaso, como las que el cliente elige
+          if (principal && esBebidaPorNombres(principal.categoriaNombre, principal.areaNombre)) p.bebidaFija = true;
+        }
         if (p.alternativas && p.alternativas.length > 0) {
           // Todas las alternativas, con su nombre y si se puede elegir ahora (las agotadas salen bloqueadas)
           p.alternativas = p.alternativas.map((a, j) => {

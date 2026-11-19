@@ -19,4 +19,12 @@ describe('Editor de combos: categorías y productos ocultos', () => {
     expect(screen.getByRole('checkbox', { name: 'Torta Y' })).not.toHaveTextContent('oculto');
     expect(screen.getByRole('checkbox', { name: 'Postres — todos' })).not.toHaveTextContent('oculta');
   });
+
+  it('avisa si se marca una categoría oculta entera; con productos marcados uno por uno no avisa', () => {
+    const porCategoria: Parte = { ...parte, categorias: ['9'] };
+    const { rerender } = render(<EditorPartesCombo partes={[porCategoria]} productos={productos} categorias={categorias} onCambiar={() => {}} />);
+    expect(screen.getByTestId('aviso-categoria-oculta')).toHaveTextContent('categoría oculta');
+    rerender(<EditorPartesCombo partes={[{ ...porCategoria, productos: ['90'] }]} productos={productos} categorias={categorias} onCambiar={() => {}} />);
+    expect(screen.queryByText(/Marcaste una categoría oculta/)).not.toBeInTheDocument();
+  });
 });

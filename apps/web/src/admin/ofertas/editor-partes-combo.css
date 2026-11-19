@@ -82,3 +82,4 @@
 .epc-vacio p { margin: 0 0 10px; }
 
 .epc-oculto { font-style: normal; font-weight: 600; font-size: 11px; color: var(--cp-soft, #6B6B6B); }
+.epc-aviso-oculta { color: var(--cp-rust, #B5471F); font-weight: 700; }

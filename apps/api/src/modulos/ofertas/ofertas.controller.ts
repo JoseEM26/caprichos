@@ -46,6 +46,23 @@ export class OfertasController {
     );
   }
 
+  /**
+   * Por qué cada combo no se puede armar ahora (solo los agotados), para que Caja y mozo lo expliquen en vez de «Agotado».
+   * La carta pública no lo trae a propósito. Permiso de ver ofertas o de abrir pedidos de mesa.
+   */
+  @Get('motivos-agotado')
+  @Permiso([
+    { modulo: 'ofertas', accion: 'ver' },
+    { modulo: 'mesas', accion: 'abrir' },
+    { modulo: 'pedidos', accion: 'crear' },
+  ])
+  async motivosAgotado() {
+    const combos = await this.ofertasService.listarOfertas('COMBO', true);
+    const motivos: Record<string, string> = {};
+    for (const c of combos) if (c.disponible === false && c.motivoAgotado) motivos[String(c.id)] = c.motivoAgotado;
+    return motivos;
+  }
+
   @Get()
   @Permiso('ofertas', 'ver')
   async listarOfertas(

@@ -13,6 +13,8 @@ import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from
 import {
   AvisoAlternativasCombo,
   bebidasElegidas,
+  bebidasFijasCombo,
+  envasesCombo,
   comboConBebidas,
   eleccionesCombo,
   ParteOpcionalTarjeta,
@@ -210,8 +212,10 @@ export function VentanaOpcionesProducto({
   // Lo elegido en todas las partes (contadores y pasos de bebidas)
   const elegido = unirElecciones(partesJug, juguetes, bebidas, cantidad);
   // Sin esos grupos, cada paso de la parte de bebidas es una bebida con su envase
-  const nB = gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0);
-  const envases = bebidasElegidas(partesJug, elegido);
+  // Las bebidas fijas del combo (siempre incluidas) también llevan nombre de vaso: el servidor lo exige
+  const nFijas = bebidasFijasCombo(ofertaCombo).reduce((a, b) => a + b.cantidad, 0);
+  const nB = (gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0)) + nFijas;
+  const envases = nFijas > 0 ? envasesCombo(ofertaCombo, partesJug, elegido) : bebidasElegidas(partesJug, elegido);
   const [nombresCombo, setNombresCombo] = useState<Record<number, string>>({});
 
   // Es bebida por su CATEGORÍA (igual que la carta): Frappes, Iced, Frozen, Calientes o «bebida».
@@ -862,7 +866,7 @@ export function VentanaOpcionesProducto({
                 const elegidas = opcionesPorUnidad[personalizarPorUnidad ? Math.floor(i / nB) : 0] || [];
                 const bebida = g
                   ? (g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1])
-                  : (envases[i] ?? `Bebida ${i + 1}`);
+                  : (envases[i] || `Bebida ${i + 1}`);
                 return {
                   etiqueta: `Bebida ${(i % nB) + 1}`,
                   bebida,
@@ -1010,7 +1014,7 @@ export function VentanaOpcionesProducto({
 
         {comboAgotado && (
           <div role="status" style={{ fontWeight: 800, color: 'var(--cp-rust)' }}>
-            Agotado
+            Agotado{oferta?.motivoAgotado ? ` · ${oferta.motivoAgotado}` : ''}
           </div>
         )}
         {!comboAgotado && vis('tamano') && <ResumenPartesFijas oferta={ofertaCombo} />}

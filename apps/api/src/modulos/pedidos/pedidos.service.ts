@@ -550,9 +550,12 @@ export class PedidosService {
       };
       if (combo.partes.length > 0) {
         // Combo: cada vaso de sus bebidas lleva nombre (en orden de bebida)
+        // El bot de WhatsApp no pregunta el vaso de una bebida FIJA del combo: ahí se usa el nombre del cliente (ver escribirLineasPedido)
+        const esBot = origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT';
         let k = 0;
         for (const parte of combo.partes as ParteResueltaCombo[]) {
           if (!esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined)) continue;
+          if (esBot && parte.tipo === 'FIJO') continue;
           for (let u = 0; u < parte.cantidad; u++, k++) exigirNombre(k, u + 1);
         }
         personasAsignadas.push(...nombresDe);
@@ -657,6 +660,8 @@ export class PedidosService {
       let nombreSiguiente = 0;
       for (const parte of lin.partesCombo) {
         const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
+        // Bot: la bebida fija no consume nombres de la lista (no se pregunta) y lleva el del cliente
+        const consumeNombres = esBebidaParte && !((origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT') && parte.tipo === 'FIJO');
         const hija = await tx.pedidoLinea.create({
           data: {
             pedido_id: pedidoId,
@@ -669,13 +674,13 @@ export class PedidosService {
             subtotal: new Prisma.Decimal(0),
             area_id: parte.areaId,
             nombres_persona: esBebidaParte
-              ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[nombreSiguiente + u]?.trim() || clienteNombre || 'Mesa')
+              ? Array.from({ length: parte.cantidad }, (_, u) => (consumeNombres ? lin.personasEntrada[nombreSiguiente + u]?.trim() : '') || clienteNombre || 'Mesa')
               : [],
             nota: parte.nota,
             para_llevar: lin.paraLlevar === true,
           },
         });
-        if (esBebidaParte) nombreSiguiente += parte.cantidad;
+        if (consumeNombres) nombreSiguiente += parte.cantidad;
         // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
         for (const sb of parte.sabores ?? []) {
           await tx.pedidoLineaSabor.create({

@@ -75,6 +75,8 @@ export interface ComboParteItem {
   opcionesDetalle?: OpcionDetalleCombo[];
   /** Parte de bebidas por categorías: el cliente elige «Bebida 1..N» entre `opcionesDetalle`. */
   bebidas?: boolean;
+  /** Parte FIJA que es una bebida (siempre incluida): su vaso también lleva nombre. */
+  bebidaFija?: boolean;
 }
 
 export interface LlevaPagaConfig {

@@ -67,6 +67,11 @@ function Selector({ categorias, productos, cats, prods, onCambio, etiqueta }: {
           ))}
         </div>
       )}
+      {prods.length === 0 && categorias.some((c) => c.oculta && cats.includes(c.id)) && (
+        <p className="epc-nota epc-aviso-oculta" role="status" data-testid="aviso-categoria-oculta">
+          Marcaste una categoría oculta en la carta: sus productos ocultos no se ofrecen si eliges la categoría entera y el combo puede salir agotado. Marca los productos uno por uno.
+        </p>
+      )}
       <input type="search" className="epc-buscar" aria-label={`Buscar categoría o producto: ${etiqueta}`} placeholder="Buscar categoría o producto…" value={q} onChange={(e) => setQ(e.target.value)} />
       <ul className="epc-lista-productos epc-selector" aria-label={`Qué puede elegir: ${etiqueta}`}>
         {catsVis.map((c) => {

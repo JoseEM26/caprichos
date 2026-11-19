@@ -1949,6 +1949,13 @@ describe('PedidosService', () => {
         expect(prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data)[1].nombres_persona).toEqual(['Lucía']);
       });
 
+      it('bot: la bebida fija del combo no exige nombre de vaso y lleva el del cliente', async () => {
+        await crearSinRelleno(dtoCajita(), 'key-cajita-bot-vaso', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '987654321' });
+        const hijas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(hijas[1].nombres_persona).toHaveLength(1);
+        expect(hijas[1].nombres_persona[0]).toBeTruthy();
+      });
+
       it('la madre no lleva producto ni área; cada parte es una línea hija con su área y sin cobro', async () => {
         await service.crear(dtoCajita(), 'key-cajita-lineas', { canal: 'MOZO' });
         const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);

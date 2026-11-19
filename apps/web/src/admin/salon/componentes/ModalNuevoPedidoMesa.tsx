@@ -264,6 +264,14 @@ function resaltarCoincidencia(texto: string, q: string) {
 
 const PISOS_VACIOS: PisoSalon[] = [];
 
+/** Combos de la carta + el motivo por el que alguno está agotado (solo para el personal; la carta pública no lo trae). */
+async function cargarCombosConMotivo(): Promise<OfertaItem[]> {
+  const r = await api.get<OfertaItem[]>('/carta/ofertas');
+  const lista = Array.isArray(r) ? r : [];
+  const motivos = await api.get<Record<string, string>>('/admin/ofertas/motivos-agotado').catch(() => ({}) as Record<string, string>);
+  return lista.map((o) => (o.disponible === false && motivos?.[String(o.id)] ? { ...o, motivoAgotado: motivos[String(o.id)] } : o));
+}
+
 export function ModalNuevoPedidoMesa({
   abierto,
   alCerrar,
@@ -663,8 +671,7 @@ export function ModalNuevoPedidoMesa({
   useEffect(() => {
     (async () => {
       try {
-        const r = await api.get<OfertaItem[]>('/carta/ofertas');
-        setOfertasCombo(Array.isArray(r) ? r : []);
+        setOfertasCombo(await cargarCombosConMotivo());
       } catch {
         setOfertasCombo([]);
       }
@@ -1787,8 +1794,7 @@ export function ModalNuevoPedidoMesa({
         setFase('pedido');
         setErrorEnvio(`${err.message} El pedido sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
         try {
-          const r = await api.get<OfertaItem[]>('/carta/ofertas');
-          setOfertasCombo(Array.isArray(r) ? r : []);
+          setOfertasCombo(await cargarCombosConMotivo());
         } catch {
           /* se mantiene la lista anterior */
         }

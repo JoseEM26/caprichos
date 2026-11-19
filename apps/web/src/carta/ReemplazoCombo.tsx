@@ -265,6 +265,30 @@ export function bebidasElegidas(partes: ParteEleccion[], elegido: Record<string,
     );
 }
 
+/** Bebidas FIJAS (siempre incluidas, p. ej. el frappé de la cajita) del combo: su vaso también lleva nombre. */
+export function bebidasFijasCombo(oferta: OfertaItem | null | undefined): { nombre: string; cantidad: number }[] {
+  return (oferta?.combosParte ?? [])
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.bebidaFija === true && p.alternativasActivas !== true)
+    .map((p) => ({ nombre: p.principalNombre || 'Bebida', cantidad: p.cantidad ?? 1 }));
+}
+
+/**
+ * Nombre de cada bebida del combo en el orden de sus partes (el mismo en que el servidor reparte los nombres de vaso):
+ * las fijas con su producto y las que elige el cliente con lo elegido; lo que aún no eligió queda vacío.
+ */
+export function envasesCombo(oferta: OfertaItem | null | undefined, partes: ParteEleccion[], elegido: Record<string, Reparto>): string[] {
+  const deEleccion = new Map(partes.filter((p) => p.bebidas).map((p) => [p.parteId, p] as const));
+  return (oferta?.combosParte ?? []).flatMap((p): string[] => {
+    if ((p.tipo ?? p.tipoParte) === 'FIJO' && p.bebidaFija === true && p.alternativasActivas !== true) {
+      return Array.from({ length: p.cantidad ?? 1 }, () => p.principalNombre || 'Bebida');
+    }
+    const pe = deEleccion.get(String(p.id));
+    if (!pe) return [];
+    const elegidas = bebidasElegidas([pe], elegido);
+    return Array.from({ length: pe.cantidad }, (_, i) => elegidas[i] ?? '');
+  });
+}
+
 /** Los grupos de opciones del anfitrión que repiten la bebida («Bebida 1 · Sabor») se ocultan si el combo tiene bebidas por categorías. */
 export const esGrupoBebidaDuplicado = (nombre: string): boolean => {
   const n = nombre.trim();
