@@ -531,7 +531,7 @@ export function MisPedidosView() {
           {borradores.map((b) => (
             <div key={b.mesaId} className="mp-borrador">
               <span>
-                Borrador · {b.mesaNombre} · {b.productos} producto{b.productos === 1 ? '' : 's'} · de {b.mozo} · {haceTexto(b.actualizadoEn)}
+                Borrador · {b.mesaNombre} · {b.productos} producto{b.productos === 1 ? '' : 's'} · {haceTexto(b.actualizadoEn)}
               </span>
               <button type="button" onClick={() => setBorradorAbierto(b)}>Continuar</button>
               <button type="button" onClick={() => setBorradorABorrar(b)}>Eliminar</button>

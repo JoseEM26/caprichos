@@ -24,9 +24,9 @@ describe('BorradorMesaService', () => {
     svc = new BorradorMesaService(prisma, auditoria);
   });
 
-  it('guarda con upsert por mesa (único por mesa), audita y NO ocupa la mesa', async () => {
+  it('guarda con upsert por mesa y persona (uno por persona), audita y NO ocupa la mesa', async () => {
     const r = await svc.guardar('5', { lineas: [] }, 2, { partyId: '9' });
-    expect(prisma.pedidoBorradorMesa.upsert.mock.calls[0][0].where).toEqual({ mesa_id: 5n });
+    expect(prisma.pedidoBorradorMesa.upsert.mock.calls[0][0].where).toEqual({ mesa_id_party_id: { mesa_id: 5n, party_id: 9n } });
     expect(r.mozo).toBe('Ana Ruiz');
     expect(r.mesaNombre).toBe('Mesa 1');
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'GUARDAR_BORRADOR_PEDIDO' }));
@@ -35,7 +35,7 @@ describe('BorradorMesaService', () => {
   });
 
   it('al consultar borra los de días anteriores', async () => {
-    await svc.listar();
+    await svc.listar({ partyId: '9' });
     const corte = prisma.pedidoBorradorMesa.deleteMany.mock.calls[0][0].where.actualizado_en.lt as Date;
     expect(corte.getTime()).toBe(inicioDiaLima().getTime());
   });
@@ -45,9 +45,17 @@ describe('BorradorMesaService', () => {
     expect(inicioDiaLima(new Date('2027-03-21T06:00:00Z')).toISOString()).toBe('2027-03-21T05:00:00.000Z');
   });
 
+  it('cada persona ve solo el suyo: listar y obtener filtran por su party', async () => {
+    await svc.listar({ partyId: '9' });
+    expect(prisma.pedidoBorradorMesa.findMany.mock.calls[0][0].where).toEqual({ party_id: 9n });
+    prisma.pedidoBorradorMesa.findUnique.mockResolvedValueOnce(null);
+    expect(await svc.obtenerPorMesa('5', { partyId: '9' })).toBeNull();
+    expect(prisma.pedidoBorradorMesa.findUnique.mock.calls[0][0].where).toEqual({ mesa_id_party_id: { mesa_id: 5n, party_id: 9n } });
+  });
+
   it('eliminar audita; si no existe no falla', async () => {
     prisma.pedidoBorradorMesa.findUnique.mockResolvedValueOnce(null);
-    expect(await svc.eliminar('5', {})).toEqual({ ok: true });
+    expect(await svc.eliminar('5', { partyId: '9' })).toEqual({ ok: true });
     prisma.pedidoBorradorMesa.findUnique.mockResolvedValueOnce({ mesa_id: 5n, party_id: 9n, productos: 2 });
     await svc.eliminar('5', { partyId: '1' });
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ELIMINAR_BORRADOR_PEDIDO' }));

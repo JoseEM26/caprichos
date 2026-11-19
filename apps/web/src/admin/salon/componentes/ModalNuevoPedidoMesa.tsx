@@ -4230,8 +4230,8 @@ export function ModalNuevoPedidoMesa({
       )}
       {reemplazoPregunta && (
         <DialogoOpciones
-          titulo="Esta mesa ya tiene un borrador"
-          mensaje={`${reemplazoPregunta.mesaNombre} ya tiene un borrador (de ${reemplazoPregunta.mozo}, ${haceTexto(reemplazoPregunta.actualizadoEn)}). ¿Lo reemplazas con este?`}
+          titulo="Ya tienes un borrador de esta mesa"
+          mensaje={`Ya tienes un borrador de ${reemplazoPregunta.mesaNombre} (${reemplazoPregunta.productos} producto${reemplazoPregunta.productos === 1 ? '' : 's'}, ${haceTexto(reemplazoPregunta.actualizadoEn)}). ¿Lo reemplazas con este?`}
           opciones={[
             { texto: 'Reemplazar', variante: 'peligro' as const, alElegir: () => void guardarComoBorrador(true) },
             { texto: 'No, volver al pedido', alElegir: () => setReemplazoPregunta(null) },
@@ -4240,20 +4240,23 @@ export function ModalNuevoPedidoMesa({
       )}
       {borradorPregunta && (
         <DialogoOpciones
-          titulo="Hay un borrador de esta mesa"
-          mensaje={`Hay un borrador de esta mesa (de ${borradorPregunta.mozo}, ${haceTexto(borradorPregunta.actualizadoEn)}, ${borradorPregunta.productos} producto${borradorPregunta.productos === 1 ? '' : 's'}). ¿Continuar el borrador o eliminarlo y crear uno nuevo?`}
+          titulo={`Tienes un borrador de ${borradorPregunta.mesaNombre || 'esta mesa'}`}
+          mensaje={`Lo dejaste con ${borradorPregunta.productos} producto${borradorPregunta.productos === 1 ? '' : 's'}, ${haceTexto(borradorPregunta.actualizadoEn)}. Es solo tuyo: nadie más lo ve. ¿Sigues donde lo dejaste o empiezas de cero?`}
           opciones={[
             {
-              texto: 'Eliminar y crear uno nuevo',
+              texto: 'Empezar de cero (borra el borrador)',
               variante: 'peligro' as const,
               alElegir: () => {
                 const id = borradorPregunta.mesaId;
                 setBorradorPregunta(null);
-                void Promise.resolve().then(() => salonApi.eliminarBorradorMesa(id)).catch(() => undefined);
+                // Si no se pudo borrar, se avisa: de lo contrario volvería a preguntar en la próxima vez
+                void Promise.resolve()
+                  .then(() => salonApi.eliminarBorradorMesa(id))
+                  .catch(() => setAvisoMesa('No se pudo borrar el borrador. Se conserva; bórralo desde «Mis pedidos».'));
               },
             },
             {
-              texto: 'Continuar el borrador',
+              texto: 'Continuar mi borrador',
               variante: 'primario' as const,
               alElegir: () => {
                 const b = borradorPregunta;

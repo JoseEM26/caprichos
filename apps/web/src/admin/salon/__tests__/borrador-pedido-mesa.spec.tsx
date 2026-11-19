@@ -111,13 +111,13 @@ describe('borrador del pedido de mesa', () => {
     vi.mocked(salonApi.borradorDeMesa).mockResolvedValue(borrador as any);
     // la mesa ya tiene borrador: el aviso de continuar sale primero; se elimina para armar uno nuevo
     render(<ModalNuevoPedidoMesa abierto alCerrar={vi.fn()} pisos={pisos} mesasPreseleccionadasIds={['m1']} canal="MOZO" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Eliminar y crear uno nuevo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Empezar de cero (borra el borrador)' }));
     fireEvent.click(await screen.findByText('Café Americano'));
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Ana' } });
   fireEvent.click(await screen.findByText('Agregar al pedido'));
     fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar' })[0]);
     fireEvent.click(await screen.findByRole('button', { name: 'Guardar como borrador' }));
-    expect(await screen.findByText('Esta mesa ya tiene un borrador')).toBeInTheDocument();
+    expect(await screen.findByText('Ya tienes un borrador de esta mesa')).toBeInTheDocument();
     expect(salonApi.guardarBorradorMesa).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Reemplazar' }));
     await waitFor(() => expect(salonApi.guardarBorradorMesa).toHaveBeenCalled());
@@ -126,10 +126,10 @@ describe('borrador del pedido de mesa', () => {
   it('al abrir una mesa con borrador, «Continuar» restaura los productos', async () => {
     vi.mocked(salonApi.borradorDeMesa).mockResolvedValue(borrador as any);
     render(<ModalNuevoPedidoMesa abierto alCerrar={vi.fn()} pisos={pisos} mesasPreseleccionadasIds={['m1']} canal="MOZO" />);
-    expect(await screen.findByText(/Hay un borrador de esta mesa \(de Ana Ruiz, hace 10 min, 1 producto\)/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar el borrador' }));
+    expect(await screen.findByText(/Lo dejaste con 1 producto, hace 10 min/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar mi borrador' }));
     expect(await screen.findAllByText(/Café Americano/)).not.toHaveLength(0);
-    expect(screen.queryByText('Hay un borrador de esta mesa')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tienes un borrador de/)).not.toBeInTheDocument();
   });
 
   it('si la mesa del borrador ya está ocupada, avisa y pide otra libre sin perder los productos', async () => {

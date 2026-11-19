@@ -13,7 +13,7 @@ export function inicioDiaLima(ahora = new Date()): Date {
 }
 
 /**
- * Borradores de pedido de mesa: uno por mesa, en el servidor, vencen al cierre del día.
+ * Borradores de pedido de mesa: uno por mesa y por persona, en el servidor, vencen al cierre del día.
  * No ocupan la mesa, no van a cocina ni descuentan stock.
  */
 @Injectable()
@@ -26,6 +26,12 @@ export class BorradorMesaService {
   /** Los de días anteriores se borran al consultar (lo más simple; no hace falta cron). */
   private async limpiarVencidos() {
     await this.prisma.pedidoBorradorMesa.deleteMany({ where: { actualizado_en: { lt: inicioDiaLima() } } });
+  }
+
+  /** Cada persona ve y toca solo su borrador. */
+  private partyDe(usuario: any): bigint {
+    if (!usuario?.partyId) throw new BadRequestException('No se pudo identificar al usuario.');
+    return BigInt(usuario.partyId);
   }
 
   private async nombreMozo(partyId: bigint): Promise<string> {
@@ -46,16 +52,16 @@ export class BorradorMesaService {
     };
   }
 
-  async listar() {
+  async listar(usuario: any) {
     await this.limpiarVencidos();
-    const filas = await this.prisma.pedidoBorradorMesa.findMany({ include: { mesa: true }, orderBy: { actualizado_en: 'desc' } });
+    const filas = await this.prisma.pedidoBorradorMesa.findMany({ where: { party_id: this.partyDe(usuario) }, include: { mesa: true }, orderBy: { actualizado_en: 'desc' } });
     return Promise.all(filas.map((b) => this.dto(b)));
   }
 
   /** Devuelve el borrador de la mesa o null. */
-  async obtenerPorMesa(mesaId: string) {
+  async obtenerPorMesa(mesaId: string, usuario: any) {
     await this.limpiarVencidos();
-    const b = await this.prisma.pedidoBorradorMesa.findUnique({ where: { mesa_id: BigInt(mesaId) }, include: { mesa: true } });
+    const b = await this.prisma.pedidoBorradorMesa.findUnique({ where: { mesa_id_party_id: { mesa_id: BigInt(mesaId), party_id: this.partyDe(usuario) } }, include: { mesa: true } });
     return b ? this.dto(b) : null;
   }
 
@@ -67,7 +73,7 @@ export class BorradorMesaService {
     const partyId = BigInt(usuario.partyId);
     const ahora = new Date();
     const b = await this.prisma.pedidoBorradorMesa.upsert({
-      where: { mesa_id: mesa.id },
+      where: { mesa_id_party_id: { mesa_id: mesa.id, party_id: partyId } },
       create: { mesa_id: mesa.id, party_id: partyId, contenido: contenido as any, productos },
       update: { party_id: partyId, contenido: contenido as any, productos, creado_en: ahora, actualizado_en: ahora },
       include: { mesa: true },
@@ -81,9 +87,10 @@ export class BorradorMesaService {
   }
 
   async eliminar(mesaId: string, usuario: any) {
-    const b = await this.prisma.pedidoBorradorMesa.findUnique({ where: { mesa_id: BigInt(mesaId) } });
+    const clave = { mesa_id_party_id: { mesa_id: BigInt(mesaId), party_id: this.partyDe(usuario) } };
+    const b = await this.prisma.pedidoBorradorMesa.findUnique({ where: clave });
     if (!b) return { ok: true };
-    await this.prisma.pedidoBorradorMesa.delete({ where: { mesa_id: b.mesa_id } });
+    await this.prisma.pedidoBorradorMesa.delete({ where: clave });
     await this.auditoria.registrar({
       categoria: 'CAMBIO', modulo: 'mesas', accion: 'ELIMINAR_BORRADOR_PEDIDO', resultado: 'OK',
       entidad: 'elemento_plano', entidadId: b.mesa_id,

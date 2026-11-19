@@ -1582,7 +1582,7 @@ model ElementoPlano {
   piso         Piso          @relation(fields: [piso_id], references: [id])
   pedidosMesa  PedidoMesa[]
   reservasMesa ReservaMesa[]
-  borradorPedido PedidoBorradorMesa?
+  borradorPedido PedidoBorradorMesa[]
 
   @@map("elemento_plano")
 }
@@ -3696,10 +3696,10 @@ model ConocimientoBot {
 }
 
 /// Borrador de pedido de mesa del mozo/caja. No ocupa la mesa, no va a cocina ni descuenta stock.
-/// Uno por mesa (único); vence al cierre del día (America/Lima).
+/// Uno por mesa y por persona; vence al cierre del día (America/Lima).
 model PedidoBorradorMesa {
   id            BigInt         @id @default(autoincrement())
-  mesa_id       BigInt         @unique
+  mesa_id       BigInt
   party_id      BigInt
   contenido     Json
   productos     Int            @default(0)
@@ -3709,5 +3709,7 @@ model PedidoBorradorMesa {
   mesa          ElementoPlano  @relation(fields: [mesa_id], references: [id], onDelete: Cascade)
   party         Party          @relation(fields: [party_id], references: [id])
 
+  // Un borrador por mesa y por persona: cada quien tiene el suyo
+  @@unique([mesa_id, party_id])
   @@map("pedido_borrador_mesa")
 }

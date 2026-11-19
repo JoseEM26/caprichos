@@ -29,17 +29,17 @@ export class SalonController {
     private readonly borradores: BorradorMesaService,
   ) {}
 
-  /** Borradores de pedido de mesa vigentes del día (mesas/abrir). */
+  /** Mis borradores de pedido de mesa vigentes del día (cada persona ve los suyos; mesas/abrir). */
   @Get('borradores')
   @Permiso('mesas', 'abrir')
-  listarBorradores() {
-    return this.borradores.listar();
+  listarBorradores(@Req() req: any) {
+    return this.borradores.listar(req.usuario);
   }
 
   @Get('borradores/mesa/:mesaId')
   @Permiso('mesas', 'abrir')
-  borradorDeMesa(@Param('mesaId') mesaId: string) {
-    return this.borradores.obtenerPorMesa(mesaId);
+  borradorDeMesa(@Param('mesaId') mesaId: string, @Req() req: any) {
+    return this.borradores.obtenerPorMesa(mesaId, req.usuario);
   }
 
   /** Crea o reemplaza el borrador de la mesa. No ocupa la mesa. */
