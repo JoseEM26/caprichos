@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
+import { NOMBRES_COCINA } from './nombre-cocina';
 
 /**
  * Stock de productos terminados que controlan su stock (`producto.controla_stock`).
@@ -44,7 +45,7 @@ export function fechaColumna(fecha: string): Date {
   return new Date(`${fecha}T00:00:00.000Z`);
 }
 
-/** Lugar donde vive el saldo del producto: su fila de stock si ya existe; si no, el de su área, Salados o Almacén. */
+/** Lugar donde vive el saldo del producto: su fila de stock si ya existe; si no, el de su área, Cocina o Almacén. */
 // ponytail: un producto guarda su saldo en un solo lugar (la primera fila). Si algún día hay varios, habría que sumar.
 export async function lugarDelProducto(db: any, productoId: bigint, areaId?: bigint | null): Promise<bigint | null> {
   const fila = await db.stock.findFirst({
@@ -57,7 +58,7 @@ export async function lugarDelProducto(db: any, productoId: bigint, areaId?: big
     const lugarArea = await db.lugarStock.findFirst({ where: { tipo: 'AREA', area_id: areaId } });
     if (lugarArea) return lugarArea.id;
   }
-  const cocina = await db.lugarStock.findFirst({ where: { nombre: 'Salados' } });
+  const cocina = await db.lugarStock.findFirst({ where: { nombre: { in: NOMBRES_COCINA } } });
   if (cocina) return cocina.id;
   const almacen = await db.lugarStock.findFirst({ where: { tipo: 'ALMACEN' } });
   return almacen?.id ?? null;

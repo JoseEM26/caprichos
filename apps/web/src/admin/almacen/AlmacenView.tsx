@@ -140,7 +140,7 @@ export const AlmacenView: React.FC = () => {
       await almacenApi.entregarPedidoInterno(pedidoEntregarId);
       setConfirmarEntregarAbierto(false);
       setPedidoEntregarId(null);
-      setMensajeExito('Pedido interno entregado: insumos trasladados a Salados.');
+      setMensajeExito('Pedido interno entregado: insumos trasladados a Cocina.');
       cargarDatos();
       setTimeout(() => setMensajeExito(''), 4000);
     } catch (err: any) {

@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { NOMBRES_COCINA, esNombreCocina } from '../stock/nombre-cocina';
 
 export interface InsumoExistenciaCocinaDto {
   insumoId: string;
@@ -23,16 +24,14 @@ export class CocinaExistenciasController {
     const lugares = await this.prisma.lugarStock.findMany({
       where: {
         OR: [
-          { nombre: { contains: 'Salados', mode: 'insensitive' } },
+          { nombre: { in: NOMBRES_COCINA } },
           { nombre: { contains: 'Almacén', mode: 'insensitive' } },
           { tipo: 'ALMACEN' },
         ],
       },
     });
 
-    const cocinaLugar = lugares.find((l) =>
-      l.nombre.toLowerCase().includes('salados'),
-    );
+    const cocinaLugar = lugares.find((l) => esNombreCocina(l.nombre));
     const almacenLugar =
       lugares.find((l) => l.nombre.toLowerCase().includes('almacén')) ||
       lugares.find((l) => l.tipo === 'ALMACEN');
