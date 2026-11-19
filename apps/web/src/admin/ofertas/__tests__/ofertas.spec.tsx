@@ -151,7 +151,7 @@ describe('OfertasAdminView', () => {
           { id: '3', tipo: 'COMBO', nombre: 'Combo Frappé Dúo', activo: true, orden: 3, alcanceProductoId: '10', combosPrecio: [], combosParte: [] },
         ]);
       }
-      if (url === '/carta') {
+      if (url === '/carta' || url === '/admin/catalogo/carta-completa') {
         return Promise.resolve([
           {
             id: 1,
