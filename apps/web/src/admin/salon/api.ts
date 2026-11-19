@@ -169,7 +169,9 @@ export const salonApi = {
 
   /** Borradores de pedido de mesa del día (uno por mesa; no ocupan la mesa). */
   listarBorradoresMesa: () => api.get<BorradorMesa[]>('/admin/salon/borradores'),
-  borradorDeMesa: (mesaId: string) => api.get<BorradorMesa | null>(`/admin/salon/borradores/mesa/${mesaId}`),
+  // Sin borrador el servidor responde 200 sin cuerpo y el cliente lo vuelve {}: solo cuenta si trae su mesaId
+  borradorDeMesa: (mesaId: string) =>
+    api.get<BorradorMesa | null>(`/admin/salon/borradores/mesa/${mesaId}`).then((b) => (b && b.mesaId ? b : null)),
   guardarBorradorMesa: (mesaId: string, contenido: Record<string, unknown>, productos: number) =>
     api.put<BorradorMesa>(`/admin/salon/borradores/mesa/${mesaId}`, { contenido, productos }),
   eliminarBorradorMesa: (mesaId: string) => api.delete(`/admin/salon/borradores/mesa/${mesaId}`),
