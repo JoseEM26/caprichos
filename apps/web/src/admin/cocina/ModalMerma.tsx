@@ -36,7 +36,7 @@ export interface InsumoItem {
 }
 
 const MOTIVOS_RAPIDOS = ['Se cayó', 'Vencido', 'Mal preparado', 'Otro'];
-const ORIGENES = ['Salados', 'Bebidas', 'Producción'];
+const ORIGENES = ['Cocina', 'Bebidas', 'Producción'];
 
 export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
   const [insumosList, setInsumosList] = useState<InsumoItem[]>([]);
@@ -51,7 +51,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
       stockActual: 0,
       cantidad: '',
       motivo: 'Se cayó',
-      origen: 'Salados',
+      origen: 'Cocina',
     },
   ]);
 
@@ -134,7 +134,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
         stockActual: primerInsumo.stockActual,
         cantidad: '',
         motivo: 'Se cayó',
-        origen: 'Salados',
+        origen: 'Cocina',
       },
     ]);
   };
@@ -228,7 +228,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
           insumoNombre: l.insumoNombre,
           cantidad: cantNum,
           unidad: l.unidad,
-          origen: l.origen || 'Salados',
+          origen: l.origen || 'Cocina',
           destino: `Merma · ${motivoFinal}`,
           motivo: motivoFinal,
         };

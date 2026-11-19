@@ -24,6 +24,7 @@ import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
 import { MermaProductoDto } from './dto/merma-producto.dto';
 import {
   controlaPorSabor,
+  fechaColumna,
   fechaLimaHoy,
   mermarProductoControlado,
   NOTA_OTRO_MINIMA,
@@ -34,6 +35,7 @@ import {
 } from '../stock/producto-controlado';
 import { StockService } from '../stock/stock.service';
 import { ConsumoRecetaService } from './consumo-receta.service';
+import { bloquearInsumo, lugarPorNombre, NOMBRE_COCINA } from './stock-cocina';
 
 @Injectable()
 export class AlmacenService {
@@ -56,19 +58,9 @@ export class AlmacenService {
     }
   }
 
+  /** Lugar por nombre; «Cocina» y el antiguo «Salados» son el mismo lugar (ver stock-cocina). */
   private async obtenerLugarPorNombre(nombre: string) {
-    let lugar = await this.prisma.lugarStock.findUnique({
-      where: { nombre },
-    });
-    if (!lugar) {
-      lugar = await this.prisma.lugarStock.create({
-        data: {
-          nombre,
-          tipo: nombre === 'Almacén central' ? 'ALMACEN' : 'AREA',
-        },
-      });
-    }
-    return lugar;
+    return lugarPorNombre(this.prisma, nombre);
   }
 
   // ==========================================
@@ -823,22 +815,29 @@ export class AlmacenService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const linea of dto.lineas) {
-        const entityId = this.parsearId(linea.insumoId, 'insumo o producto');
+        // Cada línea es insumo o producto, nunca los dos: el tipo lo dice el payload y no se adivina por el id
+        const tieneInsumo = linea.insumoId !== undefined && linea.insumoId !== null && linea.insumoId !== '';
+        const tieneProducto = linea.productoId !== undefined && linea.productoId !== null && linea.productoId !== '';
+        if (tieneInsumo === tieneProducto) {
+          throw new BadRequestException({
+            codigo: 'LINEA_ITEM_INVALIDA',
+            mensaje: 'Cada línea de merma lleva insumoId o productoId (uno solo)',
+          });
+        }
+        const entityId = tieneInsumo
+          ? this.parsearId(linea.insumoId!, 'insumo')
+          : this.parsearId(linea.productoId!, 'producto');
         const origenLugar = await this.obtenerLugarPorNombre(linea.origen);
         const cantDecimal = new Prisma.Decimal(linea.cantidad);
         const cantNum = Number(linea.cantidad);
 
-        // Buscar primero como Insumo, luego como Producto
-        const insumo = await tx.insumo.findUnique({ where: { id: entityId } });
-        let producto = null;
-        if (!insumo) {
-          producto = await tx.producto.findUnique({ where: { id: entityId } });
-        }
+        const insumo = tieneInsumo ? await tx.insumo.findUnique({ where: { id: entityId } }) : null;
+        const producto = tieneProducto ? await tx.producto.findUnique({ where: { id: entityId } }) : null;
 
         if (!insumo && !producto) {
           throw new NotFoundException({
             codigo: 'ITEM_NO_ENCONTRADO',
-            mensaje: `El insumo o producto con ID ${entityId.toString()} no existe`,
+            mensaje: `El ${tieneInsumo ? 'insumo' : 'producto'} con ID ${entityId.toString()} no existe`,
           });
         }
 
@@ -987,6 +986,26 @@ export class AlmacenService {
       });
     }
 
+    // Lo que nace de un documento se anula desde ese documento: aquí el documento quedaría intacto y el stock duplicado
+    if (movOriginal.compra_id) {
+      throw new BadRequestException({
+        codigo: 'MOVIMIENTO_DE_DOCUMENTO',
+        mensaje: `Este movimiento es de la compra OC-${movOriginal.compra_id.toString()}: anúlala desde Compras, no desde el movimiento`,
+      });
+    }
+    if (movOriginal.produccion_id || movOriginal.tipo.startsWith('PRODUCCION_')) {
+      throw new BadRequestException({
+        codigo: 'MOVIMIENTO_DE_DOCUMENTO',
+        mensaje: 'Este movimiento es de una producción: anúlala desde Producción, no desde el movimiento',
+      });
+    }
+    if (movOriginal.traslado_id || movOriginal.tipo.startsWith('TRASLADO_')) {
+      throw new BadRequestException({
+        codigo: 'MOVIMIENTO_DE_DOCUMENTO',
+        mensaje: 'Este movimiento es de un traslado o pedido interno: no se anula por movimiento',
+      });
+    }
+
     const movYaAnulado = await this.prisma.movimientoStock.findFirst({
       where: { movimiento_anulado_id: movId },
     });
@@ -1098,7 +1117,7 @@ export class AlmacenService {
       },
     });
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
+    const cocinaLugar = await this.obtenerLugarPorNombre(NOMBRE_COCINA);
     const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
 
     const resultado: any[] = [];
@@ -1226,7 +1245,7 @@ export class AlmacenService {
       tandasCalculadas = 1;
     }
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
+    const cocinaLugar = await this.obtenerLugarPorNombre(NOMBRE_COCINA);
 
     if (modoAlmacen) {
       if (!modoAlmacen.permitirNegativa) {
@@ -1418,7 +1437,7 @@ export class AlmacenService {
       });
     }
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
+    const cocinaLugar = await this.obtenerLugarPorNombre(NOMBRE_COCINA);
 
     await this.prisma.$transaction(async (tx) => {
       // Marca atómica: dos anulaciones a la vez no devuelven los insumos dos veces
@@ -1607,117 +1626,94 @@ export class AlmacenService {
     usuario?: UsuarioAutenticado,
     ip?: string,
   ) {
-    const hoy = dto.fecha ? new Date(dto.fecha) : new Date();
-    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
+    // Día de Lima (no UTC): un cierre de la noche no cae en el día siguiente
+    const fecha = fechaColumna(fechaLimaHoy(dto.fecha ? new Date(dto.fecha) : new Date()));
+    const cocinaLugar = await this.obtenerLugarPorNombre(NOMBRE_COCINA);
+    const por = usuario ? usuario.partyId : BigInt(1);
 
-    const resultado = await this.prisma.$transaction(async (tx) => {
-      for (const fila of dto.filas) {
-        // Producto por sabor: no se cierra por fila (su saldo está por sabor); se botan sabores con registrarMermaProducto
-        if (fila.productoId && (await tx.sabor.count({ where: { producto_id: this.parsearId(fila.productoId, 'producto'), activo: true } })) > 0) {
-          continue;
-        }
-        const cont = Number(fila.contado);
-        const bot = Number(fila.botar);
-        const sis = Number(fila.sistema);
-        const dif = Math.max(0, sis - cont);
+    let marca;
+    try {
+      marca = await this.prisma.$transaction(async (tx) => {
+        // Un cierre por día y lugar: la marca va primero. Si llegan dos envíos a la vez, el segundo espera al primero
+        // y falla aquí, antes de tocar stock: no se descuenta merma ni diferencia dos veces.
+        const cierre = await tx.cierreDia.create({
+          data: { fecha, lugar_id: cocinaLugar.id, detalle: dto.filas as any, por },
+        });
 
-        if (bot > 0) {
-          if (fila.insumoId) {
-            const insId = this.parsearId(fila.insumoId, 'insumo');
-            await tx.stock.updateMany({
-              where: { insumo_id: insId, lugar_id: cocinaLugar.id },
-              data: { cantidad: { decrement: new Prisma.Decimal(bot) } },
+        for (const fila of dto.filas) {
+          // Producto por sabor: no se cierra por fila (su saldo está por sabor); se botan sabores con registrarMermaProducto
+          if (fila.productoId && (await tx.sabor.count({ where: { producto_id: this.parsearId(fila.productoId, 'producto'), activo: true } })) > 0) {
+            continue;
+          }
+          const insId = fila.insumoId ? this.parsearId(fila.insumoId, 'insumo') : null;
+          const prodId = !insId && fila.productoId ? this.parsearId(fila.productoId, 'producto') : null;
+          if (!insId && !prodId) continue;
+
+          const cont = new Prisma.Decimal(Number(fila.contado));
+          const bot = new Prisma.Decimal(Number(fila.botar));
+          if (bot.greaterThan(cont)) {
+            throw new BadRequestException({
+              codigo: 'BOTAR_MAYOR_QUE_CONTEO',
+              mensaje: `En ${fila.nombre}: no puedes botar más de lo que contaste`,
             });
-            await tx.movimientoStock.create({
-              data: {
-                tipo: 'MERMA',
-                insumo_id: insId,
-                lugar_id: cocinaLugar.id,
-                cantidad: new Prisma.Decimal(-bot),
-                nota: `Cierre del día · Merma (${fila.destino})`,
-                por: usuario ? usuario.partyId : BigInt(1),
-              },
-            });
-          } else if (fila.productoId) {
-            const prodId = this.parsearId(fila.productoId, 'producto');
+          }
+
+          const datos = insId ? { insumo_id: insId } : { producto_id: prodId! };
+          const donde = { ...datos, lugar_id: cocinaLugar.id };
+          if (insId && typeof (tx as any).$queryRaw === 'function') await bloquearInsumo(tx, insId);
+
+          // Saldo real leído dentro de la transacción. El «sistema» que manda el cliente solo queda en el detalle.
+          const filasStock = await tx.stock.findMany({ where: donde, select: { cantidad: true } });
+          const saldo = filasStock.reduce((acc, f) => acc.plus(f.cantidad), new Prisma.Decimal(0));
+
+          if (prodId && bot.greaterThan(0)) {
             const pc = await tx.producto.findUnique({ where: { id: prodId }, select: { nombre: true, controla_stock: true } });
             if (pc?.controla_stock) throw this.mermaProductoEnApertura(pc.nombre);
-            await tx.stock.updateMany({
-              where: { producto_id: prodId, lugar_id: cocinaLugar.id },
-              data: { cantidad: { decrement: new Prisma.Decimal(bot) } },
-            });
+          }
+
+          if (bot.greaterThan(0)) {
             await tx.movimientoStock.create({
               data: {
                 tipo: 'MERMA',
-                producto_id: prodId,
+                ...datos,
                 lugar_id: cocinaLugar.id,
-                cantidad: new Prisma.Decimal(-bot),
+                cantidad: bot.negated(),
                 nota: `Cierre del día · Merma (${fila.destino})`,
-                por: usuario ? usuario.partyId : BigInt(1),
+                por,
               },
             });
           }
-        }
 
-        if (dif > 0) {
-          if (fila.insumoId) {
-            const insId = this.parsearId(fila.insumoId, 'insumo');
-            await tx.stock.updateMany({
-              where: { insumo_id: insId, lugar_id: cocinaLugar.id },
-              data: { cantidad: { decrement: new Prisma.Decimal(dif) } },
-            });
+          // Diferencia = saldo real menos contado. Si sobra en el sistema baja; si se contó más, sube (sobrante auditado).
+          const dif = saldo.minus(cont);
+          if (!dif.isZero()) {
             await tx.movimientoStock.create({
-              data: {
-                tipo: 'DIFERENCIA_CONTEO',
-                insumo_id: insId,
-                lugar_id: cocinaLugar.id,
-                cantidad: new Prisma.Decimal(-dif),
-                nota: `Cierre del día · Diferencia de conteo`,
-                por: usuario ? usuario.partyId : BigInt(1),
-              },
-            });
-          } else if (fila.productoId) {
-            const prodId = this.parsearId(fila.productoId, 'producto');
-            await tx.stock.updateMany({
-              where: { producto_id: prodId, lugar_id: cocinaLugar.id },
-              data: { cantidad: { decrement: new Prisma.Decimal(dif) } },
-            });
-            await tx.movimientoStock.create({
-              data: {
-                tipo: 'DIFERENCIA_CONTEO',
-                producto_id: prodId,
-                lugar_id: cocinaLugar.id,
-                cantidad: new Prisma.Decimal(-dif),
-                nota: `Cierre del día · Diferencia de conteo`,
-                por: usuario ? usuario.partyId : BigInt(1),
-              },
+              data: dif.greaterThan(0)
+                ? { tipo: 'DIFERENCIA_CONTEO', ...datos, lugar_id: cocinaLugar.id, cantidad: dif.negated(), nota: 'Cierre del día · Diferencia de conteo', por }
+                : { tipo: 'AJUSTE', ...datos, lugar_id: cocinaLugar.id, cantidad: dif.negated(), nota: `Cierre del día · Sobrante de conteo (contado ${cont.toString()}, sistema ${saldo.toString()})`, por },
             });
           }
-        }
-      }
 
-      const cierre = await tx.cierreDia.upsert({
-        where: {
-          fecha_lugar_id: {
-            fecha: hoy,
-            lugar_id: cocinaLugar.id,
-          },
-        },
-        update: {
-          detalle: dto.filas as any,
-          por: usuario ? usuario.partyId : BigInt(1),
-          en: new Date(),
-        },
-        create: {
-          fecha: hoy,
-          lugar_id: cocinaLugar.id,
-          detalle: dto.filas as any,
-          por: usuario ? usuario.partyId : BigInt(1),
-        },
+          // Deja el saldo en lo contado menos lo botado; crea la fila si el insumo o producto no tenía ninguna en el lugar
+          const delta = cont.minus(bot).minus(saldo);
+          if (!delta.isZero()) {
+            const r = await tx.stock.updateMany({ where: donde, data: { cantidad: { increment: delta } } });
+            if (r.count === 0) await tx.stock.create({ data: { ...datos, lugar_id: cocinaLugar.id, cantidad: delta } });
+          }
+        }
+
+        return cierre;
       });
-
-      return cierre;
-    });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException({
+          codigo: 'CIERRE_YA_REGISTRADO',
+          mensaje: 'El cierre de este día ya se registró: no se vuelve a descontar merma ni diferencia',
+        });
+      }
+      throw err;
+    }
+    const resultado = marca;
 
     if (usuario) {
       await this.auditoria.registrar({
@@ -1859,7 +1855,7 @@ export class AlmacenService {
     }
 
     const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
-    const destinoLugar = await this.obtenerLugarPorNombre(ped.area?.nombre || 'Salados');
+    const destinoLugar = await this.obtenerLugarPorNombre(ped.area?.nombre || NOMBRE_COCINA);
     const ahora = new Date();
 
     const detalleObj: any = ped.detalle;
@@ -1872,6 +1868,19 @@ export class AlmacenService {
     const trasladosCreados: bigint[] = [];
 
     await this.prisma.$transaction(async (tx) => {
+      // Transición condicional antes de mover stock: si otra entrega llegó primero, esta no descuenta nada
+      const paso = await tx.pedidoInterno.updateMany({
+        where: { id: pedId, estado: ped.estado },
+        data: { estado: 'ENTREGADO', entregado_por: usuario ? usuario.partyId : BigInt(1), entregado_en: ahora },
+      });
+      if (paso.count === 0) {
+        const actual = await tx.pedidoInterno.findUnique({ where: { id: pedId }, select: { estado: true } });
+        if (actual?.estado === 'ENTREGADO') {
+          throw new ConflictException({ codigo: 'PEDIDO_INTERNO_YA_ENTREGADO', mensaje: 'El pedido interno ya fue entregado' });
+        }
+        throw new ConflictException({ codigo: 'PEDIDO_INTERNO_CAMBIO_CONCURRENTE', mensaje: 'El pedido cambió de estado mientras se entregaba: recárgalo' });
+      }
+
       for (const item of items) {
         const cantNum = Number(item.cantidad);
         if (isNaN(cantNum) || cantNum <= 0) continue;
@@ -1943,15 +1952,6 @@ export class AlmacenService {
           trasladosCreados.push(traslado.id);
         }
       }
-
-      await tx.pedidoInterno.update({
-        where: { id: pedId },
-        data: {
-          estado: 'ENTREGADO',
-          entregado_por: usuario ? usuario.partyId : BigInt(1),
-          entregado_en: ahora,
-        },
-      });
     });
 
     if (usuario) {
@@ -2031,6 +2031,24 @@ export class AlmacenService {
     const diferenciaNum = enviadoNum - recibidoNum;
 
     await this.prisma.$transaction(async (tx) => {
+      // Transición condicional antes de mover stock: una recepción doble no suma dos veces
+      const paso = await tx.traslado.updateMany({
+        where: { id: trasladoId, estado: traslado.estado },
+        data: {
+          estado: 'RECIBIDO',
+          recibido: new Prisma.Decimal(recibidoNum),
+          diferencia: new Prisma.Decimal(diferenciaNum),
+          recibido_por: usuario ? usuario.partyId : BigInt(1),
+          recibido_en: new Date(),
+        },
+      });
+      if (paso.count === 0) {
+        throw new BadRequestException({
+          codigo: 'TRASLADO_YA_RECIBIDO',
+          mensaje: 'El traslado ya fue recibido anteriormente',
+        });
+      }
+
       const stockDestino = await tx.stock.findFirst({
         where: {
           insumo_id: traslado.insumo_id,
@@ -2062,17 +2080,6 @@ export class AlmacenService {
           traslado_id: trasladoId,
           nota: `Recepción traslado TR-${trasladoId.toString()}${diferenciaNum !== 0 ? ` (dif: ${diferenciaNum})` : ''}`,
           por: usuario ? usuario.partyId : BigInt(1),
-        },
-      });
-
-      await tx.traslado.update({
-        where: { id: trasladoId },
-        data: {
-          estado: 'RECIBIDO',
-          recibido: new Prisma.Decimal(recibidoNum),
-          diferencia: new Prisma.Decimal(diferenciaNum),
-          recibido_por: usuario ? usuario.partyId : BigInt(1),
-          recibido_en: new Date(),
         },
       });
     });

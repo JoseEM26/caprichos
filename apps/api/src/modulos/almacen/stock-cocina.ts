@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { NOMBRE_COCINA, NOMBRE_COCINA_ANTIGUO, esNombreCocina } from '../stock/nombre-cocina';
 
 /**
  * Operaciones atómicas de stock de insumos usadas por el consumo por receta, las tandas, los pendientes de Almacén y
@@ -6,7 +7,7 @@ import { Prisma } from '@prisma/client';
  */
 export type Tx = Prisma.TransactionClient;
 
-export const NOMBRE_COCINA = 'Salados';
+export { NOMBRE_COCINA } from '../stock/nombre-cocina';
 export const NOMBRE_ALMACEN = 'Almacén central';
 const NS_LOCK = 74201;
 export const redondear3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -22,15 +23,15 @@ export async function bloquearInsumo(tx: Tx, insumoId: bigint): Promise<void> {
 
 /**
  * «La Cocina» de consumo: un ÚNICO lugar de stock para el consumo por recetas, las tandas, los pendientes y el recuento.
- * Regla: el lugar llamado «Cocina» si existe; si no, «Salados» (el lugar de cocina que el sistema ya usaba); si no hay
- * ninguno, se crea «Cocina». No importa cuántos lugares por área existan: aquí nunca se reparte por área.
+ * Regla: el lugar llamado «Cocina» si existe; si no, «Salados» (nombre antiguo, para bases que aún no lo renombraron); si
+ * no hay ninguno, se crea «Cocina». No importa cuántos lugares por área existan: aquí nunca se reparte por área.
  */
 export async function lugarCocina(db: any) {
-  for (const nombre of ['Cocina', NOMBRE_COCINA]) {
+  for (const nombre of [NOMBRE_COCINA, NOMBRE_COCINA_ANTIGUO]) {
     const l = await db.lugarStock.findUnique({ where: { nombre } });
     if (l) return l;
   }
-  return db.lugarStock.create({ data: { nombre: 'Cocina', tipo: 'AREA' } });
+  return db.lugarStock.create({ data: { nombre: NOMBRE_COCINA, tipo: 'AREA' } });
 }
 
 /**
@@ -45,6 +46,7 @@ export function consumoRealConMerma(neta: number, mermaPct: number | string | { 
 
 /** Lugar por nombre; si no existe lo crea (como hace el resto de Almacén). */
 export async function lugarPorNombre(tx: Tx, nombre: string) {
+  if (esNombreCocina(nombre)) return lugarCocina(tx);
   const l = await tx.lugarStock.findUnique({ where: { nombre } });
   if (l) return l;
   return tx.lugarStock.create({ data: { nombre, tipo: nombre === NOMBRE_ALMACEN ? 'ALMACEN' : 'AREA' } });

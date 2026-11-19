@@ -2,8 +2,12 @@ import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class LineaMermaDto {
-  @IsNotEmpty({ message: 'El ID del insumo o producto es obligatorio' })
-  insumoId!: string | number;
+  /** Insumo de la línea. Un producto va en productoId (exactamente uno de los dos). */
+  @IsOptional()
+  insumoId?: string | number;
+
+  @IsOptional()
+  productoId?: string | number;
 
   /** Producto por sabor: sabor al que se descuenta la merma (obligatorio en esos productos). */
   @IsOptional()

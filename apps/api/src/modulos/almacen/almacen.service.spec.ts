@@ -61,7 +61,7 @@ describe('AlmacenService', () => {
           return { id: 10n, nombre: 'Almacén Principal' };
         }),
         findUnique: jest.fn().mockImplementation(async (args: any) => {
-          if (args?.where?.nombre && /salados/i.test(args.where.nombre)) {
+          if (args?.where?.nombre && /salados|cocina/i.test(args.where.nombre)) {
             return { id: 11n, nombre: 'Salados' };
           }
           if (args?.where?.id === 11n) {
@@ -95,6 +95,7 @@ describe('AlmacenService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       cierreDia: {
         create: jest.fn(),
@@ -715,13 +716,13 @@ describe('AlmacenService', () => {
       prisma.stock.findFirst.mockResolvedValue(null);
       prisma.stockSabor.update = jest.fn().mockResolvedValue({});
       await expect(
-        service.mermaMultiple({ lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho' }] } as any, mockUsuario),
+        service.mermaMultiple({ lineas: [{ productoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho' }] } as any, mockUsuario),
       ).rejects.toMatchObject({ response: { codigo: 'SABOR_REQUERIDO' } });
 
       // La merma de productos ya no sale de aquí: se registra en Apertura del día
       await expect(
         service.mermaMultiple(
-          { lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho', saborId: 11 }] } as any,
+          { lineas: [{ productoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho', saborId: 11 }] } as any,
           mockUsuario,
         ),
       ).rejects.toMatchObject({ response: { codigo: 'MERMA_PRODUCTO_EN_APERTURA', enlace: '/admin/apertura' } });
@@ -825,7 +826,7 @@ describe('AlmacenService', () => {
       prisma.producto.findUnique.mockResolvedValue({ id: 50n, nombre: 'Galletas de Avena' });
       prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
       await expect(
-        service.mermaMultiple({ lineas: [{ insumoId: 50, cantidad: 4, origen: 'Salados', destino: 'Personal' }] }, mockUsuario),
+        service.mermaMultiple({ lineas: [{ productoId: 50, cantidad: 4, origen: 'Salados', destino: 'Personal' }] }, mockUsuario),
       ).rejects.toMatchObject({
         response: { codigo: 'MERMA_PRODUCTO_EN_APERTURA', mensaje: expect.stringContaining('Apertura del día') },
       });

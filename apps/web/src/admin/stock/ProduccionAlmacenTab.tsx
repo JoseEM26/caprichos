@@ -3,9 +3,9 @@ import { InsumoItem, LugarStockItem } from './tipos';
 import { stockApi } from './stockApi';
 import { ModalMovimiento } from './ModalMovimiento';
 import { ModalRegistrarProduccion } from '../almacen/ModalRegistrarProduccion';
+import { ModalCerrarDia } from '../almacen/ModalCerrarDia';
 import { ExistenciasTab } from './ExistenciasTab';
 import { MovimientosTab } from './MovimientosTab';
-import { Confirmar } from '../../comun/Confirmar';
 
 interface ProduccionAlmacenTabProps {
   insumos: InsumoItem[];
@@ -27,10 +27,8 @@ export function ProduccionAlmacenTab({
     'SALIDA' | 'MERMA' | 'DEVOLUCION' | 'TRASLADO' | 'AJUSTE'
   >('SALIDA');
 
-  // Modal para cerrar el día (sobrantes a merma)
-  const [confirmarCierreDia, setConfirmarCierreDia] = useState(false);
-  const [cerrandoDia, setCerrandoDia] = useState(false);
-  const [mensajeCierre, setMensajeCierre] = useState('');
+  // Cierre del día: el mismo flujo con conteo de almacén (cierre-dia)
+  const [modalCierreAbierto, setModalCierreAbierto] = useState(false);
 
   // Pedidos de cocina y barra al almacén (requisiciones/solicitudes)
   const [pedidosPendientes, setPedidosPendientes] = useState<any[]>([]);
@@ -56,30 +54,6 @@ export function ProduccionAlmacenTab({
     await stockApi.registrarMovimiento(datos);
     if (onActualizar) {
       onActualizar();
-    }
-  };
-
-  const handleCerrarDia = async () => {
-    setCerrandoDia(true);
-    try {
-      // Buscar insumos perecibles o con stock sobrante en cocina/barra para registrar merma de cierre
-      const insumosPerecibles = insumos.filter(
-        (i) =>
-          i.nombre.toLowerCase().includes('dona') ||
-          i.nombre.toLowerCase().includes('leche') ||
-          i.nombre.toLowerCase().includes('crema'),
-      );
-
-      if (insumosPerecibles.length === 0) {
-        setMensajeCierre('No se detectaron productos perecibles para enviar a merma.');
-      } else {
-        setMensajeCierre('Día cerrado: los productos perecibles del día fueron registrados en merma.');
-      }
-      setConfirmarCierreDia(false);
-    } catch (err: any) {
-      alert(err.message || 'Error al cerrar el día');
-    } finally {
-      setCerrandoDia(false);
     }
   };
 
@@ -242,7 +216,7 @@ export function ProduccionAlmacenTab({
               </button>
               <button
                 type="button"
-                onClick={() => setConfirmarCierreDia(true)}
+                onClick={() => setModalCierreAbierto(true)}
                 style={{
                   minHeight: '44px',
                   padding: '0 16px',
@@ -261,23 +235,6 @@ export function ProduccionAlmacenTab({
           </div>
         </div>
       </div>
-
-      {mensajeCierre && (
-        <div
-          role="status"
-          style={{
-            background: '#e6f5ea',
-            border: '1px solid #9bd3ab',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: 'var(--cp-ok)',
-          }}
-        >
-          {mensajeCierre}
-        </div>
-      )}
 
       {/* Bloque: Pedidos de cocina y barra al almacén (líneas 1126-1128 del mockup) */}
       <div
@@ -365,18 +322,14 @@ export function ProduccionAlmacenTab({
         />
       )}
 
-      {/* Confirmación para Cerrar el día */}
-      {confirmarCierreDia && (
-        <Confirmar
-          abierto={confirmarCierreDia}
-          titulo="¿Cerrar el día y registrar sobrantes en merma?"
-          mensaje="Los productos perecibles abiertos o elaborados en la jornada pasarán a registrarse como merma de cierre conforme a la política del local."
-          textoConfirmar="Sí, cerrar el día"
-          textoNo="Cancelar"
-          peligro={true}
-          cargando={cerrandoDia}
-          alConfirmar={handleCerrarDia}
-          alCancelar={() => setConfirmarCierreDia(false)}
+      {/* Cierre del día con conteo (cierre-dia): registra merma y diferencias contra el saldo real */}
+      {modalCierreAbierto && (
+        <ModalCerrarDia
+          abierto={modalCierreAbierto}
+          alCerrar={() => setModalCierreAbierto(false)}
+          alGuardar={() => {
+            if (onActualizar) onActualizar();
+          }}
         />
       )}
     </div>

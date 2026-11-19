@@ -19,7 +19,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
   const [insumoId, setInsumoId] = useState('');
   const [cantidad, setCantidad] = useState('');
   const [origen, setOrigen] = useState('Almacén central');
-  const [destino, setDestino] = useState('Salados');
+  const [destino, setDestino] = useState('Cocina');
   const [motivo, setMotivo] = useState('');
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -32,7 +32,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
       setInsumoId(insumos[0]?.id || '');
       setCantidad('');
       setOrigen('Almacén central');
-      setDestino('Salados');
+      setDestino('Cocina');
       setMotivo('');
       setErrorMsg('');
       setBusquedaInsumo('');
@@ -45,12 +45,12 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
     setTipo(t);
     if (t === 'SALIDA') {
       setOrigen('Almacén central');
-      setDestino('Salados');
+      setDestino('Cocina');
     } else if (t === 'MERMA') {
       setOrigen('Almacén central');
       setDestino('Merma');
     } else if (t === 'DEVOLUCION') {
-      setOrigen('Salados');
+      setOrigen('Cocina');
       setDestino('Almacén central');
     }
   };
@@ -319,7 +319,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
               </label>
               <input
                 type="text"
-                placeholder="Ej. Almacén central, Salados..."
+                placeholder="Ej. Almacén central, Cocina..."
                 value={origen}
                 onChange={(e) => setOrigen(e.target.value)}
                 style={{
@@ -340,7 +340,7 @@ export const ModalRegistrarMovimiento: React.FC<ModalRegistrarMovimientoProps> =
               </label>
               <input
                 type="text"
-                placeholder="Ej. Salados, Bebidas, Merma..."
+                placeholder="Ej. Cocina, Bebidas, Merma..."
                 value={destino}
                 onChange={(e) => setDestino(e.target.value)}
                 style={{
