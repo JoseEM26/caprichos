@@ -75,7 +75,7 @@ function Selector({ categorias, productos, cats, prods, onCambio, etiqueta }: {
             <li key={`c${c.id}`}>
               <button type="button" role="checkbox" aria-checked={on} aria-label={`${c.nombre} — todos`} className={`epc-producto epc-cat${on ? ' on' : ''}`} onClick={() => alternarCat(c.id)}>
                 <span className="epc-sinfoto" aria-hidden="true">📁</span>
-                <span>{on ? '✓ ' : ''}{c.nombre} — todos</span>
+                <span>{on ? '✓ ' : ''}{c.nombre} — todos{c.oculta && <em className="epc-oculto"> · oculta en la carta</em>}</span>
               </button>
             </li>
           );
@@ -86,7 +86,7 @@ function Selector({ categorias, productos, cats, prods, onCambio, etiqueta }: {
             <li key={`p${p.id}`}>
               <button type="button" role="checkbox" aria-checked={on} aria-label={p.nombre} className={`epc-producto${on ? ' on' : ''}`} onClick={() => alternarProd(p.id)}>
                 {p.fotoUrl ? <img src={p.fotoUrl} alt="" /> : <span className="epc-sinfoto" aria-hidden="true">🍽</span>}
-                <span>{on ? '✓ ' : ''}{p.nombre}</span>
+                <span>{on ? '✓ ' : ''}{p.nombre}{p.oculto && <em className="epc-oculto"> · oculto en la carta</em>}</span>
               </button>
             </li>
           );
@@ -160,7 +160,7 @@ function ListaProductos({ productos, marcados, onCambio, unico, etiqueta, vacio 
                   onClick={() => onCambio(unico ? [p.id] : on ? marcados.filter((x) => x !== p.id) : [...marcados, p.id])}
                 >
                   {p.fotoUrl ? <img src={p.fotoUrl} alt="" /> : <span className="epc-sinfoto" aria-hidden="true">🍽</span>}
-                  <span>{on ? '✓ ' : ''}{p.nombre}</span>
+                  <span>{on ? '✓ ' : ''}{p.nombre}{p.oculto && <em className="epc-oculto"> · oculto en la carta</em>}</span>
                 </button>
               </li>
             );

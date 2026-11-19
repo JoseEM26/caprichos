@@ -100,6 +100,16 @@ export class CartaController {
 export class CatalogoController {
   constructor(private readonly catalogoService: CatalogoService) {}
 
+  /**
+   * Carta completa para el panel de ofertas: incluye las categorías y los productos ocultos (con su marca), para armar
+   * combos con piezas que el cliente no pide sueltas (juguetes). La ruta pública /carta nunca los trae.
+   */
+  @Get('carta-completa')
+  @Permiso('ofertas', 'ver')
+  async cartaCompleta() {
+    return this.catalogoService.obtenerCarta(undefined, { incluirOcultos: true });
+  }
+
   // --- Productos ---
 
   @Get('productos')

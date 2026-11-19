@@ -136,6 +136,26 @@ describe('CatalogoService', () => {
       expect(carta[0].productos[0].grupos.map((g) => g.nombre)).toEqual(['G1']);
     });
 
+    it('con incluirOcultos (solo panel) trae lo oculto marcado; sin él, la carta pública lo filtra en la consulta', async () => {
+      const prod = (id: number, oculto: boolean) => ({
+        id: BigInt(id), nombre: `P${id}`, descripcion: null, precio: 5, oculto,
+        agotado_hasta: null, no_suma_beneficios: false, foto_archivo: null,
+        tamanos: [], sabores: [], grupos: [],
+      });
+      prisma.categoria.findMany.mockResolvedValue([
+        { id: BigInt(9), nombre: 'Juguetes', orden: 9, oculta: true, productos: [prod(90, true), prod(91, false)] },
+      ]);
+      const completa = await service.obtenerCarta(undefined, { incluirOcultos: true });
+      expect(prisma.categoria.findMany.mock.calls[0][0].where).toEqual({});
+      expect(prisma.categoria.findMany.mock.calls[0][0].include.productos.where).toEqual({});
+      expect(completa[0].oculta).toBe(true);
+      expect(completa[0].productos.map((p) => p.oculto)).toEqual([true, false]);
+
+      await service.obtenerCarta();
+      expect(prisma.categoria.findMany.mock.calls[1][0].where).toEqual({ oculta: false });
+      expect(prisma.categoria.findMany.mock.calls[1][0].include.productos.where).toEqual({ oculto: false });
+    });
+
     it('debe omitir categorías ocultas y productos ocultos en GET /carta', async () => {
       prisma.categoria.findMany.mockResolvedValue([
         {

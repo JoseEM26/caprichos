@@ -80,3 +80,5 @@
 .epc-reemplazo { border-top: 1px dashed var(--cp-line, #E3D6C6); padding-top: 4px; }
 .epc-reemplazo > summary { color: var(--cp-soft, #6B7A86); }
 .epc-vacio p { margin: 0 0 10px; }
+
+.epc-oculto { font-style: normal; font-weight: 600; font-size: 11px; color: var(--cp-soft, #6B6B6B); }

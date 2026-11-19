@@ -59,6 +59,8 @@ export interface ProductoCarta {
   /** Alérgenos que contiene; solo se muestran/afirman si alergenosConfirmados. */
   alergenos: string[];
   alergenosConfirmados: boolean;
+  /** Solo en la carta del panel (incluirOcultos): el producto está oculto para el cliente. */
+  oculto?: boolean;
 }
 
 export interface CategoriaCarta {
@@ -66,4 +68,6 @@ export interface CategoriaCarta {
   nombre: string;
   orden: number;
   productos: ProductoCarta[];
+  /** Solo en la carta del panel (incluirOcultos): la categoría está oculta para el cliente. */
+  oculta?: boolean;
 }

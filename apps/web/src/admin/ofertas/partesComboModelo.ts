@@ -16,10 +16,14 @@ export interface ProductoEditor {
   fotoUrl?: string | null;
   sabores?: Array<{ id: string; nombre: string }>;
   tamanos?: Array<{ id: string; nombre: string; precio?: number; valorId?: string }>;
+  /** Oculto para el cliente en la carta: solo se ofrece dentro de un combo (juguetes, regalos). */
+  oculto?: boolean;
 }
 export interface CategoriaEditor {
   id: string;
   nombre: string;
+  /** Categoría oculta para el cliente en la carta. */
+  oculta?: boolean;
 }
 export type Parte = ComboParteItem;
 

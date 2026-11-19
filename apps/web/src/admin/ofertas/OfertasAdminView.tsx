@@ -367,7 +367,7 @@ export function OfertasAdminView() {
   const [reglasOriginales, setReglasOriginales] = useState<ReglasAcumulacionItem | null>(null);
 
   // Catálogo para autocompletar y partes
-  const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string; productos: any[] }>>([]);
+  const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string; productos: any[]; oculta?: boolean }>>([]);
   const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean; fotoUrl?: string | null; sabores?: Array<{ id: string; nombre: string }>; tamanos?: Array<{ id: string; nombre: string; precio?: number; valorId?: string }> }>>([]);
   const [, setCargando] = useState(false);
 
@@ -442,12 +442,13 @@ export function OfertasAdminView() {
 
       // Cargar categorías y productos del catálogo
       try {
-        const catRes = await api.get<any[]>('/carta');
+        // Carta completa del panel: incluye lo oculto (juguetes, regalos) para poder armar combos con ello; sin permiso, la pública
+        const catRes = await api.get<any[]>('/admin/catalogo/carta-completa').catch(() => api.get<any[]>('/carta'));
         if (Array.isArray(catRes)) {
           const prods: any[] = [];
-          const cats: Array<{ id: string; nombre: string; productos: any[] }> = [];
+          const cats: Array<{ id: string; nombre: string; productos: any[]; oculta?: boolean }> = [];
           catRes.forEach((c) => {
-            cats.push({ id: String(c.id), nombre: c.nombre, productos: c.productos || [] });
+            cats.push({ id: String(c.id), nombre: c.nombre, productos: c.productos || [], ...(c.oculta ? { oculta: true } : {}) });
             (c.productos || []).forEach((p: any) => {
               prods.push({
                 id: String(p.id),
@@ -457,6 +458,7 @@ export function OfertasAdminView() {
                 precio: p.precio,
                 noSumaBeneficios: Boolean(p.noSumaBeneficios),
                 fotoUrl: p.fotoUrl ?? null,
+                ...(p.oculto || c.oculta ? { oculto: true } : {}),
                 sabores: (p.sabores || []).map((x: any) => ({ id: String(x.id), nombre: x.nombre })),
                 tamanos: (p.tamanos || []).map((t: any) => ({ id: String(t.id), nombre: t.nombre, precio: t.precio, valorId: t.tamanoValorId ? String(t.tamanoValorId) : undefined })),
               });

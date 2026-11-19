@@ -241,13 +241,19 @@ export class CatalogoService implements OnApplicationBootstrap {
     return valor;
   }
 
-  async obtenerCarta(q?: string): Promise<CategoriaCarta[]> {
+  /**
+   * Carta pública. Con `incluirOcultos` (solo para el panel, nunca en la ruta pública) también trae las categorías y los
+   * productos ocultos, marcados con `oculta` / `oculto`: el editor de combos los necesita para elegir piezas que el
+   * cliente no debe pedir sueltas (juguetes, regalos).
+   */
+  async obtenerCarta(q?: string, opciones: { incluirOcultos?: boolean } = {}): Promise<CategoriaCarta[]> {
+    const incluirOcultos = opciones.incluirOcultos === true;
     const categorias = await this.prisma.categoria.findMany({
-      where: { oculta: false },
+      where: incluirOcultos ? {} : { oculta: false },
       orderBy: { orden: 'asc' },
       include: {
         productos: {
-          where: { oculto: false },
+          where: incluirOcultos ? {} : { oculto: false },
           orderBy: { orden: 'asc' },
           include: {
             foto_archivo: true,
@@ -417,6 +423,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           porciones: p.porciones ?? null,
           alergenos: p.alergenos ?? [],
           alergenosConfirmados: p.alergenos_confirmados ?? false,
+          ...(incluirOcultos ? { oculto: p.oculto } : {}),
         });
       }
 
@@ -430,6 +437,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         nombre: cat.nombre,
         orden: cat.orden,
         productos: productosCarta,
+        ...(incluirOcultos ? { oculta: cat.oculta } : {}),
       });
     }
 

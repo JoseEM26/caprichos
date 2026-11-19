@@ -43,7 +43,7 @@ interface ModalComboProps {
   onGuardar: (datos: any) => Promise<void>;
   productosDisponibles?: ProductoEditor[];
   categoriasDisponibles?: string[];
-  categorias?: Array<{ id: string; nombre: string; productos?: any[] }>;
+  categorias?: Array<{ id: string; nombre: string; productos?: any[]; oculta?: boolean }>;
 }
 
 type ProductoPrecio = { id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number };
@@ -144,7 +144,7 @@ export function ModalCombo({
   // Categorías reales disponibles normalizadas
   const listaCategorias = useMemo(() => {
     if (categorias && categorias.length > 0) {
-      return categorias.map((c) => ({ id: String(c.id), nombre: c.nombre }));
+      return categorias.map((c) => ({ id: String(c.id), nombre: c.nombre, ...(c.oculta ? { oculta: true } : {}) }));
     }
     if (categoriasDisponibles && categoriasDisponibles.length > 0) {
       return categoriasDisponibles.map((c, i) => ({ id: String(i + 1), nombre: c }));
