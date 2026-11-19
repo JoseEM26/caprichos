@@ -120,6 +120,49 @@ export function insumosDeLinea(
   return resultado;
 }
 
+/**
+ * Recetas aplicables a un sabor: la de (producto, tamaño, SABOR) si existe; si no, la general (sabor vacío) del mismo tamaño.
+ * Devuelve la lista por tamaño que espera `insumosDeLinea`.
+ */
+export function recetasDelSabor(recetas: any[], saborId: bigint | string | number | null): any[] {
+  const generales = recetas.filter((r) => r.sabor_id == null);
+  if (saborId == null) return generales;
+  const porTamano = new Map<string, any>(generales.map((r) => [String(r.tamano_valor_id ?? 'null'), r]));
+  for (const r of recetas) if (String(r.sabor_id) === String(saborId) && r.lineas?.length) porTamano.set(String(r.tamano_valor_id ?? 'null'), r);
+  return [...porTamano.values()];
+}
+
+/** Parte de una línea que va a un sabor: `peso` es lo que se llevó ese sabor (unidades). */
+export interface ParteSaborVenta {
+  saborId: bigint | string | number | null;
+  peso: number;
+}
+
+/**
+ * Insumos (en unidad de receta) que consume una venta de `cantidad` de un producto. Con sabores, cada sabor aporta su
+ * parte (`peso` / total) y usa SU receta (o la general como respaldo, ver `recetasDelSabor`); sin sabores, la general.
+ * Así una receta por sabor reemplaza a la general y no se descuenta doble.
+ */
+export function insumosDeVentaLinea(
+  recetas: any[],
+  ajustes: AjusteOpcionEntrada[] | null | undefined,
+  tamanoId: bigint | string | number | null | undefined,
+  opcionesIds: Array<bigint | string | number> | null | undefined,
+  cantidad: number,
+  sabores: ParteSaborVenta[] = [],
+): InsumoCalculado[] {
+  const conPeso = sabores.filter((s) => s.peso > 0);
+  const total = conPeso.reduce((a, s) => a + s.peso, 0);
+  const partes = total > 0 ? conPeso.map((s) => ({ saborId: s.saborId, parte: s.peso / total })) : [{ saborId: null, parte: 1 }];
+  const neto = new Map<string, number>();
+  for (const p of partes) {
+    for (const c of insumosDeLinea(recetasDelSabor(recetas, p.saborId), ajustes, tamanoId, opcionesIds, cantidad * p.parte)) {
+      neto.set(c.insumoId, (neto.get(c.insumoId) ?? 0) + c.cantidad);
+    }
+  }
+  return [...neto.entries()].map(([insumoId, cant]) => ({ insumoId, cantidad: Math.round(cant * 1000) / 1000 })).filter((c) => c.cantidad > 0);
+}
+
 export type SemaforoColor = 'rojo' | 'naranja' | 'verde';
 export type EstadoInsumoTexto = 'Agotado' | 'Poco' | 'Por acabarse' | 'Bien' | 'Lleno';
 

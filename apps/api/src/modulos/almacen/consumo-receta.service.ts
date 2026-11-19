@@ -17,17 +17,9 @@ import {
 const ESTADOS_ANULADOS = ['ANULADO', 'RECHAZADO'];
 const BOT = BigInt(1);
 
-/**
- * Recetas aplicables a un sabor: la de (producto, tamaño, SABOR) si existe; si no, la general (sabor vacío) del mismo tamaño.
- * Devuelve la lista por tamaño que espera `insumosDeLinea`.
- */
-export function recetasDelSabor(recetas: any[], saborId: bigint | null): any[] {
-  const generales = recetas.filter((r) => r.sabor_id == null);
-  if (saborId == null) return generales;
-  const porTamano = new Map<string, any>(generales.map((r) => [String(r.tamano_valor_id ?? 'null'), r]));
-  for (const r of recetas) if (r.sabor_id === saborId && r.lineas?.length) porTamano.set(String(r.tamano_valor_id ?? 'null'), r);
-  return [...porTamano.values()];
-}
+// La regla de receta por sabor vive en stock/receta.util (la usa también el cobro); se reexporta por compatibilidad.
+import { recetasDelSabor } from '../stock/receta.util';
+export { recetasDelSabor };
 
 export interface FaltanteTanda {
   insumo: string;

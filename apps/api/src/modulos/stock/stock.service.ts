@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
   forwardRef,
@@ -15,7 +16,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { MovimientoManualDto } from './dto/movimiento-manual.dto';
 import { MovimientosQueryDto } from './dto/movimientos-query.dto';
-import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
+import { convertirAUnidadAlmacen, insumosDeVentaLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { almacenConsumirAlPreparar, controlAlmacenActivo } from './control-almacen';
@@ -23,6 +24,8 @@ import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoProducto, saldoSabor, sinc
 
 @Injectable()
 export class StockService {
+  private readonly logger = new Logger(StockService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
@@ -616,6 +619,7 @@ export class StockService {
         lineas: {
           include: {
             opcionesElegidas: true,
+            sabores: true,
           },
         },
       },
@@ -687,12 +691,12 @@ export class StockService {
       for (const linea of pedido.lineas) {
         if (!linea.producto_id) continue;
 
-        // Buscar recetas del producto (producción unitaria / al momento)
+        // Buscar recetas del producto (producción unitaria / al momento): generales y por sabor (el reparto por sabor
+        // se resuelve al calcular, con insumosDeVentaLinea)
         const recetas = await db.receta.findMany({
           where: {
             producto_id: linea.producto_id,
             es_produccion: false,
-            sabor_id: null,
           },
           include: {
             lineas: {
@@ -817,13 +821,16 @@ export class StockService {
           });
         }
 
-        // Calcular insumos requeridos
-        const insumosCalculados = insumosDeLinea(
+        // Calcular insumos requeridos: cada sabor de la línea usa su receta (o la general) y no se cuenta doble.
+        // Pendiente de decisión: al cobrar no se aplica la merma del insumo (÷(1 − merma_pct)) que sí aplica «al preparar»
+        // (consumo-receta.service.ts insumosDeLaLinea). Unificarlo cambia las cantidades descontadas en vivo.
+        const insumosCalculados = insumosDeVentaLinea(
           recetas,
           ajustes,
           tamanoValorId,
           opcionesIds,
           linea.cantidad,
+          (linea.sabores ?? []).map((s: any) => ({ saborId: s.sabor_id ?? null, peso: Number(s.cantidad) || 0 })),
         );
 
         for (const item of insumosCalculados) {
@@ -856,26 +863,7 @@ export class StockService {
           const cantDecimal = new Prisma.Decimal(cantidadEnAlmacen).toDecimalPlaces(3);
 
           // Actualizar stock de forma atómica (permite negativo: se deja vender)
-          let st = await db.stock.findFirst({
-            where: { insumo_id: insumoIdBig, lugar_id: lugarIdADescontar },
-          });
-
-          if (!st) {
-            st = await db.stock.create({
-              data: {
-                insumo_id: insumoIdBig,
-                lugar_id: lugarIdADescontar,
-                cantidad: cantDecimal.negated(),
-              },
-            });
-          } else {
-            st = await db.stock.update({
-              where: { id: st.id },
-              data: {
-                cantidad: { decrement: cantDecimal },
-              },
-            });
-          }
+          const nuevoSaldo = await this.restarStockInsumo(db, insumoIdBig, lugarIdADescontar, cantDecimal);
 
           // Registrar movimiento VENTA
           await db.movimientoStock.create({
@@ -890,7 +878,6 @@ export class StockService {
             },
           });
 
-          const nuevoSaldo = Number(st.cantidad);
           insumosModificados.add(insumoIdBig.toString());
 
           if (nuevoSaldo <= 0) {
@@ -918,25 +905,7 @@ export class StockService {
       }
 
       const ahora = new Date();
-      // Si algún insumo llegó a 0 o menos, apagar productos que lo usan (escribiendo agotado_hasta como cocina)
-      // Exclusivo para recetas unitarias/al momento: los productos por tanda se apagan cuando se agota su producto terminado
-      if (insumosAgotadosDetectados.size > 0) {
-        for (const insIdStr of insumosAgotadosDetectados) {
-          const recsConInsumo = await db.recetaLinea.findMany({
-            where: { insumo_id: BigInt(insIdStr) },
-            include: { receta: true },
-          });
-
-          const prodsAgotar = new Set<bigint>();
-          for (const rl of recsConInsumo) {
-            if (rl.receta && !rl.receta.es_produccion) {
-              prodsAgotar.add(rl.receta.producto_id);
-            }
-          }
-
-          for (const prodId of prodsAgotar) await this.apagarProductoAutomatico(db, prodId, ahora);
-        }
-      }
+      await this.apagarProductosDeInsumos(db, insumosAgotadosDetectados, ahora);
 
       // Si algún producto terminado por tanda llegó a 0 o menos, apagarlo
       if (productosAgotadosDetectados.size > 0) {
@@ -1018,6 +987,197 @@ export class StockService {
     }
 
     return { ok: true, descontado: true };
+  }
+
+  /** Intentos de `descontarPorPedido` antes de dejarlo en auditoría. Es idempotente, así que reintentar no duplica. */
+  static readonly INTENTOS_DESCUENTO = 3;
+
+  /**
+   * Descuento de insumos al cobrar, al crear un pedido que nace pagado y al regularizar. Reintenta de forma acotada y, si
+   * sigue fallando, lo deja en auditoría y en el log. Nunca lanza: el cobro o el pedido ya están hechos y no se deshacen.
+   */
+  async descontarPorPedidoSeguro(pedidoId: bigint | string | number, por?: bigint | string | number) {
+    let ultimoError: any = null;
+    for (let intento = 1; intento <= StockService.INTENTOS_DESCUENTO; intento++) {
+      try {
+        return await this.descontarPorPedido(pedidoId);
+      } catch (e) {
+        ultimoError = e;
+        this.logger.warn(`Descuento de insumos del pedido ${pedidoId}, intento ${intento}: ${(e as any)?.message ?? e}`);
+      }
+    }
+    const motivo = String((ultimoError as any)?.message ?? ultimoError).slice(0, 300);
+    this.logger.error(`Descuento de insumos del pedido ${pedidoId} sin aplicar tras ${StockService.INTENTOS_DESCUENTO} intentos: ${motivo}`);
+    try {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'stock',
+        accion: 'DESCUENTO_INSUMOS_FALLO',
+        resultado: 'RECHAZADO',
+        entidad: 'pedido',
+        entidadId: BigInt(pedidoId),
+        motivo,
+        partyId: por === undefined ? undefined : BigInt(por),
+      });
+    } catch {
+      // el registro del fallo tampoco puede deshacer el cobro ni el pedido
+    }
+    return { ok: false, mensaje: motivo };
+  }
+
+  /**
+   * Regulariza pedidos PAGADOS de los últimos `dias` que tienen productos con receta y no tienen su VENTA de insumos
+   * (un descuento que falló al cobrar). Idempotente: un pedido ya descontado no se vuelve a tocar. Con el control
+   * apagado, o con «consumir al preparar» (lo descuenta Cocina), no hace nada. Lo llama un script o un cron.
+   */
+  async regularizarInsumosPagados(opciones: { dias?: number; limite?: number } = {}) {
+    if (!(await this.controlActivo())) return { procesados: 0, fallidos: 0, motivo: 'Control de almacén apagado' };
+    if (await almacenConsumirAlPreparar(this.prisma)) return { procesados: 0, fallidos: 0, motivo: 'Insumos al preparar' };
+
+    const desde = new Date(Date.now() - (opciones.dias ?? 7) * 24 * 60 * 60 * 1000);
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        pago_estado: 'PAGADO',
+        estado: { notIn: ['ANULADO', 'RECHAZADO'] },
+        creado_en: { gte: desde },
+        lineas: { some: { producto: { recetas: { some: { es_produccion: false } } } } },
+        movimientosStock: { none: { tipo: 'VENTA', insumo_id: { not: null }, movimientosRevertidos: { none: {} } } },
+      },
+      select: { id: true },
+      orderBy: { creado_en: 'asc' },
+      take: opciones.limite ?? 200,
+    });
+
+    let fallidos = 0;
+    for (const p of pedidos) {
+      const r: any = await this.descontarPorPedidoSeguro(p.id);
+      if (!r?.ok) fallidos++;
+    }
+    return { procesados: pedidos.length, fallidos };
+  }
+
+  /**
+   * Cortesía por separado con el control encendido: consume los insumos de la receta del producto (con su sabor),
+   * ligados a la cortesía. A diferencia de una venta no depende de «consumir al preparar»: una cortesía separada no
+   * pasa por Cocina. Va dentro de la transacción de quien registra la cortesía (`db`).
+   */
+  async descontarInsumosCortesia(
+    db: any,
+    c: {
+      cortesiaId: bigint;
+      productoId: bigint;
+      areaId?: bigint | null;
+      tamanoValorId?: bigint | null;
+      cantidad: number;
+      sabores?: Array<{ saborId: bigint; cantidad: number }>;
+      por: bigint;
+      ahora?: Date;
+    },
+  ): Promise<{ insumos: number; insumosAgotados: string[] }> {
+    if (!(await this.controlActivo(db))) return { insumos: 0, insumosAgotados: [] };
+
+    const recetas = await db.receta.findMany({
+      where: { producto_id: c.productoId, es_produccion: false },
+      include: { lineas: { include: { insumo: true } } },
+    });
+    if (recetas.length === 0) return { insumos: 0, insumosAgotados: [] };
+
+    const items = insumosDeVentaLinea(
+      recetas,
+      [],
+      c.tamanoValorId ?? null,
+      [],
+      c.cantidad,
+      (c.sabores ?? []).map((s) => ({ saborId: s.saborId, peso: s.cantidad })),
+    );
+    const insumos = new Map<string, any>();
+    for (const r of recetas) for (const l of r.lineas) insumos.set(l.insumo_id.toString(), l.insumo);
+    const cocina = await db.lugarStock.findFirst({ where: { nombre: 'Salados' } });
+    const almacenCentral = await db.lugarStock.findFirst({ where: { tipo: 'ALMACEN' } });
+
+    const agotados = new Set<string>();
+    for (const it of items) {
+      const insumo = insumos.get(it.insumoId);
+      if (!insumo) continue;
+      // Mismo orden que una venta: lugar de consumo del insumo, luego el del área, luego Cocina y el almacén
+      let lugarId: bigint | null = insumo.lugar_consumo_id ?? null;
+      if (!lugarId && c.areaId) {
+        lugarId = (await db.lugarStock.findFirst({ where: { tipo: 'AREA', area_id: c.areaId } }))?.id ?? null;
+      }
+      lugarId = lugarId ?? cocina?.id ?? almacenCentral?.id ?? null;
+      if (!lugarId) continue;
+
+      const cant = new Prisma.Decimal(convertirAUnidadAlmacen(it.cantidad, 'receta', insumo.factor_compra, insumo.factor_receta)).toDecimalPlaces(3);
+      const saldo = await this.restarStockInsumo(db, insumo.id, lugarId, cant);
+      await db.movimientoStock.create({
+        data: {
+          tipo: 'CORTESIA',
+          insumo_id: insumo.id,
+          lugar_id: lugarId,
+          cantidad: cant,
+          cortesia_id: c.cortesiaId,
+          por: c.por,
+          nota: `Cortesía · ${insumo.nombre}`,
+        },
+      });
+      if (saldo <= 0) agotados.add(insumo.id.toString());
+    }
+
+    await this.apagarProductosDeInsumos(db, agotados, c.ahora ?? new Date());
+    return { insumos: items.length, insumosAgotados: [...agotados] };
+  }
+
+  /** Anular una cortesía separada: devuelve los insumos que consumió (movimientos CORTESIA ligados, aún sin revertir). */
+  async revertirInsumosCortesia(db: any, cortesiaId: bigint, por: bigint): Promise<bigint[]> {
+    const movs = await db.movimientoStock.findMany({
+      where: { cortesia_id: cortesiaId, tipo: 'CORTESIA', insumo_id: { not: null }, movimientosRevertidos: { none: {} } },
+    });
+    const repuestos: bigint[] = [];
+    for (const m of movs) {
+      const st = await db.stock.findFirst({ where: { insumo_id: m.insumo_id, lugar_id: m.lugar_id } });
+      if (st) await db.stock.update({ where: { id: st.id }, data: { cantidad: { increment: m.cantidad } } });
+      else await db.stock.create({ data: { insumo_id: m.insumo_id, lugar_id: m.lugar_id, cantidad: m.cantidad } });
+      await db.movimientoStock.create({
+        data: {
+          tipo: 'ANULACION',
+          insumo_id: m.insumo_id,
+          lugar_id: m.lugar_id,
+          cantidad: m.cantidad,
+          cortesia_id: cortesiaId,
+          movimiento_anulado_id: m.id,
+          por,
+          nota: `Anulación de cortesía ${cortesiaId}`,
+        },
+      });
+      repuestos.push(m.insumo_id);
+    }
+    return repuestos;
+  }
+
+  /** Resta `cantidad` del stock de un insumo en un lugar (puede quedar negativo). Devuelve el saldo resultante. */
+  private async restarStockInsumo(db: any, insumoId: bigint, lugarId: bigint, cantidad: Prisma.Decimal): Promise<number> {
+    let st = await db.stock.findFirst({ where: { insumo_id: insumoId, lugar_id: lugarId } });
+    if (!st) {
+      st = await db.stock.create({ data: { insumo_id: insumoId, lugar_id: lugarId, cantidad: cantidad.negated() } });
+    } else {
+      st = await db.stock.update({ where: { id: st.id }, data: { cantidad: { decrement: cantidad } } });
+    }
+    return Number(st.cantidad);
+  }
+
+  /** Cuando un insumo llega a 0: apaga los productos de recetas unitarias que lo usan (no los de tanda). */
+  private async apagarProductosDeInsumos(db: any, insumosIds: Iterable<string>, ahora: Date) {
+    for (const insIdStr of insumosIds) {
+      const recsConInsumo = await db.recetaLinea.findMany({
+        where: { insumo_id: BigInt(insIdStr) },
+        include: { receta: true },
+      });
+      const prodsAgotar = new Set<bigint>();
+      for (const rl of recsConInsumo) {
+        if (rl.receta && !rl.receta.es_produccion) prodsAgotar.add(rl.receta.producto_id);
+      }
+      for (const prodId of prodsAgotar) await this.apagarProductoAutomatico(db, prodId, ahora);
+    }
   }
 
   /**

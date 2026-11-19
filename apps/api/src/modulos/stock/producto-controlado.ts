@@ -919,8 +919,9 @@ export async function mermarProductoControlado(
  * ninguno ligado (cortesía anterior a la liga o sin stock controlado); quien llama decide qué hacer.
  */
 export async function devolverCortesiaProductos(db: any, cortesiaId: bigint, por: bigint, ahora = new Date()): Promise<number> {
+  // Solo productos: los insumos de la cortesía los devuelve StockService.revertirInsumosCortesia
   const movs: any[] = await db.movimientoStock.findMany({
-    where: { cortesia_id: cortesiaId, tipo: 'CORTESIA', movimientosRevertidos: { none: {} } },
+    where: { cortesia_id: cortesiaId, tipo: 'CORTESIA', insumo_id: null, movimientosRevertidos: { none: {} } },
   });
   const sabores = new Set<bigint>();
   const productos = new Set<bigint>();

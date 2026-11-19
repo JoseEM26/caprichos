@@ -1,14 +1,20 @@
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('ControlAlmacen');
+
 /**
  * Interruptor «Control de almacén» (parámetro `stock_control_activo`, «si»/«no»; sin parámetro, apagado).
  * Apagado, vender no toca el stock y el sistema no genera avisos de insumos (stock bajo, agotados por receta).
  * Se lee directo del parámetro para que cualquier módulo pueda consultarlo sin depender de StockService.
+ * Si leer el parámetro falla, cuenta como apagado (sin cambiar eso) pero lo deja en el log.
  */
 export async function controlAlmacenActivo(db: any): Promise<boolean> {
   try {
     const p = await db?.parametro?.findUnique?.({ where: { clave: 'stock_control_activo' } });
     const v = p?.valor;
     return v === true || String(v ?? '').toLowerCase().trim() === 'si';
-  } catch {
+  } catch (e: any) {
+    logger.error(`No se pudo leer stock_control_activo; se trata como apagado: ${e?.message ?? e}`);
     return false;
   }
 }
@@ -25,7 +31,8 @@ async function leerSiNo(db: any, clave: string, defecto: boolean): Promise<boole
     if (t === 'si' || t === 'sí' || t === 'true') return true;
     if (t === 'no' || t === 'false') return false;
     return defecto;
-  } catch {
+  } catch (e: any) {
+    logger.error(`No se pudo leer ${clave}; se usa el valor por defecto: ${e?.message ?? e}`);
     return defecto;
   }
 }
