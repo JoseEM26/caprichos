@@ -2471,6 +2471,30 @@ export function ModalNuevoPedidoMesa({
                     >
                       Para llevar (sin mesa)
                     </button>
+                    <button
+                      type="button"
+                      data-testid="personal-delivery"
+                      onClick={() => {
+                        setModalidad('delivery');
+                        setCliNombre(`${staffElegido.nombre} (personal)`);
+                        setCliTelefono('');
+                        setPaso('cli');
+                      }}
+                      style={{
+                        flex: '1 1 200px',
+                        minHeight: '48px',
+                        borderRadius: '12px',
+                        border: '1.5px solid var(--cp-navy)',
+                        background: 'var(--cp-white)',
+                        color: 'var(--cp-navy)',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Delivery (el envío se paga aparte)
+                    </button>
                   </div>
                 </div>
               )}
@@ -3225,6 +3249,7 @@ export function ModalNuevoPedidoMesa({
                       medio={medioPersonal}
                       onMedio={setMedioPersonal}
                       total={total}
+                      envio={modalidad === 'delivery' ? envioCalculado : 0}
                       pagaCon={cliPagaCon}
                       onPagaCon={setCliPagaCon}
                       puedeCobrarAhora={puedeSaldarPersonal}

@@ -1267,7 +1267,9 @@ export class PedidosService {
     // contado. Entonces el pedido NO es «del personal»: es de un cliente normal cuyo cobro pendiente es solo el envío
     // (total - monto_credito). Con envío ya en S/ 0 no hay nada que cobrar: todo a crédito, como un pedido del personal.
     // Con envío «por confirmar» (null) nace igual: el envío se cobra cuando se ubique el pedido.
-    const creditoConEnvio = creditoEquipo && dto.modalidad === 'DELIVERY' && envio !== 0;
+    // Lo mismo en Caja y mozo: el pedido del personal a CRÉDITO con delivery. Con «Pagar ahora» todo se paga al instante (envío íntegro).
+    const personalACredito = Boolean(origen?.esPersonal) && origen?.pagoPersonal?.modo !== 'AHORA';
+    const creditoConEnvio = (creditoEquipo || personalACredito) && dto.modalidad === 'DELIVERY' && envio !== 0;
     const personal = tieneColaborador && !creditoConEnvio;
 
     // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
@@ -1351,7 +1353,7 @@ export class PedidosService {
     // (mozo/caja): no sabe el billete al abrir y lo pide al cobrar en la precuenta. Pagar exacto = escribir el monto exacto.
     const mesaDelPersonal = dto.modalidad === 'MESA' && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA');
     // Un pedido PROGRAMADO tampoco lo pide: no se cobra al crearlo (solo el adelanto opcional, que tiene su propio monto); el vuelto se ve al cobrarlo.
-    if (montoEfectivo > 0 && !mesaDelPersonal && !programadoPara && (dto.pago.pagaCon === undefined || dto.pago.pagaCon === null || !(Number(dto.pago.pagaCon) > 0))) {
+    if (montoEfectivo > 0 && !mesaDelPersonal && !programadoPara && !(creditoConEnvio && origen?.esPersonal) && (dto.pago.pagaCon === undefined || dto.pago.pagaCon === null || !(Number(dto.pago.pagaCon) > 0))) {
       throw new BadRequestException({
         codigo: 'PAGA_CON_REQUERIDO',
         mensaje: 'Escribe con cuánto paga el cliente (en efectivo)',

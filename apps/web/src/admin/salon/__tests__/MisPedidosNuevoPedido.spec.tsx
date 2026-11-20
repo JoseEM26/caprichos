@@ -103,3 +103,28 @@ describe('Mis pedidos: Nuevo pedido se ve en Salón y en Lista', () => {
     expect(screen.queryByRole('dialog', { name: /Nuevo pedido/ })).toBeNull();
   });
 });
+
+describe('Pedido del personal: opción Delivery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permisos = ['mesas/ver', 'mesas/abrir', 'pedidos/crear', 'creditos/ver'];
+    localStorage.clear();
+    vi.mocked(salonApi.misPedidos).mockResolvedValue(respuestaVacia as any);
+    vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos } as any);
+    vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue({ categorias: [] } as any);
+    vi.mocked(api.get).mockResolvedValue({ items: [] } as any);
+    vi.mocked(listarPersonalActivo).mockResolvedValue([{ partyId: '2', nombre: 'María Soto', rol: 'MOZO', descuentoPct: 25 }]);
+  });
+
+  it('tras elegir al trabajador ofrece Delivery y pasa a pedir celular y ubicación', async () => {
+    render(<MisPedidosView />);
+    await screen.findByRole('tab', { name: 'Salón' });
+    abrirNuevo();
+    const dialogo = await screen.findByRole('dialog', { name: /Nuevo pedido/ });
+    fireEvent.click(within(dialogo).getByText('Pedido del personal'));
+    fireEvent.click(await within(dialogo).findByRole('button', { name: /María Soto/ }));
+    fireEvent.click(await within(dialogo).findByTestId('personal-delivery'));
+    expect(await within(dialogo).findByText(/Celular del cliente \(9 dígitos\) \*/)).toBeTruthy();
+  });
+});

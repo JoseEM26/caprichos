@@ -26,6 +26,8 @@ interface Props {
   medio: string;
   onMedio: (m: string) => void;
   total: number;
+  /** Envío del delivery (sin descuento): con crédito se paga aparte; 0 si no hay delivery o aún no se conoce */
+  envio?: number;
   pagaCon: string;
   onPagaCon: (v: string) => void;
   /** Puede cobrar en el momento (creditos/cobrar_ahora); si no, solo existe «a su crédito» */
@@ -48,7 +50,7 @@ const tarjeta = (activa: boolean): React.CSSProperties => ({
   fontSize: 12,
 });
 
-export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCon, onPagaCon, puedeCobrarAhora, error, mostrarError, canal = 'MOZO' }: Props) {
+export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, envio = 0, pagaCon, onPagaCon, puedeCobrarAhora, error, mostrarError, canal = 'MOZO' }: Props) {
   const { medios: encendidos, presentacion } = useMediosCanal(canal);
   const vuelto = Number(pagaCon) - total;
   return (
@@ -66,6 +68,13 @@ export function PagoPersonalBloque({ modo, onModo, medio, onMedio, total, pagaCo
           </button>
         )}
       </div>
+      {envio > 0 && (
+        <div data-testid="personal-aviso-envio" style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+          {modo === 'ahora' && puedeCobrarAhora
+            ? `Incluye el envío (S/ ${envio.toFixed(2)}), que no lleva descuento.`
+            : `El envío (S/ ${envio.toFixed(2)}) no lleva descuento ni va a su crédito: se paga aparte, al contado, al entregar.`}
+        </div>
+      )}
       {modo === 'ahora' && puedeCobrarAhora && (
         <>
           <div role="radiogroup" aria-label="Medio de pago" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

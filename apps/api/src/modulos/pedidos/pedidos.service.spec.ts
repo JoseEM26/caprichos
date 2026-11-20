@@ -980,6 +980,39 @@ describe('PedidosService', () => {
         }));
       });
 
+      describe('delivery del personal (Caja y mozo): el envío no lleva descuento y se paga aparte', () => {
+        const dtoDeliveryPers: CrearPedidoDto = { ...pedidoBaseDto, pago: { metodo: 'EFECTIVO' }, comprobante: undefined };
+
+        it('a crédito: el crédito cubre solo los productos con su 25 %, el envío (5) queda por cobrar y no pide «paga con»', async () => {
+          await service.crear(dtoDeliveryPers, 'idemp-persdel-1', { ...origen, pagoPersonal: { modo: 'CREDITO' } });
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(data.es_personal).toBe(false);
+          expect(data.pago_estado).toBe('PENDIENTE');
+          expect(Number(data.envio)).toBe(5);
+          expect(Number(data.descuento)).toBe(7);
+          expect(Number(data.total)).toBe(26);
+          expect(Number(data.monto_credito)).toBe(21);
+          expect(Number(prismaMock.consumoPersonal.create.mock.calls[0][0].data.monto)).toBe(21);
+        });
+
+        it('sin indicar modo equivale a crédito', async () => {
+          await service.crear(dtoDeliveryPers, 'idemp-persdel-2', origen);
+          expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.monto_credito)).toBe(21);
+        });
+
+        it('pagar ahora: todo al instante, descuento solo en productos y envío íntegro', async () => {
+          prismaMock.caja = { findFirst: jest.fn().mockResolvedValue({ id: 1n }) };
+          prismaMock.movimientoCaja = { create: jest.fn().mockResolvedValue({ id: 3n }) };
+          await service.crear(dtoDeliveryPers, 'idemp-persdel-3', { ...origen, puedeCobrarAhora: true, pagoPersonal: { modo: 'AHORA', medio: 'EFECTIVO', pagaCon: 30 } });
+          const data = prismaMock.pedido.create.mock.calls[0][0].data;
+          expect(data.es_personal).toBe(true);
+          expect(data.pago_estado).toBe('PAGADO');
+          expect(Number(data.total)).toBe(26);
+          expect(Number(data.monto_credito)).toBe(0);
+          expect(Number(prismaMock.consumoPersonal.create.mock.calls[0][0].data.monto)).toBe(26);
+        });
+      });
+
       it('nace PAGADO y descuenta sus insumos al crear (sin pasar por Caja), con reintento y auditoría del servicio de stock', async () => {
         await service.crear(dtoPersonal, 'idemp-personal-stock', origen);
 
