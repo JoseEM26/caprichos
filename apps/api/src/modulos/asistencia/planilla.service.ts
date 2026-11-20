@@ -18,6 +18,7 @@ import {
   ReglaTarifaEspecial,
   aplicarTarifaEspecial,
   calcularDiaPlanilla,
+  extraSemanal,
   calcularPlanilla,
   horasYMinutos,
   pagoDia,
@@ -538,7 +539,7 @@ export class PlanillaService {
     const { fechasVac, vacPagadas } = tercerizado
       ? { fechasVac: new Set<string>(), vacPagadas: [] as Array<{ id: bigint; fecha_desde: Date; dias: unknown; monto: unknown }> }
       : await this.vacacionesDelPeriodo(id, periodo);
-    const diasBase = aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac);
+    const diasBase = extraSemanal(aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac));
     const [extras, ajustes, consumosBd, persona, feriadosBd, prestamosBd, recurrentesBd, tarifasBd] = await Promise.all([
       this.prisma.planillaExtraAprobada.findMany({ where: { party_id: id, jornada: { gte: fechaDb(periodo.desde), lte: fechaDb(periodo.hasta) } } }),
       this.prisma.planillaAjuste.findMany({
@@ -1020,7 +1021,7 @@ export class PlanillaService {
     const periodo = periodoDe(modalidad, hoy);
     const { dias, cfg } = await this.asistencia.diasDePersona(partyId, periodo.desde, periodo.hasta, ahora);
     const { fechasVac } = await this.vacacionesDelPeriodo(partyId, periodo);
-    const calc = aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac);
+    const calc = extraSemanal(aplicarVacaciones(dias.map((d) => calcularDiaPlanilla(d, cfg.toleranciaMin)), fechasVac));
     const suma = (f: (d: (typeof calc)[number]) => number) => calc.reduce((a, d) => a + f(d), 0);
     return {
       modalidad,
