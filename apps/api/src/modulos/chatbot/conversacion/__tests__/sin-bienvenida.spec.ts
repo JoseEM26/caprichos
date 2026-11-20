@@ -26,4 +26,13 @@ describe('Bienvenida con menú (regla del dueño)', () => {
     const r = transicionarEstado(flujoMenu, normalizarEntrada({ texto: 'menu' }), ctx({ sinBienvenida: true }));
     expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarLista']);
   });
+  it('«Y las opciones son???» muestra el menú completo, no el «Hola de nuevo»', () => {
+    const r = transicionarEstado({ estado: 'INICIO', pedido: null, repreguntasFallidas: 0 } as any, normalizarEntrada({ texto: 'Y las opciones son???' }), ctx({ sinBienvenida: true }));
+    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarLista']);
+  });
+  it('texto libre en INICIO con conversación reciente no cae en el «Hola de nuevo» con un solo botón', () => {
+    const inicio = { estado: 'INICIO', pedido: null, repreguntasFallidas: 0 } as any;
+    const r = transicionarEstado(inicio, normalizarEntrada({ texto: 'que tienen' }), ctx({ sinBienvenida: true }));
+    expect((r.acciones[0] as any)?.texto ?? '').not.toContain('Hola de nuevo');
+  });
 });

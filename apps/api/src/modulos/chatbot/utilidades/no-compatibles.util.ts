@@ -33,8 +33,9 @@ export function tipoChatNoCompatible(subtipo: string): string {
  * Aviso amable para el cliente. El PDF solo se pide como foto cuando el bot espera un voucher.
  * Emojis solo porque es WhatsApp, uno por mensaje.
  */
-export function textoAvisoNoCompatible(subtipo: string, esperaVoucher = false): string {
-  const cierre = 'Escríbeme tu mensaje o elige una de las opciones';
+export function textoAvisoNoCompatible(subtipo: string, esperaVoucher = false, sinOpciones = false): string {
+  // Sin un paso que repetir no hay opciones a la vista: se dice cómo verlas
+  const cierre = sinOpciones ? 'Escribe *menú* para ver las opciones' : 'Escríbeme tu mensaje o elige una de las opciones';
   switch (subtipo) {
     case 'audio':
     case 'voice':

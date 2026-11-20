@@ -47,6 +47,9 @@ describe('armarTextoRepeticion y avisos', () => {
   it('el PDF pide captura solo cuando se espera voucher', () => {
     expect(textoAvisoNoCompatible('document', true)).toContain('foto o captura');
     expect(textoAvisoNoCompatible('document', false)).not.toContain('captura');
+    // Sin opciones a la vista (sticker como primer mensaje) dice cómo verlas
+    expect(textoAvisoNoCompatible('sticker', false, true)).toContain('menú');
+    expect(textoAvisoNoCompatible('sticker', false, true)).not.toContain('elige una de las opciones');
   });
 });
 

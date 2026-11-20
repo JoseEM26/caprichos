@@ -1295,7 +1295,7 @@ export class WhatsappWebhookService {
           Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm)));
       const prompt = await this.ultimoPromptDelBot(p.conversacion.id);
       const repeticion = armarTextoRepeticion(prompt);
-      const aviso = p.avisoPropio ?? textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher);
+      const aviso = p.avisoPropio ?? textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher, !(prompt?.botones?.length || prompt?.filas?.length));
       // Si el último mensaje del bot tenía botones o lista, se repite con ellos reales; si no, texto con viñetas
       const interactivo = p.avisoPropio ? null : interactivoDesdeContenido(prompt, aviso);
 

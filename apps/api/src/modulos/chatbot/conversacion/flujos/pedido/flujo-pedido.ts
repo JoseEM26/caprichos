@@ -3420,7 +3420,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return {
         id: `ped_prod_${p.id}`,
         titulo: p.nombre.slice(0, 24),
-        descripcion: `S/ ${precio.toFixed(2)}${aviso ? ` · ${aviso.texto}` : desc}`.slice(0, 72),
+        descripcion: recortarEnPalabra(`S/ ${precio.toFixed(2)}${aviso ? ` · ${aviso.texto}` : desc}`, 72),
       };
     });
 
@@ -3612,6 +3612,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 }
 
 // Función auxiliar para coincidencia de palabras
+/** Recorta al límite de WhatsApp sin cortar una palabra a la mitad («…» al final). */
+export function recortarEnPalabra(texto: string, max: number): string {
+  if (texto.length <= max) return texto;
+  const corte = texto.slice(0, max - 1);
+  const espacio = corte.lastIndexOf(' ');
+  return `${(espacio > max / 2 ? corte.slice(0, espacio) : corte).replace(/[\s·,.;:(-]+$/, '')}…`;
+}
+
 function coincideAlgunaPalabra(textoNormalizado: string, listaPalabras: string[]): boolean {
   if (!textoNormalizado) return false;
   return listaPalabras.some((palabra) => {

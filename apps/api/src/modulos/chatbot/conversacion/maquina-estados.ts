@@ -2015,12 +2015,14 @@ function transicionarSoloMenusNucleo(
   }
 
   // Con conversación reciente, pedido de hoy o chat atendido, un «hola»/«gracias» no vuelve a abrir la bienvenida con menú
-  if (contexto.sinBienvenida && !enPedido && !enPago && !esId('menu', 'btn_menu', 'volver_menu', 'inicio') && !['menu', 'comenzar', 'opciones', '0'].includes(texto) && (esSaludoPuro(texto) || flujo.estado === 'INICIO')) {
+  // «¿y las opciones?», «menú», «ver opciones»: siempre el menú completo, nunca el «Hola de nuevo»
+  const pideMenu = ['comenzar', '0'].includes(texto) || /(^|\s)(menu|opciones)(\s|$)/.test(texto);
+  if (contexto.sinBienvenida && !enPedido && !enPago && !esId('menu', 'btn_menu', 'volver_menu', 'inicio') && !pideMenu && esSaludoPuro(texto)) {
     return saludoCorto();
   }
 
   // Saludo y regreso al menú (fuera de un pedido o pago en curso: ahí lo atiende el flujo de pedido)
-  if (!enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || ['comenzar', 'opciones', '0'].includes(texto))) {
+  if (!enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || pideMenu)) {
     return saludo();
   }
 
