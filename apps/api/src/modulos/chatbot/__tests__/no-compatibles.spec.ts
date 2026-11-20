@@ -9,7 +9,7 @@ import { clasificarMensajeEntrante } from '../utilidades/clasificar-mensaje-entr
 import { armarTextoRepeticion, textoAvisoNoCompatible } from '../utilidades/no-compatibles.util';
 
 const TEL = '51987654321';
-const AVISO_VIDEO = 'No puedo ver videos';
+const AVISO_VIDEO = 'no puedo ver videos';
 
 const payload = (msg: Record<string, unknown>) => ({
   object: 'whatsapp_business_account',
@@ -48,8 +48,8 @@ describe('armarTextoRepeticion y avisos', () => {
     expect(textoAvisoNoCompatible('document', true)).toContain('foto o captura');
     expect(textoAvisoNoCompatible('document', false)).not.toContain('captura');
     // Sin opciones a la vista (sticker como primer mensaje) dice cómo verlas
-    expect(textoAvisoNoCompatible('sticker', false, true)).toContain('menú');
-    expect(textoAvisoNoCompatible('sticker', false, true)).not.toContain('elige una de las opciones');
+    expect(textoAvisoNoCompatible('sticker', false, 'menu')).toContain('lo que puedo hacer');
+    expect(textoAvisoNoCompatible('sticker', false, 'respuesta')).not.toContain('opciones');
   });
 });
 
@@ -148,6 +148,16 @@ describe('Mensajes no compatibles en el webhook', () => {
     expect(encolados()[0].carga.interactivo.lista.secciones[0].filas).toEqual([{ id: 'f1', titulo: 'Pollo' }]);
   });
 
+  it('sticker fuera de un pedido y sin opciones a la vista: sale el menú principal (conversación real del 20/11)', async () => {
+    conv = { ...conv, flujo: { estado: 'MENU' } };
+    mensajesSalientes = [{ contenido: { texto: '¡Gracias por tu compra!' } }];
+    await webhook.procesarPayload(payload({ type: 'sticker', sticker: { id: 's' } }));
+    const e = encolados()[0];
+    expect(e.tipo).toBe('INTERACTIVO');
+    expect(e.carga.interactivo.cuerpo).toContain('lindo sticker');
+    expect(e.carga.interactivo.lista.secciones[0].filas.map((f: any) => f.id)).toContain('pedir');
+  });
+
   it('registra el video en mensaje_chat con su tipo y el id de WhatsApp', async () => {
     await webhook.procesarPayload(payload(video));
     expect(prisma.mensajeChat.create).toHaveBeenCalledWith({
@@ -161,10 +171,10 @@ describe('Mensajes no compatibles en el webhook', () => {
   });
 
   it.each([
-    ['video', { type: 'video', video: { id: 'v' } }, 'No puedo ver videos'],
-    ['sticker', { type: 'sticker', sticker: { id: 's' } }, 'No puedo usar stickers'],
-    ['contactos', { type: 'contacts', contacts: [] }, 'No puedo usar contactos'],
-    ['tipo desconocido', { type: 'unsupported' }, 'No puedo revisar este tipo de mensaje'],
+    ['video', { type: 'video', video: { id: 'v' } }, 'no puedo ver videos'],
+    ['sticker', { type: 'sticker', sticker: { id: 's' } }, 'lindo sticker'],
+    ['contactos', { type: 'contacts', contacts: [] }, 'no puedo abrir contactos'],
+    ['tipo desconocido', { type: 'unsupported' }, 'no puedo revisar este tipo de mensaje'],
   ])('%s: aviso específico y sin pasar al motor', async (_n, msg, aviso) => {
     await webhook.procesarPayload(payload(msg));
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();

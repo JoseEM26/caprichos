@@ -50,7 +50,7 @@ import {
 import { esSaludo as esSaludoPuro, normalizarTexto } from './normalizador-entrada.util';
 import { nombreParaSaludo } from './bienvenida.util';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
-import './flujos/pedido/flujo-pedido';
+import { PREFIJO_NO_ENTENDI } from './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
 import './flujos/ia/flujo-ia';
@@ -1938,6 +1938,13 @@ function pasarAsesor(flujo: FlujoConversacion, entrada: EntradaNormalizada, cont
   };
 }
 
+/** Cambia el «Uy, no te entendí» de la repregunta por otro inicio (cuando el cliente no se equivocó). */
+function cambiarPrefijoNoEntendi(acciones: AccionMensaje[], inicio: string): AccionMensaje[] {
+  return acciones.map((a: any) =>
+    typeof a.texto === 'string' && a.texto.startsWith(PREFIJO_NO_ENTENDI) ? { ...a, texto: `${inicio}${a.texto.slice(PREFIJO_NO_ENTENDI.length)}` } : a,
+  );
+}
+
 /** Oferta de asesor con botones (en Evolution salen numerados: 1 = Sí, 2 = No). */
 function ofertaAsesor(flujo: FlujoConversacion, tipo: 'pedido' | 'menu', texto: string, tituloNo: string): ResultadoTransicion {
   return {
@@ -1968,6 +1975,12 @@ function transicionarSoloMenusNucleo(
   });
 
   const saludo = () => {
+    // Ya conversamos hace poco: el menú sin volver a presentarse
+    if (contexto.sinBienvenida) {
+      return respuesta([
+        { tipo: 'enviarLista', texto: `¡Claro! 😊 Esto es lo que puedo hacer por ti:\n\n💛 Hay más descuento en nuestra carta virtual: ${url}`, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
+      ]);
+    }
     // Misma bienvenida que el menú principal (fuente única): saludo + promociones vigentes + carta virtual
     const cuerpo = TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, null, {
       textos: contexto.textosPersonalizados,
@@ -2083,16 +2096,24 @@ function transicionarSoloMenusNucleo(
   if (enPedido) {
     const r = atenderConSubflujo('pedido', flujo, entrada, contexto);
     if (r) {
-      if (id || !texto.trim()) return r;
+      if (id) return r;
+      // Solo emojis o signos («?», «👍»): se repite el paso sin «no te entendí»
+      if (!texto.trim()) return { ...r, acciones: cambiarPrefijoNoEntendi(r.acciones, '😊') };
       const clave = (p: any) => JSON.stringify({ e: r.nuevoEstado, i: p?.estadoInterno, n: p?.items?.length, c: p?.categoriaSeleccionadaId, cf: p?.configuracionActual?.grupoIndexActual, pr: p?.productoSeleccionadoId });
       const sinAvance = r.nuevoFlujo.estado === flujo.estado && clave(r.nuevoFlujo.pedido) === clave(flujo.pedido);
       const flujoLimpio: any = { ...r.nuevoFlujo };
       delete flujoLimpio.pasoNoEntendido;
       if (!sinAvance) return { ...r, nuevoFlujo: flujoLimpio };
       // El cliente no eligió una opción válida: nunca se le atrapa repitiendo la misma pregunta
-      if (ACUSES_CORTOS.includes(texto.trim()) || /^(muchas )?gracias\b|^(ok|okey|listo|vale) gracias/.test(texto.trim())) {
-        return { nuevoEstado: flujo.estado, acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.acuseEnPedido() }], nuevoFlujo: flujo };
-      }
+      // «ok», «jaja», «¿y las opciones?»: no es un error; se vuelve a mostrar el paso (con sus números) sin «no te entendí»
+      const sinCulpa = ACUSES_CORTOS.includes(texto.trim()) || /^(muchas )?gracias\b|^(ok|okey|listo|vale) gracias/.test(texto.trim())
+        ? '¡Con gusto! 💛'
+        : /^(x+d+|ja(ja)+j?|je(je)+|ji(ji)+|lol|jsjs\w*)$/.test(texto.trim())
+          ? '😄'
+          : /(^|\s)(opciones|cuales|menu)(\s|$)/.test(texto)
+            ? '¡Claro! 😊'
+            : null;
+      if (sinCulpa) return { ...r, acciones: cambiarPrefijoNoEntendi(r.acciones, sinCulpa), nuevoFlujo: flujo };
       const prev = Number((flujo as any).pasoNoEntendido?.n ?? 0);
       if (contexto.chatbotIaActivo && /[a-z]{3}/.test(texto)) {
         return { nuevoEstado: flujo.estado, acciones: [{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }], nuevoFlujo: flujo };

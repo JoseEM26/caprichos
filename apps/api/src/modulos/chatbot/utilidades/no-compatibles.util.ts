@@ -33,28 +33,32 @@ export function tipoChatNoCompatible(subtipo: string): string {
  * Aviso amable para el cliente. El PDF solo se pide como foto cuando el bot espera un voucher.
  * Emojis solo porque es WhatsApp, uno por mensaje.
  */
-export function textoAvisoNoCompatible(subtipo: string, esperaVoucher = false, sinOpciones = false): string {
-  // Sin un paso que repetir no hay opciones a la vista: se dice cómo verlas
-  const cierre = sinOpciones ? 'Escribe *menú* para ver las opciones' : 'Escríbeme tu mensaje o elige una de las opciones';
+export function textoAvisoNoCompatible(
+  subtipo: string,
+  esperaVoucher = false,
+  cierreSegun: 'opciones' | 'menu' | 'respuesta' = 'opciones',
+): string {
+  // Qué sigue: las opciones del paso repetido, el menú principal o una respuesta escrita (paso sin opciones)
+  const cierre = { opciones: 'Escríbeme o elige una de estas opciones 👇', menu: 'Mira lo que puedo hacer por ti 👇', respuesta: '¿Me lo escribes, por favor? 💛' }[cierreSegun];
   switch (subtipo) {
     case 'audio':
     case 'voice':
-      return `Por ahora no puedo escuchar audios 🎧 ${cierre}`;
+      return `Todavía no puedo escuchar audios 🎧 ${cierre}`;
     case 'video':
-      return `No puedo ver videos 🎬 ${cierre}`;
+      return `Todavía no puedo ver videos 🎬 ${cierre}`;
     case 'sticker':
-      return `No puedo usar stickers 🙂 ${cierre}`;
+      return `¡Qué lindo sticker! 😄 Todavía no puedo verlos. ${cierre}`;
     case 'contacts':
-      return `No puedo usar contactos 📇 ${cierre}`;
+      return `Todavía no puedo abrir contactos 📇 ${cierre}`;
     case 'live_location':
       return 'No puedo seguir una ubicación en vivo 📍 Envíame tu ubicación fija o escribe tu dirección';
     case 'order':
-      return `No puedo leer pedidos del catálogo de WhatsApp. ${cierre}`;
+      return `Todavía no puedo leer pedidos del catálogo de WhatsApp. ${cierre}`;
     case 'document':
       if (esperaVoucher) return 'Envíame una foto o captura de pantalla del pago 📸 (por ahora no puedo leer PDF)';
-      return `No puedo abrir documentos 📄 ${cierre}`;
+      return `Todavía no puedo abrir documentos 📄 ${cierre}`;
     default:
-      return `No puedo revisar este tipo de mensaje 🤔 ${cierre}`;
+      return `Todavía no puedo revisar este tipo de mensaje 🤔 ${cierre}`;
   }
 }
 

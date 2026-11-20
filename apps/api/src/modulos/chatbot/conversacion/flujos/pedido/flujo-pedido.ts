@@ -869,7 +869,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: 'Por favor elige si deseas tu pedido para Delivery o Para recoger:',
+          texto: `${PREFIJO_NO_ENTENDI} ¿Lo quieres con delivery o para recoger?`,
           botones: BOTONES_PEDIDO_MODALIDAD,
         },
       ],
@@ -989,7 +989,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     if (!categoria) {
-      return this.mostrarCategorias(flujo, pedido, contexto, 'Por favor elige una categoría de la lista:');
+      return this.mostrarCategorias(flujo, pedido, contexto, `${PREFIJO_NO_ENTENDI} ¿Qué categoría te provoca?`);
     }
 
     const nuevoPedido: EstadoCarritoPedido = {
@@ -1076,7 +1076,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         pedido,
         categoria,
         contexto,
-        'Por favor elige un producto de la lista:',
+        PREFIJO_NO_ENTENDI,
         true,
       );
     }
@@ -3433,13 +3433,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     const acciones: AccionMensaje[] = [];
-    if (mensajeEncabezado) {
-      acciones.push({ tipo: 'enviarTexto', texto: mensajeEncabezado });
-    }
-
+    // El encabezado («no te entendí») va en el mismo mensaje de la lista: un solo mensaje, sin repetir
     const lista: AccionMensaje = {
       tipo: 'enviarLista',
-      texto: TEXTOS_BOT.pedidoCategoriaSeleccionada(categoria.nombre),
+      texto: `${mensajeEncabezado ? `${mensajeEncabezado} ` : ''}${TEXTOS_BOT.pedidoCategoriaSeleccionada(categoria.nombre)}`,
       botonTexto: 'Ver productos',
       filas: filas.slice(0, 10),
     };
@@ -3612,6 +3609,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 }
 
 // Función auxiliar para coincidencia de palabras
+/** Inicio de la repregunta de un paso del pedido; la máquina lo cambia por algo amable cuando no fue un error. */
+export const PREFIJO_NO_ENTENDI = 'Uy, no te entendí 🙈';
+
 /** Recorta al límite de WhatsApp sin cortar una palabra a la mitad («…» al final). */
 export function recortarEnPalabra(texto: string, max: number): string {
   if (texto.length <= max) return texto;

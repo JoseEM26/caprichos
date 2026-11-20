@@ -1068,7 +1068,6 @@ export const TEXTOS_SOLO_MENUS = {
   ofertaPersona: (): string => '¿Quieres que te atienda una persona? 💛',
 
   /** Acuse en medio de un paso del pedido: no repite la pregunta. */
-  acuseEnPedido: (): string => '¡Con gusto! 💛 Cuando quieras, elige una opción y seguimos con tu pedido 🥰',
 
   /** Sin dato confirmado: la IA no inventa. */
   sinDatoAsesor: (): string =>

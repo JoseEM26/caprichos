@@ -1,3 +1,4 @@
+import { BOTON_LISTA_MENU, FILAS_MENU_PRINCIPAL, TITULO_SECCION_MENU } from '../conversacion/textos-bot';
 import { NumerosWhatsappService } from './numeros-whatsapp.service';
 import { CANAL_WHATSAPP_BUSINESS } from '../utilidades/canal-whatsapp-business';
 import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
@@ -1295,9 +1296,16 @@ export class WhatsappWebhookService {
           Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm)));
       const prompt = await this.ultimoPromptDelBot(p.conversacion.id);
       const repeticion = armarTextoRepeticion(prompt);
-      const aviso = p.avisoPropio ?? textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher, !(prompt?.botones?.length || prompt?.filas?.length));
-      // Si el último mensaje del bot tenía botones o lista, se repite con ellos reales; si no, texto con viñetas
-      const interactivo = p.avisoPropio ? null : interactivoDesdeContenido(prompt, aviso);
+      // Con opciones en el último paso se repiten; fuera de un pedido o pago y sin opciones, va el menú principal
+      const conOpciones = Boolean(prompt?.botones?.length || prompt?.filas?.length);
+      const enCurso = Boolean(flujo.pedido || flujo.pago?.pedidoCodigo) || /^(PEDIDO|PAGO|VALIDAR|RESERVA)/.test(String(flujo.estado ?? ''));
+      const conMenu = !p.avisoPropio && !conOpciones && !enCurso;
+      const aviso = p.avisoPropio ?? textoAvisoNoCompatible(p.clasificacion.subtipo, esperaVoucher, conOpciones ? 'opciones' : conMenu ? 'menu' : 'respuesta');
+      const interactivo = p.avisoPropio
+        ? null
+        : conMenu
+          ? interactivoDesdeContenido({ texto: '¿En qué te ayudo? 😊', filas: FILAS_MENU_PRINCIPAL, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU }, aviso)
+          : interactivoDesdeContenido(prompt, aviso);
 
       await this.outbox.encolar({
         telefono: p.identificador,
@@ -1305,7 +1313,7 @@ export class WhatsappWebhookService {
         clave: `no-compatible-${p.waMessageId || `${p.identificador}-${Date.now()}`}`,
         origen: ORIGEN_NO_COMPATIBLE,
         carga: {
-          textoLibre: repeticion && !p.avisoPropio ? `${aviso}\n\n${repeticion}` : aviso,
+          textoLibre: repeticion && !p.avisoPropio && !conMenu ? `${aviso}\n\n${repeticion}` : aviso,
           ...(interactivo ? { interactivo } : {}),
           autor: 'BOT',
           nombre: obtenerNombreMostrar(p.conversacion),
