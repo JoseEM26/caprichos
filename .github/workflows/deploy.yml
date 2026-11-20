@@ -272,10 +272,14 @@ jobs:
           fi
           if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "consultar-pedido" ]; then
             ACCION="consultar-pedido"
-            if [ "$IN_AMBIENTE" != "demo" ] || [ "$REF_NAME" != "preprod" ]; then
-              echo "::error::consultar-pedido se lanza con ambiente demo desde la rama preprod."
+            # Solo lectura. Demo desde preprod; prod desde main con la confirmación PRODUCCION (sin desplegar nada)
+            if ! { [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" = "preprod" ]; } && ! { [ "$IN_AMBIENTE" = "prod" ] && [ "$REF_NAME" = "main" ] && [ "$IN_CONFIRMACION" = "PRODUCCION" ]; }; then
+              echo "::error::consultar-pedido: demo desde preprod, o prod desde main con confirmacion PRODUCCION."
               exit 1
             fi
+            echo "ambiente=${IN_AMBIENTE}" >> "$GITHUB_OUTPUT"
+            echo "accion=${ACCION}" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "ver-estado-servidor" ]; then
             ACCION="ver-estado-servidor"
@@ -2240,6 +2244,7 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           CODIGO: ${{ github.event.inputs.codigo_pedido }}
+          AMB: ${{ github.event.inputs.ambiente }}
         run: |
           set -o pipefail
           if [[ ! "$CODIGO" =~ ^[A-Za-z0-9-]{3,24}$ ]]; then
@@ -2248,7 +2253,7 @@ jobs:
           fi
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
             "${SSH_USER:-deploy}@${SSH_HOST}" \
-            "/opt/caprichos/scripts/consultar-pedido.sh demo '${CODIGO}'" 2>&1 | tee pedido.log
+            "/opt/caprichos/scripts/consultar-pedido.sh ${AMB} '${CODIGO}'" 2>&1 | tee pedido.log
 
       - name: Borrar la llave del ejecutor
         if: always()
