@@ -25,7 +25,8 @@ q "SELECT codigo, canal, modalidad, estado, pago_estado, pago_metodo, pago_prefe
           to_char(confirmado_en AT TIME ZONE 'America/Lima','YYYY-MM-DD HH24:MI') AS confirmado,
           to_char(anulado_en AT TIME ZONE 'America/Lima','YYYY-MM-DD HH24:MI') AS anulado,
           motivo_anulacion,
-          left(coalesce(cliente_nombre,''),22) AS cliente,
+          to_char(programado_para AT TIME ZONE 'America/Lima','YYYY-MM-DD HH24:MI') AS programado,
+          left(coalesce(cliente_nombre,''),1)||'***' AS cliente,
           '*****'||right(coalesce(cliente_telefono,''),3) AS tel
    FROM pedido WHERE codigo = '${COD}'"
 echo "== Recorrido de estados =="
@@ -48,6 +49,12 @@ q "SELECT c.area_id, c.estado, to_char(c.llego_en AT TIME ZONE 'America/Lima','M
 echo "== Pedidos con código parecido =="
 q "SELECT codigo, estado, canal, pago_estado, total, to_char(creado_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS creado
    FROM pedido WHERE codigo ILIKE '%'||right('${COD}',3)||'%' OR codigo ILIKE '${COD}%' ORDER BY creado_en DESC LIMIT 8"
-echo "== Pedidos de hoy por estado (demo) =="
+echo "== Mensajes del bot que nombran el código (sin texto del cliente) =="
+q "SELECT to_char(m.en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS cuando, m.tipo, m.autor
+   FROM mensaje_chat m WHERE m.direccion='SALE' AND m.contenido::text LIKE '%${COD}%' ORDER BY m.en LIMIT 10"
+echo "== Auditoría del pedido (acciones, sin datos personales) =="
+q "SELECT to_char(a.en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS cuando, a.modulo, a.accion, a.resultado
+   FROM auditoria a JOIN pedido p ON a.entidad='pedido' AND a.entidad_id=p.id WHERE p.codigo='${COD}' ORDER BY a.en LIMIT 30"
+echo "== Pedidos de hoy por estado =="
 q "SELECT estado, count(*) FROM pedido WHERE creado_en >= date_trunc('day', now() AT TIME ZONE 'America/Lima') GROUP BY estado ORDER BY 2 DESC"
 echo "OK: consulta terminada (solo lectura)."
