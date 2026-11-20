@@ -21,7 +21,7 @@ sugerencias:
 Bandeja de atencion para las conversaciones de WhatsApp del negocio. Permite al equipo de caja y salon (Cajero y Mozo) atender clientes cuando el chatbot requiere asistencia humana, validar capturas de pago para [[caja]], coordinar el envio de comandas a [[cocina]], registrar posibles [[reclamos]] y fidelizar a los [[clientes]].
 
 ## Como se hace: Atender un chat que requiere ayuda humana
-1. En la columna izquierda, revisar la pestana Por atender (chats con fondo naranja claro y etiqueta Requiere atencion).
+1. En la columna izquierda, revisar la pestana Todos: los chats que piden una persona tienen fondo naranja claro y la etiqueta Requiere atencion. La pestana Atendidos guarda los chats ya archivados.
 2. Seleccionar la conversacion del cliente en la lista.
 3. En la barra superior del chat, pulsar el boton Tomar chat para asignarse la conversacion. Si otro operador lo tenia asignado, se puede pulsar Forzar tomar chat tras confirmar la advertencia.
 4. Escribir la respuesta en el campo de texto inferior y presionar la tecla Enter o pulsar Enviar.
@@ -117,8 +117,7 @@ Ver tambien: [[caja]]
 7. Si el bot tiene un problema al procesar un mensaje del cliente, le responde una disculpa breve y le invita a escribir de nuevo o a pedir un asesor.
 
 ## Como se hace: Marcar un chat como no visto y leer las fechas
-1. Arriba de la lista, junto a Por atender, aparece el contador N sin ver. Los chats sin ver tienen una franja naranja, el nombre en negrita y la etiqueta Sin ver (mensajes nuevos del cliente) o No visto (marcado a mano).
-2. Para verlos juntos, pulsar la pestana No vistos.
+1. Arriba de la lista aparece el contador N sin ver. Los chats sin ver tienen una franja naranja, el nombre en negrita y la etiqueta Sin ver (mensajes nuevos del cliente) o No visto (marcado a mano).
 3. Para acordarse de volver a un chat, pulsar el boton de tres puntos de su fila y elegir Marcar como no visto, o abrir el chat y pulsar Marcar como no visto sobre la conversacion. La marca es del chat: la ve todo el equipo.
 4. La marca no se quita sola al abrir la lista: se quita al abrir ese chat o al elegir Marcar como visto en el menu de la fila.
 5. Dentro del chat, una franja con el dia (Hoy, Ayer, o Martes 3 de noviembre) separa los mensajes de cada dia, y cada mensaje muestra su hora. Al pasar el cursor o tocar la hora se ve la fecha completa, por ejemplo 3 nov 2026, 15:37.
