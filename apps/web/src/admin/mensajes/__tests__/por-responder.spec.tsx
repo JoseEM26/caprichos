@@ -28,9 +28,7 @@ describe('Por responder en Mensajes', () => {
     } as any);
     render(<MensajesView />);
     await waitFor(() => expect(screen.getByTestId('sin-leer-c1')).toHaveTextContent('3'));
-    const tabs = screen.getByTestId('pestanas').querySelectorAll('button');
-    expect(tabs[0]).toHaveTextContent('Por responder');
-    expect(tabs[0]).toHaveTextContent('2');
+    // Ya no hay pestaña «Por responder» (solo Todos y Atendidos); el globo, quién atiende y la espera siguen en la lista
     expect(screen.getByTestId('atiende-c1')).toHaveTextContent('WhatsApp Business');
     expect(screen.getByTestId('atiende-c2')).toHaveTextContent('Bot');
     expect(screen.getByTestId('esperando-c1')).toHaveTextContent('Esperando hace 25 min');

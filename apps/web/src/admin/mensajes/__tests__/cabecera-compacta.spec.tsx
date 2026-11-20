@@ -24,9 +24,9 @@ describe('cabecera compacta de la bandeja', () => {
     expect(screen.queryByTestId('badge-filtros')).toBeNull();
     expect(screen.getByTestId('boton-filtros')).toHaveAttribute('aria-expanded', 'false');
     const tabs = screen.getByTestId('pestanas');
-    expect(within(tabs).getAllByRole('button')).toHaveLength(6);
+    // Decisión del dueño (20/11): solo «Todos» y «Atendidos»
+    expect(within(tabs).getAllByRole('button').map((b) => b.textContent?.replace(/\s*\d+$/, ''))).toEqual(['Todos', 'Atendidos']);
     expect(tabs).toHaveClass('msg-tabs');
-    expect(screen.getByRole('button', { name: /Por atender/ })).toHaveAttribute('data-pendiente', '1');
     // el aviso de días anteriores se ve sin abrir el panel
     expect(screen.getByTestId('aviso-anteriores')).toHaveTextContent('35 de días anteriores sin atender');
   });

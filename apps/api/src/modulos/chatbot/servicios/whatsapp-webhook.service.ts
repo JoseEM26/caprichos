@@ -1962,7 +1962,7 @@ export class WhatsappWebhookService {
       // Una reacción no es una respuesta ni interrumpe al bot
       if (tipo === 'reaction' || (!texto && clase === 'TEXTO')) return 'OMITIDO';
 
-      const conv = await this.prisma.conversacion.findUnique({ where: { telefono: identificador } });
+      const conv = await this.chatDelMensajeDelLocal(identificador);
       const datos: any = { duenio: 'PERSONA', ultima_actividad: new Date() };
       const conversacion = conv
         ? await this.prisma.conversacion.update({ where: { id: conv.id }, data: datos })
@@ -1987,6 +1987,23 @@ export class WhatsappWebhookService {
       if (err?.code !== 'P2002') this.logger.warn(`No se pudo guardar un mensaje del local: ${err?.message}`);
       return 'OMITIDO';
     }
+  }
+
+  /**
+   * Chat al que va lo que el local escribe desde WhatsApp Business. WhatsApp a veces lo reporta con el número aunque el chat
+   * entró como LID (o al revés): sin este cruce la respuesta caía en un chat nuevo y en el chat real no se veía.
+   */
+  private async chatDelMensajeDelLocal(identificador: string) {
+    const directo = await this.prisma.conversacion.findUnique({ where: { telefono: identificador } });
+    if (directo) return directo;
+    if (identificador.startsWith('wa-user:')) {
+      // LID → celular aprendido (Redis o el propio chat) → chat de ese celular
+      const lid = identificador.replace(/\D/g, '');
+      const cel = this.redis ? await this.redis.obtenerCliente().get(claveParLidCelular(lid)).catch(() => null) : null;
+      return cel ? this.prisma.conversacion.findUnique({ where: { telefono: normalizarTelefono(cel) } }) : null;
+    }
+    // Número → chat que entró como LID y quedó vinculado a ese celular
+    return this.prisma.conversacion.findFirst({ where: { celular_vinculado: identificador.slice(-9) }, orderBy: { ultima_actividad: 'desc' } });
   }
 
   /**

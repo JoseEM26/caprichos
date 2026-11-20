@@ -74,7 +74,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
     vi.spyOn(api, 'marcarChatNoVisto').mockResolvedValue({ ok: true });
   });
 
-  it('muestra el contador «N sin ver», las insignias con texto y el filtro No vistos', async () => {
+  it('muestra el contador «N sin ver» y las insignias con texto', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
     await abrirFiltros();
@@ -83,9 +83,6 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
     expect(screen.getByTestId('sin-leer-c2')).toHaveAttribute('aria-label', '2 mensajes sin ver');
     expect(screen.getByTestId('no-visto-c3')).toHaveTextContent('No visto');
     expect(screen.queryByTestId('no-visto-c1')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: /No vistos/ }));
-    await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('novistos', '', undefined, expect.any(Object)));
   });
 
   it('abrir la lista no marca visto; abrir el chat sí', async () => {

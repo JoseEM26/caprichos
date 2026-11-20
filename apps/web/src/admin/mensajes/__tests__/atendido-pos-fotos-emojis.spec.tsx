@@ -40,7 +40,7 @@ describe('Atendido y punto de venta en la pantalla', () => {
 
   it('las pestañas muestran los contadores Por atender y Atendidos', async () => {
     render(<MensajesView />);
-    expect(await screen.findByRole('button', { name: /Por atender\s*1/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Todos\s*1/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Atendidos\s*4/ })).toBeInTheDocument();
   });
 

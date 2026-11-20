@@ -260,15 +260,9 @@ export function ListaChats({
 
       <div ref={pestanasRef} className="msg-tabs" role="group" aria-label="Filtrar chats" data-testid="pestanas">
         {[
-          { id: 'responder', label: 'Por responder', count: conteos.porResponder ?? 0 },
+          // Decisión del dueño (20/11): solo dos pestañas; «Atendidos» son los archivados
           { id: 'todos', label: 'Todos', count: conteos.todos },
-          { id: 'atender', label: 'Por atender', count: conteos.atender },
-          { id: 'bot', label: 'Con el bot', count: conteos.bot },
-          { id: 'novistos', label: 'No vistos', count: conteos.sinVer ?? 0 },
           { id: 'atendidos', label: 'Atendidos', count: conteos.atendidos },
-          ...((conteos.reprogramar ?? 0) > 0 || filtro === 'reprogramar'
-            ? [{ id: 'reprogramar', label: 'Por reprogramar', count: conteos.reprogramar ?? 0 }]
-            : []),
         ].map((tab) => {
           const activa = filtro === tab.id;
           return (

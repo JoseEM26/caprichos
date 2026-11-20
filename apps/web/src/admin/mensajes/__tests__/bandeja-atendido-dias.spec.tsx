@@ -84,7 +84,7 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
 
   const irAPorAtender = async () => {
     render(<MensajesView />);
-    fireEvent.click(await screen.findByRole('button', { name: /Por atender\s*3/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Todos\s*3/ }));
   };
 
   it('Por atender abre en «Hoy», avisa de los días anteriores y los muestra con encabezados y contadores', async () => {
@@ -200,8 +200,8 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
   it('un evento de socket por mensaje nuevo lo devuelve a Por atender con «Volvió a escribir»', async () => {
     respuesta = { conteos: { todos: 0, atender: 0, bot: 0, atendidos: 1, sinVer: 0 }, chats: [] };
     render(<MensajesView />);
-    fireEvent.click(await screen.findByRole('button', { name: /Por atender\s*0/ }));
-    expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('Todo al día');
+    fireEvent.click(await screen.findByRole('button', { name: /Todos\s*0/ }));
+    expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('No hay conversaciones');
     respuesta = {
       conteos: { todos: 1, atender: 1, bot: 0, atendidos: 0, sinVer: 1 },
       chats: [chat('5', { sinLeer: 1, volvioAEscribir: true })],
@@ -210,15 +210,6 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     alEvento();
     expect(await screen.findByTestId('volvio-5')).toHaveTextContent('Volvió a escribir');
     expect(screen.getByTestId('sin-leer-5')).toBeInTheDocument();
-  });
-
-  it('el chip «Por reprogramar» aparece con contador y lista los chats con esa etiqueta', async () => {
-    render(<MensajesView />);
-    const chip = await screen.findByRole('button', { name: /Por reprogramar\s*1/ });
-    respuesta = { ...respuesta, chats: [respuesta.chats[2]] };
-    fireEvent.click(chip);
-    expect(await screen.findByTestId('reprogramar-3')).toHaveTextContent('Entrega por reprogramar');
-    expect(api.listarConversaciones).toHaveBeenLastCalledWith('reprogramar', '', undefined, expect.any(Object));
   });
 
   it('el check tiene nombre accesible y tamaño táctil', async () => {

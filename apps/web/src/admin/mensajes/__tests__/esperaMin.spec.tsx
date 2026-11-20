@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MensajesView, obtenerEstiloEspera } from '../MensajesView';
 import * as api from '../mensajesApi';
 
@@ -105,71 +105,4 @@ describe('esperaMin y orden en lista Por atender (MensajesView)', () => {
     expect(b3.style.color).toContain('--cp-soft');
   });
 
-  it('en filtro Por atender ordena por más esperado primero (descendente por esperaMin)', async () => {
-    vi.spyOn(api, 'listarConversaciones').mockResolvedValue({
-      conteos: { todos: 3, atender: 3, bot: 0, atendidos: 0 },
-      chats: [
-        {
-          id: 'c-corto',
-          nombre: 'Cliente Corto',
-          telefono: '911111111',
-          estado: 'atencion',
-          urgente: false,
-          ultimo: 'Hola',
-          hora: '12:15',
-          sinLeer: 0,
-          esperaMin: 2,
-        },
-        {
-          id: 'c-maximo',
-          nombre: 'Cliente Maximo',
-          telefono: '922222222',
-          estado: 'atencion',
-          urgente: true,
-          ultimo: 'Urgente',
-          hora: '11:55',
-          sinLeer: 1,
-          esperaMin: 25,
-        },
-        {
-          id: 'c-medio',
-          nombre: 'Cliente Medio',
-          telefono: '933333333',
-          estado: 'atencion',
-          urgente: false,
-          ultimo: 'Aviso',
-          hora: '12:05',
-          sinLeer: 0,
-          esperaMin: 12,
-        },
-      ],
-    });
-
-    render(<MensajesView />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Cliente Corto')).toBeInTheDocument();
-    });
-
-    // Cambiar a pestaña Por atender
-    const btnAtender = screen.getByRole('button', { name: /Por atender/i });
-    fireEvent.click(btnAtender);
-
-    await waitFor(() => {
-      const rows = screen.getAllByRole('button').filter((b) => b.className.includes('msg-fila'));
-      expect(rows).toHaveLength(3);
-
-      // El más esperado (25 min) debe ser el primero
-      expect(rows[0]).toHaveTextContent('Cliente Maximo');
-      expect(rows[0]).toHaveTextContent('Espera: 25 min');
-
-      // El del medio (12 min) es el segundo
-      expect(rows[1]).toHaveTextContent('Cliente Medio');
-      expect(rows[1]).toHaveTextContent('Espera: 12 min');
-
-      // El menor (2 min) es el tercero
-      expect(rows[2]).toHaveTextContent('Cliente Corto');
-      expect(rows[2]).toHaveTextContent('Espera: 2 min');
-    });
-  });
 });

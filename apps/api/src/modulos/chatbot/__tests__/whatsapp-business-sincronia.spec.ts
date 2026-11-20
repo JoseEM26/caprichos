@@ -62,8 +62,18 @@ describe('Mensajes que el local escribe desde WhatsApp Business (fromMe)', () =>
 
   it('humano a un cliente sin chat: crea la conversación en manos de una persona', async () => {
     prisma.conversacion.findUnique.mockResolvedValue(null);
+    prisma.conversacion.findFirst.mockResolvedValue(null);
     expect(await webhook.registrarMensajeDelLocal(msg())).toBe('GUARDADO');
     expect(prisma.conversacion.create.mock.calls[0][0].data).toMatchObject({ telefono: CLIENTE, duenio: 'PERSONA' });
+  });
+
+  it('chat que entró sin número (LID) y quedó vinculado al celular: la respuesta desde el celular va a ESE chat, no a uno nuevo', async () => {
+    prisma.conversacion.findUnique.mockResolvedValue(null);
+    prisma.conversacion.findFirst.mockResolvedValue({ id: 33n, duenio: 'BOT' });
+    expect(await webhook.registrarMensajeDelLocal(msg())).toBe('GUARDADO');
+    expect(prisma.conversacion.findFirst.mock.calls[0][0].where).toEqual({ celular_vinculado: String(CLIENTE).slice(-9) });
+    expect(prisma.conversacion.create).not.toHaveBeenCalled();
+    expect(prisma.conversacion.update.mock.calls[0][0].where).toEqual({ id: 33n });
   });
 
   it.each([
