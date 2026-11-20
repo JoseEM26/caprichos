@@ -64,6 +64,12 @@ describe('registrarPago PAGADO crea el Cobro', () => {
     ]);
   });
 
+  it('plan que ya trae la propina (CP-W926: 29 + propina 2, plan Yape 31): no la suma dos veces', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ total: 29, propina: 2, planPago: [{ medio: 'YAPE', monto: 31 }] }));
+    await confirmar();
+    expect(cobros.cobrar.mock.calls[0][0].pagos).toEqual([{ medio: 'YAPE', monto: 31 }]);
+  });
+
   it('caja cerrada: 409 CAJA_CERRADA y no se marca nada', async () => {
     prisma.caja.findUnique.mockResolvedValue({ estado: 'CERRADA' });
     await expect(confirmar()).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });

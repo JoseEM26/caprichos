@@ -1711,7 +1711,10 @@ export class PedidosEstadoService {
       const renglones = plan.length
         ? plan.map((f) => ({ medio: String(f.medio), monto: aCentimos(f.monto) }))
         : [{ medio: metodoUpper, monto: aCentimos(montoACobrar(pedido)) }];
-      renglones[0].monto += aCentimos(pedido.propina ?? 0);
+      // El plan guardado ya trae la propina (se valida contra total + propina al crear, editar o agregar un servicio);
+      // solo se suma cuando no la trae (sin plan, o un plan antiguo que cuadra con la venta sola)
+      const sumaRenglones = renglones.reduce((a, r) => a + r.monto, 0);
+      if (sumaRenglones === aCentimos(montoACobrar(pedido))) renglones[0].monto += aCentimos(pedido.propina ?? 0);
       await this.cobros!.cobrar(
         {
           pedidoId: pedido.id.toString(),
