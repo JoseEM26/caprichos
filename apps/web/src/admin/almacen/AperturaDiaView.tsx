@@ -295,10 +295,10 @@ export function AperturaDiaView() {
       const items: ItemApertura[] = aEnviar.map(({ c, cantidad, produccionHoy }) => {
         const item: ItemApertura = { productoId: c.productoId, cantidad, produccion: produccionHoy };
         if (c.saborId) item.saborId = c.saborId;
+        // Saldo contra el que contó: la API resta lo vendido mientras tanto (si no, el conteo devolvía esas ventas)
+        if (cantidad !== c.quedaronAyer) item.saldoEsperado = cambiadas[c.clave]?.antes ?? c.saldo;
         if (mermaDe(c) > 0) {
           const m = motivos[c.clave];
-          // si el stock cambió mientras contaba, se manda el saldo contra el que contó: la API lo rechaza y recuenta
-          item.saldoEsperado = cambiadas[c.clave]?.antes ?? c.saldo;
           item.motivo = m?.motivo || undefined;
           if (m?.motivo === 'OTRO') item.nota = m.nota.trim();
         }

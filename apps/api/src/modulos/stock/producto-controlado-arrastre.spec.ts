@@ -304,13 +304,29 @@ describe('Apertura: bajar el conteo = MERMA con motivo', () => {
     expect(db.movimientoStock.filas[0].nota).toBe('Merma · Otro · Se quemó');
   });
 
-  it('el saldo cambió mientras contaba: 409 CONTEO_DESACTUALIZADO sin tocar nada', async () => {
+  it('se vendió mientras contaba: la venta no se pierde y la merma sale contra el saldo real', async () => {
     const db = dbDos();
-    db.stockSabor.filas[0].cantidad = 9; // se vendió una
+    db.stockSabor.filas[0].cantidad = 9; // se vendió una mientras contaba 7 (de 10)
+    await registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'VENCIDO', saldoEsperado: 10 } });
+    expect(saldoFresa(db)).toBe(6); // 7 contadas − 1 vendida después
+    const merma = db.movimientoStock.filas.find((x: Row) => x.tipo === 'MERMA');
+    expect(Math.abs(Number(merma.cantidad))).toBe(3);
+  });
+
+  it('conteo que SUBE con ventas mientras contaba: resta lo vendido (antes lo devolvía al saldo)', async () => {
+    const db = dbDos();
+    db.stockSabor.filas[0].cantidad = 8; // contó 12 cuando veía 10; luego se vendieron 2
+    await registrarAperturaArrastre(db, { ...base, quedaron: 12, merma: { ...m, saldoEsperado: 10 } });
+    expect(saldoFresa(db)).toBe(10); // 12 contadas − 2 vendidas
+  });
+
+  it('el saldo SUBIÓ mientras contaba (otra entrada) y el conteo baja: 409 CONTEO_DESACTUALIZADO sin tocar nada', async () => {
+    const db = dbDos();
+    db.stockSabor.filas[0].cantidad = 11;
     await expect(
       registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'VENCIDO', saldoEsperado: 10 } }),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(saldoFresa(db)).toBe(9);
+    expect(saldoFresa(db)).toBe(11);
     expect(db.movimientoStock.filas).toHaveLength(0);
   });
 

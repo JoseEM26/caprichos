@@ -768,7 +768,12 @@ export async function registrarAperturaArrastre(
   // (se vendió producción de hoy) ese 0 no es un conteo: es «sin cambios». Así guardar no devuelve lo ya vendido.
   const saldoActual = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
   const sinCambios = c.quedaron === Math.max(0, saldoActual - previa);
-  const objetivo = sinCambios ? saldoActual : c.quedaron + previa;
+  // Lo vendido entre que se contó (saldoEsperado = saldo que veía la pantalla) y el guardado ya salió del local: el
+  // conteo no lo incluye. Sin restarlo, guardar un conteo viejo devolvía al saldo esas ventas (ventas «perdidas»).
+  // ponytail: solo resta bajadas; si a la vez otra persona sumó producción, esa venta neta puede quedar corta.
+  const esperado = c.merma?.saldoEsperado;
+  const vendidoMientras = !sinCambios && esperado !== undefined ? Math.max(0, esperado - saldoActual) : 0;
+  const objetivo = sinCambios ? saldoActual : Math.max(0, c.quedaron + previa - vendidoMientras);
   let mermado: { cantidad: number; motivo: MotivoMermaProducto; movimientoId: bigint } | undefined;
   if (c.merma && objetivo < saldoActual) {
     const { motivo, nota, saldoEsperado, nombre, saborNombre } = c.merma;
@@ -781,7 +786,7 @@ export async function registrarAperturaArrastre(
     if (motivo === 'OTRO' && !notaOtroValida(nota)) {
       throw new BadRequestException({ codigo: 'NOTA_OBLIGATORIA', mensaje: `Si el motivo es Otro, escribe una nota de al menos ${NOTA_OTRO_MINIMA} letras` });
     }
-    if (saldoEsperado !== undefined && saldoEsperado !== saldoActual) {
+    if (saldoEsperado !== undefined && saldoEsperado < saldoActual) {
       throw new ConflictException({
         codigo: 'CONTEO_DESACTUALIZADO',
         mensaje: `El stock de ${nombre}${saborNombre ? ` · ${saborNombre}` : ''} cambió mientras contabas (ahora ${saldoActual}). Recarga la pantalla y vuelve a contar.`,

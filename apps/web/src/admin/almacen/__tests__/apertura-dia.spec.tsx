@@ -105,7 +105,7 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
         { productoId: 'd1', cantidad: 9, produccion: 0, saldoEsperado: 10, motivo: 'SE_CAYO' },
-        { productoId: 'g1', cantidad: 7, produccion: 0 },
+        { productoId: 'g1', cantidad: 7, produccion: 0, saldoEsperado: 6 },
       ]),
     );
   });
