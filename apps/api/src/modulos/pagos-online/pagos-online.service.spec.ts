@@ -92,9 +92,10 @@ function armar(opts: { activo?: boolean; pasarela?: PasarelaPago; pedido?: Parti
   const auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
   const pasarela = opts.pasarela ?? new SimuladoAdaptador();
   const gateway: any = { emitirAdmin: jest.fn() };
-  const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela, gateway);
+  const avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENCOLADO' }) };
+  const s = new PagosOnlineService(prisma, auditoria as any, cobros as any, pasarela, gateway, undefined, avisos as any);
   const acceso = { seguimientoToken: generarTokenSeguimiento(pedido.id) };
-  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela, pagoCulqi, gateway };
+  return { s, prisma, cobros, auditoria, pedido, intentos, eventos, acceso, pasarela, pagoCulqi, gateway, avisos };
 }
 
 describe('PagosOnlineService', () => {
@@ -166,6 +167,14 @@ describe('PagosOnlineService', () => {
     expect(gateway.emitirAdmin).toHaveBeenCalledWith('pedido:nuevo', expect.objectContaining({ codigo: 'P-0007', estado: 'COLA' }));
     expect(intentos[0]).toMatchObject({ estado: 'APROBADO', ultimos4: '1111' });
     expect(intentos[0].cobrado_en).toBeInstanceOf(Date);
+  });
+
+  it('el «recibimos tu pedido» por WhatsApp sale recién al aprobarse el pago (no al crearlo sin pagar)', async () => {
+    const { s, acceso, avisos } = armar();
+    const { intentoId } = await s.crearIntento('7', acceso);
+    expect(avisos.avisar).not.toHaveBeenCalled();
+    await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
+    expect(avisos.avisar).toHaveBeenCalledWith(expect.anything(), 'RECIBIDO', {});
   });
 
   it('Yape aprobado queda como YAPE', async () => {
@@ -540,6 +549,18 @@ describe('PagosOnlineVencimientoService', () => {
     const { v, pedidos } = armarV(15, [{ id: 1n }, { id: 2n }]);
     pedidos.cambiarEstado.mockRejectedValueOnce(new Error('x'));
     expect(await v.anularVencidos(new Date())).toBe(1);
+  });
+
+  it('al anular por falta de pago le avisa al cliente por WhatsApp (caso CP-W920: tenía el código y nadie le avisó)', async () => {
+    const { prisma, pedidos } = armarV(15, [{ id: 7n, codigo: 'CP-W920', cliente_telefono: '989690890' }, { id: 8n, codigo: 'CP-W921', cliente_telefono: null }]);
+    const outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
+    const v = new PagosOnlineVencimientoService(prisma, {} as any, pedidos as any, outbox as any);
+    expect(await v.anularVencidos(new Date())).toBe(2);
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+    const [d] = outbox.encolar.mock.calls[0];
+    expect(d).toMatchObject({ tipo: 'TEXTO', clave: 'pago-online-vencido-7', origen: 'PAGO_ONLINE_VENCIDO' });
+    expect(d.carga.textoLibre).toContain('CP-W920');
+    expect(d.carga.textoLibre).toContain('no se registró');
   });
 });
 

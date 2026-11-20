@@ -1,4 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
+import { telefonoEnviable } from '../chatbot/utilidades/enmascarar.util';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { adquirirCandado } from '../../comun/redis/candado.util';
@@ -21,6 +23,7 @@ export class PagosOnlineVencimientoService implements OnModuleInit, OnModuleDest
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly pedidos: PedidosEstadoService,
+    @Optional() private readonly outbox?: OutboxWhatsappService,
   ) {}
 
   onModuleInit() {
@@ -57,7 +60,7 @@ export class PagosOnlineVencimientoService implements OnModuleInit, OnModuleDest
         creado_en: { lte: corte },
         pagosOnline: { none: { estado: { in: ['PROCESANDO', 'PENDIENTE', 'APROBADO'] } } },
       },
-      select: { id: true },
+      select: { id: true, codigo: true, cliente_telefono: true },
       take: 100,
     });
     if (!vencidos.length) return 0;
@@ -75,10 +78,26 @@ export class PagosOnlineVencimientoService implements OnModuleInit, OnModuleDest
         await this.pedidos.cambiarEstado(p.id, { estado: 'ANULADO', motivo: `Sin pago en línea en ${min} minutos` } as any, usuario);
         await this.prisma.pagoOnlineIntento.updateMany({ where: { pedido_id: p.id, estado: 'CREADO' }, data: { estado: 'FALLIDO', mensaje: 'Venció el tiempo para pagar' } });
         n += 1;
+        await this.avisarCliente(p).catch((e: any) => this.logger.warn(`Aviso de pedido sin pago ${p.id} no encolado: ${e?.message}`));
       } catch (e: any) {
         this.logger.warn(`No se anuló el pedido ${p.id} sin pago: ${e?.message}`);
       }
     }
     return n;
+  }
+
+  /** El cliente ya recibió el código en la carta: se le dice que el pedido no quedó porque el pago no se completó. */
+  private async avisarCliente(p: { id: bigint; codigo: string; cliente_telefono: string | null }): Promise<void> {
+    const telefono = telefonoEnviable(p.cliente_telefono);
+    if (!telefono || !this.outbox) return;
+    const texto = `Hola 👋 Tu pedido ${p.codigo} no se registró porque el pago en línea no se completó a tiempo, así que no lo preparamos. 🙏\nSi aún lo quieres, puedes hacerlo de nuevo en la carta o escribirnos por aquí y te ayudamos 💛`;
+    await this.outbox.encolar({
+      telefono,
+      tipo: 'TEXTO',
+      clave: `pago-online-vencido-${p.id}`,
+      origen: 'PAGO_ONLINE_VENCIDO',
+      carga: { textoLibre: texto, autor: 'BOT', etapa: 'PAGO_ONLINE_VENCIDO' },
+    });
+    this.outbox.despertar();
   }
 }

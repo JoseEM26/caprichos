@@ -169,6 +169,7 @@ export class AvisosPedidoService {
         monto_credito: true,
         pago_metodo: true,
         pago_preferido: true,
+        pago_estado: true,
         canal: true,
         party_id: true,
         cliente_party_id: true,
@@ -179,6 +180,8 @@ export class AvisosPedidoService {
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
+    // Pago en línea aún sin pagar: no se dice «recibimos tu pedido» (si no paga, se anula). Sale al aprobarse el pago.
+    if (etapa === 'RECIBIDO' && (pedido as any).pago_estado === 'PENDIENTE_ONLINE') return { estado: 'OMITIDO', motivo: 'ESPERA_PAGO_EN_LINEA' };
     // Pedido del bot o de WhatsApp: el bot ya confirmó el pedido en la conversación, no se manda un «recibido» extra
     if (etapa === 'RECIBIDO' && (pedido.canal === 'BOT' || pedido.canal === 'WHATSAPP')) return { estado: 'OMITIDO', motivo: 'LO_CONFIRMA_EL_BOT' };
     // El pedido del personal nunca se avisa

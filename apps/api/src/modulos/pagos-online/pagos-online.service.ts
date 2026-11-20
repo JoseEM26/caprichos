@@ -1,3 +1,4 @@
+import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { ConflictException, ForbiddenException, HttpException, Inject, Injectable, Logger, NotFoundException, Optional, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -49,6 +50,7 @@ export class PagosOnlineService {
     @Inject(PASARELA_PAGO) private readonly pasarela: PasarelaPago,
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() nucleo?: DevolucionCulqiService,
+    @Optional() private readonly avisos?: AvisosPedidoService,
   ) {
     this.nucleo = nucleo ?? new DevolucionCulqiService(prisma, pasarela);
   }
@@ -431,6 +433,8 @@ export class PagosOnlineService {
         }
       }
       await this.prisma.pagoOnlineIntento.update({ where: { id: intentoId }, data: { cobrado_en: ahora, cobro_error: null } });
+      // Recién pagado: ahora sí el «recibimos tu pedido» (con pago confirmado). Al crearlo se omitió porque aún no pagaba.
+      if (estabaPorPagar) await this.avisos?.avisar(pedido.id, 'RECIBIDO', {}).catch(() => undefined);
       await this.auditoria.registrar({
         categoria: 'CAMBIO', modulo: 'pagos_online', accion: 'PAGO_ONLINE_APROBADO', resultado: 'OK',
         entidad: 'pedido', entidadId: pedido.id,

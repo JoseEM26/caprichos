@@ -6,9 +6,10 @@ import { PagosOnlineVencimientoService } from './pagos-online-vencimiento.servic
 import { PagosOnlineAdminController, PagosOnlinePublicoController } from './pagos-online.controller';
 import { PagosOnlineService } from './pagos-online.service';
 import { DevolucionCulqiModule } from './devolucion-culqi.module';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 
 @Module({
-  imports: [DevolucionCulqiModule, CajaModule, ClientesModule, PedidosAdminModule],
+  imports: [DevolucionCulqiModule, CajaModule, ClientesModule, PedidosAdminModule, ChatbotModule],
   controllers: [PagosOnlinePublicoController, PagosOnlineAdminController],
   providers: [PagosOnlineService, PagosOnlineVencimientoService],
   exports: [PagosOnlineService],

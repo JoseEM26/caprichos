@@ -146,6 +146,14 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
+  it('pago en línea aún sin pagar (CP-W920): no se dice «recibimos tu pedido»', async () => {
+    pedido.canal = 'CARTA';
+    pedido.pago_metodo = 'CULQI';
+    pedido.pago_estado = 'PENDIENTE_ONLINE';
+    expect(await servicio.avisar(77, 'RECIBIDO')).toEqual({ estado: 'OMITIDO', motivo: 'ESPERA_PAGO_EN_LINEA' });
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
   it('pago digital en RECIBIDO: encola el aviso y anota el pedido en el chat SIN tomarlo (captura opcional: sin VALIDAR_PAGO ni urgente)', async () => {
     pedido.pago_metodo = 'YAPE';
     pedido.pago_preferido = 'YAPE';
