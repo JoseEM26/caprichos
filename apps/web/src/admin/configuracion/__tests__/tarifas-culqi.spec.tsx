@@ -42,10 +42,10 @@ describe('Comisión de Culqi en Parámetros de operación', () => {
     render(<ParametrosOperacionTab puedeVer puedeEditar />);
 
     const grupo = await screen.findByTestId('grupo-parametros-pago_online');
-    expect(within(grupo).getByText('Comisión de Culqi por tarjeta: porcentaje (sin IGV)')).toBeInTheDocument();
-    expect(within(grupo).getByText('Comisión de Culqi por tarjeta: monto fijo (sin IGV)')).toBeInTheDocument();
-    expect(within(grupo).getByText('Comisión de Culqi por Yape: porcentaje (sin IGV)')).toBeInTheDocument();
-    expect(within(grupo).getByText('Comisión de Culqi por Yape: monto fijo (sin IGV)')).toBeInTheDocument();
+    expect(within(grupo).getByText('Comisión de Culqi por tarjeta: porcentaje (IGV incluido)')).toBeInTheDocument();
+    expect(within(grupo).getByText('Comisión de Culqi por tarjeta: monto fijo (IGV incluido)')).toBeInTheDocument();
+    expect(within(grupo).getByText('Comisión de Culqi por Yape: porcentaje (IGV incluido)')).toBeInTheDocument();
+    expect(within(grupo).getByText('Comisión de Culqi por Yape: monto fijo (IGV incluido)')).toBeInTheDocument();
     expect(within(grupo).getAllByText('Sin configurar')).toHaveLength(4);
     expect(within(grupo).queryByText(/null/)).not.toBeInTheDocument();
     expect(within(grupo).getAllByRole('button', { name: /^Editar$/ })).toHaveLength(5);

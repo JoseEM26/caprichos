@@ -565,8 +565,8 @@ describe('Comisión de la pasarela (la asume el local)', () => {
     expect(comisionDeCargoCulqi({ total_fee: 240, total_fee_taxes: 43 }, 5250)?.total).toBe(2.83);
   });
 
-  it('comisionEstimada: porcentaje + fijo + IGV 18 %; sin tarifa, null', () => {
-    expect(comisionEstimada(52.5, { pct: 4, fijo: 0.3 })).toEqual({ total: 2.83, detalle: { fijo: 0.3, variable: 2.1, igv: 0.43, neto_depositado: 49.67, fuente: 'ESTIMADA' } });
+  it('comisionEstimada: porcentaje + fijo (IGV incluido, no se suma otra vez); sin tarifa, null', () => {
+    expect(comisionEstimada(52.5, { pct: 4, fijo: 0.3 })).toEqual({ total: 2.4, detalle: { fijo: 0.3, variable: 2.1, igv: 0, neto_depositado: 50.1, fuente: 'ESTIMADA' } });
     expect(comisionEstimada(52.5, null)).toBeNull();
   });
 
@@ -588,7 +588,7 @@ describe('Comisión de la pasarela (la asume el local)', () => {
       where.clave === 'culqi_comision_tarjeta_pct' ? { valor: 4 } : where.clave === 'culqi_comision_tarjeta_fijo' ? { valor: 0.3 } : { valor: { CARTA: { PAGO_EN_LINEA: true } } });
     const { intentoId } = await s.crearIntento('7', acceso);
     await s.cargar({ intentoId, token: 'tkn_simulado_ok', medio: 'TARJETA' });
-    expect(pagoCulqi.comision_pasarela).toBe(2.83);
+    expect(pagoCulqi.comision_pasarela).toBe(2.4);
     expect(pagoCulqi.comision_detalle.fuente).toBe('ESTIMADA');
   });
 

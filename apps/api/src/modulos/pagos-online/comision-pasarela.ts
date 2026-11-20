@@ -14,7 +14,6 @@ export interface ComisionCobro {
   detalle: ComisionDetalle;
 }
 
-export const IGV = 0.18;
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /**
@@ -51,16 +50,15 @@ export interface TarifaCulqi {
 }
 
 /**
- * Estimada con la tarifa que el ADMIN configura (pct y fijo SIN IGV; el IGV 18 % se suma). Sin porcentaje configurado: null
+ * Estimada con la tarifa que el ADMIN configura (pct y fijo ya con el IGV incluido: es lo que Culqi cobra). Sin porcentaje configurado: null
  * («por confirmar»). El fijo sin configurar cuenta 0 solo cuando el porcentaje sí está.
  */
 export function comisionEstimada(montoSoles: number, tarifa: TarifaCulqi | null): ComisionCobro | null {
   if (!tarifa) return null;
   const variable = Math.round(montoSoles * tarifa.pct) / 100;
   const base = variable + tarifa.fijo;
-  const igv = Math.round(base * IGV * 100) / 100;
-  const total = Math.round((base + igv) * 100) / 100;
-  return { total, detalle: { fijo: tarifa.fijo, variable, igv, neto_depositado: Math.round((montoSoles - total) * 100) / 100, fuente: 'ESTIMADA' } };
+  const total = Math.round(base * 100) / 100;
+  return { total, detalle: { fijo: tarifa.fijo, variable, igv: 0, neto_depositado: Math.round((montoSoles - total) * 100) / 100, fuente: 'ESTIMADA' } };
 }
 
 /** Lee la tarifa del medio (TARJETA | YAPE) de la tabla parametro. */
