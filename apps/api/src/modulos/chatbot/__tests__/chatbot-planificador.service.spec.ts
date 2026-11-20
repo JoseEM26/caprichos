@@ -200,6 +200,10 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
     });
     expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'RETIRO', { recargo: 5, recargoModo: 'IGUAL_ENVIO' });
     expect(mockEventos.emitirAdmin).toHaveBeenCalledWith('reparto:incidente', expect.anything());
+    // CP-W904: el retiro es del sistema; antes quedaba a nombre del repartidor y parecía que él lo marcó
+    expect(mockPrisma.pedidoEstadoHistorial.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ por_party_id: null, motivo: expect.stringContaining('lo hizo el sistema') }),
+    });
   });
 
   it('retiro: si el pedido ya no está en puerta con ese repartidor (updateMany sin filas) no avisa ni registra', async () => {

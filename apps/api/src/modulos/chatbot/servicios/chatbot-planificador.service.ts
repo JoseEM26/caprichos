@@ -586,8 +586,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
           pedido_id: pedidoId,
           estado_anterior: 'EN_CAMINO',
           estado_nuevo: 'LISTO',
-          motivo: 'Retiro por espera agotada',
-          por_party_id: repartidorPartyId,
+          // Lo hace el sistema, no el repartidor: sin autor y dicho en el motivo (antes salía a nombre del repartidor)
+          motivo: 'Retiro automático por espera agotada (lo hizo el sistema: no se marcó Entregado a tiempo)',
+          por_party_id: null,
           en: ahora,
         },
       });
