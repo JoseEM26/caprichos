@@ -753,8 +753,18 @@ describe('CierreService', () => {
       prismaMock.pedido.findMany.mockResolvedValue([]);
       await service.cerrar(cerrarDto, mockUsuarioCajero);
       expect(prismaMock.pedido.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA } }),
+        expect.objectContaining({ where: { creado_en: { lt: expect.any(Date) }, estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA } }),
       );
+    });
+
+    it('caja de ayer abierta: los pedidos de hoy (en cocina o sin cobrar) no bloquean su cierre', async () => {
+      prismaMock.pedido.count.mockResolvedValue(0);
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+      await service.cerrar(cerrarDto, mockUsuarioCajero);
+      const fin = new Date('2026-10-22T05:00:00.000Z');
+      expect(prismaMock.pedido.count.mock.calls[0][0].where.creado_en).toEqual({ lt: fin });
+      const sinTerminar = prismaMock.pedido.findMany.mock.calls.find((c: any) => c[0].where?.estado?.notIn);
+      expect(sinTerminar[0].where.creado_en).toEqual({ lt: fin });
     });
 
     it('un pedido PROGRAMADO (para otro día, aunque no esté cobrado) no cuenta como cobro en curso ni sin terminar: el cierre de hoy pasa', async () => {

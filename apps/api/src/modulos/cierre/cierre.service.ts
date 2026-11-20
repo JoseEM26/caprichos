@@ -182,6 +182,15 @@ export class CierreService {
   }
 
   /**
+   * Fin del día de la caja abierta (Lima). Los pedidos creados desde ahí son del día siguiente: no bloquean
+   * el cierre de una caja que quedó abierta de ayer. Sin caja abierta, sin límite.
+   */
+  private async finDiaCajaAbierta(db: any = this.prisma): Promise<{ creado_en?: { lt: Date } }> {
+    const caja = await db.caja?.findFirst?.({ where: { estado: 'ABIERTA' }, orderBy: { id: 'desc' }, select: { fecha: true } });
+    return caja?.fecha ? { creado_en: { lt: rangoDiaCaja(new Date(caja.fecha)).fin } } : {};
+  }
+
+  /**
    * Bloquea la caja y comprueba que siga abierta. Todo lo que escribe en la caja pasa por aquí.
    */
   private async bloquearCajaAbierta(tx: Prisma.TransactionClient, cajaId: bigint) {
@@ -554,8 +563,11 @@ export class CierreService {
 
       // 1. No puede haber cobros en curso ni pedidos pendientes de confirmación.
       // Un entregado sin cobrar ya justificado por el ADMIN (sin_cobro_justificado_en) no vuelve a bloquear.
+      // Solo pedidos hasta el fin del día de esta caja: los de hoy no bloquean cerrar la de ayer.
+      const delDia = { creado_en: { lt: rangoDiaCaja(new Date(caja.fecha)).fin } };
       const cobrosEnCurso = await tx.pedido.count({
         where: {
+          ...delDia,
           pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
           // Un pedido PROGRAMADO (para otro día) aún no es venta del día: no bloquea ni descuadra el cierre.
           // Lo ya adelantado entra por pedido_adelanto en la caja del día en que se recibió.
@@ -567,7 +579,7 @@ export class CierreService {
       if (cobrosEnCurso > 0) {
         // Entregados sin cobrar de Para llevar / Recoger / Delivery digital: se cobran, se anulan o el ADMIN los justifica
         const entregados = await tx.pedido.findMany({
-          where: { pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO', sin_cobro_justificado_en: null },
+          where: { ...delDia, pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, estado: 'ENTREGADO', sin_cobro_justificado_en: null },
           select: { id: true, codigo: true, modalidad: true, pago_estado: true, pago_metodo: true, es_personal: true, total: true, monto_credito: true, adelanto_total: true, planPago: { select: { medio: true, monto: true } } },
           orderBy: { creado_en: 'asc' },
         });
@@ -618,7 +630,7 @@ export class CierreService {
       }
 
       // 1b. Ningún pedido sin terminar (ni pagado): todo debe quedar ENTREGADO o ANULADO. Solo el ADMIN justifica.
-      const sinTerminar = await this.pedidosSinTerminar(tx);
+      const sinTerminar = await this.pedidosSinTerminar(tx, delDia);
       if (sinTerminar.length > 0) {
         const esAdminST = tieneRol(usuario, 'ADMIN');
         const motivoST = (dto.motivoPedidosSinTerminar ?? '').trim();
@@ -1330,9 +1342,10 @@ export class CierreService {
    * Pedidos de cualquier día que no están en estado final (ENTREGADO o ANULADO), pagados o no.
    * Bloquean el cierre (PEDIDOS_SIN_TERMINAR). Sin teléfono ni DNI.
    */
-  async pedidosSinTerminar(db: any = this.prisma) {
+  async pedidosSinTerminar(db: any = this.prisma, delDia?: { creado_en?: { lt: Date } }) {
+    const hasta = delDia ?? (await this.finDiaCajaAbierta(db));
     const pedidos = await db.pedido.findMany({
-      where: { estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA },
+      where: { ...hasta, estado: { notIn: ['ENTREGADO', 'ANULADO', 'PROGRAMADO'] }, ...SIN_ABANDONADOS_EN_LINEA },
       orderBy: { creado_en: 'asc' },
       select: { id: true, codigo: true, canal: true, modalidad: true, estado: true, pago_estado: true, total: true, creado_en: true, cliente_nombre: true },
     });
@@ -1351,8 +1364,10 @@ export class CierreService {
 
   /** `justificados`: la lista aparte de los entregados sin cobrar que el ADMIN ya justificó (no bloquean el cierre). */
   async listarPendientesDeCobro(justificados = false) {
+    const hasta = await this.finDiaCajaAbierta();
     const pedidos = await this.prisma.pedido.findMany({
       where: {
+        ...hasta,
         pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
         estado: { notIn: ['ANULADO', 'PROGRAMADO'] },
         cobros: { none: { anulado_en: null } },
