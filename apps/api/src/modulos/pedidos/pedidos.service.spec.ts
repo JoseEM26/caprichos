@@ -1384,7 +1384,7 @@ describe('PedidosService', () => {
       };
 
       beforeEach(() => {
-        prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+        prismaMock.cupon = { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ tope_usos: null }) };
         prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
         prismaMock.pedido.create.mockImplementation(({ data }: any) =>
           Promise.resolve({ id: 300n, codigo: 'CP-W300', estado: 'COLA', subtotal: 28, envio: Number(data.envio), total: Number(data.total) }),
@@ -1791,7 +1791,7 @@ describe('PedidosService', () => {
           total: data.total,
         });
       });
-      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ tope_usos: null }) };
       prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
 
       const res = await service.crear(
@@ -1828,7 +1828,7 @@ describe('PedidosService', () => {
       prismaMock.pedido.create.mockImplementation(({ data }: any) =>
         Promise.resolve({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: data.subtotal, descuento: data.descuento, envio: data.envio, total: data.total }),
       );
-      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+      prismaMock.cupon = { update: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ tope_usos: null }) };
       prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
 
       await service.crear({ ...pedidoBaseDto, cuponCodigo: 'BIENVENIDO5' }, 'idemp-cupon-mozo', { canal: 'MOZO', usuarioPartyId: 77n });

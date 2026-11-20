@@ -1455,6 +1455,33 @@ describe('OfertasService', () => {
       ).rejects.toMatchObject({ response: { codigo: 'CUPON_NO_APLICA_CANAL' } });
       expect(prismaMock.cupon.findUnique).not.toHaveBeenCalled();
     });
+
+    const cuponCompartido = (extra: any = {}) => ({
+      id: 9n, modo: 'COMPARTIDO', codigo_base: 'SOLOCARTA', descuento_tipo: 'PORCENTAJE', descuento_valor: 20, compra_minima: null,
+      categoria_id: null, producto_id: null, canales: ['CARTA'], medios_pago: [], dias: [], hora_desde: null, hora_hasta: null,
+      fecha_desde: null, fecha_hasta: null, requiere_cuenta: false, tope_usos: null, usos_actuales: 0, max_por_cliente: null, activo: true, ...extra,
+    });
+
+    it('un cupón solo de carta no vale en caja (cualquier tipo, no solo envío gratis)', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([]);
+      prismaMock.cuponEmitido = { findUnique: jest.fn().mockResolvedValue(null) };
+      prismaMock.cupon.findUnique.mockResolvedValue(cuponCompartido());
+      await expect(service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'CAJA', cuponCodigo: 'SOLOCARTA' })).rejects.toMatchObject({
+        response: { codigo: 'CUPON_NO_APLICA_CANAL' },
+      });
+    });
+
+    it('cupón «toda la carta» descuenta solo las líneas elegibles (no el producto de un combo ni los que no suman beneficios)', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([]);
+      prismaMock.cuponEmitido = { findUnique: jest.fn().mockResolvedValue(null) };
+      prismaMock.cupon.findUnique.mockResolvedValue(cuponCompartido({ canales: [] }));
+      const conExcluida = [
+        { productoId: 1n, categoriaId: 2n, cantidad: 1, subtotal: 20 },
+        { productoId: 3n, categoriaId: 2n, cantidad: 1, subtotal: 30, noSumaBeneficios: true },
+      ];
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 50, lineas: conExcluida as any, canal: 'CARTA', cuponCodigo: 'SOLOCARTA' });
+      expect(res.descuentoTotal).toBe(4); // 20 % de 20, no de 50
+    });
   });
 
   describe('visible en la carta (diseñador)', () => {

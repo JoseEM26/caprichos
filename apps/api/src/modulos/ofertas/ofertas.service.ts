@@ -1,7 +1,7 @@
 import { leerPuntosPromoSuman, montoElegiblePuntos } from './puntos-elegibles.util';
 import { usosDeCupon } from './cupon-usos';
 import { cuponesParaDar, darCupon, quitarCuponDado } from './cupon-asignado';
-import { canalDeCanje, lineasParaCupon, motivoCuponNoAplica, motivoPedidoNoAdmiteCupon, PEDIDO_PARA_CUPON, revisarCupon } from './cupon-canje';
+import { canalDeCanje, lineasParaCupon, sumarUsoCompartido, motivoCuponNoAplica, motivoPedidoNoAdmiteCupon, PEDIDO_PARA_CUPON, revisarCupon } from './cupon-canje';
 import {
   BadRequestException,
   ConflictException,
@@ -1526,8 +1526,10 @@ export class OfertasService {
       };
     }
 
-    // Base imponible del descuento según alcance (toda la carta, categoría o producto)
-    let baseCalculo = dto.subtotal;
+    // Base del descuento según alcance. «Toda la carta» = las líneas elegibles que llegan (sin combos ni productos que no suman
+    // beneficios); sin líneas, el subtotal. La compra mínima sí se mide con el subtotal completo.
+    let baseCalculo = Array.isArray(dto.lineas) && dto.lineas.length > 0 ? dto.lineas.reduce((acc, l) => acc + (Number(l.subtotal) || 0), 0) : dto.subtotal;
+    if (Array.isArray(dto.lineas) && dto.lineas.length === 0 && dto.subtotal > 0) baseCalculo = 0;
     if (cupon.categoria_id && Array.isArray(dto.lineas)) {
       const catIdStr = cupon.categoria_id.toString();
       const lineasCat = dto.lineas.filter((l) => l.categoriaId && l.categoriaId.toString() === catIdStr);
@@ -1550,6 +1552,9 @@ export class OfertasService {
       }
     }
 
+    if (baseCalculo <= 0) {
+      throw new BadRequestException({ codigo: 'CUPON_SIN_PRODUCTOS', mensaje: 'Este cupón no aplica a los productos de este pedido (combos y productos sin beneficios no entran)' });
+    }
     const valor = Number(cupon.descuento_valor);
     let descuentoMonto = 0;
     if (cupon.descuento_tipo === 'PORCENTAJE') {
@@ -1628,16 +1633,32 @@ export class OfertasService {
       lineas: lineasParaCupon(pedido),
       clientePartyId: partyClienteDelPedido(pedido),
     });
-    const motivoCupon = motivoCuponNoAplica(validacion.cupon, canal);
+    const motivoCupon = motivoCuponNoAplica(validacion.cupon, canal, pedido.pago_metodo);
     if (motivoCupon) throw new BadRequestException({ codigo: 'CUPON_NO_APLICA', mensaje: motivoCupon });
 
     const descuento = validacion.cupon.descuentoCalculado;
-    const nuevoTotal = Math.max(0, Number((Number(pedido.subtotal) - descuento + (Number(pedido.envio) || 0)).toFixed(2)));
+    if (!(descuento > 0)) throw new BadRequestException({ codigo: 'CUPON_NO_APLICA', mensaje: 'Este cupón no descuenta nada en este pedido' });
+    // Sobre el total actual (lleva envío y cargos); el pedido no tiene otro descuento (lo exige motivoPedidoNoAdmiteCupon)
+    const nuevoTotal = Math.max(0, Number((Number(pedido.total) - descuento).toFixed(2)));
+    const yaUsado = () => new ConflictException({ codigo: 'CUPON_YA_CANJEADO', mensaje: 'Este cupón o este pedido acaban de usarse en otro canje' });
 
     await this.prisma.$transaction(async (tx) => {
+      // Condicional: dos canjes a la vez no pueden poner dos cupones en el mismo pedido
+      const libre = await tx.pedido.updateMany({
+        where: { id: pedido.id, cupon_id: null, descuento: 0, OR: [{ pago_estado: null }, { pago_estado: { not: 'PAGADO' } }] },
+        data: {
+          cupon_id: BigInt(validacion.cupon.id),
+          cupon_emitido_id: validacion.cupon.emitidoId ? BigInt(validacion.cupon.emitidoId) : null,
+          descuento: new Prisma.Decimal(descuento),
+          total: new Prisma.Decimal(nuevoTotal),
+          descuento_detalle: { tipo: 'CUPON', codigo: dto.codigo.trim().toUpperCase(), monto: descuento },
+        },
+      });
+      if (libre.count === 0) throw yaUsado();
       if (validacion.cupon.emitidoId) {
-        await tx.cuponEmitido.update({
-          where: { id: BigInt(validacion.cupon.emitidoId) },
+        // Condicional: el mismo código no se gasta dos veces a la vez
+        const gastado = await tx.cuponEmitido.updateMany({
+          where: { id: BigInt(validacion.cupon.emitidoId), estado: 'VIGENTE' },
           data: {
             estado: 'CANJEADO',
             canjeado_en: new Date(),
@@ -1646,11 +1667,9 @@ export class OfertasService {
             canjeado_por: usuario?.partyId != null ? BigInt(usuario.partyId) : null,
           },
         });
+        if (gastado.count === 0) throw yaUsado();
       } else {
-        await tx.cupon.update({
-          where: { id: BigInt(validacion.cupon.id) },
-          data: { usos_actuales: { increment: 1 } },
-        });
+        await sumarUsoCompartido(tx, BigInt(validacion.cupon.id));
 
         await tx.cuponCanjeCompartido.create({
           data: {
@@ -1662,21 +1681,6 @@ export class OfertasService {
           },
         });
       }
-
-      await tx.pedido.update({
-        where: { id: pedido.id },
-        data: {
-          cupon_id: BigInt(validacion.cupon.id),
-          cupon_emitido_id: validacion.cupon.emitidoId ? BigInt(validacion.cupon.emitidoId) : null,
-          descuento: new Prisma.Decimal(descuento),
-          total: new Prisma.Decimal(nuevoTotal),
-          descuento_detalle: {
-            tipo: 'CUPON',
-            codigo: dto.codigo.trim().toUpperCase(),
-            monto: descuento,
-          },
-        },
-      });
     });
 
     await this.auditoriaService.registrar({
@@ -2179,6 +2183,11 @@ export class OfertasService {
           clientePartyId,
         });
 
+        // Canales del cupón (todos los tipos, no solo envío gratis): un cupón «solo carta» no vale en caja, mozo ni bot
+        const canalCupon = canalOferta(canal);
+        if ((val.cupon.canales ?? []).length > 0 && !ofertaIncluyeCanal(val.cupon.canales, canalCupon)) {
+          throw new BadRequestException({ codigo: 'CUPON_NO_APLICA_CANAL', mensaje: 'Este cupón no vale en este canal' });
+        }
         // Cupón por medio de pago: vale solo si TODO el pedido se paga con medios de su lista; si no, no se aplica todavía
         if (!ofertaIncluyeMedios(val.cupon.mediosPago, medios, mediosEncendidos)) {
           cuponMediosRequeridos = val.cupon.mediosPago ?? [];

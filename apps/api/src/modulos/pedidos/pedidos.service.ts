@@ -25,6 +25,7 @@ import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { sumarUsoCompartido } from '../ofertas/cupon-canje';
 import { darCuponAlCrear, type ResultadoCuponAlCrear } from './cupon-al-crear';
 import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
 import { esGrupoBebidaDuplicado } from '../ofertas/combo-grupos.util';
@@ -1606,10 +1607,8 @@ export class PedidosService {
           throw new ConflictException({ codigo: 'CUPON_YA_CANJEADO', mensaje: 'Este cupón ya fue canjeado' });
         }
       } else if (desgloseDescuento.cuponId) {
-        await tx.cupon.update({
-          where: { id: BigInt(desgloseDescuento.cuponId) },
-          data: { usos_actuales: { increment: 1 } },
-        });
+        // Condicional: el tope no se pasa aunque dos pedidos lo usen a la vez
+        await sumarUsoCompartido(tx, BigInt(desgloseDescuento.cuponId));
         await tx.cuponCanjeCompartido.create({
           data: {
             cupon_id: BigInt(desgloseDescuento.cuponId),

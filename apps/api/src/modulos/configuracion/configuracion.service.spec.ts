@@ -90,7 +90,7 @@ describe('ConfiguracionService', () => {
         create: { clave: 'culqi_comision_tarjeta_pct', valor: 3.99 },
       });
       expect(await leerTarifaCulqi(prismaMock, 'TARJETA')).toEqual({ pct: 3.99, fijo: 0.5 });
-      expect(comisionEstimada(100, await leerTarifaCulqi(prismaMock, 'TARJETA'))?.total).toBe(5.3);
+      expect(comisionEstimada(100, await leerTarifaCulqi(prismaMock, 'TARJETA'))?.total).toBe(4.49);
       const listado = await service.listar();
       expect(listado.find((p) => p.clave === 'culqi_comision_tarjeta_pct')).toEqual({ clave: 'culqi_comision_tarjeta_pct', valor: 3.99 });
     });

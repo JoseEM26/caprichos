@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { celularEnmascarado } from './cupon-usos';
 
 /**
@@ -7,28 +7,63 @@ import { celularEnmascarado } from './cupon-usos';
 export type CanalCanje = 'CAJA' | 'MOZO';
 export const canalDeCanje = (c?: string | null): CanalCanje => (c === 'MOZO' ? 'MOZO' : 'CAJA');
 
+/**
+ * Suma un uso a un cupón compartido sin pasar su tope. El UPDATE condicional vuelve a mirar la fila al escribir:
+ * dos canjes a la vez en el último cupo dejan pasar solo uno.
+ */
+export async function sumarUsoCompartido(tx: any, cuponId: bigint): Promise<void> {
+  const c = await tx.cupon.findUnique({ where: { id: cuponId }, select: { tope_usos: true } });
+  if (c?.tope_usos == null) {
+    await tx.cupon.update({ where: { id: cuponId }, data: { usos_actuales: { increment: 1 } } });
+    return;
+  }
+  const r = await tx.cupon.updateMany({ where: { id: cuponId, usos_actuales: { lt: c.tope_usos } }, data: { usos_actuales: { increment: 1 } } });
+  if (r.count === 0) throw new BadRequestException({ codigo: 'CUPON_AGOTADO', mensaje: 'Se agotaron los usos de este cupón' });
+}
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Motivo (español simple) por el que el pedido no admite un cupón; null si lo admite. */
-export function motivoPedidoNoAdmiteCupon(p: { estado?: string | null; cupon_id?: unknown; puntos_canjeados?: unknown }): string | null {
+export function motivoPedidoNoAdmiteCupon(p: {
+  estado?: string | null;
+  cupon_id?: unknown;
+  puntos_canjeados?: unknown;
+  pago_estado?: string | null;
+  cobro_mozo_en?: unknown;
+  es_personal?: boolean | null;
+  descuento?: unknown;
+}): string | null {
   if (p.estado === 'ANULADO' || p.estado === 'RECHAZADO') return 'El pedido está anulado: no se le puede aplicar un cupón';
   if (p.cupon_id != null) return 'Este pedido ya tiene un cupón aplicado';
   if (Number(p.puntos_canjeados ?? 0) > 0) return 'No se pueden usar puntos y un cupón en el mismo pedido';
+  // Cobrado: el total ya cuadró con la caja; un descuento ahora la descuadra
+  if (String(p.pago_estado ?? '').toUpperCase() === 'PAGADO' || p.cobro_mozo_en != null) return 'El pedido ya está cobrado: el cupón se aplica antes de cobrar';
+  if (p.es_personal) return 'Los pedidos del personal ya llevan su descuento: no admiten cupón';
+  // Una promoción ya aplicada no se pisa ni se suma (al crear el pedido se elige la mejor)
+  if (Number(p.descuento ?? 0) > 0) return 'Este pedido ya tiene una promoción aplicada: el cupón no se suma';
   return null;
 }
 
 /** Motivo por el que el cupón ya validado no sirve aquí (canal o envío gratis); null si sirve. */
-export function motivoCuponNoAplica(c: { canales?: string[]; tipo?: string }, canal: CanalCanje): string | null {
+export function motivoCuponNoAplica(c: { canales?: string[]; tipo?: string; mediosPago?: string[] }, canal: CanalCanje, pagoMetodo?: string | null): string | null {
   if (c.canales && c.canales.length > 0 && !c.canales.includes(canal)) {
     return `Este cupón no vale en ${canal === 'MOZO' ? 'mozo' : 'caja'}`;
   }
   if (c.tipo === 'ENVIO_GRATIS') return 'Este cupón es de envío gratis: se aplica al crear un pedido de delivery, no aquí';
+  // Cupón por medio de pago: el pedido tiene que pagarse con uno de sus medios (igual que al crear el pedido)
+  const medios = (c.mediosPago ?? []).map((m) => m.toUpperCase());
+  if (medios.length > 0 && !medios.includes(String(pagoMetodo ?? '').toUpperCase())) {
+    return `Este cupón solo vale pagando con ${medios.join(', ')}`;
+  }
   return null;
 }
 
 /** Líneas del pedido con la forma que espera la validación de cupones (alcance por producto o categoría). */
 export const lineasParaCupon = (pedido: { lineas?: any[] }) =>
-  (pedido.lineas ?? []).map((l) => ({
+  (pedido.lineas ?? [])
+    // Igual que al crear el pedido: sin cortesías, cargos libres, partes o anfitriones de combo ni productos que no suman beneficios
+    .filter((l) => !l.es_cortesia && !l.cargo_libre && l.linea_combo_id == null && l.oferta_id == null && !l.producto?.no_suma_beneficios)
+    .map((l) => ({
     productoId: l.producto_id != null ? String(l.producto_id) : '',
     categoriaId: l.producto?.categoria_id != null ? String(l.producto.categoria_id) : undefined,
     cantidad: Number(l.cantidad ?? 1),
@@ -36,7 +71,18 @@ export const lineasParaCupon = (pedido: { lineas?: any[] }) =>
   }));
 
 export const PEDIDO_PARA_CUPON = {
-  lineas: { select: { producto_id: true, cantidad: true, subtotal: true, producto: { select: { categoria_id: true } } } },
+  lineas: {
+    select: {
+      producto_id: true,
+      cantidad: true,
+      subtotal: true,
+      es_cortesia: true,
+      cargo_libre: true,
+      linea_combo_id: true,
+      oferta_id: true,
+      producto: { select: { categoria_id: true, no_suma_beneficios: true } },
+    },
+  },
 };
 
 interface Deps {
@@ -86,7 +132,7 @@ export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codi
     try {
       validacion = await validar({ codigo, subtotal: Number(pedido.subtotal), lineas: lineasParaCupon(pedido), clientePartyId: partyCliente(pedido) });
       descuento = Number(validacion.cupon.descuentoCalculado);
-      motivo = motivoCuponNoAplica(validacion.cupon, canal);
+      motivo = motivoCuponNoAplica(validacion.cupon, canal, pedido.pago_metodo);
       if (motivo) descuento = null;
     } catch (e) {
       motivo = (emitido && ESTADO_TEXTO[estado]) || mensajeDe(e);
@@ -100,7 +146,7 @@ export async function revisarCupon({ prisma, validar, partyCliente }: Deps, codi
     const p = id == null ? null : personas.find((x) => String(x.party_id) === String(id));
     return id == null ? null : p ? `${p.nombres} ${p.apellidos ?? ''}`.trim() : 'Trabajador';
   };
-  const nuevoTotal = pedido && descuento != null ? Math.max(0, r2(Number(pedido.subtotal) - descuento + (Number(pedido.envio) || 0))) : null;
+  const nuevoTotal = pedido && descuento != null ? Math.max(0, r2(Number(pedido.total) - descuento)) : null;
 
   return {
     codigo,

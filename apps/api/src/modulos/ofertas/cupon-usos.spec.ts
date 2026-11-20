@@ -5,6 +5,7 @@ import 'reflect-metadata';
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { celularEnmascarado, usosDeCupon } from './cupon-usos';
+import { lineasParaCupon } from './cupon-canje';
 import { OfertasService } from './ofertas.service';
 import { CuponesController } from './ofertas.controller';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -120,16 +121,8 @@ describe('GET /admin/cupones/:id/usos', () => {
 });
 
 describe('canjearCuponEnCaja guarda quién y por qué canal', () => {
-  it('canje compartido: canal CAJA y aplicado_por = partyId del operador', async () => {
-    const tx: any = {
-      cupon: { update: jest.fn() },
-      cuponCanjeCompartido: { create: jest.fn() },
-      pedido: { update: jest.fn() },
-    };
-    const prisma: any = {
-      pedido: { findUnique: jest.fn().mockResolvedValue({ id: 9n, subtotal: 50, envio: 0, puntos_canjeados: 0, cliente_party_id: 5n }) },
-      $transaction: (fn: any) => fn(tx),
-    };
+  const armar = async (pedido: any, cupon: any, tx: any) => {
+    const prisma: any = { pedido: { findUnique: jest.fn().mockResolvedValue(pedido) }, $transaction: (fn: any) => fn(tx) };
     const mod = await Test.createTestingModule({
       providers: [
         OfertasService,
@@ -140,36 +133,72 @@ describe('canjearCuponEnCaja guarda quién y por qué canal', () => {
       ],
     }).compile();
     const servicio = mod.get(OfertasService);
-    jest.spyOn(servicio, 'validarCuponParaCarta').mockResolvedValue({ cupon: { id: '5', emitidoId: null, descuentoCalculado: 12.5 } } as any);
+    jest.spyOn(servicio, 'validarCuponParaCarta').mockResolvedValue({ cupon } as any);
+    return servicio;
+  };
+  const txBase = () => ({
+    pedido: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    cupon: { findUnique: jest.fn().mockResolvedValue({ tope_usos: null }), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    cuponCanjeCompartido: { create: jest.fn() },
+    cuponEmitido: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+  });
+  const pedidoBase = { id: 9n, subtotal: 50, envio: 0, total: 50, descuento: 0, puntos_canjeados: 0, estado: 'COLA', pago_estado: 'PENDIENTE', pago_metodo: 'EFECTIVO', cliente_party_id: 5n, lineas: [] };
 
+  it('canje compartido: canal CAJA y aplicado_por = partyId del operador', async () => {
+    const tx: any = txBase();
+    const servicio = await armar(pedidoBase, { id: '5', emitidoId: null, descuentoCalculado: 12.5 }, tx);
     await servicio.canjearCuponEnCaja({ codigo: '25off', pedidoId: 9 }, { partyId: 77n });
-
     expect(tx.cuponCanjeCompartido.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ cupon_id: 5n, pedido_id: 9n, canal: 'CAJA', aplicado_por: 77n }),
     });
   });
 
-  it('cupón emitido: canal MOZO y canjeado_por del operador; descuenta del total', async () => {
-    const tx: any = { cuponEmitido: { update: jest.fn() }, pedido: { update: jest.fn() } };
-    const prisma: any = {
-      pedido: { findUnique: jest.fn().mockResolvedValue({ id: 9n, subtotal: 50, envio: 0, puntos_canjeados: 0, estado: 'COLA', cliente_party_id: 5n, lineas: [] }) },
-      $transaction: (fn: any) => fn(tx),
-    };
-    const mod = await Test.createTestingModule({
-      providers: [
-        OfertasService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: RedisService, useValue: { obtenerCliente: () => ({}) } },
-        { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
-        { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
-      ],
-    }).compile();
-    const servicio = mod.get(OfertasService);
-    jest.spyOn(servicio, 'validarCuponParaCarta').mockResolvedValue({ cupon: { id: '5', emitidoId: '3', descuentoCalculado: 10, canales: ['MOZO'], tipo: 'MONTO' } } as any);
-
+  it('cupón emitido: canal MOZO y canjeado_por del operador; descuenta del total (con envío)', async () => {
+    const tx: any = txBase();
+    const servicio = await armar({ ...pedidoBase, envio: 4, total: 54 }, { id: '5', emitidoId: '3', descuentoCalculado: 10, canales: ['MOZO'], tipo: 'MONTO' }, tx);
     const r = await servicio.canjearCuponEnCaja({ codigo: 'abc', pedidoId: 9, canal: 'MOZO' }, { partyId: 77n });
+    expect(tx.cuponEmitido.updateMany).toHaveBeenCalledWith({ where: { id: 3n, estado: 'VIGENTE' }, data: expect.objectContaining({ estado: 'CANJEADO', canjeado_canal: 'MOZO', canjeado_por: 77n, pedido_canje_id: 9n }) });
+    expect(r).toMatchObject({ canjeado: true, descuento: 10, totalActualizado: 44 });
+  });
 
-    expect(tx.cuponEmitido.update).toHaveBeenCalledWith({ where: { id: 3n }, data: expect.objectContaining({ estado: 'CANJEADO', canjeado_canal: 'MOZO', canjeado_por: 77n, pedido_canje_id: 9n }) });
-    expect(r).toMatchObject({ canjeado: true, descuento: 10, totalActualizado: 40 });
+  it.each([
+    ['ya cobrado', { pago_estado: 'PAGADO' }, 'ya está cobrado'],
+    ['cobrado por el mozo', { cobro_mozo_en: new Date() }, 'ya está cobrado'],
+    ['del personal', { es_personal: true }, 'del personal'],
+    ['con promoción', { descuento: 5, total: 45 }, 'promoción'],
+  ])('no se aplica a un pedido %s', async (_n, extra, texto) => {
+    const tx: any = txBase();
+    const servicio = await armar({ ...pedidoBase, ...extra }, { id: '5', emitidoId: null, descuentoCalculado: 10 }, tx);
+    await expect(servicio.canjearCuponEnCaja({ codigo: 'X', pedidoId: 9 }, {})).rejects.toMatchObject({ response: { mensaje: expect.stringContaining(texto) } });
+    expect(tx.pedido.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('cupón por medio de pago: no vale si el pedido se paga con otro medio', async () => {
+    const tx: any = txBase();
+    const servicio = await armar(pedidoBase, { id: '5', emitidoId: null, descuentoCalculado: 10, mediosPago: ['YAPE'] }, tx);
+    await expect(servicio.canjearCuponEnCaja({ codigo: 'X', pedidoId: 9 }, {})).rejects.toMatchObject({ response: { mensaje: expect.stringContaining('YAPE') } });
+  });
+
+  it('dos canjes a la vez del mismo código: el segundo falla y no deja el descuento', async () => {
+    const tx: any = txBase();
+    tx.cuponEmitido.updateMany.mockResolvedValue({ count: 0 });
+    const servicio = await armar(pedidoBase, { id: '5', emitidoId: '3', descuentoCalculado: 10 }, tx);
+    await expect(servicio.canjearCuponEnCaja({ codigo: 'X', pedidoId: 9 }, {})).rejects.toMatchObject({ response: { codigo: 'CUPON_YA_CANJEADO' } });
+  });
+
+  it('cupón compartido en su último cupo: si otro lo gastó antes, se agota', async () => {
+    const tx: any = txBase();
+    tx.cupon.findUnique.mockResolvedValue({ tope_usos: 10 });
+    tx.cupon.updateMany.mockResolvedValue({ count: 0 });
+    const servicio = await armar(pedidoBase, { id: '5', emitidoId: null, descuentoCalculado: 10 }, tx);
+    await expect(servicio.canjearCuponEnCaja({ codigo: 'X', pedidoId: 9 }, {})).rejects.toMatchObject({ response: { codigo: 'CUPON_AGOTADO' } });
+  });
+});
+
+describe('lineasParaCupon', () => {
+  it('deja fuera cortesías, cargos libres, combos y productos que no suman beneficios', () => {
+    const l = (x: any) => ({ producto_id: 1n, cantidad: 1, subtotal: 10, producto: { categoria_id: 2n }, ...x });
+    const r = lineasParaCupon({ lineas: [l({}), l({ es_cortesia: true }), l({ cargo_libre: true }), l({ oferta_id: 3n }), l({ linea_combo_id: 4n }), l({ producto: { no_suma_beneficios: true } })] });
+    expect(r).toHaveLength(1);
   });
 });
