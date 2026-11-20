@@ -91,7 +91,7 @@ export function UbicacionRapidaDelivery({ telefono, onElegir }: UbicacionRapidaD
         </button>
       )}
       <label htmlFor="ubicacion-pegar" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
-        Pegar coordenadas o enlace de Google Maps
+        Pegar código Plus, coordenadas o enlace de Google Maps
       </label>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <input
@@ -102,7 +102,7 @@ export function UbicacionRapidaDelivery({ telefono, onElegir }: UbicacionRapidaD
             setPegado(e.target.value);
             setErrorPegado(false);
           }}
-          placeholder="-12.0123, -76.9456"
+          placeholder="XX34+CV Lima o -12.0123, -76.9456"
           aria-invalid={errorPegado}
           style={{ ...CAMPO, flex: '1 1 220px', maxWidth: '420px' }}
         />
@@ -112,7 +112,7 @@ export function UbicacionRapidaDelivery({ telefono, onElegir }: UbicacionRapidaD
       </div>
       {errorPegado && (
         <span role="alert" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-          Pega las coordenadas o un enlace largo de Google Maps
+          Pega un código Plus, las coordenadas o un enlace largo de Google Maps
         </span>
       )}
     </div>

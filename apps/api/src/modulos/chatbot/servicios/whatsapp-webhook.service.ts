@@ -739,7 +739,7 @@ export class WhatsappWebhookService {
 
     // Registrar mensaje en mensaje_chat del módulo de mensajes (la ubicación conserva sus coordenadas)
     // Un Plus Code escrito en texto (completo, o corto con «Lima») también ubica; el motor sigue viendo solo el texto
-    const plusEscrito = !ubicacion && tipoRegistro === 'TEXTO' ? plusCodeDesdeTexto(texto) : null;
+    const plusEscrito = !ubicacion && tipoRegistro === 'TEXTO' ? (plusCodeDesdeTexto(texto) ?? plusCodeDesdeTexto(`${texto} Lima`)) : null;
     const ubicacionGuardada: UbicacionCliente | null =
       ubicacion && ubicacionValida(ubicacion.latitud, ubicacion.longitud)
         ? { lat: ubicacion.latitud, lng: ubicacion.longitud, nombre: ubicacion.nombre, direccion: ubicacion.direccion }

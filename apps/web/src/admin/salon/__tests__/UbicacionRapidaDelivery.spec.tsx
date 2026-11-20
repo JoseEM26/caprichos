@@ -37,7 +37,7 @@ describe('UbicacionRapidaDelivery', () => {
     render(<UbicacionRapidaDelivery telefono="987654321" onElegir={onElegir} />);
     await waitFor(() => expect(api.get).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Usar ubicacion de WhatsApp' })).toBeNull();
-    expect(screen.getByLabelText('Pegar coordenadas o enlace de Google Maps')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pegar código Plus, coordenadas o enlace de Google Maps')).toBeInTheDocument();
   });
 
   it('sin celular válido no consulta', () => {
@@ -48,7 +48,7 @@ describe('UbicacionRapidaDelivery', () => {
   it('el campo pega coordenadas y pone el punto en el mapa', () => {
     vi.mocked(api.get).mockResolvedValue({ encontrada: false });
     render(<UbicacionRapidaDelivery telefono={null} onElegir={onElegir} />);
-    const campo = screen.getByLabelText('Pegar coordenadas o enlace de Google Maps');
+    const campo = screen.getByLabelText('Pegar código Plus, coordenadas o enlace de Google Maps');
     const boton = screen.getByRole('button', { name: 'Poner en el mapa' });
     expect((boton as HTMLButtonElement).disabled).toBe(true);
 
@@ -59,16 +59,16 @@ describe('UbicacionRapidaDelivery', () => {
 
   it('acepta coordenadas separadas por espacio', () => {
     render(<UbicacionRapidaDelivery telefono={null} onElegir={onElegir} />);
-    fireEvent.change(screen.getByLabelText('Pegar coordenadas o enlace de Google Maps'), { target: { value: '-12.0123 -76.9456' } });
+    fireEvent.change(screen.getByLabelText('Pegar código Plus, coordenadas o enlace de Google Maps'), { target: { value: '-12.0123 -76.9456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Poner en el mapa' }));
     expect(onElegir).toHaveBeenCalledWith({ lat: -12.0123, lng: -76.9456 });
   });
 
   it('un texto sin coordenadas muestra el aviso y no pone nada en el mapa', () => {
     render(<UbicacionRapidaDelivery telefono={null} onElegir={onElegir} />);
-    fireEvent.change(screen.getByLabelText('Pegar coordenadas o enlace de Google Maps'), { target: { value: 'https://maps.app.goo.gl/abc' } });
+    fireEvent.change(screen.getByLabelText('Pegar código Plus, coordenadas o enlace de Google Maps'), { target: { value: 'https://maps.app.goo.gl/abc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Poner en el mapa' }));
-    expect(screen.getByRole('alert').textContent).toBe('Pega las coordenadas o un enlace largo de Google Maps');
+    expect(screen.getByRole('alert').textContent).toBe('Pega un código Plus, las coordenadas o un enlace largo de Google Maps');
     expect(onElegir).not.toHaveBeenCalled();
   });
 });

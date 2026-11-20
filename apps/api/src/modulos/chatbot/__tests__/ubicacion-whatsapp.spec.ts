@@ -99,7 +99,7 @@ describe('Ubicación del cliente en el webhook', () => {
     expect(contenidoGuardado.ubicacion).toEqual({ lat: -12.0701, lng: -77.0355 });
   });
 
-  it('un Plus Code escrito en texto se guarda como ubicación; un código corto sin localidad se ignora', async () => {
+  it('un Plus Code escrito en texto se guarda como ubicación; un código corto sin localidad se toma como de Lima', async () => {
     const texto = (body: string) => ({
       object: 'whatsapp_business_account',
       entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL, profile: { name: 'Ana' } }], messages: [{ id: 'wamid.T1', from: TEL, type: 'text', text: { body } }] } }] }],
@@ -112,7 +112,9 @@ describe('Ubicación del cliente en el webhook', () => {
     expect(u.nombre).toBe(`Código Plus ${cod}`);
     prisma.mensajeChat.create.mockClear();
     await webhook.procesarPayload(texto(`Mi ubicación: ${cod.slice(4)}`));
-    expect(prisma.mensajeChat.create.mock.calls[0][0].data.contenido).toEqual({ texto: `Mi ubicación: ${cod.slice(4)}` });
+    const solo = prisma.mensajeChat.create.mock.calls[0][0].data.contenido.ubicacion;
+    expect(solo.lat).toBeCloseTo(-12.0701, 3);
+    expect(solo.lng).toBeCloseTo(-77.0355, 3);
   });
 
   it('con coordenadas inválidas no agrega el objeto ubicación', async () => {

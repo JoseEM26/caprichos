@@ -81,3 +81,27 @@ describe('parsearUbicacion: textos inválidos', () => {
     expect(parsearUbicacion(undefined as unknown as string)).toBeNull();
   });
 });
+
+describe('parsearUbicacion: código Plus y frases', () => {
+  it('lee un código Plus completo', () => {
+    const r = parsearUbicacion('57V4XX34+CV');
+    expect(r?.lat).toBeCloseTo(-12.0464, 2);
+    expect(r?.lng).toBeCloseTo(-77.0428, 2);
+  });
+
+  it('lee un código corto con o sin «Lima»', () => {
+    const con = parsearUbicacion('XX34+CV Lima');
+    const sin = parsearUbicacion('XX34+CV');
+    expect(con).not.toBeNull();
+    expect(sin).toEqual(con);
+  });
+
+  it('lee un código Plus dentro de un mensaje', () => {
+    expect(parsearUbicacion('Hola, mi dirección es 57V4XX34+CV gracias')).not.toBeNull();
+  });
+
+  it('lee coordenadas dentro de una frase, pero no un celular', () => {
+    expect(parsearUbicacion('Mi ubicación -12.0123, -76.9456 gracias')).toEqual({ lat: -12.0123, lng: -76.9456 });
+    expect(parsearUbicacion('mi cel es 987654321')).toBeNull();
+  });
+});

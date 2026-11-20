@@ -1,3 +1,5 @@
+import { plusCodeDesdeTexto } from '@caprichos/compartido';
+
 export interface UbicacionTexto {
   lat: number;
   lng: number;
@@ -5,6 +7,7 @@ export interface UbicacionTexto {
 
 const NUMERO = '-?\\d{1,3}(?:\\.\\d+)?';
 const PAR_SIMPLE = new RegExp(`^\\s*(${NUMERO})\\s*[,\\s]\\s*(${NUMERO})\\s*$`);
+const COORD_EN_TEXTO = /(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})/;
 const PIN_LUGAR = new RegExp(`!3d(${NUMERO})!4d(${NUMERO})`);
 const CENTRO_MAPA = new RegExp(`@(${NUMERO}),(${NUMERO})`);
 const PARAM_COORD = new RegExp(`[?&](?:q|ll|query|center)=(${NUMERO}),(${NUMERO})(?=[&#]|$)`);
@@ -20,7 +23,7 @@ function desdePar(a: string, b: string): UbicacionTexto | null {
 }
 
 /**
- * Lee un punto de un texto pegado: «-12.0123, -76.9456», «-12.0123 -76.9456» o un enlace largo de Google Maps
+ * Lee un punto de un texto pegado: un código Plus («7P7J+2X Lima»), «-12.0123, -76.9456», «-12.0123 -76.9456» o un enlace largo de Google Maps
  * (…/@lat,lng…, ?q=lat,lng, ?ll=lat,lng, …!3d lat!4d lng…). Los enlaces cortos (maps.app.goo.gl) no se
  * pueden resolver aquí y devuelven null, igual que cualquier texto que no traiga coordenadas válidas.
  */
@@ -31,7 +34,15 @@ export function parsearUbicacion(texto: string): UbicacionTexto | null {
   const par = PAR_SIMPLE.exec(limpio);
   if (par) return desdePar(par[1], par[2]);
 
-  if (!/^https?:\/\//i.test(limpio) && !/google\.|maps\./i.test(limpio)) return null;
+  const esEnlace = /^https?:\/\//i.test(limpio) || /google\.|maps\./i.test(limpio);
+  if (!esEnlace) {
+    // Código Plus copiado de Google Maps o de un mensaje: completo, o corto («7P7J+2X», con o sin «Lima»; el local está en Lima)
+    const plus = plusCodeDesdeTexto(limpio) ?? plusCodeDesdeTexto(`${limpio} Lima`);
+    if (plus) return desdePar(String(plus.lat), String(plus.lng));
+    // Coordenadas dentro de una frase («Mi ubicación -12.0123, -76.9456»): exige decimales para no confundir un celular
+    const suelto = /[A-Za-zÁ-ú]/.test(limpio) ? COORD_EN_TEXTO.exec(limpio) : null;
+    return suelto ? desdePar(suelto[1], suelto[2]) : null;
+  }
 
   let decodificado = limpio;
   try {
