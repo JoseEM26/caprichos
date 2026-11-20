@@ -4,10 +4,9 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
-import { AvisosPedidoService, NUMEROS_INTENTO, esParametroActivo } from './avisos-pedido.service';
-import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
+import { AvisosPedidoService, esParametroActivo } from './avisos-pedido.service';
+import { ReprogramacionService } from './reprogramacion.service';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
-import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
 import { telefonoEnviable } from '../utilidades/enmascarar.util';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 import { horaLimaEntera } from '../../../comun/fechas-lima';
@@ -263,44 +262,21 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
 
         if (!params.avisoEsperaActivo) continue;
 
-        // (2) ESPERA AGOTADA: aviso de que la movilidad se retirará, con reprogramación y recargo
-        if (minutosEnPuerta >= params.repartoEsperaMaxMin) {
-          const r = await this.avisos?.avisar(p.id, 'ESPERA_AGOTADA');
-          if (r && r.estado !== 'OMITIDO' && r.estado !== 'YA_ENVIADO') {
-            resumen.avisosEspera++;
-            await this.notificarEquipo(
-              'ESPERA_AGOTADA',
-              'Espera agotada en entrega de pedido',
-              `Repartidor superó los ${params.repartoEsperaMaxMin} min de espera en la puerta para ${p.codigo}. Se avisó al cliente que la movilidad se retirará.`,
-            );
-          }
-        }
-
-        // (3) RETIRO: tras la espera máxima más reparto_insistencia_min de gracia, la movilidad se retira
-        //     y el pedido vuelve a LISTO con motivo de falla y recargo de reprogramación.
+        // (2) ESPERA AGOTADA (decisión del dueño 20/11, caso CP-W904): el sistema ya NO retira la movilidad ni le habla
+        //     al cliente de recargo. Pregunta una sola vez al repartidor y a Caja si lo entregó; el retiro queda como
+        //     acción manual del repartidor («No contesta»). Un repartidor que solo olvidó marcar Entregado no rompe nada.
         if (minutosEnPuerta >= params.repartoEsperaMaxMin + params.repartoInsistenciaMin) {
-          // Mismo cálculo que luego cobra el reenvío (se guarda en el incidente y se le dice al cliente)
-          const { monto: recargo, modo: recargoModo } = await calcularMontoReprogramacion(this.prisma, p.id);
-          const retirado = await this.retirarMovilidad(p.id, p.repartidor_party_id, recargo, ahora);
-          if (retirado) {
-            resumen.retiros++;
-            // Tope de reprogramaciones alcanzado: no se pregunta, el pedido se cancela directo
-            const tope = this.reprogramacion
-              ? await this.reprogramacion.topeAlcanzado(p.id, params.reprogMaxIntentos)
-              : false;
-            if (tope) {
-              await this.reprogramacion?.cancelar(p.id, 'TOPE');
-            } else {
-              await this.avisos?.avisar(p.id, 'RETIRO', { recargo, recargoModo });
-            }
-            await this.notificarEquipo(
-              'RETIRO_MOVILIDAD',
-              'Movilidad retirada por espera agotada',
-              tope
-                ? `La movilidad se retiró de ${p.codigo} y se alcanzó el límite de reprogramaciones: el pedido se canceló.`
-                : `La movilidad se retiró de ${p.codigo} tras la espera máxima. Se preguntó al cliente si reprograma; si no responde en ${params.reprogRespuestaMin} min el pedido se cancela.`,
-              p.id,
-            );
+          const tipo = 'CONFIRMAR_ENTREGA';
+          const yaPreguntado = await this.prisma.notificacion.findFirst({ where: { tipo, mensaje: { contains: p.codigo } }, select: { id: true } });
+          if (!yaPreguntado) {
+            const min = Math.floor(minutosEnPuerta);
+            const titulo = `¿Se entregó ${p.codigo}?`;
+            const mensaje = `${p.codigo} lleva ${min} min con «Llegué» y sin «Entregado». Si ya lo entregaste, márcalo Entregado; si el cliente no contesta, usa «No contesta».`;
+            resumen.avisosEspera++;
+            // Al repartidor (a él) y a Caja
+            const notif = await this.prisma.notificacion.create({ data: { tipo, party_destino: p.repartidor_party_id, titulo, mensaje, enlace: '/admin/repartos' } });
+            this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo, pedidoId: Number(p.id) });
+            await this.notificarEquipo(tipo, titulo, mensaje, p.id);
           }
         }
         } catch (err: any) {
@@ -537,74 +513,6 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         } catch { /* liberar el candado es best-effort; expira solo por TTL */ }
       }
     }
-  }
-
-  /**
-   * Retira la movilidad de un pedido en puerta: solo si sigue EN_CAMINO con ese repartidor (una sola vez).
-   * El pedido vuelve a LISTO sin repartidor con motivo ESPERA_AGOTADA y se registra el incidente con recargo.
-   * Se borran los avisos del intento anterior (etapas 1 a 4) para que el nuevo intento vuelva a avisar.
-   */
-  private async retirarMovilidad(
-    pedidoId: bigint,
-    repartidorPartyId: bigint | null,
-    recargo: number,
-    ahora: Date,
-  ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
-      const actualizados = await tx.pedido.updateMany({
-        where: {
-          id: pedidoId,
-          estado: 'EN_CAMINO',
-          llego_en: { not: null },
-          entregado_en: null,
-          repartidor_party_id: repartidorPartyId,
-        },
-        data: {
-          estado: 'LISTO',
-          repartidor_party_id: null,
-          motivo_falla: MOTIVO_RETIRO,
-          salio_en: null,
-          llego_en: null,
-        },
-      });
-      if (actualizados.count === 0) return false;
-
-      const intentos = await tx.incidenteEntrega.count({ where: { pedido_id: pedidoId } });
-      await tx.incidenteEntrega.create({
-        data: {
-          pedido_id: pedidoId,
-          motivo: MOTIVO_RETIRO,
-          intento: intentos + 1,
-          recargo,
-          contactos: [],
-          en: ahora,
-        },
-      });
-
-      await tx.pedidoEstadoHistorial.create({
-        data: {
-          pedido_id: pedidoId,
-          estado_anterior: 'EN_CAMINO',
-          estado_nuevo: 'LISTO',
-          // Lo hace el sistema, no el repartidor: sin autor y dicho en el motivo (antes salía a nombre del repartidor)
-          motivo: 'Retiro automático por espera agotada (lo hizo el sistema: no se marcó Entregado a tiempo)',
-          por_party_id: null,
-          en: ahora,
-        },
-      });
-
-      await tx.mensajeReparto.deleteMany({
-        where: { pedido_id: pedidoId, numero: { in: NUMEROS_INTENTO } },
-      });
-
-      return true;
-    }).then((ok) => {
-      if (ok) {
-        this.eventos?.emitirAdmin('pedido:estado', { id: Number(pedidoId), estado: 'LISTO', motivo_falla: MOTIVO_RETIRO });
-        this.eventos?.emitirAdmin('reparto:incidente', { pedidoId: Number(pedidoId), motivo: MOTIVO_RETIRO });
-      }
-      return ok;
-    });
   }
 
   /**

@@ -51,7 +51,7 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       parametro: { findMany: jest.fn().mockResolvedValue(parametros()) },
       pedido: { findMany: jest.fn().mockResolvedValue([]) },
       whatsappMensaje: { findFirst: jest.fn().mockResolvedValue(null) },
-      notificacion: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }) },
+      notificacion: { create: jest.fn().mockResolvedValue({ id: BigInt(1) }), findFirst: jest.fn().mockResolvedValue(null) },
       incidenteEntrega: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({ id: BigInt(1) }),
@@ -160,66 +160,33 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
     expect(res.retiros).toBe(0);
   });
 
-  it('espera agotada: avisa al cliente con el recargo y notifica a Caja una sola vez', async () => {
-    mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(11)]);
-
-    const res = await planificador.ejecutarCiclo();
-
-    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'ESPERA_AGOTADA');
-    expect(res.avisosEspera).toBe(1);
-    expect(mockPrisma.notificacion.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ tipo: 'ESPERA_AGOTADA', rol_destino: 'CAJERO' }) }),
-    );
-  });
-
-  it('espera agotada ya enviada (YA_ENVIADO): no vuelve a notificar a Caja', async () => {
-    mockAvisos.avisar.mockResolvedValue({ estado: 'YA_ENVIADO' });
-    mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(11)]);
-
-    const res = await planificador.ejecutarCiclo();
-
-    expect(res.avisosEspera).toBe(0);
-    expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
-  });
-
-  it('retiro: tras espera máxima + gracia retira la movilidad, registra incidente con recargo y avisa al cliente', async () => {
-    // 10 (espera) + 3 (insistencia) = 13 minutos; llegó hace 14
-    mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(14)]);
-
-    const res = await planificador.ejecutarCiclo();
-
-    expect(res.retiros).toBe(1);
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.incidenteEntrega.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ motivo: 'NO_CONTESTA', intento: 1, recargo: 5 }),
-      }),
-    );
-    expect(mockPrisma.mensajeReparto.deleteMany).toHaveBeenCalledWith({
-      where: { pedido_id: BigInt(13), numero: { in: [1, 2, 3, 4, 5, 10, 15] } },
-    });
-    expect(mockAvisos.avisar).toHaveBeenCalledWith(BigInt(13), 'RETIRO', { recargo: 5, recargoModo: 'IGUAL_ENVIO' });
-    expect(mockEventos.emitirAdmin).toHaveBeenCalledWith('reparto:incidente', expect.anything());
-    // CP-W904: el retiro es del sistema; antes quedaba a nombre del repartidor y parecía que él lo marcó
-    expect(mockPrisma.pedidoEstadoHistorial.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ por_party_id: null, motivo: expect.stringContaining('lo hizo el sistema') }),
-    });
-  });
-
-  it('retiro: si el pedido ya no está en puerta con ese repartidor (updateMany sin filas) no avisa ni registra', async () => {
-    mockPrisma.$transaction.mockImplementationOnce(async (fn: any) =>
-      fn({
-        ...mockPrisma,
-        pedido: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-      }),
-    );
+  it('espera agotada (CP-W904): no retira ni le habla al cliente; pregunta al repartidor y a Caja si lo entregó', async () => {
+    // 10 (espera) + 3 (gracia) = 13 minutos; llegó hace 14
     mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(14)]);
 
     const res = await planificador.ejecutarCiclo();
 
     expect(res.retiros).toBe(0);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockAvisos.avisar).not.toHaveBeenCalledWith(expect.anything(), 'ESPERA_AGOTADA');
     expect(mockAvisos.avisar).not.toHaveBeenCalledWith(expect.anything(), 'RETIRO', expect.anything());
-    expect(mockPrisma.incidenteEntrega.create).not.toHaveBeenCalled();
+    expect(mockPrisma.notificacion.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tipo: 'CONFIRMAR_ENTREGA', party_destino: BigInt(7), titulo: '¿Se entregó CP-104?' }),
+    });
+    expect(mockPrisma.notificacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tipo: 'CONFIRMAR_ENTREGA', rol_destino: 'CAJERO' }) }),
+    );
+  });
+
+  it('antes de los 13 minutos no pregunta nada; y si ya preguntó, no repite', async () => {
+    mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(11)]);
+    await planificador.ejecutarCiclo();
+    expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
+
+    mockPrisma.notificacion.findFirst.mockResolvedValueOnce({ id: BigInt(5) });
+    mockPrisma.pedido.findMany.mockResolvedValueOnce([pedidoEnPuerta(20)]);
+    await planificador.ejecutarCiclo();
+    expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
   });
 
   it('aceptación: pedido en PREPARANDO o cobrado en COLA dispara el aviso ACEPTADO', async () => {
