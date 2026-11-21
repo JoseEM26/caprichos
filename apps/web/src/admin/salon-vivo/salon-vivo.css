@@ -144,3 +144,53 @@
   .sv-vivo i, .sv-area.prep::before, .sv-demora.alerta, .sv-ped, .sv-bitacora div { animation: none; }
   .sv-barra i { transition: none; }
 }
+
+/* ---------- Pantalla para la TV (/tv/salon-vivo): ocupa toda la pantalla, sin el panel del admin ---------- */
+.sv-raiz.sv-tv { position: fixed; inset: 0; z-index: 50; background: var(--sv-navy-2); }
+.sv-tv .sv-app { height: 100vh; height: 100dvh; min-height: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 560px); }
+.sv-completa .sv-cabeza { pointer-events: none; }
+.sv-btn.sv-prim { background: var(--sv-naranja); border-color: transparent; color: #fff; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; }
+.sv-sel { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--sv-f-txt); color: rgba(251, 244, 236, .75); }
+.sv-sel select { font: 600 13px var(--sv-f-txt); color: var(--sv-hueso); background: var(--sv-navy-2); border: 1px solid rgba(251, 244, 236, .2); border-radius: 999px; padding: 6px 10px; min-height: 36px; }
+.sv-sel select:focus-visible { outline: 3px solid var(--sv-oro); outline-offset: 2px; }
+.sv-ayuda-tv { position: absolute; right: 16px; top: 16px; margin: 0; font-size: 12px; color: rgba(251, 244, 236, .7); background: rgba(8, 34, 49, .7); padding: 6px 10px; border-radius: 10px; }
+
+/* ---------- Panel de pedidos pendientes: grande y visual para la TV ---------- */
+.sv-pend-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 18px 20px 12px; background: #fff; border-bottom: 1px solid var(--sv-linea); }
+.sv-pend-cab h1 { margin: 0; font: 900 clamp(18px, 1.6vw, 26px) var(--sv-f-disp); }
+.sv-pend-cab h1::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--sv-naranja); margin-right: 9px; vertical-align: 3px; }
+.sv-pend-cab .sv-reloj { font: 900 clamp(18px, 1.5vw, 24px) var(--sv-f-disp); font-variant-numeric: tabular-nums; }
+.sv-pend-resumen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; }
+.sv-pend-chip { display: grid; justify-items: center; padding: 8px 6px; border-radius: 14px; background: #fff; border: 1px solid var(--sv-linea); font: 700 12px var(--sv-f-txt); color: var(--sv-suave); border-top: 5px solid; }
+.sv-pend-chip b { font: 900 clamp(22px, 2vw, 32px) var(--sv-f-disp); color: var(--sv-navy); line-height: 1.1; }
+.sv-pend-chip.caja { border-top-color: var(--sv-oro); } .sv-pend-chip.cocina { border-top-color: var(--sv-naranja); } .sv-pend-chip.listo { border-top-color: var(--sv-verde); }
+.sv-pend-lista { list-style: none; margin: 0; padding: 4px 16px 18px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; min-height: 0; }
+.sv-pend-vacio { padding: 28px 10px; text-align: center; font: 700 16px var(--sv-f-txt); color: var(--sv-suave); }
+.sv-pend-item { background: #fff; border: 1px solid var(--sv-linea); border-left: 7px solid var(--sv-naranja); border-radius: 16px; padding: 12px 14px; box-shadow: 0 3px 12px rgba(11, 44, 62, .06); animation: sv-entra .5s cubic-bezier(.2, .8, .2, 1); }
+.sv-pend-item.caja { border-left-color: var(--sv-oro); }
+.sv-pend-item.listo { border-left-color: var(--sv-verde); background: #EFFAF3; }
+.sv-pend-item.tarde { box-shadow: 0 0 0 2px #C5221F inset, 0 3px 12px rgba(11, 44, 62, .06); }
+@keyframes sv-entra { from { opacity: 0; transform: translateY(10px); } }
+.sv-pend-fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.sv-pend-cod { font: 900 clamp(20px, 1.8vw, 28px) var(--sv-f-disp); font-variant-numeric: tabular-nums; }
+.sv-pend-cod small { font-size: .45em; opacity: .55; }
+.sv-pend-donde { font: 700 clamp(13px, 1vw, 16px) var(--sv-f-txt); color: var(--sv-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-pend-etapa { font: 800 clamp(12px, .95vw, 15px) var(--sv-f-txt); padding: 4px 12px; border-radius: 99px; color: #fff; background: var(--sv-naranja); white-space: nowrap; }
+.sv-pend-item.caja .sv-pend-etapa { background: var(--sv-oro); color: var(--sv-navy); }
+.sv-pend-item.listo .sv-pend-etapa { background: var(--sv-verde); animation: sv-latido 1.2s infinite; }
+@keyframes sv-latido { 50% { transform: scale(1.06); } }
+.sv-pend-barra { position: relative; height: 22px; margin-top: 10px; border-radius: 99px; background: rgba(11, 44, 62, .08); overflow: hidden; }
+.sv-pend-barra i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: linear-gradient(90deg, var(--sv-oro), var(--sv-naranja)); transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+.sv-pend-item.listo .sv-pend-barra i { background: var(--sv-verde); }
+.sv-pend-barra span { position: relative; display: block; text-align: center; font: 900 13px/22px var(--sv-f-disp); color: var(--sv-navy); }
+.sv-pend-pasos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 6px; font: 700 11px var(--sv-f-txt); color: rgba(11, 44, 62, .4); }
+.sv-pend-pasos span:nth-child(2) { text-align: center; } .sv-pend-pasos span:nth-child(3) { text-align: right; }
+.sv-pend-pasos .hecho { color: var(--sv-navy); }
+.sv-pend-areas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.sv-pend-areas span { font: 700 12px var(--sv-f-txt); padding: 3px 10px; border-radius: 99px; border: 1px solid var(--sv-linea); }
+.sv-pend-areas .ok { background: var(--sv-verde); color: #fff; border-color: transparent; }
+.sv-pend-areas .prep { color: var(--sv-naranja-osc); border-color: var(--sv-naranja); }
+.sv-pend-min { margin-left: auto; font: 700 12px var(--sv-f-txt); font-style: normal; color: var(--sv-suave); }
+.sv-pend-item.tarde .sv-pend-min { color: #C5221F; }
+@media (prefers-reduced-motion: reduce) { .sv-pend-item, .sv-pend-item.listo .sv-pend-etapa { animation: none; } .sv-pend-barra i { transition: none; } }
+@media (max-width: 900px) { .sv-tv .sv-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 55dvh minmax(0, 1fr); } .sv-tv .sv-escena { height: auto; min-height: 0; } .sv-tv .sv-panel { height: 100%; overflow: hidden; } }

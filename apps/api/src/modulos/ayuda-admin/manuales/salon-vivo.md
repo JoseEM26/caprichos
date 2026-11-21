@@ -8,6 +8,7 @@ relacionados: [plano, caja, cocina, reservas, repartos, mis-pedidos]
 sugerencias:
   - Como veo el salon en 3D con las mesas ocupadas
   - Como se que pedidos estan en cocina o listos en despacho
+  - Como pongo el salon en vivo en la TV en pantalla completa
   - Como cambio la tematica del salon en 3D
   - Como pongo el salon en modo ligero porque va lento
   - Por que no veo el salon en 3D en mi equipo
@@ -26,17 +27,23 @@ Muestra el local de Caprichos en 3D, dibujado a partir del plano que ya configur
 Antes: [[plano]]
 
 ## Como se hace: usar el panel de la derecha
-1. En "Pedidos": meseros, carga de cocina por área, pedidos por cobrar, en cocina (con chips por área, listos o en preparación), listos en despacho, en reparto y "Últimos movimientos". Un reloj rojo avisa los pedidos que pasan de 15 minutos.
-2. En "Mesas": reservas próximas y todas las mesas del piso con su estado y cuántas personas hay.
-3. En "Temática": la hora del día (automática usa la hora de Lima: de noche se encienden las luces y el letrero) y la temática de la decoración. La temática solo cambia esta pantalla.
-4. Arriba, "Interna" muestra el bloque "Del día"; "Pública" lo esconde para poder mostrar la pantalla a otras personas.
+1. A la derecha solo están los pedidos pendientes, cada uno con una barra de avance grande: En caja (dorado), En cocina (naranja, avanza a medida que cada área termina lo suyo) y ¡Listo! (verde, el pedido espera que lo lleven).
+2. Arriba del panel ves cuántos hay en caja, en cocina y listos. Los listos salen primero.
+3. Cuando el pedido se entrega o sale con el repartidor, desaparece de la lista.
+4. Un borde rojo avisa los pedidos que pasan de 15 minutos.
 Ver tambien: [[caja]], [[cocina]], [[repartos]]
 
+## Como se hace: ponerlo en la TV del local
+1. Pulsa "Abrir en la TV" (abajo en la escena) o entra en la TV a /tv/salon-vivo con un usuario que tenga el permiso.
+2. Elige la cámara, la temática y la luz con los controles de abajo, y pulsa "Pantalla completa".
+3. En pantalla completa desaparecen todos los controles, porque la ven los clientes. Para volver a cambiar algo, presiona Esc.
+
 ## Como se hace: mover la cámara y ahorrar equipo
-1. Arrastra para girar, rueda o pellizco para acercar. Los botones "Todo el local", "Cocina", "Salón" y "Seguir a Capri" mueven la cámara. Toca a Capri para que te salude.
-2. "Voz de Capri" anuncia en voz alta los pedidos que quedan listos y "Sonido ambiente" activa el murmullo del salón. Ambos empiezan apagados.
-3. Si el equipo va lento, pulsa "Modo ligero": quita sombras y efectos, baja la calidad y los cuadros por segundo. Se recuerda en ese equipo. Si tu equipo pide reducir movimiento, la pantalla ya viene sin animaciones: las personas aparecen directamente en su lugar.
-4. Los datos se actualizan solos en tiempo real y, de respaldo, cada 8 segundos.
+1. La temática y la luz (hora real, día, atardecer o noche) se eligen en la barra de abajo. La temática solo cambia esta pantalla.
+2. Arrastra para girar, rueda o pellizco para acercar. Los botones "Todo el local", "Cocina", "Salón" y "Seguir a Capri" mueven la cámara. Toca a Capri para que te salude.
+3. "Voz de Capri" anuncia en voz alta los pedidos que quedan listos y "Sonido ambiente" activa el murmullo del salón. Ambos empiezan apagados.
+4. Si el equipo va lento, pulsa "Modo ligero": quita sombras y efectos, baja la calidad y los cuadros por segundo. Se recuerda en ese equipo. Si tu equipo pide reducir movimiento, la pantalla ya viene sin animaciones: las personas aparecen directamente en su lugar.
+5. Los datos se actualizan solos en tiempo real y, de respaldo, cada 8 segundos.
 
 ## Errores y dudas comunes
 - Dice que el equipo no puede mostrar 3D: el navegador no tiene WebGL activo. El panel de la derecha sigue funcionando.

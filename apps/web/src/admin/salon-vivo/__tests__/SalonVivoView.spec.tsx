@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as soporte from '../../../mascota/soporteWebGL';
 import { salonEjemplo } from './datosEjemplo';
 
@@ -34,9 +34,10 @@ describe('SalonVivoView', () => {
     expect(motor.saludar).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Sonido ambiente' }));
     expect(motor.sonido).toHaveBeenCalledWith(true);
-    fireEvent.click(screen.getByRole('tab', { name: 'Temática' }));
-    fireEvent.click(screen.getByRole('button', { name: /Halloween/ }));
+    fireEvent.change(screen.getByLabelText('Temática'), { target: { value: 'halloween' } });
     expect(motor.tema).toHaveBeenCalledWith('halloween');
+    // en el panel del admin se ofrece abrir la pantalla de la TV
+    expect(screen.getByRole('link', { name: /Abrir en la TV/ })).toHaveAttribute('href', '/tv/salon-vivo');
     fireEvent.click(screen.getByRole('button', { name: 'Modo ligero' }));
     expect(screen.getByRole('button', { name: 'Modo ligero' })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -46,8 +47,26 @@ describe('SalonVivoView', () => {
     render(<SalonVivoView />);
     expect(await screen.findByText(/no puede mostrar el salón en 3D/)).toBeTruthy();
     expect(screen.queryByTestId('escena')).toBeNull();
-    expect(screen.getByLabelText('Pedidos en cocina')).toBeTruthy();
+    expect(screen.getByLabelText('Pedidos pendientes')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Saludar' })).toBeNull();
+  });
+
+  it('en la TV: botón de pantalla completa y en pantalla completa no queda ningún control', async () => {
+    vi.spyOn(soporte, 'tieneSoporteWebGL').mockReturnValue(true);
+    vi.spyOn(soporte, 'prefiereMovimientoReducido').mockReturnValue(false);
+    const pedir = vi.fn(() => Promise.resolve());
+    (document.documentElement as any).requestFullscreen = pedir;
+    render(<SalonVivoView tv />);
+    await screen.findByTestId('escena');
+    fireEvent.click(screen.getByRole('button', { name: /Pantalla completa/ }));
+    expect(pedir).toHaveBeenCalled();
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => document.documentElement });
+    act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
     expect(screen.queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByText(/presiona Esc/)).toBeNull();
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => null });
+    act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+    expect(screen.getByRole('toolbar')).toBeTruthy();
   });
 
   it('si falla la carga muestra el error', async () => {

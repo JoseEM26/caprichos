@@ -17,6 +17,7 @@ import {
 } from "./carta/legal";
 import { PantallaCocinaView } from "./pantalla/PantallaCocinaView";
 const PantallaLocal = lazy(() => import("./pantalla-local/PantallaLocal"));
+const SalonVivoTv = lazy(() => import("./admin/salon-vivo/SalonVivoView").then((m) => ({ default: () => <m.SalonVivoView tv /> })));
 import { PaginaMascota } from "./mascota/PaginaMascota";
 import { PantallaAsistenciaPublica } from "./admin/asistencia";
 
@@ -39,7 +40,8 @@ function TituloPanel() {
     if (
       pathname === "/admin" ||
       pathname.startsWith("/admin/") ||
-      pathname.startsWith("/pantalla")
+      pathname.startsWith("/pantalla") ||
+      pathname.startsWith("/tv/")
     ) {
       document.title = "Caprichos - Panel del Local";
     }
@@ -71,6 +73,18 @@ export function RutasApp() {
             <Suspense fallback={null}>
               <PantallaLocal />
             </Suspense>
+          }
+        />
+
+        {/* Salón en vivo 3D para la TV del local: pantalla propia, sin el panel del admin (pide sesión con permiso) */}
+        <Route
+          path="/tv/salon-vivo"
+          element={
+            <RutaProtegida permiso="salon_vivo/ver">
+              <Suspense fallback={null}>
+                <SalonVivoTv />
+              </Suspense>
+            </RutaProtegida>
           }
         />
 
