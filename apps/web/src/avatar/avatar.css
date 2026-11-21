@@ -68,11 +68,57 @@
 .av-estado[data-sucio="true"] { color: var(--av-naranja-osc); }
 .av-estado[data-sucio="false"] { color: #1F6B3A; }
 .av-error { color: #B3412E; font-weight: 700; font-size: 13px; }
+/* Pantalla completa tipo app: la vista 3D ocupa todo el alto y solo el vestidor hace scroll por dentro */
+.av-raiz { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+.av-cab { flex: none; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.av-main { flex: 1; min-height: 0; width: 100%; max-width: none; padding: 14px 18px; grid-template-columns: minmax(0, 1.15fr) minmax(400px, .85fr); align-items: stretch; }
+.av-vista { position: relative; top: auto; display: flex; flex-direction: column; min-height: 0; }
+.av-lienzo-caja { flex: 1; aspect-ratio: auto; max-height: none; min-height: 0; }
+.av-vestidor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.av-vestidor > .av-nombre, .av-vestidor > .av-cats, .av-vestidor > .av-pie, .av-vestidor > .av-error { flex: none; }
+#av-panel { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 8px 2px; margin-right: -4px; }
+.av-rejilla { max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.av-pie { margin: 10px -14px -14px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 1500px) {
+  .av-main { grid-template-columns: minmax(0, 1.3fr) minmax(480px, .9fr); padding: 18px 28px; gap: 22px; }
+  .av-rejilla { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+}
+/* Tablet y celular: arriba la vista (un tercio de la pantalla), abajo el vestidor con su propio scroll y los botones fijos al pie */
 @media (max-width: 920px) {
-  .av-main { grid-template-columns: minmax(0, 1fr); padding: 10px 12px 40px; }
-  .av-vista { position: sticky; top: 56px; z-index: 10; padding: 8px; }
-  .av-lienzo-caja { aspect-ratio: 16 / 11; max-height: 38vh; }
+  .av-main { display: flex; flex-direction: column; gap: 8px; padding: 8px max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px)); }
+  .av-vista { flex: none; padding: 6px; border-radius: 18px; }
+  .av-lienzo-caja { flex: none; height: 36vh; height: 36dvh; border-radius: 14px; }
   .av-acciones { display: none; }
+  .av-vestidor { flex: 1; padding: 10px 10px 0; border-radius: 18px 18px 0 0; }
+  .av-nombre { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; margin-bottom: 8px; }
+  .av-nombre small { grid-column: 1 / -1; font-size: 11px; }
+  .av-cats { margin-bottom: 6px; padding-bottom: 6px; }
+  .av-cat { min-width: 66px; min-height: 52px; padding: 6px; }
+  .av-rejilla { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .av-pie { margin: 8px -10px 0; padding: 8px 10px max(8px, env(safe-area-inset-bottom, 0px)); border-radius: 0; }
+  .av-pie { flex-wrap: nowrap; }
+  .av-pie .av-btn { padding: 8px 12px; white-space: nowrap; }
+  .av-pie .av-estado { display: none; }
+  .av-lienzo-caja { height: 30vh; height: 30dvh; }
+  .av-nombre small { display: none; }
+  .av-nombre input { min-height: 44px; padding: 8px 12px; }
+  .av-cat { min-height: 48px; font-size: 11px; }
+  .av-cat span { font-size: 18px; }
+  .av-filtros { margin-bottom: 6px; }
+  #av-panel > .av-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 8px !important; }
+  #av-panel > .av-chips .av-chip { flex: none; }
+}
+@media (max-width: 380px) {
+  .av-pie > div .av-btn:nth-child(2) { display: none; }
+  .av-lienzo-caja { height: 27dvh; }
+}
+/* Celular acostado: vista a la izquierda, vestidor a la derecha */
+@media (max-width: 920px) and (orientation: landscape) and (max-height: 520px) {
+  .av-main { flex-direction: row; padding-bottom: 8px; }
+  .av-vista { flex: 0 0 40%; display: flex; }
+  .av-lienzo-caja { flex: 1; height: auto; }
+  .av-vestidor { border-radius: 18px; }
+  .av-nombre small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .av-item, .av-btn { transition: none; }
