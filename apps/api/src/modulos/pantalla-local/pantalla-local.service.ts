@@ -52,7 +52,7 @@ export class PantallaLocalService {
     const filas = await this.prisma.pedido.findMany({
       where: {
         creado_en: { gte: inicioDiaLimaIso(hoyLimaIso(ahora)) },
-        modalidad: { in: ['COMER_LOCAL', 'MESA', 'RECOGER'] },
+        modalidad: { in: ['COMER_LOCAL', 'MESA', 'LOCAL', 'LLEVAR', 'RECOGER'] },
         OR: [{ estado: { in: ['COLA', 'PREPARANDO'] } }, { estado: 'LISTO', listo_en: { gte: limiteListo } }],
       },
       // Solo lo necesario: nunca teléfono, documento ni apellidos.
@@ -67,7 +67,7 @@ export class PantallaLocalService {
       return {
         codigo: f.codigo,
         estado: listo ? 'LISTO' : 'PREPARANDO',
-        modalidad: f.modalidad === 'RECOGER' ? 'LLEVAR' : 'COMER_LOCAL',
+        modalidad: f.modalidad === 'RECOGER' || f.modalidad === 'LLEVAR' ? 'LLEVAR' : 'COMER_LOCAL',
         minutos: Math.max(0, Math.floor((ahora.getTime() - desde.getTime()) / 60000)),
         nombre: mostrarNombre ? nombreDePila(f.cliente_nombre) : null,
         avatarUrl: null,

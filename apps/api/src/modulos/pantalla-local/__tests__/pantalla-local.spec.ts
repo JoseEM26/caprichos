@@ -51,7 +51,7 @@ describe('PantallaLocalService', () => {
     await servicio.pedidos(AHORA);
     const where = prisma.pedido.findMany.mock.calls[0][0].where;
     expect(where.creado_en.gte.toISOString()).toBe('2026-11-20T05:00:00.000Z');
-    expect(where.modalidad.in).toEqual(['COMER_LOCAL', 'MESA', 'RECOGER']);
+    expect(where.modalidad.in).toEqual(['COMER_LOCAL', 'MESA', 'LOCAL', 'LLEVAR', 'RECOGER']);
     expect(where.modalidad.in).not.toContain('DELIVERY');
     expect(where.OR[0].estado.in).toEqual(['COLA', 'PREPARANDO']);
     expect(where.OR[1].estado).toBe('LISTO');
