@@ -25,7 +25,9 @@ export function escParaSalir(e: KeyboardEvent): boolean {
   const activo = document.activeElement as HTMLElement | null;
   if (activo && activo.matches('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')) return false;
   if (activo?.isContentEditable) return false;
-  if (document.querySelector('[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[aria-modal="true"]')) return false;
+  // Solo cuenta lo que está a la vista: un menú cerrado que queda montado con `hidden` no bloquea la salida
+  const abiertos = document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[aria-modal="true"]');
+  if (Array.from(abiertos).some((el) => !el.closest('[hidden]'))) return false;
   return true;
 }
 
