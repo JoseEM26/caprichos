@@ -8,6 +8,8 @@ export interface ClienteCuenta {
   correo: string | null;
   telefono: string | null;
   fotoUrl: string | null;
+  /** Retrato del avatar 3D (URL del archivo); null si aún no creó uno */
+  avatarUrl?: string | null;
   cumpleanos: string | null;
   puntos: number;
 }
@@ -46,6 +48,9 @@ interface ContextoCuenta {
   actualizarPerfil: (datos: DatosPerfil) => Promise<void>;
   subirFoto: (archivo: File) => Promise<void>;
   quitarFoto: () => Promise<void>;
+  /** Avatar 3D guardado (config) o null si no tiene */
+  cargarAvatar?: () => Promise<unknown | null>;
+  guardarAvatar?: (config: unknown, retrato: string) => Promise<void>;
   salir: () => Promise<void>;
   refrescar: () => Promise<void>;
 }
@@ -144,6 +149,16 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
     if (r.cliente) setCliente(r.cliente);
   }, []);
 
+  const cargarAvatar = useCallback(async () => {
+    const r = await api.get<{ config: unknown | null }>('/carta/cuenta/avatar');
+    return r.config ?? null;
+  }, []);
+
+  const guardarAvatar = useCallback(async (config: unknown, retrato: string) => {
+    const r = await api.put<{ cliente: ClienteCuenta | null }>('/carta/cuenta/avatar', { config, retrato });
+    if (r.cliente) setCliente(r.cliente);
+  }, []);
+
   const salir = useCallback(async () => {
     try {
       await api.post('/carta/cuenta/salir');
@@ -166,10 +181,12 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
       actualizarPerfil,
       subirFoto,
       quitarFoto,
+      cargarAvatar,
+      guardarAvatar,
       salir,
       refrescar,
     }),
-    [cliente, equipo, panelAbierto, ingresar, registrar, actualizarPerfil, subirFoto, quitarFoto, salir, refrescar],
+    [cliente, equipo, panelAbierto, ingresar, registrar, actualizarPerfil, subirFoto, quitarFoto, cargarAvatar, guardarAvatar, salir, refrescar],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

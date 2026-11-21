@@ -4,6 +4,7 @@ import { useCarrito } from './CarritoContext';
 import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
 import { usePedidosGuardados } from './seguimiento';
+import { RetratoAvatar } from '../avatar/RetratoAvatar';
 import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
 import { BotonReservar } from './reservas/BotonReservar';
 import { TEXTO_CERRADO_PROGRAMAR, type ProgramarCarta } from './ProgramarPedido';
@@ -312,7 +313,9 @@ export function CabeceraCarta({
                 gap: 6,
               }}
             >
-              {cliente?.fotoUrl ? (
+              {cliente?.avatarUrl ? (
+                <RetratoAvatar url={cliente.avatarUrl} tamano={18} />
+              ) : cliente?.fotoUrl ? (
                 // mismo recuadro de 18 px que el icono: la cabecera no cambia de ancho con o sin foto
                 <img src={cliente.fotoUrl} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 9, objectFit: 'cover', flex: 'none' }} />
               ) : (

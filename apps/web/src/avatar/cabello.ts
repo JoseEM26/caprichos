@@ -1,0 +1,414 @@
+/* eslint-disable -- piezas pasadas tal cual de la maqueta aprobada (no se reescriben a mano) */
+// @ts-nocheck
+import { AVATAR } from './nucleo';
+
+/*
+ * Cabellos del avatar de Caprichos. Todo se arma sobre H.casquete (respeta la frente) más mechones, melenas,
+ * colas, moños y rizos. Regla fija: nada del cabello baja de MED.frenteY en la cara (los mechones se suben solos
+ * si el borde les quedaría bajo la frente).
+ */
+export function registrarCabello() {
+  const A = AVATAR, T = A.T, MED = A.MED;
+  const FRENTE = MED.frenteY + .008;
+  const R = .283; // radio donde viven los mechones (sobre el casquete)
+  const V = (x, y, z) => new T.Vector3(x, y, z);
+  const Y = V(0, 1, 0);
+  let semilla = 7;
+  const azar = () => { semilla = (semilla * 16807) % 2147483647; return (semilla - 1) / 2147483646; };
+
+  /** Tubo que se afina a lo largo de una curva (mechón, cola, rasta). Termina redondeado. */
+  function geoTubo(pts, r, afil, n = 24, m = 10) {
+    const c = new T.CatmullRomCurve3(pts);
+    const pos = [], idx = [];
+    const ref = Math.abs(c.getTangentAt(0).y) < .9 ? V(0, 1, 0) : V(1, 0, 0);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, p = c.getPointAt(t), tg = c.getTangentAt(t).normalize();
+      const N = new T.Vector3().crossVectors(tg, ref).normalize(), B = new T.Vector3().crossVectors(tg, N);
+      let rr = r * (1 - (1 - afil) * t);
+      if (t > .88) rr *= Math.sqrt(Math.max(0, 1 - Math.pow((t - .88) / .12, 2)));
+      for (let j = 0; j < m; j++) {
+        const a = (j / m) * Math.PI * 2, ca = Math.cos(a) * rr, sa = Math.sin(a) * rr;
+        pos.push(p.x + N.x * ca + B.x * sa, p.y + N.y * ca + B.y * sa, p.z + N.z * ca + B.z * sa);
+      }
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) {
+      const a = i * m + j, b = i * m + (j + 1) % m, c2 = (i + 1) * m + j, d = (i + 1) * m + (j + 1) % m;
+      idx.push(a, b, c2, b, d, c2);
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+
+  /** Melena: esfera deformada (arriba corta, abajo larga) con corte plano, vuelo y onda opcionales. */
+  function geoMelena({ w = .287, ht = .26, largo = .4, d = .255, plano = 0, onda = 0, vuelo = 0 }) {
+    const g = new T.SphereGeometry(1, 30, 22);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      let ny = y > 0 ? y * ht : y * largo;
+      if (plano && ny < -largo * plano) ny = -largo * plano;
+      const k = ny < 0 ? 1 + vuelo * (-ny / largo) : 1;
+      const f = ny < 0 ? -ny / largo : 0;
+      x = x * w * k + Math.sin(ny * onda) * .04 * f;
+      z = z * d * (ny < 0 ? 1 + vuelo * .3 * f : 1) - f * .16;
+      p.setXYZ(i, x, ny, z);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+
+  function utiles(ctx, g) {
+    const cab = ctx.partes.cabeza, m = ctx.mat('principal'), m2 = ctx.mat('secundario');
+    const oscuro = ctx.mat('principal'); // reemplazado abajo
+    const U = { ctx, g, cab, m, m2, anim: [] };
+    U.mDark = ctx.M(ctx.tono(ctx.col('principal'), .55));
+    U.bola = (rx, ry, rz, x, y, z, mat = m, par = cab, seg = 18) => {
+      const s = ctx.esfera(1, mat, x, y, z, par, seg); s.scale.set(rx, ry, rz); return s;
+    };
+    U.casquete = (o = {}) => ctx.H.casquete(Object.assign({ mat: m, radio: g ? .274 : .284 }, o));
+    U.tubo = (pts, r, afil = .3, mat = m, par = cab, n = 24, mm = 10) => ctx.malla(geoTubo(pts, r, afil, n, mm), mat, 0, 0, 0, par);
+    U.mel = (o, mat = m, y = -.02, z = -.07) => ctx.malla(geoMelena(Object.assign({ ht: g ? .12 : .26 }, o)), mat, 0, y, z, cab);
+    U.grupo = (x, y, z) => { const gr = new T.Group(); gr.position.set(x, y, z); cab.add(gr); return gr; };
+    U.aro = (r, grosor, x, y, z, rx = 0, ry = 0, par = cab, mat = U.mDark) => {
+      const t = ctx.malla(new T.TorusGeometry(r, grosor, 8, 20), mat, x, y, z, par); t.rotation.set(rx, ry, 0); return t;
+    };
+    /** Punto sobre el casquete que no baja de la frente (si el mechón de largo drop lo hiciera, sube). */
+    U.punto = (el, az, rad, drop = 0) => {
+      const P = () => V(Math.sin(az) * Math.cos(el) * rad, Math.sin(el) * rad, Math.cos(az) * Math.cos(el) * rad);
+      let p = P();
+      for (let k = 0; k < 40 && Math.abs(p.x) < .22 && p.z > .06 && p.y - drop < FRENTE; k++) { el += .025; p = P(); }
+      return p;
+    };
+    /** Mechón aplanado pegado a la cabeza; la punta cae siguiendo la superficie. giro > 0 la lleva hacia +x. */
+    U.mechon = (az, el, w, l, th, giro = 0, mat = m, rad = R) => {
+      const n = V(0, 0, 0), t = V(0, 0, 0), P = V(0, 0, 0);
+      const calc = () => {
+        P.set(Math.sin(az) * Math.cos(el) * rad, Math.sin(el) * rad, Math.cos(az) * Math.cos(el) * rad);
+        n.copy(P).normalize();
+        t.set(Math.sin(az) * Math.sin(el), -Math.cos(el), Math.cos(az) * Math.sin(el)).normalize();
+        if (giro) t.applyAxisAngle(n, giro);
+      };
+      calc();
+      for (let k = 0; k < 40 && Math.abs(P.x) < .22 && P.z > .06 && P.y + t.y * l < FRENTE; k++) { el += .025; calc(); }
+      const Zb = n.clone().addScaledVector(t, -n.dot(t)).normalize(), Xb = new T.Vector3().crossVectors(t, Zb);
+      const s = U.bola(w, l, th, P.x, P.y, P.z, mat);
+      s.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(Xb, t, Zb));
+      return s;
+    };
+    /** Flequillo: recto | lado | cortina. Siempre termina sobre la frente. */
+    U.flequillo = (tipo, n = 9, mat = m) => {
+      for (let i = 0; i < n; i++) {
+        const k = i / (n - 1);
+        if (tipo === 'recto') {
+          const az = (k - .5) * 2;
+          U.mechon(az, .86, .065, .08, .036, 0, mat);
+          U.mechon(az + .1, 1.12, .07, .1, .04, 0, mat);
+        } else if (tipo === 'lado') {
+          const az = -1 + k * 1.9;
+          U.mechon(az, .86, .07, .1, .036, .85, mat);
+          U.mechon(az, 1.12, .07, .11, .04, .65, mat);
+        } else {
+          const az = (k - .5) * 2.1, s = Math.sign(az) || 1;
+          if (Math.abs(az) < .16) continue;
+          U.mechon(az, .86, .07, .1, .036, s * .7, mat);
+          U.mechon(az, 1.12, .07, .11, .04, s * .5, mat);
+        }
+      }
+    };
+    /** Patillas cortas a los lados (|x| > .2, sin pasar por delante de los ojos). */
+    U.patillas = (largo = .07, y = .03, mat = m) => {
+      for (const s of [-1, 1]) U.bola(.032, largo, .05, s * .258, y, .06, mat);
+    };
+    /** Frente a dos mechones largos que caen por delante de los hombros, pegados al costado. */
+    U.mechonesFrente = (largoY = -.5, r = .042) => {
+      for (const s of [-1, 1]) U.tubo([V(s * .255, .04, .0), V(s * .272, -.1, .04), V(s * .26, -.3, .07), V(s * .235, largoY, .075)], r, .45);
+    };
+    /** Cola o trenza colgante con balanceo suave; el grupo gira desde su atadura. */
+    U.cola = (x, y, z, pts, r, afil, fase = 0, amp = .06) => {
+      const gr = U.grupo(x, y, z);
+      U.tubo(pts, r, afil, m, gr);
+      U.anim.push((t) => { gr.rotation.z = Math.sin(t * 1.7 + fase) * amp; gr.rotation.x = Math.sin(t * 1.2 + fase) * amp * .6; });
+      return gr;
+    };
+    U.espinas = (el, cuantos, desde, hasta, largo = .17, r = .05) => {
+      for (let i = 0; i < cuantos; i++) {
+        const az = desde + (hasta - desde) * (i / Math.max(1, cuantos - 1));
+        const p = U.punto(el, az, .268, .06);
+        const n = p.clone().normalize(), dir = n.clone().add(V(0, .45, 0)).normalize();
+        const c = ctx.malla(new T.ConeGeometry(r, largo, 10), m, 0, 0, 0, cab);
+        c.position.copy(p).addScaledVector(dir, largo * .42);
+        c.quaternion.setFromUnitVectors(Y, dir);
+      }
+    };
+    return U;
+  }
+
+  function reg(id, nombre, grupo, alto, bajo, sec) {
+    A.registrar('cabello', {
+      id, nombre, grupo,
+      colores: sec ? ['principal', 'secundario'] : ['principal'],
+      porDefecto: sec ? { principal: '#4A2C1D', secundario: sec } : { principal: '#4A2C1D' },
+      construir(ctx) {
+        semilla = 7;
+        const g = ctx.conGorro, U = utiles(ctx, g);
+        if (!ctx.gorroOcultaCabello && alto) alto(U, g);
+        if (bajo) bajo(U, g);
+        if (U.anim.length) return { animar: (t, dt) => U.anim.forEach((f) => f(t, dt)) };
+      },
+    });
+  }
+
+  /* ============================ CORTO ============================ */
+  reg('corto', 'Corto clásico', 'Corto', (U, g) => {
+    U.casquete();
+    if (!g) for (const az of [-.55, -.2, .15, .5]) U.mechon(az, 1.12, .06, .1, .036, az * .6);
+    U.patillas();
+  });
+  reg('degradado', 'Degradado (fade)', 'Corto', (U, g) => {
+    U.casquete({ mat: U.m2, radio: g ? .272 : .279 });
+    U.casquete({ cobertura: .33, inclinacion: -.3, radio: g ? .277 : .288 });
+    if (!g) for (const az of [-.5, -.15, .2, .55]) U.mechon(az, 1.2, .06, .1, .038, az * .5, U.m, .288);
+  }, null, '#2B170E');
+  reg('rapado', 'Rapado', 'Corto', (U) => {
+    U.casquete({ radio: .277 });
+  });
+  reg('mohicano', 'Mohicano', 'Corto', (U, g) => {
+    U.casquete({ radio: .277 });
+    if (g) return;
+    const pc = [48, 70, 95, 125, 148].map((a) => { a *= Math.PI / 180; return V(0, Math.sin(a) * .312, Math.cos(a) * .312); });
+    U.tubo(pc, .05, 1, U.m, U.cab, 28, 12);
+  });
+  reg('erizado', 'Erizado con gel', 'Corto', (U, g) => {
+    U.casquete({ radio: g ? .274 : .281 });
+    if (g) return;
+    U.espinas(.95, 10, -3.0, 3.0, .15);
+    U.espinas(1.2, 7, 0, 6.0, .17);
+    U.espinas(1.43, 3, 0, 4, .17);
+    U.espinas(.4, 10, 1.4, 4.9, .14);
+    U.espinas(-.05, 9, 1.9, 4.4, .13);
+  });
+  reg('raya_costado', 'Raya al costado', 'Corto', (U, g) => {
+    U.casquete();
+    if (g) return;
+    U.flequillo('lado', 8);
+    U.bola(.16, .075, .17, .03, .235, .03);
+    U.patillas();
+  });
+  reg('militar', 'Militar', 'Corto', (U, g) => {
+    U.casquete({ radio: .277 });
+    if (!g) U.ctx.malla(new T.CylinderGeometry(.16, .18, .05, 28), U.m, 0, .26, -.03, U.cab);
+  });
+
+  /* ========================= CON CERQUILLO ========================= */
+  reg('cerquillo_recto', 'Cerquillo recto', 'Con cerquillo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('recto', 10);
+  }, (U, g) => { U.mel({ largo: .2, plano: .85 }); U.patillas(.09, .0); });
+  reg('cerquillo_lado', 'Cerquillo de lado', 'Con cerquillo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('lado', 9);
+  }, (U, g) => { U.mel({ largo: .2, plano: .85 }); U.patillas(.09, .0); });
+  reg('cerquillo_cortina', 'Cerquillo cortina', 'Con cerquillo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 11);
+  }, (U, g) => { U.mel({ largo: .26, plano: .9 }); U.patillas(.1, .0); });
+  reg('bob_cerquillo', 'Bob con cerquillo', 'Con cerquillo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('recto', 10);
+  }, (U, g) => { U.mel({ w: .295, largo: .27, plano: .9, vuelo: .08 }); U.patillas(.1, .0); });
+
+  /* ============================ MEDIANO ============================ */
+  reg('bob', 'Bob', 'Mediano', (U, g) => {
+    U.casquete();
+    if (!g) { U.flequillo('lado', 8); }
+  }, (U, g) => { U.mel({ w: .297, largo: .26, plano: .88, vuelo: .1 }); });
+  reg('hombros', 'Melena a los hombros', 'Mediano', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 9);
+  }, (U, g) => { U.mel({ largo: .42, vuelo: .12, plano: .93 }); U.mechonesFrente(-.33, .04); });
+  reg('ondulado', 'Ondulado', 'Mediano', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('lado', 8);
+  }, (U, g) => {
+    U.mel({ w: .29, largo: .42, vuelo: .2, onda: 16 });
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) U.bola(.055, .06, .055, s * (.255 + i * .008), -.1 - i * .09, -.03);
+  });
+  reg('shaggy', 'Desmechado (shaggy)', 'Mediano', (U, g) => {
+    U.casquete({ radio: g ? .274 : .286 });
+    if (g) return;
+    for (let i = 0; i < 12; i++) U.mechon(-1.1 + i * .2, .9 + azar() * .25, .06, .1 + azar() * .05, .036, (azar() - .5) * 1.5);
+    for (let i = 0; i < 6; i++) U.mechon(-.9 + i * .36, 1.3, .07, .1, .04, (azar() - .5));
+  }, (U, g) => {
+    U.mel({ largo: .2, w: .29, vuelo: .1 });
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) {
+      const c = U.bola(.035, .12 + azar() * .05, .04, s * (.255 + azar() * .02), -.02 - i * .05, -.02 - i * .06);
+      c.rotation.z = s * (.12 + azar() * .2);
+    }
+    for (let i = 0; i < 8; i++) {
+      const az = 1.7 + i * .3, c = U.bola(.04, .11 + azar() * .06, .04, Math.sin(az) * .27, -.17 - azar() * .04, -.07 + Math.cos(az) * .22);
+      c.rotation.z = Math.sin(az) * .25;
+    }
+  });
+
+  /* ============================== LARGO ============================== */
+  reg('largo_lacio', 'Largo lacio', 'Largo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('lado', 9);
+  }, (U, g) => { U.mel({ largo: .72, vuelo: .08, plano: .95 }); U.mechonesFrente(-.55); });
+  reg('largo_ondulado', 'Largo ondulado', 'Largo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('lado', 8);
+  }, (U, g) => { U.mel({ largo: .7, vuelo: .18, onda: 14, plano: .95 }); U.mechonesFrente(-.5, .046); });
+  reg('largo_raya_medio', 'Largo con raya al medio', 'Largo', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 11);
+  }, (U, g) => { U.mel({ largo: .72, vuelo: .1, plano: .95 }); U.mechonesFrente(-.55); });
+  reg('media_cola', 'Media cola', 'Largo', (U, g) => {
+    U.casquete();
+    if (!g) { U.flequillo('lado', 7); U.bola(.15, .07, .14, 0, .25, -.03); }
+  }, (U, g) => {
+    U.mel({ largo: .55, vuelo: .08, plano: .95, onda: 10 });
+    U.mechonesFrente(-.4, .04);
+    if (!g) { U.bola(.07, .06, .06, 0, .15, -.27); U.aro(.062, .016, 0, .15, -.27, 0, Math.PI / 2); }
+  });
+
+  /* ============================== RECOGIDO ============================== */
+  const colaAlta = (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('lado', 6);
+  };
+  reg('cola_alta', 'Cola alta', 'Recogido', (U, g) => {
+    colaAlta(U, g);
+    if (g) return;
+    U.cola(0, .2, -.255, [V(0, 0, 0), V(0, .08, -.1), V(0, .06, -.2), V(0, -.08, -.27), V(0, -.3, -.27), V(0, -.5, -.21)], .072, .3, 0, .09);
+    U.aro(.06, .018, 0, .2, -.255, -.4, Math.PI / 2 - .2);
+  });
+  reg('cola_baja', 'Cola baja', 'Recogido', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 8);
+  }, (U, g) => {
+    U.bola(.22, .2, .17, 0, -.06, -.13);
+    U.cola(0, -.06, -.29, [V(0, 0, 0), V(0, -.08, -.06), V(0, -.26, -.06), V(0, -.5, -.03)], .066, .35, 0, .07);
+    U.aro(.058, .017, 0, -.06, -.29, .2, Math.PI / 2);
+  });
+  reg('dos_colitas', 'Dos colitas', 'Recogido', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 8);
+  }, (U, g) => {
+    for (const s of [-1, 1]) {
+      U.cola(s * .2, .1, -.2, [V(0, 0, 0), V(s * .07, -.01, -.05), V(s * .12, -.12, -.06), V(s * .12, -.3, -.04)], .06, .3, s, .12);
+      U.aro(.05, .015, s * .2, .1, -.2, 0, Math.PI / 2 - s * .6);
+    }
+  });
+  reg('mono_alto', 'Moño alto', 'Recogido', (U, g) => {
+    U.casquete();
+    if (g) return;
+    U.flequillo('lado', 6);
+    U.bola(.12, .11, .12, 0, .35, -.07);
+    U.aro(.092, .02, 0, .3, -.07, Math.PI / 2, 0);
+    U.aro(.105, .015, 0, .385, -.07, Math.PI / 2, 0, U.cab, U.m);
+  });
+  reg('mono_bajo', 'Moño bajo (tomate)', 'Recogido', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 8);
+  }, (U, g) => {
+    U.bola(.22, .2, .17, 0, -.05, -.12);
+    U.bola(.115, .105, .1, 0, -.07, -.31);
+    U.aro(.09, .018, 0, -.07, -.31, 0, 0);
+    U.aro(.06, .014, 0, -.07, -.35, 0, 0, U.cab, U.m);
+  });
+  reg('dos_monos', 'Dos moños (space buns)', 'Recogido', (U, g) => {
+    U.casquete();
+    if (g) return;
+    U.flequillo('cortina', 7);
+    for (const s of [-1, 1]) {
+      U.bola(.095, .095, .095, s * .17, .31, -.04);
+      U.aro(.075, .016, s * .17, .26, -.04, Math.PI / 2, 0);
+    }
+  });
+  const trenzaPartes = (U, x, y, z, n, escala, fase) => {
+    const gr = U.grupo(x, y, z);
+    let yy = -.045;
+    for (let i = 0; i < n; i++) {
+      const k = 1 - i / (n * 1.5);
+      const e = U.bola(.052 * k, .066 * k, .046 * k, 0, yy, -i * .004, U.m, gr, 14);
+      e.rotation.z = (i % 2 ? .5 : -.5);
+      yy -= .062 * k;
+    }
+    U.bola(.03, .03, .03, 0, yy - .01, -n * .004, U.mDark, gr, 10);
+    U.anim.push((t) => { gr.rotation.z = Math.sin(t * 1.6 + fase) * escala; gr.rotation.x = Math.sin(t * 1.1 + fase) * escala * .5; });
+  };
+  reg('trenza', 'Trenza', 'Recogido', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 8);
+  }, (U, g) => {
+    U.bola(.2, .18, .16, 0, -.05, -.13);
+    trenzaPartes(U, 0, -.04, -.285, 10, .07, 0);
+  });
+  reg('dos_trenzas', 'Dos trenzas', 'Recogido', (U, g) => {
+    U.casquete();
+    if (!g) U.flequillo('cortina', 8);
+  }, (U, g) => {
+    U.mel({ largo: .1, w: .29, plano: .8 }, U.m, 0, -.09);
+    for (const s of [-1, 1]) {
+      U.bola(.06, .07, .07, s * .17, -.02, -.22);
+      trenzaPartes(U, s * .17, -.04, -.24, 9, .09, s);
+    }
+  });
+
+  /* ============================ RIZADO / AFRO ============================ */
+  reg('rizado_corto', 'Rizado corto', 'Rizado', (U, g) => {
+    U.casquete({ radio: g ? .274 : .281 });
+    const anillos = [[.95, 12, -2.4, 2.4], [1.2, 10, 0, 6.28], [1.42, 4, 0, 4.5], [.45, 14, 1.3, 5.0], [.05, 10, 1.9, 4.4]];
+    for (const [el, n, d, h] of anillos) {
+      if (g && el > .5) continue;
+      for (let i = 0; i < n; i++) {
+        const az = d + (h - d) * (i / n) + (el > 1 ? .2 * (i % 2) : 0);
+        const p = U.punto(el, az, .285, .06);
+        U.bola(.052, .052, .05, p.x, p.y, p.z, U.m, U.cab, 12);
+      }
+    }
+  });
+  reg('afro', 'Afro', 'Rizado', (U, g) => {
+    if (g) { U.casquete(); return; }
+    U.bola(.375, .34, .36, 0, .19, -.14, U.m, U.cab, 26);
+    for (let i = 0; i < 9; i++) {
+      const az = -1.1 + i * .28, p = U.punto(1.0, az, .31, .07);
+      U.bola(.06, .06, .05, p.x, p.y, p.z, U.m, U.cab, 12);
+    }
+  });
+  reg('rizos_largos', 'Rizos largos', 'Rizado', (U, g) => {
+    U.casquete({ radio: g ? .274 : .286 });
+    if (g) return;
+    for (let i = 0; i < 8; i++) { const p = U.punto(.95, -1.3 + i * .37, .295, .06); U.bola(.056, .06, .05, p.x, p.y, p.z, U.m, U.cab, 12); }
+    for (let i = 0; i < 6; i++) { const p = U.punto(1.28, -.8 + i * .32, .295, .06); U.bola(.058, .06, .055, p.x, p.y, p.z, U.m, U.cab, 12); }
+  }, (U, g) => {
+    U.mel({ largo: .55, vuelo: .25, onda: 18, plano: .95 });
+    const filas = [[-.18, 9, .27, .3], [-.34, 9, .28, .3], [-.5, 8, .27, .32]];
+    for (const [y, n, rx, rz] of filas) for (let i = 0; i < n; i++) {
+      const az = 1.55 + (i / (n - 1)) * 3.2;
+      U.bola(.065, .075, .065, Math.sin(az) * rx, y - (i % 2) * .03, -.07 + Math.cos(az) * rz * .72, U.m, U.cab, 12);
+    }
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) U.bola(.06, .07, .06, s * .26, -.08 - i * .13, .0 + i * .015, U.m, U.cab, 12);
+  });
+  reg('rastas', 'Rastas', 'Rizado', (U, g) => {
+    U.casquete({ radio: g ? .274 : .284 });
+  }, (U, g) => {
+    const filas = [[.5, 1.45, 4.85, .43, .85], [.1, 1.9, 4.4, .45, 1], [1.1, 1.7, 4.6, .8, .6]];
+    for (const [el, d, h, paso, alt] of filas) {
+      if (g && el > .4) continue;
+      for (let az = d; az <= h; az += paso) {
+        const p = U.punto(el, az, .268, 0), n = p.clone().normalize();
+        const largo = .3 + azar() * .25 * alt, ph = azar() * 6;
+        const gr = U.grupo(p.x, p.y, p.z);
+        const o = n.clone().multiplyScalar(.1), q = (k) => V(o.x * k, 0, o.z * k);
+        const pts = [V(0, 0, 0), V(o.x * .7, o.y * .5 + .0, o.z * .7), V(o.x * 1.1, -.12, o.z * 1.1), V(o.x * 1.2 + (azar() - .5) * .04, -largo * .6, o.z * 1.2), V(o.x * 1.1, -largo - .05, o.z * 1.1)];
+        void q;
+        U.tubo(pts, .03, .75, U.m, gr, 20, 8);
+        U.anim.push((t) => { gr.rotation.z = Math.sin(t * 1.5 + ph) * .05; gr.rotation.x = Math.sin(t * 1.1 + ph) * .04; });
+      }
+    }
+  });
+}

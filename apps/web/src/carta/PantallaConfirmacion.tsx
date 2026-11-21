@@ -13,6 +13,8 @@ import { EstadoVoucherPedido } from './EstadoVoucherPedido';
 import { avancePedido, etapaCliente, firmasPestanas, NOMBRE_MEDIO, NOMBRE_MODALIDAD, textoPagoMedio } from './seguimiento-textos';
 import type { EtapaCliente } from './seguimiento-textos';
 import type { PedidoConfirmado } from './tipos';
+import { RetratoAvatar } from '../avatar/RetratoAvatar';
+import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import './seguimiento-modal.css';
 
@@ -195,6 +197,7 @@ function PanelEstado({
     titulo = pedido.nombre ? `¡Gracias, ${pedido.nombre}!` : 'Recibimos tu pedido';
     detalle = creacion.mensaje || 'Un asesor te escribirá para coordinar el pago';
   }
+  const avatarUrl = useCuentaOpcional()?.cliente?.avatarUrl ?? null;
   const preparando = etapa.clave === 'recibido' || etapa.clave === 'cocina';
   const nombre = pedido.nombre ? `, ${pedido.nombre}` : '';
   const textoLocal =
@@ -222,11 +225,16 @@ function PanelEstado({
         data-testid="seguimiento-estado"
         data-etapa={etapa.clave}
       >
+        {avatarUrl && !anulado ? (
+          // El retrato del cliente en lugar del icono; salta de alegría cuando el pedido está listo (CSS, sin 3D)
+          <RetratoAvatar url={avatarUrl} tamano={64} celebra={etapa.tono === 'listo'} />
+        ) : (
         <span className="sg-icono" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             {anulado ? <path d="M6 6l12 12M18 6L6 18" /> : etapa.tono === 'normal' ? <path d="M12 7v5l3 2" /> : <path d="M5 12.5l4.5 4.5L19 7.5" />}
           </svg>
         </span>
+        )}
         <h3 className="sg-titulo">{titulo}</h3>
         {detalle && <p className="sg-detalle">{detalle}</p>}
         {estado?.progreso?.estimadoMin !== undefined && etapa.clave === 'cocina' && (

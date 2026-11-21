@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { AvatarEditorPerezoso } from '../../avatar/AvatarEditorPerezoso';
+import { RetratoAvatar } from '../../avatar/RetratoAvatar';
 import type { CSSProperties } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useCuenta } from './CuentaContext';
@@ -14,7 +16,8 @@ const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 const CORREO_VALIDO = /^\S+@\S+\.\S+$/;
 
 /** Foto de perfil, o las iniciales en un círculo de color si el cliente no tiene foto. */
-function Avatar({ nombre, fotoUrl, tamano }: { nombre: string; fotoUrl: string | null; tamano: number }) {
+function Avatar({ nombre, fotoUrl, avatarUrl, tamano }: { nombre: string; fotoUrl: string | null; avatarUrl?: string | null; tamano: number }) {
+  if (avatarUrl) return <RetratoAvatar url={avatarUrl} tamano={tamano} />;
   const estilo: CSSProperties = { width: tamano, height: tamano, borderRadius: tamano / 2, flex: 'none', objectFit: 'cover' };
   if (fotoUrl) return <img src={fotoUrl} alt="" style={estilo} />;
   const iniciales = nombre
@@ -28,6 +31,46 @@ function Avatar({ nombre, fotoUrl, tamano }: { nombre: string; fotoUrl: string |
     <span style={{ ...estilo, background: 'var(--cp-orange)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: Math.round(tamano * 0.35) }}>
       {iniciales}
     </span>
+  );
+}
+
+/** «Mi avatar»: crea o edita el avatar 3D (el editor se baja solo al abrirlo). La foto de perfil sigue funcionando igual. */
+function SeccionAvatar() {
+  const { cliente, cargarAvatar, guardarAvatar } = useCuenta();
+  const [abierto, setAbierto] = useState(false);
+  const [inicial, setInicial] = useState<unknown | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState('');
+  if (!cliente || !guardarAvatar) return null;
+  const abrir = async () => {
+    setCargando(true);
+    setError('');
+    try {
+      setInicial(cliente.avatarUrl && cargarAvatar ? await cargarAvatar() : null);
+      setAbierto(true);
+    } catch {
+      setError('No pudimos abrir tu avatar. Inténtalo otra vez.');
+    } finally {
+      setCargando(false);
+    }
+  };
+  return (
+    <section aria-label="Mi avatar" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'var(--cp-sand)', borderRadius: 14, padding: 12 }}>
+      {cliente.avatarUrl && <RetratoAvatar url={cliente.avatarUrl} tamano={48} alt="Tu avatar" />}
+      <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: 14 }}>Mi avatar</div>
+        <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+          {cliente.avatarUrl ? 'Sale en tus pedidos y en la pantalla del local.' : 'Crea tu avatar 3D: sale en tus pedidos y celebra cuando están listos.'}
+        </div>
+      </div>
+      <button type="button" onClick={() => void abrir()} disabled={cargando} style={{ ...botonSecundario, width: 'auto', minHeight: 44 }}>
+        {cargando ? 'Abriendo…' : cliente.avatarUrl ? 'Editar mi avatar' : 'Crear mi avatar'}
+      </button>
+      {error && <div role="alert" style={{ flexBasis: '100%', fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>{error}</div>}
+      {abierto && (
+        <AvatarEditorPerezoso inicial={inicial} nombreCuenta={cliente.nombre} guardar={guardarAvatar} cerrar={() => setAbierto(false)} />
+      )}
+    </section>
   );
 }
 
@@ -216,7 +259,7 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
         {cliente ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar nombre={cliente.nombre} fotoUrl={cliente.fotoUrl} tamano={52} />
+              <Avatar nombre={cliente.nombre} fotoUrl={cliente.fotoUrl} avatarUrl={cliente.avatarUrl} tamano={52} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{cliente.nombre}</div>
                 <div style={{ fontSize: 13, color: 'var(--cp-soft)', overflowWrap: 'anywhere' }}>
@@ -227,6 +270,8 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
             </div>
 
             <BotonesFoto />
+
+            <SeccionAvatar />
 
             {mensajeExito && (
               <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-ok)', background: 'var(--cp-greenbg)', borderRadius: 12, padding: '10px 12px' }}>
