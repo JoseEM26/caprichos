@@ -772,6 +772,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  pantalla_local_mostrar_nombre: {
+    nombre: 'Mostrar nombre del cliente en la pantalla',
+    descripcion: 'En la pantalla de TV del local se muestra el nombre de pila del cliente junto al código de su pedido (nunca apellidos, teléfono ni documento).',
+    tipo: 'sino',
+  },
   aprendizaje_activo: {
     nombre: 'Aprendizaje nocturno del bot encendido',
     descripcion: 'Cada noche la IA lee los chats del día anterior y propone preguntas frecuentes nuevas para el bot; una persona las aprueba o descarta.',
@@ -1346,6 +1351,12 @@ export function ParametrosOperacionTab({
             <summary style={{ minHeight: '44px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 18px', cursor: 'pointer', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
               {g.titulo} ({g.items.length})
             </summary>
+            {g.id === 'pantalla_local' && (
+              <p style={{ margin: '0 18px 10px', fontSize: '14px' }}>
+                <a href="/pantalla-local" target="_blank" rel="noreferrer" data-testid="abrir-pantalla-local">Abrir pantalla del local</a>
+                {' '}(se abre en otra pestaña; ponla en la TV en pantalla completa)
+              </p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '0 12px 12px' }}>
           {g.items.map((p) => {
             const meta = META_PARAMETROS[p.clave] || {

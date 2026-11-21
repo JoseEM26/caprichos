@@ -57,6 +57,7 @@ import { AnunciosModule } from './modulos/anuncios/anuncios.module';
 import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
 import { ResenasModule } from './modulos/resenas/resenas.module';
 import { CartaEventosModule } from './modulos/carta-eventos';
+import { PantallaLocalModule } from './modulos/pantalla-local/pantalla-local.module';
 import { PagosOnlineModule } from './modulos/pagos-online';
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { PagosOnlineModule } from './modulos/pagos-online';
     PantallaIngresoModule,
     ResenasModule,
     CartaEventosModule,
+    PantallaLocalModule,
     PagosOnlineModule,
   ],
   providers: [

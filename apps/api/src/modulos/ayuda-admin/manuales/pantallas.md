@@ -10,6 +10,8 @@ sugerencias:
   - ¿Cómo asigno una pantalla a la estación de fríos o calientes?
   - ¿Cómo desactivo una pantalla si la televisión no se usará hoy?
   - ¿Qué hago si una pantalla dice que está desconectada?
+  - ¿Cómo pongo la pantalla de pedidos del local en la TV?
+  - ¿Cómo oculto el nombre del cliente en la pantalla del local?
 ---
 # Pantallas
 
@@ -42,7 +44,18 @@ Ver tambien: [[pantallas]]
 4. Para reactivarla cuando se reanude el servicio en esa área, pulsa el botón "Activar" y confirma en la ventana emergente con "Sí, activar".
 Ver tambien: [[cocina]]
 
+## Como se hace: poner la pantalla de pedidos del local en la TV
+1. Esta pantalla es distinta a la de cocina: la ven los clientes y no pide código ni sesión. Muestra a Capri, los pedidos "Comer en el local" y "Para llevar", con "Preparando" y "¡Listo! Acércate a la barra".
+2. En Configuración del local, pestaña "Parámetros de operación", abre el grupo "Pantalla de pedidos del local (TV)" y pulsa "Abrir pantalla del local". También puedes escribir la dirección /pantalla-local de Caprichos en el navegador de la TV (ejemplo: caprichos.pe/pantalla-local).
+3. Pulsa "Pantalla completa" (los botones aparecen al mover el mouse o tocar la pantalla y se esconden solos a los pocos segundos).
+4. Si quieres que Capri avise con voz y sonido cuando un pedido pasa a "Listo", pulsa "Activar sonido y voz". El navegador exige ese clic una vez cada vez que abres la página.
+5. La pantalla se actualiza sola cada 5 segundos. Los pedidos de delivery no se muestran, y un pedido "Listo" se queda unos 20 minutos si nadie lo entrega antes.
+6. Para ocultar el nombre del cliente, en el mismo grupo cambia "Mostrar nombre del cliente en la pantalla" a "No". Solo se muestra el nombre de pila, nunca apellidos, teléfono ni documento.
+7. La temática (Navidad, Halloween, Fiestas Patrias, San Valentín, Año Nuevo) sigue a la de Capri en [[mascota]].
+Ver tambien: [[mascota]]
+
 ## Errores y dudas comunes
+- La pantalla del local dice "Sin conexión, reintentando": revisa el Internet de la TV; sigue mostrando lo último que recibió y se recupera sola.
 - La televisión no muestra pedidos: verifica que la pantalla figure como "Activa" y con estado de conexión en verde. Si aparece desconectada, comprueba la conexión a Internet o red Wi-Fi de la TV.
 - Código no válido: los códigos de 6 caracteres que muestra la TV tienen un tiempo de expiración. Si tardaste en ingresarlo, actualiza la página de la TV para generar un nuevo código e inténtalo nuevamente.
 

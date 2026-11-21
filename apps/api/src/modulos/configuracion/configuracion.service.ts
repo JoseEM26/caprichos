@@ -333,6 +333,8 @@ export const CLAVES_SI_NO = [
   'aprendizaje_activo',
   'evolution_pausado',
   'evolution_exigir_contacto_previo',
+  // Pantalla de TV del local: mostrar el nombre de pila del cliente junto a su pedido (por defecto sí)
+  'pantalla_local_mostrar_nombre',
 ] as const;
 
 /** Enumerados de lista cerrada: clave → valores permitidos (se guardan en mayúscula). */

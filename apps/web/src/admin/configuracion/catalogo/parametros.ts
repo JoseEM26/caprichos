@@ -47,6 +47,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
   { id: 'cola', titulo: 'Cola de envío de WhatsApp (reintentos y alertas)', claves: ['outbox_alerta_fallidos', 'outbox_max_intentos', 'outbox_retencion_dias', 'outbox_retencion_fallidos_dias', 'outbox_lag_alerta_min'] },
   { id: 'aprendizaje', titulo: 'Aprendizaje nocturno del bot', claves: ['aprendizaje_activo', 'aprendizaje_hora', 'aprendizaje_min_repeticiones', 'aprendizaje_tope_usd_noche', 'aprendizaje_tope_usd_historico', 'aprendizaje_usd_por_millon_entrada', 'aprendizaje_usd_por_millon_salida'] },
+  { id: 'pantalla_local', titulo: 'Pantalla de pedidos del local (TV)', claves: ['pantalla_local_mostrar_nombre'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
   { id: 'impresion', titulo: 'Etiquetas e impresión', claves: ['impresion_alerta_min', 'impresion_vence_min', 'impresion_etiqueta_bebida_ancho_mm', 'impresion_etiqueta_bebida_alto_mm', 'impresion_etiqueta_general_ancho_mm', 'impresion_etiqueta_general_alto_mm'] },
 ];
@@ -866,6 +867,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 5: un mensaje detenido 5 minutos dispara el aviso.',
     efecto: 'Bajarlo avisa antes pero puede avisar por demoras cortas.',
     porDefecto: '5', unidad: 'minutos', rango: '1 a 1440', palabras: ['cola', 'whatsapp', 'atraso', 'demora', 'alerta', 'outbox'], peligro: 'bajo',
+  },
+  pantalla_local_mostrar_nombre: {
+    grupo: 'pantalla_local', titulo: 'Mostrar nombre del cliente en la pantalla',
+    descripcion: 'En la pantalla de TV del local, muestra el nombre de pila del cliente junto al código de su pedido. Nunca se muestran apellidos, teléfono ni documento.',
+    ejemplo: 'En «Sí»: «CP-W945 · Lucía». En «No»: solo «CP-W945».',
+    efecto: 'En «No» la pantalla solo muestra el código del pedido. Se nota en la pantalla en unos segundos.',
+    porDefecto: 'Sí', rango: SI_NO, palabras: ['pantalla', 'tv', 'televisor', 'nombre', 'pedidos', 'local', 'capri'], peligro: 'bajo',
   },
   aprendizaje_activo: {
     grupo: 'aprendizaje', titulo: 'Aprendizaje nocturno del bot encendido',

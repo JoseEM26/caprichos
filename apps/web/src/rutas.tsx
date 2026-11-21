@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { RutaProtegida } from "./comun/RutaProtegida";
 import { Ingresar } from "./admin/Ingresar";
@@ -16,6 +16,7 @@ import {
   ReclamosPublicoPage,
 } from "./carta/legal";
 import { PantallaCocinaView } from "./pantalla/PantallaCocinaView";
+const PantallaLocal = lazy(() => import("./pantalla-local/PantallaLocal"));
 import { PaginaMascota } from "./mascota/PaginaMascota";
 import { PantallaAsistenciaPublica } from "./admin/asistencia";
 
@@ -63,7 +64,17 @@ export function RutasApp() {
           element={<PantallaAsistenciaPublica />}
         />
 
-        {/* 2. Pantallas de cocina y TV */}
+        {/* 2. Pantalla pública de pedidos del local (TV, sin sesión) */}
+        <Route
+          path="/pantalla-local"
+          element={
+            <Suspense fallback={null}>
+              <PantallaLocal />
+            </Suspense>
+          }
+        />
+
+        {/* Pantallas de cocina y TV */}
         <Route
           path="/pantalla/*"
           element={
