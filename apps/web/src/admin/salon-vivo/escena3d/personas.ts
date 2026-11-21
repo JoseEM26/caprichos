@@ -39,6 +39,10 @@ export interface Persona {
   mesaId?: string;
   mesaCx?: number;
   mesaCz?: number;
+  /** Cliente dibujado con su avatar real (cuenta para el tope de avatares a la vez) */
+  avatarReal?: boolean;
+  /** Animación propia de las piezas del avatar (se llama en cada cuadro) */
+  animarExtra?: (t: number, dt: number) => void;
 }
 
 export interface OpcionesPersona {
@@ -312,6 +316,7 @@ export function animarGente(gente: Set<Persona>, t: number, dt: number, comiendo
   for (const p of gente) {
     if (!p.raiz.parent) { gente.delete(p); continue; }
     const f = p.semilla;
+    p.animarExtra?.(t, dt);
     const parp = ((t + f) % 4.1) < 0.12 ? 0.15 : 1;
     p.ojos.forEach((o) => { o.scale.y = parp; });
     if (p.enMoto) {

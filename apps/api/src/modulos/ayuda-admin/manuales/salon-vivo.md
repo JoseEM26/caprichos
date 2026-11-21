@@ -24,6 +24,7 @@ Muestra el local de Caprichos en 3D, dibujado a partir del plano que ya configur
 3. Cuando un pedido aparece listo en el despacho, suena la campana y Capri (o un mozo de apoyo) lo lleva a su mesa. Los pedidos para llevar esperan en la caja y los de delivery salen en moto cuando hay pedidos en reparto.
 4. Los cocineros trabajan más rápido en el área con más pedidos por preparar. Capri se preocupa cuando algún pedido pasa de 15 minutos.
 5. Nada se inventa: si no cambia nada en el salón, solo hay movimiento de fondo (miradas, saludos). Las personas que ves son una figura de los clientes reales; no se muestran nombres completos, teléfonos ni documentos.
+6. Los clientes que crearon su avatar en la carta aparecen con su avatar en la escena (el titular de la mesa o quien espera para llevar) y con su retrato en la lista de pendientes; los demás son figuras genéricas. En modo ligero siempre se ven las figuras genéricas.
 Antes: [[plano]]
 
 ## Como se hace: usar el panel de la derecha

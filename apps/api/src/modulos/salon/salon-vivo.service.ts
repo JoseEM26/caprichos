@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerRangoHoyLima } from '../plano/plano.util';
-import { armarSalonVivo, SalonVivo } from './salon-vivo.util';
+import { armarSalonVivo, AvatarVivo, SalonVivo } from './salon-vivo.util';
 
 /** Salón en vivo (solo lectura): plano real + estado de mesas, cocina, despacho y reparto del día de Lima. */
 @Injectable()
@@ -22,7 +22,7 @@ export class SalonVivoService {
         select: {
           id: true, codigo: true, modalidad: true, estado: true, cliente_nombre: true, pago_estado: true,
           creado_en: true, pasa_cocina_en: true, listo_en: true, entregado_mesa_en: true, entregado_en: true,
-          cobro_mozo_en: true, despachado_en: true, espera_personas: true,
+          cobro_mozo_en: true, despachado_en: true, espera_personas: true, party_id: true,
           mesas: { select: { mesa_id: true, mesa_nombre: true, abierta: true } },
           comandas: { select: { estado: true, area: { select: { nombre: true } } } },
           lineas: { select: { nombre: true, cantidad: true } },
@@ -36,8 +36,22 @@ export class SalonVivoService {
       this.prisma.caja.findFirst({ where: { estado: 'ABIERTA' }, select: { id: true } }),
     ]);
 
+    // Avatares de los clientes de todos los pedidos en UNA consulta (sin N+1); solo retrato y configuración
+    const partyIds = [...new Set(pedidos.map((p) => p.party_id).filter((x): x is bigint => x != null))];
+    const avatares = new Map<string, AvatarVivo>();
+    if (partyIds.length) {
+      const personas = await this.prisma.person.findMany({
+        where: { party_id: { in: partyIds } },
+        select: { party_id: true, avatar_url: true, avatar_config: true },
+      });
+      for (const pe of personas) {
+        if (pe.avatar_url || pe.avatar_config) avatares.set(String(pe.party_id), { url: pe.avatar_url ?? null, config: (pe.avatar_config as object | null) ?? null });
+      }
+    }
+
     return armarSalonVivo({
       ahora,
+      avatares,
       cajaAbierta: !!caja,
       pisos: pisos.map((p) => ({
         id: String(p.id),

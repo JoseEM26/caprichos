@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { PedidoVivo, SalonVivo } from './salonVivoApi';
 
 /**
@@ -15,6 +16,7 @@ export interface Pendiente {
   porcentaje: number;
   minutos: number;
   areas: PedidoVivo['areas'];
+  avatarUrl: string | null;
 }
 
 const ETIQUETA: Record<EtapaPendiente, string> = { CAJA: 'En caja', COCINA: 'En cocina', LISTO: '¡Listo!' };
@@ -35,7 +37,7 @@ export function pendientesDe(d: SalonVivo): Pendiente[] {
       etapa === 'LISTO' ? 100 : etapa === 'CAJA' ? 12 : Math.round(25 + (p.estado === 'PREPARANDO' ? 10 : 0) + (total ? (listas / total) * 55 : 0));
     const previo = porId.get(p.id);
     if (previo && previo.porcentaje >= porcentaje) return;
-    porId.set(p.id, { id: p.id, codigo: p.codigo, donde: donde(p), cliente: p.cliente, etapa, porcentaje, minutos: p.minutos, areas: p.areas });
+    porId.set(p.id, { id: p.id, codigo: p.codigo, donde: donde(p), cliente: p.cliente, etapa, porcentaje, minutos: p.minutos, areas: p.areas, avatarUrl: p.avatar?.url ?? null });
   };
   // En caja solo cuenta mientras aún no entra a cocina ni está listo (por cobrar antes de preparar)
   for (const p of d.caja) if (p.estado === 'COLA' && p.areas.every((a) => a.estado === 'PENDIENTE')) poner(p, 'CAJA');
@@ -43,6 +45,13 @@ export function pendientesDe(d: SalonVivo): Pendiente[] {
   for (const p of d.despacho) poner(p, 'LISTO');
   // Listos primero (hay que entregarlos), luego los que más avanzaron, y a igual avance el que más espera
   return [...porId.values()].sort((a, b) => (b.etapa === 'LISTO' ? 1 : 0) - (a.etapa === 'LISTO' ? 1 : 0) || b.porcentaje - a.porcentaje || b.minutos - a.minutos);
+}
+
+/** Retrato circular del cliente; si la imagen falla, el círculo queda vacío y no se ve un icono roto. */
+function Retrato({ url }: { url: string }) {
+  const [falla, setFalla] = useState(false);
+  if (falla) return <span className="sv-pend-retrato vacio" aria-hidden="true" />;
+  return <img className="sv-pend-retrato" src={url} alt="" loading="lazy" onError={() => setFalla(true)} />;
 }
 
 const nombreArea = (n: string) => n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
@@ -66,6 +75,7 @@ export function PanelPendientes({ datos, reloj }: { datos: SalonVivo; reloj: str
         {lista.map((p) => (
           <li key={p.id} className={`sv-pend-item ${p.etapa.toLowerCase()} ${p.minutos >= 15 && p.etapa !== 'LISTO' ? 'tarde' : ''}`}>
             <div className="sv-pend-fila">
+              {p.avatarUrl && <Retrato url={p.avatarUrl} />}
               <span className="sv-pend-cod"><small>{p.codigo.slice(0, 3)}</small>{p.codigo.slice(3)}</span>
               <span className="sv-pend-donde">{p.donde}{p.cliente ? ` · ${p.cliente}` : ''}</span>
               <span className="sv-pend-etapa">{ETIQUETA[p.etapa]}</span>

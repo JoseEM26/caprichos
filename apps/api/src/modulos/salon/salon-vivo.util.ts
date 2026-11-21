@@ -31,6 +31,12 @@ export interface AreaVivo {
   estado: 'PENDIENTE' | 'LISTA';
 }
 
+/** Avatar del cliente del pedido: solo retrato y configuración 3D (nunca teléfono ni documento). */
+export interface AvatarVivo {
+  url: string | null;
+  config: object | null;
+}
+
 export interface PedidoVivo {
   id: string;
   codigo: string;
@@ -44,6 +50,7 @@ export interface PedidoVivo {
   productos: number;
   items: string[];
   areas: AreaVivo[];
+  avatar: AvatarVivo | null;
 }
 
 export interface MesaVivo {
@@ -53,7 +60,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[] } | null;
+  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[]; avatar: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 
@@ -89,6 +96,7 @@ export interface SalonVivo {
 /** Pedido del día tal como sale de Prisma (solo lo necesario). */
 export interface PedidoDia {
   id: bigint;
+  party_id?: bigint | null;
   codigo: string;
   modalidad: string;
   estado: string;
@@ -122,6 +130,8 @@ export interface EntradaSalonVivo {
   pedidos: PedidoDia[];
   reservas: ReservaDia[];
   cajaAbierta: boolean;
+  /** Avatares por party_id (clave en texto), cargados con una sola consulta */
+  avatares?: Map<string, AvatarVivo>;
 }
 
 const nombreDePila = (n: string | null | undefined): string | null => {
@@ -135,7 +145,10 @@ const minutosDesde = (d: Date | null | undefined, ahora: Date): number =>
 const horaLima = (d: Date): string =>
   new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(d);
 
-function aPedidoVivo(p: PedidoDia, ahora: Date): PedidoVivo {
+const avatarDe = (p: PedidoDia, avatares?: Map<string, AvatarVivo>): AvatarVivo | null =>
+  (p.party_id != null ? avatares?.get(String(p.party_id)) : undefined) ?? null;
+
+function aPedidoVivo(p: PedidoDia, ahora: Date, avatares?: Map<string, AvatarVivo>): PedidoVivo {
   return {
     id: String(p.id),
     codigo: p.codigo,
@@ -148,6 +161,7 @@ function aPedidoVivo(p: PedidoDia, ahora: Date): PedidoVivo {
     productos: p.lineas.reduce((s, l) => s + (l.cantidad || 0), 0),
     items: p.lineas.slice(0, 3).map((l) => l.nombre),
     areas: p.comandas.map((c) => ({ nombre: c.area.nombre, estado: c.estado === 'DESPEJADA' ? 'LISTA' : 'PENDIENTE' })),
+    avatar: avatarDe(p, avatares),
   };
 }
 
@@ -200,6 +214,7 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
           personas: personas && personas > 0 ? Math.min(personas, asientos) : null,
           minutos: minutosDesde(ped.pasa_cocina_en ?? ped.creado_en, ahora),
           areasPendientes: ped.comandas.filter((c) => c.estado !== 'DESPEJADA').map((c) => c.area.nombre),
+          avatar: avatarDe(ped, e.avatares),
         };
       } else if (res) {
         estado = 'RESERVADA';
@@ -230,10 +245,10 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
     cajaAbierta: e.cajaAbierta,
     pisos: e.pisos,
     mesas,
-    caja: caja.map((p) => aPedidoVivo(p, ahora)),
-    cocina: cocina.map((p) => aPedidoVivo(p, ahora)),
-    despacho: despacho.map((p) => aPedidoVivo(p, ahora)),
-    enReparto: enReparto.map((p) => aPedidoVivo(p, ahora)),
+    caja: caja.map((p) => aPedidoVivo(p, ahora, e.avatares)),
+    cocina: cocina.map((p) => aPedidoVivo(p, ahora, e.avatares)),
+    despacho: despacho.map((p) => aPedidoVivo(p, ahora, e.avatares)),
+    enReparto: enReparto.map((p) => aPedidoVivo(p, ahora, e.avatares)),
     reservas: proximas.slice(0, 12).map((r) => ({ hora: horaLima(r.hora), nombre: nombreDePila(r.nombre) ?? '', personas: r.personas, mesas: r.mesas.map((m) => m.nombre ?? '').filter(Boolean) })),
     cargaCocina: [...porArea.entries()].map(([area, pendientes]) => ({ area, pendientes })),
     conteos: {

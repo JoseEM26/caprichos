@@ -86,6 +86,52 @@ describe('armarSalonVivo', () => {
   });
 });
 
+describe('avatar del cliente', () => {
+  const avatares = new Map([['77', { url: '/archivos/avatar-77.png', config: { genero: 'mujer' } }]]);
+  it('sale en el pedido vivo y en el de la mesa; sin avatar o sin cliente es null', () => {
+    const r = armarSalonVivo({ ...entrada([
+      ped(50, { party_id: 77n, mesas: [{ mesaId: 1n, nombre: 'Mesa 1', abierta: true }] }),
+      ped(51, { party_id: 88n, mesas: [{ mesaId: 2n, nombre: 'Mesa 2', abierta: true }] }),
+      ped(52, { modalidad: 'LLEVAR' }),
+    ]), avatares });
+    expect(r.cocina.map((p) => p.avatar)).toEqual([{ url: '/archivos/avatar-77.png', config: { genero: 'mujer' } }, null, null]);
+    expect(r.mesas.find((m) => m.numero === 1)!.pedido!.avatar).toEqual({ url: '/archivos/avatar-77.png', config: { genero: 'mujer' } });
+    expect(r.mesas.find((m) => m.numero === 2)!.pedido!.avatar).toBeNull();
+  });
+
+  it('el servicio consulta Person una sola vez para todos los pedidos y no filtra otros datos', async () => {
+    const prisma: any = {
+      piso: { findMany: jest.fn().mockResolvedValue([]) },
+      pedido: { findMany: jest.fn().mockResolvedValue([
+        { ...ped(60, { party_id: 5n }), mesas: [] }, { ...ped(61, { party_id: 5n }), mesas: [] }, { ...ped(62, { party_id: 6n }), mesas: [] }, { ...ped(63), mesas: [] },
+      ]) },
+      reserva: { findMany: jest.fn().mockResolvedValue([]) },
+      caja: { findFirst: jest.fn().mockResolvedValue(null) },
+      person: { findMany: jest.fn().mockResolvedValue([
+        { party_id: 5n, avatar_url: '/archivos/a5.png', avatar_config: { genero: 'hombre' } },
+        { party_id: 6n, avatar_url: null, avatar_config: null },
+      ]) },
+    };
+    const r = await new SalonVivoService(prisma).obtener(ahora);
+    expect(prisma.person.findMany).toHaveBeenCalledTimes(1);
+    const q = prisma.person.findMany.mock.calls[0][0];
+    expect(q.where.party_id.in).toEqual([5n, 6n]);
+    expect(Object.keys(q.select).sort()).toEqual(['avatar_config', 'avatar_url', 'party_id']);
+    expect(r.cocina.map((p) => p.avatar?.url ?? null)).toEqual(['/archivos/a5.png', '/archivos/a5.png', null, null]);
+    expect(JSON.stringify(r)).not.toMatch(/party_id|telefono/i);
+  });
+
+  it('sin pedidos con cliente no consulta Person', async () => {
+    const prisma: any = {
+      piso: { findMany: jest.fn().mockResolvedValue([]) }, pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      reserva: { findMany: jest.fn().mockResolvedValue([]) }, caja: { findFirst: jest.fn().mockResolvedValue(null) },
+      person: { findMany: jest.fn() },
+    };
+    await new SalonVivoService(prisma).obtener(ahora);
+    expect(prisma.person.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('SalonVivoService', () => {
   it('lee de Prisma solo el día de Lima y entrega el plano activo', async () => {
     const prisma: any = {

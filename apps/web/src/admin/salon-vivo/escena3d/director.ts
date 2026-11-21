@@ -5,7 +5,8 @@ import { COLOR_ESTADO, type Local, type MesaEsc } from './local';
 import { buscarRuta, claveArea, type PlanoEscena } from './planoAEscena';
 import { TEMAS, type Tema } from './temas';
 import type { Sonido } from './sonido';
-import type { PedidoVivo, SalonVivo } from '../salonVivoApi';
+import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, type MotorAvatar } from './avatarReal';
+import type { AvatarVivo, PedidoVivo, SalonVivo } from '../salonVivoApi';
 
 /**
  * Director: anima la escena SOLO con lo que cambia en los datos reales.
@@ -170,6 +171,23 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   let firmaCaja = '';
   let motoEstado: 'parqueada' | 'ruta' = 'parqueada';
 
+  /* ---------- Clientes con su avatar real (titular de la mesa y cliente para llevar) ---------- */
+  let motorAvatar: MotorAvatar | null = null;
+  let avatarFallo = false;
+  let cargandoAvatar = false;
+  let esperando: { d: SalonVivo; primera: boolean } | null = null;
+  const avataresEnUso = () => { let n = 0; for (const p of gente) if (p.avatarReal) n++; return n; };
+  /** El titular usa su avatar si ya está cargado y hay cupo; si no, figura genérica. */
+  function crearCliente(avatar: AvatarVivo | null | undefined): Persona {
+    if (motorAvatar && usaAvatarReal(avatar, ctx.ligero, avataresEnUso())) {
+      const real = construirPersonaAvatar(ctx, gente, motorAvatar, avatar!.config);
+      if (real) return real;
+    }
+    return persona(ctx, gente);
+  }
+  const hayAvatares = (d: SalonVivo) =>
+    d.mesas.some((m) => m.pedido?.avatar?.config) || [...d.caja, ...d.cocina, ...d.despacho].some((p) => p.modalidad === 'LLEVAR' && p.avatar?.config);
+
   const mesaPorId = (id: string) => meseDe.get(id);
   const estadoDe = (m: MesaEsc) => (datos?.mesas.find((x) => x.id === m.id)?.estado ?? 'LIBRE');
 
@@ -197,7 +215,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     grupos.set(m.id, grupo);
     let llegaron = 0;
     for (let i = 0; i < n; i++) {
-      const per = persona(ctx, gente);
+      const per = i === 0 ? crearCliente(datos?.mesas.find((x) => x.id === m.id)?.pedido?.avatar) : persona(ctx, gente);
       grupo.personas.push(per);
       escena.add(per.raiz);
       const silla = m.sillas[i];
@@ -446,7 +464,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       const usados = new Set([...clientesLlevar.values()].map((c) => c.spot));
       const spot = [0, 1, 2].find((i) => !usados.has(i));
       if (spot === undefined) break;
-      const per = persona(ctx, gente);
+      const per = crearCliente(vivosLlevar.find((x) => x.codigo === cod)?.avatar);
       escena.add(per.raiz);
       clientesLlevar.set(cod, { per, spot });
       const sp = local.esperaLlevar[spot];
@@ -459,7 +477,21 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   }
 
   /* ---------- Aplicar datos reales ---------- */
+  /** Si hay avatares por dibujar, baja sus piezas una sola vez antes de aplicar; si falla, todo sigue con figuras genéricas. */
   function aplicar(nuevo: SalonVivo, primera: boolean) {
+    if (motorAvatar || avatarFallo || ctx.ligero || !hayAvatares(nuevo)) { aplicarDatos(nuevo, primera); return; }
+    esperando = { d: nuevo, primera: primera || !!esperando?.primera };
+    if (cargandoAvatar) return;
+    cargandoAvatar = true;
+    cargarMotorAvatar()
+      .then((m) => { motorAvatar = m; }, () => { avatarFallo = true; })
+      .finally(() => {
+        cargandoAvatar = false;
+        const e = esperando; esperando = null;
+        if (e && vivo) aplicarDatos(e.d, e.primera);
+      });
+  }
+  function aplicarDatos(nuevo: SalonVivo, primera: boolean) {
     const previo = datos;
     datos = nuevo;
     const previoMesa = new Map((previo?.mesas ?? []).map((m) => [m.id, m.estado]));

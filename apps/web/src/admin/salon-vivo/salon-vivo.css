@@ -171,7 +171,9 @@
 .sv-pend-item.listo { border-left-color: var(--sv-verde); background: #EFFAF3; }
 .sv-pend-item.tarde { box-shadow: 0 0 0 2px #C5221F inset, 0 3px 12px rgba(11, 44, 62, .06); }
 @keyframes sv-entra { from { opacity: 0; transform: translateY(10px); } }
-.sv-pend-fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.sv-pend-fila { display: flex; gap: 10px; align-items: center; }
+.sv-pend-fila > .sv-pend-donde { flex: 1 1 auto; min-width: 0; }
+.sv-pend-retrato { flex: none; width: clamp(34px, 3vw, 46px); aspect-ratio: 1; border-radius: 50%; object-fit: cover; background: rgba(11, 44, 62, .08); border: 2px solid rgba(11, 44, 62, .15); }
 .sv-pend-cod { font: 900 clamp(20px, 1.8vw, 28px) var(--sv-f-disp); font-variant-numeric: tabular-nums; }
 .sv-pend-cod small { font-size: .45em; opacity: .55; }
 .sv-pend-donde { font: 700 clamp(13px, 1vw, 16px) var(--sv-f-txt); color: var(--sv-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

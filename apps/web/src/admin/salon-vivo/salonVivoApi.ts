@@ -24,6 +24,12 @@ export interface PisoVivo {
   elementos: ElementoVivo[];
 }
 
+/** Avatar del cliente del pedido: solo retrato (URL pública) y configuración 3D. */
+export interface AvatarVivo {
+  url: string | null;
+  config: object | null;
+}
+
 export interface PedidoVivo {
   id: string;
   codigo: string;
@@ -36,6 +42,7 @@ export interface PedidoVivo {
   productos: number;
   items: string[];
   areas: Array<{ nombre: string; estado: 'PENDIENTE' | 'LISTA' }>;
+  avatar?: AvatarVivo | null;
 }
 
 export interface MesaVivo {
@@ -45,7 +52,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[] } | null;
+  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[]; avatar?: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 

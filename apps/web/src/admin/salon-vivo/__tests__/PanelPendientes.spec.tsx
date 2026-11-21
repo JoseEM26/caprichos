@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { PanelPendientes, pendientesDe } from '../PanelPendientes';
 import { pedido, salonEjemplo } from './datosEjemplo';
 
@@ -47,5 +47,21 @@ describe('Pedidos pendientes del salón en vivo', () => {
     d.caja = []; d.cocina = []; d.despacho = [];
     render(<PanelPendientes datos={d} reloj="19:05" />);
     expect(screen.getByText(/No hay pedidos pendientes/)).toBeTruthy();
+  });
+
+  it('muestra el retrato circular a la izquierda del código y cae a un círculo vacío si la imagen falla', () => {
+    const d = salonEjemplo();
+    d.despacho = [pedido('CP-W903', { estado: 'LISTO', avatar: { url: '/archivos/avatar-1.png', config: null } })];
+    d.caja = []; d.cocina = [pedido('CP-W902')];
+    const { container } = render(<PanelPendientes datos={d} reloj="19:05" />);
+    const img = container.querySelector('img.sv-pend-retrato') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.getAttribute('alt')).toBe('');
+    expect(img.getAttribute('src')).toBe('/archivos/avatar-1.png');
+    expect(container.querySelectorAll('img.sv-pend-retrato')).toHaveLength(1);
+    expect(img.nextElementSibling?.className).toBe('sv-pend-cod');
+    fireEvent.error(img);
+    expect(container.querySelector('img.sv-pend-retrato')).toBeNull();
+    expect(container.querySelector('.sv-pend-retrato.vacio')).toBeTruthy();
   });
 });
