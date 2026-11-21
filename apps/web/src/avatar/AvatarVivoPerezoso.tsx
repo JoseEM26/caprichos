@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { prefiereMovimientoReducido, tieneSoporteWebGL } from '../mascota/soporteWebGL';
 import { RetratoAvatar } from './RetratoAvatar';
 import type { AccionAvatar } from './escena';
+import type { OpcionesCartel } from './cartel';
 
 // three vive en este chunk: solo se baja si de verdad se va a dibujar el avatar en 3D
 const AvatarVivo = lazy(() => import('./AvatarVivo'));
@@ -13,13 +14,16 @@ const CELEBRA: AccionAvatar[] = ['celebrar', 'baile'];
  * El avatar del cliente: 3D con la acción pedida, o el retrato PNG con animación CSS si no hay WebGL,
  * el cliente prefiere menos movimiento, la escena falla o aún no llegó su configuración.
  */
-export function AvatarVivoPerezoso({ config, retratoUrl, accion, ancho, alto = ancho, tamanoRetrato = Math.min(ancho, alto) }: {
+export function AvatarVivoPerezoso({ config, retratoUrl, accion, ancho, alto = ancho, tamanoRetrato = Math.min(ancho, alto), cartel, alFallar }: {
   config: unknown | null;
   retratoUrl: string;
   accion: AccionAvatar;
   ancho: number;
   alto?: number;
   tamanoRetrato?: number;
+  cartel?: OpcionesCartel;
+  /** Avisa cuando se queda en retrato porque la escena 3D falló */
+  alFallar?: () => void;
 }) {
   const hay3d = useMemo(() => tieneSoporteWebGL() && !prefiereMovimientoReducido(), []);
   const [fallo, setFallo] = useState(false);
@@ -31,7 +35,7 @@ export function AvatarVivoPerezoso({ config, retratoUrl, accion, ancho, alto = a
   if (!hay3d || fallo || !config) return retrato;
   return (
     <Suspense fallback={retrato}>
-      <AvatarVivo config={config} accion={accion} ancho={ancho} alto={alto} alFallar={() => setFallo(true)} />
+      <AvatarVivo config={config} accion={accion} ancho={ancho} alto={alto} alFallar={() => { setFallo(true); alFallar?.(); }} cartel={cartel} />
     </Suspense>
   );
 }

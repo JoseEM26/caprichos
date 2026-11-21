@@ -15,7 +15,8 @@ vi.mock('../../avatar/AvatarEditorPerezoso', () => ({ AvatarEditorPerezoso: () =
 const montajes3d = vi.fn();
 vi.mock('../../avatar/AvatarVivo', () => ({ default: () => { montajes3d(); return <canvas data-testid="avatar-3d" />; } }));
 let webgl = true;
-vi.mock('../../mascota/soporteWebGL', () => ({ tieneSoporteWebGL: () => webgl, prefiereMovimientoReducido: () => false }));
+let reducido = false;
+vi.mock('../../mascota/soporteWebGL', () => ({ tieneSoporteWebGL: () => webgl, prefiereMovimientoReducido: () => reducido }));
 
 import { SaludoAvatar } from '../SaludoAvatar';
 import { CelebracionPedido } from '../CelebracionPedido';
@@ -27,6 +28,7 @@ describe('avatar en la carta', () => {
     vi.useFakeTimers();
     localStorage.clear();
     webgl = true;
+    reducido = false;
     montajes3d.mockClear();
     cuenta.cliente = CLIENTE;
     cuenta.cargarAvatar = vi.fn().mockResolvedValue({ nombre: 'Lu' });
@@ -92,13 +94,16 @@ describe('avatar en la carta', () => {
       conPedido();
       await montar(<CelebracionPedido />);
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText('¡Gracias por tu compra, Lu! 🎉')).toBeInTheDocument();
-      expect(screen.getByText('Pedido #A12')).toBeInTheDocument();
+      // Con 3D el texto visible va en el cartel del avatar; el lector de pantalla lo oye en la región aria-live
+      expect(screen.getByText('¡Gracias por tu compra, Lu! Pedido A12')).toHaveAttribute('aria-live', 'polite');
+      expect(screen.getByTestId('avatar-3d')).toBeInTheDocument();
+      expect(screen.queryByTestId('cartel-html')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Saltar' })).toHaveFocus();
       fireEvent.click(screen.getByRole('button', { name: 'Saltar' }));
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
-    it('se cierra con Esc y también sola a los 5 s', async () => {
+    it('se cierra con Esc y también sola a los 5,8 s', async () => {
       conPedido();
       const { unmount } = await montar(<CelebracionPedido />);
       fireEvent.keyDown(window, { key: 'Escape' });
@@ -107,8 +112,38 @@ describe('avatar en la carta', () => {
       carrito.pedidoConfirmado = { codigo: 'B7' };
       await montar(<CelebracionPedido />);
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      await act(async () => { await vi.advanceTimersByTimeAsync(5100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(5900); });
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('sin WebGL: retrato grande con el cartel en HTML y sin bajar three', async () => {
+      webgl = false;
+      conPedido();
+      await montar(<CelebracionPedido />);
+      expect(screen.getByTestId('retrato-avatar')).toBeInTheDocument();
+      expect(screen.getByTestId('cartel-html')).toHaveTextContent('¡Gracias, Lu!');
+      expect(screen.getByTestId('cartel-html')).toHaveTextContent('Pedido #A12');
+      expect(montajes3d).not.toHaveBeenCalled();
+    });
+
+    it('con movimiento reducido no baja three: retrato quieto y cartel en HTML', async () => {
+      reducido = true;
+      conPedido();
+      await montar(<CelebracionPedido decoracion="halloween" />);
+      expect(screen.getByTestId('retrato-avatar')).toBeInTheDocument();
+      expect(screen.getByTestId('cartel-html')).toBeInTheDocument();
+      expect(montajes3d).not.toHaveBeenCalled();
+    });
+
+    it('el fondo sigue la temática de la carta y sin temática es el clásico', async () => {
+      conPedido();
+      const { unmount } = await montar(<CelebracionPedido decoracion="NAVIDAD" />);
+      expect(screen.getByTestId('fondo-celebracion')).toHaveAttribute('data-tema', 'navidad');
+      expect(screen.getByRole('dialog')).toHaveAttribute('data-tema', 'navidad');
+      unmount();
+      carrito.pedidoConfirmado = { codigo: 'C3' };
+      await montar(<CelebracionPedido />);
+      expect(screen.getByTestId('fondo-celebracion')).toHaveAttribute('data-tema', 'clasico');
     });
 
     it('sin avatar no se monta y no baja three', async () => {

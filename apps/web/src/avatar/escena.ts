@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { conPelo } from './config';
 import type { Avatar3D, ConfigAvatar, PartesAvatar } from './tipos';
+import { crearCartel } from './cartel';
+import type { OpcionesCartel } from './cartel';
 
 export type VistaAvatar = 'cuerpo' | 'cabeza' | 'pies' | 'mascota';
-export type AccionAvatar = 'saludando' | 'baile' | 'celebrar' | 'giro' | 'posar' | 'esperando';
+export type AccionAvatar = 'saludando' | 'baile' | 'celebrar' | 'giro' | 'posar' | 'esperando' | 'cartel';
 
 const azar = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 const suave = (p: number) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
@@ -62,6 +64,8 @@ export class EscenaAvatar {
   private abajo: { x: number; y: number } | null = null;
   private destellos: { lanzar: (y?: number) => void; mover: (dt: number) => void };
   private quitar: (() => void)[] = [];
+  private cartel: ReturnType<typeof crearCartel> | null = null;
+  private extra: THREE.Object3D[] = [];
 
   constructor(
     private lienzo: HTMLCanvasElement,
@@ -108,6 +112,36 @@ export class EscenaAvatar {
     }
     this.ajustar();
     this.bucle();
+  }
+
+  /**
+   * Celebración del pedido: cámara de cuerpo entero con ligero picado, sombra en el piso y un cartel que el avatar
+   * sostiene con las dos manos durante la acción 'cartel'. El avatar no cambia: solo se agrega el cartel.
+   */
+  ponerCartel(o: OpcionesCartel): void {
+    this.cartel = crearCartel(o);
+    this.escena.add(this.cartel.grupo);
+        const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    if (g) {
+      const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+      gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    }
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.8), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2;
+    blob.position.y = 0.003;
+    this.escena.add(blob);
+    this.extra.push(blob);
+    this.controles.target.set(0, 0.84, 0);
+    this.encuadrarCartel();
+  }
+
+  private encuadrarMascota(): void {
+    if (!this.cartel || !this.av?.mascota) return;
+    this.controles.target.x = 0.26;
+    this.encuadrarCartel();
   }
 
   private escuchar<K extends keyof HTMLElementEventMap>(tipo: K, fn: (e: HTMLElementEventMap[K] & PointerEvent) => void) {
@@ -162,6 +196,15 @@ export class EscenaAvatar {
     this.renderer.setSize(r.width, r.height, false);
     this.camara.aspect = r.width / r.height;
     this.camara.updateProjectionMatrix();
+    this.encuadrarCartel();
+  }
+
+  /** Con el cartel: cuerpo entero; si el lienzo es ancho (laptop) la cámara se acerca para que el avatar llene el alto. */
+  private encuadrarCartel(): void {
+    if (!this.cartel) return;
+    const d = this.camara.aspect > 0.85 ? 3.8 : 4.05;
+    this.camara.position.set(this.controles.target.x, 0.84 + (1.8 - 0.84) * (d / 3.95), d);
+    this.controles.update();
   }
 
   irA(v: VistaAvatar): void {
@@ -179,6 +222,7 @@ export class EscenaAvatar {
     this.escena.add(this.av.raiz);
     // La mascota sale de la raíz del avatar: así no gira ni salta con él (giro, baile) y se queda en el piso al lado
     if (this.av.mascota) this.escena.add(this.av.mascota);
+    this.encuadrarMascota();
     if (conPop) {
       this.pop = 1;
       this.destellos.lanzar(this.vista === 'cabeza' ? 1.5 : this.vista === 'pies' ? 0.2 : 1);
@@ -228,6 +272,17 @@ export class EscenaAvatar {
       case 'giro': giro = suave(p) * Math.PI * 2; salto = Math.sin(p * Math.PI) * 0.2; pose(0, 0, -0.3, k, -1.2); pose(1, 0, -0.3, k, 1.2); break;
       case 'posar': pose(0, -0.3, -1.9, k, -0.5); pose(1, 0, -0.1, k, 0.35); torsion = 0.25; inclina = 0.1; av.piernas[1].rotation.z = 0.15; break;
       case 'esperando': pose(0, -0.6, -1.4, k); pose(1, -0.3, -0.6, k); break;
+      case 'cartel': {
+        // 0 a 0.9 s: entra con un saltito; hasta 2.2 s: sostiene el cartel quieto; luego lo agita celebrando
+        const s = t - anim.desde, fiesta = s > 2.2;
+        const bal = fiesta ? Math.sin((s - 2.2) * 8) : Math.sin(s * 2) * 0.03;
+        salto = s < 0.9 ? Math.sin((s / 0.9) * Math.PI) * 0.32 : fiesta ? Math.abs(Math.sin((s - 2.2) * 4)) * 0.1 : 0;
+        pose(0, -0.9 + bal * 0.22, -0.5, k, -0.42); pose(1, -0.9 - bal * 0.22, -0.5, k, 0.42);
+        inclina = fiesta ? bal * 0.05 : 0;
+        av.rodillas.forEach((r) => { r.rotation.x = salto > 0.04 ? 0.4 : 0; });
+        av.piernas.forEach((pi) => { pi.rotation.x = salto > 0.04 ? -0.25 : 0; });
+        break;
+      }
       default: pose(0, 0, -0.12, k); pose(1, 0, -0.12, k);
     }
     av.raiz.position.y = salto;
@@ -249,6 +304,24 @@ export class EscenaAvatar {
     const guino = this.cfg.expresion === 'guino';
     av.ojos.forEach((o, i) => { o.scale.y = guino && i === 0 ? 0.1 : anim.estado === 'celebrar' ? 0.45 : parp; });
     av.animar(t, dt);
+    this.cartelEnManos(t);
+  }
+
+  /** El cartel va entre las dos manos: sigue su altura, su separación y su inclinación. */
+  private cartelEnManos(t: number) {
+    const av = this.av, c = this.cartel;
+    if (!av || !c) return;
+    const activo = this.anim.estado === 'cartel';
+    c.grupo.visible = activo;
+    if (!activo) return;
+    av.raiz.updateMatrixWorld(true);
+    const a = av.codos[0].localToWorld(new THREE.Vector3(0, -0.2, 0.02));
+    const b = av.codos[1].localToWorld(new THREE.Vector3(0, -0.2, 0.02));
+    c.grupo.position.set((a.x + b.x) / 2, (a.y + b.y) / 2 + 0.11, (a.z + b.z) / 2 - 0.03);
+    c.grupo.rotation.set(-0.2, 0, Math.atan2(b.y - a.y, b.x - a.x));
+    const s = t - this.anim.desde;
+    const e = Math.min(1, s / 0.45);
+    c.grupo.scale.setScalar(Math.max(0.001, 1 - Math.pow(1 - e, 3)));
   }
 
   private bucle = () => {
@@ -272,6 +345,8 @@ export class EscenaAvatar {
     this.quitar.forEach((f) => f());
     this.obs?.disconnect();
     this.controles.dispose();
+    this.cartel?.dispose();
+    this.extra.forEach((o) => { (o as THREE.Mesh).geometry.dispose(); });
     if (this.av) { liberar(this.av.raiz); if (this.av.mascota) liberar(this.av.mascota); }
     this.renderer.dispose();
   }

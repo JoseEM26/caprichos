@@ -3,6 +3,7 @@ import { cargarAvatar } from './piezas';
 import { EscenaAvatar } from './escena';
 import type { AccionAvatar } from './escena';
 import { normalizar } from './config';
+import type { OpcionesCartel } from './cartel';
 
 export interface AvatarVivoProps {
   /** Config guardada de la cuenta (cruda: aquí se normaliza contra el catálogo) */
@@ -12,10 +13,12 @@ export interface AvatarVivoProps {
   alto: number;
   /** Si WebGL falla al crear la escena, el contenedor vuelve al retrato */
   alFallar: () => void;
+  /** Celebración del pedido: con cartel, la acción 'cartel' lo sostiene (cámara de cuerpo entero) */
+  cartel?: OpcionesCartel;
 }
 
 /** Avatar 3D suelto, sin editor: chunk aparte (three entra solo al montarlo). Repite la acción mientras esté en pantalla. */
-export default function AvatarVivo({ config, accion, ancho, alto, alFallar }: AvatarVivoProps) {
+export default function AvatarVivo({ config, accion, ancho, alto, alFallar, cartel }: AvatarVivoProps) {
   const A = useMemo(() => cargarAvatar(), []);
   const lienzo = useRef<HTMLCanvasElement>(null);
   const escena = useRef<EscenaAvatar | null>(null);
@@ -26,16 +29,17 @@ export default function AvatarVivo({ config, accion, ancho, alto, alFallar }: Av
     if (!lienzo.current) return;
     try {
       escena.current = new EscenaAvatar(lienzo.current, A, false, true);
+      if (cartel) escena.current.ponerCartel(cartel);
     } catch {
       falla.current();
       return;
     }
     escena.current.reconstruir(normalizar(A, config), false);
     return () => { escena.current?.dispose(); escena.current = null; };
-  }, [A, config]);
+  }, [A, config, cartel]);
 
   useEffect(() => {
-    const dur = accion === 'saludando' ? 2.4 : 2.6;
+    const dur = accion === 'cartel' ? 5.8 : accion === 'saludando' ? 2.4 : 2.6;
     escena.current?.accion(accion, dur);
     const t = setInterval(() => escena.current?.accion(accion, dur), dur * 1000);
     return () => clearInterval(t);

@@ -1038,7 +1038,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
 
       {/* Avatar del cliente: saludo al entrar (una vez al día) y celebración al pedir */}
       <SaludoAvatar />
-      <CelebracionPedido />
+      <CelebracionPedido decoracion={contenido?.decoracion} />
 
       {/* Historial de pedidos («Mis pedidos») */}
       <MisPedidos />
