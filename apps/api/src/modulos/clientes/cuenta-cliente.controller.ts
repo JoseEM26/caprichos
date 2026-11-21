@@ -170,6 +170,27 @@ export class CuentaClienteController {
     return { cliente: actualizado };
   }
 
+  /** Avatar 3D de la cuenta: configuración y retrato (solo con sesión). */
+  @Get('avatar')
+  async avatar(@Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({ codigo: 'SESION_REQUERIDA', mensaje: 'Inicia sesión para ver tu avatar.' });
+    }
+    return this.clientesService.avatarDeCuenta(cliente.partyId);
+  }
+
+  @Put('avatar')
+  async guardarAvatar(@Body() dto: { config?: unknown; retrato?: unknown }, @Req() req: Request) {
+    const cliente = await this.clientesService.clienteDesdeRequest(req);
+    if (!cliente) {
+      throw new UnauthorizedException({ codigo: 'SESION_REQUERIDA', mensaje: 'Inicia sesión para guardar tu avatar.' });
+    }
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const actualizado = await this.clientesService.guardarAvatar(cliente.partyId, dto, ip);
+    return { cliente: actualizado };
+  }
+
   @Delete('foto')
   async quitarFoto(@Req() req: Request) {
     const cliente = await this.clientesService.clienteDesdeRequest(req);

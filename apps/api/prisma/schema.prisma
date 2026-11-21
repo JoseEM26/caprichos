@@ -101,6 +101,10 @@ model Person {
   horario_24_7    Boolean   @default(false)
   /// Reparto de propinas: NULL = según rol (ADMIN no participa, el resto sí); true/false = excepción fijada por el ADMIN.
   participa_propinas Boolean?
+  /// Avatar 3D del cliente (carta): ids de piezas y colores. NULL = sin avatar.
+  avatar_config   Json?
+  /// Retrato PNG del avatar (URL pública del archivo, «/archivos/...»). Es lo único que sale a la pantalla del local.
+  avatar_url      String?
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")

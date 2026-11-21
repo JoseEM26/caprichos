@@ -13,6 +13,7 @@ sugerencias:
   - Como verifica el cliente su celular al crear su cuenta
   - Por que el cliente escribe primero al WhatsApp del negocio
   - El cliente dice que no avanza la verificacion del celular
+  - Como crea su avatar 3D el cliente en la carta
 ---
 # Clientes
 
@@ -76,6 +77,11 @@ La cuenta del cliente es celular + contrasena (sin DNI). Para crear la cuenta o 
 4. Si el cliente dice que no avanza: pidele revisar que mando el mensaje desde su propio WhatsApp al numero de Caprichos, sin cambiar el texto. A los 60 segundos la carta le dice que revisar. Si sigue igual, que pulse Pedir un enlace nuevo (o "El enlace vencio. Pide uno nuevo.") o avisa al local. Tras 5 mensajes desde otro celular la clave se invalida.
 5. Registro y recuperar: en ambos modos termina igual, el cliente ya puede registrarse o crear una contrasena nueva. Si el celular ya tiene cuenta con contrasena el registro dice que ingrese o recupere.
 Ver tambien: [[mensajes]]
+
+## Como se hace: Entender el avatar 3D del cliente
+1. En la carta, dentro de su cuenta, el cliente tiene la seccion Mi avatar: toca Crear mi avatar (o Editar mi avatar), arma su personaje en 3D (cuerpo, cabello, ropa, gorros, disfraces, colores) y pulsa Guardar avatar. Su foto de perfil sigue funcionando igual; si tiene avatar, se ve el retrato del avatar en el icono de su cuenta y en el seguimiento de su pedido, donde celebra cuando el pedido esta listo.
+2. El apodo del avatar (hasta 18 letras) es lo unico de texto que se guarda; nunca el celular. A la pantalla del local solo sale el retrato del avatar (una imagen), nunca su configuracion ni datos personales.
+3. El cliente puede entrar y cambiarlo cuando quiera. El personal no edita ni ve la configuracion del avatar; si un cliente reclama que no le abre el editor, suele ser un celular sin 3D (WebGL): que pruebe desde otro celular o navegador.
 
 ## Errores y dudas comunes
 - No es posible restar una cantidad de puntos superior al saldo actual que posee el cliente.

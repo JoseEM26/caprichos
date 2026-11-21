@@ -29,6 +29,7 @@ import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { generarXlsx } from '../../comun/xlsx-simple';
 import { hoyLimaIso } from '../../comun/fechas-lima';
 import { detalleCelularSorteo, mesLima, nombreParaSorteo, rangoPedidos, type FiltrosClientes } from './clientes-filtros';
+import { type AvatarConfig, retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
 import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
 import { estadoVerificacionCliente } from './estado-verificacion-cliente';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
@@ -551,6 +552,7 @@ export class ClientesService {
       correo: party.persona?.correo || null,
       telefono: party.cuentaCliente?.telefono ?? telefonoDeContactos(party.contactos),
       fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
+      avatarUrl: party.persona?.avatar_url ?? null,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
       puntos,
       // El DNI es opcional: solo se muestra enmascarado y solo si la cuenta lo tiene
@@ -688,6 +690,71 @@ export class ClientesService {
     });
 
     return this.yo(id);
+  }
+
+  /** Avatar 3D de la cuenta (GET /carta/cuenta/avatar): configuración y retrato, o nulos si aún no creó uno. */
+  async avatarDeCuenta(partyId: bigint | string): Promise<{ config: AvatarConfig | null; avatarUrl: string | null }> {
+    const p = await this.prisma.person.findUnique({
+      where: { party_id: BigInt(partyId) },
+      select: { avatar_config: true, avatar_url: true },
+    });
+    return { config: (p?.avatar_config as AvatarConfig | null) ?? null, avatarUrl: p?.avatar_url ?? null };
+  }
+
+  /**
+   * Guarda el avatar (PUT /carta/cuenta/avatar): valida la configuración, guarda el retrato PNG (≤ 200 KB) con
+   * ArchivosService y enlaza ambos a la persona. La foto de perfil no se toca.
+   */
+  async guardarAvatar(
+    partyId: bigint | string,
+    dto: { config?: unknown; retrato?: unknown },
+    ip?: string,
+  ): Promise<ClienteSesion | null> {
+    const id = BigInt(partyId);
+    const config = validarAvatarConfig(dto?.config);
+    const png = retratoDesdeDataUrl(dto?.retrato);
+
+    let archivo: { id: string; ruta?: string };
+    try {
+      archivo = await this.archivos.subirArchivo(
+        { buffer: png, size: png.length, mimetype: 'image/png', originalname: 'avatar.png' } as Express.Multer.File,
+        false,
+        { partyId: id, rol: 'CLIENTE', debeCambiar: false },
+        ip,
+      );
+    } catch {
+      throw new BadRequestException({ codigo: 'AVATAR_RETRATO_INVALIDO', mensaje: 'No pudimos leer el retrato del avatar.' });
+    }
+    const f = await this.prisma.archivo.findUnique({ where: { id: BigInt(archivo.id) }, select: { ruta: true } });
+    if (!f) throw new BadRequestException({ codigo: 'AVATAR_RETRATO_INVALIDO', mensaje: 'No pudimos guardar el retrato del avatar.' });
+
+    await this.prisma.person.update({
+      where: { party_id: id },
+      data: { avatar_config: config as unknown as Prisma.InputJsonValue, avatar_url: `/archivos/${f.ruta}` },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_AVATAR_GUARDADO',
+      entidad: 'party',
+      entidadId: id,
+      partyId: id,
+      ip,
+    });
+
+    return this.yo(id);
+  }
+
+  /**
+   * Retrato del avatar del cliente de un pedido, para la pantalla pública del local. Devuelve SOLO la URL del archivo
+   * (o null si el pedido no tiene cliente con cuenta o no creó avatar): nunca nombre, celular ni la configuración.
+   */
+  async avatarDePedido(pedidoId: bigint | string): Promise<string | null> {
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) }, select: { party_id: true } });
+    if (!pedido?.party_id) return null;
+    const p = await this.prisma.person.findUnique({ where: { party_id: pedido.party_id }, select: { avatar_url: true } });
+    return p?.avatar_url ?? null;
   }
 
   /**

@@ -4,6 +4,8 @@ export interface ClienteSesion {
   correo: string | null;
   telefono: string | null;
   fotoUrl: string | null;
+  /** Retrato PNG del avatar 3D (URL pública del archivo); null si no creó avatar */
+  avatarUrl: string | null;
   cumpleanos: string | null;
   puntos: number;
   /** DNI enmascarado, solo si la cuenta tiene uno guardado */

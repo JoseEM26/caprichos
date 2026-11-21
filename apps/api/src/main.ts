@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { PinoLoggerService } from './comun/logger/pino-logger.service';
 import { limiteWebhookEvolutionMb, parserWebhookEvolution, RUTA_WEBHOOK_EVOLUTION } from './comun/limite-webhook-evolution';
+import { parserAvatarCliente, RUTA_AVATAR_CLIENTE } from './comun/limite-avatar';
 import { RedisIoAdapter } from './comun/socket/redis-io.adapter';
 
 // Los ids de la base son BigInt: salen como texto en el JSON
@@ -24,6 +25,8 @@ async function bootstrap() {
   app.useLogger(pinoLogger);
   // Cuerpos grandes (fotos/audios en base64, historial) SOLO en el webhook de Evolution; el límite global no cambia
   app.use(RUTA_WEBHOOK_EVOLUTION, parserWebhookEvolution(limiteWebhookEvolutionMb(process.env.EVOLUTION_WEBHOOK_MAX_MB)));
+  // El retrato del avatar del cliente (data URL ~270 KB) tampoco cabe en el límite global
+  app.use(RUTA_AVATAR_CLIENTE, parserAvatarCliente());
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
