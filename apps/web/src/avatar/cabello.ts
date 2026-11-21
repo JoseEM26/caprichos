@@ -1,6 +1,8 @@
 /* eslint-disable -- piezas pasadas tal cual de la maqueta aprobada (no se reescriben a mano) */
 // @ts-nocheck
 import { AVATAR } from './nucleo';
+import { crearPelo } from './cabello-util';
+import { registrarNuevos } from './cabello-cortos';
 
 /*
  * Cabellos del avatar de Caprichos. Todo se arma sobre H.casquete (respeta la frente) más mechones, melenas,
@@ -160,96 +162,18 @@ export function registrarCabello() {
     });
   }
 
-  /* ============================ CORTO ============================ */
-  reg('corto', 'Corto clásico', 'Corto', (U, g) => {
-    U.casquete();
-    if (!g) for (const az of [-.55, -.2, .15, .5]) U.mechon(az, 1.12, .06, .1, .036, az * .6);
-    U.patillas();
-  });
-  reg('degradado', 'Degradado (fade)', 'Corto', (U, g) => {
-    U.casquete({ mat: U.m2, radio: g ? .272 : .279 });
-    U.casquete({ cobertura: .33, inclinacion: -.3, radio: g ? .277 : .288 });
-    if (!g) for (const az of [-.5, -.15, .2, .55]) U.mechon(az, 1.2, .06, .1, .038, az * .5, U.m, .288);
-  }, null, '#2B170E');
-  reg('rapado', 'Rapado', 'Corto', (U) => {
-    U.casquete({ radio: .277 });
-  });
-  reg('mohicano', 'Mohicano', 'Corto', (U, g) => {
-    U.casquete({ radio: .277 });
-    if (g) return;
-    const pc = [48, 70, 95, 125, 148].map((a) => { a *= Math.PI / 180; return V(0, Math.sin(a) * .312, Math.cos(a) * .312); });
-    U.tubo(pc, .05, 1, U.m, U.cab, 28, 12);
-  });
-  reg('erizado', 'Erizado con gel', 'Corto', (U, g) => {
-    U.casquete({ radio: g ? .274 : .281 });
-    if (g) return;
-    U.espinas(.95, 10, -3.0, 3.0, .15);
-    U.espinas(1.2, 7, 0, 6.0, .17);
-    U.espinas(1.43, 3, 0, 4, .17);
-    U.espinas(.4, 10, 1.4, 4.9, .14);
-    U.espinas(-.05, 9, 1.9, 4.4, .13);
-  });
-  reg('raya_costado', 'Raya al costado', 'Corto', (U, g) => {
-    U.casquete();
-    if (g) return;
-    U.flequillo('lado', 8);
-    U.bola(.16, .075, .17, .03, .235, .03);
-    U.patillas();
-  });
-  reg('militar', 'Militar', 'Corto', (U, g) => {
-    U.casquete({ radio: .277 });
-    if (!g) U.ctx.malla(new T.CylinderGeometry(.16, .18, .05, 28), U.m, 0, .26, -.03, U.cab);
-  });
-
-  /* ========================= CON CERQUILLO ========================= */
-  reg('cerquillo_recto', 'Cerquillo recto', 'Con cerquillo', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('recto', 10);
-  }, (U, g) => { U.mel({ largo: .2, plano: .85 }); U.patillas(.09, .0); });
-  reg('cerquillo_lado', 'Cerquillo de lado', 'Con cerquillo', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('lado', 9);
-  }, (U, g) => { U.mel({ largo: .2, plano: .85 }); U.patillas(.09, .0); });
-  reg('cerquillo_cortina', 'Cerquillo cortina', 'Con cerquillo', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('cortina', 11);
-  }, (U, g) => { U.mel({ largo: .26, plano: .9 }); U.patillas(.1, .0); });
-  reg('bob_cerquillo', 'Bob con cerquillo', 'Con cerquillo', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('recto', 10);
-  }, (U, g) => { U.mel({ w: .295, largo: .27, plano: .9, vuelo: .08 }); U.patillas(.1, .0); });
-
-  /* ============================ MEDIANO ============================ */
-  reg('bob', 'Bob', 'Mediano', (U, g) => {
-    U.casquete();
-    if (!g) { U.flequillo('lado', 8); }
-  }, (U, g) => { U.mel({ w: .297, largo: .26, plano: .88, vuelo: .1 }); });
-  reg('hombros', 'Melena a los hombros', 'Mediano', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('cortina', 9);
-  }, (U, g) => { U.mel({ largo: .42, vuelo: .12, plano: .93 }); U.mechonesFrente(-.33, .04); });
-  reg('ondulado', 'Ondulado', 'Mediano', (U, g) => {
-    U.casquete();
-    if (!g) U.flequillo('lado', 8);
-  }, (U, g) => {
-    U.mel({ w: .29, largo: .42, vuelo: .2, onda: 16 });
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) U.bola(.055, .06, .055, s * (.255 + i * .008), -.1 - i * .09, -.03);
-  });
-  reg('shaggy', 'Desmechado (shaggy)', 'Mediano', (U, g) => {
-    U.casquete({ radio: g ? .274 : .286 });
-    if (g) return;
-    for (let i = 0; i < 12; i++) U.mechon(-1.1 + i * .2, .9 + azar() * .25, .06, .1 + azar() * .05, .036, (azar() - .5) * 1.5);
-    for (let i = 0; i < 6; i++) U.mechon(-.9 + i * .36, 1.3, .07, .1, .04, (azar() - .5));
-  }, (U, g) => {
-    U.mel({ largo: .2, w: .29, vuelo: .1 });
-    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) {
-      const c = U.bola(.035, .12 + azar() * .05, .04, s * (.255 + azar() * .02), -.02 - i * .05, -.02 - i * .06);
-      c.rotation.z = s * (.12 + azar() * .2);
-    }
-    for (let i = 0; i < 8; i++) {
-      const az = 1.7 + i * .3, c = U.bola(.04, .11 + azar() * .06, .04, Math.sin(az) * .27, -.17 - azar() * .04, -.07 + Math.cos(az) * .22);
-      c.rotation.z = Math.sin(az) * .25;
-    }
+  /* ===== CORTO, CON CERQUILLO, MEDIANO: peinados con mechones (ver cabello-util.ts) ===== */
+  registrarNuevos((id, nombre, grupo, construir, sec) => {
+    A.registrar('cabello', {
+      id, nombre, grupo,
+      colores: sec ? ['principal', 'secundario'] : ['principal'],
+      porDefecto: sec ? { principal: '#4A2C1D', secundario: sec } : { principal: '#4A2C1D' },
+      construir(ctx) {
+        const U = crearPelo(ctx, 11);
+        construir(U, ctx);
+        return U.fin();
+      },
+    });
   });
   // Largo, Recogido y Rizado viven en cabello-largo.ts (registrarCabelloLargo)
 }
