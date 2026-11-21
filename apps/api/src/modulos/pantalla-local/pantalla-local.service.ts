@@ -16,7 +16,7 @@ export interface PedidoPantalla {
   minutos: number;
   /** Solo la primera palabra del nombre, y solo si el parámetro lo permite. */
   nombre: string | null;
-  // TODO: llenar cuando la cuenta del cliente tenga `avatar_url` (otro agente lo agrega al esquema).
+  /** Retrato del avatar del cliente (solo la URL pública), si tiene cuenta y avatar y se muestran nombres. */
   avatarUrl: string | null;
 }
 
@@ -56,11 +56,18 @@ export class PantallaLocalService {
         OR: [{ estado: { in: ['COLA', 'PREPARANDO'] } }, { estado: 'LISTO', listo_en: { gte: limiteListo } }],
       },
       // Solo lo necesario: nunca teléfono, documento ni apellidos.
-      select: { codigo: true, estado: true, modalidad: true, cliente_nombre: true, creado_en: true, pasa_cocina_en: true, listo_en: true },
+      select: { codigo: true, estado: true, modalidad: true, cliente_nombre: true, creado_en: true, pasa_cocina_en: true, listo_en: true, party_id: true },
       orderBy: { creado_en: 'asc' },
       take: 60,
     });
 
+    // Retratos en una sola consulta (sin N+1); solo la URL, nunca otros datos de la persona
+    const partyIds = mostrarNombre ? [...new Set(filas.map((f) => f.party_id).filter((x): x is bigint => x != null))] : [];
+    const retratos = new Map<string, string>();
+    if (partyIds.length) {
+      const personas = await this.prisma.person.findMany({ where: { party_id: { in: partyIds }, avatar_url: { not: null } }, select: { party_id: true, avatar_url: true } });
+      for (const pe of personas) if (pe.avatar_url) retratos.set(String(pe.party_id), pe.avatar_url);
+    }
     const pedidos: PedidoPantalla[] = filas.map((f) => {
       const listo = f.estado === 'LISTO';
       const desde = listo ? (f.listo_en ?? f.creado_en) : (f.pasa_cocina_en ?? f.creado_en);
@@ -70,7 +77,7 @@ export class PantallaLocalService {
         modalidad: f.modalidad === 'RECOGER' || f.modalidad === 'LLEVAR' ? 'LLEVAR' : 'COMER_LOCAL',
         minutos: Math.max(0, Math.floor((ahora.getTime() - desde.getTime()) / 60000)),
         nombre: mostrarNombre ? nombreDePila(f.cliente_nombre) : null,
-        avatarUrl: null,
+        avatarUrl: f.party_id != null ? retratos.get(String(f.party_id)) ?? null : null,
       };
     });
 

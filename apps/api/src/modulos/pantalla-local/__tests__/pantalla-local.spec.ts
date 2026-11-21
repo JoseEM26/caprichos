@@ -8,6 +8,7 @@ function crear(param: unknown, filas: any[]) {
   const prisma: any = {
     parametro: { findUnique: jest.fn().mockResolvedValue(param === undefined ? null : { valor: param }) },
     pedido: { findMany: jest.fn().mockResolvedValue(filas) },
+    person: { findMany: jest.fn().mockResolvedValue([{ party_id: 7n, avatar_url: '/archivos/retrato-7.png' }]) },
   };
   return { servicio: new PantallaLocalService(prisma), prisma };
 }
@@ -60,6 +61,16 @@ describe('PantallaLocalService', () => {
     const select = prisma.pedido.findMany.mock.calls[0][0].select;
     expect(select.cliente_telefono).toBeUndefined();
     expect(select.comprobante_doc).toBeUndefined();
+  });
+
+  it('el retrato del avatar sale solo si el cliente tiene uno y se muestran nombres', async () => {
+    const con = crear('si', [fila({ party_id: 7n }), fila({ codigo: 'CP-B2', party_id: null })]);
+    const r = await con.servicio.pedidos(AHORA);
+    expect(r.pedidos.map((p) => p.avatarUrl)).toEqual(['/archivos/retrato-7.png', null]);
+    expect(con.prisma.person.findMany.mock.calls[0][0].select).toEqual({ party_id: true, avatar_url: true });
+    const sin = crear('no', [fila({ party_id: 7n })]);
+    expect((await sin.servicio.pedidos(AHORA)).pedidos[0].avatarUrl).toBeNull();
+    expect(sin.prisma.person.findMany).not.toHaveBeenCalled();
   });
 
   it('guarda en caché unos segundos', async () => {
