@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as cuentaModulo from '../CuentaContext';
 import * as carritoModulo from '../../CarritoContext';
 import { CabeceraCarta } from '../../CabeceraCarta';
@@ -57,16 +57,18 @@ describe('CabeceraCarta ▸ avatar de la cuenta', () => {
 
   it('con foto muestra el avatar redondo en el botón de cuenta', () => {
     renderizar('/archivos/publico/2026/10/ana.webp');
-    const boton = screen.getByRole('button', { name: 'Mi cuenta: 12 puntos' });
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    const boton = screen.getByRole('menuitem', { name: /Mi cuenta/ });
     const img = boton.querySelector('img');
     expect(img).not.toBeNull();
     expect(img).toHaveAttribute('src', '/archivos/publico/2026/10/ana.webp');
-    expect(img).toHaveStyle({ width: '18px', height: '18px' });
+    expect(img).toHaveStyle({ width: '22px', height: '22px' });
   });
 
   it('sin foto conserva el icono de siempre', () => {
     renderizar(null);
-    const boton = screen.getByRole('button', { name: 'Mi cuenta: 12 puntos' });
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    const boton = screen.getByRole('menuitem', { name: /Mi cuenta/ });
     expect(boton.querySelector('img')).toBeNull();
     expect(boton.querySelector('svg')).not.toBeNull();
   });

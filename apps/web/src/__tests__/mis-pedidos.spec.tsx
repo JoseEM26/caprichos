@@ -266,27 +266,38 @@ describe('Mis pedidos: conservación en el navegador', () => {
   });
 });
 
+// Los botones de pedidos viven en el menú «Opciones» de la cabecera: se abre (una sola vez) y se busca la opción
+function abrirMenu() {
+  const b = screen.getByRole('button', { name: 'Opciones' });
+  if (b.getAttribute('aria-expanded') === 'false') fireEvent.click(b);
+}
+const itemPedidos = (name: RegExp) => {
+  abrirMenu();
+  return screen.getByRole('menuitem', { name });
+};
+
 describe('Mis pedidos: botón de la cabecera', () => {
   it('dice «Mi pedido» con uno, «Mis pedidos» con varios y muestra cuántos están activos', () => {
     render(cabecera());
-    expect(screen.queryByRole('button', { name: /Mis? pedidos?/ })).not.toBeInTheDocument();
+    abrirMenu();
+    expect(screen.queryByRole('menuitem', { name: /Mis? pedidos?/ })).not.toBeInTheDocument();
 
     act(() => guardarPedido(pedido('PED-601')));
-    const boton = screen.getByRole('button', { name: 'Mi pedido' });
+    const boton = itemPedidos(/^Mi pedido/);
     expect(within(boton).getByText('1')).toBeInTheDocument();
 
     act(() => guardarPedido(pedido('PED-602', { terminado: true })));
-    expect(screen.getByRole('button', { name: 'Mis pedidos' })).toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: 'Mis pedidos' })).getByText('1')).toBeInTheDocument();
+    expect(itemPedidos(/^Mis pedidos/)).toBeInTheDocument();
+    expect(within(itemPedidos(/^Mis pedidos/)).getByText('1')).toBeInTheDocument();
 
     act(() => guardarPedido(pedido('PED-603')));
-    expect(within(screen.getByRole('button', { name: 'Mis pedidos' })).getByText('2')).toBeInTheDocument();
+    expect(within(itemPedidos(/^Mis pedidos/)).getByText('2')).toBeInTheDocument();
   });
 
   it('con sesión iniciada aparece aunque no haya pedidos guardados en el navegador', () => {
     conSesion();
     render(cabecera());
-    expect(screen.getByRole('button', { name: 'Mis pedidos' })).toBeInTheDocument();
+    expect(itemPedidos(/^Mis pedidos/)).toBeInTheDocument();
     expect(screen.queryByText('1')).not.toBeInTheDocument();
   });
 
@@ -309,7 +320,7 @@ describe('Mis pedidos: botón de la cabecera', () => {
       </CarritoProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mi pedido' }));
+    fireEvent.click(itemPedidos(/^Mi pedido/));
     expect(await screen.findByRole('dialog', { name: 'Mis pedidos' })).toBeInTheDocument();
   });
 });

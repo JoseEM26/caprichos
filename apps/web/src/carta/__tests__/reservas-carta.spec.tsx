@@ -97,7 +97,8 @@ describe('Reservar mesa desde la carta ▸ botón', () => {
         <CabeceraCarta busqueda="" onCambioBusqueda={() => {}} estadoLocal={{ abierta: true } as any} datosLocal={{ nombre: 'Caprichos' } as any} pagina="carta" onPagina={() => {}} categorias={[]} categoriaActivaId="todo" onCategoria={() => {}} />
       </CarritoProvider>,
     );
-    expect(await screen.findByRole('button', { name: 'Reservar mesa' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    expect(await screen.findByRole('menuitem', { name: 'Reservar mesa' })).toBeInTheDocument();
     unmount();
 
     vi.mocked(api.get).mockClear();
@@ -107,7 +108,8 @@ describe('Reservar mesa desde la carta ▸ botón', () => {
       </CarritoProvider>,
     );
     await new Promise((r) => setTimeout(r, 0));
-    expect(screen.queryByRole('button', { name: 'Reservar mesa' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    expect(screen.queryByRole('menuitem', { name: 'Reservar mesa' })).not.toBeInTheDocument();
     expect(api.get).not.toHaveBeenCalledWith('/carta/reservas/opciones');
   });
 });

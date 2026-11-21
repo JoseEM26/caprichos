@@ -77,9 +77,23 @@ function renderCabecera() {
   );
 }
 
+// Los botones de pedidos viven en el menú «Opciones» de la cabecera: se abre (una sola vez) y se busca la opción
+function abrirMenu() {
+  const b = screen.getByRole('button', { name: 'Opciones' });
+  if (b.getAttribute('aria-expanded') === 'false') fireEvent.click(b);
+}
+const itemPedidos = (name: RegExp) => {
+  abrirMenu();
+  return screen.getByRole('menuitem', { name });
+};
+const sinItemPedidos = (name: RegExp) => {
+  abrirMenu();
+  return screen.queryByRole('menuitem', { name });
+};
+
 // Abre «Mi pedido» / «Mis pedidos» y después el detalle de uno de la lista
 async function abrirPedido(codigo: string) {
-  fireEvent.click(screen.getByRole('button', { name: /^Mis? pedidos?$/ }));
+  fireEvent.click(itemPedidos(/^Mis? pedidos?/));
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^#${codigo}(?!\\d)`) }));
 }
 
@@ -199,17 +213,17 @@ describe('seguimiento del pedido en la carta', () => {
 
   it('el botón «Mi pedido» aparece solo si hay pedidos guardados', () => {
     render(renderCabecera());
-    expect(screen.queryByRole('button', { name: /Mi pedido/i })).not.toBeInTheDocument();
+    expect(sinItemPedidos(/Mi pedido/i)).not.toBeInTheDocument();
 
     act(() => guardarPedido(pedidoGuardado('PED-010')));
-    expect(screen.getByRole('button', { name: /Mi pedido/i })).toBeInTheDocument();
+    expect(itemPedidos(/Mi pedido/i)).toBeInTheDocument();
 
     // Otra pestaña borra los pedidos: el navegador avisa con el evento storage
     act(() => {
       localStorage.clear();
       window.dispatchEvent(new Event('storage'));
     });
-    expect(screen.queryByRole('button', { name: /Mi pedido/i })).not.toBeInTheDocument();
+    expect(sinItemPedidos(/Mi pedido/i)).not.toBeInTheDocument();
   });
 
   it('la pantalla muestra los pasos reales de la API con su hora', async () => {
@@ -255,7 +269,7 @@ describe('seguimiento del pedido en la carta', () => {
     });
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mi pedido/i }));
+    fireEvent.click(itemPedidos(/Mi pedido/i));
 
     await waitFor(() => expect(leerPedidosGuardados()[0]?.terminado).toBe(true));
     expect(leerPedidosGuardados()).toHaveLength(1);
@@ -272,7 +286,7 @@ describe('seguimiento del pedido en la carta', () => {
     });
 
     render(renderCabecera());
-    fireEvent.click(screen.getByRole('button', { name: /Mis pedidos/i }));
+    fireEvent.click(itemPedidos(/Mis pedidos/i));
 
     expect(await screen.findByText('Listo para recoger')).toBeInTheDocument();
     expect(screen.getByText('En camino')).toBeInTheDocument();
@@ -290,6 +304,6 @@ describe('seguimiento del pedido en la carta', () => {
     expect(leerPedidosGuardados()).toEqual([]);
 
     render(renderCabecera());
-    expect(screen.queryByRole('button', { name: /Mi pedido/i })).not.toBeInTheDocument();
+    expect(sinItemPedidos(/Mi pedido/i)).not.toBeInTheDocument();
   });
 });

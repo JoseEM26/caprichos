@@ -1,13 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
-import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
-import { usePedidosGuardados } from './seguimiento';
-import { RetratoAvatar } from '../avatar/RetratoAvatar';
-import { fotoDelCliente } from '../avatar/fotoCliente';
-import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
-import { BotonReservar } from './reservas/BotonReservar';
+import { MenuOpciones } from './MenuOpciones';
 import { TEXTO_CERRADO_PROGRAMAR, type ProgramarCarta } from './ProgramarPedido';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
@@ -75,17 +70,8 @@ export function CabeceraCarta({
   mostrarReservar = true,
   programar = null,
 }: CabeceraCartaProps) {
-  const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
-  const { cliente, abrirPanel } = useCuenta();
-  const fotoCabecera = fotoDelCliente(cliente);
+  const { cantidadTotal, subtotal, abrirCajon } = useCarrito();
   const movil = useEsMovil();
-  // en pantallas medianas «Mi pedido» queda solo con el icono para que la cabecera no baje a dos filas
-  const [angosto, setAngosto] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1240);
-  useEffect(() => {
-    const alRedimensionar = () => setAngosto(window.innerWidth < 1240);
-    window.addEventListener('resize', alRedimensionar);
-    return () => window.removeEventListener('resize', alRedimensionar);
-  }, []);
   const franja = useRef<HTMLDivElement>(null);
   const arrastre = useRef<{ x: number; scroll: number } | null>(null);
 
@@ -95,13 +81,6 @@ export function CabeceraCarta({
   const cerrado = estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda);
   // Cerrado por horario pero se puede programar: aviso amable en vez del aviso de «no se puede pedir»
   const puedeProgramar = Boolean(cerrado && programar && !estadoLocal?.pausaAltaDemanda);
-  // Pedidos guardados en este navegador (el más reciente va primero) y cuántos siguen activos
-  const guardados = usePedidosGuardados();
-  const activos = guardados.filter((p) => !p.terminado).length;
-  const etiquetaPedidos = guardados.length === 1 && !cliente ? 'Mi pedido' : 'Mis pedidos';
-  const mostrarPedidos = guardados.length > 0 || cliente !== null;
-  // puntos siempre con 2 decimales (1.01 pts, 12.00 pts) para que el chip no cambie de ancho
-  const puntosTexto = (Number(cliente?.puntos) || 0).toFixed(2);
   // la insignia del carrito tiene tamaño fijo: a partir de 100 productos muestra 99+
   const insigniaCarrito = cantidadTotal > 99 ? '99+' : String(cantidadTotal);
 
@@ -153,10 +132,10 @@ export function CabeceraCarta({
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            gap: movil ? '4px 10px' : '12px 20px',
+            gap: movil ? '4px 6px' : '12px 20px',
           }}
         >
-          <div style={{ order: 1, display: 'flex', alignItems: 'center', gap: movil ? 8 : 12, flex: movil ? '1 1 0' : '0 1 auto', minWidth: 0 }}>
+          <div style={{ order: 1, display: 'flex', alignItems: 'center', gap: movil ? 8 : 12, flex: movil ? '0 0 auto' : '0 1 auto', minWidth: 0 }}>
             <img
               src="/logo.webp"
               alt={nombre}
@@ -164,7 +143,7 @@ export function CabeceraCarta({
               height={movil ? 32 : 48}
               style={{ flex: 'none', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
             />
-            <div style={{ minWidth: 0 }}>
+            {!movil && <div style={{ minWidth: 0 }}>
               <div
                 style={{
                   fontFamily: 'var(--fuente-titulos)',
@@ -179,15 +158,13 @@ export function CabeceraCarta({
               >
                 {nombre}
               </div>
-              {!movil && (
-                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {lema}
-                </div>
-              )}
-            </div>
+              <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {lema}
+              </div>
+            </div>}
           </div>
 
-          <nav aria-label="Páginas" style={{ order: movil ? 4 : 2, display: 'flex', gap: 4, alignItems: 'center', width: movil ? '100%' : 'auto' }}>
+          <nav aria-label="Páginas" style={{ order: 2, display: 'flex', gap: 0, alignItems: 'center', minWidth: 0, flex: movil ? '1 1 0' : 'none', overflowX: movil ? 'auto' : 'visible', scrollbarWidth: 'none' }}>
             {PAGINAS.map(([id, texto]) => (
               <button
                 key={id}
@@ -196,14 +173,14 @@ export function CabeceraCarta({
                 style={{
                   flex: 'none',
                   minHeight: TACTIL,
-                  padding: movil ? '0 10px' : '0 14px',
+                  padding: movil ? '0 7px' : '0 14px',
                   border: 0,
                   borderBottom: `3px solid ${pagina === id ? 'var(--cp-orange)' : 'transparent'}`,
                   background: 'transparent',
                   color: 'var(--cp-navy)',
                   fontFamily: 'var(--fuente-titulos)',
                   fontWeight: 800,
-                  fontSize: movil ? 13 : 14,
+                  fontSize: movil ? 12 : 14,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -213,7 +190,7 @@ export function CabeceraCarta({
           </nav>
 
           {esCarta ? (
-            <div style={{ order: movil ? 5 : 3, flex: movil ? '1 1 100%' : mostrarPedidos ? '1 1 150px' : '1 1 240px', minWidth: movil ? '100%' : mostrarPedidos ? 110 : 180 }}>
+            <div style={{ order: movil ? 5 : 3, flex: movil ? '1 1 100%' : '1 1 240px', minWidth: movil ? '100%' : 180 }}>
               <label htmlFor="buscar-carta" style={{ position: 'absolute', left: '-9999px' }}>
                 Buscar en la carta
               </label>
@@ -241,93 +218,17 @@ export function CabeceraCarta({
             <div style={{ order: 3, flex: 1 }} />
           )}
 
-          {/* Grupo de la derecha: pedidos, puntos y carrito saltan de línea como una sola pieza */}
+          {/* Grupo de la derecha: carrito y menú «Opciones» (cuenta, avatar, pedidos, reservas, instalar) */}
           <div
             style={{
-              order: movil ? 2 : 4,
+              order: movil ? 3 : 4,
               flex: 'none',
-              marginLeft: 'auto',
+              marginLeft: movil ? 0 : 'auto',
               display: 'flex',
               alignItems: 'center',
               gap: movil ? 8 : 12,
             }}
           >
-            {mostrarReservar && <BotonReservar />}
-            {mostrarInstalar && <BotonInstalarApp />}
-
-            {mostrarPedidos && (
-              <button
-                onClick={() => setListaPedidosAbierta(true)}
-                aria-label={etiquetaPedidos}
-                title={etiquetaPedidos}
-                style={{
-                  flex: 'none',
-                  minHeight: TACTIL,
-                  padding: `0 ${movil ? 10 : 14}px`,
-                  boxSizing: 'border-box',
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontFamily: 'var(--fuente-titulos)',
-                  fontWeight: 800,
-                  fontSize: 13,
-                  whiteSpace: 'nowrap',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none' }}>
-                  <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
-                  <path d="M9 8h6M9 12h6" />
-                </svg>
-                {!(movil || angosto) && <span>{etiquetaPedidos}</span>}
-                {activos > 0 && (
-                  <span
-                    aria-label={`${activos} ${activos === 1 ? 'pedido activo' : 'pedidos activos'}`}
-                    style={{ flex: 'none', minWidth: 18, height: 18, padding: '0 5px', boxSizing: 'border-box', borderRadius: 9, backgroundColor: 'var(--cp-orange)', color: '#FFFFFF', fontSize: 11, lineHeight: '18px', textAlign: 'center', fontWeight: 800 }}
-                  >
-                    {activos}
-                  </span>
-                )}
-              </button>
-            )}
-
-            <button
-              onClick={abrirPanel}
-              aria-label={cliente ? `Mi cuenta: ${cliente.puntos} puntos` : 'Ingresar o crear cuenta'}
-              style={{
-                flex: 'none',
-                minHeight: TACTIL,
-                padding: `0 ${movil ? 10 : 14}px`,
-                boxSizing: 'border-box',
-                borderRadius: 12,
-                border: '1.5px solid var(--cp-navy)',
-                background: cliente ? 'rgba(230,121,41,0.25)' : 'transparent',
-                color: 'var(--cp-navy)',
-                fontFamily: 'var(--fuente-titulos)',
-                fontWeight: 800,
-                fontSize: 13,
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {fotoCabecera?.esAvatar ? (
-                <RetratoAvatar url={fotoCabecera.url} tamano={18} />
-              ) : fotoCabecera ? (
-                // mismo recuadro de 18 px que el icono: la cabecera no cambia de ancho con o sin foto
-                <img src={fotoCabecera.url} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 9, objectFit: 'cover', flex: 'none' }} />
-              ) : (
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none' }}>
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
-                </svg>
-              )}
-              <span>{cliente ? `${puntosTexto} pts` : 'Ingresar'}</span>
-            </button>
 
             <button
               onClick={abrirCajon}
@@ -379,6 +280,8 @@ export function CabeceraCarta({
                 </span>
               )}
             </button>
+
+            <MenuOpciones mostrarInstalar={mostrarInstalar} mostrarReservar={mostrarReservar} />
           </div>
         </header>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // El botón «Instalar app» está en la cabecera de la carta, siempre que la app no esté instalada.
@@ -48,7 +48,10 @@ import { CartaPublica } from '../CartaPublica';
 const enCarta = () => <MemoryRouter><CartaPublica /></MemoryRouter>;
 import { iniciarCapturaInstalar } from '../../pwa/instalar';
 
-const NOMBRE_BOTON = 'Instalar app';
+const NOMBRE_BOTON = 'Instalar aplicación';
+
+// «Instalar aplicación» vive en el menú «Opciones» de la cabecera
+const abrirMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
 
 function dispararInstalable() {
   act(() => {
@@ -68,7 +71,9 @@ describe('Botón «Instalar app» en la cabecera de la carta', () => {
 
   it('está en la cabecera sin pedido previo y sin que el navegador haya dado el aviso', async () => {
     render(enCarta());
-    expect(await screen.findByRole('button', { name: NOMBRE_BOTON })).toBeDefined();
+    await act(async () => {});
+    abrirMenu();
+    expect(await screen.findByRole('menuitem', { name: NOMBRE_BOTON })).toBeDefined();
   });
 
   it('ya no hay barra de instalar bajo la cabecera: el aviso vive en el botón', async () => {
@@ -82,6 +87,7 @@ describe('Botón «Instalar app» en la cabecera de la carta', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
     render(enCarta());
     await act(async () => {});
-    expect(screen.queryByRole('button', { name: NOMBRE_BOTON })).toBeNull();
+    abrirMenu();
+    expect(screen.queryByRole('menuitem', { name: NOMBRE_BOTON })).toBeNull();
   });
 });

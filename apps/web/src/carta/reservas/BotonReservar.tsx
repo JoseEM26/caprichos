@@ -3,6 +3,7 @@ import { useEsMovil } from '../useEsMovil';
 import { HojaReservar } from './HojaReservar';
 import { obtenerOpcionesReserva } from './reservasCartaApi';
 import type { OpcionesReserva } from './reservasCartaApi';
+import { estiloItemMenu } from '../menuItemEstilo';
 
 const TACTIL = 44;
 
@@ -10,7 +11,7 @@ const TACTIL = 44;
  * Botón «Reservar» de la cabecera de la carta. Solo aparece si el local tiene las reservas web encendidas
  * (GET /carta/reservas/opciones). Si la consulta falla, no se muestra: la carta sigue funcionando sin él.
  */
-export function BotonReservar() {
+export function BotonReservar({ comoItem = false, alAbrir }: { comoItem?: boolean; alAbrir?: () => void } = {}) {
   const movil = useEsMovil();
   const [opciones, setOpciones] = useState<OpcionesReserva | null>(null);
   const [abierta, setAbierta] = useState(false);
@@ -35,11 +36,13 @@ export function BotonReservar() {
     <>
       <button
         type="button"
-        onClick={() => setAbierta(true)}
-        aria-label="Reservar mesa"
-        title="Reservar mesa"
+        onClick={() => {
+          alAbrir?.();
+          setAbierta(true);
+        }}
+        {...(comoItem ? { role: 'menuitem', className: 'cp-menu-item' } : { 'aria-label': 'Reservar mesa', title: 'Reservar mesa' })}
         aria-haspopup="dialog"
-        style={{
+        style={comoItem ? estiloItemMenu : {
           flex: 'none',
           minWidth: movil ? TACTIL : 0,
           minHeight: TACTIL,
@@ -61,11 +64,11 @@ export function BotonReservar() {
           cursor: 'pointer',
         }}
       >
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none' }}>
+        <svg viewBox="0 0 24 24" width={comoItem ? 20 : 18} height={comoItem ? 20 : 18} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none' }}>
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M3 10h18M8 3v4M16 3v4" />
         </svg>
-        {!movil && <span>Reservar</span>}
+        {comoItem ? <span>Reservar mesa</span> : !movil && <span>Reservar</span>}
       </button>
       {abierta && <HojaReservar opciones={opciones} onCerrar={() => setAbierta(false)} />}
     </>

@@ -4,6 +4,7 @@ import { Icono } from '../comun/Icono';
 import { esIos, estaInstalada, suscribirInstalar } from './instalar';
 import { ElegirAppInstalar } from './ElegirAppInstalar';
 import { esRutaAdmin } from './manifestPorRuta';
+import { estiloItemMenu } from '../carta/menuItemEstilo';
 
 // objetivo táctil mínimo de 44 px
 const TACTIL = 44;
@@ -143,7 +144,7 @@ function Instrucciones() {
  * instalada; con `siempre` se ve también ya instalada (panel del local: ahí sirve para reinstalar o buscar cambios).
  * `abrirInicial` + `sinBoton` abren solo la ventana (pestaña abierta con ?instalar=...).
  */
-export function BotonInstalarApp({ siempre = false, abrirInicial = false, sinBoton = false }: { siempre?: boolean; abrirInicial?: boolean; sinBoton?: boolean } = {}) {
+export function BotonInstalarApp({ siempre = false, abrirInicial = false, sinBoton = false, comoItem = false, alAbrir }: { siempre?: boolean; abrirInicial?: boolean; sinBoton?: boolean; comoItem?: boolean; alAbrir?: () => void } = {}) {
   const [, actualizar] = useReducer((n: number) => n + 1, 0);
   const [abierto, setAbierto] = useState(abrirInicial);
   const [angosto, setAngosto] = useState(() => typeof window !== 'undefined' && window.innerWidth <= ANCHO_ANGOSTO);
@@ -195,14 +196,16 @@ export function BotonInstalarApp({ siempre = false, abrirInicial = false, sinBot
       {!sinBoton && <button
         ref={disparador}
         type="button"
-        onClick={() => setAbierto(true)}
+        onClick={() => {
+          alAbrir?.();
+          setAbierto(true);
+        }}
         aria-haspopup="dialog"
-        aria-label={angosto ? 'Instalar app Caprichos' : undefined}
-        title="Instalar app Caprichos"
-        style={{ ...estiloBotonCabecera, width: angosto ? TACTIL : undefined, padding: angosto ? 0 : '0 14px', justifyContent: 'center' }}
+        {...(comoItem ? { role: 'menuitem', className: 'cp-menu-item' } : { 'aria-label': angosto ? 'Instalar app Caprichos' : undefined, title: 'Instalar app Caprichos' })}
+        style={comoItem ? estiloItemMenu : { ...estiloBotonCabecera, width: angosto ? TACTIL : undefined, padding: angosto ? 0 : '0 14px', justifyContent: 'center' }}
       >
         <Trazo paths={PATH_DESCARGA} tamano={20} />
-        {!angosto && <span>Instalar app</span>}
+        {comoItem ? <span>Instalar aplicación</span> : !angosto && <span>Instalar app</span>}
       </button>}
 
       {abierto &&

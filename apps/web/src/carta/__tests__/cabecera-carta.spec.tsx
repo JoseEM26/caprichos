@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import * as cuentaModulo from '../cuenta/CuentaContext';
 import { CarritoProvider, useCarrito } from '../CarritoContext';
@@ -65,12 +65,13 @@ describe('Cabecera de la carta ▸ puntos', () => {
     expect(screen.getByText('12.00 pts')).toBeInTheDocument();
   });
 
-  it('el chip y «Mis pedidos» van en el mismo grupo, junto al carrito', () => {
+  it('«Mi cuenta» con los puntos está en el menú Opciones, que va en el mismo grupo que el carrito', () => {
     conCliente(1.01);
     render(cabecera());
-    const chip = screen.getByRole('button', { name: /Mi cuenta/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    expect(screen.getByRole('menuitem', { name: /Mi cuenta/ })).toBeInTheDocument();
     const carrito = screen.getByRole('button', { name: /Abrir el carrito/ });
-    expect(chip.parentElement).toBe(carrito.parentElement);
+    expect(screen.getByRole('button', { name: 'Opciones' }).parentElement?.parentElement).toBe(carrito.parentElement);
     expect(carrito.parentElement?.style.flexShrink).toBe('0');
     expect(carrito.parentElement?.style.marginLeft).toBe('auto');
   });
@@ -143,12 +144,12 @@ describe('Cabecera de la carta ▸ instalar app', () => {
     vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue({ ...cuentaBase, cliente: null } as any);
   });
 
-  it('muestra «Instalar app» en el mismo grupo que el carrito, sin pedido y sin prompt', () => {
+  it('muestra «Instalar aplicación» dentro del menú Opciones, sin pedido y sin prompt', () => {
     render(cabecera(0));
-    const instalar = screen.getByRole('button', { name: 'Instalar app' });
-    const carrito = screen.getByRole('button', { name: /Abrir el carrito/ });
-    expect(instalar.parentElement).toBe(carrito.parentElement);
-    expect(instalar.style.minHeight).toBe('44px');
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    const instalar = screen.getByRole('menuitem', { name: 'Instalar aplicación' });
+    expect(instalar.closest('[role="menu"]')).not.toBeNull();
+    expect(parseInt(instalar.style.minHeight, 10)).toBeGreaterThanOrEqual(44);
   });
 
   it('en la vista previa del diseñador (mostrarInstalar=false) no aparece', () => {
@@ -168,7 +169,8 @@ describe('Cabecera de la carta ▸ instalar app', () => {
         />
       </CarritoProvider>,
     );
-    expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones' }));
+    expect(screen.queryByRole('menuitem', { name: /Instalar aplicación/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Abrir el carrito/ })).toBeInTheDocument();
   });
 });
