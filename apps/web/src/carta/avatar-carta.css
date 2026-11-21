@@ -1,0 +1,33 @@
+/* Avatar de bolsillo (saludo al entrar) y celebración del pedido */
+@keyframes avc-asoma { from { transform: translateY(130%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes avc-globo { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.avc-bolsillo {
+  position: fixed; z-index: 40; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  display: flex; align-items: flex-end; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer;
+  animation: avc-asoma .45s cubic-bezier(.2, .9, .3, 1.2);
+}
+.avc-globo {
+  position: relative; margin-bottom: 70px; background: #fff; color: #0B2C3E; border: 1.5px solid #E3D6C6; border-radius: 14px;
+  padding: 7px 11px; font-weight: 800; font-size: 14px; white-space: nowrap; box-shadow: 0 6px 18px rgba(11, 44, 62, .18);
+  animation: avc-globo .35s .25s both;
+}
+@media (max-width: 380px) { .avc-globo { font-size: 13px; padding: 6px 9px; } }
+
+@keyframes avc-vida { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes avc-entra { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes avc-cae { from { transform: translateY(-12vh) rotate(0); } to { transform: translateY(112vh) rotate(540deg); } }
+.avc-fiesta {
+  position: fixed; inset: 0; z-index: 2100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 244, 225, .97), rgba(251, 224, 190, .97)); color: #0B2C3E; text-align: center; padding: 24px;
+  animation: avc-vida 5s linear forwards;
+}
+.avc-fiesta h2 { margin: 0; font-size: clamp(22px, 5.5vw, 38px); animation: avc-entra .5s .2s both; }
+.avc-fiesta p { margin: 0; font-weight: 800; font-size: clamp(16px, 4vw, 22px); color: #B2500F; }
+.avc-fiesta:focus { outline: none; }
+.avc-saltar { margin-top: 12px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid #0B2C3E; background: #fff; color: #0B2C3E; font-weight: 800; font-size: 15px; cursor: pointer; }
+.avc-saltar:focus-visible { outline: 3px solid #E67929; outline-offset: 2px; }
+.avc-confeti { position: absolute; top: 0; width: 10px; height: 16px; border-radius: 2px; pointer-events: none; animation: avc-cae linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .avc-bolsillo, .avc-globo, .avc-fiesta h2 { animation: none; }
+  .avc-confeti { display: none; }
+}

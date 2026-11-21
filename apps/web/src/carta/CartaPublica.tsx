@@ -34,6 +34,8 @@ import { CajonCarrito } from './CajonCarrito';
 import { FormularioCheckout } from './FormularioCheckout';
 import { useProgramarFueraHorario } from './ProgramarPedido';
 import { PantallaConfirmacion } from './PantallaConfirmacion';
+import { CelebracionPedido } from './CelebracionPedido';
+import { SaludoAvatar } from './SaludoAvatar';
 import { MisPedidos } from './MisPedidos';
 import { NotificacionAgregado } from './NotificacionAgregado';
 import { DecoracionAnimada } from './contenido/DecoracionAnimada';
@@ -1033,6 +1035,10 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
 
       {/* Pantalla de confirmación de pedido */}
       <PantallaConfirmacion />
+
+      {/* Avatar del cliente: saludo al entrar (una vez al día) y celebración al pedir */}
+      <SaludoAvatar />
+      <CelebracionPedido />
 
       {/* Historial de pedidos («Mis pedidos») */}
       <MisPedidos />

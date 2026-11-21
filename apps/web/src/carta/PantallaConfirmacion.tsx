@@ -13,7 +13,8 @@ import { EstadoVoucherPedido } from './EstadoVoucherPedido';
 import { avancePedido, etapaCliente, firmasPestanas, NOMBRE_MEDIO, NOMBRE_MODALIDAD, textoPagoMedio } from './seguimiento-textos';
 import type { EtapaCliente } from './seguimiento-textos';
 import type { PedidoConfirmado } from './tipos';
-import { RetratoAvatar } from '../avatar/RetratoAvatar';
+import { AvatarVivoPerezoso } from '../avatar/AvatarVivoPerezoso';
+import { useAvatarConfig } from '../avatar/useAvatarConfig';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import './seguimiento-modal.css';
@@ -198,6 +199,8 @@ function PanelEstado({
     detalle = creacion.mensaje || 'Un asesor te escribirá para coordinar el pago';
   }
   const avatarUrl = useCuentaOpcional()?.cliente?.avatarUrl ?? null;
+  const configAvatar = useAvatarConfig(Boolean(avatarUrl) && !anulado);
+  const accionAvatar = etapa.tono === 'listo' || etapa.tono === 'fin' ? 'celebrar' : etapa.clave === 'recibido' ? 'saludando' : 'esperando';
   const preparando = etapa.clave === 'recibido' || etapa.clave === 'cocina';
   const nombre = pedido.nombre ? `, ${pedido.nombre}` : '';
   const textoLocal =
@@ -226,8 +229,8 @@ function PanelEstado({
         data-etapa={etapa.clave}
       >
         {avatarUrl && !anulado ? (
-          // El retrato del cliente en lugar del icono; salta de alegría cuando el pedido está listo (CSS, sin 3D)
-          <RetratoAvatar url={avatarUrl} tamano={64} celebra={etapa.tono === 'listo'} />
+          // Su avatar en lugar del icono: saluda al recibir, espera en cocina y celebra cuando está listo (3D si hay WebGL, si no el retrato)
+          <AvatarVivoPerezoso config={configAvatar} retratoUrl={avatarUrl} accion={accionAvatar} ancho={80} alto={96} tamanoRetrato={64} />
         ) : (
         <span className="sg-icono" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

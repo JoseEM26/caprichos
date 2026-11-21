@@ -21,6 +21,8 @@ export interface AvatarConfig {
   cabeza: PiezaAvatar;
   cara: PiezaAvatar;
   accesorio: PiezaAvatar;
+  /** Saludo al entrar a la carta (encendido si falta) */
+  mostrarAlEntrar?: boolean;
 }
 
 export const AVATAR_CONFIG_MAX_BYTES = 4 * 1024;
@@ -67,6 +69,11 @@ export function validarAvatarConfig(crudo: unknown): AvatarConfig {
     disfraz,
     disfrazId: c.disfrazId == null ? null : id(c.disfrazId, 'disfraz'),
   };
+  // mostrarAlEntrar: booleano opcional
+  if (c.mostrarAlEntrar !== undefined) {
+    if (typeof c.mostrarAlEntrar !== 'boolean') throw invalido('«Mostrar mi avatar al entrar» no es válido.');
+    salida.mostrarAlEntrar = c.mostrarAlEntrar;
+  }
   for (const k of PIEZAS) {
     const p = c[k] as { id?: unknown; colores?: unknown } | undefined;
     if (!p || typeof p !== 'object') throw invalido(`Falta la pieza «${k}».`);

@@ -99,6 +99,16 @@ describe('EditorAvatar', () => {
     expect(await screen.findByText(/quedó guardado/)).toBeInTheDocument();
   });
 
+  it('«Mostrar mi avatar al entrar» viene encendido y se guarda apagado si se desmarca', async () => {
+    const { guardar } = montar();
+    const caja = screen.getByLabelText('Mostrar mi avatar al entrar');
+    expect(caja).toBeChecked();
+    fireEvent.click(caja);
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar avatar' }));
+    await waitFor(() => expect(guardar).toHaveBeenCalledTimes(1));
+    expect(guardar.mock.calls[0][0].mostrarAlEntrar).toBe(false);
+  });
+
   it('si guardar falla muestra el error y no pierde los cambios', async () => {
     montar(vi.fn().mockRejectedValue(new Error('Sin conexión')));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar avatar' }));

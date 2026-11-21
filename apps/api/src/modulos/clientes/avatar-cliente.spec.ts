@@ -54,6 +54,12 @@ describe('validarAvatarConfig', () => {
     expect(() => validarAvatarConfig({ ...configValida(), ...cambio })).toThrow(BadRequestException);
   });
 
+  it('mostrarAlEntrar: acepta un booleano, lo omite si falta y rechaza otro tipo', () => {
+    expect(validarAvatarConfig({ ...configValida(), mostrarAlEntrar: false }).mostrarAlEntrar).toBe(false);
+    expect(validarAvatarConfig(configValida()).mostrarAlEntrar).toBeUndefined();
+    expect(() => validarAvatarConfig({ ...configValida(), mostrarAlEntrar: 'no' })).toThrow(BadRequestException);
+  });
+
   it('rechaza un cuerpo que no es objeto y uno demasiado grande', () => {
     expect(() => validarAvatarConfig(null)).toThrow(BadRequestException);
     expect(() => validarAvatarConfig([])).toThrow(BadRequestException);

@@ -18,6 +18,8 @@ export interface ConfigAvatar extends Record<CategoriaPieza, PiezaElegida> {
   colorPelo: string;
   disfraz: string | null;
   disfrazId: string | null;
+  /** Saludo al entrar a la carta (encendido si falta) */
+  mostrarAlEntrar?: boolean;
 }
 
 export interface DefPieza {

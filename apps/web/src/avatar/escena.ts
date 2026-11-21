@@ -66,6 +66,8 @@ export class EscenaAvatar {
     private lienzo: HTMLCanvasElement,
     private A: Avatar3D,
     private reducir = false,
+    /** Avatar suelto (saludo, celebración, seguimiento): sin piso, sin aro y sin órbita con el dedo */
+    compacto = false,
   ) {
     this.renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, alpha: true });
     const r = this.renderer;
@@ -83,10 +85,12 @@ export class EscenaAvatar {
     this.aro.rotation.x = Math.PI / 2;
     this.aro.position.y = 0.004;
     this.escena.add(this.aro);
+    if (compacto) { piso.visible = false; this.aro.visible = false; }
     this.destellos = this.crearDestellos();
     this.camara.position.copy(VISTAS.cuerpo[0]);
     const c = (this.controles = new OrbitControls(this.camara, lienzo));
     c.target.copy(VISTAS.cuerpo[1]);
+    if (compacto) c.enabled = false;
     Object.assign(c, { enablePan: false, enableDamping: true, dampingFactor: 0.08, minDistance: 1.1, maxDistance: 6, minPolarAngle: 0.5, maxPolarAngle: 1.75 });
     c.addEventListener('start', () => { this.tocando = true; this.volando = false; });
     c.addEventListener('end', () => { this.tocando = false; });

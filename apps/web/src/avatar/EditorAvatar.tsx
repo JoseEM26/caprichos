@@ -289,6 +289,11 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
             <label htmlFor="av-apodo">¿Cómo te llamamos?</label>
             <input id="av-apodo" maxLength={18} value={cfg.nombre} autoComplete="nickname" onChange={(e) => { const v = e.target.value; cambiar((c) => { c.nombre = v; }, { sinPop: true, fusionar: 'apodo' }); }} />
             <small>Así sale tu pedido en la pantalla del local: solo tu nombre o apodo, nunca tu celular.</small>
+            {/* Saludo al entrar a la carta */}
+            <label className="av-interruptor">
+              <input type="checkbox" checked={cfg.mostrarAlEntrar !== false} onChange={(e) => { const v = e.target.checked; cambiar((c) => { c.mostrarAlEntrar = v; }, { sinPop: true }); }} />
+              Mostrar mi avatar al entrar
+            </label>
           </div>
           <div className="av-cats" role="tablist" aria-label="Partes del avatar" onKeyDown={teclasPestanas}>
             {CATS.map((c) => (
