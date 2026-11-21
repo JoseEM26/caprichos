@@ -29,7 +29,7 @@ import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { generarXlsx } from '../../comun/xlsx-simple';
 import { hoyLimaIso } from '../../comun/fechas-lima';
 import { detalleCelularSorteo, mesLima, nombreParaSorteo, rangoPedidos, type FiltrosClientes } from './clientes-filtros';
-import { type AvatarConfig, retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
+import { type AvatarConfig, fotoMostrada, retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
 import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
 import { estadoVerificacionCliente } from './estado-verificacion-cliente';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
@@ -546,13 +546,17 @@ export class ClientesService {
     const fotoId = party.persona?.foto_archivo_id;
     const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
 
+    const fotoUrl = foto ? `/archivos/${foto.ruta}` : null;
+    const avatarComoFoto = (party.persona?.avatar_config as { usarComoFoto?: unknown } | null)?.usarComoFoto === true;
     return {
       partyId: id.toString(),
       nombre: party.persona?.nombres || 'Cliente',
       correo: party.persona?.correo || null,
       telefono: party.cuentaCliente?.telefono ?? telefonoDeContactos(party.contactos),
-      fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
+      fotoUrl,
       avatarUrl: party.persona?.avatar_url ?? null,
+      avatarComoFoto,
+      fotoMostrada: fotoMostrada({ fotoUrl, avatarUrl: party.persona?.avatar_url ?? null, avatarComoFoto }),
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
       puntos,
       // El DNI es opcional: solo se muestra enmascarado y solo si la cuenta lo tiene

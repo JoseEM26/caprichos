@@ -10,6 +10,10 @@ export interface ClienteCuenta {
   fotoUrl: string | null;
   /** Retrato del avatar 3D (URL del archivo); null si aún no creó uno */
   avatarUrl?: string | null;
+  /** Eligió usar su avatar como foto de perfil */
+  avatarComoFoto?: boolean;
+  /** Foto que muestra la API según la regla (avatar o foto subida) */
+  fotoMostrada?: string | null;
   cumpleanos: string | null;
   puntos: number;
 }

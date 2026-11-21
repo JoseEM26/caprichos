@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { AvatarEditorPerezoso } from '../../avatar/AvatarEditorPerezoso';
 import { RetratoAvatar } from '../../avatar/RetratoAvatar';
+import { fotoDelCliente } from '../../avatar/fotoCliente';
 import type { CSSProperties } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { useCuenta } from './CuentaContext';
@@ -16,10 +17,11 @@ const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 const CORREO_VALIDO = /^\S+@\S+\.\S+$/;
 
 /** Foto de perfil, o las iniciales en un círculo de color si el cliente no tiene foto. */
-function Avatar({ nombre, fotoUrl, avatarUrl, tamano }: { nombre: string; fotoUrl: string | null; avatarUrl?: string | null; tamano: number }) {
-  if (avatarUrl) return <RetratoAvatar url={avatarUrl} tamano={tamano} />;
+function Avatar({ nombre, fotoUrl, avatarUrl, avatarComoFoto, tamano }: { nombre: string; fotoUrl: string | null; avatarUrl?: string | null; avatarComoFoto?: boolean; tamano: number }) {
+  const foto = fotoDelCliente({ fotoUrl, avatarUrl, avatarComoFoto });
+  if (foto?.esAvatar) return <RetratoAvatar url={foto.url} tamano={tamano} />;
   const estilo: CSSProperties = { width: tamano, height: tamano, borderRadius: tamano / 2, flex: 'none', objectFit: 'cover' };
-  if (fotoUrl) return <img src={fotoUrl} alt="" style={estilo} />;
+  if (foto) return <img src={foto.url} alt="" style={estilo} />;
   const iniciales = nombre
     .split(' ')
     .filter(Boolean)
@@ -259,7 +261,7 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
         {cliente ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar nombre={cliente.nombre} fotoUrl={cliente.fotoUrl} avatarUrl={cliente.avatarUrl} tamano={52} />
+              <Avatar nombre={cliente.nombre} fotoUrl={cliente.fotoUrl} avatarUrl={cliente.avatarUrl} avatarComoFoto={cliente.avatarComoFoto} tamano={52} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{cliente.nombre}</div>
                 <div style={{ fontSize: 13, color: 'var(--cp-soft)', overflowWrap: 'anywhere' }}>

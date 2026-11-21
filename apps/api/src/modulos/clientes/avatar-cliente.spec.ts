@@ -6,7 +6,7 @@ jest.mock('@nestjs/jwt', () => ({
 import { BadRequestException, PayloadTooLargeException, UnauthorizedException } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { CuentaClienteController } from './cuenta-cliente.controller';
-import { retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
+import { fotoMostrada, retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
 
 const pieza = (id: string, colores: Record<string, string> = {}) => ({ id, colores });
 const configValida = () => ({
@@ -165,5 +165,49 @@ describe('CuentaClienteController: avatar', () => {
     expect(clientes.guardarAvatar).toHaveBeenCalledWith('5', dto, '9.9.9.9');
     await ctrl.avatar(req);
     expect(clientes.avatarDeCuenta).toHaveBeenCalledWith('5');
+  });
+});
+
+describe('validarAvatarConfig: mascota y foto de perfil', () => {
+  it('un avatar sin mascota (guardado antes) se lee como «ninguno»', () => {
+    const r = validarAvatarConfig(configValida());
+    expect(r.mascota).toEqual({ id: 'ninguno', colores: {}, nombre: '' });
+    expect(r.usarComoFoto).toBe(false);
+  });
+
+  it('acepta la mascota con colores y nombre, y limpia el nombre', () => {
+    const r = validarAvatarConfig({ ...configValida(), mascota: { id: 'perro_cachorro', colores: { principal: '#d9a25b', acento: '#2B1B14' }, nombre: '  Canela ' } });
+    expect(r.mascota).toEqual({ id: 'perro_cachorro', colores: { principal: '#D9A25B', acento: '#2B1B14' }, nombre: 'Canela' });
+  });
+
+  it('rechaza nombre de mascota de más de 14 letras, id raro, color malo o slot desconocido', () => {
+    const base = configValida();
+    expect(() => validarAvatarConfig({ ...base, mascota: { id: 'gato', colores: {}, nombre: 'a'.repeat(15) } })).toThrow(BadRequestException);
+    expect(() => validarAvatarConfig({ ...base, mascota: { id: '../gato', colores: {}, nombre: '' } })).toThrow(BadRequestException);
+    expect(() => validarAvatarConfig({ ...base, mascota: { id: 'gato', colores: { principal: 'rojo' }, nombre: '' } })).toThrow(BadRequestException);
+    expect(() => validarAvatarConfig({ ...base, mascota: { id: 'gato', colores: { cola: '#FFFFFF' }, nombre: '' } })).toThrow(BadRequestException);
+    expect(() => validarAvatarConfig({ ...base, mascota: { id: 'gato', colores: {}, nombre: 5 } })).toThrow(BadRequestException);
+  });
+
+  it('descarta campos extra dentro de la mascota (lista blanca)', () => {
+    const r = validarAvatarConfig({ ...configValida(), mascota: { id: 'gato', colores: {}, nombre: '', telefono: '999' } });
+    expect(Object.keys(r.mascota).sort()).toEqual(['colores', 'id', 'nombre']);
+  });
+
+  it('usarComoFoto: solo booleano', () => {
+    expect(validarAvatarConfig({ ...configValida(), usarComoFoto: true }).usarComoFoto).toBe(true);
+    expect(() => validarAvatarConfig({ ...configValida(), usarComoFoto: 'si' })).toThrow(BadRequestException);
+  });
+});
+
+describe('fotoMostrada (una sola regla de foto del cliente)', () => {
+  const av = '/archivos/avatar.png';
+  const foto = '/archivos/foto.jpg';
+  it('eligió usar el avatar: su retrato', () => expect(fotoMostrada({ fotoUrl: foto, avatarUrl: av, avatarComoFoto: true })).toBe(av));
+  it('no eligió y no tiene foto: el retrato por defecto', () => expect(fotoMostrada({ fotoUrl: null, avatarUrl: av, avatarComoFoto: false })).toBe(av));
+  it('tiene foto y no eligió el avatar: su foto', () => expect(fotoMostrada({ fotoUrl: foto, avatarUrl: av, avatarComoFoto: false })).toBe(foto));
+  it('sin avatar: su foto o nada, aunque marque la opción', () => {
+    expect(fotoMostrada({ fotoUrl: foto, avatarUrl: null, avatarComoFoto: true })).toBe(foto);
+    expect(fotoMostrada({ fotoUrl: null, avatarUrl: null, avatarComoFoto: true })).toBeNull();
   });
 });

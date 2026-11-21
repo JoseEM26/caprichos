@@ -31,6 +31,30 @@ const ctx = {
   malla: (geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0, p?: THREE.Object3D) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); p?.add(m); return m; },
 } as unknown as Ctx;
 
+describe('mascota del cliente en el salón', () => {
+  it('se ve echada junto a la silla solo mientras el cliente está sentado', () => {
+    const pa = partes() as ReturnType<typeof partes> & { mascota?: THREE.Group };
+    const mascota = grupo();
+    mascota.userData = { volador: true };
+    pa.raiz.add(mascota);
+    pa.mascota = mascota;
+    let animadas = 0;
+    pa.animar = () => { animadas++; };
+    const gente = new Set<Persona>();
+    const per = personaDeAvatar(ctx, gente, pa);
+    new THREE.Scene().add(per.raiz);
+    expect(mascota.userData.descanso).toBe(true);
+    expect(mascota.userData.base).toBeLessThan(0.6); // las voladoras flotan bajito
+    per.sentado = true;
+    animarGente(gente, 1, 0.05, () => false);
+    expect(mascota.visible).toBe(true);
+    per.sentado = false;
+    animarGente(gente, 2, 0.05, () => false);
+    expect(mascota.visible).toBe(false);
+    expect(animadas).toBe(2);
+  });
+});
+
 describe('adaptador de animación del avatar', () => {
   it('queda como Persona escalada y el director la anima como a las genéricas (comiendo, mano arriba, caminando)', () => {
     const pa = partes();

@@ -6,6 +6,10 @@ export interface ClienteSesion {
   fotoUrl: string | null;
   /** Retrato PNG del avatar 3D (URL pública del archivo); null si no creó avatar */
   avatarUrl: string | null;
+  /** El cliente eligió usar su avatar como foto de perfil */
+  avatarComoFoto: boolean;
+  /** Foto que se muestra del cliente (una sola regla): el retrato del avatar o su foto subida */
+  fotoMostrada: string | null;
   cumpleanos: string | null;
   puntos: number;
   /** DNI enmascarado, solo si la cuenta tiene uno guardado */

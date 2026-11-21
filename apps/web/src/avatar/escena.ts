@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { conPelo } from './config';
 import type { Avatar3D, ConfigAvatar, PartesAvatar } from './tipos';
 
-export type VistaAvatar = 'cuerpo' | 'cabeza' | 'pies';
+export type VistaAvatar = 'cuerpo' | 'cabeza' | 'pies' | 'mascota';
 export type AccionAvatar = 'saludando' | 'baile' | 'celebrar' | 'giro' | 'posar' | 'esperando';
 
 const azar = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
@@ -37,6 +37,7 @@ const VISTAS: Record<VistaAvatar, [THREE.Vector3, THREE.Vector3]> = {
   cuerpo: [new THREE.Vector3(0, 1.1, 4.3), new THREE.Vector3(0, 0.88, 0)],
   cabeza: [new THREE.Vector3(0, 1.5, 1.75), new THREE.Vector3(0, 1.4, 0)],
   pies: [new THREE.Vector3(0.6, 0.55, 1.7), new THREE.Vector3(0, 0.2, 0)],
+  mascota: [new THREE.Vector3(1.1, 0.75, 2.5), new THREE.Vector3(0.6, 0.45, 0)],
 };
 
 /** Escena 3D del editor: renderer, cámara con órbita, piso, destellos y animaciones del avatar. */
@@ -172,10 +173,12 @@ export class EscenaAvatar {
   /** Reconstruye el avatar con la configuración (con «pop» y destellos si cambió algo visible). */
   reconstruir(cfg: ConfigAvatar, conPop = true): void {
     this.cfg = cfg;
-    if (this.av) { this.escena.remove(this.av.raiz); liberar(this.av.raiz); }
+    if (this.av) { this.escena.remove(this.av.raiz); liberar(this.av.raiz); if (this.av.mascota) { this.escena.remove(this.av.mascota); liberar(this.av.mascota); } }
     this.av = this.A.construir(conPelo(cfg));
     this.av.raiz.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
     this.escena.add(this.av.raiz);
+    // La mascota sale de la raíz del avatar: así no gira ni salta con él (giro, baile) y se queda en el piso al lado
+    if (this.av.mascota) this.escena.add(this.av.mascota);
     if (conPop) {
       this.pop = 1;
       this.destellos.lanzar(this.vista === 'cabeza' ? 1.5 : this.vista === 'pies' ? 0.2 : 1);
@@ -185,6 +188,7 @@ export class EscenaAvatar {
   accion(e: AccionAvatar, dur: number): void {
     const t = this.reloj.elapsedTime;
     this.anim = { estado: e, desde: t, dur, prox: t + 10 + Math.random() * 6 };
+    if (e === 'celebrar' || e === 'saludando' || e === 'baile' || e === 'giro') this.av?.mascotaAlegrar?.(dur);
   }
 
   private pose(i: number, x: number, codo: number, k: number, z?: number) {
@@ -268,7 +272,7 @@ export class EscenaAvatar {
     this.quitar.forEach((f) => f());
     this.obs?.disconnect();
     this.controles.dispose();
-    if (this.av) liberar(this.av.raiz);
+    if (this.av) { liberar(this.av.raiz); if (this.av.mascota) liberar(this.av.mascota); }
     this.renderer.dispose();
   }
 }

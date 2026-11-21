@@ -28,6 +28,7 @@ vi.mock('../../mascota/soporteWebGL', () => ({ tieneSoporteWebGL: () => true, pr
 
 import EditorAvatar from '../EditorAvatar';
 import { cargarAvatar } from '../piezas';
+import { normalizar, porDefecto } from '../config';
 import type { ConfigAvatar } from '../tipos';
 
 const ultima = () => escenas[escenas.length - 1];
@@ -48,7 +49,7 @@ describe('EditorAvatar', () => {
     montar();
     const lista = screen.getByRole('tablist', { name: 'Partes del avatar' });
     expect(lista).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(9);
+    expect(screen.getAllByRole('tab')).toHaveLength(10);
     fireEvent.click(screen.getByRole('tab', { name: /Arriba/ }));
     expect(screen.getByRole('tab', { name: /Arriba/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel')).toBeInTheDocument();
@@ -114,6 +115,117 @@ describe('EditorAvatar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar avatar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
     expect(screen.getByRole('button', { name: 'Guardar avatar' })).not.toBeDisabled();
+  });
+});
+
+describe('mascota del avatar', () => {
+  const abrirMascotas = () => fireEvent.click(screen.getByRole('tab', { name: /Mascota/ }));
+  const tarjeta = (id: string) => document.querySelector(`.av-item[data-id="${id}"]`) as HTMLElement;
+
+  it('por defecto no hay mascota; elegir una la pone en la config y muestra nombre y colores', () => {
+    montar();
+    expect(ultimaConfig().mascota.id).toBe('ninguno');
+    abrirMascotas();
+    expect(screen.queryByLabelText(/Nombre de tu mascota/)).not.toBeInTheDocument();
+    fireEvent.click(tarjeta('perro_cachorro'));
+    expect(ultimaConfig().mascota.id).toBe('perro_cachorro');
+    expect(screen.getByLabelText(/Nombre de tu mascota/)).toBeInTheDocument();
+    expect(screen.getByText(/Colores de «Cachorro»/)).toBeInTheDocument();
+    expect(ultima().irA).toHaveBeenCalledWith('mascota');
+  });
+
+  it('cambia el color (paleta y libre) y el nombre, que se corta a 14 letras', () => {
+    montar();
+    abrirMascotas();
+    fireEvent.click(tarjeta('gato'));
+    fireEvent.click(screen.getAllByRole('button', { name: /Color principal #/ })[0]);
+    expect(ultimaConfig().mascota.colores.principal).toMatch(/^#[0-9A-F]{6}$/i);
+    fireEvent.change(screen.getAllByLabelText(/Detalles: otro color/i)[0], { target: { value: '#123456' } });
+    expect(ultimaConfig().mascota.colores.acento).toBe('#123456');
+    const nombre = screen.getByLabelText(/Nombre de tu mascota/) as HTMLInputElement;
+    expect(nombre.maxLength).toBe(14);
+    fireEvent.change(nombre, { target: { value: 'Michi' } });
+    expect(ultimaConfig().mascota.nombre).toBe('Michi');
+    expect(ultimaConfig().mascota.colores.acento).toBe('#123456');
+  });
+
+  it('cambiar de mascota conserva el nombre y «Sin mascota» la quita', () => {
+    montar();
+    abrirMascotas();
+    fireEvent.click(tarjeta('gato'));
+    fireEvent.change(screen.getByLabelText(/Nombre de tu mascota/), { target: { value: 'Luna' } });
+    fireEvent.click(tarjeta('conejo'));
+    expect(ultimaConfig().mascota).toMatchObject({ id: 'conejo', nombre: 'Luna' });
+    fireEvent.click(tarjeta('ninguno'));
+    expect(ultimaConfig().mascota.id).toBe('ninguno');
+    expect(screen.queryByLabelText(/Nombre de tu mascota/)).not.toBeInTheDocument();
+  });
+
+  it('el interruptor «Usar mi avatar como foto de perfil» queda en la config que se guarda', async () => {
+    const { guardar } = montar();
+    const sw = screen.getByRole('switch', { name: /Usar mi avatar como foto de perfil/ });
+    expect(sw).not.toBeChecked();
+    fireEvent.click(sw);
+    expect(ultimaConfig().usarComoFoto).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar avatar' }));
+    await waitFor(() => expect(guardar).toHaveBeenCalledTimes(1));
+    expect(guardar.mock.calls[0][0].usarComoFoto).toBe(true);
+  });
+});
+
+describe('construir con mascota', () => {
+  const A = cargarAvatar();
+  const base = () => normalizar(A, null, 'Ana');
+
+  it('todas las mascotas del catálogo se construyen con su grupo, animan sin romper y miran a +z', () => {
+    const ids = A.REG.mascota.filter((d) => d.id !== 'ninguno').map((d) => d.id);
+    expect(ids.length).toBeGreaterThanOrEqual(16);
+    for (const id of ids) {
+      const p = A.construir({ ...base(), mascota: { id, colores: {}, nombre: 'Rex' } });
+      expect(p.mascota, id).toBeDefined();
+      expect(p.mascota!.children.length, id).toBeGreaterThan(3);
+      expect(p.raiz.children).toContain(p.mascota);
+      expect(p.mascota!.position.x, id).toBeGreaterThan(0.4);
+      expect(() => { p.animar(1, 0.03); p.mascotaAlegrar?.(1); p.animar(1.5, 0.03); }, id).not.toThrow();
+    }
+  });
+
+  it('las voladoras flotan a la altura del hombro y las de piso quedan en el piso', () => {
+    const vuela = A.construir({ ...base(), mascota: { id: 'dragon', colores: {}, nombre: '' } });
+    expect(vuela.mascota!.userData.volador).toBe(true);
+    expect(vuela.mascota!.userData.base).toBeGreaterThan(0.8);
+    const piso = A.construir({ ...base(), mascota: { id: 'perro_cachorro', colores: {}, nombre: '' } });
+    expect(piso.mascota!.userData.base).toBe(0);
+  });
+
+  it('«ninguno», sin campo o con un id desconocido no agrega nada', () => {
+    expect(A.construir({ ...base(), mascota: { id: 'ninguno', colores: {}, nombre: '' } }).mascota).toBeUndefined();
+    const sin = { ...base() } as Partial<ConfigAvatar>;
+    delete sin.mascota;
+    expect(A.construir(sin).mascota).toBeUndefined();
+    expect(A.construir({ ...base(), mascota: { id: 'no_existe', colores: {}, nombre: '' } }).mascota).toBeUndefined();
+  });
+
+  it('los colores elegidos se aplican a la mascota', () => {
+    const p = A.construir({ ...base(), mascota: { id: 'conejo', colores: { principal: '#112233' }, nombre: '' } });
+    const colores: string[] = [];
+    p.mascota!.traverse((o) => { const m = (o as import('three').Mesh).material as import('three').MeshStandardMaterial | undefined; if (m?.color) colores.push(m.color.getHexString()); });
+    expect(colores).toContain('112233');
+  });
+});
+
+describe('normalizar: mascota y foto', () => {
+  const A = cargarAvatar();
+  it('un avatar guardado antes (sin mascota) queda sin mascota, y una mascota que ya no existe se descarta', () => {
+    const viejo = { ...porDefecto(A, 'Ana') } as Partial<ConfigAvatar>;
+    delete viejo.mascota;
+    expect(normalizar(A, viejo, 'Ana').mascota).toEqual({ id: 'ninguno', colores: {}, nombre: '' });
+    expect(normalizar(A, { ...viejo, mascota: { id: 'ya_no_esta', colores: {}, nombre: 'X' } }, 'Ana').mascota.id).toBe('ninguno');
+  });
+  it('conserva la mascota válida, corta el nombre a 14 y lee usarComoFoto', () => {
+    const c = normalizar(A, { ...porDefecto(A, 'Ana'), mascota: { id: 'panda', colores: { acento: '#FF0000' }, nombre: 'Nombremuylargodeverdad' }, usarComoFoto: true }, 'Ana');
+    expect(c.mascota).toEqual({ id: 'panda', colores: { acento: '#FF0000' }, nombre: 'Nombremuylargo' });
+    expect(c.usarComoFoto).toBe(true);
   });
 });
 

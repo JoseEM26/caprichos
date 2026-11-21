@@ -4,8 +4,10 @@ import type * as THREE from 'three';
 export interface PiezaElegida {
   id: string;
   colores: Record<string, string>;
+  /** Solo la mascota: nombre opcional (máx. 14 letras) */
+  nombre?: string;
 }
-export type CategoriaPieza = 'cabello' | 'arriba' | 'abajo' | 'calzado' | 'cabeza' | 'cara' | 'accesorio';
+export type CategoriaPieza = 'cabello' | 'arriba' | 'abajo' | 'calzado' | 'cabeza' | 'cara' | 'accesorio' | 'mascota';
 export type Genero = 'mujer' | 'hombre' | 'neutro';
 export type Expresion = 'feliz' | 'sonrisa' | 'guino' | 'sorpresa';
 
@@ -20,6 +22,8 @@ export interface ConfigAvatar extends Record<CategoriaPieza, PiezaElegida> {
   disfrazId: string | null;
   /** Saludo al entrar a la carta (encendido si falta) */
   mostrarAlEntrar?: boolean;
+  /** Usar el retrato del avatar como foto de perfil de la cuenta */
+  usarComoFoto?: boolean;
 }
 
 export interface DefPieza {
@@ -41,6 +45,11 @@ export interface PartesAvatar {
   piernas: THREE.Group[];
   rodillas: THREE.Group[];
   ojos: THREE.Group[];
+  /** Grupo de la mascota (si eligió una): va al lado del avatar, mira a +z y se anima sola */
+  mascota?: THREE.Group;
+  mascotaNombre?: string;
+  /** Hace que la mascota festeje unos segundos (cuando el avatar celebra o saluda) */
+  mascotaAlegrar?: (segundos?: number) => void;
   animar: (t: number, dt: number) => void;
 }
 

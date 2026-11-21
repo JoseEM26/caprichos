@@ -5,6 +5,10 @@ export interface PiezaAvatar {
   id: string;
   colores: Record<string, string>;
 }
+/** Mascota del avatar: id del catálogo, colores y un nombre opcional de hasta 14 letras. */
+export interface MascotaAvatar extends PiezaAvatar {
+  nombre: string;
+}
 export interface AvatarConfig {
   nombre: string;
   genero: 'mujer' | 'hombre' | 'neutro';
@@ -23,6 +27,10 @@ export interface AvatarConfig {
   accesorio: PiezaAvatar;
   /** Saludo al entrar a la carta (encendido si falta) */
   mostrarAlEntrar?: boolean;
+  /** Opcional: los avatares guardados antes de las mascotas no la traen (se lee como «ninguno») */
+  mascota: MascotaAvatar;
+  /** El cliente eligió usar el retrato del avatar como foto de perfil */
+  usarComoFoto: boolean;
 }
 
 export const AVATAR_CONFIG_MAX_BYTES = 4 * 1024;
@@ -44,6 +52,20 @@ function hex(v: unknown, campo: string): string {
 function id(v: unknown, campo: string): string {
   if (typeof v !== 'string' || !ID.test(v)) throw invalido(`La pieza de «${campo}» no es válida.`);
   return v;
+}
+
+const MASCOTA_NOMBRE_MAX = 14;
+
+/** Quita la ficha repetida de una pieza: valida id y colores (misma higiene para todas las piezas). */
+function pieza(p: { id?: unknown; colores?: unknown }, k: string): PiezaAvatar {
+  const colores: Record<string, string> = {};
+  const crudos = p.colores ?? {};
+  if (typeof crudos !== 'object' || Array.isArray(crudos)) throw invalido(`Los colores de «${k}» no son válidos.`);
+  for (const [slot, valor] of Object.entries(crudos as Record<string, unknown>)) {
+    if (!SLOTS.includes(slot)) throw invalido(`Color desconocido en «${k}».`);
+    colores[slot] = hex(valor, k);
+  }
+  return { id: id(p.id, k), colores };
 }
 
 /** Valida y devuelve una copia limpia (lista blanca de campos): lo que no encaja se rechaza. */
@@ -77,15 +99,20 @@ export function validarAvatarConfig(crudo: unknown): AvatarConfig {
   for (const k of PIEZAS) {
     const p = c[k] as { id?: unknown; colores?: unknown } | undefined;
     if (!p || typeof p !== 'object') throw invalido(`Falta la pieza «${k}».`);
-    const colores: Record<string, string> = {};
-    const crudos = p.colores ?? {};
-    if (typeof crudos !== 'object' || Array.isArray(crudos)) throw invalido(`Los colores de «${k}» no son válidos.`);
-    for (const [slot, valor] of Object.entries(crudos as Record<string, unknown>)) {
-      if (!SLOTS.includes(slot)) throw invalido(`Color desconocido en «${k}».`);
-      colores[slot] = hex(valor, k);
-    }
-    salida[k] = { id: id(p.id, k), colores };
+    salida[k] = pieza(p, k);
   }
+  // Mascota: opcional (avatares viejos); con la misma higiene que el resto y el nombre como el apodo
+  const m = c.mascota as { id?: unknown; colores?: unknown; nombre?: unknown } | undefined | null;
+  if (m == null) salida.mascota = { id: 'ninguno', colores: {}, nombre: '' };
+  else {
+    if (typeof m !== 'object' || Array.isArray(m)) throw invalido('La mascota no es válida.');
+    const nombreMascota = typeof m.nombre === 'string' ? m.nombre.trim() : m.nombre == null ? '' : undefined;
+    if (nombreMascota === undefined) throw invalido('El nombre de la mascota no es válido.');
+    if (nombreMascota.length > MASCOTA_NOMBRE_MAX) throw invalido('El nombre de la mascota admite hasta 14 letras.');
+    salida.mascota = { ...pieza(m, 'mascota'), nombre: nombreMascota };
+  }
+  if (c.usarComoFoto != null && typeof c.usarComoFoto !== 'boolean') throw invalido('La opción de foto de perfil no es válida.');
+  salida.usarComoFoto = c.usarComoFoto === true;
   return salida as unknown as AvatarConfig;
 }
 
@@ -103,4 +130,13 @@ export function retratoDesdeDataUrl(dataUrl: unknown): Buffer {
     throw new BadRequestException({ codigo: 'AVATAR_RETRATO_INVALIDO', mensaje: 'El retrato del avatar debe ser una imagen PNG.' });
   }
   return buf;
+}
+
+/**
+ * Foto que se muestra del cliente (misma regla que el front): si eligió usar el avatar → su retrato; si no eligió pero no
+ * tiene foto de perfil → el retrato por defecto; si tiene foto y no eligió el avatar → su foto.
+ */
+export function fotoMostrada(o: { fotoUrl: string | null; avatarUrl: string | null; avatarComoFoto: boolean }): string | null {
+  if (o.avatarUrl && (o.avatarComoFoto || !o.fotoUrl)) return o.avatarUrl;
+  return o.fotoUrl ?? null;
 }

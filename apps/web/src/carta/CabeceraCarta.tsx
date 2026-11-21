@@ -5,6 +5,7 @@ import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
 import { usePedidosGuardados } from './seguimiento';
 import { RetratoAvatar } from '../avatar/RetratoAvatar';
+import { fotoDelCliente } from '../avatar/fotoCliente';
 import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
 import { BotonReservar } from './reservas/BotonReservar';
 import { TEXTO_CERRADO_PROGRAMAR, type ProgramarCarta } from './ProgramarPedido';
@@ -76,6 +77,7 @@ export function CabeceraCarta({
 }: CabeceraCartaProps) {
   const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
   const { cliente, abrirPanel } = useCuenta();
+  const fotoCabecera = fotoDelCliente(cliente);
   const movil = useEsMovil();
   // en pantallas medianas «Mi pedido» queda solo con el icono para que la cabecera no baje a dos filas
   const [angosto, setAngosto] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1240);
@@ -313,11 +315,11 @@ export function CabeceraCarta({
                 gap: 6,
               }}
             >
-              {cliente?.avatarUrl ? (
-                <RetratoAvatar url={cliente.avatarUrl} tamano={18} />
-              ) : cliente?.fotoUrl ? (
+              {fotoCabecera?.esAvatar ? (
+                <RetratoAvatar url={fotoCabecera.url} tamano={18} />
+              ) : fotoCabecera ? (
                 // mismo recuadro de 18 px que el icono: la cabecera no cambia de ancho con o sin foto
-                <img src={cliente.fotoUrl} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 9, objectFit: 'cover', flex: 'none' }} />
+                <img src={fotoCabecera.url} alt="" width={18} height={18} style={{ width: 18, height: 18, borderRadius: 9, objectFit: 'cover', flex: 'none' }} />
               ) : (
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none' }}>
                   <circle cx="12" cy="8" r="4" />

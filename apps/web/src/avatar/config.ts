@@ -1,5 +1,6 @@
 import type { Avatar3D, CategoriaPieza, ConfigAvatar, DefPieza, PiezaElegida } from './tipos';
 
+export const MASCOTA_NOMBRE_MAX = 14;
 export const PALETA = ['#E67929', '#B2500F', '#D99E39', '#F2C14E', '#FBF4EC', '#FFFFFF', '#E8D5BC', '#8BA7B8', '#0B2C3E', '#1C1C22', '#5A6B78', '#C5221F', '#E84A7F', '#F2B6C3', '#6B4E9B', '#3B6FB6', '#3BB4E7', '#2DBE60', '#1F6B3A', '#7A4A2A'];
 export const PIELES = ['#FFE6D0', '#F8D2B0', '#EDBB92', '#DDA477', '#C68B5E', '#A86E45', '#83532F', '#5E3A22'];
 export const OJOS = ['#14141A', '#5B3A29', '#8A5A2B', '#2E7D5B', '#3B6FB6', '#6E8899', '#7A4FA0', '#B5651D'];
@@ -15,9 +16,10 @@ export const CATS: { id: CategoriaEditor; nombre: string; icono: string }[] = [
   { id: 'cabeza', nombre: 'Gorros', icono: '🎩' },
   { id: 'cara', nombre: 'Cara', icono: '🥸' },
   { id: 'accesorio', nombre: 'Extras', icono: '🎒' },
+  { id: 'mascota', nombre: 'Mascota', icono: '🐾' },
   { id: 'disfraz', nombre: 'Disfraces', icono: '🎭' },
 ];
-export const ZOOM: Partial<Record<CategoriaEditor, 'cabeza' | 'pies'>> = { cabello: 'cabeza', cabeza: 'cabeza', cara: 'cabeza', calzado: 'pies' };
+export const ZOOM: Partial<Record<CategoriaEditor, 'cabeza' | 'pies' | 'mascota'>> = { cabello: 'cabeza', cabeza: 'cabeza', cara: 'cabeza', calzado: 'pies', mascota: 'mascota' };
 export const NOMBRE_COLOR: Record<string, string> = { principal: 'Color principal', secundario: 'Segundo color', acento: 'Detalles' };
 
 const primero = (A: Avatar3D, cat: string, evitar?: string) => A.REG[cat].find((x) => x.id !== evitar)?.id ?? 'ninguno';
@@ -32,7 +34,7 @@ export function porDefecto(A: Avatar3D, nombre = ''): ConfigAvatar {
     arriba: { id: preferido(A, 'arriba', ['polo_basico', 'polo']), colores: {} },
     abajo: { id: preferido(A, 'abajo', ['jean', 'pantalon']), colores: {} },
     calzado: { id: preferido(A, 'calzado', ['zapatilla_urbana', 'zapatillas_urbanas']), colores: {} },
-    cabeza: nada(), cara: nada(), accesorio: nada(),
+    cabeza: nada(), cara: nada(), accesorio: nada(), mascota: { id: 'ninguno', colores: {}, nombre: '' },
   };
 }
 
@@ -65,6 +67,10 @@ export function normalizar(A: Avatar3D, guardada: unknown, nombre = ''): ConfigA
     const p = g[cat];
     c[cat] = p && A.buscar(cat, p.id) ? { id: p.id, colores: { ...(p.colores ?? {}) } } : base[cat];
   }
+  // Mascota: avatares guardados antes de que existiera no la traen
+  const m = g.mascota;
+  c.mascota = m && A.buscar('mascota', m.id) ? { id: m.id, colores: { ...(m.colores ?? {}) }, nombre: String(m.nombre ?? '').slice(0, MASCOTA_NOMBRE_MAX) } : base.mascota;
+  c.usarComoFoto = g.usarComoFoto === true;
   return c;
 }
 

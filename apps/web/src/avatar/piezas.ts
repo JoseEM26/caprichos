@@ -6,6 +6,7 @@ import { AVATAR } from './nucleo';
 import { registrarCabello } from './cabello';
 import { registrarRopa } from './ropa';
 import { registrarDisfraces } from './disfraces';
+import { registrarMascotas } from './mascotas';
 import type { Avatar3D } from './tipos';
 
 let listo = false;
@@ -16,6 +17,7 @@ export function cargarAvatar(): Avatar3D {
     registrarCabello();
     registrarRopa();
     registrarDisfraces();
+    registrarMascotas();
     listo = true;
   }
   return AVATAR as unknown as Avatar3D;

@@ -38,11 +38,24 @@ export function personaDeAvatar(ctx: Ctx, gente: Set<Persona>, partes: PartesAva
   raiz.add(partes.raiz);
   const tel = ctx.malla(new THREE.BoxGeometry(0.06, 0.11, 0.012), ctx.M('#14141A', { emissive: 0x3BB4E7, emissiveIntensity: 0.25 }), 0, -0.2, 0.05, partes.codos[0]);
   tel.rotation.x = -0.6; tel.visible = false;
+  // Mascota: solo se ve mientras el cliente está sentado; echada junto a la silla (de lado y un poco atrás, fuera del paso
+  // hacia la mesa). Al caminar se oculta, así no estorba los caminos. Las voladoras flotan bajito.
+  const m = partes.mascota;
+  let animar = partes.animar;
+  if (m) {
+    m.userData.descanso = true;
+    m.userData.base = m.userData.volador ? 0.45 : 0;
+    m.scale.setScalar(1);
+    m.position.set(0.58, m.userData.base, -0.32);
+    m.rotation.y = -0.7;
+    m.visible = false;
+    animar = (t, dt) => { m.visible = !!per.sentado; partes.animar(t, dt); };
+  }
   const per: Persona = {
     raiz, cuerpo: partes.cuerpo, piernas: partes.piernas, rodillas: partes.rodillas, brazos: partes.brazos, codos: partes.codos,
     cabeza: partes.cabeza, ojos: partes.ojos as unknown as THREE.Mesh[], boca: (partes.boca ?? new THREE.Group()) as unknown as THREE.Mesh,
     cola: null, tel, rol: 'cliente', semilla: Math.random() * 10, usaCel: Math.random() < 0.35, ritmo: 0, paso: 0,
-    avatarReal: true, animarExtra: partes.animar,
+    avatarReal: true, animarExtra: animar,
   };
   gente.add(per);
   return per;

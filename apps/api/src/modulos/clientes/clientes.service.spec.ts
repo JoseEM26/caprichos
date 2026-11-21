@@ -785,6 +785,22 @@ describe('ClientesService', () => {
       const sinFoto = await service.yo(101n);
       expect(sinFoto?.fotoUrl).toBeNull();
     });
+
+    it('yo expone avatarComoFoto y fotoMostrada según la regla de la foto', async () => {
+      const persona = (extra: Record<string, unknown>) => ({ id: 102n, persona: { nombres: 'Ana', foto_archivo_id: 5n, avatar_url: '/archivos/av.png', ...extra }, documentos: [], contactos: [], roles: [] });
+      prismaMock.party.findUnique.mockResolvedValueOnce(persona({ avatar_config: { usarComoFoto: true } }));
+      const elige = await service.yo(102n);
+      expect(elige?.avatarComoFoto).toBe(true);
+      expect(elige?.fotoMostrada).toBe('/archivos/av.png');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce(persona({ avatar_config: { usarComoFoto: false } }));
+      const conFoto = await service.yo(102n);
+      expect(conFoto?.avatarComoFoto).toBe(false);
+      expect(conFoto?.fotoMostrada).toBe('/archivos/publico/2026/10/foto.webp');
+
+      prismaMock.party.findUnique.mockResolvedValueOnce(persona({ foto_archivo_id: null, avatar_config: null }));
+      expect((await service.yo(102n))?.fotoMostrada).toBe('/archivos/av.png');
+    });
   });
 
   describe('teléfono y perfil de la cuenta', () => {

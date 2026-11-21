@@ -3,7 +3,7 @@ import { conPelo } from './config';
 import { liberar, luces } from './escena';
 import type { Avatar3D, ConfigAvatar } from './tipos';
 
-export type ZoomMini = 'cuerpo' | 'cabeza' | 'pies' | 'retrato';
+export type ZoomMini = 'cuerpo' | 'cabeza' | 'pies' | 'retrato' | 'mascota';
 
 const W = 160;
 const H = 200;
@@ -33,13 +33,24 @@ export function crearMiniaturas(A: Avatar3D) {
     if (guardada) return guardada;
     const p = A.construir(conPelo(c));
     esc.add(p.raiz);
-    const [d, y, m] = zoom === 'cabeza' ? [1.55, 1.5, 1.42] : zoom === 'pies' ? [1.25, 0.5, 0.22] : zoom === 'retrato' ? [1.35, 1.46, 1.36] : [4.4, 1.1, 0.88];
-    const ang = zoom === 'pies' ? 0.5 : 0;
+    const [d, y, m] = zoom === 'cabeza' ? [1.55, 1.5, 1.42] : zoom === 'pies' ? [1.25, 0.5, 0.22] : zoom === 'retrato' ? [1.75, 1.46, 1.36] : [4.4, 1.1, 0.88];
+    const ang = zoom === 'pies' || zoom === 'mascota' ? 0.5 : 0;
     const cuadrada = zoom === 'retrato';
+    // Retrato y primer plano de la cara: sin la mascota (quedaría recortada al borde); la pestaña Mascota la muestra sola
+    if (p.mascota && (zoom === 'retrato' || zoom === 'cabeza' || zoom === 'pies')) p.mascota.visible = false;
+    let dist = d, mirY = m, camY = y, mirX = 0, camX = 0, camZ = 0;
+    if (zoom === 'mascota' && p.mascota) {
+      p.cuerpo.visible = false;
+      const caja = new THREE.Box3().setFromObject(p.mascota);
+      const cen = caja.getCenter(new THREE.Vector3());
+      const tam = caja.getSize(new THREE.Vector3());
+      dist = Math.max(tam.x, tam.y * 0.8) * 2.9 + 0.25;
+      mirY = cen.y; camY = cen.y + 0.1; mirX = cen.x; camX = cen.x; camZ = cen.z;
+    }
     cam.aspect = cuadrada ? 1 : W / H;
     r.setSize(cuadrada ? lado : W, cuadrada ? lado : H);
-    cam.position.set(Math.sin(ang) * d, y, Math.cos(ang) * d);
-    cam.lookAt(0, m, 0);
+    cam.position.set(camX + Math.sin(ang) * dist, camY, camZ + Math.cos(ang) * dist);
+    cam.lookAt(mirX, mirY, camZ);
     cam.updateProjectionMatrix();
     r.render(esc, cam);
     const url = r.domElement.toDataURL(formato === 'png' ? 'image/png' : 'image/jpeg', 0.85);

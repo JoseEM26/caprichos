@@ -6,7 +6,7 @@ import { EscenaAvatar } from './escena';
 import type { AccionAvatar } from './escena';
 import { crearMiniaturas } from './miniaturas';
 import type { Miniaturas } from './miniaturas';
-import { aplicarDisfraz, CATS, NOMBRE_COLOR, norm, normalizar, OJOS, PALETA, PELOS, PIELES, porDefecto, ZOOM } from './config';
+import { aplicarDisfraz, CATS, MASCOTA_NOMBRE_MAX, NOMBRE_COLOR, norm, normalizar, OJOS, PALETA, PELOS, PIELES, porDefecto, ZOOM } from './config';
 import type { CategoriaEditor } from './config';
 import type { CategoriaPieza, ConfigAvatar } from './tipos';
 import './avatar.css';
@@ -168,6 +168,7 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
     setMinis({});
     const base = cfgRef.current;
     for (const d of visibles) {
+      if (cat === 'mascota' && d.id === 'ninguno') continue;
       const c = cat === 'disfraz' ? aplicarDisfraz(A, base, d) : { ...base, [cat]: { id: d.id, colores: d.id === base[cat].id ? base[cat].colores : {} } };
       m.pedir(c as ConfigAvatar, cat === 'disfraz' ? 'cuerpo' : (ZOOM[cat] ?? 'cuerpo'), (url) => {
         if (url) setMinis((prev) => ({ ...prev, [d.id]: url }));
@@ -202,10 +203,10 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
       return;
     }
     if (cfg[cat].id === id) return;
-    cambiar((c) => { c[cat] = { id, colores: {} }; }, { anim: cat === 'cabeza' || cat === 'cara' ? 'posar' : null });
+    cambiar((c) => { c[cat] = cat === 'mascota' ? { id, colores: {}, nombre: c.mascota.nombre ?? '' } : { id, colores: {} }; }, { anim: cat === 'cabeza' || cat === 'cara' ? 'posar' : cat === 'mascota' ? 'saludando' : null });
   };
 
-  const quitarDisfraz = () => cambiar((c) => { Object.assign(c, porDefecto(A, c.nombre), { nombre: c.nombre }); }, { minis: true });
+  const quitarDisfraz = () => cambiar((c) => { Object.assign(c, porDefecto(A, c.nombre), { nombre: c.nombre, mascota: c.mascota, usarComoFoto: c.usarComoFoto }); }, { minis: true });
 
   const alAzar = () => cambiar((c) => {
     const pick = (k: string) => { const l = A.REG[k]; return l.length ? azar(l).id : 'ninguno'; };
@@ -270,7 +271,7 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
             ) : (
               <p className="av-sin3d" role="alert">Este equipo no puede mostrar 3D, así que no se puede crear el avatar aquí. Prueba desde otro celular o navegador.</p>
             )}
-            <div className="av-placa"><span>{cfg.nombre || 'Tu nombre'}</span>{cfg.disfraz && <small>· {cfg.disfraz}</small>}</div>
+            <div className="av-placa"><span>{cfg.nombre || 'Tu nombre'}</span>{cfg.disfraz && <small>· {cfg.disfraz}</small>}{cfg.mascota.id !== 'ninguno' && cfg.mascota.nombre && <small>· 🐾 {cfg.mascota.nombre}</small>}</div>
             <div className="av-deshacer">
               <button type="button" className="av-redondo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled={!pasado.current.length} onClick={deshacer}>↶</button>
               <button type="button" className="av-redondo" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" disabled={!futuro.current.length} onClick={rehacer}>↷</button>
@@ -291,8 +292,12 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
             <small>Así sale tu pedido en la pantalla del local: solo tu nombre o apodo, nunca tu celular.</small>
             {/* Saludo al entrar a la carta */}
             <label className="av-interruptor">
-              <input type="checkbox" checked={cfg.mostrarAlEntrar !== false} onChange={(e) => { const v = e.target.checked; cambiar((c) => { c.mostrarAlEntrar = v; }, { sinPop: true }); }} />
+              <input type="checkbox" role="switch" checked={cfg.mostrarAlEntrar !== false} onChange={(e) => { const v = e.target.checked; cambiar((c) => { c.mostrarAlEntrar = v; }, { sinPop: true }); }} />
               Mostrar mi avatar al entrar
+            </label>
+            <label className="av-interruptor">
+              <input type="checkbox" role="switch" checked={cfg.usarComoFoto === true} onChange={(e) => { const v = e.target.checked; cambiar((c) => { c.usarComoFoto = v; }, { sinPop: true }); }} />
+              Usar mi avatar como foto de perfil
             </label>
           </div>
           <div className="av-cats" role="tablist" aria-label="Partes del avatar" onKeyDown={teclasPestanas}>
@@ -336,6 +341,12 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
                   ))}
                 </div>
                 <div className="av-colores">
+                  {cat === 'mascota' && cfg.mascota.id !== 'ninguno' && (
+                    <div className="av-nombre">
+                      <label htmlFor="av-mascota-nombre">Nombre de tu mascota (opcional)</label>
+                      <input id="av-mascota-nombre" maxLength={MASCOTA_NOMBRE_MAX} value={cfg.mascota.nombre ?? ''} autoComplete="off" onChange={(e) => { const v = e.target.value; cambiar((c) => { c.mascota = { ...c.mascota, nombre: v }; }, { sinPop: true, fusionar: 'mascota-nombre' }); }} />
+                    </div>
+                  )}
                   {cat === 'disfraz' && <p className="av-nota">Elige un disfraz y luego cambia los colores de cada prenda en su pestaña (Arriba, Gorros, Extras…).</p>}
                   {cat === 'cabello' && <><h3>Color del cabello</h3><div className="av-slot"><Muestras lista={PELOS} actual={cfg.colorPelo} etiqueta="Cabello" alElegir={(c) => ponerColor('pelo', '', c)} /></div></>}
                   {slots && slots.colores.length > 0 && (

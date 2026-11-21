@@ -275,7 +275,7 @@ let _A;
   /* =================================================================
    * REGISTRO DE PIEZAS
    * ================================================================= */
-  const CATEGORIAS = ['cabello', 'arriba', 'abajo', 'calzado', 'accesorio', 'cabeza', 'cara', 'disfraz'];
+  const CATEGORIAS = ['cabello', 'arriba', 'abajo', 'calzado', 'accesorio', 'cabeza', 'cara', 'disfraz', 'mascota'];
   const REG = Object.fromEntries(CATEGORIAS.map((k) => [k, []]));
   /**
    * def = { id, nombre, grupo, colores: ['principal', 'secundario'?, 'acento'?], porDefecto: { principal: '#hex', ... },
@@ -319,6 +319,30 @@ let _A;
         const r = def.construir(ctx);
         if (r && typeof r.animar === 'function') animadores.push(r.animar);
       } catch (e) { console.error('Falló la pieza', cat, sel.id, e); }
+    }
+    // Mascota: grupo aparte AL LADO del avatar (a su izquierda de cámara, +x), en el piso; las voladoras flotan a la altura del hombro.
+    // Mira hacia +z. Los consumidores pueden sacarla de partes.raiz (escena del editor, salón) y moverla.
+    const selM = c.mascota && c.mascota.id !== 'ninguno' && buscar('mascota', c.mascota.id);
+    if (selM) {
+      try {
+        const g = new T.Group();
+        const colM = Object.assign({}, selM.porDefecto || {}, c.mascota.colores || {});
+        g.userData = { base: selM.volador ? .95 : 0, volador: Boolean(selM.volador), alegria: 0, descanso: false };
+        g.scale.setScalar(1.3);
+        g.position.set(.6, g.userData.base, .05);
+        g.rotation.y = -.25;
+        partes.raiz.add(g);
+        const ctxM = { T, g, M, tono, col: (s) => colM[s] || '#888888' };
+        const r = selM.construir(ctxM);
+        g.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+        partes.mascota = g;
+        partes.mascotaNombre = String(c.mascota.nombre || '').slice(0, 14);
+        partes.mascotaAlegrar = (s = 2) => { g.userData.alegria = Math.max(g.userData.alegria, s); };
+        if (r && typeof r.animar === 'function') animadores.push((t, dt) => {
+          g.userData.alegria = Math.max(0, g.userData.alegria - dt);
+          r.animar(t, dt, Math.min(1, g.userData.alegria));
+        });
+      } catch (e) { console.error('Falló la mascota', c.mascota.id, e); }
     }
     partes.animar = (t, dt) => animadores.forEach((f) => { try { f(t, dt); } catch (e) { /* una pieza rota no frena al resto */ } });
     return partes;
