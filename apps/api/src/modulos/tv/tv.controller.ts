@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Header, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsString } from 'class-validator';
 import { ComandasService } from '../cocina/comandas.service';
 import { ComandasQueryDto } from '../cocina/dto/comandas-query.dto';
@@ -6,6 +6,11 @@ import { SalonVivoService } from '../salon/salon-vivo.service';
 import { TvGuard } from './tv.guard';
 import { limitarTv, llaveDe } from './tv.limite';
 import { TvService } from './tv.service';
+
+/** Cada TV solo lee la vista con la que se vinculó (salón no ve comandas y cocina no ve el salón). */
+function exigirVista(req: any, vista: string) {
+  if (req.tv?.vista && req.tv.vista !== vista) throw new ForbiddenException({ codigo: 'VISTA_NO_PERMITIDA', mensaje: 'Esta pantalla no está vinculada para esta vista' });
+}
 
 class PedirCodigoTvDto {
   @IsString()
@@ -41,14 +46,16 @@ export class TvController {
   @Get('salon-vivo')
   @UseGuards(TvGuard)
   @Header('Cache-Control', 'no-store')
-  salonVivo() {
+  salonVivo(@Req() req: any) {
+    exigirVista(req, 'SALON_VIVO');
     return this.vivo.obtener();
   }
 
   @Get('cocina/areas')
   @UseGuards(TvGuard)
   @Header('Cache-Control', 'no-store')
-  areas() {
+  areas(@Req() req: any) {
+    exigirVista(req, 'COCINA');
     return this.comandas.listarAreas();
   }
 
@@ -57,6 +64,7 @@ export class TvController {
   @UseGuards(TvGuard)
   @Header('Cache-Control', 'no-store')
   listarComandas(@Query() q: ComandasQueryDto, @Req() req: any) {
+    exigirVista(req, 'COCINA');
     const fija = req.tv?.area_id ? String(req.tv.area_id) : undefined;
     return this.comandas.listarComandas(fija ?? q.area);
   }
