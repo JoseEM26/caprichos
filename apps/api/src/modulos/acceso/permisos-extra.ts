@@ -25,7 +25,7 @@ export const esSensible = (clave: string): boolean => PERMISOS_SENSIBLES.include
 export const NOMBRES_MODULO: Record<string, string> = {
   usuarios: 'Usuarios', configuracion: 'Configuración', auditoria: 'Auditoría', catalogo: 'Productos', local: 'Datos del local',
   archivos: 'Archivos', pedidos: 'Pedidos', zonas: 'Zonas de reparto', caja: 'Caja', repartos: 'Repartos', cortesias: 'Cortesías',
-  cocina: 'Cocina', stock: 'Stock', recetas: 'Recetas', plano: 'Plano del salón', mesas: 'Mesas', reservas: 'Reservas',
+  cocina: 'Cocina', stock: 'Stock', recetas: 'Recetas', plano: 'Plano del salón', salon_vivo: 'Salón en vivo', mesas: 'Mesas', reservas: 'Reservas',
   comprobantes: 'Comprobantes', reclamos: 'Reclamos', ofertas: 'Ofertas', cupones: 'Cupones', clientes: 'Clientes', puntos: 'Puntos',
   compras: 'Compras', proveedores: 'Proveedores', pedidos_proveedor: 'Pedidos a proveedor', almacen: 'Almacén', produccion: 'Producción',
   creditos: 'Créditos', iniciativas: 'Iniciativas', mensajes: 'Mensajes de WhatsApp', whatsapp_salientes: 'Avisos de WhatsApp enviados',

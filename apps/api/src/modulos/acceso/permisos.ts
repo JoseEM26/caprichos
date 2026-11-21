@@ -127,6 +127,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'mesas', accion: 'ver' },
   { modulo: 'mesas', accion: 'abrir' },
   { modulo: 'mesas', accion: 'liberar' },
+  // Salón en vivo 3D (solo lectura del plano y del estado real del salón): ADMIN, SUPERVISOR y CAJERO
+  { modulo: 'salon_vivo', accion: 'ver' },
   { modulo: 'reservas', accion: 'ver' },
   { modulo: 'reservas', accion: 'crear' },
   { modulo: 'reservas', accion: 'editar' },
@@ -325,6 +327,7 @@ export const MATRIZ: Record<string, string[]> = {
     'iniciativas/comentar',
     'comprobantes/ver',
     'comprobantes/reimprimir',
+    'salon_vivo/ver',
     'mesas/ver',
     'mesas/abrir',
     'mesas/liberar',

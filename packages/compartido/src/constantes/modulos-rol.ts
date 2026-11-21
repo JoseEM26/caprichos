@@ -67,6 +67,7 @@ export const MODULOS_ROL: readonly ModuloRolCatalogo[] = [
   { clave: 'mi-asistencia', minimo: 'asistencia/marcar', bloqueado: true },
   { clave: 'pantallas', minimo: 'pantallas/ver' },
   { clave: 'plano', minimo: 'plano/ver' },
+  { clave: 'salon-vivo', minimo: 'salon_vivo/ver' },
   { clave: 'notificaciones', minimo: 'notificaciones/ver', bloqueado: true },
 ];
 
