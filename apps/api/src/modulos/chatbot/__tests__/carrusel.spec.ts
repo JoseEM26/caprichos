@@ -9,6 +9,7 @@ import {
   ordenarPorVentas,
   payloadInteractivoCarrusel,
   resumenCarrusel,
+  unirCarruselConBotones,
   urlPublicaFoto,
 } from '../servicios/carrusel.util';
 import { inicialesProducto, pngImagenInicial } from '../../catalogo/imagen-inicial';
@@ -275,5 +276,24 @@ describe('botón común en todas las tarjetas', () => {
     }
     const sin = armar({ cuerpo: 'Hola', tarjetas: [t('1'), t('2')] });
     expect(sin.action.cards[0].action.buttons).toHaveLength(1);
+  });
+});
+
+describe('Evolution: el «Ver más» va dentro de la lista del carrusel', () => {
+  it('une el mensaje de botones siguiente a la lista (sin repetir opciones) y lo quita', () => {
+    const acciones = unirCarruselConBotones([
+      { tipo: 'enviarCarrusel', carga: { ...carga(10), respaldo: { texto: 'Elige', botones: [{ id: 'volver_menu', titulo: 'Volver al menú' }] } } },
+      { tipo: 'enviarBotones', texto: 'Hay 4 más', botones: [{ id: 'ver_mas:2', titulo: 'Ver más' }, { id: 'volver_menu', titulo: 'Volver al menú' }] },
+      { tipo: 'enviarTexto', texto: 'otro' },
+    ]);
+    expect(acciones.map((a) => a.tipo)).toEqual(['enviarCarrusel', 'enviarTexto']);
+    const rp = acciones[0].carga.respaldo;
+    expect(rp.filas).toHaveLength(10);
+    expect(rp.botones.map((b: any) => b.id)).toEqual(['volver_menu', 'ver_mas:2']);
+    expect(rp.texto).toBe('Elige\n\nHay 4 más');
+  });
+  it('sin mensaje de botones después, no cambia nada', () => {
+    const a = [{ tipo: 'enviarCarrusel', carga: carga(3) }, { tipo: 'enviarTexto', texto: 'x' }];
+    expect(unirCarruselConBotones(a)).toEqual(a);
   });
 });

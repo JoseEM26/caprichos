@@ -208,6 +208,30 @@ const filaDeTarjeta = (t: TarjetaCarrusel): FilaLista => ({
 });
 
 /**
+ * Evolution no tiene carrusel ni botones: el carrusel sale como lista numerada y cada mensaje numerado reemplaza al
+ * anterior. Si al carrusel le sigue un mensaje de botones («Ver más», «¿Qué más te provoca?»), su menú pisaría el de
+ * los productos y el «3» del cliente elegiría otra cosa: se une todo en la misma lista.
+ */
+export function unirCarruselConBotones(acciones: any[]): any[] {
+  const salida: any[] = [];
+  for (let i = 0; i < acciones.length; i++) {
+    const a = acciones[i], sig = acciones[i + 1];
+    if (a?.tipo === 'enviarCarrusel' && sig?.tipo === 'enviarBotones' && sig.botones?.length) {
+      const c = a.carga as CargaCarrusel, rp = c.respaldo;
+      const filas = rp?.filas?.length ? rp.filas.slice(0, LIMITES_CARRUSEL.max) : c.tarjetas.slice(0, LIMITES_CARRUSEL.max).map(filaDeTarjeta);
+      const usados = new Set([...filas.map((f) => f.id), ...(rp?.botones ?? []).map((b) => b.id)]);
+      const botones = [...(rp?.botones ?? []), ...(sig.botones as BotonAccion[]).filter((b) => !usados.has(b.id))];
+      const texto = [rp?.texto ?? c.cuerpo, sig.texto].filter(Boolean).join('\n\n');
+      salida.push({ ...a, carga: { ...c, respaldo: { ...(rp ?? {}), texto, filas, botones } } });
+      i++;
+      continue;
+    }
+    salida.push(a);
+  }
+  return salida;
+}
+
+/**
  * Una página de hasta 10 tarjetas como acciones del bot: carrusel (2 o más), lista si queda 1, y si hay más,
  * un mensaje de botones aparte con «Ver más» (Meta no admite un botón extra dentro del carrusel).
  */

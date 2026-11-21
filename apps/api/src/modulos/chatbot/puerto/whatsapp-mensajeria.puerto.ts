@@ -36,6 +36,8 @@ export interface ResultadoEnvioWhatsApp {
   errorCodigo?: string;
   errorDetalle?: string;
   reintentos?: number;
+  /** El carrusel salió como lista (respaldo de Meta, o Evolution, que no tiene carrusel). */
+  respaldo?: boolean;
 }
 
 export interface EstadoConexionWhatsApp {

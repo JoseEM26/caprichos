@@ -322,8 +322,10 @@ describe('adaptador y enrutador', () => {
   });
   it('carrusel sale como lista numerada; plantilla como su texto libre', async () => {
     const { ad, api } = montarAdaptador(true);
-    await ad.enviarCarrusel('51900000001', { cuerpo: 'Mira', tarjetas: [{ nombre: 'Torta', imagenUrl: null, cuerpo: 'c', boton: { id: 'p1', titulo: 'Pedir' } }, { nombre: 'Dona', imagenUrl: null, cuerpo: 'c', boton: { id: 'p2', titulo: 'Pedir' } }] });
+    const r = await ad.enviarCarrusel('51900000001', { cuerpo: 'Mira', tarjetas: [{ nombre: 'Torta', imagenUrl: null, cuerpo: 'c', boton: { id: 'p1', titulo: 'Pedir' } }, { nombre: 'Dona', imagenUrl: null, cuerpo: 'c', boton: { id: 'p2', titulo: 'Pedir' } }] });
     expect(api.llamar.mock.calls[0][2].text).toContain('1. Torta');
+    // se marca como respaldo: el chat la registra como lista y no se manda el «Ver más» aparte
+    expect(r.respaldo).toBe(true);
     await ad.enviarPlantilla('51900000001', 'caprichos_delivery_en_camino', 'es', ['Ana', 'P-1', '20']);
     expect(api.llamar.mock.calls[1][2].text).toContain('Tu pedido P-1 ya salió');
   });

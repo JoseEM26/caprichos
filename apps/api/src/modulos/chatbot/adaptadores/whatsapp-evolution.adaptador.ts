@@ -178,7 +178,8 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
       ? rp.filas.slice(0, 10)
       : carga.tarjetas.slice(0, 10).map((t) => ({ id: t.boton.id, titulo: t.nombre, descripcion: t.cuerpo.split('\n')[1] ?? '' }));
     const salidas = rp?.botones?.length ? rp.botones : carga.botonComun ? [carga.botonComun] : [];
-    return this.enviarMenu(telefono, textoSinBotonPedirEste(rp?.texto ?? carga.cuerpo), [...filas, ...salidas], 'lista', o);
+    // respaldo: el chat la registra como la lista que es (no como «Carrusel: …») y no se manda el «Ver más» aparte
+    return this.enviarMenu(telefono, textoSinBotonPedirEste(rp?.texto ?? carga.cuerpo), [...filas, ...salidas], 'lista', o).then((r) => ({ ...r, respaldo: true }));
   }
 
   /** Plantilla = su texto libre equivalente del catálogo, con las variables puestas. */

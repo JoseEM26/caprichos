@@ -12,7 +12,7 @@ import { TEXTOS_PROGRAMAR } from './textos-programar';
 import { CatalogoService } from '../../catalogo/catalogo.service';
 import { aplanarEnlacesMarkdown } from '../utilidades/texto-whatsapp.util';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
-import { enviarCarruselConRespaldo, resumenCarrusel, urlPublicaCarta } from '../servicios/carrusel.util';
+import { enviarCarruselConRespaldo, resumenCarrusel, unirCarruselConBotones, urlPublicaCarta } from '../servicios/carrusel.util';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
@@ -1870,7 +1870,15 @@ export class EjecutorConversacionService {
     let carruselSalio = false;
     // Anti-baneo: nunca el mismo texto dos veces seguidas al mismo cliente (se cambia por la oferta de asesor)
     let ultimoSaliente = await this.ultimoTextoBot(conversacion.id);
-    for (let accion of resultado.acciones) {
+    // Con Evolution el «Ver más» va dentro de la lista del carrusel (un menú numerado aparte pisaría el de productos)
+    let porEvolution = false;
+    try {
+      porEvolution = Boolean(this.evolutionConfig) && (await this.evolutionConfig!.proveedor()) === 'EVOLUTION';
+    } catch {
+      porEvolution = false;
+    }
+    const acciones: typeof resultado.acciones = porEvolution ? (unirCarruselConBotones(resultado.acciones) as typeof resultado.acciones) : resultado.acciones;
+    for (let accion of acciones) {
       if (accion.tipo === 'enviarTexto' || accion.tipo === 'enviarBotones' || accion.tipo === 'enviarLista') {
         const t = this.compactar(accion.texto);
         if (t && t === ultimoSaliente) {
