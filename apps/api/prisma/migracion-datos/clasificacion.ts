@@ -79,6 +79,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
     'notificacion_lectura',
   ]],
+  ['anuncios emergentes y sus vistas: cada ambiente programa los suyos y lleva su propia estadística, no se migran', [
+    'anuncio', 'anuncio_vista',
+  ]],
   ['roles y permisos extra de cada cuenta: se asignan de nuevo en la base destino tras migrar el personal', [
     'user_account_rol', 'user_account_rol_historial', 'user_account_area', 'user_account_permiso',
   ]],

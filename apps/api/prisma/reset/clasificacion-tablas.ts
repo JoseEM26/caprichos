@@ -93,7 +93,7 @@ export const CONSERVAR: string[] = [
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
   'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'incidente_entrega_foto', 'iniciativa', 'iniciativa_comentario',
   'consumo_linea', 'pendiente_almacen', 'insumo', 'liquidacion', 'lista', 'lista_valor', 'lugar_stock', 'mensaje_carta', 'mensaje_chat',
-  'mensaje_reparto', 'movimiento_caja', 'movimiento_stock', 'notificacion_lectura', 'novedad', 'novedad_foto', 'oferta',
+  'mensaje_reparto', 'movimiento_caja', 'movimiento_stock', 'notificacion_lectura', 'novedad', 'novedad_foto', 'anuncio', 'anuncio_vista', 'oferta',
   'opcion', 'organization', 'parametro', 'pedido_estado_historial', 'pedido_interno',
   'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_mesa', 'pedido_pago_plan', 'pedido_proveedor',
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
