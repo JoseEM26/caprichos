@@ -35,6 +35,7 @@ import {
 } from './contenido';
 import { MascotaAdminView } from './mascota';
 import { AnunciosView } from './anuncios';
+import { SalonVivoLazy } from './salon-vivo';
 import { ResenasView } from './resenas/ResenasView';
 
 export type GrupoModulo =
@@ -159,6 +160,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'pedidos/crear',
     componente: MisPedidosView,
     icono: 'pedidos',
+  },
+  {
+    clave: 'salon-vivo',
+    nombre: 'Salón en vivo',
+    grupo: 'Operación',
+    ruta: '/admin/salon-vivo',
+    permisoMinimo: 'salon_vivo/ver',
+    componente: SalonVivoLazy,
+    icono: 'plano',
   },
 
   // --- Clientes y ventas ---
