@@ -16,8 +16,9 @@ import {
   ReclamosPublicoPage,
 } from "./carta/legal";
 import { PantallaCocinaView } from "./pantalla/PantallaCocinaView";
+import { PuertaTv, type AccesoTv } from "./tv/PuertaTv";
 const PantallaLocal = lazy(() => import("./pantalla-local/PantallaLocal"));
-const SalonVivoTv = lazy(() => import("./admin/salon-vivo/SalonVivoView").then((m) => ({ default: () => <m.SalonVivoView tv /> })));
+const SalonVivoTv = lazy(() => import("./admin/salon-vivo/SalonVivoView").then((m) => ({ default: ({ acceso }: { acceso: AccesoTv }) => <m.SalonVivoView tv acceso={acceso} /> })));
 import { PaginaMascota } from "./mascota/PaginaMascota";
 import { PantallaAsistenciaPublica } from "./admin/asistencia";
 
@@ -76,15 +77,17 @@ export function RutasApp() {
           }
         />
 
-        {/* Salón en vivo 3D para la TV del local: pantalla propia, sin el panel del admin (pide sesión con permiso) */}
+        {/* Salón en vivo 3D para la TV del local: entra sin usuario (código rotativo que se vincula en Pantallas) o con sesión y permiso */}
         <Route
           path="/tv/salon-vivo"
           element={
-            <RutaProtegida permiso="salon_vivo/ver">
-              <Suspense fallback={null}>
-                <SalonVivoTv />
-              </Suspense>
-            </RutaProtegida>
+            <PuertaTv vista="SALON_VIVO" permiso="salon_vivo/ver">
+              {(acceso) => (
+                <Suspense fallback={null}>
+                  <SalonVivoTv acceso={acceso} />
+                </Suspense>
+              )}
+            </PuertaTv>
           }
         />
 
@@ -92,9 +95,9 @@ export function RutasApp() {
         <Route
           path="/pantalla/*"
           element={
-            <RutaProtegida permiso="cocina/ver">
-              <PantallaCocinaView />
-            </RutaProtegida>
+            <PuertaTv vista="COCINA" permiso="cocina/ver">
+              {(acceso) => <PantallaCocinaView acceso={acceso} />}
+            </PuertaTv>
           }
         />
 

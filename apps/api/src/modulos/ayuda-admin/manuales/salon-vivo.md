@@ -35,9 +35,11 @@ Antes: [[plano]]
 Ver tambien: [[caja]], [[cocina]], [[repartos]]
 
 ## Como se hace: ponerlo en la TV del local
-1. Pulsa "Abrir en la TV" (abajo en la escena) o entra en la TV a /tv/salon-vivo con un usuario que tenga el permiso.
-2. Elige la cámara, la temática y la luz con los controles de abajo, y pulsa "Pantalla completa".
-3. En pantalla completa desaparecen todos los controles, porque la ven los clientes. Para volver a cambiar algo, presiona Esc.
+1. En el navegador de la TV abre caprichos.pe/tv/salon-vivo. No pide usuario ni contraseña: aparece un código grande de 6 caracteres (ejemplo ABC-234) que cambia solo cada 10 minutos.
+2. En el administrativo entra a [[pantallas]], escribe el código en la casilla de vinculación, pulsa "Vincular pantalla" y confirma. La TV entra sola al salón en vivo en unos segundos, y la lista de Pantallas la muestra como "Salón en vivo".
+3. Elige la cámara, la temática y la luz con los controles de abajo, y pulsa "Pantalla completa".
+4. En pantalla completa desaparecen todos los controles, porque la ven los clientes. Para volver a cambiar algo, presiona Esc.
+5. Si ya hay una sesión con el permiso en esa TV, también entra directo sin código. Si se pierde o se filtra la TV, desactívala en Pantallas: vuelve a pedir un código. También puedes pulsar "Abrir en la TV" (abajo en la escena) desde tu propio computador.
 
 ## Como se hace: mover la cámara y ahorrar equipo
 1. La temática y la luz (hora real, día, atardecer o noche) se eligen en la barra de abajo. La temática solo cambia esta pantalla.
@@ -47,6 +49,7 @@ Ver tambien: [[caja]], [[cocina]], [[repartos]]
 5. Los datos se actualizan solos en tiempo real y, de respaldo, cada 8 segundos.
 
 ## Errores y dudas comunes
+- La TV muestra un código en vez del salón: aún no está vinculada o la desactivaron en [[pantallas]]. Escribe el código que ves en Pantallas. Si venció, la TV ya muestra otro: usa el nuevo.
 - Dice que el equipo no puede mostrar 3D: el navegador no tiene WebGL activo. El panel de la derecha sigue funcionando.
 - Una mesa aparece libre aunque hay gente: el estado sale de los pedidos abiertos de la mesa. Si el mozo no abrió el pedido en [[plano]], el sistema no sabe que está ocupada.
 - Cambié el plano y no se actualiza: la escena se vuelve a dibujar sola al guardar; si no, recarga la página.

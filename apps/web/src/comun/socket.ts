@@ -127,6 +127,7 @@ export function useTiempoReal(
   const clave = eventos.join('|');
 
   useEffect(() => {
+    if (!clave) return; // sin eventos (TV sin sesión): no abre el socket
     const socket = conectarSocket();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const disparar = () => {

@@ -46,6 +46,7 @@ import { CreditosModule } from './modulos/creditos/creditos.module';
 import { IniciativasModule } from './modulos/iniciativas/iniciativas.module';
 import { MensajesModule } from './modulos/mensajes/mensajes.module';
 import { PantallasModule } from './modulos/pantallas/pantallas.module';
+import { TvModule } from './modulos/tv/tv.module';
 import { AsistenciaModule } from './modulos/asistencia/asistencia.module';
 import { ContenidoModule } from './modulos/contenido/contenido.module';
 import { ChatbotModule } from './modulos/chatbot/chatbot.module';
@@ -105,6 +106,7 @@ import { PagosOnlineModule } from './modulos/pagos-online';
     StockModule,
     MensajesModule,
     PantallasModule,
+    TvModule,
     AsistenciaModule,
     IniciativasModule,
     CreditosModule,

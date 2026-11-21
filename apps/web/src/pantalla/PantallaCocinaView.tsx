@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AreaCocina, Comanda } from '../admin/cocina/cocinaTipos';
 import {
   listarAreasCocina,
   listarComandasArea,
 } from '../admin/cocina/cocinaApi';
-import { conectarSocket, useEventos } from '../comun/socket';
+import { conectarSocket, useTiempoReal } from '../comun/socket';
+import type { AccesoTv } from '../tv/PuertaTv';
+import { llaveRevocada, tvFetch } from '../tv/tvApi';
 import { textoSabores } from '../admin/cocina/cocinaTipos';
 import type { UmbralesCocina } from '../admin/cocina/cocinaTipos';
-import { colorPorMinutos, useTiempoEnVivo } from '../admin/cocina/tiempoEnVivo';
+import { colorPorMinutos, registrarHoraServidor, useTiempoEnVivo } from '../admin/cocina/tiempoEnVivo';
 import { COLOR_TV, NumeroDia, TiempoEspera } from '../admin/cocina/TiempoEspera';
 import { textoMesa } from '../admin/cocina/InsigniaMesa';
 
-export type ModoTV = 'orders' | 'pair' | 'off' | 'out';
+export type ModoTV = 'orders' | 'off' | 'out';
 
 /** Datos de una tarjeta de la TV (ya filtrados por área). */
 interface DatosTarjetaTV {
@@ -178,7 +180,12 @@ function TarjetaCocinaTV({ k }: { k: DatosTarjetaTV }) {
   );
 }
 
-export function PantallaCocinaView() {
+export function PantallaCocinaView({ acceso }: { acceso?: AccesoTv } = {}) {
+  // TV sin sesión: llave de la pantalla (datos por /carta/tv, sin socket, con sondeo) y área fijada al vincular
+  const llave = acceso?.llave ?? null;
+  const areaFija = acceso?.areaId ?? null;
+  const revocadaRef = useRef(acceso?.revocada);
+  revocadaRef.current = acceso?.revocada;
   const searchParams =
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search)
@@ -192,7 +199,9 @@ export function PantallaCocinaView() {
         window.localStorage?.getItem('pantalla_area') ||
         ''
       : '';
-  const areaKey = normalizarArea(areaParam || vinculacionArea);
+  const [areasApi, setAreasApi] = useState<AreaCocina[]>([]);
+  const nombreAreaFija = areaFija ? areasApi.find((a) => a.id === areaFija)?.nombre : undefined;
+  const areaKey = areaFija ? normalizarArea(nombreAreaFija) : normalizarArea(areaParam || vinculacionArea);
   const nombreArea = NOMBRE_AREA_MAP[areaKey] || 'Todas';
   const tituloHeader =
     areaKey === 'todas'
@@ -202,12 +211,9 @@ export function PantallaCocinaView() {
   // Estados reales de conectividad y vinculación
   const [conectado, setConectado] = useState(true);
   const [desvinculada, setDesvinculada] = useState(false);
-  const [necesitaVincular, setNecesitaVincular] = useState(false);
-  const [codigoVinculacion] = useState('K7M-4QX');
 
   // Datos de la API
   const [comandasApi, setComandasApi] = useState<Comanda[]>([]);
-  const [areasApi, setAreasApi] = useState<AreaCocina[]>([]);
   const [horaActual, setHoraActual] = useState<string>(obtenerHoraLima);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string>(obtenerHoraLima);
 
@@ -224,20 +230,20 @@ export function PantallaCocinaView() {
   // Cargar áreas
   const cargarAreas = useCallback(async () => {
     try {
-      const res = await listarAreasCocina();
+      const res = llave ? await tvFetch<AreaCocina[]>('/carta/tv/cocina/areas', llave) : await listarAreasCocina();
       setAreasApi(res);
       return res;
     } catch {
       return [];
     }
-  }, []);
+  }, [llave]);
 
   // Cargar comandas de la API
   const cargarComandas = useCallback(
     async (areaNorm: string, areasDisponibles: AreaCocina[]) => {
       try {
-        let apiAreaParam = '';
-        if (areaNorm !== 'todas') {
+        let apiAreaParam = areaFija ?? '';
+        if (!areaFija && areaNorm !== 'todas') {
           const match = areasDisponibles.find((a) => {
             const nom = a.nombre.toLowerCase();
             if (areaNorm === 'bebidas') return nom.includes('bebid') || nom.includes('barr');
@@ -250,28 +256,32 @@ export function PantallaCocinaView() {
           }
         }
 
-        const res = await listarComandasArea(apiAreaParam);
+        let res: Comanda[];
+        if (llave) {
+          res = await tvFetch<Comanda[]>(`/carta/tv/cocina/comandas${apiAreaParam ? `?area=${encodeURIComponent(apiAreaParam)}` : ''}`, llave);
+          registrarHoraServidor(res.find((c) => c.ahoraServidor)?.ahoraServidor);
+        } else {
+          res = await listarComandasArea(apiAreaParam);
+        }
         // Solo pendientes: las ya despejadas (seguimiento) no se muestran en la pantalla
         setComandasApi(res.filter((c) => !c.despejada));
         setUltimaActualizacion(obtenerHoraLima());
         setConectado(true);
       } catch (err: any) {
-        if (
+        if (llave && llaveRevocada(err)) {
+          // desactivada por el admin: la puerta vuelve a mostrar un código
+          revocadaRef.current?.();
+        } else if (
           err?.codigo === 'PANTALLA_DESACTIVADA' ||
           /desactivada|desvinculada/i.test(err?.message || '')
         ) {
           setDesvinculada(true);
-        } else if (
-          err?.codigo === 'PANTALLA_NO_VINCULADA' ||
-          /no_vinculada|vincular/i.test(err?.message || '')
-        ) {
-          setNecesitaVincular(true);
         } else if (/failed to fetch|networkerror|conexi/i.test(err?.message || '')) {
           setConectado(false);
         }
       }
     },
-    [],
+    [llave, areaFija],
   );
 
   useEffect(() => {
@@ -282,7 +292,7 @@ export function PantallaCocinaView() {
 
   // Manejo de eventos de socket y red
   useEffect(() => {
-    const socket = conectarSocket();
+    const socket = llave ? null : conectarSocket();
 
     const onConnect = () => {
       setConectado(true);
@@ -295,9 +305,9 @@ export function PantallaCocinaView() {
       setConectado(false);
     };
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('connect_error', onConnectError);
+    socket?.on('connect', onConnect);
+    socket?.on('disconnect', onDisconnect);
+    socket?.on('connect_error', onConnectError);
 
     const onOnline = () => {
       setConectado(true);
@@ -311,31 +321,31 @@ export function PantallaCocinaView() {
     window.addEventListener('offline', onOffline);
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('connect_error', onConnectError);
+      socket?.off('connect', onConnect);
+      socket?.off('disconnect', onDisconnect);
+      socket?.off('connect_error', onConnectError);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [areaKey, areasApi, cargarComandas]);
+  }, [areaKey, areasApi, cargarComandas, llave]);
 
   // Actualizaciones reactivas
-  useEventos('pedido:nuevo', () => {
+  useTiempoReal(llave ? [] : ['pedido:nuevo', 'cocina:comanda', 'pedido:estado'], () => {
     cargarComandas(areaKey, areasApi);
-  });
-  useEventos('cocina:comanda', () => {
-    cargarComandas(areaKey, areasApi);
-  });
-  useEventos('pedido:estado', () => {
-    cargarComandas(areaKey, areasApi);
-  });
+  }, 0);
+  // TV sin sesión: sin socket, se vuelve a pedir cada 5 s
+  useEffect(() => {
+    if (!llave) return;
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'hidden') cargarComandas(areaKey, areasApi);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [llave, areaKey, areasApi, cargarComandas]);
 
   // Modo de visualización: automático según estado real, o forzado por parámetro URL para capturas de prueba
   const paramModo = (searchParams.get('modo') || searchParams.get('estado') || '').toLowerCase().trim();
   const modoActual: ModoTV =
-    paramModo === 'pair' || paramModo === 'vincular'
-      ? 'pair'
-      : paramModo === 'off' || paramModo === 'sin-conexion' || paramModo === 'desconectada'
+    paramModo === 'off' || paramModo === 'sin-conexion' || paramModo === 'desconectada'
       ? 'off'
       : paramModo === 'out' || paramModo === 'desvinculada'
       ? 'out'
@@ -345,8 +355,6 @@ export function PantallaCocinaView() {
       ? 'out'
       : !conectado
       ? 'off'
-      : necesitaVincular
-      ? 'pair'
       : 'orders';
 
   // Procesar comandas reales
@@ -734,68 +742,6 @@ export function PantallaCocinaView() {
             <span>Pantalla fija: no se toca · Se actualiza sola</span>
           </div>
         </>
-      )}
-
-      {modoActual === 'pair' && (
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '18px',
-            textAlign: 'center',
-            padding: '20px',
-          }}
-        >
-          <img
-            src="/logo.webp"
-            alt="Caprichos"
-            style={{
-              width: '96px',
-              height: '96px',
-              borderRadius: '48px',
-              objectFit: 'cover',
-            }}
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
-          <div style={{ fontWeight: 800, fontSize: '34px' }}>
-            Vincula esta pantalla
-          </div>
-          <div
-            style={{
-              fontSize: '20px',
-              color: '#C9D6DD',
-              maxWidth: '760px',
-              lineHeight: '28px',
-            }}
-          >
-            En el administrativo entra a Pantallas, pulsa Vincular pantalla y
-            escribe este código:
-          </div>
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: '96px',
-              lineHeight: '1.1',
-              letterSpacing: '0.18em',
-              padding: '12px 40px',
-              borderRadius: '20px',
-              background: '#FBF4EC',
-              color: '#0B2C3E',
-              display: 'inline-block',
-            }}
-          >
-            {codigoVinculacion}
-          </div>
-          <div style={{ fontSize: '18px', color: '#C9D6DD' }}>
-            El código vence en 10 minutos. Esta pantalla solo mostrará pedidos
-            de cocina.
-          </div>
-        </div>
       )}
 
       {modoActual === 'off' && (

@@ -103,13 +103,39 @@ describe('PantallaCocinaView - TV de Cocina', () => {
     expect(screen.getByText(/Estación: Salados · Meta de entrega: 13 min/i)).toBeInTheDocument();
   });
 
-  it('6. Muestra estado «Vincular pantalla» con código cuando se fuerza o requiere vincular', async () => {
+  it('6. Ya no hay código de vinculación falso en la vista (la puerta de la TV muestra el real)', async () => {
     (window as any).location = new URL('http://localhost:5173/pantalla/cocina?modo=pair');
     render(<PantallaCocinaView />);
 
-    expect(screen.getByText('Vincula esta pantalla')).toBeInTheDocument();
-    expect(screen.getByText('K7M-4QX')).toBeInTheDocument();
-    expect(screen.getByText(/El código vence en 10 minutos/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('CP-101')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('K7M-4QX')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vincula esta pantalla')).not.toBeInTheDocument();
+  });
+
+  it('6b. TV con llave: pide los datos por /carta/tv sin abrir el socket y revoca si la API da 401', async () => {
+    const llaveRevocada = vi.fn();
+    const socket = vi.spyOn(socketModule, 'conectarSocket');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: '1', nombre: 'Barra' }] })
+      .mockResolvedValue({ ok: true, json: async () => [comandaBase] });
+    vi.stubGlobal('fetch', fetchMock);
+    socket.mockClear();
+    render(<PantallaCocinaView acceso={{ llave: 'LL', areaId: '1', revocada: llaveRevocada }} />);
+
+    await waitFor(() => expect(screen.getByText('CP-101')).toBeInTheDocument());
+    expect(screen.getByText('ÁREA: BEBIDAS')).toBeInTheDocument();
+    expect(fetchMock.mock.calls[0][0]).toBe('/carta/tv/cocina/areas');
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer LL');
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/carta/tv/cocina/comandas?area=1'))).toBe(true);
+    expect(socket).not.toHaveBeenCalled();
+
+    // el admin desactiva la TV: la siguiente consulta da 401 y la vista pide volver al código
+    fetchMock.mockResolvedValue({ ok: false, status: 401, statusText: 'x', json: async () => ({ codigo: 'PANTALLA_DESACTIVADA' }) });
+    await waitFor(() => expect(llaveRevocada).toHaveBeenCalled(), { timeout: 8000 });
+    vi.unstubAllGlobals();
   });
 
   it('7. Muestra estado «Sin conexión» con última actualización', async () => {

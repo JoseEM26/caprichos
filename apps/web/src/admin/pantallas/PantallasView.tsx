@@ -66,7 +66,7 @@ export function PantallasView() {
   // Vincular pantalla con código
   const handleIntentarVincular = () => {
     const code = pairCode.trim().toUpperCase();
-    if (code.length < 6) {
+    if (code.replace(/[^A-Z0-9]/g, '').length < 6) {
       setPairMsg({
         texto: 'Escribe el código completo que aparece en la TV (6 caracteres).',
         error: true,
@@ -76,7 +76,7 @@ export function PantallasView() {
     setPairMsg(null);
     setConfirmarAccion({
       titulo: '¿Vincular esta pantalla?',
-      mensaje: `La TV con el código ${code} empezará a mostrar los pedidos de cocina. No podrá cambiar nada.`,
+      mensaje: `La TV que muestra el código ${code} entrará sola a su vista (Salón en vivo o Cocina). Solo podrá mirar, no cambiar nada.`,
       textoSi: 'Sí, vincular',
       accion: async () => {
         setVinculando(true);
@@ -295,7 +295,7 @@ export function PantallasView() {
                     Estación
                   </div>
                   <div style={{ fontSize: '13px', lineHeight: '18px', overflowWrap: 'anywhere' }}>
-                    {p.estacion}
+                    {p.vista ?? p.estacion}
                   </div>
                 </div>
 
@@ -375,7 +375,7 @@ export function PantallasView() {
           Vincular una pantalla nueva
         </div>
         <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-          1) En la TV abre la dirección de pantallas de Caprichos. 2) La TV muestra un código de 6 caracteres. 3) Escríbelo aquí y pulsa Vincular. La pantalla solo verá pedidos de cocina: sin teléfono ni dirección del cliente, y no entra al administrativo. Si se pierde o se filtra, desactívala en la lista.
+          1) En la TV abre caprichos.pe/tv/salon-vivo (Salón en vivo) o caprichos.pe/pantalla/cocina (Cocina): no pide usuario. 2) La TV muestra un código de 6 caracteres que cambia cada 10 minutos. 3) Escríbelo aquí y pulsa Vincular: la TV entra sola. La pantalla solo mira: sin teléfono ni dirección del cliente, y no entra al administrativo. Si se pierde o se filtra, desactívala en la lista: la TV vuelve a pedir un código.
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

@@ -2682,6 +2682,8 @@ model DeviceKey {
   reemplazada_por    BigInt?
   /// El dueño confirmó que NO es la misma PC que otra con igual nombre
   distinta_confirmada Boolean    @default(false)
+  /// Vista de una TV vinculada por código: SALON_VIVO | COCINA
+  vista            String?
 
   area             AreaCocina? @relation(fields: [area_id], references: [id])
   printJobs        PrintJob[]

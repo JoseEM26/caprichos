@@ -1,5 +1,4 @@
 import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -45,6 +44,9 @@ const mapearEstacion = (area: { nombre: string } | null): string => {
   return area.nombre;
 };
 
+const textoVista = (vista: string | null, area: { nombre: string } | null): string | null =>
+  vista === 'SALON_VIVO' ? 'Salón en vivo' : vista === 'COCINA' ? `Cocina · ${area ? area.nombre : 'todas las áreas'}` : null;
+
 @Injectable()
 export class PantallasService {
   constructor(
@@ -60,13 +62,17 @@ export class PantallasService {
       orderBy: { id: 'asc' },
     });
 
-    const items = dispositivos.map((d) => {
+    const ahora = new Date();
+    // Pendientes con el código vencido: ya no existen para el admin (se limpian al pedir otro código)
+    const vigentes = dispositivos.filter((d) => !(d.codigo_vinculo && d.codigo_expira_en && d.codigo_expira_en < ahora));
+    const items = vigentes.map((d) => {
       const est = mapearEstacion(d.area);
       const sufijoHash = d.llave_hash.slice(-4).toUpperCase();
       return {
         id: d.id.toString(),
         nombre: d.nombre,
         estacion: est,
+        vista: textoVista(d.vista, d.area),
         areaId: d.area_id ? d.area_id.toString() : null,
         ultimaConexion: aFechaHoraLima(d.ultima_conexion),
         llave: `Termina en ...${sufijoHash}`,
@@ -113,8 +119,8 @@ export class PantallasService {
     usuario?: UsuarioAutenticado,
     ip?: string,
   ) {
-    const codigoLimpio = dto.codigo.trim().toUpperCase();
-    if (codigoLimpio.length < 4) {
+    const codigoLimpio = dto.codigo.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (codigoLimpio.length < 6) {
       throw new HttpException(
         { codigo: 'CODIGO_INVALIDO', mensaje: 'Escribe el código completo que aparece en la TV (6 caracteres).' },
         HttpStatus.BAD_REQUEST,
@@ -130,60 +136,26 @@ export class PantallasService {
       }
     }
 
-    // Buscar si existe un dispositivo esperando vinculación con ese código
+    // Solo se vincula una TV que está mostrando ese código ahora (pendiente y sin vencer)
     const existente = await this.prisma.deviceKey.findFirst({
-      where: {
-        tipo: 'TV',
-        codigo_vinculo: codigoLimpio,
+      where: { tipo: 'TV', codigo_vinculo: codigoLimpio, codigo_expira_en: { gt: new Date() } },
+    });
+    if (!existente) {
+      throw new NotFoundException({ codigo: 'CODIGO_NO_ENCONTRADO', mensaje: 'No hay ninguna TV mostrando ese código' });
+    }
+
+    const actualizada = await this.prisma.deviceKey.update({
+      where: { id: existente.id },
+      data: {
+        activo: true,
+        nombre: dto.nombre?.trim() || existente.nombre,
+        area_id: areaIdBig !== null ? areaIdBig : existente.area_id,
+        codigo_vinculo: null,
+        codigo_expira_en: null,
+        ultima_conexion: new Date(),
       },
     });
-
-    let pantallaId: bigint;
-
-    if (existente) {
-      if (existente.codigo_expira_en && existente.codigo_expira_en < new Date()) {
-        throw new HttpException(
-          { codigo: 'CODIGO_EXPIRADO', mensaje: 'El código de vinculación ha expirado. Genera uno nuevo en la TV.' },
-          HttpStatus.GONE,
-        );
-      }
-
-      const actualizada = await this.prisma.deviceKey.update({
-        where: { id: existente.id },
-        data: {
-          activo: true,
-          nombre: dto.nombre?.trim() || existente.nombre,
-          area_id: areaIdBig !== null ? areaIdBig : existente.area_id,
-          codigo_vinculo: null,
-          codigo_expira_en: null,
-          ultima_conexion: new Date(),
-        },
-      });
-      pantallaId = actualizada.id;
-    } else {
-      // Registrar nueva pantalla con su propia llave segura SHA-256
-      const llaveSecreta = crypto.randomBytes(24).toString('hex');
-      const hash = crypto.createHash('sha256').update(llaveSecreta).digest('hex');
-      const nombreFinal = dto.nombre?.trim() || `TV ${codigoLimpio.slice(-4)}`;
-
-      // Si no se pasó área específica, vincular a área Cocina o Barra por defecto si existe
-      if (areaIdBig === null) {
-        const primeraArea = await this.prisma.areaCocina.findFirst();
-        if (primeraArea) areaIdBig = primeraArea.id;
-      }
-
-      const nueva = await this.prisma.deviceKey.create({
-        data: {
-          tipo: 'TV',
-          nombre: nombreFinal,
-          llave_hash: hash,
-          area_id: areaIdBig,
-          activo: true,
-          ultima_conexion: new Date(),
-        },
-      });
-      pantallaId = nueva.id;
-    }
+    const pantallaId = actualizada.id;
 
     if (this.auditoria && usuario) {
       await this.auditoria.registrar({
@@ -202,7 +174,7 @@ export class PantallasService {
 
     return {
       ok: true,
-      mensaje: `Pantalla vinculada con el código ${codigoLimpio}. El código ya no sirve. Aparecerá en la lista cuando la TV se conecte.`,
+      mensaje: `Pantalla vinculada con el código ${codigoLimpio}. El código ya no sirve; la TV entra sola en unos segundos.`,
     };
   }
 

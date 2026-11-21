@@ -12,6 +12,6 @@ import { ImpresionModule } from '../impresion/impresion.module';
   imports: [PedidosModule, ReservasModule, ImpresionModule],
   controllers: [SalonController, SalonVivoController],
   providers: [SalonService, BorradorMesaService, SalonVivoService],
-  exports: [SalonService],
+  exports: [SalonService, SalonVivoService],
 })
 export class SalonModule {}

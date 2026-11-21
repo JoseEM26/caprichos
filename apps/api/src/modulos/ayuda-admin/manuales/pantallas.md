@@ -19,13 +19,13 @@ sugerencias:
 Gestiona las pantallas y televisores inteligentes (Smart TV) del local dedicados a la visualización de comandas en [[cocina]], barra y despacho. Se vincula con la configuración de áreas en [[mirest]] y con el centro de alertas operativas en [[notificaciones]].
 
 ## Como se hace: vincular una nueva pantalla de TV
-1. Enciende la televisión o abre el navegador web en el dispositivo y dirígete a la dirección de pantalla de cocina de Caprichos.
-2. En la televisión aparecerá un código de vinculación de 6 caracteres (letras y números).
-3. En el panel administrativo de Pantallas, escribe ese código en el campo "Código de la TV (6 caracteres)".
+1. En el navegador de la TV abre la dirección de la vista que quieres: caprichos.pe/tv/salon-vivo (Salón en vivo) o caprichos.pe/pantalla/cocina (Cocina). No pide usuario ni contraseña.
+2. La TV muestra un código grande de 6 caracteres (letras y números, con un guion al medio) y una cuenta regresiva: el código cambia solo cada 10 minutos.
+3. En el administrativo, en Pantallas, escribe ese código en la casilla de vinculación (con o sin guion).
 4. Pulsa el botón "Vincular pantalla".
-5. Se abrirá la ventana de confirmación "¿Vincular esta pantalla?", con el aviso: "La TV con el código X empezará a mostrar los pedidos de cocina. No podrá cambiar nada".
-6. Pulsa "Sí, vincular" para confirmar o "No, cancelar" para abortar.
-7. Una vez vinculada, la televisión comenzará a recibir las comandas en tiempo real y quedará listada en tu panel con su nombre asignado.
+5. Se abrirá la ventana "¿Vincular esta pantalla?". Pulsa "Sí, vincular" para confirmar o "No, cancelar" para abortar.
+6. La TV entra sola a su vista en unos segundos y queda en la lista con su vista ("Salón en vivo" o "Cocina · área"). Luego puedes cambiarle el nombre y el área con "Editar".
+7. Solo se puede vincular una TV que esté mostrando su código en ese momento; no se crean pantallas desde aquí. Si desactivas una pantalla, esa TV vuelve a mostrar un código.
 Despues: [[cocina]]
 Ver tambien: [[mirest]]
 
@@ -57,7 +57,7 @@ Ver tambien: [[mascota]]
 ## Errores y dudas comunes
 - La pantalla del local dice "Sin conexión, reintentando": revisa el Internet de la TV; sigue mostrando lo último que recibió y se recupera sola.
 - La televisión no muestra pedidos: verifica que la pantalla figure como "Activa" y con estado de conexión en verde. Si aparece desconectada, comprueba la conexión a Internet o red Wi-Fi de la TV.
-- Código no válido: los códigos de 6 caracteres que muestra la TV tienen un tiempo de expiración. Si tardaste en ingresarlo, actualiza la página de la TV para generar un nuevo código e inténtalo nuevamente.
+- "No hay ninguna TV mostrando ese código": el código venció o está mal escrito. La TV ya cambió a otro código solo; escribe el que ves ahora.
 
 ## Quien puede hacerlo
 El módulo Pantallas requiere el permiso pantallas/ver y está restringido al rol Administrador (ADMIN), quien tiene permisos para pantallas/vincular y pantallas/desactivar. El personal de cocina utiliza las pantallas para visualizar las comandas, pero no tiene acceso para vincular ni reasignar estaciones desde este panel.

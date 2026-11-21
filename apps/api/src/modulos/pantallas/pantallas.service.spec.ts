@@ -53,12 +53,12 @@ describe('PantallasService', () => {
           },
         ]),
         findFirst: jest.fn().mockImplementation(({ where }) => {
-          if (where.codigo_vinculo === 'K7M-4QX') {
+          if (where.codigo_vinculo === 'K7M4QX') {
             return Promise.resolve({
               id: 3n,
               tipo: 'TV',
               nombre: 'TV despacho',
-              codigo_vinculo: 'K7M-4QX',
+              codigo_vinculo: 'K7M4QX',
               codigo_expira_en: new Date(Date.now() + 600000),
               activo: false,
             });
@@ -112,10 +112,23 @@ describe('PantallasService', () => {
     expect(eventos.emitirAdmin).toHaveBeenCalledWith('pantallas:actualizado', expect.any(Object));
   });
 
-  it('vincular crea una nueva pantalla TV si el código no existía en cola', async () => {
-    const res = await service.vincular({ codigo: 'X9P-123', nombre: 'TV Sala' }, admin);
-    expect(res.ok).toBe(true);
-    expect(prisma.deviceKey.create).toHaveBeenCalled();
+  it('vincular acepta el código con guion y minúsculas, y activa la TV sin crear otra', async () => {
+    await service.vincular({ codigo: 'k7m-4qx', nombre: 'TV Sala' }, admin);
+    expect(prisma.deviceKey.create).not.toHaveBeenCalled();
+    expect(prisma.deviceKey.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ activo: true, nombre: 'TV Sala', codigo_vinculo: null }) }),
+    );
+  });
+
+  it('vincular un código que ninguna TV muestra da 404 y no crea nada', async () => {
+    await expect(service.vincular({ codigo: 'X9P-123' }, admin)).rejects.toMatchObject({
+      response: { codigo: 'CODIGO_NO_ENCONTRADO', mensaje: 'No hay ninguna TV mostrando ese código' },
+    });
+    expect(prisma.deviceKey.create).not.toHaveBeenCalled();
+    // busca solo códigos que no han vencido
+    expect(prisma.deviceKey.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ codigo_expira_en: { gt: expect.any(Date) } }) }),
+    );
   });
 
   it('cambiarEstado activa o desactiva la pantalla y audita', async () => {

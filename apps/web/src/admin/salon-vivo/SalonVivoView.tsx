@@ -4,6 +4,7 @@ import type { Motor, ModoHora, VistaCamara } from './escena3d/motor';
 import { TEMAS } from './escena3d/temas';
 import { PanelPendientes } from './PanelPendientes';
 import { useSalonVivo } from './useSalonVivo';
+import type { AccesoTv } from '../../tv/PuertaTv';
 import './salon-vivo.css';
 
 const Escena3D = lazy(() => import('./Escena3D'));
@@ -35,8 +36,8 @@ function usePantallaCompletaActiva() {
  * solo los pedidos pendientes. `tv`: la pantalla propia para la TV (/tv/salon-vivo), sin el panel del admin.
  * Los controles se ven antes de entrar a pantalla completa; en pantalla completa desaparecen.
  */
-export function SalonVivoView({ tv = false }: { tv?: boolean }) {
-  const { datos, error, cargando } = useSalonVivo();
+export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: AccesoTv }) {
+  const { datos, error, cargando } = useSalonVivo(undefined, acceso);
   const [soporta3d] = useState(() => tieneSoporteWebGL());
   const [falla3d, setFalla3d] = useState<string | null>(null);
   const reducir = useMemo(() => prefiereMovimientoReducido(), []);
