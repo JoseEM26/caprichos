@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { SaludoCumpleanos } from './SaludoCumpleanos';
+import { AnunciosEmergentes } from '../anuncios/AnunciosEmergentes';
 import { BannerCumpleanosEquipo } from './BannerCumpleanosEquipo';
 import { esSoloMarketing } from '../comun/rolesUsuario';
 import { Confirmar } from '../comun/Confirmar';
@@ -65,7 +66,7 @@ const horaLima = (d: Date): string =>
  * menú que se contrae a iconos, grupos plegables con insignias, tarjeta de perfil, hora, conexión y campanita.
  */
 export function AdminShell() {
-  const { usuario, salir, tiene } = useSesion();
+  const { usuario, salir, tiene, debeCambiar } = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
   const movil = useEsMovil();
@@ -881,6 +882,8 @@ export function AdminShell() {
       {esRepartidorMovil && location.pathname !== '/admin/repartos' && barraInferiorRepartidor}
 
       <SaludoCumpleanos />
+      {/* Anuncios emergentes para el personal (Admin › Anuncios); espera a que termine el cambio de clave obligatorio */}
+      <AnunciosEmergentes origen="PERSONAL" listo={!!usuario && !debeCambiar} />
 
       <Confirmar
         abierto={confirmarSalida}

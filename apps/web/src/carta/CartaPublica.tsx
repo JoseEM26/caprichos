@@ -49,6 +49,7 @@ import { useBeneficiosCarta } from './useBeneficiosCarta';
 import { TextoEd, useEdicion } from './edicion';
 import { useEventoCarta } from './eventosCarta';
 import { ModalAvisoEntrada } from './ModalAvisoEntrada';
+import { AnunciosEmergentes } from '../anuncios/AnunciosEmergentes';
 import { fijarUmbralesStock } from './umbralesStock';
 
 const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
@@ -129,7 +130,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
   const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto, aplicarCarta } =
+  const { checkoutAbierto, productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto, aplicarCarta } =
     useCarrito();
 
   // Enlace del bot o del aviso «pedido recibido»: abre directo el seguimiento de ese pedido (si el token no coincide, no pasa nada)
@@ -1019,6 +1020,9 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         estadoLocal={estadoLocal}
         onVerPromocion={irAPromociones}
       />
+
+      {/* Anuncios emergentes programados desde Admin › Anuncios (no en el diseñador ni en la vista previa) */}
+      {!vistaPrevia && !ed && <AnunciosEmergentes origen="CARTA" pausado={checkoutAbierto} />}
 
       {/* Formulario de Checkout */}
       <FormularioCheckout

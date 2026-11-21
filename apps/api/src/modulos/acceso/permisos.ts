@@ -259,6 +259,11 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Planilla del personal (sueldos, pagos, adelantos, descuentos): solo ADMIN
   { modulo: 'planilla', accion: 'ver' },
   { modulo: 'planilla', accion: 'administrar' },
+  // Anuncios emergentes (modal programable al ingresar a la carta o al panel)
+  { modulo: 'anuncios', accion: 'ver' },
+  { modulo: 'anuncios', accion: 'crear' },
+  { modulo: 'anuncios', accion: 'editar' },
+  { modulo: 'anuncios', accion: 'eliminar' },
   // Mascota Capri (mas-api)
   { modulo: 'mascota', accion: 'ver' },
   { modulo: 'mascota', accion: 'editar' },
@@ -483,6 +488,10 @@ export const MATRIZ: Record<string, string[]> = {
     'paleta/ver',
     'paleta/editar',
     'paleta/publicar',
+    'anuncios/ver',
+    'anuncios/crear',
+    'anuncios/editar',
+    'anuncios/eliminar',
     'archivos/subir',
     'notificaciones/ver',
     'notificaciones/marcar',

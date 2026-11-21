@@ -55,6 +55,7 @@ export const MODULOS_ROL: readonly ModuloRolCatalogo[] = [
   { clave: 'destacadas', minimo: 'destacadas/ver' },
   { clave: 'resenas', minimo: 'resenas/ver' },
   { clave: 'paleta', minimo: 'paleta/ver' },
+  { clave: 'anuncios', minimo: 'anuncios/ver' },
   { clave: 'mascota', minimo: 'mascota/ver' },
   { clave: 'mirest', minimo: 'local/ver' },
   { clave: 'zonas', minimo: 'zonas/ver' },

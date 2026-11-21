@@ -16,6 +16,7 @@ const PERMISOS_MARKETING = [
   'destacadas/ver', 'destacadas/crear', 'destacadas/editar', 'destacadas/archivar', 'destacadas/eliminar',
   'resenas/ver', 'resenas/editar',
   'paleta/ver', 'paleta/editar', 'paleta/publicar',
+  'anuncios/ver', 'anuncios/crear', 'anuncios/editar', 'anuncios/eliminar',
   'archivos/subir', 'notificaciones/ver', 'notificaciones/marcar', 'asistencia/marcar',
 ];
 const tiene = (p: string) => tienePermiso(PERMISOS_MARKETING, p);
@@ -27,9 +28,9 @@ afterEach(() => {
 });
 
 describe('menú del rol MARKETING', () => {
-  it('ve los seis módulos de contenido, Mi asistencia y Notificaciones (Escritorio no exige permiso; el shell lo oculta)', () => {
+  it('ve los seis módulos de contenido, Anuncios, Mi asistencia y Notificaciones (Escritorio no exige permiso; el shell lo oculta)', () => {
     expect(visibles().filter((c) => c !== 'escritorio').sort()).toEqual(
-      ['conocenos', 'destacadas', 'disenador', 'mi-asistencia', 'notificaciones', 'novedades', 'paleta', 'resenas'].sort(),
+      ['anuncios', 'conocenos', 'destacadas', 'disenador', 'mi-asistencia', 'notificaciones', 'novedades', 'paleta', 'resenas'].sort(),
     );
   });
 

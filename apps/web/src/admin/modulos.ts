@@ -34,6 +34,7 @@ import {
   PaletaView,
 } from './contenido';
 import { MascotaAdminView } from './mascota';
+import { AnunciosView } from './anuncios';
 import { ResenasView } from './resenas/ResenasView';
 
 export type GrupoModulo =
@@ -373,6 +374,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'paleta/ver',
     componente: PaletaView,
     icono: 'paleta',
+  },
+  {
+    clave: 'anuncios',
+    nombre: 'Anuncios',
+    grupo: 'Configuración',
+    ruta: '/admin/anuncios',
+    permisoMinimo: 'anuncios/ver',
+    componente: AnunciosView,
+    icono: 'novedades',
   },
   {
     clave: 'mascota',

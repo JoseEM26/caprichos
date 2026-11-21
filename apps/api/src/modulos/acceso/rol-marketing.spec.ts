@@ -20,6 +20,7 @@ const ESPERADO_MARKETING = [
   'destacadas/ver', 'destacadas/crear', 'destacadas/editar', 'destacadas/archivar', 'destacadas/eliminar',
   'resenas/ver', 'resenas/editar',
   'paleta/ver', 'paleta/editar', 'paleta/publicar',
+  'anuncios/ver', 'anuncios/crear', 'anuncios/editar', 'anuncios/eliminar',
   'archivos/subir',
   'notificaciones/ver', 'notificaciones/marcar',
   'asistencia/marcar',

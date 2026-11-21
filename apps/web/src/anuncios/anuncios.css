@@ -1,0 +1,31 @@
+.anu-fondo { position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(11, 44, 62, 0.65); }
+.anu-dialogo { position: relative; width: min(440px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(11, 44, 62, 0.4); outline: none; background: #fff; }
+.anu-x { position: absolute; top: 10px; right: 10px; z-index: 2; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid rgba(11, 44, 62, 0.5); background: rgba(251, 244, 236, 0.92); color: #0B2C3E; font-size: 22px; font-weight: 800; line-height: 1; cursor: pointer; }
+.anu-tarjeta { background: var(--anu-fondo); color: var(--anu-texto); overflow-y: auto; display: flex; flex-direction: column; font-family: inherit; }
+.anu-img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.anu-img-grande { max-height: 300px; }
+.anu-img-completa { width: 100%; max-height: calc(100dvh - 120px); object-fit: contain; display: block; }
+.anu-solo-imagen { align-items: stretch; }
+.anu-solo-imagen .anu-boton { margin: 12px 16px 16px; }
+.anu-cuerpo { padding: 22px 20px 20px; display: flex; flex-direction: column; gap: 10px; text-align: center; align-items: center; }
+.anu-titulo { margin: 0; font-size: 22px; line-height: 28px; font-weight: 800; overflow-wrap: anywhere; }
+.anu-texto { margin: 0; font-size: 15px; line-height: 22px; overflow-wrap: anywhere; white-space: pre-line; }
+.anu-texto-largo { text-align: left; max-height: 40dvh; overflow-y: auto; width: 100%; }
+.anu-etiqueta { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: var(--anu-acento); color: var(--anu-fondo); border-radius: 9999px; padding: 3px 12px; }
+.anu-icono { width: 48px; height: 48px; border-radius: 50%; background: var(--anu-acento); color: var(--anu-fondo); font-size: 26px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.anu-precio { margin: 0; font-size: 34px; font-weight: 800; color: var(--anu-acento); }
+.anu-cupon { margin: 0; font-size: 14px; border: 1.5px dashed var(--anu-acento); border-radius: 10px; padding: 6px 12px; }
+.anu-datos { margin: 0; display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
+.anu-acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; }
+.anu-boton { min-height: 44px; padding: 0 20px; border-radius: 12px; border: 0; background: var(--anu-acento); color: var(--anu-fondo); font-weight: 800; font-size: 15px; cursor: pointer; }
+.anu-boton-entendido { background: transparent; color: var(--anu-texto); border: 1.5px solid var(--anu-texto); }
+.anu-barra { height: 5px; background: rgba(11, 44, 62, 0.15); flex: none; }
+.anu-barra-relleno { height: 100%; background: #E67929; transition: width .1s linear; }
+@media (prefers-reduced-motion: reduce) { .anu-barra-relleno { transition: none; } }
+@media (max-width: 400px) { .anu-cuerpo { padding: 18px 14px 16px; } .anu-titulo { font-size: 20px; line-height: 26px; } .anu-precio { font-size: 28px; } }
+
+/* Editor del admin: formulario + vista previa en vivo */
+.anu-ed-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 20px; align-items: start; }
+.anu-ed-previa { display: flex; flex-direction: column; gap: 10px; align-items: center; position: sticky; top: 0; }
+.anu-ed-lienzo { background: rgba(11, 44, 62, 0.65); padding: 16px; border-radius: 16px; box-sizing: border-box; }
+@media (max-width: 760px) { .anu-ed-dos { grid-template-columns: minmax(0, 1fr); } .anu-ed-previa { position: static; } }

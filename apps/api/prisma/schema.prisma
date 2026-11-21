@@ -3715,3 +3715,67 @@ model PedidoBorradorMesa {
   @@unique([mesa_id, party_id])
   @@map("pedido_borrador_mesa")
 }
+
+/// Anuncio emergente («novedades al ingresar»): modal programable para la carta y/o el personal.
+model Anuncio {
+  id              BigInt    @id @default(autoincrement())
+  /// CARTA | PERSONAL | AMBOS
+  publico         String
+  /// Roles destino cuando el público incluye PERSONAL (vacío = todos).
+  roles           String[]  @default([])
+  /// NOVEDAD | PROMOCION | AVISO | EVENTO | SOLO_IMAGEN | BIENVENIDA | COMUNICADO_INTERNO
+  plantilla       String
+  titulo          String
+  texto           String?
+  imagen_url      String?
+  boton_texto     String?
+  /// Enlace interno de la carta (/carta/...) o del panel (/admin/...).
+  boton_enlace    String?
+  /// Datos propios de la plantilla: precio, cupón, fecha, lugar, ícono.
+  detalle         Json?
+  /// NAVY | CREMA | NARANJA | DORADO
+  color           String    @default("CREMA")
+  desde           DateTime? @db.Timestamptz
+  hasta           DateTime? @db.Timestamptz
+  /// «HH:MM» en hora de Lima; las dos o ninguna.
+  franja_desde    String?
+  franja_hasta    String?
+  /// 0 = domingo … 6 = sábado (Lima); vacío = todos los días.
+  dias_semana     Int[]     @default([])
+  /// UNA_VEZ | CADA_INGRESO | VECES_POR_DIA | CADA_N_HORAS
+  frecuencia      String    @default("UNA_VEZ")
+  veces_por_dia   Int       @default(1)
+  cada_horas      Int?
+  /// 0 = no se cierra solo.
+  cierre_segundos Int       @default(0)
+  puede_cerrar    Boolean   @default(true)
+  prioridad       Int       @default(0)
+  activo          Boolean   @default(true)
+  creado_por      BigInt?
+  actualizado_por BigInt?
+  creado_en       DateTime  @default(now()) @db.Timestamptz
+  actualizado_en  DateTime  @default(now()) @updatedAt @db.Timestamptz
+
+  vistas          AnuncioVista[]
+
+  @@index([activo, publico])
+  @@map("anuncio")
+}
+
+/// Evento de un anuncio: vista, cierre, clic en el botón o «Entendido». party_id solo en personal (para la frecuencia).
+model AnuncioVista {
+  id         BigInt   @id @default(autoincrement())
+  anuncio_id BigInt
+  /// VISTA | CIERRE | CLIC | ENTENDIDO
+  tipo       String
+  /// CARTA | PERSONAL
+  origen     String
+  party_id   BigInt?
+  creado_en  DateTime @default(now()) @db.Timestamptz
+
+  anuncio    Anuncio  @relation(fields: [anuncio_id], references: [id], onDelete: Cascade)
+
+  @@index([anuncio_id, tipo])
+  @@index([party_id, anuncio_id, creado_en])
+  @@map("anuncio_vista")
+}

@@ -53,6 +53,7 @@ import { ImpresionModule } from './modulos/impresion/impresion.module';
 import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
 import { VouchersModule } from './modulos/vouchers/vouchers.module';
 import { MascotaModule } from './modulos/mascota/mascota.module';
+import { AnunciosModule } from './modulos/anuncios/anuncios.module';
 import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
 import { ResenasModule } from './modulos/resenas/resenas.module';
 import { CartaEventosModule } from './modulos/carta-eventos';
@@ -113,6 +114,7 @@ import { PagosOnlineModule } from './modulos/pagos-online';
     AyudaAdminModule,
     VouchersModule,
     MascotaModule,
+    AnunciosModule,
     PantallaIngresoModule,
     ResenasModule,
     CartaEventosModule,
