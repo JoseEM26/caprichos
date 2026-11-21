@@ -1,6 +1,6 @@
 /* Editor «Mi avatar» (carta). Mismo diseño de la maqueta aprobada; todo con prefijo av- para no pisar la carta. */
 .av-raiz { --av-hueso: #FBF4EC; --av-blanco: #fff; --av-navy: #0B2C3E; --av-naranja: #E67929; --av-naranja-osc: #B2500F; --av-oro: #D99E39; --av-verde: #2DBE60; --av-suave: rgba(11, 44, 62, .62); --av-linea: rgba(11, 44, 62, .12);
-  position: fixed; inset: 0; z-index: 400; overflow-y: auto; background: var(--av-hueso); color: var(--av-navy); font-family: 'Open Sans', system-ui, sans-serif; font-size: 15px; overscroll-behavior: contain; }
+  position: fixed; inset: 0; z-index: 2000; overflow-y: auto; background: var(--av-hueso); color: var(--av-navy); font-family: 'Open Sans', system-ui, sans-serif; font-size: 15px; overscroll-behavior: contain; }
 .av-raiz * { box-sizing: border-box; }
 .av-raiz [hidden] { display: none !important; }
 .av-raiz :focus-visible { outline: 3px solid var(--av-oro); outline-offset: 2px; }
