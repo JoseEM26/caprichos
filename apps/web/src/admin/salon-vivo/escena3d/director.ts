@@ -8,6 +8,7 @@ import type { Sonido } from './sonido';
 import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, MAX_AVATARES, type MotorAvatar } from './avatarReal';
 import { cantidadClientes, configAleatoria, semilla, TOPE_PERSONAS, TOPE_PERSONAS_LIGERO } from './acompanantes';
 import type { Foco, V2 } from './camaraDirector';
+import { repartirSillas, revisarAtasco, rastroNuevo, type Rastro } from './atasco';
 import { estaListo, frasePaseo, planEntrega, productosBandeja } from './entrega';
 import type { AvatarVivo, PedidoVivo, SalonVivo } from '../salonVivoApi';
 
@@ -18,7 +19,7 @@ import type { AvatarVivo, PedidoVivo, SalonVivo } from '../salonVivoApi';
  */
 type Punto = [number, number] | THREE.Vector3;
 
-interface Agente { obj: any; ruta: THREE.Vector3[]; vel: number; alLlegar?: () => void; v?: number }
+interface Agente { obj: any; ruta: THREE.Vector3[]; vel: number; alLlegar?: () => void; v?: number; rastro?: Rastro }
 
 type Tarea =
   | { tipo: 'pedido'; codigo: string; mesaId: string }
@@ -72,7 +73,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       alLlegar?.();
       return null;
     }
-    const ag: Agente = { obj, ruta, vel, alLlegar };
+    const ag: Agente = { obj, ruta, vel, alLlegar, rastro: rastroNuevo(t) };
     agentes.add(ag);
     return ag;
   }
@@ -91,6 +92,11 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       if (!destino) { agentes.delete(ag); est.ritmo = 0; ag.alLlegar?.(); continue; }
       const dx = destino.x - o.position.x, dz = destino.z - o.position.z;
       const dist = Math.hypot(dx, dz);
+      // Atascado (otra persona o un mueble le cierra el paso): a los pocos segundos queda en su destino final, nunca caminando en el sitio
+      const fin = ag.ruta[ag.ruta.length - 1];
+      const tramo = revisarAtasco(ag.rastro ?? rastroNuevo(t), Math.hypot(fin.x - o.position.x, fin.z - o.position.z), t);
+      ag.rastro = tramo.rastro;
+      if (tramo.atascado) { o.position.x = fin.x; o.position.z = fin.z; ag.ruta = []; est.ritmo = 0; continue; }
       ag.v = Math.min(ag.vel, (ag.v || 0) + ag.vel * 2.4 * dt);
       let v = ag.v;
       if (ag.ruta.length === 1 && dist < 0.7) v *= Math.max(0.3, dist / 0.7);
@@ -224,7 +230,9 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   }
 
   function llegarMesa(m: MesaEsc, inmediato: boolean) {
-    const n = personasDeMesa(m);
+    // Solo sillas libres de esta mesa: nunca más personas que sillas
+    const asignadas = repartirSillas(personasDeMesa(m), m.sillas.length).sillas;
+    const n = asignadas.length;
     const pedidoMesa = datos?.mesas.find((x) => x.id === m.id)?.pedido;
     const grupo: Grupo = { personas: [], fase: 'llegando' };
     grupos.set(m.id, grupo);
@@ -233,10 +241,11 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       const per = crearCliente(i === 0 ? pedidoMesa?.avatar : null, `${pedidoMesa?.id ?? pedidoMesa?.codigo ?? m.id}:${i}`);
       grupo.personas.push(per);
       escena.add(per.raiz);
-      const silla = m.sillas[i];
+      const silla = m.sillas[asignadas[i]];
       const listo = () => {
         sentar(per, silla, m);
-        if (++llegaron === n) { grupo.fase = 'sentado'; sincronizarMesa(m); }
+        if (++llegaron === n) grupo.fase = 'sentado';
+        sincronizarMesa(m); // el conteo de la mesa sigue a las personas realmente sentadas
       };
       if (inmediato) { listo(); continue; }
       per.raiz.position.copy(G(afueraG[0] + i * 0.5 * dirG[1], afueraG[1] + i * 0.5 * dirG[0]));
@@ -304,7 +313,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     if (g) g.personas.forEach((p, i) => { p.manoArriba = est === 'POR_COBRAR' && i === 0; });
     if (est === 'COMIENDO' || est === 'POR_COBRAR') { if (!m.comida.children.length && g) servirMesa(m); }
     else if (est === 'LIBRE' || est === 'RESERVADA') { m.comida.clear(); m.vapor = []; }
-    const pers = g ? g.personas.length : 0;
+    const pers = g ? g.personas.filter((p) => p.sentado).length : 0;
     m.etq.el.className = `sv-etq sv-etq-mesa ${est.toLowerCase()}`;
     m.etq.el.innerHTML = `<b>${m.item.numero ?? m.nombre}</b>${g ? `${pers}/${m.seats} pers.${d?.pedido ? ' · ' + d.pedido.codigo : ''}` : `${m.seats} pers.`}<br><span class="ch">${textoMesa(est, d)}</span>`;
   }
