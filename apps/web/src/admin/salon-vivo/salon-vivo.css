@@ -147,7 +147,16 @@
 
 /* ---------- Pantalla para la TV (/tv/salon-vivo): ocupa toda la pantalla, sin el panel del admin ---------- */
 .sv-raiz.sv-tv { position: fixed; inset: 0; z-index: 50; background: var(--sv-navy-2); }
-.sv-tv .sv-app { height: 100vh; height: 100dvh; min-height: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 560px); }
+.sv-tv .sv-app { height: 100vh; height: 100dvh; min-height: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+/* TV: el local en 3D ocupa todo el ancho de arriba; los pedidos van en una franja abajo (resumen a la izquierda, tarjetas en fila) */
+.sv-tv .sv-escena { height: auto; min-height: 0; }
+.sv-tv .sv-pend { height: auto; max-height: 34dvh; display: grid; grid-template-columns: clamp(260px, 21vw, 400px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); box-shadow: 0 -10px 30px rgba(0, 0, 0, .28); }
+.sv-tv .sv-pend-cab { grid-column: 1; grid-row: 1; border-bottom: 0; padding: 12px 16px 6px; }
+.sv-tv .sv-pend-resumen { grid-column: 1; grid-row: 2; align-content: start; padding: 6px 16px 14px; }
+.sv-tv .sv-pend-lista { grid-column: 2; grid-row: 1 / span 2; flex-direction: row; align-items: stretch; overflow-x: auto; overflow-y: hidden; padding: 12px 16px; border-left: 1px solid var(--sv-linea); }
+.sv-tv .sv-pend-item { flex: 0 0 clamp(280px, 23vw, 400px); }
+.sv-tv .sv-pend-vacio { align-self: center; flex: 1; }
+.sv-tv .sv-ayuda-tv { top: 64px; }
 .sv-completa .sv-cabeza { pointer-events: none; }
 .sv-btn.sv-prim { background: var(--sv-naranja); border-color: transparent; color: #fff; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; }
 .sv-sel { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--sv-f-txt); color: rgba(251, 244, 236, .75); }
@@ -195,7 +204,8 @@
 .sv-pend-min { margin-left: auto; font: 700 12px var(--sv-f-txt); font-style: normal; color: var(--sv-suave); }
 .sv-pend-item.tarde .sv-pend-min { color: #C5221F; }
 @media (prefers-reduced-motion: reduce) { .sv-pend-item, .sv-pend-item.listo .sv-pend-etapa { animation: none; } .sv-pend-barra i { transition: none; } }
-@media (max-width: 900px) { .sv-tv .sv-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 55dvh minmax(0, 1fr); } .sv-tv .sv-escena { height: auto; min-height: 0; } .sv-tv .sv-panel { height: 100%; overflow: hidden; } }
+/* TV o celular angosto: la franja se apila (resumen arriba, tarjetas en fila debajo) */
+@media (max-width: 900px) { .sv-tv .sv-pend { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); max-height: 45dvh; } .sv-tv .sv-pend-lista { grid-column: 1; grid-row: 3; border-left: 0; } .sv-tv .sv-pend-item { flex-basis: 80vw; } }
 
 /* Botón «Centrar»: devuelve la cámara a la vista elegida si el zoom o el arrastre dejaron el local fuera de cuadro */
 .sv-centrar { position: absolute; top: 12px; right: 12px; z-index: 3; min-height: 44px; padding: 0 16px; border-radius: 9999px; border: 1px solid rgba(251, 244, 236, .25); background: rgba(8, 34, 49, .88); color: var(--sv-hueso); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }

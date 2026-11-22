@@ -203,7 +203,8 @@ export function crearMotor(op: OpcionesMotor): Motor {
     renderer.setSize(w, h, false);
     camara.aspect = w / h; camara.updateProjectionMatrix();
     // Solo si cambió de verdad (girar el celular), no por la barra del navegador que aparece y se esconde
-    const nuevo = THREE.MathUtils.clamp(1.5 / (w / h || 1), 1, 2.2);
+    // Angosta (celular de pie): se aleja; muy ancha (TV con la franja de pedidos abajo): se acerca para llenar el alto
+    const nuevo = THREE.MathUtils.clamp(1.5 / (w / h || 1), 0.72, 2.2);
     if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; volando = true; }
   }
   const observador = new ResizeObserver(ajustar); observador.observe(contenedor);
