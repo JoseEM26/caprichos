@@ -453,8 +453,6 @@ describe('mi planilla (el trabajador ve solo lo suyo)', () => {
     m.dias[0] = { ...m.dias[0], estado: 'TARDANZA', marcas: [{ tipo: 'ENTRADA', minutos: 840, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
     m.dias[1] = { ...m.dias[1], estado: 'SALIO_DESPUES', marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1140, estado: 'VALIDA' }] } as any; // 60 min extra
     m.dias[2] = { ...m.dias[2], estado: 'SALIO_DESPUES', marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1110, estado: 'VALIDA' }] } as any; // 30 min extra
-    // Extra semanal: la semana del 2 al 8 queda completa (sin faltas) para que esos minutos sí sean extra
-    for (const i of [6, 7]) m.dias[i] = { ...m.dias[i], estado: 'CUMPLIO', marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
     (m.svc as any).prisma.planillaExtraAprobada.findMany = async () => [{ jornada: d('2026-11-02'), aprobado_por: 1n, aprobado_en: AHORA }];
     m.poner({ id: 91n, party_id: LUIS, monto: 100, num_cuotas: 2, periodicidad: 'MENSUAL', fecha_inicio: d('2026-11-01'), estado: 'ACTIVO', motivo: 'nota interna', monto_cuota: 60, interes_pct_mensual: 10, interes_monto: 20 }, [60, 60]);
     m.ajustes.push({ id: 31n, party_id: LUIS, tipo: 'ADELANTO', fecha: d('2026-11-05'), monto: 50, motivo: 'Adelanto', categoria: null, anulado_en: null, creado_en: AHORA });
@@ -692,13 +690,12 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
 
   it('descanso trabajado: se ve como tal, sus horas van como extra, bloquea el pago hasta que el admin lo aprueba y entonces se paga', async () => {
     const m = montar({ sueldo: { metodo_valor_hora: 'TARIFA_HORA', tarifa_hora: 10 }, vigencias: [] });
-    // Semana del 16 al 22 sin horas programadas: el descanso trabajado es extra entera (regla semanal)
-    m.dias[19] = { jornada: '2026-11-20', estado: 'A_REVISAR', turno: null, marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
+    m.dias[10] = { jornada: '2026-11-11', estado: 'A_REVISAR', turno: null, marcas: [{ tipo: 'ENTRADA', minutos: 780, estado: 'VALIDA' }, { tipo: 'SALIDA', minutos: 1080, estado: 'VALIDA' }] } as any;
     const antes = await m.svc.detalle(7, '2026-11-15', [], AHORA);
-    const dia = antes.dias.find((x: any) => x.jornada === '2026-11-20');
+    const dia = antes.dias.find((x: any) => x.jornada === '2026-11-11');
     expect(dia).toMatchObject({ descansoTrabajado: true, extraMin: 300, extraPendiente: true });
     expect(antes.pendientes).toBe(1);
-    await m.svc.aprobarExtra(7, '2026-11-20', true, ADMIN);
+    await m.svc.aprobarExtra(7, '2026-11-11', true, ADMIN);
     const despues = await m.svc.detalle(7, '2026-11-15', [], AHORA);
     expect(despues.pendientes).toBe(0);
     expect(despues.resultado.pagoExtra).toBe(5 * 10); // descanso trabajado: valor hora normal, sin el 1,25 de la extra

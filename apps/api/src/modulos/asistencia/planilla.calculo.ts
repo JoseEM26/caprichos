@@ -68,35 +68,6 @@ export function periodoDe(modalidad: Modalidad, fecha: string): { desde: string;
   return { desde: `${a}-${mm}-01`, hasta: `${a}-${mm}-${String(dias).padStart(2, '0')}` };
 }
 
-/**
- * Hora extra semanal (decisión del dueño, 20/11/2026): el tiempo de más solo es EXTRA cuando en la semana (lunes a
- * domingo) se supera la jornada programada de esa persona. Lo que cubre horas programadas no trabajadas (faltas,
- * tardanza, salida antes o días sin venir) pasa a trabajadaMin: se paga como hora normal, sin aprobación ni recargo.
- * Se descuenta la extra de los primeros días de la semana.
- * ponytail: en el pago MENSUAL las semanas que cruzan el cambio de mes se cuentan solo con los días del período.
- */
-export function extraSemanal(dias: DiaPlanilla[]): DiaPlanilla[] {
-  const semanas = new Map<string, number[]>();
-  dias.forEach((d, i) => {
-    const k = periodoDe('SEMANAL', d.jornada).desde;
-    semanas.set(k, [...(semanas.get(k) ?? []), i]);
-  });
-  const salida = dias.map((d) => ({ ...d, extraBrutaMin: d.extraMin }));
-  for (const idx of semanas.values()) {
-    const ds = idx.map((i) => salida[i]);
-    let pendiente = Math.max(0, ds.reduce((a, d) => a + d.programadaMin - d.trabajadaMin, 0));
-    for (const d of ds) {
-      if (pendiente <= 0) break;
-      const pasa = Math.min(pendiente, d.extraMin);
-      if (pasa <= 0) continue;
-      d.extraMin -= pasa;
-      d.trabajadaMin += pasa;
-      pendiente -= pasa;
-    }
-  }
-  return salida;
-}
-
 /** Estados con los que la jornada se puede pagar tal cual. */
 const PAGABLES: readonly EstadoJornada[] = ['CUMPLIO', 'TARDANZA', 'SALIO_ANTES', 'SALIO_DESPUES'];
 /** Estados que impiden marcar el período como pagado hasta que el admin los corrija. */
@@ -124,8 +95,6 @@ export interface DiaPlanilla {
   salidaAnticipadaMin: number;
   /** Minutos fuera del turno (antes de entrar o después de salir) pasada la tolerancia. */
   extraMin: number;
-  /** Extra del día ANTES de la regla semanal (para explicar en pantalla cuánto pasó a hora normal). Lo pone extraSemanal. */
-  extraBrutaMin?: number;
   /** Feriado activo ese día: multiplicador del valor hora para las horas trabajadas y la tardanza (vacío = 1). */
   recargo?: number;
   /** Día de descanso (sin horario) en que marcó entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */

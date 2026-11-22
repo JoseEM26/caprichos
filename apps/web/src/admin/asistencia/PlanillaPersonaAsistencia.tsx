@@ -57,17 +57,14 @@ export function ResumenExtraSemanas({ dias }: { dias: DiaPlanillaApi[] }) {
   const filas = [...semanas.entries()].map(([lunes, ds]) => {
     const suma = (f: (x: DiaPlanillaApi) => number) => ds.reduce((a, x) => a + f(x), 0);
     const extra = suma((x) => x.extraMin);
-    const bruta = suma((x) => x.extraBrutaMin ?? x.extraMin);
     const porAprobar = suma((x) => (x.extraAprobada ? 0 : x.extraMin));
-    return { lunes, extra, bruta, porAprobar, aprobada: extra - porAprobar, prog: suma((x) => x.programadaMin) };
-  }).filter((s) => s.extra > 0 || s.bruta > 0);
+    return { lunes, extra, porAprobar, aprobada: extra - porAprobar };
+  }).filter((s) => s.extra > 0);
   if (filas.length === 0) return null;
   return (
     <ul className="pl-filas" data-testid="extra-semanas">
       {filas.map((s) => (
-        <Fila key={s.lunes} t={`Semana del ${s.lunes}`} v={s.extra > 0
-          ? `${s.extra} min de extra (${s.porAprobar > 0 ? `${s.porAprobar} min por aprobar` : 'todo aprobado'}${s.aprobada > 0 && s.porAprobar > 0 ? `, ${s.aprobada} ya aprobados` : ''})`
-          : `Sin extra: ${s.bruta} min de más cubren horas programadas que no se trabajaron esta semana (${horas(s.prog)} h programadas); se pagan como hora normal`} />
+        <Fila key={s.lunes} t={`Semana del ${s.lunes}`} v={`${s.extra} min de extra (${s.porAprobar} por aprobar, ${s.aprobada} aprobados)`} />
       ))}
     </ul>
   );
@@ -156,7 +153,7 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
                             onChange={(e) => setExtraPorConfirmar({ jornada: x.jornada, aprobar: e.target.checked, min: x.extraMin, descanso: !!x.descansoTrabajado })} />
                           {x.extraAprobada ? 'Aprobada' : x.descansoTrabajado ? 'Aprobar descanso trabajado' : 'Sin aprobar'}
                         </label>
-                      ) : (x.extraBrutaMin ?? 0) > 0 ? <small>Pasó a hora normal (cubre horas de la semana)</small> : '—'}
+                      ) : '—'}
                     </td>
                     <td data-label="Ganado" className="as-num">{soles(x.ganado)}</td>
                     <td data-label="Detalle">

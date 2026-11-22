@@ -41,17 +41,19 @@ describe('Aprobar horas extra desde la tabla', () => {
   });
 
   it('semana con extra: resume cuánto hay y cuánto falta aprobar; día aprobado sigue visible', () => {
-    const aprobado = { ...dia, jornada: '2026-11-11', extraMin: 60, extraBrutaMin: 60, extraAprobada: true, extraPendiente: false };
+    const aprobado = { ...dia, jornada: '2026-11-11', extraMin: 60, extraAprobada: true, extraPendiente: false };
     const c: any = { d: { partyId: 15, dias: [dia, aprobado] }, r: { ganado: 60, extraMin: 93, extraAprobadaMin: 60, pagoExtra: 0 }, pagado: false, ocupado: false, faltan: 0, penal: 0, detallePenal: [], ejecutar: vi.fn() };
     render(<PestanaAsistencia c={c} />);
-    expect(screen.getByTestId('extra-semanas').textContent).toMatch(/93 min de extra \(33 min por aprobar, 60 ya aprobados\)/);
+    expect(screen.getByTestId('extra-semanas').textContent).toMatch(/93 min de extra \(33 por aprobar, 60 aprobados\)/);
   });
 
-  it('semana sin extra por la regla semanal: lo explica en vez de quitar la acción sin aviso', () => {
-    const pasoANormal = { ...dia, extraMin: 0, extraBrutaMin: 120, extraPendiente: false };
-    const c: any = { d: { partyId: 15, dias: [pasoANormal] }, r: { ganado: 60, extraMin: 0, extraAprobadaMin: 0, pagoExtra: 0 }, pagado: false, ocupado: false, faltan: 0, penal: 0, detallePenal: [], ejecutar: vi.fn() };
+  it('semana con falta y días largos: la extra del día sigue aprobable y no hay texto de hora normal', () => {
+    const falta = { ...dia, jornada: '2026-11-16', estado: 'FALTA', programadaMin: 540, trabajadaMin: 0, extraMin: 0, extraPendiente: false };
+    const largo = { ...dia, jornada: '2026-11-17', extraMin: 120, extraAprobada: false, extraPendiente: true };
+    const c: any = { d: { partyId: 15, dias: [falta, largo] }, r: { ganado: 60, extraMin: 120, extraAprobadaMin: 0, pagoExtra: 0 }, pagado: false, ocupado: false, faltan: 0, penal: 0, detallePenal: [], ejecutar: vi.fn() };
     render(<PestanaAsistencia c={c} />);
-    expect(screen.getByTestId('extra-semanas').textContent).toMatch(/Sin extra: 120 min de más cubren horas programadas/);
-    expect(screen.getAllByText(/Pasó a hora normal/).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('extra-semanas').textContent).toMatch(/120 min de extra \(120 por aprobar, 0 aprobados\)/);
+    expect(screen.queryByText(/hora normal/)).toBeNull();
+    expect(screen.getByLabelText(/Aprobar las horas extra del 2026-11-17/)).toBeTruthy();
   });
 });

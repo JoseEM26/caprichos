@@ -292,3 +292,23 @@ describe('descanso trabajado: se paga a valor hora normal, sin el 1,25 de la ext
     expect(pagoDia(dia(false), vh, true, 1.25)).toBeCloseTo((523 / 60) * vh * 1.25, 2);
   });
 });
+
+describe('Extra por día (22/11): la falta no se compensa con la extra', () => {
+  // Valor hora fijo S/ 10; semana: lunes falta (9 h), martes 9 h + 2 h extra
+  const dias = [
+    dia({ jornada: '2026-11-16', estado: 'FALTA', programadaMin: 540 }),
+    dia({ jornada: '2026-11-17', programadaMin: 540, trabajadaMin: 540, extraMin: 120 }),
+  ];
+  const e = { ...base, dias, sueldoPeriodo: 0, valorHora: 10, multiplicadorExtra: 1.25 };
+  it('la extra del día queda entera y aprobable; la falta no paga y no resta de la extra', () => {
+    const r = calcularPlanilla({ ...e, extrasAprobadas: new Set(['2026-11-17']) });
+    expect(r.extraMin).toBe(120);
+    expect(r.extraAprobadaMin).toBe(120);
+    expect(r.pagoTrabajado).toBe(90); // solo el martes, 9 h
+    expect(r.pagoExtra).toBe(25); // 2 h × 10 × 1,25
+    expect(r.ganado).toBe(115); // sin doble conteo
+  });
+  it('sin aprobar, la extra no suma', () => {
+    expect(calcularPlanilla(e).ganado).toBe(90);
+  });
+});
