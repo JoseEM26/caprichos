@@ -679,8 +679,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   private fraseDePedido(flujo: FlujoConversacion, entrada: EntradaNormalizada, contexto: ContextoConversacion): PedidoLibre | null {
     const estado = String(flujo.estado || '');
     if (entrada.id || !ESTADOS_FRASE.includes(estado) || !entrada.texto) return null;
-    // Local cerrado con programación: primero se elige el día y la hora (flujo propio)
-    if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) return null;
+    // Local cerrado con programación: primero se elige el día y la hora (flujo propio); ya elegidos, el pedido en frase vale igual
+    if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta && !flujo.pedido?.programadoPara) return null;
     if (esPregunta(entrada.texto, entrada.textoOriginal)) return null;
     // Con el pedido en un paso de texto simple («delivery», «recoger») se atiende ese paso, no una frase
     if (estado === 'PEDIDO_MODALIDAD' && /^(delivery|recoger|para recoger|para llevar|llevar|domicilio|a domicilio)$/.test(entrada.texto)) return null;
@@ -1043,8 +1043,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
   private pasoPagoCamino(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, entrada: EntradaNormalizada, contexto: ContextoConversacion): ResultadoTransicion {
     const t = entrada.texto || '';
-    const pagado = entrada.id === 'ped_camino_pagado' || t.includes('pagado');
-    const recibir = entrada.id === 'ped_camino_recibir' || t.includes('recibir');
+    const pagado = entrada.id === 'ped_camino_pagado' || t.includes('pagado') || t.includes('ahora') || /yape|plin|voucher/.test(t);
+    const recibir = entrada.id === 'ped_camino_recibir' || t.includes('recibir') || t.includes('recoger');
     if (!pagado && !recibir) return this.preguntarCaminoPago(flujo, pedido);
     if (pagado && this.mediosDelPedido({ ...pedido, pagoCamino: 'DEJAR_PAGADO' }, contexto).length === 0) {
       const r = this.mostrarOpcionesPago(flujo, { ...pedido, pagoCamino: 'AL_RECIBIR' }, contexto);

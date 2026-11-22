@@ -43,6 +43,8 @@ export function turnoDocil(s: Simulador, o: Objetivo): boolean {
   // Menús con opciones
   if (/con cuanto pagas/.test(txt)) return pick(o.paga ? new RegExp(`\\b${o.paga}\\b`) : /exacto/, /exacto/, /./);
   if (ops.some((x) => /^confirmar pedido/.test(x.t))) return pick(/^confirmar pedido/);
+  // Pedido programado con el local cerrado: «Pagar ahora» (Yape/Plin con voucher) o «Pagar al recibir»
+  if (ops.some((x) => /^pagar ahora/.test(x.t))) return pick(o.pago === 'EFECTIVO' ? /pagar al recibir/ : /pagar ahora/);
   if (ops.some((x) => /delivery/.test(x.t)) && ops.some((x) => /recoger/.test(x.t))) return pick(o.modalidad === 'DELIVERY' ? /delivery/ : /recoger/);
   if (/como pagaras/.test(txt)) return pick(new RegExp(o.pago === 'TARJETA' ? 'tarjeta' : o.pago.toLowerCase()));
   if (ops.some((x) => /comprobante simple/.test(x.t))) return pick(new RegExp(o.comprobante ?? 'simple'));

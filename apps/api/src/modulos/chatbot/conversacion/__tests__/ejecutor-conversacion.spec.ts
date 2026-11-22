@@ -490,7 +490,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
 
   describe('5. Pruebas de ampliación (a) a (f): consumo real de BD y seguridad', () => {
 
-    it('(b) Disponibilidad: cerrado sin pedido en curso, el motor calla (el aviso único lo da la autorespuesta)', async () => {
+    it('(b) Disponibilidad: cerrado sin pedido en curso, el bot contesta con el aviso de cerrado y la hora de apertura (nunca silencio)', async () => {
       mockLocalService.obtenerEstadoCarta.mockResolvedValueOnce({
         abierta: false,
         abre: '18:00',
@@ -508,8 +508,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       });
 
       await service.procesarMensajeEntrante(21n, { texto: 'hola' });
-      expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
-      expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
+      expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(expect.anything(), expect.stringMatching(/cerrados.*18:00/s), expect.anything(), expect.anything(), expect.anything());
     });
 
     it('(b2) Cerrado con «Pedidos programados fuera de horario» encendido: el bot atiende y ofrece programar (llevar o delivery)', async () => {
@@ -522,8 +521,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       expect(mockLocalService.horasProgramables).toHaveBeenCalled();
       expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
         expect.anything(),
-        expect.stringContaining('programarte tu pedido para llevar o delivery'),
-        [expect.objectContaining({ id: 'pedir' })],
+        expect.stringContaining('no podemos atender pedidos para ahora'),
+        [expect.objectContaining({ id: 'pedir' }), expect.objectContaining({ id: 'btn_horario' }), expect.objectContaining({ id: 'persona' })],
         expect.anything(),
       );
     });

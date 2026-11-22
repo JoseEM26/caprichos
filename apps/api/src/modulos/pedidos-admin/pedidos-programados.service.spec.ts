@@ -44,4 +44,16 @@ describe('PedidosProgramadosService.pasarACola', () => {
     expect(await svc.pasarACola(new Date())).toEqual([]);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('un programado creado con la caja CERRADA pasa a cocina a su hora: no mira la caja ni toca el stock (ya se separó al crearlo)', async () => {
+    const { svc, prisma, tx } = armar([{ id: 7n, codigo: 'CP-W007' }]);
+    prisma.parametro.findMany.mockResolvedValue([{ clave: 'programado_aviso_min', valor: 45 }]);
+    const ahora = new Date('2026-11-23T14:15:00.000Z');
+    expect(await svc.pasarACola(ahora)).toEqual(['CP-W007']);
+    // aviso configurado: 45 min antes de la hora pactada
+    expect(prisma.pedido.findMany.mock.calls[0][0].where.programado_para.lte).toEqual(new Date('2026-11-23T15:00:00.000Z'));
+    expect(prisma.caja).toBeUndefined();
+    expect(tx.movimientoStock).toBeUndefined();
+    expect(tx.pedido.updateMany).toHaveBeenCalledWith({ where: { id: 7n, estado: 'PROGRAMADO' }, data: { estado: 'COLA', pasa_cocina_en: ahora } });
+  });
 });

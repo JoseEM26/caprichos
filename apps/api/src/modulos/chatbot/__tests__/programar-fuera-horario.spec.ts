@@ -36,15 +36,16 @@ describe('Bot cerrado: solo programar', () => {
     it('un «hola» explica que estamos cerrados y ofrece SOLO programar (sin el menú completo)', () => {
       const r = paso(base('INICIO'), { texto: 'hola' }, programando());
       expect(tipos(r)).toEqual(['enviarBotones']);
-      expect(textos(r)).toContain('Ahora estamos cerrados');
-      expect(textos(r)).toContain('programarte tu pedido para llevar o delivery dentro de nuestro horario');
-      expect(ids(r)).toEqual(['pedir']);
+      expect(textos(r)).toContain('Estamos fuera de horario');
+      expect(textos(r)).toContain('no podemos atender pedidos para ahora');
+      expect(textos(r)).toContain('pedido programado');
+      expect(ids(r)).toEqual(['pedir', 'btn_horario', 'persona']);
     });
 
     it('cualquier otro tema recibe el mismo aviso de cerrado con la oferta de programar', () => {
       const r = paso(base('MENU'), { texto: 'tienen tortas de chocolate hoy' }, programando());
-      expect(textos(r)).toContain('Ahora estamos cerrados');
-      expect(ids(r)).toEqual(['pedir']);
+      expect(textos(r)).toContain('Estamos fuera de horario');
+      expect(ids(r)).toEqual(['pedir', 'btn_horario', 'persona']);
     });
 
     it('pedir una persona o preguntar por su pedido sigue su camino de siempre', () => {
@@ -99,7 +100,7 @@ describe('Bot cerrado: solo programar', () => {
     it('«Pedir este» de un producto con el local cerrado ofrece programar el pedido (no dice «no tomamos pedidos»)', () => {
       const r = paso(base('MENU'), { buttonPayload: 'ped_prod_12' }, programando());
       expect(ids(r)).toEqual(['pedir']);
-      expect(textos(r)).toContain('programarte tu pedido');
+      expect(textos(r)).toContain('pedido programado');
       expect(textos(r)).not.toContain('No tomamos pedidos');
     });
 
@@ -130,7 +131,7 @@ describe('Bot cerrado: solo programar', () => {
     it('antes de elegir el medio pregunta el camino: pagar al recibir o dejarlo pagado', () => {
       const r = paso(base('PEDIDO_COMPROBANTE_TIPO', pedido()), { buttonPayload: 'ped_comp_simple' }, contextoPago());
       expect(r.nuevoEstado).toBe('PEDIDO_PAGO_CAMINO');
-      expect(ids(r)).toEqual(['ped_camino_recibir', 'ped_camino_pagado']);
+      expect(ids(r)).toEqual(['ped_camino_pagado', 'ped_camino_recibir']);
     });
 
     it('«Pagar al recibir» ofrece los medios habilitados (sin Culqi ni pago dividido)', () => {
@@ -173,7 +174,7 @@ describe('Bot cerrado: solo programar', () => {
   });
 });
 
-/** Fuera de horario, la cortesía automática deja pasar al bot solo si el parámetro está encendido. */
+/** Fuera de horario, la cortesía automática deja siempre que el bot conteste (con o sin programación). */
 describe('Autorespuesta con el local cerrado', () => {
   function montar(fueraHorario: boolean) {
     const enviados: any[] = [];
@@ -200,16 +201,15 @@ describe('Autorespuesta con el local cerrado', () => {
     return { hablar, enviados };
   }
 
-  it('parámetro encendido: no manda el aviso fijo, deja que el bot ofrezca programar', async () => {
+  it('parámetro encendido: no manda aviso fijo, deja que el bot ofrezca programar', async () => {
     const { hablar, enviados } = montar(true);
     expect(await hablar()).toBe(false);
     expect(enviados).toHaveLength(0);
   });
 
-  it('parámetro apagado: el aviso único de cerrado de siempre', async () => {
+  it('parámetro apagado: el bot igual contesta (nunca silencio); el aviso fijo ya no se manda', async () => {
     const { hablar, enviados } = montar(false);
-    expect(await hablar()).toBe(true);
-    expect(enviados).toHaveLength(1);
-    expect(enviados[0].carga.textoLibre).toContain('Ahora estamos cerrados');
+    expect(await hablar()).toBe(false);
+    expect(enviados).toHaveLength(0);
   });
 });

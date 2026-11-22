@@ -5,7 +5,9 @@ import type { EstadoLocalCarta } from './tipos';
 /** Días y horas que el cliente puede elegir para programar su pedido con el local cerrado (GET /carta/programar-horas). */
 export interface ProgramarCarta {
   diasMax: number;
-  dias: { fecha: string; horas: { hora: string; iso: string }[] }[];
+  /** Día de hoy en Lima (YYYY-MM-DD), para decir «hoy» y «mañana». */
+  hoy?: string;
+  dias: { fecha: string; abre?: string; horas: { hora: string; iso: string }[] }[];
 }
 
 const CINCO_MIN = 5 * 60_000;
@@ -27,7 +29,7 @@ export function useProgramarFueraHorario(estadoLocal: EstadoLocalCarta | null): 
     const traer = () =>
       Promise.resolve(api.get<{ habilitado?: boolean } & ProgramarCarta>('/carta/programar-horas'))
         .then((r) => {
-          if (vivo) setDatos(r?.habilitado && Array.isArray(r.dias) && r.dias.length > 0 ? { diasMax: r.diasMax, dias: r.dias } : null);
+          if (vivo) setDatos(r?.habilitado && Array.isArray(r.dias) && r.dias.length > 0 ? { diasMax: r.diasMax, hoy: r.hoy, dias: r.dias } : null);
         })
         .catch(() => {
           if (vivo) setDatos(null);
@@ -52,6 +54,23 @@ export function diaLargo(fechaIso: string): string {
     .replace(',', '');
 }
 
+/** «hoy» / «mañana» / «lunes 1 de marzo» para una fecha YYYY-MM-DD, según el «hoy» de Lima que manda el servidor. */
+export function cuando(fechaIso: string, hoy?: string): string {
+  if (hoy && fechaIso === hoy) return 'hoy';
+  if (hoy) {
+    const m = new Date(`${hoy}T12:00:00.000-05:00`);
+    m.setUTCDate(m.getUTCDate() + 1);
+    if (fechaIso === m.toISOString().slice(0, 10)) return 'mañana';
+  }
+  return diaLargo(fechaIso);
+}
+
+/** «Abrimos hoy a las 15:00» (próximo día con horas disponibles); vacío si no se sabe. */
+export function textoApertura(programar?: ProgramarCarta | null): string {
+  const d = programar?.dias[0];
+  return d?.abre ? ` Abrimos ${cuando(d.fecha, programar?.hoy)} a las ${d.abre}.` : '';
+}
+
 /** «lunes 1 de marzo a las 10:30» desde el instante ISO pactado (hora de Lima). */
 export function textoDiaHora(iso: string): string {
   const d = new Date(iso);
@@ -64,7 +83,7 @@ export const TEXTO_CERRADO_PROGRAMAR =
   'Estamos cerrados ahora, pero puedes programar tu pedido para llevar o delivery y lo atendemos en nuestro horario.';
 
 /** Aviso amable (no es un error): cuando se puede programar, el cierre deja de ser un bloqueo. */
-export function AvisoProgramar({ compacto = false }: { compacto?: boolean }) {
+export function AvisoProgramar({ compacto = false, programar = null }: { compacto?: boolean; programar?: ProgramarCarta | null }) {
   return (
     <div
       role="status"
@@ -82,6 +101,7 @@ export function AvisoProgramar({ compacto = false }: { compacto?: boolean }) {
     >
       <span aria-hidden="true">🕒 </span>
       {TEXTO_CERRADO_PROGRAMAR}
+      {textoApertura(programar)}
     </div>
   );
 }
@@ -111,7 +131,7 @@ export function SelectorCuando({ programar, valor, alCambiar }: { programar: Pro
         >
           {programar.dias.map((d) => (
             <option key={d.fecha} value={d.fecha}>
-              {cap(diaLargo(d.fecha))}
+              {['hoy', 'mañana'].includes(cuando(d.fecha, programar.hoy)) ? `${cap(cuando(d.fecha, programar.hoy))} · ${diaLargo(d.fecha)}` : cap(diaLargo(d.fecha))}
             </option>
           ))}
         </select>
@@ -159,8 +179,8 @@ export type CaminoPago = 'RECIBIR' | 'PAGADO';
 export const MEDIOS_DEJAR_PAGADO = ['YAPE', 'PLIN', 'TRANSFERENCIA'] as const;
 
 const CAMINOS: { id: CaminoPago; titulo: string; texto: string }[] = [
-  { id: 'RECIBIR', titulo: 'Pagar al recibir', texto: 'Pagas cuando te lo entreguemos o lo recojas. No se cobra nada ahora.' },
-  { id: 'PAGADO', titulo: 'Dejarlo pagado', texto: 'Paga con Yape, Plin o transferencia y sube la captura de tu pago. Así tu pedido queda listo.' },
+  { id: 'RECIBIR', titulo: 'Pagar al recoger o recibir', texto: 'Pagas cuando te lo entreguemos o lo recojas. Queda pendiente de pago, no se cobra nada ahora.' },
+  { id: 'PAGADO', titulo: 'Pagar ahora con Yape o Plin', texto: 'Envía tu voucher (captura de tu pago) y tu pedido queda pagado. También puedes usar transferencia.' },
 ];
 
 /** «¿Cómo prefieres pagar?» para un pedido programado: pagar al recibir o dejarlo pagado con captura. */

@@ -73,7 +73,7 @@ describe('ProgramarPedido: componentes', () => {
   it('SelectorCaminoPago: dos caminos claros y el aviso del pago en línea', () => {
     const elegidos: string[] = [];
     render(<SelectorCaminoPago valor={null} alCambiar={(c) => elegidos.push(c)} />);
-    expect(screen.getByRole('radio', { name: /Pagar al recibir/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Pagar al recoger o recibir/ })).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(screen.getByTestId('camino-pago-pagado'));
     expect(elegidos).toEqual(['PAGADO']);
     expect(screen.getByTestId('aviso-pago-en-linea-horario')).toHaveTextContent('El pago en línea con tarjeta está disponible dentro del horario; puedes pagar al recibir o dejar tu Yape con captura.');

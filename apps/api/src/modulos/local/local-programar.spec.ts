@@ -81,6 +81,27 @@ describe('LocalService: programar fuera de horario', () => {
       expect(dias[0].fecha).toBe('2027-03-02');
     });
 
+    it('«hoy más tarde»: antes de abrir (08:00) hoy se ofrece desde la apertura, y trae «hoy» y la hora de apertura de cada día', async () => {
+      const r = await service.horasProgramables(limaIso('2027-03-01', '08:00'));
+      expect(r.hoy).toBe('2027-03-01');
+      expect(r.dias[0]).toMatchObject({ fecha: '2027-03-01', abre: '10:00' });
+      expect(r.dias[0].horas.map((h) => h.hora)).toEqual(['10:00', '10:30', '11:00', '11:30']);
+    });
+
+    it('respeta un tiempo mínimo de preparación: a las 09:50 ya no se ofrece las 10:00 (faltan menos de 15 min)', async () => {
+      const { dias } = await service.horasProgramables(limaIso('2027-03-01', '09:50'));
+      expect(dias[0].horas.map((h) => h.hora)).toEqual(['10:30', '11:00', '11:30']);
+    });
+
+    it('un feriado cerrado no sale y un día con horario especial ofrece SU horario', async () => {
+      especiales['2027-03-02'] = { cerrado: true, abre: null, cierra: null };
+      especiales['2027-03-03'] = { cerrado: false, abre: horaToDate('15:00'), cierra: horaToDate('16:00') };
+      const { dias } = await service.horasProgramables(domingoNoche);
+      expect(dias.map((d) => d.fecha)).not.toContain('2027-03-02');
+      expect(dias.find((d) => d.fecha === '2027-03-03')).toMatchObject({ abre: '15:00' });
+      expect(dias.find((d) => d.fecha === '2027-03-03')!.horas.map((h) => h.hora)).toEqual(['15:00', '15:30']);
+    });
+
     it('cada hora ofrecida pasa la validación del servidor', async () => {
       const { dias } = await service.horasProgramables(domingoNoche);
       for (const d of dias) for (const h of d.horas) await expect(service.exigirAbiertoEn(new Date(h.iso))).resolves.toBeUndefined();

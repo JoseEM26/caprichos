@@ -24,7 +24,7 @@ import {
   TITULO_SECCION_MENU,
   TITULO_SECCION_PREGUNTAS,
 } from './textos-bot';
-import { BOTON_PROGRAMAR_PEDIDO, TEXTOS_PROGRAMAR } from './textos-programar';
+import { BOTON_PERSONA_CERRADO, BOTON_PROGRAMAR_PEDIDO, BOTON_VER_HORARIO, TEXTOS_PROGRAMAR } from './textos-programar';
 import {
   AccionEnviarLista,
   AccionMensaje,
@@ -2123,7 +2123,26 @@ function transicionarSoloMenusNucleo(
     const quierePedir = esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido', 'programar']);
     if (!otroTema && !quierePedir) {
       const nombreReal = nombreParaSaludo(contexto.nombreCliente);
-      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.bienvenida(nombreReal ? nombreReal.split(/\s+/)[0] : null), botones: [BOTON_PROGRAMAR_PEDIDO] }]);
+      const primer = nombreReal ? nombreReal.split(/\s+/)[0] : null;
+      const prim = contexto.programacion?.dias?.[0];
+      const apertura = prim && prim.abre ? TEXTOS_PROGRAMAR.apertura(prim.fecha, contexto.programacion?.hoy ?? prim.fecha, prim.abre) : contexto.datosLocal?.abre ? `hoy a las ${contexto.datosLocal.abre}` : null;
+      const avisadoHace = Date.now() - Number((flujo as any).avisoCerradoEn ?? 0);
+      const yaAvisado = avisadoHace >= 0 && avisadoHace < 6 * 3_600_000;
+      // «Horario»: se contesta con el horario real y se vuelve a ofrecer programar
+      if (esId('btn_horario', 'horario', 'faq_horario') || RE_HORARIO.test(texto)) {
+        return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal), botones: [BOTON_PROGRAMAR_PEDIDO, BOTON_PERSONA_CERRADO] }]);
+      }
+      // Pregunta libre y la IA está encendida: ella contesta (nunca toma el pedido para ahora: «pedir» lleva a programar)
+      if (yaAvisado && contexto.chatbotIaActivo && !id && !esSaludoPuro(texto) && /[a-z]{3}/.test(texto) && texto.trim().split(/\s+/).length >= 4) {
+        return respuesta([{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }]);
+      }
+      // Primer mensaje: aviso completo con botones; si vuelve a escribir, una línea corta (no el mismo texto)
+      const r = respuesta([
+        yaAvisado
+          ? { tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.recordatorio(apertura), botones: [BOTON_PROGRAMAR_PEDIDO, BOTON_VER_HORARIO] }
+          : { tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.bienvenida(primer, apertura), botones: [BOTON_PROGRAMAR_PEDIDO, BOTON_VER_HORARIO, BOTON_PERSONA_CERRADO] },
+      ]);
+      return { ...r, nuevoFlujo: { ...r.nuevoFlujo, avisoCerradoEn: yaAvisado ? (flujo as any).avisoCerradoEn : Date.now() } as FlujoConversacion };
     }
   }
 
@@ -2183,9 +2202,10 @@ function transicionarSoloMenusNucleo(
 
   // 2. Hablar con una persona (también en mitad de un pedido)
   if (esId('persona', 'btn_persona', 'btn_asi_persona', 'btn_esp_persona') || hay(PALABRAS_PERSONA_SOLO)) {
-    const estaCerrado = contexto.datosLocal && contexto.datosLocal.abierta === false;
+    const estaCerrado = contexto.datosLocal && contexto.datosLocal.abierta === false && !contexto.datosLocal.pausaAltaDemanda;
     const horaAbre = contexto.datosLocal?.abre || '15:00';
-    const horaCierra = contexto.datosLocal?.cierra || '23:00';
+    const prim = contexto.programacion?.dias?.[0];
+    const apertura = prim?.abre ? TEXTOS_PROGRAMAR.apertura(prim.fecha, contexto.programacion?.hoy ?? prim.fecha, prim.abre) : `hoy a las ${horaAbre}`;
     return {
       nuevoEstado: 'ATENCION_PERSONA',
       acciones: [
@@ -2193,12 +2213,12 @@ function transicionarSoloMenusNucleo(
           tipo: 'pasarAPersona',
           motivo: estaCerrado ? 'FUERA_DE_HORARIO' : 'CLIENTE_SOLICITO_PERSONA',
           mensajeCliente: entrada.textoOriginal,
+          // Fuera de horario: sin campanita de noche; el chat queda urgente para salir PRIMERO en Mensajes al abrir
+          ...(estaCerrado ? { esUrgente: true, sinCampanita: true } : {}),
         },
         {
           tipo: 'enviarTexto',
-          texto: estaCerrado
-            ? TEXTOS_CAMBIOS.fueraDeHorario(horaAbre, horaCierra, horaAbre)
-            : TEXTOS_BOT.pasarAPersona(contexto.textosPersonalizados?.chatbot_texto_pase_persona),
+          texto: estaCerrado ? TEXTOS_PROGRAMAR.personaCuandoAbramos(apertura) : TEXTOS_BOT.pasarAPersona(contexto.textosPersonalizados?.chatbot_texto_pase_persona),
         },
       ],
       nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },

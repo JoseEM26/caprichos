@@ -1339,7 +1339,7 @@ export function FormularioCheckout({
               {/* ================= APARTADO 1: TUS DATOS ================= */}
               {paso === 1 && (
                 <>
-                  {programando && <AvisoProgramar />}
+                  {programando && <AvisoProgramar programar={programar} />}
 
                   {/* Modalidad de entrega */}
                   <div

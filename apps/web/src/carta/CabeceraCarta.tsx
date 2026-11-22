@@ -3,7 +3,7 @@ import { DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { MenuOpciones } from './MenuOpciones';
-import { TEXTO_CERRADO_PROGRAMAR, type ProgramarCarta } from './ProgramarPedido';
+import { TEXTO_CERRADO_PROGRAMAR, textoApertura, type ProgramarCarta } from './ProgramarPedido';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
 
@@ -97,6 +97,7 @@ export function CabeceraCarta({
           style={{ backgroundColor: 'var(--cp-navy)', color: '#FFFFFF', padding: '8px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}
         >
           {TEXTO_CERRADO_PROGRAMAR}
+          {textoApertura(programar)}
         </div>
       )}
       {cerrado && !puedeProgramar && (

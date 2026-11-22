@@ -8,10 +8,12 @@ import { BotonAccion } from './tipos-conversacion';
 /** Filas que se muestran por página (WhatsApp admite 10 por lista: 8 + «Ver más»). */
 export const FILAS_PROGRAMAR_POR_PAGINA = 8;
 
-export const BOTON_PROGRAMAR_PEDIDO: BotonAccion = { id: 'pedir', titulo: 'Programar mi pedido' };
+export const BOTON_PROGRAMAR_PEDIDO: BotonAccion = { id: 'pedir', titulo: 'Programar pedido' };
+export const BOTON_VER_HORARIO: BotonAccion = { id: 'btn_horario', titulo: 'Ver horario' };
+export const BOTON_PERSONA_CERRADO: BotonAccion = { id: 'persona', titulo: 'Hablar con persona' };
 export const BOTONES_PEDIDO_CAMINO_PAGO: BotonAccion[] = [
+  { id: 'ped_camino_pagado', titulo: 'Pagar ahora' },
   { id: 'ped_camino_recibir', titulo: 'Pagar al recibir' },
-  { id: 'ped_camino_pagado', titulo: 'Dejarlo pagado' },
 ];
 
 /** «lunes 3 de noviembre» (día de calendario de Lima). */
@@ -35,9 +37,24 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 export const tituloFilaDia = (fechaIso: string): string => cap(etiquetaDia(fechaIso)).slice(0, 24);
 
 export const TEXTOS_PROGRAMAR = {
-  /** Saludo fuera de horario: explica que estamos cerrados y ofrece solo programar. */
+  /** Primer mensaje fuera de horario: explica que no se atiende para ahora y ofrece programar. `apertura`: «hoy a las 14:00». */
   bienvenida: (nombre?: string | null, apertura?: string | null): string =>
-    `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Ahora estamos cerrados${apertura ? ` (abrimos ${apertura})` : ''}, pero puedo programarte tu pedido para llevar o delivery dentro de nuestro horario. 🙌\n¿Quieres programarlo?`,
+    `¡Hola${nombre ? ` ${nombre}` : ''}! 💛 Estamos fuera de horario${apertura ? ` (abrimos ${apertura})` : ''}, no podemos atender pedidos para ahora. Puedes dejar tu pedido programado para cuando estemos abiertos 👇`,
+
+  /** Si vuelve a escribir sin pedir nada: corto, sin repetir el aviso completo. */
+  recordatorio: (apertura?: string | null): string =>
+    `Seguimos fuera de horario${apertura ? ` (abrimos ${apertura})` : ''} 🙏 Si quieres, te programo tu pedido para cuando estemos abiertos.`,
+
+  /** «hoy a las 14:00» / «mañana a las 10:00» / «el lunes 3 de noviembre a las 10:00». */
+  apertura: (fechaIso: string, hoyIso: string, hora: string): string => {
+    const manana = new Date(`${hoyIso}T12:00:00.000-05:00`);
+    manana.setUTCDate(manana.getUTCDate() + 1);
+    const dia = fechaIso === hoyIso ? 'hoy' : fechaIso === manana.toISOString().slice(0, 10) ? 'mañana' : `el ${etiquetaDia(fechaIso)}`;
+    return `${dia} a las ${hora}`;
+  },
+
+  /** Pidió una persona con el local cerrado. `apertura`: «hoy a las 14:00». */
+  personaCuandoAbramos: (apertura: string): string => `Te escribiremos cuando abramos ${apertura} 💛`,
 
   sinHorarios: (): string =>
     'Por ahora no tengo horarios disponibles para programar. Escríbenos cuando abramos y con gusto te atendemos. 💛',
@@ -49,7 +66,7 @@ export const TEXTOS_PROGRAMAR = {
   programadoOk: (iso: string): string => `Listo, tu pedido será para el ${etiquetaDiaHora(iso)}. 😊 Ahora armemos tu pedido.`,
 
   preguntaCaminoPago: (): string =>
-    '💳 ¿Cómo prefieres pagar?\n• *Pagar al recibir*: pagas cuando llegue o lo recojas.\n• *Dejarlo pagado*: nos envías la captura de tu Yape, Plin o transferencia y lo dejas listo.',
+    '💳 ¿Cómo prefieres pagar?\n• *Pagar ahora* con Yape o Plin: nos envías tu voucher (captura) y lo dejas pagado.\n• *Pagar al recibir*: pagas cuando lo recojas o llegue (queda pendiente de pago).',
   sinMediosDigitales: (): string => 'Por ahora no tengo Yape, Plin ni transferencia disponibles, así que pagarás al recibir. 🙏',
 
   /** Línea del resumen final de un pedido programado. */

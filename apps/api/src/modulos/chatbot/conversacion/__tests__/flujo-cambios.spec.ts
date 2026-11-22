@@ -429,10 +429,10 @@ describe('Flujo de Cambios después del Pedido y Derivación a Persona (Ola 3, A
       const res = transicionarEstado(flujo, entrada, ctx);
       expect(res.nuevoEstado).toBe('ATENCION_PERSONA');
       const texto = (res.acciones.find((a) => a.tipo === 'enviarTexto') as any).texto;
-      expect(texto).toContain('Ahora estamos cerrados');
-      expect(texto).toContain('16:00');
+      expect(texto).toContain('Te escribiremos cuando abramos hoy a las 16:00');
       const accion = res.acciones.find((a) => a.tipo === 'pasarAPersona');
       expect((accion as any).motivo).toBe('FUERA_DE_HORARIO');
+      expect((accion as any).sinCampanita).toBe(true);
     });
 
     it('queja escrita: deriva con urgencia y marca crearQueja para queja_whatsapp', () => {

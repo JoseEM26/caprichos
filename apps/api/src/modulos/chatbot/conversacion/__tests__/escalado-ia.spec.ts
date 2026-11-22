@@ -190,11 +190,10 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
     expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
   });
 
-  it('fuera de horario y sin pedido en curso: silencio total (ni IA ni respuesta)', async () => {
+  it('fuera de horario y sin pedido en curso: nunca silencio (el bot responde)', async () => {
     (service as any).localService.obtenerEstadoCarta.mockResolvedValue({ abierta: false, abre: '12:00', cierra: '23:00', texto: 'Cerrado' });
     await cliente(CHAT[3]);
-    expect(ia.procesarConsulta).not.toHaveBeenCalled();
-    expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
+    expect(mensajeria.enviarBotones.mock.calls.length + mensajeria.enviarTexto.mock.calls.length + mensajeria.enviarLista.mock.calls.length).toBeGreaterThan(0);
   });
 
   it('fuera de horario con pedido en curso: sigue atendido y dice cuándo responderán', async () => {

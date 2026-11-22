@@ -30,6 +30,8 @@ import { diaCalendarioLima, sumarDiasIso } from '../../comun/fechas-lima';
 
 /** Cada cuántos minutos se ofrece una hora para programar un pedido. */
 export const PASO_HORA_PROGRAMADA_MIN = 30;
+/** Minutos mínimos de anticipación para una hora programada (preparación). */
+export const MIN_ANTICIPACION_PROGRAMADO_MIN = 15;
 
 const aMinutos = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const aHHmm = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -164,10 +166,12 @@ export class LocalService {
    * programados, cada 30 minutos desde que abrimos hasta media hora antes de cerrar, siempre a futuro.
    * Los días cerrados no salen. Cada hora lleva su instante ISO para enviarlo tal cual como programadoPara.
    */
-  async horasProgramables(ahora: Date = new Date()): Promise<{ diasMax: number; dias: { fecha: string; horas: { hora: string; iso: string }[] }[] }> {
+  async horasProgramables(ahora: Date = new Date()): Promise<{ diasMax: number; hoy: string; dias: { fecha: string; abre: string; horas: { hora: string; iso: string }[] }[] }> {
     const { diasMax } = await leerConfigProgramados(this.prisma);
     const hoy = diaCalendarioLima(ahora);
-    const dias: { fecha: string; horas: { hora: string; iso: string }[] }[] = [];
+    const dias: { fecha: string; abre: string; horas: { hora: string; iso: string }[] }[] = [];
+    // Tiempo mínimo para preparar: no se ofrece una hora que ya casi llega
+    const desde = ahora.getTime() + MIN_ANTICIPACION_PROGRAMADO_MIN * 60_000;
     for (let i = 0; i <= diasMax; i++) {
       const fecha = sumarDiasIso(hoy, i);
       const h = await this.horarioDelDia(fecha);
@@ -175,11 +179,11 @@ export class LocalService {
       const horas: { hora: string; iso: string }[] = [];
       for (let m = aMinutos(h.abre); m + PASO_HORA_PROGRAMADA_MIN <= aMinutos(h.cierra); m += PASO_HORA_PROGRAMADA_MIN) {
         const iso = new Date(`${fecha}T${aHHmm(m)}:00.000-05:00`);
-        if (iso.getTime() > ahora.getTime()) horas.push({ hora: aHHmm(m), iso: iso.toISOString() });
+        if (iso.getTime() > desde) horas.push({ hora: aHHmm(m), iso: iso.toISOString() });
       }
-      if (horas.length) dias.push({ fecha, horas });
+      if (horas.length) dias.push({ fecha, abre: h.abre, horas });
     }
-    return { diasMax, dias };
+    return { diasMax, hoy, dias };
   }
 
   /**

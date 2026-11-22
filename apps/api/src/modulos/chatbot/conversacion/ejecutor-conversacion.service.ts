@@ -1228,14 +1228,8 @@ export class EjecutorConversacionService {
       errorServicio = true;
     }
 
-    // Local cerrado: el aviso único lo da AutorespuestaWhatsappService; aquí el bot no conversa (ni «hola de nuevo» ni IA).
-    // Excepción: pedido en curso (últimas 24 h, no terminado) o pago por validar.
-    const terminado = ['ENTREGADO', 'ANULADO', 'CANCELADO', 'FINALIZADO', 'RECHAZADO'];
-    const enCursoCerrado = esValidarPago || String((flujoPrevio as any)?.estado ?? '').startsWith('PAGO') || (pedidoActivo && !terminado.includes(String(pedidoActivo.estado)));
-    if (!errorServicio && datosLocal && datosLocal.abierta === false && !datosLocal.pausaAltaDemanda && !enCursoCerrado && !soloProgramar) {
-      await this.registrarSilencio(conversacion.id, 'Local cerrado: el bot no conversa fuera del horario (ya se avisó la hora de apertura).');
-      return false;
-    }
+    // Local cerrado: el bot SIEMPRE responde (nunca silencio): con programación ofrece programar; sin ella avisa el horario.
+    // El motor (maquina-estados) arma el aviso; spam y «persona atendiendo» se cortan antes.
 
     let minutosInactividad = 0;
     let inactividadExpirada = false;
@@ -2226,29 +2220,32 @@ export class EjecutorConversacionService {
           }
         }
 
-        const tituloNotif = esUrgente
-          ? `URGENTE: Atención en WhatsApp (${nombreMostrar})`
-          : `Atención requerida en WhatsApp (${nombreMostrar})`;
-        const mensajeNotif = accion.mensajeCliente
-          ? `Cliente escribió: "${accion.mensajeCliente.slice(0, 100)}". Motivo: ${accion.motivo}`
-          : `El cliente solicitó hablar con una persona (${accion.motivo}).`;
+        if (accion.sinCampanita) {
+          this.logger.log(`Conversación ${conversacion.id} derivada a PERSONA fuera de horario (sin campanita; queda urgente para cuando abran).`);
+        } else {
+          const tituloNotif = esUrgente
+            ? `URGENTE: Atención en WhatsApp (${nombreMostrar})`
+            : `Atención requerida en WhatsApp (${nombreMostrar})`;
+          const mensajeNotif = accion.mensajeCliente
+            ? `Cliente escribió: "${accion.mensajeCliente.slice(0, 100)}". Motivo: ${accion.motivo}`
+            : `El cliente solicitó hablar con una persona (${accion.motivo}).`;
 
-        const notif = await this.prisma.notificacion.create({
-          data: {
-            tipo: 'ATENCION_WHATSAPP',
-            rol_destino: null, // Visible para ADMIN y CAJA
+          const notif = await this.prisma.notificacion.create({
+            data: {
+              tipo: 'ATENCION_WHATSAPP',
+              rol_destino: null, // Visible para ADMIN y CAJA
+              titulo: tituloNotif,
+              mensaje: mensajeNotif,
+              enlace: '/admin/mensajes',
+            },
+          });
+
+          this.eventos?.emitirAdmin('notificaciones:nueva', {
+            id: notif.id.toString(),
             titulo: tituloNotif,
-            mensaje: mensajeNotif,
-            enlace: '/admin/mensajes',
-          },
-        });
-
-        this.eventos?.emitirAdmin('notificaciones:nueva', {
-          id: notif.id.toString(),
-          titulo: tituloNotif,
-        });
-
-        this.logger.log(`Conversación ${conversacion.id} derivada a PERSONA. Notificación campana id ${notif.id}.`);
+          });
+          this.logger.log(`Conversación ${conversacion.id} derivada a PERSONA. Notificación campana id ${notif.id}.`);
+        }
       } else if (accion.tipo === 'crearPedido') {
         // Tope: no más de N pedidos por WhatsApp sin pagar por número. No se crea el pedido.
         const tope = await topePedidosSinPagarAlcanzado(this.prisma, conversacion.telefono);

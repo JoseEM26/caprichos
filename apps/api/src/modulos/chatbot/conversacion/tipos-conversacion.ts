@@ -145,6 +145,8 @@ export interface AccionPasarAPersona {
   motivo: string;
   mensajeCliente?: string;
   esUrgente?: boolean;
+  /** No crea la notificación de la campana (fuera de horario: el chat solo queda marcado para cuando abran). */
+  sinCampanita?: boolean;
   crearQueja?: boolean;
   quejaTexto?: string;
 }
@@ -353,7 +355,7 @@ export interface ContextoConversacion {
   /** Local cerrado con «pedidos programados fuera de horario» encendido: el bot solo atiende para programar un pedido (llevar o delivery). */
   soloProgramar?: boolean;
   /** Días y horas que se ofrecen para programar (LocalService.horasProgramables). */
-  programacion?: { dias: { fecha: string; horas: { hora: string; iso: string }[] }[] };
+  programacion?: { hoy?: string; dias: { fecha: string; abre?: string; horas: { hora: string; iso: string }[] }[] };
   categoriasCarta?: any[];
   ofertas?: any[];
   /** Promociones vigentes que valen en la carta web y NO por WhatsApp (el bot las nombra, no las vende). */

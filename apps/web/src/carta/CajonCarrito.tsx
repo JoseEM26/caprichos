@@ -650,7 +650,7 @@ export function CajonCarrito({
               )}
             </div>
 
-            {programando && <AvisoProgramar compacto />}
+            {programando && <AvisoProgramar compacto programar={programar} />}
 
             {localBloqueado && (
               <div

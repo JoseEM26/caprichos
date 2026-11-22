@@ -3,7 +3,6 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { LocalService } from '../../local/local.service';
-import { leerConfigProgramados } from '../../pedidos/programado.util';
 import { armarBienvenida, nombreParaSaludo } from '../conversacion/bienvenida.util';
 import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esSaludo } from '../conversacion/cortesia-entrante.util';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
@@ -104,15 +103,15 @@ export class AutorespuestaWhatsappService {
     const link = urlPublicaCarta((k) => this.config.get<string>(k));
     const nombre = nombreParaSaludo(e.nombre);
 
-    // Local cerrado (Meta y Evolution por igual): el bot NO conversa (ni menú ni IA ni «hola de nuevo»). UN solo aviso
-    // (saludo + «Ahora estamos cerrados. Abrimos…») y silencio total hasta que abra o pasen HORAS_ENTRE_AUTORESPUESTAS.
-    // Excepción: quien tiene un pedido en curso o un pago por validar sigue con el bot.
+    // Local cerrado (Meta y Evolution por igual): si el bot va a contestar, él SIEMPRE responde (aviso de fuera de horario
+    // con opción de programar; nunca silencio). Si el bot no contesta (apagado, mensaje que no procesa), UN solo aviso
+    // (saludo + «Ahora estamos cerrados. Abrimos…») hasta que abra o pasen HORAS_ENTRE_AUTORESPUESTAS.
+    // Quien tiene un pedido en curso o un pago por validar sigue con el bot.
     if (!horario.abierto) {
       const enCurso = estadoFlujo.startsWith('PAGO') || e.conversacion.estado === 'VALIDAR_PAGO' || (await this.pedidoDesde(e.telefono, 24 * 3_600_000, true));
       if (enCurso) return false;
-      // «Pedidos programados fuera de horario» encendido: si el bot va a contestar, él ofrece programar (llevar o delivery);
-      // para otros temas el propio bot da el aviso de cerrado. Apagado: el aviso único de siempre.
-      if (e.puedeProcesarMotor && (await this.botActivo()) && (await this.puedeProgramarFueraHorario())) return false;
+      // Cerrado por horario o fecha especial: el bot ofrece programar (si el parámetro está encendido) o avisa el horario.
+      if (e.puedeProcesarMotor && (await this.botActivo()) && (await this.cerradoPorHorario())) return false;
       return this.enviarUnaVez(e.telefono, 'FUERA_DE_HORARIO', await this.avisoCerrado(nombre, horario.apertura, link));
     }
     if (!evolution) return false; // con el local abierto, Meta sigue exactamente como antes
@@ -133,11 +132,10 @@ export class AutorespuestaWhatsappService {
     return armarBienvenida(nombre, { abierta: false, aperturaTexto: apertura }, { textos, linkCarta: link });
   }
 
-  /** Parámetro encendido y local cerrado por horario o fecha especial (una pausa por alta demanda no se programa). */
-  private async puedeProgramarFueraHorario(): Promise<boolean> {
+  /** Local cerrado por horario o fecha especial (una pausa por alta demanda la sigue avisando el aviso único). */
+  private async cerradoPorHorario(): Promise<boolean> {
     if (!this.local) return false;
     try {
-      if (!(await leerConfigProgramados(this.prisma)).fueraHorario) return false;
       const estado = await this.local.obtenerEstadoCartaSeguro();
       return !estado.abierta && estado.motivo !== 'PAUSA';
     } catch {
