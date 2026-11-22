@@ -17,6 +17,13 @@ export const DEFECTOS_EVOLUTION = {
   evolution_pausa_min_seg: 2,
   evolution_pausa_max_seg: 6,
   evolution_escribiendo_ms_por_caracter: 40,
+  /** Pausa humana antes de responder a un mensaje del cliente (con «escribiendo…»), en segundos. No aplica a avisos de pedidos. */
+  evolution_humana_min_seg: 2,
+  evolution_humana_max_seg: 5,
+  /** Alerta a ADMIN: salientes del día sobre factor x promedio de 7 días (mínimo X), y salientes a un mismo chat en una hora (0 = sin alerta). */
+  evolution_alerta_dia_factor: 2,
+  evolution_alerta_dia_minimo: 300,
+  evolution_alerta_chat_hora: 30,
   evolution_horario_desde: 9,
   evolution_horario_hasta: 22,
   evolution_exigir_contacto_previo: 'si',

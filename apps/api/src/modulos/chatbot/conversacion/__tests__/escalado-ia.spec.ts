@@ -29,6 +29,8 @@ const CHAT = [
   'La máquina no me entiende 😅',
 ];
 
+const avisoSpam = jest.fn();
+
 describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efectivo)', () => {
   let service: EjecutorConversacionService;
   let prisma: any;
@@ -84,7 +86,7 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
         { provide: ReservasService, useValue: {} },
         { provide: PedidosService, useValue: {} },
         { provide: ChatbotIaService, useValue: ia },
-        { provide: ChatbotConfiguracionService, useValue: { verificarAntiSpam: jest.fn().mockResolvedValue({ permitido: true }), obtenerFuncionesActivas: jest.fn().mockResolvedValue({}), obtenerTextosBot: jest.fn().mockResolvedValue({}) } },
+        { provide: ChatbotConfiguracionService, useValue: { avisoSpamUnaVez: avisoSpam, verificarAntiSpam: jest.fn().mockResolvedValue({ permitido: true }), obtenerFuncionesActivas: jest.fn().mockResolvedValue({}), obtenerTextosBot: jest.fn().mockResolvedValue({}) } },
         { provide: WHATSAPP_MENSAJERIA_PUERTO, useValue: mensajeria },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
       ],
@@ -171,11 +173,21 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
     expect(huboDerivacion()).toBe(false);
   });
 
-  it('el cliente escribe demasiado rápido (omitir): la IA espera y no se envía nada', async () => {
+  it('el cliente escribe demasiado rápido (omitir): la IA espera; el aviso único ya se dio y no se envía nada más', async () => {
+    avisoSpam.mockResolvedValue(null);
     ia.procesarConsulta.mockResolvedValue(respuestaIa('', { omitir: true }));
     await cliente(CHAT[0]);
     expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
     expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('el cliente escribe demasiado rápido (omitir): la primera vez recibe el aviso único', async () => {
+    avisoSpam.mockResolvedValue('Recibí tus mensajes 😊 dame un momento y te respondo');
+    ia.procesarConsulta.mockResolvedValue(respuestaIa('', { omitir: true }));
+    await cliente(CHAT[0]);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledTimes(1);
+    expect(mensajeria.enviarTexto.mock.calls[0][1]).toContain('Recibí tus mensajes');
+    expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
   });
 
   it('fuera de horario y sin pedido en curso: silencio total (ni IA ni respuesta)', async () => {

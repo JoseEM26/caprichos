@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono as mascara, hashTelefono } from '../utilidades/enmascarar.util';
@@ -10,6 +10,7 @@ import { MenuNumeradoStore } from '../evolution/menu-numerado.store';
 import { escribiendoMs, limitarEnlaces, pausaAleatoriaMs, variarSaludo } from '../evolution/anti-bloqueo.util';
 import { EvolutionApiCliente } from '../evolution/evolution-api.cliente';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
+import { ContadorSalientesService } from '../evolution/contador-salientes.service';
 import {
   BotonAccion,
   EstadoConexionWhatsApp,
@@ -41,6 +42,8 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
   private readonly logger = new Logger(WhatsAppEvolutionAdaptador.name);
   private cola: Promise<unknown> = Promise.resolve();
   private ultimoEnvio = 0;
+  /** Último mensaje del cliente al que se respondió: la pausa humana se aplica una vez por respuesta, no por cada mensaje de ella. */
+  private ultimaRespondida: string | undefined;
   private identicos = new Map<string, { n: number; desde: number }>();
   private medias = new Map<string, { buffer: Buffer; mime: string; nombre?: string; vence: number }>();
 
@@ -49,6 +52,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     private readonly config: EvolutionConfigService,
     private readonly menus: MenuNumeradoStore,
     private readonly prisma: PrismaService,
+    @Optional() private readonly contador?: ContadorSalientesService,
   ) {}
 
   estaConectado(): EstadoConexionWhatsApp {
@@ -72,6 +76,22 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     });
     this.cola = corrida.catch(() => undefined);
     return corrida;
+  }
+
+  /**
+   * Respuesta a un mensaje del cliente (lleva replyToWaMessageId; los avisos de pedidos no): «escribiendo…» y espera aleatoria
+   * antes del primer envío de la respuesta. Corre dentro del turno de la fila, así que no reordena ni frena al webhook.
+   */
+  private async pausaHumana(tel: string, o: OpcionesEnvio | undefined, minSeg: number, maxSeg: number): Promise<void> {
+    const id = o?.replyToWaMessageId;
+    if (!id || id === this.ultimaRespondida || maxSeg <= 0) return;
+    this.ultimaRespondida = id;
+    const ms = pausaAleatoriaMs(minSeg, maxSeg);
+    // Presencia «escribiendo…» (Evolution v2: /chat/sendPresence); si falla, igual se espera
+    await this.api
+      .llamar('POST', `/chat/sendPresence/${encodeURIComponent(this.api.instancia)}`, { number: this.numero(tel), presence: 'composing', delay: ms })
+      .catch(() => undefined);
+    await new Promise((r) => setTimeout(r, ms));
   }
 
   /** Mismo texto idéntico repetido en la última hora: se varía el saludo. */
@@ -101,7 +121,10 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     }
     const cfg = await this.config.obtener();
     const r = await this.turno(
-      () => this.api.llamar('POST', `${ruta}/${encodeURIComponent(this.api.instancia)}`, { number: this.numero(tel), ...(esperaTipeo ? { delay: esperaTipeo } : {}), ...cuerpo }),
+      async () => {
+        await this.pausaHumana(tel, opciones, cfg.evolution_humana_min_seg, cfg.evolution_humana_max_seg);
+        return this.api.llamar('POST', `${ruta}/${encodeURIComponent(this.api.instancia)}`, { number: this.numero(tel), ...(esperaTipeo ? { delay: esperaTipeo } : {}), ...cuerpo });
+      },
       cfg.evolution_pausa_min_seg,
       cfg.evolution_pausa_max_seg,
     );
@@ -109,6 +132,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
       const waMessageId: string | undefined = r.data?.key?.id ?? r.data?.id ?? undefined;
       await this.config.registrarResultadoEnvio(true).catch(() => undefined);
       await this.registrar(tel, tipo, waMessageId, opciones);
+      void this.contador?.vigilar(hashTelefono(tel), mascara(tel));
       return { exito: true, estado: 'ENVIADO', waMessageId };
     }
     // Cuentan para la pausa automática la red caída, los 5xx y 401/403; un 400/404 (p. ej. número sin WhatsApp) es del destinatario

@@ -135,7 +135,7 @@ export const TEXTOS_FUNCIONES_DESACTIVADAS = {
  */
 export const TEXTOS_ANTI_SPAM = {
   avisoExceso: (): string => {
-    return 'Has enviado varios mensajes en poco tiempo. Por favor espera unos momentos para que podamos atenderte con gusto. ☕';
+    return 'Recibí tus mensajes 😊 dame un momento y te respondo';
   },
 };
 
@@ -180,7 +180,8 @@ export interface AntiSpamParametros {
 }
 
 export const ANTI_SPAM_DEFECTO: AntiSpamParametros = {
-  maxPorMinuto: 10,
+  /** Con 7, el mensaje número 8 en un minuto activa el aviso único. */
+  maxPorMinuto: 7,
   maxPorHora: 60,
 };
 

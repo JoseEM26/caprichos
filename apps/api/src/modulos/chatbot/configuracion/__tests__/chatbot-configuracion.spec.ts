@@ -115,7 +115,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       expect(config.funciones.cambios).toBe(true);
       expect(config.funciones.ia).toBe(false);
       expect(config.funciones.promociones).toBe(true);
-      expect(config.antiSpam.maxPorMinuto).toBe(10);
+      expect(config.antiSpam.maxPorMinuto).toBe(7);
       expect(config.antiSpam.maxPorHora).toBe(60);
       expect(config.privacidad.diasRetencion).toBe(90);
     });
@@ -281,8 +281,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
 
         expect(res.permitido).toBe(false);
         expect(res.enviarAvisoSpam).toBe(true);
-        expect(res.mensajeAviso).toContain('varios mensajes');
-        expect(res.mensajeAviso).toContain('☕');
+        expect(res.mensajeAviso).toBe('Recibí tus mensajes 😊 dame un momento y te respondo');
         expect(mockRedisClient.set).toHaveBeenCalledWith(
           expect.stringContaining('chatbot:antispam:aviso:'),
           '1',

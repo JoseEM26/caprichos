@@ -2645,6 +2645,9 @@ export class EjecutorConversacionService {
 
             // Cliente escribiendo muy rápido: la IA espera, no se envía nada (un solo mensaje por respuesta)
             if (resIa.omitir) {
+              // Aviso único (el mismo del anti-spam) y luego silencio, en vez de callar sin decir nada
+              const aviso = await this.chatbotConfiguracionService?.avisoSpamUnaVez(entradaRaw.telefono || conversacion.telefono);
+              if (aviso && destinoEnvio) await this.mensajeria.enviarTexto(destinoEnvio, aviso, { conversacionId: conversacion.id, replyToWaMessageId: entradaRaw.waMessageId });
               await this.registrarSilencio(conversacion.id, 'La IA esperó: el cliente escribe más rápido que el límite por minuto.');
               continue;
             }

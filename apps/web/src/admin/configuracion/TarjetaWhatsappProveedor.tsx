@@ -14,6 +14,8 @@ export interface EstadoProveedorWhatsapp {
   pausado: boolean;
   conexion: { estado: 'CONECTADO' | 'DESCONECTADO' | 'DESCONOCIDO'; razon: string | null; actualizadoEn: string | null; enVivo: string | null };
   limites: Record<string, number | string>;
+  /** Mensajes salientes de hoy, promedio de los 7 días anteriores y umbral de alerta. */
+  envios?: { hoy: number; promedio7: number; umbral: number } | null;
 }
 
 const RUTA = '/admin/whatsapp/evolution';
@@ -25,6 +27,11 @@ const LIMITES: Array<{ clave: string; texto: string; ayuda?: string; texto_libre
   { clave: 'evolution_limite_dia', texto: 'Máx. mensajes por día', ayuda: '0 = sin tope' },
   { clave: 'evolution_pausa_min_seg', texto: 'Pausa mínima entre envíos (seg)' },
   { clave: 'evolution_pausa_max_seg', texto: 'Pausa máxima entre envíos (seg)' },
+  { clave: 'evolution_humana_min_seg', texto: 'Pausa humana mínima antes de responder (seg)', ayuda: 'Solo respuestas a clientes, con «escribiendo…»; no avisos de pedidos' },
+  { clave: 'evolution_humana_max_seg', texto: 'Pausa humana máxima antes de responder (seg)' },
+  { clave: 'evolution_alerta_dia_factor', texto: 'Alerta si hoy supera este múltiplo del promedio de 7 días' },
+  { clave: 'evolution_alerta_dia_minimo', texto: 'Alerta diaria: mínimo de mensajes' },
+  { clave: 'evolution_alerta_chat_hora', texto: 'Alerta si un chat recibe más de N mensajes en una hora', ayuda: '0 = sin alerta' },
   { clave: 'evolution_escribiendo_ms_por_caracter', texto: '«Escribiendo…» (ms por letra)' },
   { clave: 'evolution_horario_desde', texto: 'Respaldo: avisos desde la hora (Lima)', ayuda: 'Solo si no se puede leer el horario del local; Evolution envía en el horario de Configuración › Local' },
   { clave: 'evolution_horario_hasta', texto: 'Respaldo: avisos hasta la hora (Lima)' },
@@ -154,6 +161,11 @@ export function TarjetaWhatsappProveedor({ esAdmin = false }: { esAdmin?: boolea
               <Boton variante="secundario" onClick={() => void pedirQr()}>Mostrar QR para vincular</Boton>
             )}
           </div>
+          {e.envios && (
+            <div style={{ fontSize: 13 }}>
+              Mensajes enviados hoy: <b>{e.envios.hoy}</b> · promedio de los últimos 7 días: <b>{e.envios.promedio7}</b> · alerta sobre <b>{e.envios.umbral}</b>
+            </div>
+          )}
           {!e.webhookConTokenConfigurado && (
             <div style={{ fontSize: 12, color: 'var(--cp-rust)', fontWeight: 700 }}>
               Falta el token del webhook (EVOLUTION_WEBHOOK_TOKEN): sin él no se reciben mensajes de Evolution.

@@ -756,6 +756,22 @@ export class ChatbotConfiguracionService {
     }
   }
 
+  /**
+   * Aviso único compartido con verificarAntiSpam (misma marca de 60 s): lo usa la IA cuando llega a su tope por minuto.
+   * Devuelve el texto la primera vez y null mientras dure la marca (silencio). Sin Redis: null.
+   */
+  async avisoSpamUnaVez(telefonoOId: string): Promise<string | null> {
+    try {
+      const redis = this.redisService.obtenerCliente();
+      const clave = `chatbot:antispam:aviso:${encodeURIComponent(telefonoOId.trim())}`;
+      if (await redis.get(clave)) return null;
+      await redis.set(clave, '1', 'EX', 60);
+      return TEXTOS_ANTI_SPAM.avisoExceso();
+    } catch {
+      return null;
+    }
+  }
+
   /** Lee un parámetro numérico positivo; si falta o es inválido, usa el valor por defecto. */
   private async parametroNumero(clave: string, porDefecto: number): Promise<number> {
     try {

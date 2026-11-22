@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AccesoGuard } from '../../acceso/acceso.guard';
 import { Permiso } from '../../acceso/permiso.decorator';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { ContadorSalientesService } from './contador-salientes.service';
 import { EvolutionApiCliente } from './evolution-api.cliente';
 import { CLAVES_LIMITES, EvolutionConfigService } from './evolution-config.service';
 
@@ -29,6 +30,7 @@ export class EvolutionAdminController {
     private readonly api: EvolutionApiCliente,
     private readonly env: ConfigService,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly contador?: ContadorSalientesService,
   ) {}
 
   private soloAdmin(req: any) {
@@ -49,6 +51,7 @@ export class EvolutionAdminController {
       pausado: String(cfg.evolution_pausado).toLowerCase() === 'si',
       conexion: { ...guardado, enVivo: enVivo ?? null },
       limites,
+      envios: (await this.contador?.resumen().catch(() => null)) ?? null,
     };
   }
 

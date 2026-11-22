@@ -47,6 +47,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
 import { WhatsAppEvolutionAdaptador } from './adaptadores/whatsapp-evolution.adaptador';
 import { EvolutionApiCliente } from './evolution/evolution-api.cliente';
 import { EvolutionConfigService } from './evolution/evolution-config.service';
+import { ContadorSalientesService } from './evolution/contador-salientes.service';
 import { MenuNumeradoStore } from './evolution/menu-numerado.store';
 import { PoliticaEvolutionService } from './evolution/politica-evolution.service';
 import { EvolutionWebhookService } from './evolution/evolution-webhook.service';
@@ -81,6 +82,7 @@ import { EvolutionAdminController } from './evolution/evolution-admin.controller
     WhatsAppSimuladoAdaptador,
     EvolutionApiCliente,
     EvolutionConfigService,
+    ContadorSalientesService,
     MenuNumeradoStore,
     PoliticaEvolutionService,
     EvolutionWebhookService,
