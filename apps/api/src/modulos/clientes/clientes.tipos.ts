@@ -77,6 +77,8 @@ export interface ClienteAdminListItem {
   razonSinVerificar: 'MOSTRADOR' | 'SIN_CONTRASENA' | null;
   tieneContrasena: boolean;
   puedeGastarPuntos: boolean;
+  /** Retrato del avatar (null si no creó uno) y si lo personalizó */
+  avatar: { url: string | null; personalizado: boolean };
 }
 
 export interface RegistrarMostradorDto {

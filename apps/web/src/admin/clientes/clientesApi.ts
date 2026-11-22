@@ -14,6 +14,8 @@ export interface FiltrosClientes {
   creditoPersonal?: string;
   verificacion?: 'verificados' | 'sin_verificar' | 'todos';
   gastaPuntos?: boolean;
+  /** Solo los que ya personalizaron su avatar (distinto al de partida) */
+  avatar?: 'personalizado';
   /** Rango de los pedidos que se cuentan: hoy, semana, mes o siempre (sin rango) */
   periodo?: 'hoy' | 'semana' | 'mes' | 'siempre';
   /** Rango propio, AAAA-MM-DD (día de Lima); manda sobre «periodo» */
@@ -48,7 +50,7 @@ export interface RespuestaListaClientes {
   total: number;
   pagina: number;
   paginas: number;
-  contadores?: { verificados: number; sinVerificar: number; gastanPuntos: number };
+  contadores?: { verificados: number; sinVerificar: number; gastanPuntos: number; avatarPersonalizado?: number };
 }
 
 export interface RegistrarClienteMostradorDto {
@@ -90,6 +92,7 @@ export function paramsClientes(filtros: FiltrosClientes = {}): URLSearchParams {
   }
   if (filtros.verificacion && filtros.verificacion !== 'todos') params.set('verificacion', filtros.verificacion);
   if (filtros.gastaPuntos) params.set('gastaPuntos', 'si');
+  if (filtros.avatar) params.set('avatar', filtros.avatar);
   if (filtros.pagina) params.set('pagina', String(filtros.pagina));
   if (filtros.limite) params.set('limite', String(filtros.limite));
   if (filtros.periodo && filtros.periodo !== 'siempre' && !filtros.desde && !filtros.hasta) params.set('periodo', filtros.periodo);

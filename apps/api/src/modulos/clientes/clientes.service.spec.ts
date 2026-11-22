@@ -216,6 +216,29 @@ describe('ClientesService', () => {
       expect(enParty).toMatchObject({ pago_estado: 'PAGADO', estado: { not: 'ANULADO' }, canal: { in: ['CARTA', 'WHATSAPP', 'BOT'] }, cliente_party_id: null });
     });
 
+    it('avatar: cada fila trae su retrato y si es personalizado; el filtro y el contador lo respetan', async () => {
+      const conAvatar = (id: number, nombre: string, config: any, url: string | null) => {
+        const r: any = rol(id, nombre, `91000000${id}`);
+        r.party.persona.avatar_config = config;
+        r.party.persona.avatar_url = url;
+        return r;
+      };
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+        conAvatar(1, 'Pers', { piel: '#83532F' }, '/archivos/a.png'),
+        conAvatar(2, 'Igual', {}, '/archivos/b.png'),
+        conAvatar(3, 'Nada', null, null),
+      ]);
+      prismaMock.pedido.groupBy = jest.fn().mockResolvedValue([]);
+      const nombres = async (f: any) => (await service.listarAdmin(f, { rol: 'ADMIN' })).items.map((i) => i.nombre);
+      const todos = await service.listarAdmin({}, { rol: 'ADMIN' });
+      expect(todos.items[0].avatar).toEqual({ url: '/archivos/a.png', personalizado: true });
+      expect(todos.items[1].avatar).toEqual({ url: '/archivos/b.png', personalizado: false });
+      expect(todos.items[2].avatar).toEqual({ url: null, personalizado: false });
+      expect(todos.contadores.avatarPersonalizado).toBe(1);
+      expect(await nombres({ avatar: 'personalizado' })).toEqual(['Pers']);
+      expect(await nombres({ avatar: 'sin' })).toEqual(['Igual', 'Nada']);
+    });
+
     describe('filtros de compra, consumo, puntos, fechas y orden', () => {
       const dia = (n: number) => new Date(Date.now() - n * 86400000);
       beforeEach(() => {
@@ -447,7 +470,7 @@ describe('ClientesService', () => {
         expect(por.SinSaldo).toMatchObject({ verificado: true, puedeGastarPuntos: false });
         expect(por.Antigua).toMatchObject({ verificado: false, estadoVerificacion: 'ANTIGUA', puedeGastarPuntos: true });
         expect(JSON.stringify(res)).not.toContain('"hash"');
-        expect(res.contadores).toEqual({ verificados: 2, sinVerificar: 2, gastanPuntos: 2 });
+        expect(res.contadores).toEqual({ verificados: 2, sinVerificar: 2, gastanPuntos: 2, avatarPersonalizado: 0 });
       });
 
       it('filtra por verificados, sin verificar y gastaPuntos, sobre la misma consulta', async () => {

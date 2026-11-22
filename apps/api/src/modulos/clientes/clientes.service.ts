@@ -29,6 +29,7 @@ import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { generarXlsx } from '../../comun/xlsx-simple';
 import { hoyLimaIso } from '../../comun/fechas-lima';
 import { detalleCelularSorteo, mesLima, nombreParaSorteo, rangoPedidos, type FiltrosClientes } from './clientes-filtros';
+import { esAvatarPersonalizado } from './avatar-personalizado';
 import { type AvatarConfig, fotoMostrada, retratoDesdeDataUrl, validarAvatarConfig } from './avatar-config';
 import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
 import { estadoVerificacionCliente } from './estado-verificacion-cliente';
@@ -1063,12 +1064,14 @@ export class ClientesService {
           envioFijo,
           descuentoEnvio: descEnvio,
           activo: r.hasta === null && p.estado === 'ACTIVO',
+          avatar: { url: p.persona?.avatar_url ?? null, personalizado: esAvatarPersonalizado(p.persona?.avatar_config) },
           ...camposVerificacion(verif),
         },
       };
     });
 
     // Filtros de memoria (rápidos y homogéneos con la maqueta)
+    if (filtros.avatar) filas = filas.filter((f) => f.item.avatar.personalizado === (filtros.avatar === 'personalizado'));
     if (filtros.alcance === 'registrados') filas = filas.filter((f) => f.item.tieneContrasena);
     if (filtros.tipo && filtros.tipo !== 'Todos') {
       filas = filas.filter((f) => f.item.tipo === filtros.tipo);
@@ -1089,6 +1092,7 @@ export class ClientesService {
       verificados: filas.filter((f) => f.item.verificado).length,
       sinVerificar: filas.filter((f) => !f.item.verificado).length,
       gastanPuntos: filas.filter((f) => f.item.puedeGastarPuntos).length,
+      avatarPersonalizado: filas.filter((f) => f.item.avatar.personalizado).length,
     };
     if (filtros.verificacion === 'verificados') filas = filas.filter((f) => f.item.verificado);
     else if (filtros.verificacion === 'sin_verificar') filas = filas.filter((f) => !f.item.verificado);
@@ -1145,7 +1149,7 @@ export class ClientesService {
     total: number;
     pagina: number;
     paginas: number;
-    contadores: { verificados: number; sinVerificar: number; gastanPuntos: number };
+    contadores: { verificados: number; sinVerificar: number; gastanPuntos: number; avatarPersonalizado: number };
   }> {
     const { filas, contadores } = await this.filtrarAdmin(filtros);
     const total = filas.length;

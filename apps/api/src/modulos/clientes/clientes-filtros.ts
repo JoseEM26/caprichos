@@ -15,6 +15,8 @@ export class FiltrosClientesDto {
   @IsOptional() @IsString() creditoPersonal?: string;
   @IsOptional() @IsIn(['verificados', 'sin_verificar', 'todos']) verificacion?: 'verificados' | 'sin_verificar' | 'todos';
   @IsOptional() @IsIn(['si', 'no']) gastaPuntos?: 'si' | 'no';
+  /** Avatar: «personalizado» (distinto al de partida) o «sin» (no lo creó o lo dejó igual) */
+  @IsOptional() @IsIn(['personalizado', 'sin']) avatar?: 'personalizado' | 'sin';
 
   /** Rango de fechas de los pedidos que se cuentan: hoy, semana (lunes a hoy), mes (1 al hoy) o siempre. */
   @IsOptional() @IsIn(['hoy', 'semana', 'mes', 'siempre']) periodo?: 'hoy' | 'semana' | 'mes' | 'siempre';

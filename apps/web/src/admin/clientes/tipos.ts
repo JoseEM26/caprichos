@@ -26,6 +26,8 @@ export interface ClienteItem extends VerificacionCliente {
   envioFijo: number | null;
   descuentoEnvio: number | null;
   activo: boolean;
+  /** Retrato del avatar y si lo personalizó (opcional: una API anterior no lo envía) */
+  avatar?: { url: string | null; personalizado: boolean };
 }
 
 export interface PedidoCliente {

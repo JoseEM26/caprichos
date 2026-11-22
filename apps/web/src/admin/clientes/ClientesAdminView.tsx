@@ -11,6 +11,7 @@ import {
 import { ModalNuevoCliente } from './ModalNuevoCliente';
 import { ModalFichaCliente } from './ModalFichaCliente';
 import { ModalEditarCliente } from './ModalEditarCliente';
+import { AvatarCliente } from './AvatarCliente';
 import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { Paginacion } from '../../comun/Paginacion';
@@ -54,6 +55,7 @@ interface EstadoFiltros {
   registro: string;
   verif: string;
   gasta: string;
+  avatarPers: boolean;
   periodo: 'siempre' | 'hoy' | 'semana' | 'mes';
   desde: string;
   hasta: string;
@@ -77,6 +79,7 @@ const SIN_FILTROS: EstadoFiltros = {
   registro: 'Todos',
   verif: 'todos',
   gasta: 'Todos',
+  avatarPers: false,
   periodo: 'siempre',
   desde: '',
   hasta: '',
@@ -108,6 +111,7 @@ function aFiltrosApi(f: EstadoFiltros, busqueda: string): FiltrosClientes {
     estado: f.registro !== 'Todos' ? f.registro : undefined,
     verificacion: f.verif as 'verificados' | 'sin_verificar' | 'todos',
     gastaPuntos: f.gasta === 'Sí',
+    avatar: f.avatarPers ? 'personalizado' : undefined,
     periodo: f.periodo !== 'siempre' ? f.periodo : undefined,
     desde: f.desde || undefined,
     hasta: f.hasta || undefined,
@@ -236,7 +240,7 @@ export function ClientesAdminView() {
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [f, setF] = useState<EstadoFiltros>(SIN_FILTROS);
   const cambiar = (parcial: Partial<EstadoFiltros>) => setF((a) => ({ ...a, ...parcial }));
-  const [contadores, setContadores] = useState<{ verificados: number; sinVerificar: number; gastanPuntos: number } | null>(null);
+  const [contadores, setContadores] = useState<{ verificados: number; sinVerificar: number; gastanPuntos: number; avatarPersonalizado?: number } | null>(null);
 
   // Modales
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
@@ -319,6 +323,7 @@ export function ClientesAdminView() {
     if (f.registro !== 'Todos') l.push({ id: 'registro', texto: `Registro: ${f.registro}`, quitar: { registro: 'Todos' } });
     if (f.verif !== 'todos') l.push({ id: 'verif', texto: f.verif === 'verificados' ? 'Verificados' : 'Sin verificar', quitar: { verif: 'todos' } });
     if (f.gasta !== 'Todos') l.push({ id: 'gasta', texto: 'Pueden gastar sus puntos', quitar: { gasta: 'Todos' } });
+    if (f.avatarPers) l.push({ id: 'avatar', texto: 'Con avatar personalizado', quitar: { avatarPers: false } });
     if (f.desde || f.hasta) l.push({ id: 'fechas', texto: `Fechas: ${f.desde || '…'} a ${f.hasta || '…'}`, quitar: { desde: '', hasta: '' } });
     else if (f.periodo !== 'siempre') l.push({ id: 'periodo', texto: PERIODOS.find((p) => p.valor === f.periodo)!.etiqueta, quitar: { periodo: 'siempre' } });
     if (f.pedidosMin || f.pedidosMax) l.push({ id: 'pedidos', texto: `Pedidos: ${f.pedidosMin || '0'} a ${f.pedidosMax || 'más'}`, quitar: { pedidosMin: '', pedidosMax: '' } });
@@ -531,6 +536,12 @@ export function ClientesAdminView() {
                 {numFiltrosPanel}
               </span>
             )}
+          </button>
+        </div>
+
+        <div role="group" aria-label="Avatar" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <button type="button" aria-pressed={f.avatarPers} onClick={() => cambiar({ avatarPers: !f.avatarPers })} style={estiloChip(f.avatarPers)}>
+            Con avatar personalizado{contadores?.avatarPersonalizado !== undefined ? ` (${contadores.avatarPersonalizado})` : ''}
           </button>
         </div>
 
@@ -763,7 +774,10 @@ export function ClientesAdminView() {
                   style={{ borderTop: '1px solid var(--cp-line)', cursor: 'pointer', opacity: c.activo ? 1 : 0.6, minHeight: 44 }}
                 >
                   <td style={{ padding: '12px', fontWeight: 700 }}>
-                    {c.nombre}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <AvatarCliente cliente={c} tamano={32} />
+                      <span>{c.nombre}</span>
+                    </span>
                     {!c.activo && <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--cp-soft)' }}>(Desactivado)</span>}
                   </td>
                   <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{c.telefono || '—'}</td>
@@ -804,8 +818,11 @@ export function ClientesAdminView() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16, lineHeight: '21px', minWidth: 0, overflowWrap: 'anywhere' }}>
-                    {c.nombre}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <AvatarCliente cliente={c} tamano={40} />
+                    <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16, lineHeight: '21px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                      {c.nombre}
+                    </div>
                   </div>
                   {off && (
                     <span style={{ flex: 'none', fontSize: 12, fontWeight: 700, borderRadius: 9999, padding: '2px 10px', background: 'var(--cp-line)', color: 'var(--cp-soft)' }}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
+import { AvatarCliente } from './AvatarCliente';
 import type { ClienteItem, FichaCliente, MovimientoPuntosItem, PedidoCliente } from './tipos';
 import { obtenerFichaCliente, listarHistorialPuntos, listarComprasCliente } from './clientesApi';
 import { DetalleCompra } from './DetalleCompra';
@@ -111,8 +112,11 @@ export function ModalFichaCliente({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20 }}>
-            {nombre}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <AvatarCliente cliente={{ nombre, avatar: cliente.avatar }} tamano={72} />
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20 }}>
+              {nombre}
+            </div>
           </div>
           <button
             onClick={alCerrar}
