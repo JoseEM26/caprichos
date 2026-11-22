@@ -6,8 +6,12 @@ import { EstadoVacio } from '../comun/EstadoVacio';
 import { Icono } from '../comun/Icono';
 import { useCarrito } from './CarritoContext';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
-import { PasoPedido } from './PantallaConfirmacion';
-import { ProgresoPedido } from '../admin/salon/ProgresoPedido';
+import { PanelPago, PanelPedido, PasoPedido } from './PantallaConfirmacion';
+import { CancelarPedido } from './CancelarPedido';
+import { BotonRecibirPorWhatsapp } from './BotonRecibirPorWhatsapp';
+import { ConfirmacionProgramado } from './ProgramarPedido';
+import { NOMBRE_MODALIDAD } from './seguimiento-textos';
+import './seguimiento-modal.css';
 import {
   consultarLote,
   EstadoSeguimiento,
@@ -36,7 +40,7 @@ interface RespuestaCuenta {
 }
 
 // Fila de la lista: viene del historial de la cuenta o del navegador
-interface Fila {
+export interface Fila {
   codigo: string;
   token: string;
   modalidad: ModalidadEntrega;
@@ -164,14 +168,7 @@ function ContenidoMisPedidos({ alCerrar }: { alCerrar: () => void }) {
                   No pudimos actualizar tus pedidos. Reintentaremos en unos segundos.
                 </div>
               )}
-              {filas.map((f) => (
-                <TarjetaPedido key={f.codigo} fila={f} onElegir={() => setDetalle(f)} />
-              ))}
-              {cliente && historial.hayMas && (
-                <Boton variante="secundario" onClick={historial.verMas} deshabilitado={historial.cargando}>
-                  {historial.cargando ? 'Cargando...' : 'Ver más'}
-                </Boton>
-              )}
+              <ListaAgrupada filas={filas} onElegir={setDetalle} hayMasServidor={!!cliente && historial.hayMas} cargandoMas={historial.cargando} verMasServidor={historial.verMas} />
               {/* Ya tiene pedidos: aquí se ofrece instalar la app (nunca con la lista vacía) */}
               <BannerInstalarApp />
             </>
@@ -221,7 +218,8 @@ function TarjetaPedido({ fila, onElegir }: { fila: Fila; onElegir: () => void })
 }
 
 function DetallePedido({ fila, onVolver }: { fila: Fila; onVolver: () => void }) {
-  const { estado, error } = useSeguimientoPedido(fila.codigo, fila.token);
+  const { estado, error, refrescar } = useSeguimientoPedido(fila.codigo, fila.token);
+  const { setSeguimientoAbierto, setListaPedidosAbierta } = useCarrito();
 
   if (error === 'NO_ENCONTRADO') {
     return (
@@ -232,31 +230,122 @@ function DetallePedido({ fila, onVolver }: { fila: Fila; onVolver: () => void })
     );
   }
 
+  const anulado = estado?.anulado === true || fila.anulado;
+  const modalidad = estado?.modalidad ?? fila.modalidad;
+  const total = estado ? estado.total + (estado.propina ?? 0) : fila.total;
+  const guardado: PedidoGuardado = { codigo: fila.codigo, token: fila.token, modalidad, nombre: '', creadoEn: fila.creadoEn };
+  const verSeguimiento = () => {
+    setListaPedidosAbierta(false);
+    setSeguimientoAbierto(guardado);
+  };
+  const lugar =
+    modalidad === 'COMER_LOCAL' && estado?.mesa
+      ? `Mesa ${estado.mesa}`
+      : null;
+
   return (
     <>
       <BotonVolver onVolver={onVolver} />
-      <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-        {formatearFecha(fila.creadoEn)} · {fila.modalidad === 'DELIVERY' ? 'Delivery' : fila.modalidad === 'COMER_LOCAL' ? 'Comer en el local' : 'Recojo en local'}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#FFFFFF', backgroundColor: colorEstado({ ...fila, estado: estado?.estado ?? fila.estado, anulado }), borderRadius: 999, padding: '3px 10px' }}>
+          {anulado ? 'Anulado' : estado?.estadoEtiqueta ?? fila.estadoEtiqueta ?? 'Consultando...'}
+        </span>
+        <span className="sg-chip">{NOMBRE_MODALIDAD[modalidad] ?? modalidad}</span>
+        {lugar && <span className="sg-chip" data-testid="lugar-pedido">{lugar}</span>}
+        <span style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{formatearFecha(fila.creadoEn)}</span>
       </div>
-      {estado?.anulado || fila.anulado ? (
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)' }}>Tu pedido fue anulado</p>
-      ) : estado ? (
-        <div style={{ backgroundColor: 'var(--cp-cream)', border: '1px solid var(--cp-line)', borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {estado.pasos.map((p, idx) => (
-            <PasoPedido key={p.clave} paso={p} numero={idx + 1} />
-          ))}
-          <ProgresoPedido progreso={estado.progreso} modalidad={estado.modalidad} variante="completo" sinLinea />
-        </div>
-      ) : (
+
+      {!anulado && estado?.programadoPara && <ConfirmacionProgramado iso={estado.programadoPara} />}
+
+      {!estado ? (
         <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft)' }}>
           {error === 'RED' ? 'No pudimos consultar el estado. Reintentaremos en unos segundos.' : 'Consultando el estado de tu pedido...'}
         </p>
+      ) : (
+        <>
+          {anulado ? (
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)' }}>Tu pedido fue anulado</p>
+          ) : (
+            <section className="sg-tarjeta" aria-label="Línea de tiempo del pedido">
+              {estado.pasos.map((p, idx) => (
+                <PasoPedido key={p.clave} paso={p} numero={idx + 1} />
+              ))}
+            </section>
+          )}
+          <PanelPedido estado={estado} creacion={null} modalidad={modalidad} total={total} anulado={anulado} completo />
+          <PanelPago pedido={guardado} estado={estado} total={total} onSubida={refrescar} pedidoId={estado.pagoEnLinea?.pedidoId} token={fila.token} creadoEn={estado.pagoEnLinea?.creadoEn ?? fila.creadoEn} />
+          <CancelarPedido codigo={fila.codigo} token={fila.token} cancelable={estado.cancelable} anulado={anulado} terminado={estado.terminado} onCancelado={refrescar} />
+          {!anulado && <BotonRecibirPorWhatsapp codigo={fila.codigo} token={fila.token} />}
+          <Boton variante="secundario" onClick={verSeguimiento}>Ver seguimiento</Boton>
+        </>
       )}
-      {estado && (
-        <div style={{ backgroundColor: 'var(--cp-sand)', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, color: 'var(--cp-navy)' }}>
-          <span>Total</span>
-          <span style={{ color: 'var(--cp-rust)' }}>S/ {Number(estado.total).toFixed(2)}</span>
-        </div>
+    </>
+  );
+}
+
+const ETIQUETA_DIA = (iso: string): string => {
+  const f = new Date(iso);
+  if (Number.isNaN(f.getTime())) return 'Antes';
+  const dia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dif = Math.round((dia(new Date()) - dia(f)) / 86_400_000);
+  if (dif === 0) return 'Hoy';
+  if (dif === 1) return 'Ayer';
+  return f.toLocaleDateString('es-PE', { day: 'numeric', month: 'long' });
+};
+
+const POR_TANDA = 6;
+
+/** «En curso» (más reciente arriba) y «Anteriores» agrupados por día, de a pocos con «Ver más». */
+export function ListaAgrupada({ filas, onElegir, hayMasServidor, cargandoMas, verMasServidor }: {
+  filas: Fila[];
+  onElegir: (f: Fila) => void;
+  hayMasServidor: boolean;
+  cargandoMas: boolean;
+  verMasServidor: () => void;
+}) {
+  const [visibles, setVisibles] = useState(POR_TANDA);
+  const porFecha = (a: Fila, b: Fila) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn);
+  const enCurso = filas.filter((f) => !f.terminado && !f.anulado).sort(porFecha);
+  const anteriores = filas.filter((f) => f.terminado || f.anulado).sort(porFecha);
+  const mostradas = anteriores.slice(0, visibles);
+  const grupos: { dia: string; filas: Fila[] }[] = [];
+  for (const f of mostradas) {
+    const dia = ETIQUETA_DIA(f.creadoEn);
+    const g = grupos[grupos.length - 1];
+    if (g && g.dia === dia) g.filas.push(f);
+    else grupos.push({ dia, filas: [f] });
+  }
+  return (
+    <>
+      {enCurso.length > 0 && (
+        <section aria-label="Pedidos en curso" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy)' }}>En curso</h3>
+          {enCurso.map((f) => (
+            <TarjetaPedido key={f.codigo} fila={f} onElegir={() => onElegir(f)} />
+          ))}
+        </section>
+      )}
+      {grupos.length > 0 && (
+        <section aria-label="Pedidos anteriores" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy)' }}>Anteriores</h3>
+          {grupos.map((g) => (
+            <div key={g.dia} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <h4 data-testid="grupo-dia" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)', textTransform: 'capitalize' }}>{g.dia}</h4>
+              {g.filas.map((f) => (
+                <TarjetaPedido key={f.codigo} fila={f} onElegir={() => onElegir(f)} />
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
+      {anteriores.length > visibles ? (
+        <Boton variante="secundario" onClick={() => setVisibles((v) => v + POR_TANDA)}>Ver más</Boton>
+      ) : (
+        hayMasServidor && (
+          <Boton variante="secundario" onClick={verMasServidor} deshabilitado={cargandoMas}>
+            {cargandoMas ? 'Cargando...' : 'Ver más'}
+          </Boton>
+        )
       )}
     </>
   );

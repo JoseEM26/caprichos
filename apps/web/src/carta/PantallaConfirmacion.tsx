@@ -309,9 +309,11 @@ function QueFalta({ estado, etapa }: { estado: EstadoSeguimiento; etapa: EtapaCl
   );
 }
 
-function PanelPedido({
-  estado, creacion, modalidad, total, anulado,
+export function PanelPedido({
+  estado, creacion, modalidad, total, anulado, completo,
 }: {
+  /** «Mis pedidos»: productos con tamaño, opciones, sabores y precio por línea (en lugar del avance por área) */
+  completo?: boolean;
   estado: EstadoSeguimiento | null;
   creacion: PedidoConfirmado | null;
   modalidad: string;
@@ -327,7 +329,25 @@ function PanelPedido({
 
   return (
     <>
-      {areas.length > 0 ? (
+      {completo && detalle && detalle.lineas.length > 0 ? (
+        <section className="sg-tarjeta" aria-label="Productos del pedido">
+          <ResumenParaLlevar lineas={detalle.lineas} />
+          <ul className="sg-lista">
+            {detalle.lineas.map((l, i) => (
+              <li key={i} data-testid="linea-detalle">
+                <div className="sg-fila">
+                  <span>{l.cantidad} × {l.nombre}{l.tamano ? ` (${l.tamano})` : ''}</span>
+                  {l.subtotal !== undefined && <span>{SOLES(l.subtotal)}</span>}
+                </div>
+                {[...(l.opciones ?? []), ...(l.sabores ?? []), ...(l.nombresPersona?.length ? [`Nombre en el vaso: ${l.nombresPersona.join(', ')}`] : [])].map((t, j) => (
+                  <div key={j} className="sg-detalle">{t}</div>
+                ))}
+                {l.paraLlevar && <ChipParaLlevar compacto />}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : areas.length > 0 ? (
         areas.map((a) => (
           <section key={a.nombre} className="sg-tarjeta" aria-label={`Productos de ${a.nombre}`}>
             <div className="sg-fila">
@@ -373,9 +393,13 @@ function PanelPedido({
 
       <section className="sg-tarjeta" aria-label="Resumen de importes">
         {subtotal !== undefined && <div className="sg-fila"><span>Subtotal</span><span>{SOLES(subtotal)}</span></div>}
-        {(detalle?.descuento ?? 0) > 0 && (
-          <div className="sg-fila" data-testid="descuento-seguimiento"><span>Descuento</span><span>− {SOLES(detalle!.descuento)}</span></div>
-        )}
+        {(detalle?.descuentos ?? []).length > 0
+          ? detalle!.descuentos!.map((d, i) => (
+              <div key={i} className="sg-fila" data-testid="descuento-seguimiento"><span>{d.nombre}</span><span>− {SOLES(d.monto)}</span></div>
+            ))
+          : (detalle?.descuento ?? 0) > 0 && (
+              <div className="sg-fila" data-testid="descuento-seguimiento"><span>Descuento</span><span>− {SOLES(detalle!.descuento)}</span></div>
+            )}
         {(detalle?.puntosCanjeados ?? 0) > 0 && (
           <div className="sg-fila"><span>Puntos canjeados</span><span>{detalle!.puntosCanjeados}</span></div>
         )}
@@ -394,7 +418,7 @@ function PanelPedido({
   );
 }
 
-function PanelPago({
+export function PanelPago({
   pedido, estado, total, onSubida, pedidoId, token, auto, creadoEn, alFormulario,
 }: {
   alFormulario?: (abierto: boolean) => void;

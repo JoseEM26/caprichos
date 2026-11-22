@@ -72,7 +72,25 @@ export interface DetalleSeguimiento {
   envio: number | null;
   puntosCanjeados: number;
   nota: string | null;
-  lineas: { nombre: string; cantidad: number; nota: string | null; paraLlevar?: boolean }[];
+  lineas: LineaDetalleSeguimiento[];
+  /** Cupón, oferta o descuento del personal con su monto */
+  descuentos?: { nombre: string; monto: number }[];
+  creadoEn?: string;
+}
+
+export interface LineaDetalleSeguimiento {
+  nombre: string;
+  cantidad: number;
+  nota: string | null;
+  paraLlevar?: boolean;
+  tamano?: string | null;
+  /** «Grupo: opción» */
+  opciones?: string[];
+  /** «2 × Fresa» */
+  sabores?: string[];
+  nombresPersona?: string[];
+  precioUnit?: number;
+  subtotal?: number;
 }
 
 export interface EstadoSeguimiento {
