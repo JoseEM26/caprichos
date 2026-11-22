@@ -136,7 +136,7 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
           )}
           {tv && !completa && <p className="sv-ayuda-tv">En pantalla completa los controles se esconden. Para salir, presiona Esc.</p>}
         </section>
-        <PanelPendientes datos={datos} reloj={reloj} />
+        <PanelPendientes datos={datos} reloj={reloj} auto={tv} reducir={reducir} />
       </div>
     </div>
   );

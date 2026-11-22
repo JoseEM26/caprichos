@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PedidoVivo, SalonVivo } from './salonVivoApi';
 
 /**
@@ -54,10 +54,45 @@ function Retrato({ url }: { url: string }) {
   return <img className="sv-pend-retrato" src={url} alt="" loading="lazy" onError={() => setFalla(true)} />;
 }
 
+/** Cada cuántos ms pasa sola la franja de la TV. */
+export const INTERVALO_PASO_MS = 5000;
+
+/**
+ * Franja de la TV: si hay más tarjetas de las que entran, avanza sola una tarjeta cada ~5 s (suave) y al llegar al final
+ * vuelve al inicio; con pocas tarjetas no se mueve. Con movimiento reducido no se desplaza: devuelve cuántas quedan fuera
+ * (para mostrar «+N más»).
+ */
+export function usePasoAuto(ref: React.RefObject<HTMLElement | null>, activo: boolean, reducir: boolean, total: number): number {
+  const [ocultos, setOcultos] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!activo || !el) { setOcultos(0); return; }
+    const medir = () => {
+      const item = el.querySelector<HTMLElement>('.sv-pend-item');
+      const ancho = item?.offsetWidth ?? 0;
+      setOcultos(reducir && ancho > 0 ? Math.max(0, total - Math.max(1, Math.floor(el.clientWidth / ancho))) : 0);
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    if (reducir) return () => window.removeEventListener('resize', medir);
+    const id = setInterval(() => {
+      if (el.scrollWidth <= el.clientWidth + 4) return; // caben todas: quieto
+      const item = el.querySelector<HTMLElement>('.sv-pend-item');
+      const paso = (item?.offsetWidth ?? el.clientWidth) + 10;
+      const alFinal = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      el.scrollTo({ left: alFinal ? 0 : el.scrollLeft + paso, behavior: 'smooth' });
+    }, INTERVALO_PASO_MS);
+    return () => { clearInterval(id); window.removeEventListener('resize', medir); };
+  }, [ref, activo, reducir, total]);
+  return ocultos;
+}
+
 const nombreArea = (n: string) => n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
 
-export function PanelPendientes({ datos, reloj }: { datos: SalonVivo; reloj: string }) {
+export function PanelPendientes({ datos, reloj, auto = false, reducir = false }: { datos: SalonVivo; reloj: string; auto?: boolean; reducir?: boolean }) {
   const lista = pendientesDe(datos);
+  const listaRef = useRef<HTMLOListElement>(null);
+  const ocultos = usePasoAuto(listaRef, auto, reducir, lista.length);
   const cuenta = (e: EtapaPendiente) => lista.filter((p) => p.etapa === e).length;
   return (
     <aside className="sv-panel sv-pend" aria-label="Pedidos pendientes">
@@ -69,8 +104,9 @@ export function PanelPendientes({ datos, reloj }: { datos: SalonVivo; reloj: str
         <span className="sv-pend-chip caja"><b>{cuenta('CAJA')}</b> En caja</span>
         <span className="sv-pend-chip cocina"><b>{cuenta('COCINA')}</b> En cocina</span>
         <span className="sv-pend-chip listo"><b>{cuenta('LISTO')}</b> Listos</span>
+        {ocultos > 0 && <span className="sv-pend-mas">+{ocultos} más</span>}
       </div>
-      <ol className="sv-pend-lista" aria-live="polite">
+      <ol ref={listaRef} className="sv-pend-lista" aria-live="polite">
         {lista.length === 0 && <li className="sv-pend-vacio">No hay pedidos pendientes 🎉</li>}
         {lista.map((p) => (
           <li key={p.id} className={`sv-pend-item ${p.etapa.toLowerCase()} ${p.minutos >= 15 && p.etapa !== 'LISTO' ? 'tarde' : ''}`}>

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { PanelPendientes, pendientesDe } from '../PanelPendientes';
 import { pedido, salonEjemplo } from './datosEjemplo';
 
@@ -63,5 +63,55 @@ describe('Pedidos pendientes del salón en vivo', () => {
     fireEvent.error(img);
     expect(container.querySelector('img.sv-pend-retrato')).toBeNull();
     expect(container.querySelector('.sv-pend-retrato.vacio')).toBeTruthy();
+  });
+});
+
+describe('franja de la TV que pasa sola', () => {
+  const mucho = () => { const d = salonEjemplo(); d.cocina = Array.from({ length: 8 }, (_, i) => pedido(`CP-X${i}`, { id: `x${i}` })); return d; };
+  const medidas = (ancho: number, scroll: number, cli: number) => {
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => ancho });
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => scroll });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => cli });
+  };
+  afterEach(() => { vi.useRealTimers(); delete (HTMLElement.prototype as any).offsetWidth; delete (HTMLElement.prototype as any).scrollWidth; delete (HTMLElement.prototype as any).clientWidth; });
+
+  it('con más tarjetas de las que entran avanza una tarjeta cada 5 s y vuelve al inicio al final', () => {
+    vi.useFakeTimers();
+    medidas(300, 3000, 900);
+    const scrollTo = vi.fn(function (this: HTMLElement, o: ScrollToOptions) { (this as any).scrollLeft = o.left; });
+    HTMLElement.prototype.scrollTo = scrollTo as any;
+    render(<PanelPendientes datos={mucho()} reloj="19:05" auto />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 310, behavior: 'smooth' });
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 620, behavior: 'smooth' });
+    // llegó al final: vuelve al inicio
+    (screen.getByRole('list') as any).scrollLeft = 2100;
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'smooth' });
+  });
+
+  it('con pocas tarjetas (caben todas) no se mueve, y fuera de la TV tampoco', () => {
+    vi.useFakeTimers();
+    medidas(300, 900, 900);
+    const scrollTo = vi.fn(); HTMLElement.prototype.scrollTo = scrollTo as any;
+    const { unmount } = render(<PanelPendientes datos={salonEjemplo()} reloj="19:05" auto />);
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(scrollTo).not.toHaveBeenCalled();
+    unmount();
+    medidas(300, 3000, 900);
+    render(<PanelPendientes datos={mucho()} reloj="19:05" />);
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('con movimiento reducido no se desplaza: muestra las que entran y «+N más»', () => {
+    vi.useFakeTimers();
+    medidas(300, 3000, 900);
+    const scrollTo = vi.fn(); HTMLElement.prototype.scrollTo = scrollTo as any;
+    render(<PanelPendientes datos={mucho()} reloj="19:05" auto reducir />);
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.getByText(/\+\d+ más/)).toBeTruthy();
   });
 });
