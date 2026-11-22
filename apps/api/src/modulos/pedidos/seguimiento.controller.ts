@@ -29,6 +29,12 @@ export class SeguimientoController {
     private readonly vouchersService: VouchersService,
   ) {}
 
+  /** ¿Mostrar «Recibir mi pedido por WhatsApp»? (solo si el bot no puede escribirle primero) */
+  @Get('seguimiento/:codigo/whatsapp')
+  async botonWhatsapp(@Param('codigo') codigo: string, @Query('t') token?: string) {
+    return this.seguimientoService.botonWhatsapp(codigo, token);
+  }
+
   @Get('seguimiento/:codigo')
   async obtener(@Param('codigo') codigo: string, @Query('t') token?: string) {
     return this.seguimientoService.obtener(codigo, token);

@@ -40,6 +40,7 @@ import { EjecutorConversacionService } from '../conversacion/ejecutor-conversaci
 import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 import { anotarPagoEnFlujo } from './pago-para-persona.util';
+import { enviarResumenPendienteDeCarta, telefonoDelChat } from './pedidos-del-chat.util';
 import { pedidoEsperandoVoucher, SELECT_PEDIDO_VOUCHER, ultimos9 } from './pedido-esperando-voucher.util';
 import { readFile } from 'fs/promises';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
@@ -661,12 +662,14 @@ export class WhatsappWebhookService {
     }
 
     // 2. Buscar último pedido activo o reciente del cliente para asociarlo (solo si tiene teléfono)
-    const pedidoReciente = telefonoNorm
+    // Chat sin número (LID): su celular vinculado hace de teléfono para ligar pedidos y vouchers
+    const telefonoPedidos = telefonoNorm || telefonoDelChat(conversacion) || null;
+    const pedidoReciente = telefonoPedidos
       ? await this.prisma.pedido.findFirst({
           where: {
             OR: [
-              { cliente_telefono: { contains: telefonoNorm.slice(-8) } },
-              { cliente_telefono: telefonoNorm },
+              { cliente_telefono: { contains: telefonoPedidos.slice(-8) } },
+              { cliente_telefono: telefonoPedidos },
             ],
           },
           orderBy: { creado_en: 'desc' },
@@ -677,8 +680,8 @@ export class WhatsappWebhookService {
     // 5. Procesamiento de imagen de voucher
     let archivoMensajeId: string | null = null;
     // El voucher se liga al pedido que espera pago (no al último pedido del cliente, que puede estar cerrado)
-    const pedidoVoucher = imagenBuffer && telefonoNorm
-      ? await pedidoEsperandoVoucher(this.prisma, conversacion?.flujo, telefonoNorm)
+    const pedidoVoucher = imagenBuffer && telefonoPedidos
+      ? await pedidoEsperandoVoucher(this.prisma, conversacion?.flujo, telefonoPedidos)
       : null;
     // El voucher quedó ligado a un pedido: el cliente recibe un acuse y el motor no vuelve a contestar esa foto.
     let voucherAtendido = false;
@@ -929,6 +932,16 @@ export class WhatsappWebhookService {
     // 5.8. Ubicación (pin) de un cliente con delivery activo: se asigna a su pedido (o queda como propuesta para Caja)
     const ubicacionAtendida = await this.atenderUbicacionDePedido(conversacion, ubicacionGuardada, telefonoNorm);
 
+    // 5.9. «Hola, mi pedido CP-XXXX» (botón de la carta): vincula el chat con el pedido y sale al instante el resumen
+    // que la regla anti-baneo no pudo mandar antes (el cliente aún no había escrito). Una sola vez por pedido.
+    let resumenCartaAtendido = false;
+    if (this.outbox && clasificacion.clase === 'TEXTO' && !voucherAtendido) {
+      resumenCartaAtendido = await enviarResumenPendienteDeCarta(this.prisma, this.outbox, conversacion as any, texto).catch((err: any) => {
+        this.logger.warn(`Resumen del pedido de la carta no enviado: ${err?.message}`);
+        return false;
+      });
+    }
+
     // 6. Invocación segura del motor de conversación (Ola 1 Agente B)
     // El bot responde únicamente si la conversación le pertenece y el cliente no solicitó baja/alta
     const esComandoBajaOAlta =
@@ -954,7 +967,7 @@ export class WhatsappWebhookService {
     // Cortesías sin bot: ❤️ a un «gracias», y con el bot apagado o el chat en manos de una persona, el aviso de fuera de
     // horario y la bienvenida con la carta (una vez cada 12 h). Con el bot activo no cambia nada: él ya saluda y avisa el horario.
     let cortesiaAtendida = false;
-    if (this.autorespuesta && telefonoNorm && clasificacion.clase === 'TEXTO' && !esComandoBajaOAlta && !encuestaAtendida && !reprogramacionAtendida && !ubicacionAtendida && !voucherAtendido) {
+    if (this.autorespuesta && telefonoNorm && clasificacion.clase === 'TEXTO' && !esComandoBajaOAlta && !encuestaAtendida && !reprogramacionAtendida && !ubicacionAtendida && !voucherAtendido && !resumenCartaAtendido) {
       try {
         cortesiaAtendida = await this.autorespuesta.atender({
           telefono: telefonoNorm,
@@ -977,7 +990,8 @@ export class WhatsappWebhookService {
       !reprogramacionAtendida &&
       !ubicacionAtendida &&
       !encuestaAtendida &&
-      !voucherAtendido
+      !voucherAtendido &&
+      !resumenCartaAtendido
     ) {
       const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({
         where: { telefono_hash: telHash },

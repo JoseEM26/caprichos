@@ -1,6 +1,7 @@
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { hashTelefono, telefonoEnviable } from '../chatbot/utilidades/enmascarar.util';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from './pago-plan.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
@@ -376,6 +377,24 @@ export class SeguimientoService {
     const resumenPago = { pagado: Math.round(pagadoMonto * 100) / 100, total: totalCobrable, pagos };
     if (!pagoDigital && digitales.length === 0) return { ...base, resumenPago };
     return { ...base, resumenPago, voucher: voucherAgregado(pagos.filter((f) => f.digital), medioPreferido) };
+  }
+
+  /**
+   * ¿La carta debe mostrar «Recibir mi pedido por WhatsApp»? Solo si el bot no puede escribirle primero: el celular del pedido
+   * no escribió en las últimas 24 h (regla anti-baneo de Evolution) y el resumen aún no salió. Token inválido = pedido inexistente.
+   */
+  async botonWhatsapp(codigo: string, token: string | undefined): Promise<{ requiereBoton: boolean }> {
+    const pedido = await this.prisma.pedido.findUnique({ where: { codigo }, select: { id: true, estado: true, cliente_telefono: true } });
+    if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    if (pedido.estado === 'ANULADO' || !telefonoEnviable(pedido.cliente_telefono)) return { requiereBoton: false };
+    const hash = hashTelefono(telefonoEnviable(pedido.cliente_telefono));
+    const [reciente, enviado] = await Promise.all([
+      this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE', creado_en: { gte: new Date(Date.now() - 24 * 3_600_000) } } }),
+      this.prisma.salienteWhatsapp.count({ where: { pedido_id: pedido.id, origen: { in: ['AVISO_PEDIDO', 'AUTORESPUESTA'] }, estado: 'ENVIADO' } }),
+    ]);
+    return { requiereBoton: reciente === 0 && enviado === 0 };
   }
 
   /**

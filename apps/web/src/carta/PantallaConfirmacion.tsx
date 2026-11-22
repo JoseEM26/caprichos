@@ -8,6 +8,7 @@ import { ModalConPestanas } from '../comun/ModalConPestanas';
 import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { EstadoSeguimiento, PasoSeguimiento, PedidoGuardado } from './seguimiento';
 import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
+import { BotonRecibirPorWhatsapp } from './BotonRecibirPorWhatsapp';
 import { ConfirmacionProgramado } from './ProgramarPedido';
 import { PagarEnLinea } from './pagos/PagarEnLinea';
 import { EstadoVoucherPedido } from './EstadoVoucherPedido';
@@ -249,6 +250,8 @@ function PanelEstado({
           <p className="sg-local" data-testid="texto-comer-local">{textoLocal}.</p>
         )}
       </section>
+
+      {creacion && !anulado && <BotonRecibirPorWhatsapp codigo={pedido.codigo} token={pedido.token} />}
 
       {!anulado && (creacion?.programadoPara || estado?.programadoPara) && <ConfirmacionProgramado iso={(creacion?.programadoPara ?? estado?.programadoPara) as string} />}
 

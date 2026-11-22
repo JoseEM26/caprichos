@@ -72,6 +72,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
+import { condicionPedidosDelChat, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
 import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAfirmaSinDatos, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
@@ -1028,7 +1029,8 @@ export class EjecutorConversacionService {
     // 6. Preparar datos del contexto consumiendo servicios y la Base de Datos
     const nombreMostrar = obtenerNombreMostrar(conversacion);
     const cartaUrlPublica = urlPublicaCarta((k) => this.configService.get<string>(k));
-    const telefonoCliente = normalizarTelefono(conversacion.telefono);
+    // Chat sin número (LID): el celular vinculado hace de teléfono, para encontrar sus pedidos (la carta guarda 9 dígitos)
+    let telefonoCliente = telefonoDelChat(conversacion) || normalizarTelefono(conversacion.telefono);
 
     let errorServicio = false;
     let datosLocal: DatosHorarioLocal | undefined;
@@ -1124,6 +1126,9 @@ export class EjecutorConversacionService {
         if (!rateLimitPedidoOk) {
           limiteConsultasExcedido = true;
         } else {
+          // Chat sin vincular que da el código de su pedido de la carta: se vincula (ver pedidoDelChatPorCodigo)
+          const delChat = await pedidoDelChatPorCodigo(this.prisma, conversacion, codigoFinal).catch(() => null);
+          if (delChat && telefonoDelChat(conversacion)) telefonoCliente = telefonoDelChat(conversacion);
           const pedidoEncontrado = await this.prisma.pedido.findUnique({
             where: { codigo: codigoFinal },
           });
@@ -1132,7 +1137,7 @@ export class EjecutorConversacionService {
           // Si el pedido tiene teléfono registrado, debe coincidir con el teléfono de la conversación.
           if (pedidoEncontrado) {
             const telPedido = normalizarTelefono(pedidoEncontrado.cliente_telefono || '');
-            if (!telPedido || !telefonoCliente || telPedido === telefonoCliente) {
+            if (!telPedido || !telefonoCliente || telPedido === telefonoCliente || pedidoEsDelChat(conversacion, pedidoEncontrado)) {
               pedidoActivo = pedidoEncontrado;
             } else {
               // Pertenece a otro cliente: rechazar
@@ -1158,10 +1163,10 @@ export class EjecutorConversacionService {
           }
         }
       } else if (telefonoCliente) {
-        // Buscar el último pedido activo del cliente en las últimas 24 horas
+        // Buscar el último pedido activo del cliente en las últimas 24 horas (por celular, celular vinculado o party)
         const pedidoReciente = await this.prisma.pedido.findFirst({
           where: {
-            cliente_telefono: { contains: telefonoCliente.slice(-8) },
+            ...(condicionPedidosDelChat(conversacion) ?? { cliente_telefono: { contains: telefonoCliente.slice(-8) } }),
             creado_en: { gte: new Date(Date.now() - 24 * 3600 * 1000) },
           },
           orderBy: { creado_en: 'desc' },
