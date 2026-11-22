@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { obtenerRangoHoyLima } from '../plano/plano.util';
+import { celularValido } from '../clientes/party-puntos.service';
 import { armarSalonVivo, AvatarVivo, SalonVivo } from './salon-vivo.util';
 
 /** Salón en vivo (solo lectura): plano real + estado de mesas, cocina, despacho y reparto del día de Lima. */
@@ -22,10 +23,10 @@ export class SalonVivoService {
         select: {
           id: true, codigo: true, modalidad: true, estado: true, cliente_nombre: true, pago_estado: true,
           creado_en: true, pasa_cocina_en: true, listo_en: true, entregado_mesa_en: true, entregado_en: true,
-          cobro_mozo_en: true, despachado_en: true, espera_personas: true, party_id: true,
+          cobro_mozo_en: true, despachado_en: true, espera_personas: true, party_id: true, cliente_telefono: true,
           mesas: { select: { mesa_id: true, mesa_nombre: true, abierta: true } },
           comandas: { select: { estado: true, area: { select: { nombre: true } } } },
-          lineas: { select: { nombre: true, cantidad: true } },
+          lineas: { select: { nombre: true, cantidad: true, producto: { select: { categoria: { select: { nombre: true } } } } } },
         },
       }),
       this.prisma.reserva.findMany({
@@ -36,8 +37,18 @@ export class SalonVivoService {
       this.prisma.caja.findFirst({ where: { estado: 'ABIERTA' }, select: { id: true } }),
     ]);
 
+    // Pedido sin party: se une por el celular del pedido con la cuenta de cliente de ese celular (solo para sacar su avatar)
+    const celulares = [...new Set(pedidos.filter((p) => p.party_id == null).map((p) => celularValido(p.cliente_telefono)).filter((x): x is string => !!x))];
+    const partyPorCelular = new Map<string, bigint>();
+    if (celulares.length) {
+      const cuentas = await this.prisma.customerAccount.findMany({ where: { telefono: { in: celulares }, activo: true }, select: { telefono: true, party_id: true } });
+      for (const c of cuentas) if (c.telefono) partyPorCelular.set(c.telefono, c.party_id);
+    }
+    const partyDe = (p: { party_id: bigint | null; cliente_telefono: string | null }): bigint | null =>
+      p.party_id ?? partyPorCelular.get(celularValido(p.cliente_telefono) ?? '') ?? null;
+
     // Avatares de los clientes de todos los pedidos en UNA consulta (sin N+1); solo retrato y configuración
-    const partyIds = [...new Set(pedidos.map((p) => p.party_id).filter((x): x is bigint => x != null))];
+    const partyIds = [...new Set(pedidos.map(partyDe).filter((x): x is bigint => x != null))];
     const avatares = new Map<string, AvatarVivo>();
     if (partyIds.length) {
       const personas = await this.prisma.person.findMany({
@@ -65,6 +76,7 @@ export class SalonVivoService {
       })),
       pedidos: pedidos.map((p) => ({
         ...p,
+        party_id: partyDe(p),
         mesas: p.mesas.map((m) => ({ mesaId: m.mesa_id, nombre: m.mesa_nombre, abierta: m.abierta })),
       })),
       reservas: reservas.map((r) => ({

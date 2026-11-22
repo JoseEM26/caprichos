@@ -48,6 +48,8 @@ export interface PedidoVivo {
   mesaIds: string[];
   minutos: number;
   productos: number;
+  /** Bebidas del pedido (acompañantes en la escena 3D) */
+  bebidas: number;
   items: string[];
   areas: AreaVivo[];
   avatar: AvatarVivo | null;
@@ -60,7 +62,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[]; avatar: AvatarVivo | null } | null;
+  pedido: { codigo: string; personas: number | null; bebidas: number; minutos: number; areasPendientes: string[]; avatar: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 
@@ -97,6 +99,7 @@ export interface SalonVivo {
 export interface PedidoDia {
   id: bigint;
   party_id?: bigint | null;
+  cliente_telefono?: string | null;
   codigo: string;
   modalidad: string;
   estado: string;
@@ -112,7 +115,7 @@ export interface PedidoDia {
   espera_personas: number | null;
   mesas: Array<{ mesaId: bigint | null; nombre: string | null; abierta: boolean }>;
   comandas: Array<{ estado: string; area: { nombre: string } }>;
-  lineas: Array<{ nombre: string; cantidad: number }>;
+  lineas: Array<{ nombre: string; cantidad: number; producto?: { categoria: { nombre: string } | null } | null }>;
 }
 
 export interface ReservaDia {
@@ -159,11 +162,16 @@ function aPedidoVivo(p: PedidoDia, ahora: Date, avatares?: Map<string, AvatarViv
     mesaIds: p.mesas.filter((m) => m.abierta && m.mesaId != null).map((m) => String(m.mesaId)),
     minutos: minutosDesde(p.pasa_cocina_en ?? p.creado_en, ahora),
     productos: p.lineas.reduce((s, l) => s + (l.cantidad || 0), 0),
+    bebidas: bebidasDe(p),
     items: p.lineas.slice(0, 3).map((l) => l.nombre),
     areas: p.comandas.map((c) => ({ nombre: c.area.nombre, estado: c.estado === 'DESPEJADA' ? 'LISTA' : 'PENDIENTE' })),
     avatar: avatarDe(p, avatares),
   };
 }
+
+/** Unidades de bebida del pedido (categoría con «bebida» en el nombre) */
+const bebidasDe = (p: PedidoDia): number =>
+  p.lineas.reduce((s, l) => s + (/bebida/i.test(l.producto?.categoria?.nombre ?? '') ? l.cantidad || 0 : 0), 0);
 
 const esMesa = (p: PedidoDia) => p.modalidad === 'MESA';
 
@@ -212,6 +220,7 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
         pedido = {
           codigo: ped.codigo,
           personas: personas && personas > 0 ? Math.min(personas, asientos) : null,
+          bebidas: bebidasDe(ped),
           minutos: minutosDesde(ped.pasa_cocina_en ?? ped.creado_en, ahora),
           areasPendientes: ped.comandas.filter((c) => c.estado !== 'DESPEJADA').map((c) => c.area.nombre),
           avatar: avatarDe(ped, e.avatares),

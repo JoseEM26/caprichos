@@ -40,6 +40,7 @@ export interface PedidoVivo {
   mesaIds: string[];
   minutos: number;
   productos: number;
+  bebidas?: number;
   items: string[];
   areas: Array<{ nombre: string; estado: 'PENDIENTE' | 'LISTA' }>;
   avatar?: AvatarVivo | null;
@@ -52,7 +53,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { codigo: string; personas: number | null; minutos: number; areasPendientes: string[]; avatar?: AvatarVivo | null } | null;
+  pedido: { codigo: string; personas: number | null; bebidas?: number; minutos: number; areasPendientes: string[]; avatar?: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 

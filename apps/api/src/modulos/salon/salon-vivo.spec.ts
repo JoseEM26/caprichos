@@ -86,6 +86,19 @@ describe('armarSalonVivo', () => {
   });
 });
 
+describe('bebidas del pedido', () => {
+  it('cuenta las unidades de la categoría Bebidas en la mesa y en el pedido', () => {
+    const lineas = [
+      { nombre: 'Capuccino', cantidad: 2, producto: { categoria: { nombre: 'Bebidas calientes' } } },
+      { nombre: 'Frappé', cantidad: 1, producto: { categoria: { nombre: 'Bebidas' } } },
+      { nombre: 'Dona', cantidad: 4, producto: { categoria: { nombre: 'Donas' } } },
+    ];
+    const r = armarSalonVivo(entrada([ped(80, { lineas, mesas: [{ mesaId: 1n, nombre: 'Mesa 1', abierta: true }] })]));
+    expect(r.mesas[0].pedido?.bebidas).toBe(3);
+    expect(r.cocina[0].bebidas).toBe(3);
+  });
+});
+
 describe('avatar del cliente', () => {
   const avatares = new Map([['77', { url: '/archivos/avatar-77.png', config: { genero: 'mujer' } }]]);
   it('sale en el pedido vivo y en el de la mesa; sin avatar o sin cliente es null', () => {
@@ -119,6 +132,22 @@ describe('avatar del cliente', () => {
     expect(Object.keys(q.select).sort()).toEqual(['avatar_config', 'avatar_url', 'party_id']);
     expect(r.cocina.map((p) => p.avatar?.url ?? null)).toEqual(['/archivos/a5.png', '/archivos/a5.png', null, null]);
     expect(JSON.stringify(r)).not.toMatch(/party_id|telefono/i);
+  });
+
+  it('un pedido sin party se une por el celular del pedido con la cuenta de ese celular, sin exponer el celular', async () => {
+    const prisma: any = {
+      piso: { findMany: jest.fn().mockResolvedValue([]) },
+      pedido: { findMany: jest.fn().mockResolvedValue([{ ...ped(70, { cliente_telefono: '987654321' }), mesas: [] }]) },
+      reserva: { findMany: jest.fn().mockResolvedValue([]) },
+      caja: { findFirst: jest.fn().mockResolvedValue(null) },
+      customerAccount: { findMany: jest.fn().mockResolvedValue([{ telefono: '987654321', party_id: 9n }]) },
+      person: { findMany: jest.fn().mockResolvedValue([{ party_id: 9n, avatar_url: '/archivos/a9.png', avatar_config: { genero: 'mujer' } }]) },
+    };
+    const r = await new SalonVivoService(prisma).obtener(ahora);
+    expect(prisma.customerAccount.findMany.mock.calls[0][0].where).toMatchObject({ telefono: { in: ['987654321'] }, activo: true });
+    expect(prisma.person.findMany.mock.calls[0][0].where.party_id.in).toEqual([9n]);
+    expect(r.cocina[0].avatar?.url).toBe('/archivos/a9.png');
+    expect(JSON.stringify(r)).not.toMatch(/987654321|party_id|telefono/i);
   });
 
   it('sin pedidos con cliente no consulta Person', async () => {
