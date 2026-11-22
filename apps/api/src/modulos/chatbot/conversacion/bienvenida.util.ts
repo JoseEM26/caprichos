@@ -103,7 +103,7 @@ export function armarBienvenida(nombre: string | null | undefined, datos: DatosB
   const link = String(op.linkCarta ?? '').trim();
   const local = op.local || NOMBRE_LOCAL_BOT;
   // puntos: lo pone obtenerTextosBot con el % real; '5' (el defecto del sistema) solo si los textos no se pudieron leer
-  const base = { nombre: nombreParaSaludo(nombre), local, link_carta: link, puntos: '5' };
+  const base = { nombre: nombreParaSaludo(nombre), local, link_carta: link, puntos: '5', puntos_aclaracion: ' (en productos sin promo)' };
 
   if (datos?.pausaAltaDemanda) {
     const saludo = interpolar(t('chatbot_texto_bienvenida'), { ...base, promociones: '' }).trim();

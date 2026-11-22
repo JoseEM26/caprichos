@@ -647,13 +647,14 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
     });
 
     it('obtenerTextosBot usa caché y se invalida al guardar', async () => {
+      // 2 lecturas por carga: los textos y los interruptores de puntos (combos/ofertas suman); la segunda llamada usa caché
       await service.obtenerTextosBot();
       await service.obtenerTextosBot();
-      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(2);
       await service.actualizarTextos({ chatbot_texto_despedida: 'Chau' }, mockUsuario as any);
       prisma.parametro.findMany.mockClear();
       await service.obtenerTextosBot();
-      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(2);
     });
 
     it('obtenerTextosBot pone el % real de puntos y trata la frase antigua como sin personalizar', async () => {

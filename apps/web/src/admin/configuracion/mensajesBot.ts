@@ -8,7 +8,7 @@ export const LIMITE_MENSAJE_BOT = 1024;
 export const VARIABLES_MENSAJE: Record<string, string[]> = {
   chatbot_texto_bienvenida: ['nombre', 'local', 'link_carta', 'promociones'],
   chatbot_texto_promos_encabezado: ['local'],
-  chatbot_texto_mas_descuento: ['link_carta', 'local', 'puntos'],
+  chatbot_texto_mas_descuento: ['link_carta', 'local', 'puntos', 'puntos_aclaracion'],
   chatbot_promos_mostrar: [],
   chatbot_promos_max: [],
   chatbot_texto_despedida: ['local'],
@@ -28,6 +28,7 @@ const EJEMPLO: Record<string, string> = {
   local: 'Caprichos',
   link_carta: 'https://caprichos.pe',
   puntos: '5',
+  puntos_aclaracion: ' (en productos sin promo)',
   horario: 'Lunes a Domingo',
   hora_apertura: '14:00',
   apertura: 'Abrimos hoy a las 14:00.',

@@ -32,6 +32,17 @@ export async function leerPuntosPromoSuman(prisma: {
   }
 }
 
+/**
+ * Aclaración corta de qué suma puntos, según los interruptores de Configuración › Puntos (para la invitación del bot):
+ * todo suma → nada; nada de promos → «(en productos sin promo)»; solo una de las dos → qué queda fuera.
+ */
+export function aclaracionPuntos(suman?: PuntosPromoSuman): string {
+  if (suman?.combos && suman?.ofertas) return '';
+  if (suman?.combos) return ' (sin contar productos en oferta)';
+  if (suman?.ofertas) return ' (sin contar combos)';
+  return ' (en productos sin promo)';
+}
+
 /** ¿Esta línea de promoción queda fuera de los puntos con los interruptores dados? */
 export function promoExcluyePuntos(l: { enPromocion?: boolean; tipoPromo?: 'COMBO' | 'OFERTA' }, suman?: PuntosPromoSuman): boolean {
   if (!l.enPromocion) return false;

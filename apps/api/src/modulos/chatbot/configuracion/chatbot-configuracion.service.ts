@@ -1,3 +1,4 @@
+import { aclaracionPuntos, leerPuntosPromoSuman } from '../../ofertas/puntos-elegibles.util';
 import {
   BadRequestException,
   Injectable,
@@ -911,7 +912,12 @@ export class ChatbotConfiguracionService {
     let param: { valor: unknown } | null = null;
     try { param = await this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } }); } catch { /* usa el 5 de fábrica */ }
     const puntos = param?.valor !== null && param?.valor !== undefined && Number.isFinite(Number(param.valor)) ? String(Number(param.valor)) : '5';
-    const textos = { ...config.textos, chatbot_texto_mas_descuento: textoBot(config.textos, 'chatbot_texto_mas_descuento').replace(/\{puntos\}/g, puntos) };
+    // {puntos_aclaracion}: qué suma puntos según «combos/ofertas suman» (vacío si todo suma)
+    const aclaracion = aclaracionPuntos(await leerPuntosPromoSuman(this.prisma));
+    const textos = {
+      ...config.textos,
+      chatbot_texto_mas_descuento: textoBot(config.textos, 'chatbot_texto_mas_descuento').replace(/\{puntos\}/g, puntos).replace(/\{puntos_aclaracion\}/g, aclaracion),
+    };
     this.cacheTextos = { en: Date.now(), textos };
     return textos;
   }

@@ -29,7 +29,7 @@ export const TEXTOS_BOT_DEFECTO = {
   chatbot_texto_promos_encabezado: '🔥 Hoy tenemos:',
 
   chatbot_texto_mas_descuento:
-    'Con gusto te tomo el pedido por aquí 😊 Pero si pides en nuestra *NUEVA CARTA VIRTUAL* 👉 {link_carta} te devolvemos el *{puntos}% de tu compra en puntos* (en productos sin promo), para canjear en delivery o en el local, y te atendemos más rápido ⚡\n¿Pides por la carta o prefieres seguir por aquí?',
+    'Con gusto te tomo el pedido por aquí 😊 Pero si pides en nuestra *NUEVA CARTA VIRTUAL* 👉 {link_carta} te devolvemos el *{puntos}% de tu compra en puntos*{puntos_aclaracion}, para canjear en delivery o en el local, y te atendemos más rápido ⚡\n¿Pides por la carta o prefieres seguir por aquí?',
 
   /** 'si' / 'no': muestra el bloque de promociones vigentes en la bienvenida. */
   chatbot_promos_mostrar: 'si',
@@ -77,7 +77,7 @@ export const MAS_DESCUENTO_ANTIGUO = '💛 Hay *MÁS DESCUENTO* en nuestra *CART
 export const VARIABLES_TEXTO_BOT: Record<ClaveTextoBot, string[]> = {
   chatbot_texto_bienvenida: ['nombre', 'local', 'link_carta', 'promociones'],
   chatbot_texto_promos_encabezado: ['local'],
-  chatbot_texto_mas_descuento: ['link_carta', 'local', 'puntos'],
+  chatbot_texto_mas_descuento: ['link_carta', 'local', 'puntos', 'puntos_aclaracion'],
   chatbot_promos_mostrar: [],
   chatbot_promos_max: [],
   chatbot_texto_despedida: ['local'],

@@ -2072,7 +2072,7 @@ function transicionarSoloMenusNucleo(
     // Ya conversamos hace poco: el menú sin volver a presentarse
     if (contexto.sinBienvenida) {
       return respuesta([
-        { tipo: 'enviarLista', texto: `¡Claro! 😊 Esto es lo que puedo hacer por ti:\n\n${interpolar(textoBot(contexto.textosPersonalizados, 'chatbot_texto_mas_descuento'), { link_carta: url, local: NOMBRE_LOCAL_BOT, puntos: '5' })}`, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
+        { tipo: 'enviarLista', texto: `¡Claro! 😊 Esto es lo que puedo hacer por ti:\n\n${interpolar(textoBot(contexto.textosPersonalizados, 'chatbot_texto_mas_descuento'), { link_carta: url, local: NOMBRE_LOCAL_BOT, puntos: '5', puntos_aclaracion: ' (en productos sin promo)' })}`, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
       ]);
     }
     // Misma bienvenida que el menú principal (fuente única): saludo + promociones vigentes + carta virtual
