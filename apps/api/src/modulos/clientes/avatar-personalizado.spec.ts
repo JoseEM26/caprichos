@@ -24,4 +24,10 @@ describe('esAvatarPersonalizado', () => {
     expect(esAvatarPersonalizado({ ...porDefecto(), mascota: { id: 'gato', colores: {}, nombre: 'Michi' } })).toBe(true);
     expect(esAvatarPersonalizado({ ...porDefecto(), disfrazId: 'pirata' })).toBe(true);
   });
+  it.each(['dz_kig_conejita', 'dz_kig_michi', 'dz_kig_diablito', 'dz_kig_perrito', 'dz_kig_osito'])('la pijama %s cuenta como personalizado', (id) => {
+    const kig = { ...porDefecto(), disfraz: 'Pijama', disfrazId: id, arriba: { id, colores: {} }, cabeza: { id: id.replace('dz_kig_', 'dz_capucha_'), colores: {} }, calzado: { id: 'dz_pantufla_patita', colores: {} } };
+    expect(esAvatarPersonalizado(kig)).toBe(true);
+    // aunque solo viniera la pieza suelta (sin disfrazId), el cambio de pieza ya cuenta
+    expect(esAvatarPersonalizado({ ...porDefecto(), arriba: { id, colores: {} } })).toBe(true);
+  });
 });

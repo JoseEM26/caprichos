@@ -8,6 +8,7 @@ import { registrarCabelloLargo } from './cabello-largo';
 import { registrarRopa } from './ropa';
 import { registrarDisfraces } from './disfraces';
 import { registrarMascotas } from './mascotas';
+import { registrarPijamas } from './pijamas';
 import type { Avatar3D } from './tipos';
 
 let listo = false;
@@ -19,6 +20,7 @@ export function cargarAvatar(): Avatar3D {
     registrarCabelloLargo();
     registrarRopa();
     registrarDisfraces();
+    registrarPijamas();
     registrarMascotas();
     listo = true;
   }

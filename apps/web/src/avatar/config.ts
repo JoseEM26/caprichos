@@ -20,6 +20,8 @@ export const CATS: { id: CategoriaEditor; nombre: string; icono: string }[] = [
   { id: 'disfraz', nombre: 'Disfraces', icono: '🎭' },
 ];
 export const ZOOM: Partial<Record<CategoriaEditor, 'cabeza' | 'pies' | 'mascota'>> = { cabello: 'cabeza', cabeza: 'cabeza', cara: 'cabeza', calzado: 'pies', mascota: 'mascota' };
+/** Sección de Disfraces con las pijamas enteras: va primera y se abre por defecto. */
+export const GRUPO_DESTACADOS = 'Destacados ✨';
 export const NOMBRE_COLOR: Record<string, string> = { principal: 'Color principal', secundario: 'Segundo color', acento: 'Detalles' };
 
 const primero = (A: Avatar3D, cat: string, evitar?: string) => A.REG[cat].find((x) => x.id !== evitar)?.id ?? 'ninguno';

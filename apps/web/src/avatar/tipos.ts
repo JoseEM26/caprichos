@@ -32,6 +32,12 @@ export interface DefPieza {
   grupo?: string;
   colores: string[];
   porDefecto?: Record<string, string>;
+  /** Disfraz destacado: sale en la sección «Destacados ✨» del editor con insignia «Nuevo» */
+  destacado?: boolean;
+  /** Gorro con orejas o cuernos altos: el retrato se aleja un poco para no cortarlos */
+  orejasAltas?: boolean;
+  nuevo?: boolean;
+  descripcion?: string;
   aplica?: Record<string, { id: string; colores?: Record<string, string> } | string>;
 }
 

@@ -303,6 +303,7 @@ let _A;
     const defArriba = c.arriba && buscar('arriba', c.arriba.id);
     for (const cat of ORDEN) {
       if (cat === 'abajo' && defArriba && defArriba.cubreAbajo) continue; // vestidos y enterizos tapan lo de abajo
+      if (cat === 'cabello' && defCabeza && defCabeza.sinCabello) continue; // capuchas kigurumi: el cabello queda debajo
       const sel = c[cat];
       if (!sel) continue;
       const def = buscar(cat, sel.id);

@@ -29,6 +29,23 @@ const configValida = () => ({
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(50, 1)]);
 const dataUrl = (b: Buffer) => `data:image/png;base64,${b.toString('base64')}`;
 
+describe('validarAvatarConfig › pijamas kigurumi destacadas', () => {
+  it.each(['conejita', 'michi', 'diablito', 'perrito', 'osito'])('acepta la pijama %s con colores y entra holgada en el tope de tamaño', (e) => {
+    const cfg = {
+      ...configValida(),
+      disfraz: 'Perrito Nube de Leche',
+      disfrazId: `dz_kig_${e}`,
+      arriba: pieza(`dz_kig_${e}`, { principal: '#9CD3F2', secundario: '#FFF6E8', acento: '#6FAEE0' }),
+      cabeza: pieza(`dz_capucha_${e}`, { principal: '#9CD3F2', secundario: '#FFF6E8', acento: '#6FAEE0' }),
+      calzado: pieza('dz_pantufla_patita', { principal: '#9CD3F2', secundario: '#FFF6E8', acento: '#F5A9C2' }),
+    };
+    const r = validarAvatarConfig(cfg);
+    expect(r.disfrazId).toBe(`dz_kig_${e}`);
+    expect(r.cabeza.id).toBe(`dz_capucha_${e}`);
+    expect(Buffer.byteLength(JSON.stringify(r))).toBeLessThan(2 * 1024);
+  });
+});
+
 describe('validarAvatarConfig', () => {
   it('acepta una configuración válida y normaliza los colores a mayúsculas', () => {
     const r = validarAvatarConfig(configValida());

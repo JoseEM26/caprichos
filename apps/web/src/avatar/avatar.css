@@ -133,3 +133,10 @@
 .av-nombre .av-interruptor input:checked { background: #E67929; border-color: #E67929; }
 .av-nombre .av-interruptor input:checked::after { transform: translateX(18px); }
 .av-nombre .av-interruptor input:focus-visible { outline: 3px solid #0B2C3E; outline-offset: 2px; }
+
+/* Destacados ✨ (pijamas enteras): tarjetas grandes con insignia «Nuevo» */
+.av-rejilla.av-rejilla--grande { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.av-rejilla--grande .av-item { font-size: 14px; padding: 8px 8px 10px; background: linear-gradient(180deg, #FFF8EE, #FDEBDD); }
+.av-rejilla--grande .av-item small { font-size: 11px; }
+.av-nuevo { position: absolute; top: 12px; left: 12px; z-index: 1; padding: 2px 9px; border-radius: 999px; background: #E84A7F; color: #fff; font: 800 11px 'Open Sans', system-ui, sans-serif; letter-spacing: .02em; box-shadow: 0 2px 6px rgba(232, 74, 127, .35); }
+@media (max-width: 920px) { .av-rejilla.av-rejilla--grande { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } }

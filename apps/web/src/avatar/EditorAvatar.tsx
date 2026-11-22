@@ -6,7 +6,7 @@ import { EscenaAvatar } from './escena';
 import type { AccionAvatar } from './escena';
 import { crearMiniaturas } from './miniaturas';
 import type { Miniaturas } from './miniaturas';
-import { aplicarDisfraz, CATS, MASCOTA_NOMBRE_MAX, NOMBRE_COLOR, norm, normalizar, OJOS, PALETA, PELOS, PIELES, porDefecto, ZOOM } from './config';
+import { aplicarDisfraz, CATS, GRUPO_DESTACADOS, MASCOTA_NOMBRE_MAX, NOMBRE_COLOR, norm, normalizar, OJOS, PALETA, PELOS, PIELES, porDefecto, ZOOM } from './config';
 import type { CategoriaEditor } from './config';
 import type { CategoriaPieza, ConfigAvatar } from './tipos';
 import './avatar.css';
@@ -151,12 +151,17 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
 
   // Piezas visibles de la pestaña
   const defs = cat === 'cuerpo' ? [] : A.REG[cat];
-  const grupos = useMemo(() => ['Todos', ...Array.from(new Set(defs.map((d) => d.grupo || 'Otros')))], [defs]);
+  const grupos = useMemo(() => {
+    const g = Array.from(new Set(defs.map((d) => d.grupo || 'Otros')));
+    const destacados = g.filter((x) => x === GRUPO_DESTACADOS);
+    return [...destacados, 'Todos', ...g.filter((x) => x !== GRUPO_DESTACADOS)];
+  }, [defs]);
   const grupoOk = grupos.includes(grupo) ? grupo : 'Todos';
-  const visibles = useMemo(
-    () => defs.filter((d) => (grupoOk === 'Todos' || (d.grupo || 'Otros') === grupoOk) && (!busqueda || norm(d.nombre).includes(norm(busqueda)))),
-    [defs, grupoOk, busqueda],
-  );
+  const visibles = useMemo(() => {
+    const lista = defs.filter((d) => (grupoOk === 'Todos' || (d.grupo || 'Otros') === grupoOk) && (!busqueda || norm(d.nombre).includes(norm(busqueda))));
+    // En «Todos», los destacados van primero (el orden entre ellos no cambia)
+    return cat === 'disfraz' ? [...lista.filter((d) => d.destacado), ...lista.filter((d) => !d.destacado)] : lista;
+  }, [defs, grupoOk, busqueda, cat]);
   const actualId = cat === 'disfraz' ? cfg.disfrazId : cat === 'cuerpo' ? null : cfg[cat].id;
 
   // Miniaturas 3D: el avatar de hoy con cada pieza (se piden en cola para no trabar la pantalla)
@@ -252,7 +257,7 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
     cambiarCat(CATS[n].id);
     document.getElementById(`av-tab-${CATS[n].id}`)?.focus();
   };
-  const cambiarCat = (id: CategoriaEditor) => { setCat(id); setGrupo('Todos'); setBusqueda(''); };
+  const cambiarCat = (id: CategoriaEditor) => { setCat(id); setGrupo(id === 'disfraz' ? GRUPO_DESTACADOS : 'Todos'); setBusqueda(''); };
 
   const slots = cat !== 'cuerpo' && cat !== 'disfraz' && cat !== 'cabello' ? A.buscar(cat, cfg[cat].id) : undefined;
   const nombreCat = CATS.find((c) => c.id === cat)?.nombre ?? '';
@@ -330,13 +335,14 @@ export default function EditorAvatar({ inicial, nombreCuenta, guardar, cerrar }:
                 <div className="av-chips" style={{ marginBottom: 10 }}>
                   {grupos.map((g) => <button key={g} type="button" className="av-chip" aria-pressed={g === grupoOk} onClick={() => setGrupo(g)}>{g}</button>)}
                 </div>
-                <div className="av-rejilla">
+                <div className={`av-rejilla${cat === 'disfraz' && grupoOk === GRUPO_DESTACADOS ? ' av-rejilla--grande' : ''}`}>
                   {visibles.length === 0 && <p className="av-sin-res">No hay piezas con ese nombre.</p>}
                   {visibles.map((d) => (
                     <button key={d.id} type="button" className="av-item" data-id={d.id} aria-pressed={d.id === actualId} onClick={() => elegir(d.id)}>
+                      {d.nuevo && <span className="av-nuevo">Nuevo</span>}
                       {minis[d.id] ? <img src={minis[d.id]} alt="" /> : <span className="av-vacio" aria-hidden="true">✦</span>}
                       {d.nombre}
-                      <small>{d.grupo || ''}</small>
+                      <small>{d.descripcion && grupoOk === GRUPO_DESTACADOS ? d.descripcion : (d.grupo || '')}</small>
                     </button>
                   ))}
                 </div>

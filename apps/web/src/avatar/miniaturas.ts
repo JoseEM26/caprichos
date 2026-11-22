@@ -33,7 +33,9 @@ export function crearMiniaturas(A: Avatar3D) {
     if (guardada) return guardada;
     const p = A.construir(conPelo(c));
     esc.add(p.raiz);
-    const [d, y, m] = zoom === 'cabeza' ? [1.55, 1.5, 1.42] : zoom === 'pies' ? [1.25, 0.5, 0.22] : zoom === 'retrato' ? [1.75, 1.46, 1.36] : [4.4, 1.1, 0.88];
+    let [d, y, m] = zoom === 'cabeza' ? [1.55, 1.5, 1.42] : zoom === 'pies' ? [1.25, 0.5, 0.22] : zoom === 'retrato' ? [1.75, 1.46, 1.36] : [4.4, 1.1, 0.88];
+    // Capuchas con orejas altas (pijamas kigurumi): se aleja y sube un poco para que no se corten
+    if ((zoom === 'retrato' || zoom === 'cabeza') && A.buscar('cabeza', c.cabeza.id)?.orejasAltas) { d *= 1.2; y += 0.07; m += 0.1; }
     const ang = zoom === 'pies' || zoom === 'mascota' ? 0.5 : 0;
     const cuadrada = zoom === 'retrato';
     // Retrato y primer plano de la cara: sin la mascota (quedaría recortada al borde); la pestaña Mascota la muestra sola
