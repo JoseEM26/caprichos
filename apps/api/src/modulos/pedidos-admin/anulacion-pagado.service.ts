@@ -37,9 +37,14 @@ export class AnulacionPagadoService {
   ) {}
 
   /** ¿Hay dinero recibido? Cobro vigente en dinero (el crédito del personal no cuenta) o pago PAGADO/COORDINADO. */
-  async estaPagado(pedido: { id: bigint; pago_estado?: string | null }): Promise<boolean> {
+  async estaPagado(pedido: { id: bigint; pago_estado?: string | null; pago_metodo?: string | null }): Promise<boolean> {
     const cobros = await this.prisma.cobro.findMany({ where: { pedido_id: pedido.id, anulado_en: null }, select: { credito_personal: true } });
     if (cobros.length > 0) return cobros.some((c) => !c.credito_personal);
+    // Pedido del personal a crédito sin saldar: nace PAGADO pero no entró dinero; no hay nada que devolver
+    if (pedido.pago_metodo === 'CREDITO_PERSONAL') {
+      const consumo = await this.prisma.consumoPersonal.findUnique({ where: { pedido_id: pedido.id }, select: { pagado_en: true } });
+      if (consumo && !consumo.pagado_en) return false;
+    }
     return PAGOS_CON_DINERO.includes(String(pedido.pago_estado));
   }
 

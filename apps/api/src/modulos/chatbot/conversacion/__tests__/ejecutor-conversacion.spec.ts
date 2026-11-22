@@ -74,6 +74,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       pedido: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 

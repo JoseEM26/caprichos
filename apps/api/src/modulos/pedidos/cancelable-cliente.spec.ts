@@ -44,4 +44,10 @@ describe('regla «cancelable por el cliente»', () => {
     expect(razon({ estado: 'ANULADO' })).toBe('ANULADO');
     expect(razon({ estado: 'ENTREGADO' })).toBe('FINALIZADO');
   });
+  it('crédito del personal sin saldar (nace PAGADO sin dinero): sí se cancela; con dinero real: no', () => {
+    expect(razon({ pago_estado: 'PAGADO', creditoPersonalSinCobrar: true })).toBe('OK');
+    expect(razon({ pago_estado: 'PAGADO', creditoPersonalSinCobrar: true, cobrosVigentes: 1 })).toBe('YA_PAGADO');
+    expect(razon({ pago_estado: 'PAGADO', creditoPersonalSinCobrar: false })).toBe('YA_PAGADO');
+    expect(razon({ pago_estado: 'PAGADO', creditoPersonalSinCobrar: true, estado: 'PREPARANDO' })).toBe('EN_PREPARACION');
+  });
 });

@@ -1080,6 +1080,11 @@ export const TEXTOS_SOLO_MENUS = {
   estadoPedido: (codigo: string, estado: string, pagoEstado: string | null | undefined): string =>
     `Tu pedido *${codigo}* está en estado: *${estado}*${pagoEstado ? ` (Pago: *${pagoEstado}*)` : ''}.`,
 
+  variosPedidosEnCurso: (): string => 'Tienes varios pedidos en curso. ¿De cuál quieres saber?',
+
+  pedirCodigoSinLlave: (): string =>
+    'No reconozco tu número en WhatsApp. Escríbeme el código de tu pedido (CP-…) junto al celular con el que lo hiciste, por ejemplo: CP-W435 987654321.',
+
   sinPedidoActivo: (url: string): string => `No tienes un pedido activo con este número. Carta: ${url}`,
 
   ubicacionRecibida: (codigo: string): string =>

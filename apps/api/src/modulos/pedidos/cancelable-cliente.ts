@@ -15,6 +15,8 @@ export interface DatosCancelable {
   pagosOnlineActivos: number; // cargo PROCESANDO o APROBADO
   vouchersVigentes: number;
   comandasEmpezadas: number; // áreas de cocina ya despejadas o devueltas
+  /** Pedido del personal a crédito sin saldar: nace «PAGADO» pero no entró dinero (se descuenta después), no cuenta como pagado. */
+  creditoPersonalSinCobrar?: boolean;
 }
 
 export type ResultadoCancelable = { cancelable: true } | { cancelable: false; razon: RazonNoCancelable; mensaje: string };
@@ -22,7 +24,7 @@ export type ResultadoCancelable = { cancelable: true } | { cancelable: false; ra
 export const MENSAJES_NO_CANCELABLE: Record<RazonNoCancelable, string> = {
   ANULADO: 'Este pedido ya está cancelado.',
   FINALIZADO: 'Este pedido ya fue entregado.',
-  YA_PAGADO: 'Ya no se puede cancelar: el pedido ya está pagado.',
+  YA_PAGADO: 'Ya no se puede cancelar: tu pedido ya está pagado o con el pago confirmado. Escríbenos y lo vemos contigo.',
   PAGO_EN_REVISION: 'Tu pago está en revisión, escríbenos y lo vemos contigo.',
   EN_PREPARACION: 'Ya no se puede cancelar: tu pedido ya está en preparación.',
 };
@@ -33,9 +35,7 @@ export function reglaCancelable(d: DatosCancelable): ResultadoCancelable {
   if (d.estado === 'ANULADO') return no('ANULADO');
   if (d.estado === 'ENTREGADO') return no('FINALIZADO');
   const pagado =
-    d.pago_estado === 'PAGADO' ||
-    d.pago_estado === 'COORDINADO' ||
-    !!d.cobro_mozo_en ||
+    (!d.creditoPersonalSinCobrar && (d.pago_estado === 'PAGADO' || d.pago_estado === 'COORDINADO' || !!d.cobro_mozo_en)) ||
     Number(d.adelanto_total ?? 0) > 0 ||
     d.cobrosVigentes > 0 ||
     d.pagosOnlineActivos > 0;
@@ -51,12 +51,14 @@ const SELECCION = {
   codigo: true,
   estado: true,
   pago_estado: true,
+  pago_metodo: true,
+  consumoPersonal: { select: { pagado_en: true } },
   cobro_mozo_en: true,
   adelanto_total: true,
   cliente_telefono: true,
   _count: {
     select: {
-      cobros: { where: { anulado_en: null } },
+      cobros: { where: { anulado_en: null, credito_personal: false } }, // el crédito del personal no es dinero recibido
       pagosOnline: { where: { estado: { in: ['PROCESANDO', 'APROBADO'] } } },
       vouchers: { where: { reemplazado_en: null } },
       comandas: { where: { OR: [{ estado: 'DESPEJADA' }, { devuelta_en: { not: null } }] } },
@@ -69,6 +71,8 @@ export type FilaCancelable = {
   codigo: string;
   estado: string;
   pago_estado: string | null;
+  pago_metodo?: string | null;
+  consumoPersonal?: { pagado_en: Date | null } | null;
   cobro_mozo_en: Date | null;
   adelanto_total: unknown;
   cliente_telefono: string | null;
@@ -85,6 +89,7 @@ export const evaluarFila = (p: FilaCancelable): ResultadoCancelable =>
     pagosOnlineActivos: (p._count?.pagosOnline ?? 0),
     vouchersVigentes: (p._count?.vouchers ?? 0),
     comandasEmpezadas: (p._count?.comandas ?? 0),
+    creditoPersonalSinCobrar: p.pago_metodo === 'CREDITO_PERSONAL' && !!p.consumoPersonal && !p.consumoPersonal.pagado_en,
   });
 
 /** Lee el pedido con sus conteos y aplica la regla. null si no existe. */

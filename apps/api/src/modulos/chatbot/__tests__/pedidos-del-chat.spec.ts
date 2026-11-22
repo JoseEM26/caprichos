@@ -5,6 +5,8 @@ import {
   claveCortaPedido,
   condicionPedidosDelChat,
   enviarResumenPendienteDeCarta,
+  extraerCelularTexto,
+  extraerClavePedido,
   pedidoDelChatPorCodigo,
   pedidoEsDelChat,
   telefonoDelChat,
@@ -87,9 +89,15 @@ describe('Chat LID sin vincular que da el código de su pedido de la carta', () 
     }
   });
 
-  it('clave válida pero pedido personal: no', async () => {
+  it('clave válida en un pedido personal: es suyo (código + clave)', async () => {
     const { prisma } = montar(pedidoCarta({ es_personal: true }));
-    expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: 'wa-user:1234@lid' }, 'CP-0123', CLAVE)).toBeNull();
+    expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: 'wa-user:1234@lid' }, 'CP-0123', CLAVE)).not.toBeNull();
+  });
+  it('caso del dueño: «Hola, mi pedido CP-0123 (clave XXXXX)» con pedido personal, chat con otro número', async () => {
+    const { prisma } = montar(pedidoCarta({ es_personal: true, cliente_telefono: null }));
+    const texto = `Hola, mi pedido CP-0123 (clave ${CLAVE})`;
+    expect(extraerClavePedido(texto)).toBe(CLAVE);
+    expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: '51912345678' }, 'CP-0123', extraerClavePedido(texto))).not.toBeNull();
   });
 
   it('celular coincidente: basta el código, sin clave', async () => {
@@ -182,5 +190,23 @@ describe('«Hola, mi pedido CP-XXXX»: resumen al instante, una sola vez', () =>
     const { prisma, outbox } = montar(pedidoCarta({ codigo: 'CP-W382' }), diferido);
     expect(await enviarResumenPendienteDeCarta(prisma, outbox, { id: 1n, telefono: '51987654321' }, 'Hola, mi pedido CP-W382')).toBe(true);
     expect(prisma.pedido.findUnique).toHaveBeenCalledWith({ where: { codigo: 'CP-W382' } });
+  });
+});
+
+describe('Pedido del equipo (descuento) y chat LID: código + celular', () => {
+  const lid = () => ({ id: 1n, telefono: 'wa-user:1234@lid', celular_vinculado: null as string | null });
+  it('extrae el celular del texto sin confundirlo con el código', () => {
+    expect(extraerCelularTexto('CP-W435 987 654 321')).toBe('987654321');
+    expect(extraerCelularTexto('mi pedido CP-0123 +51 987654321')).toBe('987654321');
+    expect(extraerCelularTexto('CP-W435')).toBeNull();
+  });
+  it('pedido personal: con código + su celular se ve y vincula el chat; sin celular no', async () => {
+    const pedido = pedidoCarta({ es_personal: true, canal: 'CARTA' });
+    const { prisma } = montar(pedido);
+    expect(await pedidoDelChatPorCodigo(prisma, lid(), 'CP-0123', null, null)).toBeNull();
+    expect(await pedidoDelChatPorCodigo(prisma, lid(), 'CP-0123', null, '912345678')).toBeNull();
+    const chat = lid();
+    expect(await pedidoDelChatPorCodigo(prisma, chat, 'CP-0123', null, '987654321')).toBe(pedido);
+    expect(chat.celular_vinculado).toBe('987654321');
   });
 });

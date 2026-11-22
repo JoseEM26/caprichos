@@ -367,6 +367,10 @@ export interface ContextoConversacion {
   /** Unidades vendidas por productoId (últimos 90 días), para ordenar los carruseles. */
   ventasProductos?: Record<string, number>;
   pedidoActivo?: any;
+  /** Pedidos en curso del chat (más reciente primero, hasta 5). */
+  pedidosEnCurso?: any[];
+  /** El chat no tiene celular, vínculo ni cuenta: no hay con qué buscar sus pedidos. */
+  chatSinLlave?: boolean;
   /** Pedidos recientes del celular con veredicto «cancelable por el cliente» (solo se llena si el cliente pide cancelar). */
   cancelablesCliente?: Array<{ codigo: string; cancelable: boolean; mensaje?: string }>;
   errorServicio?: boolean;

@@ -2369,10 +2369,26 @@ function transicionarSoloMenusNucleo(
     }
     const conCodigo = /CP-W?\d{3,4}/i.test(entrada.textoOriginal || '') || id.startsWith('ord_');
     // Pregunta abierta sobre SU pedido («¿mi pedido ya sale?»): la IA responde con los datos reales de sus pedidos de cualquier canal
-    if (!id && preguntaEspecificaParaIa(entrada, contexto)) {
+    if (!id && !conCodigo && preguntaEspecificaParaIa(entrada, contexto)) {
       return respuesta([{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }]);
     }
+    // Varios en curso: lista corta para elegir (la elección llega como ord_CODIGO)
+    const enCurso = contexto.pedidosEnCurso ?? [];
+    if (!conCodigo && enCurso.length > 1) {
+      return respuesta([
+        {
+          tipo: 'enviarLista',
+          texto: TEXTOS_SOLO_MENUS.variosPedidosEnCurso(),
+          botonTexto: 'Elegir pedido',
+          tituloSeccion: 'Tus pedidos',
+          filas: enCurso.slice(0, 5).map((o: any) => ({ id: `ord_${o.codigo}`, titulo: String(o.codigo), descripcion: `${String(o.estado)} · S/ ${Number(o.total ?? 0).toFixed(2)}` })),
+        },
+      ]);
+    }
     const p = conCodigo || pedidoVigente(contexto.pedidoActivo) ? contexto.pedidoActivo : null;
+    if (!p && contexto.chatSinLlave) {
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.pedirCodigoSinLlave(), botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA] }]);
+    }
     if (!p) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] }]);
     }

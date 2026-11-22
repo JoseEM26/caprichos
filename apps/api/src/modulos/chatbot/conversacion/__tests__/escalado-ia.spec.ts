@@ -59,7 +59,7 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
         findMany: jest.fn(async () => [...historial].reverse()),
       },
       notificacion: { create: jest.fn().mockResolvedValue({ id: 99n }) },
-      pedido: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0) },
+      pedido: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       reserva: { findMany: jest.fn().mockResolvedValue([]) },
       solicitudReserva: { count: jest.fn().mockResolvedValue(0) },
     };

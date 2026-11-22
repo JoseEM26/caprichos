@@ -24,6 +24,10 @@ export function claveCortaPedido(pedidoId: bigint | string | number): string {
 }
 
 /** Clave que el cliente deja en el texto («… (clave 7K4Q2)»); null si no hay. */
+/** Celular peruano (9 dígitos) escrito en el texto, sin confundirlo con el código del pedido. */
+export const extraerCelularTexto = (texto: string | null | undefined): string | null =>
+  String(texto ?? '').replace(/CP-W?\d+/gi, ' ').match(/(?<!\d)(?:\+?51[\s-]?)?(9\d{2}[\s-]?\d{3}[\s-]?\d{3})(?!\d)/)?.[1]?.replace(/\D/g, '') ?? null;
+
 export const extraerClavePedido = (texto: string | null | undefined): string | null =>
   (String(texto ?? '').match(/\bclave\s+([A-Za-z2-9]{5})\b/i)?.[1] ?? '').toUpperCase() || null;
 
@@ -64,11 +68,14 @@ export function pedidoEsDelChat(chat: ChatLlaves, pedido: { cliente_telefono?: s
  * clave correcta (botón de la carta): un chat LID sin vincular queda vinculado al celular del pedido; un chat con otro número lo ve
  * sin vincular. Sin clave o con clave errada devuelve null y no se filtra nada.
  */
-export async function pedidoDelChatPorCodigo(prisma: PrismaService, chat: ChatLlaves & { id: bigint }, codigo: string, clave?: string | null) {
+export async function pedidoDelChatPorCodigo(prisma: PrismaService, chat: ChatLlaves & { id: bigint }, codigo: string, clave?: string | null, celular?: string | null) {
   const pedido = await prisma.pedido.findUnique({ where: { codigo } });
   if (!pedido) return null;
   if (pedidoEsDelChat(chat, pedido)) return pedido;
-  if (!clave || clave.toUpperCase() !== claveCortaPedido(pedido.id) || pedido.es_personal) return null;
+  // Prueba de que es suyo: la clave del botón de la carta, o el código MÁS el celular con el que hizo el pedido (también los del equipo)
+  const claveOk = !!clave && clave.toUpperCase() === claveCortaPedido(pedido.id);
+  const celularOk = !!celular && /^9\d{8}$/.test(celular) && celular === ultimos9(pedido.cliente_telefono);
+  if (!claveOk && !celularOk) return null;
   const esLid = String(chat.telefono ?? '').startsWith('wa-user:');
   const cel = telefonoEnviable(pedido.cliente_telefono).slice(-9);
   if (esLid && !chat.celular_vinculado && /^9\d{8}$/.test(cel)) {

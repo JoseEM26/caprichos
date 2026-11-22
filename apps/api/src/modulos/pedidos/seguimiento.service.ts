@@ -154,7 +154,26 @@ export interface DetallePedidoSeguimiento {
   envio: number | null;
   puntosCanjeados: number;
   nota: string | null;
-  lineas: { nombre: string; cantidad: number; nota: string | null; paraLlevar: boolean }[];
+  lineas: LineaDetalleSeguimiento[];
+  /** Cupón, oferta o descuento del personal: nombre y monto descontado (aditivo). */
+  descuentos?: { nombre: string; monto: number }[];
+  /** Hora de creación del pedido (ISO, aditivo). */
+  creadoEn?: string;
+}
+
+export interface LineaDetalleSeguimiento {
+  nombre: string;
+  cantidad: number;
+  nota: string | null;
+  paraLlevar: boolean;
+  tamano?: string | null;
+  /** «Grupo: opción» de cada opción elegida */
+  opciones?: string[];
+  /** «2 × Fresa» */
+  sabores?: string[];
+  nombresPersona?: string[];
+  precioUnit?: number;
+  subtotal?: number;
 }
 
 export type EstadoPagoMedio = EstadoVoucherSeguimiento | 'AL_RECIBIR' | 'COBRADO_MOZO' | 'PAGADO';
@@ -318,8 +337,15 @@ export class SeguimientoService {
         lineas: {
           where: { linea_combo_id: null },
           orderBy: { id: 'asc' as const },
-          select: { nombre: true, cantidad: true, nota: true, para_llevar: true, ...SELECCION_AREA_LINEA },
+          select: {
+            nombre: true, cantidad: true, nota: true, para_llevar: true, tamano: true, sabor: true, nombres_persona: true, precio_unit: true, subtotal: true,
+            opcionesElegidas: { select: { grupo_nombre: true, opcion_nombre: true } },
+            sabores: { select: { sabor_nombre: true, cantidad: true } },
+            ...SELECCION_AREA_LINEA,
+          },
         },
+        descuento_detalle: true,
+        creado_en: true,
         planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' as const } },
       },
     });
@@ -354,7 +380,22 @@ export class SeguimientoService {
         envio: pedido.envio == null ? null : Number(pedido.envio),
         puntosCanjeados: Number(pedido.puntos_canjeados ?? 0),
         nota: pedido.nota ?? null,
-        lineas: (pedido.lineas ?? []).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, nota: l.nota ?? null, paraLlevar: l.para_llevar === true })),
+        lineas: (pedido.lineas ?? []).map((l: any) => ({
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          nota: l.nota ?? null,
+          paraLlevar: l.para_llevar === true,
+          tamano: l.tamano ?? null,
+          opciones: (l.opcionesElegidas ?? []).map((o: any) => `${o.grupo_nombre}: ${o.opcion_nombre}`),
+          sabores: (l.sabores?.length ? l.sabores.map((x: any) => `${x.cantidad} × ${x.sabor_nombre}`) : l.sabor ? [l.sabor] : []),
+          nombresPersona: l.nombres_persona ?? [],
+          precioUnit: l.precio_unit == null ? undefined : Number(l.precio_unit),
+          subtotal: l.subtotal == null ? undefined : Number(l.subtotal),
+        })),
+        descuentos: (Array.isArray((pedido as any).descuento_detalle) ? ((pedido as any).descuento_detalle as any[]) : [])
+          .filter((d) => Number(d?.montoDescontado) > 0)
+          .map((d) => ({ nombre: String(d.nombre ?? 'Descuento'), monto: Number(d.montoDescontado) })),
+        creadoEn: (pedido as any).creado_en?.toISOString?.(),
       },
     };
 

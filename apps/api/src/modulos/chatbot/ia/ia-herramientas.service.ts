@@ -11,7 +11,7 @@ import { HerramientaIaDefinicion } from './tipos-ia';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
 import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
-import { condicionPedidosDelChat, pedidoEsDelChat } from '../servicios/pedidos-del-chat.util';
+import { condicionPedidosDelChat, extraerCelularTexto, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat } from '../servicios/pedidos-del-chat.util';
 import { MEDIOS_DIGITALES_VOUCHER } from '../servicios/pedido-esperando-voucher.util';
 import { progresoDelPedido } from '../../pedidos/progreso-pedido';
 import { leerConfigEta } from '../../repartos/eta-entrega';
@@ -227,7 +227,7 @@ export class IaHerramientasService {
   async ejecutarHerramienta(
     nombre: string,
     args: Record<string, any>,
-    contextoSeguridad: { telefonoCliente?: string | null; conversacionId?: string | bigint },
+    contextoSeguridad: { telefonoCliente?: string | null; conversacionId?: string | bigint; textoCliente?: string | null },
   ): Promise<{ resultado: any; necesitaDerivar?: boolean; alertaAlergia?: boolean }> {
     try {
       switch (nombre) {
@@ -261,6 +261,7 @@ export class IaHerramientasService {
               args.codigo,
               contextoSeguridad.telefonoCliente,
               contextoSeguridad.conversacionId,
+              contextoSeguridad.textoCliente,
             ),
           };
 
@@ -634,7 +635,7 @@ export class IaHerramientasService {
    * 6. estadoDePedido: Consulta el pedido SOLO si coincide con el teléfono del cliente.
    * Si el pedido pertenece a otro número, se rechaza para proteger la privacidad.
    */
-  async estadoDePedido(codigo: string, telefonoCliente?: string | null, conversacionId?: string | bigint) {
+  async estadoDePedido(codigo: string, telefonoCliente?: string | null, conversacionId?: string | bigint, textoCliente?: string | null) {
     const telBusqueda = normalizarTelefono(telefonoCliente || '');
     // Llaves del chat (celular, celular vinculado del chat LID, party): pedidos de CUALQUIER canal (Caja, mozo, carta, WhatsApp)
     const chat = await this.chatDe(conversacionId);
@@ -666,8 +667,17 @@ export class IaHerramientasService {
     // Titularidad estricta: con las llaves del chat, el pedido tiene que ser de este chat; sin chat, por celular
     const telPedido = normalizarTelefono(pedido.cliente_telefono || '');
     const telCliente = normalizarTelefono(telefonoCliente || '');
-    const ajeno = chat && llaves ? !pedidoEsDelChat(chat, pedido as any) : Boolean(telPedido && telCliente && telPedido !== telCliente);
-    if (ajeno || (chat && !llaves && codigoNorm)) {
+    let ajeno = chat && llaves ? !pedidoEsDelChat(chat, pedido as any) : Boolean(telPedido && telCliente && telPedido !== telCliente);
+    // Código + clave de la carta (o + su celular) en el mensaje del cliente: es suyo, aunque sea del equipo o de otro canal
+    let sinLlaveConCodigo = Boolean(chat && !llaves && codigoNorm);
+    if ((ajeno || sinLlaveConCodigo) && chat && codigoNorm && textoCliente && /^\d+$/.test(String(conversacionId))) {
+      const ok = await pedidoDelChatPorCodigo(this.prisma, { ...chat, id: BigInt(conversacionId as any) }, codigoNorm, extraerClavePedido(textoCliente), extraerCelularTexto(textoCliente)).catch(() => null);
+      if (ok) {
+        ajeno = false;
+        sinLlaveConCodigo = false;
+      }
+    }
+    if (ajeno || sinLlaveConCodigo) {
       // Seguridad: rechazar sin filtrar datos de otra persona
       return {
         encontrado: false,

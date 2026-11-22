@@ -40,7 +40,7 @@ describe('Regla única de silencio tras atender una persona (20 min sin activida
         findMany: jest.fn().mockResolvedValue([]),
       },
       notificacion: { create: jest.fn().mockResolvedValue({ id: 99n }) },
-      pedido: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0) },
+      pedido: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       reserva: { findMany: jest.fn().mockResolvedValue([]) },
       solicitudReserva: { count: jest.fn().mockResolvedValue(0) },
     };

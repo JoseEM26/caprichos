@@ -310,6 +310,7 @@ export class ChatbotIaService {
               {
                 telefonoCliente,
                 conversacionId,
+                textoCliente: textoUsuario,
               },
             );
 

@@ -71,7 +71,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { BOT_REANUDA_MIN_DEFECTO, PARAM_BOT_REANUDA_MIN, botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
-import { condicionPedidosDelChat, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
+import { condicionPedidosDelChat, extraerCelularTexto, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
 import type { ResultadoConsultaIa } from '../ia/tipos-ia';
 import { respuestaConAccionIa } from './accion-ia.util';
 import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAfirmaSinDatos, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
@@ -678,7 +678,7 @@ export class EjecutorConversacionService {
       id.startsWith('ord_') ||
       textoNorm.includes('mi pedido') ||
       textoNorm.includes('estado') ||
-      Boolean(textoNorm.match(/cp-\d{4}/i))
+      Boolean(textoNorm.match(/cp-w?\d{3,4}/i))
     )
       return true;
     // Horario / Ubicación / FAQ
@@ -1039,6 +1039,8 @@ export class EjecutorConversacionService {
     let anfitrionesNoBot: string[] = [];
     let ventasProductos: Record<string, number> = {};
     let pedidoActivo: any = null;
+    let pedidosEnCurso: any[] = [];
+    let chatSinLlave = false;
     let limiteConsultasExcedido = false;
     // Local cerrado con «Pedidos programados fuera de horario» encendido: el bot solo atiende para programar (llevar o delivery)
     let soloProgramar = false;
@@ -1125,7 +1127,7 @@ export class EjecutorConversacionService {
           limiteConsultasExcedido = true;
         } else {
           // Chat sin vincular que da el código de su pedido de la carta: se vincula (ver pedidoDelChatPorCodigo)
-          const delChat = await pedidoDelChatPorCodigo(this.prisma, conversacion, codigoFinal, extraerClavePedido(entradaRaw.textoOriginal ?? entradaRaw.texto)).catch(() => null);
+          const delChat = await pedidoDelChatPorCodigo(this.prisma, conversacion, codigoFinal, extraerClavePedido(entradaRaw.textoOriginal ?? entradaRaw.texto), extraerCelularTexto(entradaRaw.textoOriginal ?? entradaRaw.texto)).catch(() => null);
           if (delChat && telefonoDelChat(conversacion)) telefonoCliente = telefonoDelChat(conversacion);
           const pedidoEncontrado = await this.prisma.pedido.findUnique({
             where: { codigo: codigoFinal },
@@ -1135,7 +1137,8 @@ export class EjecutorConversacionService {
           // Si el pedido tiene teléfono registrado, debe coincidir con el teléfono de la conversación.
           if (pedidoEncontrado) {
             const telPedido = normalizarTelefono(pedidoEncontrado.cliente_telefono || '');
-            if (!telPedido || !telefonoCliente || telPedido === telefonoCliente || pedidoEsDelChat(conversacion, pedidoEncontrado)) {
+            // delChat: código + clave de la carta (o + su celular) ya probó que es suyo, aunque sea del equipo o de otro número
+            if (delChat || !telPedido || !telefonoCliente || telPedido === telefonoCliente || pedidoEsDelChat(conversacion, pedidoEncontrado)) {
               pedidoActivo = pedidoEncontrado;
             } else {
               // Pertenece a otro cliente: rechazar
@@ -1160,17 +1163,25 @@ export class EjecutorConversacionService {
             }
           }
         }
-      } else if (telefonoCliente) {
-        // Buscar el último pedido activo del cliente en las últimas 24 horas (por celular, celular vinculado o party)
-        const pedidoReciente = await this.prisma.pedido.findFirst({
-          where: {
-            ...(condicionPedidosDelChat(conversacion) ?? { cliente_telefono: { contains: telefonoCliente.slice(-8) } }),
-            creado_en: { gte: new Date(Date.now() - 24 * 3600 * 1000) },
-          },
-          orderBy: { creado_en: 'desc' },
-        });
-        if (pedidoReciente) {
-          pedidoActivo = pedidoReciente;
+      } else {
+        // Pedidos del chat por celular, celular vinculado o party. Los EN CURSO salen sin límite de tiempo (incluye los del equipo
+        // con descuento); si no hay ninguno, el último de las últimas 24 h. Sin ninguna llave (chat LID sin vincular): el bot pide el código.
+        const cond = condicionPedidosDelChat(conversacion);
+        if (!cond) {
+          chatSinLlave = true;
+        } else {
+          pedidosEnCurso = await this.prisma.pedido.findMany({
+            where: { ...cond, estado: { notIn: ['ENTREGADO', 'ANULADO'] } },
+            orderBy: { creado_en: 'desc' },
+            take: 5,
+          });
+          pedidoActivo =
+            pedidosEnCurso[0] ??
+            (await this.prisma.pedido.findFirst({
+              where: { ...cond, creado_en: { gte: new Date(Date.now() - 24 * 3600 * 1000) } },
+              orderBy: { creado_en: 'desc' },
+            })) ??
+            null;
         }
       }
     } catch (err: any) {
@@ -1425,6 +1436,8 @@ export class EjecutorConversacionService {
       productosComboNoBot: anfitrionesNoBot,
       ventasProductos,
       pedidoActivo,
+      pedidosEnCurso,
+      chatSinLlave,
       errorServicio,
       limiteConsultasExcedido,
       pedidosHoyTelefono,
@@ -1495,7 +1508,7 @@ export class EjecutorConversacionService {
 
       const esEstadoPedido =
         payload === 'mipedido' ||
-        Boolean(textoNorm.match(/cp-\d{4}/i)) ||
+        Boolean(textoNorm.match(/cp-w?\d{3,4}/i)) ||
         payload.startsWith('ord_') ||
         textoNorm.includes('mi pedido') ||
         textoNorm.includes('estado');
