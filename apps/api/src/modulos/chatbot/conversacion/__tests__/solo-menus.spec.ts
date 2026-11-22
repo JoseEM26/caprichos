@@ -66,12 +66,12 @@ describe('Bot con menú (decisión del dueño)', () => {
       expect(r.nuevoEstado).toBe('MENU');
     });
 
-    it('el saludo trae la frase de más descuento con el enlace de la carta virtual, sin producto del mes ni puntos', () => {
+    it('el saludo trae la invitación a la carta virtual con su enlace, sin producto del mes', () => {
       const texto: string = (ejecutar({ texto: 'Hola' }).acciones[0] as any).texto;
       expect(texto).toContain('Soy Capri');
-      expect(texto).toContain('MÁS DESCUENTO');
-      expect(texto).toContain(`CARTA VIRTUAL*: ${URL_CARTA}`);
-      expect(texto).not.toMatch(/CAPRICHOS DEL MES|puntos|🎁/i);
+      expect(texto).toContain('NUEVA CARTA VIRTUAL');
+      expect(texto).toContain(URL_CARTA);
+      expect(texto).not.toMatch(/CAPRICHOS DEL MES|🎁/i);
     });
 
     it('con promociones vigentes en el contexto, las lista en la bienvenida', () => {

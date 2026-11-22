@@ -2,6 +2,7 @@ import { textoCondicionMedios } from '@caprichos/compartido';
 import {
   BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES,
   LIMITE_CUERPO_TEXTO,
+  MAS_DESCUENTO_ANTIGUO,
   TEXTOS_BOT_DEFECTO,
 } from '../configuracion/chatbot-configuracion.tipos';
 
@@ -40,7 +41,7 @@ export interface OpcionesBienvenida {
 /** Texto efectivo de un mensaje: el guardado, o el defecto si falta, está vacío o es la bienvenida antigua. */
 export function textoBot(textos: Record<string, string> | null | undefined, clave: keyof typeof TEXTOS_BOT_DEFECTO): string {
   const v = textos?.[clave];
-  if (typeof v !== 'string' || !v.trim() || v.trim() === BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES) return TEXTOS_BOT_DEFECTO[clave];
+  if (typeof v !== 'string' || !v.trim() || v.trim() === BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES || v.trim() === MAS_DESCUENTO_ANTIGUO) return TEXTOS_BOT_DEFECTO[clave];
   return v.trim();
 }
 
@@ -101,7 +102,8 @@ export function armarBienvenida(nombre: string | null | undefined, datos: DatosB
   const t = (k: keyof typeof TEXTOS_BOT_DEFECTO) => textoBot(op.textos, k);
   const link = String(op.linkCarta ?? '').trim();
   const local = op.local || NOMBRE_LOCAL_BOT;
-  const base = { nombre: nombreParaSaludo(nombre), local, link_carta: link };
+  // puntos: lo pone obtenerTextosBot con el % real; '5' (el defecto del sistema) solo si los textos no se pudieron leer
+  const base = { nombre: nombreParaSaludo(nombre), local, link_carta: link, puntos: '5' };
 
   if (datos?.pausaAltaDemanda) {
     const saludo = interpolar(t('chatbot_texto_bienvenida'), { ...base, promociones: '' }).trim();

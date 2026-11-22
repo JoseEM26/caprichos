@@ -32,6 +32,7 @@ import {
   VARIABLES_TEXTO_BOT,
   ChatbotConfiguracionCompleta,
 } from './chatbot-configuracion.tipos';
+import { textoBot } from '../conversacion/bienvenida.util';
 import {
   ActualizarAntiSpamDto,
   ActualizarFuncionesBotDto,
@@ -906,8 +907,13 @@ export class ChatbotConfiguracionService {
     // Caché corta (60 s); se vacía al guardar o restablecer. Si falla la lectura, el llamador cae a los defectos.
     if (this.cacheTextos && Date.now() - this.cacheTextos.en < 60_000) return this.cacheTextos.textos;
     const config = await this.obtenerConfiguracion();
-    this.cacheTextos = { en: Date.now(), textos: config.textos };
-    return config.textos;
+    // {puntos}: el % de puntos real (Configuración › Puntos), para que la invitación a la carta nunca prometa otro número
+    let param: { valor: unknown } | null = null;
+    try { param = await this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } }); } catch { /* usa el 5 de fábrica */ }
+    const puntos = param?.valor !== null && param?.valor !== undefined && Number.isFinite(Number(param.valor)) ? String(Number(param.valor)) : '5';
+    const textos = { ...config.textos, chatbot_texto_mas_descuento: textoBot(config.textos, 'chatbot_texto_mas_descuento').replace(/\{puntos\}/g, puntos) };
+    this.cacheTextos = { en: Date.now(), textos };
+    return textos;
   }
 
   private cacheTextos: { en: number; textos: Record<ClaveTextoBot, string> } | null = null;

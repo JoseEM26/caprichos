@@ -21,7 +21,7 @@ import { AuditoriaService } from '../../../auditoria/auditoria.service';
 import 'reflect-metadata';
 import { validateSync } from 'class-validator';
 import { ActualizarAntiSpamDto } from '../dto/chatbot-configuracion.dto';
-import { TEXTOS_BOT_DEFECTO, LIMITE_CUERPO_TEXTO } from '../chatbot-configuracion.tipos';
+import { TEXTOS_BOT_DEFECTO, MAS_DESCUENTO_ANTIGUO, LIMITE_CUERPO_TEXTO } from '../chatbot-configuracion.tipos';
 
 describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
   let service: ChatbotConfiguracionService;
@@ -643,7 +643,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       prisma.parametro.findUnique.mockResolvedValue({ valor: 'otro' });
       const r = await service.restablecerTexto('chatbot_texto_mas_descuento', mockUsuario as any);
       expect(r.valor).toBe(TEXTOS_BOT_DEFECTO.chatbot_texto_mas_descuento);
-      expect(r.valor).toContain('MÁS DESCUENTO');
+      expect(r.valor).toContain('NUEVA CARTA VIRTUAL');
     });
 
     it('obtenerTextosBot usa caché y se invalida al guardar', async () => {
@@ -654,6 +654,15 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       prisma.parametro.findMany.mockClear();
       await service.obtenerTextosBot();
       expect(prisma.parametro.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('obtenerTextosBot pone el % real de puntos y trata la frase antigua como sin personalizar', async () => {
+      prisma.parametro.findMany.mockResolvedValue([{ clave: 'chatbot_texto_mas_descuento', valor: MAS_DESCUENTO_ANTIGUO }]);
+      prisma.parametro.findUnique.mockResolvedValue({ valor: '8' });
+      const t = await service.obtenerTextosBot();
+      expect(t.chatbot_texto_mas_descuento).toContain('8% de tu compra en puntos');
+      expect(t.chatbot_texto_mas_descuento).not.toContain('{puntos}');
+      expect(t.chatbot_texto_mas_descuento).not.toContain('MÁS DESCUENTO');
     });
 
     it('el endpoint de promociones vigentes devuelve solo las vigentes de la carta', async () => {

@@ -28,7 +28,8 @@ export const TEXTOS_BOT_DEFECTO = {
 
   chatbot_texto_promos_encabezado: '🔥 Hoy tenemos:',
 
-  chatbot_texto_mas_descuento: '💛 Hay *MÁS DESCUENTO* en nuestra *CARTA VIRTUAL*: {link_carta}',
+  chatbot_texto_mas_descuento:
+    'Con gusto te tomo el pedido por aquí 😊 Pero si pides en nuestra *NUEVA CARTA VIRTUAL* 👉 {link_carta} te devolvemos el *{puntos}% de tu compra en puntos* (en productos sin promo), para canjear en delivery o en el local, y te atendemos más rápido ⚡\n¿Pides por la carta o prefieres seguir por aquí?',
 
   /** 'si' / 'no': muestra el bloque de promociones vigentes en la bienvenida. */
   chatbot_promos_mostrar: 'si',
@@ -69,11 +70,14 @@ export type ClaveTextoBot = keyof typeof TEXTOS_BOT_DEFECTO;
 export const BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES =
   'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁';
 
+/** Frase de «más descuento» de fábrica anterior: si quedó guardada, se trata como «sin personalizar». */
+export const MAS_DESCUENTO_ANTIGUO = '💛 Hay *MÁS DESCUENTO* en nuestra *CARTA VIRTUAL*: {link_carta}';
+
 /** Variables permitidas por mensaje: cualquier otra {variable} se rechaza al guardar. */
 export const VARIABLES_TEXTO_BOT: Record<ClaveTextoBot, string[]> = {
   chatbot_texto_bienvenida: ['nombre', 'local', 'link_carta', 'promociones'],
   chatbot_texto_promos_encabezado: ['local'],
-  chatbot_texto_mas_descuento: ['link_carta', 'local'],
+  chatbot_texto_mas_descuento: ['link_carta', 'local', 'puntos'],
   chatbot_promos_mostrar: [],
   chatbot_promos_max: [],
   chatbot_texto_despedida: ['local'],

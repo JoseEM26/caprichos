@@ -1,5 +1,6 @@
 import {
   BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES,
+  MAS_DESCUENTO_ANTIGUO,
   TEXTOS_BOT_DEFECTO,
 } from '../../configuracion/chatbot-configuracion.tipos';
 import { armarBienvenida, lineasPromosVigentes } from '../bienvenida.util';
@@ -13,8 +14,9 @@ describe('Bienvenida del bot (fuente única)', () => {
     const t = armarBienvenida('Ana', { abierta: true }, { linkCarta: LINK });
     expect(t).not.toMatch(/DEL MES|Frappe/i);
     expect(t).toContain('¡Hola Ana!');
-    expect(t).toContain('MÁS DESCUENTO');
-    expect(t).toContain('CARTA VIRTUAL');
+    expect(t).toContain('NUEVA CARTA VIRTUAL');
+    expect(t).toContain('5% de tu compra en puntos');
+    expect(t).not.toContain('{puntos}');
     expect(t).toContain(LINK);
   });
 
@@ -63,7 +65,7 @@ describe('Bienvenida del bot (fuente única)', () => {
     expect(dos).not.toContain('• C');
     const off = armarBienvenida('Ana', { abierta: true }, { promos, linkCarta: LINK, textos: { chatbot_promos_mostrar: 'no' } });
     expect(off).not.toContain('• A');
-    expect(off).toContain('MÁS DESCUENTO');
+    expect(off).toContain('NUEVA CARTA VIRTUAL');
   });
 
   it('cerrado: dice la hora de apertura, no muestra promociones ni invita a pedir', () => {
@@ -71,7 +73,7 @@ describe('Bienvenida del bot (fuente única)', () => {
     expect(t).toContain('Abrimos hoy a las 14:00.');
     expect(t).toContain('No tomamos pedidos fuera de horario');
     expect(t).not.toContain('• A');
-    expect(t).not.toContain('MÁS DESCUENTO');
+    expect(t).not.toContain('CARTA VIRTUAL');
   });
 
   it('pausa por alta demanda no muestra promociones', () => {
@@ -108,7 +110,7 @@ describe('Bienvenida del bot (fuente única)', () => {
       textos: { chatbot_texto_bienvenida: 'H'.repeat(700) },
     });
     expect(t.length).toBeLessThanOrEqual(1024);
-    expect(t).toContain('MÁS DESCUENTO');
+    expect(t).toContain('NUEVA CARTA VIRTUAL');
     const n = (t.match(/•/g) ?? []).length;
     expect(n).toBeLessThan(5);
   });
@@ -119,5 +121,15 @@ describe('Bienvenida del bot (fuente única)', () => {
       armarBienvenida('Ana', { abierta: true }, extra),
     );
     expect(TEXTOS_BOT_DEFECTO.chatbot_texto_bienvenida).toContain('{nombre}');
+  });
+
+  it('la invitación: ≤ 300 caracteres, con el % ya puesto por el servicio, la frase antigua se reemplaza y la propia se respeta', () => {
+    expect(TEXTOS_BOT_DEFECTO.chatbot_texto_mas_descuento.replace('{link_carta}', LINK).replace('{puntos}', '10').length).toBeLessThanOrEqual(300);
+    const antigua = armarBienvenida('Ana', { abierta: true }, { linkCarta: LINK, textos: { chatbot_texto_mas_descuento: MAS_DESCUENTO_ANTIGUO } });
+    expect(antigua).not.toContain('MÁS DESCUENTO');
+    expect(antigua).toContain('NUEVA CARTA VIRTUAL');
+    const propia = armarBienvenida('Ana', { abierta: true }, { linkCarta: LINK, textos: { chatbot_texto_mas_descuento: 'Mira {link_carta}' } });
+    expect(propia).toContain(`Mira ${LINK}`);
+    expect(propia).not.toContain('NUEVA CARTA');
   });
 });

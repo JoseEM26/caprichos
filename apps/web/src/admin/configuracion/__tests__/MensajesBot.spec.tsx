@@ -149,4 +149,10 @@ describe('mensajesBot (reglas)', () => {
     const dentro = vistaPreviaMensaje('chatbot_texto_bienvenida', { ...textos, chatbot_texto_bienvenida: 'Hola\n{promociones}\nFin' }, ['• A']);
     expect(dentro.startsWith('Hola\nHoy tenemos:\n• A\nFin')).toBe(true);
   });
+
+  it('la vista previa de la invitación a la carta pone el enlace y el % de puntos, y {puntos} es una variable válida', () => {
+    const t = { ...TEXTOS, chatbot_texto_mas_descuento: 'Gana el {puntos}% en puntos: {link_carta}' };
+    expect(vistaPreviaMensaje('chatbot_texto_mas_descuento', t, [])).toContain('Gana el 5% en puntos: https://caprichos.pe');
+    expect(validarMensaje('chatbot_texto_mas_descuento', 'Gana {puntos}% {link_carta}')).toBeNull();
+  });
 });

@@ -35,4 +35,14 @@ describe('Bienvenida con menú (regla del dueño)', () => {
     const r = transicionarEstado(inicio, normalizarEntrada({ texto: 'que tienen' }), ctx({ sinBienvenida: true }));
     expect((r.acciones[0] as any)?.texto ?? '').not.toContain('Hola de nuevo');
   });
+
+  it('el menú corto (ya conversamos) trae la invitación a la carta con su enlace, y respeta una frase propia', () => {
+    const r = transicionarEstado(flujoMenu, normalizarEntrada({ texto: 'menu' }), ctx({ sinBienvenida: true }));
+    const t: string = (r.acciones[0] as any).texto;
+    expect(t).toContain('NUEVA CARTA VIRTUAL');
+    expect(t).toContain('https://carta.test');
+    expect(t).not.toContain('{');
+    const p = transicionarEstado(flujoMenu, normalizarEntrada({ texto: 'menu' }), ctx({ sinBienvenida: true, textosPersonalizados: { chatbot_texto_mas_descuento: 'Mira {link_carta}' } }));
+    expect((p.acciones[0] as any).texto).toContain('Mira https://carta.test');
+  });
 });
