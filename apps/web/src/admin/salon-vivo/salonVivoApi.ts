@@ -53,7 +53,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { id?: string; codigo: string; personas: number | null; bebidas?: number; minutos: number; areasPendientes: string[]; avatar?: AvatarVivo | null } | null;
+  pedido: { id?: string; codigo: string; personas: number | null; bebidas?: number; productos?: number; minutos: number; areasPendientes: string[]; avatar?: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 

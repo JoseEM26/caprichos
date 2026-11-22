@@ -66,52 +66,69 @@ describe('Pedidos pendientes del salón en vivo', () => {
   });
 });
 
-describe('franja de la TV que pasa sola', () => {
-  const mucho = () => { const d = salonEjemplo(); d.cocina = Array.from({ length: 8 }, (_, i) => pedido(`CP-X${i}`, { id: `x${i}` })); return d; };
-  const medidas = (ancho: number, scroll: number, cli: number) => {
-    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => ancho });
+describe('pedidos en la franja de la TV', () => {
+  it('los pedidos de delivery no salen (ni en caja, ni en cocina, ni listos); los de para llevar sí', () => {
+    const d = salonEjemplo();
+    d.caja = [pedido('CP-W905', { modalidad: 'LLEVAR', mesas: [], mesaIds: [], areas: PEND }), pedido('CP-D1', { modalidad: 'DELIVERY', mesas: [], mesaIds: [], areas: PEND })];
+    d.cocina = [...d.cocina, pedido('CP-D2', { modalidad: 'DELIVERY', mesas: [], mesaIds: [] })];
+    d.despacho = [...d.despacho, pedido('CP-D3', { modalidad: 'DELIVERY', estado: 'LISTO', mesas: [], mesaIds: [] })];
+    const codigos = pendientesDe(d).map((p) => p.codigo);
+    expect(codigos).toContain('CP-W905');
+    expect(codigos.filter((c) => c.startsWith('CP-D'))).toEqual([]);
+  });
+});
+
+describe('franja de la TV: hora y carrusel', () => {
+  const mucho = () => { const d = salonEjemplo(); d.cocina = Array.from({ length: 12 }, (_, i) => pedido(`CP-X${i}`, { id: `x${i}` })); return d; };
+  const medidas = (scroll: number, cli: number) => {
     Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => scroll });
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => cli });
   };
-  afterEach(() => { vi.useRealTimers(); delete (HTMLElement.prototype as any).offsetWidth; delete (HTMLElement.prototype as any).scrollWidth; delete (HTMLElement.prototype as any).clientWidth; });
+  afterEach(() => { vi.useRealTimers(); delete (HTMLElement.prototype as any).scrollWidth; delete (HTMLElement.prototype as any).clientWidth; });
 
-  it('con más tarjetas de las que entran avanza una tarjeta cada 5 s y vuelve al inicio al final', () => {
+  it('solo queda la hora y el carrusel: sin el bloque «Pedidos en curso» ni los KPI', () => {
+    render(<PanelPendientes datos={salonEjemplo()} reloj="19:05" tv />);
+    expect(screen.getByText('19:05')).toBeTruthy();
+    expect(screen.queryByText('Pedidos en curso')).toBeNull();
+    expect(screen.queryByLabelText('Resumen')).toBeNull();
+    expect(screen.getByRole('list')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('si no caben todas, la lista se duplica (para que el bucle no salte) y la copia no la leen los lectores de pantalla', () => {
+    medidas(4000, 900);
+    const { container } = render(<PanelPendientes datos={mucho()} reloj="19:05" tv />);
+    expect(container.querySelector('.sv-pista.anima')).toBeTruthy();
+    const listas = container.querySelectorAll('ol.sv-pend-lista');
+    expect(listas).toHaveLength(2);
+    expect(listas[1]).toHaveAttribute('aria-hidden', 'true');
+    expect(listas[1].children).toHaveLength(listas[0].children.length);
+  });
+
+  it('si todas entran, está quieta y sin copia', () => {
+    medidas(500, 900);
+    const { container } = render(<PanelPendientes datos={salonEjemplo()} reloj="19:05" tv />);
+    expect(container.querySelector('.sv-pista.anima')).toBeNull();
+    expect(container.querySelectorAll('ol.sv-pend-lista')).toHaveLength(1);
+  });
+
+  it('con movimiento reducido no hay animación: pasa de página cada 4 s y vuelve al inicio', () => {
     vi.useFakeTimers();
-    medidas(300, 3000, 900);
+    medidas(4000, 900);
     const scrollTo = vi.fn(function (this: HTMLElement, o: ScrollToOptions) { (this as any).scrollLeft = o.left; });
     HTMLElement.prototype.scrollTo = scrollTo as any;
-    render(<PanelPendientes datos={mucho()} reloj="19:05" auto />);
-    act(() => { vi.advanceTimersByTime(5000); });
-    expect(scrollTo).toHaveBeenLastCalledWith({ left: 310, behavior: 'smooth' });
-    act(() => { vi.advanceTimersByTime(5000); });
-    expect(scrollTo).toHaveBeenLastCalledWith({ left: 620, behavior: 'smooth' });
-    // llegó al final: vuelve al inicio
-    (screen.getByRole('list') as any).scrollLeft = 2100;
-    act(() => { vi.advanceTimersByTime(5000); });
-    expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'smooth' });
+    const { container } = render(<PanelPendientes datos={mucho()} reloj="19:05" tv reducir />);
+    expect(container.querySelector('.sv-pista.anima')).toBeNull();
+    act(() => { vi.advanceTimersByTime(4000); });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 900, behavior: 'auto' });
+    (container.querySelector('.sv-carrusel') as any).scrollLeft = 3100;
+    act(() => { vi.advanceTimersByTime(4000); });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'auto' });
   });
 
-  it('con pocas tarjetas (caben todas) no se mueve, y fuera de la TV tampoco', () => {
-    vi.useFakeTimers();
-    medidas(300, 900, 900);
-    const scrollTo = vi.fn(); HTMLElement.prototype.scrollTo = scrollTo as any;
-    const { unmount } = render(<PanelPendientes datos={salonEjemplo()} reloj="19:05" auto />);
-    act(() => { vi.advanceTimersByTime(20000); });
-    expect(scrollTo).not.toHaveBeenCalled();
-    unmount();
-    medidas(300, 3000, 900);
-    render(<PanelPendientes datos={mucho()} reloj="19:05" />);
-    act(() => { vi.advanceTimersByTime(20000); });
-    expect(scrollTo).not.toHaveBeenCalled();
-  });
-
-  it('con movimiento reducido no se desplaza: muestra las que entran y «+N más»', () => {
-    vi.useFakeTimers();
-    medidas(300, 3000, 900);
-    const scrollTo = vi.fn(); HTMLElement.prototype.scrollTo = scrollTo as any;
-    render(<PanelPendientes datos={mucho()} reloj="19:05" auto reducir />);
-    act(() => { vi.advanceTimersByTime(20000); });
-    expect(scrollTo).not.toHaveBeenCalled();
-    expect(screen.getByText(/\+\d+ más/)).toBeTruthy();
+  it('fuera de la TV (panel del admin) no hay carrusel: lista vertical con resumen', () => {
+    medidas(4000, 900);
+    const { container } = render(<PanelPendientes datos={mucho()} reloj="19:05" />);
+    expect(container.querySelector('.sv-carrusel')).toBeNull();
+    expect(screen.getByText('Pedidos en curso')).toBeTruthy();
   });
 });

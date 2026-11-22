@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { azar, type Ctx } from './base';
+import { azar, liberar, type Ctx } from './base';
 import type { Tema } from './temas';
 
 /** Personas, Capri, bandejas y moto: las piezas vivas de la escena (portadas de la maqueta aprobada). */
@@ -263,6 +263,27 @@ export function crearBandeja(ctx: Ctx, padre: THREE.Object3D, y: number, z: numb
   malla(new THREE.CylinderGeometry(0.05, 0.04, 0.15, 12), M('#FBF4EC'), 0.01, 0.09, 0.1, b);
   malla(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16), M('#FFFFFF'), 0.1, 0.02, -0.07, b);
   malla(new THREE.CylinderGeometry(0.065, 0.065, 0.07, 14), M('#5B3A29'), 0.1, 0.065, -0.07, b);
+  return b;
+}
+
+/** Pone en la bandeja un vaso por bebida y un plato por el resto de productos (la base queda). */
+export function ponerProductosBandeja(ctx: Ctx, b: THREE.Group, vasos: number, platos: number) {
+  const { M, malla } = ctx;
+  for (const h of [...b.children].slice(1)) { b.remove(h); liberar(h); }
+  const colores = ['#E67929', '#FBF4EC', '#8BA7B8', '#D99E39'];
+  const n = vasos + platos;
+  const pos = (i: number): [number, number] => { const a = (i / Math.max(1, n)) * Math.PI * 2; return n === 1 ? [0, 0] : [Math.cos(a) * 0.14, Math.sin(a) * 0.14]; };
+  for (let i = 0; i < vasos; i++) { const [x, z] = pos(i); malla(new THREE.CylinderGeometry(0.05, 0.04, 0.15, 12), M(colores[i % colores.length]), x, 0.09, z, b); }
+  for (let i = 0; i < platos; i++) { const [x, z] = pos(vasos + i); malla(new THREE.CylinderGeometry(0.09, 0.09, 0.02, 16), M('#FFFFFF'), x, 0.02, z, b); malla(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 14), M(i % 2 ? '#C9874A' : '#5B3A29'), x, 0.06, z, b); }
+}
+
+/** Cajita de cartón con cinta naranja para el delivery. */
+export function crearCaja(ctx: Ctx, padre: THREE.Object3D, x: number, y: number, z: number) {
+  const { M, malla } = ctx;
+  const b = new THREE.Group(); b.position.set(x, y, z); b.visible = false; padre.add(b);
+  malla(new THREE.BoxGeometry(0.34, 0.2, 0.28), M('#C9874A'), 0, 0.1, 0, b);
+  malla(new THREE.BoxGeometry(0.06, 0.205, 0.285), M('#E67929'), 0, 0.1, 0, b);
+  malla(new THREE.BoxGeometry(0.345, 0.205, 0.05), M('#E67929'), 0, 0.1, 0, b);
   return b;
 }
 

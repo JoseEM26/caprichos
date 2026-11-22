@@ -117,4 +117,24 @@ describe('escena 3D desde el plano real', () => {
     e.director.destruir();
     expect(() => correr(e.director, 1)).not.toThrow();
   });
+
+  it('un delivery listo: Capri lo lleva a la entrada una sola vez, aunque los datos se repitan', () => {
+    vi.useFakeTimers();
+    const e = armar();
+    e.director.aplicar(e.datos, true);
+    const listo = () => { const d = salonEjemplo(); d.despacho = [pedido('CP-D9', { id: 'd9', modalidad: 'DELIVERY', estado: 'LISTO', mesas: [], mesaIds: [], areas: [{ nombre: 'Bebidas', estado: 'LISTA' as const }] })]; return d; };
+    e.director.aplicar(listo(), false);
+    let episodios = 0, antes = false;
+    for (let i = 0; i < 1500; i++) {
+      e.director.paso(i * 0.05, 0.05); vi.advanceTimersByTime(50);
+      const ahora = e.director.resumenMeseros().some((m) => m.esCapri && /Entrega CP-D9 al repartidor/.test(m.texto));
+      if (ahora && !antes) episodios++;
+      antes = ahora;
+      if (i === 200) e.director.aplicar(listo(), false); // repetido: no cuenta como otra entrega
+    }
+    expect(episodios).toBe(1);
+    e.director.aplicar(listo(), false);
+    for (let i = 0; i < 40; i++) { e.director.paso(80 + i * 0.05, 0.05); vi.advanceTimersByTime(50); }
+    expect(e.director.resumenMeseros().find((m) => m.esCapri)!.texto).not.toMatch(/Entrega/);
+  });
 });

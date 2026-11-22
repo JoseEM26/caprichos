@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { azar, formaCorazon, liberar, type Ctx, type Etq } from './base';
-import { construirCapriMesera, crearBandeja, crearBolsa, crearLibreta, crearMoto, persona, animarGente, type CapriPiezas, type Persona } from './personas';
+import { construirCapriMesera, crearBandeja, crearBolsa, crearCaja, crearLibreta, crearMoto, persona, animarGente, ponerProductosBandeja, type CapriPiezas, type Persona } from './personas';
 import { COLOR_ESTADO, type Local, type MesaEsc } from './local';
 import { buscarRuta, claveArea, type PlanoEscena } from './planoAEscena';
 import { TEMAS, type Tema } from './temas';
@@ -8,6 +8,7 @@ import type { Sonido } from './sonido';
 import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, MAX_AVATARES, type MotorAvatar } from './avatarReal';
 import { cantidadClientes, configAleatoria, semilla, TOPE_PERSONAS, TOPE_PERSONAS_LIGERO } from './acompanantes';
 import type { Foco, V2 } from './camaraDirector';
+import { estaListo, frasePaseo, planEntrega, productosBandeja } from './entrega';
 import type { AvatarVivo, PedidoVivo, SalonVivo } from '../salonVivoApi';
 
 /**
@@ -22,13 +23,14 @@ interface Agente { obj: any; ruta: THREE.Vector3[]; vel: number; alLlegar?: () =
 type Tarea =
   | { tipo: 'pedido'; codigo: string; mesaId: string }
   | { tipo: 'llevar'; codigo: string }
+  | { tipo: 'delivery'; codigo: string }
   | { tipo: 'cuenta'; mesaId: string }
   | { tipo: 'tomar'; mesaId: string }
   | { tipo: 'limpiar'; mesaId: string };
 
 interface Mesero {
   nombre: string; esCapri: boolean; obj: any; per?: Persona; bandeja: THREE.Group; bolsa: THREE.Group; libreta: THREE.Group;
-  base: THREE.Vector3; vel: number; tarea: Tarea | 'paseo' | null; globo: Etq; globoHasta: number;
+  caja?: THREE.Group; base: THREE.Vector3; vel: number; tarea: Tarea | 'paseo' | null; globo: Etq; globoHasta: number;
 }
 
 interface Grupo { personas: Persona[]; fase: 'llegando' | 'sentado' | 'saliendo' }
@@ -120,6 +122,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   const capriEstado = { anim: 'reposo', animDesde: 0, animDur: 0, proxAccion: 4, felizHasta: 0 };
   const bandejaC = crearBandeja(ctx, capriObj, 0.66, 0.32);
   const bolsaC = crearBolsa(ctx, capriObj, 0.32, 0.38, 0.15);
+  const cajaC = crearCaja(ctx, capriObj, 0, 0.66, 0.34);
   const globoC = etiqueta('sv-globo', capriObj, 1.75); globoC.visible = false;
   let globoCHasta = 0;
   const globoCaja = etiqueta('sv-globo caja', new THREE.Vector3(), 0); globoCaja.visible = false;
@@ -127,7 +130,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   const base = (fx: number, dy: number) => { const [x, y] = libreEn(ancho * fx, plano.pasilloY - dy); return G(x, y); };
   const meseros: Mesero[] = [{
     nombre: 'Capri', esCapri: true, obj: capriObj, bandeja: bandejaC, bolsa: bolsaC, libreta: crearLibreta(ctx, capriObj, -0.1, 0.66, 0.34),
-    base: base(0.375, 1.2), vel: 2.3, tarea: null, globo: globoC, globoHasta: 0,
+    caja: cajaC, base: base(0.375, 1.2), vel: 2.3, tarea: null, globo: globoC, globoHasta: 0,
   }];
   capriObj.position.copy(meseros[0].base);
   for (const [nombre, fx, dy, estilo] of [['Mozo Luis', 0.485, 0.6, 'corto'], ['Moza Ana', 0.73, 0.5, 'cola']] as const) {
@@ -157,8 +160,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     local.cajero.raiz.getWorldPosition(globoCaja.pos as THREE.Vector3); (globoCaja.pos as THREE.Vector3).y = 1.85;
     globoCaja.el.textContent = txt; globoCaja.visible = true; globoCajaHasta = t + 2.6;
   }
-  function cargar(ms: Mesero, que: 'bandeja' | 'bolsa' | null) {
-    ms.bandeja.visible = que === 'bandeja'; ms.bolsa.visible = que === 'bolsa';
+  function cargar(ms: Mesero, que: 'bandeja' | 'bolsa' | 'caja' | null) {
+    ms.bandeja.visible = que === 'bandeja'; ms.bolsa.visible = que === 'bolsa'; if (ms.caja) ms.caja.visible = que === 'caja';
     if (ms.per) ms.per.carga = !!que;
   }
 
@@ -172,6 +175,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   let codigosDespacho = new Set<string>();
   let firmaCaja = '';
   let motoEstado: 'parqueada' | 'ruta' = 'parqueada';
+  const entregas = new Set<string>();
 
   /* ---------- Clientes con su avatar real (titular de la mesa y cliente para llevar) ---------- */
   let motorAvatar: MotorAvatar | null = null;
@@ -275,10 +279,15 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     m.comida.clear(); m.vapor = [];
     const g = grupos.get(m.id);
     const n = g ? g.personas.length : personasDeMesa(m);
+    const ped = datos?.mesas.find((x) => x.id === m.id)?.pedido;
+    const { vasos, platos } = productosBandeja(ped?.bebidas, ped?.productos);
+    const hayDatos = !!ped && ((ped.bebidas ?? 0) > 0 || (ped.productos ?? 0) > 0);
     m.sillas.slice(0, n).forEach((s, i) => {
       const pos = s.local.clone().multiplyScalar(0.45);
       malla(new THREE.CylinderGeometry(0.13, 0.13, 0.02, 16), M('#FFFFFF'), pos.x, 0.76, pos.z, m.comida);
-      const tipo = (i + Number(m.id)) % 3;
+      // Con los datos del pedido: un vaso por bebida y comida en los platos que corresponden; sin datos, lo de siempre
+      const tipo = hayDatos ? (i < vasos ? 0 : i < vasos + platos ? 1 + ((i + Number(m.id)) % 2) : -1) : (i + Number(m.id)) % 3;
+      if (tipo === -1) return;
       if (tipo === 0) { malla(new THREE.CylinderGeometry(0.06, 0.05, 0.17, 12), M('#E67929'), pos.x, 0.86, pos.z, m.comida); m.vapor.push(new THREE.Vector3(m.cx + pos.x, 0.96, m.cz + pos.z)); }
       else if (tipo === 1) malla(new THREE.CylinderGeometry(0.08, 0.08, 0.08, 14), M('#5B3A29'), pos.x, 0.81, pos.z, m.comida);
       else malla(new THREE.BoxGeometry(0.16, 0.06, 0.1), M('#C9874A'), pos.x, 0.8, pos.z, m.comida);
@@ -314,12 +323,13 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     for (const ms of meseros) {
       if (ms.tarea || caminando(raizDe(ms))) continue;
       const mozosLibres = meseros.some((o) => !o.esCapri && !o.tarea);
-      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar') ? !despachoOcupado : tk.tipo === 'limpiar' ? !ms.esCapri || !mozosLibres : true);
+      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar' || tk.tipo === 'delivery') ? !despachoOcupado : tk.tipo === 'limpiar' ? !ms.esCapri || !mozosLibres : true);
       if (i >= 0) {
         const tk = tareas.splice(i, 1)[0];
         ms.tarea = tk; alCambiar();
         if (tk.tipo === 'pedido') atender(ms, tk);
         else if (tk.tipo === 'llevar') atenderLlevar(ms, tk);
+        else if (tk.tipo === 'delivery') atenderDelivery(ms, tk);
         else if (tk.tipo === 'cuenta') llevarCuenta(ms, tk.mesaId);
         else if (tk.tipo === 'tomar') tomarPedido(ms, tk.mesaId);
         else limpiarMesa(ms, tk.mesaId);
@@ -355,7 +365,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       espera(2600, () => { m.comida.clear(); m.vapor = []; volverBase(ms); });
     });
   }
-  const pedidoListo = (codigo: string): PedidoVivo | undefined => datos?.despacho.find((p) => p.codigo === codigo);
+  const pedidoListo = (codigo: string): PedidoVivo | undefined => datos?.despacho.find((p) => p.codigo === codigo) ?? datos?.cocina.find((p) => p.codigo === codigo && estaListo(p));
+  const pedidoDeMesaListo = (mesaId: string) => !!datos && [...datos.despacho, ...datos.cocina].some((p) => p.modalidad === 'MESA' && p.mesaIds.includes(mesaId) && estaListo(p));
   function atender(ms: Mesero, tk: Extract<Tarea, { tipo: 'pedido' }>) {
     const m = mesaPorId(tk.mesaId);
     if (!m || !pedidoListo(tk.codigo) || !local.despachoPunto) { ms.tarea = null; return; }
@@ -365,13 +376,16 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       o.rotation.y = Math.PI;
       espera(650, () => {
         despachoOcupado = false;
+        const pl = pedidoListo(tk.codigo);
+        const { vasos, platos } = productosBandeja(pl?.bebidas, pl?.productos);
+        ponerProductosBandeja(ctx, ms.bandeja, vasos, platos);
         cargar(ms, 'bandeja'); ocultarBandeja(true);
         caminar(ms.obj, rutaA(ms.obj, puntoMesa(m)), ms.vel, () => {
           o.rotation.y = m.mira;
           cargar(ms, null);
           if (grupos.has(m.id)) servirMesa(m);
           if (ms.esCapri) capriEstado.felizHasta = t + 3.5;
-          saludar(ms); hablar(ms, azar([`¡Buen provecho${pedidoListo(tk.codigo)?.cliente ? ', ' + pedidoListo(tk.codigo)!.cliente : ''}! 😋`, '¡Aquí está su pedido!', '¡Que lo disfruten! 😊']));
+          saludar(ms); hablar(ms, `¡Aquí tienes${pl?.cliente ? ', ' + pl.cliente : ''}! Gracias 💛`);
           espera(1500, () => volverBase(ms));
         });
       });
@@ -399,6 +413,46 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       });
     });
   }
+  /** Delivery: cocina → caja de cartón → entrada → se la da al repartidor, que se va en su moto → Capri vuelve. */
+  function atenderDelivery(ms: Mesero, tk: Extract<Tarea, { tipo: 'delivery' }>) {
+    if (!local.despachoPunto) { ms.tarea = null; return; }
+    despachoOcupado = true;
+    const o = raizDe(ms);
+    const adentro = libreEn(entradaG[0] - dirG[0] * 1.3, entradaG[1] - dirG[1] * 1.3);
+    const miraAfuera = Math.atan2(dirG[0], dirG[1]);
+    const afueraRep = G(entradaG[0] + dirG[0] * 0.9, entradaG[1] + dirG[1] * 0.9);
+    // El repartidor tiene que estar afuera con su moto: si salió a una entrega, vuelve primero
+    let intentos = 0;
+    const repartidorListo = (cb: () => void) => {
+      if (motoEstado === 'ruta' && !caminando(moto) && intentos === 0) volverMoto();
+      if ((motoEstado === 'parqueada' && !caminando(moto)) || ++intentos > 40) cb(); else espera(500, () => repartidorListo(cb));
+    };
+    caminar(ms.obj, rutaA(ms.obj, local.despachoPunto), ms.vel, () => {
+      o.rotation.y = Math.PI;
+      espera(650, () => {
+        despachoOcupado = false;
+        cargar(ms, 'caja'); ocultarBandeja(true);
+        caminar(ms.obj, rutaA(ms.obj, adentro), ms.vel, () => {
+          o.rotation.y = miraAfuera;
+          repartidorListo(() => {
+            caminar(repartidor, [afueraRep], 1.8, () => {
+              repartidor.raiz.rotation.y = miraAfuera + Math.PI;
+              hablar(ms, azar(['¡Aquí está el pedido! Buen viaje 🛵', 'Delivery listo, ¡cuidado en el camino! 💛']));
+              saludar(ms); cargar(ms, null); cajaRep.visible = true;
+              espera(1300, () => {
+                caminar(repartidor, [alLadoG], 2, () => {
+                  cajaRep.visible = false;
+                  if (motoEstado === 'parqueada') salirEnMoto(false);
+                });
+                volverBase(ms);
+              });
+            });
+          });
+        });
+      });
+    });
+    void tk;
+  }
   function paseoCapri() {
     const ms = meseros[0];
     if (t <= capriEstado.proxAccion) return;
@@ -407,17 +461,25 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     if (demorado() && r < 0.5) { decir(azar(['¡Ya casi sale, gracias por esperar! 🙏', 'Voy a apurar a cocina 😅'])); return; }
     if (r < 0.3) { accion('saludando', 2.6); decir(azar(['¡Bienvenidos a Caprichos! 😊', '¿Ya probaron el frappé de caramelo?', 'Busca tu código en la pantalla 👀'])); return; }
     if (r < 0.45) { accion('baile', 3); return; }
-    const ocupadas = local.mesas.filter((x) => grupos.has(x.id) && grupos.get(x.id)!.fase === 'sentado');
+    // No visita mesas cuyo pedido ya está listo: ahí va a entregar
+    const ocupadas = local.mesas.filter((x) => grupos.has(x.id) && grupos.get(x.id)!.fase === 'sentado' && !pedidoDeMesaListo(x.id));
     const m = ocupadas.length ? azar(ocupadas) : null;
     if (!m) return;
     ms.tarea = 'paseo'; alCambiar();
     irAMesa(ms, m, () => {
       accion('saludando', 2);
-      decir(estadoDe(m) === 'COMIENDO' ? azar(['¿Todo bien por aquí? 😊', '¡Que lo disfruten!', '¿Algo más para la mesa?']) : azar(['Su pedido ya está en cocina 👩‍🍳', '¡Ya casi sale su pedido!', 'Gracias por esperar 💛']));
+      const enCocina = !!datos?.cocina.some((p) => p.mesaIds.includes(m.id) && !estaListo(p));
+      const minutos = datos?.cocina.find((p) => p.mesaIds.includes(m.id))?.minutos ?? 0;
+      const f = frasePaseo({ listo: pedidoDeMesaListo(m.id), enCocina, minutos, comiendo: estadoDe(m) === 'COMIENDO' });
+      if (f === 'comiendo') decir(azar(['¿Todo bien por aquí? 😊', '¡Que lo disfruten!', '¿Algo más para la mesa?']));
+      else if (f === 'espera') decir(azar(['Gracias por esperar 💛 ya casi sale', 'Perdón la demora 🙏 ya casi está']));
+      else if (f === 'cocina') decir(azar(['Su pedido ya está en cocina 👩‍🍳', 'Lo estamos preparando con cariño 💛']));
+      else if (f === 'listo') decir('¡Su pedido ya está listo! 🔔');
       espera(2200, () => volverBase(ms));
     });
   }
-  const demorado = () => !!datos && [...datos.cocina, ...datos.despacho].some((p) => p.minutos >= UMBRAL_DEMORA);
+  // Solo cuenta lo que de verdad sigue en cocina: un pedido ya listo no se «demora», se entrega
+  const demorado = () => !!datos && datos.cocina.some((p) => !estaListo(p) && p.minutos >= UMBRAL_DEMORA);
 
   function ocultarBandeja(tomando = false) {
     const listos = (datos?.despacho ?? []);
@@ -437,6 +499,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   escena.add(repartidor.raiz);
   const bolsaRep = crearBolsa(ctx, repartidor.raiz, 0.3, 0.42, 0.12);
   void bolsaRep;
+  const cajaRep = crearCaja(ctx, repartidor.raiz, 0, 0.7, 0.3);
+  const alLadoG: [number, number] = [entradaG[0] + dirG[0] * 1.4 + dirG[1] * 2.8, entradaG[1] + dirG[1] * 1.4 + dirG[0] * 2.8];
   const lejos = G(parqueo.x + ancho / 2 + dirG[0] * 14, parqueo.z + alto / 2 + dirG[1] * 14);
 
   function salirEnMoto(inmediato: boolean) {
@@ -520,11 +584,15 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     // Pedidos que aparecen listos en despacho: campana y a llevarlos
     const nuevosListos = nuevo.despacho.filter((p) => !codigosDespacho.has(p.codigo));
     codigosDespacho = new Set(nuevo.despacho.map((p) => p.codigo));
-    for (let i = tareas.length - 1; i >= 0; i--) { const tk = tareas[i]; if ((tk.tipo === 'pedido' || tk.tipo === 'llevar') && !codigosDespacho.has(tk.codigo)) tareas.splice(i, 1); }
+    for (let i = tareas.length - 1; i >= 0; i--) { const tk = tareas[i]; if ((tk.tipo === 'pedido' || tk.tipo === 'llevar' || tk.tipo === 'delivery') && !codigosDespacho.has(tk.codigo)) tareas.splice(i, 1); }
     aplicarLlevar(nuevo, primera);
     for (const p of nuevosListos) {
+      // Una sola entrega por pedido (llave por id), aunque los datos se repitan
+      const pasos = planEntrega({ id: p.id, modalidad: p.modalidad, estado: 'LISTO', areas: p.areas }, entregas);
+      if (pasos.length === 0) continue;
       if (p.modalidad === 'MESA' && p.mesaIds[0] && mesaPorId(p.mesaIds[0])) tareas.push({ tipo: 'pedido', codigo: p.codigo, mesaId: p.mesaIds[0] });
       else if (p.modalidad === 'LLEVAR') tareas.push({ tipo: 'llevar', codigo: p.codigo });
+      else if (p.modalidad === 'DELIVERY') tareas.push({ tipo: 'delivery', codigo: p.codigo });
       if (!primera) {
         sonido.campana();
         const dest = p.modalidad === 'MESA' ? p.mesas[0] ?? 'mesa' : p.modalidad === 'DELIVERY' ? 'delivery' : 'para llevar';
@@ -618,9 +686,13 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       if (!anda && tk) {
         const m = local.mesas.find((x) => grupos.has(x.id) && Math.hypot(x.cx - pos.x, x.cz - pos.z) < 3);
         if (m) { cerca = 'mesa'; mesa = { centro: { x: m.cx, z: m.cz }, personas: grupos.get(m.id)!.personas.map((p) => ({ x: p.raiz.position.x, z: p.raiz.position.z })) }; }
-        else if (local.despachoPunto) { const dp = G(local.despachoPunto[0], local.despachoPunto[1]); if (Math.hypot(dp.x - pos.x, dp.z - pos.z) < 2.2) cerca = 'cocina'; }
+        else if (typeof tk === 'object' && tk.tipo === 'delivery' && Math.hypot(capriObj.position.x - G(entradaG[0], entradaG[1]).x, capriObj.position.z - G(entradaG[0], entradaG[1]).z) < 3) {
+          // En la puerta: se encuadran Capri y el repartidor
+          const e = G(entradaG[0], entradaG[1]);
+          cerca = 'mesa'; mesa = { centro: { x: e.x, z: e.z }, personas: [{ x: repartidor.raiz.position.x, z: repartidor.raiz.position.z }] };
+        } else if (local.despachoPunto) { const dp = G(local.despachoPunto[0], local.despachoPunto[1]); if (Math.hypot(dp.x - pos.x, dp.z - pos.z) < 2.2) cerca = 'cocina'; }
       }
-      const haciaCocina = typeof tk === 'object' && tk !== null && (tk.tipo === 'pedido' || tk.tipo === 'llevar') && !bandejaC.visible && !bolsaC.visible;
+      const haciaCocina = typeof tk === 'object' && tk !== null && (tk.tipo === 'pedido' || tk.tipo === 'llevar' || tk.tipo === 'delivery') && !bandejaC.visible && !bolsaC.visible && !cajaC.visible;
       return { pos, rumboY: capriObj.rotation.y, caminando: anda, ocupada: !!tk, cerca, rumbo: haciaCocina ? 'cocina' : null, quietoS: 0, mesa };
     },
     comiendo: (p: Persona) => !!p.mesaId && estadoDe(mesaPorId(p.mesaId)!) === 'COMIENDO',
@@ -639,7 +711,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     resumenMeseros(): ResumenMesero[] {
       return meseros.map((ms) => {
         const tk = ms.tarea;
-        const txt = !tk ? 'Libre' : tk === 'paseo' ? 'Visitando mesas' : tk.tipo === 'tomar' ? `Toma el pedido · ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'cuenta' ? `Lleva la cuenta · ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'limpiar' ? `Limpiando ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'llevar' ? `Lleva ${tk.codigo} · para llevar` : `Lleva ${tk.codigo} · ${mesaPorId(tk.mesaId)?.nombre ?? ''}`;
+        const txt = !tk ? 'Libre' : tk === 'paseo' ? 'Visitando mesas' : tk.tipo === 'tomar' ? `Toma el pedido · ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'cuenta' ? `Lleva la cuenta · ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'limpiar' ? `Limpiando ${mesaPorId(tk.mesaId)?.nombre ?? ''}` : tk.tipo === 'llevar' ? `Lleva ${tk.codigo} · para llevar` : tk.tipo === 'delivery' ? `Entrega ${tk.codigo} al repartidor` : `Lleva ${tk.codigo} · ${mesaPorId(tk.mesaId)?.nombre ?? ''}`;
         return { nombre: ms.nombre, esCapri: ms.esCapri, ocupado: !!tk && tk !== 'paseo', texto: txt };
       });
     },

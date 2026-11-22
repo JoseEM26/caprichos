@@ -40,9 +40,11 @@ export function pendientesDe(d: SalonVivo): Pendiente[] {
     porId.set(p.id, { id: p.id, codigo: p.codigo, donde: donde(p), cliente: p.cliente, etapa, porcentaje, minutos: p.minutos, areas: p.areas, avatarUrl: p.avatar?.url ?? null });
   };
   // En caja solo cuenta mientras aún no entra a cocina ni está listo (por cobrar antes de preparar)
-  for (const p of d.caja) if (p.estado === 'COLA' && p.areas.every((a) => a.estado === 'PENDIENTE')) poner(p, 'CAJA');
-  for (const p of d.cocina) poner(p, 'COCINA');
-  for (const p of d.despacho) poner(p, 'LISTO');
+  // Los pedidos de delivery no se muestran: a los clientes del local no les interesan
+  const caja = d.caja.filter((p) => p.modalidad !== 'DELIVERY'), cocina = d.cocina.filter((p) => p.modalidad !== 'DELIVERY'), despacho = d.despacho.filter((p) => p.modalidad !== 'DELIVERY');
+  for (const p of caja) if (p.estado === 'COLA' && p.areas.every((a) => a.estado === 'PENDIENTE')) poner(p, 'CAJA');
+  for (const p of cocina) poner(p, 'COCINA');
+  for (const p of despacho) poner(p, 'LISTO');
   // Listos primero (hay que entregarlos), luego los que más avanzaron, y a igual avance el que más espera
   return [...porId.values()].sort((a, b) => (b.etapa === 'LISTO' ? 1 : 0) - (a.etapa === 'LISTO' ? 1 : 0) || b.porcentaje - a.porcentaje || b.minutos - a.minutos);
 }
@@ -54,46 +56,98 @@ function Retrato({ url }: { url: string }) {
   return <img className="sv-pend-retrato" src={url} alt="" loading="lazy" onError={() => setFalla(true)} />;
 }
 
-/** Cada cuántos ms pasa sola la franja de la TV. */
-export const INTERVALO_PASO_MS = 5000;
+/** Segundos que se ve cada tarjeta en el carrusel continuo, y ms entre páginas con movimiento reducido. */
+export const SEGUNDOS_POR_TARJETA = 5;
+export const INTERVALO_PAGINA_MS = 4000;
 
 /**
- * Franja de la TV: si hay más tarjetas de las que entran, avanza sola una tarjeta cada ~5 s (suave) y al llegar al final
- * vuelve al inicio; con pocas tarjetas no se mueve. Con movimiento reducido no se desplaza: devuelve cuántas quedan fuera
- * (para mostrar «+N más»).
+ * Carrusel de la TV. Si las tarjetas no caben, `desborda` es verdadero: la vista duplica la lista y la desliza en bucle
+ * continuo (sin salto, porque la copia empalma con el inicio). Si caben todas, no hay movimiento. Con movimiento
+ * reducido no se anima: pasa de página en página cada 4 s con un corte, y vuelve al inicio al final.
  */
-export function usePasoAuto(ref: React.RefObject<HTMLElement | null>, activo: boolean, reducir: boolean, total: number): number {
-  const [ocultos, setOcultos] = useState(0);
+export function useCarrusel(vista: React.RefObject<HTMLElement | null>, lista: React.RefObject<HTMLElement | null>, activo: boolean, reducir: boolean, total: number): boolean {
+  const [desborda, setDesborda] = useState(false);
   useEffect(() => {
-    const el = ref.current;
-    if (!activo || !el) { setOcultos(0); return; }
-    const medir = () => {
-      const item = el.querySelector<HTMLElement>('.sv-pend-item');
-      const ancho = item?.offsetWidth ?? 0;
-      setOcultos(reducir && ancho > 0 ? Math.max(0, total - Math.max(1, Math.floor(el.clientWidth / ancho))) : 0);
-    };
+    const v = vista.current, l = lista.current;
+    if (!activo || !v || !l) { setDesborda(false); return; }
+    const medir = () => setDesborda(l.scrollWidth > v.clientWidth + 4);
     medir();
     window.addEventListener('resize', medir);
-    if (reducir) return () => window.removeEventListener('resize', medir);
+    return () => window.removeEventListener('resize', medir);
+  }, [vista, lista, activo, total]);
+  useEffect(() => {
+    const v = vista.current;
+    if (!activo || !reducir || !desborda || !v) return;
     const id = setInterval(() => {
-      if (el.scrollWidth <= el.clientWidth + 4) return; // caben todas: quieto
-      const item = el.querySelector<HTMLElement>('.sv-pend-item');
-      const paso = (item?.offsetWidth ?? el.clientWidth) + 10;
-      const alFinal = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
-      el.scrollTo({ left: alFinal ? 0 : el.scrollLeft + paso, behavior: 'smooth' });
-    }, INTERVALO_PASO_MS);
-    return () => { clearInterval(id); window.removeEventListener('resize', medir); };
-  }, [ref, activo, reducir, total]);
-  return ocultos;
+      const alFinal = v.scrollLeft + v.clientWidth >= v.scrollWidth - 4;
+      v.scrollTo({ left: alFinal ? 0 : v.scrollLeft + v.clientWidth, behavior: 'auto' });
+    }, INTERVALO_PAGINA_MS);
+    return () => clearInterval(id);
+  }, [vista, activo, reducir, desborda]);
+  return desborda;
 }
 
 const nombreArea = (n: string) => n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
 
-export function PanelPendientes({ datos, reloj, auto = false, reducir = false }: { datos: SalonVivo; reloj: string; auto?: boolean; reducir?: boolean }) {
+function Tarjeta({ p }: { p: Pendiente }) {
+  return (
+    <li className={`sv-pend-item ${p.etapa.toLowerCase()} ${p.minutos >= 15 && p.etapa !== 'LISTO' ? 'tarde' : ''}`}>
+      <div className="sv-pend-fila">
+        {p.avatarUrl && <Retrato url={p.avatarUrl} />}
+        <span className="sv-pend-cod"><small>{p.codigo.slice(0, 3)}</small>{p.codigo.slice(3)}</span>
+        <span className="sv-pend-donde">{p.donde}{p.cliente ? ` · ${p.cliente}` : ''}</span>
+        <span className="sv-pend-etapa">{ETIQUETA[p.etapa]}</span>
+      </div>
+      <div className="sv-pend-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.porcentaje} aria-label={`${p.codigo}: ${ETIQUETA[p.etapa]}, ${p.porcentaje}%`}>
+        <i style={{ width: `${p.porcentaje}%` }} />
+        <span>{p.porcentaje}%</span>
+      </div>
+      <div className="sv-pend-pasos" aria-hidden="true">
+        <span className={p.porcentaje >= 12 ? 'hecho' : ''}>Caja</span>
+        <span className={p.etapa !== 'CAJA' ? 'hecho' : ''}>Cocina</span>
+        <span className={p.etapa === 'LISTO' ? 'hecho' : ''}>Listo</span>
+      </div>
+      {p.etapa === 'COCINA' && p.areas.length > 0 && (
+        <div className="sv-pend-areas">
+          {p.areas.map((a) => <span key={a.nombre} className={a.estado === 'LISTA' ? 'ok' : 'prep'}>{a.estado === 'LISTA' ? '✓' : '●'} {nombreArea(a.nombre)}</span>)}
+          <em className="sv-pend-min">⏱ {p.minutos} min</em>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/**
+ * `tv`: la franja de abajo de la pantalla de la TV: solo la hora y el carrusel de pedidos (en bucle continuo si no caben).
+ * Sin `tv`: el panel del admin, con el resumen y la lista vertical.
+ */
+export function PanelPendientes({ datos, reloj, tv = false, reducir = false }: { datos: SalonVivo; reloj: string; tv?: boolean; reducir?: boolean }) {
   const lista = pendientesDe(datos);
-  const listaRef = useRef<HTMLOListElement>(null);
-  const ocultos = usePasoAuto(listaRef, auto, reducir, lista.length);
   const cuenta = (e: EtapaPendiente) => lista.filter((p) => p.etapa === e).length;
+  const vistaRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLOListElement>(null);
+  const desborda = useCarrusel(vistaRef, listaRef, tv, reducir, lista.length);
+  if (tv) {
+    const anima = desborda && !reducir;
+    return (
+      <aside className="sv-panel sv-pend sv-pend-tv" aria-label="Pedidos pendientes">
+        <time className="sv-reloj-tv">{reloj}</time>
+        <div ref={vistaRef} className={`sv-carrusel ${reducir ? 'paginas' : ''}`}>
+          <div className={`sv-pista ${anima ? 'anima' : ''}`} style={anima ? { animationDuration: `${Math.max(12, lista.length * SEGUNDOS_POR_TARJETA)}s` } : undefined}>
+            <ol ref={listaRef} className="sv-pend-lista" aria-live="polite">
+              {lista.length === 0 && <li className="sv-pend-vacio">No hay pedidos pendientes 🎉</li>}
+              {lista.map((p) => <Tarjeta key={p.id} p={p} />)}
+            </ol>
+            {anima && (
+              <ol className="sv-pend-lista" aria-hidden="true">
+                {lista.map((p) => <Tarjeta key={p.id} p={p} />)}
+              </ol>
+            )}
+          </div>
+        </div>
+      </aside>
+    );
+  }
   return (
     <aside className="sv-panel sv-pend" aria-label="Pedidos pendientes">
       <div className="sv-pend-cab">
@@ -104,35 +158,10 @@ export function PanelPendientes({ datos, reloj, auto = false, reducir = false }:
         <span className="sv-pend-chip caja"><b>{cuenta('CAJA')}</b> En caja</span>
         <span className="sv-pend-chip cocina"><b>{cuenta('COCINA')}</b> En cocina</span>
         <span className="sv-pend-chip listo"><b>{cuenta('LISTO')}</b> Listos</span>
-        {ocultos > 0 && <span className="sv-pend-mas">+{ocultos} más</span>}
       </div>
-      <ol ref={listaRef} className="sv-pend-lista" aria-live="polite">
+      <ol className="sv-pend-lista" aria-live="polite">
         {lista.length === 0 && <li className="sv-pend-vacio">No hay pedidos pendientes 🎉</li>}
-        {lista.map((p) => (
-          <li key={p.id} className={`sv-pend-item ${p.etapa.toLowerCase()} ${p.minutos >= 15 && p.etapa !== 'LISTO' ? 'tarde' : ''}`}>
-            <div className="sv-pend-fila">
-              {p.avatarUrl && <Retrato url={p.avatarUrl} />}
-              <span className="sv-pend-cod"><small>{p.codigo.slice(0, 3)}</small>{p.codigo.slice(3)}</span>
-              <span className="sv-pend-donde">{p.donde}{p.cliente ? ` · ${p.cliente}` : ''}</span>
-              <span className="sv-pend-etapa">{ETIQUETA[p.etapa]}</span>
-            </div>
-            <div className="sv-pend-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.porcentaje} aria-label={`${p.codigo}: ${ETIQUETA[p.etapa]}, ${p.porcentaje}%`}>
-              <i style={{ width: `${p.porcentaje}%` }} />
-              <span>{p.porcentaje}%</span>
-            </div>
-            <div className="sv-pend-pasos" aria-hidden="true">
-              <span className={p.porcentaje >= 12 ? 'hecho' : ''}>Caja</span>
-              <span className={p.etapa !== 'CAJA' ? 'hecho' : ''}>Cocina</span>
-              <span className={p.etapa === 'LISTO' ? 'hecho' : ''}>Listo</span>
-            </div>
-            {p.etapa === 'COCINA' && p.areas.length > 0 && (
-              <div className="sv-pend-areas">
-                {p.areas.map((a) => <span key={a.nombre} className={a.estado === 'LISTA' ? 'ok' : 'prep'}>{a.estado === 'LISTA' ? '✓' : '●'} {nombreArea(a.nombre)}</span>)}
-                <em className="sv-pend-min">⏱ {p.minutos} min</em>
-              </div>
-            )}
-          </li>
-        ))}
+        {lista.map((p) => <Tarjeta key={p.id} p={p} />)}
       </ol>
     </aside>
   );

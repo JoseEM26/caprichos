@@ -150,15 +150,23 @@
 .sv-tv .sv-app { height: 100vh; height: 100dvh; min-height: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
 /* TV: el local en 3D ocupa todo el ancho de arriba; los pedidos van en una franja abajo (resumen a la izquierda, tarjetas en fila) */
 .sv-tv .sv-escena { height: auto; min-height: 0; }
-.sv-tv .sv-pend { height: auto; max-height: 34dvh; display: grid; grid-template-columns: clamp(260px, 21vw, 400px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); box-shadow: 0 -10px 30px rgba(0, 0, 0, .28); }
-.sv-tv .sv-pend-cab { grid-column: 1; grid-row: 1; border-bottom: 0; padding: 12px 16px 6px; }
-.sv-tv .sv-pend-resumen { grid-column: 1; grid-row: 2; align-content: start; padding: 6px 16px 14px; }
-.sv-tv .sv-pend-lista { grid-column: 2; grid-row: 1 / span 2; flex-direction: row; align-items: stretch; overflow-x: auto; overflow-y: hidden; padding: 12px 16px; border-left: 1px solid var(--sv-linea); }
-.sv-tv .sv-pend-item { flex: 0 0 clamp(280px, 23vw, 400px); }
-.sv-tv .sv-pend-lista { scroll-behavior: smooth; scrollbar-width: none; }
-.sv-tv .sv-pend-lista::-webkit-scrollbar { display: none; }
-.sv-pend-mas { grid-column: 1 / -1; text-align: center; font: 800 14px var(--sv-f-txt); color: var(--sv-naranja-osc); }
-@media (prefers-reduced-motion: reduce) { .sv-tv .sv-pend-lista { scroll-behavior: auto; } }
+/* Franja de la TV: solo la hora y el carrusel de pedidos (bucle continuo si no caben) */
+.sv-tv .sv-pend-tv { height: auto; max-height: none; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; box-shadow: 0 -10px 30px rgba(0, 0, 0, .28); }
+.sv-reloj-tv { padding: 0 clamp(14px, 1.6vw, 28px); font: 900 clamp(26px, 2.6vw, 44px) var(--sv-f-disp); font-variant-numeric: tabular-nums; color: var(--sv-navy); opacity: .72; border-right: 1px solid var(--sv-linea); align-self: stretch; display: grid; place-items: center; }
+.sv-carrusel { overflow: hidden; min-width: 0; padding: 12px 0; mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
+.sv-carrusel.paginas { overflow-x: hidden; mask-image: none; }
+.sv-pista { display: flex; width: max-content; }
+.sv-pista.anima { animation: sv-marquee linear infinite; will-change: transform; }
+.sv-pista.anima:hover { animation-play-state: paused; }
+@keyframes sv-marquee { to { transform: translateX(-50%); } }
+.sv-tv .sv-pend-tv .sv-pend-lista { flex: none; flex-direction: row; align-items: stretch; overflow: visible; padding: 0 16px 0 0; margin-left: 16px; border: 0; gap: 12px; }
+.sv-tv .sv-pend-tv .sv-pend-lista + .sv-pend-lista { margin-left: 0; }
+.sv-tv .sv-pend-item { flex: 0 0 clamp(200px, 15vw, 280px); padding: 10px 12px; }
+.sv-tv .sv-pend-fila { flex-wrap: wrap; row-gap: 2px; }
+.sv-tv .sv-pend-fila > .sv-pend-donde { order: 3; flex-basis: 100%; }
+.sv-tv .sv-pend-pasos, .sv-tv .sv-pend-areas { display: none; }
+.sv-tv .sv-pend-barra { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .sv-pista.anima { animation: none; } }
 .sv-tv .sv-pend-vacio { align-self: center; flex: 1; }
 .sv-tv .sv-ayuda-tv { top: 64px; }
 .sv-completa .sv-cabeza { pointer-events: none; }
@@ -209,7 +217,7 @@
 .sv-pend-item.tarde .sv-pend-min { color: #C5221F; }
 @media (prefers-reduced-motion: reduce) { .sv-pend-item, .sv-pend-item.listo .sv-pend-etapa { animation: none; } .sv-pend-barra i { transition: none; } }
 /* TV o celular angosto: la franja se apila (resumen arriba, tarjetas en fila debajo) */
-@media (max-width: 900px) { .sv-tv .sv-pend { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); max-height: 45dvh; } .sv-tv .sv-pend-lista { grid-column: 1; grid-row: 3; border-left: 0; } .sv-tv .sv-pend-item { flex-basis: 80vw; } }
+@media (max-width: 900px) { .sv-tv .sv-pend-tv { grid-template-columns: minmax(0, 1fr); } .sv-reloj-tv { border-right: 0; padding: 6px; } .sv-tv .sv-pend-item { flex-basis: 60vw; } }
 
 /* Botón «Centrar»: devuelve la cámara a la vista elegida si el zoom o el arrastre dejaron el local fuera de cuadro */
 .sv-centrar { position: absolute; top: 12px; right: 12px; z-index: 3; min-height: 44px; padding: 0 16px; border-radius: 9999px; border: 1px solid rgba(251, 244, 236, .25); background: rgba(8, 34, 49, .88); color: var(--sv-hueso); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
