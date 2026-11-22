@@ -42,10 +42,13 @@ import { ReservasModule } from '../reservas/reservas.module';
 import { PedidosProgramadosService } from './pedidos-programados.service';
 import { DevolucionCulqiModule } from '../pagos-online/devolucion-culqi.module';
 import { PedidosProgramadosTarea } from './pedidos-programados.tarea';
+import { CancelarClienteService } from './cancelar-cliente.service';
+import { CancelarClienteController } from './cancelar-cliente.controller';
+import { CANCELAR_PEDIDO_CLIENTE_PUERTO } from '../chatbot/puerto/cancelar-pedido-cliente.puerto';
 
 @Module({
   imports: [DevolucionCulqiModule, ConsumoRecetaModule, SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule, ReservasModule],
-  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
+  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController, CancelarClienteController],
   providers: [
     PedidosEstadoService,
     // Sin estado: se usa para despejar las comandas al forzar un pedido (importar CocinaModule arrastraría sus controladores)
@@ -71,8 +74,10 @@ import { PedidosProgramadosTarea } from './pedidos-programados.tarea';
     // Sin estado ni dependencias; PedidosModule no lo exporta
     PagoPlanService,
     UbicacionWhatsappPedidoService,
+    CancelarClienteService,
+    { provide: CANCELAR_PEDIDO_CLIENTE_PUERTO, useExisting: CancelarClienteService },
     { provide: UBICACION_PEDIDO_PUERTO, useExisting: UbicacionWhatsappPedidoService },
   ],
-  exports: [PedidosEstadoService, UBICACION_PEDIDO_PUERTO],
+  exports: [PedidosEstadoService, UBICACION_PEDIDO_PUERTO, CANCELAR_PEDIDO_CLIENTE_PUERTO],
 })
 export class PedidosAdminModule {}

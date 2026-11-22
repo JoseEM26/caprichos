@@ -190,6 +190,14 @@ export interface AccionCancelarReservaCliente {
 }
 
 /**
+ * Acción transaccional: el cliente cancela su pedido sin pagar (confirmó con el botón). El ejecutor revalida celular y regla.
+ */
+export interface AccionCancelarPedidoCliente {
+  tipo: 'cancelarPedidoCliente';
+  pedidoCodigo: string;
+}
+
+/**
  * Acción transaccional: solicitar cambio de una reserva activa del cliente.
  */
 export interface AccionCambiarReservaCliente {
@@ -254,6 +262,7 @@ export type AccionMensaje =
   | AccionCrearPedido
   | AccionCrearSolicitudReserva
   | AccionCancelarReservaCliente
+  | AccionCancelarPedidoCliente
   | AccionCambiarReservaCliente
   | AccionCrearSolicitudCambio
   | AccionConsultarIa;
@@ -356,6 +365,8 @@ export interface ContextoConversacion {
   /** Unidades vendidas por productoId (últimos 90 días), para ordenar los carruseles. */
   ventasProductos?: Record<string, number>;
   pedidoActivo?: any;
+  /** Pedidos recientes del celular con veredicto «cancelable por el cliente» (solo se llena si el cliente pide cancelar). */
+  cancelablesCliente?: Array<{ codigo: string; cancelable: boolean; mensaje?: string }>;
   errorServicio?: boolean;
   limiteConsultasExcedido?: boolean;
   pedidosHoyTelefono?: number;

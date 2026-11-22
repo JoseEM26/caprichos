@@ -101,6 +101,8 @@ export interface PasoSeguimiento {
 }
 
 export interface SeguimientoPedido {
+  /** El cliente puede cancelarlo (aún sin pagar ni preparar); si no, `mensaje` dice por qué. */
+  cancelable?: { puede: boolean; mensaje?: string };
   codigo: string;
   estado: string;
   estadoEtiqueta: string;
@@ -287,6 +289,7 @@ const textoRango = (min: number, max: number) =>
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
 import { lineasDeCuenta } from './lineas-combo.util';
+import { cargarCancelable } from './cancelable-cliente';
 
 @Injectable()
 export class SeguimientoService {
@@ -333,8 +336,10 @@ export class SeguimientoService {
     const digitales = mediosDigitalesDelPedido(plan, null, 0);
     const montoDigital = digitales.length > 0 ? montoDigitalDePlan(plan) : null;
     const totalCobrable = Math.round((montoACobrar(pedido) + Number(pedido.propina ?? 0)) * 100) / 100;
+    const veredicto = (await cargarCancelable(this.prisma, { id: pedido.id }))?.resultado;
     const base = {
       ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
+      cancelable: veredicto?.cancelable ? { puede: true } : { puede: false, mensaje: veredicto?.mensaje },
       pagoDigital,
       ...(pedido.pago_estado === 'PENDIENTE_ONLINE' ? { pagoEnLinea: { pedidoId: pedido.id.toString(), creadoEn: pedido.creado_en.toISOString() } } : {}),
       ...(pagoDigital ? { medioPago: medioPreferido } : {}),

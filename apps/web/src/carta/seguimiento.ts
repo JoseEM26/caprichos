@@ -76,6 +76,8 @@ export interface DetalleSeguimiento {
 }
 
 export interface EstadoSeguimiento {
+  /** El cliente puede cancelarlo (sin pagar ni preparar); si no, `mensaje` dice por qué. */
+  cancelable?: { puede: boolean; mensaje?: string };
   codigo: string;
   estado: string;
   estadoEtiqueta: string;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CancelarPedido } from './CancelarPedido';
 import { useCarrito } from './CarritoContext';
 import { ChipParaLlevar, ResumenParaLlevar } from '../admin/pedidos/paraLlevar';
 import { Icono } from '../comun/Icono';
@@ -117,7 +118,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       id: 'estado',
       etiqueta: 'Estado',
       insignia: marca('estado'),
-      contenido: <PanelEstado pedido={pedido} estado={estado} error={error} etapa={etapa} modalidad={modalidad} total={total} creacion={creacion} />,
+      contenido: <PanelEstado pedido={pedido} estado={estado} error={error} etapa={etapa} modalidad={modalidad} total={total} creacion={creacion} onCancelado={refrescar} />,
     },
     {
       id: 'pedido',
@@ -174,8 +175,9 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
 }
 
 function PanelEstado({
-  pedido, estado, error, etapa, modalidad, total, creacion,
+  pedido, estado, error, etapa, modalidad, total, creacion, onCancelado,
 }: {
+  onCancelado: () => void;
   pedido: PedidoGuardado;
   estado: EstadoSeguimiento | null;
   error: 'RED' | 'NO_ENCONTRADO' | null;
@@ -257,6 +259,11 @@ function PanelEstado({
       </dl>
 
       {estado && !anulado && <QueFalta estado={estado} etapa={etapa} />}
+
+      {estado && (
+        <CancelarPedido codigo={pedido.codigo} token={pedido.token} cancelable={estado.cancelable} anulado={anulado} terminado={estado.terminado} onCancelado={onCancelado} />
+      )}
+      {estado && anulado && !estado.pagoEnLinea && <p className="sg-detalle" data-testid="pedido-cancelado">Pedido cancelado.</p>}
 
       {estado && !anulado && (
         <div className="sg-tarjeta" aria-label="Línea de tiempo del pedido">

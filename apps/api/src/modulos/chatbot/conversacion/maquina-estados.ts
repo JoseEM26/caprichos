@@ -1,4 +1,5 @@
 import { lineaAvisoStock } from './flujos/pedido/aviso-stock-bot.util';
+import { atenderCancelarCliente } from './flujos/cambios/cancelar-cliente-bot';
 import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
@@ -2042,6 +2043,12 @@ function transicionarSoloMenusNucleo(
   // Con una persona atendiendo, el texto libre no se contesta (regla de siempre)
   if (enPersona && !id && !contexto.modoAsistido) {
     return { nuevoEstado: 'ATENCION_PERSONA', acciones: [], nuevoFlujo: flujo };
+  }
+
+  // 0.c Cancelar un pedido sin pagar (de cualquier canal): botón con confirmación; sin pedidos recientes sigue el camino de siempre
+  if (!enPedido && !enPago) {
+    const cancelar = atenderCancelarCliente(flujo, entrada, contexto);
+    if (cancelar) return cancelar;
   }
 
   // 1. Queja escrita: urgente, a una persona (también en mitad de un pedido)

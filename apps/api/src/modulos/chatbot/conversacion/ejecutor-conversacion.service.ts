@@ -2,6 +2,9 @@ import { CANAL_WHATSAPP_BUSINESS, SILENCIO_WHATSAPP_BUSINESS_MIN } from '../util
 import { PuntosService } from '../../clientes/puntos.service';
 import { CUENTA_CLIENTE_BOT_PUERTO, CuentaClienteBotPuerto } from '../puerto/cuenta-cliente-bot.puerto';
 import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { CANCELAR_PEDIDO_CLIENTE_PUERTO, CancelarPedidoClientePuerto } from '../puerto/cancelar-pedido-cliente.puerto';
+import { pideCancelarPedido } from './flujos/cambios/cancelar-cliente-bot';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
@@ -116,7 +119,17 @@ export class EjecutorConversacionService {
     @Optional() private readonly reanudacionBot?: ReanudacionBotService,
     @Optional() private readonly facturacionCliente?: FacturacionClienteService,
     @Optional() private readonly evolutionConfig?: EvolutionConfigService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /** Puerto de cancelación (lo implementa pedidos-admin; se resuelve tarde para evitar el ciclo de módulos). */
+  private puertoCancelar(): CancelarPedidoClientePuerto | null {
+    try {
+      return this.moduleRef?.get<CancelarPedidoClientePuerto>(CANCELAR_PEDIDO_CLIENTE_PUERTO, { strict: false }) ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Origen del pedido de WhatsApp: los puntos van SIEMPRE al celular de quien escribe. El bot no acepta otro número
@@ -1386,7 +1399,18 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Solo si el cliente pide cancelar: veredicto de sus pedidos recientes (cualquier canal)
+    let cancelablesCliente: ContextoConversacion['cancelablesCliente'];
+    if (telefonoCliente && pideCancelarPedido(normalizarEntrada(entradaRaw))) {
+      try {
+        cancelablesCliente = await this.puertoCancelar()?.evaluarPorTelefono(telefonoCliente);
+      } catch (err: any) {
+        this.logger.warn(`Sin veredicto de cancelación: ${err?.message}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
+      cancelablesCliente,
       facturaGuardada,
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
@@ -2429,6 +2453,24 @@ export class EjecutorConversacionService {
         } catch (err: any) {
           this.logger.error(`Error guardando solicitud de reserva: ${err.message}`, err.stack);
         }
+      } else if (accion.tipo === 'cancelarPedidoCliente') {
+        let textoResultado = `Listo, cancelé tu pedido ${accion.pedidoCodigo}. Cuando quieras, vuelve a pedir. 💛`;
+        try {
+          const puerto = this.puertoCancelar();
+          if (!puerto) throw new Error('Cancelación no disponible');
+          await puerto.cancelarPorTelefono(accion.pedidoCodigo, telefonoCliente, 'Cancelado desde WhatsApp');
+        } catch (err: any) {
+          this.logger.warn(`Cancelación de ${accion.pedidoCodigo} por WhatsApp: ${err?.message}`);
+          textoResultado = err?.getResponse?.()?.mensaje ?? `No pude cancelar ${accion.pedidoCodigo}. Escríbenos y una persona te ayuda.`;
+        }
+        let metaId: string | null = null;
+        if (destinoEnvio) {
+          const res = await this.mensajeria.enviarTexto(destinoEnvio, textoResultado, { conversacionId: conversacion.id, replyToWaMessageId: entradaRaw.waMessageId });
+          metaId = res.waMessageId || null;
+        }
+        await this.prisma.mensajeChat.create({
+          data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'TEXTO', contenido: { texto: textoResultado }, meta_id: metaId },
+        });
       } else if (accion.tipo === 'cancelarReservaCliente') {
         try {
           if (this.reservasService && accion.reservaId) {
