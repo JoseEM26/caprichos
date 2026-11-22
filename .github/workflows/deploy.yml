@@ -54,6 +54,7 @@ on:
           - revisar-efectivo-sin-liquidar
           - clonar-prod-a-demo
           - consultar-pedido
+          - exportar-chats
           - programar-respaldos
           - importar-datos-produccion
           - importar-personal
@@ -269,6 +270,17 @@ jobs:
               echo "::error::Escriba exactamente 'PROGRAMAR RESPALDOS' en confirmacion."
               exit 1
             fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "exportar-chats" ]; then
+            ACCION="exportar-chats"
+            # Solo lectura; sale cifrado con el secreto CHATS_CLAVE. Prod desde main con PRODUCCION; demo desde preprod o main
+            if ! { [ "$IN_AMBIENTE" = "demo" ]; } && ! { [ "$IN_AMBIENTE" = "prod" ] && [ "$REF_NAME" = "main" ] && [ "$IN_CONFIRMACION" = "PRODUCCION" ]; }; then
+              echo "::error::exportar-chats: prod desde main con confirmacion PRODUCCION."
+              exit 1
+            fi
+            echo "ambiente=${IN_AMBIENTE}" >> "$GITHUB_OUTPUT"
+            echo "accion=${ACCION}" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "consultar-pedido" ]; then
             ACCION="consultar-pedido"
@@ -2258,6 +2270,61 @@ jobs:
       - name: Borrar la llave del ejecutor
         if: always()
         run: rm -f ~/.ssh/deploy_key
+
+  # Chats del bot (anonimizados) para analizarlos. Solo lectura. El archivo sale CIFRADO con CHATS_CLAVE y dura 1 día.
+  exportar-chats:
+    name: Exportar chats del bot (cifrado)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'exportar-chats'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: demo
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          CHATS_CLAVE: ${{ secrets.CHATS_CLAVE }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS CHATS_CLAVE; do
+            if [ -z "${!v}" ]; then echo "::error::Falta el secreto $v."; exit 1; fi
+          done
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+
+      - name: Exportar y cifrar (no se imprime el contenido)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          CHATS_CLAVE: ${{ secrets.CHATS_CLAVE }}
+          DIAS: ${{ github.event.inputs.codigo_pedido }}
+          AMB: ${{ github.event.inputs.ambiente }}
+        run: |
+          set -eo pipefail
+          [[ "$DIAS" =~ ^[0-9]{1,3}$ ]] || DIAS=14
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+          $SSH "/opt/caprichos/scripts/exportar-chats.sh ${AMB} ${DIAS}" | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:CHATS_CLAVE -out chats.jsonl.gz.enc
+          echo "Tamaño cifrado: $(stat -c %s chats.jsonl.gz.enc) bytes"
+
+      - name: Guardar el archivo cifrado (1 día)
+        uses: actions/upload-artifact@v4
+        with:
+          name: chats-cifrado
+          path: chats.jsonl.gz.enc
+          retention-days: 1
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key chats.jsonl.gz.enc
 
   # Consumo del VPS y estado de respaldos. Solo lectura.
   ver-estado-servidor:
