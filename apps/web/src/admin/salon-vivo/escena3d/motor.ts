@@ -7,12 +7,14 @@ import { crearDecoracion, crearParticulas, TEMAS } from './temas';
 import { crearSonido } from './sonido';
 import { planoAEscena, type PlanoEscena } from './planoAEscena';
 import type { Persona } from './personas';
+import { factorSuave, poseDeEstado, siguienteEstado, suavizarAngulo, type EstadoCamara, type EstadoDirector, type Mundo, type Pose, type V2 } from './camaraDirector';
 import type { PisoVivo, SalonVivo } from '../salonVivoApi';
 
 /**
  * Motor 3D del salón en vivo: arma la escena desde el plano real y la anima con los datos reales.
  * Three a pelo (sin react-three-fiber), como la mascota; se carga solo cuando se abre el módulo.
  */
+export type { EstadoCamara };
 export type VistaCamara = 'general' | 'cocina' | 'salon' | 'capri';
 export type ModoHora = 'auto' | 'dia' | 'tarde' | 'noche';
 
@@ -29,8 +31,10 @@ export interface OpcionesMotor {
 export interface Motor {
   actualizar: (d: SalonVivo) => void;
   camara: (v: VistaCamara) => void;
-  /** Vuelve a la vista elegida (botón «Centrar»): deshace el zoom o el arrastre que dejó el local fuera de cuadro. */
+  /** Vuelve a seguir a Capri (botón «Centrar»): deshace el zoom o el arrastre y retoma el director de cámara. */
   centrar: () => void;
+  /** Estado actual del director de cámara (para pruebas y para el letrero de depuración). */
+  estadoCamara: () => EstadoCamara;
   tema: (clave: string) => void;
   hora: (m: ModoHora) => string;
   sonido: (on: boolean) => boolean;
@@ -152,13 +156,26 @@ export function crearMotor(op: OpcionesMotor): Motor {
   const relojHora = setInterval(() => { if (modoHora === 'auto') aplicarHora(); }, 60000);
 
   /* ---------- Cámara ---------- */
-  let vista: VistaCamara = 'general', volando = true, tocando = false;
+  // Por defecto sigue a Capri: el director de cámara decide el encuadre (SIGUIENDO, EN_MESA, EN_COCINA, PANORAMA)
+  let vista: VistaCamara = 'capri', volando = true, tocando = false;
   controles.addEventListener('start', () => { tocando = true; volando = false; });
   controles.addEventListener('end', () => { tocando = false; });
-  const vSeguir = new THREE.Vector3();
   // En pantallas angostas (celular de pie) la vista se aleja para que el local entre completo
   let alejar = 1;
   const posDe = (v: { pos: THREE.Vector3; obj: THREE.Vector3 }) => (alejar === 1 ? v.pos : v.obj.clone().add(v.pos.clone().sub(v.obj).multiplyScalar(alejar)));
+  const aPose = (v: { pos: THREE.Vector3; obj: THREE.Vector3 }): Pose => { const p = posDe(v); return { pos: [p.x, p.y, p.z], obj: [v.obj.x, v.obj.y, v.obj.z] }; };
+  // El director de cámara pone la cámara solo donde se puede estar: dentro del local, sin pared ni mueble
+  const mundo: Mundo = {
+    ancho, alto, fov: camara.fov, aspecto: 1,
+    libre: (x, z) => { const i = Math.floor(x + ancho / 2), j = Math.floor(z + alto / 2); return plano.bloqueo[j]?.[i] === false; },
+    get general() { return aPose(vistas.general); },
+  };
+  const cocinaCentro: V2 = { x: cc.x, z: cc.z };
+  let dirCam: EstadoDirector = { estado: 'PANORAMA', desde: -10 };
+  let quietoDesde = 0, rumboSuave = 0;
+  let ultimaMesa: { centro: V2; personas: V2[] } | null = null;
+  const modoControles = () => { controles.minDistance = vista === 'capri' ? 0.4 : 5; controles.maxPolarAngle = vista === 'capri' ? 1.5 : 1.35; };
+  modoControles();
   // El punto al que mira la cámara no sale del local: arrastrar con dos dedos ya no lo pierde
   const limitarObjetivo = () => {
     const t = controles.target;
@@ -166,13 +183,23 @@ export function crearMotor(op: OpcionesMotor): Motor {
     t.z = THREE.MathUtils.clamp(t.z, -alto * 0.6, alto * 0.6);
     t.y = THREE.MathUtils.clamp(t.y, 0, 3);
   };
-  function moverCamara() {
-    if (vista === 'capri') {
-      vSeguir.copy(director.capriObj.position); vSeguir.y = 0.8;
-      controles.target.lerp(vSeguir, 0.08);
-      if (volando) camara.position.lerp(vSeguir.clone().add(new THREE.Vector3(0, 4.5, 6)), 0.05);
-      return;
-    }
+  const destinoCam = new THREE.Vector3(), objCam = new THREE.Vector3();
+  function seguirCapri(t: number, dt: number) {
+    const f = director.focoCapri();
+    if (f.caminando || f.ocupada) quietoDesde = t;
+    f.quietoS = t - quietoDesde;
+    dirCam = siguienteEstado(dirCam, f, t);
+    rumboSuave = suavizarAngulo(rumboSuave, f.rumboY, reducir ? 1 : factorSuave(dt, 0.6));
+    if (f.mesa) ultimaMesa = f.mesa;
+    mundo.aspecto = camara.aspect;
+    const pose = poseDeEstado({ estado: dirCam.estado, capri: f.pos, rumbo: rumboSuave, mesa: f.mesa ?? (dirCam.estado === 'EN_MESA' ? ultimaMesa : null), cocina: cocinaCentro, camaraActual: { x: camara.position.x, z: camara.position.z } }, mundo);
+    destinoCam.set(...pose.pos); objCam.set(...pose.obj);
+    // Cortes en vez de movimientos si se prefiere menos movimiento; si no, transiciones suaves de 1 a 2 segundos
+    const k = reducir ? 1 : factorSuave(dt);
+    camara.position.lerp(destinoCam, k); controles.target.lerp(objCam, k);
+  }
+  function moverCamara(t: number, dt: number) {
+    if (vista === 'capri') { if (volando) seguirCapri(t, dt); return; }
     if (!volando || tocando) return;
     const v = vistas[vista];
     const destino = posDe(v);
@@ -205,7 +232,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
     // Solo si cambió de verdad (girar el celular), no por la barra del navegador que aparece y se esconde
     // Angosta (celular de pie): se aleja; muy ancha (TV con la franja de pedidos abajo): se acerca para llenar el alto
     const nuevo = THREE.MathUtils.clamp(1.5 / (w / h || 1), 0.72, 2.2);
-    if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; volando = true; }
+    if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; if (vista !== 'capri') volando = true; }
   }
   const observador = new ResizeObserver(ajustar); observador.observe(contenedor);
   ajustar();
@@ -240,7 +267,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
     particulas.mover(t, dt);
     humo(dt);
     vapor(dt, local.mesas.flatMap((m) => (m.comida.children.length ? m.vapor : [])));
-    moverCamara();
+    moverCamara(t, dt);
     limitarObjetivo();
     controles.update();
     moverEtiquetas();
@@ -270,8 +297,9 @@ export function crearMotor(op: OpcionesMotor): Motor {
       director.aplicar(d, primera);
       primera = false;
     },
-    camara(v) { vista = v; volando = true; },
-    centrar() { volando = true; },
+    camara(v) { vista = v; volando = true; modoControles(); },
+    centrar() { vista = 'capri'; volando = true; modoControles(); },
+    estadoCamara: () => dirCam.estado,
     tema(clave) {
       const t = TEMAS[clave] ?? TEMAS.normal;
       claveTema = clave in TEMAS ? clave : 'normal';

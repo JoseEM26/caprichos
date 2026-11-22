@@ -16,6 +16,8 @@ const guardar = (k: string, v: string) => { try { localStorage.setItem(k, v); } 
 
 const relojLima = () => new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date());
 
+/** La vista por defecto, en el panel y en la TV: la cámara sigue a Capri y decide sola el encuadre. */
+export const VISTA_INICIAL: VistaCamara = 'capri';
 const CAMARAS: Array<[VistaCamara, string]> = [['general', 'Todo el local'], ['cocina', 'Cocina'], ['salon', 'Salón'], ['capri', 'Seguir a Capri']];
 const HORAS: Array<[ModoHora, string]> = [['auto', 'Hora real'], ['dia', 'Día'], ['tarde', 'Atardecer'], ['noche', 'Noche']];
 const sinMeseros = () => undefined;
@@ -44,7 +46,7 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
   const [ligero, setLigero] = useState(() => leer(CLAVE_LIGERO) === '1' || (typeof navigator !== 'undefined' && (navigator.hardwareConcurrency ?? 8) <= 2));
   const [motor, setMotor] = useState<Motor | null>(null);
   const [pisoId, setPisoId] = useState<string>('');
-  const [camara, setCamara] = useState<VistaCamara>('general');
+  const [camara, setCamara] = useState<VistaCamara>(VISTA_INICIAL);
   const [tema, setTema] = useState(() => leer(CLAVE_TEMA) ?? 'normal');
   const [hora, setHora] = useState<ModoHora>('auto');
   const [sonido, setSonido] = useState(false);
@@ -58,7 +60,7 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
   const pisos = datos?.pisos ?? [];
   const piso = useMemo(() => pisos.find((p) => p.id === pisoId) ?? pisos.find((p) => p.elementos.some((e) => e.tipo === 'MESA' && e.activo)) ?? pisos[0], [pisos, pisoId]);
 
-  useEffect(() => { if (motor) { if (tema !== 'normal') motor.tema(tema); motor.hora(hora); } }, [motor]);
+  useEffect(() => { if (motor) { motor.camara(camara); if (tema !== 'normal') motor.tema(tema); motor.hora(hora); } }, [motor]);
 
   const cambiarTema = (k: string) => { setTema(k); guardar(CLAVE_TEMA, k); motor?.tema(k); };
   const cambiarHora = (h: ModoHora) => { setHora(h); motor?.hora(h); };
@@ -97,7 +99,7 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
             )}
           </div>
           {con3d && !completa && (
-            <button type="button" className="sv-centrar" onClick={() => motor?.centrar()} aria-label="Centrar el local" title="Volver a ver todo el local">
+            <button type="button" className="sv-centrar" onClick={() => cambiarCamara('capri')} aria-label="Centrar: volver a seguir a Capri" title="Volver a seguir a Capri">
               ⌖ Centrar
             </button>
           )}

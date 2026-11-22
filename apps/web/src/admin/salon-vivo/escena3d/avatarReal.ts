@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Ctx } from './base';
 import type { Persona } from './personas';
 import type { AvatarVivo } from '../salonVivoApi';
-import type { Avatar3D, PartesAvatar } from '../../../avatar/tipos';
+import type { Avatar3D, ConfigAvatar, PartesAvatar } from '../../../avatar/tipos';
 
 /**
  * Cliente con su avatar real. Las piezas del avatar (el chunk pesado) se bajan con import() diferido, solo cuando
@@ -12,7 +12,7 @@ export const MAX_AVATARES = 12;
 /** El avatar mide ~1.75 y las figuras genéricas del salón ~1.5. */
 const ESCALA = 0.86;
 
-export interface MotorAvatar { A: Avatar3D; normalizar: (A: Avatar3D, guardada: unknown, nombre?: string) => unknown }
+export interface MotorAvatar { A: Avatar3D; normalizar: (A: Avatar3D, guardada: unknown, nombre?: string) => ConfigAvatar; conPelo: (c: ConfigAvatar) => ConfigAvatar }
 
 /** ¿Este cliente se dibuja con su avatar real? Con modo ligero, sin configuración o con el tope lleno: figura genérica. */
 export function usaAvatarReal(avatar: AvatarVivo | null | undefined, ligero: boolean, enUso: number, tope = MAX_AVATARES): boolean {
@@ -22,7 +22,7 @@ export function usaAvatarReal(avatar: AvatarVivo | null | undefined, ligero: boo
 let carga: Promise<MotorAvatar> | null = null;
 /** Baja (una sola vez) el núcleo, las piezas y el normalizador del avatar. */
 export function cargarMotorAvatar(): Promise<MotorAvatar> {
-  const p = (carga ??= Promise.all([import('../../../avatar/piezas'), import('../../../avatar/config')]).then(([m, c]) => ({ A: m.cargarAvatar(), normalizar: c.normalizar })));
+  const p = (carga ??= Promise.all([import('../../../avatar/piezas'), import('../../../avatar/config')]).then(([m, c]) => ({ A: m.cargarAvatar(), normalizar: c.normalizar, conPelo: c.conPelo })));
   p.catch(() => { carga = null; });
   return p;
 }
@@ -64,7 +64,7 @@ export function personaDeAvatar(ctx: Ctx, gente: Set<Persona>, partes: PartesAva
 /** Intenta construir el avatar; si la configuración está rota devuelve null y el director usa la figura genérica. */
 export function construirPersonaAvatar(ctx: Ctx, gente: Set<Persona>, motor: MotorAvatar, config: unknown): Persona | null {
   try {
-    return personaDeAvatar(ctx, gente, motor.A.construir(motor.normalizar(motor.A, config)));
+    return personaDeAvatar(ctx, gente, motor.A.construir(motor.conPelo(motor.normalizar(motor.A, config))));
   } catch {
     return null;
   }

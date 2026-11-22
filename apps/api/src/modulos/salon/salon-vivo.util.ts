@@ -62,7 +62,7 @@ export interface MesaVivo {
   nombre: string;
   asientos: number;
   estado: EstadoMesaVivo;
-  pedido: { codigo: string; personas: number | null; bebidas: number; minutos: number; areasPendientes: string[]; avatar: AvatarVivo | null } | null;
+  pedido: { id: string; codigo: string; personas: number | null; bebidas: number; minutos: number; areasPendientes: string[]; avatar: AvatarVivo | null } | null;
   reserva: { hora: string; nombre: string; personas: number } | null;
 }
 
@@ -218,6 +218,7 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
         const delaReserva = e.reservas.find((r) => r.pedido_id === ped.id);
         const personas = delaReserva?.personas ?? ped.espera_personas ?? null;
         pedido = {
+          id: String(ped.id),
           codigo: ped.codigo,
           personas: personas && personas > 0 ? Math.min(personas, asientos) : null,
           bebidas: bebidasDe(ped),

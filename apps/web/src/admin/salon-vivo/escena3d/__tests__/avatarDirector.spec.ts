@@ -11,7 +11,7 @@ import { salonEjemplo, pedido } from '../../__tests__/datosEjemplo';
 const construir = vi.fn();
 vi.mock('../avatarReal', async (original) => ({
   ...(await original<typeof import('../avatarReal')>()),
-  cargarMotorAvatar: vi.fn(async () => ({ A: { construir }, normalizar: (_a: unknown, c: unknown) => c })),
+  cargarMotorAvatar: vi.fn(async () => ({ A: { construir, REG: {} }, normalizar: (_a: unknown, c: unknown) => c, conPelo: (c: unknown) => c })),
 }));
 
 beforeAll(() => {
@@ -28,6 +28,7 @@ const AV = { url: '/archivos/a.png', config: { genero: 'mujer' } };
 
 function armar(ligero = false) {
   const datos = salonEjemplo();
+  datos.caja = []; // sin clientes para llevar: aquí se cuentan solo los de las mesas
   const plano = planoAEscena(datos.pisos[0]);
   const escena = new THREE.Scene();
   const ctx = crearCtx(escena, document.createElement('div'), plano.ancho, plano.alto, false, ligero);
@@ -39,25 +40,54 @@ function armar(ligero = false) {
 const avatares = (g: Set<Persona>) => [...g].filter((p) => p.avatarReal);
 
 describe('clientes con avatar real en el salón', () => {
-  it('solo el titular de la mesa usa su avatar; el acompañante sigue genérico', async () => {
+  it('el titular usa su avatar y el acompañante uno sencillo al azar', async () => {
     const e = armar();
     e.datos.mesas[0].pedido!.avatar = AV;
     e.director.aplicar(e.datos, true);
-    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
+    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(2));
+    expect(construir.mock.calls.some((c) => c[0] === AV.config)).toBe(true);
     expect(e.gente.size).toBeGreaterThan(2);
+  });
+
+  it('los acompañantes salen de las bebidas del pedido (3 bebidas = cliente + 2) con tope en las sillas', async () => {
+    const e = armar();
+    e.datos.mesas[0].estado = 'LIBRE'; e.datos.mesas[0].pedido = null;
+    e.datos.mesas[1].estado = 'ESPERANDO';
+    e.datos.mesas[1].pedido = { id: '77', codigo: 'CP-W77', personas: null, bebidas: 3, minutos: 2, areasPendientes: [] };
+    const antes = e.gente.size;
+    e.director.aplicar(e.datos, true);
+    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(3));
+    expect(e.gente.size - antes).toBe(3);
+    const f = armar();
+    f.datos.mesas[0].estado = 'LIBRE'; f.datos.mesas[0].pedido = null;
+    f.datos.mesas[1].estado = 'ESPERANDO';
+    f.datos.mesas[1].pedido = { id: '78', codigo: 'CP-W78', personas: null, bebidas: 9, minutos: 2, areasPendientes: [] };
+    f.director.aplicar(f.datos, true);
+    await vi.waitFor(() => expect(avatares(f.gente).length).toBeGreaterThan(0));
+    expect(avatares(f.gente)).toHaveLength(4);
+  });
+
+  it('un cliente sin avatar sale con uno aleatorio pero estable por pedido', async () => {
+    const config = async () => {
+      construir.mockClear();
+      const e = armar();
+      e.datos.mesas[0].pedido = { id: '501', codigo: 'CP-W501', personas: null, bebidas: 1, minutos: 2, areasPendientes: [] };
+      e.director.aplicar(e.datos, true);
+      await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
+      return JSON.stringify(construir.mock.calls[0][0]);
+    };
+    expect(await config()).toBe(await config());
   });
 
   it('un cliente para llevar con avatar en caja también lo usa', async () => {
     const e = armar();
     e.datos.caja = [pedido('CP-W905', { modalidad: 'LLEVAR', mesas: [], mesaIds: [], avatar: AV })];
     e.director.aplicar(e.datos, true);
-    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
+    await vi.waitFor(() => expect(avatares(e.gente).some((p) => p.rol === 'cliente')).toBe(true));
+    expect(construir.mock.calls.some((c) => c[0] === AV.config)).toBe(true);
   });
 
-  it('sin avatar no se carga nada; en modo ligero tampoco aunque lo traiga', async () => {
-    const a = armar();
-    a.director.aplicar(a.datos, true);
-    expect(avatares(a.gente)).toHaveLength(0);
+  it('en modo ligero no hay avatares reales aunque los traiga', async () => {
     const b = armar(true);
     b.datos.mesas[0].pedido!.avatar = AV;
     b.director.aplicar(b.datos, true);
@@ -66,7 +96,7 @@ describe('clientes con avatar real en el salón', () => {
   });
 
   it('con una configuración rota cae a la figura genérica', async () => {
-    construir.mockImplementationOnce(() => { throw new Error('pieza rota'); });
+    construir.mockImplementation(() => { throw new Error('pieza rota'); });
     const e = armar();
     e.datos.mesas[0].pedido!.avatar = AV;
     const antes = e.gente.size;

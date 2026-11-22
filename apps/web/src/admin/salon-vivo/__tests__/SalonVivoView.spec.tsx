@@ -16,7 +16,7 @@ vi.mock('../Escena3D', () => ({
   },
 }));
 
-import { SalonVivoView } from '../SalonVivoView';
+import { SalonVivoView, VISTA_INICIAL } from '../SalonVivoView';
 
 describe('SalonVivoView', () => {
   beforeEach(() => { obtener.mockResolvedValue(salonEjemplo()); Object.values(motor).forEach((f) => (f as any).mockClear?.()); });
@@ -28,10 +28,18 @@ describe('SalonVivoView', () => {
     render(<SalonVivoView />);
     expect(await screen.findByTestId('escena')).toHaveTextContent('Piso 1:2');
     await waitFor(() => expect(motor.hora).toHaveBeenCalled());
+    // la vista por defecto es seguir a Capri
+    expect(VISTA_INICIAL).toBe('capri');
+    expect(screen.getByRole('button', { name: 'Seguir a Capri' })).toHaveAttribute('aria-pressed', 'true');
+    expect(motor.camara).toHaveBeenCalledWith('capri');
     fireEvent.click(screen.getByRole('button', { name: 'Cocina' }));
     expect(motor.camara).toHaveBeenCalledWith('cocina');
-    fireEvent.click(screen.getByRole('button', { name: 'Centrar el local' }));
-    expect(motor.centrar).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Seguir a Capri' })).toHaveAttribute('aria-pressed', 'false');
+    // «Centrar» vuelve al seguimiento
+    motor.camara.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /Centrar/ }));
+    expect(motor.camara).toHaveBeenCalledWith('capri');
+    expect(screen.getByRole('button', { name: 'Seguir a Capri' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Saludar' }));
     expect(motor.saludar).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Sonido ambiente' }));

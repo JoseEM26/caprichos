@@ -22,7 +22,8 @@ function armar(reducir = false) {
   const plano = planoAEscena(datos.pisos[0]);
   const escena = new THREE.Scene();
   const capa = document.createElement('div');
-  const ctx = crearCtx(escena, capa, plano.ancho, plano.alto, reducir, false);
+  // Modo ligero: sin avatares reales (su carga es asíncrona y se prueba en avatarDirector.spec); el resto del director es el mismo
+  const ctx = crearCtx(escena, capa, plano.ancho, plano.alto, reducir, true);
   const gente = new Set<Persona>();
   const local = construirLocal(ctx, plano, gente);
   const cambios = vi.fn();

@@ -5,7 +5,9 @@ import { COLOR_ESTADO, type Local, type MesaEsc } from './local';
 import { buscarRuta, claveArea, type PlanoEscena } from './planoAEscena';
 import { TEMAS, type Tema } from './temas';
 import type { Sonido } from './sonido';
-import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, type MotorAvatar } from './avatarReal';
+import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, MAX_AVATARES, type MotorAvatar } from './avatarReal';
+import { cantidadClientes, configAleatoria, semilla, TOPE_PERSONAS, TOPE_PERSONAS_LIGERO } from './acompanantes';
+import type { Foco, V2 } from './camaraDirector';
 import type { AvatarVivo, PedidoVivo, SalonVivo } from '../salonVivoApi';
 
 /**
@@ -177,16 +179,25 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   let cargandoAvatar = false;
   let esperando: { d: SalonVivo; primera: boolean } | null = null;
   const avataresEnUso = () => { let n = 0; for (const p of gente) if (p.avatarReal) n++; return n; };
-  /** El titular usa su avatar si ya está cargado y hay cupo; si no, figura genérica. */
-  function crearCliente(avatar: AvatarVivo | null | undefined): Persona {
-    if (motorAvatar && usaAvatarReal(avatar, ctx.ligero, avataresEnUso())) {
-      const real = construirPersonaAvatar(ctx, gente, motorAvatar, avatar!.config);
-      if (real) return real;
+  /** Los acompañantes (y los clientes sin avatar) usan un avatar sencillo al azar; dejan siempre cupo a los titulares con avatar propio. */
+  const TOPE_ACOMPANANTES = MAX_AVATARES - 4;
+  const topePersonas = () => (ctx.ligero ? TOPE_PERSONAS_LIGERO : TOPE_PERSONAS);
+  /**
+   * El cliente usa su avatar si ya está cargado y hay cupo; si no trae avatar, uno sencillo al azar pero estable
+   * (la semilla es el id del pedido y el puesto); sin motor, en modo ligero o sin cupo, la figura genérica.
+   */
+  function crearCliente(avatar: AvatarVivo | null | undefined, sem: string): Persona {
+    if (motorAvatar && !ctx.ligero) {
+      const enUso = avataresEnUso();
+      const propio = usaAvatarReal(avatar, ctx.ligero, enUso);
+      if (propio || enUso < TOPE_ACOMPANANTES) {
+        const real = construirPersonaAvatar(ctx, gente, motorAvatar, propio ? avatar!.config : configAleatoria(motorAvatar.A, semilla(sem)));
+        if (real) return real;
+      }
     }
     return persona(ctx, gente);
   }
-  const hayAvatares = (d: SalonVivo) =>
-    d.mesas.some((m) => m.pedido?.avatar?.config) || [...d.caja, ...d.cocina, ...d.despacho].some((p) => p.modalidad === 'LLEVAR' && p.avatar?.config);
+  const hayAvatares = (d: SalonVivo) => d.mesas.some((m) => m.pedido) || [...d.caja, ...d.cocina, ...d.despacho].some((p) => p.modalidad === 'LLEVAR');
 
   const mesaPorId = (id: string) => meseDe.get(id);
   const estadoDe = (m: MesaEsc) => (datos?.mesas.find((x) => x.id === m.id)?.estado ?? 'LIBRE');
@@ -205,17 +216,17 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
 
   function personasDeMesa(m: MesaEsc) {
     const d = datos?.mesas.find((x) => x.id === m.id);
-    const n = d?.pedido?.personas ?? Math.min(2, m.seats);
-    return Math.max(1, Math.min(m.sillas.length, n));
+    return cantidadClientes({ personas: d?.pedido?.personas, bebidas: d?.pedido?.bebidas, sillas: m.sillas.length, cupo: Math.max(1, topePersonas() - gente.size) });
   }
 
   function llegarMesa(m: MesaEsc, inmediato: boolean) {
     const n = personasDeMesa(m);
+    const pedidoMesa = datos?.mesas.find((x) => x.id === m.id)?.pedido;
     const grupo: Grupo = { personas: [], fase: 'llegando' };
     grupos.set(m.id, grupo);
     let llegaron = 0;
     for (let i = 0; i < n; i++) {
-      const per = i === 0 ? crearCliente(datos?.mesas.find((x) => x.id === m.id)?.pedido?.avatar) : persona(ctx, gente);
+      const per = crearCliente(i === 0 ? pedidoMesa?.avatar : null, `${pedidoMesa?.id ?? pedidoMesa?.codigo ?? m.id}:${i}`);
       grupo.personas.push(per);
       escena.add(per.raiz);
       const silla = m.sillas[i];
@@ -464,7 +475,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       const usados = new Set([...clientesLlevar.values()].map((c) => c.spot));
       const spot = [0, 1, 2].find((i) => !usados.has(i));
       if (spot === undefined) break;
-      const per = crearCliente(vivosLlevar.find((x) => x.codigo === cod)?.avatar);
+      const pl = vivosLlevar.find((x) => x.codigo === cod);
+      const per = crearCliente(pl?.avatar, `${pl?.id ?? cod}:0`);
       escena.add(per.raiz);
       clientesLlevar.set(cod, { per, spot });
       const sp = local.esperaLlevar[spot];
@@ -598,6 +610,19 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     moto,
     caminandoMoto: () => caminando(moto),
     estaCaminando: caminando,
+    /** Qué hace Capri, para el director de cámara (dónde está, si camina, si está en una mesa o en el despacho). */
+    focoCapri(): Foco & { pos: V2; rumboY: number; mesa: { centro: V2; personas: V2[] } | null } {
+      const ms = meseros[0], tk = ms.tarea, anda = caminando(capriObj);
+      const pos = { x: capriObj.position.x, z: capriObj.position.z };
+      let cerca: Foco['cerca'] = null, mesa: { centro: V2; personas: V2[] } | null = null;
+      if (!anda && tk) {
+        const m = local.mesas.find((x) => grupos.has(x.id) && Math.hypot(x.cx - pos.x, x.cz - pos.z) < 3);
+        if (m) { cerca = 'mesa'; mesa = { centro: { x: m.cx, z: m.cz }, personas: grupos.get(m.id)!.personas.map((p) => ({ x: p.raiz.position.x, z: p.raiz.position.z })) }; }
+        else if (local.despachoPunto) { const dp = G(local.despachoPunto[0], local.despachoPunto[1]); if (Math.hypot(dp.x - pos.x, dp.z - pos.z) < 2.2) cerca = 'cocina'; }
+      }
+      const haciaCocina = typeof tk === 'object' && tk !== null && (tk.tipo === 'pedido' || tk.tipo === 'llevar') && !bandejaC.visible && !bolsaC.visible;
+      return { pos, rumboY: capriObj.rotation.y, caminando: anda, ocupada: !!tk, cerca, rumbo: haciaCocina ? 'cocina' : null, quietoS: 0, mesa };
+    },
     comiendo: (p: Persona) => !!p.mesaId && estadoDe(mesaPorId(p.mesaId)!) === 'COMIENDO',
     paso(tt: number, dt: number) {
       t = tt;
