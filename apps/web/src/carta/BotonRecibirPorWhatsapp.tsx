@@ -8,15 +8,17 @@ import type { DatosLocalCarta } from './tipos';
  */
 export function BotonRecibirPorWhatsapp({ codigo, token }: { codigo: string; token?: string | null }) {
   const [numero, setNumero] = useState<string | null>(null);
+  const [clave, setClave] = useState('');
   useEffect(() => {
     if (!token) return;
     let activo = true;
     (async () => {
       try {
-        const { requiereBoton } = await api.get<{ requiereBoton: boolean }>(`/carta/seguimiento/${encodeURIComponent(codigo)}/whatsapp?t=${encodeURIComponent(token)}`);
+        const { requiereBoton, clave: k } = await api.get<{ requiereBoton: boolean; clave?: string }>(`/carta/seguimiento/${encodeURIComponent(codigo)}/whatsapp?t=${encodeURIComponent(token)}`);
         if (!requiereBoton) return;
         const local = await api.get<DatosLocalCarta>('/carta/local');
         const d = String(local?.whatsapp ?? '').replace(/\D/g, '');
+        if (activo && d) setClave(k ?? '');
         if (activo && d) setNumero(d.length === 9 ? `51${d}` : d);
       } catch {
         /* sin botón: el pedido igual avanza */
@@ -29,7 +31,7 @@ export function BotonRecibirPorWhatsapp({ codigo, token }: { codigo: string; tok
   return (
     <a
       data-testid="recibir-por-whatsapp"
-      href={`https://wa.me/${numero}?text=${encodeURIComponent(`Hola, mi pedido ${codigo}`)}`}
+      href={`https://wa.me/${numero}?text=${encodeURIComponent(`Hola, mi pedido ${codigo}${clave ? ` (clave ${clave})` : ''}`)}`}
       target="_blank"
       rel="noreferrer"
       style={{ minHeight: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', fontWeight: 800, fontSize: '16px', color: '#fff', background: '#1F8F4E', textDecoration: 'none', padding: '0 16px', textAlign: 'center' }}

@@ -2,6 +2,7 @@ jest.mock('@nestjs/jwt', () => ({ JwtService: class {}, JwtModule: { registerAsy
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import {
   celular9DelChat,
+  claveCortaPedido,
   condicionPedidosDelChat,
   enviarResumenPendienteDeCarta,
   pedidoDelChatPorCodigo,
@@ -10,6 +11,7 @@ import {
 } from '../servicios/pedidos-del-chat.util';
 import { ORIGENES_RESPUESTA } from '../evolution/politica-evolution.service';
 
+const CLAVE = claveCortaPedido(7n);
 const pedidoCarta = (extra: Record<string, unknown> = {}) => ({
   id: 7n,
   codigo: 'CP-0123',
@@ -71,26 +73,39 @@ describe('Chat LID sin vincular que da el código de su pedido de la carta', () 
   it('vincula el celular del pedido al chat', async () => {
     const { prisma } = montar(pedidoCarta());
     const chat: any = { id: 1n, telefono: 'wa-user:1234@lid', celular_vinculado: null };
-    const p = await pedidoDelChatPorCodigo(prisma, chat, 'CP-0123');
+    const p = await pedidoDelChatPorCodigo(prisma, chat, 'CP-0123', CLAVE);
     expect(p?.codigo).toBe('CP-0123');
     expect(prisma.conversacion.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { celular_vinculado: '987654321' } });
     expect(chat.celular_vinculado).toBe('987654321');
   });
 
-  it.each([
-    ['pedido del bot', { canal: 'BOT' }],
-    ['pedido viejo', { creado_en: new Date(Date.now() - 3 * 24 * 3_600_000) }],
-    ['pedido sin celular', { cliente_telefono: null }],
-    ['pedido del personal', { es_personal: true }],
-  ])('no vincula: %s', async (_n, extra) => {
-    const { prisma } = montar(pedidoCarta(extra));
-    expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: 'wa-user:1234@lid' }, 'CP-0123')).toBeNull();
-    expect(prisma.conversacion.update).not.toHaveBeenCalled();
+  it('sin clave o con clave errada: no vincula ni devuelve el pedido', async () => {
+    for (const clave of [undefined, null, '', 'AAAAA']) {
+      const { prisma } = montar(pedidoCarta());
+      expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: 'wa-user:1234@lid' }, 'CP-0123', clave)).toBeNull();
+      expect(prisma.conversacion.update).not.toHaveBeenCalled();
+    }
+  });
+
+  it('clave válida pero pedido personal: no', async () => {
+    const { prisma } = montar(pedidoCarta({ es_personal: true }));
+    expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: 'wa-user:1234@lid' }, 'CP-0123', CLAVE)).toBeNull();
+  });
+
+  it('celular coincidente: basta el código, sin clave', async () => {
+    const { prisma } = montar(pedidoCarta());
+    expect((await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: '51987654321' }, 'CP-0123'))?.codigo).toBe('CP-0123');
+  });
+
+  it('la clave es corta, sin O/0/I/1 y distinta por pedido', () => {
+    expect(CLAVE).toMatch(/^[A-HJ-NP-Z2-9]{5}$/);
+    expect(claveCortaPedido(8n)).not.toBe(CLAVE);
   });
 
   it('un chat con número distinto no se apropia del pedido de otro', async () => {
     const { prisma } = montar(pedidoCarta());
     expect(await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: '51911111111' }, 'CP-0123')).toBeNull();
+    expect((await pedidoDelChatPorCodigo(prisma, { id: 1n, telefono: '51911111111' }, 'CP-0123', CLAVE))?.codigo).toBe('CP-0123');
   });
 });
 
@@ -113,7 +128,7 @@ describe('«Hola, mi pedido CP-XXXX»: resumen al instante, una sola vez', () =>
   it('chat LID: vincula y responde con el resumen', async () => {
     const { prisma, outbox } = montar(pedidoCarta(), diferido);
     const chat: any = { id: 2n, telefono: 'wa-user:999@lid' };
-    expect(await enviarResumenPendienteDeCarta(prisma, outbox, chat, 'Hola, mi pedido cp-0123')).toBe(true);
+    expect(await enviarResumenPendienteDeCarta(prisma, outbox, chat, `Hola, mi pedido cp-0123 (clave ${CLAVE.toLowerCase()})`)).toBe(true);
     expect(chat.celular_vinculado).toBe('987654321');
     expect(outbox.encolar.mock.calls[0][0].telefono).toBe('51987654321');
   });
@@ -139,8 +154,33 @@ describe('«Hola, mi pedido CP-XXXX»: resumen al instante, una sola vez', () =>
     const a = montar(pedidoCarta(), diferido);
     expect(await enviarResumenPendienteDeCarta(a.prisma, a.outbox, { id: 1n, telefono: '51987654321' }, 'hola')).toBe(false);
     const b = montar(pedidoCarta(), diferido);
+    b.prisma.pedido.count = jest.fn().mockResolvedValue(0);
     expect(await enviarResumenPendienteDeCarta(b.prisma, b.outbox, { id: 1n, telefono: '51911111111' }, 'CP-0123')).toBe(false);
     const c = montar(pedidoCarta({ estado: 'ANULADO' }), diferido);
     expect(await enviarResumenPendienteDeCarta(c.prisma, c.outbox, { id: 1n, telefono: '51987654321' }, 'CP-0123')).toBe(false);
+  });
+
+  it('código ajeno sin clave desde un chat con número: respuesta corta, sin datos del pedido', async () => {
+    const { prisma, outbox } = montar(pedidoCarta(), diferido);
+    prisma.pedido.count = jest.fn().mockResolvedValue(1);
+    expect(await enviarResumenPendienteDeCarta(prisma, outbox, { id: 1n, telefono: '51911111111' }, 'Hola, mi pedido CP-0123')).toBe(true);
+    const arg = outbox.encolar.mock.calls[0][0];
+    expect(arg.telefono).toBe('51911111111');
+    expect(arg.carga.textoLibre).toMatch(/botón de la carta/);
+    expect(JSON.stringify(arg)).not.toMatch(/987654321|Rosa|Yape/);
+  });
+
+  it('LID sin clave: no vincula ni responde (lo contesta el motor)', async () => {
+    const { prisma, outbox } = montar(pedidoCarta(), diferido);
+    prisma.pedido.count = jest.fn().mockResolvedValue(1);
+    expect(await enviarResumenPendienteDeCarta(prisma, outbox, { id: 2n, telefono: 'wa-user:999@lid' }, 'Hola, mi pedido CP-0123')).toBe(false);
+    expect(prisma.conversacion.update).not.toHaveBeenCalled();
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
+  it('acepta códigos CP-W### de la carta', async () => {
+    const { prisma, outbox } = montar(pedidoCarta({ codigo: 'CP-W382' }), diferido);
+    expect(await enviarResumenPendienteDeCarta(prisma, outbox, { id: 1n, telefono: '51987654321' }, 'Hola, mi pedido CP-W382')).toBe(true);
+    expect(prisma.pedido.findUnique).toHaveBeenCalledWith({ where: { codigo: 'CP-W382' } });
   });
 });

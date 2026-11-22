@@ -9,10 +9,10 @@ describe('Botón «Recibir mi pedido por WhatsApp»', () => {
   beforeEach(() => get.mockReset());
 
   it('si el bot no puede escribir primero: enlace wa.me con «Hola, mi pedido CP-XXXX»', async () => {
-    get.mockImplementation(async (url?: string) => (String(url ?? '').includes('/whatsapp') ? { requiereBoton: true } : { whatsapp: '987654321' }));
+    get.mockImplementation(async (url?: string) => (String(url ?? '').includes('/whatsapp') ? { requiereBoton: true, clave: '7K4Q2' } : { whatsapp: '987654321' }));
     render(<BotonRecibirPorWhatsapp codigo="CP-0123" token="t" />);
     const a = await screen.findByTestId('recibir-por-whatsapp');
-    expect(a).toHaveAttribute('href', 'https://wa.me/51987654321?text=Hola%2C%20mi%20pedido%20CP-0123');
+    expect(a).toHaveAttribute('href', 'https://wa.me/51987654321?text=Hola%2C%20mi%20pedido%20CP-0123%20(clave%207K4Q2)');
     expect(a).toHaveTextContent('Recibir mi pedido por WhatsApp');
   });
 

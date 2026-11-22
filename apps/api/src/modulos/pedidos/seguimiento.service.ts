@@ -1,6 +1,7 @@
 import { montoACobrar } from '../../comun/monto-a-cobrar';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { claveCortaPedido } from '../chatbot/servicios/pedidos-del-chat.util';
 import { hashTelefono, telefonoEnviable } from '../chatbot/utilidades/enmascarar.util';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from './pago-plan.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
@@ -383,7 +384,7 @@ export class SeguimientoService {
    * ¿La carta debe mostrar «Recibir mi pedido por WhatsApp»? Solo si el bot no puede escribirle primero: el celular del pedido
    * no escribió en las últimas 24 h (regla anti-baneo de Evolution) y el resumen aún no salió. Token inválido = pedido inexistente.
    */
-  async botonWhatsapp(codigo: string, token: string | undefined): Promise<{ requiereBoton: boolean }> {
+  async botonWhatsapp(codigo: string, token: string | undefined): Promise<{ requiereBoton: boolean; clave?: string }> {
     const pedido = await this.prisma.pedido.findUnique({ where: { codigo }, select: { id: true, estado: true, cliente_telefono: true } });
     if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
@@ -394,7 +395,8 @@ export class SeguimientoService {
       this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE', creado_en: { gte: new Date(Date.now() - 24 * 3_600_000) } } }),
       this.prisma.salienteWhatsapp.count({ where: { pedido_id: pedido.id, origen: { in: ['AVISO_PEDIDO', 'AUTORESPUESTA'] }, estado: 'ENVIADO' } }),
     ]);
-    return { requiereBoton: reciente === 0 && enviado === 0 };
+    const requiereBoton = reciente === 0 && enviado === 0;
+    return requiereBoton ? { requiereBoton, clave: claveCortaPedido(pedido.id) } : { requiereBoton };
   }
 
   /**

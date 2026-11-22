@@ -72,7 +72,7 @@ import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servi
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
-import { condicionPedidosDelChat, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
+import { condicionPedidosDelChat, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
 import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAfirmaSinDatos, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
@@ -1111,8 +1111,8 @@ export class EjecutorConversacionService {
 
       // b) Búsqueda y validación estricta de "Mi pedido" (requisito d)
       const matchCodigo =
-        entradaRaw.texto?.match(/CP-\d{4}/i) ||
-        entradaRaw.textoOriginal?.match(/CP-\d{4}/i);
+        entradaRaw.texto?.match(/CP-W?\d{3,4}/i) ||
+        entradaRaw.textoOriginal?.match(/CP-W?\d{3,4}/i);
       const codigoBuscado = matchCodigo ? matchCodigo[0].toUpperCase() : null;
 
       const idInteractivo = entradaRaw.buttonPayload || entradaRaw.listRowId;
@@ -1127,7 +1127,7 @@ export class EjecutorConversacionService {
           limiteConsultasExcedido = true;
         } else {
           // Chat sin vincular que da el código de su pedido de la carta: se vincula (ver pedidoDelChatPorCodigo)
-          const delChat = await pedidoDelChatPorCodigo(this.prisma, conversacion, codigoFinal).catch(() => null);
+          const delChat = await pedidoDelChatPorCodigo(this.prisma, conversacion, codigoFinal, extraerClavePedido(entradaRaw.textoOriginal ?? entradaRaw.texto)).catch(() => null);
           if (delChat && telefonoDelChat(conversacion)) telefonoCliente = telefonoDelChat(conversacion);
           const pedidoEncontrado = await this.prisma.pedido.findUnique({
             where: { codigo: codigoFinal },

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { normalizarTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
+import { generarTokenSeguimiento } from '../../pedidos/seguimiento.tokens';
 import { MEDIOS_DIGITALES_VOUCHER, ultimos9 } from './pedido-esperando-voucher.util';
 import type { OutboxWhatsappService, CargaSaliente } from './outbox-whatsapp.service';
 
@@ -8,7 +9,23 @@ type ChatLlaves = { telefono?: string | null; celular_vinculado?: string | null;
 
 /** Código de pedido dentro de un texto («Hola, mi pedido CP-0123»). */
 export const extraerCodigoPedido = (texto: string | null | undefined): string | null =>
-  (String(texto ?? '').match(/\bCP-\d{4}\b/i)?.[0] ?? '').toUpperCase() || null;
+  (String(texto ?? '').match(/\bCP-W?\d{3,4}\b/i)?.[0] ?? '').toUpperCase() || null;
+
+const ALFABETO_CLAVE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin O/0/I/1
+/**
+ * Clave corta del wa.me de la carta: derivada (HMAC) del token de seguimiento del pedido, así el servidor la verifica sin guardarla.
+ * Los códigos son secuenciales; la clave prueba que el mensaje sale del botón de quien hizo el pedido.
+ */
+export function claveCortaPedido(pedidoId: bigint | string | number): string {
+  const hex = generarTokenSeguimiento(pedidoId);
+  let c = '';
+  for (let i = 0; i < 5; i++) c += ALFABETO_CLAVE[parseInt(hex.slice(i * 2, i * 2 + 2), 16) % ALFABETO_CLAVE.length];
+  return c;
+}
+
+/** Clave que el cliente deja en el texto («… (clave 7K4Q2)»); null si no hay. */
+export const extraerClavePedido = (texto: string | null | undefined): string | null =>
+  (String(texto ?? '').match(/\bclave\s+([A-Za-z2-9]{5})\b/i)?.[1] ?? '').toUpperCase() || null;
 
 /**
  * Celular (9 dígitos) de un chat: el de su propio número, o, si entró como LID/usuario de WhatsApp (sin número), el que quedó vinculado.
@@ -42,23 +59,22 @@ export function pedidoEsDelChat(chat: ChatLlaves, pedido: { cliente_telefono?: s
   return !!chat.party_id && !!pedido.cliente_party_id && chat.party_id === pedido.cliente_party_id;
 }
 
-const VENTANA_VINCULO_MS = 24 * 3_600_000;
-
 /**
- * Chat sin número (LID) que escribe «mi pedido CP-XXXX»: si el pedido es de la carta, reciente (24 h) y trae celular real,
- * el celular del pedido queda vinculado al chat. El código solo lo tiene quien hizo el pedido (botón wa.me de la carta).
- * Devuelve el pedido si el chat ya es dueño de él (o acaba de serlo); null si no.
+ * Pedido por su código para un chat. El celular del chat coincide con el del pedido: basta el código. Si no coincide, solo con la
+ * clave correcta (botón de la carta): un chat LID sin vincular queda vinculado al celular del pedido; un chat con otro número lo ve
+ * sin vincular. Sin clave o con clave errada devuelve null y no se filtra nada.
  */
-export async function pedidoDelChatPorCodigo(prisma: PrismaService, chat: ChatLlaves & { id: bigint }, codigo: string) {
+export async function pedidoDelChatPorCodigo(prisma: PrismaService, chat: ChatLlaves & { id: bigint }, codigo: string, clave?: string | null) {
   const pedido = await prisma.pedido.findUnique({ where: { codigo } });
   if (!pedido) return null;
   if (pedidoEsDelChat(chat, pedido)) return pedido;
+  if (!clave || clave.toUpperCase() !== claveCortaPedido(pedido.id) || pedido.es_personal) return null;
   const esLid = String(chat.telefono ?? '').startsWith('wa-user:');
   const cel = telefonoEnviable(pedido.cliente_telefono).slice(-9);
-  const reciente = Date.now() - new Date(pedido.creado_en).getTime() <= VENTANA_VINCULO_MS;
-  if (!esLid || chat.celular_vinculado || pedido.canal !== 'CARTA' || pedido.es_personal || !reciente || !/^9\d{8}$/.test(cel)) return null;
-  await prisma.conversacion.update({ where: { id: chat.id }, data: { celular_vinculado: cel } });
-  chat.celular_vinculado = cel; // el objeto del turno en curso ya lo ve
+  if (esLid && !chat.celular_vinculado && /^9\d{8}$/.test(cel)) {
+    await prisma.conversacion.update({ where: { id: chat.id }, data: { celular_vinculado: cel } });
+    chat.celular_vinculado = cel; // el objeto del turno en curso ya lo ve
+  }
   return pedido;
 }
 
@@ -75,8 +91,24 @@ export async function enviarResumenPendienteDeCarta(
 ): Promise<boolean> {
   const codigo = extraerCodigoPedido(texto);
   if (!codigo) return false;
-  const pedido = await pedidoDelChatPorCodigo(prisma, chat, codigo);
-  if (!pedido || pedido.canal !== 'CARTA' || pedido.estado === 'ANULADO' || pedido.es_personal) return false;
+  const pedido = await pedidoDelChatPorCodigo(prisma, chat, codigo, extraerClavePedido(texto));
+  if (!pedido) {
+    // Código ajeno sin clave válida: respuesta corta, sin datos del pedido (solo a chats con número; un LID lo contesta el motor)
+    const tel = String(chat.telefono ?? '');
+    if (!tel.startsWith('wa-user:') && (await prisma.pedido.count({ where: { codigo } })) > 0) {
+      const enc = await outbox.encolar({
+        telefono: normalizarTelefono(tel),
+        tipo: 'TEXTO',
+        origen: 'AUTORESPUESTA',
+        clave: `pedido-sin-clave-${chat.id}-${codigo}-${Math.floor(Date.now() / 600_000)}`,
+        carga: { textoLibre: 'Para mostrarte ese pedido, envía el mensaje desde el botón de la carta o escríbenos desde el celular con que lo hiciste.', autor: 'BOT' } as CargaSaliente,
+      });
+      if (enc) outbox.despertar();
+      return enc;
+    }
+    return false;
+  }
+  if (pedido.canal !== 'CARTA' || pedido.estado === 'ANULADO' || pedido.es_personal) return false;
   const filas = await prisma.salienteWhatsapp.findMany({
     where: { pedido_id: pedido.id, origen: 'AVISO_PEDIDO', clave_idempotencia: { startsWith: `pedido-${pedido.id}-RECIBIDO` } },
     select: { estado: true, carga: true },
