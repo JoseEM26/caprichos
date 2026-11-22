@@ -89,7 +89,7 @@ export class WhatsAppEvolutionAdaptador implements WhatsAppMensajeriaPuerto {
     const ms = pausaAleatoriaMs(minSeg, maxSeg);
     // Presencia «escribiendo…» (Evolution v2: /chat/sendPresence); si falla, igual se espera
     await this.api
-      .llamar('POST', `/chat/sendPresence/${encodeURIComponent(this.api.instancia)}`, { number: this.numero(tel), presence: 'composing', delay: ms })
+      .llamar('POST', `/chat/sendPresence/${encodeURIComponent(this.api.instancia)}`, { number: this.numero(tel), presence: 'composing', delay: ms }, 3000)
       .catch(() => undefined);
     await new Promise((r) => setTimeout(r, ms));
   }

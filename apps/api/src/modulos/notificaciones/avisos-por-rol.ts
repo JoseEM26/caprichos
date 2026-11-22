@@ -23,6 +23,7 @@ export interface TipoAviso {
 
 export const CATALOGO_AVISOS: TipoAviso[] = [
   { tipo: 'PEDIDO_NUEVO', nombre: 'Pedido nuevo', detalle: 'Entró un pedido desde la carta web.' },
+  { tipo: 'PEDIDO_CANCELADO_CLIENTE', nombre: 'Pedido cancelado por el cliente', detalle: 'El cliente canceló desde la carta o el bot un pedido sin pagar.' },
   { tipo: 'PEDIDO_POR_CONFIRMAR', nombre: 'Pedido por confirmar', detalle: 'Un pedido espera que alguien lo confirme.' },
   { tipo: 'PEDIDOS_SIN_PAGAR_TOPE', nombre: 'Cliente con muchos pedidos sin pagar', detalle: 'Un cliente llegó al tope de pedidos sin pagar.' },
   { tipo: 'UBICACION_PROPUESTA', nombre: 'Ubicación propuesta por el cliente', detalle: 'El cliente mandó su ubicación y Caja debe aceptarla.' },

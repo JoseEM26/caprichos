@@ -8,6 +8,7 @@ export const LIBRE = '*';
 
 export const PERMISOS_POR_TIPO: Record<string, string[]> = {
   PEDIDO_NUEVO: ['caja/ver', 'pedidos/ver'],
+  PEDIDO_CANCELADO_CLIENTE: ['caja/ver', 'pedidos/ver'],
   PEDIDO_POR_CONFIRMAR: ['caja/ver', 'pedidos/ver'],
   PEDIDOS_SIN_PAGAR_TOPE: ['caja/ver', 'pedidos/ver'],
   UBICACION_PROPUESTA: ['caja/ver', 'pedidos/ver'],
