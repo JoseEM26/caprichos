@@ -80,6 +80,7 @@ import {
   rolesDeConfig,
   tiposDeRoles,
   tiposDeConfig,
+  colaDeEquipo,
 } from './ruteo-impresion';
 import {
   ESTADOS_NO_VIGENTES,
@@ -174,6 +175,8 @@ const INCLUDE_LINEAS_PEDIDO = {
 @Injectable()
 export class ImpresionService {
   private readonly logger = new Logger(ImpresionService.name);
+  /** Última vez que se revisó si algo espera en una PC que ya no lo imprime (a lo sumo una vez por minuto). */
+  private ultimaReubicacion = 0;
   /** Configuración por computadora (cada PC manda): ruteo, tomar y latido leen de aquí. */
   private readonly equipos: EquipoConfigService;
   /**
@@ -225,7 +228,7 @@ export class ImpresionService {
     // 1. Recuperar huérfanos (> 2 minutos en IMPRIMIENDO)
     const haceDosMinutos = new Date(Date.now() - 2 * 60 * 1000);
     try {
-      await this.prisma.printJob.updateMany({
+      const recuperados = await this.prisma.printJob.updateMany({
         where: {
           estado: 'IMPRIMIENDO',
           tomado_en: { lt: haceDosMinutos },
@@ -234,6 +237,8 @@ export class ImpresionService {
           estado: 'PENDIENTE',
         },
       });
+      // Un huérfano vuelve a PENDIENTE con el destino de la PC que murió: si esa PC ya no lo imprime, se reubica ya
+      if ((recuperados?.count ?? 0) > 0) await this.equipos.reasignarPendientes().catch(() => 0);
     } catch (err: any) {
       this.logger.warn(`Error recuperando trabajos huérfanos: ${err.message}`);
     }
@@ -469,7 +474,10 @@ export class ImpresionService {
       this.eventos?.emitirAdmin('impresion:estado', { impresoras, equipoId: deviceKeyId.toString() });
     }
     // Lo que no tenía PC (por ejemplo, porque aún no estaba configurada) se reubica en cuanto hay quien lo imprima
-    if ((await this.equipos.contarSinReceptor()) > 0) {
+    // y lo que quedó en una PC apagada que ya no lo imprime (se revisa como máximo una vez por minuto)
+    const hace1min = Date.now() - 60_000;
+    if ((await this.equipos.contarSinReceptor()) > 0 || this.ultimaReubicacion < hace1min) {
+      this.ultimaReubicacion = Date.now();
       await this.equipos.reasignarPendientes().catch((err: any) => this.logger.warn(`No se pudo reubicar la cola: ${err.message}`));
     }
     // Lo que el dueño eligió y configuró para ESTA PC viaja en la respuesta; un programa viejo la ignora
@@ -569,7 +577,7 @@ export class ImpresionService {
             candidatas: conectado ? leerCandidatasLatido(e.latido_detalle) : [],
             seleccion: await this.leerSeleccionAgente(e.id),
             pendientes: await this.prisma.printJob.count({
-              where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] }, destino_equipo_id: e.id },
+              where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] }, ...colaDeEquipo(e.id, ctx.equipos.find((x) => x.id === e.id)?.config) },
             }),
             config: ctx.equipos.find((x) => x.id === e.id)?.config,
             ultimoLatido: e.ultimo_latido ? new Date(e.ultimo_latido).toISOString() : null,

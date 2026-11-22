@@ -139,6 +139,15 @@ export function tiposDeConfig(cfg: ConfigEquipoImpresion, roles: RolImpresora[])
   ];
 }
 
+/**
+ * Filtro Prisma de lo que de verdad espera en una PC: sus pruebas y los papeles que su configuración deja imprimir.
+ * Un trabajo apuntado a una PC que ya no lo acepta no es «su cola» (se reubica o se descarta).
+ */
+export function colaDeEquipo(id: bigint, cfg: ConfigEquipoImpresion | undefined) {
+  const tipos = cfg ? tiposDeConfig(cfg, rolesDeConfig(cfg)) : [];
+  return { destino_equipo_id: id, OR: [{ pedido_id: null }, { tipo: { in: tipos } }] };
+}
+
 const MODALIDADES_STICKER_GENERAL = ['LLEVAR', 'RECOGER', 'DELIVERY'];
 
 /**

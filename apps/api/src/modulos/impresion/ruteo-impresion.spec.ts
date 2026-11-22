@@ -5,6 +5,7 @@ import {
   ContextoRuteo,
   EquipoRuteo,
   aplicaSegunReglas,
+  colaDeEquipo,
   areasParaRuteo,
   destinoDeTrabajo,
   equipoAcepta,
@@ -170,5 +171,21 @@ describe('equipos: roles declarados y estado por rol', () => {
 
   it('un equipo sin latido vigente figura como sin programa', () => {
     expect(estadoPorRol(null).ETIQUETERA.estado).toBe('sin_programa');
+  });
+});
+
+describe('PC sin ningún papel activado', () => {
+  const vacia = pc(7, { ticketera: true, etiquetera: true });
+  const TODOS = ['TICKET_PAGO', 'TICKET_CIERRE', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA', 'ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
+  it('no recibe ningún tipo (salón, pago, cierre, reimpresiones) y el trabajo queda sin destino', () => {
+    for (const t of TODOS) {
+      expect(equipoAcepta(vacia.config, t, [SALADOS, BEBIDAS])).toBe(false);
+      expect(destinoDeTrabajo(t, [SALADOS, BEBIDAS], ctx(vacia))).toBeNull();
+    }
+  });
+  it('su cola solo cuenta pruebas y papeles que acepta: un pendiente viejo apuntado a ella no cuenta', () => {
+    expect(colaDeEquipo(7n, vacia.config)).toEqual({ destino_equipo_id: 7n, OR: [{ pedido_id: null }, { tipo: { in: [] } }] });
+    const conPago = cfg({ ticketera: true, ticketPago: true });
+    expect((colaDeEquipo(7n, conPago).OR[1] as any).tipo.in).toEqual(['TICKET_PAGO', 'TICKET_CIERRE']);
   });
 });

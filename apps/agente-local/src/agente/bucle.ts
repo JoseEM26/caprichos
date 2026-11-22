@@ -543,7 +543,15 @@ export class AgenteLocalServicio {
     );
 
     while (this.corriendo) {
-      await this.ejecutarCiclo();
+      // Un error inesperado de un ciclo no mata el programa: se deja en el log y se reintenta con espera
+      try {
+        await this.ejecutarCiclo();
+      } catch (err: any) {
+        this.fallosRed++;
+        this.ultimoError = err?.message ?? String(err);
+        this.logger('error', `Error inesperado en el ciclo (sigo vivo y reintento): ${this.ultimoError}`);
+        this.anotarEstado();
+      }
       const esperaMs = this.obtenerEsperaActualMs();
       await Promise.race([this.temporizador(esperaMs), this.señalDespertar]);
     }

@@ -4,7 +4,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { agenteConectado, estadoPorRol, rolesDeclarados } from './estado-impresion';
-import { areasParaRuteo, destinoDeTrabajo } from './ruteo-impresion';
+import { areasParaRuteo, colaDeEquipo, destinoDeTrabajo } from './ruteo-impresion';
 import { EquipoConfigService } from './equipo-config.service';
 import { CLAVES_REGLAS, leerReglasImpresion, valoresDesdeCambio } from './reglas-impresion';
 
@@ -121,7 +121,7 @@ export class ImpresionConfigService {
 
     const colaPendientePorEquipo = await Promise.all(
       equipos.map(async (e) => {
-        const pendientes = await this.prisma.printJob.count({ where: { estado: 'PENDIENTE', destino_equipo_id: e.id } });
+        const pendientes = await this.prisma.printJob.count({ where: { estado: 'PENDIENTE', ...colaDeEquipo(e.id, ctx.equipos.find((x) => x.id === e.id)?.config) } });
         return { deviceKeyId: e.id.toString(), pendientes };
       }),
     );

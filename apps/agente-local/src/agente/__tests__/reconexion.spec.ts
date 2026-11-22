@@ -115,6 +115,22 @@ describe('Bucle con cliente simulado: red caída y confirmación pendiente', () 
     expect(impresora.obtenerTrabajosEscritos()).toHaveLength(1);
     expect(cliente.reportarResultado).toHaveBeenCalledWith('J4', true);
   });
+
+  it('iniciar() sobrevive a un error inesperado dentro de un ciclo (no muere)', async () => {
+    const cliente = clienteSimulado();
+    let llamadas = 0;
+    cliente.tomarTrabajos.mockImplementation(async () => {
+      llamadas++;
+      if (llamadas === 1) throw new TypeError('error raro no de red'); // rechaza fuera del manejo normal
+      return [];
+    });
+    cliente.enviarLatido.mockResolvedValue(undefined);
+    let vueltas = 0;
+    const agente = new AgenteLocalServicio({ config, clienteApi: cliente, impresora: new ImpresoraMemoria(), logger: silencio, temporizador: async () => { if (++vueltas === 3) agente.detener(); } });
+    vi.spyOn(agente, 'ejecutarCiclo').mockRejectedValueOnce(new Error('boom')).mockResolvedValue({ trabajosProcesados: 0, errorRed: false });
+    await expect(agente.iniciar()).resolves.toBeUndefined();
+    expect(vueltas).toBe(3);
+  });
 });
 
 describe('Bucle contra una API HTTP real que se cae y vuelve', () => {

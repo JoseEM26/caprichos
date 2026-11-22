@@ -55,6 +55,14 @@ export function haceCuanto(iso: string | null | undefined, ahora = Date.now()): 
   return `hace ${Math.round(s / 86400)} d`;
 }
 
+/** Una PC configurada sin ningún papel activado: no recibe trabajos. */
+export function sinPapeles(c?: { ticketera?: boolean; etiquetera?: boolean; ticketPago?: boolean; comandaSalon?: boolean; comandaAreas?: unknown[]; stickerGeneral?: boolean; stickerAreas?: unknown[]; stickerBebidaAreas?: unknown[] } | null): boolean {
+  if (!c) return true;
+  const tk = !!c.ticketera && (!!c.ticketPago || !!c.comandaSalon || !!c.comandaAreas?.length);
+  const et = !!c.etiquetera && (!!c.stickerGeneral || !!c.stickerAreas?.length || !!c.stickerBebidaAreas?.length);
+  return !tk && !et;
+}
+
 const boton = {
   minHeight: 44,
   padding: '0 12px',
@@ -248,9 +256,20 @@ export function ImpresorasDelEquipo({ equipo, alCambiar }: { equipo: EquipoEstad
         </div>
       )}
 
+      {equipo.config?.configurado && sinPapeles(equipo.config) && (
+        <div data-testid={`sin-papeles-${equipo.deviceKeyId}`} style={{ fontSize: 13, fontWeight: 700 }}>
+          Sin papeles asignados (no recibe trabajos).
+        </div>
+      )}
+
       {!equipo.conectado && (
         <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: COLOR.error }}>
-          Esta computadora no está conectada.{equipo.pendientes > 0 ? ` Sus ${equipo.pendientes} trabajos esperan en cola y saldrán al abrir el programa.` : ' Los trabajos que le tocan esperan en cola y no se pierden.'}
+          Esta computadora está apagada o sin el programa (último latido {haceCuanto(equipo.ultimoLatido)}).
+          {equipo.pendientes > 0
+            ? ` Sus ${equipo.pendientes} trabajos esperan en cola y saldrán al abrir el programa.`
+            : sinPapeles(equipo.config)
+              ? ' Si ya no la usas, usa «Eliminar PC» para archivarla.'
+              : ' Los trabajos que le tocan esperan en cola y no se pierden.'}
         </div>
       )}
 
