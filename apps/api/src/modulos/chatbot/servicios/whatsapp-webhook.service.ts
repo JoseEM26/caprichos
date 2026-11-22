@@ -982,11 +982,14 @@ export class WhatsappWebhookService {
       }
     }
 
+    // Un chat en manos de una persona también pasa por el motor: él decide si calla (el equipo conversa) o retoma
+    // (20 min sin actividad del equipo). Antes un chat con dueño PERSONA no llegaba y el cliente quedaba sin respuesta.
+    const motorDecide = puedeProcesarMotor || conversacion.duenio !== 'BOT' || conversacion.tomado_por != null;
     if (
       this.motorConversacion &&
       !esComandoBajaOAlta &&
       !cortesiaAtendida &&
-      puedeProcesarMotor &&
+      motorDecide &&
       !reprogramacionAtendida &&
       !ubicacionAtendida &&
       !encuestaAtendida &&

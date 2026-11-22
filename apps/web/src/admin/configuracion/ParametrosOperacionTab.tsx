@@ -554,21 +554,15 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
-  chat_tomado_liberar_min: {
-    nombre: 'Liberación de chat tomado y abandonado',
-    descripcion: 'Minutos de inactividad de la persona antes de liberar el chat de vuelta al bot (excepto VALIDAR_PAGO).',
-    tipo: 'numero',
-    sufijo: 'minutos',
-  },
   alerta_pedido_sin_confirmar_min: {
     nombre: 'Alerta de pedido nuevo sin confirmar en Caja',
     descripcion: 'Minutos sin confirmación en Caja antes de alertar a los administradores por WhatsApp.',
     tipo: 'numero',
     sufijo: 'minutos',
   },
-  asistido_espera_min: {
-    nombre: 'Espera antes de modo asistido',
-    descripcion: 'Minutos sin respuesta de asesor antes de activar el bot asistido en chats en espera.',
+  bot_reanuda_min: {
+    nombre: 'El bot retoma el chat tras (minutos)',
+    descripcion: 'Minutos sin que el equipo escriba en un chat atendido para que el bot vuelva a responder. También es la espera antes de que el bot retome un chat donde el cliente pidió una persona y nadie contestó.',
     tipo: 'numero',
     sufijo: 'minutos',
   },
@@ -697,6 +691,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Hora del día (Lima) hasta la que Evolution envía mensajes. 24 = hasta medianoche.',
     tipo: 'numero',
     sufijo: 'hora',
+  },
+  evolution_meta_respaldo: {
+    nombre: 'Usar Meta como respaldo',
+    descripcion: 'Apagado: con Evolution nunca se escribe por Meta. Encendido: Meta solo recoge lo que Evolution no pudo entregar por estar caído o en pausa.',
+    tipo: 'sino',
   },
   evolution_exigir_contacto_previo: {
     nombre: 'Evolution: solo a quien ya escribió antes',

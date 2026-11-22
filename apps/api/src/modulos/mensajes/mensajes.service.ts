@@ -80,7 +80,7 @@ const hora = (d: Date) =>
 /** Un chat está «sin ver» si el cliente escribió después de la última vez que se abrió, o si alguien lo marcó a mano. */
 const sinVer = (f: { sinLeer: number; marcadoNoVisto: boolean }) => f.sinLeer > 0 || f.marcadoNoVisto;
 
-/** Quién atiende el chat: el bot, una persona (panel) o una persona desde la app WhatsApp Business (el bot calla hasta 2 h desde su último mensaje). */
+/** Quién atiende el chat: el bot, una persona (panel) o una persona desde la app WhatsApp Business (el bot calla hasta 20 min desde su último mensaje). */
 export function atiendeDe(
   c: { duenio: string; tomado_por?: unknown; atendido_en?: Date | null },
   mensajes: { autor: string; direccion: string; en: Date; canal?: string | null; contenido?: any }[],
@@ -1443,8 +1443,8 @@ export class MensajesService {
 
   async pausar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
-    // Decisión del dueño (16/11): el bot pausado NO se reanuda en minutos. Se marca el momento de la pausa (tomado_en cuenta como
-    // intervención humana) y el bot calla todo el día; vuelve solo a las 00:01 o con «Reanudar bot» / «Devolver al bot».
+    // Se marca el momento de la pausa (tomado_en cuenta como intervención humana): el bot calla y vuelve solo cuando nadie del
+    // equipo escribe en `bot_reanuda_min` (20) minutos, o con «Reanudar bot» / «Devolver al bot».
     await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, tomado_en: new Date() });
     await this.auditar(usuario, 'PAUSAR_BOT', c.id, undefined, ip);
     return { ok: true };
@@ -1480,8 +1480,8 @@ export class MensajesService {
   }
 
   /**
-   * «Atendido»: archiva el chat hasta que el cliente o el equipo vuelvan a escribir. NO toca duenio ni tomado_por
-   * (el bot lo retoma a las 00:01 de Lima del día siguiente a partir de `atendido_en`; eso lo hace otro módulo).
+   * «Atendido»: archiva el chat hasta que el cliente o el equipo vuelvan a escribir y devuelve el chat al bot AL INSTANTE
+   * (dueño BOT, sin tomar, flujo fuera de «atención persona»).
    * Con un pago por revisar o un pedido sin cobrar pide confirmar (`confirmar`).
    */
   async marcarAtendido(id: string, usuario: UsuarioAutenticado, ip?: string, confirmar = false) {
@@ -1503,6 +1503,10 @@ export class MensajesService {
     await this.tocar(c.id, {
       atendido_en: ahora,
       atendido_por: await this.yo(usuario),
+      duenio: 'BOT',
+      tomado_por: null,
+      tomado_en: null,
+      flujo: flujoLiberadoParaBot(c.flujo) as any,
       urgente: false,
       visto_en: ahora,
       marcado_no_visto: false,

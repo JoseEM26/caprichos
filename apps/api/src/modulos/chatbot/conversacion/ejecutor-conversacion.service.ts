@@ -1,4 +1,3 @@
-import { CANAL_WHATSAPP_BUSINESS, SILENCIO_WHATSAPP_BUSINESS_MIN } from '../utilidades/canal-whatsapp-business';
 import { PuntosService } from '../../clientes/puntos.service';
 import { CUENTA_CLIENTE_BOT_PUERTO, CuentaClienteBotPuerto } from '../puerto/cuenta-cliente-bot.puerto';
 import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
@@ -24,7 +23,7 @@ import { ReservasService } from '../../reservas/reservas.service';
 import { textosNotificacionSolicitud } from '../../reservas/notificacion-solicitud';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
-import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
+import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA, TEXTO_PERDONA_ESPERA } from './textos-bot';
 import { FacturacionClienteService } from '../../clientes/facturacion-cliente.service';
 import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
@@ -70,7 +69,7 @@ import { DireccionesClienteService } from '../../clientes/direcciones-cliente.se
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
 import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
-import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
+import { BOT_REANUDA_MIN_DEFECTO, PARAM_BOT_REANUDA_MIN, botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
 import { condicionPedidosDelChat, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
 import type { ResultadoConsultaIa } from '../ia/tipos-ia';
@@ -586,24 +585,10 @@ export class EjecutorConversacionService {
     }
   }
 
-  /**
-   * Obtiene el parámetro de espera antes de activar el Modo Asistido (defecto 3 min).
-   */
-  private async obtenerAsistidoEsperaMin(): Promise<number> {
-    try {
-      if (typeof this.prisma.parametro?.findUnique === 'function') {
-        const param = await this.prisma.parametro.findUnique({
-          where: { clave: 'asistido_espera_min' },
-        });
-        if (param && param.valor != null) {
-          const val = Number(param.valor);
-          if (!isNaN(val) && val > 0) return val;
-        }
-      }
-    } catch (err: any) {
-      this.logger.warn(`Error leyendo parametro asistido_espera_min: ${err.message}`);
-    }
-    return 3;
+  /** Minutos sin actividad del equipo para que el bot retome un chat (parámetro `bot_reanuda_min`, por defecto 20). */
+  private async minutosReanudaBot(): Promise<number> {
+    const m = await this.leerParametroNumero(PARAM_BOT_REANUDA_MIN, BOT_REANUDA_MIN_DEFECTO);
+    return m > 0 ? m : BOT_REANUDA_MIN_DEFECTO;
   }
 
   /**
@@ -893,19 +878,22 @@ export class EjecutorConversacionService {
       conversacion.tomado_por !== null ||
       flujoPrevio?.estado === 'ATENCION_PERSONA';
 
-    // Reanudación 00:01: si una persona intervino hoy (hora de Lima), el bot calla todo el día aunque el cliente escriba;
-    // si fue un día anterior, el chat vuelve al bot (por si el cron de las 00:01 no alcanzó a liberarlo).
-    let ultimoMensajePersonaDia: { en: Date } | null = null;
+    // Regla única (22/11): tras una intervención de una persona (escribió, tomó el chat o lo pausó) el bot calla mientras el equipo
+    // conversa; con `bot_reanuda_min` (20) minutos sin que nadie del equipo escriba, el chat vuelve al bot. «Atendido» lo devuelve al instante.
+    let esperaMin = BOT_REANUDA_MIN_DEFECTO;
+    if (enManosDePersona && !esValidarPago) esperaMin = await this.minutosReanudaBot();
+    let ultimoMensajePersona: { en: Date } | null = null;
     if (enManosDePersona && !esValidarPago && typeof this.prisma.mensajeChat?.findFirst === 'function') {
-      ultimoMensajePersonaDia = await this.prisma.mensajeChat.findFirst({
+      ultimoMensajePersona = await this.prisma.mensajeChat.findFirst({
         where: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'PERSONA' },
         orderBy: { en: 'desc' },
         select: { en: true },
       });
-      const intervencion = ultimaIntervencionHumana(ultimoMensajePersonaDia?.en, conversacion.tomado_en, (conversacion as any).atendido_en);
-      if (botPausadoPorPersona(intervencion)) {
-        this.logger.log(`Conversación ${conversacionId}: una persona intervino hoy; el bot se reanuda a las 00:01.`);
-        await this.registrarSilencio(conversacion.id, 'Una persona atendió este chat hoy; el bot se reanuda a las 00:01.');
+      const intervencion = ultimaIntervencionHumana(ultimoMensajePersona?.en, conversacion.tomado_en, (conversacion as any).atendido_en);
+      if (botPausadoPorPersona(intervencion, new Date(), esperaMin)) {
+        const hace = Math.round((Date.now() - intervencion!.getTime()) / 60_000);
+        this.logger.log(`Conversación ${conversacionId}: una persona escribió hace ${hace} min; el bot calla hasta ${esperaMin} min sin actividad del equipo.`);
+        await this.registrarSilencio(conversacion.id, `Una persona del equipo escribió hace ${hace} min; el bot responde de nuevo tras ${esperaMin} min sin actividad del equipo.`);
         return false;
       }
       if (intervencion && this.reanudacionBot && (await this.reanudacionBot.liberarUna(conversacion as any))) {
@@ -918,75 +906,37 @@ export class EjecutorConversacionService {
     }
 
     let esModoAsistido = false;
-    let asistidoEsperaMin = 3;
+    const asistidoEsperaMin = esperaMin;
     let minutosSinHumano = 0;
     let esEsperaCumplida = false;
 
     if (enManosDePersona && !esValidarPago) {
-      // Regla 5: Si la conversación está TOMADA (tomado_por) por alguien activo, el bot calla
+      // Solo llega aquí un chat que nadie del equipo atendió (el cliente pidió una persona) o que sigue con Caja por un pago o delivery.
       if (conversacion.tomado_por !== null) {
         this.logger.log(`Conversación ${conversacionId} tomada por persona (${conversacion.tomado_por}). El bot calla.`);
         return false; // la persona ve el mensaje en su chat: no hace falta evento
       }
 
-      asistidoEsperaMin = await this.obtenerAsistidoEsperaMin();
-
-      // Regla 1 y 5: Si una persona envió un mensaje al cliente en los últimos N minutos, el bot calla
-      const ultimoMensajePersona =
-        typeof this.prisma.mensajeChat?.findFirst === 'function'
-          ? await this.prisma.mensajeChat.findFirst({
-              where: {
-                conversacion_id: conversacion.id,
-                direccion: 'SALE',
-                autor: 'PERSONA',
-              },
-              orderBy: { en: 'desc' },
-            })
-          : null;
-
-      let minutosDesdeUltimoHumano = Infinity;
-      if (ultimoMensajePersona) {
-        minutosDesdeUltimoHumano =
-          (Date.now() - new Date(ultimoMensajePersona.en).getTime()) / (60 * 1000);
+      // Desde cuándo espera el cliente: la derivación a persona, o lo último que se le contestó.
+      let desde: Date | null = (flujoPrevio as any)?.derivado_en ? new Date((flujoPrevio as any).derivado_en) : null;
+      if (!desde || isNaN(desde.getTime())) {
+        const ultimoSale =
+          typeof this.prisma.mensajeChat?.findFirst === 'function'
+            ? await this.prisma.mensajeChat.findFirst({
+                where: { conversacion_id: conversacion.id, direccion: 'SALE', tipo: { not: 'SISTEMA' } },
+                orderBy: { en: 'desc' },
+                select: { en: true },
+              })
+            : null;
+        desde = ultimoSale?.en ? new Date(ultimoSale.en) : conversacion.ultima_actividad ? new Date(conversacion.ultima_actividad) : null;
       }
+      minutosSinHumano = desde ? (Date.now() - desde.getTime()) / 60_000 : 0;
+      esEsperaCumplida = minutosSinHumano >= esperaMin;
 
-      // Lo último que escribió una persona fue desde WhatsApp Business: el bot calla SILENCIO min (fijo), también ante el menú.
-      // Termina antes si se marcó Atendido después de ese mensaje o si se tocó «Devolver al bot» (duenio BOT: no entra aquí).
-      if (
-        (ultimoMensajePersona?.contenido as any)?.canal === CANAL_WHATSAPP_BUSINESS &&
-        minutosDesdeUltimoHumano < SILENCIO_WHATSAPP_BUSINESS_MIN &&
-        !(conversacion.atendido_en && new Date(conversacion.atendido_en) > new Date(ultimoMensajePersona!.en))
-      ) {
-        this.logger.log(`Una persona escribió desde WhatsApp Business hace ${minutosDesdeUltimoHumano.toFixed(1)} min. El bot calla.`);
-        await this.registrarSilencio(conversacion.id, `Atiende una persona desde WhatsApp Business (escribió hace ${Math.round(minutosDesdeUltimoHumano)} min; el bot calla ${SILENCIO_WHATSAPP_BUSINESS_MIN / 60} h).`);
-        return false;
-      }
-
-      // Una acción directa del cliente (menú, carta, pedir) se atiende aunque la persona haya escrito hace poco;
-      // solo el chat tomado (arriba) mantiene al bot callado.
-      if (minutosDesdeUltimoHumano < asistidoEsperaMin && !this.esAccionInmediataAsistido(entradaRaw)) {
-        this.logger.log(
-          `Persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (< ${asistidoEsperaMin} min). El bot calla.`,
-        );
-        await this.registrarSilencio(conversacion.id, `Modo asistido: una persona escribió hace ${minutosDesdeUltimoHumano.toFixed(1)} min (espera ${asistidoEsperaMin} min).`);
-        return false;
-      }
-
-      minutosSinHumano = ultimoMensajePersona
-        ? minutosDesdeUltimoHumano
-        : conversacion.ultima_actividad
-          ? (Date.now() - new Date(conversacion.ultima_actividad).getTime()) / (60 * 1000)
-          : 0;
-
-      esEsperaCumplida = minutosSinHumano >= asistidoEsperaMin;
-      const esAccionInmediata = this.esAccionInmediataAsistido(entradaRaw);
-
-      // Si no han pasado N minutos y no es una acción inmediata (menú, carta, pedir, etc.), el bot calla
-      if (!esEsperaCumplida && !esAccionInmediata) {
-        this.logger.log(
-          `Modo asistido en conversación ${conversacionId}: no han transcurrido ${asistidoEsperaMin} min (${minutosSinHumano.toFixed(1)} min) y no es acción directa. El bot calla.`,
-        );
-        await this.registrarSilencio(conversacion.id, `Modo asistido: aún no pasan ${asistidoEsperaMin} min sin respuesta de una persona.`);
+      // Una acción directa del cliente (menú, carta, pedir) se atiende siempre; el texto libre espera a que se cumplan los minutos.
+      if (!esEsperaCumplida && !this.esAccionInmediataAsistido(entradaRaw)) {
+        this.logger.log(`Conversación ${conversacionId}: espera a una persona hace ${minutosSinHumano.toFixed(1)} min (< ${esperaMin}). El bot calla.`);
+        await this.registrarSilencio(conversacion.id, `Esperando a una persona (el cliente la pidió hace ${Math.round(minutosSinHumano)} min); si nadie responde, el bot retoma a los ${esperaMin} min.`);
         return false;
       }
 
@@ -1478,7 +1428,7 @@ export class EjecutorConversacionService {
       errorServicio,
       limiteConsultasExcedido,
       pedidosHoyTelefono,
-      sinBienvenida: await this.omitirBienvenida(conversacion, pedidosHoyTelefono, ultimoMensajePersonaDia?.en),
+      sinBienvenida: await this.omitirBienvenida(conversacion, pedidosHoyTelefono, ultimoMensajePersona?.en),
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
@@ -1916,6 +1866,14 @@ export class EjecutorConversacionService {
     // La marca de frase fija del modo asistido se decide antes de guardar
     if (resultado.acciones.some((a: any) => a.tipo === 'enviarBotones' && a.texto === TEXTO_ASISTIDO_FRASE_FIJA)) {
       (resultado.nuevoFlujo as any).asistido_ultima_frase_fija_ts = Date.now();
+    }
+    // «Perdona la espera»: una sola vez por derivación a persona (la marca se limpia al volver a derivar o al liberar el chat)
+    if (resultado.acciones.some((a: any) => a.tipo === 'enviarBotones' && a.texto === TEXTO_PERDONA_ESPERA)) {
+      (resultado.nuevoFlujo as any).perdona_espera_ts = Date.now();
+    }
+    if (resultado.nuevoFlujo?.estado === 'ATENCION_PERSONA' && (flujoPrevio as any)?.estado !== 'ATENCION_PERSONA') {
+      (resultado.nuevoFlujo as any).derivado_en = new Date().toISOString();
+      delete (resultado.nuevoFlujo as any).perdona_espera_ts;
     }
     const flujoPersistir: FlujoConversacion = {
       ...resultado.nuevoFlujo,

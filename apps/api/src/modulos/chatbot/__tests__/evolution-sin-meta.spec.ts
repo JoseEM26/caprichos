@@ -25,4 +25,31 @@ describe('enrutador: el proveedor se decide al ENVIAR', () => {
     expect(meta.enviarTexto).toHaveBeenCalledTimes(1);
     expect(evo.enviarTexto).not.toHaveBeenCalled();
   });
+  describe('respaldo de Meta (evolution_meta_respaldo, apagado por defecto)', () => {
+    const caido = { exito: false, estado: 'FALLIDO', errorCodigo: 'EVOLUTION_NO_DISPONIBLE' } as any;
+    const armar = (respaldo: string, resultadoEvo = caido) => {
+      const meta = puerto();
+      const evo = { ...puerto(), enviarPlantilla: jest.fn(async () => resultadoEvo), enviarTexto: jest.fn(async () => resultadoEvo) } as any;
+      const cfg: any = { proveedor: async () => 'EVOLUTION', proveedorEnCache: () => 'EVOLUTION', obtener: async () => ({ whatsapp_proveedor: 'EVOLUTION', evolution_meta_respaldo: respaldo }) };
+      return { meta, evo, r: new WhatsAppEnrutadorAdaptador(meta, evo, cfg) };
+    };
+    it('apagado: aunque Evolution esté caído, no se llama a Meta (ni plantilla ni texto)', async () => {
+      const { meta, evo, r } = armar('no');
+      expect((await r.enviarPlantilla('51900000001', 'encuesta_pedido', 'es', ['Ana'])).exito).toBe(false);
+      await r.enviarTexto('51900000001', 'hola');
+      expect(evo.enviarPlantilla).toHaveBeenCalledTimes(1);
+      expect(meta.enviarPlantilla).not.toHaveBeenCalled();
+      expect(meta.enviarTexto).not.toHaveBeenCalled();
+    });
+    it('encendido: Meta solo recoge lo que Evolution no pudo entregar por estar caído', async () => {
+      const { meta, r } = armar('si');
+      await r.enviarTexto('51900000001', 'hola');
+      expect(meta.enviarTexto).toHaveBeenCalledTimes(1);
+    });
+    it('encendido, pero un rechazo del destinatario (no es caída) no pasa a Meta', async () => {
+      const { meta, r } = armar('si', { exito: false, estado: 'FALLIDO', errorCodigo: 'ERROR_EVOLUTION' } as any);
+      await r.enviarTexto('51900000001', 'hola');
+      expect(meta.enviarTexto).not.toHaveBeenCalled();
+    });
+  });
 });

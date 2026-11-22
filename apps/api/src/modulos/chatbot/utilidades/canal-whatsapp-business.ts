@@ -1,8 +1,8 @@
 /** Marca en mensaje_chat.contenido.canal de lo que el local escribió desde la app WhatsApp Business (celular o Web). */
 export const CANAL_WHATSAPP_BUSINESS = 'WHATSAPP_BUSINESS';
 
-/** Minutos (24 h; la reanudación diaria de las 00:01 manda) que el bot calla en un chat después del último mensaje que una persona escribió desde WhatsApp Business. Fijo. */
-export const SILENCIO_WHATSAPP_BUSINESS_MIN = 24 * 60;
+/** Minutos que el bot calla tras el último mensaje de una persona desde WhatsApp Business: la misma regla que el panel (`bot_reanuda_min`, 20 por defecto). */
+export const SILENCIO_WHATSAPP_BUSINESS_MIN = 20;
 
 /** ¿Una persona escribió a este chat desde WhatsApp Business hace menos del silencio y el chat sigue en manos de una persona? */
 export async function personaAtiendeDesdeWhatsapp(

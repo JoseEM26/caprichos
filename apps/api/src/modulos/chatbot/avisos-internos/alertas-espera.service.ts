@@ -378,8 +378,8 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       }
 
       // =========================================================================
-      // 2) Chat tomado: YA NO se libera solo al bot por inactividad (decisión del dueño, 16/11). Un chat pausado o tomado por una
-      //    persona sigue en sus manos hasta «Reanudar bot» / «Devolver al bot» o la reanudación diaria de las 00:01 (Lima).
+      // 2) Chat tomado: lo libera ReanudacionBotService cuando nadie del equipo escribe en `bot_reanuda_min` (20) minutos,
+      //    o antes con «Reanudar bot» / «Devolver al bot» / «Atendido».
       // =========================================================================
 
       // =========================================================================

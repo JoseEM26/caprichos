@@ -18,6 +18,7 @@ import {
   FILAS_MENU_PRINCIPAL,
   FILAS_PREGUNTAS_FRECUENTES,
   TEXTO_ASISTIDO_FRASE_FIJA,
+  TEXTO_PERDONA_ESPERA,
   TEXTOS_BOT,
   TEXTOS_SOLO_MENUS,
   TITULO_SECCION_CATEGORIAS,
@@ -2096,6 +2097,12 @@ function transicionarSoloMenusNucleo(
     // Si vuelve a saludar sin nada en medio, la próxima vez va el menú (no el mismo mensaje otra vez)
     return { ...r, nuevoFlujo: { ...r.nuevoFlujo, saludoCorto: true } as FlujoConversacion };
   };
+
+  // El cliente pidió una persona y nadie del equipo respondió en el tiempo de espera (local abierto): el bot retoma una sola vez.
+  // El chat sigue marcado para el equipo (aquí no se suelta ni se quita lo urgente).
+  if (enPersona && !id && contexto.modoAsistido && !(flujo as any).perdona_espera_ts && contexto.datosLocal?.abierta !== false) {
+    return respuesta([{ tipo: 'enviarBotones', texto: TEXTO_PERDONA_ESPERA, botones: BOTONES_MODO_ASISTIDO }]);
+  }
 
   // 0. Pedido en curso que lleva más de 30 minutos sin respuesta: se descarta el carrito y se vuelve al menú
   if (contexto.inactividadExpirada && enPedido && flujo.pedido?.items?.length && (contexto.minutosInactividad ?? 0) <= 360) {

@@ -25,7 +25,7 @@ Bandeja de atencion para las conversaciones de WhatsApp del negocio. Permite al 
 2. Seleccionar la conversacion del cliente en la lista.
 3. En la barra superior del chat, pulsar el boton Tomar chat para asignarse la conversacion. Si otro operador lo tenia asignado, se puede pulsar Forzar tomar chat tras confirmar la advertencia.
 4. Escribir la respuesta en el campo de texto inferior y presionar la tecla Enter o pulsar Enviar.
-5. Al terminar la atencion, pulsar el boton Marcar como atendido o Soltar chat para devolverlo al flujo normal.
+5. Al terminar la atencion, pulsar el boton Marcar como atendido o Soltar chat: el chat vuelve al bot al instante. Si no lo marcas, el bot vuelve a responder solo cuando nadie del equipo escribio en ese chat durante 20 minutos (Configuracion, parametro El bot retoma el chat). Si el cliente pidio una persona y nadie contesto en ese tiempo, el bot escribe Perdona la espera y le ofrece ayuda, y el chat sigue pendiente para el equipo.
 Ver tambien: [[caja]], [[clientes]]
 
 ## Como se hace: Responder a una calificacion baja de la encuesta

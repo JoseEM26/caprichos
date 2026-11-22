@@ -1,15 +1,14 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
-import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { flujoLiberadoParaBot } from '../conversacion/flujo-liberado.util';
-import { botPausadoHasta, diaLima, minutoDelDiaLima, ultimaIntervencionHumana } from '../conversacion/reanudacion-bot.util';
+import { BOT_REANUDA_MIN_DEFECTO, PARAM_BOT_REANUDA_MIN, botPausadoPorPersona, ultimaIntervencionHumana } from '../conversacion/reanudacion-bot.util';
 
-export const MOTIVO_REANUDADO = 'Reanudado a las 00:01';
+export const MOTIVO_REANUDADO = 'El bot retomó el chat: nadie del equipo escribió en los últimos minutos';
 
 /**
- * Cada día a las 00:01 (Lima) devuelve al bot los chats que una persona atendió un día anterior.
- * No toca chats con pago por revisar (VALIDAR_PAGO) ni con un delivery en curso: siguen con Caja.
+ * Cada minuto devuelve al bot los chats que una persona atendió y donde nadie del equipo escribió en `bot_reanuda_min` (20) minutos
+ * (también libera un chat «tomado» sin actividad). No toca chats con pago por revisar (VALIDAR_PAGO) ni con un delivery en curso.
  */
 @Injectable()
 export class ReanudacionBotService implements OnModuleInit, OnModuleDestroy {
@@ -19,12 +18,10 @@ export class ReanudacionBotService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
     @Optional() private readonly eventos?: EventosGateway,
   ) {}
 
   onModuleInit() {
-    // ponytail: sondeo cada minuto + candado diario en Redis; un cron exacto no aporta nada más.
     this.timer = setInterval(() => {
       this.ejecutarCiclo().catch((err) => this.logger.error(`Reanudación del bot: ${err.message}`, err.stack));
     }, 60_000);
@@ -34,33 +31,29 @@ export class ReanudacionBotService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Libera los chats vencidos una sola vez por día (candado Redis). Devuelve cuántos liberó. */
   async ejecutarCiclo(ahora: Date = new Date()): Promise<number> {
     if (this.ejecutando) return 0;
-    // 00:00 todavía no cuenta: la reanudación es a las 00:01 de Lima (el candado diario se toma recién desde ahí).
-    if (minutoDelDiaLima(ahora) < 1) return 0;
     this.ejecutando = true;
-    const clave = `chatbot:reanudacion:${diaLima(ahora)}`;
-    let redis: ReturnType<RedisService['obtenerCliente']> | null = null;
     try {
-      redis = this.redisService.obtenerCliente();
-      // Antes de las 00:01 no hay nada vencido: el candado diario se toma al primer ciclo útil del día.
-      const ok = await redis.set(clave, '1', 'EX', 172800, 'NX');
-      if (ok !== 'OK') return 0;
       return await this.liberarVencidos(ahora);
-    } catch (err: any) {
-      try {
-        await redis?.del(clave);
-      } catch {
-        /* sin Redis no hay candado que soltar */
-      }
-      throw err;
     } finally {
       this.ejecutando = false;
     }
   }
 
+  private async minutosEspera(): Promise<number> {
+    try {
+      const p = await this.prisma.parametro.findUnique({ where: { clave: PARAM_BOT_REANUDA_MIN } });
+      const n = Number(p?.valor);
+      if (p && p.valor != null && n > 0) return n;
+    } catch {
+      /* sin parámetro: el de siempre */
+    }
+    return BOT_REANUDA_MIN_DEFECTO;
+  }
+
   async liberarVencidos(ahora: Date = new Date()): Promise<number> {
+    const esperaMin = await this.minutosEspera();
     const candidatos = await this.prisma.conversacion.findMany({
       where: { estado: { not: 'VALIDAR_PAGO' }, OR: [{ duenio: 'PERSONA' }, { tomado_por: { not: null } }] },
       select: { id: true, telefono: true, estado: true, flujo: true, tomado_en: true },
@@ -73,11 +66,11 @@ export class ReanudacionBotService implements OnModuleInit, OnModuleDestroy {
         select: { en: true },
       });
       const intervencion = ultimaIntervencionHumana(ultimo?.en, c.tomado_en, (c as any).atendido_en);
-      // Sin intervención humana (derivado por el bot y sin atender) o de hoy: se queda como está.
-      if (!intervencion || ahora.getTime() < botPausadoHasta(intervencion).getTime()) continue;
+      // Sin intervención humana (derivado por el bot y sin atender) o con el equipo conversando: se queda como está.
+      if (!intervencion || botPausadoPorPersona(intervencion, ahora, esperaMin)) continue;
       if (await this.liberarUna(c, ahora)) liberados++;
     }
-    if (liberados > 0) this.logger.log(`Reanudación 00:01: ${liberados} chat(s) devueltos al bot.`);
+    if (liberados > 0) this.logger.log(`Reanudación del bot: ${liberados} chat(s) devueltos al bot.`);
     return liberados;
   }
 

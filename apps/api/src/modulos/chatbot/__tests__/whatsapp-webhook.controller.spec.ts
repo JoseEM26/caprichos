@@ -573,7 +573,7 @@ describe('WhatsappWebhookController y Service', () => {
       );
     });
 
-    it('NO invoca al motor de conversación si la conversación pertenece a PERSONA', async () => {
+    it('SÍ invoca al motor si la conversación pertenece a PERSONA: él decide si calla o retoma (20 min)', async () => {
       mockMotor.procesarMensajeEntrante.mockClear();
       mockPrisma.whatsappMensaje.findUnique.mockResolvedValue(null);
       mockPrisma.conversacion.findUnique.mockResolvedValue({
@@ -613,7 +613,7 @@ describe('WhatsappWebhookController y Service', () => {
 
       await service.procesarPayload(payload);
 
-      expect(mockMotor.procesarMensajeEntrante).not.toHaveBeenCalled();
+      expect(mockMotor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
     });
 
     it('NO invoca al motor de conversación ante comandos de baja o alta (BAJA/STOP)', async () => {

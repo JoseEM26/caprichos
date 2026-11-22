@@ -44,11 +44,11 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min', 'voucher_recordatorio_min', 'voucher_mozo_obligatorio'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_modo_libre', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo', 'ayuda_ia_max_por_minuto_usuario', 'ayuda_ia_max_por_hora_usuario'] },
   { id: 'pago_online', titulo: 'Pago en línea (se enciende en Local › Pagos)', claves: ['pago_online_espera_min', 'culqi_comision_tarjeta_pct', 'culqi_comision_tarjeta_fijo', 'culqi_comision_yape_pct', 'culqi_comision_yape_fijo'] },
-  { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
+  { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_meta_respaldo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
   { id: 'cola', titulo: 'Cola de envío de WhatsApp (reintentos y alertas)', claves: ['outbox_alerta_fallidos', 'outbox_max_intentos', 'outbox_retencion_dias', 'outbox_retencion_fallidos_dias', 'outbox_lag_alerta_min'] },
   { id: 'aprendizaje', titulo: 'Aprendizaje nocturno del bot', claves: ['aprendizaje_activo', 'aprendizaje_hora', 'aprendizaje_min_repeticiones', 'aprendizaje_tope_usd_noche', 'aprendizaje_tope_usd_historico', 'aprendizaje_usd_por_millon_entrada', 'aprendizaje_usd_por_millon_salida'] },
   { id: 'pantalla_local', titulo: 'Pantalla de pedidos del local (TV)', claves: ['pantalla_local_mostrar_nombre'] },
-  { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
+  { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'alerta_pedido_sin_confirmar_min', 'bot_reanuda_min'] },
   { id: 'impresion', titulo: 'Etiquetas e impresión', claves: ['impresion_alerta_min', 'impresion_vence_min', 'impresion_etiqueta_bebida_ancho_mm', 'impresion_etiqueta_bebida_alto_mm', 'impresion_etiqueta_general_ancho_mm', 'impresion_etiqueta_general_alto_mm'] },
 ];
 
@@ -609,13 +609,6 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     efecto: 'Bajarlo tranquiliza antes al cliente; subirlo evita mensajes si Caja suele responder rápido.',
     porDefecto: '10', unidad: 'minutos', rango: '1 a 180', palabras: ['espera', 'tranquilidad', 'validando pago', 'voucher', 'cliente esperando'], peligro: 'bajo',
   },
-  chat_tomado_liberar_min: {
-    grupo: 'alertas', titulo: 'Liberar un chat tomado y abandonado',
-    descripcion: 'Minutos de silencio de la persona que tomó un chat antes de devolverlo al bot (no aplica a los chats de validar pago).',
-    ejemplo: 'Con 10: si el asesor no escribe en 10 minutos, el chat vuelve al bot.',
-    efecto: 'Subirlo deja el chat más tiempo bloqueado para el bot; bajarlo lo libera rápido y el bot puede interrumpir a una persona.',
-    porDefecto: '10', unidad: 'minutos', rango: '1 a 180', palabras: ['chat tomado', 'liberar chat', 'asesor', 'abandonado', 'devolver al bot', 'mensajes'], peligro: 'medio',
-  },
   alerta_pedido_sin_confirmar_min: {
     grupo: 'alertas', titulo: 'Aviso de pedido nuevo sin confirmar en Caja',
     descripcion: 'Minutos que puede esperar un pedido nuevo sin que Caja lo confirme antes de avisar a los administradores por WhatsApp.',
@@ -623,12 +616,12 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     efecto: 'Bajarlo da más avisos; subirlo permite pedidos olvidados más tiempo.',
     porDefecto: '5', unidad: 'minutos', rango: '1 a 180', palabras: ['pedido sin confirmar', 'caja', 'estancado', 'alerta', 'administradores'], peligro: 'medio',
   },
-  asistido_espera_min: {
-    grupo: 'alertas', titulo: 'Silencio del bot tras escribir una persona (modo asistido)',
-    descripcion: 'Si una persona escribió al cliente hace menos de estos minutos, el bot se queda callado para no pisarla. Pasado ese tiempo, el bot vuelve a ayudar al cliente. Los botones directos del cliente (menú, carta, pedir) siempre se atienden.',
-    ejemplo: 'Con 3: el asesor escribe a las 8:00; hasta las 8:03 el bot no interviene.',
-    efecto: 'Subirlo da más tiempo al asesor; bajarlo hace que el bot retome antes.',
-    porDefecto: '3', unidad: 'minutos', rango: '1 a 180', palabras: ['modo asistido', 'bot callado', 'asesor', 'persona escribio', 'silencio del bot'], peligro: 'medio',
+  bot_reanuda_min: {
+    grupo: 'alertas', titulo: 'El bot retoma el chat tras atender una persona',
+    descripcion: 'Mientras el equipo conversa con el cliente, el bot calla. Cuando nadie del equipo escribe en el chat durante estos minutos, el bot vuelve a responder. También es la espera antes de que el bot retome un chat donde el cliente pidió una persona y nadie contestó (con un «Perdona la espera»). «Atendido» devuelve el chat al bot al instante.',
+    ejemplo: 'Con 20: el asesor escribe a las 8:00; si nadie del equipo vuelve a escribir, a las 8:20 el bot responde al cliente.',
+    efecto: 'Subirlo da más tiempo al equipo; bajarlo hace que el bot retome antes y pueda interrumpir una conversación lenta.',
+    porDefecto: '20', unidad: 'minutos', rango: '1 a 180', palabras: ['modo asistido', 'bot callado', 'asesor', 'persona escribio', 'silencio del bot', 'retomar', 'chat tomado', 'perdona la espera'], peligro: 'medio',
   },
   impresion_alerta_min: {
     grupo: 'impresion', titulo: 'Aviso por WhatsApp de etiquetas sin imprimir',
@@ -784,6 +777,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     efecto: 'En «No» se puede escribir a cualquiera, con más riesgo de bloqueo.',
     porDefecto: 'Sí', rango: SI_NO, palabras: ['evolution', 'contacto previo', 'spam', 'bloqueo'], peligro: 'alto',
   },
+  evolution_meta_respaldo: {
+    grupo: 'evolution', titulo: 'Usar Meta como respaldo',
+    descripcion: 'Apagado: con Evolution nunca se escribe por Meta. Encendido: Meta solo recoge lo que Evolution no pudo entregar por estar caído o en pausa (las plantillas de Meta deben estar aprobadas).',
+    ejemplo: 'Apagado: si Evolution se cae, los avisos esperan y se reintentan; no salen por Meta.',
+    efecto: 'Encenderlo puede generar envíos fallidos de plantillas de Meta si no están aprobadas.',
+    porDefecto: 'No', rango: SI_NO, palabras: ['evolution', 'meta', 'respaldo', 'plantillas', 'whatsapp oficial'], peligro: 'medio',
+  },
   evolution_max_enlaces: {
     grupo: 'evolution', titulo: 'Evolution: enlaces por mensaje',
     descripcion: 'Cuántos enlaces como máximo lleva cada mensaje; el resto se quita. Los mensajes con muchos enlaces parecen spam.',
@@ -932,7 +932,7 @@ export const idParametro = (clave: string) => `parametros-${kebabParametro(clave
 /** Claves editables en la tarjeta «Umbrales de alertas y espera» (el id lo lleva la tarjeta, no la fila). */
 export const CLAVES_EN_TARJETA_UMBRALES = [
   'alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min',
-  'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min',
+  'alerta_pedido_sin_confirmar_min', 'bot_reanuda_min',
 ];
 
 const titulosGrupo = new Map(GRUPOS_PARAMETROS.map((g) => [g.id, g.titulo]));

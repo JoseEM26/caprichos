@@ -40,6 +40,7 @@ const LIMITES: Array<{ clave: string; texto: string; ayuda?: string; texto_libre
   { clave: 'evolution_max_enlaces', texto: 'Máx. enlaces por mensaje' },
   { clave: 'evolution_max_texto_identico', texto: 'Mismo texto repetido antes de variar el saludo' },
   { clave: 'evolution_exigir_contacto_previo', texto: 'Solo escribir a quien ya escribió (si / no)', texto_libre: true },
+  { clave: 'evolution_meta_respaldo', texto: 'Usar Meta como respaldo (si / no)', ayuda: 'Apagado: con Evolution nunca se escribe por Meta. Encendido: solo si Evolution está caído o en pausa.', texto_libre: true },
   { clave: 'evolution_origenes_permitidos', texto: 'Solo estos orígenes salen por Evolution (vacío = los mismos avisos que con Meta)', texto_libre: true },
 ];
 

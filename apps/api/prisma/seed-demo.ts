@@ -89,7 +89,7 @@ async function configurarParametrosDemo() {
     { clave: 'tolerancia_reserva_min', valor: 15 },
     { clave: 'alta_demanda_min_base', valor: 0 },
     { clave: 'chatbot_activo', valor: 'no' },
-    { clave: 'asistido_espera_min', valor: 3 },
+    { clave: 'bot_reanuda_min', valor: 20 },
     { clave: 'whatsapp_aviso_asignado_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_salida_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_llegada_activo', valor: 'si' },

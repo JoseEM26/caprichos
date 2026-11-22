@@ -53,6 +53,16 @@ describe('conmutación de proveedor', () => {
     expect([c.evolution_limite_minuto, c.evolution_limite_hora, c.evolution_limite_dia]).toEqual([3, 60, 350]);
     expect([c.evolution_pausa_min_seg, c.evolution_pausa_max_seg, c.evolution_horario_desde, c.evolution_horario_hasta]).toEqual([2, 6, 9, 22]);
   });
+  it('un fallo al leer los parámetros nunca vuelve a META: conserva lo último leído y, sin nada leído, falla (el envío se reintenta)', async () => {
+    const prisma = prismaFalso({ whatsapp_proveedor: 'EVOLUTION' });
+    const svc = new EvolutionConfigService(prisma);
+    expect(await svc.proveedor()).toBe('EVOLUTION');
+    prisma.parametro.findMany.mockRejectedValue(new Error('bd caída'));
+    (svc as any).cache.en = 0; // cache vencido
+    expect(await svc.proveedor()).toBe('EVOLUTION');
+    const frio = new EvolutionConfigService(prisma);
+    await expect(frio.proveedor()).rejects.toThrow('bd caída');
+  });
   it('desconexión con Meta activo: avisa al ADMIN una sola vez y el baneo pausa el envío', async () => {
     const prisma = prismaFalso();
     const svc = new EvolutionConfigService(prisma);

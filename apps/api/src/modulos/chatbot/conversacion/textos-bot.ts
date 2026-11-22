@@ -212,6 +212,8 @@ export const FILAS_PREGUNTAS_FRECUENTES: FilaLista[] = [
 export const TEXTO_ASISTIDO_FRASE_FIJA =
   'Ya avise a una persona; mientras tanto puedo ayudarte con esto:';
 
+export const TEXTO_PERDONA_ESPERA = 'Perdona la espera 🙏 ¿te ayudo yo mientras tanto?';
+
 export const BOTONES_MODO_ASISTIDO: BotonAccion[] = [
   { id: 'btn_asi_carta', titulo: 'Ver la carta' },
   { id: 'btn_asi_pedido', titulo: 'Estado de mi pedido' },

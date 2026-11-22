@@ -13,18 +13,16 @@ export interface UmbralesAlertasEspera {
   alerta_voucher_min_1: number;
   alerta_voucher_min_2: number;
   espera_cliente_aviso_min: number;
-  chat_tomado_liberar_min: number;
   alerta_pedido_sin_confirmar_min: number;
-  asistido_espera_min: number;
+  bot_reanuda_min: number;
 }
 
 export const VALORES_DEFECTO_UMBRALES: UmbralesAlertasEspera = {
   alerta_voucher_min_1: 5,
   alerta_voucher_min_2: 15,
   espera_cliente_aviso_min: 10,
-  chat_tomado_liberar_min: 10,
   alerta_pedido_sin_confirmar_min: 5,
-  asistido_espera_min: 3,
+  bot_reanuda_min: 20,
 };
 
 const CAMPOS_UMBRALES: Array<{
@@ -52,22 +50,16 @@ const CAMPOS_UMBRALES: Array<{
     defecto: 10,
   },
   {
-    clave: 'chat_tomado_liberar_min',
-    etiqueta: 'Liberar chat tomado y abandonado',
-    descripcion: 'Devolver conversación al bot por inactividad',
-    defecto: 10,
-  },
-  {
     clave: 'alerta_pedido_sin_confirmar_min',
     etiqueta: 'Aviso pedido sin confirmar en Caja',
     descripcion: 'Alerta a administradores por orden estancada',
     defecto: 5,
   },
   {
-    clave: 'asistido_espera_min',
-    etiqueta: 'Espera antes de modo asistido',
-    descripcion: 'Minutos sin respuesta de asesor antes de activar el bot asistido',
-    defecto: 3,
+    clave: 'bot_reanuda_min',
+    etiqueta: 'El bot retoma el chat tras (minutos)',
+    descripcion: 'Minutos sin que el equipo escriba en un chat atendido para que el bot vuelva a responder',
+    defecto: 20,
   },
 ];
 

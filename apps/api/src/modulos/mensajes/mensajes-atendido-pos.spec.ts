@@ -111,14 +111,13 @@ describe('Atendido: archivar y volver a Por atender', () => {
       expect((await service.listar('todos', '', 'procesados')).chats.map((c) => c.id)).toEqual(['1']);
     });
 
-    it('marcarAtendido guarda atendido_en/por, deja visto y NO toca duenio ni tomado_por ni escribe al cliente', async () => {
+    it('marcarAtendido guarda atendido_en/por, deja visto y devuelve el chat al bot al instante sin escribir al cliente', async () => {
       await expect(service.marcarAtendido('1', usuario)).resolves.toEqual({ ok: true });
       const data = prisma.conversacion.update.mock.calls[0][0].data;
       expect(data.atendido_en).toBeInstanceOf(Date);
       expect(data.atendido_por).toBe(7n);
       expect(data.marcado_no_visto).toBe(false);
-      expect(data).not.toHaveProperty('duenio');
-      expect(data).not.toHaveProperty('tomado_por');
+      expect(data).toMatchObject({ duenio: 'BOT', tomado_por: null, tomado_en: null });
       expect(eventos.emitirAdmin).toHaveBeenCalledWith('mensajes:actualizado', { id: '1' });
     });
 

@@ -5,6 +5,7 @@
  */
 export function flujoLiberadoParaBot(flujo: unknown): Record<string, unknown> {
   const actual = (flujo && typeof flujo === 'object' ? (flujo as Record<string, unknown>) : {}) as Record<string, unknown>;
-  if (actual.estado !== 'ATENCION_PERSONA') return actual;
-  return { ...actual, estado: 'MENU', repreguntasFallidas: 0 };
+  const { perdona_espera_ts: _p, derivado_en: _d, ...resto } = actual;
+  if (actual.estado !== 'ATENCION_PERSONA') return resto;
+  return { ...resto, estado: 'MENU', repreguntasFallidas: 0 };
 }

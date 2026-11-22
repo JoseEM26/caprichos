@@ -35,6 +35,8 @@ export const DEFECTOS_EVOLUTION = {
   evolution_fallos_seguidos: 5,
   evolution_fallos_ventana_min: 10,
   evolution_pausado: 'no',
+  /** Con EVOLUTION, Meta NO se usa. En 'si', Meta recoge solo lo que Evolution no entregó por estar caído o en pausa. */
+  evolution_meta_respaldo: 'no',
 } as const;
 
 export type ClaveEvolution = keyof typeof DEFECTOS_EVOLUTION;
@@ -81,7 +83,7 @@ export class EvolutionConfigService implements OnModuleInit {
 
   /** Calienta el cache para que el enrutador sepa el proveedor desde el primer envío. */
   onModuleInit(): void {
-    void this.obtener();
+    this.obtener().catch(() => undefined);
   }
 
   /** Último proveedor leído, sin tocar la BD (META mientras no se haya leído). */
@@ -98,6 +100,12 @@ export class EvolutionConfigService implements OnModuleInit {
       filas = await this.prisma.parametro.findMany({ where: { clave: { in: claves } } });
     } catch (err: any) {
       this.logger.warn(`No se pudieron leer los parámetros de Evolution: ${err?.message}`);
+      // Un fallo de lectura nunca debe volver a META: se conserva lo último leído; sin eso, el envío falla y se reintenta.
+      if (this.cache) {
+        this.cache = { en: Date.now(), valores: this.cache.valores };
+        return this.cache.valores;
+      }
+      throw err;
     }
     const porClave = new Map(filas.map((f) => [f.clave, f.valor]));
     const valores: Record<string, number | string> = {};

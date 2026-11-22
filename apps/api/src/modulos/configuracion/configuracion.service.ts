@@ -77,7 +77,7 @@ export const CLAVES_NUMERICAS = [
   'espera_cliente_aviso_min',
   'chat_tomado_liberar_min',
   'alerta_pedido_sin_confirmar_min',
-  'asistido_espera_min',
+  'bot_reanuda_min',
   'impresion_alerta_min',
   'impresion_vence_min',
   // Tamano de los stickers en mm (enteros 30 a 200): bebida y general
@@ -333,6 +333,7 @@ export const CLAVES_SI_NO = [
   'aprendizaje_activo',
   'evolution_pausado',
   'evolution_exigir_contacto_previo',
+  'evolution_meta_respaldo',
   // Pantalla de TV del local: mostrar el nombre de pila del cliente junto a su pedido (por defecto sí)
   'pantalla_local_mostrar_nombre',
 ] as const;

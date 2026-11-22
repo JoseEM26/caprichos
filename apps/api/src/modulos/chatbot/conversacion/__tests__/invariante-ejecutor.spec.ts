@@ -33,7 +33,7 @@ const ESCENARIOS: Array<[string, any, { apagado?: boolean; antispam?: boolean; p
   ['duenio PERSONA sin tomar (calificación baja)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', motivo_derivacion: 'CALIFICACION_BAJA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, {}],
   ['modo asistido (persona escribió hace 1 min)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'ATENCION_PERSONA', repreguntasFallidas: 0 } }, { personaHaceMin: 1 }],
   ['chatbot apagado', { ...base, id: 1n, duenio: 'BOT', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { apagado: true }],
-  ['persona escribió desde WhatsApp Business hace 30 min (el bot calla 2 h, también ante el menú)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { personaHaceMin: 30, personaWb: true }],
+  ['persona escribió desde WhatsApp Business hace 5 min (el bot calla hasta 20 min sin actividad del equipo, también ante el menú)', { ...base, id: 1n, duenio: 'PERSONA', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { personaHaceMin: 5, personaWb: true }],
   ['anti-spam', { ...base, id: 1n, duenio: 'BOT', estado: 'ABIERTA', flujo: { version: 2, estado: 'MENU', repreguntasFallidas: 0 } }, { antispam: true }],
 ];
 
@@ -193,9 +193,13 @@ describe('Invariante: ningún mensaje del cliente queda sin respuesta ni evento 
     // callar deja el evento «El bot no respondió» en el chat (la regla de «una persona atendió hoy» ya cubre lo de WhatsApp Business)
     const respondio = () => !prismaMock.mensajeChat.create.mock.calls.some(([a]: any) => String(a?.data?.contenido?.texto ?? '').includes('El bot no respondió'));
 
-    it('hace 30 min: el bot NO responde ni a un saludo', async () => {
-      await correr(30, 'WHATSAPP_BUSINESS');
+    it('hace 5 min: el bot NO responde ni a un saludo', async () => {
+      await correr(5, 'WHATSAPP_BUSINESS');
       expect(respondio()).toBe(false);
+    });
+    it('hace 30 min: nadie del equipo escribió en 20 min y el bot vuelve a responder', async () => {
+      await correr(30, 'WHATSAPP_BUSINESS');
+      expect(respondio()).toBe(true);
     });
   });
 });

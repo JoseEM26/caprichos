@@ -80,4 +80,21 @@ describe('Contrato: MODO ASISTIDO DEL BOT (Caprichos, 27/10/2026)', () => {
     });
   });
 
+  describe('Decisión 22/11: «Perdona la espera» al retomar un chat que nadie atendió', () => {
+    const acciones = (ctx: Partial<ContextoConversacion>, flujo = crearFlujo()) =>
+      transicionarEstado(flujo, normalizar('hola'), crearContexto(ctx)).acciones as any[];
+
+    it('con espera cumplida y local abierto: texto corto con el menú corto, y el chat sigue en atención de persona', () => {
+      const res = transicionarEstado(crearFlujo(), normalizar('hola'), crearContexto());
+      expect(res.nuevoEstado).toBe('ATENCION_PERSONA');
+      expect((res.acciones as any[])[0]).toMatchObject({ tipo: 'enviarBotones', texto: 'Perdona la espera 🙏 ¿te ayudo yo mientras tanto?' });
+    });
+    it('una sola vez: con la marca puesta ya no se repite', () => {
+      expect(acciones({}, crearFlujo({ perdona_espera_ts: Date.now() } as any))[0]?.texto).not.toContain('Perdona la espera');
+    });
+    it('con el local cerrado no se dice', () => {
+      const cerrado = crearContexto().datosLocal!;
+      expect(acciones({ datosLocal: { ...cerrado, abierta: false } })[0]?.texto ?? '').not.toContain('Perdona la espera');
+    });
+  });
 });

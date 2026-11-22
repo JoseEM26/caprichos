@@ -154,25 +154,25 @@ describe('EvolutionWebhookService: enruta lo propio y la lectura', () => {
   });
 });
 
-describe('El bot calla todo el día (hasta las 00:01) tras un mensaje humano de WhatsApp Business', () => {
+describe('El bot calla 20 min tras un mensaje humano de WhatsApp Business', () => {
   const hace = (min: number) => new Date(Date.now() - min * 60_000);
   const wb = (min: number) => ({ en: hace(min), contenido: { canal: 'WHATSAPP_BUSINESS' } });
   const prismaCon = (ultimo: any) => ({ mensajeChat: { findFirst: jest.fn().mockResolvedValue(ultimo) } });
 
-  it('autorespuesta: calla dentro de las 24 h; habla pasadas 25 h, si lo escribió el panel o si el chat volvió al bot', async () => {
-    expect(await personaAtiendeDesdeWhatsapp(prismaCon(wb(30)), { id: 1n, duenio: 'PERSONA' })).toBe(true);
-    expect(await personaAtiendeDesdeWhatsapp(prismaCon(wb(25 * 60)), { id: 1n, duenio: 'PERSONA' })).toBe(false);
+  it('autorespuesta: calla dentro de los 20 min; habla pasados 25 min, si lo escribió el panel o si el chat volvió al bot', async () => {
+    expect(await personaAtiendeDesdeWhatsapp(prismaCon(wb(10)), { id: 1n, duenio: 'PERSONA' })).toBe(true);
+    expect(await personaAtiendeDesdeWhatsapp(prismaCon(wb(25)), { id: 1n, duenio: 'PERSONA' })).toBe(false);
     expect(await personaAtiendeDesdeWhatsapp(prismaCon({ en: hace(5), contenido: { texto: 'panel' } }), { id: 1n, duenio: 'PERSONA' })).toBe(false);
     expect(await personaAtiendeDesdeWhatsapp(prismaCon(wb(5)), { id: 1n, duenio: 'BOT' })).toBe(false); // «Devolver al bot»
   });
 
-  it('etiqueta «quién atiende»: Bot, Persona (panel) o WhatsApp Business; Atendido y las 24 h la terminan', () => {
+  it('etiqueta «quién atiende»: Bot, Persona (panel) o WhatsApp Business; Atendido y los 20 min la terminan', () => {
     const m = (min: number, canal?: string) => [{ autor: 'PERSONA', direccion: 'SALE', en: hace(min), canal }];
     expect(atiendeDe({ duenio: 'BOT' }, [])).toBe('BOT');
     expect(atiendeDe({ duenio: 'PERSONA', tomado_por: 3n }, m(5, 'WHATSAPP_BUSINESS'))).toBe('PERSONA');
     expect(atiendeDe({ duenio: 'PERSONA' }, m(5))).toBe('PERSONA');
     expect(atiendeDe({ duenio: 'PERSONA' }, m(5, 'WHATSAPP_BUSINESS'))).toBe('WHATSAPP_BUSINESS');
-    expect(atiendeDe({ duenio: 'PERSONA' }, m(24 * 60 + 1, 'WHATSAPP_BUSINESS'))).toBe('PERSONA');
+    expect(atiendeDe({ duenio: 'PERSONA' }, m(21, 'WHATSAPP_BUSINESS'))).toBe('PERSONA');
     expect(atiendeDe({ duenio: 'PERSONA', atendido_en: hace(1) }, m(5, 'WHATSAPP_BUSINESS'))).toBe('PERSONA');
   });
 });
