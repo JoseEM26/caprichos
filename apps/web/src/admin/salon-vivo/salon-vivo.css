@@ -196,3 +196,7 @@
 .sv-pend-item.tarde .sv-pend-min { color: #C5221F; }
 @media (prefers-reduced-motion: reduce) { .sv-pend-item, .sv-pend-item.listo .sv-pend-etapa { animation: none; } .sv-pend-barra i { transition: none; } }
 @media (max-width: 900px) { .sv-tv .sv-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 55dvh minmax(0, 1fr); } .sv-tv .sv-escena { height: auto; min-height: 0; } .sv-tv .sv-panel { height: 100%; overflow: hidden; } }
+
+/* Botón «Centrar»: devuelve la cámara a la vista elegida si el zoom o el arrastre dejaron el local fuera de cuadro */
+.sv-centrar { position: absolute; top: 12px; right: 12px; z-index: 3; min-height: 44px; padding: 0 16px; border-radius: 9999px; border: 1px solid rgba(251, 244, 236, .25); background: rgba(8, 34, 49, .88); color: var(--sv-hueso); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+.sv-centrar:hover, .sv-centrar:focus-visible { background: var(--cp-orange, #E67929); color: #fff; outline: none; }

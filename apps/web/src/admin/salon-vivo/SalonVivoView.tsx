@@ -96,6 +96,11 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
               </select>
             )}
           </div>
+          {con3d && !completa && (
+            <button type="button" className="sv-centrar" onClick={() => motor?.centrar()} aria-label="Centrar el local" title="Volver a ver todo el local">
+              ⌖ Centrar
+            </button>
+          )}
           {!completa && (
             <div className="sv-barra-cam" role="toolbar" aria-label="Controles del salón">
               {con3d && CAMARAS.map(([k, t]) => <button key={k} type="button" className="sv-btn" aria-pressed={camara === k} onClick={() => cambiarCamara(k)}>{t}</button>)}

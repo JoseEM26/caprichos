@@ -29,6 +29,8 @@ export interface OpcionesMotor {
 export interface Motor {
   actualizar: (d: SalonVivo) => void;
   camara: (v: VistaCamara) => void;
+  /** Vuelve a la vista elegida (botón «Centrar»): deshace el zoom o el arrastre que dejó el local fuera de cuadro. */
+  centrar: () => void;
   tema: (clave: string) => void;
   hora: (m: ModoHora) => string;
   sonido: (on: boolean) => boolean;
@@ -70,7 +72,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
   const controles = new OrbitControls(camara, lienzo);
   controles.target.copy(vistas.general.obj);
   controles.enableDamping = true; controles.dampingFactor = 0.08;
-  controles.minDistance = 4; controles.maxDistance = 30 * k; controles.maxPolarAngle = 1.35; controles.screenSpacePanning = false;
+  controles.minDistance = 5; controles.zoomSpeed = 0.7; controles.maxDistance = 30 * k; controles.maxPolarAngle = 1.35; controles.screenSpacePanning = false;
 
   // Las luces de three moderno son físicas: se escalan para igualar la maqueta
   const hemi = new THREE.HemisphereLight(0xffffff, 0x3a4c5a, 0.75 * PI);
@@ -154,6 +156,16 @@ export function crearMotor(op: OpcionesMotor): Motor {
   controles.addEventListener('start', () => { tocando = true; volando = false; });
   controles.addEventListener('end', () => { tocando = false; });
   const vSeguir = new THREE.Vector3();
+  // En pantallas angostas (celular de pie) la vista se aleja para que el local entre completo
+  let alejar = 1;
+  const posDe = (v: { pos: THREE.Vector3; obj: THREE.Vector3 }) => (alejar === 1 ? v.pos : v.obj.clone().add(v.pos.clone().sub(v.obj).multiplyScalar(alejar)));
+  // El punto al que mira la cámara no sale del local: arrastrar con dos dedos ya no lo pierde
+  const limitarObjetivo = () => {
+    const t = controles.target;
+    t.x = THREE.MathUtils.clamp(t.x, -ancho * 0.6, ancho * 0.6);
+    t.z = THREE.MathUtils.clamp(t.z, -alto * 0.6, alto * 0.6);
+    t.y = THREE.MathUtils.clamp(t.y, 0, 3);
+  };
   function moverCamara() {
     if (vista === 'capri') {
       vSeguir.copy(director.capriObj.position); vSeguir.y = 0.8;
@@ -163,9 +175,10 @@ export function crearMotor(op: OpcionesMotor): Motor {
     }
     if (!volando || tocando) return;
     const v = vistas[vista];
-    if (reducir) { camara.position.copy(v.pos); controles.target.copy(v.obj); volando = false; return; }
-    camara.position.lerp(v.pos, 0.06); controles.target.lerp(v.obj, 0.06);
-    if (camara.position.distanceTo(v.pos) < 0.05) volando = false;
+    const destino = posDe(v);
+    if (reducir) { camara.position.copy(destino); controles.target.copy(v.obj); volando = false; return; }
+    camara.position.lerp(destino, 0.06); controles.target.lerp(v.obj, 0.06);
+    if (camara.position.distanceTo(destino) < 0.05) volando = false;
   }
 
   // Tocar a Capri
@@ -189,6 +202,9 @@ export function crearMotor(op: OpcionesMotor): Motor {
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camara.aspect = w / h; camara.updateProjectionMatrix();
+    // Solo si cambió de verdad (girar el celular), no por la barra del navegador que aparece y se esconde
+    const nuevo = THREE.MathUtils.clamp(1.5 / (w / h || 1), 1, 2.2);
+    if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; volando = true; }
   }
   const observador = new ResizeObserver(ajustar); observador.observe(contenedor);
   ajustar();
@@ -224,6 +240,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
     humo(dt);
     vapor(dt, local.mesas.flatMap((m) => (m.comida.children.length ? m.vapor : [])));
     moverCamara();
+    limitarObjetivo();
     controles.update();
     moverEtiquetas();
     renderer.render(escena, camara);
@@ -253,6 +270,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
       primera = false;
     },
     camara(v) { vista = v; volando = true; },
+    centrar() { volando = true; },
     tema(clave) {
       const t = TEMAS[clave] ?? TEMAS.normal;
       claveTema = clave in TEMAS ? clave : 'normal';

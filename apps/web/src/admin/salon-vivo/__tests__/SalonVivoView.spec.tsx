@@ -7,7 +7,7 @@ const obtener = vi.fn();
 vi.mock('../salonVivoApi', () => ({ salonVivoApi: { obtener: (...a: unknown[]) => obtener(...a) } }));
 vi.mock('../../../comun/socket', () => ({ useTiempoReal: vi.fn(), useEventos: vi.fn() }));
 
-const motor = { actualizar: vi.fn(), camara: vi.fn(), tema: vi.fn(), hora: vi.fn(() => 'Noche'), sonido: vi.fn(() => true), voz: vi.fn(), saludar: vi.fn(), bailar: vi.fn(), destruir: vi.fn() };
+const motor = { actualizar: vi.fn(), camara: vi.fn(), centrar: vi.fn(), tema: vi.fn(), hora: vi.fn(() => 'Noche'), sonido: vi.fn(() => true), voz: vi.fn(), saludar: vi.fn(), bailar: vi.fn(), destruir: vi.fn() };
 vi.mock('../Escena3D', () => ({
   default: ({ piso, datos, onMotor }: any) => {
     // Escena de mentira: sin WebGL ni three; avisa que está lista con el motor simulado
@@ -30,6 +30,8 @@ describe('SalonVivoView', () => {
     await waitFor(() => expect(motor.hora).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Cocina' }));
     expect(motor.camara).toHaveBeenCalledWith('cocina');
+    fireEvent.click(screen.getByRole('button', { name: 'Centrar el local' }));
+    expect(motor.centrar).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Saludar' }));
     expect(motor.saludar).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Sonido ambiente' }));
