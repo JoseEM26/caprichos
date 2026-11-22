@@ -7,7 +7,7 @@ import { ETIQUETA_ROL } from './correccionesApi';
 import { useDetalleDia } from './DetalleDiaPersona';
 import { Plegable } from './Plegable';
 import { Confirmar } from '../../comun/Confirmar';
-import { aprobarExtra, soles } from './planillaApi';
+import { aprobarExtra, soles, type DiaPlanillaApi } from './planillaApi';
 import { InsigniaTarifaEspecial } from './PlanillaPersonaTarifas';
 import type { CtlPlanilla } from './PlanillaPersonaTipos';
 import type { FilaCal } from './calendarioApi';
@@ -41,6 +41,35 @@ function PanelDia({ c, fila, jornada, cerrar }: { c: CtlPlanilla; fila: FilaCal 
       alCerrar={cerrar}
       ancho={1040}
     />
+  );
+}
+
+const lunesDe = (iso: string) => {
+  const f = new Date(`${iso}T00:00:00Z`);
+  f.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7));
+  return f.toISOString().slice(0, 10);
+};
+
+/** Explica por semana (lunes a domingo) cuántas horas extra hay y cuáles faltan aprobar; si no hay, dice por qué. */
+export function ResumenExtraSemanas({ dias }: { dias: DiaPlanillaApi[] }) {
+  const semanas = new Map<string, DiaPlanillaApi[]>();
+  for (const x of dias) semanas.set(lunesDe(x.jornada), [...(semanas.get(lunesDe(x.jornada)) ?? []), x]);
+  const filas = [...semanas.entries()].map(([lunes, ds]) => {
+    const suma = (f: (x: DiaPlanillaApi) => number) => ds.reduce((a, x) => a + f(x), 0);
+    const extra = suma((x) => x.extraMin);
+    const bruta = suma((x) => x.extraBrutaMin ?? x.extraMin);
+    const porAprobar = suma((x) => (x.extraAprobada ? 0 : x.extraMin));
+    return { lunes, extra, bruta, porAprobar, aprobada: extra - porAprobar, prog: suma((x) => x.programadaMin) };
+  }).filter((s) => s.extra > 0 || s.bruta > 0);
+  if (filas.length === 0) return null;
+  return (
+    <ul className="pl-filas" data-testid="extra-semanas">
+      {filas.map((s) => (
+        <Fila key={s.lunes} t={`Semana del ${s.lunes}`} v={s.extra > 0
+          ? `${s.extra} min de extra (${s.porAprobar > 0 ? `${s.porAprobar} min por aprobar` : 'todo aprobado'}${s.aprobada > 0 && s.porAprobar > 0 ? `, ${s.aprobada} ya aprobados` : ''})`
+          : `Sin extra: ${s.bruta} min de más cubren horas programadas que no se trabajaron esta semana (${horas(s.prog)} h programadas); se pagan como hora normal`} />
+      ))}
+    </ul>
   );
 }
 
@@ -82,6 +111,8 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
         <Fila t="Faltas del período" v={String(faltas)} />
       </ul>
 
+      <ResumenExtraSemanas dias={dias} />
+
       <Plegable titulo="Penalidad por tardanza" resumen={c.penal > 0 ? `− ${soles(c.penal)}` : 'Sin penalidad'} abierta={c.penal > 0}>
         <p className="as-ayuda">La hora tarde no se paga y además se cobra una penalidad según su valor (el factor se cambia en Configuración).</p>
         {c.detallePenal.length === 0 ? <small className="as-nota">No hay tardanzas con penalidad en este período.</small> : (
@@ -119,13 +150,13 @@ export function PestanaAsistencia({ c, diaInicial }: { c: CtlPlanilla; diaInicia
                     <td data-label="Tardanza (min)" className="as-num">{x.tardanzaMin}</td>
                     <td data-label="Extra (min)" className="as-num">{x.extraMin}{x.extraPendiente ? <small style={{ display: 'block' }}>pendiente de aprobar</small> : null}</td>
                     <td data-label="Aprobar extra">
-                      {x.extraMin > 0 ? (
+                      {x.extraMin > 0 || x.extraAprobada ? (
                         <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
                           <input type="checkbox" checked={x.extraAprobada} disabled={pagado || ocupado} aria-label={x.descansoTrabajado ? `Aprobar el descanso trabajado del ${x.jornada}` : `Aprobar las horas extra del ${x.jornada}`}
                             onChange={(e) => setExtraPorConfirmar({ jornada: x.jornada, aprobar: e.target.checked, min: x.extraMin, descanso: !!x.descansoTrabajado })} />
                           {x.extraAprobada ? 'Aprobada' : x.descansoTrabajado ? 'Aprobar descanso trabajado' : 'Sin aprobar'}
                         </label>
-                      ) : '—'}
+                      ) : (x.extraBrutaMin ?? 0) > 0 ? <small>Pasó a hora normal (cubre horas de la semana)</small> : '—'}
                     </td>
                     <td data-label="Ganado" className="as-num">{soles(x.ganado)}</td>
                     <td data-label="Detalle">

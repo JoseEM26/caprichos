@@ -33,4 +33,10 @@ describe('Hora extra semanal: solo pasado lo programado de la semana', () => {
     expect(r[2].extraMin).toBe(0); // semana del 23: faltó 9 h programadas
     expect(dias[2].extraMin).toBe(120);
   });
+
+  it('guarda la extra original del día para explicar en pantalla cuánto pasó a hora normal', () => {
+    const r = extraSemanal(semana([[9, 3], [8, 0], [9, 0], [9, 0], [9, 0], [9, 0]]));
+    expect(r[0].extraBrutaMin).toBe(180);
+    expect(r[0].extraMin).toBe(120);
+  });
 });

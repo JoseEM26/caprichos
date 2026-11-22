@@ -81,7 +81,7 @@ export function extraSemanal(dias: DiaPlanilla[]): DiaPlanilla[] {
     const k = periodoDe('SEMANAL', d.jornada).desde;
     semanas.set(k, [...(semanas.get(k) ?? []), i]);
   });
-  const salida = dias.map((d) => ({ ...d }));
+  const salida = dias.map((d) => ({ ...d, extraBrutaMin: d.extraMin }));
   for (const idx of semanas.values()) {
     const ds = idx.map((i) => salida[i]);
     let pendiente = Math.max(0, ds.reduce((a, d) => a + d.programadaMin - d.trabajadaMin, 0));
@@ -124,6 +124,8 @@ export interface DiaPlanilla {
   salidaAnticipadaMin: number;
   /** Minutos fuera del turno (antes de entrar o después de salir) pasada la tolerancia. */
   extraMin: number;
+  /** Extra del día ANTES de la regla semanal (para explicar en pantalla cuánto pasó a hora normal). Lo pone extraSemanal. */
+  extraBrutaMin?: number;
   /** Feriado activo ese día: multiplicador del valor hora para las horas trabajadas y la tardanza (vacío = 1). */
   recargo?: number;
   /** Día de descanso (sin horario) en que marcó entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */

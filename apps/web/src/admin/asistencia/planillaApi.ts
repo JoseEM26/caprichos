@@ -116,6 +116,8 @@ export interface DiaPlanillaApi {
   breakMin?: number;
   alertas?: string[];
   extraPendiente?: boolean;
+  /** Extra del día antes de la regla semanal; lo que no queda en extraMin pasó a hora normal. */
+  extraBrutaMin?: number;
   /** Descanso (sin horario) con entrada y salida: sus horas van como extra y solo se pagan si el admin las aprueba. */
   descansoTrabajado?: boolean;
   vacacion?: boolean;
