@@ -13,7 +13,7 @@ export class PantallaLocalController {
   constructor(private readonly servicio: PantallaLocalService) {}
 
   @Get('pedidos')
-  @Permiso('cocina', 'ver')
+  @Permiso([{ modulo: 'cocina', accion: 'ver' }, { modulo: 'cocina', accion: 'despacho' }])
   @Header('Cache-Control', 'no-store')
   pedidos(): Promise<RespuestaPantalla> {
     return this.servicio.pedidos();

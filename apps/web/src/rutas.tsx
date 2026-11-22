@@ -71,7 +71,7 @@ export function RutasApp() {
         <Route
           path="/pantalla-local"
           element={
-            <PuertaTv vista="PANTALLA_LOCAL" permiso="cocina/ver">
+            <PuertaTv vista="PANTALLA_LOCAL" permiso={["cocina/ver", "cocina/despacho"]}>
               {(acceso) => (
                 <Suspense fallback={null}>
                   <PantallaLocal acceso={acceso} />

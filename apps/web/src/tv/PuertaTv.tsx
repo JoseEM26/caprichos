@@ -28,10 +28,10 @@ type Fase =
  * guardada en el navegador y, si no hay o fue revocada, muestra un código rotativo para vincularla
  * en Pantallas del administrativo.
  */
-export function PuertaTv({ vista, permiso, children }: { vista: VistaTv; permiso: string; children: (acceso: AccesoTv) => ReactNode }) {
+export function PuertaTv({ vista, permiso, children }: { vista: VistaTv; permiso: string | string[]; children: (acceso: AccesoTv) => ReactNode }) {
   const { usuario, cargando, tiene } = useSesion();
   if (cargando) return <Cargando mensaje="Preparando la pantalla..." pantallaCompleta />;
-  if (usuario && tiene(permiso)) return <>{children(SIN_SESION)}</>;
+  if (usuario && ([] as string[]).concat(permiso).some((p) => tiene(p))) return <>{children(SIN_SESION)}</>;
   return <TvSinSesion vista={vista}>{children}</TvSinSesion>;
 }
 
