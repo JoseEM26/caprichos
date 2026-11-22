@@ -72,10 +72,11 @@ export async function pedidoDelChatPorCodigo(prisma: PrismaService, chat: ChatLl
   const pedido = await prisma.pedido.findUnique({ where: { codigo } });
   if (!pedido) return null;
   if (pedidoEsDelChat(chat, pedido)) return pedido;
-  // Prueba de que es suyo: la clave del botón de la carta, o el código MÁS el celular con el que hizo el pedido (también los del equipo)
+  // Prueba de que es suyo: solo la clave del botón de la carta (también los del equipo). El celular escrito NO prueba nada:
+  // se conoce con facilidad y los códigos son correlativos; vincularía el chat de un extraño a los pedidos de otra persona.
+  void celular;
   const claveOk = !!clave && clave.toUpperCase() === claveCortaPedido(pedido.id);
-  const celularOk = !!celular && /^9\d{8}$/.test(celular) && celular === ultimos9(pedido.cliente_telefono);
-  if (!claveOk && !celularOk) return null;
+  if (!claveOk) return null;
   const esLid = String(chat.telefono ?? '').startsWith('wa-user:');
   const cel = telefonoEnviable(pedido.cliente_telefono).slice(-9);
   if (esLid && !chat.celular_vinculado && /^9\d{8}$/.test(cel)) {

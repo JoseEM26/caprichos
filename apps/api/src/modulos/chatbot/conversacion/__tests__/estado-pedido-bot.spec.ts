@@ -20,9 +20,9 @@ describe('bot: «Estado de mi pedido»', () => {
     expect(r[0].texto).toContain('CP-0001');
   });
 
-  it('chat LID sin llave: no dice «no tienes pedido», pide código y celular', () => {
+  it('chat LID sin llave: no dice «no tienes pedido», lo manda al botón de la carta', () => {
     const t = texto(nuevo({ pedidoActivo: null, pedidosEnCurso: [], chatSinLlave: true }).di('estado de mi pedido'));
-    expect(t).toMatch(/código de tu pedido/);
+    expect(t).toMatch(/Recibir mi pedido por WhatsApp/);
     expect(t).not.toMatch(/No tienes un pedido activo/);
   });
 

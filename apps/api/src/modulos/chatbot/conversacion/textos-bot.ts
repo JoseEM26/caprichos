@@ -1083,7 +1083,7 @@ export const TEXTOS_SOLO_MENUS = {
   variosPedidosEnCurso: (): string => 'Tienes varios pedidos en curso. ¿De cuál quieres saber?',
 
   pedirCodigoSinLlave: (): string =>
-    'No reconozco tu número en WhatsApp. Escríbeme el código de tu pedido (CP-…) junto al celular con el que lo hiciste, por ejemplo: CP-W435 987654321.',
+    'No reconozco tu número en WhatsApp. Abre tu pedido en la carta y toca «Recibir mi pedido por WhatsApp», o escríbenos desde el celular con el que lo hiciste.',
 
   sinPedidoActivo: (url: string): string => `No tienes un pedido activo con este número. Carta: ${url}`,
 
