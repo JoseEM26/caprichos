@@ -1,7 +1,7 @@
 import { transicionarEstado } from '../maquina-estados';
 import { normalizarEntrada } from '../normalizador-entrada.util';
 import { AccionMensaje, ContextoConversacion, FlujoConversacion } from '../tipos-conversacion';
-import { BOTON_VOLVER_MENU, BOTONES_PEDIDO_UBICACION, BOTONES_PEDIDO_UBICACION_FALLIDA, TEXTOS_BOT } from '../textos-bot';
+import { BOTONES_PEDIDO_UBICACION, BOTONES_PEDIDO_UBICACION_FALLIDA, TEXTOS_BOT } from '../textos-bot';
 
 /** Punto que el cliente mandó en el caso reportado (WhatsApp, «Enviar mi ubicación actual»). */
 const UBICACION_REPORTADA = { latitud: -12.018591, longitud: -76.957939 };
@@ -81,21 +81,30 @@ describe('Flujo de Pedido: delivery pide solo la ubicación actual', () => {
     return total;
   }
 
-  it('pide la ubicación en un solo mensaje, con la instrucción del clip y solo el botón de menú', () => {
+  it('pide la ubicación en un solo mensaje, con la instrucción del clip y la salida «Mejor para recoger» o menú', () => {
     const r = transicionarEstado(alPedir(), normalizarEntrada({ buttonPayload: 'ped_mod_delivery' }), contextoBase);
 
     expect(r.nuevoEstado).toBe('PEDIDO_UBICACION');
-    expect(r.acciones).toEqual([{ tipo: 'enviarBotones', texto: TEXTO_PEDIR_UBICACION, botones: [BOTON_VOLVER_MENU] }]);
-    expect(BOTONES_PEDIDO_UBICACION).toEqual([BOTON_VOLVER_MENU]);
+    expect(r.acciones).toEqual([{ tipo: 'enviarBotones', texto: TEXTO_PEDIR_UBICACION, botones: BOTONES_PEDIDO_UBICACION }]);
+    expect(BOTONES_PEDIDO_UBICACION.map((b) => b.id)).toEqual(['ped_mod_recojer', 'btn_menu']);
   });
 
-  it('texto libre repite la misma instrucción en un solo mensaje y no lo toma como dirección', () => {
+  it('una dirección escrita no se toma como ubicación: se explica una vez (con salida a recoger) y a la segunda se ofrece una persona (la vía del motor para lo que no entiende)', () => {
     const r = transicionarEstado(llegarAlPasoDelivery(), normalizarEntrada({ texto: 'Av. Las Palmeras 123, San Juan' }), contextoBase);
 
     expect(r.nuevoEstado).toBe('PEDIDO_UBICACION');
     expect(r.acciones).toHaveLength(1);
-    expect(r.acciones[0]).toEqual({ tipo: 'enviarBotones', texto: TEXTO_PEDIR_UBICACION, botones: [BOTON_VOLVER_MENU] });
+    expect(r.acciones[0]).toEqual({ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoUbicacionEscrita(), botones: BOTONES_PEDIDO_UBICACION_FALLIDA });
     expect((r.nuevoFlujo as any).pedido.entrega).toBeUndefined();
+    const otra = transicionarEstado(r.nuevoFlujo as FlujoConversacion, normalizarEntrada({ texto: 'mi casa es la verde' }), contextoBase);
+    // el motor (solo-menus) ya ofrece una persona si el segundo mensaje tampoco avanza; aquí, sin ese motor, repite la instrucción
+    expect(otra.acciones[0]).toMatchObject({ tipo: 'enviarBotones' });
+  });
+
+  it('«mejor para recoger» escrito en el paso de la ubicación cambia a recoger', () => {
+    const r = transicionarEstado(llegarAlPasoDelivery(), normalizarEntrada({ texto: 'mejor paso a recoger' }), contextoBase);
+    expect(r.nuevoEstado).toBe('PEDIDO_CATEGORIAS');
+    expect((r.nuevoFlujo as any).pedido.modalidad).toBe('RECOGER');
   });
 
   it('un botón o una lista de versiones anteriores repite la instrucción, sin cargar nada', () => {
@@ -107,7 +116,7 @@ describe('Flujo de Pedido: delivery pide solo la ubicación actual', () => {
     ]) {
       const r = transicionarEstado(llegarAlPasoDelivery(), normalizarEntrada(entrada), contextoBase);
       expect(r.nuevoEstado).toBe('PEDIDO_UBICACION');
-      expect(r.acciones).toEqual([{ tipo: 'enviarBotones', texto: TEXTO_PEDIR_UBICACION, botones: [BOTON_VOLVER_MENU] }]);
+      expect(r.acciones).toEqual([{ tipo: 'enviarBotones', texto: TEXTO_PEDIR_UBICACION, botones: BOTONES_PEDIDO_UBICACION }]);
       expect((r.nuevoFlujo as any).pedido.entrega).toBeUndefined();
     }
   });
@@ -166,14 +175,10 @@ describe('Flujo de Pedido: delivery pide solo la ubicación actual', () => {
       { entrada: { buttonPayload: 'ped_tam_tam_simple' }, ctx: ctxConCobertura },
       { entrada: { listRowId: 'ped_op_op_tartara' }, ctx: ctxConCobertura },
       { entrada: { buttonPayload: 'ped_cant_1' }, ctx: ctxConCobertura },
-      { entrada: { buttonPayload: 'ped_cart_continuar' }, ctx: ctxConCobertura },
-      { entrada: { buttonPayload: 'ped_nombre_si' }, ctx: ctxConCobertura },
-      { entrada: { buttonPayload: 'ped_tel_mismo' }, ctx: ctxConCobertura },
+      { entrada: { buttonPayload: 'ped_continuar' }, ctx: ctxConCobertura }, // nombre y celular salen solos
       { entrada: { buttonPayload: 'ped_pago_efectivo' }, ctx: ctxConCobertura },
       { entrada: { texto: '50' }, ctx: ctxConCobertura },
-      { entrada: { buttonPayload: 'ped_comp_boleta' }, ctx: ctxConCobertura },
-      { entrada: { texto: '12345678', textoOriginal: '12345678' }, ctx: ctxConCobertura },
-      { entrada: { buttonPayload: 'ped_confirmar_si' }, ctx: ctxConCobertura },
+      { entrada: { buttonPayload: 'ped_confirmar' }, ctx: ctxConCobertura },
     ];
     let flujo: FlujoConversacion = transicionarEstado(null, normalizarEntrada({ listRowId: 'pedir' }), contextoBase).nuevoFlujo as FlujoConversacion;
     let ultima: ReturnType<typeof transicionarEstado> | null = null;

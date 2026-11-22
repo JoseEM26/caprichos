@@ -104,7 +104,7 @@ describe('Ubicación del bot: el envío sale del servidor, sin tarifa inventada'
       vistaPreviaPedido: { subtotal: 40, descuento: 0, descuentoNombre: null, envio: 0, envioGratis: true },
     });
     expect((r.nuevoFlujo.pedido as any).entrega.tarifaEnvio).toBe(0);
-    expect((r.acciones[0] as any).texto).toContain('es gratis');
+    expect((r.acciones[0] as any).texto).toContain('Delivery gratis');
   });
 
   it('zona sin tarifa conocida: el envío queda por calcular (no 5.00 ni 70 por defecto)', () => {

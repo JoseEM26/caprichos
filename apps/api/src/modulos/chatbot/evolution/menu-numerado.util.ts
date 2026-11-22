@@ -42,7 +42,7 @@ export function aTextoNumerado(
   const lineas = opciones.map((o) => {
     const desc = (items[o.n - 1] as FilaLista).descripcion;
     // «3 Regular» ya trae su número (escala de la encuesta): no se duplica, y lleva su emoji
-    const titulo = o.titulo.replace(new RegExp(`^${o.n}\\s+`), '');
+    const titulo = o.id.startsWith('encuesta:') ? o.titulo.replace(new RegExp(`^${o.n}\\s+`), '') : o.titulo;
     const emoji = EMOJI_ESCALA[o.id] ? `${EMOJI_ESCALA[o.id]} ` : '';
     return `${o.n}. ${emoji}${titulo}${desc ? ` (${desc})` : ''}`;
   });

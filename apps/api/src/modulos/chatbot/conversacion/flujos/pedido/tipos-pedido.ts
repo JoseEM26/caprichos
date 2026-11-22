@@ -157,6 +157,10 @@ export interface ItemEnConfiguracionBot {
   nombresEnvase?: string[];
   /** Producto anfitrión de un combo vendible por el bot: tras la cantidad se eligen sus partes. */
   combo?: ComboEnConfiguracionBot;
+  /** La cantidad ya vino dicha en la frase del cliente: no se pregunta. */
+  cantidadFija?: boolean;
+  /** Ya se le ofreció personalizar (grupos opcionales) y dijo que sí: se preguntan uno por uno. */
+  personalizar?: boolean;
 }
 
 export interface DatosEntregaBot {
@@ -245,6 +249,16 @@ export interface EstadoCarritoPedido {
   ofertasRechazadas?: string[];
   pago?: DatosPagoBot;
   comprobante?: DatosComprobanteBot;
+  /** Pedido dicho en una frase: lo que falta por configurar (producto, tamaño y opciones ya dichas, cantidad). */
+  colaFrase?: Array<{ productoId: string; tamanoId?: string; opcionIds: string[]; cantidad: number }>;
+  /** Pedido nacido de una frase: tras la modalidad se sigue directo al pago (ya dijo lo que quiere). */
+  desdeFrase?: boolean;
+  /** Productos de la frase que no se pudieron poner (agotados o sin entender): se avisan en el siguiente mensaje. */
+  avisosFrase?: string[];
+  /** Ya se le explicó que la dirección escrita no sirve (no repetir la misma explicación). */
+  ubicacionReintento?: boolean;
+  /** Trozos de la frase con varios productos posibles: se pregunta cuál, uno por vez. */
+  ambiguosFrase?: Array<{ texto: string; ids: string[] }>;
   idempotenciaPaso?: string;
   timestampUltimaAccion?: number;
   estadoPrevioCancelacion?: EstadoPedidoFlujo;

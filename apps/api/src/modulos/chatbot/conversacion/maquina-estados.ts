@@ -2038,10 +2038,12 @@ function transicionarSoloMenusNucleo(
   const esId = (...ids: string[]) => ids.includes(id);
   const hay = (palabras: string[]) => coincideAlgunaPalabra(texto, palabras);
 
+  // Un carrito con productos sobrevive a una respuesta informativa (menú, horario, carta…): solo se descarta al pasar a una persona
+  const carritoGuardado = !enPersona && flujo.pedido?.items?.length ? flujo.pedido : null;
   const respuesta = (acciones: any[], estado: EstadoConversacion = enPersona ? 'ATENCION_PERSONA' : 'MENU') => ({
     nuevoEstado: estado,
     acciones,
-    nuevoFlujo: { ...flujo, estado, pedido: null, repreguntasFallidas: 0, saludoCorto: undefined, insultos: undefined } as FlujoConversacion,
+    nuevoFlujo: { ...flujo, estado, pedido: estado === 'MENU' ? carritoGuardado : null, repreguntasFallidas: 0, saludoCorto: undefined, insultos: undefined } as FlujoConversacion,
   });
 
   const saludo = () => {
@@ -2075,6 +2077,11 @@ function transicionarSoloMenusNucleo(
   };
 
   // 0. Pedido en curso que lleva más de 30 minutos sin respuesta: se descarta el carrito y se vuelve al menú
+  if (contexto.inactividadExpirada && enPedido && flujo.pedido?.items?.length && (contexto.minutosInactividad ?? 0) <= 360) {
+    // Con productos ya elegidos, el carrito se guarda unas horas: se ofrece retomarlo en vez de perderlo
+    const r = atenderConSubflujo('pedido', { ...flujo, estado: 'MENU' }, { tipo: 'boton', texto: 'pedir', textoOriginal: 'pedir', id: 'pedir' }, contexto);
+    if (r) return r;
+  }
   if (contexto.inactividadExpirada && enPedido) {
     return {
       nuevoEstado: 'MENU',
@@ -2182,6 +2189,18 @@ function transicionarSoloMenusNucleo(
     return pasarAsesor(flujo, entrada, contexto, 'PEDIDO_ESPECIAL', TEXTOS_SOLO_MENUS.pedidoEspecial(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
   }
 
+  // 2.c «Menú» a medio pedido: el menú de siempre, con el carrito guardado (volver a «Hacer pedido» lo retoma)
+  if (enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || texto === 'menu' || texto === 'volver al menu')) {
+    const n = flujo.pedido?.items?.length ?? 0;
+    return {
+      nuevoEstado: 'MENU',
+      acciones: [
+        { tipo: 'enviarLista', texto: n ? `Tu pedido sigue guardado (${n} ${n === 1 ? 'producto' : 'productos'}). ¿Qué necesitas?` : '¿Qué necesitas?', botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'MENU', pedido: n ? flujo.pedido : null, repreguntasFallidas: 0 },
+    };
+  }
+
   // 3. Pedido o pago en curso: el flujo del motor anterior atiende la respuesta (carrito, dirección, medio de pago, voucher)
   if (enPedido) {
     const r = atenderConSubflujo('pedido', flujo, entrada, contexto);
@@ -2204,6 +2223,13 @@ function transicionarSoloMenusNucleo(
             ? '¡Claro! 😊'
             : null;
       if (sinCulpa) return { ...r, acciones: cambiarPrefijoNoEntendi(r.acciones, sinCulpa), nuevoFlujo: flujo };
+      // Pregunta suelta (horario, pagos, delivery…) a medio pedido: se contesta y se ofrece seguir donde iba, sin perder nada
+      const faqSuelta = claveFaqSoloMenus('', texto) ?? (hay(['horario', 'ubicacion', 'abren', 'cierran', 'hasta que hora', 'direccion']) ? 'horario' : null);
+      // (en los pasos de pago, «yape»/«pago» ya los contesta el propio paso)
+      if (faqSuelta && texto.length > 3 && !(faqSuelta === 'pagos' && /PAGO|MONTO|COMPROBANTE/.test(String(flujo.estado)))) {
+        const a = respuestaFaqSoloMenus(faqSuelta, contexto);
+        return { nuevoEstado: flujo.estado, acciones: [{ ...a, botones: [{ id: 'ped_seguir', titulo: 'Seguir con mi pedido' }, BOTON_VOLVER_MENU] }], nuevoFlujo: flujo };
+      }
       const prev = Number((flujo as any).pasoNoEntendido?.n ?? 0);
       if (contexto.chatbotIaActivo && /[a-z]{3}/.test(texto)) {
         return { nuevoEstado: flujo.estado, acciones: [{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }], nuevoFlujo: flujo };
@@ -2242,7 +2268,8 @@ function transicionarSoloMenusNucleo(
   }
 
   // 4. Hacer pedido: botón «Hacer pedido», «Pedir este» de la carta o texto como «quiero pedir»
-  if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
+  // (también un pedido dicho en una frase: «2 frappé moka grande para llevar»)
+  if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido']) || (!id && !enPersona && texto.length > 2)) {
     // Desde el menú, el flujo de pedido arranca como si viniera del menú
     const r = atenderConSubflujo('pedido', { ...flujo, estado: 'MENU', pedido: null }, entrada, contexto);
     if (r) return r;

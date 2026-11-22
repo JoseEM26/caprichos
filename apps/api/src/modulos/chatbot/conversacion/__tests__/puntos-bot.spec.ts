@@ -68,37 +68,23 @@ describe('Puntos en el bot de WhatsApp: solo acumular, con el celular de quien e
     });
   });
 
-  describe('flujo de pedido: al llegar a la confirmación del nombre', () => {
-    const flujo: FlujoConversacion = {
-      version: 2,
-      estado: 'PEDIDO_ACCION_CARRITO',
-      repreguntasFallidas: 0,
-      nombre_perfil_wa: 'José M',
-      pedido: {
-        estadoInterno: 'PEDIDO_ACCION_CARRITO',
-        modalidad: 'RECOGER',
-        items: [{ productoId: 'prod_clasica', nombre: 'Hamburguesa Clásica', cantidad: 1, subtotal: 20, opciones: [] }],
-      } as any,
-    };
-    const base = {
-      nombreCliente: 'José M',
-      telefonoCliente: '51987654321',
-      cartaUrlPublica: 'https://carta.caprichos.pe',
-      datosLocalPublicos: { pedidoMinimo: 0, tiempo_base: 25, tiempo_maximo: 35 },
-    } as ContextoConversacion;
-
-    it('muestra el celular de quien escribe, enmascarado, sin pedirlo', () => {
-      const res = transicionarEstado(flujo, normalizarEntrada({ buttonPayload: 'ped_cart_continuar' }), base);
-      expect(res.nuevoEstado).toBe('PEDIDO_CONFIRMAR_NOMBRE');
-      const accion = res.acciones.find((a) => a.tipo === 'enviarBotones') as any;
-      expect(accion.texto).toContain('sumas puntos en tu número 9•• ••• 321.');
-    });
-
-    it('con cuenta de puntos ya cargada en el contexto, muestra el saldo sin consultar nada más', () => {
-      const ctx = { ...base, puntos: { porcentaje: 5, cuentaTelefono: { partyId: '1', primerNombre: 'José', saldo: 7 } } } as ContextoConversacion;
-      const res = transicionarEstado(flujo, normalizarEntrada({ buttonPayload: 'ped_cart_continuar' }), ctx);
-      const accion = res.acciones.find((a) => a.tipo === 'enviarBotones') as any;
-      expect(accion.texto).toContain('Tu saldo: 7.00 puntos.');
+  describe('flujo de pedido: ya no se pregunta el nombre', () => {
+    it('al continuar el carrito el nombre sale del perfil y se va directo al pago (el resumen no menciona puntos)', () => {
+      const flujo: FlujoConversacion = {
+        version: 2,
+        estado: 'PEDIDO_ACCION_CARRITO',
+        repreguntasFallidas: 0,
+        nombre_perfil_wa: 'José M',
+        pedido: {
+          estadoInterno: 'PEDIDO_ACCION_CARRITO',
+          modalidad: 'RECOGER',
+          items: [{ productoId: 'prod_clasica', productoNombre: 'Hamburguesa Clásica', cantidad: 1, precioUnitario: 20, subtotal: 20, opciones: [] }],
+        } as any,
+      };
+      const base = { nombreCliente: 'José M', telefonoCliente: '51987654321', datosLocalPublicos: { pedidoMinimo: 0, tiempo_base: 25, tiempo_maximo: 35 } } as ContextoConversacion;
+      const res = transicionarEstado(flujo, normalizarEntrada({ buttonPayload: 'ped_continuar' }), base);
+      expect(res.nuevoEstado).toBe('PEDIDO_MEDIO_PAGO');
+      expect(res.nuevoFlujo.pedido?.cliente?.nombre).toBe('José M');
     });
   });
 });

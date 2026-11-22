@@ -164,13 +164,9 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       entrada = normalizarEntrada({ buttonPayload: 'ped_cart_continuar' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
-      // 10. Sin pregunta de cupón: pasa directo a confirmar el nombre del cliente (sugerido por perfil)
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CONFIRMAR_NOMBRE');
-      entrada = normalizarEntrada({ buttonPayload: 'ped_nombre_si' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
-
-      // 12. Recojo: no se pide celular (solo delivery); va directo al medio de pago
+      // 10. Sin preguntas de nombre ni celular: el nombre sale del perfil y en recojo no se pide celular; va directo al pago
       expect(resultado.nuevoEstado).toBe('PEDIDO_MEDIO_PAGO');
+      expect(resultado.nuevoFlujo.pedido?.cliente?.nombre).toBe('Carlos Test');
       entrada = normalizarEntrada({ buttonPayload: 'ped_pago_efectivo' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
@@ -179,20 +175,15 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       entrada = normalizarEntrada({ texto: '50' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
-      // 14. Comprobante
-      expect(resultado.nuevoEstado).toBe('PEDIDO_COMPROBANTE_TIPO');
-      entrada = normalizarEntrada({ buttonPayload: 'ped_comp_boleta' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
-      expect(resultado.nuevoEstado).toBe('PEDIDO_COMPROBANTE_DNI');
-      entrada = normalizarEntrada({ texto: '12345678', textoOriginal: '12345678' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
+      // 14. Comprobante simple por defecto (boleta o factura se piden desde el resumen)
+      expect(resultado.nuevoFlujo.pedido?.comprobante?.tipo).toBe('SIMPLE');
 
       // 15. Resumen final con botones Confirmar o Cambiar
       expect(resultado.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
       expect(resultado.acciones[0].tipo).toBe('enviarBotones');
 
       // 16. Confirmar Pedido -> Despacha crearPedido transaccional
-      entrada = normalizarEntrada({ buttonPayload: 'ped_confirmar_si' });
+      entrada = normalizarEntrada({ buttonPayload: 'ped_confirmar' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
       expect(resultado.acciones.some((a) => a.tipo === 'crearPedido')).toBe(true);
       expect(resultado.nuevoEstado).toBe('MENU');
@@ -530,7 +521,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
   });
 
   describe('12. Expiración por inactividad (30 minutos)', () => {
-    it('al volver a escribir tras 30 minutos sin respuesta, descarta el carrito y avisa al cliente', () => {
+    it('al volver a escribir tras 30 minutos sin respuesta, ofrece retomar el carrito; tras más de 6 horas lo descarta y avisa', () => {
       const flujoInactivo: FlujoConversacion = {
         version: 1,
         estado: 'PEDIDO_CATEGORIAS',
@@ -564,10 +555,18 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       const entrada = normalizarEntrada({ texto: 'hola' });
       const resultado = transicionarEstado(flujoInactivo, entrada, contextoExpirado);
 
-      expect(resultado.nuevoEstado).toBe('MENU');
-      expect(resultado.nuevoFlujo.pedido).toBeNull();
+      // Con productos ya elegidos, el carrito se guarda unas horas: se ofrece retomarlo, no se pierde
+      expect(resultado.nuevoFlujo.pedido?.items).toHaveLength(1);
       if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('expiró por inactividad');
+        expect(resultado.acciones[0].texto).toContain('pedido a medias');
+      }
+
+      // Pasadas muchas horas (más de 6) sí se descarta, como antes
+      const muyViejo = transicionarEstado(flujoInactivo, entrada, { ...contextoExpirado, minutosInactividad: 600 });
+      expect(muyViejo.nuevoEstado).toBe('MENU');
+      expect(muyViejo.nuevoFlujo.pedido).toBeNull();
+      if (muyViejo.acciones[0].tipo === 'enviarBotones') {
+        expect(muyViejo.acciones[0].texto).toContain('expiró por inactividad');
       }
     });
   });
@@ -644,6 +643,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
         pedido: {
           estadoInterno: 'PEDIDO_ACCION_CARRITO',
           modalidad: 'DELIVERY',
+          entrega: { modalidad: 'DELIVERY', lat: -12.0196, lng: -76.9632, tarifaEnvio: 5 },
           items: [
             {
               lineaId: 'lin_1',
@@ -683,7 +683,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
   });
 
   describe('16. Sin promociones ni descuentos en el bot', () => {
-    it('con una oferta configurada, continuar el carrito va directo a confirmar el nombre y no la menciona', () => {
+    it('con una oferta configurada, continuar el carrito va directo al pago y no la menciona', () => {
       const contextoConOferta: ContextoConversacion = {
         ...contextoBase,
         ofertas: [
@@ -726,11 +726,11 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       const entrada = normalizarEntrada({ buttonPayload: 'ped_cart_continuar' });
       const resultado = transicionarEstado(flujoCon2Hamburguesas, entrada, contextoConOferta);
 
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CONFIRMAR_NOMBRE');
+      expect(resultado.nuevoEstado).toBe('PEDIDO_MEDIO_PAGO');
       const textos = resultado.acciones
         .map((a: any) => `${a.texto ?? ''} ${a.botones?.map((b: any) => b.titulo).join(' ') ?? ''}`)
         .join(' ');
-      // La línea de puntos (solo acumular, con el celular de quien escribe) sí va en este mensaje; las promos no
+      // Las promos no se mencionan en el bot
       expect(textos).not.toMatch(/promo|oferta|descuento|cup[oó]n|ahorr/i);
     });
   });

@@ -110,16 +110,15 @@ describe('Flujo de Pedido: combos con elecciones', () => {
   }
   const textos = (r: R) => r.acciones.map((a: any) => a.texto).join('\n');
   const todasLasFilas = (r: R) => r.acciones.flatMap((a: any) => a.filas ?? a.botones ?? []);
+  /** Del carrito hasta crear el pedido: nombre y celular salen solos; se contesta lo que el bot pregunta. */
   const crear = (r: R, c: ContextoConversacion) => {
-    let x = boton(r, c, 'ped_cart_continuar');
-    x = boton(x, c, 'ped_nombre_si');
-    x = boton(x, c, 'ped_tel_mismo');
-    x = boton(x, c, 'ped_pago_efectivo');
-    x = paso(x, c, { texto: '100' });
-    x = boton(x, c, 'ped_comp_ninguno');
-    if (x.nuevoEstado === 'PEDIDO_COMPROBANTE_TIPO') x = boton(x, c, 'ped_comp_boleta');
-    if (x.nuevoEstado === 'PEDIDO_COMPROBANTE_DNI') x = paso(x, c, { texto: '12345678', textoOriginal: '12345678' });
-    x = boton(x, c, 'ped_confirmar_si');
+    let x = boton(r, c, 'ped_continuar');
+    for (let i = 0; i < 8 && !x.acciones.some((a: any) => a.tipo === 'crearPedido'); i++) {
+      if (x.nuevoEstado === 'PEDIDO_MEDIO_PAGO') x = boton(x, c, 'ped_pago_efectivo');
+      else if (x.nuevoEstado === 'PEDIDO_MONTO_EFECTIVO') x = paso(x, c, { texto: '100', textoOriginal: '100' });
+      else if (x.nuevoEstado === 'PEDIDO_RESUMEN_CONFIRMAR') x = boton(x, c, 'ped_confirmar');
+      else x = boton(x, c, 'ped_continuar');
+    }
     return x.acciones.find((a: any) => a.tipo === 'crearPedido') as any;
   };
 

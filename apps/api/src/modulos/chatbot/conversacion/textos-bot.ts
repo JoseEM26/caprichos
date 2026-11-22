@@ -85,8 +85,8 @@ export const BOTONES_PEDIDO_MODALIDAD: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
 ];
 
-/** Delivery: solo se pide la ubicación actual; el único botón deja salir al menú. */
-export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [BOTON_VOLVER_MENU];
+/** Delivery: se pide la ubicación actual; quien no quiere mandarla puede recoger en el local o salir al menú. */
+export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [{ id: 'ped_mod_recojer', titulo: 'Mejor para recoger' }, BOTON_VOLVER_MENU];
 
 export const BOTONES_PEDIDO_UBICACION_FALLIDA: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
@@ -136,6 +136,13 @@ export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
   { id: 'ped_cambiar', titulo: 'Cambiar algo' },
 ];
 
+/** Resumen con ticket simple por defecto: quien necesita boleta o factura la pide aquí (sin preguntarlo a todos). */
+export const BOTONES_PEDIDO_CONFIRMAR_FINAL_CON_COMPROBANTE: BotonAccion[] = [
+  { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
+  { id: 'ped_cambiar', titulo: 'Cambiar algo' },
+  { id: 'ped_comp_pedir', titulo: 'Boleta o factura' },
+];
+
 export const BOTONES_PEDIDO_CANCELAR_CONFIRMAR: BotonAccion[] = [
   { id: 'ped_cancelar_si', titulo: 'Sí, cancelar' },
   { id: 'ped_cancelar_no', titulo: 'No, continuar' },
@@ -144,6 +151,17 @@ export const BOTONES_PEDIDO_CANCELAR_CONFIRMAR: BotonAccion[] = [
 export const BOTONES_PEDIDO_NOTAS: BotonAccion[] = [
   { id: 'ped_nota_sin', titulo: 'Sin notas' },
   { id: 'ped_continuar', titulo: 'Continuar' },
+];
+
+export const BOTONES_PEDIDO_RETOMAR: BotonAccion[] = [
+  { id: 'ped_continuar', titulo: 'Sí, continuar' },
+  { id: 'ped_otro', titulo: 'Agregar producto' },
+  { id: 'ped_nuevo', titulo: 'Empezar de nuevo' },
+];
+
+export const BOTONES_PEDIDO_PERSONALIZAR: BotonAccion[] = [
+  { id: 'ped_per_no', titulo: 'Así está bien' },
+  { id: 'ped_per_si', titulo: 'Personalizar' },
 ];
 
 export const BOTONES_PEDIDO_CANTIDADES: BotonAccion[] = [
@@ -674,6 +692,9 @@ export const TEXTOS_BOT = {
     return '¿Dónde te lo llevamos? 📍 Envíanos tu ubicación actual: toca el clip 📎 > Ubicación > Enviar mi ubicación actual.';
   },
 
+  pedidoUbicacionEscrita: (): string =>
+    'Con una dirección escrita no puedo calcular tu envío 📍 Toca el clip 📎 > Ubicación > Enviar mi ubicación actual, o elige recoger en el local.',
+
   pedidoFueraDeCobertura: (): string => {
     return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local o enviarnos otra ubicación.';
   },
@@ -753,6 +774,10 @@ export const TEXTOS_BOT = {
     return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
   },
 
+  /** Un solo mensaje para varios grupos opcionales (leche, endulzante…). */
+  pedidoPersonalizar: (producto: string, grupos: string[]): string =>
+    `¿Quieres personalizar tu ${producto}? Puedes elegir ${grupos.map((g) => g.toLowerCase()).join(', ')} (todo es opcional).`,
+
   pedidoPreguntarCantidad: (nombreProd: string, avisoStock?: string | null): string => {
     return `${avisoStock ? `${avisoStock}\n` : ''}¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
@@ -801,7 +826,9 @@ export const TEXTOS_BOT = {
   },
 
   pedidoPedirNombreEnvase: (producto: string, indice: number, total: number): string => {
-    return `Tu ${producto}: escribe el nombre para el envase ${indice} de ${total}. Irá en la etiqueta pegada al envase (máx. 14 letras se ven completas).`;
+    if (total === 1) return `¿A nombre de quién va tu ${producto}? Va escrito en la etiqueta del envase.`;
+    const base = `Tu ${producto}: escribe el nombre para el envase ${indice} de ${total}.`;
+    return indice === 1 ? `${base} Puedes escribir los ${total} nombres juntos, separados por coma (Ana, Luis).` : base;
   },
 
   pedidoConfirmarNombresEnvases: (producto: string, nombres: string[]): string => {
@@ -919,6 +946,10 @@ export const TEXTOS_BOT = {
     avisoDemanda?: string;
     /** Pedido programado: reemplaza la línea de tiempo estimado por «Programado para…». */
     programadoTexto?: string;
+    /** «Ana · cel. 987654321»: a nombre de quién sale y, en delivery, el celular de contacto. */
+    clienteTexto?: string;
+    /** Solo si pidió boleta o factura (el ticket simple es lo normal y no se menciona). */
+    comprobanteTexto?: string;
   }): string => {
     const {
       lineasTexto,
@@ -935,6 +966,8 @@ export const TEXTOS_BOT = {
       tiempoMax,
       avisoDemanda,
       programadoTexto,
+      clienteTexto,
+      comprobanteTexto,
     } = params;
 
     const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
@@ -949,7 +982,8 @@ export const TEXTOS_BOT = {
       (propina && propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +
-      `Pago: ${pagoTexto}\n` +
+      (clienteTexto ? `A nombre de: ${clienteTexto}\n` : '') +
+      `Pago: ${pagoTexto}${comprobanteTexto ? ` · ${comprobanteTexto}` : ''}\n` +
       (programadoTexto ? `${programadoTexto}\n\n` : `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n`) +
       `¿Confirmo tu pedido?`
     );

@@ -38,14 +38,13 @@ const textos = (r: any) => r.acciones.map((a: any) => a.texto).join('\n---\n');
 
 describe('Pagos del bot', () => {
   describe('resumen con total antes de pagar', () => {
-    it('lista cantidad, tamaño, precios, subtotal, delivery y TOTAL en negrita (sin descuentos)', () => {
+    it('muestra solo el envío y el TOTAL en negrita antes de pagar (sin descuentos ni el carrito repetido)', () => {
       const f = flujoPago({ modalidad: 'DELIVERY', entrega: { modalidad: 'DELIVERY', tarifaEnvio: 5 } }, 'PEDIDO_INGRESAR_TELEFONO');
       (f.pedido as any).cliente.telefono = undefined;
       const r = paso(f, { buttonPayload: 'ped_tel_mismo' });
       const t = (r.acciones[0] as any).texto as string;
-      expect(t).toContain('2× Hamburguesa · Doble — S/ 52.00');
-      expect(t).toContain('Frappe — S/ 10.50');
-      expect(t).toContain('Subtotal: S/ 62.50');
+      // Antes de pagar solo va el total (el detalle sale en el resumen final): sin repetir el carrito
+      expect(t).not.toContain('Hamburguesa');
       expect(t).not.toMatch(/descuento|cup[oó]n/i);
       expect(t).toContain('Delivery: S/ 5.00');
       expect(t).toContain('*TOTAL: S/ 67.50*');

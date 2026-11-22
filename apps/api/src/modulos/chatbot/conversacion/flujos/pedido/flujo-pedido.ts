@@ -43,12 +43,15 @@ import {
   BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
   BOTONES_PEDIDO_COMPROBANTE,
   BOTONES_PEDIDO_CONFIRMAR_FINAL,
+  BOTONES_PEDIDO_CONFIRMAR_FINAL_CON_COMPROBANTE,
   BOTONES_PEDIDO_PROPINA,
   BOTONES_PEDIDO_CANCELAR_CONFIRMAR,
   BOTONES_PEDIDO_NOTAS,
   BOTONES_PEDIDO_CANTIDADES,
   BOTONES_PEDIDO_NOMBRES_ENVASE,
   BOTONES_PEDIDO_TELEFONO,
+  BOTONES_PEDIDO_PERSONALIZAR,
+  BOTONES_PEDIDO_RETOMAR,
 } from '../../textos-bot';
 import {
   MEDIOS_DIGITALES,
@@ -65,6 +68,7 @@ import {
   textoPago,
 } from './pago-bot.util';
 import { MedioPagoBot } from './tipos-pedido';
+import { PedidoLibre, esPregunta, esSi, interpretarPedidoLibre } from './pedido-libre.util';
 import {
   BOTONES_PEDIDO_CAMINO_PAGO,
   FILAS_PROGRAMAR_POR_PAGINA,
@@ -72,6 +76,7 @@ import {
   TEXTOS_PROGRAMAR,
   tituloFilaDia,
 } from '../../textos-programar';
+import { nombreParaSaludo } from '../../bienvenida.util';
 import { esGrupoBebidaDuplicado } from '../../../../ofertas/combo-grupos.util';
 import { celularPuntosEnmascarado } from '../../../utilidades/enmascarar.util';
 
@@ -100,6 +105,28 @@ const PALABRAS_CANCELAR = [
  * Estados de dirección que ya no existen (conversaciones abiertas antes de quitar las direcciones anteriores
  * y la referencia aparte): siguen por la ubicación, para que nadie quede atascado.
  */
+const NUMEROS_PALABRA: Record<string, number> = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+const RE_SOLO_MODALIDAD = /^(delivery|a domicilio|domicilio|para recoger|para llevar|recoger|recojo|llevar|pedir delivery|quiero delivery)$/;
+const RE_CAMBIO_CANTIDAD = /(?:mejor|que sean|que seran|cambialo a|cambia a) (?:que sean |que seran )?(\d{1,2})\b|^(?:en vez de \d+,? )(\d{1,2})\b/;
+const RE_QUITAR = /\b(quita|quitar|quitame|saca|sacar|elimina|eliminar|borra|borrar|sin el)\b/;
+const ESTADOS_CORRECCION = ['PEDIDO_MODALIDAD', 'PEDIDO_UBICACION', 'PEDIDO_CATEGORIAS', 'PEDIDO_PRODUCTOS', 'PEDIDO_ACCION_CARRITO', 'PEDIDO_VER_CARRITO', 'PEDIDO_MEDIO_PAGO', 'PEDIDO_MONTO_EFECTIVO', 'PEDIDO_RESUMEN_CONFIRMAR'];
+
+/** El cliente escribió el nombre de la opción, con o sin el precio que lleva el botón («Grande S/20», «Almendra +S/3»). */
+function coincideTitulo(nombre: string, textoNormalizado: string): boolean {
+  const n = normalizarTexto(nombre);
+  return n.length > 0 && (textoNormalizado === n || textoNormalizado.startsWith(`${n} `) || (n.length >= 4 && ` ${textoNormalizado} `.includes(` ${n} `)));
+}
+
+const raizCat = (t: string) => normalizarTexto(t).replace(/s\b/g, '');
+/** El texto del cliente nombra esa categoría («frappés», «ver los postres»), sin importar plural o artículos. */
+function categoriaCoincide(nombre: string, texto: string): boolean {
+  const n = raizCat(nombre);
+  return n.length >= 4 && raizCat(texto).includes(n);
+}
+
+/** Estados donde un texto libre puede ser un pedido en una frase (no los pasos que esperan nombre, monto, etc.). */
+const ESTADOS_FRASE = ['INICIO', 'MENU', 'PEDIDO', 'PEDIDO_MODALIDAD', 'PEDIDO_CATEGORIAS', 'PEDIDO_PRODUCTOS', 'PEDIDO_ACCION_CARRITO', 'PEDIDO_VER_CARRITO', 'PEDIDO_MEDIO_PAGO', 'PEDIDO_RESUMEN_CONFIRMAR'];
+
 const ESTADOS_UBICACION_LEGADOS: string[] = ['PEDIDO_DIRECCION_ELEGIR', 'PEDIDO_DIRECCION_TEXTO', 'PEDIDO_REFERENCIA'];
 
 function normalizarEstadoUbicacion(estado: EstadoPedidoFlujo): EstadoPedidoFlujo {
@@ -329,6 +356,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return true;
     }
 
+    // Pedido dicho en una frase («2 frappé moka grande para llevar»)
+    if (!entrada.id && this.fraseDePedido(flujo, entrada, _contexto)) return true;
+    if (!entrada.id && ['INICIO', 'MENU'].includes(estadoStr) && RE_SOLO_MODALIDAD.test(entrada.texto)) return true;
+
     // Botones directos del flujo de pedido
     if (entrada.id?.startsWith('ped_')) {
       return true;
@@ -457,6 +488,32 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
+    // «Seguir con mi pedido» tras una pregunta suelta (horario, pagos…): vuelve al paso donde iba
+    if (entrada.id === 'ped_seguir' && flujo.pedido) {
+      return this.renderizarEstado(flujo.pedido.estadoInterno || 'PEDIDO_CATEGORIAS', flujo, { ...flujo.pedido }, contexto);
+    }
+
+    // «delivery» o «para llevar» como primer mensaje: ya dijo cómo lo quiere; se sigue desde ahí
+    if (!entrada.id && ['INICIO', 'MENU'].includes(String(flujo.estado)) && RE_SOLO_MODALIDAD.test(entrada.texto) && !(contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta)) {
+      const bloqueo = this.bloqueoDeApertura(flujo, contexto);
+      if (bloqueo) return bloqueo;
+      const base: EstadoCarritoPedido = flujo.pedido?.items?.length ? flujo.pedido : { estadoInterno: 'PEDIDO_MODALIDAD', items: [], idempotenciaPaso: `step_${Date.now()}`, timestampUltimaAccion: Date.now() };
+      return this.pasoModalidad({ ...flujo, estado: 'PEDIDO_MODALIDAD' }, base, entrada, contexto);
+    }
+
+    // 2.c Corregir a última hora («mejor que sean 3», «quita el cheesecake») aunque ya esté en el pago o el resumen
+    if (!entrada.id && flujo.pedido?.items?.length && ESTADOS_CORRECCION.includes(String(flujo.estado)) && (RE_CAMBIO_CANTIDAD.test(entrada.texto) || RE_QUITAR.test(entrada.texto))) {
+      return this.pasoVerCarrito(flujo, { ...flujo.pedido, estadoInterno: 'PEDIDO_VER_CARRITO' }, entrada, contexto);
+    }
+
+    // 2.b Pedido dicho en una frase: se arma el carrito de una vez y solo se pregunta lo que falta
+    const libre = !entrada.id ? this.fraseDePedido(flujo, entrada, contexto) : null;
+    if (libre) {
+      const bloqueo = this.bloqueoDeApertura(flujo, contexto);
+      if (bloqueo) return bloqueo;
+      return this.aplicarFrase(flujo, libre, contexto);
+    }
+
     // 3. Inicio del flujo ("Hacer un pedido")
     const esInicioPedido =
       !entrada.id?.startsWith('ped_prod_') &&
@@ -465,6 +522,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         flujo.estado === 'PEDIDO' ||
         entrada.id === 'pedir' ||
         entrada.id === 'btn_pedido');
+
+    // Tiene un carrito guardado (salió al menú a medio pedido o volvió después): se retoma, no se empieza de cero
+    if (esInicioPedido && !flujo.estado.startsWith('PEDIDO_') && flujo.pedido?.items?.length) {
+      if (entrada.id === 'ped_nuevo') {
+        return this.renderizarEstado('PEDIDO_MODALIDAD', { ...flujo, pedido: null }, { estadoInterno: 'PEDIDO_MODALIDAD', items: [], idempotenciaPaso: `step_${Date.now()}` }, contexto);
+      }
+      return this.retomarCarrito(flujo, flujo.pedido, contexto);
+    }
 
     if (esInicioPedido && !flujo.estado.startsWith('PEDIDO_')) {
       // 3.1. Validar local cerrado o pausado
@@ -535,9 +600,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 3.b Pedido directo de un producto concreto (CTA comercial / Pedir este producto)
+    // 3.b Pedido directo de un producto concreto (CTA comercial / Pedir este producto). Con el pedido ya en marcha es una
+    // elección más de la lista: no se vuelve a revisar el horario (y no se pierde el carrito).
     if (entrada.id?.startsWith('ped_prod_')) {
-      if (contexto.datosLocal?.pausaAltaDemanda) {
+      const enMarcha = String(flujo.estado).startsWith('PEDIDO_');
+      if (!enMarcha && contexto.datosLocal?.pausaAltaDemanda) {
         const extraMin = contexto.datosLocal.altaDemandaMinutosExtra || 20;
         const motivo = contexto.datosLocal.motivoPausa || 'Muchos pedidos';
         return {
@@ -557,7 +624,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       }
 
       // Cerrado con «programar fuera de horario»: no se pierde al cliente; se le ofrece programar el pedido completo
-      if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) {
+      if (!enMarcha && contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) {
         return {
           nuevoEstado: 'MENU',
           acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_PROGRAMAR.bienvenida(), botones: [BOTON_PROGRAMAR_PEDIDO] }],
@@ -565,7 +632,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         };
       }
 
-      if (contexto.datosLocal && !contexto.datosLocal.abierta) {
+      if (!enMarcha && contexto.datosLocal && !contexto.datosLocal.abierta) {
         const horarioTexto = contexto.datosLocal.textoEstado || 'de 14:00 a 22:00';
         return {
           nuevoEstado: 'MENU',
@@ -603,6 +670,169 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedidoActual.timestampUltimaAccion = Date.now();
 
     return this.despacharPaso(pedidoActual.estadoInterno, flujo, pedidoActual, entrada, contexto);
+  }
+
+  // -------------------------------------------------------------------------
+  // PEDIDO EN UNA FRASE: «2 frappé moka grande para llevar». El carrito se arma de una vez; solo se pregunta lo que falta.
+  // -------------------------------------------------------------------------
+  /** Interpreta el texto como pedido si el cliente está en un punto donde eso tiene sentido (menú o armando el carrito). */
+  private fraseDePedido(flujo: FlujoConversacion, entrada: EntradaNormalizada, contexto: ContextoConversacion): PedidoLibre | null {
+    const estado = String(flujo.estado || '');
+    if (entrada.id || !ESTADOS_FRASE.includes(estado) || !entrada.texto) return null;
+    // Local cerrado con programación: primero se elige el día y la hora (flujo propio)
+    if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta) return null;
+    if (esPregunta(entrada.texto, entrada.textoOriginal)) return null;
+    // Con el pedido en un paso de texto simple («delivery», «recoger») se atiende ese paso, no una frase
+    if (estado === 'PEDIDO_MODALIDAD' && /^(delivery|recoger|para recoger|para llevar|llevar|domicilio|a domicilio)$/.test(entrada.texto)) return null;
+    const vendible = (p: any) => !productoAgotado(p) && !ocultoEnBot(p, contexto) && !comboVendibleBot(contexto.ofertas, String(p.id));
+    const libre = interpretarPedidoLibre(entrada.textoOriginal || entrada.texto, contexto.categoriasCarta || [], vendible);
+    if (!libre || (!libre.lineas.length && !libre.ambiguos.length && !libre.agotados.length)) return null;
+    // «frappés», «los postres»: nombra una categoría, no un producto; se muestra la categoría
+    if (!libre.lineas.length && libre.ambiguos.length && (contexto.categoriasCarta || []).some((c: any) => categoriaCoincide(c.nombre, entrada.texto))) return null;
+    return libre;
+  }
+
+  /** Pausa por alta demanda o local cerrado sin programación: no se arma el pedido. */
+  private bloqueoDeApertura(flujo: FlujoConversacion, contexto: ContextoConversacion): ResultadoTransicion | null {
+    if (String(flujo.estado).startsWith('PEDIDO_')) return null;
+    if (contexto.datosLocal?.pausaAltaDemanda) {
+      const extraMin = contexto.datosLocal.altaDemandaMinutosExtra || 20;
+      const motivo = contexto.datosLocal.motivoPausa || 'Muchos pedidos';
+      return {
+        nuevoEstado: 'MENU',
+        acciones: [{ tipo: 'enviarBotones', texto: `Por ahora pausamos los pedidos por alta demanda (${motivo}). La entrega tardará unos ${extraMin} min adicionales. Puedes volver al menú o consultar con un asesor.`, botones: [BOTON_HABLAR_PERSONA, BOTON_VOLVER_MENU] }],
+        nuevoFlujo: { ...flujo, estado: 'MENU' },
+      };
+    }
+    if (contexto.datosLocal && !contexto.datosLocal.abierta) {
+      const horarioTexto = contexto.datosLocal.textoEstado || 'de 14:00 a 22:00';
+      return {
+        nuevoEstado: 'MENU',
+        acciones: [{ tipo: 'enviarBotones', texto: `Ahora estamos cerrados. Nuestro horario: ${horarioTexto}. No tomamos pedidos fuera de horario; escríbenos cuando abramos.`, botones: [BOTON_VOLVER_MENU] }],
+        nuevoFlujo: { ...flujo, estado: 'MENU' },
+      };
+    }
+    return null;
+  }
+
+  private aplicarFrase(flujo: FlujoConversacion, libre: PedidoLibre, contexto: ContextoConversacion): ResultadoTransicion {
+    // Lo ya elegido (carrito, modalidad, ubicación) se conserva: la frase solo suma
+    const previo = flujo.pedido && (flujo.pedido.items?.length || String(flujo.estado).startsWith('PEDIDO_')) ? flujo.pedido : null;
+    const pedido: EstadoCarritoPedido = {
+      ...(previo || { estadoInterno: 'PEDIDO_MODALIDAD' as EstadoPedidoFlujo, items: [], idempotenciaPaso: `step_${Date.now()}` }),
+      timestampUltimaAccion: Date.now(),
+      desdeFrase: true,
+      itemEnConfiguracion: undefined,
+    };
+    if (libre.modalidad === 'RECOGER') {
+      pedido.modalidad = 'RECOGER';
+      pedido.entrega = { modalidad: 'RECOGER', tarifaEnvio: 0 };
+    } else if (libre.modalidad === 'DELIVERY' && pedido.modalidad !== 'DELIVERY') {
+      pedido.modalidad = 'DELIVERY';
+      pedido.entrega = undefined;
+    }
+    if (libre.medio && this.mediosDelPedido(pedido, contexto).includes(libre.medio)) {
+      pedido.pago = { metodo: libre.medio, ...(libre.medio === 'EFECTIVO' && libre.pagaCon ? { pagaCon: libre.pagaCon } : {}) };
+    }
+    pedido.colaFrase = libre.lineas.map((l) => ({
+      productoId: String(l.producto.id),
+      tamanoId: l.tamano ? String(l.tamano.id) : undefined,
+      opcionIds: l.opciones.map((o) => String(o.opcion.id)),
+      cantidad: l.cantidad,
+    }));
+    pedido.avisosFrase = libre.agotados.map((n) => `${n} está agotado por ahora.`);
+    pedido.ambiguosFrase = libre.ambiguos.map((a) => ({ texto: a.texto, ids: a.candidatos.map((c) => String(c.producto.id)).slice(0, 9) }));
+    return this.siguienteDeCola(flujo, pedido, contexto);
+  }
+
+  /** Configura el siguiente producto de la frase; cuando no queda ninguno, cierra con un solo mensaje. */
+  private siguienteDeCola(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): ResultadoTransicion {
+    const categorias = contexto.categoriasCarta || [];
+    while (pedido.colaFrase && pedido.colaFrase.length > 0) {
+      const l = pedido.colaFrase.shift()!;
+      const cat = categorias.find((c) => (c.productos || []).some((p: any) => String(p.id) === l.productoId));
+      const prod = cat ? (cat.productos || []).find((p: any) => String(p.id) === l.productoId) : null;
+      if (!cat || !prod) continue;
+      const config: ItemEnConfiguracionBot = {
+        productoId: String(prod.id),
+        productoNombre: prod.nombre,
+        categoriaId: String(cat.id),
+        categoriaNombre: cat.nombre,
+        precioBase: Number(prod.precio),
+        opciones: [],
+        grupoIndexActual: 0,
+        cantidad: l.cantidad,
+        noSumaBeneficios: Boolean(prod.noSumaBeneficios),
+        cantidadFija: true,
+      };
+      const caben = tamanosQueCaben(prod);
+      const tam = caben.find((t: any) => String(t.id) === l.tamanoId) ?? (caben.length === 1 ? caben[0] : null);
+      if (tam) {
+        config.tamanoId = String(tam.id);
+        config.tamanoNombre = tam.nombre;
+        config.precioBase = Number(tam.precio);
+      }
+      for (const g of gruposDePregunta(prod)) {
+        for (const o of g.opciones || []) {
+          if (l.opcionIds.includes(String(o.id))) {
+            config.opciones.push({ opcionId: String(o.id), nombre: o.nombre, precioExtra: Number(o.precioExtra || 0), grupoId: String(g.id), grupoNombre: g.nombre });
+          }
+        }
+      }
+      pedido.itemEnConfiguracion = config;
+      if (!tam && caben.length > 1) {
+        return this.preguntarTamano(flujo, pedido, prod, `${config.cantidad > 1 ? `${config.cantidad} ` : ''}${TEXTOS_BOT.pedidoPreguntarTamano(prod.nombre)}`);
+      }
+      return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
+    }
+    return this.cerrarFrase(flujo, pedido, contexto);
+  }
+
+  /** Todo el pedido de la frase ya está en el carrito: se pregunta lo que falta (cuál, modalidad, ubicación) o se sigue al pago. */
+  private cerrarFrase(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): ResultadoTransicion {
+    const avisos = (pedido.avisosFrase ?? []).join('\n');
+    const nuevo: EstadoCarritoPedido = { ...pedido, colaFrase: undefined, avisosFrase: undefined, itemEnConfiguracion: undefined, desdeFrase: undefined };
+    const antes = (t: string) => (avisos ? `${avisos}\n\n${t}` : t);
+    const anotado = nuevo.items.length ? `Anotado:\n${this.lineasResumen(nuevo, contexto)}\n\n` : '';
+
+    // Un trozo con varios productos posibles: se pregunta cuál
+    const amb = nuevo.ambiguosFrase?.[0];
+    if (amb) {
+      const filas: FilaLista[] = amb.ids.map((id) => {
+        const p = productoDeCarta(contexto.categoriasCarta || [], id);
+        return { id: `ped_prod_${id}`, titulo: String(p?.nombre ?? id).slice(0, 24), descripcion: `S/ ${Number(p?.precio ?? 0).toFixed(2)}` };
+      });
+      nuevo.ambiguosFrase = nuevo.ambiguosFrase!.slice(1);
+      nuevo.estadoInterno = 'PEDIDO_PRODUCTOS';
+      return {
+        nuevoEstado: 'PEDIDO_PRODUCTOS',
+        acciones: [{ tipo: 'enviarLista', texto: antes(`${anotado}¿Cuál de estos quieres?`), botonTexto: 'Elegir', filas }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_PRODUCTOS', pedido: nuevo },
+      };
+    }
+    if (!nuevo.items.length) {
+      // Nada se pudo poner (agotado): categorías para que elija otra cosa
+      return this.mostrarCategorias(flujo, { ...nuevo, estadoInterno: 'PEDIDO_CATEGORIAS' }, contexto, avisos ? `${avisos} Elige otra cosa:` : undefined);
+    }
+    if (!nuevo.modalidad) {
+      nuevo.estadoInterno = 'PEDIDO_MODALIDAD';
+      return {
+        nuevoEstado: 'PEDIDO_MODALIDAD',
+        acciones: [{ tipo: 'enviarBotones', texto: antes(`${anotado}¿Cómo lo quieres?`), botones: BOTONES_PEDIDO_MODALIDAD }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_MODALIDAD', pedido: nuevo },
+      };
+    }
+    if (nuevo.modalidad === 'DELIVERY' && !nuevo.entrega?.lat) {
+      nuevo.estadoInterno = 'PEDIDO_UBICACION';
+      return {
+        nuevoEstado: 'PEDIDO_UBICACION',
+        acciones: [{ tipo: 'enviarBotones', texto: antes(`${anotado}${TEXTOS_BOT.pedidoPedirUbicacion()}`), botones: BOTONES_PEDIDO_UBICACION }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_UBICACION', pedido: nuevo },
+      };
+    }
+    const r = this.avanzarHaciaCheckout(flujo, nuevo, contexto);
+    if (avisos) r.acciones = [{ tipo: 'enviarTexto', texto: avisos }, ...r.acciones];
+    return r;
   }
 
   private despacharPaso(
@@ -735,6 +965,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         nuevoFlujo: { ...flujo, estado: 'MENU', pedido: null },
       };
     }
+    // Un solo día disponible: no se pregunta, se pasa directo a la hora
+    if (dias.length === 1 && dias[0].horas.length > 0) {
+      return this.mostrarHorasProgramar(flujo, { ...pedido, programadoFecha: dias[0].fecha, estadoInterno: 'PEDIDO_PROG_HORA' }, contexto, 0);
+    }
     const inicio = pagina * FILAS_PROGRAMAR_POR_PAGINA;
     const filas: FilaLista[] = dias.slice(inicio, inicio + FILAS_PROGRAMAR_POR_PAGINA).map((d) => ({ id: `ped_prog_dia_${d.fecha}`, titulo: tituloFilaDia(d.fecha), descripcion: `${d.horas.length} horarios disponibles` }));
     if (dias.length > inicio + FILAS_PROGRAMAR_POR_PAGINA) filas.push({ id: 'ped_prog_dia_mas', titulo: 'Ver más días', descripcion: 'Ver los días siguientes' });
@@ -770,7 +1004,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const inicio = pagina * FILAS_PROGRAMAR_POR_PAGINA;
     const filas: FilaLista[] = horas.slice(inicio, inicio + FILAS_PROGRAMAR_POR_PAGINA).map((h) => ({ id: `ped_prog_hora_${h.hora}`, titulo: h.hora }));
     if (horas.length > inicio + FILAS_PROGRAMAR_POR_PAGINA) filas.push({ id: 'ped_prog_hora_mas', titulo: 'Ver más horas' });
-    filas.push({ id: 'ped_prog_otro_dia', titulo: 'Elegir otro día' });
+    if ((contexto.programacion?.dias.length ?? 0) > 1) filas.push({ id: 'ped_prog_otro_dia', titulo: 'Elegir otro día' });
     return {
       nuevoEstado: 'PEDIDO_PROG_HORA',
       acciones: [{ tipo: 'enviarLista', texto: TEXTOS_PROGRAMAR.preguntaHora(fecha), botonTexto: 'Elegir hora', filas }],
@@ -792,10 +1026,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, programadoPara: elegida.iso, programadoFecha: undefined, paginaProg: undefined, estadoInterno: 'PEDIDO_MODALIDAD' };
     return {
       nuevoEstado: 'PEDIDO_MODALIDAD',
-      acciones: [
-        { tipo: 'enviarTexto', texto: TEXTOS_PROGRAMAR.programadoOk(elegida.iso) },
-        { tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoModalidad(), botones: BOTONES_PEDIDO_MODALIDAD },
-      ],
+      // Un solo mensaje: lo programado y la pregunta que sigue
+      acciones: [{ tipo: 'enviarBotones', texto: `${TEXTOS_PROGRAMAR.programadoOk(elegida.iso)}\n\n${TEXTOS_BOT.pedidoModalidad()}`, botones: BOTONES_PEDIDO_MODALIDAD }],
       nuevoFlujo: { ...flujo, estado: 'PEDIDO_MODALIDAD', pedido: nuevoPedido },
     };
   }
@@ -840,6 +1072,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const esDelivery =
       entrada.id === 'ped_mod_delivery' ||
       entrada.texto.includes('delivery') ||
+      entrada.texto.includes('domicilio') ||
       entrada.textoOriginal.toLowerCase().includes('delivery');
 
     const esRecoger =
@@ -860,7 +1093,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         entrega: { modalidad: 'RECOGER', tarifaEnvio: 0 },
         estadoInterno: 'PEDIDO_CATEGORIAS',
       };
-      return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoRecojoConfirmado());
+      return this.seguirTrasModalidad(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoRecojoConfirmado());
     }
 
     // Entrada no reconocida en modalidad
@@ -899,19 +1132,27 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    if (entrada.id === 'ped_mod_recojer') {
+    if (entrada.id === 'ped_mod_recojer' || (!entrada.id && /\b(recoger|recojo|retiro|retirar|llevar|paso por|voy a)\b/.test(entrada.texto) && !entrada.ubicacion)) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
         modalidad: 'RECOGER',
         entrega: { modalidad: 'RECOGER', tarifaEnvio: 0 },
         estadoInterno: 'PEDIDO_CATEGORIAS',
       };
-      return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoRecojoConfirmado());
+      return this.seguirTrasModalidad(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoRecojoConfirmado());
     }
 
     const ubicacion = entrada.ubicacion;
-    // Cualquier cosa que no sea una ubicación (texto, botón viejo) repite la misma instrucción
+    // Una dirección escrita no se puede ubicar en el mapa: se explica cómo mandar la ubicación (o recoger) sin repetir lo mismo
     if (!ubicacion || !Number.isFinite(ubicacion.latitud) || !Number.isFinite(ubicacion.longitud)) {
+      if (!entrada.id && entrada.textoOriginal.length >= 6 && !pedido.ubicacionReintento) {
+        const nuevo: EstadoCarritoPedido = { ...pedido, ubicacionReintento: true, estadoInterno: 'PEDIDO_UBICACION' };
+        return {
+          nuevoEstado: 'PEDIDO_UBICACION',
+          acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoUbicacionEscrita(), botones: BOTONES_PEDIDO_UBICACION_FALLIDA }],
+          nuevoFlujo: { ...flujo, estado: 'PEDIDO_UBICACION', pedido: nuevo },
+        };
+      }
       return this.pedirUbicacion(flujo, pedido);
     }
 
@@ -931,7 +1172,34 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       direccion: ubicacion.direccion || ubicacion.nombre,
     });
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, modalidad: 'DELIVERY', entrega, estadoInterno: 'PEDIDO_CATEGORIAS' };
-    return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis));
+    return this.seguirTrasModalidad(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis));
+  }
+
+  /** Carrito guardado: se muestra lo que lleva y se pregunta cómo seguir (un solo mensaje). */
+  private retomarCarrito(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): ResultadoTransicion {
+    const nuevo: EstadoCarritoPedido = { ...pedido, itemEnConfiguracion: undefined, colaFrase: undefined, estadoInterno: 'PEDIDO_ACCION_CARRITO' };
+    const subtotal = Number(nuevo.items.reduce((acc, i) => acc + i.subtotal, 0).toFixed(2));
+    return {
+      nuevoEstado: 'PEDIDO_ACCION_CARRITO',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: `Tienes un pedido a medias 🛒
+${this.lineasResumen(nuevo, contexto)}
+*Subtotal:* S/ ${subtotal.toFixed(2)}
+
+¿Seguimos con él?`,
+          botones: BOTONES_PEDIDO_RETOMAR,
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_ACCION_CARRITO', pedido: nuevo },
+    };
+  }
+
+  /** Con modalidad (y ubicación) ya resueltas: si el carrito ya tiene productos se sigue al pago; si no, a elegirlos. */
+  private seguirTrasModalidad(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion, textoCategorias: string): ResultadoTransicion {
+    if (pedido.items.length > 0) return this.avanzarHaciaCheckout(flujo, { ...pedido, estadoInterno: 'PEDIDO_ACCION_CARRITO' }, contexto);
+    return this.mostrarCategorias(flujo, pedido, contexto, textoCategorias);
   }
 
   /** Entrega DELIVERY con zona, tarifa y envío gratis según la cobertura resuelta para el punto. */
@@ -985,7 +1253,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     let categoria = categorias.find((c) => String(c.id) === catIdMatch);
     if (!categoria) {
-      categoria = categorias.find((c) => normalizarTexto(c.nombre) === entrada.texto);
+      categoria = categorias.find((c) => normalizarTexto(c.nombre) === entrada.texto) ?? categorias.find((c) => categoriaCoincide(c.nombre, entrada.texto));
     }
 
     if (!categoria) {
@@ -1179,17 +1447,18 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const caben = tamanosQueCaben(prod);
     let tamano = (prod?.tamanos || []).find((t: any) => String(t.id) === tamIdMatch);
     if (!tamano) {
-      tamano = (prod?.tamanos || []).find((t: any) => normalizarTexto(t.nombre) === entrada.texto);
+      tamano = (prod?.tamanos || []).find((t: any) => normalizarTexto(t.nombre) === entrada.texto) ?? (prod?.tamanos || []).find((t: any) => coincideTitulo(t.nombre, entrada.texto));
     }
 
     // Tamaño que ya no cabe (el stock bajó desde que se mostró la lista): se vuelve a preguntar
     if (tamano && !caben.includes(tamano)) {
       return this.preguntarTamano(flujo, pedido, prod, `Solo quedan ${quedanDeProducto(prod)} de ${prod.nombre} 😅 Elige otro tamaño:`);
     }
-    if (!tamano && caben.length > 0) {
-      // Tomar primer tamaño que cabe defensivamente si el botón no coincidió
-      tamano = caben[0];
+    if (!tamano && caben.length > 1) {
+      // Ni botón ni nombre de tamaño: se vuelve a preguntar (nunca se elige uno por el cliente)
+      return this.preguntarTamano(flujo, pedido, prod, `${PREFIJO_NO_ENTENDI} ${TEXTOS_BOT.pedidoPreguntarTamano(prod.nombre)}`);
     }
+    if (!tamano && caben.length === 1) tamano = caben[0];
 
     if (tamano) {
       config.tamanoId = String(tamano.id);
@@ -1235,6 +1504,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
     }
 
+    if (entrada.id === 'ped_per_no' || (!(grupoActual.obligatorio || grupoActual.minimo > 0) && (entrada.texto === 'no' || /asi esta bien|asi nomas|sin nada|nada mas/.test(entrada.texto)))) {
+      // Todo lo que queda es opcional: se omite
+      config.grupoIndexActual = grupos.length;
+      return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
+    }
+    if (entrada.id === 'ped_per_si' || (!config.personalizar && esSi(entrada.texto))) {
+      config.personalizar = true;
+      return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
+    }
     const esObligatorio = grupoActual.obligatorio || grupoActual.minimo > 0;
     const esNinguno = entrada.id === 'ped_op_ninguno' || entrada.texto === 'ninguno';
 
@@ -1268,7 +1546,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!opcion) {
       opcion = pedibles.find(
         (o: any) => normalizarTexto(o.nombre) === entrada.texto,
-      );
+      ) ?? pedibles.find((o: any) => coincideTitulo(o.nombre, entrada.texto));
     }
 
     if (!opcion && esObligatorio) {
@@ -1474,10 +1752,23 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     else if (entrada.id === 'ped_cant_2') cantidad = 2;
     else if (entrada.id === 'ped_cant_3') cantidad = 3;
     else {
-      const num = parseInt(entrada.textoOriginal.replace(/\D/g, ''), 10);
-      if (!isNaN(num) && num > 0) {
-        cantidad = Math.min(9999, num); // Sin tope de negocio; 9999 solo evita desbordes por un error de tecleo
+      // «3», «tres», «quiero 2», «1 unidad»; si no hay ningún número se vuelve a preguntar (antes se asumía 1 sin avisar)
+      const palabra = entrada.texto.split(' ').map((w) => NUMEROS_PALABRA[w]).find((n) => n);
+      const num = /\d/.test(entrada.textoOriginal) ? parseInt(entrada.textoOriginal.replace(/\D/g, ''), 10) : (palabra ?? NaN);
+      if (isNaN(num) || num <= 0) {
+        return {
+          nuevoEstado: 'PEDIDO_CANTIDAD',
+          acciones: [
+            {
+              tipo: 'enviarBotones',
+              texto: `${PREFIJO_NO_ENTENDI} ${TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto))}`,
+              botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
+            },
+          ],
+          nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
+        };
       }
+      cantidad = Math.min(9999, num); // Sin tope de negocio; 9999 solo evita desbordes por un error de tecleo
     }
 
     // Productos que controlan stock: no se acepta más que lo que queda (cantidad × unidades del tamaño)
@@ -1551,9 +1842,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
     if (this.esBebidaConNombres(config.categoriaNombre) || this.bebidasDeCombo(config).length > 0) {
       // Combo que volvió a elegir una parte: los nombres ya escritos se conservan si siguen completos
-      if (config.nombresEnvase?.length !== this.totalEnvases(config)) config.nombresEnvase = [];
-      else return this.confirmarNombresEnvase(flujo, pedido, config);
-      return this.preguntarNombreEnvase(flujo, pedido, config);
+      if (config.nombresEnvase?.length === this.totalEnvases(config)) return this.agregarLineaConfigurada(flujo, pedido, contexto);
+      config.nombresEnvase = [];
+      // Un solo envase y se conoce su nombre: va a nombre de quien escribe, sin preguntar (en el resumen se ve y se puede cambiar)
+      const primero = this.primerNombre(flujo, contexto);
+      if (this.totalEnvases(config) === 1 && primero) {
+        config.nombresEnvase = [primero];
+        return this.agregarLineaConfigurada(flujo, pedido, contexto);
+      }
+      return this.preguntarNombreEnvase(flujo, pedido, config, contexto);
     }
 
     return this.agregarLineaConfigurada(flujo, pedido, contexto);
@@ -1667,26 +1964,31 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return config.cantidad * (this.bebidasDeCombo(config).length || 1);
   }
 
+  /** Primer nombre real del cliente (el del perfil de WhatsApp o de su cuenta); '' si no hay uno confiable. */
+  private primerNombre(flujo: FlujoConversacion, contexto: ContextoConversacion): string {
+    const n = nombreParaSaludo(flujo.nombre_perfil_wa || contexto.nombreCliente).split(/\s+/)[0] ?? '';
+    return /^\p{L}{2,14}$/u.test(n) ? n : '';
+  }
+
   private preguntarNombreEnvase(
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     config: ItemEnConfiguracionBot,
+    contexto?: ContextoConversacion,
   ): ResultadoTransicion {
     const hechos = config.nombresEnvase?.length || 0;
     pedido.estadoInterno = 'PEDIDO_NOMBRES_ENVASE';
+    const texto = TEXTOS_BOT.pedidoPedirNombreEnvase(this.nombreEnvase(config, hechos), hechos + 1, this.totalEnvases(config));
+    const primero = contexto ? this.primerNombre(flujo, contexto) : '';
+    const acciones: AccionMensaje[] = [
+      primero && this.totalEnvases(config) > 1 && hechos === 0
+        ? { tipo: 'enviarBotones', texto, botones: [{ id: 'ped_nom_todos', titulo: `Todos: ${primero}`.slice(0, 20) }] }
+        : { tipo: 'enviarTexto', texto },
+    ];
     return {
       nuevoEstado: 'PEDIDO_NOMBRES_ENVASE',
-      acciones: [
-        {
-          tipo: 'enviarTexto',
-          texto: TEXTOS_BOT.pedidoPedirNombreEnvase(
-            this.nombreEnvase(config, hechos),
-            hechos + 1,
-            this.totalEnvases(config),
-          ),
-        },
-      ],
-      nuevoFlujo: { ...flujo, estado: 'PEDIDO_NOMBRES_ENVASE', pedido },
+      acciones,
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_NOMBRES_ENVASE', pedido, nombre_perfil_wa: flujo.nombre_perfil_wa },
     };
   }
 
@@ -1718,15 +2020,19 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
+    const total = this.totalEnvases(config);
+    if (entrada.id === 'ped_nom_todos') {
+      config.nombresEnvase = Array.from({ length: total }, () => this.primerNombre(flujo, contexto) || 'Cliente');
+      return this.agregarLineaConfigurada(flujo, pedido, contexto);
+    }
     const texto = entrada.textoOriginal.trim();
     if (!texto || entrada.id) {
-      return this.preguntarNombreEnvase(flujo, pedido, config);
+      return this.preguntarNombreEnvase(flujo, pedido, config, contexto);
     }
 
     const nombres = config.nombresEnvase || [];
-    // Si escribe todos los nombres juntos separados por coma ("Ana, Luis, Rosa") y coinciden con los envases
-    const separados = texto.split(',').map((n) => n.trim()).filter(Boolean);
-    const total = this.totalEnvases(config);
+    // «Ana, Luis, Rosa» o «Ana y Luis»: todos los nombres juntos
+    const separados = texto.split(/\s*(?:,|;|\s+y\s+)\s*/).map((n) => n.trim()).filter(Boolean);
     if (nombres.length === 0 && total > 1 && separados.length === total) {
       config.nombresEnvase = separados.map((n) => n.slice(0, 30));
     } else {
@@ -1734,9 +2040,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     if ((config.nombresEnvase?.length || 0) < total) {
-      return this.preguntarNombreEnvase(flujo, pedido, config);
+      return this.preguntarNombreEnvase(flujo, pedido, config, contexto);
     }
-    return this.confirmarNombresEnvase(flujo, pedido, config);
+    // Lo escrito es la confirmación: sin «¿está correcto?»
+    return this.agregarLineaConfigurada(flujo, pedido, contexto);
   }
 
   private pasoNombresConfirmar(
@@ -1748,7 +2055,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
-    if (entrada.id === 'ped_nom_si' || entrada.texto === 'si') {
+    if (entrada.id === 'ped_nom_si' || esSi(entrada.texto)) {
       return this.agregarLineaConfigurada(flujo, pedido, contexto);
     }
     if (entrada.id === 'ped_nom_no' || entrada.texto === 'no') {
@@ -1824,6 +2131,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       estadoInterno: 'PEDIDO_ACCION_CARRITO',
     };
 
+    // Pedido dicho en una frase: sin «Agregué… ¿algo más?» por cada producto; sigue el siguiente o se cierra de una vez
+    if (nuevoPedido.desdeFrase) return this.siguienteDeCola(flujo, nuevoPedido, contexto);
+
     return {
       nuevoEstado: 'PEDIDO_ACCION_CARRITO',
       acciones: [
@@ -1850,7 +2160,31 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    if (entrada.id === 'ped_otro' || entrada.texto.includes('agregar')) {
+    if (entrada.id === 'ped_nuevo') {
+      return this.renderizarEstado('PEDIDO_MODALIDAD', { ...flujo, pedido: null }, { estadoInterno: 'PEDIDO_MODALIDAD', items: [], idempotenciaPaso: `step_${Date.now()}` }, contexto);
+    }
+
+    // «mejor que sean 3», «en vez de 2, 3»: cambia la cantidad de lo último que pidió
+    const cambioCantidad = !entrada.id ? RE_CAMBIO_CANTIDAD.exec(entrada.texto) : null;
+    if (cambioCantidad && pedido.items.length > 0) {
+      const n = Number(cambioCantidad[1] ?? cambioCantidad[2]);
+      const ultimo = pedido.items[pedido.items.length - 1];
+      if (n >= 1 && n <= 99 && !ultimo.ofertaId && !ultimo.sabores) {
+        const items = pedido.items.map((i) => (i === ultimo ? { ...i, cantidad: n, subtotal: Number((i.precioUnitario * n).toFixed(2)), personas: i.personas ? Array.from({ length: n }, (_, k) => i.personas![k % i.personas!.length]) : undefined } : i));
+        return this.pasoVerCarrito(flujo, { ...pedido, items, estadoInterno: 'PEDIDO_VER_CARRITO' }, { ...entrada, id: 'ped_ver_carrito', texto: 'carrito' }, contexto);
+      }
+    }
+
+    // «quitar el cheesecake»: lo quita sin pasar por la lista
+    if (!entrada.id && RE_QUITAR.test(entrada.texto)) {
+      const linea = pedido.items.find((i) => {
+        const k = normalizarTexto(i.productoNombre).split(' ').filter((w) => w.length > 3);
+        return k.length > 0 && k.some((w) => entrada.texto.includes(w.replace(/s$/, '')));
+      });
+      if (linea) return this.pasoQuitarItem(flujo, { ...pedido, estadoInterno: 'PEDIDO_QUITAR_ITEM' }, { ...entrada, id: `ped_del_${linea.lineaId}` }, contexto);
+    }
+
+    if (entrada.id === 'ped_otro' || entrada.texto.includes('agregar') || /\b(otro|otra|algo mas|quiero mas)\b/.test(entrada.texto)) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
         estadoInterno: 'PEDIDO_CATEGORIAS',
@@ -1914,8 +2248,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // Continuar hacia el checkout
-    return this.avanzarHaciaCheckout(flujo, pedido, contexto);
+    // Continuar hacia el checkout: botón, «sí / ok / dale», «eso es todo»; otro texto vuelve a mostrar el carrito (no avanza solo)
+    if (entrada.id?.includes('continuar') || esSi(entrada.texto) || /\b(continuar|continua|seguir|siguiente|nada mas|eso es todo|seria todo|es todo|ya esta|pagar|pago)\b/.test(entrada.texto)) {
+      return this.avanzarHaciaCheckout(flujo, pedido, contexto);
+    }
+    return this.pasoVerCarrito(flujo, pedido, { ...entrada, id: 'ped_ver_carrito', texto: 'carrito' }, contexto);
   }
 
   // -------------------------------------------------------------------------
@@ -2476,7 +2813,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    return this.avanzarHaciaCheckout(flujo, pedido, contexto);
+    // Otro texto: se vuelve a preguntar el comprobante
+    return {
+      nuevoEstado: 'PEDIDO_COMPROBANTE_TIPO',
+      acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoComprobanteTipo(), botones: BOTONES_PEDIDO_COMPROBANTE }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMPROBANTE_TIPO', pedido: { ...pedido, estadoInterno: 'PEDIDO_COMPROBANTE_TIPO' } },
+    };
   }
 
   private pasoComprobanteDni(
@@ -2613,8 +2955,17 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.renderizarEstado('PEDIDO_VER_CARRITO', flujo, nuevoPedido, contexto);
     }
 
-    // Seguridad: validación estricta de botón de confirmación
-    if (entrada.id !== 'ped_confirmar' && !entrada.texto.includes('confirmar')) {
+    // Boleta o factura (por defecto va el comprobante simple)
+    if (entrada.id === 'ped_comp_pedir' || (!entrada.id && /\b(boleta|factura)\b/.test(entrada.texto))) {
+      return {
+        nuevoEstado: 'PEDIDO_COMPROBANTE_TIPO',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoComprobanteTipo(), botones: BOTONES_PEDIDO_COMPROBANTE }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMPROBANTE_TIPO', pedido: { ...pedido, estadoInterno: 'PEDIDO_COMPROBANTE_TIPO' } },
+      };
+    }
+
+    // Confirma con el botón o con cualquier «sí / ok / dale / confirmo»; otra cosa repite el resumen UNA vez y luego ayuda
+    if (entrada.id !== 'ped_confirmar' && !entrada.texto.includes('confirmar') && !esSi(entrada.texto)) {
       return this.mostrarResumenFinal(flujo, pedido, contexto);
     }
 
@@ -2831,6 +3182,16 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
+    // Carrito armado sin decir cómo lo quiere (frase sin «para llevar» ni «delivery»): primero eso
+    if (pedido.items.length > 0 && !pedido.modalidad) {
+      return {
+        nuevoEstado: 'PEDIDO_MODALIDAD',
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoModalidad(), botones: BOTONES_PEDIDO_MODALIDAD }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_MODALIDAD', pedido: { ...pedido, estadoInterno: 'PEDIDO_MODALIDAD' } },
+      };
+    }
+    if (pedido.items.length > 0 && pedido.modalidad === 'DELIVERY' && !pedido.entrega) return this.pedirUbicacion(flujo, pedido);
+
     const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
     // Sin `pedido_minimo` configurado (0 o null) no hay mínimo
     const pedidoMin = Number(contexto.datosLocalPublicos?.pedidoMinimo || 0);
@@ -2859,33 +3220,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 2. Nombre del cliente
+    // 2. Nombre del cliente: el del perfil de WhatsApp, sin preguntarlo (se ve en el resumen y se cambia con «Cambiar algo»)
     if (!pedido.cliente?.nombre) {
-      const nombreSugerido = flujo.nombre_perfil_wa || contexto.nombreCliente;
+      const nombreSugerido = nombreParaSaludo(flujo.nombre_perfil_wa || contexto.nombreCliente);
       if (nombreSugerido) {
-        const nuevoPedido: EstadoCarritoPedido = {
-          ...pedido,
-          estadoInterno: 'PEDIDO_CONFIRMAR_NOMBRE',
-        };
-        return {
-          nuevoEstado: 'PEDIDO_CONFIRMAR_NOMBRE',
-          acciones: [
-            {
-              tipo: 'enviarBotones',
-              // Puntos: siempre al celular de quien escribe (contexto.telefonoCliente); el saldo solo si ya vino en el contexto
-              texto: TEXTOS_BOT.pedidoConfirmarNombre(nombreSugerido, {
-                celular: celularPuntosEnmascarado(contexto.telefonoCliente),
-                saldo: contexto.puntos?.cuentaTelefono?.saldo ?? null,
-              }),
-              botones: BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
-            },
-          ],
-          nuevoFlujo: {
-            ...flujo,
-            estado: 'PEDIDO_CONFIRMAR_NOMBRE',
-            pedido: nuevoPedido,
-          },
-        };
+        return this.avanzarHaciaCheckout(flujo, { ...pedido, cliente: { ...(pedido.cliente || {}), nombre: nombreSugerido } }, contexto);
       }
 
       const nuevoPedido: EstadoCarritoPedido = {
@@ -2917,6 +3256,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         : '';
 
     // Solo delivery pide el celular (el repartidor llama); en otras modalidades se usa el del chat si es real, o ninguno
+    if (pedido.modalidad === 'DELIVERY' && !pedido.cliente?.telefono && telExistente) {
+      // El número del chat sirve para coordinar la entrega: no se pregunta (sale en el resumen)
+      return this.avanzarHaciaCheckout(flujo, { ...pedido, cliente: { ...(pedido.cliente || {}), telefono: telExistente } }, contexto);
+    }
     if (pedido.modalidad === 'DELIVERY' && !pedido.cliente?.telefono) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
@@ -2955,27 +3298,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.mostrarOpcionesPago(flujo, pedido, contexto);
     }
 
-    // 5. Comprobante
+    // 5. Comprobante: ticket simple por defecto; boleta o factura se piden desde el resumen («Boleta o factura»)
     if (!pedido.comprobante) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        estadoInterno: 'PEDIDO_COMPROBANTE_TIPO',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_COMPROBANTE_TIPO',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoComprobanteTipo(),
-            botones: BOTONES_PEDIDO_COMPROBANTE,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_COMPROBANTE_TIPO',
-          pedido: nuevoPedido,
-        },
-      };
+      return this.avanzarHaciaCheckout(flujo, { ...pedido, comprobante: { tipo: 'SIMPLE' } }, contexto);
     }
 
     // 6. Resumen final completo
@@ -3061,8 +3386,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             tiempoMax,
             avisoDemanda,
             programadoTexto: pedido.programadoPara ? TEXTOS_PROGRAMAR.lineaResumen(pedido.programadoPara) : undefined,
+            clienteTexto: pedido.cliente?.nombre
+              ? `${pedido.cliente.nombre}${pedido.modalidad === 'DELIVERY' && pedido.cliente.telefono ? ` · cel. ${pedido.cliente.telefono}` : ''}`
+              : undefined,
+            comprobanteTexto: pedido.comprobante && pedido.comprobante.tipo !== 'SIMPLE' ? ({ BOLETA: 'Boleta', FACTURA: 'Factura' } as Record<string, string>)[pedido.comprobante.tipo] : undefined,
           }),
-          botones: BOTONES_PEDIDO_CONFIRMAR_FINAL,
+          botones: !pedido.comprobante || pedido.comprobante.tipo === 'SIMPLE' ? BOTONES_PEDIDO_CONFIRMAR_FINAL_CON_COMPROBANTE : BOTONES_PEDIDO_CONFIRMAR_FINAL,
         },
       ],
       nuevoFlujo: {
@@ -3153,15 +3482,18 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           : envio > 0
             ? `Delivery: S/ ${envio.toFixed(2)}`
             : 'Delivery gratis';
+    // Solo el total (lo que importa para elegir cómo pagar): el detalle completo sale en el resumen final
     return (
-      `🧾 *Resumen de tu pedido*\n${lineas}\n\n` +
-      `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
       descuentoTxt +
-      `${envioTxt}\n` +
-      (pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0 ? `${TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)}\n` : '') +
-      (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
+      `${envioTxt}
+` +
+      (pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0 ? `${TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)}
+` : '') +
+      (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}
+` : '') +
       `*TOTAL: S/ ${total.toFixed(2)}*` +
-      (ahorrosPorMedio.length ? `\n${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
+      (ahorrosPorMedio.length ? `
+${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
     );
   }
 
@@ -3192,11 +3524,23 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
     const grupos = gruposDePregunta(prod, config.combo?.ocultaGruposBebida);
+    // Los grupos que el cliente ya contestó (p. ej. «leche de almendra» dicho en su frase) no se vuelven a preguntar
+    while (config.grupoIndexActual < grupos.length && config.opciones.some((o) => o.grupoId === String(grupos[config.grupoIndexActual].id))) config.grupoIndexActual++;
 
     // Si aún quedan grupos de opciones por responder
     if (config.grupoIndexActual < grupos.length) {
       const g = grupos[config.grupoIndexActual];
       pedido.estadoInterno = 'PEDIDO_GRUPO_OPCION';
+
+      // Dos o más grupos opcionales seguidos: una sola pregunta («¿lo quieres personalizar?») en vez de una por grupo
+      const restantes = grupos.slice(config.grupoIndexActual);
+      if (!config.personalizar && restantes.length >= 2 && restantes.every((x: any) => !(x.obligatorio || x.minimo > 0))) {
+        return {
+          nuevoEstado: 'PEDIDO_GRUPO_OPCION',
+          acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoPersonalizar(config.productoNombre, restantes.map((x: any) => String(x.nombre))), botones: BOTONES_PEDIDO_PERSONALIZAR }],
+          nuevoFlujo: { ...flujo, estado: 'PEDIDO_GRUPO_OPCION', pedido },
+        };
+      }
 
       const esObligatorio = g.obligatorio || g.minimo > 0;
       const accionesGrupo = this.construirAccionGrupo(g);
@@ -3246,7 +3590,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // Cantidad
+    // Cantidad (si ya la dijo en su frase y el producto no pide sabor por stock, no se pregunta)
+    if (config.cantidadFija && !prod?.saboresConStock) return this.continuarTrasCantidad(flujo, pedido, config, contexto);
     pedido.estadoInterno = 'PEDIDO_CANTIDAD';
     return {
       nuevoEstado: 'PEDIDO_CANTIDAD',
@@ -3602,6 +3947,36 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           nuevoFlujo: { ...flujo, estado, pedido },
         };
       }
+      case 'PEDIDO_MEDIO_PAGO':
+        return this.mostrarOpcionesPago(flujo, pedido, contexto);
+      case 'PEDIDO_MONTO_EFECTIVO':
+        return this.pedirMontoEfectivo(flujo, pedido, calcularTotales(pedido, contexto.vistaPreviaPedido).aCobrar);
+      case 'PEDIDO_RESUMEN_CONFIRMAR':
+        return this.mostrarResumenFinal(flujo, pedido, contexto);
+      case 'PEDIDO_PRODUCTOS': {
+        const cat = (contexto.categoriasCarta || []).find((c: any) => String(c.id) === String(pedido.categoriaSeleccionadaId));
+        return cat ? this.mostrarProductosDeCategoria(flujo, pedido, cat, contexto) : this.mostrarCategorias(flujo, pedido, contexto);
+      }
+      case 'PEDIDO_TAMANO':
+      case 'PEDIDO_GRUPO_OPCION':
+      case 'PEDIDO_SABOR':
+      case 'PEDIDO_CANTIDAD':
+      case 'PEDIDO_NOMBRES_ENVASE':
+      case 'PEDIDO_NOMBRES_CONFIRMAR': {
+        const config = pedido.itemEnConfiguracion;
+        const prod = config ? productoDeCarta(contexto.categoriasCarta || [], config.productoId) : null;
+        if (!config || !prod) return this.mostrarCategorias(flujo, pedido, contexto);
+        if (estado === 'PEDIDO_TAMANO') return this.preguntarTamano(flujo, pedido, prod, TEXTOS_BOT.pedidoPreguntarTamano(prod.nombre));
+        if (estado === 'PEDIDO_NOMBRES_ENVASE') return this.preguntarNombreEnvase(flujo, pedido, config, contexto);
+        if (estado === 'PEDIDO_NOMBRES_CONFIRMAR') return this.confirmarNombresEnvase(flujo, pedido, config);
+        return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
+      }
+      case 'PEDIDO_INGRESAR_NOMBRE':
+        return { nuevoEstado: estado, acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoIngresarNombre() }], nuevoFlujo: { ...flujo, estado, pedido } };
+      case 'PEDIDO_INGRESAR_TELEFONO':
+        return { nuevoEstado: estado, acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoIngresarTelefono() }], nuevoFlujo: { ...flujo, estado, pedido } };
+      case 'PEDIDO_PROPINA':
+        return this.pedirPropina(flujo, pedido, contexto);
       default:
         return this.mostrarCategorias(flujo, pedido, contexto);
     }

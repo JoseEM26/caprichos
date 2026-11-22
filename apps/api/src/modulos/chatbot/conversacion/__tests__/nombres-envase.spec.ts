@@ -12,29 +12,37 @@ const flujoCantidad = (categoriaNombre: string): any => ({
 const paso = (flujo: any, e: any) => transicionarEstado(flujo, normalizarEntrada(e), {});
 
 describe('nombres por envase en bebidas', () => {
-  it('3 frappés piden 3 nombres, confirman con Sí/No y los guardan en la línea', () => {
+  it('3 frappés piden 3 nombres y los guardan en la línea (sin pregunta de confirmación)', () => {
     let r = paso(flujoCantidad('FROZEN'), { buttonPayload: 'ped_cant_3' });
     expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_ENVASE');
     r = paso(r.nuevoFlujo, { texto: 'Ana', textoOriginal: 'Ana' });
     r = paso(r.nuevoFlujo, { texto: 'Luis', textoOriginal: 'Luis' });
     expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_ENVASE');
     r = paso(r.nuevoFlujo, { texto: 'Rosa', textoOriginal: 'Rosa' });
-    expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_CONFIRMAR');
-    const textoConfirm = (r.acciones[0] as any).texto;
-    expect(textoConfirm).toContain('1. Ana');
-    expect(textoConfirm).toContain('3. Rosa');
-    r = paso(r.nuevoFlujo, { buttonPayload: 'ped_nom_si' });
+    // Lo escrito es la confirmación: sin «¿está correcto?»
     expect(r.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
     expect(r.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana', 'Luis', 'Rosa']);
   });
 
-  it('No vuelve a pedir los nombres desde el primero', () => {
+  it('«Ana, Luis» (todos los nombres juntos) completa los envases de una vez', () => {
     let r = paso(flujoCantidad('FRAPPES'), { buttonPayload: 'ped_cant_2' });
     r = paso(r.nuevoFlujo, { texto: 'Ana, Luis', textoOriginal: 'Ana, Luis' });
-    expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_CONFIRMAR');
-    r = paso(r.nuevoFlujo, { buttonPayload: 'ped_nom_no' });
+    expect(r.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
+    expect(r.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana', 'Luis']);
+  });
+
+  it('con un solo envase y el nombre del cliente conocido no lo pregunta: usa su primer nombre', () => {
+    const r = transicionarEstado(flujoCantidad('FROZEN'), normalizarEntrada({ buttonPayload: 'ped_cant_1' }), { nombreCliente: 'Ana Torres' });
+    expect(r.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
+    expect(r.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana']);
+  });
+
+  it('con 2 envases ofrece «Todos: Ana» en un botón', () => {
+    const r = transicionarEstado(flujoCantidad('FROZEN'), normalizarEntrada({ buttonPayload: 'ped_cant_2' }), { nombreCliente: 'Ana Torres' });
     expect(r.nuevoEstado).toBe('PEDIDO_NOMBRES_ENVASE');
-    expect(r.nuevoFlujo.pedido?.itemEnConfiguracion?.nombresEnvase).toEqual([]);
+    expect((r.acciones[0] as any).botones[0]).toMatchObject({ id: 'ped_nom_todos', titulo: 'Todos: Ana' });
+    const t = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_nom_todos' }), { nombreCliente: 'Ana Torres' });
+    expect(t.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana', 'Ana']);
   });
 
   it('el nombre del vaso es obligatorio: un mensaje vacío o un botón no avanzan, vuelve a preguntar', () => {
@@ -65,7 +73,6 @@ describe('nombres por envase en bebidas', () => {
     r = paso(r.nuevoFlujo, { texto: 'Ana', textoOriginal: 'Ana' });
     expect((r.acciones[0] as any).texto).toContain('Tu Café Latte: escribe el nombre para el envase 2 de 2');
     r = paso(r.nuevoFlujo, { texto: 'Luis', textoOriginal: 'Luis' });
-    r = paso(r.nuevoFlujo, { buttonPayload: 'ped_nom_si' });
     expect(r.nuevoFlujo.pedido?.items[0].personas).toEqual(['Ana', 'Luis']);
   });
 });
