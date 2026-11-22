@@ -65,16 +65,16 @@ describe('Bot: aviso de «se está acabando»', () => {
       return { menu, sel };
     };
 
-    it('al elegir el producto, la pregunta de cantidad trae el aviso', () => {
-      const c = ctx([dona(3), { ...dona(9), id: 'p2', nombre: 'Galletas' }]);
+    it('al elegir el producto (sin preguntar cantidad) el aviso de «ya se acaban» sale en el mensaje de «Agregué»', () => {
+      const c = ctx([dona(1), { ...dona(9), id: 'p2', nombre: 'Galletas' }]);
       const { sel } = hastaCantidad(c);
-      expect(sel.nuevoEstado).toBe('PEDIDO_CANTIDAD');
-      expect((sel.acciones[0] as any).texto).toContain('🍩 ¡Quedan solo 3, ya se acaban!');
+      expect(sel.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
+      expect((sel.acciones[0] as any).texto).toContain('🍩');
     });
 
     it('con stock lejano no hay aviso', () => {
       const { sel } = hastaCantidad(ctx([dona(20), { ...dona(9), id: 'p2', nombre: 'Galletas' }]));
-      expect((sel.acciones[0] as any).texto).not.toContain('🍩');
+      expect(JSON.stringify(sel.acciones)).not.toContain('🍩');
     });
 
     it('el menú muestra el aviso y el agotado sigue oculto', () => {
@@ -86,11 +86,11 @@ describe('Bot: aviso de «se está acabando»', () => {
       expect(json).toContain('Brownie');
     });
 
-    it('pedir más de lo que queda dice cuántas quedan', () => {
+    it('pedir más de lo que queda («mejor que sean 5») dice cuántas quedan', () => {
       const c = ctx([dona(3), { ...dona(9), id: 'p2', nombre: 'Galletas' }]);
       const { sel } = hastaCantidad(c);
-      const r = transicionarEstado(sel.nuevoFlujo, normalizarEntrada({ texto: '5' }), c);
-      expect((r.acciones[0] as any).texto).toBe('Solo quedan 3 de Donas 😅 ¿Cuántas quieres?');
+      const r = transicionarEstado(sel.nuevoFlujo, normalizarEntrada({ texto: 'mejor que sean 5' }), c);
+      expect((r.acciones[0] as any).texto).toContain('Solo quedan 3 de Donas');
     });
   });
 

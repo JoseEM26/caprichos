@@ -2,6 +2,8 @@ import { transicionarEstado } from '../maquina-estados';
 import { normalizarEntrada } from '../normalizador-entrada.util';
 import { aTextoNumerado, resolverRespuesta, MenuNumerado } from '../../evolution/menu-numerado.util';
 import { ContextoConversacion, FlujoConversacion } from '../tipos-conversacion';
+import { respuestaConAccionIa } from '../accion-ia.util';
+import type { AccionIa } from '../../ia/tipos-ia';
 
 /**
  * Simulador de conversaciones de punta a punta con el motor real (transicionarEstado). Imita lo que hace el ejecutor
@@ -70,6 +72,11 @@ export interface OpcionesSimulador {
   primerContacto?: boolean;
   /** Respuesta fija de la IA cuando el motor la consulta. */
   respuestaIa?: string;
+  /**
+   * IA simulada con respuestas/acciones fijas (enciende chatbotIaActivo). `fallo` = OpenAI no respondió (el motor usa sus reglas);
+   * `omitir` = el cliente escribe demasiado rápido (no se responde); `accion` = acción estructurada que ejecuta el motor.
+   */
+  ia?: (pregunta: string) => { texto?: string; accion?: AccionIa; fallo?: boolean; omitir?: boolean };
 }
 
 export class Simulador {
@@ -120,11 +127,38 @@ export class Simulador {
   }
 
   private procesar(entrada: ReturnType<typeof normalizarEntrada>) {
-    const r = transicionarEstado(this.flujo, entrada, {
+    const ctx = {
       ...this.ctx,
+      ...(this.op.ia ? { chatbotIaActivo: true } : {}),
       sinBienvenida: this.sinBienvenida,
       chatTomado: this.chatTomado,
-    } as ContextoConversacion);
+    } as ContextoConversacion;
+    let r = transicionarEstado(this.flujo, entrada, ctx);
+    // IA simulada: se consulta antes de guardar el flujo, igual que el ejecutor real
+    if (this.op.ia && r.acciones.length === 1 && r.acciones[0].tipo === 'consultarIa') {
+      const pregunta = (r.acciones[0] as any).pregunta as string;
+      this.preguntasIa.push(pregunta);
+      const ia = this.op.ia(pregunta);
+      if (ia.fallo) {
+        r = transicionarEstado(this.flujo, entrada, { ...ctx, chatbotIaActivo: false });
+      } else if (ia.omitir) {
+        this.flujo = r.nuevoFlujo;
+        return;
+      } else if (ia.accion) {
+        const c = respuestaConAccionIa(ia.accion, ia.texto ?? '', r.nuevoFlujo, ctx);
+        this.flujo = c.nuevoFlujo ?? r.nuevoFlujo;
+        const n = aTextoNumerado(c.texto, c.botones, 'boton');
+        this.menu = n.menu;
+        this.decir('botones', n.texto);
+        this.sinBienvenida = true;
+        return;
+      } else {
+        this.flujo = r.nuevoFlujo;
+        this.decir('texto', ia.texto ?? 'Respuesta de la IA.');
+        this.sinBienvenida = true;
+        return;
+      }
+    }
     this.flujo = r.nuevoFlujo;
     for (const a of r.acciones as any[]) {
       switch (a.tipo) {
@@ -149,7 +183,7 @@ export class Simulador {
           this.chatTomado = true;
           break;
         case 'consultarIa':
-          this.preguntasIa.push(a.pregunta);
+          if (!this.op.ia) this.preguntasIa.push(a.pregunta);
           this.decir('texto', this.op.respuestaIa ?? 'Respuesta de la IA.');
           break;
         default:

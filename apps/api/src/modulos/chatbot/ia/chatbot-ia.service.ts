@@ -12,10 +12,12 @@ import {
   prepararHistorialPrivado,
 } from './ia-privacidad.util';
 import {
+  AccionIa,
   MensajeOpenAI,
   ParametrosConsultaIa,
   ResultadoConsultaIa,
 } from './tipos-ia';
+import { createHash } from 'crypto';
 import { TEXTOS_IA } from '../conversacion/textos-ia';
 
 /**
@@ -38,6 +40,15 @@ const PATRONES_INYECCION = [
   /(?:curar[aá]|cura)\s+(?:mi\s+)?(?:diabetes|c[aá]ncer|enfermedad)/i,
   /modo\s+desarrollador|jailbreak/i,
 ];
+
+/** Anti-bloqueo: como mucho tantas respuestas de IA por minuto y por chat; si el cliente escribe más rápido, se espera (no se responde cada mensaje). */
+export const MAX_RESPUESTAS_IA_POR_MINUTO = 4;
+
+/** Herramientas cuyas respuestas son iguales para todos: solo con estas (y sin nombre del cliente) se cachea una respuesta. */
+const HERRAMIENTAS_CACHEABLES = new Set(['horarioYUbicacion', 'costoYZonaDeEnvio', 'mediosDePago', 'politicasDePago', 'cartaCompleta', 'buscarEnCarta', 'recomendarProductos', 'promocionesDeHoy']);
+const TTL_CACHE_GENERICA_S = 300;
+/** Pregunta que toca SU pedido o su cuenta: nunca se cachea. */
+const PREGUNTA_PERSONAL = /\b(mi|mis|mio|mia|cp-?w?\d|pedido|pedi|ya sale|cuanto falta|llego|voucher|pague|pago|deposite|yapee|yapeé|reclam|quiero|dame|agrega|ponme)\b/i;
 
 @Injectable()
 export class ChatbotIaService {
@@ -74,8 +85,8 @@ export class ChatbotIaService {
   }
 
   /** Resumen de una línea del pedido más reciente del cliente (para la nota del asesor); solo lectura. */
-  resumenPedidoParaAsesor(telefono?: string | null): Promise<string | null> {
-    return this.herramientasService.resumenPedidoParaAsesor?.(telefono) ?? Promise.resolve(null);
+  resumenPedidoParaAsesor(telefono?: string | null, conversacionId?: string | bigint): Promise<string | null> {
+    return this.herramientasService.resumenPedidoParaAsesor?.(telefono, conversacionId) ?? Promise.resolve(null);
   }
 
   /**
@@ -152,6 +163,24 @@ export class ChatbotIaService {
       };
     }
 
+    // 3.b Anti-bloqueo: tope de respuestas de IA por minuto y por chat; pasado el tope se espera sin responder
+    if (!(await this.dentroDelLimitePorMinuto(conversacionId))) {
+      this.logger.warn('Cliente escribiendo muy rápido: la IA espera (límite por minuto).');
+      return {
+        exito: true,
+        respuestaTexto: '',
+        confianza: 1,
+        necesitaDerivar: false,
+        quierePedir: false,
+        herramientasUsadas: [],
+        tokensEntrada: 0,
+        tokensSalida: 0,
+        costoUsdEstimado: 0,
+        resultadoRegistro: 'EXITO',
+        omitir: true,
+      };
+    }
+
     // 4. Detección preventiva de inyección de prompt
     const esInyeccion = PATRONES_INYECCION.some((regex) => regex.test(textoUsuario));
     if (esInyeccion) {
@@ -220,6 +249,13 @@ export class ChatbotIaService {
       { role: 'user', content: textoUsuarioEnmascarado },
     ];
 
+    // Caché solo para preguntas genéricas (sin pedido propio, sin conversación previa): igual para todos los clientes
+    const claveCache = this.claveCacheGenerica(textoUsuario, historialReciente);
+    if (claveCache) {
+      const guardada = await this.leerCache(claveCache);
+      if (guardada) return { ...guardada, costoUsdEstimado: 0, tokensEntrada: 0, tokensSalida: 0 };
+    }
+
     const herramientasDefiniciones = this.herramientasService.obtenerDefinicionesHerramientas();
     const herramientasUsadas: string[] = [];
     const productosObtenidos: any[] = [];
@@ -233,6 +269,7 @@ export class ChatbotIaService {
     const MAX_VUELTAS_HERRAMIENTAS = modoLibre ? 4 : 3;
     const MAX_HERRAMIENTAS_POR_TURNO = modoLibre ? 5 : 3;
     let motivoPasarAPersona: string | undefined;
+    let accionIa: AccionIa | undefined;
 
     try {
       while (vueltasHerramientas < MAX_VUELTAS_HERRAMIENTAS) {
@@ -278,6 +315,9 @@ export class ChatbotIaService {
 
             if (resultadoHerramienta.necesitaDerivar || resultadoHerramienta.alertaAlergia) {
               necesitaDerivar = true;
+            }
+            if (nombreFuncion === 'accionDelBot' && resultadoHerramienta.resultado?.ok && resultadoHerramienta.resultado?.accion) {
+              accionIa = resultadoHerramienta.resultado.accion as AccionIa;
             }
             if (nombreFuncion === 'pasarAPersona') {
               const r = resultadoHerramienta.resultado;
@@ -363,7 +403,20 @@ export class ChatbotIaService {
           motivoDerivacion: motivoPasarAPersona,
           productoConcreto,
           productosConsultados,
+          ...(accionIa ? { accionIa } : {}),
         };
+
+        // Caché de preguntas genéricas: nunca con pedido propio, acción, derivación ni el nombre del cliente
+        if (
+          claveCache &&
+          !necesitaDerivar &&
+          !accionIa &&
+          herramientasUsadas.length > 0 &&
+          herramientasUsadas.every((h) => HERRAMIENTAS_CACHEABLES.has(h)) &&
+          !(nombreLimpio !== 'Cliente' && textoFinal.toLowerCase().includes(nombreLimpio.toLowerCase()))
+        ) {
+          await this.guardarCache(claveCache, resultadoFinal);
+        }
 
         // Cachear respuesta para idempotencia si waMessageId está presente
         if (waMessageId) {
@@ -422,6 +475,46 @@ export class ChatbotIaService {
         resultadoRegistro: 'ERROR',
         motivoDerivacion: err.message,
       };
+    }
+  }
+
+  /** Cuenta la respuesta de IA de este chat en la ventana de 1 minuto; false si ya llegó al tope. Sin Redis: no limita (otro control ya apaga la IA). */
+  private async dentroDelLimitePorMinuto(conversacionId?: string | bigint): Promise<boolean> {
+    if (conversacionId === undefined || conversacionId === null) return true;
+    try {
+      const redis = this.redisService.obtenerCliente();
+      const clave = `chatbot:ia:min:${conversacionId}`;
+      const n = await redis.incr(clave);
+      if (n === 1) await redis.expire(clave, 60);
+      return n <= MAX_RESPUESTAS_IA_POR_MINUTO;
+    } catch {
+      return true;
+    }
+  }
+
+  /** Clave de caché de una pregunta genérica, o null si no es cacheable (personal, corta o con conversación previa). */
+  private claveCacheGenerica(texto: string, historial?: Array<{ autor: string; texto: string }>): string | null {
+    const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (t.length < 12 || PREGUNTA_PERSONAL.test(t)) return null;
+    // Con mensajes previos del cliente la respuesta depende del contexto («y el otro?»)
+    if ((historial || []).filter((m) => m.autor === 'CLIENTE').length > 1) return null;
+    return `chatbot:ia:gen:${createHash('sha256').update(t).digest('hex').slice(0, 24)}`;
+  }
+
+  private async leerCache(clave: string): Promise<ResultadoConsultaIa | null> {
+    try {
+      const raw = await this.redisService.obtenerCliente().get(clave);
+      return raw ? (JSON.parse(raw) as ResultadoConsultaIa) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async guardarCache(clave: string, r: ResultadoConsultaIa): Promise<void> {
+    try {
+      await this.redisService.obtenerCliente().set(clave, JSON.stringify(r), 'EX', TTL_CACHE_GENERICA_S);
+    } catch {
+      // Sin Redis no hay caché
     }
   }
 

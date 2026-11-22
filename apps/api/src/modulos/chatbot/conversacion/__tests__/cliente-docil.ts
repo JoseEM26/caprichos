@@ -49,7 +49,18 @@ export function turnoDocil(s: Simulador, o: Objetivo): boolean {
   if (ops.some((x) => /^si/.test(x.t)) && /correcto|confirmas|usamos/.test(txt)) return pick(/^si/);
   if (ops.some((x) => /usar este numero/.test(x.t))) return pick(/usar este numero/);
   if (/propina/.test(txt)) return pick(/sin propina/);
-  if (ops.some((x) => /(continuar|agregar producto)/.test(x.t))) return pend ? pick(/agregar producto/) : pick(/continuar/);
+  if (ops.some((x) => /(continuar|agregar producto)/.test(x.t))) {
+    // La cantidad ya no se pregunta (se asume 1): si quiere otra, la corrige una vez con «mejor que sean N»
+    const ultimo = s.carrito?.items?.[hechos - 1];
+    const quiere = o.items[hechos - 1]?.cantidad ?? 1;
+    const yaCorrigio: Set<number> = ((s as any)._corrigioCantidad ??= new Set<number>());
+    if (ultimo && ultimo.cantidad !== quiere && !yaCorrigio.has(hechos)) {
+      yaCorrigio.add(hechos);
+      s.decir(`mejor que sean ${quiere}`);
+      return true;
+    }
+    return pend ? pick(/agregar producto/) : pick(/continuar/);
+  }
   if (/cuantas unidades|cuantas quieres/.test(txt)) {
     const n = q?.cantidad ?? 1;
     if (pick(new RegExp(`^${n} unidad`))) return true;

@@ -1282,6 +1282,16 @@ export class WhatsappWebhookService {
           (estado === 'VALIDAR_PAGO' && motivo_derivacion !== MOTIVO_DERIVACION_NO_COMPATIBLES));
       if (!atiendeBot) return;
 
+      // Sticker suelto (sin paso pendiente: ni pedido, ni pago, ni voucher esperado): el bot NO responde nada (decisión del dueño 22/11)
+      if (p.clasificacion.subtipo === 'sticker') {
+        const pasoPendiente =
+          Boolean(flujo.pedido || flujo.pago?.pedidoCodigo) ||
+          /^(PEDIDO|PAGO|VALIDAR|RESERVA)/.test(String(flujo.estado ?? '')) ||
+          estado === 'VALIDAR_PAGO' ||
+          Boolean(await pedidoEsperandoVoucher(this.prisma, p.conversacion.flujo, p.telefonoNorm));
+        if (!pasoPendiente) return;
+      }
+
       const ultimos = await this.prisma.mensajeChat.findMany({
         where: { conversacion_id: p.conversacion.id, direccion: 'ENTRA' },
         orderBy: { id: 'desc' },

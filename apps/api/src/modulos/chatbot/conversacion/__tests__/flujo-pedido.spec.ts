@@ -150,13 +150,14 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       entrada = normalizarEntrada({ listRowId: 'ped_op_op_tartara' });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
 
-      // 7. Pregunta cantidad
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
-      entrada = normalizarEntrada({ buttonPayload: 'ped_cant_2' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
-
-      // 8. Producto agregado -> Carrito
+      // 7. No pregunta cantidad: asume 1 y lo agrega al carrito (decisión del dueño 22/11)
       expect(resultado.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
+      expect((resultado.acciones[0] as any).texto).toContain('mejor que sean 3');
+      expect(resultado.nuevoFlujo.pedido?.items?.length).toBe(1);
+      expect(resultado.nuevoFlujo.pedido?.items[0].cantidad).toBe(1);
+
+      // 8. Corrige la cantidad con «mejor que sean 2»
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ texto: 'mejor que sean 2' }), contextoBase);
       expect(resultado.nuevoFlujo.pedido?.items?.length).toBe(1);
       expect(resultado.nuevoFlujo.pedido?.items[0].cantidad).toBe(2);
 
@@ -838,14 +839,13 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_tam_tam_simple' }), contextoQuedan);
       resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_op_op_tartara' }), contextoQuedan);
 
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
-      const botones = (resultado.acciones[0] as any).botones.map((b: any) => b.id);
-      expect(botones).toEqual(['ped_cant_1']);
+      // Sin preguntar cantidad: con 1 en stock se agrega 1; pedir más avisa cuántas quedan
+      expect(resultado.nuevoEstado).toBe('PEDIDO_ACCION_CARRITO');
+      expect(resultado.nuevoFlujo.pedido?.items?.[0]?.cantidad).toBe(1);
 
-      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), contextoQuedan);
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
-      expect((resultado.acciones[0] as any).texto).toBe('Solo quedan 1 de Hamburguesa Clásica 😅 ¿Cuántas quieres?');
-      expect(resultado.nuevoFlujo.pedido?.items?.length ?? 0).toBe(0);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ texto: 'mejor que sean 2' }), contextoQuedan);
+      expect((resultado.acciones[0] as any).texto).toContain('Solo quedan 1 de Hamburguesa Clásica');
+      expect(resultado.nuevoFlujo.pedido?.items?.[0]?.cantidad).toBe(1);
     });
   });
 });

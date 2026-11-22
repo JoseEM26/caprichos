@@ -73,6 +73,8 @@ import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
 import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
 import { flujoLiberadoParaBot } from './flujo-liberado.util';
 import { condicionPedidosDelChat, extraerClavePedido, pedidoDelChatPorCodigo, pedidoEsDelChat, telefonoDelChat } from '../servicios/pedidos-del-chat.util';
+import type { ResultadoConsultaIa } from '../ia/tipos-ia';
+import { respuestaConAccionIa } from './accion-ia.util';
 import { MENCIONA_PERSONA, TEXTOS_ESCALADO, detectarCasoAtascado, iaAfirmaSinDatos, iaAgotada, notaResumenAsesor, siguienteTurnosIa } from './escalado-ia.util';
 import {
   leerExpiraPagoMin,
@@ -90,6 +92,13 @@ export interface EntradaProcesarMensaje extends EntradaRawInput {
 
 /** Mensajes sobre total, monto o dónde pagar (sin tildes, en minúsculas). */
 const TEMA_DATOS_PAGO = /total|monto|precio|cuanto|yape|plin|numero|cuenta|donde (pago|pagar|deposito|yapeo)|transferenc|deposit/;
+
+/** Resultado de la consulta anticipada a la IA (ver consultarIaPrevia). */
+interface ResultadoConsultaIaPrevio {
+  res: ResultadoConsultaIa;
+  historial: Array<{ autor: string; texto: string }>;
+  fallo: boolean;
+}
 
 @Injectable()
 export class EjecutorConversacionService {
@@ -799,6 +808,45 @@ export class EjecutorConversacionService {
       return this.compactar(m?.contenido?.texto);
     } catch {
       return '';
+    }
+  }
+
+  /** Últimos 15 mensajes del chat para la IA (el servicio la recorta y enmascara). */
+  private async historialParaIa(conversacionId: bigint): Promise<Array<{ autor: string; texto: string }>> {
+    try {
+      const ultimos = await this.prisma.mensajeChat.findMany({ where: { conversacion_id: conversacionId }, orderBy: { en: 'desc' }, take: 15 });
+      return ultimos.reverse().map((m) => ({ autor: m.autor, texto: (m.contenido as any)?.texto || '' }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Consulta a la IA antes de guardar el flujo. `fallo` = OpenAI no respondió bien (error, tiempo, apagada, tope o límite por hora):
+   * el llamador usa entonces las reglas del bot. Una derivación pedida por la propia IA (reclamo, alergia) NO es fallo.
+   */
+  private async consultarIaPrevia(
+    pregunta: string,
+    conversacion: { id: bigint },
+    telefonoCliente: string | null | undefined,
+    nombreMostrar: string,
+    waMessageId?: string,
+  ): Promise<ResultadoConsultaIaPrevio> {
+    const historial = await this.historialParaIa(conversacion.id);
+    try {
+      const res = await this.chatbotIaService!.procesarConsulta({
+        textoUsuario: pregunta,
+        conversacionId: conversacion.id,
+        telefonoCliente,
+        primerNombre: nombreMostrar,
+        historialReciente: historial,
+        waMessageId,
+      });
+      const fallo = !res.exito && !res.omitir;
+      return { res, historial, fallo };
+    } catch (err: any) {
+      this.logger.error(`Error consultando la IA (se usan las reglas del bot): ${err.message}`);
+      return { res: null as any, historial, fallo: true };
     }
   }
 
@@ -1857,7 +1905,18 @@ export class EjecutorConversacionService {
           ? 'ATENCION_PERSONA'
           : flujoPrevio?.estado || 'INICIO',
     };
-    const resultado = transicionarEstado(flujoEntrada, entradaNorm, contexto);
+    let resultado = transicionarEstado(flujoEntrada, entradaNorm, contexto);
+
+    // IA (texto libre): se consulta ANTES de guardar el flujo. Si OpenAI falla o tarda, responden las reglas del bot (menú o
+    // persona), nunca un error ni silencio. Si el cliente escribe demasiado rápido, la IA espera (anti-bloqueo).
+    let iaPrevia: ResultadoConsultaIaPrevio | null = null;
+    if (resultado.acciones.length === 1 && resultado.acciones[0].tipo === 'consultarIa' && this.chatbotIaService) {
+      iaPrevia = await this.consultarIaPrevia((resultado.acciones[0] as any).pregunta, conversacion, telefonoCliente, nombreMostrar, entradaRaw.waMessageId);
+      if (iaPrevia.fallo) {
+        resultado = transicionarEstado(flujoEntrada, entradaNorm, { ...contexto, chatbotIaActivo: false });
+        iaPrevia = null;
+      }
+    }
 
     // 9.a Persistir el nuevo flujo ANTES de despachar los mensajes (un toque rápido siempre lee el estado correcto)
     // La marca de frase fija del modo asistido se decide antes de guardar
@@ -2570,28 +2629,25 @@ export class EjecutorConversacionService {
         let esDerivacion = false;
         let ofrecerAsesor = false;
         let motivoDeriv = 'CONSULTA_IA_FALLIDA';
+        let accionIaPend: ResultadoConsultaIa['accionIa'];
 
         if (this.chatbotIaService) {
           try {
-            // Historial reciente (últimos 15 mensajes); el servicio de IA recorta a 6 si el modo libre está apagado
-            const ultimosMensajes = await this.prisma.mensajeChat.findMany({
-              where: { conversacion_id: conversacion.id },
-              orderBy: { en: 'desc' },
-              take: 15,
-            });
-            const historial = ultimosMensajes.reverse().map((m) => ({
-              autor: m.autor,
-              texto: (m.contenido as any)?.texto || '',
-            }));
-
-            const resIa = await this.chatbotIaService.procesarConsulta({
+            const historial = iaPrevia?.historial ?? (await this.historialParaIa(conversacion.id));
+            const resIa = iaPrevia?.res ?? (await this.chatbotIaService.procesarConsulta({
               textoUsuario: accion.pregunta,
               conversacionId: conversacion.id,
               telefonoCliente,
               primerNombre: nombreMostrar,
               historialReciente: historial,
               waMessageId: entradaRaw.waMessageId,
-            });
+            }));
+
+            // Cliente escribiendo muy rápido: la IA espera, no se envía nada (un solo mensaje por respuesta)
+            if (resIa.omitir) {
+              await this.registrarSilencio(conversacion.id, 'La IA esperó: el cliente escribe más rápido que el límite por minuto.');
+              continue;
+            }
 
             textoRespuesta = resIa.respuestaTexto;
             esDerivacion = resIa.necesitaDerivar || !resIa.exito;
@@ -2611,7 +2667,10 @@ export class EjecutorConversacionService {
               motivoDeriv = atascado.motivo!;
             }
 
-            if (!esDerivacion && !ofrecerAsesor) {
+            // Acción estructurada de la IA (empezar pedido, agregar producto, ver categoría): la ejecuta el motor, abajo
+            if (!esDerivacion && !ofrecerAsesor && resIa.accionIa) accionIaPend = resIa.accionIa;
+
+            if (!esDerivacion && !ofrecerAsesor && !accionIaPend) {
               const { productoConcreto, productosMultiples } = this.identificarProductosConsulta(
                 accion.pregunta,
                 textoRespuesta,
@@ -2722,7 +2781,7 @@ export class EjecutorConversacionService {
             });
 
             // Nota interna para el asesor: qué pidió, pedido relacionado y qué ya respondió la IA
-            const pedidoResumen = await this.chatbotIaService?.resumenPedidoParaAsesor?.(telefonoCliente)?.catch(() => null);
+            const pedidoResumen = await this.chatbotIaService?.resumenPedidoParaAsesor?.(telefonoCliente, conversacion.id)?.catch(() => null);
             await this.prisma.mensajeChat.create({
               data: {
                 conversacion_id: conversacion.id,
@@ -2738,6 +2797,27 @@ export class EjecutorConversacionService {
           }
           this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
         }
+
+        // La acción de la IA se une a su respuesta en UN solo mensaje (texto + paso del pedido con sus botones)
+        if (accionIaPend && !esDerivacion) {
+          const conAccion = respuestaConAccionIa(accionIaPend, limpiarFrasesPasivasIa(textoRespuesta), flujoPersistir, contexto);
+          textoRespuesta = conAccion.texto;
+          botonesEnvio = conAccion.botones;
+          if (conAccion.nuevoFlujo) {
+            await this.prisma.conversacion.update({
+              where: { id: conversacion.id },
+              data: { flujo: { ...(conAccion.nuevoFlujo as any), ultimo_wa_message_id: (flujoPersistir as any).ultimo_wa_message_id, ia_turnos: (flujoPersistir as any).ia_turnos } as any },
+            });
+          }
+        }
+
+        // Anti-baneo: nunca el mismo texto dos veces seguidas (como en el resto de respuestas del bot)
+        if (this.compactar(textoRespuesta) && this.compactar(textoRespuesta) === ultimoSaliente && !esDerivacion) {
+          textoRespuesta = TEXTOS_SOLO_MENUS.ofertaPersona();
+          botonesEnvio = BOTONES_OFERTA_ASESOR;
+          ofrecerAsesor = true;
+        }
+        ultimoSaliente = this.compactar(textoRespuesta);
 
         // WhatsApp no entiende los enlaces Markdown de la IA: URL plana
         textoRespuesta = aplanarEnlacesMarkdown(textoRespuesta);

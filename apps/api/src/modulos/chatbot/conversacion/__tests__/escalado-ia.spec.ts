@@ -64,6 +64,7 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
     mensajeria = {
       enviarTexto: jest.fn().mockResolvedValue({ exito: true, waMessageId: 'm' }),
       enviarBotones: jest.fn().mockResolvedValue({ exito: true, waMessageId: 'm' }),
+      enviarLista: jest.fn().mockResolvedValue({ exito: true, waMessageId: 'm' }),
     };
     ia = {
       estaDisponible: jest.fn().mockResolvedValue(true),
@@ -152,11 +153,29 @@ describe('Escalado de la IA a una persona (caso Yape parcial + delivery en efect
     expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
   });
 
-  it('IA con error o sin presupuesto: deriva a una persona con el resumen', async () => {
+  it('IA con error, tiempo agotado o sin presupuesto: responden las reglas del bot (menú), sin error ni silencio ni derivar de inmediato', async () => {
     ia.procesarConsulta.mockResolvedValue(respuestaIa('Por el momento nuestra asistencia automática no está disponible. Te voy a transferir con un asesor.', { exito: false, necesitaDerivar: true, motivoDerivacion: 'tope mensual' }));
     await cliente(CHAT[0]);
-    expect(huboDerivacion()).toBe(true);
-    expect(notasCreadas).toHaveLength(1);
+    // respondió algo (el menú de siempre): nunca silencio
+    expect(mensajeria.enviarBotones.mock.calls.length + mensajeria.enviarLista.mock.calls.length + mensajeria.enviarTexto.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(huboDerivacion()).toBe(false);
+    expect(notasCreadas).toHaveLength(0);
+  });
+
+  it('OpenAI lanza una excepción: también responden las reglas, nunca un error al cliente', async () => {
+    ia.procesarConsulta.mockRejectedValue(new Error('timeout'));
+    await cliente(CHAT[0]);
+    const textos = JSON.stringify([...mensajeria.enviarBotones.mock.calls, ...mensajeria.enviarTexto.mock.calls, ...mensajeria.enviarLista.mock.calls], (_k, v) => (typeof v === "bigint" ? String(v) : v));
+    expect(textos).not.toMatch(/problemita/);
+    expect(textos.length).toBeGreaterThan(10);
+    expect(huboDerivacion()).toBe(false);
+  });
+
+  it('el cliente escribe demasiado rápido (omitir): la IA espera y no se envía nada', async () => {
+    ia.procesarConsulta.mockResolvedValue(respuestaIa('', { omitir: true }));
+    await cliente(CHAT[0]);
+    expect(mensajeria.enviarBotones).not.toHaveBeenCalled();
+    expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
   });
 
   it('fuera de horario y sin pedido en curso: silencio total (ni IA ni respuesta)', async () => {

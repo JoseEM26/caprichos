@@ -11,6 +11,11 @@ import { HerramientaIaDefinicion } from './tipos-ia';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
 import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
+import { condicionPedidosDelChat, pedidoEsDelChat } from '../servicios/pedidos-del-chat.util';
+import { MEDIOS_DIGITALES_VOUCHER } from '../servicios/pedido-esperando-voucher.util';
+import { progresoDelPedido } from '../../pedidos/progreso-pedido';
+import { leerConfigEta } from '../../repartos/eta-entrega';
+import { obtenerFechaHoraLima } from '../../local/local.util';
 
 /** Reglas reales de pago y entrega (las que aplica el sistema): la IA no puede afirmar otras. */
 export const POLITICAS_DE_PAGO = {
@@ -134,7 +139,7 @@ export class IaHerramientasService {
         function: {
           name: 'estadoDePedido',
           description:
-            'Consulta un pedido del cliente actual: estado, total, delivery (incluido o no), pagado, saldo por cobrar, plan de pago y vouchers. Úsala SIEMPRE ante dudas de pago, saldo o delivery. Con el código (ej: CP-0110) busca ese pedido; sin código devuelve su último pedido. Solo consulta pedidos que pertenezcan estrictamente al número del cliente.',
+            'Consulta los pedidos de ESTE chat, de cualquier canal (Caja, mozo, carta o WhatsApp): estado, qué lleva, total, modalidad, si está programado, progreso (etapa, porcentaje, minutos aproximados que faltan), pago (pagado, saldo, plan, si FALTA EL VOUCHER) y delivery. Úsala SIEMPRE ante «mi pedido», «ya sale», «cuánto falta», «llegó», dudas de pago, saldo, voucher o delivery. Con el código (ej: CP-0110) busca ese pedido; sin código devuelve su último pedido y un resumen de otros recientes. Solo ve pedidos de este chat. Los minutos que faltan son aproximados: dilos como «aprox.», nunca como promesa.',
           parameters: {
             type: 'object',
             properties: {
@@ -143,6 +148,32 @@ export class IaHerramientasService {
                 description: 'Código del pedido a consultar (ej: "CP-0110").',
               },
             },
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'cartaCompleta',
+          description:
+            'Devuelve TODA la carta real y compacta: categorías, productos con precio, disponibilidad del momento y cuántos quedan si hay stock. Úsala para preguntas abiertas («algo frío», «refresco», «iced», «algo dulce», «qué me recomiendas», «sin azúcar») y razona tú qué productos encajan; recomienda solo lo que está aquí y disponible.',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'accionDelBot',
+          description:
+            'Pide al sistema una acción que el cliente acepta o pidió: EMPEZAR_PEDIDO (quiere pedir), AGREGAR_PRODUCTO (quiere un producto concreto; pasa el nombre exacto de la carta), VER_CATEGORIA (quiere ver una categoría). El sistema la ejecuta y añade los botones; tú solo escribe una respuesta corta. No inventes productos: si no existe, la herramienta lo dirá.',
+          parameters: {
+            type: 'object',
+            properties: {
+              accion: { type: 'string', enum: ['EMPEZAR_PEDIDO', 'AGREGAR_PRODUCTO', 'VER_CATEGORIA'] },
+              producto: { type: 'string', description: 'Nombre del producto (solo AGREGAR_PRODUCTO).' },
+              categoria: { type: 'string', description: 'Nombre de la categoría (solo VER_CATEGORIA).' },
+            },
+            required: ['accion'],
           },
         },
       },
@@ -206,6 +237,12 @@ export class IaHerramientasService {
         case 'promocionesDeHoy':
           return { resultado: await this.promocionesDeHoy() };
 
+        case 'cartaCompleta':
+          return { resultado: await this.cartaCompleta() };
+
+        case 'accionDelBot':
+          return { resultado: await this.accionDelBot(args.accion, args.producto, args.categoria) };
+
         case 'horarioYUbicacion':
           return { resultado: await this.horarioYUbicacion() };
 
@@ -223,6 +260,7 @@ export class IaHerramientasService {
             resultado: await this.estadoDePedido(
               args.codigo,
               contextoSeguridad.telefonoCliente,
+              contextoSeguridad.conversacionId,
             ),
           };
 
@@ -340,6 +378,63 @@ export class IaHerramientasService {
       productos: productosEncontrados,
       nota: 'Todos los productos son de la carta real. No escribas instrucciones de compra ni cierres.',
     };
+  }
+
+
+  /** Toda la carta, compacta (precio, disponibilidad del momento, cuántos quedan): para preguntas abiertas. */
+  async cartaCompleta() {
+    if (!this.catalogoService) return { error: 'Catálogo temporalmente no disponible' };
+    const carta = await this.catalogoService.obtenerCarta();
+    return {
+      categorias: (carta || []).map((c: any) => ({
+        categoria: c.nombre,
+        productos: (c.productos || []).slice(0, 40).map((p: any) => ({
+          nombre: p.nombre,
+          precio: Number(p.precio ?? 0),
+          disponible: p.disponible !== false,
+          ...(typeof p.quedan === 'number' ? { quedan: p.quedan } : {}),
+          ...(p.descripcion ? { descripcion: String(p.descripcion).slice(0, 80) } : {}),
+        })),
+      })),
+      nota: 'Carta real del momento. Solo recomienda productos con disponible=true.',
+    };
+  }
+
+  /**
+   * Acción estructurada para el motor. Solo valida contra la carta real y devuelve el id: NO escribe nada.
+   * El motor (ejecutor) la convierte en botones o en el siguiente paso del pedido guiado.
+   */
+  async accionDelBot(accion?: string, producto?: string, categoria?: string) {
+    const a = String(accion || '').toUpperCase();
+    if (a === 'EMPEZAR_PEDIDO') return { ok: true, accion: { tipo: 'EMPEZAR_PEDIDO' }, instruccion: 'Escribe una respuesta corta; el sistema añade el inicio del pedido.' };
+    if (!this.catalogoService) return { ok: false, error: 'Catálogo no disponible' };
+    const norm = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    const carta = await this.catalogoService.obtenerCarta();
+    if (a === 'AGREGAR_PRODUCTO') {
+      const q = norm(producto || '');
+      for (const c of carta || []) {
+        for (const p of c.productos || []) {
+          if (q && norm(p.nombre) === q && p.disponible !== false) {
+            return { ok: true, accion: { tipo: 'AGREGAR_PRODUCTO', productoId: String(p.id), nombre: p.nombre }, instruccion: 'Escribe una respuesta corta; el sistema pregunta lo que falte para agregarlo.' };
+          }
+        }
+      }
+      for (const c of carta || []) {
+        for (const p of c.productos || []) {
+          if (q.length >= 3 && norm(p.nombre).includes(q) && p.disponible !== false) {
+            return { ok: true, accion: { tipo: 'AGREGAR_PRODUCTO', productoId: String(p.id), nombre: p.nombre }, instruccion: 'Escribe una respuesta corta; el sistema pregunta lo que falte para agregarlo.' };
+          }
+        }
+      }
+      return { ok: false, error: 'Ese producto no está en la carta o está agotado. No lo prometas.' };
+    }
+    if (a === 'VER_CATEGORIA') {
+      const q = norm(categoria || '');
+      const cat = (carta || []).find((c: any) => q.length >= 3 && norm(c.nombre).includes(q));
+      if (cat) return { ok: true, accion: { tipo: 'VER_CATEGORIA', categoriaId: String(cat.id), nombre: cat.nombre }, instruccion: 'Escribe una respuesta corta; el sistema añade el botón para verla.' };
+      return { ok: false, error: 'Esa categoría no existe en la carta.' };
+    }
+    return { ok: false, error: 'Acción desconocida.' };
   }
 
   /**
@@ -539,19 +634,24 @@ export class IaHerramientasService {
    * 6. estadoDePedido: Consulta el pedido SOLO si coincide con el teléfono del cliente.
    * Si el pedido pertenece a otro número, se rechaza para proteger la privacidad.
    */
-  async estadoDePedido(codigo: string, telefonoCliente?: string | null) {
+  async estadoDePedido(codigo: string, telefonoCliente?: string | null, conversacionId?: string | bigint) {
     const telBusqueda = normalizarTelefono(telefonoCliente || '');
-    if (!codigo && !telBusqueda) {
-      return { encontrado: false, mensaje: 'Debes proporcionar un código de pedido válido (ej: CP-0110).' };
+    // Llaves del chat (celular, celular vinculado del chat LID, party): pedidos de CUALQUIER canal (Caja, mozo, carta, WhatsApp)
+    const chat = await this.chatDe(conversacionId);
+    const llaves = chat ? condicionPedidosDelChat(chat) : null;
+    const donde: any = llaves ?? (telBusqueda ? { cliente_telefono: { endsWith: telBusqueda.slice(-9) } } : null);
+    if (!codigo && !donde) {
+      return { encontrado: false, mensaje: 'No encontramos pedidos asociados a este chat. Si tiene el código de su pedido (ej: CP-0110), puede dárnoslo.' };
     }
 
+    const incluir = { lineas: true, planPago: true, cobros: true, zona: true, vouchers: true, comandas: { include: { area: true } } } as const;
     const codigoNorm = (codigo || '').trim().toUpperCase();
     const pedido = codigoNorm
-      ? await this.prisma.pedido.findUnique({ where: { codigo: codigoNorm }, include: { lineas: true, planPago: true, cobros: true, zona: true, vouchers: true } })
+      ? await this.prisma.pedido.findUnique({ where: { codigo: codigoNorm }, include: incluir })
       : await this.prisma.pedido.findFirst({
-          where: { cliente_telefono: { endsWith: telBusqueda.slice(-9) } },
+          where: { ...donde, es_personal: false, estado: { not: 'ANULADO' } },
           orderBy: { creado_en: 'desc' },
-          include: { lineas: true, planPago: true, cobros: true, zona: true, vouchers: true },
+          include: incluir,
         });
 
     if (!pedido) {
@@ -563,11 +663,11 @@ export class IaHerramientasService {
       };
     }
 
-    // Validación estricta de titularidad por teléfono
+    // Titularidad estricta: con las llaves del chat, el pedido tiene que ser de este chat; sin chat, por celular
     const telPedido = normalizarTelefono(pedido.cliente_telefono || '');
     const telCliente = normalizarTelefono(telefonoCliente || '');
-
-    if (telPedido && telCliente && telPedido !== telCliente) {
+    const ajeno = chat && llaves ? !pedidoEsDelChat(chat, pedido as any) : Boolean(telPedido && telCliente && telPedido !== telCliente);
+    if (ajeno || (chat && !llaves && codigoNorm)) {
       // Seguridad: rechazar sin filtrar datos de otra persona
       return {
         encontrado: false,
@@ -575,6 +675,48 @@ export class IaHerramientasService {
       };
     }
 
+    const detalle = await this.detalleDePedido(pedido);
+    // Otros pedidos recientes del mismo chat (breve): «¿cuál de mis pedidos?»
+    let otrosPedidos: any[] | undefined;
+    if (!codigoNorm && donde) {
+      try {
+        const otros = await (this.prisma.pedido as any).findMany?.({
+          where: { ...donde, es_personal: false, estado: { not: 'ANULADO' }, id: { not: pedido.id }, creado_en: { gte: new Date(Date.now() - 3 * 24 * 3600 * 1000) } },
+          orderBy: { creado_en: 'desc' },
+          take: 3,
+          select: { codigo: true, estado: true, modalidad: true, total: true, canal: true, programado_para: true },
+        });
+        if (Array.isArray(otros) && otros.length) {
+          otrosPedidos = otros.map((o: any) => ({ codigo: o.codigo, estado: o.estado, modalidad: o.modalidad, canal: o.canal, total: Number(o.total), ...(o.programado_para ? { programadoPara: this.horaLima(o.programado_para) } : {}) }));
+        }
+      } catch {
+        otrosPedidos = undefined;
+      }
+    }
+    return { ...detalle, ...(otrosPedidos ? { otrosPedidos } : {}) };
+  }
+
+  /** Llaves del chat (teléfono, celular vinculado, party). null si no hay conversación o falla la consulta. */
+  private async chatDe(conversacionId?: string | bigint): Promise<{ telefono: string | null; celular_vinculado: string | null; party_id: bigint | null } | null> {
+    if (conversacionId === undefined || conversacionId === null || !/^\d+$/.test(String(conversacionId))) return null;
+    try {
+      const c: any = await (this.prisma as any).conversacion?.findUnique?.({
+        where: { id: BigInt(conversacionId) },
+        select: { telefono: true, celular_vinculado: true, party_id: true },
+      });
+      return c ? { telefono: c.telefono ?? null, celular_vinculado: c.celular_vinculado ?? null, party_id: c.party_id ?? null } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private horaLima(fecha: Date): string {
+    const f = obtenerFechaHoraLima(fecha);
+    return `${f.fechaIso} ${f.horaMinutos}`;
+  }
+
+  /** Datos del pedido para la IA: sin DNI, dirección ni teléfono. Progreso, tiempos, pago y voucher con las mismas reglas del sistema. */
+  private async detalleDePedido(pedido: any) {
     const productos = lineasDeCuenta(pedido.lineas || []).map(
       (linea: any) => `${linea.cantidad}x ${linea.nombre || 'Producto'}`,
     );
@@ -600,11 +742,33 @@ export class IaHerramientasService {
         }
       : undefined;
 
+    // ¿Debe un voucher? Medio digital elegido, sin pagar y sin voucher vigente
+    const medioDigital = [p.pago_metodo, p.pago_preferido, ...plan.map((f: any) => f.medio)].some((m: any) => MEDIOS_DIGITALES_VOUCHER.includes(String(m ?? '').toUpperCase()));
+    const faltaVoucher = medioDigital && p.pago_estado !== 'PAGADO' && vouchers.length === 0 && !['ANULADO', 'ENTREGADO'].includes(p.estado);
+
+    // Progreso (misma fuente que la carta y el mozo) y tiempo que falta; nunca lanza
+    let progreso: any;
+    try {
+      const cfg = p.estado === 'EN_CAMINO' ? await leerConfigEta(this.prisma as any).catch(() => undefined) : undefined;
+      const pr = progresoDelPedido(p, { ahora: new Date(), ...(cfg ? { cfg } : {}) });
+      progreso = {
+        etapa: pr.etapa,
+        etiqueta: pr.etiqueta,
+        porcentaje: pr.porcentaje,
+        ...(pr.estimadoMin !== undefined ? { listoEnMinAprox: pr.estimadoMin } : {}),
+        ...(pr.etaMin !== undefined ? { llegaEnMin: { desde: pr.etaMin, hasta: pr.etaMax } } : {}),
+      };
+    } catch {
+      progreso = undefined;
+    }
+
     return {
       encontrado: true,
       codigo: pedido.codigo,
       estado: pedido.estado,
       modalidad: pedido.modalidad,
+      canal: p.canal ?? null,
+      ...(p.programado_para ? { programadoPara: this.horaLima(p.programado_para), nota_programado: 'Pedido programado: no entra a cocina hasta cerca de esa hora.' } : {}),
       total: Number(pedido.total),
       totalACobrar: totalCobrable,
       pago: {
@@ -616,9 +780,11 @@ export class IaHerramientasService {
         saldoPorCobrar: saldo,
         montoPorCobrarAlRecibirSegunPlan: alRecibir,
         vouchersEnRevision: vouchers.filter((v: any) => !v.revisado_en).length,
+        faltaVoucher,
         aviso: 'Pagado y saldo salen de lo que Caja registró; un voucher en revisión aún no cuenta como pagado.',
       },
       delivery,
+      ...(progreso ? { progreso } : {}),
       creado_en: pedido.creado_en.toISOString(),
       productos,
       tiempoEstimadoMin:
@@ -632,9 +798,9 @@ export class IaHerramientasService {
   /**
    * Resumen de una línea del pedido más reciente del cliente, para la nota interna del asesor. Solo lectura; nunca lanza.
    */
-  async resumenPedidoParaAsesor(telefonoCliente?: string | null): Promise<string | null> {
+  async resumenPedidoParaAsesor(telefonoCliente?: string | null, conversacionId?: string | bigint): Promise<string | null> {
     try {
-      const r: any = await this.estadoDePedido('', telefonoCliente);
+      const r: any = await this.estadoDePedido('', telefonoCliente, conversacionId);
       if (!r?.encontrado) return null;
       const partes = [`${r.codigo} (${r.estado}, ${r.modalidad})`, `total S/ ${r.totalACobrable ?? r.total}`];
       if (r.pago) partes.push(`pagado por Caja S/ ${r.pago.pagadoRegistradoPorCaja}`, `saldo S/ ${r.pago.saldoPorCobrar}`);

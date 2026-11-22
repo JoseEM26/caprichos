@@ -61,7 +61,16 @@ export interface ResultadoConsultaIa {
   motivoDerivacion?: string;
   productoConcreto?: any;
   productosConsultados?: any[];
+  /** Acción estructurada que la IA pidió (ya validada contra la carta); la ejecuta el motor, no la IA. */
+  accionIa?: AccionIa;
+  /** true = el cliente escribe demasiado rápido: no se responde ahora (anti-bloqueo de WhatsApp). */
+  omitir?: boolean;
 }
+
+export type AccionIa =
+  | { tipo: 'EMPEZAR_PEDIDO' }
+  | { tipo: 'AGREGAR_PRODUCTO'; productoId: string; nombre: string }
+  | { tipo: 'VER_CATEGORIA'; categoriaId: string; nombre: string };
 
 export interface ResumenConsumoIaMes {
   periodo: string; // YYYY-MM

@@ -250,8 +250,13 @@ describe('Bot con menú (decisión del dueño)', () => {
   });
 
   describe('IA', () => {
-    it('nunca pide a la IA, aunque esté disponible', () => {
+    it('con la IA encendida, el texto libre que las reglas no entienden va a la IA (decisión del dueño 22/11)', () => {
       const r = ejecutar({ texto: 'que clima hace hoy en lima' }, contextoBase({ chatbotIaActivo: true }));
+      expect(tipos(r)).toEqual(['consultarIa']);
+    });
+
+    it('con la IA apagada o agotada, el mismo texto muestra el menú (respaldo por reglas)', () => {
+      const r = ejecutar({ texto: 'que clima hace hoy en lima' }, contextoBase({ chatbotIaActivo: false }));
       expect(tipos(r)).not.toContain('consultarIa');
     });
   });

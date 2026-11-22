@@ -176,12 +176,13 @@ const ESCENARIOS: Escenario[] = [
     ok: (s) => pidio(s, 'p_chee', 1) && pidio(s, 'p_carr', 1) && pidio(s, 'p_amer', 2),
   },
   {
-    id: 'E19', nombre: 'Escribe la cantidad con letras/número suelto', maxBot: 10,
+    id: 'E19', nombre: 'Guiado sin «¿cuántas?»: asume 1 y corrige con «mejor que sean 5»', maxBot: 10,
     correr: (s) => {
-      s.decir('hola'); s.decir('1'); s.decir('2'); s.decir('3'); s.decir('1'); s.decir('5');
+      s.decir('hola'); s.decir('1'); s.decir('2'); s.decir('3'); s.decir('1');
       correrDocil(s, base({ items: [{ producto: 'cheesecake', cantidad: 5 }] }));
+      (s as any).noPregunto = !s.botTextos.some((t) => /cuantas unidades|cuántas unidades/i.test(t));
     },
-    ok: (s) => pidio(s, 'p_chee', 5),
+    ok: (s) => pidio(s, 'p_chee', 5) && (s as any).noPregunto === true,
   },
   {
     id: 'E20', nombre: 'Vuelve horas después con carrito a medias', maxBot: 6,

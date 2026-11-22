@@ -84,7 +84,7 @@ export function notaResumenAsesor(d: {
 }
 
 /** Respuestas de IA seguidas (sin que el cliente toque el menú) tras las cuales el bot ofrece el menú y deja la IA. */
-export const TOPE_TURNOS_IA = 6;
+export const TOPE_TURNOS_IA = 15;
 
 /** true si la IA ya no debe contestar: llegó al tope y el cliente escribe texto libre (un toque de menú la reactiva). */
 export function iaAgotada(turnosPrevios: number | undefined, eligioOpcion: boolean): boolean {

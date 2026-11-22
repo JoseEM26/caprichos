@@ -782,8 +782,11 @@ export const TEXTOS_BOT = {
     return `${avisoStock ? `${avisoStock}\n` : ''}¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
 
-  pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number): string => {
-    return `Agregué ${nombreProd} (S/ ${subtotalLinea.toFixed(2)}) a tu pedido. ¿Quieres algo más?`;
+  pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number, cantidad = 0, avisoStock?: string | null): string => {
+    // La cantidad no se pregunta (se asume 1): se dice cuántas van y cómo corregirlo
+    const cuantas = cantidad > 0 ? `${cantidad} ` : '';
+    const corregir = cantidad === 1 ? ' Si quieres otra cantidad, escribe «mejor que sean 3».' : '';
+    return `${avisoStock ? `${avisoStock}\n` : ''}Agregué ${cuantas}${nombreProd} (S/ ${subtotalLinea.toFixed(2)}) a tu pedido.${corregir} ¿Quieres algo más?`;
   },
 
   pedidoVerCarrito: (itemsTexto: string, subtotal: number): string => {
@@ -1050,6 +1053,11 @@ export const TEXTOS_BOT = {
  * Sin promociones, descuentos, cupones ni puntos. La carta virtual se menciona en el saludo y al confirmar un pedido.
  */
 export const TEXTOS_SOLO_MENUS = {
+  /** Respuestas fijas cortas (sin IA, decisión del dueño 22/11). */
+  comprobante: (): string => 'Sí, emitimos boleta o factura. Si quieres factura, pásanos tu RUC al pagar 💛',
+  vuelto: (): string => '¿Con cuánto pagas? Llevamos tu vuelto 💵',
+  efectivoDelivery: (): string => 'Sí, puedes pagar en efectivo al repartidor 💵',
+
   /** Línea breve del saludo que invita a la carta virtual. */
   lineaCartaSaludo: (url: string): string => `💛 Mira nuestra carta virtual con fotos y precios: ${url} ✨`,
 

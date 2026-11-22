@@ -148,14 +148,19 @@ describe('Mensajes no compatibles en el webhook', () => {
     expect(encolados()[0].carga.interactivo.lista.secciones[0].filas).toEqual([{ id: 'f1', titulo: 'Pollo' }]);
   });
 
-  it('sticker fuera de un pedido y sin opciones a la vista: sale el menú principal (conversación real del 20/11)', async () => {
+  it('sticker suelto (sin paso pendiente): el bot no responde nada (decisión del dueño 22/11; antes salía «¡Qué lindo sticker!»)', async () => {
     conv = { ...conv, flujo: { estado: 'MENU' } };
     mensajesSalientes = [{ contenido: { texto: '¡Gracias por tu compra!' } }];
     await webhook.procesarPayload(payload({ type: 'sticker', sticker: { id: 's' } }));
-    const e = encolados()[0];
-    expect(e.tipo).toBe('INTERACTIVO');
-    expect(e.carga.interactivo.cuerpo).toContain('lindo sticker');
-    expect(e.carga.interactivo.lista.secciones[0].filas.map((f: any) => f.id)).toContain('pedir');
+    expect(encolados()).toHaveLength(0);
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('sticker con un pedido en curso: sigue repitiendo el paso pendiente', async () => {
+    conv = { ...conv, flujo: { estado: 'PEDIDO_MODALIDAD', pedido: { items: [] } } };
+    mensajesSalientes = [{ contenido: { texto: '¿Cómo lo quieres?', botones: [{ id: 'ped_x', titulo: 'Delivery' }] } }];
+    await webhook.procesarPayload(payload({ type: 'sticker', sticker: { id: 's' } }));
+    expect(encolados()[0].carga.interactivo.cuerpo).toContain('lindo sticker');
   });
 
   it('registra el video en mensaje_chat con su tipo y el id de WhatsApp', async () => {
@@ -172,7 +177,6 @@ describe('Mensajes no compatibles en el webhook', () => {
 
   it.each([
     ['video', { type: 'video', video: { id: 'v' } }, 'no puedo ver videos'],
-    ['sticker', { type: 'sticker', sticker: { id: 's' } }, 'lindo sticker'],
     ['contactos', { type: 'contacts', contacts: [] }, 'no puedo abrir contactos'],
     ['tipo desconocido', { type: 'unsupported' }, 'no puedo revisar este tipo de mensaje'],
   ])('%s: aviso específico y sin pasar al motor', async (_n, msg, aviso) => {

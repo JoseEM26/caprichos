@@ -1879,6 +1879,27 @@ function textoPagoMedio(contexto: ContextoConversacion, textoCliente: string): s
   return TEXTOS_SOLO_MENUS.pagoMedio(pedido[0], Boolean(hit), hit ? hit[1]?.nombre || hit[0] : null, activos);
 }
 
+const RE_SOBRE_SU_PEDIDO = /(^|\s)(ya|mi|mis|pedido|saldo|pague|pagado|cancele|yape|yapee|plin|transferi\w*|voucher|deposit\w*|no me)(\s|$)/;
+const RE_PIDE_COMPROBANTE = /(^|\s)(boleta|boletas|factura|facturas|facturan|comprobante|comprobantes)(\s|$)/;
+const RE_COMPROBANTE_CAMBIO = /(cambi|correg|modific|error|equivoc|reclam|anul|ya pague|ya hice|ya sali|no me llego|no llego)/;
+const RE_PIDE_VUELTO = /(^|\s)(vuelto|sencillo)(\s|$)|(tienen|tendran|llevan|hay|tienes) cambio|cambio (para|de) (un )?(billete|\d)/;
+const RE_EFECTIVO_ENTREGA = /(^|\s)(efectivo|cash)(\s|$)/;
+const RE_ENTREGA = /(delivery|domicilio|repartidor|reparto|entrega|entregan|al recibir|contra ?entrega|a mi casa|llega)/;
+
+/** Boleta/factura, vuelto y efectivo al repartidor: texto fijo corto. null = no aplica (sigue su camino, p. ej. la IA). */
+function respuestaFijaCorta(texto: string, contexto: ContextoConversacion): string | null {
+  // Solo la pregunta simple y corta; una frase larga o sobre SU pedido o pago («ya pagué por yape…») la contesta la IA con sus datos
+  if (texto.split(' ').length > 9 || RE_SOBRE_SU_PEDIDO.test(texto)) return null;
+  if (RE_PIDE_COMPROBANTE.test(texto) && !RE_COMPROBANTE_CAMBIO.test(texto)) return TEXTOS_SOLO_MENUS.comprobante();
+  if (RE_PIDE_VUELTO.test(texto)) return TEXTOS_SOLO_MENUS.vuelto();
+  if (RE_EFECTIVO_ENTREGA.test(texto) && RE_ENTREGA.test(texto)) {
+    // Solo si el efectivo está encendido en el local (si no, lo contesta la pregunta de pagos con la lista real)
+    const ef: any = (contexto.datosLocalPublicos?.mediosPago as any)?.efectivo;
+    if (ef?.activo !== false) return TEXTOS_SOLO_MENUS.efectivoDelivery();
+  }
+  return null;
+}
+
 /** Distancia de edición mínima (faltas de ortografía: «frape», «capucino»). */
 function distancia(a: string, b: string): number {
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
@@ -2267,6 +2288,12 @@ function transicionarSoloMenusNucleo(
     return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.estamosAtendiendo(contexto.datosLocal) }]);
   }
 
+  // 3.d Respuestas fijas cortas, sin IA: boleta o factura, vuelto, efectivo al repartidor (fuera de un pedido o pago en curso)
+  if (!id && !enPedido && !enPago && !/CP-W?\d{3,4}/i.test(entrada.textoOriginal || '')) {
+    const fija = respuestaFijaCorta(texto, contexto);
+    if (fija) return respuesta([{ tipo: 'enviarTexto', texto: fija }]);
+  }
+
   // 4. Hacer pedido: botón «Hacer pedido», «Pedir este» de la carta o texto como «quiero pedir»
   // (también un pedido dicho en una frase: «2 frappé moka grande para llevar»)
   if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido']) || (!id && !enPersona && texto.length > 2)) {
@@ -2314,6 +2341,10 @@ function transicionarSoloMenusNucleo(
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.miPedidoDemasiadasConsultas(), botones: [BOTON_VOLVER_MENU] }]);
     }
     const conCodigo = /CP-W?\d{3,4}/i.test(entrada.textoOriginal || '') || id.startsWith('ord_');
+    // Pregunta abierta sobre SU pedido («¿mi pedido ya sale?»): la IA responde con los datos reales de sus pedidos de cualquier canal
+    if (!id && preguntaEspecificaParaIa(entrada, contexto)) {
+      return respuesta([{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }]);
+    }
     const p = conCodigo || pedidoVigente(contexto.pedidoActivo) ? contexto.pedidoActivo : null;
     if (!p) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] }]);
@@ -2388,7 +2419,7 @@ function transicionarSoloMenusNucleo(
   // 10. Preguntas frecuentes concretas
   let faq = claveFaqSoloMenus(id, texto);
   // Una pregunta larga y específica de pago o delivery la contesta la IA con los datos reales, no la FAQ fija
-  if ((faq === 'pagos' || faq === 'delivery') && preguntaEspecificaParaIa(entrada, contexto)) faq = null;
+  if (faq && faq !== 'horario' && preguntaEspecificaParaIa(entrada, contexto)) faq = null;
   if (faq) {
     return respuesta([respuestaFaqSoloMenus(faq, contexto, texto, Boolean(id))]);
   }
@@ -2438,7 +2469,8 @@ function transicionarSoloMenusNucleo(
   }
 
   // 14. Primer contacto sin intención clara: saludo con el menú
-  if (flujo.estado === 'INICIO') return saludo();
+  // (con la IA encendida, una pregunta abierta en el primer mensaje la contesta la IA; el saludo puro ya salió arriba)
+  if (flujo.estado === 'INICIO' && !(contexto.chatbotIaActivo && !id && /[a-z]{3}/.test(texto))) return saludo();
 
   // 14.b Un número suelto sin menú vigente («1» de un «Volver al menú» viejo): vuelve al menú, nunca a la IA ni al «no entendí»
   if (!id && !enPersona && /^(?:(?:por favor|porfa|xfa)\s+)?\d{1,2}$/.test(texto.trim())) return saludo();

@@ -1598,22 +1598,7 @@ ${this.lineasResumen(nuevo, contexto)}
       config.sabor = entrada.textoOriginal;
     }
 
-    pedido.estadoInterno = 'PEDIDO_CANTIDAD';
-    return {
-      nuevoEstado: 'PEDIDO_CANTIDAD',
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
-          botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
-        },
-      ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_CANTIDAD',
-        pedido,
-      },
-    };
+    return this.preguntarCantidad(flujo, pedido, config, contexto);
   }
 
   /** Stock por sabor: un solo sabor por línea; las unidades que consume son tamaño × cantidad. */
@@ -1717,21 +1702,33 @@ ${this.lineasResumen(nuevo, contexto)}
       config.nota = entrada.textoOriginal.slice(0, 150);
     }
 
+    return this.preguntarCantidad(flujo, pedido, config, contexto);
+  }
+
+  /**
+   * Cantidad de la línea: NO se pregunta, se asume 1 (o la que dijo en su frase); el resumen la muestra y «mejor que sean 3» la corrige.
+   * Solo la piden los productos con sabor por stock (la lista de sabores depende de las unidades) y los combos con elecciones.
+   */
+  private preguntarCantidad(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    config: ItemEnConfiguracionBot,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const prod = productoDeCarta(contexto.categoriasCarta || [], config.productoId);
+    // (los combos con elecciones también la piden: cada combo multiplica las elecciones y su cantidad no se corrige después)
+    if (!prod?.saboresConStock && !config.combo) return this.continuarTrasCantidad(flujo, pedido, config, contexto);
     pedido.estadoInterno = 'PEDIDO_CANTIDAD';
     return {
       nuevoEstado: 'PEDIDO_CANTIDAD',
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(prod, contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_CANTIDAD',
-        pedido,
-      },
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
     };
   }
 
@@ -2139,7 +2136,7 @@ ${this.lineasResumen(nuevo, contexto)}
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoProductoAgregado(config.productoNombre, subtotalLinea),
+          texto: TEXTOS_BOT.pedidoProductoAgregado(config.productoNombre, subtotalLinea, config.cantidad, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: BOTONES_PEDIDO_ACCION_CARRITO,
         },
       ],
@@ -2170,6 +2167,16 @@ ${this.lineasResumen(nuevo, contexto)}
       const n = Number(cambioCantidad[1] ?? cambioCantidad[2]);
       const ultimo = pedido.items[pedido.items.length - 1];
       if (n >= 1 && n <= 99 && !ultimo.ofertaId && !ultimo.sabores) {
+        // La cantidad ya no se pregunta: al corregirla se respeta lo que queda en stock
+        const quedan = this.quedanProducto(String(ultimo.productoId), contexto);
+        const prodCorr = productoDeCarta(contexto.categoriasCarta || [], String(ultimo.productoId));
+        if (quedan !== null && n * unidadesDeTamano(prodCorr, (ultimo as any).tamanoId) > quedan) {
+          return {
+            nuevoEstado: flujo.estado,
+            acciones: [{ tipo: 'enviarBotones', texto: `Solo quedan ${quedan} de ${ultimo.productoNombre} 😅 Dime otra cantidad (por ejemplo «mejor que sean ${Math.max(1, quedan)}»).`, botones: BOTONES_PEDIDO_ACCION_CARRITO }],
+            nuevoFlujo: flujo,
+          };
+        }
         const items = pedido.items.map((i) => (i === ultimo ? { ...i, cantidad: n, subtotal: Number((i.precioUnitario * n).toFixed(2)), personas: i.personas ? Array.from({ length: n }, (_, k) => i.personas![k % i.personas!.length]) : undefined } : i));
         return this.pasoVerCarrito(flujo, { ...pedido, items, estadoInterno: 'PEDIDO_VER_CARRITO' }, { ...entrada, id: 'ped_ver_carrito', texto: 'carrito' }, contexto);
       }
@@ -3590,24 +3597,8 @@ ${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
       };
     }
 
-    // Cantidad (si ya la dijo en su frase y el producto no pide sabor por stock, no se pregunta)
-    if (config.cantidadFija && !prod?.saboresConStock) return this.continuarTrasCantidad(flujo, pedido, config, contexto);
-    pedido.estadoInterno = 'PEDIDO_CANTIDAD';
-    return {
-      nuevoEstado: 'PEDIDO_CANTIDAD',
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
-          botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
-        },
-      ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_CANTIDAD',
-        pedido,
-      },
-    };
+    // Cantidad: se asume 1 (el cliente la corrige con «mejor que sean 3»); solo se pregunta si el sabor se elige por stock
+    return this.preguntarCantidad(flujo, pedido, config, contexto);
   }
 
   /** Paso de combo con opciones agotadas por stock: primero una línea de aviso (plan B), luego lo que se puede elegir. */
