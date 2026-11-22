@@ -116,7 +116,8 @@ export async function enviarResumenPendienteDeCarta(
   });
   // Ya salió, o está en cola (con el mensaje del cliente la política lo deja pasar): nada que reenviar
   if (filas.some((f) => f.estado === 'ENVIADO' || f.estado === 'PENDIENTE' || f.estado === 'ENVIANDO')) return false;
-  const telefono = telefonoEnviable(pedido.cliente_telefono) || telefonoDelChat(chat);
+  // Al chat que escribió (la política anti-baneo solo deja responder a quien escribió); su celular vinculado si es LID
+  const telefono = telefonoDelChat(chat) || telefonoEnviable(pedido.cliente_telefono);
   if (!telefono) return false;
   const previo = filas.find((f) => (f.carga as any)?.textoLibre);
   let carga: CargaSaliente;

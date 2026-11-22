@@ -600,7 +600,7 @@ export function transicionarEstado(
 
     // f) Estado de mi pedido (Regla 1)
     const matchCod =
-      textoOriginalEntrada.match(/CP-\d{4}/i) || textoEntrada.match(/CP-\d{4}/i);
+      textoOriginalEntrada.match(/CP-W?\d{3,4}/i) || textoEntrada.match(/CP-W?\d{3,4}/i);
     const esEstadoPedido =
       idInteractivoEntrada === 'mipedido' ||
       idInteractivoEntrada === 'btn_mipedido' ||
@@ -777,7 +777,7 @@ export function transicionarEstado(
 
   // Detección de código de pedido en el texto (ej: CP-0110)
   const matchCodigo =
-    textoOriginal.match(/CP-\d{4}/i) || texto.match(/CP-\d{4}/i);
+    textoOriginal.match(/CP-W?\d{3,4}/i) || texto.match(/CP-W?\d{3,4}/i);
   const codigoDetectado = matchCodigo ? matchCodigo[0].toUpperCase() : null;
 
   // 3. Detección de queja escrita o intención explícita de hablar con una persona
@@ -2089,7 +2089,7 @@ function transicionarSoloMenusNucleo(
     const otroTema =
       esId('persona', 'btn_persona', 'btn_asi_persona', 'btn_esp_persona', 'mipedido', 'btn_mipedido', 'btn_asi_pedido', 'c_eta') ||
       id.startsWith('ord_') ||
-      /CP-\d{4}/i.test(entrada.textoOriginal || '') ||
+      /CP-W?\d{3,4}/i.test(entrada.textoOriginal || '') ||
       entrada.tipo === 'ubicacion' ||
       hay([...PALABRAS_PERSONA_SOLO, ...PALABRAS_QUEJA, ...PALABRAS_MI_PEDIDO, ...PALABRAS_ETA]);
     const quierePedir = esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido', 'programar']);
@@ -2280,13 +2280,13 @@ function transicionarSoloMenusNucleo(
   if (
     esId('mipedido', 'btn_mipedido', 'btn_asi_pedido', 'c_eta') ||
     id.startsWith('ord_') ||
-    /CP-\d{4}/i.test(entrada.textoOriginal || '') ||
+    /CP-W?\d{3,4}/i.test(entrada.textoOriginal || '') ||
     hay([...PALABRAS_MI_PEDIDO, ...PALABRAS_ETA])
   ) {
     if (contexto.limiteConsultasExcedido) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.miPedidoDemasiadasConsultas(), botones: [BOTON_VOLVER_MENU] }]);
     }
-    const conCodigo = /CP-\d{4}/i.test(entrada.textoOriginal || '') || id.startsWith('ord_');
+    const conCodigo = /CP-W?\d{3,4}/i.test(entrada.textoOriginal || '') || id.startsWith('ord_');
     const p = conCodigo || pedidoVigente(contexto.pedidoActivo) ? contexto.pedidoActivo : null;
     if (!p) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] }]);
