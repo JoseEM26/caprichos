@@ -2,12 +2,12 @@ import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@n
 import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
-export const VISTAS_TV = ['SALON_VIVO', 'COCINA'] as const;
+export const VISTAS_TV = ['SALON_VIVO', 'COCINA', 'PANTALLA_LOCAL'] as const;
 export type VistaTv = (typeof VISTAS_TV)[number];
 
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin O/0/I/1
 export const VIGENCIA_CODIGO_MS = 10 * 60_000;
-const NOMBRE_POR_VISTA: Record<VistaTv, string> = { SALON_VIVO: 'TV Salón en vivo', COCINA: 'TV Cocina' };
+const NOMBRE_POR_VISTA: Record<VistaTv, string> = { SALON_VIVO: 'TV Salón en vivo', COCINA: 'TV Cocina', PANTALLA_LOCAL: 'TV Pedidos del local' };
 
 export const hashLlave = (llave: string) => crypto.createHash('sha256').update(llave).digest('hex');
 const generarCodigo = () => Array.from({ length: 6 }, () => ALFABETO[crypto.randomInt(ALFABETO.length)]).join('');

@@ -19,12 +19,12 @@ sugerencias:
 Gestiona las pantallas y televisores inteligentes (Smart TV) del local dedicados a la visualización de comandas en [[cocina]], barra y despacho. Se vincula con la configuración de áreas en [[mirest]] y con el centro de alertas operativas en [[notificaciones]].
 
 ## Como se hace: vincular una nueva pantalla de TV
-1. En el navegador de la TV abre la dirección de la vista que quieres: caprichos.pe/tv/salon-vivo (Salón en vivo) o caprichos.pe/pantalla/cocina (Cocina). No pide usuario ni contraseña.
+1. En el navegador de la TV abre la dirección de la vista que quieres: caprichos.pe/tv/salon-vivo (Salón en vivo), caprichos.pe/pantalla/cocina (Cocina) o caprichos.pe/pantalla-local (Pedidos del local). No pide usuario ni contraseña.
 2. La TV muestra un código grande de 6 caracteres (letras y números, con un guion al medio) y una cuenta regresiva: el código cambia solo cada 10 minutos.
 3. En el administrativo, en Pantallas, escribe ese código en la casilla de vinculación (con o sin guion).
 4. Pulsa el botón "Vincular pantalla".
 5. Se abrirá la ventana "¿Vincular esta pantalla?". Pulsa "Sí, vincular" para confirmar o "No, cancelar" para abortar.
-6. La TV entra sola a su vista en unos segundos y queda en la lista con su vista ("Salón en vivo" o "Cocina · área"). Luego puedes cambiarle el nombre y el área con "Editar".
+6. La TV entra sola a su vista en unos segundos y queda en la lista con su vista ("Salón en vivo", "Pedidos del local" o "Cocina · área"). Luego puedes cambiarle el nombre y el área con "Editar".
 7. Solo se puede vincular una TV que esté mostrando su código en ese momento; no se crean pantallas desde aquí. Si desactivas una pantalla, esa TV vuelve a mostrar un código.
 Despues: [[cocina]]
 Ver tambien: [[mirest]]
@@ -45,16 +45,18 @@ Ver tambien: [[pantallas]]
 Ver tambien: [[cocina]]
 
 ## Como se hace: poner la pantalla de pedidos del local en la TV
-1. Esta pantalla es distinta a la de cocina: la ven los clientes y no pide código ni sesión. Muestra a Capri, los pedidos "Comer en el local" y "Para llevar", con "Preparando" y "¡Listo! Acércate a la barra".
-2. En Configuración del local, pestaña "Parámetros de operación", abre el grupo "Pantalla de pedidos del local (TV)" y pulsa "Abrir pantalla del local". También puedes escribir la dirección /pantalla-local de Caprichos en el navegador de la TV (ejemplo: caprichos.pe/pantalla-local).
-3. Pulsa "Pantalla completa" (los botones aparecen al mover el mouse o tocar la pantalla y se esconden solos a los pocos segundos).
-4. Si quieres que Capri avise con voz y sonido cuando un pedido pasa a "Listo", pulsa "Activar sonido y voz". El navegador exige ese clic una vez cada vez que abres la página.
-5. La pantalla se actualiza sola cada 5 segundos. Los pedidos de delivery no se muestran, y un pedido "Listo" se queda unos 20 minutos si nadie lo entrega antes.
-6. Para ocultar el nombre del cliente, en el mismo grupo cambia "Mostrar nombre del cliente en la pantalla" a "No". Solo se muestra el nombre de pila, nunca apellidos, teléfono ni documento.
-7. La temática (Navidad, Halloween, Fiestas Patrias, San Valentín, Año Nuevo) sigue a la de Capri en [[mascota]].
-Ver tambien: [[mascota]]
+1. Esta pantalla es para el personal y los clientes en sala: muestra solo pedidos, con el reloj, sobre fondo claro. Ya no tiene a Capri. Como lleva nombre, productos y forma de pago, ya no es pública: se vincula con código igual que el Salón en vivo.
+2. En el navegador de la TV escribe caprichos.pe/pantalla-local. La TV muestra un código grande de 6 caracteres. En Pantallas escríbelo y pulsa "Vincular pantalla"; la TV entra sola a "Pedidos del local". Con sesión y permiso de cocina también se puede abrir desde Configuración del local, pestaña "Parámetros de operación", grupo "Pantalla de pedidos del local (TV)", botón "Abrir pantalla del local".
+3. Cada tarjeta muestra el código, quién pidió, dónde (Mesa N, Comer en el local, Para llevar, Recoger o DELIVERY con su zona), cada producto con cantidad, tamaño, opciones, sabores, nombre del vaso y nota, el pago (Pagado o Por cobrar y con qué medio) y cuánto tiempo lleva esperando, que corre solo y se pone naranja o rojo si se demora.
+4. El avance se ve por partes: En caja, En cocina, Listo. Debajo, cada área con su estado (por ejemplo "Salado ✓ Lista" y "Bebidas ● Preparando").
+5. Los pedidos anulados se quedan 2 minutos marcados con el sello ANULADO y luego desaparecen. Un pedido "Listo" se queda unos 20 minutos si nadie lo entrega antes; los entregados salen.
+6. Si hay más pedidos de los que caben (6 por pantalla), la pantalla pasa sola de página cada 12 segundos y abajo indica "Página 1 de 2".
+7. Pulsa "Pantalla completa" (el botón aparece al mover el mouse o tocar la pantalla y se esconde solo). La pantalla se actualiza sola cada 5 segundos.
+8. Para ocultar el nombre del cliente, en Configuración del local, grupo "Pantalla de pedidos del local (TV)", cambia "Mostrar nombre del cliente en la pantalla" a "No". Solo se muestra el nombre de pila: nunca apellidos, celular, DNI ni la dirección (en delivery solo la zona).
+Ver tambien: [[cocina]]
 
 ## Errores y dudas comunes
+- La pantalla del local pide un código al abrirla: es lo normal la primera vez. Vincúlala en Pantallas; si la desactivas, la TV vuelve a pedir código.
 - La pantalla del local dice "Sin conexión, reintentando": revisa el Internet de la TV; sigue mostrando lo último que recibió y se recupera sola.
 - La televisión no muestra pedidos: verifica que la pantalla figure como "Activa" y con estado de conexión en verde. Si aparece desconectada, comprueba la conexión a Internet o red Wi-Fi de la TV.
 - "No hay ninguna TV mostrando ese código": el código venció o está mal escrito. La TV ya cambió a otro código solo; escribe el que ves ahora.

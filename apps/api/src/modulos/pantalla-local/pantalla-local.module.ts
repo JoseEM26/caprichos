@@ -7,5 +7,6 @@ import { PantallaLocalService } from './pantalla-local.service';
   imports: [ComunModule],
   controllers: [PantallaLocalController],
   providers: [PantallaLocalService],
+  exports: [PantallaLocalService],
 })
 export class PantallaLocalModule {}

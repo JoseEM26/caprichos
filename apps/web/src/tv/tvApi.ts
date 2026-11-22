@@ -1,7 +1,7 @@
 import { ErrorApi } from '../comun/api';
 
 /** Vistas que una TV puede mostrar sin sesión (iguales a las de la API). */
-export type VistaTv = 'SALON_VIVO' | 'COCINA';
+export type VistaTv = 'SALON_VIVO' | 'COCINA' | 'PANTALLA_LOCAL';
 
 export interface EstadoTv {
   vinculada: boolean;

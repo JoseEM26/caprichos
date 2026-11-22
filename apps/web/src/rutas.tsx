@@ -67,13 +67,17 @@ export function RutasApp() {
           element={<PantallaAsistenciaPublica />}
         />
 
-        {/* 2. Pantalla pública de pedidos del local (TV, sin sesión) */}
+        {/* 2. Pedidos del local en la TV: sin usuario con código rotativo que se vincula en Pantallas, o con sesión y permiso de cocina */}
         <Route
           path="/pantalla-local"
           element={
-            <Suspense fallback={null}>
-              <PantallaLocal />
-            </Suspense>
+            <PuertaTv vista="PANTALLA_LOCAL" permiso="cocina/ver">
+              {(acceso) => (
+                <Suspense fallback={null}>
+                  <PantallaLocal acceso={acceso} />
+                </Suspense>
+              )}
+            </PuertaTv>
           }
         />
 

@@ -45,7 +45,7 @@ const mapearEstacion = (area: { nombre: string } | null): string => {
 };
 
 const textoVista = (vista: string | null, area: { nombre: string } | null): string | null =>
-  vista === 'SALON_VIVO' ? 'Salón en vivo' : vista === 'COCINA' ? `Cocina · ${area ? area.nombre : 'todas las áreas'}` : null;
+  vista === 'SALON_VIVO' ? 'Salón en vivo' : vista === 'PANTALLA_LOCAL' ? 'Pedidos del local' : vista === 'COCINA' ? `Cocina · ${area ? area.nombre : 'todas las áreas'}` : null;
 
 @Injectable()
 export class PantallasService {

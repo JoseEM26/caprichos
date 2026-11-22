@@ -2,14 +2,15 @@ import { Body, Controller, ForbiddenException, Get, Header, Post, Query, Req, Us
 import { IsString } from 'class-validator';
 import { ComandasService } from '../cocina/comandas.service';
 import { ComandasQueryDto } from '../cocina/dto/comandas-query.dto';
+import { PantallaLocalService } from '../pantalla-local/pantalla-local.service';
 import { SalonVivoService } from '../salon/salon-vivo.service';
 import { TvGuard } from './tv.guard';
 import { limitarTv, llaveDe } from './tv.limite';
 import { TvService } from './tv.service';
 
 /** Cada TV solo lee la vista con la que se vinculó (salón no ve comandas y cocina no ve el salón). */
-function exigirVista(req: any, vista: string) {
-  if (req.tv?.vista && req.tv.vista !== vista) throw new ForbiddenException({ codigo: 'VISTA_NO_PERMITIDA', mensaje: 'Esta pantalla no está vinculada para esta vista' });
+function exigirVista(req: any, vista: string, estricta = false) {
+  if ((estricta || req.tv?.vista) && req.tv?.vista !== vista) throw new ForbiddenException({ codigo: 'VISTA_NO_PERMITIDA', mensaje: 'Esta pantalla no está vinculada para esta vista' });
 }
 
 class PedirCodigoTvDto {
@@ -27,6 +28,7 @@ export class TvController {
     private readonly tv: TvService,
     private readonly vivo: SalonVivoService,
     private readonly comandas: ComandasService,
+    private readonly pantallaLocal: PantallaLocalService,
   ) {}
 
   @Post('codigo')
@@ -49,6 +51,15 @@ export class TvController {
   salonVivo(@Req() req: any) {
     exigirVista(req, 'SALON_VIVO');
     return this.vivo.obtener();
+  }
+
+  /** Pedidos del local para la TV vinculada como «Pedidos del local»: nombre de pila, productos y pago; nunca celular, DNI ni dirección. */
+  @Get('pedidos-local')
+  @UseGuards(TvGuard)
+  @Header('Cache-Control', 'no-store')
+  pedidosLocal(@Req() req: any) {
+    exigirVista(req, 'PANTALLA_LOCAL', true); // datos personales: una TV sin vista (antigua) tampoco entra
+    return this.pantallaLocal.pedidos();
   }
 
   @Get('cocina/areas')

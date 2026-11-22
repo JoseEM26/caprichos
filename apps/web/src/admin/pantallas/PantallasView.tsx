@@ -76,7 +76,7 @@ export function PantallasView() {
     setPairMsg(null);
     setConfirmarAccion({
       titulo: '¿Vincular esta pantalla?',
-      mensaje: `La TV que muestra el código ${code} entrará sola a su vista (Salón en vivo o Cocina). Solo podrá mirar, no cambiar nada.`,
+      mensaje: `La TV que muestra el código ${code} entrará sola a su vista (Salón en vivo, Cocina o Pedidos del local). Solo podrá mirar, no cambiar nada.`,
       textoSi: 'Sí, vincular',
       accion: async () => {
         setVinculando(true);
@@ -375,7 +375,7 @@ export function PantallasView() {
           Vincular una pantalla nueva
         </div>
         <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-          1) En la TV abre caprichos.pe/tv/salon-vivo (Salón en vivo) o caprichos.pe/pantalla/cocina (Cocina): no pide usuario. 2) La TV muestra un código de 6 caracteres que cambia cada 10 minutos. 3) Escríbelo aquí y pulsa Vincular: la TV entra sola. La pantalla solo mira: sin teléfono ni dirección del cliente, y no entra al administrativo. Si se pierde o se filtra, desactívala en la lista: la TV vuelve a pedir un código.
+          1) En la TV abre caprichos.pe/tv/salon-vivo (Salón en vivo), caprichos.pe/pantalla/cocina (Cocina) o caprichos.pe/pantalla-local (Pedidos del local): no pide usuario. 2) La TV muestra un código de 6 caracteres que cambia cada 10 minutos. 3) Escríbelo aquí y pulsa Vincular: la TV entra sola. La pantalla solo mira: sin celular, DNI ni dirección del cliente, y no entra al administrativo. Si se pierde o se filtra, desactívala en la lista: la TV vuelve a pedir un código.
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
