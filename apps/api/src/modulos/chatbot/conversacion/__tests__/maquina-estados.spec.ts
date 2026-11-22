@@ -359,7 +359,7 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       expect(resultado.acciones[1].tipo).toBe('enviarTexto');
       if (resultado.acciones[1].tipo === 'enviarTexto') {
         expect(resultado.acciones[1].texto).toContain(
-          'Te paso con alguien del equipo.\nYa les avisé con tu nombre y tu número',
+          'Te paso con alguien del equipo; te escribe en unos minutos',
         );
       }
     });

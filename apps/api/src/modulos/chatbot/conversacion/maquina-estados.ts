@@ -1802,9 +1802,10 @@ function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): an
 }
 
 /** Respuesta de una pregunta frecuente (lactosa, bebidas calientes, postres, pagos, delivery). */
-function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion): any {
+function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion, textoCliente = '', conBotones = true): any {
   const botones = [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU];
-  const enviar = (texto: string) => ({ tipo: 'enviarBotones', texto, botones });
+  // Pregunta escrita: se responde en un solo mensaje corto, sin repetir el menú; con botón de la lista, como siempre
+  const enviar = (texto: string) => (conBotones ? { tipo: 'enviarBotones', texto, botones } : { tipo: 'enviarTexto', texto });
 
   if (clave === 'horario') {
     return enviar(TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal));
@@ -1850,13 +1851,81 @@ function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion): a
   }
 
   if (clave === 'pagos') {
-    return enviar(TEXTOS_BOT.faqPagos(contexto.datosLocalPublicos?.mediosPago || {}));
+    return enviar(textoPagoMedio(contexto, textoCliente));
   }
 
   return enviar(
-    TEXTOS_BOT.faqDelivery(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde),
+    conBotones
+      ? TEXTOS_BOT.faqDelivery(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde)
+      : TEXTOS_SOLO_MENUS.deliveryRespuesta(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde, contexto.datosLocal, /costo|cuesta|cuanto|tarifa|precio/.test(textoCliente)),
   );
 }
+
+
+/** Medios de pago que el cliente nombra y los activos del local: «¿aceptan tarjeta?» se contesta con sí o no, no con la lista. */
+const ALIAS_MEDIOS: Record<string, string[]> = {
+  yape: ['yape'],
+  plin: ['plin'],
+  efectivo: ['efectivo', 'cash', 'billete'],
+  tarjeta: ['tarjeta', 'visa', 'mastercard', 'credito', 'debito', 'culqi'],
+  transferencia: ['transferencia', 'deposito', 'bcp', 'interbank'],
+};
+function textoPagoMedio(contexto: ContextoConversacion, textoCliente: string): string {
+  const medios = Object.entries(contexto.datosLocalPublicos?.mediosPago || {}).filter(([, c]: [string, any]) => c?.activo !== false) as [string, any][];
+  const activos = medios.map(([k, c]) => c?.nombre || k.toUpperCase());
+  const pedido = Object.entries(ALIAS_MEDIOS).find(([, alias]) => alias.some((a) => new RegExp(`(^|\\s)${a}(\\s|$)`).test(textoCliente)));
+  if (!pedido) return TEXTOS_SOLO_MENUS.pagoMedio(null, false, null, activos);
+  const hit = medios.find(([k, c]) => pedido[1].some((a) => normalizarTexto(`${k} ${c?.nombre ?? ''}`).includes(a) || a === normalizarTexto(k)));
+  return TEXTOS_SOLO_MENUS.pagoMedio(pedido[0], Boolean(hit), hit ? hit[1]?.nombre || hit[0] : null, activos);
+}
+
+/** Distancia de edición mínima (faltas de ortografía: «frape», «capucino»). */
+function distancia(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+const mismaPalabra = (a: string, b: string): boolean => a === b || (a.length >= 5 && b.length >= 5 && distancia(a, b) <= 1) || (a.length >= 6 && b.length >= 6 && distancia(a, b) <= 2);
+
+const RE_PREGUNTA_PRODUCTO = /(^|\s)(cuanto|cuesta|cuestan|precio|precios|vale|valen|sale|salen|a como|tienen|tienes|tiene|hay|venden|manejan|disponible|disponibles|algun|alguna)(\s|$)/;
+const PALABRAS_RELLENO = new Set(['cuanto', 'cuesta', 'cuestan', 'precio', 'precios', 'vale', 'valen', 'sale', 'salen', 'como', 'tienen', 'tienes', 'tiene', 'hay', 'venden', 'manejan', 'disponible', 'disponibles', 'algun', 'alguna', 'para', 'por', 'favor', 'porfa', 'del', 'los', 'las', 'una', 'unos', 'unas', 'que', 'con', 'sera', 'seria', 'esta', 'estan', 'hola', 'buenas', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber']);
+
+/**
+ * Productos de la carta que encajan con lo preguntado («cuanto cuesta el frape oreo»), tolerando faltas.
+ * Gana el que más palabras comparte; si solo coincide una palabra común («frappe») salen todos los que la llevan.
+ * Con una palabra de categoría («hay bebidas calientes») salen los productos de esa categoría.
+ */
+function productosPreguntados(texto: string, contexto: ContextoConversacion, seguimiento = false): { productos: any[]; categoria?: string } | null {
+  // «y el capucino?»: sin palabra de precio, pero sigue una pregunta (empieza con «y» o termina en «?»)
+  if (!RE_PREGUNTA_PRODUCTO.test(texto) && !seguimiento) return null;
+  const q = texto.split(' ').filter((w) => w.length >= 3 && !PALABRAS_RELLENO.has(w));
+  if (!q.length) return null;
+  const todos: any[] = [];
+  for (const c of contexto.categoriasCarta || []) for (const p of c.productos || []) if (!todos.some((x) => String(x.id) === String(p.id))) todos.push(p);
+  const puntuados = todos
+    .map((p) => ({ p, n: normalizarTexto(p.nombre).split(' ').filter((w) => w.length >= 3 && q.some((x) => mismaPalabra(x, w))).length }))
+    .filter((x) => x.n > 0);
+  if (puntuados.length) {
+    const max = Math.max(...puntuados.map((x) => x.n));
+    return { productos: puntuados.filter((x) => x.n === max).map((x) => x.p).slice(0, 6) };
+  }
+  const cat = (contexto.categoriasCarta || []).find((c: any) => normalizarTexto(c.nombre).split(' ').some((w: string) => w.length >= 4 && q.some((x) => mismaPalabra(x, w) || mismaPalabra(x, w.replace(/s$/, '')))));
+  const prods = (cat?.productos || []).filter((p: any) => p.disponible !== false).slice(0, 8);
+  return cat && prods.length ? { productos: prods, categoria: cat.nombre } : null;
+}
+
+function hay_(res: RegExp[], texto: string): boolean {
+  return res.some((r) => r.test(texto));
+}
+const RE_INSULTO = /(^|\s)(mierda|porqueria|basura|idiota|estupido|estupida|imbecil|inutil|huevon|conchatumadre|puta|puto|carajo|maldito|maldita|asco|cojudo|pendejo)(\s|$)/;
+const RE_ESTAN_ATENDIENDO = /(estan|siguen|aun|todavia|pueden|puedes|ya)\s+(atendiendo|atienden|atender|abiertos|abierto|reciben)|se puede pedir|estan abiertos|hay atencion|atienden hoy|atienden ahora/;
+const RE_HORARIO = /(^|\s)(horario|horarios|abren|cierran|abierto|abiertos|atienden|atencion|a que hora|hasta que hora|desde que hora)(\s|$)/;
+const RE_LUGAR = /(^|\s)(ubicacion|ubicados|ubicado|mapa|direccion)(\s|$)|donde (estan|quedan|queda|se ubican|los encuentro|es el local|atienden)|como llego|como llegar/;
+const RE_SMALLTALK = /^(hola |buenas |buenos dias |buenas tardes |buenas noches )?(como estas|que tal|como te va|como andas|todo bien|como amaneciste)( hoy)?$/;
+const RE_RESERVA_DETALLES = /(\d{1,2}|dos|tres|cuatro|cinco|seis|siete|ocho|diez)\s*(personas|pax|amigos|amigas|chicas|chicos)|para\s+(\d|dos|tres|cuatro|cinco|seis|siete|ocho|diez)\b|(^|\s)(lunes|martes|miercoles|jueves|viernes|sabado|domingo|hoy|manana|pasado manana)(\s|$)|\d{1,2}\s*(pm|am|hrs|h)(\s|$)|a las \d/;
+const RE_RESERVA_CAMBIO = /(cancel|anul|cambi|mover|modific|reprogram|postergar|adelantar)/;
 
 /** Clave de la pregunta frecuente pedida (por botón o por palabra clave), o null. */
 function claveFaqSoloMenus(id: string, texto: string): string | null {
@@ -1873,8 +1942,8 @@ function claveFaqSoloMenus(id: string, texto: string): string | null {
     ['lactosa', ['lactosa', 'intolerante', 'leche vegetal']],
     ['calientes', ['bebidas calientes', 'calientes', 'cafes', 'cafe']],
     ['postres', ['postres', 'waffles', 'dulces', 'donas']],
-    ['pagos', ['pago', 'pagos', 'yape', 'plin', 'tarjeta', 'efectivo']],
-    ['delivery', ['delivery', 'costo envio', 'envio gratis', 'zonas reparto']],
+    ['pagos', ['pago', 'pagos', 'pagar', 'yape', 'plin', 'tarjeta', 'efectivo', 'transferencia', 'visa']],
+    ['delivery', ['delivery', 'costo envio', 'costo del envio', 'cuesta el envio', 'cuanto cuesta enviar', 'envio gratis', 'zonas reparto', 'a domicilio', 'domicilio', 'reparto', 'repartidor']],
   ];
   const hit = reglas.find(([, palabras]) => coincideAlgunaPalabra(texto, palabras));
   return hit ? hit[0] : null;
@@ -1972,7 +2041,7 @@ function transicionarSoloMenusNucleo(
   const respuesta = (acciones: any[], estado: EstadoConversacion = enPersona ? 'ATENCION_PERSONA' : 'MENU') => ({
     nuevoEstado: estado,
     acciones,
-    nuevoFlujo: { ...flujo, estado, pedido: null, repreguntasFallidas: 0 },
+    nuevoFlujo: { ...flujo, estado, pedido: null, repreguntasFallidas: 0, saludoCorto: undefined, insultos: undefined } as FlujoConversacion,
   });
 
   const saludo = () => {
@@ -1998,9 +2067,11 @@ function transicionarSoloMenusNucleo(
     const nombreReal = nombreParaSaludo(contexto.nombreCliente);
     const nombre = nombreReal ? ` ${nombreReal.split(/\s+/)[0]}` : '';
     const lineaPedido = ped?.codigo ? ` Tu pedido ${ped.codigo} sigue su curso.` : '';
-    return respuesta([
-      { tipo: 'enviarBotones', texto: `¡Hola de nuevo${nombre}! 😊${lineaPedido}\nAquí sigo por si necesitas algo más.`, botones: [BOTON_VOLVER_MENU] },
+    const r = respuesta([
+      { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.holaDeNuevo(nombre, lineaPedido), botones: [BOTON_VOLVER_MENU] },
     ]);
+    // Si vuelve a saludar sin nada en medio, la próxima vez va el menú (no el mismo mensaje otra vez)
+    return { ...r, nuevoFlujo: { ...r.nuevoFlujo, saludoCorto: true } as FlujoConversacion };
   };
 
   // 0. Pedido en curso que lleva más de 30 minutos sin respuesta: se descarta el carrito y se vuelve al menú
@@ -2032,7 +2103,7 @@ function transicionarSoloMenusNucleo(
   // «¿y las opciones?», «menú», «ver opciones»: siempre el menú completo, nunca el «Hola de nuevo»
   const pideMenu = ['comenzar', '0'].includes(texto) || /(^|\s)(menu|opciones)(\s|$)/.test(texto);
   if (contexto.sinBienvenida && !enPedido && !enPago && !esId('menu', 'btn_menu', 'volver_menu', 'inicio') && !pideMenu && esSaludoPuro(texto)) {
-    return saludoCorto();
+    return (flujo as any).saludoCorto ? saludo() : saludoCorto();
   }
 
   // Saludo y regreso al menú (fuera de un pedido o pago en curso: ahí lo atiende el flujo de pedido)
@@ -2049,6 +2120,18 @@ function transicionarSoloMenusNucleo(
   if (!enPedido && !enPago) {
     const cancelar = atenderCancelarCliente(flujo, entrada, contexto);
     if (cancelar) return cancelar;
+  }
+
+  // Insulto al bot: se responde con calma y se ofrece una persona; el segundo seguido pasa directo a una persona
+  if (!id && hay_([RE_INSULTO], texto) && !hay(PALABRAS_QUEJA)) {
+    if ((flujo as any).insultos >= 1) return pasarAsesor(flujo, entrada, contexto, 'INSULTOS', TEXTOS_SOLO_MENUS.insultoDerivado());
+    const r = ofertaAsesor(flujo, enPedido ? 'pedido' : 'menu', TEXTOS_SOLO_MENUS.insultoCalma(), enPedido ? 'Seguir pidiendo' : 'No, gracias');
+    return { ...r, nuevoFlujo: { ...r.nuevoFlujo, insultos: 1 } as FlujoConversacion };
+  }
+
+  // «¿Cómo estás?»: una línea (con el primer contacto, la bienvenida)
+  if (!id && !enPedido && !enPago && RE_SMALLTALK.test(texto)) {
+    return contexto.sinBienvenida ? respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.smalltalk() }]) : saludo();
   }
 
   // 1. Queja escrita: urgente, a una persona (también en mitad de un pedido)
@@ -2153,11 +2236,25 @@ function transicionarSoloMenusNucleo(
     }
   }
 
+  // 3.c «¿están atendiendo?», «¿se puede pedir aún?»: se contesta el estado del local (antes de tomarlo como «quiero pedir»)
+  if (!id && !enPedido && !enPago && RE_ESTAN_ATENDIENDO.test(texto)) {
+    return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.estamosAtendiendo(contexto.datosLocal) }]);
+  }
+
   // 4. Hacer pedido: botón «Hacer pedido», «Pedir este» de la carta o texto como «quiero pedir»
   if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
     // Desde el menú, el flujo de pedido arranca como si viniera del menú
     const r = atenderConSubflujo('pedido', { ...flujo, estado: 'MENU', pedido: null }, entrada, contexto);
     if (r) return r;
+  }
+
+  // 5.b Cambiar o cancelar una reserva (no es un pedido): una persona lo hace
+  if (!id && /reserv/.test(texto) && RE_RESERVA_CAMBIO.test(texto)) {
+    return pasarAsesor(flujo, entrada, contexto, 'RESERVA_CAMBIO', TEXTOS_SOLO_MENUS.reservaCambio(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
+  }
+  // 5.c Reserva con datos (personas, día u hora): se anota y pasa directo a una persona, sin segundo paso
+  if (!id && !enPago && /reserv|mesa/.test(texto) && RE_RESERVA_DETALLES.test(texto)) {
+    return pasarAsesor(flujo, entrada, contexto, 'RESERVA_NUEVA', TEXTOS_SOLO_MENUS.reservaAvisada(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
   }
 
   // 6. Cambiar dirección o anular pedido: pasa a una persona
@@ -2205,9 +2302,24 @@ function transicionarSoloMenusNucleo(
     ]);
   }
 
-  // 8. Horario y ubicación: ahora es una pregunta frecuente (también por texto)
-  if (hay(['horario', 'ubicacion', 'ubicado', 'donde estan', 'mapa', 'como llego', 'abren', 'cierran', 'hasta que hora', 'direccion'])) {
-    return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal), botones: [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU] }]);
+  // 8. Horario y ubicación (también por texto): contesta solo lo preguntado, en un mensaje
+  const preguntaHorario = RE_HORARIO.test(texto) || hay(['horario', 'abren', 'cierran', 'hasta que hora']);
+  const preguntaLugar = RE_LUGAR.test(texto) || hay(['ubicacion', 'ubicado', 'donde estan', 'mapa', 'como llego', 'direccion']);
+  if (preguntaHorario || preguntaLugar) {
+    if (id) {
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal), botones: [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU] }]);
+    }
+    const textoHL = RE_ESTAN_ATENDIENDO.test(texto)
+      ? TEXTOS_SOLO_MENUS.estamosAtendiendo(contexto.datosLocal)
+      : preguntaHorario && preguntaLugar
+        ? TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal)
+        : preguntaHorario
+          ? TEXTOS_SOLO_MENUS.soloHorario(contexto.datosLocal)
+          : TEXTOS_SOLO_MENUS.soloUbicacion(contexto.datosLocal);
+    return respuesta([{ tipo: 'enviarTexto', texto: textoHL }]);
+  }
+  if (!id && RE_ESTAN_ATENDIENDO.test(texto)) {
+    return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.estamosAtendiendo(contexto.datosLocal) }]);
   }
 
   // 9. Reservar mesa: por teléfono o con una persona
@@ -2228,12 +2340,30 @@ function transicionarSoloMenusNucleo(
     return { ...r, nuevoEstado: 'MENU', nuevoFlujo: { ...r.nuevoFlujo, estado: 'MENU', pedido: null } };
   }
 
+  // 9.c Precio o disponibilidad de un producto («cuanto cuesta el frape oreo», «hay bebidas calientes»)
+  if (!id) {
+    const q = productosPreguntados(texto, contexto, /^y /.test(texto) || /\?\s*$/.test(entrada.textoOriginal || ''));
+    if (q) {
+      if (q.productos.length === 1 && !q.categoria) {
+        const p = q.productos[0];
+        const unico = TEXTOS_SOLO_MENUS.precioProducto(p);
+        return respuesta(
+          p.disponible === false
+            ? [{ tipo: 'enviarTexto', texto: unico }]
+            : [{ tipo: 'enviarBotones', texto: unico, botones: [BOTON_HACER_PEDIDO] }],
+        );
+      }
+      const lineas = q.productos.map((p: any) => (p.disponible === false ? `• ${p.nombre} (agotado)` : `• ${p.nombre} S/ ${Number(p.precio).toFixed(2)}`));
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.listaProductos(q.categoria ? `Tenemos en ${q.categoria}:` : 'Esto es lo que tenemos:', lineas), botones: [BOTON_HACER_PEDIDO] }]);
+    }
+  }
+
   // 10. Preguntas frecuentes concretas
   let faq = claveFaqSoloMenus(id, texto);
   // Una pregunta larga y específica de pago o delivery la contesta la IA con los datos reales, no la FAQ fija
   if ((faq === 'pagos' || faq === 'delivery') && preguntaEspecificaParaIa(entrada, contexto)) faq = null;
   if (faq) {
-    return respuesta([respuestaFaqSoloMenus(faq, contexto)]);
+    return respuesta([respuestaFaqSoloMenus(faq, contexto, texto, Boolean(id))]);
   }
 
   // 10.b Pregunta por una categoría de la carta («bebidas frías»): se responde con los datos reales; el saludo la acompaña
@@ -2277,13 +2407,7 @@ function transicionarSoloMenusNucleo(
     return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.acuse() }]);
   }
   if (hay(PALABRAS_DESPEDIDA)) {
-    return respuesta([
-      {
-        tipo: 'enviarBotones',
-        texto: TEXTOS_BOT.despedida(contexto.textosPersonalizados?.chatbot_texto_despedida),
-        botones: [BOTON_VOLVER_MENU],
-      },
-    ]);
+    return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_BOT.despedida(contexto.textosPersonalizados?.chatbot_texto_despedida) }]);
   }
 
   // 14. Primer contacto sin intención clara: saludo con el menú
@@ -2314,9 +2438,7 @@ function transicionarSoloMenusNucleo(
   const noEntendi = respuesta([
     {
       tipo: 'enviarLista',
-      texto:
-        TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo) +
-        TEXTOS_SOLO_MENUS.lineaCartaNoEntiendo(contexto.cartaUrlPublica || 'https://caprichos.pe'),
+      texto: TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo),
       botonTexto: BOTON_LISTA_MENU,
       tituloSeccion: TITULO_SECCION_MENU,
       filas: FILAS_MENU_PRINCIPAL,

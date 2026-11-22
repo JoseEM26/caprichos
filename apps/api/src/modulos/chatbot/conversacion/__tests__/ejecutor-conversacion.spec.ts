@@ -293,14 +293,14 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         });
         expect(ok).toBe(true);
       }
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledTimes(5);
+      expect(mockMensajeria.enviarTexto).toHaveBeenCalledTimes(5);
 
       const bloqueado = await service.procesarMensajeEntrante(5n, {
         texto: 'horario',
         waMessageId: 'wamid.msg.6',
       });
       expect(bloqueado).toBe(false);
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledTimes(5);
+      expect(mockMensajeria.enviarTexto).toHaveBeenCalledTimes(5);
     });
   });
 

@@ -284,7 +284,7 @@ export const TEXTOS_BOT = {
   despedida: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      '¡Gracias por escribirnos, de verdad! 🥰 Fue un gusto atenderte ☕\nTe esperamos pronto en Caprichos 🧁💛',
+      '¡Gracias a ti! 🥰 Te esperamos pronto en Caprichos ☕💛',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -347,7 +347,7 @@ export const TEXTOS_BOT = {
   pasarAPersona: (textoPersonalizado?: string | null): string => {
     return interpolar(
       textoPersonalizado?.trim() ||
-      '¡Claro que sí! 🥰 Te paso con alguien del equipo.\nYa les avisé con tu nombre y tu número; en unos minutos te escriben 💛',
+      '¡Claro que sí! 🥰 Te paso con alguien del equipo; te escribe en unos minutos 💛\nSi quieres, cuéntame aquí qué necesitas para que te atiendan más rápido.',
       { local: NOMBRE_LOCAL_BOT },
     );
   },
@@ -1076,6 +1076,77 @@ export const TEXTOS_SOLO_MENUS = {
   /** Carta por categoría pedida («bebidas frías»). */
   categoriaPedida: (nombre: string, lineas: string[], url: string, saludo: boolean): string =>
     `${saludo ? '¡Hola! 💛 ' : ''}Estas son nuestras ${nombre.toLowerCase()}:\n${lineas.join('\n')}\n\nMira la carta completa con fotos 👉 ${url} ✨`,
+
+
+  /** Hola repetido sin otra cosa en medio: se muestra el menú, no otro saludo. */
+  holaDeNuevo: (nombre: string, lineaPedido: string): string =>
+    `¡Hola de nuevo${nombre}! 😊${lineaPedido}\nAquí sigo por si necesitas algo más.`,
+
+  /** Pregunta de precio o disponibilidad de un producto concreto. */
+  precioProducto: (p: { nombre: string; precio: number; disponible: boolean; agotadoHasta?: string | null; tamanos?: { nombre: string; precio: number }[] }): string => {
+    if (p.disponible === false) return `*${p.nombre}* está agotado${p.agotadoHasta ? ` hasta las ${p.agotadoHasta}` : ' por ahora'} 🙈`;
+    const tam = (p.tamanos || []).filter((t) => t && t.nombre);
+    if (tam.length > 1) return `*${p.nombre}*:\n${tam.map((t) => `• ${t.nombre} S/ ${Number(t.precio).toFixed(2)}`).join('\n')}`;
+    return `*${p.nombre}*: S/ ${Number(p.precio).toFixed(2)}`;
+  },
+
+  /** Varios productos que encajan con lo preguntado (o una categoría). */
+  listaProductos: (titulo: string, lineas: string[]): string => `${titulo}\n${lineas.join('\n')}`,
+
+  /** Cuando se pregunta si estamos atendiendo / abiertos. */
+  estamosAtendiendo: (d?: { abierta?: boolean; abre?: string | null; cierra?: string | null; textoEstado?: string | null; pausaAltaDemanda?: boolean; motivoPausa?: string | null } | null): string => {
+    if (d?.pausaAltaDemanda) return `Por ahora no estamos recibiendo pedidos (${d.motivoPausa || 'alta demanda'}) 🙈 Te avisamos en cuanto volvamos.`;
+    if (d?.abierta === false) return `Ahora estamos cerrados ☕ Abrimos hoy a las ${d.abre || 'la hora de apertura'}${d.cierra ? ` y atendemos hasta las ${d.cierra}` : ''}.`;
+    return `¡Sí, estamos atendiendo! ✅${d?.cierra ? ` Hasta las ${d.cierra}.` : ''} Escribe *pedir* para hacer tu pedido.`;
+  },
+
+  /** Solo el horario. */
+  soloHorario: (d?: { abierta?: boolean; abre?: string | null; cierra?: string | null; textoEstado?: string | null; pausaAltaDemanda?: boolean; motivoPausa?: string | null } | null): string => {
+    const base = d?.textoEstado ? ` Horario: ${d.textoEstado}.` : '';
+    if (d?.pausaAltaDemanda) return `Por ahora no estamos recibiendo pedidos (${d.motivoPausa || 'alta demanda'}) 🙈${base}`;
+    if (d?.abierta === false) return `Ahora estamos cerrados ☕ Abrimos hoy a las ${d.abre || 'la hora de apertura'}.${base}`;
+    return `Estamos abiertos ✅${d?.cierra ? ` Hoy atendemos hasta las ${d.cierra}.` : ''}${base}`;
+  },
+
+  /** Solo la ubicación. */
+  soloUbicacion: (d?: { direccion?: string | null; referencia?: string | null; enlaceMapa?: string | null; telefono?: string | null } | null): string => {
+    const ref = d?.referencia?.trim() ? ` ${d.referencia.trim()}.` : '';
+    const mapa = d?.enlaceMapa?.trim() ? `\nCómo llegar 📍 ${d.enlaceMapa.trim()}` : '';
+    return `Estamos en ${d?.direccion?.trim() || 'Campoy, San Juan de Lurigancho'}.${ref}${mapa}`;
+  },
+
+  /** Delivery: sí hacemos, con condiciones y el estado del local. */
+  deliveryRespuesta: (minimo: number | null | undefined, gratis: number | null | undefined, d?: { abierta?: boolean; abre?: string | null } | null, preguntaCosto = false): string => {
+    const cerrado = d?.abierta === false ? `Ahora estamos cerrados (abrimos a las ${d.abre || 'la hora de apertura'}). ` : '';
+    const min = minimo && minimo > 0 ? `Pedido mínimo S/ ${minimo.toFixed(2)}. ` : '';
+    const gr = gratis ? `Envío gratis desde S/ ${gratis.toFixed(2)}. ` : '';
+    const cierre = d?.abierta === false ? '' : ' Escribe *pedir* para empezar.';
+    if (preguntaCosto) return `${cerrado}El costo del envío depende de tu zona 🛵 Al pedir, envía tu ubicación 📍 y te lo mostramos antes de pagar. ${gr}${min}`.trim() + cierre;
+    return `${cerrado}Sí, hacemos delivery 🛵 ${min}${gr}El costo depende de tu zona: al pedir, envía tu ubicación 📍 y te lo mostramos.${cierre}`;
+  },
+
+  /** Pago por un medio concreto o la lista de medios activos. */
+  pagoMedio: (preguntado: string | null, acepta: boolean, nombre: string | null, activos: string[]): string => {
+    const lista = activos.length ? activos.join(', ') : 'Yape, Plin y efectivo';
+    if (!preguntado) return `Aceptamos: ${lista}.`;
+    if (acepta) return `Sí, aceptamos ${nombre} ✅ Medios disponibles: ${lista}.`;
+    return `${preguntado.charAt(0).toUpperCase()}${preguntado.slice(1)} no está disponible 🙈 Aceptamos: ${lista}.`;
+  },
+
+  insultoCalma: (): string => 'Lamento que te sientas así 💛 ¿Quieres que te atienda una persona del equipo?',
+  insultoDerivado: (): string => 'Entiendo 💛 Ya avisé a una persona del equipo para que te ayude.',
+
+  reservaAvisada: (abierta: boolean, abre?: string | null): string =>
+    abierta
+      ? 'Anoté tu reserva 💛 Una persona del equipo te la confirma por aquí en un momento 🥰'
+      : `Anoté tu reserva 💛 Te la confirmamos apenas abramos a las ${abre || '12:00'} 🥰`,
+
+  reservaCambio: (abierta: boolean, abre?: string | null): string =>
+    abierta
+      ? 'Listo 💛 Ya avisé a una persona del equipo para cambiar o cancelar tu reserva; te escribe por aquí.'
+      : `Listo 💛 Lo vemos apenas abramos a las ${abre || '12:00'} y te escribimos por aquí.`,
+
+  smalltalk: (): string => '¡Muy bien, gracias por preguntar! 😊 ¿En qué te ayudo hoy?',
 
   acuse: (): string => '¡Con mucho gusto! 🥰 Aquí estoy si necesitas algo más 💛',
 

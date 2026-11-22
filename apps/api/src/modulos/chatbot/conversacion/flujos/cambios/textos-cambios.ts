@@ -123,8 +123,8 @@ export const TEXTOS_CAMBIOS = {
   limiteSolicitudesAbiertasTelefono: (): string =>
     'Ya cuentas con 3 solicitudes de cambio pendientes de revisión. Por favor espera la respuesta de nuestro equipo antes de enviar otra.'.slice(0, 1024),
 
-  fueraDeHorario: (horaAbre: string, horaCierra: string, horaAbreReal: string): string =>
-    `Ahora estamos cerrados. Nuestro horario de atención es de ${horaAbre} a ${horaCierra}. Te escribiremos cuando abramos a las ${horaAbreReal} ☕. Dejamos tu consulta anotada para atenderte primero al abrir.`.slice(0, 1024),
+  fueraDeHorario: (_horaAbre: string, _horaCierra: string, horaAbreReal: string): string =>
+    `Ahora estamos cerrados ☕ Abrimos a las ${horaAbreReal} y una persona te escribe apenas abra. Tu consulta quedó anotada 💛`.slice(0, 1024),
 
   quejaUrgenteRecibida: (): string =>
     'Lamentamos mucho el inconveniente 😔. Hemos registrado tu reclamo con máxima prioridad (URGENTE) y un encargado de nuestro equipo te escribirá de inmediato.'.slice(0, 1024),

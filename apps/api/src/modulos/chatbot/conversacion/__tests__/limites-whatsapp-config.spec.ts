@@ -111,7 +111,7 @@ describe('Límites estrictos de WhatsApp y Configuración del Bot (Ola 4, Agente
       );
 
       expect(resultado.nuevoEstado).toBe('MENU');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
+      expect(resultado.acciones[0].tipo).toBe('enviarTexto');
       expect((resultado.acciones[0] as any).texto).toBe(
         '¡Muchas gracias por tu visita! ☕ Vuelve pronto 🧁',
       );

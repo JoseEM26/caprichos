@@ -193,9 +193,10 @@ describe('Bot con menú (decisión del dueño)', () => {
       expect(texto).toContain('https://maps.test');
     });
 
-    it('preguntar por el horario por texto da la misma respuesta', () => {
+    it('preguntar por el horario por texto contesta solo el horario, en un mensaje de texto', () => {
       const r = ejecutar({ texto: 'a qué hora abren' });
-      expect((r.acciones[0] as any).texto).toContain('Av. Principal 123');
+      expect(tipos(r)).toEqual(['enviarTexto']);
+      expect((r.acciones[0] as any).texto).toMatch(/\d{2}:\d{2}|cerrados/);
     });
 
     it('medios de pago y delivery responden desde el local', () => {
