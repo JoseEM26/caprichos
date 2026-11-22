@@ -332,7 +332,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     for (const ms of meseros) {
       if (ms.tarea || caminando(raizDe(ms))) continue;
       const mozosLibres = meseros.some((o) => !o.esCapri && !o.tarea);
-      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar' || tk.tipo === 'delivery') ? !despachoOcupado : tk.tipo === 'limpiar' ? !ms.esCapri || !mozosLibres : true);
+      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar') ? !despachoOcupado : tk.tipo === 'delivery' ? ms.esCapri && !despachoOcupado : tk.tipo === 'limpiar' ? !ms.esCapri || !mozosLibres : true);
       if (i >= 0) {
         const tk = tareas.splice(i, 1)[0];
         ms.tarea = tk; alCambiar();

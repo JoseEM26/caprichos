@@ -83,7 +83,7 @@ const ok = (m: Mundo, x: number, z: number) => dentro(m, x, z) && m.libre(x, z);
 export function poseSiguiendo(capri: V2, rumbo: number, m: Mundo): Pose {
   const fx = Math.sin(rumbo), fz = Math.cos(rumbo), rx = fz, rz = -fx;
   const obj: V3 = [capri.x, 1.0, capri.z];
-  for (const d of [2.8, 2.3, 1.8, 1.4, 1.0]) {
+  for (const d of [3.3, 2.8, 2.2, 1.6, 1.1]) {
     for (const lado of [1, -1]) {
       const x = capri.x + fx * d + rx * lado * 1.0, z = capri.z + fz * d + rz * lado * 1.0;
       if (ok(m, x, z)) return { pos: [x, 1.75, z], obj };

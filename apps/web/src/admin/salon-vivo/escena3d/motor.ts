@@ -167,7 +167,11 @@ export function crearMotor(op: OpcionesMotor): Motor {
   // El director de cámara pone la cámara solo donde se puede estar: dentro del local, sin pared ni mueble
   const mundo: Mundo = {
     ancho, alto, fov: camara.fov, aspecto: 1,
-    libre: (x, z) => { const i = Math.floor(x + ancho / 2), j = Math.floor(z + alto / 2); return plano.bloqueo[j]?.[i] === false; },
+    // Tampoco se pone la cámara en la puerta (la reja de la entrada no está en el mapa de bloqueos)
+    libre: (x, z) => {
+      const i = Math.floor(x + ancho / 2), j = Math.floor(z + alto / 2);
+      return plano.bloqueo[j]?.[i] === false && !plano.items.some((it) => it.clase === 'entrada' && i >= it.x - 1 && i < it.x + it.w + 1 && j >= it.y - 1 && j < it.y + it.h + 1);
+    },
     get general() { return aPose(vistas.general); },
   };
   const cocinaCentro: V2 = { x: cc.x, z: cc.z };
