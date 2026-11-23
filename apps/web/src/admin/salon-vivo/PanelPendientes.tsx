@@ -17,6 +17,9 @@ export interface Pendiente {
   minutos: number;
   areas: PedidoVivo['areas'];
   avatarUrl: string | null;
+  /** Primeros productos del pedido y cuántas unidades lleva en total. */
+  items: string[];
+  productos: number;
 }
 
 const ETIQUETA: Record<EtapaPendiente, string> = { CAJA: 'En caja', COCINA: 'En cocina', LISTO: '¡Listo!' };
@@ -37,7 +40,7 @@ export function pendientesDe(d: SalonVivo): Pendiente[] {
       etapa === 'LISTO' ? 100 : etapa === 'CAJA' ? 12 : Math.round(25 + (p.estado === 'PREPARANDO' ? 10 : 0) + (total ? (listas / total) * 55 : 0));
     const previo = porId.get(p.id);
     if (previo && previo.porcentaje >= porcentaje) return;
-    porId.set(p.id, { id: p.id, codigo: p.codigo, donde: donde(p), cliente: p.cliente, etapa, porcentaje, minutos: p.minutos, areas: p.areas, avatarUrl: p.avatar?.url ?? null });
+    porId.set(p.id, { id: p.id, codigo: p.codigo, donde: donde(p), cliente: p.cliente, etapa, porcentaje, minutos: p.minutos, areas: p.areas, avatarUrl: p.avatar?.url ?? null, items: p.items ?? [], productos: p.productos ?? 0 });
   };
   // En caja solo cuenta mientras aún no entra a cocina ni está listo (por cobrar antes de preparar)
   // Los pedidos de delivery no se muestran: a los clientes del local no les interesan
@@ -109,6 +112,11 @@ function Tarjeta({ p }: { p: Pendiente }) {
         <span className={p.etapa !== 'CAJA' ? 'hecho' : ''}>Cocina</span>
         <span className={p.etapa === 'LISTO' ? 'hecho' : ''}>Listo</span>
       </div>
+      {p.items.length > 0 && (
+        <div className="sv-pend-items">
+          {p.items.map((it, i) => <span key={i} className={/^y \d+ más$/.test(it) ? 'mas' : undefined}>{it}</span>)}
+        </div>
+      )}
       {p.etapa === 'COCINA' && p.areas.length > 0 && (
         <div className="sv-pend-areas">
           {p.areas.map((a) => <span key={a.nombre} className={a.estado === 'LISTA' ? 'ok' : 'prep'}>{a.estado === 'LISTA' ? '✓' : '●'} {nombreArea(a.nombre)}</span>)}

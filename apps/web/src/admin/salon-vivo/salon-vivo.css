@@ -161,10 +161,11 @@
 @keyframes sv-marquee { to { transform: translateX(-50%); } }
 .sv-tv .sv-pend-tv .sv-pend-lista { flex: none; flex-direction: row; align-items: stretch; overflow: visible; padding: 0 16px 0 0; margin-left: 16px; border: 0; gap: 12px; }
 .sv-tv .sv-pend-tv .sv-pend-lista + .sv-pend-lista { margin-left: 0; }
-.sv-tv .sv-pend-item { flex: 0 0 clamp(200px, 15vw, 280px); padding: 10px 12px; }
+.sv-tv .sv-pend-item { flex: 0 0 clamp(250px, 19vw, 340px); padding: 14px 16px; min-height: clamp(170px, 22vh, 250px); display: flex; flex-direction: column; gap: 6px; }
 .sv-tv .sv-pend-fila { flex-wrap: wrap; row-gap: 2px; }
 .sv-tv .sv-pend-fila > .sv-pend-donde { order: 3; flex-basis: 100%; }
-.sv-tv .sv-pend-pasos, .sv-tv .sv-pend-areas { display: none; }
+.sv-tv .sv-pend-pasos { display: none; }
+.sv-tv .sv-pend-areas { margin-top: auto; }
 .sv-tv .sv-pend-barra { margin-top: 8px; }
 @media (prefers-reduced-motion: reduce) { .sv-pista.anima { animation: none; } }
 .sv-tv .sv-pend-vacio { align-self: center; flex: 1; }
@@ -231,3 +232,10 @@
 .sv-aviso-avatar b { color: var(--cp-orange, #E67929); }
 .sv-completa .sv-aviso-avatar { top: 12px; }
 .sv-tv .sv-aviso-avatar { font-size: clamp(13px, 1.1vw, 20px); max-width: min(320px, 28%); }
+
+/* Productos del pedido en la tarjeta (TV y panel) */
+.sv-pend-items { margin: 8px 0 0; display: grid; gap: 2px; font: 700 clamp(13px, 1vw, 16px) var(--sv-f-txt); color: var(--sv-navy); }
+.sv-pend-items span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-pend-items span::before { content: "• "; color: var(--sv-naranja); }
+.sv-pend-items span.mas { color: var(--sv-suave); font-weight: 600; }
+.sv-pend-items span.mas::before { content: ""; }

@@ -148,3 +148,14 @@ describe('franja de la TV: hora y carrusel', () => {
     expect(screen.getByText('Pedidos en curso')).toBeTruthy();
   });
 });
+
+describe('tarjeta con productos', () => {
+  it('muestra los productos del pedido en la tarjeta de la TV', async () => {
+    const { render, screen } = await import('@testing-library/react');
+    const { PanelPendientes } = await import('../PanelPendientes');
+    const { pedido, salonEjemplo } = await import('./datosEjemplo');
+    const p = pedido('CP-W7', { estado: 'LISTO', items: ['1 × Dúo Irresistible', '2 × Capuccino'] });
+    render(<PanelPendientes datos={{ ...salonEjemplo(), caja: [], cocina: [], despacho: [p] } as any} reloj="17:10" tv />);
+    expect(screen.getAllByText('1 × Dúo Irresistible').length).toBeGreaterThan(0);
+  });
+});

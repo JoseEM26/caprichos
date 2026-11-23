@@ -151,19 +151,27 @@ const horaLima = (d: Date): string =>
 const avatarDe = (p: PedidoDia, avatares?: Map<string, AvatarVivo>): AvatarVivo | null =>
   (p.party_id != null ? avatares?.get(String(p.party_id)) : undefined) ?? null;
 
+/**
+ * Estado para la escena: un pedido en cola o preparación con TODAS sus áreas despejadas ya está listo para llevar,
+ * aunque nadie haya pulsado «Despachar» (si no, la TV lo mostraba pendiente con todo listo en cocina).
+ */
+export const estadoEfectivo = (p: PedidoDia): string =>
+  ['COLA', 'PREPARANDO'].includes(p.estado) && p.comandas.length > 0 && p.comandas.every((c) => c.estado === 'DESPEJADA') ? 'LISTO' : p.estado;
+
 function aPedidoVivo(p: PedidoDia, ahora: Date, avatares?: Map<string, AvatarVivo>): PedidoVivo {
   return {
     id: String(p.id),
     codigo: p.codigo,
     modalidad: p.modalidad,
-    estado: p.estado,
+    estado: estadoEfectivo(p),
     cliente: nombreDePila(p.cliente_nombre),
     mesas: p.mesas.filter((m) => m.abierta).map((m) => m.nombre ?? '').filter(Boolean),
     mesaIds: p.mesas.filter((m) => m.abierta && m.mesaId != null).map((m) => String(m.mesaId)),
     minutos: minutosDesde(p.pasa_cocina_en ?? p.creado_en, ahora),
     productos: p.lineas.reduce((s, l) => s + (l.cantidad || 0), 0),
     bebidas: bebidasDe(p),
-    items: p.lineas.slice(0, 3).map((l) => l.nombre),
+    // Hasta 4 líneas con su cantidad («2 × Capuccino»); si hay más, una última «y N más»
+    items: [...p.lineas.slice(0, 4).map((l) => `${l.cantidad || 1} × ${l.nombre}`), ...(p.lineas.length > 4 ? [`y ${p.lineas.length - 4} más`] : [])],
     areas: p.comandas.map((c) => ({ nombre: c.area.nombre, estado: c.estado === 'DESPEJADA' ? 'LISTA' : 'PENDIENTE' })),
     avatar: avatarDe(p, avatares),
   };
@@ -189,8 +197,8 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
       p.pago_estado === 'PENDIENTE' &&
       (p.modalidad === 'LLEVAR' || (esMesa(p) && (servida(p) || !!p.cobro_mozo_en))),
   );
-  const cocina = vivos.filter((p) => ['COLA', 'PREPARANDO'].includes(p.estado));
-  const despacho = vivos.filter((p) => p.estado === 'LISTO' && (esMesa(p) ? !p.entregado_mesa_en : true));
+  const cocina = vivos.filter((p) => ['COLA', 'PREPARANDO'].includes(estadoEfectivo(p)));
+  const despacho = vivos.filter((p) => estadoEfectivo(p) === 'LISTO' && (esMesa(p) ? !p.entregado_mesa_en : true));
   const enReparto = vivos.filter((p) => p.modalidad === 'DELIVERY' && p.estado === 'EN_CAMINO');
 
   // Mesas

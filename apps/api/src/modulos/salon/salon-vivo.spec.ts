@@ -48,6 +48,18 @@ describe('armarSalonVivo', () => {
     expect(r.conteos).toMatchObject({ mesasOcupadas: 3, mesasTotal: 4 });
   });
 
+  it('preparando con todas las áreas despejadas cuenta como LISTO (sin pulsar «Despachar»)', () => {
+    const mesa4 = [{ mesaId: 4n, nombre: 'Mesa 4', abierta: true }];
+    const todas = [{ estado: 'DESPEJADA', area: { nombre: 'Bebidas' } }, { estado: 'DESPEJADA', area: { nombre: 'Salados' } }];
+    const r = armarSalonVivo(entrada([ped(1185, { estado: 'PREPARANDO', mesas: mesa4, comandas: todas })]));
+    expect(r.despacho.map((p) => p.codigo)).toEqual(['CP-W1185']);
+    expect(r.cocina).toHaveLength(0);
+    expect(r.despacho[0].estado).toBe('LISTO');
+    const media = armarSalonVivo(entrada([ped(1186, { estado: 'PREPARANDO', mesas: mesa4, comandas: [todas[0], { estado: 'EN_COCINA', area: { nombre: 'Salados' } }] })]));
+    expect(media.cocina).toHaveLength(1);
+    expect(media.despacho).toHaveLength(0);
+  });
+
   it('transiciones del pedido de mesa: cocina → LISTO → ENTREGADO (con o sin «entregado en mesa») → comiendo', () => {
     const mesa1 = [{ mesaId: 1n, nombre: 'Mesa 1', abierta: true }];
     const est = (p: PedidoDia) => armarSalonVivo(entrada([p])).mesas.find((m) => m.numero === 1)!.estado;
