@@ -5,7 +5,7 @@ import { leerEnlaceSeguimiento, quitarEnlaceSeguimiento } from '../seguimiento';
 const TOKEN = 'b'.repeat(64);
 
 vi.mock('../../comun/api', () => ({
-  api: { get: vi.fn().mockResolvedValue({ codigo: 'CP-NUEVO', estado: 'POR_PAGAR', estadoEtiqueta: 'Por pagar', modalidad: 'RECOGER', total: 13.5, terminado: false, anulado: false, pasos: [], resumenPago: { total: 13.5, pagado: 0, pagos: [] } }), post: vi.fn() },
+  api: { get: vi.fn().mockResolvedValue({ codigo: 'CP-NUEVO', estado: 'POR_PAGAR', estadoEtiqueta: 'Por pagar', modalidad: 'RECOGER', total: 13.5, terminado: false, anulado: false, pasos: [], resumenPago: { total: 13.5, pagado: 0, pagos: [] }, pagoEnLinea: { pedidoId: '1', creadoEn: new Date().toISOString() } }), post: vi.fn() },
   clienteFetch: vi.fn().mockResolvedValue({}),
   ErrorApi: class ErrorApi extends Error {},
 }));
@@ -37,5 +37,16 @@ describe('pedido nuevo', () => {
     render(<PantallaConfirmacion />);
     expect((await screen.findAllByText(/CP-NUEVO/)).length).toBeGreaterThan(0);
     expect((await screen.findByTestId('pagar')).dataset.auto).toBe('true');
+  });
+});
+
+describe('pedido en efectivo o contra entrega', () => {
+  it('no muestra el pago en línea ni su contador aunque falte pagar', async () => {
+    const { api } = await import('../../comun/api');
+    (api.get as any).mockResolvedValueOnce({ codigo: 'CP-EFEC', estado: 'COLA', estadoEtiqueta: 'En cola', modalidad: 'RECOGER', total: 66.5, terminado: false, anulado: false, pasos: [], resumenPago: { total: 66.5, pagado: 0, pagos: [] } });
+    render(<PantallaConfirmacion />);
+    await screen.findAllByText(/CP-NUEVO/);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId('pagar')).toBeNull();
   });
 });

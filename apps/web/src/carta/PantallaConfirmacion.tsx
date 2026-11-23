@@ -448,7 +448,8 @@ export function PanelPago({
 
   return (
     <>
-      {pedidoId && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
+      {/* Solo el pedido que espera pago en línea (Culqi) lleva el contador de 15 min: efectivo, contra entrega o Yape con voucher no */}
+      {pedidoId && estado.pagoEnLinea && !estado.anulado && !estado.terminado && pagado < totalCobrable && (
         <PagarEnLinea pedidoId={String(pedidoId)} pedidoCodigo={pedido.codigo} token={token} auto={auto} monto={totalCobrable - pagado} creadoEn={creadoEn} alPagado={onSubida} alFormulario={(a) => { setPagandoForm(a); alFormulario?.(a); }} />
       )}
       {resumen && !pagandoForm && (
