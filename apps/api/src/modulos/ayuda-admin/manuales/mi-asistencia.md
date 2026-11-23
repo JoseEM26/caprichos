@@ -9,7 +9,7 @@ sugerencias:
   - Como marco mi entrada con el QR de la pantalla
   - Que hago si la camara no lee el QR
   - Por que me sale Estas a N m del local
-  - Me cambie de celular y no me deja marcar
+  - Puedo marcar desde otro celular
   - Como marco la salida a almuerzo y el regreso
   - Donde veo cuanto me toca de propinas
   - Por que mi marca quedo A revisar
@@ -81,12 +81,12 @@ Pestana Calendario, seccion Reemplazos y cambios de turno. Sirve cuando no puede
 - "Activa la ubicacion del celular y da permiso al navegador.": diste que no al permiso; habilitalo en la configuracion del navegador para este sitio.
 - "El QR vencio o no es valido. Escanea el de la pantalla actual.": el QR dura 30 segundos; escanea el que esta en pantalla ahora. No sirve una foto del QR.
 - "Ese QR ya lo usaste. Espera al siguiente.": cada QR vale para una sola marca por persona.
-- "Tu asistencia esta vinculada a otro celular. Pide al administrador que reinicie el vinculo.": la asistencia se ata al primer celular que usas. Si cambiaste de equipo, el administrador pulsa Reiniciar celular en [[asistencia]] y vuelves a marcar.
+- Puedes marcar desde cualquier celular (desde el 23/11/2026 ya no se ata a uno solo): inicia sesion con tu usuario en ese celular y marca normal.
 - "Esa marca ya quedo registrada hoy.": ya marcaste ese tipo; no hace falta repetir.
 - "Demasiados intentos. Espera unos minutos y vuelve a intentar.": hubo varios intentos fallidos seguidos; espera unos 5 minutos.
 - Errores de la foto ("La foto no es valida", "La foto es muy grande o esta vacia"): vuelve a tomar la selfie, con buena luz.
 - Marca A revisar: se guarda igual, pero el sistema vio algo raro (precision perfecta de 0 m, mismas coordenadas muchas veces o un salto imposible de ubicacion) y el administrador la revisara. La pantalla lo avisa: "queda para revision del administrador".
-- Nadie puede marcar por mi: el sistema solo acepta la marca desde mi sesion, mi celular vinculado y mi selfie.
+- Nadie puede marcar por mi: el sistema solo acepta la marca desde mi sesion, el QR del local, mi ubicacion dentro del local y mi selfie.
 
 ## Quien puede hacerlo
 Todo el personal con usuario: Administrador, Cajero, Cocina, Mozo, Almacen, Repartidor y Supervisor tienen el permiso asistencia/marcar. El repartidor en celular llega por un boton pequeno Asistencia dentro de Repartos. Las marcas de los demas solo las ve el administrador en [[asistencia]].

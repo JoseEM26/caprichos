@@ -9,11 +9,9 @@ import {
   ETIQUETA_ESTADO,
   FilaHoy,
   obtenerConfigAsistencia,
-  reiniciarCelular,
   reporteHoy,
 } from './asistenciaApi';
 import { Boton } from '../../comun/Boton';
-import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
@@ -145,8 +143,6 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
   const [jornada, setJornada] = useState('');
   const [buscar, setBuscar] = useState('');
   const [estadoSel, setEstadoSel] = useState('');
-  const [reiniciando, setReiniciando] = useState<FilaHoyExt | null>(null);
-  const [errorReinicio, setErrorReinicio] = useState<string | null>(null);
   const [verPantalla, setVerPantalla] = useState(false);
   const cargar = async () => {
     try {
@@ -170,17 +166,6 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
     const i = setInterval(() => void cargar(), 60_000);
     return () => clearInterval(i);
   }, []);
-  const reiniciar = async () => {
-    if (!reiniciando) return;
-    try {
-      await reiniciarCelular(reiniciando.partyId);
-      onOk(`Celular de ${reiniciando.nombre} reiniciado. Debe volver a marcar desde su celular nuevo.`);
-      setReiniciando(null);
-      setErrorReinicio(null);
-    } catch (e) {
-      setErrorReinicio(mensajeDe(e, 'No se pudo reiniciar el celular.'));
-    }
-  };
   if (!filas) return <Cargando mensaje="Cargando" />;
   const cuenta = (...e: string[]) => filas.filter((f) => e.includes(f.estado)).length;
   const visibles = filas.filter((f) => coincide(f.nombre, buscar) && (!estadoSel || f.estado === estadoSel));
@@ -211,14 +196,13 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
           </select>
         </label>
       </div>
-      <p className="as-ayuda">La asistencia de cada persona queda ligada al primer celular desde el que marca. Si cambió de celular, pulsa “Reiniciar celular”: su próxima marca registrará el nuevo.</p>
       {visibles.length === 0 ? (
         <EstadoVacio titulo="Nadie coincide" descripcion="Cambia la búsqueda o el estado." />
       ) : (
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas as-tabla--hoy">
             <thead>
-              <tr><th>Persona</th><th>Turno</th><th>Entrada</th><th>Salida a almorzar</th><th>Vuelta</th><th>Almuerzo (min)</th><th>Salida</th><th>Estado</th><th>Trabajado</th><th /></tr>
+              <tr><th>Persona</th><th>Turno</th><th>Entrada</th><th>Salida a almorzar</th><th>Vuelta</th><th>Almuerzo (min)</th><th>Salida</th><th>Estado</th><th>Trabajado</th></tr>
             </thead>
             <tbody>
               {visibles.map((f) => (
@@ -234,26 +218,12 @@ function HoyTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
                     <span><Chip estado={f.estado} />{f.alertas.length > 0 && <small className="as-nota">{f.alertas.join('; ')}</small>}</span>
                   </td>
                   <td data-label="Trabajado" className="as-num">{(f.trabajadaMin / 60).toFixed(2)} h</td>
-                  <td data-label="">
-                    <Boton type="button" variante="secundario" tamano="pequeno" aria-label={`Reiniciar celular de ${f.nombre}`} onClick={() => { setErrorReinicio(null); setReiniciando(f); }}>Reiniciar celular</Boton>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      <Confirmar
-        abierto={reiniciando !== null}
-        titulo="¿Reiniciar el celular?"
-        mensaje={reiniciando ? `¿Borrar el celular de ${reiniciando.nombre}? Podrá marcar desde un celular nuevo; el actual dejará de valer.` : ''}
-        textoSi="Sí, reiniciar"
-        textoNo="No"
-        focoInicialNo
-        error={errorReinicio}
-        alConfirmar={reiniciar}
-        alCancelar={() => setReiniciando(null)}
-      />
     </>
   );
 }

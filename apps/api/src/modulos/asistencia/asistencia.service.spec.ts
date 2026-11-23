@@ -258,9 +258,10 @@ describe('AsistenciaService.marcar', () => {
     expect(b.marcas).toHaveLength(3); // nada se rechaza ni se borra
   });
 
-  it('un solo celular por trabajador: otro dispositivo se rechaza', async () => {
+  it('se marca desde cualquier celular: otro dispositivo ya no se rechaza (23/11)', async () => {
     const { svc } = servicio({ dispositivo: 'huella-del-celular-viejo' });
-    expect(await error(svc.marcar(dto(), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'DISPOSITIVO_DISTINTO' });
+    const r = await svc.marcar(dto(), LUIS, undefined, AHORA);
+    expect(r.marca).toBeDefined();
   });
 
   it('ya no pide consentimiento para marcar', async () => {

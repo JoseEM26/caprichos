@@ -280,13 +280,7 @@ export class AsistenciaService {
     }
     const cfg = await this.obtenerConfig();
     const huella = manual ? '' : huellaDe(dto.dispositivo);
-    const dispositivo = manual ? null : await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
-    if (dispositivo && dispositivo.huella_hash !== huella) {
-      throw new RechazoAsistencia(
-        'DISPOSITIVO_DISTINTO',
-        'Tu asistencia está vinculada a otro celular. Pide al administrador que reinicie el vínculo.',
-      );
-    }
+    // Decisión del dueño (23/11/2026): se marca desde cualquier celular (sin vínculo a uno solo); la huella queda en la marca como registro.
 
     // Decisión del dueño (10/11/2026): ya no se pide consentimiento para marcar; el aviso de datos no bloquea.
 
@@ -370,12 +364,6 @@ export class AsistenciaService {
           await tx.asistenciaSelfie.create({
             data: { marca_id: creada.id, contenido: selfie.bytes, mime: selfie.mime },
           });
-        }
-        if (manual) return creada;
-        if (!dispositivo) {
-          await tx.asistenciaDispositivo.create({ data: { party_id: partyId, huella_hash: huella, ultimo_uso_en: ahora } });
-        } else {
-          await tx.asistenciaDispositivo.update({ where: { party_id: partyId }, data: { ultimo_uso_en: ahora } });
         }
         return creada;
       });

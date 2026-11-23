@@ -9,7 +9,7 @@ sugerencias:
   - Como veo quien llego hoy y quien falto
   - Como corrijo una marca que el trabajador olvido
   - Como fijo la ubicacion del local para marcar
-  - Como reinicio el celular de un trabajador
+  - Puede marcar desde otro celular
   - Donde veo las selfies de las marcas
   - Como descargo la asistencia del mes
   - Que significa A revisar en una marca
@@ -54,11 +54,8 @@ Ver tambien: [[historial]]
 4. En Selfies ajusta Dias que se guardan las selfies (hoy 90): pasado el plazo la foto se borra, la marca se conserva.
 5. Pulsa Guardar configuracion. Veras "Configuracion guardada.".
 
-## Como se hace: Reiniciar el celular de una persona
-1. La asistencia queda atada al primer celular que usa cada persona. Si cambio de equipo o perdio el celular, abre la pestana Hoy.
-2. En su fila pulsa Reiniciar celular de (su nombre) y confirma con Si: "Borrar el celular de (nombre)? Podra marcar desde un celular nuevo; el actual dejara de valer.". Con No no pasa nada. Queda en la auditoria. Aparece "Vinculo de celular reiniciado. La persona debe volver a marcar desde su celular.".
-3. La persona marca otra vez desde el celular nuevo, que queda vinculado.
-Ver tambien: [[mi-asistencia]]
+## Puede marcar desde cualquier celular
+Desde el 23/11/2026 la asistencia ya no queda atada a un solo celular: cada persona puede marcar desde cualquier celular, con el QR de la pantalla, su GPS dentro del local y su selfie. Cada marca guarda de que equipo se hizo, como registro.
 
 ## Como se hace: Preparar la pantalla del QR
 1. Pulsa Pantalla del QR para generar, regenerar o desactivar el enlace de la tablet del local. Los pasos completos estan en [[asistencia-pantalla]].
@@ -122,8 +119,7 @@ En [[mi-asistencia]], marca con un solo boton y ve cada marca con lo que se inte
 - "La foto ya no esta disponible": paso el plazo de retencion y la selfie se borro; la marca sigue ahi.
 - "No se pudo registrar la correccion": suele ser que la hora no cae en la jornada indicada ("La hora no cae en la jornada indicada"), la hora no es valida o el ID de persona no existe ("Persona no encontrada"). Revisa los datos.
 - Un trabajador dice "Estas a N m del local": ver [[mi-asistencia]]; si es por mala senal puedes ampliar el Radio o corregir la marca.
-- Un trabajador no puede marcar por cambio de celular: usa Reiniciar celular.
 - Una persona sin turno: aparece como Descanso; los turnos se cargan en Horarios y turnos de [[usuarios]].
 
 ## Quien puede hacerlo
-Solo el Administrador (permiso asistencia/administrar): reportes, selfies, correcciones, configuracion, reinicio de celular y enlace de la pantalla. El resto del personal solo marca y ve lo suyo en [[mi-asistencia]].
+Solo el Administrador (permiso asistencia/administrar): reportes, selfies, correcciones, configuracion y enlace de la pantalla. El resto del personal solo marca y ve lo suyo en [[mi-asistencia]].

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -344,20 +344,12 @@ describe('Calendario: modo Programar', () => {
   });
 });
 
-describe('Hoy: Reiniciar celular', () => {
-  it('explica el botón, pide confirmación Sí/No y solo reinicia con «Sí»', async () => {
-    reiniciar.mockResolvedValue({});
+describe('Hoy: sin vínculo de celular', () => {
+  it('muestra las columnas y ya no ofrece «Reiniciar celular»', async () => {
     abrir('/admin/asistencia');
-    expect(await screen.findByText(/ligada al primer celular desde el que marca/)).toBeInTheDocument();
-    const tabla = screen.getByRole('table');
+    const tabla = await screen.findByRole('table');
     for (const c of ['Entrada', 'Salida a almorzar', 'Vuelta', 'Almuerzo (min)', 'Salida']) expect(within(tabla).getByRole('columnheader', { name: c })).toBeInTheDocument();
-    expect(within(tabla).getByText('17:40')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular de Ana Pérez' }));
-    fireEvent.click(screen.getByRole('button', { name: 'No' }));
-    expect(reiniciar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar celular de Ana Pérez' }));
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sí, reiniciar' })); });
-    expect(reiniciar).toHaveBeenCalledWith(1);
-    expect(await screen.findByRole('status')).toHaveTextContent('Celular de Ana Pérez reiniciado');
+    expect(await within(tabla).findByText('17:40')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reiniciar celular/ })).toBeNull();
   });
 });
