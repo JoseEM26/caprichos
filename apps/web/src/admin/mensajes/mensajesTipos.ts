@@ -70,6 +70,12 @@ export interface ChatResumen {
   estado: EstadoChat;
   urgente: boolean;
   ultimo: string;
+  /** Si el último mensaje es nuestro: quién lo envió («Ana», «Bot», «Equipo», «WhatsApp Business»); null si es del cliente. */
+  ultimoAutor?: string | null;
+  /** Estado de envío del último mensaje nuestro (ENVIADO, ENTREGADO, LEIDO, FALLIDO...) para los checks de la lista. */
+  ultimoEstado?: string | null;
+  /** Party de quien tiene tomado el chat (filtro rápido «Míos»). */
+  tomadoPorParty?: string | null;
   hora: string;
   /** Fecha y hora (ISO) del último mensaje: la lista la muestra como hora, «Ayer», día o fecha. */
   fecha?: string;

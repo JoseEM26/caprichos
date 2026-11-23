@@ -1262,3 +1262,50 @@
 .msg-plm-vista-falta { margin-top: 6px; font-size: 12px; font-weight: 700; color: #B45309; }
 .msg-plm-check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .msg-plm-check input { width: 22px; height: 22px; }
+
+/* Lista compacta tipo WhatsApp Business: 2 líneas por chat (~68 px), botones chicos y barra superior baja */
+.msg-lista .msg-fila, .msg-root .msg-lista .msg-fila { min-height: 0; height: 68px; padding: 8px 14px; gap: 10px; align-items: center; box-sizing: border-box; }
+.msg-li-fila .msg-fila { padding-right: 14px; }
+.msg-lista .msg-av { width: 40px; height: 40px; font-size: 14px; }
+.msg-lista .msg-fila-cuerpo { gap: 2px; justify-content: center; min-width: 0; }
+.msg-lista .msg-nombre { font-size: 15px; line-height: 1.2; }
+.msg-lista .msg-hora { font-size: 11.5px; }
+.msg-lista .msg-vista { font-size: 13px; line-height: 1.25; flex: 1 1 auto; }
+.msg-checks { color: #667781; font-weight: 700; letter-spacing: -2px; margin-right: 2px; }
+.msg-checks[data-estado='LEIDO'] { color: #2196F3; }
+.msg-checks[data-estado='FALLIDO'], .msg-checks[data-estado='REVISAR'] { color: #A3261A; letter-spacing: 0; }
+.msg-lista .msg-sin-leer { min-width: 20px; height: 20px; padding: 0 6px; font-size: 11.5px; border-radius: 10px; }
+.msg-sin-leer-punto { padding: 0; width: 20px; font-size: 9px; }
+.msg-lista .msg-chips { gap: 4px; flex-wrap: nowrap; overflow: hidden; margin-top: 1px; }
+.msg-lista .msg-chip { min-height: 16px; padding: 0 6px; font-size: 10.5px; line-height: 16px; }
+.msg-lista .msg-fila:has(.msg-chips), .msg-root .msg-lista .msg-fila:has(.msg-chips) { height: 82px; }
+.msg-lista .msg-encabezado-dia { padding: 1px 14px; font-size: 10.5px; line-height: 16px; }
+/* Botones de la fila: chicos y solo al pasar el mouse (en táctil quedan siempre, con zona de toque de 40 px) */
+.msg-lista .msg-check { width: 28px; height: 28px; top: 6px; right: 8px; font-size: 15px; border-width: 1.5px; opacity: 0; position: absolute; }
+.msg-lista .msg-check::after, .msg-lista .msg-opciones-btn::after { content: ''; position: absolute; inset: -6px; }
+.msg-lista .msg-opciones { right: 8px; bottom: 6px; }
+.msg-lista .msg-opciones-btn { min-width: 28px; min-height: 28px; width: 28px; height: 28px; font-size: 16px; position: relative; opacity: 0; background: #FFFFFF; }
+.msg-lista .msg-li-fila:hover .msg-check, .msg-lista .msg-li-fila:focus-within .msg-check,
+.msg-lista .msg-li-fila:hover .msg-opciones-btn, .msg-lista .msg-li-fila:focus-within .msg-opciones-btn { opacity: 1; }
+.msg-lista .msg-check span { opacity: 1; }
+@media (hover: none) {
+  .msg-lista .msg-fila { padding-right: 48px; }
+  .msg-lista .msg-check, .msg-lista .msg-opciones-btn { opacity: 1; }
+}
+/* Barra superior baja: cabecera, buscador, pestañas y filtros rápidos en poco alto */
+.msg-lista .msg-cab { padding: 4px 8px 0; gap: 4px; }
+.msg-lista .msg-filtros-btn { min-height: 32px; padding: 0 10px; font-size: 12px; }
+.msg-lista .msg-cab .msg-buscar input { min-height: 34px; font-size: 14px; }
+.msg-lista .msg-tabs { padding: 2px 8px 2px; gap: 4px; }
+.msg-lista .msg-tab-principal { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
+.msg-lista .msg-tab-principal b { padding: 0 6px; font-size: 11px; }
+.msg-rapidos { display: flex; gap: 4px; padding: 2px 8px 6px; overflow-x: auto; flex: none; scrollbar-width: none; }
+.msg-rapidos::-webkit-scrollbar { display: none; }
+.msg-rapido { flex: none; min-height: 26px; padding: 0 10px; border: 1px solid #D5DCE0; border-radius: 999px; background: #FFFFFF; color: #3B4A54; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.msg-rapido[aria-pressed='true'] { background: #D9FDD3; border-color: #00735C; color: #00402F; }
+.msg-rapido:focus-visible { outline: 3px solid #D99E39; outline-offset: 2px; }
+@media (pointer: coarse) {
+  .msg-lista .msg-filtros-btn, .msg-lista .msg-tab-principal { min-height: 40px; }
+  .msg-lista .msg-cab .msg-buscar input { min-height: 40px; }
+  .msg-rapido { min-height: 36px; }
+}

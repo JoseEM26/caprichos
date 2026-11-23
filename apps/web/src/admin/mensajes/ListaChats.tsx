@@ -1,20 +1,11 @@
 import React from 'react';
-import { InsigniaBloqueoSpam } from './BloqueoSpam';
-import { InsigniaNumeroBloqueado } from './NumeroBloqueado';
+import { horaHasta } from './BloqueoSpam';
 import { horaListaChat } from './fechasChat';
 import { diaDeChat, encabezadoDia, FiltroDia, textoVacioDia } from './diasBandeja';
 import { MenuFilaChat } from './MenuFilaChat';
 import { InsigniaPos } from './InsigniaPos';
-import { ChatResumen, EstadoChat, FiltroChat, FiltroPos, RespuestaListarChats } from './mensajesTipos';
-import {
-  ESTADOS_BG,
-  ESTADOS_LABEL,
-  SIN_RESPUESTA_MIN_VISIBLE,
-  esUsuarioWhatsApp,
-  obtenerColorAvatar,
-  obtenerEstiloEspera,
-  obtenerIniciales,
-} from './utilidadesChat';
+import { ChatResumen, FiltroChat, FiltroPos, RespuestaListarChats } from './mensajesTipos';
+import { SIN_RESPUESTA_MIN_VISIBLE, obtenerColorAvatar, obtenerIniciales } from './utilidadesChat';
 
 export interface ListaChatsProps {
   controles?: React.ReactNode;
@@ -46,6 +37,50 @@ export interface ListaChatsProps {
   hayMas?: boolean;
   cargandoMas?: boolean;
   onCargarMas?: () => void;
+  /** Party de quien usa el panel: el filtro rápido «Míos» compara contra `tomadoPorParty`. */
+  miPartyId?: string | null;
+}
+
+/** Filtros rápidos tipo WhatsApp Business: se combinan entre sí y con la pestaña actual (sobre los chats ya cargados). */
+export type FiltroRapido = 'noLeidos' | 'conPedido' | 'esperando' | 'mios';
+export const FILTROS_RAPIDOS: { id: FiltroRapido; texto: string }[] = [
+  { id: 'noLeidos', texto: 'No leídos' },
+  { id: 'conPedido', texto: 'Con pedido hoy' },
+  { id: 'esperando', texto: 'Esperando respuesta' },
+  { id: 'mios', texto: 'Míos' },
+];
+export function pasaRapido(c: ChatResumen, f: FiltroRapido, miPartyId?: string | null): boolean {
+  if (f === 'noLeidos') return c.sinLeer > 0 || Boolean(c.marcadoNoVisto);
+  if (f === 'conPedido') return !!c.pos && c.pos.estado !== 'SIN_PEDIDO';
+  if (f === 'esperando') return Boolean(c.porResponder);
+  return !!miPartyId && c.tomadoPorParty === miPartyId;
+}
+
+/** Checks del último mensaje nuestro: ✓ enviado, ✓✓ entregado, ✓✓ azul leído. Sin dato de estado, solo ✓. */
+function checksDe(estado?: string | null): { simbolo: string; etiqueta: string } | null {
+  if (estado === 'LEIDO') return { simbolo: '✓✓', etiqueta: 'Leído' };
+  if (estado === 'ENTREGADO') return { simbolo: '✓✓', etiqueta: 'Entregado' };
+  if (estado === 'FALLIDO' || estado === 'REVISAR') return { simbolo: '!', etiqueta: 'No se pudo enviar' };
+  if (estado === 'ENCOLADO' || estado === 'ENVIANDO') return { simbolo: '🕓', etiqueta: 'Enviando' };
+  return { simbolo: '✓', etiqueta: 'Enviado' };
+}
+
+const ROJO = { background: '#A3261A', borderColor: '#A3261A', color: '#FFFFFF' } as const;
+/** Alertas útiles de la fila, de más a menos importante; la lista muestra 2 y el resto va en el title. */
+function alertasDeFila(c: ChatResumen, espera: number | null) {
+  const a: { id: string; texto: string; estilo?: React.CSSProperties }[] = [];
+  if (espera !== null) a.push({ id: 'esperando', texto: `Esperando ${espera < 1 ? 'ahora' : textoTiempoEspera(espera)}`, estilo: espera >= 15 ? ROJO : undefined });
+  if (c.bloqueoSpam?.activo && !(c.bloqueoSpam.hastaEn && new Date(c.bloqueoSpam.hastaEn).getTime() <= Date.now())) {
+    const h = horaHasta(c.bloqueoSpam.hastaEn);
+    a.push({ id: 'bloqueo-spam', texto: `Spam${h ? ` · hasta ${h}` : ''}`, estilo: { background: '#FFE0A3', borderColor: '#E9A93B', color: '#7A4A00' } });
+  }
+  if (c.numeroBloqueado || c.numeroPropio) {
+    a.push({ id: 'numero-bloqueado', texto: c.numeroPropio ? 'Número del negocio' : 'Número bloqueado', estilo: { background: '#F6D5CB', borderColor: '#B2500F', color: '#7A2E0A' } });
+  }
+  if (c.volvioAEscribir) a.push({ id: 'volvio', texto: 'Volvió a escribir', estilo: { background: '#FDE8D3', borderColor: '#E67929', color: '#6B2F00' } });
+  if (c.porReprogramar) a.push({ id: 'reprogramar', texto: 'Por reprogramar' });
+  if (c.urgente) a.push({ id: 'urgente', texto: 'Urgente', estilo: { background: '#F8C9C9', color: '#7A1A12' } });
+  return a;
 }
 
 /** «12 min», «2 h 5 min»: tiempo que lleva esperando el cliente. */
@@ -54,11 +89,6 @@ export function textoTiempoEspera(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
-}
-
-/** Chip de estado de la lista. */
-function etiquetaEstado(estado: EstadoChat, urgente: boolean): string {
-  return urgente ? `Urgente · ${ESTADOS_LABEL[estado]}` : ESTADOS_LABEL[estado];
 }
 
 /** Columna izquierda: buscador, filtros y una fila compacta por chat. */
@@ -87,7 +117,10 @@ export function ListaChats({
   hayMas = false,
   cargandoMas = false,
   onCargarMas,
+  miPartyId = null,
 }: ListaChatsProps) {
+  const [rapidos, setRapidos] = React.useState<FiltroRapido[]>([]);
+  const visibles = React.useMemo(() => (rapidos.length ? chats.filter((c) => rapidos.every((f) => pasaRapido(c, f, miPartyId))) : chats), [chats, rapidos, miPartyId]);
   const pendientes = conteos.atender;
   const sinVerTotal = conteos.sinVer ?? 0;
   const [panelAbierto, setPanelAbierto] = React.useState(false);
@@ -291,6 +324,21 @@ export function ListaChats({
         )}
       </div>
 
+      <div className="msg-rapidos" role="group" aria-label="Filtros rápidos" data-testid="filtros-rapidos">
+        {FILTROS_RAPIDOS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            className="msg-rapido"
+            aria-pressed={rapidos.includes(f.id)}
+            data-testid={`rapido-${f.id}`}
+            onClick={() => setRapidos((r) => (r.includes(f.id) ? r.filter((x) => x !== f.id) : [...r, f.id]))}
+          >
+            {f.texto}
+          </button>
+        ))}
+      </div>
+
       {(diaActivo || posActivo) && (
         <div className="msg-activos" data-testid="filtros-activos" aria-label="Filtros activos">
           {diaActivo && (
@@ -313,9 +361,11 @@ export function ListaChats({
 
       {cargando ? (
         <div className="msg-vacio">Cargando conversaciones...</div>
-      ) : chats.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <div className="msg-vacio" data-testid="vacio-lista">
-          {dias && onDia && dia !== 'todos' && dia !== 'hoy' && !busqueda
+          {rapidos.length > 0 && chats.length > 0
+            ? 'Ningún chat cumple los filtros rápidos.'
+            : dias && onDia && dia !== 'todos' && dia !== 'hoy' && !busqueda
             ? `${textoVacioDia(dia)}.`
             : filtro === 'atender' && !busqueda
               ? 'Todo al día: no hay chats por atender.'
@@ -339,18 +389,21 @@ export function ListaChats({
         </div>
       ) : (
         <ul className="msg-filas" aria-label="Conversaciones">
-          {chats.map((c, i) => {
+          {visibles.map((c, i) => {
             const diaFila = dias ? diaDeChat(c) : '';
-            const nuevoDia = dias && (i === 0 || diaDeChat(chats[i - 1]) !== diaFila);
+            const nuevoDia = dias && (i === 0 || diaDeChat(visibles[i - 1]) !== diaFila);
             const seleccionado = c.id === chatSeleccionadoId;
-            const espera = typeof c.esperaMin === 'number' ? obtenerEstiloEspera(c.esperaMin) : null;
             const sinVer = c.sinLeer > 0 || Boolean(c.marcadoNoVisto);
-            const esperaCliente = c.porResponder ? c.sinRespuestaMin ?? null : null;
+            const espera = c.porResponder || (c.sinRespuestaMin ?? 0) >= SIN_RESPUESTA_MIN_VISIBLE ? c.sinRespuestaMin ?? null : null;
+            const alertas = alertasDeFila(c, espera);
+            const visiblesChips = alertas.slice(0, 2);
+            const ocultas = alertas.slice(2).map((x) => x.texto).join(' · ');
+            const checks = checksDe(c.ultimoEstado);
             return (
               <React.Fragment key={c.id}>
               {nuevoDia && (
                 <li className="msg-encabezado-dia" role="presentation" data-testid={`dia-${diaFila}`}>
-                  {encabezadoDia(diaFila)} · {chats.filter((x) => diaDeChat(x) === diaFila).length}
+                  {encabezadoDia(diaFila)} · {visibles.filter((x) => diaDeChat(x) === diaFila).length}
                 </li>
               )}
               <li className="msg-li-fila">
@@ -368,13 +421,19 @@ export function ListaChats({
                   <span className="msg-fila-cuerpo">
                     <span className="msg-fila-l1">
                       <span className="msg-nombre" style={c.porResponder || sinVer ? { fontWeight: 800 } : undefined}>{c.nombre}</span>
-                      <span className={c.sinLeer > 0 ? 'msg-hora msg-hora-nueva' : 'msg-hora'}>{c.fecha ? horaListaChat(c.fecha) : c.hora}</span>
+                      <span className={c.sinLeer > 0 ? 'msg-hora msg-hora-nueva' : 'msg-hora'} data-testid={`hora-${c.id}`}>{c.fecha ? horaListaChat(c.fecha) : c.hora}</span>
                     </span>
                     <span className="msg-fila-l2">
-                      <span className="msg-vista" title={c.ultimo} style={c.porResponder || sinVer ? { fontWeight: 700, color: 'inherit' } : undefined}>
+                      <span className="msg-vista" data-testid={`vista-${c.id}`} title={c.ultimo} style={c.porResponder || sinVer ? { fontWeight: 700, color: 'inherit' } : undefined}>
+                        {c.ultimoAutor && checks && (
+                          <span className="msg-checks" data-estado={c.ultimoEstado ?? ''} aria-label={checks.etiqueta} title={checks.etiqueta}>
+                            {checks.simbolo}{' '}
+                          </span>
+                        )}
+                        {c.ultimoAutor ? `${c.ultimoAutor}: ` : ''}
                         {c.ultimo}
                       </span>
-                      {c.sinLeer > 0 && (
+                      {c.sinLeer > 0 ? (
                         <span
                           className="msg-sin-leer"
                           data-testid={`sin-leer-${c.id}`}
@@ -383,78 +442,22 @@ export function ListaChats({
                         >
                           {c.sinLeer}
                         </span>
-                      )}
+                      ) : c.marcadoNoVisto ? (
+                        <span className="msg-sin-leer msg-sin-leer-punto" data-testid={`no-visto-${c.id}`} role="status" aria-label="Marcado como no visto" title="No visto">
+                          ●
+                        </span>
+                      ) : null}
                     </span>
-                    <span className="msg-chips">
- {c.atiende && (
-                        <span className="msg-chip" data-testid={`atiende-${c.id}`} title="Quién atiende este chat">
-                          Atiende: {c.atiende === 'BOT' ? 'Bot' : c.atiende === 'PERSONA' ? 'Persona' : 'WhatsApp Business'}
-                        </span>
-                      )}
-                      {esperaCliente !== null && (
-                        <span
-                          className="msg-chip"
-                          data-testid={`esperando-${c.id}`}
-                          style={esperaCliente >= 15 ? { background: '#A3261A', borderColor: '#A3261A', color: '#FFFFFF' } : undefined}
-                        >
-                          Esperando {esperaCliente < 1 ? 'ahora' : `hace ${textoTiempoEspera(esperaCliente)}`}
-                        </span>
-                      )}
-                      {sinVer && (
-                        <span className="msg-chip msg-chip-no-visto" data-testid={`no-visto-${c.id}`}>
-                          <span aria-hidden="true">●</span> {c.marcadoNoVisto ? 'No visto' : 'Sin ver'}
-                        </span>
-                      )}
-                      <span
-                        className="msg-chip"
-                        style={{ background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#EEF2F4' }}
-                      >
-                        {etiquetaEstado(c.estado, c.urgente)}
+                    {(visiblesChips.length > 0 || c.pos) && (
+                      <span className="msg-chips" title={ocultas || undefined}>
+                        <InsigniaPos pos={c.pos} id={c.id} />
+                        {visiblesChips.map((x) => (
+                          <span key={x.id} className="msg-chip" data-testid={`${x.id}-${c.id}`} style={x.estilo} title={x.texto}>
+                            {x.texto}
+                          </span>
+                        ))}
                       </span>
-                      {esUsuarioWhatsApp(c) && (
-                        <span className="msg-chip" style={{ background: '#E0F2FE', borderColor: '#BAE6FD', color: '#0C4A6E' }}>
-                          Usuario de WhatsApp
-                        </span>
-                      )}
-                      {c.volvioAEscribir && (
-                        <span className="msg-chip msg-chip-no-visto" data-testid={`volvio-${c.id}`}>
-                          Volvió a escribir
-                        </span>
-                      )}
-                      {c.porReprogramar && (
-                        <span className="msg-chip" data-testid={`reprogramar-${c.id}`}>
-                          Entrega por reprogramar
-                        </span>
-                      )}
-                      <InsigniaPos pos={c.pos} id={c.id} />
-                      {c.estado === 'atendido' && c.atendidoPor && (
-                        <span className="msg-chip" data-testid={`atendido-por-${c.id}`}>
-                          Atendido por {c.atendidoPor}
-                          {c.atendidoEn ? ` · ${horaListaChat(c.atendidoEn)}` : ''}
-                        </span>
-                      )}
-                      <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
-                      <InsigniaNumeroBloqueado bloqueado={c.numeroBloqueado} propio={c.numeroPropio} id={c.id} />
-                      {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
-                        <span
-                          data-testid={`sin-respuesta-${c.id}`}
-                          className="msg-chip"
-                          style={{ background: '#A3261A', borderColor: '#A3261A', color: '#FFFFFF' }}
-                        >
-                          Sin respuesta hace {c.sinRespuestaMin} min
-                        </span>
-                      )}
-                      {espera && (
-                        <span
-                          data-testid={`espera-badge-${c.id}`}
-                          className="msg-chip cv-espera-badge"
-                          style={{ background: espera.fondo, border: espera.borde, color: espera.color }}
-                          title={`Tiempo de espera: ${c.esperaMin} minutos`}
-                        >
-                          Espera: {c.esperaMin} min
-                        </span>
-                      )}
-                    </span>
+                    )}
                   </span>
                 </button>
                 {c.estado === 'atendido' ? (

@@ -70,8 +70,10 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   let tieneVouchersVer = true;
   let puedeDesbloquear = false;
   let puedeBloquearNumero = false;
+  let miPartyId: string | null = null;
   try {
     const sesion = useSesion();
+    miPartyId = sesion?.usuario?.partyId ?? null;
     puedeDesbloquear = Boolean(sesion?.tiene?.('mensajes/enviar'));
     puedeBloquearNumero = Boolean(sesion?.tiene?.('mensajes/bloquear_numeros'));
     tieneVouchersVer =
@@ -1010,6 +1012,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         style={{ '--cvz': zoom / 100, zoom: zoom / 100 } as React.CSSProperties}
       >
         <ListaChats
+          miPartyId={miPartyId}
           controles={controles}
           conteos={conteos}
           busqueda={busqueda}

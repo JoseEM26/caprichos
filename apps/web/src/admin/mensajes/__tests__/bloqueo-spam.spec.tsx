@@ -35,7 +35,7 @@ describe('Bloqueo por spam en Mensajes', () => {
   it('insignia ámbar con la hora en la fila y en el encabezado; solo en el chat bloqueado', async () => {
     render(<MensajesView />);
     const insignia = await screen.findByTestId('bloqueo-spam-1');
-    expect(insignia.textContent).toMatch(/Bloqueado por spam · hasta \d{2}:\d{2}/);
+    expect(insignia.textContent).toMatch(/Spam · hasta \d{2}:\d{2}/);
     expect(await screen.findByTestId('bloqueo-spam-detalle-1')).toBeTruthy();
     expect(screen.queryByTestId('bloqueo-spam-2')).toBeNull();
   });

@@ -16,6 +16,7 @@ describe('MensajesService', () => {
     prisma = {
       caja: { findUnique: jest.fn().mockResolvedValue({ estado: 'ABIERTA' }), findFirst: jest.fn().mockResolvedValue(null) },
       userAccount: {
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.party_id === 10n) return Promise.resolve({ id: 100n });
           if (where.party_id === 20n) return Promise.resolve({ id: 200n });

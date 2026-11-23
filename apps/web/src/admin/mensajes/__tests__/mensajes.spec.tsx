@@ -146,12 +146,11 @@ describe('MensajesView (/admin/mensajes)', () => {
     });
   });
 
-  it('5. Muestra la etiqueta Usuario de WhatsApp para remitentes sin teléfono en lista y detalle', async () => {
+  it('5. La fila de un remitente sin teléfono ya no lleva la etiqueta Usuario de WhatsApp (queda en la cabecera)', async () => {
     render(<MensajesView />);
-    await waitFor(() => {
-      expect(screen.getByText('Contacto Anónimo WA')).toBeInTheDocument();
-      expect(screen.getAllByText('Usuario de WhatsApp').length).toBeGreaterThanOrEqual(1);
-    });
+    // La fila ya no lleva la etiqueta (queda en la cabecera del chat abierto)
+    expect(await screen.findByText('Contacto Anónimo WA')).toBeInTheDocument();
+    expect(screen.queryByText('Usuario de WhatsApp')).toBeNull();
   });
 
   it('6. Ofrece Editar nombre en el menú del chat y abre el modal', async () => {

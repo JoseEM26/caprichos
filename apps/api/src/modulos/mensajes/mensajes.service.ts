@@ -472,9 +472,8 @@ export class MensajesService {
     const inv = (n: number | bigint, ancho: number) => (10n ** BigInt(ancho) - BigInt(n)).toString().padStart(ancho, '0');
     const ua = new Date(f.c.ultima_actividad).getTime();
     const id = inv(f.c.id, 19);
-    // Por responder arriba (el que más espera primero) en todas las pestañas menos «Por atender», que ya ordena por espera
-    if (filtro !== 'atender' && filtro !== 'atendidos' && f.porResponder) return '0' + new Date(f.ult.en).getTime().toString().padStart(14, '0') + id;
-    if (filtro !== 'atender') return (filtro === 'atendidos' ? '' : '1') + inv(ua, 14) + id;
+    // Estrictamente cronológico: el último mensaje más reciente arriba (ya no sube «por responder»)
+    if (filtro !== 'atender') return inv(new Date(f.fecha).getTime(), 14) + id;
     const espera = f.esperando ? new Date(f.ult.en).getTime().toString().padStart(14, '0') : inv(ua, 14);
     return inv(Number(f.dia.replace(/-/g, '')), 8) + (f.c.urgente ? '0' : '1') + (f.esperando ? '0' : '1') + espera + id;
   }
@@ -486,11 +485,30 @@ export class MensajesService {
       this.nombresDe(items.map((f) => f.c.atendido_por)),
       Promise.all(items.map(async (f) => [f.c.telefono, await this.numeros?.motivoOmision(f.c.telefono)] as const)).then((e) => new Map(e)),
     ]);
+    // Quién escribió el último mensaje nuestro (nombre de pila) y cómo va su envío (✓ / ✓✓ / ✓✓ azul), solo de la página mostrada
+    const ultimos = items.map((f) => (f.c.mensajes ? f.ult : completos.get(f.c.id)?.[0] ?? f.ult)).filter((m) => m?.direccion === 'SALE');
+    const partyIds = [...new Set(ultimos.map((m) => m.contenido?.origen?.partyId).filter((x) => /^\d+$/.test(String(x ?? ''))).map((x) => BigInt(x)))];
+    const metaIds = ultimos.map((m) => m.meta_id).filter(Boolean) as string[];
+    const tomadores = [...new Set(items.map((f) => f.c.tomado_por).filter((x): x is bigint => x != null))];
+    const [personas, entregas, cuentasTomadoras] = await Promise.all([
+      partyIds.length ? this.prisma.person.findMany({ where: { party_id: { in: partyIds } }, select: { party_id: true, nombres: true } }) : [],
+      metaIds.length ? this.prisma.whatsappMensaje.findMany({ where: { wa_message_id: { in: metaIds } }, select: { wa_message_id: true, estado: true } }) : [],
+      tomadores.length ? this.prisma.userAccount.findMany({ where: { id: { in: tomadores } }, select: { id: true, party_id: true } }) : [],
+    ]);
+    const partyDeCuenta = new Map(cuentasTomadoras.map((u: any) => [u.id.toString(), u.party_id.toString()]));
+    const pilaPorParty = new Map(personas.map((p: any) => [p.party_id.toString(), String(p.nombres ?? '').trim().split(/\s+/)[0]]));
+    const estadoPorMeta = new Map(entregas.map((w: any) => [w.wa_message_id, w.estado as string]));
     return items.map((f) => {
       const c = f.c;
       const estado = f.estado;
       const ult = c.mensajes ? f.ult : completos.get(c.id)?.[0] ?? f.ult;
-      const prefijo = !ult ? '' : ult.autor === 'CLIENTE' ? '' : ult.autor === 'BOT' ? 'Bot: ' : 'Tú: ';
+      const saliente = ult?.direccion === 'SALE';
+      const ultimoAutor = !saliente
+        ? null
+        : ult.autor === 'BOT'
+          ? 'Bot'
+          : (pilaPorParty.get(String(ult.contenido?.origen?.partyId ?? '')) || (ult.contenido?.canal === CANAL_WHATSAPP_BUSINESS ? 'WhatsApp Business' : 'Equipo'));
+      const ultimoEstado = !saliente ? null : estadoPorMeta.get(ult.meta_id) || ult.contenido?.estado || (ult.meta_id ? 'ENVIADO' : null);
       return {
         id: c.id.toString(),
         nombre: f.nombre,
@@ -502,7 +520,12 @@ export class MensajesService {
         nombre_editado: c.nombre_editado,
         estado,
         urgente: c.urgente,
-        ultimo: ult ? prefijo + (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
+        ultimo: ult ? (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
+        /** Último mensaje nuestro: quién lo envió («Ana», «Bot», «Equipo») y su estado de envío; null si el último es del cliente. */
+        ultimoAutor,
+        ultimoEstado,
+        /** Party de quien tiene tomado el chat (para el filtro «Míos» de la lista); null si nadie lo tomó. */
+        tomadoPorParty: c.tomado_por ? partyDeCuenta.get(c.tomado_por.toString()) ?? null : null,
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
         fecha: f.fecha.toISOString(),
         marcadoNoVisto: c.marcado_no_visto,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MensajesView, obtenerEstiloEspera } from '../MensajesView';
 import * as api from '../mensajesApi';
 
@@ -85,24 +85,9 @@ describe('esperaMin y orden en lista Por atender (MensajesView)', () => {
 
     render(<MensajesView />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('espera-badge-c1')).toBeInTheDocument();
-      expect(screen.getByTestId('espera-badge-c2')).toBeInTheDocument();
-      expect(screen.getByTestId('espera-badge-c3')).toBeInTheDocument();
-    });
-
-    const b1 = screen.getByTestId('espera-badge-c1');
-    const b2 = screen.getByTestId('espera-badge-c2');
-    const b3 = screen.getByTestId('espera-badge-c3');
-
-    expect(b1).toHaveTextContent('Espera: 18 min');
-    expect(b1.style.color).toContain('--cp-rust');
-
-    expect(b2).toHaveTextContent('Espera: 8 min');
-    expect(b2.style.color).toContain('--cp-gold');
-
-    expect(b3).toHaveTextContent('Espera: 3 min');
-    expect(b3.style.color).toContain('--cp-soft');
+    // La lista ya no muestra la espera como chip aparte (el aviso «Esperando N min» sale de sinRespuestaMin)
+    await screen.findByText('Maria Gomez');
+    expect(screen.queryByTestId('espera-badge-c1')).toBeNull();
   });
 
 });

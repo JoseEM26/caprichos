@@ -25,7 +25,7 @@ describe('Envío encolado: validaciones síncronas y respuesta inmediata', () =>
 
   beforeEach(() => {
     prisma = {
-      userAccount: { findUnique: jest.fn().mockResolvedValue({ id: 100n }) },
+      userAccount: { findUnique: jest.fn().mockResolvedValue({ id: 100n }), findMany: jest.fn().mockResolvedValue([]) },
       conversacion: { findUnique: jest.fn().mockResolvedValue({ ...conversacionBase }), update: jest.fn().mockResolvedValue({}) },
       mensajeChat: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -165,17 +165,10 @@ describe('Lista de chats paginada por cursor', () => {
       ...extra,
     };
   };
-  // «Por responder» (último mensaje del cliente) arriba, el que más espera primero; luego el resto por actividad reciente
-  const porResp = (c: any) => c.mensajes[0].autor === 'CLIENTE';
+  // Estrictamente cronológico: el último mensaje más reciente arriba; empate por id desc
   const ordenEsperado = (lista: any[]) =>
     [...lista]
-      .sort((a, b) =>
-        porResp(a) !== porResp(b)
-          ? (porResp(a) ? -1 : 1)
-          : porResp(a)
-            ? a.ultima_actividad.getTime() - b.ultima_actividad.getTime() || Number(b.id - a.id)
-            : b.ultima_actividad.getTime() - a.ultima_actividad.getTime() || Number(b.id - a.id),
-      )
+      .sort((x, y) => y.mensajes[0].en.getTime() - x.mensajes[0].en.getTime() || Number(y.id - x.id))
       .map((c) => c.id.toString());
 
   beforeEach(() => {
@@ -207,7 +200,7 @@ describe('Lista de chats paginada por cursor', () => {
     return { ids, paginas };
   };
 
-  it('recorrer todas las páginas da cada chat UNA vez, en el orden estable (por responder arriba, luego última actividad desc, id desc)', async () => {
+  it('recorrer todas las páginas da cada chat UNA vez, en el orden estable (último mensaje desc, id desc)', async () => {
     const { ids, paginas } = await recorrer(30);
     expect(paginas).toHaveLength(4); // 30 + 30 + 30 + 5
     expect(paginas[0].chats).toHaveLength(30);

@@ -81,7 +81,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     expect(await screen.findByTestId('total-sin-ver')).toHaveTextContent('2 sin ver');
     expect(screen.getByTestId('sin-leer-c2')).toHaveAttribute('aria-label', '2 mensajes sin ver');
-    expect(screen.getByTestId('no-visto-c3')).toHaveTextContent('No visto');
+    expect(screen.getByTestId('no-visto-c3')).toHaveAttribute('title', 'No visto');
     expect(screen.queryByTestId('no-visto-c1')).toBeNull();
   });
 
