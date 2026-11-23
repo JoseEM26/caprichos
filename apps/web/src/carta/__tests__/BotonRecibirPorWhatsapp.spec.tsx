@@ -13,7 +13,7 @@ describe('Botón «Recibir mi pedido por WhatsApp»', () => {
     render(<BotonRecibirPorWhatsapp codigo="CP-0123" token="t" />);
     const a = await screen.findByTestId('recibir-por-whatsapp');
     expect(a).toHaveAttribute('href', 'https://wa.me/51987654321?text=Hola%2C%20mi%20pedido%20CP-0123%20(clave%207K4Q2)');
-    expect(a).toHaveTextContent('Recibir mi pedido por WhatsApp');
+    expect(a).toHaveTextContent('Activa los avisos de tu pedido por WhatsApp');
   });
 
   it('si el resumen le llega directo: no hay botón', async () => {

@@ -3,7 +3,7 @@ import { api } from '../comun/api';
 import type { DatosLocalCarta } from './tipos';
 
 /**
- * «Recibir mi pedido por WhatsApp»: solo si el bot no puede escribirle primero (su celular nunca escribió; regla anti-baneo).
+ * «Activa los avisos de tu pedido por WhatsApp»: solo si el bot no puede escribirle primero (su celular nunca escribió; regla anti-baneo).
  * Abre el chat del local con «Hola, mi pedido CP-XXXX»: al llegar ese mensaje el bot vincula el chat y manda el resumen al instante.
  */
 export function BotonRecibirPorWhatsapp({ codigo, token }: { codigo: string; token?: string | null }) {
@@ -34,9 +34,15 @@ export function BotonRecibirPorWhatsapp({ codigo, token }: { codigo: string; tok
       href={`https://wa.me/${numero}?text=${encodeURIComponent(`Hola, mi pedido ${codigo}${clave ? ` (clave ${clave})` : ''}`)}`}
       target="_blank"
       rel="noreferrer"
-      style={{ minHeight: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', fontWeight: 800, fontSize: '16px', color: '#fff', background: '#1F8F4E', textDecoration: 'none', padding: '0 16px', textAlign: 'center' }}
+      aria-label="Activar avisos de mi pedido por WhatsApp"
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '14px', border: '1.5px solid #1F8F4E', background: '#EAF7EF', color: 'var(--cp-navy, #0B2C3E)', textDecoration: 'none', padding: '10px 12px', textAlign: 'left' }}
     >
-      Recibir mi pedido por WhatsApp
+      <span aria-hidden="true" style={{ flex: 'none', width: '36px', height: '36px', borderRadius: '50%', background: '#1F8F4E', color: '#fff', display: 'grid', placeItems: 'center', fontSize: '18px' }}>🔔</span>
+      <span style={{ display: 'grid', gap: '2px', flex: 1 }}>
+        <strong style={{ fontSize: '15px' }}>Activa los avisos de tu pedido por WhatsApp</strong>
+        <small style={{ fontSize: '13px', color: 'var(--cp-soft, #4A5A66)' }}>Envía el mensaje que se abre y te avisamos cuando esté listo.</small>
+      </span>
+      <span aria-hidden="true" style={{ flex: 'none', fontWeight: 800, color: '#1F8F4E' }}>›</span>
     </a>
   );
 }
