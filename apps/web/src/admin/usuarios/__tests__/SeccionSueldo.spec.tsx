@@ -66,3 +66,23 @@ describe('SeccionSueldo: sugerencia del celular de pago', () => {
     expect(m.guardar.mock.calls[0][3].vigenteDesde).toBe('2026-11-05');
   });
 });
+
+describe('SeccionSueldo: el botón principal del modal también guarda', () => {
+  beforeEach(() => { m.obtener.mockReset(); m.guardar.mockReset().mockResolvedValue({}); });
+  const SUELDO = { sueldo: { modalidad: 'SEMANAL', semanal: 300, mensual: 1300, metodo: 'TARIFA_HORA', diasMes: null, horasDia: null, tarifaHora: 8 } };
+
+  it('sin cambios no llama al servidor; con la tarifa cambiada la guarda', async () => {
+    m.obtener.mockResolvedValue(SUELDO);
+    const ref = { current: null as null | (() => Promise<boolean>) };
+    render(<SeccionSueldo partyId="7" guardarRef={ref} />);
+    const tarifa = await screen.findByDisplayValue('8') as HTMLInputElement;
+    expect(await ref.current!()).toBe(true);
+    expect(m.guardar).not.toHaveBeenCalled();
+    fireEvent.change(tarifa, { target: { value: '9.5' } });
+    expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument();
+    let ok = false;
+    await waitFor(async () => { ok = await ref.current!(); expect(m.guardar).toHaveBeenCalled(); });
+    expect(ok).toBe(true);
+    expect(m.guardar.mock.calls[0][3].tarifaHora).toBe(9.5);
+  });
+});

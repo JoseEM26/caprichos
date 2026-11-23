@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ErrorApi } from "../../comun/api";
 import { Boton } from "../../comun/Boton";
@@ -152,6 +152,7 @@ export function EditarUsuarioModal({
   const [descartarAbierto, setDescartarAbierto] = useState(false);
   // Foto del horario tal como llegó del servidor o se guardó, para saber si hay cambios sin guardar
   const [horarioBase, setHorarioBase] = useState("");
+  const guardarSueldoRef = useRef<(() => Promise<boolean>) | null>(null);
   const [horario, setHorario] = useState<HorarioEstado>(horarioVacio);
   const [reemplazos, setReemplazos] = useState<ReemplazosEstado>({});
   const [confirmarHorario, setConfirmarHorario] = useState(false);
@@ -179,14 +180,16 @@ export function EditarUsuarioModal({
 
   async function guardarHorario() {
     if (!usuario) return;
+    // El sueldo vive en esta misma pestaña: el botón principal también lo guarda (antes solo tenía su botón chico y se perdía)
     setGuardando(true);
     try {
       await api.put(`/admin/usuarios/${usuario.id}/horario`, {
         horarios: horariosParaEnviar(horario),
         reemplazos: reemplazosParaEnviar(reemplazos),
       });
-      setMsgHorario("Horario y reemplazos guardados.");
       setHorarioBase(JSON.stringify([horario, reemplazos]));
+      const sueldoOk = (await guardarSueldoRef.current?.()) ?? true;
+      setMsgHorario(sueldoOk ? "Horario, sueldo y reemplazos guardados." : "Horario y reemplazos guardados. El sueldo NO se guardó: revisa el aviso del cuadro Sueldo.");
     } catch (err) {
       setErrorServidor(
         err instanceof ErrorApi
@@ -821,7 +824,7 @@ export function EditarUsuarioModal({
       />
       {esAdmin && (rol || usuario.rol) !== "ADMIN" && (
         <>
-          <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} celularSugerido={celular9} />
+          <SeccionSueldo partyId={usuario.partyId} deshabilitado={guardando} celularSugerido={celular9} guardarRef={guardarSueldoRef} />
           <PanelVinculo partyId={Number(usuario.partyId)} deshabilitado={guardando} />
         </>
       )}

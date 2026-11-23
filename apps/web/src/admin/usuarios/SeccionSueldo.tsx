@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { MutableRefObject, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { ETIQUETA_METODO, guardarSueldo, MEDIOS_PAGO, MetodoValorHora, Modalidad, obtenerSueldo, SueldoHistorial, soles, sueldoEquivalente } from '../asistencia/planillaApi';
 
 const ENTRADA = { minHeight: 44, width: '100%', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' } as const;
 
 /** Sueldo de la persona (solo ADMIN): modalidad, monto, cómo se calcula el valor hora y a dónde se le paga. */
-export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { partyId: string; deshabilitado?: boolean; /** Celular (9 dígitos) que el admin acaba de escribir en el modal y aún no guarda; tiene prioridad sobre el guardado. */ celularSugerido?: string | null }) {
+export function SeccionSueldo({ partyId, deshabilitado, celularSugerido, guardarRef }: { partyId: string; deshabilitado?: boolean; /** El modal lo llama con su botón principal: guarda el sueldo si hubo cambios (true = guardado o sin cambios). */ guardarRef?: MutableRefObject<(() => Promise<boolean>) | null>; /** Celular (9 dígitos) que el admin acaba de escribir en el modal y aún no guarda; tiene prioridad sobre el guardado. */ celularSugerido?: string | null }) {
   const [modalidad, setModalidad] = useState<Modalidad>('MENSUAL');
   const [monto, setMonto] = useState('');
   const [metodo, setMetodo] = useState<MetodoValorHora>('DIAS_HORAS');
@@ -19,6 +19,8 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
   const [guardando, setGuardando] = useState(false);
   const [vigenteDesde, setVigenteDesde] = useState('');
   const [historial, setHistorial] = useState<SueldoHistorial[]>([]);
+  // Foto de lo guardado para saber si hay cambios sin guardar
+  const [base, setBase] = useState('');
 
   useEffect(() => {
     let vivo = true;
@@ -36,6 +38,8 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
         setPagoMedio(r.pago?.medio ?? '');
         setModalidad(r.sueldo.modalidad);
         setMonto(String(r.sueldo.modalidad === 'SEMANAL' ? r.sueldo.semanal : r.sueldo.mensual));
+        setBase(JSON.stringify([r.sueldo.modalidad, String(r.sueldo.modalidad === 'SEMANAL' ? r.sueldo.semanal : r.sueldo.mensual), r.sueldo.metodo ?? 'PROGRAMADAS',
+          r.sueldo.diasMes ? String(r.sueldo.diasMes) : '', r.sueldo.horasDia ? String(r.sueldo.horasDia) : '', r.sueldo.tarifaHora ? String(r.sueldo.tarifaHora) : '', r.pago?.celular ?? '', r.pago?.medio ?? '', '']));
       })
       .catch(() => undefined);
     return () => { vivo = false; };
@@ -52,7 +56,10 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
   // Referencia: lo mismo que calcula el servidor (mensual ÷ días ÷ horas)
   const vhRef = metodo === 'DIAS_HORAS' && eq ? eq.mensual / (Number(diasMes) > 0 ? Number(diasMes) : 24) / (Number(horasDia) > 0 ? Number(horasDia) : 9) : null;
 
-  const guardar = async () => {
+  const actual = JSON.stringify([modalidad, monto, metodo, diasMes, horasDia, tarifa, pagoCelular, pagoMedio, vigenteDesde]);
+  const sucio = actual !== base;
+
+  const guardar = async (): Promise<boolean> => {
     setGuardando(true);
     setMsg(null);
     try {
@@ -66,14 +73,24 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
         ...(vigenteDesde ? { vigenteDesde } : {}),
       });
       setVigenteDesde('');
+      setBase(JSON.stringify([modalidad, monto, metodo, diasMes, horasDia, tarifa, pagoCelular, pagoMedio, '']));
       obtenerSueldo(Number(partyId)).then((r) => setHistorial(r.historial ?? [])).catch(() => undefined);
       setMsg({ ok: true, texto: 'Sueldo guardado.' });
+      return true;
     } catch (e) {
       setMsg({ ok: false, texto: (e as any)?.message || 'No se pudo guardar el sueldo.' });
+      return false;
     } finally {
       setGuardando(false);
     }
   };
+  if (guardarRef) {
+    guardarRef.current = async () => {
+      if (!sucio) return true;
+      if (!valido) { setMsg({ ok: false, texto: porHora ? 'Escribe la tarifa por hora para guardar el sueldo.' : 'Escribe el monto para guardar el sueldo.' }); return false; }
+      return guardar();
+    };
+  }
 
   return (
     <fieldset style={{ border: '1px solid var(--cp-line)', borderRadius: 12, padding: 12, display: 'grid', gap: 10, margin: 0 }}>
@@ -151,9 +168,9 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
           </select>
         </label>
       </div>
-      <label style={{ fontSize: 12, fontWeight: 700 }}>Vigente desde (vacío = hoy)
+      <label style={{ fontSize: 12, fontWeight: 700 }}>Vigente desde (vacío = desde el inicio del período sin pagar)
         <input type="date" value={vigenteDesde} max={new Date().toISOString().slice(0, 10)} disabled={deshabilitado || guardando} onChange={(e) => setVigenteDesde(e.target.value)} style={ENTRADA} />
-        <small style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>Los días anteriores se siguen pagando con el sueldo de antes.</small>
+        <small style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>Los días anteriores a esa fecha se siguen pagando con el sueldo de antes.</small>
       </label>
       {historial.length > 1 && (
         <div style={{ fontSize: 13 }}>
@@ -174,6 +191,7 @@ export function SeccionSueldo({ partyId, deshabilitado, celularSugerido }: { par
         <Boton type="button" variante="secundario" disabled={!valido || deshabilitado || guardando} onClick={() => void guardar()}>
           Guardar sueldo
         </Boton>
+        {sucio && <small style={{ marginLeft: 8, color: 'var(--cp-rust)', fontWeight: 700 }}>Cambios sin guardar</small>}
       </div>
       {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ fontWeight: 700, fontSize: 13, color: msg.ok ? 'var(--cp-green)' : 'var(--cp-rust)' }}>{msg.texto}</div>}
     </fieldset>

@@ -201,7 +201,16 @@ export class PlanillaService {
     const datos = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo, ...opc, actualizado_en: new Date(), actualizado_por: usuario.partyId };
     // Sueldo con vigencia: un cambio en las cifras es una fila nueva con su fecha de inicio (hoy por defecto); no se pisa el historial.
     const hoy = jornadaDe(ahora).jornada;
-    const desde = dto.vigenteDesde ? fechaValida(dto.vigenteDesde) : antes ? hoy : DESDE_SIEMPRE;
+    // Sin fecha: rige desde el inicio del período abierto (no desde hoy: si no, la semana en curso mezclaba la tarifa vieja
+    // en los días anteriores y parecía que el cambio no se guardaba). Nunca antes del día siguiente al último período pagado.
+    let desde = dto.vigenteDesde ? fechaValida(dto.vigenteDesde) : DESDE_SIEMPRE;
+    if (!dto.vigenteDesde && antes) {
+      const ultimoPagado = await this.prisma.planillaPeriodo.findFirst({ where: { party_id: id, estado: 'PAGADO' }, orderBy: { hasta: 'desc' } });
+      const trasPagado = ultimoPagado ? sumarDias(isoDe(ultimoPagado.hasta), 1) : '';
+      const inicio = periodoDe(dto.modalidad, hoy).desde;
+      desde = trasPagado > inicio ? trasPagado : inicio;
+      if (desde > hoy) desde = hoy;
+    }
     if (desde > hoy) throw new BadRequestException({ codigo: 'FECHA_FUTURA', mensaje: 'El sueldo nuevo puede regir desde hoy o desde un día pasado, no desde el futuro' });
     const nuevo = { modalidad: dto.modalidad, monto_semanal: eq.semanal, monto_mensual: eq.mensual, metodo_valor_hora: metodo,
       dias_mes: dto.diasMes !== undefined ? dto.diasMes : antes?.dias_mes ?? null, horas_dia: dto.horasDia !== undefined ? dto.horasDia : antes?.horas_dia ?? null,

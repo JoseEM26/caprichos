@@ -126,7 +126,9 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
       },
     },
     planillaPeriodo: {
-      findFirst: async ({ where }: any) => periodos.find((p) => p.estado === 'PAGADO' && p.party_id === where.party_id && (where.desde?.lte ? p.desde <= where.desde.lte && p.hasta >= where.hasta.gte : where.desde ? p.desde.getTime() === where.desde.getTime() : p.hasta >= where.hasta.gte)) ?? null,
+      findFirst: async ({ where }: any) => (!where.desde && !where.hasta
+        ? periodos.filter((p) => p.estado === 'PAGADO' && p.party_id === where.party_id).sort((a, b) => b.hasta.getTime() - a.hasta.getTime())[0] ?? null
+        : null) ?? periodos.find((p) => p.estado === 'PAGADO' && p.party_id === where.party_id && (where.desde?.lte ? p.desde <= where.desde.lte && p.hasta >= where.hasta.gte : where.desde ? p.desde.getTime() === where.desde.getTime() : p.hasta >= where.hasta.gte)) ?? null,
       findUnique: async ({ where }: any) => periodos.find((p) => p.id === where.id) ?? null,
       create: async ({ data }: any) => { const f = { id: id++, estado: 'PAGADO', pagado_en: AHORA, ...data }; periodos.push(f); return f; },
       update: async ({ where, data }: any) => Object.assign(periodos.find((p) => p.id === where.id)!, data),
@@ -658,6 +660,17 @@ describe('neto con todos los descuentos, sin doble descuento', () => {
     await expect(m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1500, vigenteDesde: '2999-01-01' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'FECHA_FUTURA' } });
     m.periodos.push({ id: 99n, party_id: LUIS, estado: 'PAGADO', desde: d('2026-11-01'), hasta: d('2026-11-30') });
     await expect(m.svc.guardarSueldo(7, { modalidad: 'MENSUAL', monto: 1500, vigenteDesde: '2026-11-20' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'PERIODO_PAGADO' } });
+  });
+
+  it('sin fecha, el sueldo nuevo rige desde el inicio del período abierto (no desde hoy) y nunca antes de lo pagado', async () => {
+    // AHORA = sábado 05/12: la semana va del lunes 30/11 al domingo 06/12
+    const m = montar({ sueldo: { metodo_valor_hora: 'DIAS_HORAS' } });
+    await m.svc.guardarSueldo(7, { modalidad: 'SEMANAL', monto: 400 }, ADMIN, undefined, AHORA);
+    expect(m.vigencias.map((v) => v.vigente_desde.toISOString().slice(0, 10))).toEqual(['1900-01-01', '2026-11-30']);
+    const m2 = montar({ sueldo: { metodo_valor_hora: 'DIAS_HORAS' } });
+    m2.periodos.push({ id: 98n, party_id: LUIS, estado: 'PAGADO', desde: d('2026-11-25'), hasta: d('2026-12-01') });
+    await m2.svc.guardarSueldo(7, { modalidad: 'SEMANAL', monto: 400 }, ADMIN, undefined, AHORA);
+    expect(m2.vigencias.map((v) => v.vigente_desde.toISOString().slice(0, 10))).toEqual(['1900-01-01', '2026-12-02']);
   });
 
   it('guardar solo el celular de pago no crea una fila nueva de sueldo', async () => {
