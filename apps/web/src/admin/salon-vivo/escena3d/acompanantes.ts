@@ -56,3 +56,19 @@ export function configAleatoria(A: Pick<Avatar3D, 'REG'>, sem: number): Partial<
   }
   return c;
 }
+
+/**
+ * Cliente sin avatar propio: figura clásica de «hombre» o «mujer» (pictograma amable, colores fijos por género).
+ * No hay dato de género en los pedidos, así que se elige por la semilla (id del pedido + puesto): estable entre renders y refrescos.
+ */
+export type GeneroClasico = 'hombre' | 'mujer';
+export const generoClasico = (sem: string): GeneroClasico => (semilla(`g:${sem}`) % 2 === 0 ? 'hombre' : 'mujer');
+
+const PIELES_CLASICAS = ['#F1C9A3', '#E0AC82', '#C68E67'] as const;
+export function opcionesClasicas(sem: string) {
+  const genero = generoClasico(sem);
+  const piel = PIELES_CLASICAS[semilla(`p:${sem}`) % PIELES_CLASICAS.length];
+  return genero === 'hombre'
+    ? { genero, piel, pelo: '#3A2A20', ropa: '#3B6EA5', pantalon: '#2B3A55', estilo: 'corto', lentes: false, gorro: null }
+    : { genero, piel, pelo: '#4A2C1D', ropa: '#D9588A', pantalon: '#5B3F6B', estilo: 'largo', lentes: false, gorro: null };
+}

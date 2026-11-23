@@ -7,7 +7,7 @@ import { crearDecoracion, crearParticulas, TEMAS } from './temas';
 import { crearSonido } from './sonido';
 import { planoAEscena, type PlanoEscena } from './planoAEscena';
 import type { Persona } from './personas';
-import { factorSuave, poseDeEstado, siguienteEstado, suavizarAngulo, type EstadoCamara, type EstadoDirector, type Mundo, type Pose, type V2 } from './camaraDirector';
+import { factorSuave, puedeInteractuar, poseDeEstado, siguienteEstado, suavizarAngulo, type EstadoCamara, type EstadoDirector, type Mundo, type Pose, type V2, type V3 } from './camaraDirector';
 import type { PisoVivo, SalonVivo } from '../salonVivoApi';
 
 /**
@@ -35,6 +35,8 @@ export interface Motor {
   centrar: () => void;
   /** Estado actual del director de cámara (para pruebas y para el letrero de depuración). */
   estadoCamara: () => EstadoCamara;
+  /** Pose actual de la cámara y si el usuario puede moverla (solo para pruebas). */
+  poseCamara: () => { pos: V3; obj: V3; interactiva: boolean };
   tema: (clave: string) => void;
   hora: (m: ModoHora) => string;
   sonido: (on: boolean) => boolean;
@@ -158,6 +160,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
   /* ---------- Cámara ---------- */
   // Por defecto sigue a Capri: el director de cámara decide el encuadre (SIGUIENDO, EN_MESA, EN_COCINA, PANORAMA)
   let vista: VistaCamara = 'capri', volando = true, tocando = false;
+  // En «Seguir a Capri» los controles están apagados, así que este evento no llega: nadie puede sacar a la cámara del seguimiento
   controles.addEventListener('start', () => { tocando = true; volando = false; });
   controles.addEventListener('end', () => { tocando = false; });
   // En pantallas angostas (celular de pie) la vista se aleja para que el local entre completo
@@ -178,8 +181,16 @@ export function crearMotor(op: OpcionesMotor): Motor {
   let dirCam: EstadoDirector = { estado: 'PANORAMA', desde: -10 };
   let quietoDesde = 0, rumboSuave = 0;
   let ultimaMesa: { centro: V2; personas: V2[] } | null = null;
-  const modoControles = () => { controles.minDistance = vista === 'capri' ? 0.4 : 5; controles.maxPolarAngle = vista === 'capri' ? 1.5 : 1.35; };
+  let tAhora = 0;
+  // Los límites de órbita (distancia mínima 5) solo valen cuando la cámara ya llegó a su vista: durante el vuelo desde Capri
+  // (cámara a ~3 m) empujarían la cámara de golpe y la dejarían desencuadrada.
+  const modoControles = (enVuelo = false) => {
+    controles.enabled = puedeInteractuar(vista);
+    const libre = vista === 'capri' || enVuelo;
+    controles.minDistance = libre ? 0.4 : 5; controles.maxPolarAngle = libre ? 1.5 : 1.35;
+  };
   modoControles();
+  const reiniciarSeguimiento = () => { dirCam = { estado: 'SIGUIENDO', desde: -10 }; quietoDesde = tAhora; };
   // El punto al que mira la cámara no sale del local: arrastrar con dos dedos ya no lo pierde
   const limitarObjetivo = () => {
     const t = controles.target;
@@ -203,13 +214,16 @@ export function crearMotor(op: OpcionesMotor): Motor {
     camara.position.lerp(destinoCam, k); controles.target.lerp(objCam, k);
   }
   function moverCamara(t: number, dt: number) {
-    if (vista === 'capri') { if (volando) seguirCapri(t, dt); return; }
+    if (vista === 'capri') { seguirCapri(t, dt); return; }
     if (!volando || tocando) return;
     const v = vistas[vista];
     const destino = posDe(v);
-    if (reducir) { camara.position.copy(destino); controles.target.copy(v.obj); volando = false; return; }
-    camara.position.lerp(destino, 0.06); controles.target.lerp(v.obj, 0.06);
-    if (camara.position.distanceTo(destino) < 0.05) volando = false;
+    const llegar = () => { camara.position.copy(destino); controles.target.copy(v.obj); volando = false; modoControles(); };
+    if (reducir) { llegar(); return; }
+    const k = factorSuave(dt, 0.35);
+    camara.position.lerp(destino, k); controles.target.lerp(v.obj, k);
+    // Llega EXACTO a la vista (sin residuo): el ida y vuelta Capri ↔ Ver todo es siempre el mismo encuadre
+    if (camara.position.distanceTo(destino) < 0.05 && controles.target.distanceTo(v.obj) < 0.05) llegar();
   }
 
   // Tocar a Capri
@@ -236,7 +250,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
     // Solo si cambió de verdad (girar el celular), no por la barra del navegador que aparece y se esconde
     // Angosta (celular de pie): se aleja; muy ancha (TV con la franja de pedidos abajo): se acerca para llenar el alto
     const nuevo = THREE.MathUtils.clamp(1.5 / (w / h || 1), 0.72, 2.2);
-    if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; if (vista !== 'capri') volando = true; }
+    if (Math.abs(nuevo - alejar) > 0.05) { alejar = nuevo; controles.maxDistance = 30 * k * alejar; if (vista !== 'capri') { volando = true; modoControles(true); } }
   }
   const observador = new ResizeObserver(ajustar); observador.observe(contenedor);
   ajustar();
@@ -266,6 +280,7 @@ export function crearMotor(op: OpcionesMotor): Motor {
     if (intervalo && ms - ultimo < intervalo) return;
     ultimo = ms;
     const dt = Math.min(reloj.getDelta(), 0.1), t = reloj.elapsedTime;
+    tAhora = t;
     director.paso(t, dt);
     decoracion.animar(t);
     particulas.mover(t, dt);
@@ -301,9 +316,10 @@ export function crearMotor(op: OpcionesMotor): Motor {
       director.aplicar(d, primera);
       primera = false;
     },
-    camara(v) { vista = v; volando = true; modoControles(); },
-    centrar() { vista = 'capri'; volando = true; modoControles(); },
+    camara(v) { vista = v; volando = true; modoControles(true); if (v === 'capri') reiniciarSeguimiento(); },
+    centrar() { vista = 'capri'; volando = true; modoControles(); reiniciarSeguimiento(); },
     estadoCamara: () => dirCam.estado,
+    poseCamara: () => ({ pos: [camara.position.x, camara.position.y, camara.position.z], obj: [controles.target.x, controles.target.y, controles.target.z], interactiva: controles.enabled }),
     tema(clave) {
       const t = TEMAS[clave] ?? TEMAS.normal;
       claveTema = clave in TEMAS ? clave : 'normal';

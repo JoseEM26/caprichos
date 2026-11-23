@@ -6,6 +6,9 @@
  */
 export type EstadoCamara = 'SIGUIENDO' | 'EN_MESA' | 'EN_COCINA' | 'PANORAMA';
 
+/** Con «Seguir a Capri» la cámara es automática: el usuario no gira, no hace zoom ni arrastra. */
+export const puedeInteractuar = (vista: string): boolean => vista !== 'capri';
+
 export interface V2 { x: number; z: number }
 export type V3 = [number, number, number];
 export interface Pose { pos: V3; obj: V3 }

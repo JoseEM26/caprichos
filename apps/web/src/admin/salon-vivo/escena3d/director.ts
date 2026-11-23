@@ -5,8 +5,8 @@ import { COLOR_ESTADO, type Local, type MesaEsc } from './local';
 import { buscarRuta, claveArea, type PlanoEscena } from './planoAEscena';
 import { TEMAS, type Tema } from './temas';
 import type { Sonido } from './sonido';
-import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, MAX_AVATARES, type MotorAvatar } from './avatarReal';
-import { cantidadClientes, configAleatoria, semilla, TOPE_PERSONAS, TOPE_PERSONAS_LIGERO } from './acompanantes';
+import { cargarMotorAvatar, construirPersonaAvatar, usaAvatarReal, type MotorAvatar } from './avatarReal';
+import { cantidadClientes, opcionesClasicas, TOPE_PERSONAS, TOPE_PERSONAS_LIGERO } from './acompanantes';
 import type { Foco, V2 } from './camaraDirector';
 import { repartirSillas, revisarAtasco, rastroNuevo, type Rastro } from './atasco';
 import { estaListo, frasePaseo, planEntrega, productosBandeja } from './entrega';
@@ -122,7 +122,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     }
   }
 
-  /* ---------- Capri y los mozos de apoyo ---------- */
+  /* ---------- Capri: la única mesera de la escena ---------- */
   const capriObj = new THREE.Group(); escena.add(capriObj);
   let capri: CapriPiezas | null = null;
   const capriEstado = { anim: 'reposo', animDesde: 0, animDur: 0, proxAccion: 4, felizHasta: 0 };
@@ -139,14 +139,6 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     caja: cajaC, base: base(0.375, 1.2), vel: 2.3, tarea: null, globo: globoC, globoHasta: 0,
   }];
   capriObj.position.copy(meseros[0].base);
-  for (const [nombre, fx, dy, estilo] of [['Mozo Luis', 0.485, 0.6, 'corto'], ['Moza Ana', 0.73, 0.5, 'cola']] as const) {
-    const per = persona(ctx, gente, { ropa: '#0B2C3E', mandil: '#E67929', gorro: 'gorra', pantalon: '#1C1C22', estilo, rol: 'mozo', lentes: false });
-    const b = base(fx, dy);
-    per.raiz.position.copy(b);
-    escena.add(per.raiz);
-    const g = etiqueta('sv-globo', per.raiz, 1.75); g.visible = false;
-    meseros.push({ nombre, esCapri: false, obj: per, per, libreta: crearLibreta(ctx, per.raiz, 0, 0.9, 0.3), bandeja: crearBandeja(ctx, per.raiz, 0.84, 0.3), bolsa: crearBolsa(ctx, per.raiz, 0.3, 0.42, 0.12), base: b, vel: 2.1, tarea: null, globo: g, globoHasta: 0 });
-  }
   const raizDe = (ms: Mesero) => ms.obj.raiz || ms.obj;
   function ponerCapri(nuevo: Tema) {
     if (capri) { capriObj.remove(capri.raiz); liberar(capri.raiz); }
@@ -181,6 +173,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   let codigosDespacho = new Set<string>();
   let firmaCaja = '';
   let motoEstado: 'parqueada' | 'ruta' = 'parqueada';
+  /** El repartidor está en medio de recibir un pedido de Capri: los datos no lo mandan a la moto hasta que termine. */
+  let repOcupado = false;
   const entregas = new Set<string>();
 
   /* ---------- Clientes con su avatar real (titular de la mesa y cliente para llevar) ---------- */
@@ -189,28 +183,57 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   let cargandoAvatar = false;
   let esperando: { d: SalonVivo; primera: boolean } | null = null;
   const avataresEnUso = () => { let n = 0; for (const p of gente) if (p.avatarReal) n++; return n; };
-  /** Los acompañantes (y los clientes sin avatar) usan un avatar sencillo al azar; dejan siempre cupo a los titulares con avatar propio. */
-  const TOPE_ACOMPANANTES = MAX_AVATARES - 4;
   const topePersonas = () => (ctx.ligero ? TOPE_PERSONAS_LIGERO : TOPE_PERSONAS);
   /**
-   * El cliente usa su avatar si ya está cargado y hay cupo; si no trae avatar, uno sencillo al azar pero estable
-   * (la semilla es el id del pedido y el puesto); sin motor, en modo ligero o sin cupo, la figura genérica.
+   * El cliente usa su avatar si ya está cargado y hay cupo; si no trae avatar (o sin motor, en modo ligero o sin cupo),
+   * un hombre o una mujer clásicos, elegidos de forma estable por la semilla (id del pedido y puesto).
    */
+  const firmas = new WeakMap<Persona, string>();
+  const firmaDe = (a: AvatarVivo | null | undefined) => (a?.config ? JSON.stringify(a.config) : '');
   function crearCliente(avatar: AvatarVivo | null | undefined, sem: string): Persona {
+    const per = construirCliente(avatar, sem);
+    firmas.set(per, firmaDe(avatar));
+    return per;
+  }
+  /**
+   * Si el cliente cambió su avatar en la carta, el muñeco se reconstruye en el mismo lugar y postura (al siguiente refresco de datos).
+   * Devuelve el muñeco nuevo, o el mismo si no cambió, si camina (se reintenta en el siguiente refresco) o si su avatar aún no se bajó.
+   */
+  function refrescarAvatar(per: Persona, avatar: AvatarVivo | null | undefined, sem: string): Persona {
+    const firma = firmaDe(avatar);
+    if (firmas.get(per) === firma || caminando(per.raiz) || (firma && !motorAvatar)) return per;
+    const nuevo = crearCliente(avatar, sem);
+    nuevo.raiz.position.copy(per.raiz.position); nuevo.raiz.rotation.y = per.raiz.rotation.y;
+    nuevo.sentado = per.sentado; nuevo.mesaId = per.mesaId;
+    if (per.sentado) {
+      nuevo.ritmo = 0; nuevo.cuerpo.position.y = -0.05;
+      nuevo.piernas.forEach((pi) => { pi.rotation.x = -1.5; }); nuevo.rodillas.forEach((r) => { r.rotation.x = 1.5; });
+    }
+    escena.add(nuevo.raiz);
+    retirar(per);
+    return nuevo;
+  }
+  function construirCliente(avatar: AvatarVivo | null | undefined, sem: string): Persona {
     if (motorAvatar && !ctx.ligero) {
-      const enUso = avataresEnUso();
-      const propio = usaAvatarReal(avatar, ctx.ligero, enUso);
-      if (propio || enUso < TOPE_ACOMPANANTES) {
-        const real = construirPersonaAvatar(ctx, gente, motorAvatar, propio ? avatar!.config : configAleatoria(motorAvatar.A, semilla(sem)));
+      const propio = usaAvatarReal(avatar, ctx.ligero, avataresEnUso());
+      if (propio) {
+        const real = construirPersonaAvatar(ctx, gente, motorAvatar, avatar!.config);
         if (real) return real;
       }
     }
-    return persona(ctx, gente);
+    // Sin avatar propio: hombre o mujer clásico, estable por semilla
+    return persona(ctx, gente, opcionesClasicas(sem));
   }
-  const hayAvatares = (d: SalonVivo) => d.mesas.some((m) => m.pedido) || [...d.caja, ...d.cocina, ...d.despacho].some((p) => p.modalidad === 'LLEVAR');
+  const hayAvatares = (d: SalonVivo) => d.mesas.some((m) => m.pedido?.avatar?.config) || [...d.caja, ...d.cocina, ...d.despacho].some((p) => p.modalidad === 'LLEVAR' && p.avatar?.config);
 
   const mesaPorId = (id: string) => meseDe.get(id);
-  const estadoDe = (m: MesaEsc) => (datos?.mesas.find((x) => x.id === m.id)?.estado ?? 'LIBRE');
+  /** Mesas a las que Capri ya les llevó el pedido (id de mesa → id del pedido): aunque el sistema aún no lo marque entregado, el cliente ya come. */
+  const servidasPorCapri = new Map<string, string>();
+  const estadoDe = (m: MesaEsc) => {
+    const d = datos?.mesas.find((x) => x.id === m.id);
+    const real = d?.estado ?? 'LIBRE';
+    return real === 'ESPERANDO' && d?.pedido && servidasPorCapri.get(m.id) === (d.pedido.id ?? d.pedido.codigo) ? 'COMIENDO' : real;
+  };
 
   function sentar(per: Persona, silla: MesaEsc['sillas'][number], m: MesaEsc) {
     per.sentado = true; per.mesaId = m.id; per.ritmo = 0; per.cuerpo.position.y = -0.05;
@@ -306,7 +329,8 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   /** Pone la mesa como dicen los datos (anillo, etiqueta, platos, mano arriba). */
   function sincronizarMesa(m: MesaEsc) {
     const d = datos?.mesas.find((x) => x.id === m.id);
-    const est = d?.estado ?? 'LIBRE';
+    const est = estadoDe(m);
+    if (est === 'LIBRE' || est === 'RESERVADA') servidasPorCapri.delete(m.id);
     (m.anillo.material as THREE.MeshBasicMaterial).color.setHex(COLOR_ESTADO[est]);
     m.cartel.visible = est === 'RESERVADA';
     const g = grupos.get(m.id);
@@ -331,8 +355,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   function procesarMeseros() {
     for (const ms of meseros) {
       if (ms.tarea || caminando(raizDe(ms))) continue;
-      const mozosLibres = meseros.some((o) => !o.esCapri && !o.tarea);
-      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar') ? !despachoOcupado : tk.tipo === 'delivery' ? ms.esCapri && !despachoOcupado : tk.tipo === 'limpiar' ? !ms.esCapri || !mozosLibres : true);
+      const i = tareas.findIndex((tk) => (tk.tipo === 'pedido' || tk.tipo === 'llevar') ? !despachoOcupado : tk.tipo === 'delivery' ? !despachoOcupado : true);
       if (i >= 0) {
         const tk = tareas.splice(i, 1)[0];
         ms.tarea = tk; alCambiar();
@@ -392,7 +415,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
         caminar(ms.obj, rutaA(ms.obj, puntoMesa(m)), ms.vel, () => {
           o.rotation.y = m.mira;
           cargar(ms, null);
-          if (grupos.has(m.id)) servirMesa(m);
+          if (grupos.has(m.id)) { servirMesa(m); const pm = datos?.mesas.find((x) => x.id === m.id)?.pedido; const idPed = pm ? pm.id ?? pm.codigo : null; if (idPed) servidasPorCapri.set(m.id, idPed); sincronizarMesa(m); }
           if (ms.esCapri) capriEstado.felizHasta = t + 3.5;
           saludar(ms); hablar(ms, `¡Aquí tienes${pl?.cliente ? ', ' + pl.cliente : ''}! Gracias 💛`);
           espera(1500, () => volverBase(ms));
@@ -425,7 +448,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   /** Delivery: cocina → caja de cartón → entrada → se la da al repartidor, que se va en su moto → Capri vuelve. */
   function atenderDelivery(ms: Mesero, tk: Extract<Tarea, { tipo: 'delivery' }>) {
     if (!local.despachoPunto) { ms.tarea = null; return; }
-    despachoOcupado = true;
+    despachoOcupado = true; repOcupado = true;
     const o = raizDe(ms);
     const adentro = libreEn(entradaG[0] - dirG[0] * 1.3, entradaG[1] - dirG[1] * 1.3);
     const miraAfuera = Math.atan2(dirG[0], dirG[1]);
@@ -434,7 +457,11 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     let intentos = 0;
     const repartidorListo = (cb: () => void) => {
       if (motoEstado === 'ruta' && !caminando(moto) && intentos === 0) volverMoto();
-      if ((motoEstado === 'parqueada' && !caminando(moto)) || ++intentos > 40) cb(); else espera(500, () => repartidorListo(cb));
+      if ((motoEstado === 'parqueada' && !caminando(moto)) || ++intentos > 40) {
+        // Último recurso: si la moto no volvió, baja al repartidor ya (nunca camina estando montado)
+        if (motoEstado === 'ruta') { for (const a of [...agentes]) if (a.obj === moto) agentes.delete(a); motoEstado = 'parqueada'; moto.visible = true; moto.position.copy(parqueo); bajarRepartidor(); }
+        cb();
+      } else espera(500, () => repartidorListo(cb));
     };
     caminar(ms.obj, rutaA(ms.obj, local.despachoPunto), ms.vel, () => {
       o.rotation.y = Math.PI;
@@ -512,7 +539,16 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   const alLadoG: [number, number] = [entradaG[0] + dirG[0] * 1.4 + dirG[1] * 2.8, entradaG[1] + dirG[1] * 1.4 + dirG[0] * 2.8];
   const lejos = G(parqueo.x + ancho / 2 + dirG[0] * 14, parqueo.z + alto / 2 + dirG[1] * 14);
 
+  /** Repartidor en el piso junto a la moto parqueada: lo único que cambia al bajarse (la moto y él van siempre en un mismo grupo mientras está montado). */
+  function bajarRepartidor() {
+    moto.remove(repartidor.raiz); escena.add(repartidor.raiz);
+    repartidor.enMoto = false; repartidor.cuerpo.rotation.x = 0;
+    repartidor.raiz.position.copy(alLado); repartidor.raiz.rotation.y = Math.atan2(-dirG[0], -dirG[1]) || 0; repartidor.usaCel = true;
+  }
   function salirEnMoto(inmediato: boolean) {
+    // Causa del bug: si aquí él seguía caminando (agente propio), ese agente movía su posición LOCAL de la moto y se separaba de ella
+    for (const a of [...agentes]) if (a.obj === repartidor) agentes.delete(a);
+    repOcupado = false;
     motoEstado = 'ruta';
     repartidor.usaCel = false;
     moto.add(repartidor.raiz); repartidor.raiz.position.set(0, 0.16, -0.1); repartidor.raiz.rotation.set(0, 0, 0); repartidor.enMoto = true;
@@ -523,12 +559,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
   function volverMoto() {
     motoEstado = 'parqueada';
     moto.visible = true;
-    const fin = () => {
-      moto.remove(repartidor.raiz); escena.add(repartidor.raiz);
-      repartidor.enMoto = false; repartidor.cuerpo.rotation.x = 0;
-      repartidor.raiz.position.copy(alLado); repartidor.usaCel = true;
-      alCambiar();
-    };
+    const fin = () => { bajarRepartidor(); alCambiar(); };
     if (ctx.reducir) { moto.position.copy(parqueo); fin(); return; }
     moto.position.copy(lejos); sonido.moto();
     caminar(moto, [parqueo], 4.5, fin);
@@ -544,7 +575,12 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       caminar(c.per, [...buscarRuta(plano, aGrid(c.per.raiz.position), entradaG), afueraG], 1.6, () => retirar(c.per));
     }
     for (const cod of codigos.slice(0, 3)) {
-      if (clientesLlevar.has(cod)) continue;
+      const previo = clientesLlevar.get(cod);
+      if (previo) {
+        const pl = vivosLlevar.find((x) => x.codigo === cod);
+        previo.per = refrescarAvatar(previo.per, pl?.avatar, `${pl?.id ?? cod}:0`);
+        continue;
+      }
       const usados = new Set([...clientesLlevar.values()].map((c) => c.spot));
       const spot = [0, 1, 2].find((i) => !usados.has(i));
       if (spot === undefined) break;
@@ -588,6 +624,10 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
       if (ocupada && !g) llegarMesa(m, primera);
       else if (!ocupada && g) irseMesa(m, previoMesa.get(m.id) === 'POR_COBRAR');
       if (dm.estado === 'POR_COBRAR' && previoMesa.get(m.id) && previoMesa.get(m.id) !== 'POR_COBRAR' && !primera) tareas.push({ tipo: 'cuenta', mesaId: m.id });
+      const gm = grupos.get(m.id);
+      if (ocupada && gm && gm.personas.length) {
+        gm.personas[0] = refrescarAvatar(gm.personas[0], dm.pedido?.avatar, `${dm.pedido?.id ?? dm.pedido?.codigo ?? m.id}:0`);
+      }
       sincronizarMesa(m);
     }
     // Pedidos que aparecen listos en despacho: campana y a llevarlos
@@ -624,7 +664,7 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     if (!primera && firma !== firmaCaja && local.cajero) { local.cajero.trabajando = t + 1.4; sonido.caja(); }
     firmaCaja = firma;
     // Delivery: la moto sale cuando hay pedidos en reparto y vuelve cuando ya no hay
-    if (nuevo.enReparto.length > 0 && motoEstado === 'parqueada') salirEnMoto(primera);
+    if (nuevo.enReparto.length > 0 && motoEstado === 'parqueada' && !repOcupado && !caminando(repartidor.raiz)) salirEnMoto(primera);
     else if (nuevo.enReparto.length === 0 && motoEstado === 'ruta') volverMoto();
     sonido.murmullo(nuevo.conteos.personas);
     alCambiar();
@@ -658,19 +698,20 @@ export function crearDirector(ctx: Ctx, plano: PlanoEscena, local: Local, gente:
     c.cabeza.rotation.y = anda ? Math.sin(fp * 0.5) * 0.08 : Math.sin(t * 0.5) * 0.3;
     c.cabeza.rotation.z = Math.sin(t * 1.3) * 0.05;
     const parp = t % 3.7 < 0.12 ? 0.12 : 1;
-    const cara = t < e.felizHasta || feliz ? 'feliz' : demorado() ? 'preocupada' : 'normal';
+    // Siempre sonriendo: solo cambia entre sonrisa normal y sonrisa grande, nunca otra expresión
+    const cara = t < e.felizHasta || feliz ? 'feliz' : 'normal';
     if (cara === 'feliz') feliz = true;
     c.cejas.forEach((ce, i) => {
       const s = i ? 1 : -1;
-      const rz = cara === 'preocupada' ? -s * 0.4 : cara === 'feliz' ? s * 0.12 : 0;
+      const rz = cara === 'feliz' ? s * 0.12 : 0;
       ce.rotation.z += (rz - ce.rotation.z) * k; ce.position.y += ((cara === 'feliz' ? 0.2 : 0.16) - ce.position.y) * k;
     });
-    c.boca.rotation.z = cara === 'preocupada' ? 0 : Math.PI;
-    c.boca.position.y = cara === 'preocupada' ? -0.21 : -0.16;
-    c.gota.visible = cara === 'preocupada';
+    c.boca.rotation.z = Math.PI; // sonrisa siempre
+    c.boca.position.y = -0.16;
+    c.gota.visible = false;
     if (c.gota.visible) c.gota.position.y = 0.28 - ((t * 0.5) % 1) * 0.25;
     c.ojos.forEach((o) => { o.scale.y = feliz ? 0.45 : parp; });
-    c.boca.scale.y = 1 + (habla || globoC.visible ? (Math.sin(t * 18) * 0.5 + 0.5) * 1.2 : 0) + (cara === 'feliz' ? 0.5 : cara === 'preocupada' ? -0.3 : 0);
+    c.boca.scale.y = 1 + (habla || globoC.visible ? (Math.sin(t * 18) * 0.5 + 0.5) * 1.2 : 0) + (cara === 'feliz' ? 0.5 : 0);
     c.boca.scale.x = cara === 'feliz' ? 1.35 : 1;
     bandejaC.position.y = 0.66 + salto;
     c.orbitan.forEach((s) => { const a = t * 1.2 + s.userData.fase; s.position.set(Math.cos(a) * 1.1, 2.3 + Math.sin(a * 2) * 0.2, Math.sin(a) * 1.1); s.rotation.y = t * 3; });

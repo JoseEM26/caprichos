@@ -134,6 +134,7 @@ export function SalonVivoView({ tv = false, acceso }: { tv?: boolean; acceso?: A
               )}
             </div>
           )}
+          <p className="sv-aviso-avatar">¿Quieres verte así? Personaliza tu avatar en la carta tocando <b>⋯</b></p>
           {tv && !completa && <p className="sv-ayuda-tv">En pantalla completa los controles se esconden. Para salir, presiona Esc.</p>}
         </section>
         <PanelPendientes datos={datos} reloj={reloj} tv={tv} reducir={reducir} />

@@ -40,11 +40,11 @@ function armar(ligero = false) {
 const avatares = (g: Set<Persona>) => [...g].filter((p) => p.avatarReal);
 
 describe('clientes con avatar real en el salón', () => {
-  it('el titular usa su avatar y el acompañante uno sencillo al azar', async () => {
+  it('el titular usa su avatar y el acompañante es un hombre o mujer clásico', async () => {
     const e = armar();
     e.datos.mesas[0].pedido!.avatar = AV;
     e.director.aplicar(e.datos, true);
-    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(2));
+    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
     expect(construir.mock.calls.some((c) => c[0] === AV.config)).toBe(true);
     expect(e.gente.size).toBeGreaterThan(2);
   });
@@ -56,27 +56,47 @@ describe('clientes con avatar real en el salón', () => {
     e.datos.mesas[1].pedido = { id: '77', codigo: 'CP-W77', personas: null, bebidas: 3, minutos: 2, areasPendientes: [] };
     const antes = e.gente.size;
     e.director.aplicar(e.datos, true);
-    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(3));
-    expect(e.gente.size - antes).toBe(3);
+    await vi.waitFor(() => expect(e.gente.size - antes).toBe(3));
+    expect(avatares(e.gente)).toHaveLength(0);
     const f = armar();
     f.datos.mesas[0].estado = 'LIBRE'; f.datos.mesas[0].pedido = null;
     f.datos.mesas[1].estado = 'ESPERANDO';
     f.datos.mesas[1].pedido = { id: '78', codigo: 'CP-W78', personas: null, bebidas: 9, minutos: 2, areasPendientes: [] };
     f.director.aplicar(f.datos, true);
-    await vi.waitFor(() => expect(avatares(f.gente).length).toBeGreaterThan(0));
-    expect(avatares(f.gente)).toHaveLength(4);
+    await vi.waitFor(() => expect(f.gente.size - antes).toBe(4));
+    expect(avatares(f.gente)).toHaveLength(0);
   });
 
-  it('un cliente sin avatar sale con uno aleatorio pero estable por pedido', async () => {
-    const config = async () => {
-      construir.mockClear();
+  it('un cliente sin avatar sale como hombre o mujer clásico, igual en cada refresco', () => {
+    const colores = () => {
       const e = armar();
       e.datos.mesas[0].pedido = { id: '501', codigo: 'CP-W501', personas: null, bebidas: 1, minutos: 2, areasPendientes: [] };
       e.director.aplicar(e.datos, true);
-      await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
-      return JSON.stringify(construir.mock.calls[0][0]);
+      expect(avatares(e.gente)).toHaveLength(0);
+      return e.gente.size;
     };
-    expect(await config()).toBe(await config());
+    expect(colores()).toBe(colores());
+  });
+
+  it('si el cliente cambia su avatar en la carta, el muñeco se reconstruye sin recargar', async () => {
+    const e = armar();
+    e.datos.mesas[0].pedido!.avatar = AV;
+    e.director.aplicar(e.datos, true);
+    await vi.waitFor(() => expect(avatares(e.gente)).toHaveLength(1));
+    const antes = e.gente.size;
+    const primero = avatares(e.gente)[0];
+    construir.mockClear();
+    const nuevo = { ...e.datos, mesas: e.datos.mesas.map((m, i) => (i === 0 ? { ...m, pedido: { ...m.pedido!, avatar: { url: '/archivos/b.png', config: { genero: 'hombre' } } } } : m)) };
+    e.director.aplicar(nuevo, false);
+    await vi.waitFor(() => expect(construir).toHaveBeenCalledTimes(1));
+    expect(construir.mock.calls[0][0]).toEqual({ genero: 'hombre' });
+    expect(avatares(e.gente)).toHaveLength(1);
+    expect(avatares(e.gente)[0]).not.toBe(primero);
+    expect(e.gente.size).toBe(antes);
+    // sin cambios no se reconstruye
+    construir.mockClear();
+    e.director.aplicar({ ...nuevo }, false);
+    expect(construir).not.toHaveBeenCalled();
   });
 
   it('un cliente para llevar con avatar en caja también lo usa', async () => {

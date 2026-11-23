@@ -48,6 +48,29 @@ describe('armarSalonVivo', () => {
     expect(r.conteos).toMatchObject({ mesasOcupadas: 3, mesasTotal: 4 });
   });
 
+  it('transiciones del pedido de mesa: cocina → LISTO → ENTREGADO (con o sin «entregado en mesa») → comiendo', () => {
+    const mesa1 = [{ mesaId: 1n, nombre: 'Mesa 1', abierta: true }];
+    const est = (p: PedidoDia) => armarSalonVivo(entrada([p])).mesas.find((m) => m.numero === 1)!.estado;
+    expect(est(ped(1, { estado: 'PREPARANDO', mesas: mesa1 }))).toBe('ESPERANDO');
+    expect(est(ped(1, { estado: 'LISTO', listo_en: hace(1), mesas: mesa1 }))).toBe('ESPERANDO');
+    expect(armarSalonVivo(entrada([ped(1, { estado: 'LISTO', mesas: mesa1 })])).despacho).toHaveLength(1);
+    expect(est(ped(1, { estado: 'LISTO', entregado_mesa_en: hace(1), mesas: mesa1 }))).toBe('COMIENDO');
+    // ENTREGADO sin entregado_mesa_en (antes se quedaba «esperando» para siempre)
+    expect(est(ped(1, { estado: 'ENTREGADO', mesas: mesa1 }))).toBe('COMIENDO');
+    expect(est(ped(1, { estado: 'ENTREGADO', cobro_mozo_en: hace(1), mesas: mesa1 }))).toBe('POR_COBRAR');
+    // mesa cerrada: el cliente se va
+    expect(est(ped(1, { estado: 'ENTREGADO', mesas: [{ mesaId: 1n, nombre: 'Mesa 1', abierta: false }] }))).toBe('LIBRE');
+  });
+
+  it('si una mesa tiene un pedido viejo entregado y uno nuevo en cocina, manda el nuevo sin depender del orden', () => {
+    const mesa1 = [{ mesaId: 1n, nombre: 'Mesa 1', abierta: true }];
+    const viejo = ped(1, { estado: 'ENTREGADO', creado_en: hace(60), mesas: mesa1 });
+    const nuevo = ped(2, { estado: 'COLA', creado_en: hace(5), mesas: mesa1 });
+    for (const orden of [[viejo, nuevo], [nuevo, viejo]]) {
+      expect(armarSalonVivo(entrada(orden)).mesas.find((m) => m.numero === 1)!.pedido!.codigo).toBe('CP-W2');
+    }
+  });
+
   it('clasifica caja, cocina, despacho y reparto; ignora anulados y pedidos sin pagar en línea', () => {
     const r = armarSalonVivo(entrada([
       ped(10, { modalidad: 'LLEVAR', estado: 'COLA' }),

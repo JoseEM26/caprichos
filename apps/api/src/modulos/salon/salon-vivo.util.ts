@@ -195,7 +195,8 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
 
   // Mesas
   const pedidoPorMesa = new Map<string, PedidoDia>();
-  for (const p of vivos) {
+  // Del más viejo al más nuevo: si una mesa tiene dos pedidos, manda el último (el que está vivo ahora)
+  for (const p of [...vivos].sort((x, y) => x.creado_en.getTime() - y.creado_en.getTime())) {
     if (!esMesa(p) || p.estado === 'ENTREGADO' && !p.mesas.some((m) => m.abierta)) continue;
     for (const m of p.mesas) if (m.abierta && m.mesaId != null) pedidoPorMesa.set(String(m.mesaId), p);
   }
@@ -214,7 +215,8 @@ export function armarSalonVivo(e: EntradaSalonVivo): SalonVivo {
       let estado: EstadoMesaVivo = 'LIBRE';
       let pedido: MesaVivo['pedido'] = null;
       if (ped) {
-        estado = ped.cobro_mozo_en ? 'POR_COBRAR' : ped.entregado_mesa_en ? 'COMIENDO' : 'ESPERANDO';
+        // Servida = entregada en mesa O pedido ya ENTREGADO (finalizado sin pasar por «entregado en mesa»): el cliente ya come
+        estado = ped.cobro_mozo_en ? 'POR_COBRAR' : servida(ped) ? 'COMIENDO' : 'ESPERANDO';
         const delaReserva = e.reservas.find((r) => r.pedido_id === ped.id);
         const personas = delaReserva?.personas ?? ped.espera_personas ?? null;
         pedido = {

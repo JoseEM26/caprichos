@@ -81,6 +81,47 @@ describe('escena 3D desde el plano real', () => {
     expect(e.director.resumenMeseros().some((m) => m.esCapri)).toBe(true);
   });
 
+  it('secuencia completa de una mesa: esperando → LISTO (Capri trae la bandeja) → comiendo aunque nadie marque entregado → LIBRE y se van', () => {
+    vi.useFakeTimers();
+    const e = armar();
+    e.director.aplicar(e.datos, true);
+    expect(e.local.mesas[0].etq.el.textContent).toContain('Esperando pedido');
+    const listo = salonEjemplo();
+    listo.cocina = listo.cocina.filter((p) => p.codigo !== 'CP-W901');
+    listo.despacho = [pedido('CP-W901', { estado: 'LISTO', mesas: ['Mesa 1'], mesaIds: ['1'] })];
+    e.director.aplicar(listo, false);
+    for (let i = 0; i < 400; i++) { e.director.paso(i * 0.05, 0.05); vi.advanceTimersByTime(50); if (i % 40 === 0) e.director.aplicar(listo, false); }
+    // el sistema aún dice ESPERANDO (nadie marcó entregado), pero Capri ya lo llevó: el cliente come
+    expect(e.local.mesas[0].comida.children.length).toBeGreaterThan(0);
+    expect(e.local.mesas[0].etq.el.textContent).toContain('Comiendo');
+    // el servidor lo marca entregado: sigue comiendo
+    const entregado = salonEjemplo();
+    entregado.cocina = []; entregado.despacho = [];
+    entregado.mesas[0] = { ...entregado.mesas[0], estado: 'COMIENDO' };
+    e.director.aplicar(entregado, false);
+    expect(e.local.mesas[0].etq.el.textContent).toContain('Comiendo');
+    // se libera: se van
+    const libre = salonEjemplo();
+    libre.cocina = []; libre.despacho = [];
+    libre.mesas[0] = { ...libre.mesas[0], estado: 'LIBRE', pedido: null };
+    e.director.aplicar(libre, false);
+    for (let i = 0; i < 500; i++) { e.director.paso(30 + i * 0.05, 0.05); vi.advanceTimersByTime(50); }
+    expect(e.local.mesas[0].etq.el.textContent).toContain('Libre');
+    expect(e.local.mesas[0].comida.children.length).toBe(0);
+  });
+
+  it('si el pedido pasa de cocina directo a ENTREGADO entre dos refrescos, el cliente aparece comiendo', () => {
+    vi.useFakeTimers();
+    const e = armar();
+    e.director.aplicar(e.datos, true);
+    const d = salonEjemplo();
+    d.cocina = []; d.despacho = [];
+    d.mesas[0] = { ...d.mesas[0], estado: 'COMIENDO' };
+    e.director.aplicar(d, false);
+    expect(e.local.mesas[0].etq.el.textContent).toContain('Comiendo');
+    expect(e.local.mesas[0].comida.children.length).toBeGreaterThan(0);
+  });
+
   it('los clientes llegan cuando una mesa se ocupa y se van cuando se libera', () => {
     vi.useFakeTimers();
     const e = armar();
