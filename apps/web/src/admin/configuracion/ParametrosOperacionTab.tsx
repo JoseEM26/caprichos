@@ -702,6 +702,12 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Solo envía por Evolution a clientes que ya tienen una conversación con el local. Reduce el riesgo de que reporten el número como spam.',
     tipo: 'sino',
   },
+  evolution_resumen_contacto_dias: {
+    nombre: 'Evolution: días de contacto para enviar el resumen',
+    descripcion: 'El resumen del pedido sale solo si el cliente escribió en los últimos N días. Los demás avisos siguen pidiendo 24 h. 0 = solo 24 h.',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
   evolution_max_enlaces: {
     nombre: 'Evolution: enlaces por mensaje',
     descripcion: 'Cuántos enlaces como máximo lleva cada mensaje; el resto se quita. Los mensajes con muchos enlaces parecen spam.',

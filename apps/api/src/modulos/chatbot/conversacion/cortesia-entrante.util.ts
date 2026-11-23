@@ -17,3 +17,12 @@ export function esAgradecimiento(texto?: string | null): boolean {
   if (EMOJIS_AGRADECIMIENTO.includes(crudo)) return true;
   return RE_AGRADECIMIENTO.test(normalizarTexto(crudo));
 }
+
+const RE_CONFORME =
+  /^(?:si |ok |okey |oki |okay |listo |vale |dale )?(?:ok|okey|oki|okay|conforme|confirmo|confirmado|confirmada|todo bien|todo ok|todo conforme|todo correcto|esta bien|estoy conforme)(?: (?:conforme|confirmo|gracias|todo bien|ok|okey))*$/;
+
+/** «OK», «okey», «oki», «conforme», «confirmo», «todo bien», «sí, conforme», con o sin tildes, mayúsculas o 👍: conformidad con el resumen. */
+export function esConformeConResumen(texto?: string | null): boolean {
+  const n = normalizarTexto(texto).replace(/\s?(?:👍|👌|🙌)/gu, '').trim();
+  return !!n && RE_CONFORME.test(n);
+}

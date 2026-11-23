@@ -94,6 +94,9 @@ export interface ContextoResumenRecibido {
   enlace?: string | null;
 }
 
+/** Última línea del resumen: invita al cliente a confirmar; su «ok» lo atiende AutorespuestaWhatsappService. */
+export const LINEA_CONFIRMA_RESUMEN = 'Responde *OK* o *CONFORME* para confirmar que todo está bien 🙌';
+
 const soles = (n: number): string => `S/ ${n.toFixed(2)}`;
 /** Margen bajo los 4096 de WhatsApp para lo que se anexa después (puntos de bienvenida). */
 const LIMITE_TEXTO_RECIBIDO = 3700;
@@ -190,6 +193,7 @@ export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenR
   if (comprobante) cola.push(comprobante);
   if (r.tiempoEstimado && !r.programadoPara) cola.push(`⏱️ Tiempo estimado: ${r.tiempoEstimado} minutos`);
   if (c.enlace) cola.push(`Sigue tu pedido aquí: ${c.enlace}`);
+  cola.push(LINEA_CONFIRMA_RESUMEN);
 
   // Productos: si el pedido es enorme se recorta la lista, nunca el total ni el pago
   const armarProductos = (n: number): string => {
@@ -206,6 +210,10 @@ export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenR
 }
 
 export const textoResumenRecibido = (r: ResumenRecibido, c: ContextoResumenRecibido): string => construirResumenRecibido(r, c).join('\n\n');
+
+/** Respuesta al «OK» / «CONFORME» del cliente al resumen de su pedido (una vez por pedido). */
+export const textoConformeConfirmada = (nombre: string, codigo: string): string =>
+  `¡Gracias${nombre ? `, ${nombre}` : ''}! 🙌 Tu pedido ${codigo} quedó confirmado. Te avisamos cuando esté listo.`;
 
 export const TEXTOS_REPARTO = {
   aceptado: (nombre: string, codigo: string): PayloadAvisoReparto => ({

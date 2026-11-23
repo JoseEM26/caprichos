@@ -45,6 +45,7 @@ describe('aviso «Recibimos tu pedido» completo', () => {
         `*Cómo pagas*\n${datosPlin}\n⏳ Pago pendiente`,
         '📸 Envíanos la captura de tu pago por aquí cuando puedas (opcional). Un asesor la revisará. 🙏',
         'Sigue tu pedido aquí: https://x/?seguimiento=CP-W099',
+        'Responde *OK* o *CONFORME* para confirmar que todo está bien 🙌',
       ].join('\n\n'),
     );
     sinDobles(nuevo);

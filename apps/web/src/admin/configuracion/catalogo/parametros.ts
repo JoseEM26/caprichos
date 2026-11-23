@@ -44,7 +44,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min', 'voucher_recordatorio_min', 'voucher_mozo_obligatorio'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_modo_libre', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo', 'ayuda_ia_max_por_minuto_usuario', 'ayuda_ia_max_por_hora_usuario'] },
   { id: 'pago_online', titulo: 'Pago en línea (se enciende en Local › Pagos)', claves: ['pago_online_espera_min', 'culqi_comision_tarjeta_pct', 'culqi_comision_tarjeta_fijo', 'culqi_comision_yape_pct', 'culqi_comision_yape_fijo'] },
-  { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_meta_respaldo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
+  { id: 'evolution', titulo: 'WhatsApp por Evolution', claves: ['whatsapp_proveedor', 'evolution_pausado', 'evolution_limite_minuto', 'evolution_limite_hora', 'evolution_limite_dia', 'evolution_pausa_min_seg', 'evolution_pausa_max_seg', 'evolution_escribiendo_ms_por_caracter', 'evolution_horario_desde', 'evolution_horario_hasta', 'evolution_exigir_contacto_previo', 'evolution_resumen_contacto_dias', 'evolution_meta_respaldo', 'evolution_max_enlaces', 'evolution_max_texto_identico', 'evolution_origenes_permitidos'] },
   { id: 'cola', titulo: 'Cola de envío de WhatsApp (reintentos y alertas)', claves: ['outbox_alerta_fallidos', 'outbox_max_intentos', 'outbox_retencion_dias', 'outbox_retencion_fallidos_dias', 'outbox_lag_alerta_min'] },
   { id: 'aprendizaje', titulo: 'Aprendizaje nocturno del bot', claves: ['aprendizaje_activo', 'aprendizaje_hora', 'aprendizaje_min_repeticiones', 'aprendizaje_tope_usd_noche', 'aprendizaje_tope_usd_historico', 'aprendizaje_usd_por_millon_entrada', 'aprendizaje_usd_por_millon_salida'] },
   { id: 'pantalla_local', titulo: 'Pantalla de pedidos del local (TV)', claves: ['pantalla_local_mostrar_nombre'] },
@@ -776,6 +776,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'En «Sí», un cliente que nunca escribió no recibe mensajes por Evolution.',
     efecto: 'En «No» se puede escribir a cualquiera, con más riesgo de bloqueo.',
     porDefecto: 'Sí', rango: SI_NO, palabras: ['evolution', 'contacto previo', 'spam', 'bloqueo'], peligro: 'alto',
+  },
+  evolution_resumen_contacto_dias: {
+    grupo: 'evolution', titulo: 'Evolution: días de contacto para enviar el resumen',
+    descripcion: 'El resumen del pedido («recibimos tu pedido») sale solo si el cliente escribió al local en los últimos N días. Los demás avisos (aceptado, listo, salió…) siguen pidiendo que haya escrito en las últimas 24 h. 0 = solo 24 h.',
+    ejemplo: 'Con 180: quien escribió hace 3 meses recibe el resumen solo; quien nunca escribió, no.',
+    efecto: 'Subirlo envía el resumen a más clientes antiguos, con algo más de riesgo de bloqueo; 0 vuelve a solo 24 h.',
+    porDefecto: '180', unidad: 'días', rango: '0 a 3650', palabras: ['evolution', 'resumen', 'contacto', 'seis meses', '24 horas'], peligro: 'medio',
   },
   evolution_meta_respaldo: {
     grupo: 'evolution', titulo: 'Usar Meta como respaldo',

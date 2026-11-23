@@ -6,6 +6,8 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
 
+import { DIAS_RESUMEN_CONTACTO_DEFECTO } from './ventana-aviso.util';
+
 export type ProveedorWhatsapp = 'META' | 'EVOLUTION';
 
 /** Parámetros de `parametro` y su valor por defecto (conservador). Meta sigue siendo el proveedor hasta que un ADMIN cambie. */
@@ -27,6 +29,8 @@ export const DEFECTOS_EVOLUTION = {
   evolution_horario_desde: 9,
   evolution_horario_hasta: 22,
   evolution_exigir_contacto_previo: 'si',
+  /** Solo el resumen del pedido («recibido») sale solo si el celular escribió en estos días (180 = 6 meses); 0 = solo la ventana de 24 h. */
+  evolution_resumen_contacto_dias: DIAS_RESUMEN_CONTACTO_DEFECTO,
   evolution_max_enlaces: 1,
   evolution_max_texto_identico: 2,
   /** Vacío = los mismos avisos que con Meta (rigen los interruptores whatsapp_aviso_*). Con valores, solo esos orígenes. */

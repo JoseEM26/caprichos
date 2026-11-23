@@ -311,6 +311,7 @@ import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
 import { lineasDeCuenta } from './lineas-combo.util';
 import { cargarCancelable } from './cancelable-cliente';
+import { DIAS_RESUMEN_CONTACTO_DEFECTO, escribioParaAviso } from '../chatbot/evolution/ventana-aviso.util';
 
 @Injectable()
 export class SeguimientoService {
@@ -423,7 +424,7 @@ export class SeguimientoService {
 
   /**
    * ¿La carta debe mostrar «Recibir mi pedido por WhatsApp»? Solo si el bot no puede escribirle primero: el celular del pedido
-   * no escribió en las últimas 24 h (regla anti-baneo de Evolution) y el resumen aún no salió. Token inválido = pedido inexistente.
+   * no escribió en las últimas 24 h ni en los últimos evolution_resumen_contacto_dias (regla anti-baneo de Evolution, misma que la política) y el resumen aún no salió. Token inválido = pedido inexistente.
    */
   async botonWhatsapp(codigo: string, token: string | undefined): Promise<{ requiereBoton: boolean; clave?: string }> {
     const pedido = await this.prisma.pedido.findUnique({ where: { codigo }, select: { id: true, estado: true, cliente_telefono: true } });
@@ -432,11 +433,13 @@ export class SeguimientoService {
     }
     if (pedido.estado === 'ANULADO' || !telefonoEnviable(pedido.cliente_telefono)) return { requiereBoton: false };
     const hash = hashTelefono(telefonoEnviable(pedido.cliente_telefono));
-    const [reciente, enviado] = await Promise.all([
-      this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE', creado_en: { gte: new Date(Date.now() - 24 * 3_600_000) } } }),
+    const diasParam = (await this.prisma.parametro.findUnique({ where: { clave: 'evolution_resumen_contacto_dias' } }))?.valor;
+    const dias = Number.isFinite(Number(diasParam)) && diasParam != null && diasParam !== '' ? Number(diasParam) : DIAS_RESUMEN_CONTACTO_DEFECTO;
+    const [escribio, enviado] = await Promise.all([
+      escribioParaAviso(this.prisma, hash, true, dias),
       this.prisma.salienteWhatsapp.count({ where: { pedido_id: pedido.id, origen: { in: ['AVISO_PEDIDO', 'AUTORESPUESTA'] }, estado: 'ENVIADO' } }),
     ]);
-    const requiereBoton = reciente === 0 && enviado === 0;
+    const requiereBoton = !escribio && enviado === 0;
     return requiereBoton ? { requiereBoton, clave: claveCortaPedido(pedido.id) } : { requiereBoton };
   }
 

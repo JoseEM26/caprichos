@@ -5,6 +5,7 @@ import { hashTelefono } from '../utilidades/enmascarar.util';
 import { LocalService } from '../../local/local.service';
 import { horarioDelLocal } from './horario-local';
 import { EvolutionConfigService } from './evolution-config.service';
+import { escribioParaAviso } from './ventana-aviso.util';
 import { controlAlmacenActivo } from '../../stock/control-almacen';
 
 /** Orígenes del outbox que son respuesta a algo que el cliente acaba de escribir: siempre se permiten. */
@@ -14,7 +15,6 @@ export const ORIGENES_RESPUESTA = new Set(['VOUCHER', 'BOT_ERROR', 'TOPE_SIN_PAG
 export const ORIGENES_PEDIDOS_POR_EL_CLIENTE = new Set(['CODIGO_CUENTA', 'RESERVA', 'AVISO_CUENTA']);
 /** Avisos al equipo (administradores): sus números no escriben antes al negocio; igual que con Meta, salen. */
 export const ORIGENES_DEL_EQUIPO = new Set(['ALERTA_ADMIN', 'EQUIPO_NUEVO_PEDIDO', 'EQUIPO_ALERTA_ALMACEN']);
-const HORAS_VENTANA_AVISO = 24;
 /** Código con el que un aviso del pedido queda DESCARTADO por estar fuera de las 24 h: la persona lo envía desde el pedido. */
 export const FUERA_DE_VENTANA_AVISO = 'FUERA_DE_VENTANA_24H';
 export const MOTIVO_FUERA_DE_VENTANA = 'Fuera de las 24 h: el cliente no nos escribió en las últimas 24 h, así que no se envía solo (para cuidar el número). Envíalo tú desde el pedido con «Enviar confirmación por WhatsApp».';
@@ -77,10 +77,10 @@ export class PoliticaEvolutionService {
     if (String(cfg.evolution_exigir_contacto_previo).toLowerCase() === 'si' && !ORIGENES_PEDIDOS_POR_EL_CLIENTE.has(fila.origen) && !ORIGENES_DEL_EQUIPO.has(fila.origen)) {
       const hash = hashTelefono(fila.telefono_destino);
       if (fila.origen === 'AVISO_PEDIDO') {
-        // Avisos del pedido (recibido, aceptado, listo, salió...): solo solos si el cliente escribió en las últimas 24 h
-        const desde = new Date(ahora.getTime() - HORAS_VENTANA_AVISO * 3_600_000);
-        const reciente = await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE', creado_en: { gte: desde } } });
-        if (reciente === 0) return { accion: 'DESCARTAR', codigo: FUERA_DE_VENTANA_AVISO, motivo: MOTIVO_FUERA_DE_VENTANA };
+        // Avisos del pedido (aceptado, listo, salió...): solo solos si el cliente escribió en las últimas 24 h.
+        // El resumen («recibido») también sale a quien escribió en los últimos evolution_resumen_contacto_dias.
+        const esResumen = (fila.carga as any)?.etapa === 'RECIBIDO';
+        if (!(await escribioParaAviso(this.prisma, hash, esResumen, cfg.evolution_resumen_contacto_dias, ahora))) return { accion: 'DESCARTAR', codigo: FUERA_DE_VENTANA_AVISO, motivo: MOTIVO_FUERA_DE_VENTANA };
       } else if ((await this.prisma.whatsappMensaje.count({ where: { telefono_hash: hash, direccion: 'ENTRANTE' } })) === 0) {
         return {
           accion: 'DESCARTAR',

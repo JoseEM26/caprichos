@@ -4,12 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { LocalService } from '../../local/local.service';
 import { armarBienvenida, nombreParaSaludo } from '../conversacion/bienvenida.util';
-import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esSaludo } from '../conversacion/cortesia-entrante.util';
+import { EMOJI_AGRADECIMIENTO, EMOJI_VOUCHER_RECIBIDO, esAgradecimiento, esConformeConResumen, esSaludo } from '../conversacion/cortesia-entrante.util';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
 import { horarioDelLocal } from '../evolution/horario-local';
 import { WHATSAPP_MENSAJERIA_PUERTO, WhatsAppMensajeriaPuerto } from '../puerto/whatsapp-mensajeria.puerto';
 import { urlPublicaCarta } from './carrusel.util';
+import { textoConformeConfirmada } from '../conversacion/textos-reparto';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 
 /** Cada cuánto como máximo se le repite al mismo cliente el aviso de «fuera de horario» o la bienvenida con la carta. */
@@ -83,6 +84,18 @@ export class AutorespuestaWhatsappService {
     const evolution = await this.esEvolution();
     const estadoFlujo = String((e.conversacion.flujo as any)?.estado ?? 'INICIO');
 
+    // «OK» / «CONFORME» al resumen del pedido: agradece una sola vez. Antes de la reacción ❤️ porque es el mismo «ok».
+    if (
+      esConformeConResumen(e.texto) &&
+      ESTADOS_SIN_PREGUNTA.has(estadoFlujo) &&
+      e.conversacion.estado !== 'VALIDAR_PAGO' &&
+      e.conversacion.tomado_por == null &&
+      !(await personaAtiendeDesdeWhatsapp(this.prisma, e.conversacion)) &&
+      (await this.confirmarResumen(e.telefono, e.nombre))
+    ) {
+      return true;
+    }
+
     // «Gracias», «ok», «listo»: ❤️ en vez de texto (solo Evolution), si no estamos en medio de una pregunta del bot y el cliente tiene un pedido de hoy
     if (
       evolution &&
@@ -124,6 +137,38 @@ export class AutorespuestaWhatsappService {
       return this.enviarUnaVez(e.telefono, 'BIENVENIDA', TEXTOS_CORTESIA.bienvenidaConCarta(nombre, link));
     }
     return false;
+  }
+
+  /**
+   * El cliente respondió «ok» al resumen: pedido activo del celular cuyo resumen ya salió y que aún no confirmó.
+   * La marca se toma con un UPDATE condicional (una sola vez por pedido); responde por el outbox (respuesta a su mensaje).
+   */
+  private async confirmarResumen(telefono: string, nombreCompleto: string): Promise<boolean> {
+    const pedido = await this.prisma.pedido.findFirst({
+      where: {
+        cliente_telefono: { contains: telefono.replace(/\D/g, '').slice(-9) },
+        cliente_conforme_en: null,
+        estado: { notIn: ESTADOS_PEDIDO_TERMINADOS },
+        creado_en: { gte: new Date(Date.now() - 2 * 24 * 3_600_000) },
+        salientesWhatsapp: { some: { origen: 'AVISO_PEDIDO', estado: 'ENVIADO', clave_idempotencia: { endsWith: '-RECIBIDO' } } },
+      },
+      orderBy: { id: 'desc' },
+      select: { id: true, codigo: true },
+    });
+    if (!pedido) return false;
+    const marca = await this.prisma.pedido.updateMany({ where: { id: pedido.id, cliente_conforme_en: null }, data: { cliente_conforme_en: new Date() } });
+    if (marca.count === 0) return false;
+    const nombre = nombreParaSaludo(nombreCompleto);
+    const nuevo = await this.outbox.encolar({
+      telefono,
+      tipo: 'TEXTO',
+      clave: `conforme-pedido-${pedido.id}`,
+      origen: 'AUTORESPUESTA',
+      pedidoId: pedido.id,
+      carga: { textoLibre: textoConformeConfirmada(nombre, pedido.codigo), autor: 'BOT', nombre, pedidoCodigo: pedido.codigo, etapa: 'CONFORME_RESUMEN' },
+    });
+    if (nuevo) this.outbox.despertar();
+    return true;
   }
 
   /** El mismo saludo + aviso de cierre que arma el bot (textos de Configuración), con «hoy/mañana a las HH:MM». */

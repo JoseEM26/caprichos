@@ -37,6 +37,7 @@ const LIMITES: Array<{ clave: string; texto: string; ayuda?: string; texto_libre
   { clave: 'evolution_horario_hasta', texto: 'Respaldo: avisos hasta la hora (Lima)' },
   { clave: 'evolution_fallos_seguidos', texto: 'Fallos seguidos que pausan Evolution', ayuda: '0 = no pausar solo' },
   { clave: 'evolution_fallos_ventana_min', texto: 'Ventana de esos fallos (minutos)' },
+  { clave: 'evolution_resumen_contacto_dias', texto: 'Resumen del pedido: sale solo si el cliente escribió en los últimos N días', ayuda: '180 = 6 meses; 0 = solo si escribió en las últimas 24 h. Los demás avisos siempre piden 24 h' },
   { clave: 'evolution_max_enlaces', texto: 'Máx. enlaces por mensaje' },
   { clave: 'evolution_max_texto_identico', texto: 'Mismo texto repetido antes de variar el saludo' },
   { clave: 'evolution_exigir_contacto_previo', texto: 'Solo escribir a quien ya escribió (si / no)', texto_libre: true },
