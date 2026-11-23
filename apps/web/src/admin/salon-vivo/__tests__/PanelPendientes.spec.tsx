@@ -59,10 +59,26 @@ describe('Pedidos pendientes del salón en vivo', () => {
     expect(img.getAttribute('alt')).toBe('');
     expect(img.getAttribute('src')).toBe('/archivos/avatar-1.png');
     expect(container.querySelectorAll('img.sv-pend-retrato')).toHaveLength(1);
-    expect(img.nextElementSibling?.className).toBe('sv-pend-cod');
+    expect(img.nextElementSibling?.classList.contains('sv-pend-cod')).toBe(true);
     fireEvent.error(img);
     expect(container.querySelector('img.sv-pend-retrato')).toBeNull();
     expect(container.querySelector('.sv-pend-retrato.vacio')).toBeTruthy();
+  });
+});
+
+describe('tarjeta: nombre grande y código chico', () => {
+  it('con nombre, el nombre va primero y el código después; sin nombre, el código queda grande', () => {
+    const d = salonEjemplo();
+    d.caja = []; d.despacho = [];
+    d.cocina = [pedido('CP-W902', { cliente: 'Lucía Fernández' }), pedido('CP-W901', { cliente: null })];
+    const { container } = render(<PanelPendientes datos={d} reloj="19:05" />);
+    const cods = container.querySelectorAll('.sv-pend-cod');
+    const conNombre = Array.from(cods).find((c) => c.classList.contains('con-nombre'))!;
+    expect(conNombre.children[0].textContent).toBe('Lucía Fernández');
+    expect(conNombre.children[1].textContent).toBe('CP-W902');
+    const sin = Array.from(cods).find((c) => !c.classList.contains('con-nombre'))!;
+    expect(sin.textContent).toBe('CP-W901');
+    expect(container.querySelectorAll('.con-nombre')).toHaveLength(1);
   });
 });
 

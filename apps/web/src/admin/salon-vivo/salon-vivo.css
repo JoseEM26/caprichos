@@ -197,6 +197,9 @@
 .sv-pend-retrato { flex: none; width: clamp(34px, 3vw, 46px); aspect-ratio: 1; border-radius: 50%; object-fit: cover; background: rgba(11, 44, 62, .08); border: 2px solid rgba(11, 44, 62, .15); }
 .sv-pend-cod { font: 900 clamp(20px, 1.8vw, 28px) var(--sv-f-disp); font-variant-numeric: tabular-nums; }
 .sv-pend-cod small { font-size: .45em; opacity: .55; }
+.sv-pend-cod.con-nombre { flex: 1 1 0; min-width: 0; display: grid; }
+.sv-pend-nom { font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.15; }
+.sv-pend-cod.con-nombre .sv-pend-cp { font: 700 clamp(12px, .9vw, 15px) var(--sv-f-txt); opacity: .6; letter-spacing: .02em; }
 .sv-pend-donde { font: 700 clamp(13px, 1vw, 16px) var(--sv-f-txt); color: var(--sv-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-pend-etapa { font: 800 clamp(12px, .95vw, 15px) var(--sv-f-txt); padding: 4px 12px; border-radius: 99px; color: #fff; background: var(--sv-naranja); white-space: nowrap; }
 .sv-pend-item.caja .sv-pend-etapa { background: var(--sv-oro); color: var(--sv-navy); }

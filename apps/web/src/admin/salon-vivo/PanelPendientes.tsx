@@ -94,8 +94,10 @@ function Tarjeta({ p }: { p: Pendiente }) {
     <li className={`sv-pend-item ${p.etapa.toLowerCase()} ${p.minutos >= 15 && p.etapa !== 'LISTO' ? 'tarde' : ''}`}>
       <div className="sv-pend-fila">
         {p.avatarUrl && <Retrato url={p.avatarUrl} />}
-        <span className="sv-pend-cod"><small>{p.codigo.slice(0, 3)}</small>{p.codigo.slice(3)}</span>
-        <span className="sv-pend-donde">{p.donde}{p.cliente ? ` · ${p.cliente}` : ''}</span>
+        {p.cliente
+          ? <span className="sv-pend-cod con-nombre"><b className="sv-pend-nom" title={p.cliente}>{p.cliente}</b><small className="sv-pend-cp">{p.codigo}</small></span>
+          : <span className="sv-pend-cod"><small>{p.codigo.slice(0, 3)}</small>{p.codigo.slice(3)}</span>}
+        <span className="sv-pend-donde">{p.donde}</span>
         <span className="sv-pend-etapa">{ETIQUETA[p.etapa]}</span>
       </div>
       <div className="sv-pend-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.porcentaje} aria-label={`${p.codigo}: ${ETIQUETA[p.etapa]}, ${p.porcentaje}%`}>
