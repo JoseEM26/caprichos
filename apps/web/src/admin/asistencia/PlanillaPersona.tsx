@@ -10,6 +10,7 @@ import { ETIQUETAS_ROLES } from '../usuarios/roles';
 import { FilaCal, calendarioFilas } from './calendarioApi';
 import { ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
 import { DatosPago } from './DatosPago';
+import { DetalleNeto } from './DetalleNeto';
 import { useUltimaPeticion } from './jornada';
 import { ModoPeriodo, etiquetaPeriodo, moverPeriodo } from './periodoVista';
 import { Plegable } from './Plegable';
@@ -82,6 +83,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
   const [guardando, setGuardando] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [confirmaPago, setConfirmaPago] = useState(false);
+  const [verDetalle, setVerDetalle] = useState(false);
   const [reabrir, setReabrir] = useState<string | null>(null);
   // el admin confirma pagar sin descontar los créditos de días anteriores sin cerrar
   const [sinDescontarAnt, setSinDescontarAnt] = useState(false);
@@ -371,7 +373,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
           <div><dt>Horas trabajadas / programadas</dt><dd>{horas(r.trabajadaMin)} h de {horas(r.programadaMin)} h</dd></div>
           <div><dt>Bruto (ganado)</dt><dd>{soles(r.ganado)}</dd></div>
           <div><dt>Descuentos</dt><dd>− {soles(res.totalRestas)}{lineasFranja.length > 0 && <small className="pp-desglose" data-testid="desglose-descuentos">{lineasFranja.map((x) => `${x.concepto}: ${soles(x.monto)}`).join(' · ')}</small>}</dd></div>
-          <div className="pp-cifra-neto"><dt>Neto a pagar</dt><dd>{soles(r.neto)}</dd></div>
+          <div className="pp-cifra-neto"><dt>Neto a pagar</dt><dd>{soles(r.neto)}<button type="button" className="dn-abrir" onClick={() => setVerDetalle(true)}>Ver detalle</button></dd></div>
         </dl>
         {pagado && d.pagadoEn && (
           <div role="status" className="as-aviso as-aviso--ok pp-sello">
@@ -390,6 +392,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         <BarraPestanas pestanas={pestanas} activa={seccionActiva} alCambiar={(id) => onSeccion(id as SeccionPlanilla)} base={base} etiqueta="Secciones de la planilla" />
       </header>
       <PanelesPestanas pestanas={pestanas} activa={seccionActiva} base={base} />
+      {verDetalle && <DetalleNeto d={d} alCerrar={() => setVerDetalle(false)} />}
       <Confirmar
         abierto={pendienteIr !== null}
         titulo="¿Cambiar de persona sin guardar?"

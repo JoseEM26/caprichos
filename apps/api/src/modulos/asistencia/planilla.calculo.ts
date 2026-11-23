@@ -369,3 +369,75 @@ export function calcularPlanilla(e: EntradaPlanilla): ResultadoPlanilla {
     neto: redondear2(netoAPagar - adelantos),
   };
 }
+
+export interface MovimientoPlanilla {
+  /** Día (ISO) en que ocurrió; null = «Del período» (cuotas, recurrentes, consumos de períodos anteriores, redondeo). */
+  fecha: string | null;
+  concepto: string;
+  /** Con signo: + suma al neto, − resta. INFO = 0. */
+  monto: number;
+  detalle?: string;
+  tipo: 'INGRESO' | 'RESTA' | 'INFO';
+}
+
+export interface DatosMovimientos {
+  consumos: Array<{ fecha: string; monto: number; cobrar: boolean; anterior?: boolean; pedido?: string }>;
+  ajustes: Array<{ tipo: string; fecha: string; monto: number; motivo?: string | null; etiqueta?: string }>;
+  cuotas: Array<{ numero: number; numCuotas: number; monto: number }>;
+  recurrentes: Array<{ nombre: string; signo: 'BONO' | 'DESCUENTO'; monto: number; detalle?: string }>;
+  vacacionesPagadas: Array<{ fecha: string; monto: number; dias?: number }>;
+}
+
+const hm = (min: number): string => [min >= 60 ? `${Math.floor(min / 60)} h` : '', min % 60 ? `${min % 60} min` : ''].filter(Boolean).join(' ');
+
+/**
+ * Cada movimiento del neto en el día en que ocurrió. Reutiliza las funciones por día (misma fórmula que calcularPlanilla)
+ * y cierra con una línea «Ajuste por redondeo» para que la suma sea exactamente `neto`. Los datos de `x` son los mismos
+ * que alimentan `e` (consumos cobrados, descuentos, bonos, adelantos, cuotas y recurrentes activos).
+ */
+export function movimientosPlanilla(e: EntradaPlanilla, x: DatosMovimientos, neto: number, vhExacto: number): MovimientoPlanilla[] {
+  const mult = e.multiplicadorExtra ?? 1;
+  const out: MovimientoPlanilla[] = [];
+  const ing = (fecha: string | null, concepto: string, monto: number, detalle?: string) => out.push({ fecha, concepto, monto: redondear2(monto), detalle, tipo: 'INGRESO' });
+  const res = (fecha: string | null, concepto: string, monto: number, detalle?: string) => out.push({ fecha, concepto, monto: -redondear2(monto), detalle, tipo: 'RESTA' });
+  const info = (fecha: string | null, concepto: string, detalle?: string) => out.push({ fecha, concepto, monto: 0, detalle, tipo: 'INFO' });
+
+  for (const d of [...e.dias].sort((a, b) => a.jornada.localeCompare(b.jornada))) {
+    const f = d.jornada;
+    if (d.estado === 'VACACIONES') { info(f, 'Vacaciones tomadas', 'Día de descanso pagado'); continue; }
+    if (d.trabajadaMin > 0) {
+      const notas = [d.tarifaEspecial ? `tarifa especial desde las ${aHoraTexto(d.tarifaEspecial.desdeMin)}` : d.recargo && d.recargo !== 1 ? `feriado ×${d.recargo}` : ''].filter(Boolean);
+      ing(f, `${hm(d.trabajadaMin)} trabajadas`, pagoTrabajadoDia(d, vhExacto), notas.join(', ') || undefined);
+    }
+    if (d.extraMin > 0) {
+      const t = d.descansoTrabajado ? `Descanso trabajado (${hm(d.extraMin)})` : `Horas extra (${hm(d.extraMin)})`;
+      if (e.extrasAprobadas.has(f)) ing(f, t, pagoExtraDia(d, vhExacto, mult), 'Aprobadas');
+      else info(f, t, 'Sin aprobar, no se paga');
+    }
+    if (d.tardanzaMin > 0) {
+      info(f, `Tardanza de ${d.tardanzaMin} min`, 'Esos minutos no se pagan');
+      const p = penalidadTardanzaDia(d, vhExacto, e.penalidadTardanzaPct);
+      if (p > 0) res(f, 'Penalidad por tardanza', p);
+    }
+    if (d.salidaAnticipadaMin > 0) info(f, `Salida ${d.salidaAnticipadaMin} min antes`, 'Ese tiempo no se paga');
+  }
+  for (const v of x.vacacionesPagadas) ing(v.fecha, 'Vacaciones pagadas', v.monto, v.dias ? `${v.dias} días` : undefined);
+  for (const c of x.consumos) {
+    const fecha = c.anterior ? null : c.fecha;
+    const det = [c.pedido, c.anterior ? `consumo del ${c.fecha}` : ''].filter(Boolean).join(' · ') || undefined;
+    if (c.cobrar) res(fecha, 'Consumo del personal', c.monto, det);
+    else info(fecha, 'Consumo del personal', `${det ? det + ' · ' : ''}S/ ${c.monto.toFixed(2)}, no se cobra en este pago`);
+  }
+  for (const a of x.ajustes) {
+    const det = a.motivo || undefined;
+    if (a.tipo === 'BONO') ing(a.fecha, 'Bono', a.monto, det);
+    else if (a.tipo === 'ADELANTO') res(a.fecha, 'Adelanto', a.monto, det);
+    else res(a.fecha, a.etiqueta ? `Descuento: ${a.etiqueta}` : 'Descuento', a.monto, det);
+  }
+  for (const c of x.cuotas) res(null, `Cuota ${c.numero} de ${c.numCuotas} del préstamo`, c.monto);
+  for (const r of x.recurrentes) (r.signo === 'BONO' ? ing : res)(null, r.nombre, r.monto, r.detalle);
+
+  const dif = redondear2(neto - out.reduce((a, m) => a + m.monto, 0));
+  if (dif !== 0) out.push({ fecha: null, concepto: 'Ajuste por redondeo', monto: dif, tipo: dif > 0 ? 'INGRESO' : 'RESTA' });
+  return out;
+}

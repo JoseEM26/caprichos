@@ -199,10 +199,13 @@ export interface DetallePlanilla {
   ajustes: AjustePlanillaApi[];
   /** Cada parte del neto con su razón (lo manda el servidor desde la versión con desglose; en períodos pagados antes puede faltar). */
   desglose?: LineaDesglose[];
+  /** Detalle día por día del neto (suma = resultado.neto). Falta en períodos pagados antes de esta versión. */
+  movimientos?: MovimientoPlanilla[];
   /** Descuentos y bonos personalizados que no caen en este período: empiezan después o ya terminaron. */
   recurrentesFueraDePeriodo?: RecurrenteFueraApi[];
 }
 
+export interface MovimientoPlanilla { fecha: string | null; concepto: string; monto: number; detalle?: string; tipo: 'INGRESO' | 'RESTA' | 'INFO' }
 export type GrupoDesglose = 'TARDANZA' | 'CONSUMO' | 'ADELANTO' | 'DESCUENTO' | 'PRESTAMO' | 'RECURRENTE' | 'BONO';
 export interface LineaDesglose { grupo: GrupoDesglose; concepto: string; monto: number; detalle?: string }
 export interface RecurrenteFueraApi {

@@ -2,6 +2,7 @@ import { turnoDe } from './asistencia.calculo';
 import {
   calcularDiaPlanilla,
   calcularPlanilla,
+  movimientosPlanilla,
   periodoDe,
   sueldoEquivalente,
   DiaPlanilla,
@@ -310,5 +311,53 @@ describe('Extra por día (22/11): la falta no se compensa con la extra', () => {
   });
   it('sin aprobar, la extra no suma', () => {
     expect(calcularPlanilla(e).ganado).toBe(90);
+  });
+});
+
+describe('movimientosPlanilla', () => {
+  it('suma exactamente el neto y cada línea cae en su día', () => {
+    const entrada = {
+      ...base,
+      modalidad: 'SEMANAL' as const,
+      sueldoPeriodo: 0,
+      valorHora: 20.333,
+      penalidadTardanzaPct: 100,
+      multiplicadorExtra: 1.25,
+      dias: [
+        dia({ jornada: '2026-11-16', trabajadaMin: 480, extraMin: 60 }),
+        dia({ jornada: '2026-11-17', trabajadaMin: 460, tardanzaMin: 20, extraMin: 30 }),
+        dia({ jornada: '2026-11-18', trabajadaMin: 480, recargo: 2 }),
+      ],
+      extrasAprobadas: new Set(['2026-11-16']),
+      consumos: [{ id: '1', monto: 7.5, cobrar: true }],
+      lineasDescuento: [{ categoria: 'DANO', monto: 10 }, { categoria: 'PRESTAMO', monto: 33.33 }],
+      bonos: [15],
+      adelantos: [40],
+    };
+    const r = calcularPlanilla(entrada);
+    const mov = movimientosPlanilla(
+      entrada,
+      {
+        consumos: [{ fecha: '2026-11-17', monto: 7.5, cobrar: true }, { fecha: '2026-11-18', monto: 4, cobrar: false }],
+        ajustes: [
+          { tipo: 'DESCUENTO', fecha: '2026-11-17', monto: 10, motivo: 'Vaso roto', etiqueta: 'Daño' },
+          { tipo: 'BONO', fecha: '2026-11-18', monto: 15, motivo: 'Buen trato' },
+          { tipo: 'ADELANTO', fecha: '2026-11-18', monto: 40 },
+        ],
+        cuotas: [{ numero: 1, numCuotas: 3, monto: 33.33 }],
+        recurrentes: [],
+        vacacionesPagadas: [],
+      },
+      r.neto,
+      r.valorHoraExacto,
+    );
+    expect(Math.round(mov.reduce((a, m) => a + m.monto, 0) * 100) / 100).toBe(r.neto);
+    const en = (f: string | null) => mov.filter((m) => m.fecha === f).map((m) => m.concepto);
+    expect(en('2026-11-16')).toEqual(['8 h trabajadas', 'Horas extra (1 h)']);
+    expect(mov.find((m) => m.concepto.startsWith('Horas extra (30'))).toMatchObject({ tipo: 'INFO', monto: 0, detalle: 'Sin aprobar, no se paga' });
+    expect(en('2026-11-17')).toEqual(expect.arrayContaining(['Tardanza de 20 min', 'Penalidad por tardanza', 'Consumo del personal', 'Descuento: Daño']));
+    expect(mov.find((m) => m.fecha === '2026-11-18' && m.concepto.includes('trabajadas'))!.detalle).toBe('feriado ×2');
+    expect(en('2026-11-18')).toEqual(expect.arrayContaining(['Bono', 'Adelanto']));
+    expect(en(null)).toContain('Cuota 1 de 3 del préstamo');
   });
 });

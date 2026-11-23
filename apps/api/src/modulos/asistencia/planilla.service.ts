@@ -20,6 +20,7 @@ import {
   calcularDiaPlanilla,
   calcularPlanilla,
   horasYMinutos,
+  movimientosPlanilla,
   pagoDia,
   pagoPorDiaPersona,
   periodoDe,
@@ -723,6 +724,19 @@ export class PlanillaService {
       ...vigentes.filter((a) => a.tipo === 'BONO').map((a) => ({ grupo: 'BONO' as const, concepto: 'Bono', monto: Number(a.monto), detalle: a.motivo as string })),
       ...recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => ({ grupo: 'BONO' as const, concepto: r.nombre, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
     ];
+    // Detalle día por día (misma fórmula por día que calcularPlanilla; la suma cierra exacto con el neto)
+    const movimientos = movimientosPlanilla(
+      { modalidad: sueldo.modalidad, sueldoPeriodo, dias: diasCalc, penalidadTardanzaPct, extrasAprobadas: extrasSet, consumos, descuentos: [], adelantos: [], multiplicadorExtra: multExtra },
+      {
+        consumos: consumos.map((c) => ({ fecha: c.fecha, monto: c.monto, cobrar: c.cobrar, anterior: c.anterior, pedido: c.pedido })),
+        ajustes: vigentes.map((a) => ({ tipo: a.tipo, fecha: isoDe(a.fecha), monto: Number(a.monto), motivo: a.motivo, etiqueta: a.tipo === 'DESCUENTO' ? ETIQUETA_DESCUENTO[(CATEGORIAS_DESCUENTO as readonly string[]).includes(a.categoria) ? a.categoria : 'OTRO'] : undefined })),
+        cuotas: cuotas.filter((c) => c.cobrar),
+        recurrentes: recurrentes.filter((r) => r.cobrar).map((r) => ({ nombre: r.nombre, signo: r.signo, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
+        vacacionesPagadas: vacPagadas.map((v) => ({ fecha: isoDe(v.fecha_desde), monto: Number(v.monto ?? 0), dias: Number(v.dias) })),
+      },
+      resultado.neto,
+      resultado.valorHoraExacto,
+    );
     const porDia = new Map(extras.map((e) => [isoDe(e.jornada), e]));
     // Pendiente = jornada que bloquea el pago. Un descanso trabajado que el admin ya aprobó deja de bloquear.
     const diasPendientes = diasCalc.filter((d) => (ESTADOS_PENDIENTES as readonly string[]).includes(d.estado) && !(d.descansoTrabajado && porDia.has(d.jornada)));
@@ -758,6 +772,7 @@ export class PlanillaService {
       recurrentes,
       recurrentesFueraDePeriodo,
       desglose,
+      movimientos,
       pendientes: diasPendientes.length,
       /** Jornadas que bloquean «Marcar pagado» (para el banner y su enlace al día). */
       jornadasPorRevisar: diasPendientes.map((d) => d.jornada),
