@@ -1309,3 +1309,30 @@
   .msg-lista .msg-cab .msg-buscar input { min-height: 40px; }
   .msg-rapido { min-height: 36px; }
 }
+/* Ficha del cliente, acciones rápidas, menu «/» y ayuda de atajos */
+.msg-ficha-pedidos { margin: 0; padding-left: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.msg-acciones-rapidas { display: flex; gap: 4px; padding: 4px 10px 0; flex-wrap: wrap; }
+.msg-ar { height: 28px; min-width: 32px; border: 1px solid #C9D2D8; border-radius: 8px; background: #FFFFFF; color: #34495A; }
+.msg-ar .msg-icono-txt { font-size: 12px; }
+.msg-pl-sug { display: flex; flex-direction: column; align-items: flex-start; max-width: 260px; min-height: 36px; padding: 2px 10px; text-align: left; }
+.msg-pl-sug-texto { font-size: 12px; color: #54656F; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-pl-sug-gestionar { align-self: center; min-height: 30px; justify-content: center; font-size: 12px; font-weight: 700; color: #00594A; border-style: dashed; }
+.msg-ayuda { position: fixed; right: 16px; bottom: 16px; z-index: 60; width: min(340px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 12px; background: #FFFFFF; border: 1px solid #C9D2D8; box-shadow: 0 8px 28px rgba(0,0,0,.2); }
+.msg-ayuda-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.msg-ayuda-lista { margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.msg-ayuda-lista > div { display: flex; gap: 10px; align-items: baseline; }
+.msg-ayuda-lista dt { flex: none; min-width: 120px; }
+.msg-ayuda-lista dd { margin: 0; }
+.msg-ayuda kbd { font-family: inherit; font-weight: 700; padding: 1px 6px; border: 1px solid #C9D2D8; border-radius: 6px; background: #F4F6F7; }
+
+/* Botones compactos dentro del chat abierto y del panel (en PC; en celular se conserva el tamaño tactil) */
+@media (min-width: 701px) {
+  .msg-chat .msg-btn, .msg-panel .msg-btn { min-height: 30px; padding: 0 10px; font-size: 12px; }
+  .msg-chat .msg-btn-no-visto { min-height: 28px; margin: 2px 10px 0; }
+  .msg-chat .msg-ok, .msg-chat .msg-no, .msg-panel .msg-ok, .msg-panel .msg-no { min-height: 30px; padding: 0 12px; font-size: 13px; }
+  .msg-chat .msg-pulir-btn { min-height: 32px; padding: 0 12px; font-size: 13px; }
+  .msg-chat .msg-icono-btn { height: 32px; width: 34px; font-size: 18px; }
+  .msg-chat .msg-icono-btn:has(.msg-icono-txt) { width: auto; min-width: 34px; }
+  .msg-chat .msg-enviar { width: 36px; height: 36px; }
+  .msg-chat .msg-pl-sug { min-height: 34px; }
+}

@@ -128,6 +128,13 @@ export class MensajesController {
     return this.plantillas.borrar(id, req.usuario, ipDe(req));
   }
 
+  /** Últimos pedidos, puntos y lo que más pide el cliente de este chat (solo lectura). */
+  @Get('conversaciones/:id/cliente')
+  @Permiso('mensajes', 'ver')
+  datosCliente(@Param('id') id: string) {
+    return this.mensajes.datosCliente(id);
+  }
+
   @Get('conversaciones/:id')
   @Permiso('mensajes', 'ver')
   detalle(@Param('id') id: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {

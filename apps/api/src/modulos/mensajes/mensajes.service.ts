@@ -902,6 +902,38 @@ export class MensajesService {
     };
   }
 
+  /**
+   * Ficha de solo lectura del cliente de ESTE chat: últimos pedidos, puntos y lo que más pide.
+   * Solo busca por el celular o la persona vinculados a la conversación: nunca expone a otros clientes.
+   */
+  async datosCliente(id: string) {
+    const c = await this.cargar(id);
+    const condicion: any[] = [];
+    const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
+    if (ultimos9.length === 9 && !esRemitenteSinTelefono(c)) condicion.push({ cliente_telefono: { endsWith: ultimos9 } });
+    if (c.celular_vinculado) condicion.push({ cliente_telefono: { endsWith: c.celular_vinculado } });
+    if (c.party_id) condicion.push({ party_id: c.party_id });
+    if (condicion.length === 0) return { pedidos: [], puntos: null, frecuentes: [] };
+    const pedidos = await this.prisma.pedido.findMany({
+      where: { OR: condicion, es_personal: false },
+      orderBy: { creado_en: 'desc' },
+      take: 20,
+      select: { codigo: true, total: true, estado: true, creado_en: true, lineas: { select: { nombre: true, cantidad: true, es_cortesia: true } } },
+    });
+    const conteo = new Map<string, number>();
+    for (const p of pedidos) {
+      if (p.estado === 'ANULADO') continue;
+      for (const l of p.lineas) if (!l.es_cortesia) conteo.set(l.nombre, (conteo.get(l.nombre) ?? 0) + l.cantidad);
+    }
+    const frecuentes = [...conteo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([nombre, cantidad]) => ({ nombre, cantidad }));
+    const puntos = c.party_id && this.puntosService ? await this.puntosService.obtenerSaldo(c.party_id) : null;
+    return {
+      pedidos: pedidos.slice(0, 5).map((p) => ({ codigo: p.codigo, total: Number(p.total), estado: p.estado, fecha: p.creado_en.toISOString() })),
+      puntos,
+      frecuentes,
+    };
+  }
+
   async respuestasRapidas() {
     const filas = await this.prisma.respuestaRapida.findMany({ where: { activo: true }, orderBy: [{ orden: 'asc' }, { id: 'asc' }] });
     return filas.map((r) => ({ id: r.id.toString(), titulo: r.titulo, texto: r.texto, categoria: r.categoria ?? 'OTROS' }));

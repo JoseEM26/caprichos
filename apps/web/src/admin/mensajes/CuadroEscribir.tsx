@@ -5,6 +5,7 @@ import { ContextoPlantillas, DetalleConversacion, RespuestaRapida } from './mens
 import { filtrarPlantillas, PanelPlantillas, valoresPlantilla } from './PanelPlantillas';
 import { ModalPlantillas } from './ModalPlantillas';
 import { SelectorEmojis } from './SelectorEmojis';
+import { AccionesRapidasChat } from './AccionesRapidasChat';
 import { formatearTamano } from './TarjetaDocumento';
 
 /** El servidor comprime a ≤5 MB (límite de WhatsApp); aquí solo se corta lo absurdo. */
@@ -80,6 +81,8 @@ export function CuadroEscribir({
   const [faltan, setFaltan] = useState<string[]>([]);
   const [errorMarcador, setErrorMarcador] = useState<string | null>(null);
   const [sugerida, setSugerida] = useState(0);
+  // Esc cierra el menú «/» hasta que el texto cambie
+  const [menuCerradoPara, setMenuCerradoPara] = useState<string | null>(null);
   const [foto, setFoto] = useState<{ archivo: File; url: string } | null>(null);
   const [subtitulo, setSubtitulo] = useState('');
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
@@ -109,11 +112,11 @@ export function CuadroEscribir({
     if (textoMensaje) c.style.height = `${Math.min(c.scrollHeight, 150)}px`;
   }, [textoMensaje]);
 
-  const valores = valoresPlantilla(contextoPlantillas ?? {}, detalle.nombre);
+  const valores = valoresPlantilla(contextoPlantillas ?? {}, detalle.nombre, detalle.pedido);
   const puedePlantillas = respuestasRapidas.length > 0 || puedeAdministrarPlantillas;
   // atajo: escribir «/» al inicio sugiere plantillas por título
-  const sugerencias = puedePlantillas && /^\/\S*$/.test(textoMensaje)
-    ? filtrarPlantillas(respuestasRapidas.filter((p) => p.activo !== false), textoMensaje.slice(1), null).slice(0, 6)
+  const sugerencias = puedePlantillas && /^\/\S*$/.test(textoMensaje) && menuCerradoPara !== textoMensaje
+    ? filtrarPlantillas(respuestasRapidas.filter((p) => p.activo !== false), textoMensaje.slice(1), null).slice(0, 8)
     : [];
 
   /** Pone el texto en el cuadro (nunca envía): al inicio si estaba vacío o escribiendo «/…», si no donde está el cursor. */
@@ -132,6 +135,13 @@ export function CuadroEscribir({
       caja?.focus();
       caja?.setSelectionRange(r.cursor, r.cursor);
     }, 0);
+  };
+
+  /** Botones de acción: pegan el texto (con {{variables}} resueltas si hace falta) y nunca envían. */
+  const pegarAccion = (texto: string, resolver: boolean) => {
+    if (!resolver) return insertarPlantilla(texto, []);
+    const r = resolverPlantillaTexto(texto, valores);
+    insertarPlantilla(r.texto, r.faltantes);
   };
 
   const elegirSugerida = (i: number) => {
@@ -257,11 +267,26 @@ export function CuadroEscribir({
         <ul className="msg-pl-sugerencias" role="listbox" aria-label="Plantillas sugeridas">
           {sugerencias.map((p, i) => (
             <li key={p.id} role="option" aria-selected={i === sugerida}>
-              <button type="button" className={i === sugerida ? 'msg-pl-sug msg-pl-sug-activa' : 'msg-pl-sug'} onClick={() => elegirSugerida(i)}>
+              <button type="button" className={i === sugerida ? 'msg-pl-sug msg-pl-sug-activa' : 'msg-pl-sug'} title={p.texto} onClick={() => elegirSugerida(i)}>
                 <b>{p.titulo}</b>
+                <span className="msg-pl-sug-texto">{p.texto}</span>
               </button>
             </li>
           ))}
+          {puedeAdministrarPlantillas && (
+            <li>
+              <button
+                type="button"
+                className="msg-pl-sug msg-pl-sug-gestionar"
+                onClick={() => {
+                  onCambiarTexto('');
+                  setAdminAbierto(true);
+                }}
+              >
+                Gestionar
+              </button>
+            </li>
+          )}
         </ul>
       )}
 
@@ -366,6 +391,13 @@ export function CuadroEscribir({
           Este contacto no tiene ningun identificador: no se puede responder
         </div>
       ) : (
+        <>
+        <AccionesRapidasChat
+          pedido={detalle.pedido}
+          hayLinkCarta={Boolean(contextoPlantillas?.link_carta)}
+          deshabilitado={detalle.ocupado}
+          onPegar={pegarAccion}
+        />
         <div className="msg-escribir">
           {onEnviarImagen && (
             <>
@@ -444,9 +476,11 @@ export function CuadroEscribir({
             placeholder="Escribe un mensaje"
             title="Enter envía · Shift+Enter baja a otra línea"
             aria-label="Escribe un mensaje"
+            data-cuadro-chat=""
             value={textoMensaje}
             disabled={detalle.ocupado}
             onChange={(e) => {
+              setMenuCerradoPara(null);
               onCambiarTexto(e.target.value);
               // crece con las líneas (hasta 6) y vuelve a una sola al vaciarse
               e.target.style.height = 'auto';
@@ -457,6 +491,11 @@ export function CuadroEscribir({
                 if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                   e.preventDefault();
                   setSugerida((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + sugerencias.length) % sugerencias.length);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setMenuCerradoPara(textoMensaje);
                   return;
                 }
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -493,6 +532,7 @@ export function CuadroEscribir({
             </svg>
           </button>
         </div>
+        </>
       )}
       {plantillasAbierto && (
         <PanelPlantillas

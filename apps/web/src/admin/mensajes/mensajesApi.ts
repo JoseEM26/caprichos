@@ -247,3 +247,14 @@ export async function listarPedidosParaVoucher(mensajeId: string): Promise<Pedid
 export async function asignarFotoComoVoucher(mensajeId: string, pedidoId: string): Promise<{ ok: boolean; codigo: string }> {
   return api.post<{ ok: boolean; codigo: string }>(`/admin/mensajes/mensajes/${mensajeId}/asignar-voucher`, { pedidoId });
 }
+
+export interface FichaClienteChat {
+  pedidos: Array<{ codigo: string; total: number; estado: string; fecha: string }>;
+  puntos: number | null;
+  frecuentes: Array<{ nombre: string; cantidad: number }>;
+}
+
+/** Últimos pedidos, puntos y lo que más pide el cliente de este chat (solo lectura). */
+export async function obtenerFichaCliente(id: string): Promise<FichaClienteChat> {
+  return api.get<FichaClienteChat>(`/admin/mensajes/conversaciones/${id}/cliente`);
+}

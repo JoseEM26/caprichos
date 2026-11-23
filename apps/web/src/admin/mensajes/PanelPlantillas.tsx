@@ -5,10 +5,15 @@ import { normalizarBusqueda } from '../../comun/normalizarBusqueda';
 import { ContextoPlantillas, RespuestaRapida } from './mensajesTipos';
 
 /** Valores de las variables: datos del local + nombre de pila del cliente del chat (si es un nombre y no un número). */
-export function valoresPlantilla(contexto: ContextoPlantillas, nombreCliente?: string | null): Record<string, string> {
+export function valoresPlantilla(
+  contexto: ContextoPlantillas,
+  nombreCliente?: string | null,
+  pedido?: { codigo: string; total: string } | null,
+): Record<string, string> {
   const n = String(nombreCliente ?? '').trim();
   const pila = /\p{L}/u.test(n) && !/^\+?\d[\d\s-]*$/.test(n) ? n.split(/\s+/)[0] : '';
-  return { ...contexto, nombre: pila };
+  // {{codigo}} y {{total}} salen del pedido del chat; sin pedido quedan como marcador por completar
+  return { ...contexto, nombre: pila, codigo: pedido?.codigo ?? '', total: pedido ? `S/ ${pedido.total}` : '' };
 }
 
 export const categoriaDe = (p: RespuestaRapida) => (CATEGORIAS_PLANTILLA as readonly string[]).includes(p.categoria ?? '') ? p.categoria! : 'OTROS';

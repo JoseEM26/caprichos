@@ -114,6 +114,7 @@ describe('PlantillasRespuestaService', () => {
     expect(c.mi_nombre).toBe('Lucía');
     expect(c.yape).toBe('• Número: 900000001\n• Titular: Titular Prueba');
     expect(c.plin).toBe('');
+    expect(typeof c.link_carta).toBe('string');
     expect(c.medios_pago).toContain('Yape');
     expect(c.medios_pago).toContain('Efectivo');
     expect(c.medios_pago).not.toContain('Plin');

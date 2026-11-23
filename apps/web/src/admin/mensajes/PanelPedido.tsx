@@ -3,6 +3,7 @@ import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
 import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { SemaforoVoucher, VoucherResumenChat } from '../vouchers/tipos';
 import { DetalleConversacion } from './mensajesTipos';
+import { FichaCliente } from './FichaClienteChat';
 import { ESTADOS_LABEL, esUsuarioWhatsApp } from './utilidadesChat';
 
 export interface PanelPedidoProps {
@@ -150,6 +151,8 @@ export function PanelPedido({
             </button>
           </section>
 
+          <FichaCliente conversacionId={detalle.id} />
+
           {/* Pedido */}
           <section className="msg-seccion" aria-label="Pedido">
             <span className="msg-seccion-titulo">Pedido</span>
@@ -260,23 +263,24 @@ export function PanelPedido({
                   Aún no envió el voucher de {detalle.pedido?.codigo}.
                 </span>
               )}
-            </section>
-          )}
-
-          {/* Decisiones: lo mismo que la barra de acción pendiente */}
-          {(porRevisar || solicitudPendiente) && (
-            <section className="msg-seccion" aria-label="Decisiones">
-              <span className="msg-seccion-titulo">Decisiones</span>
+              {/* La decisión va junto a la miniatura del comprobante */}
               {porRevisar && (
                 <div className="msg-decisiones">
                   <button type="button" className="msg-ok" onClick={onAprobarPago}>
                     Aprobar pago
                   </button>
-                  <button type="button" className="msg-no" onClick={onRechazarPago}>
-                    Rechazar pedido
+                  <button type="button" className="msg-no" onClick={onRechazarPago} title="Rechazar el pedido por este pago">
+                    Rechazar
                   </button>
                 </div>
               )}
+            </section>
+          )}
+
+          {/* Decisiones: lo mismo que la barra de acción pendiente */}
+          {solicitudPendiente && (
+            <section className="msg-seccion" aria-label="Decisiones">
+              <span className="msg-seccion-titulo">Decisiones</span>
               {solicitudPendiente && (
                 <div className="msg-decisiones">
                   <button type="button" className="msg-ok" onClick={onAplicarCambio}>

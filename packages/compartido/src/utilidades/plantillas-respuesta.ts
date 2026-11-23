@@ -25,6 +25,9 @@ export const VARIABLES_PLANTILLA = [
   { clave: 'yape', ayuda: 'Número y titular de Yape' },
   { clave: 'plin', ayuda: 'Número y titular de Plin' },
   { clave: 'transferencia', ayuda: 'Cuenta de transferencia' },
+  { clave: 'link_carta', ayuda: 'Enlace de la carta virtual' },
+  { clave: 'codigo', ayuda: 'Código del pedido del chat (si tiene uno)' },
+  { clave: 'total', ayuda: 'Total del pedido del chat, en soles' },
 ] as const;
 
 /** Marcadores pendientes: {{algo}} (letras, números y guion bajo). */

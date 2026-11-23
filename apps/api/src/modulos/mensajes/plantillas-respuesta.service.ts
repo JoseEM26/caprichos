@@ -1,3 +1,4 @@
+import { urlPublicaCarta } from '../chatbot/servicios/carrusel.util';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { CATEGORIAS_PLANTILLA } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -105,6 +106,8 @@ export class PlantillasRespuestaService {
       plin,
       transferencia,
       mi_nombre: nombres,
+      // Mismo enlace público que usa el bot (CARTA_URL_PUBLICA o el dominio base); vacío si no está configurado
+      link_carta: urlPublicaCarta((k) => process.env[k]),
     };
   }
 

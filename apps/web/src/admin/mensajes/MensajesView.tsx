@@ -47,6 +47,9 @@ import { CabeceraChat } from './CabeceraChat';
 import { FlujoMensajes } from './FlujoMensajes';
 import { BarraAccionPendiente } from './BarraAccionPendiente';
 import { PanelPedido } from './PanelPedido';
+import { useAvisoMensajeNuevo, useSonidoAviso } from './avisoMensajes';
+import { useAtajosChat } from './atajosChat';
+import { AyudaAtajos } from './AyudaAtajos';
 import { CuadroEscribir } from './CuadroEscribir';
 import { ModalRechazoCambio } from './ModalRechazoCambio';
 import { eventosDelChat } from './EventoSistema';
@@ -518,16 +521,9 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     if (recargaPendiente.current.timer) clearTimeout(recargaPendiente.current.timer);
   }, []);
 
-  // Título de la pestaña del navegador con lo que falta responder: «(3) Mensajes»
-  useEffect(() => {
-    const n = conteos.porResponder ?? 0;
-    const antes = document.title;
-    const base = antes.replace(/^\(\d+\)\s*/, '');
-    document.title = n > 0 ? `(${n}) ${base}` : base;
-    return () => {
-      document.title = base;
-    };
-  }, [conteos.porResponder]);
+  // Título de la pestaña con lo que falta responder «(3) Mensajes · Caprichos» y pitido corto si sube (interruptor 🔔)
+  const [sonido, alternarSonido] = useSonidoAviso();
+  useAvisoMensajeNuevo(conteos.porResponder ?? 0, sonido);
 
   // Respaldo por si el canal en vivo se cae: refresca la lista cada 20 s
   useEffect(() => {
@@ -983,12 +979,47 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   };
   const alternarPanel = () => setPanelAbierto((v) => !v);
 
+  // Atajos: Alt+↑/↓ cambian de chat (mismo efecto que tocar la fila) y Esc cierra el panel o el chat
+  const [ayudaAbierta, setAyudaAbierta] = useState(false);
+  useAtajosChat({
+    ids: chatsOrdenados.map((c) => c.id),
+    actual: chatSeleccionadoId,
+    seleccionar: (id) => {
+      abiertoPorPersona.current = id;
+      const fila = chats.find((c) => c.id === id);
+      if (fila && (fila.sinLeer > 0 || fila.marcadoNoVisto)) void alMarcarVisto(id);
+      setChatSeleccionadoId(id);
+      setChatAbiertoMovil(true);
+    },
+    cerrar: () => {
+      if (ayudaAbierta) setAyudaAbierta(false);
+      else if (panelAbierto && esVistaMovil()) setPanelAbierto(false);
+      else if (chatSeleccionadoId) setChatSeleccionadoId(null);
+      else return false;
+      return true;
+    },
+    alternarAyuda: () => setAyudaAbierta((v) => !v),
+  });
+
   return (
     <div className="msg-root" data-fs={pantallaCompleta ? '1' : '0'}>
       {/* Controles de vista: pantalla completa y zoom (solo escritorio) */}
       <div className="msg-barra">
         <button className="msg-zb" aria-pressed={pantallaCompleta} style={{ padding: '0 12px', fontSize: 13 }} onClick={toggleFullscreen}>
           {pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        </button>
+        <button
+          type="button"
+          className="msg-zb"
+          aria-pressed={sonido}
+          aria-label={sonido ? 'Silenciar el aviso de mensajes nuevos' : 'Activar el aviso sonoro de mensajes nuevos'}
+          title={sonido ? 'Aviso sonoro activado' : 'Aviso sonoro silenciado'}
+          onClick={alternarSonido}
+        >
+          {sonido ? '🔔' : '🔕'}
+        </button>
+        <button type="button" className="msg-zb" aria-label="Atajos de teclado" aria-expanded={ayudaAbierta} title="Atajos de teclado (Alt+/)" onClick={() => setAyudaAbierta((v) => !v)}>
+          ?
         </button>
         <div role="group" aria-label="Tamaño de la vista" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#33434B' }}>Zoom</span>
@@ -1147,6 +1178,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           />
         )}
       </div>
+
+      {ayudaAbierta && <AyudaAtajos alCerrar={() => setAyudaAbierta(false)} />}
 
       {/* Modal Confirmar Acción */}
       {avisoAtendido && (
