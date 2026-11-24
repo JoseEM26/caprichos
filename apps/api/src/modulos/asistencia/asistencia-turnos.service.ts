@@ -625,8 +625,10 @@ export class AsistenciaTurnosService {
   // ---------------------------------------------------------------------------
 
   /** Solo nombres, áreas/roles y horarios del día laboral. Nada de sueldos, pagos ni datos de contacto. */
-  async equipoHoy(ahora = new Date()) {
-    const hoy = jornadaDe(ahora).jornada;
+  async equipoHoy(ahora = new Date(), fecha?: string) {
+    const jornadaHoy = jornadaDe(ahora).jornada;
+    // Un día elegido para pedir un cambio de turno (hoy hasta 30 días adelante); si no, el día laboral de hoy.
+    const hoy = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha >= jornadaHoy && fecha <= sumarDias(jornadaHoy, TURNOS_DIAS_ADELANTO_MAX) ? fecha : jornadaHoy;
     const d = await this.datosRango(this.prisma, hoy, hoy);
     const cuentas = await this.cuentas(this.prisma);
     const cambiosHoy = await this.prisma.solicitudTurno.findMany({

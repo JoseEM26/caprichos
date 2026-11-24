@@ -97,7 +97,7 @@ export class TurnosAprobacionController {
   }
 }
 
-/** Tablero «Equipo de hoy» en Mi asistencia: solo lectura para todo el personal que marca. */
+/** Quién trabaja un día (hoy o el día elegido al pedir un cambio de turno): solo lectura para el personal que marca. */
 @Controller('admin/asistencia/mi/equipo')
 @UseGuards(AccesoGuard)
 export class MiEquipoController {
@@ -105,7 +105,7 @@ export class MiEquipoController {
 
   @Get('hoy')
   @Permiso('asistencia', 'marcar')
-  hoy() {
-    return this.turnos.equipoHoy();
+  hoy(@Query('fecha') fecha?: string) {
+    return this.turnos.equipoHoy(new Date(), fecha);
   }
 }

@@ -7,6 +7,7 @@ import { useSesion } from '../../comun/sesion';
 import { jornadaActual } from './jornada';
 import { miCalendario } from './miCalendarioApi';
 import { PorAprobarTurnos } from './PorAprobarTurnos';
+import { EquipoHoy } from './EquipoHoy';
 import { ChipsAprobacion } from './AprobacionTurno';
 import { textoAprobacion } from './aprobacionTurno';
 import {
@@ -101,6 +102,7 @@ function PasoQuien({ d, cambiar }: { d: Datos; cambiar: (p: Partial<Datos>) => v
     return (res?.candidatos ?? []).filter((c) => !q || c.nombre.toLowerCase().includes(q));
   }, [res, buscar]);
 
+  const equipo = d.fecha ? <EquipoHoy fecha={d.fecha} /> : null;
   if (error) return <div role="alert" className="as-aviso as-aviso--error">{error}</div>;
   if (!res) return <p aria-live="polite">Buscando personas disponibles…</p>;
   if (res.aviso) return <div role="alert" className="as-aviso as-aviso--alerta">{res.aviso}. Vuelve atrás y revisa el día y las horas.</div>;
@@ -114,11 +116,13 @@ function PasoQuien({ d, cambiar }: { d: Datos; cambiar: (p: Partial<Datos>) => v
           </ul>
         )}
         <small>Prueba con otro día u otras horas, o avisa a Supervisión.</small>
+        {equipo}
       </div>
     );
   }
   return (
     <div className="tu-form">
+      {equipo}
       <label className="as-campo">Buscar por nombre
         <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
       </label>

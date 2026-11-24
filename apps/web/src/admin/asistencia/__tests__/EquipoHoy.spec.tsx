@@ -23,38 +23,36 @@ const datos = {
 beforeEach(() => { api.equipoHoy.mockReset(); });
 afterEach(() => { vi.useRealTimers(); });
 
-describe('Equipo de hoy (Mi asistencia)', () => {
+describe('Equipo del día (pedido de cambio de turno)', () => {
   it('muestra quién trabaja con su horario, el reemplazo aprobado, los cambios y quién descansa', async () => {
     api.equipoHoy.mockResolvedValue(datos);
-    render(<EquipoHoy />);
-    const trabajan = await screen.findByLabelText('Trabajan hoy');
+    render(<EquipoHoy fecha="2026-11-16" />);
+    const trabajan = await screen.findByLabelText('Trabajan ese día');
     expect(within(trabajan).getByText('Ana Pérez cubre a Luis Gómez, 14:00–22:00')).toBeInTheDocument();
     expect(within(trabajan).getByText('Marta Ruiz, 08:00–16:00')).toBeInTheDocument();
-    expect(screen.getByLabelText('Cambios de turno de hoy')).toHaveTextContent('Ana Pérez y Luis Gómez cambiaron turno');
-    const descansan = screen.getByLabelText('Hoy descansan');
+    expect(screen.getByLabelText('Cambios de turno de ese día')).toHaveTextContent('Ana Pérez y Luis Gómez cambiaron turno');
+    const descansan = screen.getByLabelText('Descansan ese día');
     expect(descansan).toHaveTextContent('Rosa Vidal');
     expect(descansan).toHaveTextContent('Vacaciones o licencia');
   });
 
   it('sin turnos cargados muestra el estado vacío', async () => {
     api.equipoHoy.mockResolvedValue({ ...datos, trabajan: [], cambios: [], descansan: [] });
-    render(<EquipoHoy />);
-    expect(await screen.findByText('Hoy no hay turnos cargados.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Trabajan hoy')).not.toBeInTheDocument();
+    render(<EquipoHoy fecha="2026-11-16" />);
+    expect(await screen.findByText('Ese día no hay turnos cargados.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Trabajan ese día')).not.toBeInTheDocument();
   });
 
   it('si falla la carga lo dice sin bloquear la pantalla', async () => {
     api.equipoHoy.mockRejectedValue({ mensaje: 'Sin conexión' });
-    render(<EquipoHoy />);
+    render(<EquipoHoy fecha="2026-11-16" />);
     expect(await screen.findByText('Sin conexión')).toBeInTheDocument();
   });
 
-  it('se refresca solo cada pocos minutos', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('pide el día elegido', async () => {
     api.equipoHoy.mockResolvedValue(datos);
-    render(<EquipoHoy />);
-    await waitFor(() => expect(api.equipoHoy).toHaveBeenCalledTimes(1));
-    vi.advanceTimersByTime(3 * 60_000 + 10);
-    await waitFor(() => expect(api.equipoHoy).toHaveBeenCalledTimes(2));
+    render(<EquipoHoy fecha="2026-11-20" />);
+    await waitFor(() => expect(api.equipoHoy).toHaveBeenCalledWith('2026-11-20'));
+    expect(screen.getByText('Quién trabaja el 2026-11-20')).toBeInTheDocument();
   });
 });

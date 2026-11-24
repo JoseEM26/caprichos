@@ -1,42 +1,38 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { equipoHoy, type EquipoHoy as EquipoHoyDatos } from './turnosApi';
 
-/** Se refresca al abrir y cada pocos minutos; no es tiempo real. */
-const REFRESCO_MS = 3 * 60_000;
-
-/** Tarjeta «Equipo de hoy» en Mi asistencia: quién trabaja hoy, cambios y quién descansa. Solo lectura. */
-export function EquipoHoy() {
+/**
+ * Quién trabaja y quién descansa el día que la persona quiere cambiar (solo dentro del pedido de cambio de turno).
+ * Solo lectura: nombres, áreas y horarios.
+ */
+export function EquipoHoy({ fecha }: { fecha: string }) {
   const [datos, setDatos] = useState<EquipoHoyDatos | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const cargar = useCallback(async () => {
-    try {
-      const r = await equipoHoy();
-      if (!r || !Array.isArray(r.trabajan) || !Array.isArray(r.descansan)) throw new Error('Respuesta inesperada');
-      setDatos(r);
-      setError(null);
-    } catch (e) {
-      setError((e as any)?.mensaje ?? 'No pudimos cargar el equipo de hoy.');
-    }
-  }, []);
-
   useEffect(() => {
-    void cargar();
-    const id = window.setInterval(() => void cargar(), REFRESCO_MS);
-    return () => window.clearInterval(id);
-  }, [cargar]);
+    let vigente = true;
+    setDatos(null);
+    setError(null);
+    equipoHoy(fecha)
+      .then((r) => {
+        if (!r || !Array.isArray(r.trabajan) || !Array.isArray(r.descansan)) throw new Error('Respuesta inesperada');
+        if (vigente) setDatos(r);
+      })
+      .catch((e) => vigente && setError((e as any)?.mensaje ?? 'No pudimos cargar quién trabaja ese día.'));
+    return () => { vigente = false; };
+  }, [fecha]);
 
   const sinTurnos = datos !== null && datos.trabajan.length === 0 && datos.descansan.length === 0;
   return (
-    <section className="ma-card" aria-label="Equipo de hoy" data-testid="equipo-hoy">
-      <h3>Equipo de hoy</h3>
+    <details className="ma-card" aria-label="Equipo de ese día" data-testid="equipo-hoy" open>
+      <summary><b>Quién trabaja el {fecha}</b></summary>
       {error && <p className="tu-vacio">{error}</p>}
-      {!datos && !error && <p className="tu-vacio">Cargando el equipo de hoy…</p>}
-      {sinTurnos && <p className="tu-vacio">Hoy no hay turnos cargados.</p>}
+      {!datos && !error && <p className="tu-vacio">Cargando…</p>}
+      {sinTurnos && <p className="tu-vacio">Ese día no hay turnos cargados.</p>}
 
       {datos && datos.trabajan.length > 0 && (
-        <div aria-label="Trabajan hoy">
-          <h4 className="as-sub">Trabajan hoy</h4>
+        <div aria-label="Trabajan ese día">
+          <h4 className="as-sub">Trabajan</h4>
           <ul className="ma-lista">
             {datos.trabajan.map((p) => (
               <li key={p.partyId}>
@@ -55,8 +51,8 @@ export function EquipoHoy() {
       )}
 
       {datos && (datos.cambios ?? []).length > 0 && (
-        <div aria-label="Cambios de turno de hoy">
-          <h4 className="as-sub">Cambios de turno de hoy</h4>
+        <div aria-label="Cambios de turno de ese día">
+          <h4 className="as-sub">Cambios de turno</h4>
           <ul className="ma-lista">
             {datos.cambios.map((c) => <li key={c.texto}>{c.texto}</li>)}
           </ul>
@@ -64,8 +60,8 @@ export function EquipoHoy() {
       )}
 
       {datos && datos.descansan.length > 0 && (
-        <div aria-label="Hoy descansan">
-          <h4 className="as-sub">Hoy descansan</h4>
+        <div aria-label="Descansan ese día">
+          <h4 className="as-sub">Descansan</h4>
           <ul className="ma-lista">
             {datos.descansan.map((p) => (
               <li key={p.partyId}>
@@ -76,6 +72,6 @@ export function EquipoHoy() {
           </ul>
         </div>
       )}
-    </section>
+    </details>
   );
 }

@@ -610,6 +610,14 @@ describe('tablero Equipo de hoy', () => {
     expect(JSON.stringify(hoy)).not.toMatch(/sueldo|pago|monto|correo|telefono/i);
   });
 
+  it('con un día elegido muestra ese día; fuera de hoy..30 días vuelve a hoy', async () => {
+    const { servicio } = armar();
+    expect((await servicio.equipoHoy(LUNES_10, '2026-11-17')).jornada).toBe('2026-11-17');
+    expect((await servicio.equipoHoy(LUNES_10, '2026-11-15')).jornada).toBe(LUNES);
+    expect((await servicio.equipoHoy(LUNES_10, '2027-01-30')).jornada).toBe(LUNES);
+    expect((await servicio.equipoHoy(LUNES_10, 'x')).jornada).toBe(LUNES);
+  });
+
   it('muestra el reemplazo aprobado: quien cubre aparece con a quién cubre; a quien cubren, descansando', async () => {
     const { servicio } = armar();
     await servicio.crear(dto(), usuario(A), undefined, AHORA);

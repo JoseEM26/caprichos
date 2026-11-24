@@ -100,6 +100,6 @@ export const turnosPorAprobar = () => api.get<{ toleranciaMin: number; solicitud
 export const aprobarTurno = (id: number) => api.post<ResultadoAprobacion>(`${ADM}/solicitudes/${id}/aprobar`, {});
 export const rechazarTurnoAdmin = (id: number, motivo: string) => api.post(`${ADM}/solicitudes/${id}/rechazar`, { motivo });
 
-export const equipoHoy = () => api.get<EquipoHoy>('/admin/asistencia/mi/equipo/hoy');
+export const equipoHoy = (fecha: string) => api.get<EquipoHoy>(`/admin/asistencia/mi/equipo/hoy?fecha=${fecha}`);
 export const avisosTurnos = () => api.get<DestinatarioAviso[]>(`${ADM}/avisos`);
 export const configurarAvisoTurno = (partyId: number, activo: boolean) => api.put(`${ADM}/avisos/${partyId}`, { activo });
