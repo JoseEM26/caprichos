@@ -113,7 +113,7 @@ export function ModalFichaCliente({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            <AvatarCliente cliente={{ nombre, avatar: cliente.avatar }} tamano={72} />
+            <AvatarCliente cliente={{ id: cliente.id, nombre, avatar: cliente.avatar }} tamano={72} />
             <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 20 }}>
               {nombre}
             </div>

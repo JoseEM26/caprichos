@@ -19,6 +19,17 @@ describe('Clientes ▸ avatar', () => {
     expect(screen.getByTestId('avatar-cliente-iniciales')).toHaveTextContent('AP');
   });
 
+  it('un clic en el retrato abre el avatar completo del cliente', async () => {
+    const espia = vi.spyOn(clientesApi, 'obtenerAvatarCliente').mockResolvedValue({ config: null, avatarUrl: '/archivos/a.png' });
+    render(<AvatarCliente cliente={{ id: '5', nombre: 'Ana Pérez', avatar: { url: '/archivos/a.png', personalizado: true } }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ver avatar completo de Ana Pérez' }));
+    expect(await screen.findByRole('dialog', { name: 'Avatar de Ana Pérez' })).toBeInTheDocument();
+    await waitFor(() => expect(espia).toHaveBeenCalledWith('5'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    espia.mockRestore();
+  });
+
   it('el chip filtra por avatar personalizado y muestra el contador', async () => {
     const espia = vi.spyOn(clientesApi, 'listarClientes').mockResolvedValue({
       items: [cli('1', 'Ana', { avatar: { url: '/archivos/a.png', personalizado: true } })], total: 1, pagina: 1, paginas: 1,

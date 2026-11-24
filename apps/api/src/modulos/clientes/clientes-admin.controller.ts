@@ -106,6 +106,14 @@ export class ClientesAdminController {
     return this.clientesService.obtenerFichaAdmin(id, req.usuario, ip);
   }
 
+  /** Avatar completo del cliente (configuración 3D y retrato) para verlo desde la lista. */
+  @Get(':id/avatar')
+  @Permiso('clientes', 'ver')
+  async avatarDelCliente(@Param('id') id: string) {
+    if (!/^\d+$/.test(id)) throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Cliente no válido' });
+    return this.clientesService.avatarDeCuenta(id);
+  }
+
   /** Historial de compras del cliente, paginado. */
   @Get(':id/pedidos')
   @Permiso('clientes', 'ver')

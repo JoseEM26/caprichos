@@ -136,6 +136,10 @@ export async function exportarClientesExcel(filtros: FiltrosClientes = {}): Prom
   return obtenerBlobAutenticado(`/admin/clientes/exportar?${p.toString()}`);
 }
 
+export async function obtenerAvatarCliente(id: string): Promise<{ config: unknown | null; avatarUrl: string | null }> {
+  return api.get(`/admin/clientes/${id}/avatar`);
+}
+
 export async function obtenerFichaCliente(id: string): Promise<FichaCliente> {
   return api.get<FichaCliente>(`/admin/clientes/${id}`);
 }
