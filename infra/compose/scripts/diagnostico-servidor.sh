@@ -87,10 +87,12 @@ const j = (u) => fetch(u, { headers: h }).then(async (r) => r.status + " " + (aw
 evolucion_estado demo
 linea
 evolucion_estado prod
-API_DEMO=$(docker ps --format '{{.Names}}' | grep -E '^caprichos-demo-api' | head -1)
-if [[ -n "$API_DEMO" ]]; then
-  echo "-- registros de la API demo sobre WhatsApp/Evolution --"
-  docker logs --since 2h "$API_DEMO" 2>&1 | grep -iE "evolution|webhook|whatsapp|omit|descart|lista blanca|chatbot|outbox" | ocultar | tail -60
-fi
+for amb in demo prod; do
+  API_C=$(docker ps --format '{{.Names}}' | grep -E "^caprichos-${amb}-api" | head -1)
+  if [[ -n "$API_C" ]]; then
+    echo "-- registros de la API ${amb} sobre WhatsApp/Evolution (2 h, sin el resumen del outbox) --"
+    docker logs --since 2h "$API_C" 2>&1 | grep -iE "evolution|webhook|whatsapp|omit|descart|lista blanca|chatbot|outbox|conversaci|autorespuesta|error" | grep -v '"encolados\\":0' | ocultar | tail -80
+  fi
+done
 linea
 echo "OK: diagnóstico terminado (solo lectura)."
