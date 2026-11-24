@@ -100,4 +100,26 @@ for amb in demo prod; do
   fi
 done
 linea
+echo "== BOT PRODUCCIÓN: chats de las últimas 24 h (solo lectura, sin números ni textos) =="
+if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-postgres$'; then
+  docker exec -i caprichos-prod-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off' <<'SQL' 2>&1 | ocultar
+SELECT 'mensajes por autor (24 h)' AS que;
+SELECT direccion, autor, count(*) FROM mensaje_chat WHERE en > now() - interval '24 hours' GROUP BY 1,2 ORDER BY 1,2;
+SELECT 'mensajes del BOT por día (7 días)' AS que;
+SELECT (en AT TIME ZONE 'America/Lima')::date AS dia, count(*) FILTER (WHERE autor='BOT') AS bot, count(*) FILTER (WHERE autor='CLIENTE') AS cliente, count(*) FILTER (WHERE autor='PERSONA') AS persona FROM mensaje_chat WHERE en > now() - interval '7 days' GROUP BY 1 ORDER BY 1;
+SELECT 'chats con actividad en 24 h por dueño' AS que;
+SELECT duenio, estado, count(*) FROM conversacion WHERE ultima_actividad > now() - interval '24 hours' GROUP BY 1,2 ORDER BY 1,2;
+SELECT 'últimos 15 chats: dueño, hora Lima del último mensaje del cliente y del bot' AS que;
+SELECT c.id, c.duenio, c.estado, c.motivo_derivacion, c.tomado_en AT TIME ZONE 'America/Lima' AS tomado,
+  (SELECT max(en) FROM mensaje_chat m WHERE m.conversacion_id=c.id AND m.autor='CLIENTE') AT TIME ZONE 'America/Lima' AS ult_cliente,
+  (SELECT max(en) FROM mensaje_chat m WHERE m.conversacion_id=c.id AND m.autor='BOT') AT TIME ZONE 'America/Lima' AS ult_bot,
+  (SELECT max(en) FROM mensaje_chat m WHERE m.conversacion_id=c.id AND m.autor='PERSONA') AT TIME ZONE 'America/Lima' AS ult_persona
+FROM conversacion c ORDER BY c.ultima_actividad DESC LIMIT 15;
+SELECT 'salientes WhatsApp 24 h por estado' AS que;
+SELECT estado, coalesce(error_codigo,'-') AS error, count(*) FROM whatsapp_mensaje WHERE direccion='SALIENTE' AND creado_en > now() - interval '24 hours' GROUP BY 1,2 ORDER BY 3 DESC;
+SELECT 'parámetros del bot' AS que;
+SELECT clave, left(valor::text, 60) AS valor FROM parametro WHERE clave LIKE 'chatbot_funcion%' OR clave IN ('whatsapp_proveedor','evolution_pausado','evolution_pausa_auto','evolution_estado','chatbot_activo','chatbot_ia_activa') ORDER BY 1;
+SQL
+fi
+linea
 echo "OK: diagnóstico terminado (solo lectura)."
