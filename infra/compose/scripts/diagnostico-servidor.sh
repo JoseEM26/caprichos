@@ -75,6 +75,11 @@ const j = (u) => fetch(u, { headers: h }).then(async (r) => r.status + " " + (aw
   console.log("estado:", await j("http://127.0.0.1:8080/instance/connectionState/caprichos"));
   console.log("webhook instancia:", await j("http://127.0.0.1:8080/webhook/find/caprichos"));
   console.log("api salud desde evolution:", await fetch("http://api:3000/salud").then((r) => r.status).catch((e) => "ERR " + e.message));
+  // Solo horas y tipo de los últimos mensajes recibidos (sin números ni textos): ¿Evolution sigue recibiendo?
+  const m = await fetch("http://127.0.0.1:8080/chat/findMessages/caprichos", { method: "POST", headers: { ...h, "content-type": "application/json" }, body: JSON.stringify({ where: { key: { fromMe: false } }, page: 1, offset: 8 }) })
+    .then((r) => r.json()).catch((e) => ({ error: e.message }));
+  const lista = m?.messages?.records ?? (Array.isArray(m) ? m : []);
+  console.log("ultimos recibidos (hora UTC, tipo):", lista.map((x) => new Date(Number(x.messageTimestamp) * 1000).toISOString() + " " + x.messageType).join(" | ") || JSON.stringify(m).slice(0, 200));
   console.log("webhook GLOBAL url:", (process.env.WEBHOOK_GLOBAL_URL || "").replace(/\?.*/, "?<oculto>"), "enabled:", process.env.WEBHOOK_GLOBAL_ENABLED);
 })();'
     evo exec -T evolution-api node -e "$DIAG_JS" 2>&1 | ocultar
