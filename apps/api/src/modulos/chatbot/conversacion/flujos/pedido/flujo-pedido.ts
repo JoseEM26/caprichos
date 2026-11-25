@@ -27,8 +27,10 @@ import {
   detalleCombo,
   eleccionesParaServidor,
   iniciarCombo,
+  pideFoto,
   procesarEntradaCombo,
 } from './combo-bot';
+import { ESTADOS_CON_FOTO, TEXTO_SIN_FOTO_PASO, fotosDelPedido } from './fotos-pedido-bot.util';
 import { BOTONES_COMBO_CONFIRMAR, TEXTOS_COMBO } from '../../textos-combo';
 import { ordenarPorVentas, urlPublicaFoto, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
 import {
@@ -686,6 +688,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   private fraseDePedido(flujo: FlujoConversacion, entrada: EntradaNormalizada, contexto: ContextoConversacion): PedidoLibre | null {
     const estado = String(flujo.estado || '');
     if (entrada.id || !ESTADOS_FRASE.includes(estado) || !entrada.texto) return null;
+    // «Foto del frappe oreo» pide ver el producto, no pedirlo
+    if (ESTADOS_CON_FOTO.includes(estado) && pideFoto(entrada.texto)) return null;
     // Local cerrado con programación: primero se elige el día y la hora (flujo propio); ya elegidos, el pedido en frase vale igual
     if (contexto.soloProgramar && contexto.datosLocal && !contexto.datosLocal.abierta && !flujo.pedido?.programadoPara) return null;
     if (esPregunta(entrada.texto, entrada.textoOriginal)) return null;
@@ -850,6 +854,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion | null {
     estado = normalizarEstadoUbicacion(estado);
+    // «¿Cómo es el grande?», «foto de la de fresa», «foto del frappe oreo»: fotos de la carta a pedido; la elección no cambia y se repite la pregunta
+    if (!entrada.id && ESTADOS_CON_FOTO.includes(estado) && pideFoto(entrada.texto)) {
+      const fotos = fotosDelPedido(estado, entrada.texto, contexto.categoriasCarta || [], pedido.itemEnConfiguracion?.productoId, (ruta) => urlPublicaFoto(contexto.cartaUrlPublica, ruta));
+      const repite = this.renderizarEstado(estado, flujo, pedido, contexto);
+      return { ...repite, acciones: [...(fotos.length ? fotos : [{ tipo: 'enviarTexto' as const, texto: TEXTO_SIN_FOTO_PASO }]), ...repite.acciones] };
+    }
     switch (estado) {
       case 'PEDIDO_PROG_DIA':
         return this.pasoProgDia(flujo, pedido, entrada, contexto);
@@ -3965,6 +3975,7 @@ ${lineasAhorroPorMedio(ahorrosPorMedio).trimEnd()}` : '')
         const prod = config ? productoDeCarta(contexto.categoriasCarta || [], config.productoId) : null;
         if (!config || !prod) return this.mostrarCategorias(flujo, pedido, contexto);
         if (estado === 'PEDIDO_TAMANO') return this.preguntarTamano(flujo, pedido, prod, TEXTOS_BOT.pedidoPreguntarTamano(prod.nombre));
+        if (estado === 'PEDIDO_SABOR' && prod.saboresConStock) return this.preguntarSaborStock(flujo, pedido, prod, 'Elige un sabor de la lista:');
         if (estado === 'PEDIDO_NOMBRES_ENVASE') return this.preguntarNombreEnvase(flujo, pedido, config, contexto);
         if (estado === 'PEDIDO_NOMBRES_CONFIRMAR') return this.confirmarNombresEnvase(flujo, pedido, config);
         return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
