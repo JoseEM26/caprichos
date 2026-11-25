@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { TipoMarca } from './asistenciaApi';
@@ -121,7 +121,19 @@ export function CorreccionesAsistencia({ pedido, alAbrir, alCerrar }: { pedido: 
   );
 }
 
+/** El formulario se abre arriba de la pestaña; el botón que lo pide puede estar abajo (detalle del día): se trae a la vista con el foco. */
+function useTraerAVista() {
+  const ref = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const f = ref.current;
+    f?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    f?.querySelector<HTMLElement>('input, select, textarea')?.focus({ preventScroll: true });
+  }, []);
+  return ref;
+}
+
 function FormularioSolicitud({ pedido, alCerrar, alEnviado }: { pedido: PedidoCorreccion; alCerrar: () => void; alEnviado: () => Promise<void> }) {
+  const ref = useTraerAVista();
   const [jornada, setJornada] = useState(pedido.jornada);
   const [items, setItems] = useState<Array<{ tipo: TipoMarca; hora: string }>>([{ tipo: pedido.tipo ?? 'SALIDA', hora: '' }]);
   const [motivo, setMotivo] = useState('');
@@ -146,7 +158,7 @@ function FormularioSolicitud({ pedido, alCerrar, alEnviado }: { pedido: PedidoCo
   };
 
   return (
-    <form className="ma-card" aria-label="Pedir corrección de asistencia" onSubmit={(e) => void enviar(e)}>
+    <form ref={ref} className="ma-card" aria-label="Pedir corrección de asistencia" onSubmit={(e) => void enviar(e)}>
       <h3 className="as-sub">Pedir corrección</h3>
       <p className="as-ayuda">Me olvidé de marcar o marqué mal: pon la hora real de cada marca. No cuenta hasta que el administrador la apruebe.</p>
       <label className="as-campo">Jornada
@@ -180,6 +192,7 @@ function FormularioSolicitud({ pedido, alCerrar, alEnviado }: { pedido: PedidoCo
 function FormularioJustificar({ jornada, datos, alCerrar, alEnviado }: {
   jornada: string; datos: { marcaId: number; horaTurno: string; tardanzaMin: number }; alCerrar: () => void; alEnviado: () => Promise<void>;
 }) {
+  const ref = useTraerAVista();
   const [hora, setHora] = useState(datos.horaTurno);
   const [motivo, setMotivo] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -199,7 +212,7 @@ function FormularioJustificar({ jornada, datos, alCerrar, alEnviado }: {
     }
   };
   return (
-    <form className="ma-card" aria-label="Justificar tardanza" onSubmit={(e) => void enviar(e)}>
+    <form ref={ref} className="ma-card" aria-label="Justificar tardanza" onSubmit={(e) => void enviar(e)}>
       <h3 className="as-sub">Justificar tu tardanza de {datos.tardanzaMin} min</h3>
       <p className="as-ayuda">El administrador revisa tu pedido. Si lo aprueba, tu entrada cuenta a la hora que indiques y la tardanza se recalcula.</p>
       <label className="as-campo">Hora a la que debió contar tu entrada
