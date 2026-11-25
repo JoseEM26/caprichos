@@ -109,7 +109,7 @@ if [[ -f "$EVO_P/evolution.env" ]]; then
     | ocultar | cut -c1-220 | tail -70
   echo "-- Evolution prod: errores (nivel 50) completos, 6 h --"
   docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --timestamps --since 6h evolution-api 2>&1 \
-    | grep -E '"level":(50|60)|stream|Connection|connection|close|logout|restart' | grep -v "SessionEntry\|Closing session\|Removing old" | ocultar | cut -c1-1200 | tail -25
+    | grep -E '"level":(40|50|60)|stream:error|connection.update|CONNECTION|logout|decrypt|Bad MAC|No session|failed to' | ocultar | cut -c1-1500 | tail -20
   echo "-- Evolution prod: registros de webhook/mensajes (30 min) --"
   docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --since 30m evolution-api 2>&1 \
     | grep -iE "webhook|upsert|messages\.|error|axios|ECONN|timeout|refused|status code|decrypt|bad mac|no session|no matching|retry|receipt|stream|conflict|logout|connection" | grep -v "Buffer\|npm error" | ocultar | tail -40
