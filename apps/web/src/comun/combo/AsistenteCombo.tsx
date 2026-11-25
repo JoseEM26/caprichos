@@ -5,6 +5,8 @@ import './asistente-combo.css';
 export interface AsistenteComboProps {
   /** false: se muestra `children` tal cual (armado plano, sin pasos). */
   activo: boolean;
+  /** Vista previa del panel: se puede ir a cualquier paso sin elegir nada. */
+  navegacionLibre?: boolean;
   /** Decisiones del armado (el resumen se agrega aquí). */
   pasos: PasoAsistente[];
   /** Paso actual; pasos.length = resumen. Controlado por la ventana. */
@@ -38,7 +40,7 @@ export interface AsistenteComboProps {
  * perder nada y un resumen final en texto con el precio. No guarda las elecciones: las tiene la ventana.
  */
 export function AsistenteCombo({
-  activo, pasos, indice, alCambiarIndice, subIndice = 0, alCambiarSub, titulo, precio, resumen, resumenTexto, cantidad,
+  activo, navegacionLibre = false, pasos, indice, alCambiarIndice, subIndice = 0, alCambiarSub, titulo, precio, resumen, resumenTexto, cantidad,
   puedeAgregar, textoAgregar, alAgregar, avisosPie, children,
 }: AsistenteComboProps) {
   const previos = useRef<Record<string, boolean>>({});
@@ -51,7 +53,7 @@ export function AsistenteCombo({
   const slotActual = slots?.[sub];
   const hechoActual = slotActual ? slotActual.hecho : !!actual?.hecho;
   const faltaActual = slotActual ? slotActual.falta : actual?.falta;
-  const siguienteOk = !actual || hechoActual || !!actual.opcional;
+  const siguienteOk = navegacionLibre || !actual || hechoActual || !!actual.opcional;
   const motivo = actual && !siguienteOk ? faltaActual : null;
   const pendientes = pasos.map((p, i) => ({ p, i })).filter(({ p }) => !p.hecho && !p.opcional);
 
@@ -74,7 +76,7 @@ export function AsistenteCombo({
 
   if (!activo) return <>{children}</>;
 
-  const alcanzable = (i: number): boolean => i <= idx || pasos.slice(0, i).every((p) => p.hecho || p.opcional);
+  const alcanzable = (i: number): boolean => navegacionLibre || i <= idx || pasos.slice(0, i).every((p) => p.hecho || p.opcional);
   const items = [
     ...pasos.map((p) => ({ id: p.id, etiqueta: p.etiqueta, hecho: p.hecho, opcional: !!p.opcional })),
     { id: 'resumen', etiqueta: 'Resumen', hecho: false, opcional: false },

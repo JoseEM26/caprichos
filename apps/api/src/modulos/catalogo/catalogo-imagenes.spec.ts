@@ -70,4 +70,38 @@ describe('Carta: imágenes de tamaños, sabores y opciones', () => {
     expect(p.tamanos[1].fotoUrl).toBeNull();
     expect(p.sabores[1].fotoUrl).toBeNull();
   });
+
+  it('crearProducto guarda las fotos de tamaños y sabores y los interruptores', async () => {
+    const tx = {
+      producto: { create: jest.fn().mockResolvedValue({ id: 50n, nombre: 'Nuevo' }) },
+      productoTamano: { create: jest.fn() },
+      productoGrupo: { create: jest.fn() },
+      sabor: { create: jest.fn() },
+    };
+    prisma.producto.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.categoria.findUnique = jest.fn().mockResolvedValue({ id: 1n });
+    prisma.$transaction = jest.fn((fn: any) => fn(tx));
+    jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);
+
+    await service.crearProducto({
+      nombre: 'Nuevo', categoriaId: '1', precio: 5,
+      mostrarImagenesSabores: true, mostrarImagenesTamanos: true,
+      tamanos: [{ tamanoValorId: '5', precio: 6, fotoArchivoId: '900' }, { tamanoValorId: '6', precio: 7 }],
+      sabores: [{ nombre: 'Vainilla', fotoArchivoId: 901 }, 'Moka', { nombre: ' ' }],
+    });
+
+    expect(tx.producto.create.mock.calls[0][0].data).toMatchObject({ mostrar_imagenes_sabores: true, mostrar_imagenes_tamanos: true });
+    expect(tx.productoTamano.create.mock.calls.map((c: any) => c[0].data.foto_archivo_id)).toEqual([900n, null]);
+    expect(tx.sabor.create.mock.calls.map((c: any) => [c[0].data.nombre, c[0].data.foto_archivo_id])).toEqual([['Vainilla', 901n], ['Moka', null]]);
+  });
+
+  it('crearProducto sin interruptores los deja apagados', async () => {
+    const tx = { producto: { create: jest.fn().mockResolvedValue({ id: 51n, nombre: 'Otro' }) } };
+    prisma.producto.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.categoria.findUnique = jest.fn().mockResolvedValue({ id: 1n });
+    prisma.$transaction = jest.fn((fn: any) => fn(tx));
+    jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);
+    await service.crearProducto({ nombre: 'Otro', categoriaId: '1', precio: 5 });
+    expect(tx.producto.create.mock.calls[0][0].data).toMatchObject({ mostrar_imagenes_sabores: false, mostrar_imagenes_tamanos: false });
+  });
 });

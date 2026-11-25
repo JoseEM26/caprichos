@@ -117,8 +117,17 @@ export class CrearProductoDto {
   @Type(() => GrupoProductoInputDto)
   grupos?: GrupoProductoInputDto[];
 
+  /** Carta: mostrar la foto de cada sabor / de cada tamaño. */
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenesSabores?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenesTamanos?: boolean;
+
+  /** Cada sabor es su nombre o `{ nombre, fotoArchivoId }` (archivo ya subido: no depende del producto). */
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  sabores?: string[];
+  sabores?: Array<string | { nombre: string; fotoArchivoId?: string | number | null }>;
 }

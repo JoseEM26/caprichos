@@ -224,12 +224,8 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
       const btnAbierta = screen.getByRole('button', { name: /Al abrirla/i });
       fireEvent.click(btnAbierta);
 
-      // Debe mostrar el modal real VentanaProductoCarta en modo solo lectura
-      expect(await screen.findByText('Arma tu combo')).toBeInTheDocument();
-      // El botón de pedido debe estar deshabilitado con etiqueta 'Vista previa'
-      const btnPedir = screen.getByRole('button', { name: /Vista previa/i });
-      expect(btnPedir).toBeInTheDocument();
-      expect(btnPedir).toBeDisabled();
+      // Debe mostrar la misma ventana de la carta (asistente por pasos) en modo solo lectura
+      expect(await screen.findByLabelText('Pasos del armado')).toBeInTheDocument();
     });
   });
 

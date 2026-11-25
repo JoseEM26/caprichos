@@ -643,6 +643,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         )}
         <AsistenteCombo
           activo={asistente}
+          navegacionLibre={soloLectura}
           pasos={pasosAsistente}
           indice={Math.min(indicePaso, pasosAsistente.length)}
           alCambiarIndice={irPaso}

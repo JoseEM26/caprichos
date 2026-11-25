@@ -188,9 +188,12 @@ export const catalogoApi = {
     porciones?: string;
     alergenos?: string[];
     alergenosConfirmados?: boolean;
-    tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
+    tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number; fotoArchivoId?: string | number | null }>;
     grupos?: Array<{ grupoId: string | number; orden?: number }>;
-    sabores?: string[];
+    /** Cada sabor es su nombre o `{ nombre, fotoArchivoId }` (archivo ya subido). */
+    sabores?: Array<string | { nombre: string; fotoArchivoId?: string | number | null }>;
+    mostrarImagenesSabores?: boolean;
+    mostrarImagenesTamanos?: boolean;
   }): Promise<ProductoAdmin> {
     return api.post<ProductoAdmin>('/admin/catalogo/productos', data);
   },

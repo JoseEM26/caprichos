@@ -327,7 +327,7 @@ export function EditorOpcionesTamanos({
             : 'Unidad = 1, 1/2 docena = 6, Docena = 12. Cada venta de este tamaño descuenta esa cantidad del stock de cada sabor.'}
         </div>
       )}
-      {modo === 'guardado' && estado.tamanos.length > 0 && (
+      {estado.tamanos.length > 0 && (
         <div className="eo-ajuste">
           <InterruptorImagenes marcado={estado.mostrarImagenesTamanos === true} texto="Mostrar imágenes de los tamaños" deshabilitado={bloqueado}
             alCambiar={(v) => setEstado({ ...estado, mostrarImagenesTamanos: v })} />

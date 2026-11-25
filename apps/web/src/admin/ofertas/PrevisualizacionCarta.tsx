@@ -6,6 +6,8 @@ import { CarritoProvider } from '../../carta/CarritoContext';
 import { RaizCartaPrevia } from '../../carta/RaizCarta';
 import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { ProductoCarta, CategoriaCarta, GrupoOpcionesCarta } from '../../carta/tipos';
+import { partesParaVistaPrevia } from './partesVistaPrevia';
+import type { ProductoEditor } from './partesComboModelo';
 
 export interface PrevisualizacionCartaProps {
   oferta: Partial<OfertaItem>;
@@ -15,6 +17,7 @@ export interface PrevisualizacionCartaProps {
     categoriaId?: string;
     categoria?: string;
     precio?: number;
+    fotoUrl?: string | null;
     noSumaBeneficios?: boolean;
     grupos?: any[];
   }>;
@@ -81,6 +84,13 @@ export function PrevisualizacionCarta({
   const esCelular = dispositivo === 'celular';
   const aplicaHoy = calcularVigenciaPreview(oferta);
 
+  // Partes con la misma forma que la carta recibe (opciones de cada parte, bebidas): el combo abre el mismo asistente
+  const partesCombo = useMemo(
+    () => (oferta.tipo === 'COMBO' ? partesParaVistaPrevia(oferta.combosParte || oferta.combosPartes || [], productosDisponibles as ProductoEditor[], categoriasDisponibles) : (oferta.combosParte || oferta.combosPartes || [])),
+    [oferta, productosDisponibles, categoriasDisponibles],
+  );
+  const esComboConPartes = oferta.tipo === 'COMBO' && partesCombo.length > 0;
+
   // Normalizar el objeto OfertaItem para TarjetaOferta
   const ofertaNormalizada: OfertaItem = useMemo(() => {
     return {
@@ -122,11 +132,11 @@ export function PrevisualizacionCarta({
       imagenUrl: oferta.imagenUrl || null,
       combosPrecio: oferta.combosPrecio || oferta.combosPrecios || [],
       combosPrecios: oferta.combosPrecios || oferta.combosPrecio || [],
-      combosParte: oferta.combosParte || oferta.combosPartes || [],
-      combosPartes: oferta.combosPartes || oferta.combosParte || [],
+      combosParte: partesCombo,
+      combosPartes: partesCombo,
       llevaPaga: oferta.llevaPaga || null,
     };
-  }, [oferta, aplicaHoy]);
+  }, [oferta, aplicaHoy, partesCombo]);
 
   // Lista de productos reales normalizados para TarjetaOferta
   const productosCarta: ProductoCarta[] = useMemo(() => {
@@ -177,64 +187,13 @@ export function PrevisualizacionCarta({
           id: `tam-${idx + 1}`,
           nombre: p.tamanoNombre || 'Regular',
           precio: Number(p.precio) || 0,
+          tamanoValorId: p.tamanoValorId ?? null,
         }))
       : [{ id: 'tam-1', nombre: 'Regular', precio: precioBase }];
 
-    const partes = oferta.combosParte || oferta.combosPartes || [];
     const gruposSimulados: GrupoOpcionesCarta[] = [];
 
-    if (oferta.tipo === 'COMBO' && partes.length > 0) {
-      partes.forEach((parte, idxParte) => {
-        const nombreParte = parte.nombre?.trim() || `Parte ${idxParte + 1}`;
-        const cantidadParte = parte.cantidad || 1;
-        const tipoParte = parte.tipoParte || parte.tipo || 'A_ELECCION';
-
-        // Obtener productos candidatos para esta parte
-        const categoriasDeParte = parte.categorias || [];
-        const idsProds = (parte.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr));
-
-        let opcionesParte = productosDisponibles
-          .filter((p) => {
-            if (idsProds.length > 0 && idsProds.includes(String(p.id))) return true;
-            if (categoriasDeParte.length > 0 && p.categoria && categoriasDeParte.some((c: any) => String(c).toLowerCase() === p.categoria?.toLowerCase())) {
-              return true;
-            }
-            return false;
-          })
-          .map((p) => ({
-            id: `opc-p-${p.id}`,
-            nombre: p.nombre,
-            precioExtra: 0,
-            disponible: true,
-          }));
-
-        // Si no hay productos del catálogo vinculados aún, generar opciones simuladas ilustrativas
-        if (opcionesParte.length === 0) {
-          if (tipoParte === 'FIJO') {
-            opcionesParte = [{ id: `opc-fijo-${idxParte}`, nombre: nombreParte, precioExtra: 0, disponible: true }];
-          } else {
-            opcionesParte = [
-              { id: `opc-sim-${idxParte}-1`, nombre: `${nombreParte} Clásico`, precioExtra: 0, disponible: true },
-              { id: `opc-sim-${idxParte}-2`, nombre: `${nombreParte} Especial`, precioExtra: 0, disponible: true },
-            ];
-          }
-        }
-
-        // Crear pasos según la cantidad
-        for (let i = 1; i <= cantidadParte; i++) {
-          const pasoTitulo = cantidadParte > 1 ? `${nombreParte} ${i}` : nombreParte;
-          gruposSimulados.push({
-            id: `sec-${idxParte}-${i}`,
-            // El formato «Paso · Tipo» hace que VentanaProductoCarta lo arme como acordeón de combo
-            nombre: `${pasoTitulo} · ${nombreParte}`,
-            obligatorio: true,
-            minimo: 1,
-            maximo: 1,
-            opciones: opcionesParte,
-          });
-        }
-      });
-    } else {
+    if (!esComboConPartes) {
       // Para promociones 2x1 o descuentos simples, ilustrar con producto representativo o base
       gruposSimulados.push({
         id: 'sec-base',
@@ -262,7 +221,7 @@ export function PrevisualizacionCarta({
       disponible: true,
       agotadoHasta: null,
     };
-  }, [oferta, productosDisponibles]);
+  }, [oferta, esComboConPartes]);
 
   return (
     <CarritoProvider>
@@ -293,7 +252,7 @@ export function PrevisualizacionCarta({
             {() => vista === 'tarjeta' ? (
               <TarjetaOferta oferta={ofertaNormalizada} productos={productosCarta} categorias={categoriasCarta} esMovilPreview={esCelular} />
             ) : (
-              <VentanaProductoCarta producto={productoSimulado} esBebida={false} onCerrar={() => setVista('tarjeta')} soloLectura={true} esMovilPreview={esCelular} />
+              <VentanaProductoCarta producto={productoSimulado} esBebida={false} onCerrar={() => setVista('tarjeta')} soloLectura={true} esMovilPreview={esCelular} oferta={esComboConPartes ? ofertaNormalizada : null} />
             )}
           </RaizCartaPrevia>
         </MarcoDispositivo>

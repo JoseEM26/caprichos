@@ -887,6 +887,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           porciones: dto.porciones?.trim() || null,
           alergenos: normalizarAlergenos(dto.alergenos ?? []),
           alergenos_confirmados: dto.alergenosConfirmados ?? false,
+          mostrar_imagenes_sabores: dto.mostrarImagenesSabores ?? false,
+          mostrar_imagenes_tamanos: dto.mostrarImagenesTamanos ?? false,
           oculto: false,
         },
       });
@@ -920,13 +922,15 @@ export class CatalogoService implements OnApplicationBootstrap {
       }
 
       if (dto.sabores && dto.sabores.length > 0) {
-        for (const nombreSabor of dto.sabores) {
-          if (nombreSabor && nombreSabor.trim()) {
+        for (const sabor of dto.sabores) {
+          const nombreSabor = typeof sabor === 'string' ? sabor : sabor?.nombre;
+          if (typeof nombreSabor === 'string' && nombreSabor.trim()) {
             await tx.sabor.create({
               data: {
                 producto_id: prod.id,
                 nombre: nombreSabor.trim(),
                 activo: true,
+                foto_archivo_id: typeof sabor === 'string' ? null : idFoto(sabor.fotoArchivoId) ?? null,
               },
             });
           }

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ProductosView } from '../ProductosView';
 import * as sesionModulo from '../../../comun/sesion';
 import { catalogoApi } from '../catalogoApi';
+import * as api from '../../../comun/api';
 
 const CATS = [
   { id: 'c1', nombre: 'Bebidas', areaId: 'a', orden: 1, oculta: false, llevaOpciones: true },
@@ -76,5 +77,44 @@ describe('Nuevo producto: ¿Cómo se vende?', () => {
     expect(arg.nombre).toBe('CAFE');
     expect(arg.tamanos).toEqual([{ tamanoValorId: 'v1', precio: 0, activo: true, unidades: 1 }]);
     expect(arg.grupos).toEqual([]);
+  });
+
+  it('foto por tamano y por sabor al crear: se suben antes y viajan con su id junto a los interruptores', async () => {
+    const crear = vi.spyOn(catalogoApi, 'crearProducto').mockResolvedValue({} as any);
+    const ids = [{ id: '900', url: '/archivos/t.jpg' }, { id: '901', url: '/archivos/s.jpg' }];
+    const subir = vi.spyOn(api, 'clienteFetch').mockImplementation(async (ruta: string) => (ruta === '/admin/archivos' ? ids.shift() : []) as any);
+    const d = await abrirNuevo();
+    fireEvent.change(within(d).getByPlaceholderText(/BROWNIE/), { target: { value: 'dona' } });
+    fireEvent.click(await within(d).findByText('+ Agregar tamaño'));
+    const sel = await waitFor(() => {
+      const x = d.querySelector('select.eo-input') as HTMLSelectElement;
+      expect(x.options.length).toBeGreaterThan(1);
+      return x;
+    });
+    fireEvent.change(sel, { target: { value: 'v1' } });
+    fireEvent.click(within(d).getByRole('button', { name: 'Agregar a este producto' }));
+
+    // Tamano: interruptor + foto
+    fireEvent.click(await within(d).findByRole('checkbox', { name: 'Mostrar imágenes de los tamaños' }));
+    const foto = (etiqueta: string) => d.querySelector(`label[aria-label="Subir foto de ${etiqueta}"] input`) as HTMLInputElement;
+    fireEvent.change(foto('Regular 12 oz'), { target: { files: [new File(['x'], 't.jpg', { type: 'image/jpeg' })] } });
+    expect(await within(d).findByRole('img', { name: 'Foto de Regular 12 oz' })).toBeInTheDocument();
+
+    // Sabor: nombre, interruptor + foto
+    fireEvent.change(within(d).getByLabelText('Nuevo sabor'), { target: { value: 'Vainilla' } });
+    fireEvent.click(within(d).getByRole('button', { name: '+ Agregar sabor' }));
+    fireEvent.click(within(d).getByRole('checkbox', { name: 'Mostrar imágenes de los sabores' }));
+    fireEvent.change(foto('Vainilla'), { target: { files: [new File(['x'], 's.jpg', { type: 'image/jpeg' })] } });
+    expect(await within(d).findByRole('img', { name: 'Foto de Vainilla' })).toBeInTheDocument();
+    expect(subir.mock.calls.filter((c) => c[0] === '/admin/archivos')).toHaveLength(2);
+
+    fireEvent.click(within(d).getByRole('button', { name: 'Agregar a la carta' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, continuar' }));
+    await waitFor(() => expect(crear).toHaveBeenCalled());
+    const arg = crear.mock.calls[0][0];
+    expect(arg.tamanos).toEqual([{ tamanoValorId: 'v1', precio: 0, activo: true, unidades: 1, fotoArchivoId: '900' }]);
+    expect(arg.sabores).toEqual([{ nombre: 'Vainilla', fotoArchivoId: '901' }]);
+    expect(arg.mostrarImagenesTamanos).toBe(true);
+    expect(arg.mostrarImagenesSabores).toBe(true);
   });
 });

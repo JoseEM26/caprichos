@@ -19,6 +19,7 @@ import {
   SaborItem,
 } from './catalogoApi';
 import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
+import { SaboresBorrador } from './SaboresBorrador';
 import { EditarProductoModal } from './EditarProductoModal';
 import { Tip } from './ayudaOpciones';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
@@ -156,6 +157,8 @@ export function ProductosView() {
   // «¿Cómo se vende?»: null = lo decide la categoría (llevaOpciones); al tocar una tarjeta queda la elección
   const [npModoElegido, setNpModoElegido] = useState<'unico' | 'opciones' | null>(null);
   const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
+  const [npSabores, setNpSabores] = useState<SaborItem[]>([]);
+  const [npMostrarImgSabores, setNpMostrarImgSabores] = useState(false);
   const [npFoto, setNpFoto] = useState<File | null>(null);
   const npFotoUrl = useUrlArchivo(npFoto);
   /** La imagen nueva se sube al elegirla; «Agregar» espera a que el servidor la tenga. */
@@ -603,9 +606,17 @@ export function ProductosView() {
             ...(npFotoArchivoId ? { fotoArchivoId: npFotoArchivoId } : {}),
             ...(conOpciones
               ? {
-                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo, unidades: t.unidades })),
+                  // La foto de cada tamaño ya está subida (id de archivo propio, no del producto)
+                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo, unidades: t.unidades, ...(t.fotoArchivoId ? { fotoArchivoId: t.fotoArchivoId } : {}) })),
                   grupos: npOpc.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
                   resaltarOpcionMenosPedida: npOpc.resaltarMenosPedida === true,
+                  ...(npOpc.mostrarImagenesTamanos === true ? { mostrarImagenesTamanos: true } : {}),
+                }
+              : {}),
+            ...(npSabores.length > 0
+              ? {
+                  sabores: npSabores.map((s) => (s.fotoArchivoId ? { nombre: s.nombre, fotoArchivoId: s.fotoArchivoId } : s.nombre)),
+                  ...(npMostrarImgSabores ? { mostrarImagenesSabores: true } : {}),
                 }
               : {}),
           });
@@ -616,6 +627,8 @@ export function ProductosView() {
           setNpControlaStock(false);
           setNpModoElegido(null);
           setNpOpc(ESTADO_VACIO);
+          setNpSabores([]);
+          setNpMostrarImgSabores(false);
           elegirNpFoto(null);
           setNpError('');
           await cargarDatos();
@@ -1692,6 +1705,8 @@ export function ProductosView() {
               </div>
             </div>
 
+
+            <SaboresBorrador sabores={npSabores} onChange={setNpSabores} mostrarImagenes={npMostrarImgSabores} onMostrarImagenes={setNpMostrarImgSabores} />
 
             <CasillaControlaStock checked={npControlaStock} onChange={setNpControlaStock} />
 
