@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { partesFijasResumen, ResumenPartesFijas } from '../ReemplazoCombo';
+import { ofertaConTamano, partesFijasResumen, ResumenPartesFijas } from '../ReemplazoCombo';
 import { ModalCombo } from '../../admin/ofertas/ModalCombo';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 
@@ -27,6 +27,14 @@ describe('tamaño de la parte fija del combo', () => {
     expect(partesFijasResumen(combo('77', 'Regular 12 oz'))).toEqual(['FRAPPE OREO · Regular 12 oz']);
     render(<ResumenPartesFijas oferta={combo('77', 'Regular 12 oz')} />);
     expect(screen.getByText('Incluye: FRAPPE OREO · Regular 12 oz')).toBeInTheDocument();
+  });
+
+  it('cantidad 0 en un tamaño: la parte fija desaparece de ese tamaño y del «Incluye»', () => {
+    const c = combo(null, null);
+    (c.combosParte as any[]).push({ ...(c.combosParte as any[])[0], id: '101', principalNombre: 'HOT DOG AHUMADO', productos: ['9'], cantidadPorTamano: { '7': 0 } });
+    expect(partesFijasResumen(ofertaConTamano(c, '7'))).toEqual(['FRAPPE OREO']);
+    expect(partesFijasResumen(ofertaConTamano(c, '8'))).toEqual(['FRAPPE OREO', 'HOT DOG AHUMADO']);
+    expect(partesFijasResumen(ofertaConTamano(c, null))).toEqual(['FRAPPE OREO', 'HOT DOG AHUMADO']);
   });
 
   it('sin tamaño muestra solo el producto; sin partes fijas no muestra nada', () => {

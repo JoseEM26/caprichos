@@ -650,6 +650,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
           subIndice={subIdx}
           alCambiarSub={setSubPaso}
           titulo={producto.nombre}
+          descripcion={descripcionMostrada}
           precio={totalPrecio}
           resumen={resumenCombo}
           resumenTexto={<TextoResumenCombo d={datosResumen} />}

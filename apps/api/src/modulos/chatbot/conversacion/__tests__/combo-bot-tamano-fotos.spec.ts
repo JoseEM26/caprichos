@@ -1,7 +1,7 @@
 import { transicionarEstado } from '../maquina-estados';
 import { normalizarEntrada } from '../normalizador-entrada.util';
 import { ContextoConversacion, FlujoConversacion } from '../tipos-conversacion';
-import { pideFoto } from '../flujos/pedido/combo-bot';
+import { armarPasosCombo, pideFoto } from '../flujos/pedido/combo-bot';
 
 /** Combo por tamaño en el bot: cantidad del tamaño elegido y fotos SOLO si el cliente las pide. */
 describe('Bot: combo por tamaño y fotos a pedido', () => {
@@ -64,6 +64,18 @@ describe('Bot: combo por tamaño y fotos a pedido', () => {
     expect(r.nuevoEstado).toBe('PEDIDO_COMBO_PARTE');
     r = boton(r, c, 'ped_cb_j2');
     expect(r.nuevoEstado).toBe('PEDIDO_COMBO_CONFIRMAR');
+  });
+
+  it('una parte con cantidad 0 en el tamaño no se pide (va solo en el otro tamaño)', () => {
+    const oferta = combo(conFotos);
+    oferta.combosParte.push({ ...oferta.combosParte[0], id: 'parte_extra', cantidad: 1, cantidadPorTamano: { '7': 0 } } as any);
+    const pasosDe = (tam: string) => {
+      const cb: any = {};
+      armarPasosCombo(cb, oferta, 1, [], tam);
+      return cb.pasos.map((x: any) => `${x.parteId}:${x.total}`);
+    };
+    expect(pasosDe('7')).toEqual(['parte_jug:2']);
+    expect(pasosDe('8')).toEqual(['parte_jug:4', 'parte_extra:1']);
   });
 
   it('sin pedirla no manda ninguna foto', () => {

@@ -30,6 +30,8 @@ export interface AsistenteComboProps {
   alAgregar: () => void;
   /** Avisos del pie (stock, sabores) que ya calcula la ventana. */
   avisosPie?: ReactNode;
+  /** Descripción del combo o del tamaño elegido (una línea bajo la cabecera). */
+  descripcion?: string | null;
   /** Botón de cerrar de la ventana (PC): va en la cabecera, junto a «Paso N de M». */
   cerrar?: ReactNode;
   /** Contenido de la ventana: cada bloque se muestra solo en su paso (la ventana filtra). */
@@ -43,7 +45,7 @@ export interface AsistenteComboProps {
  */
 export function AsistenteCombo({
   activo, navegacionLibre = false, pasos, indice, alCambiarIndice, subIndice = 0, alCambiarSub, titulo, precio, resumen, resumenTexto, cantidad,
-  puedeAgregar, textoAgregar, alAgregar, avisosPie, cerrar, children,
+  puedeAgregar, textoAgregar, alAgregar, avisosPie, cerrar, descripcion, children,
 }: AsistenteComboProps) {
   const previos = useRef<Record<string, boolean>>({});
   const total = pasos.length + 1; // + resumen
@@ -101,6 +103,7 @@ export function AsistenteCombo({
           <strong className="ac-paso-n" data-testid="paso-texto">{`Paso ${idx + 1} de ${total}`}</strong>
           {cerrar}
         </div>
+        {descripcion && <p className="ac-descripcion" data-testid="descripcion-asistente">{descripcion}</p>}
         <ol className="ac-stepper">
           {items.map((p, i) => {
             const esActual = i === idx;

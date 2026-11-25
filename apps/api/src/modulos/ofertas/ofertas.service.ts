@@ -138,7 +138,7 @@ function cantidadesDeTamano(partes: any[] | undefined, tamanoValorId: string): R
   const r: Record<string, number> = {};
   for (const p of partes ?? []) {
     const n = (p.cantidad_por_tamano as Record<string, number> | null)?.[tamanoValorId];
-    if (n) r[p.id.toString()] = n;
+    if (n !== undefined && n !== null) r[p.id.toString()] = n;
   }
   return r;
 }
@@ -2353,13 +2353,16 @@ export class OfertasService {
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
     if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());
 
-    // Cantidad propia del tamaño elegido (p. ej. 4 juguetes en Familiar); sin ella, la de la parte
+    // Cantidad propia del tamaño elegido (p. ej. 4 juguetes en Familiar); sin ella, la de la parte.
+    // Cantidad 0 = la parte no va en ese tamaño (el hot dog solo en el Regular): se quita del armado.
     const tamanoElegido = tamanoValorId === undefined || tamanoValorId === null ? '' : String(tamanoValorId);
-    const partesTodas = (oferta.combosParte ?? []).map((p) => ({
-      ...p,
-      cantidad: (tamanoElegido && p.cantidadPorTamano?.[tamanoElegido]) || p.cantidad,
-      alternativas: p.alternativas ?? [],
-    }));
+    const partesTodas = (oferta.combosParte ?? [])
+      .map((p) => ({
+        ...p,
+        cantidad: (tamanoElegido ? p.cantidadPorTamano?.[tamanoElegido] : undefined) ?? p.cantidad,
+        alternativas: p.alternativas ?? [],
+      }))
+      .filter((p) => p.cantidad > 0);
     // Complemento a elegir: de cada grupo vale el ÚNICO paquete con elecciones; las piezas de los otros no cuentan
     const paquetesElegidos = new Map<string, string>();
     for (const grupo of new Set(partesTodas.map((p) => p.paqueteGrupo).filter((g): g is string => !!g))) {

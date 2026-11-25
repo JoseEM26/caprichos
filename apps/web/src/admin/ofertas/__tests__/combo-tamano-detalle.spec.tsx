@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ModalCombo } from '../ModalCombo';
 import type { OfertaItem } from '../ofertasApi';
@@ -53,5 +53,15 @@ describe('Combo: detalle por tamaño (descripción, foto y cantidad por parte)',
     });
     expect(payload.tamanos[0]).toMatchObject({ tamanoNombre: 'Personal', descripcion: 'Para 2' });
     expect(payload.partes[0].cantidadPorTamano).toEqual({ '7': 3 });
+  });
+
+  it('desmarcar «va en Personal» guarda 0 (la parte no va en ese tamaño); marcarla otra vez lo quita', async () => {
+    const payload = await guardar(combo, () => fireEvent.click(screen.getByLabelText(/va en Personal/)));
+    expect(payload.partes[0].cantidadPorTamano).toEqual({ '7': 0, '8': 4 });
+    cleanup();
+    const otra = await guardar({ ...combo, combosParte: [{ ...(combo as any).combosParte[0], cantidadPorTamano: { '7': 0 } }] } as any, () =>
+      fireEvent.click(screen.getByLabelText(/va en Personal/)),
+    );
+    expect(otra.partes[0].cantidadPorTamano).toBeNull();
   });
 });

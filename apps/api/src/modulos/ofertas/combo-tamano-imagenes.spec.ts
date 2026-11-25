@@ -87,6 +87,29 @@ describe('Combo por tamaño: cantidades, descripción y fotos', () => {
     expect(o.combosParte![0]).toMatchObject({ mostrarImagenes: true, cantidad: 2, cantidadPorTamano: { '8': 4 } });
   });
 
+  it('cantidad 0 en un tamaño: la parte fija no va en ese tamaño (hot dog solo en Familiar)', async () => {
+    const hotdog = { ...parte, id: 2n, tipo: 'FIJO', cantidad: 1, productos: [37n], mostrar_imagenes: false, cantidad_por_tamano: { '7': 0 } };
+    combo.combosParte = [parte, hotdog] as any;
+    try {
+      const personal = await service.resolverPartesCombo(4, elegir(2), 1, undefined, 7);
+      const familiar = await service.resolverPartesCombo(4, elegir(4), 1, undefined, 8);
+      const fijas = (r: any) => r.partes.filter((x: any) => x.tipo === 'FIJO');
+      expect(fijas(personal)).toHaveLength(0);
+      expect(fijas(familiar)).toHaveLength(1);
+      // Sin tamaño (combo sin precios por tamaño) la parte va como siempre
+      expect(fijas(await service.resolverPartesCombo(4, elegir(2)))).toHaveLength(1);
+    } finally {
+      combo.combosParte = [parte];
+    }
+  });
+
+  it('el DTO acepta 0 (no va en ese tamaño) y rechaza negativos', async () => {
+    const { CantidadPorTamanoValidaConstraint } = await import('./dto/crear-oferta.dto');
+    const v = new CantidadPorTamanoValidaConstraint();
+    expect(v.validate({ '7': 0, '8': 4 })).toBe(true);
+    expect(v.validate({ '7': -1 })).toBe(false);
+  });
+
   it('los elegibles de la parte traen la foto del producto y los que no la tienen, sin fotoUrl', async () => {
     const [o] = await service.listarOfertas('COMBO');
     const det = o.combosParte![0].opcionesDetalle!;

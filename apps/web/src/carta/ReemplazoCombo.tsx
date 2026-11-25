@@ -233,10 +233,17 @@ export function precioComboDeTamano(oferta: OfertaItem | null | undefined, taman
   return (oferta.combosPrecio ?? []).find((c) => String(c.tamanoValorId) === String(tamanoValorId));
 }
 
-/** La oferta con la cantidad de cada parte del tamaño elegido (`cantidadPorTamano`); sin dato propio queda la de la parte. */
+/**
+ * La oferta con la cantidad de cada parte del tamaño elegido (`cantidadPorTamano`); sin dato propio queda la de la parte.
+ * Cantidad 0 = la parte no va en ese tamaño: se quita.
+ */
 export function ofertaConTamano(oferta: OfertaItem | null, tamanoValorId?: string | null): OfertaItem | null {
-  if (!oferta || !tamanoValorId || !(oferta.combosParte ?? []).some((p) => p.cantidadPorTamano?.[tamanoValorId])) return oferta;
-  return { ...oferta, combosParte: (oferta.combosParte ?? []).map((p) => (p.cantidadPorTamano?.[tamanoValorId] ? { ...p, cantidad: p.cantidadPorTamano[tamanoValorId] } : p)) };
+  const propia = (p: NonNullable<OfertaItem['combosParte']>[number]) => (tamanoValorId ? p.cantidadPorTamano?.[tamanoValorId] : undefined);
+  if (!oferta || !tamanoValorId || !(oferta.combosParte ?? []).some((p) => propia(p) !== undefined)) return oferta;
+  return {
+    ...oferta,
+    combosParte: (oferta.combosParte ?? []).filter((p) => propia(p) !== 0).map((p) => (propia(p) !== undefined ? { ...p, cantidad: propia(p) as number } : p)),
+  };
 }
 
 /**

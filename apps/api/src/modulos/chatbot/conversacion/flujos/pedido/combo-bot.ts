@@ -104,6 +104,10 @@ function categoriaDe(categorias: any[], productoId?: string): string {
 export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, unidades: number, categorias: any[], tamanoValorId?: string | null): boolean {
   const pasos: PasoComboBot[] = [];
   for (const p of oferta.combosParte ?? []) {
+    // Cantidad propia del tamaño elegido (4 juguetes en Familiar); sin ella, la de la parte; 0 = no va en este tamaño
+    const propia = tamanoValorId ? p.cantidadPorTamano?.[tamanoValorId] : undefined;
+    const cantidadParte = propia !== undefined && propia !== null ? Number(propia) : Number(p.cantidad);
+    if (cantidadParte <= 0) continue;
     const tipo = p.tipo ?? p.tipoParte;
     const parteId = String(p.id);
     const alternativas = p.alternativas ?? [];
@@ -120,8 +124,7 @@ export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, uni
         tipo: 'ELECCION',
         // Bebidas por categorías (Frappes + Iced + Calientes): una sola etiqueta, no la de la primera categoría
         etiqueta: p.bebidas === true ? 'bebida' : categoriaDe(categorias, (p.opcionesDetalle as any[])[0]?.id && String((p.opcionesDetalle as any[])[0].id)),
-        // Cantidad propia del tamaño elegido (4 juguetes en Familiar); sin ella, la de la parte
-        total: (Number((tamanoValorId && p.cantidadPorTamano?.[tamanoValorId]) || 0) || Number(p.cantidad)) * unidades,
+        total: cantidadParte * unidades,
         hechos: 0,
         opciones,
       });

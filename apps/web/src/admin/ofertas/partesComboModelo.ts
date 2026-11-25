@@ -366,9 +366,9 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
 }
 
 /** Partes tal como las guarda el servidor: sin campos del editor y con el nombre siempre puesto. */
-/** Cantidad propia por tamaño: solo enteros de 1 a 99; sin ninguna, null (todos usan la de la parte). */
+/** Cantidad propia por tamaño: enteros de 0 a 99 (0 = la parte no va en ese tamaño); sin ninguna, null (todos usan la de la parte). */
 export function cantidadPorTamanoLimpia(p: Parte): Record<string, number> | null {
-  const limpia = Object.entries(p.cantidadPorTamano ?? {}).filter(([, n]) => Number.isInteger(n) && n >= 1 && n <= 99);
+  const limpia = Object.entries(p.cantidadPorTamano ?? {}).filter(([, n]) => Number.isInteger(n) && n >= 0 && n <= 99);
   return limpia.length > 0 ? Object.fromEntries(limpia) : null;
 }
 

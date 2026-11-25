@@ -14,13 +14,14 @@ interface Props {
 }
 
 /**
- * Detalle opcional de un tamaño del combo: su descripción, su foto y cuántos elige el cliente en cada parte.
+ * Detalle opcional de un tamaño del combo: su descripción, su foto, qué partes lleva y cuántos elige el cliente en cada una.
  * Lo que se deje vacío usa lo del combo o la cantidad de la parte (como siempre).
  */
 export function DetalleTamanoCombo({ tamano, partes, productos, categorias, alCambiar, alCambiarCantidad }: Props) {
   const nombre = tamano.tamanoNombre || 'este tamaño';
   const valorId = tamano.tamanoValorId;
-  const aElegir = partes.map((p, i) => ({ p, i })).filter(({ p }) => tipoDe(p) !== 'FIJO' && !p.paqueteGrupo);
+  // Complementos a elegir (paquetes) quedan fuera: se eligen como grupo, no por tamaño
+  const piezas = partes.map((p, i) => ({ p, i })).filter(({ p }) => !p.paqueteGrupo);
   return (
     <details className="detalle-tamano-combo" style={{ marginLeft: 28, fontSize: 13 }}>
       <summary style={{ cursor: 'pointer', color: 'var(--cp-soft)' }}>Detalle de {nombre} (opcional)</summary>
@@ -44,28 +45,42 @@ export function DetalleTamanoCombo({ tamano, partes, productos, categorias, alCa
           />
           <div style={{ color: 'var(--cp-soft)' }}>Sin foto propia, se usa la del combo.</div>
         </div>
-        {valorId && aElegir.length > 0 && (
+        {valorId && piezas.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontWeight: 700 }}>Cuántos elige el cliente en {nombre}</span>
-            {aElegir.map(({ p, i }) => {
+            <span style={{ fontWeight: 700 }}>Qué lleva {nombre}</span>
+            {piezas.map(({ p, i }) => {
               const propia = p.cantidadPorTamano?.[valorId];
+              const va = propia !== 0;
+              const titulo = tituloPieza(p, categorias, productos) || p.nombre || `Parte ${i + 1}`;
+              const aElegir = tipoDe(p) !== 'FIJO';
               return (
-                <label key={p.uid ?? i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ flex: 1 }}>{tituloPieza(p, categorias, productos) || p.nombre || `Parte ${i + 1}`}</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={propia ?? ''}
-                    placeholder={String(p.cantidad || 1)}
-                    aria-label={`Cantidad de ${tituloPieza(p, categorias, productos) || `parte ${i + 1}`} en ${nombre}`}
-                    onChange={(e) => alCambiarCantidad(i, e.target.value === '' ? null : Math.max(1, Math.min(99, Math.floor(Number(e.target.value)) || 1)))}
-                    style={{ width: 70, minHeight: 36, borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                  />
-                </label>
+                <div key={p.uid ?? i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <label style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center', minHeight: 36, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={va}
+                      aria-label={`${titulo} va en ${nombre}`}
+                      onChange={(e) => alCambiarCantidad(i, e.target.checked ? null : 0)}
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <span style={{ textDecoration: va ? 'none' : 'line-through', color: va ? 'inherit' : 'var(--cp-soft)' }}>{titulo}</span>
+                  </label>
+                  {aElegir && va && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={propia ?? ''}
+                      placeholder={String(p.cantidad || 1)}
+                      aria-label={`Cantidad de ${titulo} en ${nombre}`}
+                      onChange={(e) => alCambiarCantidad(i, e.target.value === '' ? null : Math.max(1, Math.min(99, Math.floor(Number(e.target.value)) || 1)))}
+                      style={{ width: 70, minHeight: 36, borderRadius: 8, border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                    />
+                  )}
+                </div>
               );
             })}
-            <div style={{ color: 'var(--cp-soft)' }}>Vacío = la cantidad de la parte.</div>
+            <div style={{ color: 'var(--cp-soft)' }}>Desmarca lo que no va en {nombre}. Cantidad vacía = la de la parte.</div>
           </div>
         )}
       </div>

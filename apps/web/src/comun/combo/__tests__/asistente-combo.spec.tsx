@@ -156,4 +156,12 @@ describe('AsistenteCombo', () => {
     expect(screen.queryByTestId('progreso-asistente')).toBeNull();
     expect(screen.queryByTestId('pie-asistente')).toBeNull();
   });
+
+  it('muestra la descripción del tamaño bajo la cabecera (CAPRIKIDS Jr. y Regular tienen la suya)', () => {
+    const props = { activo: true, pasos, indice: 0, alCambiarIndice: () => {}, titulo: 'CAPRIKIDS', precio: 1, resumen: '', puedeAgregar: false, textoAgregar: '', alAgregar: () => {} };
+    const { rerender } = render(<AsistenteCombo {...props} descripcion="Papas y 1 juguete"><p>x</p></AsistenteCombo>);
+    expect(screen.getByTestId('descripcion-asistente')).toHaveTextContent('Papas y 1 juguete');
+    rerender(<AsistenteCombo {...props} descripcion={null}><p>x</p></AsistenteCombo>);
+    expect(screen.queryByTestId('descripcion-asistente')).toBeNull();
+  });
 });

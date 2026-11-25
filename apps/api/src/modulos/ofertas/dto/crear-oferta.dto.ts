@@ -90,10 +90,10 @@ export class CantidadPorTamanoValidaConstraint implements ValidatorConstraintInt
   validate(valor: unknown): boolean {
     if (valor === null || valor === undefined) return true;
     if (typeof valor !== 'object' || Array.isArray(valor)) return false;
-    return Object.entries(valor as Record<string, unknown>).every(([id, n]) => /^\d+$/.test(id) && Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 99);
+    return Object.entries(valor as Record<string, unknown>).every(([id, n]) => /^\d+$/.test(id) && Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 99);
   }
   defaultMessage(): string {
-    return 'cantidadPorTamano debe ser { tamanoValorId: entero de 1 a 99 }';
+    return 'cantidadPorTamano debe ser { tamanoValorId: entero de 0 a 99 } (0 = la parte no va en ese tamaño)';
   }
 }
 

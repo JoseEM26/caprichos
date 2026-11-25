@@ -44,6 +44,7 @@ Ver tambien: [[novedades]]
 2. En la carta, en mozo y en Caja el cliente elige dos juguetes (cantidad exacta; los agotados no se pueden elegir). Se muestra "Incluye: producto · tamano".
 3. En cocina el combo sale desglosado: la linea madre es solo el contenedor (lleva el precio del combo y no tiene comanda) y cada parte va en su linea hija a su area, con su cantidad y tamano, sin cobro. Comprobantes, ticket y cuenta muestran solo la linea madre. Al anular el pedido el stock de cada hija se devuelve.
 4. El tamano de una parte fija se elige en la pestana "Partes y alternativas" para que la etiqueta de la bebida y la comanda salgan con ese tamano y se descuente cantidad × unidades del tamano.
+5. Cada tamano del combo tiene su "Detalle de <tamano> (opcional)" en la pestana Datos: su descripcion (sale en la ventana del combo al elegir ese tamano, tambien en el asistente por pasos), su foto y "Que lleva <tamano>". Ahi desmarcas la parte que no va en ese tamano (por ejemplo el hot dog ahumado solo en el Regular, no en el Junior) y cambias cuantos elige el cliente en las partes a eleccion. Lo desmarcado no se muestra ni se pide en la carta, mozo, Caja ni WhatsApp, no sale en "Incluye" y no va a cocina ni descuenta stock en ese tamano.
 Ver tambien: [[cocina]]
 
 ## Como se hace: Armar una promocion "Llevas mas, pagas menos" (2x1, 3x2)
