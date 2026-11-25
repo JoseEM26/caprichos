@@ -8,6 +8,9 @@ export interface TamanoItem {
   activo?: boolean;
   /** Unidades del producto que incluye el tamaño (1, 6, 12). Descuenta el stock por sabor. */
   unidades?: number;
+  /** Foto propia del tamaño (opcional). */
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
 }
 
 export interface OpcionItem {
@@ -19,6 +22,9 @@ export interface OpcionItem {
   disponible?: boolean;
   /** Marca manual «Resaltar siempre en cocina» (de la opción: vale en todos los productos que usan el grupo). */
   resaltarSiempre?: boolean;
+  /** Foto propia de la opción (opcional). */
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
 }
 
 export interface RequisitoOpcionAdmin {
@@ -48,6 +54,8 @@ export interface GrupoOpcionItem {
   activo?: boolean;
   categoriaIds?: string[];
   productosCount?: number;
+  /** Carta: mostrar la foto de cada opción. */
+  mostrarImagenes?: boolean;
   opciones: OpcionItem[];
 }
 
@@ -60,6 +68,9 @@ export interface SaborItem {
   quedan?: number | null;
   /** Hay conteo de apertura de este sabor hoy (el saldo arrastra del día anterior, pero conviene contar). */
   aperturaHoy?: boolean;
+  /** Foto propia del sabor (opcional). */
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
 }
 
 export interface PromocionProducto {
@@ -95,6 +106,9 @@ export interface ProductoAdmin {
   alergenosConfirmados?: boolean;
   /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
   resaltarOpcionMenosPedida?: boolean;
+  /** Carta: mostrar la foto de cada sabor / de cada tamaño. */
+  mostrarImagenesSabores?: boolean;
+  mostrarImagenesTamanos?: boolean;
   /** Stock propio del producto (donas, galletas): se descuenta al vender y se marca agotado en 0. Necesita conteo de apertura. */
   controlaStock: boolean;
   /** Anfitrión de un combo (Dúo, Cajita): su disponibilidad sale de lo que lo compone; no usa stock ni sabores propios. */
@@ -197,9 +211,11 @@ export const catalogoApi = {
       porciones?: string;
       alergenos?: string[];
       alergenosConfirmados?: boolean;
-      tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
+      mostrarImagenesSabores?: boolean;
+      mostrarImagenesTamanos?: boolean;
+      tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number; fotoArchivoId?: string | null }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
-      sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;
+      sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean; fotoArchivoId?: string | null }>;
       /** true: los grupos que no vengan en `grupos` se desligan de este producto. */
       sincronizarGrupos?: boolean;
     },
@@ -339,6 +355,7 @@ export const catalogoApi = {
       minimo?: number;
       maximo?: number;
       activo?: boolean;
+      mostrarImagenes?: boolean;
     },
   ): Promise<GrupoOpcionItem> {
     return api.patch<GrupoOpcionItem>(`/admin/catalogo/grupos/${id}`, data);
@@ -358,14 +375,14 @@ export const catalogoApi = {
 
   async crearOpcion(
     grupoId: string,
-    data: { nombre: string; precioExtra?: number; resaltarSiempre?: boolean },
+    data: { nombre: string; precioExtra?: number; resaltarSiempre?: boolean; fotoArchivoId?: string | null },
   ): Promise<OpcionItem> {
     return api.post<OpcionItem>(`/admin/catalogo/grupos/${grupoId}/opciones`, data);
   },
 
   async editarOpcion(
     id: string,
-    data: { nombre?: string; precioExtra?: number; activo?: boolean; resaltarSiempre?: boolean },
+    data: { nombre?: string; precioExtra?: number; activo?: boolean; resaltarSiempre?: boolean; fotoArchivoId?: string | null },
   ): Promise<OpcionItem> {
     return api.patch<OpcionItem>(`/admin/catalogo/opciones/${id}`, data);
   },

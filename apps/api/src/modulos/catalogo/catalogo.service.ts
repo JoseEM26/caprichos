@@ -133,6 +133,12 @@ export function proyectarDisponibilidad(categorias: CategoriaCarta[], ahora: Dat
   };
 }
 
+/** Id de foto que llega del panel: sin valor = no tocar; null o vacío = quitar. */
+function idFoto(v: string | number | null | undefined): bigint | null | undefined {
+  if (v === undefined) return undefined;
+  return v === null || v === '' ? null : BigInt(v);
+}
+
 @Injectable()
 export class CatalogoService implements OnApplicationBootstrap {
   constructor(
@@ -259,7 +265,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             foto_archivo: true,
             tamanos: {
               where: { activo: true },
-              include: { tamano_valor: true },
+              include: { tamano_valor: true, foto_archivo: true },
               orderBy: { tamano_valor: { orden: 'asc' } },
             },
             grupos: {
@@ -269,7 +275,7 @@ export class CatalogoService implements OnApplicationBootstrap {
                   include: {
                     opciones: {
                       where: { activo: true },
-                      include: { valor: true },
+                      include: { valor: true, foto_archivo: true },
                       orderBy: { valor: { orden: 'asc' } },
                     },
                   },
@@ -278,6 +284,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             },
             sabores: {
               where: { activo: true },
+              include: { foto_archivo: true },
               orderBy: { nombre: 'asc' },
             },
             // Anfitrión de una oferta COMBO (Dúo): sus pasos son los grupos del combo, no una mezcla propia.
@@ -330,7 +337,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         const esAnfitrionCombo = (p.ofertasAlcance ?? []).length > 0;
         const sabores: SaborCarta[] = (esAnfitrionCombo ? [] : p.sabores || [])
           .filter((s) => s.activo)
-          .map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock));
+          .map((s) => ({ ...estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock), fotoUrl: obtenerFotoUrl(s.foto_archivo) }));
         const saboresConStock = sabores.some((s) => s.disponible);
         // Producto por sabor: su stock y su disponibilidad salen de los sabores (quedan = suma de los disponibles)
         const porSabor = p.controla_stock && sabores.length > 0;
@@ -349,6 +356,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           nombre: t.tamano_valor?.nombre || '',
           precio: Number(Number(t.precio).toFixed(2)),
           unidades: t.unidades,
+          fotoUrl: obtenerFotoUrl(t.foto_archivo),
         }));
 
         const gruposTodos = (p.grupos || [])
@@ -360,6 +368,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               nombre: o.valor?.nombre || '',
               precioExtra: Number(Number(o.precio_extra).toFixed(2)),
               disponible: estaDisponible(o.agotado_hasta) && !sinStockOpcion.has(o.id.toString()),
+              fotoUrl: obtenerFotoUrl(o.foto_archivo),
             }));
             const bloqueadas = opcionesActivas.filter((o) => sinStockOpcion.has(o.id.toString())).map((o) => o.valor?.nombre || '');
             const libres = opciones.filter((o) => o.disponible).map((o) => o.nombre);
@@ -373,6 +382,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               obligatorio: pg.grupo.obligatorio,
               minimo: pg.grupo.minimo,
               maximo: pg.grupo.maximo,
+              mostrarImagenes: pg.grupo.mostrar_imagenes,
               opciones,
               aviso,
               // Todas sus opciones bloqueadas por stock (sin plan B en el paso)
@@ -414,6 +424,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           tamanos,
           grupos,
           sabores,
+          mostrarImagenesSabores: p.mostrar_imagenes_sabores,
+          mostrarImagenesTamanos: p.mostrar_imagenes_tamanos,
           noSumaBeneficios: p.no_suma_beneficios,
           disponible,
           agotadoHasta,
@@ -487,7 +499,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         categoria: true,
         foto_archivo: true,
         tamanos: {
-          include: { tamano_valor: true },
+          include: { tamano_valor: true, foto_archivo: true },
           orderBy: { tamano_valor: { orden: 'asc' } },
         },
         grupos: {
@@ -496,7 +508,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             grupo: {
               include: {
                 opciones: {
-                  include: { valor: true },
+                  include: { valor: true, foto_archivo: true },
                   orderBy: { valor: { orden: 'asc' } },
                 },
               },
@@ -504,6 +516,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           },
         },
         sabores: {
+          include: { foto_archivo: true },
           orderBy: { nombre: 'asc' },
         },
         // Anfitrión de una oferta COMBO (el Dúo, la Cajita): solo lectura, sin migración.
@@ -564,6 +577,8 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoMotivo: estaDisponible(p.agotado_hasta) ? null : p.agotado_motivo ?? null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      mostrarImagenesSabores: p.mostrar_imagenes_sabores,
+      mostrarImagenesTamanos: p.mostrar_imagenes_tamanos,
       porciones: p.porciones ?? null,
       alergenos: p.alergenos ?? [],
       alergenosConfirmados: p.alergenos_confirmados ?? false,
@@ -583,6 +598,8 @@ export class CatalogoService implements OnApplicationBootstrap {
         precio: Number(Number(t.precio).toFixed(2)),
         activo: t.activo,
         unidades: t.unidades,
+        fotoArchivoId: t.foto_archivo_id ? t.foto_archivo_id.toString() : null,
+        fotoUrl: obtenerFotoUrl(t.foto_archivo),
       })),
       grupos: (p.grupos || []).map((pg) => ({
         id: pg.grupo.id.toString(),
@@ -591,6 +608,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         minimo: pg.grupo.minimo,
         maximo: pg.grupo.maximo,
         orden: pg.orden,
+        mostrarImagenes: pg.grupo.mostrar_imagenes,
         activo: pg.grupo.activo,
         opciones: (pg.grupo.opciones || []).map((o) => ({
           id: o.id.toString(),
@@ -599,11 +617,15 @@ export class CatalogoService implements OnApplicationBootstrap {
           resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
+          fotoArchivoId: o.foto_archivo_id ? o.foto_archivo_id.toString() : null,
+          fotoUrl: obtenerFotoUrl(o.foto_archivo),
         })),
       })),
       sabores: (p.sabores || []).map((s) => ({
         ...estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock),
         aperturaHoy: estadoSabores.get(s.id.toString())?.aperturaHoy ?? false,
+        fotoArchivoId: s.foto_archivo_id ? s.foto_archivo_id.toString() : null,
+        fotoUrl: obtenerFotoUrl(s.foto_archivo),
       })),
     }));
   }
@@ -616,7 +638,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         categoria: true,
         foto_archivo: true,
         tamanos: {
-          include: { tamano_valor: true },
+          include: { tamano_valor: true, foto_archivo: true },
         },
         grupos: {
           orderBy: [{ orden: 'asc' }, { id: 'asc' }],
@@ -624,13 +646,13 @@ export class CatalogoService implements OnApplicationBootstrap {
             grupo: {
               include: {
                 opciones: {
-                  include: { valor: true },
+                  include: { valor: true, foto_archivo: true },
                 },
               },
             },
           },
         },
-        sabores: true,
+        sabores: { include: { foto_archivo: true } },
         ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
       },
     });
@@ -662,6 +684,8 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoMotivo: estaDisponible(p.agotado_hasta) ? null : p.agotado_motivo ?? null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      mostrarImagenesSabores: p.mostrar_imagenes_sabores,
+      mostrarImagenesTamanos: p.mostrar_imagenes_tamanos,
       porciones: p.porciones ?? null,
       alergenos: p.alergenos ?? [],
       alergenosConfirmados: p.alergenos_confirmados ?? false,
@@ -677,6 +701,8 @@ export class CatalogoService implements OnApplicationBootstrap {
         precio: Number(Number(t.precio).toFixed(2)),
         activo: t.activo,
         unidades: t.unidades,
+        fotoArchivoId: t.foto_archivo_id ? t.foto_archivo_id.toString() : null,
+        fotoUrl: obtenerFotoUrl(t.foto_archivo),
       })),
       grupos: (p.grupos || []).map((pg) => ({
         id: pg.grupo.id.toString(),
@@ -685,6 +711,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         minimo: pg.grupo.minimo,
         maximo: pg.grupo.maximo,
         orden: pg.orden,
+        mostrarImagenes: pg.grupo.mostrar_imagenes,
         opciones: (pg.grupo.opciones || []).map((o) => ({
           id: o.id.toString(),
           nombre: o.valor?.nombre || '',
@@ -692,11 +719,15 @@ export class CatalogoService implements OnApplicationBootstrap {
           resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
+          fotoArchivoId: o.foto_archivo_id ? o.foto_archivo_id.toString() : null,
+          fotoUrl: obtenerFotoUrl(o.foto_archivo),
         })),
       })),
       sabores: (p.sabores || []).map((s) => ({
         ...estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock),
         aperturaHoy: estadoSabores.get(s.id.toString())?.aperturaHoy ?? false,
+        fotoArchivoId: s.foto_archivo_id ? s.foto_archivo_id.toString() : null,
+        fotoUrl: obtenerFotoUrl(s.foto_archivo),
       })),
     };
   }
@@ -869,6 +900,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               precio: t.precio,
               activo: t.activo ?? true,
               unidades: t.unidades ?? 1,
+              foto_archivo_id: idFoto(t.fotoArchivoId) ?? null,
             },
           });
         }
@@ -1012,6 +1044,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           porciones: dto.porciones !== undefined ? dto.porciones?.trim() || null : undefined,
           alergenos: dto.alergenos !== undefined ? normalizarAlergenos(dto.alergenos) : undefined,
           alergenos_confirmados: dto.alergenosConfirmados !== undefined ? dto.alergenosConfirmados : undefined,
+          mostrar_imagenes_sabores: dto.mostrarImagenesSabores,
+          mostrar_imagenes_tamanos: dto.mostrarImagenesTamanos,
           foto_archivo_id: fotoArchivoId,
         },
       });
@@ -1036,6 +1070,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               precio: t.precio,
               activo: t.activo ?? true,
               ...(t.unidades !== undefined ? { unidades: t.unidades } : {}),
+              ...(t.fotoArchivoId !== undefined ? { foto_archivo_id: idFoto(t.fotoArchivoId) } : {}),
             },
             create: {
               producto_id: pId,
@@ -1043,6 +1078,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               precio: t.precio,
               activo: t.activo ?? true,
               unidades: t.unidades ?? 1,
+              foto_archivo_id: idFoto(t.fotoArchivoId) ?? null,
             },
           });
         }
@@ -1089,6 +1125,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               data: {
                 nombre: s.nombre.trim(),
                 activo: s.activo ?? true,
+                ...(s.fotoArchivoId !== undefined ? { foto_archivo_id: idFoto(s.fotoArchivoId) } : {}),
               },
             });
           } else {
@@ -1101,11 +1138,13 @@ export class CatalogoService implements OnApplicationBootstrap {
               },
               update: {
                 activo: s.activo ?? true,
+                ...(s.fotoArchivoId !== undefined ? { foto_archivo_id: idFoto(s.fotoArchivoId) } : {}),
               },
               create: {
                 producto_id: pId,
                 nombre: s.nombre.trim(),
                 activo: s.activo ?? true,
+                foto_archivo_id: idFoto(s.fotoArchivoId) ?? null,
               },
             });
           }
@@ -2231,7 +2270,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       include: {
         lista: true,
         opciones: {
-          include: { valor: true },
+          include: { valor: true, foto_archivo: true },
           orderBy: { valor: { orden: 'asc' } },
         },
         productos: {
@@ -2255,6 +2294,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         minimo: g.minimo,
         maximo: g.maximo,
         activo: g.activo,
+        mostrarImagenes: g.mostrar_imagenes,
         categoriaIds: prodCats,
         productosCount: g.productos.length,
         opciones: g.opciones.map((o) => ({
@@ -2265,6 +2305,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           resaltarSiempre: o.resaltar_siempre,
           activo: o.activo,
           disponible: estaDisponible(o.agotado_hasta),
+          fotoArchivoId: o.foto_archivo_id ? o.foto_archivo_id.toString() : null,
+          fotoUrl: obtenerFotoUrl(o.foto_archivo),
         })),
       };
     });
@@ -2401,8 +2443,9 @@ export class CatalogoService implements OnApplicationBootstrap {
     }
     const opcion = await this.prisma.opcion.upsert({
       where: { grupo_id_valor_id: { grupo_id: gId, valor_id: valor.id } },
-      update: { activo: true, precio_extra: precioExtra, ...(dto.resaltarSiempre !== undefined ? { resaltar_siempre: dto.resaltarSiempre } : {}) },
-      create: { grupo_id: gId, valor_id: valor.id, precio_extra: precioExtra, activo: true, resaltar_siempre: dto.resaltarSiempre ?? false },
+      update: { activo: true, precio_extra: precioExtra, ...(dto.resaltarSiempre !== undefined ? { resaltar_siempre: dto.resaltarSiempre } : {}), ...(dto.fotoArchivoId !== undefined ? { foto_archivo_id: idFoto(dto.fotoArchivoId) } : {}) },
+      create: { grupo_id: gId, valor_id: valor.id, precio_extra: precioExtra, activo: true, resaltar_siempre: dto.resaltarSiempre ?? false, foto_archivo_id: idFoto(dto.fotoArchivoId) ?? null },
+      include: { foto_archivo: true },
     });
 
     await this.auditoria.registrar({
@@ -2425,6 +2468,8 @@ export class CatalogoService implements OnApplicationBootstrap {
       resaltarSiempre: opcion.resaltar_siempre,
       activo: opcion.activo,
       disponible: estaDisponible(opcion.agotado_hasta),
+      fotoArchivoId: opcion.foto_archivo_id ? opcion.foto_archivo_id.toString() : null,
+      fotoUrl: obtenerFotoUrl(opcion.foto_archivo),
     };
   }
 
@@ -2478,7 +2523,9 @@ export class CatalogoService implements OnApplicationBootstrap {
         precio_extra: dto.precioExtra !== undefined ? dto.precioExtra : undefined,
         activo: dto.activo !== undefined ? dto.activo : undefined,
         resaltar_siempre: dto.resaltarSiempre !== undefined ? dto.resaltarSiempre : undefined,
+        foto_archivo_id: idFoto(dto.fotoArchivoId),
       },
+      include: { foto_archivo: true },
     });
 
     await this.auditoria.registrar({
@@ -2507,6 +2554,8 @@ export class CatalogoService implements OnApplicationBootstrap {
       resaltarSiempre: updated.resaltar_siempre,
       activo: updated.activo,
       disponible: estaDisponible(updated.agotado_hasta),
+      fotoArchivoId: updated.foto_archivo_id ? updated.foto_archivo_id.toString() : null,
+      fotoUrl: obtenerFotoUrl(updated.foto_archivo),
     };
   }
 
@@ -2551,6 +2600,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         minimo: dto.minimo !== undefined ? dto.minimo : undefined,
         maximo: dto.maximo !== undefined ? dto.maximo : undefined,
         activo: dto.activo !== undefined ? dto.activo : undefined,
+        mostrar_imagenes: dto.mostrarImagenes,
       },
     });
 
@@ -2575,6 +2625,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       minimo: updated.minimo,
       maximo: updated.maximo,
       activo: updated.activo,
+      mostrarImagenes: updated.mostrar_imagenes,
       productosCount: updated._count.productos,
     };
   }

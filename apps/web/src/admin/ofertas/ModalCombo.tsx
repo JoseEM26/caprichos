@@ -12,6 +12,7 @@ import { CategoriaEditor, ProductoEditor, errorDePartes, normalizarPartes, parte
 
 import { catalogoApi } from '../catalogo/catalogoApi';
 import { mezclarTamanos, tamanosHeredados, tamanosVigentes } from './tamanosCombo';
+import { DetalleTamanoCombo } from './DetalleTamanoCombo';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -387,11 +388,15 @@ export function ModalCombo({
           ...(t.tamanoValorId ? { tamanoValorId: t.tamanoValorId } : {}),
           tamanoNombre: t.tamanoNombre.trim(),
           precio: Number(t.precio),
+          ...(t.descripcion?.trim() ? { descripcion: t.descripcion.trim() } : {}),
+          ...(t.fotoArchivoId ? { fotoArchivoId: t.fotoArchivoId } : {}),
         })),
         combosPrecios: vigentes.map((t) => ({
           ...(t.tamanoValorId ? { tamanoValorId: t.tamanoValorId } : {}),
           tamanoNombre: t.tamanoNombre.trim(),
           precio: Number(t.precio),
+          ...(t.descripcion?.trim() ? { descripcion: t.descripcion.trim() } : {}),
+          ...(t.fotoArchivoId ? { fotoArchivoId: t.fotoArchivoId } : {}),
         })),
         partes: partesGuardar,
         combosPartes: partesGuardar,
@@ -665,7 +670,8 @@ export function ModalCombo({
               </div>
 
               {tamanos.map((t, idx) => (
-                <div key={t.tamanoValorId ?? `manual-${idx}`} data-testid="fila-tamano-combo" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div key={t.tamanoValorId ?? `manual-${idx}`} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div data-testid="fila-tamano-combo" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="checkbox"
                     checked={t.activo !== false}
@@ -748,6 +754,27 @@ export function ModalCombo({
                       ×
                     </button>
                   )}
+                </div>
+                {t.activo !== false && (
+                  <DetalleTamanoCombo
+                    tamano={t}
+                    partes={partes}
+                    productos={productosDisponibles}
+                    categorias={categoriasEditor}
+                    alCambiar={(cambio) => setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, ...cambio } : item)))}
+                    alCambiarCantidad={(iParte, n) =>
+                      setPartes((prev) =>
+                        prev.map((p, k) => {
+                          if (k !== iParte || !t.tamanoValorId) return p;
+                          const sig = { ...(p.cantidadPorTamano ?? {}) };
+                          if (n === null) delete sig[t.tamanoValorId];
+                          else sig[t.tamanoValorId] = n;
+                          return { ...p, cantidadPorTamano: sig };
+                        }),
+                      )
+                    }
+                  />
+                )}
                 </div>
               ))}
 

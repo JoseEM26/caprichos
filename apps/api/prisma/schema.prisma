@@ -447,6 +447,10 @@ model Archivo {
   ofertasImagen      Oferta[]
   destacadasFotos    DestacadaFoto[]
   vouchers           VoucherPago[]
+  combosPrecioFoto   ComboPrecio[]
+  opcionesFoto       Opcion[]
+  saboresFoto        Sabor[]
+  tamanosFoto        ProductoTamano[]
 
   @@map("archivo")
 }
@@ -525,6 +529,9 @@ model Producto {
   alergenos          String[]         @default([])
   /// El admin revisó la lista de alérgenos: solo entonces el bot y la carta la afirman
   alergenos_confirmados Boolean       @default(false)
+  /// Interruptores de la carta: mostrar la foto de cada sabor / de cada tamaño (apagados = como siempre)
+  mostrar_imagenes_sabores Boolean    @default(false)
+  mostrar_imagenes_tamanos Boolean    @default(false)
   categoria          Categoria        @relation(fields: [categoria_id], references: [id])
   foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
   tamanos            ProductoTamano[]
@@ -553,6 +560,9 @@ model ProductoTamano {
   activo          Boolean       @default(true)
   /// Unidades (donas) que lleva el tamaño: Unidad=1, 1/2 docena=6, Docena=12. Con sabores, se reparten entre ellos.
   unidades        Int           @default(1)
+  /// Foto propia del tamaño (opcional); sin ella se usa la del producto
+  foto_archivo_id BigInt?
+  foto_archivo    Archivo?      @relation(fields: [foto_archivo_id], references: [id])
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor    @relation(fields: [tamano_valor_id], references: [id])
   recetaLineas    RecetaLinea[]
@@ -570,6 +580,8 @@ model GrupoOpciones {
   minimo      Int             @default(0)
   maximo      Int             @default(1)
   activo      Boolean         @default(true)
+  /// Mostrar la foto de cada opción en la carta
+  mostrar_imagenes Boolean     @default(false)
   lista       Lista?          @relation(fields: [lista_id], references: [id])
   opciones    Opcion[]
   productos   ProductoGrupo[]
@@ -586,6 +598,9 @@ model Opcion {
   agotado_hasta       DateTime?            @db.Timestamptz
   /// «Resaltar siempre en cocina»: marca manual de la opción (vale en todos los productos que usan su grupo)
   resaltar_siempre    Boolean              @default(false)
+  /// Foto propia de la opción (opcional)
+  foto_archivo_id     BigInt?
+  foto_archivo        Archivo?             @relation(fields: [foto_archivo_id], references: [id])
   grupo               GrupoOpciones        @relation(fields: [grupo_id], references: [id])
   valor               ListaValor           @relation(fields: [valor_id], references: [id])
   pedidoLineaOpciones PedidoLineaOpcion[]
@@ -618,6 +633,9 @@ model Sabor {
   agotado_hasta DateTime? @db.Timestamptz
   /// MANUAL | AUTOMATICO (ver producto.agotado_origen)
   agotado_origen String?
+  /// Foto propia del sabor (opcional); sin ella se usa la del producto
+  foto_archivo_id BigInt?
+  foto_archivo    Archivo?  @relation(fields: [foto_archivo_id], references: [id])
   producto      Producto  @relation(fields: [producto_id], references: [id])
   agotados      Agotado[]
   stockSabor    StockSabor?
@@ -1936,7 +1954,11 @@ model ComboPrecio {
   oferta_id       BigInt
   tamano_valor_id BigInt
   precio          Decimal    @db.Decimal(12, 2)
+  /// Descripción y foto propias del tamaño (opcionales); sin ellas se usan las del combo
+  descripcion     String?
+  foto_archivo_id BigInt?
 
+  foto_archivo    Archivo?   @relation(fields: [foto_archivo_id], references: [id])
   oferta          Oferta     @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
   tamano_valor    ListaValor @relation(fields: [tamano_valor_id], references: [id])
 
@@ -1972,6 +1994,10 @@ model ComboParte {
   incluida_por_defecto Boolean @default(true)
   /// Cobro por cada unidad por encima de las incluidas; null = sin cobro extra.
   precio_extra        Decimal? @db.Decimal(12, 2)
+  /// Mostrar la foto de cada elegible de la parte en la carta
+  mostrar_imagenes    Boolean  @default(false)
+  /// Cantidad propia por tamaño del combo ({ "<tamanoValorId>": 4 }); lo no listado usa `cantidad`. null = igual para todos.
+  cantidad_por_tamano Json?
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
   tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)

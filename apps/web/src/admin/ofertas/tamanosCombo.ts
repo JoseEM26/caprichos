@@ -39,6 +39,10 @@ export interface TamanoCombo {
   precio: number;
   /** Solo en pantalla: apagado (o sin precio) = el tamaño no se ofrece ni se guarda. */
   activo?: boolean;
+  /** Descripción y foto propias del tamaño (opcionales). */
+  descripcion?: string | null;
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
 }
 
 /** Suma los heredados que falten (sin pisar precios). `activarNuevos`: combo nuevo; si no, quedan apagados. */

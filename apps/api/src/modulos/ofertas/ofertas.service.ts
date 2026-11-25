@@ -133,13 +133,23 @@ function parteResuelta(
   };
 }
 
+/** Cantidad propia de cada parte para un tamaño del combo ({ parteId: n }); solo las partes que la tienen. */
+function cantidadesDeTamano(partes: any[] | undefined, tamanoValorId: string): Record<string, number> {
+  const r: Record<string, number> = {};
+  for (const p of partes ?? []) {
+    const n = (p.cantidad_por_tamano as Record<string, number> | null)?.[tamanoValorId];
+    if (n) r[p.id.toString()] = n;
+  }
+  return r;
+}
+
 /** Campos de stock que necesitan los combos para saber si una elección tiene saldo (producto y sabores activos). */
 const SELECT_STOCK_COMBO = {
   controla_stock: true,
   stocks: { select: { cantidad: true } },
   sabores: {
     where: { activo: true },
-    select: { id: true, nombre: true, activo: true, agotado_hasta: true, stockSabor: { select: { cantidad: true } } },
+    select: { id: true, nombre: true, activo: true, agotado_hasta: true, stockSabor: { select: { cantidad: true } }, foto_archivo: { select: { ruta: true } } },
   },
 };
 
@@ -154,6 +164,7 @@ function stockDeProducto(f: any): Pick<ProductoDisp, 'controlaStock' | 'saldo' |
       activo: !!s.activo,
       agotadoHasta: s.agotado_hasta ?? null,
       saldo: Number(s.stockSabor?.cantidad ?? 0),
+      fotoUrl: obtenerFotoUrl(s.foto_archivo),
     })),
   };
 }
@@ -162,7 +173,7 @@ function stockDeProducto(f: any): Pick<ProductoDisp, 'controlaStock' | 'saldo' |
 function detalleOpcion(id: string, productos: ProductoDisp[]): OpcionDetalleCombo {
   const f = productos.find((x) => x.id === id);
   const sabores = f?.controlaStock && (f.sabores ?? []).length > 0
-    ? f.sabores!.map((s) => ({ id: s.id, nombre: s.nombre, disponible: saborDisponible(s), saldo: Math.max(0, Math.floor(s.saldo)) }))
+    ? f.sabores!.map((s) => ({ id: s.id, nombre: s.nombre, disponible: saborDisponible(s), saldo: Math.max(0, Math.floor(s.saldo)), ...(s.fotoUrl ? { fotoUrl: s.fotoUrl } : {}) }))
     : undefined;
   const disponible = !!f && productoDisponible(f);
   // Bloqueada solo por saldo (no por ocultar ni agotar a mano): la carta dice «No hay stock»
@@ -217,7 +228,7 @@ export class OfertasService {
         producto: true,
         imagen_archivo: true,
         combosPrecio: {
-          include: { tamano_valor: true },
+          include: { tamano_valor: true, foto_archivo: true },
         },
         combosParte: INCLUDE_PARTES,
       },
@@ -273,7 +284,7 @@ export class OfertasService {
         producto: true,
         imagen_archivo: true,
         combosPrecio: {
-          include: { tamano_valor: true },
+          include: { tamano_valor: true, foto_archivo: true },
         },
         combosParte: INCLUDE_PARTES,
       },
@@ -410,6 +421,8 @@ export class OfertasService {
               oferta_id: oferta.id,
               tamano_valor_id: tamanoId,
               precio: new Prisma.Decimal(t.precio),
+              descripcion: t.descripcion?.trim() || null,
+              foto_archivo_id: t.fotoArchivoId ? BigInt(t.fotoArchivoId) : null,
             },
           });
           preciosCombo.push({ tamanoValorId: tamanoId, precio: Number(t.precio) });
@@ -459,6 +472,8 @@ export class OfertasService {
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
               ...this.opcionalDeParte(tipoParte, p),
+              mostrar_imagenes: p.mostrarImagenes ?? false,
+              cantidad_por_tamano: this.cantidadPorTamanoDeParte(p.cantidadPorTamano),
               ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
             },
           });
@@ -488,7 +503,7 @@ export class OfertasService {
           categoria: true,
           producto: true,
           imagen_archivo: true,
-          combosPrecio: { include: { tamano_valor: true } },
+          combosPrecio: { include: { tamano_valor: true, foto_archivo: true } },
           combosParte: INCLUDE_PARTES,
         },
       });
@@ -675,6 +690,8 @@ export class OfertasService {
               oferta_id: BigInt(id),
               tamano_valor_id: tamanoId,
               precio: new Prisma.Decimal(t.precio),
+              descripcion: t.descripcion?.trim() || null,
+              foto_archivo_id: t.fotoArchivoId ? BigInt(t.fotoArchivoId) : null,
             },
           });
           preciosCombo.push({ tamanoValorId: tamanoId, precio: Number(t.precio) });
@@ -725,6 +742,8 @@ export class OfertasService {
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
               ...this.opcionalDeParte(tipoParte, p),
+              mostrar_imagenes: p.mostrarImagenes ?? false,
+              cantidad_por_tamano: this.cantidadPorTamanoDeParte(p.cantidadPorTamano),
               ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
             },
           });
@@ -760,7 +779,7 @@ export class OfertasService {
           categoria: true,
           producto: true,
           imagen_archivo: true,
-          combosPrecio: { include: { tamano_valor: true } },
+          combosPrecio: { include: { tamano_valor: true, foto_archivo: true } },
           combosParte: INCLUDE_PARTES,
         },
       });
@@ -812,7 +831,7 @@ export class OfertasService {
         categoria: true,
         producto: true,
         imagen_archivo: true,
-        combosPrecio: { include: { tamano_valor: true } },
+        combosPrecio: { include: { tamano_valor: true, foto_archivo: true } },
         combosParte: INCLUDE_PARTES,
       },
     });
@@ -2334,7 +2353,13 @@ export class OfertasService {
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
     if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());
 
-    const partesTodas = (oferta.combosParte ?? []).map((p) => ({ ...p, alternativas: p.alternativas ?? [] }));
+    // Cantidad propia del tamaño elegido (p. ej. 4 juguetes en Familiar); sin ella, la de la parte
+    const tamanoElegido = tamanoValorId === undefined || tamanoValorId === null ? '' : String(tamanoValorId);
+    const partesTodas = (oferta.combosParte ?? []).map((p) => ({
+      ...p,
+      cantidad: (tamanoElegido && p.cantidadPorTamano?.[tamanoElegido]) || p.cantidad,
+      alternativas: p.alternativas ?? [],
+    }));
     // Complemento a elegir: de cada grupo vale el ÚNICO paquete con elecciones; las piezas de los otros no cuentan
     const paquetesElegidos = new Map<string, string>();
     for (const grupo of new Set(partesTodas.map((p) => p.paqueteGrupo).filter((g): g is string => !!g))) {
@@ -2657,6 +2682,11 @@ export class OfertasService {
    * Parte opcional (solo FIJO): `cantidad` = incluidas en el precio; mínimo ≤ incluidas ≤ máximo; el extra no es negativo.
    * Sin opcional, todo queda en sus valores neutros (la parte se comporta como siempre).
    */
+  /** Cantidad propia por tamaño ({ tamanoValorId: n }); vacío = null (todos usan `cantidad`). */
+  private cantidadPorTamanoDeParte(v?: Record<string, number> | null): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    return v && Object.keys(v).length > 0 ? v : Prisma.DbNull;
+  }
+
   private opcionalDeParte(
     tipo: string,
     p: { cantidad?: number; opcional?: boolean; cantidadMin?: number; cantidadMax?: number | null; incluidaPorDefecto?: boolean; precioExtra?: number | null },
@@ -3104,6 +3134,10 @@ export class OfertasService {
             tamanoValorId: cp.tamano_valor_id.toString(),
             tamanoNombre: cp.tamano_valor?.nombre || '',
             precio: Number(cp.precio),
+            descripcion: cp.descripcion ?? null,
+            fotoArchivoId: cp.foto_archivo_id ? cp.foto_archivo_id.toString() : null,
+            fotoUrl: obtenerFotoUrl(cp.foto_archivo),
+            cantidades: cantidadesDeTamano(o.combosParte, cp.tamano_valor_id.toString()),
           }))
         : [],
       combosParte: Array.isArray(o.combosParte)
@@ -3123,6 +3157,8 @@ export class OfertasService {
             cantidadMax: cp.cantidad_max ?? null,
             incluidaPorDefecto: cp.incluida_por_defecto ?? true,
             precioExtra: cp.precio_extra != null ? Number(cp.precio_extra) : null,
+            mostrarImagenes: !!cp.mostrar_imagenes,
+            ...(cp.cantidad_por_tamano && Object.keys(cp.cantidad_por_tamano).length > 0 ? { cantidadPorTamano: cp.cantidad_por_tamano as Record<string, number> } : {}),
             tamanoId: cp.tamano ? cp.tamano.id.toString() : null,
             tamanoNombre: cp.tamano?.tamano_valor?.nombre ?? null,
             tamanoUnidades: cp.tamano?.unidades ?? 1,

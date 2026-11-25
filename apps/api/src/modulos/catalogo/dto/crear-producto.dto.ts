@@ -33,6 +33,10 @@ export class TamanoProductoInputDto {
   @IsInt({ message: 'Las unidades del tamaño deben ser un entero' })
   @Min(1, { message: 'Las unidades del tamaño deben ser al menos 1' })
   unidades?: number;
+
+  /** Foto propia del tamaño (archivo ya subido); null la quita. */
+  @IsOptional()
+  fotoArchivoId?: string | number | null;
 }
 
 export class GrupoProductoInputDto {

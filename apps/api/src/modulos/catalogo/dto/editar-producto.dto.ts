@@ -25,6 +25,10 @@ export class SaborInputDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Foto propia del sabor (archivo ya subido); null la quita. */
+  @IsOptional()
+  fotoArchivoId?: string | number | null;
 }
 
 export class EditarProductoDto {
@@ -68,6 +72,15 @@ export class EditarProductoDto {
   @IsOptional()
   @IsBoolean()
   controlaStock?: boolean;
+
+  /** Carta: mostrar la foto de cada sabor / de cada tamaño. */
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenesSabores?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenesTamanos?: boolean;
 
   /** «Alcanza para»: texto corto, p. ej. «8 a 10 personas». */
   @IsOptional()

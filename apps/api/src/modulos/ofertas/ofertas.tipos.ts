@@ -8,6 +8,13 @@ export interface ComboPrecioItem {
   tamanoValorId: string;
   tamanoNombre?: string;
   precio: number;
+  /** Descripción propia del tamaño; null = se usa la del combo. */
+  descripcion?: string | null;
+  /** Foto propia del tamaño; null = se usa la del combo (`imagenUrl`). */
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
+  /** Cantidad a elegir en cada parte con cantidad propia para este tamaño ({ parteId: n }); las demás usan `cantidad` de la parte. */
+  cantidades?: Record<string, number>;
 }
 
 /** Opción de una parte A_ELECCION con lista de productos. Producto por sabor: cada sabor con su saldo. */
@@ -23,7 +30,7 @@ export interface OpcionDetalleCombo {
   fotoUrl?: string;
   /** Nombre de la categoría del producto: la carta arma chips (Frappes, Iced...) cuando hay dos o más. */
   categoria?: string;
-  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
+  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number; fotoUrl?: string }[];
 }
 
 /** Alternativa de una parte: producto y cantidad («si no hay stock, el cliente podrá elegir»). Mismo precio del combo. */
@@ -63,6 +70,10 @@ export interface ComboParteItem {
   tamanoId?: string | null;
   tamanoNombre?: string | null;
   tamanoUnidades?: number;
+  /** Mostrar la foto de cada elegible de la parte (apagado por defecto). La foto sale en `opcionesDetalle[].fotoUrl` y `sabores[].fotoUrl`. */
+  mostrarImagenes?: boolean;
+  /** Cantidad propia por tamaño del combo ({ tamanoValorId: n }); lo no listado usa `cantidad`. */
+  cantidadPorTamano?: Record<string, number>;
   /** Calculado en tiempo real. FIJO: principal si está, si no las alternativas disponibles en orden. */
   disponible?: boolean;
   opcionesDisponibles?: string[];

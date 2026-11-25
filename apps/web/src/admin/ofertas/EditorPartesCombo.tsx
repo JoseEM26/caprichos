@@ -5,6 +5,7 @@ import {
   nombreDeBloque, nombresQueElige, nombreTemporal, nuevaEleccion, nuevoFijo, nuevoOpcional, opcionesDeGrupo, perteneceACategoria, piezaVacia, piezasDePlantilla,
   resumenParaCliente, retitular, saboresDeLaParte, tipoDe,
 } from './partesComboModelo';
+import { InterruptorImagenes } from '../../comun/FotoMini';
 import './editor-partes-combo.css';
 
 interface Props {
@@ -353,6 +354,7 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
         />
         <QueVera p={p} productos={productos} categorias={categorias} />
         <CuposProducto p={p} productos={productos} categorias={categorias} onCambio={(c) => parche(i, { cuposProducto: c })} />
+        <InterruptorImagenes marcado={p.mostrarImagenes === true} alCambiar={(v) => parche(i, { mostrarImagenes: v })} />
         {tipoDe(p) === 'FIJO' && (prod?.tamanos ?? []).length > 0 && (
           <label className="epc-etiqueta">Tamaño del producto
             <select aria-label="Tamaño del producto fijo" className="epc-select" value={p.tamanoId ?? ''} onChange={(e) => parche(i, { tamanoId: e.target.value || null })}>
@@ -570,6 +572,7 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
                 <Selector categorias={categorias} productos={productos} cats={p.categorias ?? []} prods={idsProductos(p)} etiqueta="esta tarjeta" onCambio={(c, pr) => poner(partes.map((x, j) => (j === i ? conSeleccion(x, c, pr, productos) : x)))} />
                 <QueVera p={p} productos={productos} categorias={categorias} />
                 <CuposProducto p={p} productos={productos} categorias={categorias} onCambio={(c) => parche(i, { cuposProducto: c })} />
+                <InterruptorImagenes marcado={p.mostrarImagenes === true} alCambiar={(v) => parche(i, { mostrarImagenes: v })} />
                 {!hayLista && (p.categorias ?? []).length > 0 && (
                   <details className="epc-mas" open={(p.productosExcluidos ?? []).length > 0}>
                     <summary className="epc-enlace">Excluir alguno (ej. sin Frozen)</summary>

@@ -4,6 +4,8 @@ export interface TamanoCarta {
   precio: number;
   /** Unidades que lleva el tamaño (1 unidad, media docena = 6, docena = 12). */
   unidades: number;
+  /** Foto propia del tamaño; null = se usa la del producto. Solo se muestra si `mostrarImagenesTamanos`. */
+  fotoUrl?: string | null;
 }
 
 export interface OpcionCarta {
@@ -11,6 +13,8 @@ export interface OpcionCarta {
   nombre: string;
   precioExtra: number;
   disponible: boolean;
+  /** Foto propia de la opción; null = se usa la del producto. Solo se muestra si el grupo tiene `mostrarImagenes`. */
+  fotoUrl?: string | null;
 }
 
 export interface GrupoOpcionesCarta {
@@ -19,6 +23,8 @@ export interface GrupoOpcionesCarta {
   obligatorio: boolean;
   minimo: number;
   maximo: number;
+  /** Interruptor «Mostrar imágenes» del grupo (apagado por defecto). */
+  mostrarImagenes?: boolean;
   opciones: OpcionCarta[];
   /** Plan B: «Se acabaron: X. Elige entre: Y» (solo si hay opciones agotadas por stock y otras disponibles) */
   aviso?: string | null;
@@ -34,6 +40,8 @@ export interface SaborCarta {
   disponible: boolean;
   /** Saldo de hoy si hay conteo de apertura del sabor; null si no hay (sin tope). */
   quedan: number | null;
+  /** Foto propia del sabor; null = se usa la del producto. Solo se muestra si `mostrarImagenesSabores`. */
+  fotoUrl?: string | null;
 }
 
 export interface ProductoCarta {
@@ -45,6 +53,9 @@ export interface ProductoCarta {
   tamanos: TamanoCarta[];
   grupos: GrupoOpcionesCarta[];
   sabores: SaborCarta[];
+  /** Interruptores del producto: mostrar la foto de cada sabor / de cada tamaño. */
+  mostrarImagenesSabores?: boolean;
+  mostrarImagenesTamanos?: boolean;
   noSumaBeneficios: boolean;
   disponible: boolean;
   agotadoHasta: string | null;

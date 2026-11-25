@@ -366,6 +366,12 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
 }
 
 /** Partes tal como las guarda el servidor: sin campos del editor y con el nombre siempre puesto. */
+/** Cantidad propia por tamaño: solo enteros de 1 a 99; sin ninguna, null (todos usan la de la parte). */
+export function cantidadPorTamanoLimpia(p: Parte): Record<string, number> | null {
+  const limpia = Object.entries(p.cantidadPorTamano ?? {}).filter(([, n]) => Number.isInteger(n) && n >= 1 && n <= 99);
+  return limpia.length > 0 ? Object.fromEntries(limpia) : null;
+}
+
 export function partesParaGuardar(partes: Parte[], categorias: CategoriaEditor[], productos: ProductoEditor[]) {
   return partes.map((p, idx) => {
     const tipo = tipoDe(p) === 'FIJO' ? 'FIJO' : 'A_ELECCION';
@@ -383,6 +389,8 @@ export function partesParaGuardar(partes: Parte[], categorias: CategoriaEditor[]
       paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
       saboresIds: (p.saboresIds ?? []).map(String),
       productosExcluidos: (p.productosExcluidos ?? []).map(String),
+      mostrarImagenes: tipo === 'A_ELECCION' && p.mostrarImagenes === true,
+      cantidadPorTamano: cantidadPorTamanoLimpia(p),
       ...(tipo === 'A_ELECCION' && cuposLimpios(p, productos, categorias) ? { cuposProducto: cuposLimpios(p, productos, categorias) } : {}),
       ...(tipo === 'FIJO' && p.opcional
         ? {

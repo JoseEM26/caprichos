@@ -79,6 +79,11 @@ export class ActualizarGrupoOpcionesDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Carta: mostrar la foto de cada opción del grupo. */
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenes?: boolean;
 }
 
 export class CrearOpcionDto {
@@ -95,6 +100,10 @@ export class CrearOpcionDto {
   @IsOptional()
   @IsBoolean({ message: 'Resaltar siempre debe ser verdadero o falso' })
   resaltarSiempre?: boolean;
+
+  /** Foto propia de la opción (archivo ya subido); null la quita. */
+  @IsOptional()
+  fotoArchivoId?: string | number | null;
 }
 
 export class ActualizarOpcionDto {
@@ -114,4 +123,8 @@ export class ActualizarOpcionDto {
   @IsOptional()
   @IsBoolean({ message: 'Resaltar siempre debe ser verdadero o falso' })
   resaltarSiempre?: boolean;
+
+  /** Foto propia de la opción (archivo ya subido); null la quita. */
+  @IsOptional()
+  fotoArchivoId?: string | number | null;
 }

@@ -11,6 +11,9 @@ export interface TamanoEstado {
   precio: number;
   activo: boolean;
   unidades: number;
+  /** Foto propia del tamaño (opcional). */
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
 }
 
 /** Un grupo de opciones que se le pregunta al cliente en este producto. */
@@ -28,6 +31,8 @@ export interface EstadoOpciones {
   grupos: GrupoEstado[];
   /** Cocina: resaltar la opción menos pedida de cada grupo. Sin valor = apagado. */
   resaltarMenosPedida?: boolean;
+  /** Carta: mostrar la foto de cada tamaño (apagado por defecto). */
+  mostrarImagenesTamanos?: boolean;
 }
 
 export const ESTADO_VACIO: EstadoOpciones = { tamanos: [], grupos: [] };
@@ -35,12 +40,15 @@ export const ESTADO_VACIO: EstadoOpciones = { tamanos: [], grupos: [] };
 export function estadoDesdeProducto(p: ProductoAdmin): EstadoOpciones {
   return {
     resaltarMenosPedida: p.resaltarOpcionMenosPedida === true,
+    mostrarImagenesTamanos: p.mostrarImagenesTamanos === true,
     tamanos: (p.tamanos || []).map((t) => ({
       tamanoValorId: t.tamanoValorId,
       nombre: t.nombre,
       precio: t.precio,
       activo: t.activo !== false,
       unidades: t.unidades ?? 1,
+      fotoArchivoId: t.fotoArchivoId ?? null,
+      fotoUrl: t.fotoUrl ?? null,
     })),
     grupos: (p.grupos || []).map((g) => ({
       grupoId: g.id,

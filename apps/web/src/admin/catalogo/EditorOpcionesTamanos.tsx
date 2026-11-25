@@ -22,6 +22,7 @@ import './editor-opciones.css';
 import { EnlacesStockOpciones } from './EnlacesStockOpciones';
 import { GrupoCard, NuevoGrupo } from './GruposPregunta';
 import { Tip } from './ayudaOpciones';
+import { FotoMini, InterruptorImagenes } from '../../comun/FotoMini';
 import { VistaCliente } from './VistaClienteOpciones';
 import { OrdenPreguntas } from './OrdenPreguntas';
 import { VistaPreviaEnVivo } from './VistaPreviaEnVivo';
@@ -215,7 +216,10 @@ export function EditorOpcionesTamanos({
           precio: Number(t.precio) || 0,
           activo: t.activo,
           unidades: t.unidades,
+          // Solo viaja la foto si cambió (null la quita)
+          ...((t.fotoArchivoId ?? null) !== (producto.tamanos.find((x) => x.tamanoValorId === t.tamanoValorId)?.fotoArchivoId ?? null) ? { fotoArchivoId: t.fotoArchivoId ?? null } : {}),
         })),
+        ...(estado.mostrarImagenesTamanos === true !== (producto.mostrarImagenesTamanos === true) ? { mostrarImagenesTamanos: estado.mostrarImagenesTamanos === true } : {}),
         grupos: estado.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
         sincronizarGrupos: true,
         resaltarOpcionMenosPedida: estado.resaltarMenosPedida === true,
@@ -323,6 +327,19 @@ export function EditorOpcionesTamanos({
             : 'Unidad = 1, 1/2 docena = 6, Docena = 12. Cada venta de este tamaño descuenta esa cantidad del stock de cada sabor.'}
         </div>
       )}
+      {modo === 'guardado' && estado.tamanos.length > 0 && (
+        <div className="eo-ajuste">
+          <InterruptorImagenes marcado={estado.mostrarImagenesTamanos === true} texto="Mostrar imágenes de los tamaños" deshabilitado={bloqueado}
+            alCambiar={(v) => setEstado({ ...estado, mostrarImagenesTamanos: v })} />
+          <Tip etiqueta="Imágenes de los tamaños" texto="Apagado, la carta no muestra fotos de los tamaños. Encendido, al elegir un tamaño se ve su foto; el que no tenga foto propia usa la del producto." />
+        </div>
+      )}
+      {estado.mostrarImagenesTamanos === true && estado.tamanos.map((t, i) => (
+        <div className="eo-micro" key={`foto-${t.tamanoValorId}`}>
+          {t.nombre}: <FotoMini etiqueta={t.nombre} url={t.fotoUrl} deshabilitado={bloqueado}
+            alCambiar={(f) => setTam(i, { fotoArchivoId: f?.id ?? null, fotoUrl: f?.url ?? null })} />
+        </div>
+      ))}
       {estado.tamanos.length === 0 && <div className="eo-micro">Este producto no tiene tamaños: se vende a un precio único.</div>}
       <div className="eo-micro">
         «Quitar» solo lo oculta; los pedidos anteriores no cambian. <Tip etiqueta="Orden de los tamaños" texto="El orden (▲▼) es el de la lista de tamaños y vale para todos los productos." />

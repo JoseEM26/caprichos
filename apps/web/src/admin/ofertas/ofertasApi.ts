@@ -6,6 +6,12 @@ export interface ComboPrecioItem {
   precio: number;
   /** Solo en el editor: apagado = el tamaño no se ofrece. */
   activo?: boolean;
+  /** Descripción y foto propias del tamaño (opcionales); sin ellas, la carta usa las del combo. */
+  descripcion?: string | null;
+  fotoArchivoId?: string | null;
+  fotoUrl?: string | null;
+  /** Solo carta: cantidad propia de cada parte para este tamaño ({ parteId: n }). */
+  cantidades?: Record<string, number>;
 }
 
 /** Opción de una parte con lista (juguetes, donas) o alternativa: si se puede elegir ahora y, por sabor, cada sabor con su saldo. */
@@ -21,7 +27,7 @@ export interface OpcionDetalleCombo {
   fotoUrl?: string;
   /** Categoría del producto (si el servidor la envía): habilita los chips de categoría en las bebidas del combo. */
   categoria?: string;
-  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
+  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number; fotoUrl?: string }[];
 }
 
 /** Alternativa de una parte: producto y cantidad («si no hay stock, el cliente podrá elegir»). Mismo precio del combo. */
@@ -56,6 +62,10 @@ export interface ComboParteItem {
   productosExcluidos?: string[];
   /** Solo A_ELECCION: lugares que ocupa cada producto ({ productoId: 2 }); lo no listado vale 1. */
   cuposProducto?: Record<string, number>;
+  /** Carta: mostrar la foto de cada elegible de la parte (apagado por defecto). */
+  mostrarImagenes?: boolean;
+  /** Cantidad propia por tamaño del combo ({ tamanoValorId: n }); lo no listado usa `cantidad`. */
+  cantidadPorTamano?: Record<string, number>;
   /** Parte FIJO opcional: el cliente puede quitarla o pedir extras. `cantidad` = incluidas; lleva de cantidadMin a cantidadMax (null = incluidas). */
   opcional?: boolean;
   cantidadMin?: number;

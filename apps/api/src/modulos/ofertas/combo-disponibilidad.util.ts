@@ -9,6 +9,8 @@ export interface SaborDisp {
   activo: boolean;
   agotadoHasta: Date | string | null;
   saldo: number;
+  /** Foto propia del sabor (opcional). */
+  fotoUrl?: string | null;
 }
 
 /** Producto mínimo que necesita el cálculo (todo como texto para no depender de bigint). */

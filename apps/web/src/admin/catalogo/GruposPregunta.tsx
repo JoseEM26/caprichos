@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { catalogoApi, GrupoOpcionItem } from './catalogoApi';
 import { Ayuda } from './ayudaOpciones';
+import { FotoMini, InterruptorImagenes } from '../../comun/FotoMini';
 
-interface OpcionDraft { id?: string; nombre: string; precioExtra: number; activo: boolean; resaltarSiempre: boolean }
+interface OpcionDraft { id?: string; nombre: string; precioExtra: number; activo: boolean; resaltarSiempre: boolean; fotoArchivoId?: string | null; fotoUrl?: string | null }
 
 export function resumenGrupo(g: GrupoOpcionItem): string {
   const n = g.opciones.length;
@@ -21,8 +22,9 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
   const [obligatorio, setObligatorio] = useState(!!g.obligatorio);
   const [minimo, setMinimo] = useState(g.minimo ?? 0);
   const [maximo, setMaximo] = useState(g.maximo ?? 1);
+  const [mostrarImagenes, setMostrarImagenes] = useState(g.mostrarImagenes === true);
   const [ops, setOps] = useState<OpcionDraft[]>(
-    g.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, activo: o.activo !== false, resaltarSiempre: o.resaltarSiempre === true })),
+    g.opciones.map((o) => ({ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, activo: o.activo !== false, resaltarSiempre: o.resaltarSiempre === true, fotoArchivoId: o.fotoArchivoId ?? null, fotoUrl: o.fotoUrl ?? null })),
   );
   const [error, setError] = useState('');
   const [confirmar, setConfirmar] = useState(false);
@@ -55,12 +57,12 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
     setGuardando(true);
     try {
       const { min, max } = calc();
-      await catalogoApi.actualizarGrupo(g.id, { nombre: nombre.trim(), obligatorio, minimo: min, maximo: max });
+      await catalogoApi.actualizarGrupo(g.id, { nombre: nombre.trim(), obligatorio, minimo: min, maximo: max, mostrarImagenes });
       for (const o of ops) {
         const orig = g.opciones.find((x) => x.id === o.id);
-        if (!o.id) await catalogoApi.crearOpcion(g.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, ...(o.resaltarSiempre ? { resaltarSiempre: true } : {}) });
-        else if (orig && (orig.nombre !== o.nombre.trim() || orig.precioExtra !== o.precioExtra || (orig.activo !== false) !== o.activo || (orig.resaltarSiempre === true) !== o.resaltarSiempre)) {
-          await catalogoApi.editarOpcion(o.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, activo: o.activo, resaltarSiempre: o.resaltarSiempre });
+        if (!o.id) await catalogoApi.crearOpcion(g.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, ...(o.resaltarSiempre ? { resaltarSiempre: true } : {}), ...(o.fotoArchivoId ? { fotoArchivoId: o.fotoArchivoId } : {}) });
+        else if (orig && (orig.nombre !== o.nombre.trim() || orig.precioExtra !== o.precioExtra || (orig.activo !== false) !== o.activo || (orig.resaltarSiempre === true) !== o.resaltarSiempre || (orig.fotoArchivoId ?? null) !== (o.fotoArchivoId ?? null))) {
+          await catalogoApi.editarOpcion(o.id, { nombre: o.nombre.trim(), precioExtra: o.precioExtra, activo: o.activo, resaltarSiempre: o.resaltarSiempre, fotoArchivoId: o.fotoArchivoId ?? null });
         }
       }
       setError('');
@@ -122,6 +124,7 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
               </>
             )}
           </div>
+          <InterruptorImagenes marcado={mostrarImagenes} texto="Mostrar imágenes de las opciones" alCambiar={setMostrarImagenes} />
           <div className="eo-titulo-sec">Opciones y su precio extra (S/)</div>
           <div className="eo-opciones">
             {ops.map((o, i) => (
@@ -139,6 +142,10 @@ export function GrupoCard({ g, enProducto, onToggle, puedeEditar, alCambiar }: {
                     aria-label={`⭐ Resaltar siempre en cocina: ${o.nombre || 'opción ' + (i + 1)}`} />
                   <span>⭐ Resaltar siempre en cocina</span>
                 </label>
+                {mostrarImagenes && (
+                  <FotoMini etiqueta={o.nombre || `opción ${i + 1}`} url={o.fotoUrl}
+                    alCambiar={(f) => setOp(i, { fotoArchivoId: f?.id ?? null, fotoUrl: f?.url ?? null })} />
+                )}
               </div>
             ))}
           </div>

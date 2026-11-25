@@ -4,6 +4,7 @@ import { ModalConPestanas, PestanaModal } from '../../comun/ModalConPestanas';
 import { Confirmar } from '../../comun/Confirmar';
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { Tip } from './ayudaOpciones';
+import { FotoMini, InterruptorImagenes } from '../../comun/FotoMini';
 import type { CategoriaAdmin, ProductoAdmin, SaborItem } from './catalogoApi';
 import './editor-opciones.css';
 import './editar-producto.css';
@@ -29,6 +30,8 @@ export interface EditarProductoModalProps {
   alSubirFoto: (e: React.ChangeEvent<HTMLInputElement>) => void;
   alQuitarFoto: () => void;
   sabores: SaborItem[]; setSabores: (v: SaborItem[]) => void;
+  /** Carta: mostrar la foto de cada sabor (apagado por defecto). */
+  mostrarImagenesSabores?: boolean; setMostrarImagenesSabores?: (v: boolean) => void;
   nuevoSabor: string; setNuevoSabor: (v: string) => void;
   error: string;
   puedeEditar: boolean;
@@ -55,8 +58,8 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
     if (v && !p.alergenos.includes(v)) p.setAlergenos([...p.alergenos, v]);
     if (v) setOtroAlergeno('');
   };
-  const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]));
-  const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados]) !== inicial.current;
+  const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados, p.mostrarImagenesSabores]));
+  const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores, p.porciones, p.alergenos, p.alergenosConfirmados, p.mostrarImagenesSabores]) !== inicial.current;
   // Tamaños y opciones reemplaza a este modal (nunca dos a la vez): con cambios sin guardar, se avisa antes.
   const abrirOpciones = () => (sucio ? setConfirmarOpciones(true) : p.alAbrirOpciones());
   const cerrar = () => (sucio ? setConfirmarSalir(true) : p.alCancelar());
@@ -209,6 +212,10 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
           <Tip etiqueta="Sabores o variantes"
             texto="Son las opciones que el cliente elige al pedir este producto (p. ej. el relleno o sabor de una dona). El bot de WhatsApp las ofrece al pedir y los avisos de agotados también las usan. Toca «Disponible» o «Agotado» para cada una." />
         </h3>
+        {p.sabores.length > 0 && (
+          <InterruptorImagenes marcado={p.mostrarImagenesSabores === true} texto="Mostrar imágenes de los sabores" deshabilitado={bloqueado}
+            alCambiar={(v) => p.setMostrarImagenesSabores?.(v)} />
+        )}
         {p.sabores.length === 0 && <div className="eo-micro">Este producto no tiene sabores. Agrega uno abajo si el cliente elige entre varios.</div>}
         <div className="ep-sabores">
           {p.sabores.map((s, i) => {
@@ -224,6 +231,10 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
                     </div>
                   )}
                 </div>
+                {p.mostrarImagenesSabores && (
+                  <FotoMini etiqueta={s.nombre} url={s.fotoUrl} deshabilitado={bloqueado}
+                    alCambiar={(f) => p.setSabores(p.sabores.map((x, k) => (k === i ? { ...x, fotoArchivoId: f?.id ?? null, fotoUrl: f?.url ?? null } : x)))} />
+                )}
                 <button type="button" className={`eo-btn eo-mini ${activo ? 'lleno' : ''}`} aria-pressed={activo}
                   aria-label={`${s.nombre}: ${activo ? 'disponible, tocar para marcar agotado' : 'agotado, tocar para marcar disponible'}`}
                   onClick={() => p.setSabores(p.sabores.map((x, k) => (k === i ? { ...x, activo: !activo } : x)))}>

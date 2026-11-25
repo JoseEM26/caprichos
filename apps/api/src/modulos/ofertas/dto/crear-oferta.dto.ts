@@ -56,6 +56,15 @@ export class ComboPrecioDto {
   @IsNumber({}, { message: 'El precio debe ser un número válido' })
   @Min(0, { message: 'El precio debe ser mayor o igual a 0' })
   precio!: number;
+
+  /** Descripción propia del tamaño; vacío = se usa la del combo. */
+  @IsOptional()
+  @IsString()
+  descripcion?: string | null;
+
+  /** Foto propia del tamaño (archivo ya subido); null = la del combo. */
+  @IsOptional()
+  fotoArchivoId?: string | number | null;
 }
 
 /** Cupos por producto: { "<productoId>": entero de 1 a `cantidad` } (la pertenencia a la parte la valida el servicio). */
@@ -71,6 +80,18 @@ export class CuposProductoValidosConstraint implements ValidatorConstraintInterf
   }
   defaultMessage(): string {
     return 'cuposProducto debe ser { productoId: entero de 1 a la cantidad de la parte }';
+  }
+}
+
+@ValidatorConstraint({ name: 'cantidadPorTamanoValida', async: false })
+export class CantidadPorTamanoValidaConstraint implements ValidatorConstraintInterface {
+  validate(valor: unknown): boolean {
+    if (valor === null || valor === undefined) return true;
+    if (typeof valor !== 'object' || Array.isArray(valor)) return false;
+    return Object.entries(valor as Record<string, unknown>).every(([id, n]) => /^\d+$/.test(id) && Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 99);
+  }
+  defaultMessage(): string {
+    return 'cantidadPorTamano debe ser { tamanoValorId: entero de 1 a 99 }';
   }
 }
 
@@ -158,6 +179,16 @@ export class ComboParteDto {
   @IsNumber({}, { message: 'El precio del extra debe ser un número' })
   @Min(0, { message: 'El precio del extra no puede ser negativo' })
   precioExtra?: number | null;
+
+  /** Carta: mostrar la foto de cada elegible de la parte. */
+  @IsOptional()
+  @IsBoolean()
+  mostrarImagenes?: boolean;
+
+  /** Cantidad propia por tamaño del combo: { tamanoValorId: cantidad }. Lo no listado usa `cantidad`. */
+  @IsOptional()
+  @Validate(CantidadPorTamanoValidaConstraint)
+  cantidadPorTamano?: Record<string, number> | null;
 }
 
 export class CrearOfertaDto {

@@ -963,8 +963,8 @@ describe('CatalogoService', () => {
       const p = carta[0].productos[0];
       expect(p.tamanos[0]).toMatchObject({ nombre: '1/2 docena', unidades: 6 });
       expect(p.sabores).toEqual([
-        { id: '401', nombre: 'Fresa', activo: true, disponible: true, quedan: 3 },
-        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 6 },
+        { id: '401', nombre: 'Fresa', activo: true, disponible: true, quedan: 3, fotoUrl: null },
+        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 6, fotoUrl: null },
       ]);
       // quedan del producto = suma de los sabores disponibles (3 + 6)
       expect(p).toMatchObject({ controlaStock: true, saboresConStock: true, quedan: 9, disponible: true });
@@ -989,8 +989,8 @@ describe('CatalogoService', () => {
       const carta = await (service as any).obtenerCarta();
       const p = carta[0].productos[0];
       expect(p.sabores).toEqual([
-        { id: '401', nombre: 'Fresa', activo: true, disponible: false, quedan: 0 },
-        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 2 },
+        { id: '401', nombre: 'Fresa', activo: true, disponible: false, quedan: 0, fotoUrl: null },
+        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 2, fotoUrl: null },
       ]);
       expect(p).toMatchObject({ saboresConStock: true, quedan: 2, disponible: true });
     });

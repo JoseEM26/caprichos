@@ -187,6 +187,7 @@ export function ProductosView() {
   const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
   const subidaEdFoto = useSubidaArchivo();
   const [edSabores, setEdSabores] = useState<Array<SaborItem>>([]);
+  const [edMostrarImgSabores, setEdMostrarImgSabores] = useState(false);
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
   const [edError, setEdError] = useState('');
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
@@ -438,6 +439,7 @@ export function ProductosView() {
     setEdFotoArchivoId(null);
     setEdFotoCambio('SIN_CAMBIO');
     setEdSabores(p.sabores.map((s) => ({ ...s })));
+    setEdMostrarImgSabores(p.mostrarImagenesSabores === true);
     setEdNuevoSabor('');
     setEdError('');
   };
@@ -459,7 +461,11 @@ export function ProductosView() {
           setGuardandoEdicion(true);
           // Solo viajan los campos que el dueño cambió: así no se pisa nada que otro guardado haya cambiado antes.
           const o = productoEnEdicion;
-          const saboresNuevos = edSabores.map((s) => ({ id: s.id, nombre: s.nombre, activo: s.activo !== false }));
+          // La foto del sabor solo viaja si cambió (null la quita)
+          const saboresNuevos = edSabores.map((s) => ({
+            id: s.id, nombre: s.nombre, activo: s.activo !== false,
+            ...(s.id && (s.fotoArchivoId ?? null) !== (o.sabores.find((x) => x.id === s.id)?.fotoArchivoId ?? null) ? { fotoArchivoId: s.fotoArchivoId ?? null } : {}),
+          }));
           const saboresViejos = o.sabores.map((s) => ({ id: s.id, nombre: s.nombre, activo: s.activo !== false }));
           await catalogoApi.editarProducto(o.id, {
             ...(edNombre.trim() !== o.nombre ? { nombre: edNombre.trim() } : {}),
@@ -470,6 +476,7 @@ export function ProductosView() {
             ...(edPorciones.trim() !== (o.porciones ?? '') ? { porciones: edPorciones.trim() } : {}),
             ...(JSON.stringify([...edAlergenos].sort()) !== JSON.stringify([...(o.alergenos ?? [])].sort()) ? { alergenos: edAlergenos } : {}),
             ...(edAlergenosConfirmados !== (o.alergenosConfirmados === true) ? { alergenosConfirmados: edAlergenosConfirmados } : {}),
+            ...(edMostrarImgSabores !== (o.mostrarImagenesSabores === true) ? { mostrarImagenesSabores: edMostrarImgSabores } : {}),
             // Sin cambio: no viaja la clave, y el servidor conserva la foto.
             ...(edFotoCambio === 'SIN_CAMBIO'
               ? {}
@@ -1836,6 +1843,7 @@ export function ProductosView() {
           alSubirFoto={manejarSubidaFoto}
           alQuitarFoto={quitarFoto}
           sabores={edSabores} setSabores={setEdSabores}
+          mostrarImagenesSabores={edMostrarImgSabores} setMostrarImagenesSabores={setEdMostrarImgSabores}
           nuevoSabor={edNuevoSabor} setNuevoSabor={setEdNuevoSabor}
           error={edError}
           puedeEditar={puedeEditar}
