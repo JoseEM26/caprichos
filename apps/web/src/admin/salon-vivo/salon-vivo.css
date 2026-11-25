@@ -161,7 +161,8 @@
 @keyframes sv-marquee { to { transform: translateX(-50%); } }
 .sv-tv .sv-pend-tv .sv-pend-lista { flex: none; flex-direction: row; align-items: stretch; overflow: visible; padding: 0 16px 0 0; margin-left: 16px; border: 0; gap: 12px; }
 .sv-tv .sv-pend-tv .sv-pend-lista + .sv-pend-lista { margin-left: 0; }
-.sv-tv .sv-pend-item { flex: 0 0 clamp(250px, 19vw, 340px); padding: 14px 16px; min-height: clamp(170px, 22vh, 250px); display: flex; flex-direction: column; gap: 6px; }
+/* width fijo: con solo flex-basis, el ancho que calcula la fila sale del texto y una tarjeta corta (las verdes «Listo») hace que la copia del carrusel se monte encima */
+.sv-tv .sv-pend-item { flex: 0 0 auto; width: clamp(250px, 19vw, 340px); padding: 14px 16px; min-height: clamp(170px, 22vh, 250px); display: flex; flex-direction: column; gap: 6px; }
 .sv-tv .sv-pend-fila { flex-wrap: wrap; row-gap: 2px; }
 .sv-tv .sv-pend-fila > .sv-pend-donde { order: 3; flex-basis: 100%; }
 .sv-tv .sv-pend-pasos { display: none; }
@@ -221,7 +222,7 @@
 .sv-pend-item.tarde .sv-pend-min { color: #C5221F; }
 @media (prefers-reduced-motion: reduce) { .sv-pend-item, .sv-pend-item.listo .sv-pend-etapa { animation: none; } .sv-pend-barra i { transition: none; } }
 /* TV o celular angosto: la franja se apila (resumen arriba, tarjetas en fila debajo) */
-@media (max-width: 900px) { .sv-tv .sv-pend-tv { grid-template-columns: minmax(0, 1fr); } .sv-reloj-tv { border-right: 0; padding: 6px; } .sv-tv .sv-pend-item { flex-basis: 60vw; } }
+@media (max-width: 900px) { .sv-tv .sv-pend-tv { grid-template-columns: minmax(0, 1fr); } .sv-reloj-tv { border-right: 0; padding: 6px; } .sv-tv .sv-pend-item { width: 60vw; } }
 
 /* Botón «Centrar»: devuelve la cámara a la vista elegida si el zoom o el arrastre dejaron el local fuera de cuadro */
 .sv-centrar { position: absolute; top: 12px; right: 12px; z-index: 3; min-height: 44px; padding: 0 16px; border-radius: 9999px; border: 1px solid rgba(251, 244, 236, .25); background: rgba(8, 34, 49, .88); color: var(--sv-hueso); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
