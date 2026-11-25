@@ -37,4 +37,11 @@ describe('VigilanteSinRespuestaService', () => {
     expect((await crear([entra(1)]).svc.ejecutarCiclo(ahora)).avisos).toBe(0);
     expect((await crear([{ ...entra(9), direccion: 'SALE' }]).svc.ejecutarCiclo(ahora)).avisos).toBe(0);
   });
+
+  it('un mensaje de verificación del celular nunca avisa ni pasa al bot (lo atiende el webhook, no la IA)', async () => {
+    const verif = { ...entra(5), contenido: { texto: 'Hola Caprichos, quiero verificar mi celular. Mi código: CY3X33ZE' } };
+    const a = crear([verif]);
+    expect(await a.svc.ejecutarCiclo(ahora)).toEqual({ avisos: 0, reintentos: 0 });
+    expect(a.motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
 });

@@ -7,6 +7,7 @@ import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
 import { WhatsAppEvolutionAdaptador } from '../adaptadores/whatsapp-evolution.adaptador';
 import {
   RESPUESTA_NO_VERIFICADO,
+  RESPUESTA_OTRO_CELULAR,
   RESPUESTA_SIN_NUMERO,
   RESPUESTA_VERIFICADO,
   iniciarVerificacion,
@@ -106,14 +107,19 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     expect(prisma.mensajeChat.create).toHaveBeenCalled();
   });
 
-  it('un celular distinto con el mismo token no verifica y recibe la frase de «no pudimos verificar»', async () => {
+  it('un celular distinto con el mismo token no verifica, le dice para qué celular es el código y la respuesta queda en el chat', async () => {
     const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '987654321', 'REGISTRO');
     await webhook.procesarPayload(mensajeTexto('wamid.V2', OTRO, `Mi código: ${token}`));
     await tick();
 
     expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(OTRO, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(OTRO, RESPUESTA_OTRO_CELULAR('987654321'));
+    expect(RESPUESTA_OTRO_CELULAR('987654321')).toContain('terminado en 321');
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+    // La respuesta queda guardada como mensaje del bot (el vigilante ya no ve el chat «sin respuesta»)
+    expect(prisma.mensajeChat.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ direccion: 'SALE', autor: 'BOT', contenido: { texto: RESPUESTA_OTRO_CELULAR('987654321') } }) }),
+    );
   });
 
   it('un mensaje normal sigue al menú del bot', async () => {
@@ -159,7 +165,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
 
     expect(redis.datos.has('cliente:reg:ok:912345678')).toBe(false);
     expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_OTRO_CELULAR('912345678'));
   });
 
   it('el mismo mensaje (mismo wa_message_id) no se procesa dos veces', async () => {

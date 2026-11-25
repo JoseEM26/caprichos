@@ -5,6 +5,7 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { adquirirCandado, liberarCandado } from '../../../comun/redis/candado.util';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
 import { obtenerNombreMostrar } from '../../mensajes/utilidades/nombre-contacto.util';
+import { esMensajeVerificacion } from '../../clientes/verificacion-whatsapp.util';
 
 /**
  * Vigilante de chats sin respuesta: cada minuto busca conversaciones cuyo ÚLTIMO mensaje es del cliente
@@ -71,6 +72,8 @@ export class VigilanteSinRespuestaService implements OnModuleInit, OnModuleDestr
       for (const conv of convs) {
         const ult = (conv as any).mensajes?.[0];
         if (!ult || ult.direccion !== 'ENTRA') continue;
+        // Verificación del celular: la atiende el webhook (nunca el bot ni la IA), aunque su respuesta no se haya guardado
+        if (esMensajeVerificacion(String((ult.contenido as any)?.texto ?? ''))) continue;
         const espera = (ahora.getTime() - new Date(ult.en).getTime()) / 60000;
         if (espera < minutos) continue;
 

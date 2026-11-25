@@ -809,12 +809,12 @@ export class WhatsappWebhookService {
     if (clasificacion.clase === 'TEXTO' && esMensajeVerificacion(texto)) {
       // Un mensaje de verificación es del sistema: nunca pasa al bot (ni a su horario, pausa o chat tomado), aunque falle.
       if (telefonoNorm) {
-        await this.atenderVerificacionCelular(telefonoNorm, texto);
+        await this.atenderVerificacionCelular(telefonoNorm, texto, conversacion.id);
       } else {
         // LID sin número en el evento: se intenta averiguar el celular (tabla, Evolution); si no, el código de 6 dígitos
         const lid = /^wa-user:(\d+)@lid$/i.exec(identificador)?.[1] ?? null;
         this.logger.warn(`[verificacion] remitente sin número visible (${telMask}): se intenta resolver el celular`);
-        await this.responderVerificacion(identificador, await this.resolverVerificacionSinNumero(texto, lid));
+        await this.responderVerificacion(identificador, await this.resolverVerificacionSinNumero(texto, lid), conversacion.id);
       }
       return true;
     }
@@ -1357,7 +1357,7 @@ export class WhatsappWebhookService {
    * Verifica el celular con el token del mensaje. La marca se escribe ANTES de responder (la web la ve al instante),
    * y un fallo al responder no la deshace. Siempre termina con una respuesta al cliente, salvo que no haya número.
    */
-  private async atenderVerificacionCelular(telefonoNorm: string, texto: string): Promise<void> {
+  private async atenderVerificacionCelular(telefonoNorm: string, texto: string, conversacionId?: bigint): Promise<void> {
     const diagnostico = (evento: string, datos: Record<string, string | number | boolean> = {}) =>
       this.logger.log(`[verificacion] ${evento} ${JSON.stringify(datos)}`);
     let respuesta: string = RESPUESTA_NO_VERIFICADO;
@@ -1371,13 +1371,14 @@ export class WhatsappWebhookService {
           texto,
           telefonoNorm,
           diagnostico,
+          true,
         );
         if (r) respuesta = r;
       }
     } catch (err: any) {
       this.logger.error(`[verificacion] error al verificar (Redis): ${err.message}`);
     }
-    await this.responderVerificacion(telefonoNorm, respuesta);
+    await this.responderVerificacion(telefonoNorm, respuesta, conversacionId);
   }
 
   /** Remitente sin número (LID): nunca lanza y siempre devuelve la frase a responder. */
@@ -1421,17 +1422,29 @@ export class WhatsappWebhookService {
   }
 
   /** Respuesta de la verificación por el puerto (Meta o Evolution). Nunca lanza; deja en el log si no salió y por qué. */
-  private async responderVerificacion(destino: string, texto: string): Promise<void> {
+  private async responderVerificacion(destino: string, texto: string, conversacionId?: bigint): Promise<void> {
     const sufijo = `a ***${String(destino).replace(/\D/g, '').slice(-3)}`;
+    let waMessageId: string | null = null;
     try {
       const r: any = await this.mensajeria.enviarTexto(destino, texto);
       if (r && r.exito === false) {
         this.logger.warn(`[verificacion] respuesta NO enviada ${sufijo}: ${r.estado} ${r.errorCodigo ?? ''} ${String(r.errorDetalle ?? '').slice(0, 160)}`);
       } else {
         this.logger.log(`[verificacion] respuesta ${r?.estado ?? 'entregada'} ${sufijo}`);
+        waMessageId = r?.waMessageId ?? null;
       }
     } catch (err: any) {
       this.logger.warn(`[verificacion] respuesta NO enviada ${sufijo}: excepción ${err?.message}`);
+    }
+    // La respuesta queda en el chat: el equipo la ve y el vigilante no toma el mensaje como «sin respuesta»
+    if (!conversacionId) return;
+    try {
+      await this.prisma.mensajeChat.create({
+        data: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo: 'TEXTO', contenido: { texto } as any, meta_id: waMessageId },
+      });
+      this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
+    } catch (err: any) {
+      this.logger.warn(`[verificacion] no se pudo guardar la respuesta en el chat: ${err?.message}`);
     }
   }
 

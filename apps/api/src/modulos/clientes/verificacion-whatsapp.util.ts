@@ -38,6 +38,9 @@ export const TOKEN_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 export const TEXTO_MENSAJE_VERIFICACION = (token: string) => `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`;
 export const RESPUESTA_NO_VERIFICADO = 'No pudimos verificar este código. Vuelve a la carta y pide uno nuevo.';
+/** El código se pidió para otro celular: se dice cuál (solo sus 3 últimos dígitos) y qué hacer. */
+export const RESPUESTA_OTRO_CELULAR = (esperado: string) =>
+  `Este código es para el celular terminado en ${esperado.slice(-3)} y nos escribiste desde otro número. En la carta escribe el número de este WhatsApp y pide un código nuevo.`;
 export const RESPUESTA_VERIFICADO = 'Listo ✅ ya verificamos tu celular. Vuelve a la carta para continuar.';
 
 /** Lo mínimo que se usa de Redis (ioredis lo cumple). */
@@ -278,6 +281,8 @@ export async function atenderMensajeVerificacion(
   texto: string,
   remitenteRaw: string,
   diagnostico?: DiagnosticoVerificacion,
+  /** Remitente con número visible: si el código es de otro celular se le dice cuál (3 últimos dígitos). */
+  decirOtroCelular = false,
 ): Promise<string | null> {
   const m = REGEX_TOKEN_MENSAJE.exec(normalizarTextoVerificacion(texto));
   if (!m) return null;
@@ -299,7 +304,7 @@ export async function atenderMensajeVerificacion(
     if (n === 1) await redis.expire(claveIntentos, TOKEN_TTL_SEG);
     if (n >= TOKEN_MAX_INTENTOS) await redis.del(clave);
     diagnostico?.('REMITENTE_DISTINTO', { token: enmascararToken(token), remitente: ultimos3(remitente), esperado: ultimos3(tel9 ?? ''), intento: n });
-    return RESPUESTA_NO_VERIFICADO;
+    return decirOtroCelular && tel9 ? RESPUESTA_OTRO_CELULAR(tel9) : RESPUESTA_NO_VERIFICADO;
   }
 
   // Mismo celular que pidió el token: si ya estaba verificado, se responde lo mismo sin volver a marcar.
