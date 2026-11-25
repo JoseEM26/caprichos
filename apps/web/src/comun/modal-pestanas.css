@@ -40,3 +40,9 @@
   .mcp-pie > * { flex: 1 1 auto; }
 }
 @media (max-width: 640px) { .mcp-dialogo.mcp-ampliado { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; } }
+/* Formulario de accion en ventana (comun/ModalFormulario.tsx): alto segun el contenido. */
+.mcp-dialogo.mcp-formulario { height: auto; max-width: 520px; }
+.mcp-formulario-form { display: flex; flex-direction: column; min-height: 0; max-height: 90dvh; }
+.mcp-formulario .mcp-cuerpo { display: flex; flex-direction: column; gap: 10px; }
+.mcp-formulario .mcp-pie > button { min-height: 44px; }
+@media (max-width: 480px) { .mcp-dialogo.mcp-formulario { height: auto; max-height: 94dvh; } .mcp-formulario-form { max-height: 94dvh; } }

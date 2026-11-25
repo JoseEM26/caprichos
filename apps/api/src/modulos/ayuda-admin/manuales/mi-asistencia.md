@@ -62,7 +62,7 @@ Marcar el almuerzo es opcional: el almuerzo se paga igual y no se descuenta de t
 
 ## Como se hace: Ver mi periodo, mi calendario y mis pagos
 1. Pestana Periodo: tus horas programadas y trabajadas, tardanzas y faltas; lo que llevas ganado dia por dia; tus vacaciones y, si el administrador ya aprobo un reparto de propinas, la lista Mis propinas (mes, horas, porcentaje, monto y si esta Por pagar o Pagado con el medio). Se ven las 3 mas recientes; Ver N mas muestra el resto. Solo ves tu parte. El numero junto al nombre de la pestana son tus propinas por pagar.
-2. Pestana Calendario: tus dias del mes con su estado (Cumplio, Tardanza, Salio antes, Falta, Descanso, Incompleto, En revision, En curso). Toca un dia para ver sus marcas y pedir una correccion. El numero rojo son las jornadas con una marca que falta o no cuadra: ahi puedes pedir la correccion.
+2. Pestana Calendario: tus dias del mes con su estado (Cumplio, Tardanza, Salio antes, Falta, Descanso, Incompleto, En revision, En curso). Toca un dia para ver sus marcas y pedir una correccion. El numero rojo son las jornadas con una marca que falta o no cuadra: ahi puedes pedir la correccion. Pedir correccion y Justificar tardanza se abren en una ventana encima de la pantalla (no hace falta subir ni bajar): si ya escribiste algo y la cierras con la X, Esc o tocando fuera, te pregunta si quieres descartarlo.
 3. Pestana Pagos: lo que se te suma, lo que se te descuenta, tus prestamos y el neto estimado. Si no carga, pulsa Reintentar.
 Ver tambien: [[propinas]]
 

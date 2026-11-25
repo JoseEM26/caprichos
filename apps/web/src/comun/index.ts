@@ -22,3 +22,4 @@ export { enlaceGoogleMaps } from './mapa/leaflet';
 export * from './ModalConPestanas';
 export * from './ModalPorPasos';
 export * from './useAtrasCierraPanel';
+export * from './ModalFormulario';

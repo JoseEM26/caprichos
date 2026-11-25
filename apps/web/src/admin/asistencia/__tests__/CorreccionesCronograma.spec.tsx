@@ -36,7 +36,6 @@ import { PlanillaTab } from '../PlanillaTab';
 import { SolicitudesTab } from '../SolicitudesTab';
 
 beforeEach(() => {
-  Element.prototype.scrollIntoView = vi.fn();
   [miInc, misSol, crear, cancelar, bandeja, lote, crono, simples, listar, detalle].forEach((f) => f.mockReset());
 });
 
@@ -60,8 +59,8 @@ describe('Mi asistencia: inconsistencias y solicitud de corrección', () => {
 
     rerender(<CorreccionesAsistencia pedido={{ jornada: '2026-11-06', tipo: 'SALIDA' }} alAbrir={abrir} alCerrar={() => undefined} />);
     const form = await screen.findByRole('form', { name: 'Pedir corrección de asistencia' });
-    // Se abre arriba de la pestaña aunque el botón esté abajo (detalle del día): debe traerse a la vista con el foco
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // Se abre en un modal encima de la página, con el foco dentro
+    expect(form.closest('[role="dialog"]')).not.toBeNull();
     expect(form.contains(document.activeElement)).toBe(true);
     expect(within(form).getByLabelText('Marca')).toHaveValue('SALIDA');
     const enviar = within(form).getByRole('button', { name: 'Enviar solicitud' });

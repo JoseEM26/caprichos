@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import { repartosApi } from '../repartos/repartosApi';
 import type { DevolucionRegistrada, NoEntregado, PreguntaNoEntregado, RegistroDevolucion, RespuestaNoEntregados } from './pedidosApi';
 import { ModalDevolucion } from './ModalDevolucion';
@@ -290,24 +292,29 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
         )}
 
         {descartando?.id === p.id && (
-          <div role="group" aria-label={`No corresponde devolver ${p.codigo}`} style={{ display: 'grid', gap: 8 }}>
-            <div style={{ fontSize: 13 }}>Lo saca de esta lista sin mover dinero ni caja. Queda registrado con tu nombre.</div>
-            <label style={{ fontSize: 13, fontWeight: 700 }}>
-              ¿Por qué no corresponde devolver?
+          <ModalFormulario
+            titulo={`No corresponde devolver ${p.codigo}`}
+            sucio={motivoDescarte.trim() !== ''}
+            bloqueado={procesando}
+            alCerrar={() => setDescartando(null)}
+            alEnviar={(e) => { e.preventDefault(); void descartar(); }}
+            pie={<>
+              <Boton type="button" variante="secundario" disabled={procesando} onClick={() => setDescartando(null)}>Cancelar</Boton>
+              <Boton type="submit" disabled={procesando}>Confirmar</Boton>
+            </>}
+          >
+            <p style={{ margin: 0, fontSize: 13 }}>Lo saca de esta lista sin mover dinero ni caja. Queda registrado con tu nombre.</p>
+            <label style={{ display: 'grid', gap: 4, fontSize: 13, fontWeight: 700 }}>¿Por qué no corresponde devolver?
               <textarea
                 value={motivoDescarte}
                 onChange={(e) => setMotivoDescarte(e.target.value)}
-                rows={2}
+                rows={3}
                 placeholder="Ej.: la caja ya cuadró con este pago / al final sí se entregó"
-                style={{ display: 'block', width: '100%', marginTop: 4, fontWeight: 400 }}
+                style={{ fontWeight: 400 }}
               />
             </label>
-            {errorDescarte && <div role="alert" style={{ color: '#B3261E', fontSize: 13 }}>{errorDescarte}</div>}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" style={estiloBoton} disabled={procesando} onClick={() => setDescartando(null)}>Cancelar</button>
-              <button type="button" style={estiloBoton} disabled={procesando} onClick={descartar}>Confirmar</button>
-            </div>
-          </div>
+            {errorDescarte && <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: 13 }}>{errorDescarte}</div>}
+          </ModalFormulario>
         )}
 
         {puedeReenviar && (
