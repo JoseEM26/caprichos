@@ -2443,6 +2443,8 @@ jobs:
           set -e
           SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
           tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+          # El compose de Evolution lleva la versión fijada de la imagen
+          $SSH 'mkdir -p /opt/caprichos/compose && cat > /opt/caprichos/compose/docker-compose.evolution.yml' < infra/compose/docker-compose.evolution.yml
           $SSH "/opt/caprichos/scripts/reiniciar-evolution.sh ${AMBIENTE}"
 
       - name: Borrar la llave del ejecutor

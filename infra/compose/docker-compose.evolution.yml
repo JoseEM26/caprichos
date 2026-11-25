@@ -57,7 +57,8 @@ services:
       - evolucion_interna
 
   evolution-api:
-    image: evoapicloud/evolution-api:v2.3.7
+    # v2.3.8: confirma los Estados (<status>) que WhatsApp manda; con v2.3.7 quedaba «open» sin recibir (stream errored out, ack class=status)
+    image: evoapicloud/evolution-api:v2.3.8
     restart: unless-stopped
     depends_on:
       evolution-postgres:
