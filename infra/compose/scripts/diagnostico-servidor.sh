@@ -105,11 +105,13 @@ EVO_P=/opt/caprichos/evolution-prod
 if [[ -f "$EVO_P/evolution.env" ]]; then
   echo "-- Evolution prod: registros de webhook/mensajes (30 min) --"
   docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --since 30m evolution-api 2>&1 \
-    | grep -iE "webhook|upsert|messages\.|error|axios|ECONN|timeout|refused|status code" | grep -v "Buffer" | ocultar | tail -40
+    | grep -iE "webhook|upsert|messages\.|error|axios|ECONN|timeout|refused|status code|decrypt|bad mac|no session|no matching|retry|receipt|stream|conflict|logout|connection" | grep -v "Buffer\|npm error" | ocultar | tail -40
 fi
 if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-redis$'; then
   echo "-- cola whatsapp-webhooks (prod): esperando / activos / fallidos / completados / pausada --"
-  docker exec caprichos-prod-redis sh -c 'A=""; [ -n "$REDIS_PASSWORD" ] && A="-a $REDIS_PASSWORD"; for k in wait active paused; do printf "%s=" $k; redis-cli $A --no-auth-warning LLEN bull:whatsapp-webhooks:$k; done; for k in failed completed delayed; do printf "%s=" $k; redis-cli $A --no-auth-warning ZCARD bull:whatsapp-webhooks:$k; done; printf "meta-paused="; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:meta paused; ult=$(redis-cli $A --no-auth-warning ZREVRANGE bull:whatsapp-webhooks:failed 0 0); [ -n "$ult" ] && { printf "ultimo fallido: "; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:$ult failedReason | cut -c1-300; }' 2>&1 | ocultar
+  API_P=$(docker ps --format '{{.Names}}' | grep -E "^caprichos-prod-api" | head -1)
+  RP=$(docker exec "$API_P" printenv REDIS_PASSWORD 2>/dev/null || true)
+  docker exec -e RP="$RP" caprichos-prod-redis sh -c 'A=""; [ -n "$RP" ] && A="-a $RP"; for k in wait active paused; do printf "%s=" $k; redis-cli $A --no-auth-warning LLEN bull:whatsapp-webhooks:$k; done; for k in failed completed delayed; do printf "%s=" $k; redis-cli $A --no-auth-warning ZCARD bull:whatsapp-webhooks:$k; done; printf "meta-paused="; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:meta paused; ult=$(redis-cli $A --no-auth-warning ZREVRANGE bull:whatsapp-webhooks:failed 0 0 | head -1); [ -n "$ult" ] && { printf "ultimo fallido: "; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:$ult failedReason | cut -c1-300; }' 2>&1 | ocultar
 fi
 if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-postgres$'; then
   docker exec -i caprichos-prod-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off' <<'SQL' 2>&1 | ocultar
