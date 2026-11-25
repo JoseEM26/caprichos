@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Reparto } from '../comun/saboresMezcla';
+import { Miniatura } from '../comun/Miniatura';
 import { claveSabor, cuposDeClave, lugaresElegidos, type ParteEleccion } from './ReemplazoCombo';
 import './combo-armado.css';
 
@@ -52,16 +53,19 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
   };
 
   // Un sabor: nombre (con aviso si no hay stock), y −, cantidad, + (el + solo si puedeMas)
-  const casilla = (clave: string, etiqueta: string, visible: string, cantidad: number, disponible: boolean, puedeMas: boolean, aviso: string | null) => {
+  const casilla = (clave: string, etiqueta: string, visible: string, cantidad: number, disponible: boolean, puedeMas: boolean, aviso: string | null, foto?: string | null) => {
     const cupos = cuposDeClave(parte, clave);
     return (
     <div key={clave} className="ca-sabor" data-n={cantidad > 0 ? 'si' : 'no'} data-agotado={disponible ? 'no' : 'si'}>
-      <span style={{ minWidth: 0, fontWeight: 700, fontSize: 13, lineHeight: '16px', color: 'var(--cp-navy)' }}>
+      <span style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, lineHeight: '16px', color: 'var(--cp-navy)' }}>
+        {parte.mostrarImagenes && <Miniatura url={foto} tamano={36} />}
+        <span style={{ minWidth: 0 }}>
         {visible}
         {cupos > 1 && (
           <span data-testid={`ocupa-${clave}`} style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft)' }}>{`ocupa ${cupos}`}</span>
         )}
         {aviso && <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-rust)' }}>{aviso}</span>}
+        </span>
       </span>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
         <button type="button" className="ca-paso" aria-label={`Quitar ${etiqueta}`} onClick={() => fijar(clave, cantidad - 1)} disabled={deshabilitar || cantidad === 0}>
@@ -109,6 +113,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
         return (
           <div key={o.id} className="ca-tarjeta" style={{ background: 'var(--cp-cream)' }}>
             <button type="button" className="ca-cab" aria-expanded={abierta} aria-controls={idCuerpo} onClick={() => alternar(o.id)}>
+              {parte.mostrarImagenes && <Miniatura url={o.fotoUrl} tamano={36} />}
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontWeight: 800, fontSize: 14 }}>{o.nombre}</span>
                 {!abierta && (
@@ -125,7 +130,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
                   const restan = s.saldo - (usos[s.id] ?? 0);
                   const puedeMas = !deshabilitar && s.disponible && elegidas + cuposDeClave(parte, clave) <= total && restan > 0;
                   const sinStock = !s.disponible || (restan <= 0 && cantidad === 0);
-                  return casilla(clave, `${o.nombre} · ${s.nombre}`, s.nombre, cantidad, !sinStock, puedeMas, sinStock ? 'No hay stock' : null);
+                  return casilla(clave, `${o.nombre} · ${s.nombre}`, s.nombre, cantidad, !sinStock, puedeMas, sinStock ? 'No hay stock' : null, s.fotoUrl ?? o.fotoUrl);
                 })}
               </div>
             </div>
@@ -138,7 +143,7 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
           {sueltas.map((o) => {
             const cantidad = valor[o.id] ?? 0;
             const puedeMas = !deshabilitar && o.disponible && elegidas + cuposDeClave(parte, o.id) <= total;
-            return casilla(o.id, o.nombre, o.nombre, cantidad, o.disponible, puedeMas, o.disponible ? null : o.sinStock ? 'No hay stock' : 'Agotado');
+            return casilla(o.id, o.nombre, o.nombre, cantidad, o.disponible, puedeMas, o.disponible ? null : o.sinStock ? 'No hay stock' : 'Agotado', o.fotoUrl);
           })}
         </div>
       )}

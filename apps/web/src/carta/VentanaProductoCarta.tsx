@@ -12,6 +12,8 @@ import { useUmbralesStock } from './umbralesStock';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
 import { maximoMezclas, totalElegido } from '../comun/saboresMezcla';
 import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
+import { Miniatura } from '../comun/Miniatura';
+import { fotoBotonTamano, fotoOpcion, fotoPrincipal, saboresConFoto } from '../comun/fotosOpcionales';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
@@ -33,6 +35,8 @@ import {
   notaReemplazos,
   partesConAlternativas,
   partesEleccion,
+  ofertaConTamano,
+  precioComboDeTamano,
   ResumenPartesFijas,
   repartoAlternativa,
   unirElecciones,
@@ -101,6 +105,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const gruposCarta = producto.saboresConStock === true ? gruposProducto.filter((g) => !(g.obligatorio || g.minimo >= 1)) : gruposProducto;
 
   const [tamanoId, setTamanoId] = useState<string | null>(producto.tamanos[0]?.id ?? null);
+  const tamano = producto.tamanos.find((t) => t.id === tamanoId) ?? null;
+  // Un combo trae por tamaño su foto, descripción y cantidad de cada parte (opcionales)
+  const precioCombo = precioComboDeTamano(oferta, tamano?.tamanoValorId);
+  const fotoMostrada = precioCombo?.fotoUrl || fotoPrincipal(producto, tamano);
+  const descripcionMostrada = precioCombo?.descripcion || producto.descripcion;
   const [sel, setSel] = useState<Record<string, string[]>>(() => {
     const inicial: Record<string, string[]> = {};
     for (const g of gruposCarta) {
@@ -112,7 +121,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   });
   // Complemento con paquetes: el cliente elige UNO y el resto del armado usa solo las piezas de ese paquete
   const [paquetes, setPaquetes] = useState<Record<string, string>>({});
-  const ofertaCombo = useMemo(() => filtrarPaquetes(oferta, paquetes), [oferta, paquetes]);
+  const ofertaCombo = useMemo(() => ofertaConTamano(filtrarPaquetes(oferta, paquetes), tamano?.tamanoValorId), [oferta, paquetes, tamano?.tamanoValorId]);
   const partesRe = useMemo(() => partesConAlternativas(ofertaCombo), [ofertaCombo]);
   // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
   const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
@@ -208,7 +217,6 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   // En modo asistente, cada bloque se muestra solo en su paso (o en el paso que lo hospeda: extras, nombres, nota)
   const vis = (id: string): boolean => !asistente || pasoActual === id || !!pasoObj?.incluye?.includes(id);
 
-  const tamano = producto.tamanos.find((t) => t.id === tamanoId) ?? null;
   // Los extras de las partes opcionales suman al precio del combo (el servidor los recalcula)
   const precioBase = (tamano ? tamano.precio : producto.precio) + recargoOpcionales(ofertaCombo, opcionales);
 
@@ -547,6 +555,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 style={{ minHeight: 44, maxWidth: '100%', borderRadius: 22, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '6px 14px 6px 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, lineHeight: '17px', opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
               >
                 <span style={{ width: 16, height: 16, borderRadius: g.maximo === 1 ? 10 : 6, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
+                <Miniatura url={fotoOpcion(producto, g, o)} tamano={32} />
                 <span style={{ fontWeight: 600 }}>{o.nombre}</span>
                 {agotada && <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}>Agotado</span>}
                 {o.precioExtra > 0 && <span style={{ fontWeight: 700, color: 'var(--cp-rust)' }}>+{fmt(o.precioExtra)}</span>}
@@ -666,15 +675,15 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               ×
             </button>
             )}
-            {!vis('tamano') ? null : producto.fotoUrl ? (
+            {!vis('tamano') ? null : fotoMostrada ? (
               <button
                 type="button"
                 onClick={() => setZoom(true)}
                 aria-label={`Ampliar la foto de ${producto.nombre}`}
                 style={{ position: 'relative', width: '100%', height: movil ? 180 : 280, border: 0, padding: 0, background: 'var(--cp-sand)', cursor: 'zoom-in', display: 'block', overflow: 'hidden' }}
               >
-                <img src={producto.fotoUrl} alt="" aria-hidden="true" style={{ position: 'absolute', left: '-10%', top: '-10%', width: '120%', height: '120%', objectFit: 'cover', filter: 'blur(22px)', opacity: 0.55 }} />
-                <img src={producto.fotoUrl} alt={producto.nombre} style={{ position: 'relative', height: '100%', maxWidth: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: '0 auto' }} />
+                <img src={fotoMostrada} alt="" aria-hidden="true" style={{ position: 'absolute', left: '-10%', top: '-10%', width: '120%', height: '120%', objectFit: 'cover', filter: 'blur(22px)', opacity: 0.55 }} />
+                <img src={fotoMostrada} alt={producto.nombre} style={{ position: 'relative', height: '100%', maxWidth: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: '0 auto' }} />
                 <span aria-hidden="true" style={{ position: 'absolute', right: 10, bottom: 10, width: 36, height: 36, borderRadius: 18, background: 'rgba(11,44,62,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" />
@@ -692,7 +701,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
           <div style={{ flex: 'none', minWidth: 0, padding: movil ? '14px 16px 20px' : '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {!asistente && <div>
               <div style={{ ...titulo, fontWeight: 800, fontSize: 24, lineHeight: '30px' }}>{producto.nombre}</div>
-              {producto.descripcion && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>{producto.descripcion}</div>}
+              {descripcionMostrada && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>{descripcionMostrada}</div>}
               {(() => {
                 // Contraído en una línea pequeña; sin datos no aparece nada
                 const alergenos = producto.alergenosConfirmados ? textoAlergenos(producto.alergenos) : '';
@@ -765,6 +774,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                           <span style={{ width: 16, height: 16, borderRadius: 8, border: '2px solid var(--cp-navy)', background: on && !noCabe ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
                           <span style={{ flex: 1, fontWeight: 700, fontSize: 13, lineHeight: '17px' }}>{t.nombre}</span>
+                          <Miniatura url={fotoBotonTamano(producto, t)} tamano={36} />
                         </span>
                         <span style={{ ...titulo, fontWeight: 800, fontSize: 15, color: 'var(--cp-rust)', paddingLeft: 24 }}>{fmt(t.precio)}</span>
                         {noCabe && (
@@ -781,7 +791,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
 
             {saborMode && (
               <SelectorSaboresMezcla
-                sabores={saboresDisp}
+                sabores={saboresConFoto(saboresDisp, producto)}
                 total={total}
                 libre={libre}
                 valor={valorSaboresOk}
@@ -1202,9 +1212,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         alCancelar={() => setConfirmarSalida(false)}
       />
 
-      {zoom && producto.fotoUrl && (
+      {zoom && fotoMostrada && (
         <div onClick={() => setZoom(false)} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(11,44,62,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
-          <img src={producto.fotoUrl} alt={producto.nombre} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 12 }} />
+          <img src={fotoMostrada} alt={producto.nombre} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 12 }} />
           <button onClick={() => setZoom(false)} aria-label="Cerrar vista ampliada" style={{ position: 'absolute', top: 12, right: 12, width: 48, height: 48, borderRadius: 24, border: '1.5px solid var(--cp-cream)', background: 'transparent', color: 'var(--cp-cream)', fontSize: 22, fontWeight: 800 }}>
             ×
           </button>

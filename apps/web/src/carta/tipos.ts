@@ -4,6 +4,10 @@ export interface TamanoCarta {
   precio: number;
   /** Donas y galletas con sabores: unidades que trae el tamaño (1, 6 o 12). */
   unidades?: number;
+  /** Valor de la lista TAMANO: enlaza el tamaño con el precio del combo (foto, descripción y cantidades propias). */
+  tamanoValorId?: string | null;
+  /** Foto propia del tamaño; solo se muestra con `mostrarImagenesTamanos` del producto. */
+  fotoUrl?: string | null;
 }
 
 export interface OpcionCarta {
@@ -11,6 +15,8 @@ export interface OpcionCarta {
   nombre: string;
   precioExtra: number;
   disponible: boolean;
+  /** Foto propia de la opción; solo se muestra con `mostrarImagenes` del grupo. */
+  fotoUrl?: string | null;
 }
 
 export interface GrupoOpcionesCarta {
@@ -19,6 +25,8 @@ export interface GrupoOpcionesCarta {
   obligatorio: boolean;
   minimo: number;
   maximo: number;
+  /** Interruptor «Mostrar imágenes» del grupo. */
+  mostrarImagenes?: boolean;
   opciones: OpcionCarta[];
   /** Plan B: «Se acabaron: X. Elige entre: Y» */
   aviso?: string | null;
@@ -31,6 +39,8 @@ export interface SaborCarta {
   nombre: string;
   disponible: boolean;
   activo?: boolean;
+  /** Foto propia del sabor; solo se muestra con `mostrarImagenesSabores` del producto. */
+  fotoUrl?: string | null;
   /** Unidades que quedan de este sabor hoy; null = sin tope. Solo con saboresConStock. */
   quedan?: number | null;
 }
@@ -52,6 +62,9 @@ export interface ProductoCarta {
   tamanos: TamanoCarta[];
   grupos: GrupoOpcionesCarta[];
   sabores: SaborCarta[];
+  /** Interruptores «Mostrar imágenes» de sabores y tamaños. */
+  mostrarImagenesSabores?: boolean;
+  mostrarImagenesTamanos?: boolean;
   noSumaBeneficios: boolean;
   disponible: boolean;
   agotadoHasta: string | null;

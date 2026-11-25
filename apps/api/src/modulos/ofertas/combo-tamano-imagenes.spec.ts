@@ -67,6 +67,16 @@ describe('Combo por tamaño: cantidades, descripción y fotos', () => {
     await expect(service.resolverPartesCombo(4, elegir(4), 1, undefined, 7)).rejects.toBeDefined();
   });
 
+  it('los cupos se validan con la cantidad del tamaño: un producto de 4 lugares llena Familiar y no cabe en Personal', async () => {
+    parte.cupos_producto = { '37': 4 } as any;
+    try {
+      await expect(service.resolverPartesCombo(4, [el('37')], 1, undefined, 8)).resolves.toBeDefined();
+      await expect(service.resolverPartesCombo(4, [el('37')], 1, undefined, 7)).rejects.toMatchObject({ response: { codigo: 'COMBO_ELECCION_INCOMPLETA' } });
+    } finally {
+      parte.cupos_producto = null;
+    }
+  });
+
   it('la carta expone descripción, foto, cantidades por tamaño y el interruptor de la parte', async () => {
     const [o] = await service.listarOfertas('COMBO');
     const personal = o.combosPrecio!.find((t) => t.tamanoNombre === 'Personal')!;

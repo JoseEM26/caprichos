@@ -271,6 +271,7 @@ export class ChatbotIaService {
     const MAX_HERRAMIENTAS_POR_TURNO = modoLibre ? 5 : 3;
     let motivoPasarAPersona: string | undefined;
     let accionIa: AccionIa | undefined;
+    let fotosIa: { nombre: string; fotoUrl: string }[] | undefined;
 
     try {
       while (vueltasHerramientas < MAX_VUELTAS_HERRAMIENTAS) {
@@ -320,6 +321,9 @@ export class ChatbotIaService {
             }
             if (nombreFuncion === 'accionDelBot' && resultadoHerramienta.resultado?.ok && resultadoHerramienta.resultado?.accion) {
               accionIa = resultadoHerramienta.resultado.accion as AccionIa;
+            }
+            if (nombreFuncion === 'fotoDe' && resultadoHerramienta.resultado?.ok && Array.isArray(resultadoHerramienta.resultado?.fotos)) {
+              fotosIa = resultadoHerramienta.resultado.fotos;
             }
             if (nombreFuncion === 'pasarAPersona') {
               const r = resultadoHerramienta.resultado;
@@ -406,6 +410,7 @@ export class ChatbotIaService {
           productoConcreto,
           productosConsultados,
           ...(accionIa ? { accionIa } : {}),
+          ...(fotosIa ? { fotosIa } : {}),
         };
 
         // Caché de preguntas genéricas: nunca con pedido propio, acción, derivación ni el nombre del cliente
@@ -413,6 +418,7 @@ export class ChatbotIaService {
           claveCache &&
           !necesitaDerivar &&
           !accionIa &&
+          !fotosIa &&
           herramientasUsadas.length > 0 &&
           herramientasUsadas.every((h) => HERRAMIENTAS_CACHEABLES.has(h)) &&
           !(nombreLimpio !== 'Cliente' && textoFinal.toLowerCase().includes(nombreLimpio.toLowerCase()))

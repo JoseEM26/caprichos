@@ -30,7 +30,7 @@ import {
   procesarEntradaCombo,
 } from './combo-bot';
 import { BOTONES_COMBO_CONFIRMAR, TEXTOS_COMBO } from '../../textos-combo';
-import { ordenarPorVentas, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
+import { ordenarPorVentas, urlPublicaFoto, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
 import {
   TEXTOS_BOT,
   BOTON_VOLVER_MENU,
@@ -206,6 +206,13 @@ function productoDeCarta(categorias: any[], productoId: string): any | null {
   return null;
 }
 
+/** Valor de la lista TAMANO del tamaño elegido: con él el combo sabe cuántos elegir en ese tamaño. */
+function tamanoValorDe(categorias: any[], productoId: string, tamanoId?: string): string | null {
+  if (!tamanoId) return null;
+  const t = (productoDeCarta(categorias, productoId)?.tamanos ?? []).find((x: any) => String(x.id) === String(tamanoId));
+  return t?.tamanoValorId ? String(t.tamanoValorId) : null;
+}
+
 /** Anfitrión de un combo que el bot no vende hoy (canal sin WhatsApp, agotado o fuera de horario): no se ofrece. */
 function ocultoEnBot(p: any, contexto: ContextoConversacion): boolean {
   return (contexto.productosComboNoBot ?? []).includes(String(p?.id));
@@ -313,7 +320,7 @@ export function carritoTrasComboRechazado(
   const oferta = comboVendibleBot(ofertas, linea.productoId);
   if (!oferta) return null;
   const combo = iniciarCombo(oferta);
-  if (!armarPasosCombo(combo, oferta, linea.cantidad, categorias) || combo.pasos.length === 0) return null;
+  if (!armarPasosCombo(combo, oferta, linea.cantidad, categorias, tamanoValorDe(categorias, linea.productoId, linea.tamanoId)) || combo.pasos.length === 0) return null;
   const prod = productoDeCarta(categorias, linea.productoId);
   const extras = linea.opciones.reduce((s, o) => s + o.precioExtra, 0);
   const config: ItemEnConfiguracionBot = {
@@ -1808,7 +1815,7 @@ ${this.lineasResumen(nuevo, contexto)}
   ): ResultadoTransicion {
     if (config.combo && !config.combo.partesListas) {
       const oferta = comboVendibleBot(contexto.ofertas, config.productoId);
-      if (!oferta || !armarPasosCombo(config.combo, oferta, config.cantidad, contexto.categoriasCarta || [])) {
+      if (!oferta || !armarPasosCombo(config.combo, oferta, config.cantidad, contexto.categoriasCarta || [], tamanoValorDe(contexto.categoriasCarta || [], config.productoId, config.tamanoId))) {
         return this.mostrarCategorias(flujo, { ...pedido, itemEnConfiguracion: undefined }, contexto, TEXTOS_COMBO.noDisponible(config.combo.nombre));
       }
       if (config.combo.pasos.length > 0) {
@@ -1861,7 +1868,7 @@ ${this.lineasResumen(nuevo, contexto)}
   ): ResultadoTransicion {
     const config = pedido.itemEnConfiguracion;
     if (!config?.combo) return this.mostrarCategorias(flujo, pedido, contexto);
-    const r = procesarEntradaCombo(config.combo, entrada, plantillasCombo(contexto));
+    const r = procesarEntradaCombo(config.combo, entrada, plantillasCombo(contexto), (ruta) => urlPublicaFoto(contexto.cartaUrlPublica, ruta));
     if (r.estado === 'reiniciar') return this.reiniciarCombo(flujo, pedido, config, entrada, contexto);
     if (r.estado === 'listo') {
       config.combo.partesListas = true;

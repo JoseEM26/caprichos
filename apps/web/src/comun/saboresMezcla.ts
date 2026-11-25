@@ -9,6 +9,8 @@ export interface SaborMezcla {
   disponible: boolean;
   /** null: sin tope (no hay apertura de stock hoy para ese sabor). */
   quedan: number | null;
+  /** Miniatura opcional (solo si el producto tiene «Mostrar imágenes» en sabores). */
+  fotoUrl?: string | null;
 }
 
 /** Forma que viaja en la línea del pedido: { saborId, cantidad }. */

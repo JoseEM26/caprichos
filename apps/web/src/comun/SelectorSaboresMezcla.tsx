@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { avisoSabor } from '@caprichos/compartido';
 import { useUmbralesStock } from '../carta/umbralesStock';
+import { Miniatura } from './Miniatura';
 import {
   Reparto,
   SaborMezcla,
@@ -152,7 +153,9 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
                     background: 'var(--cp-white)',
                   }}
                 >
-                  <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                  <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Miniatura url={s.fotoUrl} tamano={40} />
+                    <div style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>{s.nombre}</span>
                     {s.quedan === 0 ? (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-rust)' }}>No hay stock</span>
@@ -166,6 +169,7 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
                         </span>
                       )
                     )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
                     <button

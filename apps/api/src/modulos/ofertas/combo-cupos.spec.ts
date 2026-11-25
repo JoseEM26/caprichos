@@ -111,5 +111,11 @@ describe('Cupos por producto en una parte A_ELECCION', () => {
       expect(await errores(2, { torta: 2 })).toBe(1);
       expect(await errores(2, [2])).toBe(1);
     });
+    it('el cupo se valida contra la cantidad del tamaño más grande (2 base, 4 en Familiar)', async () => {
+      const con = async (cupos: any) =>
+        (await validate(plainToInstance(ComboParteDto, { tipo: 'A_ELECCION', cantidad: 2, cantidadPorTamano: { '8': 4 }, cuposProducto: cupos }))).length;
+      expect(await con({ '50': 4 })).toBe(0);
+      expect(await con({ '50': 5 })).toBe(1);
+    });
   });
 });

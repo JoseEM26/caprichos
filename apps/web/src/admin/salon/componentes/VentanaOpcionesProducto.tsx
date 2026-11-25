@@ -9,6 +9,8 @@ import {
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { alternarEleccion } from '../../../carta/eleccionGrupo';
 import { SelectorSaboresMezcla } from '../../../comun/SelectorSaboresMezcla';
+import { Miniatura } from '../../../comun/Miniatura';
+import { fotoBotonTamano, fotoOpcion, saboresConFoto } from '../../../comun/fotosOpcionales';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../../../comun/saboresMezcla';
 import {
   AvisoAlternativasCombo,
@@ -32,6 +34,8 @@ import {
   notaReemplazos,
   partesConAlternativas,
   partesEleccion,
+  ofertaConTamano,
+  precioComboDeTamano,
   ResumenPartesFijas,
   repartoAlternativa,
   unirElecciones,
@@ -129,7 +133,7 @@ export function VentanaOpcionesProducto({
   // Combo: reemplazos de partes fijas agotadas
   // Complemento con paquetes: se elige UNO y el armado usa solo las piezas de ese paquete
   const [paquetes, setPaquetes] = useState<Record<string, string>>({});
-  const ofertaCombo = useMemo(() => filtrarPaquetes(oferta, paquetes), [oferta, paquetes]);
+  const ofertaCombo = useMemo(() => ofertaConTamano(filtrarPaquetes(oferta, paquetes), tamanoSeleccionado?.tamanoValorId), [oferta, paquetes, tamanoSeleccionado?.tamanoValorId]);
   const partesRe = useMemo(() => partesConAlternativas(ofertaCombo), [ofertaCombo]);
   // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
   const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
@@ -560,7 +564,7 @@ export function VentanaOpcionesProducto({
             >
               {producto.nombre}
             </div>
-            {producto.descripcion && (
+            {(precioComboDeTamano(oferta, tamanoSeleccionado?.tamanoValorId)?.descripcion || producto.descripcion) && (
               <div
                 style={{
                   fontSize: '13px',
@@ -568,7 +572,7 @@ export function VentanaOpcionesProducto({
                   color: 'var(--cp-soft)',
                 }}
               >
-                {producto.descripcion}
+                {precioComboDeTamano(oferta, tamanoSeleccionado?.tamanoValorId)?.descripcion || producto.descripcion}
               </div>
             )}
           </div>
@@ -664,6 +668,7 @@ export function VentanaOpcionesProducto({
                       cursor: noCabe ? 'not-allowed' : 'pointer',
                     }}
                   >
+                    <Miniatura url={fotoBotonTamano(producto, v)} tamano={28} />
                     {v.nombre} · S/ {Number(v.precio || 0).toFixed(2)}
                     {noCabe && (
                       <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--cp-rust)' }}>
@@ -678,7 +683,7 @@ export function VentanaOpcionesProducto({
         )}
 
         {saborMode && (
-          <SelectorSaboresMezcla sabores={saboresDisp} total={total} libre={libre} valor={valorSaboresOk} onCambio={setValorSabores} />
+          <SelectorSaboresMezcla sabores={saboresConFoto(saboresDisp, producto)} total={total} libre={libre} valor={valorSaboresOk} onCambio={setValorSabores} />
         )}
 
         {/* Grupos de opciones */}
@@ -833,6 +838,7 @@ export function VentanaOpcionesProducto({
                       >
                         {!esUnica && elegida ? '✓' : ''}
                       </span>
+                      <Miniatura url={fotoOpcion(producto, g, o)} tamano={32} />
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                         {o.nombre}
                       </span>

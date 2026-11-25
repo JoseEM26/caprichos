@@ -62,7 +62,9 @@ export interface OpcionComboBot {
   nombre: string;
   /** Alternativas: unidades por combo (p. ej. 2 galletas). */
   cantidad?: number;
-  sabores?: { id: string; nombre: string; saldo: number }[];
+  /** Foto de la opción (ruta de la carta); solo se manda si el cliente la pide. */
+  fotoUrl?: string;
+  sabores?: { id: string; nombre: string; saldo: number; fotoUrl?: string }[];
 }
 
 /** Lo que el cliente elige en una parte del combo: la alternativa (plan B) o N opciones de una lista. */

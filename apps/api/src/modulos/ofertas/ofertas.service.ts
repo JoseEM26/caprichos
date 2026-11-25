@@ -474,7 +474,7 @@ export class OfertasService {
               ...this.opcionalDeParte(tipoParte, p),
               mostrar_imagenes: p.mostrarImagenes ?? false,
               cantidad_por_tamano: this.cantidadPorTamanoDeParte(p.cantidadPorTamano),
-              ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
+              ...(await this.cuposDeParte(tx, tipoParte, Math.max(p.cantidad || 1, ...(Object.values(p.cantidadPorTamano ?? {}) as number[])), prodIds, catIds, p.cuposProducto)),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -744,7 +744,7 @@ export class OfertasService {
               ...this.opcionalDeParte(tipoParte, p),
               mostrar_imagenes: p.mostrarImagenes ?? false,
               cantidad_por_tamano: this.cantidadPorTamanoDeParte(p.cantidadPorTamano),
-              ...(await this.cuposDeParte(tx, tipoParte, p.cantidad || 1, prodIds, catIds, p.cuposProducto)),
+              ...(await this.cuposDeParte(tx, tipoParte, Math.max(p.cantidad || 1, ...(Object.values(p.cantidadPorTamano ?? {}) as number[])), prodIds, catIds, p.cuposProducto)),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);

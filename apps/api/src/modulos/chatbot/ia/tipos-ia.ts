@@ -63,6 +63,8 @@ export interface ResultadoConsultaIa {
   productosConsultados?: any[];
   /** Acción estructurada que la IA pidió (ya validada contra la carta); la ejecuta el motor, no la IA. */
   accionIa?: AccionIa;
+  /** Fotos que el cliente pidió (ya validadas contra la carta: máx. 6); las envía el motor. */
+  fotosIa?: { nombre: string; fotoUrl: string }[];
   /** true = el cliente escribe demasiado rápido: no se responde ahora (anti-bloqueo de WhatsApp). */
   omitir?: boolean;
 }

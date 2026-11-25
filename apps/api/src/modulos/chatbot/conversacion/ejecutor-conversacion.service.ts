@@ -14,7 +14,7 @@ import { TEXTOS_PROGRAMAR } from './textos-programar';
 import { CatalogoService } from '../../catalogo/catalogo.service';
 import { aplanarEnlacesMarkdown } from '../utilidades/texto-whatsapp.util';
 import { EvolutionConfigService } from '../evolution/evolution-config.service';
-import { enviarCarruselConRespaldo, resumenCarrusel, unirCarruselConBotones, urlPublicaCarta } from '../servicios/carrusel.util';
+import { enviarCarruselConRespaldo, resumenCarrusel, unirCarruselConBotones, urlPublicaCarta, urlPublicaFoto } from '../servicios/carrusel.util';
 import { OfertasService } from '../../ofertas/ofertas.service';
 import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
@@ -2598,6 +2598,7 @@ export class EjecutorConversacionService {
         let ofrecerAsesor = false;
         let motivoDeriv = 'CONSULTA_IA_FALLIDA';
         let accionIaPend: ResultadoConsultaIa['accionIa'];
+        let fotosIaPend: NonNullable<ResultadoConsultaIa['fotosIa']> = [];
 
         if (this.chatbotIaService) {
           try {
@@ -2640,6 +2641,8 @@ export class EjecutorConversacionService {
 
             // Acción estructurada de la IA (empezar pedido, agregar producto, ver categoría): la ejecuta el motor, abajo
             if (!esDerivacion && !ofrecerAsesor && resIa.accionIa) accionIaPend = resIa.accionIa;
+            // Fotos que el cliente pidió (la IA solo las pide con la herramienta fotoDe, ya validadas contra la carta)
+            if (!esDerivacion && !ofrecerAsesor && resIa.fotosIa?.length) fotosIaPend = resIa.fotosIa;
 
             if (!esDerivacion && !ofrecerAsesor && !accionIaPend) {
               const { productoConcreto, productosMultiples } = this.identificarProductosConsulta(
@@ -2819,6 +2822,19 @@ export class EjecutorConversacionService {
             meta_id: metaId,
           },
         });
+        // Fotos pedidas: una imagen por foto, después del texto (máx. 6); el cliente nunca las recibe si no las pidió
+        for (const foto of fotosIaPend.slice(0, 6)) {
+          const urlFoto = urlPublicaFoto(cartaUrlPublica, foto.fotoUrl);
+          if (!urlFoto) continue;
+          let metaFoto: string | null = null;
+          if (destinoEnvio) {
+            const resFoto = await this.mensajeria.enviarImagen(destinoEnvio, urlFoto, foto.nombre, { conversacionId: conversacion.id });
+            metaFoto = resFoto.waMessageId || null;
+          }
+          await this.prisma.mensajeChat.create({
+            data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'IMAGEN', contenido: { url: urlFoto, texto: foto.nombre } as any, meta_id: metaFoto },
+          });
+        }
         if (ofrecerAsesor) {
           await this.prisma.conversacion.update({
             where: { id: conversacion.id },

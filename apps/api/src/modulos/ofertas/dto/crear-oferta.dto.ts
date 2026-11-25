@@ -73,7 +73,9 @@ export class CuposProductoValidosConstraint implements ValidatorConstraintInterf
   validate(valor: unknown, args: ValidationArguments): boolean {
     if (valor === null || valor === undefined) return true;
     if (typeof valor !== 'object' || Array.isArray(valor)) return false;
-    const max = Number((args.object as { cantidad?: number }).cantidad) || 1;
+    // Un cupo cabe si alguno de los tamaños lo permite: sirve la mayor cantidad entre la base y la de cada tamaño
+    const o = args.object as { cantidad?: number; cantidadPorTamano?: Record<string, number> | null };
+    const max = Math.max(Number(o.cantidad) || 1, ...Object.values(o.cantidadPorTamano ?? {}).map(Number).filter(Number.isFinite));
     return Object.entries(valor as Record<string, unknown>).every(
       ([id, n]) => /^\d+$/.test(id) && Number.isInteger(n) && (n as number) >= 1 && (n as number) <= max,
     );

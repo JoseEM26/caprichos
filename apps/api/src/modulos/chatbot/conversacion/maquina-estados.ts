@@ -1,4 +1,5 @@
 import { lineaAvisoStock } from './flujos/pedido/aviso-stock-bot.util';
+import { pideFoto } from './flujos/pedido/combo-bot';
 import { atenderCancelarCliente } from './flujos/cambios/cancelar-cliente-bot';
 import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto } from '../servicios/carrusel.util';
 import {
@@ -2233,7 +2234,7 @@ function transicionarSoloMenusNucleo(
   }
 
   // 2.b Pedido especial (torta por encargo, cumpleaños, evento, fotos de…): no es de la lista; pasa directo a una persona
-  if (!id && !enPago && esPedidoEspecial(texto)) {
+  if (!id && !enPago && esPedidoEspecial(texto) && !(flujo.estado === 'PEDIDO_COMBO_PARTE' && pideFoto(texto))) {
     return pasarAsesor(flujo, entrada, contexto, 'PEDIDO_ESPECIAL', TEXTOS_SOLO_MENUS.pedidoEspecial(contexto.datosLocal?.abierta !== false, contexto.datosLocal?.abre));
   }
 

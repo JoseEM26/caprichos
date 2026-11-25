@@ -204,6 +204,19 @@ export class IaHerramientasService {
       {
         type: 'function',
         function: {
+          name: 'fotoDe',
+          description:
+            'Manda al cliente la FOTO de un producto, combo, tamaño, sabor, juguete u opción de la carta. Úsala SOLO si el cliente pide ver algo («foto», «imagen», «cómo es», «cómo se ve», «muéstrame») o duda de cómo es. Nunca la uses por defecto. Pasa el nombre tal como está en la carta; el sistema valida que exista y que tenga foto, y envía la imagen. No inventes ni describas fotos; no escribas enlaces.',
+          parameters: {
+            type: 'object',
+            properties: { nombre: { type: 'string', description: 'Nombre de lo que el cliente quiere ver (ej: "Sirena", "Combo Dúo", "Fresa").' } },
+            required: ['nombre'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'pasarAPersona',
           description:
             'Pasa la conversación a una persona del equipo y avisa a Caja. ÚSALA SIEMPRE ante reclamos, devoluciones, descuentos, anulaciones o cambios de pedido, pagos dudosos, alergias o salud, o cuando el cliente pida hablar con alguien o tú no tengas el dato confirmado.',
@@ -266,6 +279,9 @@ export class IaHerramientasService {
 
         case 'accionDelBot':
           return { resultado: await this.accionDelBot(args.accion, args.producto, args.categoria) };
+
+        case 'fotoDe':
+          return { resultado: await this.fotoDe(args.nombre) };
 
         case 'horarioYUbicacion':
           return { resultado: await this.horarioYUbicacion() };
@@ -378,9 +394,11 @@ export class IaHerramientasService {
             precioBase: Number(prod.precio ?? 0),
             disponible: prod.disponible ?? true,
             ...datosStock(prod),
+            ...(prod.fotoUrl ? { fotoUrl: prod.fotoUrl } : {}),
             tamanos: (prod.tamanos || []).map((t: any) => ({
               nombre: t.nombre,
               precio: Number(t.precio),
+              ...(t.fotoUrl ? { fotoUrl: t.fotoUrl } : {}),
             })),
             opciones: (prod.grupos || []).flatMap((g: any) =>
               (g.opciones || []).map((o: any) => ({
@@ -388,6 +406,7 @@ export class IaHerramientasService {
                 nombre: o.nombre,
                 precioExtra: Number(o.precioExtra || 0),
                 disponible: o.disponible ?? true,
+                ...(o.fotoUrl ? { fotoUrl: o.fotoUrl } : {}),
               })),
             ),
           });
@@ -426,6 +445,40 @@ export class IaHerramientasService {
       })),
       nota: 'Carta real del momento. Solo recomienda productos con disponible=true.',
     };
+  }
+
+  /**
+   * «Mándame la foto de X»: solo valida contra la carta real y los combos y devuelve las rutas de foto que EXISTEN (máx. 6).
+   * No escribe ni envía nada: el motor manda las imágenes. Sin foto o sin coincidencia, dice que no hay (la IA no inventa).
+   */
+  async fotoDe(nombre?: string) {
+    const normalizar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const q = normalizar(String(nombre ?? ''));
+    if (q.length < 3) return { ok: false, error: 'Falta el nombre de lo que quiere ver.' };
+    const fotos: { nombre: string; fotoUrl: string }[] = [];
+    const ver = (n: string | undefined, fotoUrl: string | null | undefined) => {
+      if (n && fotoUrl && normalizar(n).includes(q) && !fotos.some((f) => f.fotoUrl === fotoUrl)) fotos.push({ nombre: n, fotoUrl });
+    };
+    for (const c of (await this.catalogoService?.obtenerCarta()) ?? []) {
+      for (const p of c.productos || []) {
+        ver(p.nombre, p.fotoUrl);
+        for (const t of p.tamanos || []) ver(`${p.nombre} ${t.nombre}`, t.fotoUrl);
+        for (const sb of p.sabores || []) ver(sb.nombre, sb.fotoUrl);
+        for (const g of p.grupos || []) for (const o of g.opciones || []) ver(o.nombre, o.fotoUrl);
+      }
+    }
+    for (const o of (await this.ofertasService?.listarOfertas('COMBO', true, 'WHATSAPP')) ?? []) {
+      ver(o.nombre, (o as any).imagenUrl);
+      for (const t of o.combosPrecio ?? []) ver(`${o.nombre} ${t.tamanoNombre ?? ''}`, t.fotoUrl);
+      for (const parte of o.combosParte ?? []) {
+        for (const op of parte.opcionesDetalle ?? []) {
+          ver(op.nombre, op.fotoUrl);
+          for (const sb of op.sabores ?? []) ver(sb.nombre, sb.fotoUrl);
+        }
+      }
+    }
+    if (fotos.length === 0) return { ok: false, error: 'No hay foto de eso en la carta. No prometas ni describas una foto.' };
+    return { ok: true, fotos: fotos.slice(0, 6), instruccion: 'El sistema enviará la(s) imagen(es). Escribe una frase corta; no pegues enlaces.' };
   }
 
   /**

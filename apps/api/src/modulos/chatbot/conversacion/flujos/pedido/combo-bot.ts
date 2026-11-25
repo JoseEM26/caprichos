@@ -82,7 +82,10 @@ function aOpcion(o: any): OpcionComboBot | null {
     id: String(o.id),
     nombre: String(o.nombre),
     ...(o.cantidad ? { cantidad: Number(o.cantidad) } : {}),
-    ...(todos.length > 0 ? { sabores: sabores.map((s: any) => ({ id: String(s.id), nombre: String(s.nombre), saldo: Number(s.saldo) })) } : {}),
+    ...(o.fotoUrl ? { fotoUrl: String(o.fotoUrl) } : {}),
+    ...(todos.length > 0
+      ? { sabores: sabores.map((s: any) => ({ id: String(s.id), nombre: String(s.nombre), saldo: Number(s.saldo), ...(s.fotoUrl ? { fotoUrl: String(s.fotoUrl) } : {}) })) }
+      : {}),
   };
 }
 
@@ -98,7 +101,7 @@ function categoriaDe(categorias: any[], productoId?: string): string {
  * Las bebidas por categorías (`bebidas`) también son un paso; los grupos «Bebida N · Sabor» del anfitrión se omiten.
  * False si alguna parte quedó sin opciones que se puedan elegir.
  */
-export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, unidades: number, categorias: any[]): boolean {
+export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, unidades: number, categorias: any[], tamanoValorId?: string | null): boolean {
   const pasos: PasoComboBot[] = [];
   for (const p of oferta.combosParte ?? []) {
     const tipo = p.tipo ?? p.tipoParte;
@@ -117,7 +120,8 @@ export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, uni
         tipo: 'ELECCION',
         // Bebidas por categorías (Frappes + Iced + Calientes): una sola etiqueta, no la de la primera categoría
         etiqueta: p.bebidas === true ? 'bebida' : categoriaDe(categorias, (p.opcionesDetalle as any[])[0]?.id && String((p.opcionesDetalle as any[])[0].id)),
-        total: Number(p.cantidad) * unidades,
+        // Cantidad propia del tamaño elegido (4 juguetes en Familiar); sin ella, la de la parte
+        total: (Number((tamanoValorId && p.cantidadPorTamano?.[tamanoValorId]) || 0) || Number(p.cantidad)) * unidades,
         hechos: 0,
         opciones,
       });
@@ -265,13 +269,45 @@ function avanzarSiCompleto(combo: ComboEnConfiguracionBot, plantillas: Plantilla
   return combo.idx >= combo.pasos.length ? { estado: 'listo', acciones: [] } : { estado: 'seguir', acciones: accionesPasoCombo(combo, plantillas) };
 }
 
-/** Procesa lo que el cliente tocó o escribió en el paso en curso del combo. */
-export function procesarEntradaCombo(combo: ComboEnConfiguracionBot, entrada: EntradaNormalizada, plantillas: PlantillasCombo = {}): ResultadoPasoCombo {
+/** Máximo de fotos que se mandan de una vez. */
+export const MAX_FOTOS_BOT = 6;
+
+/** El cliente pide ver cómo es algo («foto», «imagen», «cómo son», «muéstrame»). Las fotos NUNCA salen si no las pide. */
+export const pideFoto = (texto: string): boolean =>
+  /\b(foto|fotos|fotito|fotitos|imagen|imagenes|como (es|son|se ve|se ven|luce|lucen|queda|quedan)|muestra|muestrame|muestrenme|ensename)\b/.test(norm(texto));
+
+/** Fotos de lo que se está eligiendo (sabores si se elige sabor; si no, las opciones del paso): solo las que tienen foto, o solo la que nombra el cliente. */
+function fotosDelPaso(combo: ComboEnConfiguracionBot, paso: PasoComboBot, texto: string, urlFoto: (ruta: string) => string | null): AccionMensaje[] {
+  const lista: { nombre: string; fotoUrl?: string }[] = combo.saborDe ? saboresVisibles(combo, combo.saborDe.opcion) : opcionesVisibles(combo, paso);
+  const t = norm(texto);
+  const nombrados = lista.filter((o) => t.includes(norm(o.nombre)));
+  const fotos = (nombrados.length > 0 ? nombrados : lista)
+    .map((o) => ({ nombre: o.nombre, url: o.fotoUrl ? urlFoto(o.fotoUrl) : null }))
+    .filter((f): f is { nombre: string; url: string } => !!f.url)
+    .slice(0, MAX_FOTOS_BOT);
+  return fotos.length > 0
+    ? fotos.map((f) => ({ tipo: 'enviarImagen' as const, url: f.url, caption: f.nombre }))
+    : [{ tipo: 'enviarTexto' as const, texto: TEXTOS_COMBO.sinFotos() }];
+}
+
+/** Procesa lo que el cliente tocó o escribió en el paso en curso del combo. `urlFoto` vuelve pública la ruta de una foto (sin ella no se mandan fotos). */
+export function procesarEntradaCombo(
+  combo: ComboEnConfiguracionBot,
+  entrada: EntradaNormalizada,
+  plantillas: PlantillasCombo = {},
+  urlFoto?: (ruta: string) => string | null,
+): ResultadoPasoCombo {
   const paso = combo.pasos[combo.idx];
   if (!paso) return { estado: 'listo', acciones: [] };
   const texto = norm(entrada.texto || entrada.textoOriginal);
 
   if (['atras', 'volver', 'regresar', 'corregir'].includes(texto)) return atras(combo, plantillas);
+
+  // «¿Cómo son?»: manda las fotos de lo que se está eligiendo y repite la pregunta del paso (nada cambia en la elección)
+  const nombrePaso = [...(combo.saborDe ? saboresVisibles(combo, combo.saborDe.opcion) : opcionesVisibles(combo, paso))].some((c) => norm(c.nombre) === texto);
+  if (urlFoto && !entrada.id && !nombrePaso && pideFoto(texto)) {
+    return { estado: 'seguir', acciones: [...fotosDelPaso(combo, paso, texto, urlFoto), ...accionesPasoCombo(combo, plantillas)] };
+  }
 
   if (entrada.id?.startsWith('ped_cb_pag_')) {
     combo.pagina = Math.max(1, parseInt(entrada.id.replace('ped_cb_pag_', ''), 10) || 1);

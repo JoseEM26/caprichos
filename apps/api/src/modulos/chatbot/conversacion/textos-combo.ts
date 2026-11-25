@@ -25,6 +25,8 @@ export const TEXTOS_COMBO = {
 
   eligeSabor: (nombre: string): string => `¿De qué sabor quieres ${nombre}? 👇\n(Escribe *atrás* si te equivocas)`,
 
+  sinFotos: (): string => 'De estas opciones no tengo fotos por aquí 😅 Puedes verlas en nuestra carta virtual. Elige una de la lista:',
+
   noEncontre: (): string => 'No encontré esa opción 😅 Elige una de la lista:',
 
   nuevamente: (): string => 'Empecemos de nuevo con tu combo 💛',

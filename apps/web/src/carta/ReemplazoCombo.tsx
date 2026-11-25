@@ -223,6 +223,20 @@ export interface ParteEleccion {
   opciones: OpcionDetalleCombo[];
   /** Bebidas por categorías: se eligen en pasos «Bebida 1..N» (una por paso), no con contadores. */
   bebidas?: boolean;
+  /** Interruptor «Mostrar imágenes» de la parte: las opciones se ven con su foto. */
+  mostrarImagenes?: boolean;
+}
+
+/** Precio del combo del tamaño elegido (trae su foto, descripción y cantidades propias); undefined si el combo no lo tiene. */
+export function precioComboDeTamano(oferta: OfertaItem | null | undefined, tamanoValorId?: string | null) {
+  if (!oferta || !tamanoValorId) return undefined;
+  return (oferta.combosPrecio ?? []).find((c) => String(c.tamanoValorId) === String(tamanoValorId));
+}
+
+/** La oferta con la cantidad de cada parte del tamaño elegido (`cantidadPorTamano`); sin dato propio queda la de la parte. */
+export function ofertaConTamano(oferta: OfertaItem | null, tamanoValorId?: string | null): OfertaItem | null {
+  if (!oferta || !tamanoValorId || !(oferta.combosParte ?? []).some((p) => p.cantidadPorTamano?.[tamanoValorId])) return oferta;
+  return { ...oferta, combosParte: (oferta.combosParte ?? []).map((p) => (p.cantidadPorTamano?.[tamanoValorId] ? { ...p, cantidad: p.cantidadPorTamano[tamanoValorId] } : p)) };
 }
 
 /**
@@ -320,7 +334,7 @@ export function partesEleccion(oferta: OfertaItem | null, elegidos: Record<strin
       return alt ? [{ parteId, cantidad: alt.cantidad, opciones: [alt] }] : [];
     }
     if ((p.tipo ?? p.tipoParte) === 'A_ELECCION' && (p.opcionesDetalle ?? []).length > 0) {
-      return [{ parteId, cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [], ...(p.bebidas ? { bebidas: true } : {}) }];
+      return [{ parteId, cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [], ...(p.bebidas ? { bebidas: true } : {}), ...(p.mostrarImagenes ? { mostrarImagenes: true } : {}) }];
     }
     return [];
   });
