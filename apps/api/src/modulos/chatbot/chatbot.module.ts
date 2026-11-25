@@ -23,6 +23,7 @@ import { WhatsAppMensajeriaProvider } from './proveedor/whatsapp-mensajeria.prov
 import { WhatsappWebhookService } from './servicios/whatsapp-webhook.service';
 import { Ventana24hService } from './servicios/ventana-24h.service';
 import { VigilanteSinRespuestaService } from './servicios/vigilante-sin-respuesta.service';
+import { VigiaEntradaWhatsappService } from './servicios/vigia-entrada-whatsapp.service';
 import { ChatbotPlanificadorService } from './servicios/chatbot-planificador.service';
 import { AvisosPedidoService } from './servicios/avisos-pedido.service';
 import { ReprogramacionService } from './servicios/reprogramacion.service';
@@ -97,6 +98,7 @@ import { EvolutionAdminController } from './evolution/evolution-admin.controller
     AutorespuestaWhatsappService,
     ChatbotPlanificadorService,
     VigilanteSinRespuestaService,
+    VigiaEntradaWhatsappService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,
     ReanudacionBotService,
