@@ -657,6 +657,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
           puedeAgregar={puedeAgregar && (nB === 0 || indicesSinNombre().length === 0)}
           textoAgregar={nB > 0 && indicesSinNombre().length > 0 ? textoFaltaNombre(indicesSinNombre()[0]) : textoFalta}
           alAgregar={agregar}
+          cerrar={!movil ? (
+            <button onClick={pedirCierre} aria-label="Cerrar ventana de producto" style={{ flex: 'none', width: 40, height: 40, borderRadius: 20, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: 18, fontWeight: 800, cursor: 'pointer' }}>
+              ×
+            </button>
+          ) : undefined}
           avisosPie={
             <>
               {ayudaStock && <div role="status" className="ac-motivo">{ayudaStock}</div>}
@@ -667,7 +672,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         >
         <div data-testid="cuerpo-ventana" style={asistente ? { display: 'flex', flexDirection: 'column' } : { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ position: 'relative', flex: 'none', background: 'var(--cp-white)' }}>
-            {!movil && (
+            {!movil && !asistente && (
             <button
               onClick={pedirCierre}
               aria-label="Cerrar ventana de producto"
