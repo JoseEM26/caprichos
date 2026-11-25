@@ -35,6 +35,10 @@ describe('Vínculo y vacaciones', () => {
     render(<PestanaVinculoVacaciones partyId={7} />);
     expect(await screen.findByText('13 día(s)')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar vacaciones tomadas' }));
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Vacaciones tomadas' }), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(registrar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar vacaciones tomadas' }));
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2027-02-01' } });
     fireEvent.change(screen.getByLabelText('Hasta (inclusive)'), { target: { value: '2027-02-03' } });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));

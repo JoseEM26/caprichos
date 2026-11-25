@@ -5,6 +5,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import type { FilaPlanilla } from './planillaApi';
 import { EstadoError } from '../../comun/EstadoError';
 import { Insignia } from '../../comun/Insignia';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import { BarraPestanas, PanelesPestanas, type PestanaModal } from '../../comun/ModalConPestanas';
 import { ETIQUETAS_ROLES } from '../usuarios/roles';
 import { FilaCal, calendarioFilas } from './calendarioApi';
@@ -381,16 +382,26 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
         {pagado && d.pagadoEn && (
           <div role="status" className="as-aviso as-aviso--ok pp-sello">
             <span>Pagado el {fechaHora(d.pagadoEn)}{pagoRegistrado?.pagadoPorNombre ? ` por ${pagoRegistrado.pagadoPorNombre}` : ''}. Las cifras están congeladas (solo lectura).</span>
-            {reabrir === null
-              ? <Boton type="button" variante="peligro" onClick={() => setReabrir('')}>Reabrir período</Boton>
-              : (
-                <>
-                  <input aria-label="Motivo para reabrir (mínimo 10 caracteres)" placeholder="Motivo para reabrir (mín. 10 caracteres)" value={reabrir} onChange={(e) => setReabrir(e.target.value)} className="pp-motivo" />
-                  <Boton type="button" variante="peligro" disabled={ocupado || reabrir.trim().length < 10} onClick={() => void ejecutar(async () => { await reabrirPlanilla(d.periodoId!, reabrir.trim()); setReabrir(null); }, 'Período reabierto.')}>Confirmar</Boton>
-                  <Boton type="button" variante="secundario" onClick={() => setReabrir(null)}>Cancelar</Boton>
-                </>
-              )}
+            <Boton type="button" variante="peligro" onClick={() => setReabrir('')}>Reabrir período</Boton>
           </div>
+        )}
+        {reabrir !== null && (
+          <ModalFormulario
+            titulo="Reabrir período"
+            etiqueta="Reabrir período"
+            sucio={reabrir !== ''}
+            bloqueado={ocupado}
+            alCerrar={() => setReabrir(null)}
+            alEnviar={(e) => { e.preventDefault(); void ejecutar(async () => { await reabrirPlanilla(d.periodoId!, reabrir.trim()); setReabrir(null); }, 'Período reabierto.'); }}
+            pie={<>
+              <Boton type="button" variante="secundario" onClick={() => setReabrir(null)} disabled={ocupado}>Cancelar</Boton>
+              <Boton type="submit" variante="peligro" disabled={ocupado || reabrir.trim().length < 10}>Confirmar</Boton>
+            </>}
+          >
+            <label className="as-campo">Motivo para reabrir (mínimo 10 caracteres)
+              <input aria-label="Motivo para reabrir (mínimo 10 caracteres)" placeholder="Motivo para reabrir (mín. 10 caracteres)" value={reabrir} onChange={(e) => setReabrir(e.target.value)} autoFocus />
+            </label>
+          </ModalFormulario>
         )}
         <BarraPestanas pestanas={pestanas} activa={seccionActiva} alCambiar={(id) => onSeccion(id as SeccionPlanilla)} base={base} etiqueta="Secciones de la planilla" />
       </header>

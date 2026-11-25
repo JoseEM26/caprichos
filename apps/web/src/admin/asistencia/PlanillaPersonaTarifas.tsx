@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import { jornadaActual } from './jornada';
 import { Plegable } from './Plegable';
 import { DIAS_SEMANA, TarifaEspecialDia, TarifaEspecialRegla, crearTarifaEspecial, editarTarifaEspecial, listarTarifasEspeciales, soles } from './planillaApi';
@@ -34,7 +35,9 @@ function Tarifas({ partyId, onCambio, onError, onOk }: { partyId: number; onCamb
   const [reglas, setReglas] = useState<TarifaEspecialRegla[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   // edit: id null = regla nueva
-  const [edit, setEdit] = useState<{ id: number | null; b: Borrador } | null>(null);
+  const [edit, setEditar] = useState<{ id: number | null; b: Borrador; ini: string } | null>(null);
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+  const setEdit = (v: { id: number | null; b: Borrador } | null) => { setErrorGuardar(null); setEditar(v && { ...v, ini: JSON.stringify(v.b) }); };
   const [ocupado, setOcupado] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -62,7 +65,9 @@ function Tarifas({ partyId, onCambio, onError, onOk }: { partyId: number; onCamb
       await cargar();
       onCambio();
     } catch (e) {
-      onError(mensajeDe(e, 'No se pudo guardar la tarifa especial.'));
+      const m = mensajeDe(e, 'No se pudo guardar la tarifa especial.');
+      setErrorGuardar(m);
+      onError(m);
     } finally {
       setOcupado(false);
     }
@@ -83,7 +88,7 @@ function Tarifas({ partyId, onCambio, onError, onOk }: { partyId: number; onCamb
     }
   };
 
-  const set = (campo: keyof Borrador, valor: string | number) => setEdit((e) => (e ? { ...e, b: { ...e.b, [campo]: valor } } : e));
+  const set = (campo: keyof Borrador, valor: string | number) => setEditar((e) => (e ? { ...e, b: { ...e.b, [campo]: valor } } : e));
   const errorForm = edit ? errorBorrador(edit.b) : null;
 
   if (errorCarga) return <p role="alert" className="as-ayuda">{errorCarga}</p>;
@@ -112,9 +117,18 @@ function Tarifas({ partyId, onCambio, onError, onOk }: { partyId: number; onCamb
         </ul>
       )}
 
-      {edit ? (
-        <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-          <legend className="as-ayuda">{edit.id === null ? 'Agregar tarifa especial' : 'Editar tarifa especial'}</legend>
+      {edit && (
+        <ModalFormulario
+          titulo={edit.id === null ? 'Agregar tarifa especial' : 'Editar tarifa especial'}
+          sucio={JSON.stringify(edit.b) !== edit.ini}
+          bloqueado={ocupado}
+          alCerrar={() => setEdit(null)}
+          alEnviar={(e: FormEvent) => { e.preventDefault(); if (!errorForm) void guardar(); }}
+          pie={<>
+            <Boton type="button" variante="secundario" onClick={() => setEdit(null)} disabled={ocupado}>Cancelar</Boton>
+            <Boton type="submit" disabled={ocupado || !!errorForm}>{edit.id === null ? 'Agregar tarifa especial' : 'Guardar cambios'}</Boton>
+          </>}
+        >
           <div className="as-form">
             <label className="as-campo">Día
               <select value={edit.b.diaSemana} onChange={(e) => set('diaSemana', Number(e.target.value))}>
@@ -130,12 +144,10 @@ function Tarifas({ partyId, onCambio, onError, onOk }: { partyId: number; onCamb
             <input maxLength={200} value={edit.b.nota} onChange={(e) => set('nota', e.target.value)} />
           </label>
           {errorForm && <small className="as-nota" role="status">{errorForm}</small>}
-          <div className="as-acciones">
-            <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setEdit(null)}>Cancelar</Boton>
-            <Boton type="button" tamano="pequeno" disabled={ocupado || !!errorForm} onClick={() => void guardar()}>{edit.id === null ? 'Agregar tarifa especial' : 'Guardar cambios'}</Boton>
-          </div>
-        </fieldset>
-      ) : (
+          {errorGuardar && <div role="alert" className="as-aviso as-aviso--error">{errorGuardar}</div>}
+        </ModalFormulario>
+      )}
+      {!edit && (
         <div className="as-acciones">
           <Boton type="button" variante="secundario" disabled={ocupado} onClick={() => setEdit({ id: null, b: borradorNuevo() })}>Agregar tarifa especial</Boton>
         </div>

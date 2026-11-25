@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import {
   ETIQUETA_VINCULO,
   MAX_CONTRATO_BYTES,
@@ -240,8 +241,17 @@ export function PanelVacaciones({ partyId, hook, alCambiar }: { partyId: number;
         ))}
       </div>
       {form && (
-        <fieldset style={CAJA}>
-          <legend style={{ fontWeight: 800, fontSize: 14 }}>{form === 'TOMADAS' ? 'Vacaciones tomadas' : form === 'PAGADAS' ? 'Vacaciones pagadas en dinero' : 'Ajuste de saldo'}</legend>
+        <ModalFormulario
+          titulo={form === 'TOMADAS' ? 'Vacaciones tomadas' : form === 'PAGADAS' ? 'Vacaciones pagadas en dinero' : 'Ajuste de saldo'}
+          sucio={f.dias !== '' || f.monto !== '' || f.motivo !== ''}
+          bloqueado={ocupado}
+          alCerrar={() => setForm(null)}
+          alEnviar={(e) => { e.preventDefault(); if (valido) void registrar(); }}
+          pie={<>
+            <Boton type="button" variante="secundario" disabled={ocupado} onClick={() => setForm(null)}>Cancelar</Boton>
+            <Boton type="submit" disabled={ocupado || !valido}>Registrar</Boton>
+          </>}
+        >
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <label style={{ flex: '1 1 140px', fontSize: 12, fontWeight: 700 }}>
               {form === 'TOMADAS' ? 'Desde' : form === 'PAGADAS' ? 'Fecha (período de planilla)' : 'Fecha'}
@@ -270,13 +280,10 @@ export function PanelVacaciones({ partyId, hook, alCambiar }: { partyId: number;
             Motivo {form === 'AJUSTE' ? '(obligatorio)' : '(opcional)'}
             <input value={f.motivo} maxLength={300} onChange={(e) => setF({ ...f, motivo: e.target.value })} style={ENTRADA} />
           </label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Boton type="button" disabled={ocupado || !valido} onClick={() => void registrar()}>Registrar</Boton>
-            <Boton type="button" variante="secundario" disabled={ocupado} onClick={() => setForm(null)}>Cancelar</Boton>
-          </div>
-        </fieldset>
+          {msg && !msg.ok && <div role="alert" style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-rust)' }}>{msg.texto}</div>}
+        </ModalFormulario>
       )}
-      {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ fontWeight: 700, fontSize: 13, color: msg.ok ? 'var(--cp-green)' : 'var(--cp-rust)' }}>{msg.texto}</div>}
+      {msg && !(form && !msg.ok) && <div role={msg.ok ? 'status' : 'alert'} style={{ fontWeight: 700, fontSize: 13, color: msg.ok ? 'var(--cp-green)' : 'var(--cp-rust)' }}>{msg.texto}</div>}
       {vac.movimientos.length === 0 ? <p className="as-ayuda">Aún no hay movimientos de vacaciones.</p> : (
         <div className="as-tabla-wrap">
           <table className="as-tabla as-tabla--tarjetas">

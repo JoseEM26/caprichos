@@ -8,12 +8,16 @@ const pagar = vi.fn();
 const historial = vi.fn(async () => []);
 const sueldoApi = vi.fn(async () => ({ sueldo: null, historial: [] }));
 const filasCal = vi.fn(async () => ({ total: 0, pagina: 1, limite: 0, filas: [], totales: { trabajadaMin: 0, tardanzaMin: 0, extraMin: 0, faltas: 0 } }));
+const reabrir = vi.fn(async () => ({ ok: true }));
+const anularAj = vi.fn(async () => ({ ok: true }));
 const seleccionar = vi.fn(async () => ({ ok: true, activo: true }));
 vi.mock('../planillaApi', async (orig) => ({
   ...(await orig<any>()),
   listarPlanilla: (...a: any[]) => listar(...a),
   detallePlanilla: (...a: any[]) => detalle(...a),
   pagarPlanilla: (...a: any[]) => pagar(...a),
+  reabrirPlanilla: (...a: any[]) => (reabrir as any)(...a),
+  anularAjuste: (...a: any[]) => (anularAj as any)(...a),
   seleccionarPlanilla: (...a: any[]) => (seleccionar as any)(...a),
   historialPagos: (...a: any[]) => (historial as any)(...a),
   obtenerSueldo: (...a: any[]) => (sueldoApi as any)(...a),
@@ -369,6 +373,38 @@ describe('PlanillaTab', () => {
     await tab('Pago');
     expect(screen.queryByRole('button', { name: 'Marcar pagado' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Reabrir período' })).toBeInTheDocument();
+  });
+
+  it('Reabrir período abre una ventana: Esc la cierra y Confirmar llama a la API con el motivo', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'PAGADO' }] });
+    detalle.mockResolvedValue({ ...base, estado: 'PAGADO', periodoId: '5', pagadoEn: '2026-11-10T12:00:00Z' });
+    montar();
+    await abrir();
+    fireEvent.click(await screen.findByRole('button', { name: 'Reabrir período' }));
+    const dlg = await screen.findByRole('dialog', { name: 'Reabrir período' });
+    expect(within(dlg).getByRole('button', { name: 'Confirmar' })).toBeDisabled();
+    fireEvent.keyDown(dlg, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Reabrir período' }));
+    fireEvent.change(screen.getByLabelText('Motivo para reabrir (mínimo 10 caracteres)'), { target: { value: 'Error en las horas' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await waitFor(() => expect(reabrir).toHaveBeenCalledWith('5', 'Error en las horas'));
+  });
+
+  it('Anular un descuento abre una ventana con el motivo: Esc cierra y Anular llama a la API', async () => {
+    listar.mockResolvedValue({ fecha: 'x', filas: [{ ...persona, estado: 'ABIERTO' }] });
+    detalle.mockResolvedValue({ ...base, ajustes: [{ id: 1, tipo: 'DESCUENTO', categoria: 'MERMA', fecha: '2026-11-03', monto: 5, motivo: 'Torta caída', anulado: false }] });
+    montar();
+    await abrir();
+    await tab('Descuentos');
+    fireEvent.click(await screen.findByRole('button', { name: 'Anular' }));
+    const dlg = await screen.findByRole('dialog', { name: 'Anular ajuste' });
+    fireEvent.keyDown(dlg, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Anular' }));
+    fireEvent.change(screen.getByLabelText('Motivo de la anulación'), { target: { value: 'Error de digitación' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Anular' }));
+    await waitFor(() => expect(anularAj).toHaveBeenCalledWith(1, 'Error de digitación'));
   });
 
   it('Historial: pagos anteriores de la persona, cambios de sueldo con «Vigente desde» y ajustes anulados', async () => {

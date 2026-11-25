@@ -49,7 +49,7 @@ describe('Tarifas especiales (planilla de la persona)', () => {
     montar();
     fireEvent.click(screen.getByText('Tarifas especiales'));
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar tarifa especial' }));
-    const form = screen.getByRole('group', { name: 'Agregar tarifa especial' });
+    const form = screen.getByRole('dialog', { name: 'Agregar tarifa especial' });
     expect(within(form).getByLabelText('Día')).toHaveValue('0');
     expect(within(form).getByLabelText('Desde la hora')).toHaveValue('19:00');
     expect(within(form).getByLabelText('Tarifa por hora (S/)')).toHaveValue(15);
@@ -68,12 +68,23 @@ describe('Tarifas especiales (planilla de la persona)', () => {
     expect(onCambio).toHaveBeenCalled();
   });
 
+  it('el formulario es una ventana: Esc la cierra sin llamar a la API', async () => {
+    listarTarifasEspeciales.mockResolvedValue({ reglas: [] });
+    montar();
+    fireEvent.click(screen.getByText('Tarifas especiales'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar tarifa especial' }));
+    expect(screen.getByRole('dialog', { name: 'Agregar tarifa especial' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(crearTarifaEspecial).not.toHaveBeenCalled();
+  });
+
   it('no deja guardar una tarifa de cero', async () => {
     listarTarifasEspeciales.mockResolvedValue({ reglas: [] });
     montar();
     fireEvent.click(screen.getByText('Tarifas especiales'));
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar tarifa especial' }));
-    const form = screen.getByRole('group', { name: 'Agregar tarifa especial' });
+    const form = screen.getByRole('dialog', { name: 'Agregar tarifa especial' });
     fireEvent.change(within(form).getByLabelText('Tarifa por hora (S/)'), { target: { value: '0' } });
     expect(within(form).getByRole('button', { name: 'Agregar tarifa especial' })).toBeDisabled();
     expect(within(form).getByText('La tarifa por hora debe ser mayor que cero.')).toBeInTheDocument();

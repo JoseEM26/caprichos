@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Insignia } from '../../comun/Insignia';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import { jornadaActual } from './jornada';
 import { Plegable } from './Plegable';
 import { PrestamosPersona, ServiciosExtraPersona } from './PrestamosPersona';
@@ -83,19 +84,7 @@ export function PestanaDescuentos({ c, alCambiarBorrador }: { c: CtlPlanilla; al
           </div>
           <div>{a.motivo}</div>
           {a.anulado && <small className="as-nota">Anulado: {a.anuladoMotivo}</small>}
-          {!a.anulado && !pagado && (
-            anulando?.id === a.id ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                <label className="as-campo">Motivo de la anulación
-                  <input value={anulando.motivo} onChange={(e) => setAnulando({ id: a.id, motivo: e.target.value })} />
-                </label>
-                <div className="as-acciones">
-                  <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setAnulando(null)}>Cancelar</Boton>
-                  <Boton type="button" variante="peligro" tamano="pequeno" disabled={ocupado || anulando.motivo.trim().length < 3} onClick={() => void c.ejecutar(async () => { await anularAjuste(a.id, anulando.motivo.trim()); setAnulando(null); }, 'Ajuste anulado.')}>Anular</Boton>
-                </div>
-              </div>
-            ) : <div><Boton type="button" variante="texto" tamano="pequeno" onClick={() => setAnulando({ id: a.id, motivo: '' })}>Anular</Boton></div>
-          )}
+          {!a.anulado && !pagado && <div><Boton type="button" variante="texto" tamano="pequeno" onClick={() => setAnulando({ id: a.id, motivo: '' })}>Anular</Boton></div>}
         </li>
       ))}
     </ul>
@@ -120,6 +109,24 @@ export function PestanaDescuentos({ c, alCambiarBorrador }: { c: CtlPlanilla; al
 
   return (
     <div className="pp-seccion">
+      {anulando && (
+        <ModalFormulario
+          titulo="Anular ajuste"
+          etiqueta="Anular ajuste"
+          sucio={anulando.motivo !== ''}
+          bloqueado={ocupado}
+          alCerrar={() => setAnulando(null)}
+          alEnviar={(e: FormEvent) => { e.preventDefault(); void c.ejecutar(async () => { await anularAjuste(anulando.id, anulando.motivo.trim()); setAnulando(null); }, 'Ajuste anulado.'); }}
+          pie={<>
+            <Boton type="button" variante="secundario" onClick={() => setAnulando(null)} disabled={ocupado}>Cancelar</Boton>
+            <Boton type="submit" variante="peligro" disabled={ocupado || anulando.motivo.trim().length < 3}>Anular</Boton>
+          </>}
+        >
+          <label className="as-campo">Motivo de la anulación
+            <input value={anulando.motivo} onChange={(e) => setAnulando({ id: anulando.id, motivo: e.target.value })} autoFocus />
+          </label>
+        </ModalFormulario>
+      )}
       {c.antSinCobrar.length > 0 && (
         <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-creditos-anteriores">
           <strong>Tiene {c.antSinCobrar.length} {c.antSinCobrar.length === 1 ? 'crédito sin cerrar' : 'créditos sin cerrar'} de días anteriores por {soles(c.antTotal)}.</strong>

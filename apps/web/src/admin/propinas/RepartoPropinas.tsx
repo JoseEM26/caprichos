@@ -6,7 +6,7 @@ import { PropinasPorDia } from './PropinasPorDia';
 
 /**
  * Reparto de propinas (solo ADMIN). El pago ya NO se hace aquí: las propinas se pagan por día en la planilla de cada persona.
- * Cifras del servidor; aquí solo se muestran (y se calcula/aprueba el reparto mensual antiguo).
+ * Cifras del servidor; aquí solo se muestran. Los repartos mensuales antiguos quedan como historial de solo lectura.
  */
 type Estado = 'BORRADOR' | 'APROBADO' | 'PAGADO' | 'ANULADO';
 
@@ -94,21 +94,6 @@ function mesesTerminados(actual: { anio: number; mes: number }): Array<{ anio: n
   return lista;
 }
 
-/** CSV del reparto a partir de las filas visibles (mismo formato que el de la API). */
-export function csvDeReparto(filas: Array<{ nombre: string; horas: number; porcentaje: number; monto: number; pagadoEn?: string | null; pagadoMedio?: string | null }>): string {
-  const esc = (v: unknown) => {
-    const s = v === null || v === undefined ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lineas = ['persona,horas,porcentaje,monto,pagado_en,medio_pago'];
-  for (const f of filas) {
-    lineas.push([f.nombre, f.horas, f.porcentaje, f.monto, f.pagadoEn ?? '', f.pagadoMedio ?? ''].map(esc).join(','));
-  }
-  return lineas.join('\n') + '\n';
-}
-
-type Confirmacion = 'calcular' | 'aprobar' | 'anular' | null;
-
 export function RepartoPropinas() {
   const actual = useMemo(() => mesActualLima(), []);
   const opciones = useMemo(() => mesesTerminados(actual), [actual]);
@@ -116,11 +101,8 @@ export function RepartoPropinas() {
   const [vista, setVista] = useState<Vista | null>(null);
   const [historial, setHistorial] = useState<FilaHistorial[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
-  const [confirmacion, setConfirmacion] = useState<Confirmacion>(null);
-  const [motivo, setMotivo] = useState('');
 
   const ruta = `/admin/propinas/reparto/${seleccion.anio}/${seleccion.mes}`;
 
@@ -142,43 +124,15 @@ export function RepartoPropinas() {
     void cargar();
   }, [cargar]);
 
-  const accion = async (ruta2: string, cuerpo: unknown, ok: string) => {
-    setEnviando(true);
-    setError(null);
-    setMensaje(null);
-    try {
-      await api.post(ruta2, cuerpo);
-      setMensaje(ok);
-      setConfirmacion(null);
-      setMotivo('');
-      await cargar();
-    } catch (err) {
-      setError(err instanceof ErrorApi ? err.message : 'No se pudo completar la acción');
-    } finally {
-      setEnviando(false);
-    }
-  };
-
   const cambiarParticipacion = async (partyId: number, valor: string) => {
     setError(null);
     try {
       await api.put(`/admin/propinas/participacion/${partyId}`, { participa: valor === 'auto' ? null : valor === 'si' });
-      setMensaje('Cambio guardado. Recalcula el borrador para que cuente.');
+      setMensaje('Cambio guardado.');
       await cargar();
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar el cambio');
     }
-  };
-
-  const descargar = () => {
-    const filas = vista?.reparto ? vista.reparto.filas : vista?.previa.filas ?? [];
-    const blob = new Blob([csvDeReparto(filas)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `propinas-${seleccion.anio}-${String(seleccion.mes).padStart(2, '0')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const reparto = vista?.reparto ?? null;
@@ -188,16 +142,13 @@ export function RepartoPropinas() {
   const esGuardado = reparto !== null;
   const totalPropinas = reparto ? reparto.totalPropinas : previa?.totalPropinas ?? 0;
   const totalHoras = reparto ? reparto.totalHoras : previa?.totalHoras ?? 0;
-  const puedeCalcular = !!vista?.mesTerminado && (!reparto || reparto.estado === 'BORRADOR') && !previa?.error;
-  const puedeAprobar = estado === 'BORRADOR';
-  const puedeAnular = estado === 'BORRADOR' || (estado === 'APROBADO' && !reparto?.filas.some((f) => f.pagadoEn));
 
   return (
     <section aria-label="Reparto del mes" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', maxWidth: 680 }}>
           Cada día, la propina cobrada se reparte entre quienes trabajaron ese día, en proporción a sus horas, y se paga en la planilla de cada persona.
-          Aquí solo se ve. El ADMIN no participa salvo excepción.
+          Aquí solo se ve. El reparto en planilla cuenta desde el período abierto al 25/11/2026. El ADMIN no participa salvo excepción.
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700 }}>
           Mes
@@ -207,7 +158,6 @@ export function RepartoPropinas() {
             onChange={(e) => {
               const [anio, mes] = e.target.value.split('-').map(Number);
               setSeleccion({ anio, mes });
-              setConfirmacion(null);
             }}
             style={{ minHeight: 36, borderRadius: 8, border: '1px solid var(--cp-line)', padding: '0 8px' }}
           >
@@ -236,9 +186,9 @@ export function RepartoPropinas() {
               {estado ? (
                 <Insignia variante={estado === 'PAGADO' ? 'exito' : estado === 'APROBADO' ? 'aviso' : 'neutro'}>{ETIQUETA_ESTADO[estado]}</Insignia>
               ) : (
-                <Insignia variante="neutro">Sin reparto calculado</Insignia>
+                <Insignia variante="neutro">Sin reparto mensual antiguo</Insignia>
               )}
-              {!esGuardado && <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Vista previa {vista.mesTerminado ? '' : '(el mes aún no termina: solo lectura)'}</span>}
+              {!esGuardado && <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Vista previa (solo lectura)</span>}
             </div>
 
             {previa.error && (
@@ -324,50 +274,6 @@ export function RepartoPropinas() {
               </section>
             )}
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              {puedeCalcular && (
-                <button type="button" disabled={enviando} onClick={() => setConfirmacion('calcular')}>
-                  {reparto ? 'Recalcular borrador' : 'Calcular reparto'}
-                </button>
-              )}
-              {puedeAprobar && (
-                <button type="button" disabled={enviando} onClick={() => setConfirmacion('aprobar')}>Aprobar</button>
-              )}
-              {puedeAnular && (
-                <button type="button" disabled={enviando} onClick={() => setConfirmacion('anular')}>Anular</button>
-              )}
-              {filas.length > 0 && (
-                <button type="button" onClick={descargar}>Exportar CSV</button>
-              )}
-            </div>
-
-            {confirmacion && (
-              <div role="dialog" aria-label="Confirmación" style={{ border: '1px solid var(--cp-line)', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: 'var(--cp-white)' }}>
-                {confirmacion === 'calcular' && <span>¿Calcular el reparto de {MESES[seleccion.mes - 1]} con las horas actuales?</span>}
-                {confirmacion === 'aprobar' && <span>Al aprobar, las cifras quedan congeladas y las personas ven su parte. ¿Aprobar?</span>}
-                {confirmacion === 'anular' && (
-                  <label style={{ display: 'grid', gap: 4 }}>
-                    Motivo de la anulación (obligatorio)
-                    <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} />
-                  </label>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={enviando || (confirmacion === 'anular' && motivo.trim().length < 5)}
-                    onClick={() => {
-                      const base = ruta;
-                      if (confirmacion === 'calcular') void accion(`${base}/calcular`, undefined, 'Reparto calculado');
-                      if (confirmacion === 'aprobar') void accion(`${base}/aprobar`, undefined, 'Reparto aprobado');
-                      if (confirmacion === 'anular') void accion(`${base}/anular`, { motivo: motivo.trim() }, 'Reparto anulado');
-                    }}
-                  >
-                    Sí, confirmar
-                  </button>
-                  <button type="button" onClick={() => setConfirmacion(null)}>No</button>
-                </div>
-              </div>
-            )}
           </>
         )
       )}

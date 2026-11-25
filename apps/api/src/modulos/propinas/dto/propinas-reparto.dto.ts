@@ -1,11 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-
-export class AnularRepartoDto {
-  @IsString()
-  @MinLength(5, { message: 'Escribe el motivo (mínimo 5 caracteres)' })
-  @MaxLength(300)
-  motivo!: string;
-}
+import { IsBoolean, IsOptional } from 'class-validator';
 
 export class ParticipacionDto {
   /** true/false = forzado por el ADMIN; sin valor (null) = según el rol. */

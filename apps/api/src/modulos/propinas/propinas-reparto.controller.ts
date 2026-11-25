@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AnularRepartoDto, ParticipacionDto } from './dto/propinas-reparto.dto';
+import { ParticipacionDto } from './dto/propinas-reparto.dto';
 import { PropinasRepartoService } from './propinas-reparto.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -10,7 +9,7 @@ const ipDe = (req: any): string | undefined => {
   return raw ? (raw.split(',')[0] || '').trim() : undefined;
 };
 
-/** Reparto mensual de propinas (solo ADMIN: propinas/repartir). */
+/** Reparto de propinas (solo ADMIN: propinas/repartir): historial del reparto mensual antiguo (solo lectura), vista por día y excepción por persona. */
 @Controller('admin/propinas')
 @UseGuards(AccesoGuard)
 export class PropinasRepartoController {
@@ -29,37 +28,11 @@ export class PropinasRepartoController {
     return this.reparto.vista(Number(anio), Number(mes));
   }
 
-  @Post('reparto/:anio/:mes/calcular')
-  @Permiso('propinas', 'repartir')
-  calcular(@Param('anio') anio: string, @Param('mes') mes: string, @Req() req: any) {
-    return this.reparto.calcular(Number(anio), Number(mes), req.usuario, ipDe(req));
-  }
-
-  @Post('reparto/:anio/:mes/aprobar')
-  @Permiso('propinas', 'repartir')
-  aprobar(@Param('anio') anio: string, @Param('mes') mes: string, @Req() req: any) {
-    return this.reparto.aprobar(Number(anio), Number(mes), req.usuario, ipDe(req));
-  }
-
   /** Solo para ver: reparto por día del mes y si cada parte ya se pagó en planilla. */
   @Get('dias/:anio/:mes')
   @Permiso('propinas', 'repartir')
   dias(@Param('anio') anio: string, @Param('mes') mes: string) {
     return this.reparto.vistaDias(Number(anio), Number(mes));
-  }
-
-  @Post('reparto/:anio/:mes/anular')
-  @Permiso('propinas', 'repartir')
-  anular(@Param('anio') anio: string, @Param('mes') mes: string, @Body() dto: AnularRepartoDto, @Req() req: any) {
-    return this.reparto.anular(Number(anio), Number(mes), dto.motivo, req.usuario, ipDe(req));
-  }
-
-  @Get('reparto/:anio/:mes/csv')
-  @Permiso('propinas', 'repartir')
-  async csv(@Param('anio') anio: string, @Param('mes') mes: string, @Res({ passthrough: true }) res: Response) {
-    const r = await this.reparto.csv(Number(anio), Number(mes));
-    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${r.nombre}"` });
-    return r.csv;
   }
 
   /** Excepción por persona para participar en el reparto (null = según su rol). */

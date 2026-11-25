@@ -46,21 +46,13 @@ Ver tambien: [[caja]]
 4. Si el pedido se devuelve, la propina del dia ya sale descontada.
 Despues: [[cierre]]
 
-## Como se hace: Calcular y aprobar el reparto del mes (solo Administrador)
-1. Abre Propinas, pestana Reparto del mes, y elige el mes. El reparto se calcula y aprueba cuando termina el mes (desde el dia 1 del mes siguiente); antes solo ves la vista previa.
-2. Se reparte por horas trabajadas: cada persona recibe un porcentaje segun sus horas del mes en [[asistencia]]. La tabla Reparto por persona muestra Horas, % y Monto, y arriba Total de propinas, Horas totales y Personas.
-3. Revisa los Avisos. En Fuera del reparto estan quienes no participan: por defecto el rol Administrador no participa. Para cada persona puedes elegir "Segun su rol", "Si participa" o "No participa". Despues de cambiarlo pulsa Recalcular borrador para que cuente.
-4. Pulsa Calcular reparto (o Recalcular borrador). El estado queda Borrador.
-5. Pulsa Aprobar y confirma "Al aprobar, las cifras quedan congeladas y las personas ven su parte. Aprobar?". Estado Aprobado.
-6. Pulsa Exportar CSV si quieres el archivo.
+## Como se hace: Ver el reparto por dia (solo Administrador)
+1. Abre Propinas, pestana Reparto del mes, y elige el mes. Esta vista es solo para ver: ya no se calcula, aprueba, anula ni exporta aqui.
+2. Cada dia, la propina cobrada se reparte entre quienes trabajaron ese dia, segun sus horas de [[asistencia]], y se paga en la planilla de cada persona. La vista Por dia muestra la parte de cada uno y si ya se pago en planilla.
+3. El reparto en planilla cuenta desde el periodo abierto al 25/11/2026. Los periodos pagados antes no cobran propinas atrasadas.
+4. En Fuera del reparto estan quienes no participan: por defecto el rol Administrador no participa. Para cada persona puedes elegir "Segun su rol", "Si participa" o "No participa".
+5. El Historial de repartos de abajo muestra los repartos mensuales antiguos, solo para consultar.
 Antes: [[asistencia]]
-
-## Como se hace: Pagar el reparto
-1. Con el reparto Aprobado, elige el Medio (Efectivo, Yape, Plin, Transferencia...) y la Fecha de pago.
-2. Para pagar a todos pulsa el boton de pagar del reparto ("Pagos registrados"); para uno solo pulsa Pagar en su fila ("Pago registrado"). Cada fila pasa de Pendiente a "Pagado dd/mm/aaaa (medio)".
-3. Cuando todos estan pagados el reparto queda Pagado.
-4. Para corregir un reparto aun no pagado, pulsa Anular y escribe el motivo; luego se puede recalcular. Si hay pagos registrados no se puede anular.
-5. El Historial de repartos de abajo lista los meses anteriores.
 
 ## Como se hace: Ver mi parte de propinas
 1. Cualquier persona del equipo abre Mi asistencia: si el reparto ya esta aprobado aparece la seccion Mis propinas con el mes, tus horas, tu porcentaje, el monto y la insignia Por pagar o Pagado (con el medio).
@@ -70,14 +62,9 @@ Antes: [[asistencia]]
 - No aparece el campo de propina en la carta o el bot: esta apagada para ese canal. El Administrador la enciende en Configuracion.
 - "La propina debe ser un monto en soles, con hasta 2 decimales y no mayor a S/ N": el cliente escribio un monto invalido o sobre el tope. En el bot: "Escribe un monto en soles entre 0 y S/ N, con hasta 2 decimales.".
 - Una propina no aparece en el acumulado: todavia no esta cobrada. Mira Propinas pendientes de cobro y cobra el pedido en [[caja]].
-- "El reparto de M/A ya esta Aprobado. Anulalo con motivo para volver a calcularlo.": para recalcular hay que anularlo (si no tiene pagos).
-- "Las horas o las propinas cambiaron desde el borrador. Vuelve a calcular antes de aprobar.": llego una marca, correccion o cobro nuevo; pulsa Recalcular borrador y vuelve a aprobar.
 - "Hay propinas en el mes, pero nadie tiene horas trabajadas evaluables.": faltan marcas de [[asistencia]]; corrige las marcas del mes.
 - "Hay propinas en el mes, pero ninguna persona participa en el reparto.": revisa las excepciones en Fuera del reparto.
 - "Las devoluciones del mes superan las propinas: revisa Propinas antes de repartir.": el acumulado quedo en negativo; revisa las devoluciones.
-- "El reparto se calcula y aprueba cuando termina el mes...": espera al dia 1 del mes siguiente.
-- "Solo se paga un reparto aprobado": primero hay que aprobarlo. "No hay personas pendientes de pago en la seleccion": ya estan pagados.
-- "Otro usuario esta calculando este mes. Recarga la vista.": otra persona esta calculando; recarga.
 
 ## Quien puede hacerlo
-Administrador: todo (ver, calcular, aprobar, pagar, anular el reparto, encender o apagar por canal). Cajero y Supervisor: ven el Acumulado (permiso propinas/ver) y las propinas del dia en el cierre. El reparto es solo del Administrador (propinas/repartir). Todo el personal ve su propia parte en [[mi-asistencia]].
+Administrador: todo (ver el reparto por dia y el historial, encender o apagar por canal; la propina se paga en la planilla). Cajero y Supervisor: ven el Acumulado (permiso propinas/ver) y las propinas del dia en el cierre. El reparto es solo del Administrador (propinas/repartir). Todo el personal ve su propia parte en [[mi-asistencia]].

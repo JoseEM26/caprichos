@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import { CLAVE_PERMISO } from '../acceso/permiso.decorator';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { PropinasMiController, PropinasRepartoController } from './propinas-reparto.controller';
@@ -153,127 +152,17 @@ describe('PropinasRepartoService: cálculo proporcional', () => {
     expect(v.previa.avisos).toEqual(['3 jornadas de Juan están INCOMPLETO', '1 jornada de Juan están A REVISAR']);
   });
 
-  it('propinas sin horas trabajadas o sin participantes dan error claro y no se calcula', async () => {
+  it('propinas sin horas trabajadas o sin participantes dan error claro y no hay reparto', async () => {
     const sinHoras = crear({ total: 30, horas: [persona(2, 'Ana', { horas: 0 })], personas: personasDe([2], ['Ana']) });
-    await expect(sinHoras.servicio.calcular(2026, 11, ADMIN, undefined, AHORA)).rejects.toMatchObject({
-      response: { codigo: 'SIN_HORAS' },
-    });
+    expect((await sinHoras.servicio.vista(2026, 11, AHORA)).previa.error).toMatchObject({ codigo: 'SIN_HORAS' });
     const sinParticipantes = crear({
       total: 30,
       horas: [persona(1, 'Jefe', { horas: 10 })],
       personas: personasDe([1], ['Jefe']),
       cuentas: [{ party_id: 1n, rol: 'ADMIN' }],
     });
-    await expect(sinParticipantes.servicio.calcular(2026, 11, ADMIN, undefined, AHORA)).rejects.toMatchObject({
-      response: { codigo: 'SIN_PARTICIPANTES' },
-    });
+    expect((await sinParticipantes.servicio.vista(2026, 11, AHORA)).previa.error).toMatchObject({ codigo: 'SIN_PARTICIPANTES' });
     expect(sinParticipantes.prisma.propinaReparto.create).not.toHaveBeenCalled();
-  });
-});
-
-describe('PropinasRepartoService: estados', () => {
-  it('calcular guarda un BORRADOR con su detalle y audita', async () => {
-    const { servicio, prisma, auditoria } = crear({
-      total: 150,
-      horas: [persona(1, 'Luis', { horas: 24 }), persona(2, 'Ana', { horas: 40 })],
-      personas: personasDe([1, 2], ['Luis', 'Ana']),
-    });
-    await servicio.calcular(2026, 11, ADMIN, undefined, AHORA);
-    expect(prisma.propinaReparto.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ anio: 2026, mes: 11, estado: 'BORRADOR', total_propinas: 150, calculado_por: 1n }),
-    });
-    expect(prisma.propinaRepartoDetalle.createMany.mock.calls[0][0].data).toHaveLength(2);
-    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ modulo: 'propinas', accion: 'CALCULAR_REPARTO' }));
-  });
-
-  it('un solo reparto vigente por mes: solo cuenta el que no está ANULADO', async () => {
-    const { servicio, prisma } = crear({ total: 10, horas: [persona(1, 'Luis', { horas: 8 })], personas: personasDe([1], ['Luis']) });
-    await servicio.calcular(2026, 11, ADMIN, undefined, AHORA);
-    expect(prisma.propinaReparto.findFirst.mock.calls[0][0].where).toEqual({ anio: 2026, mes: 11, estado: { not: 'ANULADO' } });
-  });
-
-  it('recalcular un BORRADOR lo reemplaza (no crea otro)', async () => {
-    const vigente = { id: 10n, estado: 'BORRADOR' };
-    const { servicio, prisma } = crear({
-      total: 10,
-      horas: [persona(1, 'Luis', { horas: 8 })],
-      personas: personasDe([1], ['Luis']),
-      vigente,
-    });
-    await servicio.calcular(2026, 11, ADMIN, undefined, AHORA);
-    expect(prisma.propinaReparto.create).not.toHaveBeenCalled();
-    expect(prisma.propinaRepartoDetalle.deleteMany).toHaveBeenCalledWith({ where: { reparto_id: 10n } });
-    expect(prisma.propinaReparto.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 10n } }));
-  });
-
-  it('un reparto aprobado o pagado no se vuelve a calcular', async () => {
-    const { servicio } = crear({
-      total: 10,
-      horas: [persona(1, 'Luis', { horas: 8 })],
-      personas: personasDe([1], ['Luis']),
-      vigente: { id: 10n, estado: 'APROBADO', detalle: [] },
-    });
-    await expect(servicio.calcular(2026, 11, ADMIN, undefined, AHORA)).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('no se calcula ni aprueba el mes en curso', async () => {
-    const { servicio } = crear({ total: 10, horas: [persona(1, 'Luis', { horas: 8 })], personas: personasDe([1], ['Luis']) });
-    await expect(servicio.calcular(2026, 12, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'MES_EN_CURSO' } });
-    await expect(servicio.aprobar(2026, 12, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'MES_EN_CURSO' } });
-  });
-
-  it('aprobar congela el borrador si las cifras no cambiaron, y rechaza si cambiaron', async () => {
-    const detalle = [{ party_id: 1n, horas: 24, porcentaje: 20, monto: 30 }, { party_id: 2n, horas: 96, porcentaje: 80, monto: 120 }];
-    const ok = crear({
-      total: 150,
-      horas: [persona(1, 'Luis', { horas: 24 }), persona(2, 'Ana', { horas: 96 })],
-      personas: personasDe([1, 2], ['Luis', 'Ana']),
-      vigente: { id: 10n, estado: 'BORRADOR', total_propinas: 150, detalle },
-    });
-    await ok.servicio.aprobar(2026, 11, ADMIN, undefined, AHORA);
-    expect(ok.prisma.propinaReparto.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ estado: 'APROBADO', aprobado_por: 1n }) }),
-    );
-
-    const cambio = crear({
-      total: 150,
-      horas: [persona(1, 'Luis', { horas: 40 }), persona(2, 'Ana', { horas: 96 })],
-      personas: personasDe([1, 2], ['Luis', 'Ana']),
-      vigente: { id: 10n, estado: 'BORRADOR', total_propinas: 150, detalle },
-    });
-    await expect(cambio.servicio.aprobar(2026, 11, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'CIFRAS_CAMBIARON' } });
-  });
-
-  it('anular con motivo libera el mes; no se anula si ya hay pagos', async () => {
-    const { servicio, prisma } = crear({ vigente: { id: 10n, estado: 'BORRADOR', detalle: [] } });
-    await servicio.anular(2026, 11, 'Horas mal cargadas', ADMIN, undefined, AHORA);
-    expect(prisma.propinaReparto.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ estado: 'ANULADO', motivo_anulacion: 'Horas mal cargadas' }) }),
-    );
-
-    const pagado = crear({ vigente: { id: 10n, estado: 'APROBADO', detalle: [{ party_id: 1n, pagado_en: new Date() }] } });
-    await expect(pagado.servicio.anular(2026, 11, 'motivo válido', ADMIN, undefined, AHORA)).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('CSV del reparto vigente con nombres y montos', async () => {
-    const { servicio } = crear({
-      vigente: {
-        id: 10n,
-        anio: 2026,
-        mes: 11,
-        estado: 'APROBADO',
-        total_propinas: 150,
-        total_horas: 120,
-        calculado_en: AHORA,
-        aprobado_en: AHORA,
-        pagado_en: null,
-        detalle: [{ party_id: 1n, horas: 24, porcentaje: 20, monto: 30, pagado_en: null, pagado_medio: null, nota: null }],
-      },
-      personas: personasDe([1], ['Luis']),
-    });
-    const r = await servicio.csv(2026, 11);
-    expect(r.nombre).toBe('propinas-2026-11.csv');
-    expect(r.csv.split('\n')[1]).toBe('Luis,24,20,30,,,');
   });
 });
 
@@ -332,7 +221,7 @@ describe('PropinasRepartoService: trabajador y permisos', () => {
         .filter((m) => m !== 'constructor')
         .map((m) => Reflect.getMetadata(CLAVE_PERMISO, clase.prototype[m]));
     expect(permisosDe(PropinasRepartoController).every((p) => p.modulo === 'propinas' && p.accion === 'repartir')).toBe(true);
-    expect(permisosDe(PropinasRepartoController)).toHaveLength(8);
+    expect(permisosDe(PropinasRepartoController)).toHaveLength(4);
     expect(permisosDe(PropinasMiController)).toEqual([{ modulo: 'asistencia', accion: 'marcar' }]);
   });
 });

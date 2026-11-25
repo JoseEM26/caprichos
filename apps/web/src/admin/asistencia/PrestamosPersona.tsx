@@ -3,6 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia } from '../../comun/Insignia';
+import { ModalFormulario } from '../../comun/ModalFormulario';
 import {
   PeriodicidadDescuento,
   PrestamoApi,
@@ -68,6 +69,22 @@ export function PrestamosPersona({ partyId, alCambiar }: { partyId: number; alCa
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {aviso}
+      {anulando && (
+        <ModalFormulario
+          titulo="Anular préstamo"
+          etiqueta="Anular préstamo"
+          sucio={anulando.motivo !== ''}
+          bloqueado={ocupado}
+          alCerrar={() => setAnulando(null)}
+          alEnviar={(e) => { e.preventDefault(); void ejecutar(async () => { await anularPrestamo(anulando.id, anulando.motivo.trim()); setAnulando(null); }, 'Préstamo anulado. Los períodos ya pagados no cambian.'); }}
+          pie={<>
+            <Boton type="button" variante="secundario" onClick={() => setAnulando(null)} disabled={ocupado}>Cancelar</Boton>
+            <Boton type="submit" variante="peligro" disabled={ocupado || anulando.motivo.trim().length < 3}>Anular préstamo</Boton>
+          </>}
+        >
+          <label className="as-campo">Motivo de la anulación <input value={anulando.motivo} onChange={(e) => setAnulando({ id: anulando.id, motivo: e.target.value })} autoFocus /></label>
+        </ModalFormulario>
+      )}
       <fieldset style={CAJA}>
         <legend style={{ fontWeight: 800, fontSize: 14 }}>Nuevo préstamo</legend>
         <div className="as-form">
@@ -139,17 +156,7 @@ export function PrestamosPersona({ partyId, alCambiar }: { partyId: number; alCa
                     </tbody>
                   </table>
                 </div>
-                {p.estado === 'ACTIVO' && (
-                  anulando?.id === p.id ? (
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      <label className="as-campo">Motivo de la anulación <input value={anulando.motivo} onChange={(e) => setAnulando({ id: p.id, motivo: e.target.value })} /></label>
-                      <div className="as-acciones">
-                        <Boton type="button" variante="secundario" tamano="pequeno" onClick={() => setAnulando(null)}>Cancelar</Boton>
-                        <Boton type="button" variante="peligro" tamano="pequeno" disabled={ocupado || anulando.motivo.trim().length < 3} onClick={() => void ejecutar(async () => { await anularPrestamo(p.id, anulando.motivo.trim()); setAnulando(null); }, 'Préstamo anulado. Los períodos ya pagados no cambian.')}>Anular préstamo</Boton>
-                      </div>
-                    </div>
-                  ) : <Boton type="button" variante="texto" tamano="pequeno" onClick={() => setAnulando({ id: p.id, motivo: '' })}>Anular préstamo</Boton>
-                )}
+                {p.estado === 'ACTIVO' && <Boton type="button" variante="texto" tamano="pequeno" onClick={() => setAnulando({ id: p.id, motivo: '' })}>Anular préstamo</Boton>}
               </li>
             );
           })}

@@ -58,6 +58,10 @@ describe('PrestamosPersona', () => {
   it('anular exige un motivo', async () => {
     render(<PrestamosPersona partyId={7} alCambiar={() => undefined} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Anular préstamo' }));
+    const dlg = screen.getByRole('dialog', { name: 'Anular préstamo' });
+    fireEvent.keyDown(dlg, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Anular préstamo' }));
     expect(screen.getAllByRole('button', { name: 'Anular préstamo' }).at(-1)!).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Motivo de la anulación'), { target: { value: 'Se perdonó' } });
     fireEvent.click(screen.getAllByRole('button', { name: 'Anular préstamo' }).at(-1)!);

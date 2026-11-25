@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -55,79 +55,6 @@ export class PropinasRepartoService {
     };
   }
 
-  /** Calcula (o recalcula) el BORRADOR del mes. Un reparto ya aprobado o pagado no se vuelve a calcular. */
-  async calcular(anio: number, mes: number, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
-    validarMes(anio, mes);
-    this.exigirMesTerminado(anio, mes, ahora);
-    const actual = await this.vigente(anio, mes);
-    if (actual && actual.estado !== 'BORRADOR') {
-      throw new ConflictException({
-        codigo: 'REPARTO_YA_APROBADO',
-        mensaje: `El reparto de ${mes}/${anio} ya está ${actual.estado}. Anúlalo con motivo para volver a calcularlo.`,
-      });
-    }
-    const previa = await this.previa(anio, mes, ahora);
-    if (previa.error) throw new BadRequestException(previa.error);
-
-    let reparto;
-    try {
-      reparto = await this.prisma.$transaction(async (tx) => {
-        const datos = {
-          total_propinas: previa.totalPropinas,
-          total_horas: previa.totalHoras,
-          calculado_en: ahora,
-          calculado_por: usuario.partyId,
-        };
-        let r;
-        if (actual) {
-          await tx.propinaRepartoDetalle.deleteMany({ where: { reparto_id: actual.id } });
-          r = await tx.propinaReparto.update({ where: { id: actual.id }, data: datos });
-        } else {
-          r = await tx.propinaReparto.create({ data: { anio, mes, estado: 'BORRADOR', ...datos } });
-        }
-        if (previa.filas.length) {
-          await tx.propinaRepartoDetalle.createMany({
-            data: previa.filas.map((f) => ({
-              reparto_id: r.id,
-              party_id: BigInt(f.partyId),
-              horas: f.horas,
-              porcentaje: f.porcentaje,
-              monto: f.monto,
-            })),
-          });
-        }
-        return r;
-      });
-    } catch (e: any) {
-      if (e?.code === 'P2002') throw new ConflictException({ codigo: 'REPARTO_EN_CURSO', mensaje: 'Otro usuario está calculando este mes. Recarga la vista.' });
-      throw e;
-    }
-    await this.auditar('CALCULAR_REPARTO', { anio, mes, totalPropinas: previa.totalPropinas, totalHoras: previa.totalHoras, personas: previa.filas.length }, usuario.partyId, ip, reparto.id);
-    return { ok: true, id: Number(reparto.id) };
-  }
-
-  /** Aprueba el BORRADOR: exige que las cifras no hayan cambiado desde el cálculo. Congela el reparto. */
-  async aprobar(anio: number, mes: number, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
-    validarMes(anio, mes);
-    this.exigirMesTerminado(anio, mes, ahora);
-    const r = await this.exigirVigente(anio, mes);
-    if (r.estado !== 'BORRADOR') {
-      throw new ConflictException({ codigo: 'NO_ES_BORRADOR', mensaje: `Solo se aprueba un borrador (ahora está ${r.estado}).` });
-    }
-    const previa = await this.previa(anio, mes, ahora);
-    if (previa.error) throw new BadRequestException(previa.error);
-    const guardada = firmaReparto(dec(r.total_propinas), r.detalle.map((d) => ({ partyId: Number(d.party_id), horas: dec(d.horas), monto: dec(d.monto) })));
-    if (guardada !== previa.firma) {
-      throw new ConflictException({ codigo: 'CIFRAS_CAMBIARON', mensaje: 'Las horas o las propinas cambiaron desde el borrador. Vuelve a calcular antes de aprobar.' });
-    }
-    await this.prisma.propinaReparto.update({
-      where: { id: r.id },
-      data: { estado: 'APROBADO', aprobado_en: ahora, aprobado_por: usuario.partyId },
-    });
-    await this.auditar('APROBAR_REPARTO', { anio, mes, totalPropinas: previa.totalPropinas }, usuario.partyId, ip, r.id);
-    return { ok: true };
-  }
-
   /**
    * Solo para ver: cómo se reparte la propina de cada día del mes entre quienes trabajaron ese día, y si cada parte
    * ya se pagó (en la planilla de qué período, o por el reparto mensual antiguo). Los días sin nadie con horas salen «sin repartir».
@@ -174,21 +101,6 @@ export class PropinasRepartoService {
     return { anio, mes, sinRepartir: redondear2(lista.filter((d) => d.sinRepartir).reduce((a, d) => a + d.total, 0)), dias: lista };
   }
 
-  /** Anula el reparto vigente con motivo. No se anula si ya hay pagos registrados. */
-  async anular(anio: number, mes: number, motivo: string, usuario: UsuarioAutenticado, ip?: string, ahora = new Date()) {
-    validarMes(anio, mes);
-    const r = await this.exigirVigente(anio, mes);
-    if (r.estado === 'PAGADO' || r.detalle.some((d) => d.pagado_en)) {
-      throw new ConflictException({ codigo: 'TIENE_PAGOS', mensaje: 'Hay pagos registrados en este reparto: no se puede anular.' });
-    }
-    await this.prisma.propinaReparto.update({
-      where: { id: r.id },
-      data: { estado: 'ANULADO', anulado_en: ahora, anulado_por: usuario.partyId, motivo_anulacion: motivo.trim() },
-    });
-    await this.auditar('ANULAR_REPARTO', { anio, mes, estadoAnterior: r.estado }, usuario.partyId, ip, r.id, motivo.trim());
-    return { ok: true };
-  }
-
   /** Cambia la excepción de una persona: null = según su rol; true/false = forzado por el ADMIN. */
   async fijarParticipacion(partyId: number, participa: boolean | null, usuario: UsuarioAutenticado, ip?: string) {
     const id = BigInt(partyId);
@@ -218,26 +130,6 @@ export class PropinasRepartoService {
       anuladoEn: r.anulado_en?.toISOString() ?? null,
       motivoAnulacion: r.motivo_anulacion,
     }));
-  }
-
-  /** CSV del reparto vigente del mes. */
-  async csv(anio: number, mes: number) {
-    validarMes(anio, mes);
-    const r = await this.exigirVigente(anio, mes);
-    const serie = await this.serializar(r);
-    const esc = (v: unknown) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const cab = ['persona', 'horas', 'porcentaje', 'monto', 'pagado_en', 'medio_pago', 'nota'];
-    const lineas = [cab.join(',')];
-    for (const f of serie.filas) {
-      lineas.push([f.nombre, f.horas, f.porcentaje, f.monto, f.pagadoEn ?? '', f.pagadoMedio ?? '', f.nota ?? ''].map(esc).join(','));
-    }
-    return {
-      csv: lineas.join('\n') + '\n',
-      nombre: `propinas-${anio}-${String(mes).padStart(2, '0')}.csv`,
-    };
   }
 
   /**
@@ -334,21 +226,6 @@ export class PropinasRepartoService {
       where: { anio, mes, estado: { not: 'ANULADO' } },
       include: { detalle: true },
     });
-  }
-
-  private async exigirVigente(anio: number, mes: number) {
-    const r = await this.vigente(anio, mes);
-    if (!r) throw new NotFoundException({ codigo: 'SIN_REPARTO', mensaje: `No hay reparto vigente de ${mes}/${anio}` });
-    return r;
-  }
-
-  private exigirMesTerminado(anio: number, mes: number, ahora: Date) {
-    if (!mesTerminado(anio, mes, ahora)) {
-      throw new BadRequestException({
-        codigo: 'MES_EN_CURSO',
-        mensaje: 'El reparto se calcula y aprueba cuando termina el mes (a partir del día 1 del mes siguiente). Por ahora solo ves la vista previa.',
-      });
-    }
   }
 
   private async serializar(r: NonNullable<Awaited<ReturnType<PropinasRepartoService['vigente']>>>) {
