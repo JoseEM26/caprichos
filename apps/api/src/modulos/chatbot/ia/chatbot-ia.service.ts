@@ -45,7 +45,8 @@ const PATRONES_INYECCION = [
 export const MAX_RESPUESTAS_IA_POR_MINUTO = 4;
 
 /** Herramientas cuyas respuestas son iguales para todos: solo con estas (y sin nombre del cliente) se cachea una respuesta. */
-const HERRAMIENTAS_CACHEABLES = new Set(['horarioYUbicacion', 'costoYZonaDeEnvio', 'mediosDePago', 'politicasDePago', 'cartaCompleta', 'buscarEnCarta', 'recomendarProductos', 'promocionesDeHoy']);
+/** Solo lo que no cambia en minutos: la carta, el stock, el horario y las promos se leen siempre al día. */
+const HERRAMIENTAS_CACHEABLES = new Set(['costoYZonaDeEnvio', 'mediosDePago', 'politicasDePago']);
 const TTL_CACHE_GENERICA_S = 300;
 /** Pregunta que toca SU pedido o su cuenta: nunca se cachea. */
 const PREGUNTA_PERSONAL = /\b(mi|mis|mio|mia|cp-?w?\d|pedido|pedi|ya sale|cuanto falta|llego|voucher|pague|pago|deposite|yapee|yapeé|reclam|quiero|dame|agrega|ponme)\b/i;

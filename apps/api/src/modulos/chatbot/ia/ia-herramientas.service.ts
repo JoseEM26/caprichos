@@ -16,6 +16,7 @@ import { MEDIOS_DIGITALES_VOUCHER } from '../servicios/pedido-esperando-voucher.
 import { progresoDelPedido } from '../../pedidos/progreso-pedido';
 import { leerConfigEta } from '../../repartos/eta-entrega';
 import { obtenerFechaHoraLima } from '../../local/local.util';
+import { leerConfigProgramados } from '../../pedidos/programado.util';
 
 /** Reglas reales de pago y entrega (las que aplica el sistema): la IA no puede afirmar otras. */
 export const POLITICAS_DE_PAGO = {
@@ -29,6 +30,29 @@ export const POLITICAS_DE_PAGO = {
 
 /** Medios que se cobran al recibir (sin voucher). */
 const MEDIOS_AL_RECIBIR = ['EFECTIVO', 'TARJETA'];
+
+/** Nombres de los sabores agotados (solo si hay): la IA nunca debe ofrecerlos. */
+function saboresAgotadosDe(p: any): { saboresAgotados?: string[] } {
+  const agotados = (p.sabores || []).filter((s: any) => s.disponible === false).map((s: any) => s.nombre);
+  return agotados.length ? { saboresAgotados: agotados } : {};
+}
+
+/** Stock al momento de un producto: cuántos quedan, hasta cuándo está agotado y qué sabores hay. */
+function datosStock(p: any): Record<string, unknown> {
+  const sabores: any[] = p.sabores || [];
+  return {
+    ...(typeof p.quedan === 'number' ? { quedan: p.quedan } : {}),
+    ...(p.agotadoHasta ? { agotadoHasta: p.agotadoHasta } : {}),
+    ...(sabores.length
+      ? {
+          saboresDisponibles: sabores
+            .filter((s) => s.disponible)
+            .map((s) => (typeof s.quedan === 'number' ? { nombre: s.nombre, quedan: s.quedan } : { nombre: s.nombre })),
+          saboresAgotados: sabores.filter((s) => !s.disponible).map((s) => s.nombre),
+        }
+      : {}),
+  };
+}
 
 /**
  * Servicio de herramientas de SOLO LECTURA (function calling) para OpenAI.
@@ -353,6 +377,7 @@ export class IaHerramientasService {
             alergenosConfirmados: prod.alergenosConfirmados ?? false,
             precioBase: Number(prod.precio ?? 0),
             disponible: prod.disponible ?? true,
+            ...datosStock(prod),
             tamanos: (prod.tamanos || []).map((t: any) => ({
               nombre: t.nombre,
               precio: Number(t.precio),
@@ -394,7 +419,9 @@ export class IaHerramientasService {
           precio: Number(p.precio ?? 0),
           disponible: p.disponible !== false,
           ...(typeof p.quedan === 'number' ? { quedan: p.quedan } : {}),
-          ...(p.descripcion ? { descripcion: String(p.descripcion).slice(0, 80) } : {}),
+          ...(p.alergenosConfirmados ? { alergenos: p.alergenos ?? [] } : { alergenosConfirmados: false }),
+          ...(p.descripcion ? { descripcion: String(p.descripcion) } : {}),
+          ...saboresAgotadosDe(p),
         })),
       })),
       nota: 'Carta real del momento. Solo recomienda productos con disponible=true.',
@@ -480,14 +507,11 @@ export class IaHerramientasService {
    */
   async horarioYUbicacion() {
     if (!this.localService) {
-      return {
-        abierto: true,
-        direccion: 'Campoy, San Juan de Lurigancho, Lima',
-        enlaceMapa: 'https://www.google.com/maps?q=-12.0196436,-76.963255',
-      };
+      return { error: 'Horario y ubicación temporalmente no disponibles. No des horarios ni direcciones; ofrece que una persona del equipo lo confirme.' };
     }
 
-    const estadoCarta = await this.localService.obtenerEstadoCarta(new Date());
+    const ahora = new Date();
+    const estadoCarta = await this.localService.obtenerEstadoCarta(ahora);
     const datosPublicos =
       typeof (this.localService as any).obtenerDatosPublicosLocal === 'function'
         ? await (this.localService as any).obtenerDatosPublicosLocal()
@@ -498,19 +522,50 @@ export class IaHerramientasService {
         ? `https://www.google.com/maps?q=${datosPublicos.lat},${datosPublicos.lng}`
         : 'https://www.google.com/maps?q=-12.0196436,-76.963255';
 
+    // Semana completa (misma lectura que usa el admin: nombre del día y HH:mm), en orden lunes a domingo
+    const filas: any[] = (await (this.localService as any).obtenerHorarioAdmin?.()) || [];
+    const semana = filas.map((h) =>
+      h.cerrado || !h.abre || !h.cierra ? { dia: h.dia, cerrado: true } : { dia: h.dia, abre: h.abre, cierra: h.cierra },
+    );
+
+    // Próxima apertura (solo con hoy cerrado): hoy si aún no abre, si no el siguiente día abierto
+    let proximaApertura: { dia: string; abre: string } | null = null;
+    if (!estadoCarta.abierta && filas.length) {
+      const { diaSemana, horaMinutos } = obtenerFechaHoraLima(ahora);
+      for (let i = 0; i <= 7; i++) {
+        const dia = ((diaSemana - 1 + i) % 7) + 1;
+        const h = filas.find((f) => f.dia_semana === dia);
+        if (!h || h.cerrado || !h.abre) continue;
+        if (i === 0 && h.abre <= horaMinutos) continue;
+        proximaApertura = { dia: i === 0 ? `${h.dia} (hoy)` : h.dia, abre: h.abre };
+        break;
+      }
+    }
+
+    let sePuedeProgramar = false;
+    try {
+      sePuedeProgramar = (await leerConfigProgramados(this.prisma as any)).fueraHorario;
+    } catch {
+      sePuedeProgramar = false;
+    }
+
     return {
       abierto: estadoCarta.abierta,
       horarioHoy: {
-        abre: estadoCarta.abre || '14:00',
-        cierra: estadoCarta.cierra || '22:00',
+        abre: estadoCarta.abre || null,
+        cierra: estadoCarta.cierra || null,
         texto: estadoCarta.texto,
       },
+      semana,
+      proximaApertura,
+      sePuedeProgramar,
+      notaProgramar: 'Si está cerrado y sePuedeProgramar, ofrece programar el pedido para cuando abramos.',
       pausaAltaDemanda: estadoCarta.pausaAltaDemanda || false,
       altaDemandaDemoraExtraMinutos: (estadoCarta as any)?.altaDemandaExtra || 0,
       direccion: datosPublicos?.direccion || 'Campoy, San Juan de Lurigancho, Lima',
-      referencia: datosPublicos?.referencia || 'Frente al parque principal de Campoy',
+      referencia: datosPublicos?.referencia || null,
       enlaceMapa: mapaUrl,
-      telefonoContacto: datosPublicos?.telefono || datosPublicos?.whatsapp || '9XX XXX XXX',
+      telefonoContacto: datosPublicos?.telefono || datosPublicos?.whatsapp || null,
     };
   }
 
@@ -529,7 +584,7 @@ export class IaHerramientasService {
         tiempoEstimado: 30,
       }));
     } catch {
-      zonasActivas = [{ nombre: 'Campoy', tarifa: 5.0, tiempoEstimado: 30 }];
+      return { error: 'No se pudieron leer las zonas de reparto. No des tarifas; ofrece que una persona del equipo las confirme.' };
     }
 
     // Parámetros de pedido mínimo y envío gratis desde DB
@@ -564,7 +619,7 @@ export class IaHerramientasService {
       zonas: zonasResumen,
       pedidoMinimo: Number(paramPedidoMin?.valor) > 0 ? Number(paramPedidoMin?.valor) : null,
       envioGratisDesde: paramEnvioGratis?.valor ?? ENVIO_GRATIS_MONTO_POR_DEFECTO,
-      mensaje: 'Zonas de cobertura en Campoy y alrededores.',
+      mensaje: 'Zonas de cobertura activas.',
     };
   }
 
@@ -861,7 +916,7 @@ export class IaHerramientasService {
       }
 
       for (const prod of cat.productos || []) {
-        if (!prod.disponible) continue; // Solo productos disponibles
+        if (!prod.disponible || prod.quedan === 0) continue; // Solo productos disponibles y con stock
 
         const desc = (prod.descripcion || '').toLowerCase();
         let esBuenaOpcion = false;
@@ -893,6 +948,7 @@ export class IaHerramientasService {
             porciones: prod.porciones ?? null,
             alergenos: prod.alergenos ?? [],
             alergenosConfirmados: prod.alergenosConfirmados ?? false,
+            ...datosStock(prod),
           });
         }
 

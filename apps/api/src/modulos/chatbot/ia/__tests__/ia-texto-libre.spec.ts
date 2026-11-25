@@ -232,11 +232,11 @@ describe('IA: anti-bloqueo, caché y fallos', () => {
     expect((await svc.procesarConsulta({ textoUsuario: 'pregunta de otro chat', conversacionId: '6', telefonoCliente: TEL })).omitir).toBeUndefined();
   });
 
-  it('caché: una pregunta genérica (horario) se contesta una vez para todos; la de SU pedido nunca se cachea', async () => {
+  it('caché: una pregunta genérica (costo de envío) se contesta una vez para todos; la de SU pedido nunca se cachea', async () => {
     const { svc } = armar();
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(llamada('horarioYUbicacion'))
+      .mockResolvedValueOnce(llamada('costoYZonaDeEnvio'))
       .mockResolvedValueOnce(texto('Abrimos de 14:00 a 22:00 💛'))
       .mockResolvedValue(texto('Tu pedido va en cocina')) as any;
     const a = await svc.procesarConsulta({ textoUsuario: 'hasta que hora atienden los domingos', conversacionId: '1', telefonoCliente: TEL, historialReciente: [] });

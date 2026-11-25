@@ -368,7 +368,7 @@ describe('decisión 8: pausa automática por bloqueo o desconexión', () => {
       expect(avisos.enviarAvisoAdmin.mock.calls[0][1]).not.toContain('Meta');
     }
   });
-  it('al reconectar (open) se reanuda solo la pausa automática; la manual y el baneo no', async () => {
+  it('al reconectar (open) se reanuda solo la pausa automática y la sesión cerrada (401/logged_out); la manual y el baneo (403) no', async () => {
     const auto = montar();
     await auto.svc.registrarConexion('open');
     await auto.svc.registrarConexion('close', 428);
@@ -382,11 +382,27 @@ describe('decisión 8: pausa automática por bloqueo o desconexión', () => {
     await manual.svc.registrarConexion('open');
     expect(await manual.svc.estaPausado()).toBe(true);
 
-    const baneo = montar();
-    await baneo.svc.registrarConexion('open');
-    await baneo.svc.registrarConexion('close', 401);
-    await baneo.svc.registrarConexion('open');
-    expect(await baneo.svc.estaPausado()).toBe(true);
+    for (const cierre of [401, 'logged_out']) {
+      const cerrada = montar();
+      await cerrada.svc.registrarConexion('open');
+      await cerrada.svc.registrarConexion('close', cierre);
+      expect(await cerrada.svc.estaPausado()).toBe(true);
+      expect(cerrada.avisos.enviarAvisoAdmin.mock.calls[0][1]).toContain('al volver a vincular se reanuda solo');
+      await cerrada.svc.registrarConexion('open');
+      expect(await cerrada.svc.estaPausado()).toBe(false);
+    }
+
+    for (const cierre of [403, 'banned']) {
+      const baneo = montar();
+      await baneo.svc.registrarConexion('open');
+      await baneo.svc.registrarConexion('close', cierre);
+      await baneo.svc.registrarConexion('open');
+      expect(await baneo.svc.estaPausado()).toBe(true);
+    }
+    const envio = montar();
+    await envio.svc.pausarPorErrorDeEnvio('account banned');
+    await envio.svc.registrarConexion('open');
+    expect(await envio.svc.estaPausado()).toBe(true);
   });
   it('si ya estaba pausado no repite la pausa ni el aviso', async () => {
     const { svc, avisos } = montar({ evolution_pausado: 'si' });

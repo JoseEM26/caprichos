@@ -246,7 +246,10 @@ export class EvolutionConfigService implements OnModuleInit {
     await this.registrarEventoConexion('desconexion', `Cierre ${codigoCierre ?? state}`);
     const baneo = codigoCierre != null && MOTIVOS_BANEO.includes(typeof codigoCierre === 'string' ? codigoCierre.toLowerCase() : codigoCierre);
     if ((await this.proveedor()) === 'EVOLUTION') {
-      await this.pausarAutomatico(baneo ? 'BANEO' : 'DESCONEXION', `Cierre ${codigoCierre ?? state}`);
+      // 401 / logged_out = el dueño cerró la sesión desde el celular: al vincular un QR nuevo se reanuda solo.
+      const codigoNorm = typeof codigoCierre === 'string' ? codigoCierre.toLowerCase() : codigoCierre;
+      const sesionCerrada = codigoNorm === 401 || codigoNorm === '401' || codigoNorm === 'logged_out' || codigoNorm === 'loggedout';
+      await this.pausarAutomatico(sesionCerrada ? 'SESION_CERRADA' : baneo ? 'BANEO' : 'DESCONEXION', `Cierre ${codigoCierre ?? state}`);
       return;
     }
     if (baneo) await this.guardar('evolution_pausado', 'si');
@@ -291,11 +294,11 @@ export class EvolutionConfigService implements OnModuleInit {
     }
   }
 
-  /** Al reconectar: levanta la pausa solo si la puso el sistema (desconexión o fallos), no una manual ni un baneo. */
+  /** Al reconectar: levanta la pausa solo si la puso el sistema (desconexión, fallos o sesión cerrada desde el celular), no una manual ni un baneo. */
   private async reanudarSiPausaAutomatica(): Promise<void> {
     if (!(await this.estaPausado())) return;
     const fila = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_PAUSA_AUTO } }).catch(() => null);
-    if (fila?.valor !== 'DESCONEXION' && fila?.valor !== 'FALLOS') return;
+    if (fila?.valor !== 'DESCONEXION' && fila?.valor !== 'FALLOS' && fila?.valor !== 'SESION_CERRADA') return;
     await this.guardar('evolution_pausado', 'no');
     await this.guardar(CLAVE_PAUSA_AUTO, '');
     try {
@@ -311,7 +314,7 @@ export class EvolutionConfigService implements OnModuleInit {
    * constancia en la auditoría y avisa a los ADMIN (campana, y WhatsApp/correo si están activos).
    * Una sola vez: si ya estaba pausado no repite nada.
    */
-  async pausarAutomatico(motivo: 'BANEO' | 'DESCONEXION' | 'FALLOS', detalle: string): Promise<void> {
+  async pausarAutomatico(motivo: 'BANEO' | 'DESCONEXION' | 'FALLOS' | 'SESION_CERRADA', detalle: string): Promise<void> {
     if (await this.estaPausado()) return;
     const antes = await this.proveedor();
     await this.guardar('evolution_pausado', 'si');
@@ -329,6 +332,13 @@ export class EvolutionConfigService implements OnModuleInit {
       this.logger.error(`No se pudo auditar la pausa automática de Evolution: ${err?.message}`);
     }
     this.logger.warn(JSON.stringify({ evento: 'evolution_pausa_automatica', motivo }));
+    if (motivo === 'SESION_CERRADA') {
+      await this.avisarAdmin(true, {
+        titulo: 'WhatsApp: se cerró la sesión',
+        mensaje: `Evolution se pausó solo (${detalle.slice(0, 160)}). Se cerró la sesión de WhatsApp; al volver a vincular se reanuda solo. Los avisos esperan en la cola. Vincula el número en Configuración › WhatsApp.`,
+      });
+      return;
+    }
     const titulo = motivo === 'BANEO' ? 'WhatsApp: posible bloqueo del número' : 'WhatsApp: el número de Evolution falló';
     const que = 'Los avisos esperan en la cola y salen cuando Evolution vuelva a conectarse o lo reanudes.';
     await this.avisarAdmin(motivo === 'BANEO', {
