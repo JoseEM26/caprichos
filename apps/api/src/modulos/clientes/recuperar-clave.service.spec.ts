@@ -93,14 +93,19 @@ describe('RecuperarClaveService', () => {
       expect(outbox.encolar).not.toHaveBeenCalled();
     });
 
-    it('máximo 3 solicitudes por hora por celular: la 4.ª responde igual pero no envía', async () => {
+    it('máximo RECUPERAR_MAX_SOLICITUDES_HORA por hora por celular: la siguiente responde igual pero no envía', async () => {
       for (let i = 0; i < RECUPERAR_MAX_SOLICITUDES_HORA; i++) await servicio.solicitar('912345678');
-      expect(outbox.encolar).toHaveBeenCalledTimes(3);
+      expect(outbox.encolar).toHaveBeenCalledTimes(RECUPERAR_MAX_SOLICITUDES_HORA);
       expect(redis.ttl.get('cliente:rec:sol:912345678')).toBe(3600);
 
-      const cuarta = await servicio.solicitar('912345678');
-      expect(cuarta).toEqual(RESPUESTA_SOLICITUD);
-      expect(outbox.encolar).toHaveBeenCalledTimes(3);
+      const otra = await servicio.solicitar('912345678');
+      expect(otra).toEqual(RESPUESTA_SOLICITUD);
+      expect(outbox.encolar).toHaveBeenCalledTimes(RECUPERAR_MAX_SOLICITUDES_HORA);
+    });
+
+    it('con el código de respaldo (número oculto) pasado el límite se avisa claro en vez de callar', async () => {
+      for (let i = 0; i < RECUPERAR_MAX_SOLICITUDES_HORA; i++) await servicio.solicitar('912345678', undefined, true);
+      await expect(servicio.solicitar('912345678', undefined, true)).rejects.toMatchObject({ status: 429 });
     });
 
     it('celular con formato inválido: 400 TELEFONO_INVALIDO', async () => {

@@ -25,7 +25,8 @@ import {
 } from './verificacion-whatsapp.util';
 
 export const RECUPERAR_TTL_SEG = 600; // el código vence a los 10 minutos
-export const RECUPERAR_MAX_SOLICITUDES_HORA = 3;
+/** Por celular y hora; el enlace de WhatsApp y el código de 6 dígitos del mismo intento cuentan los dos. */
+export const RECUPERAR_MAX_SOLICITUDES_HORA = 5;
 export const RECUPERAR_MAX_INTENTOS = 5;
 
 export const RESPUESTA_SOLICITUD = {
@@ -80,7 +81,8 @@ export class RecuperarClaveService {
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);
       if (n > RECUPERAR_MAX_SOLICITUDES_HORA) {
-        if (entrante) throw demasiadosCodigos('Pediste varios códigos seguidos. Espera una hora e inténtalo de nuevo.');
+        // Con WhatsApp o con el código de respaldo se dice claro (callar parecía que el código nunca llegaba)
+        if (entrante || forzarCodigo) throw demasiadosCodigos('Pediste varios códigos seguidos. Espera una hora e inténtalo de nuevo.');
         return RESPUESTA_SOLICITUD;
       }
       if (ip) {
@@ -88,7 +90,7 @@ export class RecuperarClaveService {
         const m = await redis.incr(claveIp);
         if (m === 1) await redis.expire(claveIp, 3600);
         if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) {
-          if (entrante) throw demasiadosCodigos('Hay demasiados intentos desde tu conexión. Espera una hora e inténtalo de nuevo.');
+          if (entrante || forzarCodigo) throw demasiadosCodigos('Hay demasiados intentos desde tu conexión. Espera una hora e inténtalo de nuevo.');
           return RESPUESTA_SOLICITUD;
         }
       }
