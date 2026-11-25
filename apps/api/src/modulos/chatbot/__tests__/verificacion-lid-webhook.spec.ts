@@ -101,7 +101,7 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
   it('el par ya aprendido (Redis) verifica sin consultar a Evolution', async () => {
     redis.datos.set(`cliente:wa:lid:${LID}`, TEL9);
     await webhook.procesarPayload(mensajeLid('wamid.L1', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(adaptador.resolverLid).not.toHaveBeenCalled();
     expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', TEL9))).toBe('1');
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
   it('Evolution asocia el LID al celular del token: verifica y guarda el par en Redis', async () => {
     adaptador.resolverLid.mockResolvedValue(TEL);
     await webhook.procesarPayload(mensajeLid('wamid.L2', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(redis.datos.get(`cliente:wa:lid:${LID}`)).toBe(TEL9);
     expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', TEL9))).toBe('1');
   });
@@ -118,7 +118,7 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
   it('Evolution asocia el LID a otro celular: no verifica, no marca y responde RESPUESTA_NO_VERIFICADO', async () => {
     adaptador.resolverLid.mockResolvedValue('51912345678');
     await webhook.procesarPayload(mensajeLid('wamid.L3', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
     expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', TEL9))).toBeUndefined();
     expect(await estadoVerificacion(redis as any, secretoVerificacion(config), token)).toBe('pendiente');
   });
@@ -127,12 +127,12 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
     adaptador.confirmarLid.mockResolvedValue('CONFIRMADO');
     await webhook.procesarPayload(mensajeLid('wamid.L4', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
     expect(adaptador.confirmarLid).toHaveBeenCalledWith(TEL, LID);
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_VERIFICADO));
   });
 
   it('Evolution no puede confirmar: el token pasa a sin_numero, responde el texto del código y el sondeo lo ve', async () => {
     await webhook.procesarPayload(mensajeLid('wamid.L5', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_SIN_NUMERO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_SIN_NUMERO));
     expect(redis.datos.get(claveMarcaVerificacion('REGISTRO', TEL9))).toBeUndefined();
     expect(await estadoVerificacion(redis as any, secretoVerificacion(config), token)).toBe('sin_numero');
   });
@@ -141,13 +141,13 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
     adaptador.resolverLid.mockRejectedValue(new Error('timeout'));
     adaptador.confirmarLid.mockRejectedValue(new Error('timeout'));
     await webhook.procesarPayload(mensajeLid('wamid.L6', `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_SIN_NUMERO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_SIN_NUMERO));
     expect(await estadoVerificacion(redis as any, secretoVerificacion(config), token)).toBe('sin_numero');
   });
 
   it('un LID con token inexistente no consulta a Evolution y responde RESPUESTA_NO_VERIFICADO', async () => {
     await webhook.procesarPayload(mensajeLid('wamid.L7', 'Hola Caprichos, quiero verificar mi celular. Mi código: ZZZZZZZZ'));
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(IDENTIFICADOR, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
     expect(adaptador.resolverLid).not.toHaveBeenCalled();
   });
 
@@ -156,7 +156,7 @@ describe('Verificación con LID en el webhook: resolución del celular', () => {
       object: 'whatsapp_business_account',
       entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL }], messages: [{ id: 'wamid.L8', from: TEL, type: 'text', text: { body: `Mi código: ${token}` } }] } }] }],
     });
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(adaptador.resolverLid).not.toHaveBeenCalled();
     expect(adaptador.confirmarLid).not.toHaveBeenCalled();
   });

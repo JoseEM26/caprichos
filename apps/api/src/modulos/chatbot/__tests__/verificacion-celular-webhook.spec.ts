@@ -101,7 +101,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await tick();
 
     expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
     // Queda registrado en el chat como cualquier mensaje del cliente
     expect(prisma.mensajeChat.create).toHaveBeenCalled();
@@ -113,12 +113,14 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await tick();
 
     expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(OTRO, RESPUESTA_OTRO_CELULAR('987654321'));
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(OTRO, expect.stringContaining(RESPUESTA_OTRO_CELULAR('987654321')));
     expect(RESPUESTA_OTRO_CELULAR('987654321')).toContain('terminado en 321');
+    // Lleva el enlace de la carta para volver con un toque
+    expect(mensajeria.enviarTexto.mock.calls[0][1]).toMatch(/👉 https?:\/\//);
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
     // La respuesta queda guardada como mensaje del bot (el vigilante ya no ve el chat «sin respuesta»)
     expect(prisma.mensajeChat.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ direccion: 'SALE', autor: 'BOT', contenido: { texto: RESPUESTA_OTRO_CELULAR('987654321') } }) }),
+      expect.objectContaining({ data: expect.objectContaining({ direccion: 'SALE', autor: 'BOT', contenido: { texto: expect.stringContaining(RESPUESTA_OTRO_CELULAR('987654321')) } }) }),
     );
   });
 
@@ -137,7 +139,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await tick();
 
     expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_VERIFICADO));
   });
 
   it('acepta el texto prellenado con variaciones: mayúsculas, «código» sin tilde, espacio antes de los dos puntos, saltos de línea y tilde descompuesta', async () => {
@@ -153,7 +155,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
       mensajeria.enviarTexto.mockClear();
       await webhook.procesarPayload(mensajeTexto(`wamid.T${i}`, TEL, variante(token)));
       await tick();
-      expect({ variante: i, enviado: mensajeria.enviarTexto.mock.calls[0]?.[1] }).toEqual({ variante: i, enviado: RESPUESTA_VERIFICADO });
+      expect({ variante: i, enviado: mensajeria.enviarTexto.mock.calls[0]?.[1] }).toEqual({ variante: i, enviado: expect.stringContaining(RESPUESTA_VERIFICADO) });
     }
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
@@ -165,7 +167,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
 
     expect(redis.datos.has('cliente:reg:ok:912345678')).toBe(false);
     expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_OTRO_CELULAR('912345678'));
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_OTRO_CELULAR('912345678')));
   });
 
   it('el mismo mensaje (mismo wa_message_id) no se procesa dos veces', async () => {
@@ -191,7 +193,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await webhook.procesarPayload(mensajeTexto('wamid.P1', TEL, `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
 
     expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
 
@@ -238,7 +240,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await w.procesarPayload(mensajeTexto('wamid.R1', TEL, 'Mi código: ABCDEFGH'));
 
     expect(mo.procesarMensajeEntrante).not.toHaveBeenCalled();
-    expect(m.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
+    expect(m.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
   });
 
   it('un error de Redis al verificar tampoco manda el mensaje al bot', async () => {
@@ -250,17 +252,17 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     await w.procesarPayload(mensajeTexto('wamid.R2', TEL, 'Mi código: ABCDEFGH'));
 
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
   });
 
   it('token inexistente o vencido: responde «no pudimos verificar» y no marca nada', async () => {
     await webhook.procesarPayload(mensajeTexto('wamid.X1', TEL, 'Mi código: ZZZZZZZZ'));
-    expect(mensajeria.enviarTexto).toHaveBeenLastCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenLastCalledWith(TEL, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
 
     const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '987654321', 'REGISTRO');
     redis.datos.delete(`cliente:wa:tok:${createHmac('sha256', secretoVerificacion(config)).update(token).digest('hex')}`);
     await webhook.procesarPayload(mensajeTexto('wamid.X2', TEL, `Mi código: ${token}`));
-    expect(mensajeria.enviarTexto).toHaveBeenLastCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenLastCalledWith(TEL, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
     expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
@@ -269,7 +271,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     const lid = '123456789012345@lid';
     await webhook.procesarPayload(mensajeTexto('wamid.D1', lid, 'Mi código: ABCDEFGH'));
 
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(`wa-user:${lid}`, RESPUESTA_NO_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(`wa-user:${lid}`, expect.stringContaining(RESPUESTA_NO_VERIFICADO));
     expect(RESPUESTA_SIN_NUMERO).not.toBe(RESPUESTA_NO_VERIFICADO);
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
   });
@@ -278,7 +280,7 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
     const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '987654321', 'REGISTRO');
     await webhook.procesarPayload(mensajeTexto('wamid.U1', TEL, `Hola Caprichos, quiero verificar mi​celular. Mi código: ${token}`));
     expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, expect.stringContaining(RESPUESTA_VERIFICADO));
   });
 });
 

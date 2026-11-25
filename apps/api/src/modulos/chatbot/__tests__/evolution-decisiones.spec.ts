@@ -479,7 +479,7 @@ describe('la verificación del celular sigue funcionando cuando el mensaje entra
     await new Promise((r) => setImmediate(r));
 
     expect(datos.get('cliente:reg:ok:987654321')).toBe('1');
-    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', RESPUESTA_VERIFICADO);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith('51987654321', expect.stringContaining(RESPUESTA_VERIFICADO));
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
     expect(autorespuesta.atender).not.toHaveBeenCalled(); // la verificación no recibe cortesías
   });

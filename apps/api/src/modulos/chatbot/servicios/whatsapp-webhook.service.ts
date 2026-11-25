@@ -1,4 +1,5 @@
 import { BOTON_LISTA_MENU, FILAS_MENU_PRINCIPAL, TITULO_SECCION_MENU } from '../conversacion/textos-bot';
+import { urlPublicaCarta } from './carrusel.util';
 import { NumerosWhatsappService } from './numeros-whatsapp.service';
 import { CANAL_WHATSAPP_BUSINESS } from '../utilidades/canal-whatsapp-business';
 import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
@@ -1422,7 +1423,10 @@ export class WhatsappWebhookService {
   }
 
   /** Respuesta de la verificación por el puerto (Meta o Evolution). Nunca lanza; deja en el log si no salió y por qué. */
-  private async responderVerificacion(destino: string, texto: string, conversacionId?: bigint): Promise<void> {
+  private async responderVerificacion(destino: string, textoBase: string, conversacionId?: bigint): Promise<void> {
+    // Con el enlace de la carta el cliente vuelve con un toque (a seguir, o a pedir un código nuevo)
+    const carta = urlPublicaCarta((k) => this.configService.get<string>(k)) || 'https://caprichos.pe';
+    const texto = `${textoBase}\n\n👉 ${carta}`;
     const sufijo = `a ***${String(destino).replace(/\D/g, '').slice(-3)}`;
     let waMessageId: string | null = null;
     try {
