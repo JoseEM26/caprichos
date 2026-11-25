@@ -12,6 +12,12 @@ export interface BorradorProducto {
   fotoArchivo?: File | null;
   categoria?: { nombre: string } | null;
   categoriaNombre?: string;
+  categoriaId?: string;
+  controlaStock?: boolean;
+  quedan?: number | null;
+  porciones?: string | null;
+  alergenos?: string[];
+  alergenosConfirmados?: boolean;
   oculto?: boolean;
   disponible?: boolean;
   agotadoHasta?: string | null;
@@ -41,7 +47,7 @@ export function aProductoCarta(
   const d = draft as BorradorProducto;
   const tamanos = (d.tamanos ?? [])
     .filter((t) => t.activo !== false && (t.nombre ?? '').trim())
-    .map((t, i) => ({ id: t.id || `tam-${i}`, nombre: t.nombre as string, precio: num(t.precio) }));
+    .map((t, i) => ({ id: t.id || `tam-${i}`, nombre: t.nombre as string, precio: num(t.precio), ...(t.unidades ? { unidades: t.unidades } : {}) }));
 
   const grupos: GrupoOpcionesCarta[] = (d.grupos ?? [])
     .filter((g) => g.activo !== false)
@@ -67,10 +73,16 @@ export function aProductoCarta(
     grupos,
     sabores: (d.sabores ?? [])
       .filter((s) => s.activo !== false)
-      .map((s, i) => ({ id: s.id || `sab-${i}`, nombre: s.nombre, disponible: s.disponible !== false })),
+      .map((s, i) => ({ id: s.id || `sab-${i}`, nombre: s.nombre, disponible: s.disponible !== false, quedan: s.quedan ?? null })),
     noSumaBeneficios: Boolean(d.noSumaBeneficios),
     disponible: d.disponible !== false,
     agotadoHasta: d.agotadoHasta ?? null,
+    controlaStock: Boolean(d.controlaStock),
+    quedan: d.controlaStock ? (d.quedan ?? null) : null,
+    saboresConStock: Boolean(d.controlaStock) && (d.sabores ?? []).length > 0,
+    porciones: d.porciones?.trim() || null,
+    alergenos: d.alergenos ?? [],
+    alergenosConfirmados: Boolean(d.alergenosConfirmados),
   };
 }
 

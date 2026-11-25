@@ -3,6 +3,7 @@ import { OfertaItem } from './ofertasApi';
 import { TarjetaOferta } from '../../carta/TarjetaOferta';
 import { VentanaProductoCarta } from '../../carta/VentanaProductoCarta';
 import { CarritoProvider } from '../../carta/CarritoContext';
+import { RaizCartaPrevia } from '../../carta/RaizCarta';
 import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { ProductoCarta, CategoriaCarta, GrupoOpcionesCarta } from '../../carta/tipos';
 
@@ -288,13 +289,13 @@ export function PrevisualizacionCarta({
         </div>
 
         <MarcoDispositivo celular={esCelular}>
-          {vista === 'tarjeta' ? (
-            <div style={{ maxWidth: esCelular ? '100%' : '320px', margin: '0 auto' }}>
+          <RaizCartaPrevia rejilla={vista === 'tarjeta'}>
+            {() => vista === 'tarjeta' ? (
               <TarjetaOferta oferta={ofertaNormalizada} productos={productosCarta} categorias={categoriasCarta} esMovilPreview={esCelular} />
-            </div>
-          ) : (
-            <VentanaProductoCarta producto={productoSimulado} esBebida={false} onCerrar={() => setVista('tarjeta')} soloLectura={true} esMovilPreview={esCelular} />
-          )}
+            ) : (
+              <VentanaProductoCarta producto={productoSimulado} esBebida={false} onCerrar={() => setVista('tarjeta')} soloLectura={true} esMovilPreview={esCelular} />
+            )}
+          </RaizCartaPrevia>
         </MarcoDispositivo>
       </div>
     </CarritoProvider>

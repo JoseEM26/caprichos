@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CarritoProvider } from '../../carta/CarritoContext';
 import { VentanaProductoCarta } from '../../carta/VentanaProductoCarta';
+import { RaizCartaPrevia, esCategoriaBebida } from '../../carta/RaizCarta';
 import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { aProductoCarta } from './aProductoCarta';
 import type { BorradorProducto } from './aProductoCarta';
@@ -22,8 +23,12 @@ export function VistaPreviaEnVivo({ borrador, gruposGenerales, destacarGrupoId }
       <ConmutadorDispositivo celular={celular} onCambiar={setCelular} />
       <MarcoDispositivo celular={celular} etiqueta="Cómo lo ve el cliente" fiel>
         <CarritoProvider>
-          <VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => undefined} soloLectura esMovilPreview={celular}
-            numerarPreguntas destacarGrupoId={destacarGrupoId} />
+          <RaizCartaPrevia>
+            {() => (
+              <VentanaProductoCarta producto={producto} esBebida={esCategoriaBebida(borrador.categoria?.nombre ?? borrador.categoriaNombre)} onCerrar={() => undefined} soloLectura esMovilPreview={celular}
+                numerarPreguntas destacarGrupoId={destacarGrupoId} />
+            )}
+          </RaizCartaPrevia>
         </CarritoProvider>
       </MarcoDispositivo>
     </div>

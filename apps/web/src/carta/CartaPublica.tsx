@@ -53,6 +53,7 @@ import { useEventoCarta } from './eventosCarta';
 import { ModalAvisoEntrada } from './ModalAvisoEntrada';
 import { AnunciosEmergentes } from '../anuncios/AnunciosEmergentes';
 import { fijarUmbralesStock } from './umbralesStock';
+import { esCategoriaBebida, estiloRaizCarta, ZOOM_CELULAR } from './RaizCarta';
 
 const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
   COMBOS: { title: 'Combos Dúo', note: 'Precio por tamaño de bebida' },
@@ -85,14 +86,6 @@ export interface ContenidoCarta {
   /** Fotos propias de «Momentos Caprichos» de Novedades (solo las activas en la carta). */
   novedadesMomentos?: FotoMosaico[];
 }
-
-// El administrativo guarda la paleta por rol; la carta la lee con sus variables --cp-*
-const VAR_PALETA: Record<string, string> = {
-  accent: '--cp-orange', ink: '--cp-navy', bg: '--cp-cream', card: '--cp-white',
-  price: '--cp-rust', sec: '--cp-gold', soft: '--cp-soft', line: '--cp-line',
-};
-
-const ZOOM_CELULAR = 0.82;
 
 function normalizarTexto(txt: string): string {
   return txt
@@ -308,11 +301,6 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     return prod?.fotoUrl ?? productos.find((p) => p.fotoUrl)?.fotoUrl ?? null;
   }, [categorias, contenido]);
 
-  const estilosPaleta = useMemo(() => {
-    const o: Record<string, string> = {};
-    (contenido && contenido.decoracion.toUpperCase() !== 'NINGUNO' ? Object.entries(contenido.paleta ?? {}) : []).forEach(([k, v]) => { if (VAR_PALETA[k] && v) o[VAR_PALETA[k]] = v; });
-    return o;
-  }, [contenido]);
   const rankingPorProducto = useMemo(
     () => new Map((contenido?.rankingMes ?? []).map((r) => [r.productoId, r])),
     [contenido],
@@ -800,16 +788,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
 
   return (
     <div
-      style={{
-        // el mockup en celular maqueta a 476 px y reduce al 82 %: todo se ve más pequeño y cabe más
-        zoom: movil ? ZOOM_CELULAR : 1,
-        minHeight: vistaPrevia ? undefined : movil ? `${100 / ZOOM_CELULAR}vh` : '100vh',
-        backgroundColor: 'var(--cp-cream)',
-        color: 'var(--cp-navy)',
-        display: 'flex',
-        flexDirection: 'column',
-        ...(estilosPaleta as React.CSSProperties),
-      }}
+      style={estiloRaizCarta(contenido, movil, vistaPrevia ? undefined : movil ? `${100 / ZOOM_CELULAR}vh` : '100vh')}
     >
       <DecoracionAnimada tema={contenido?.decoracion ?? 'NINGUNO'} />
       {/* Cabecera pegajosa con las categorías dentro */}
@@ -992,9 +971,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       {productoEnModal && (
         <VentanaProductoCarta
           producto={todosLosProductos.find((p) => String(p.id) === String(productoEnModal.id)) ?? productoEnModal}
-          esBebida={['FRAPPES', 'ICED', 'FROZEN', 'CALIENTES'].includes(
-            (categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre ?? '').toUpperCase(),
-          )}
+          esBebida={esCategoriaBebida(categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre)}
           onCerrar={cerrarModalProducto}
           // El combo se arma desde su producto aunque «visible en la carta» esté apagado (ese interruptor solo controla el banner de promos)
           oferta={comboDeProducto(ofertasBase, productoEnModal.id)}

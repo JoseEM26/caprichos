@@ -16,6 +16,8 @@ import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CarritoProvider } from '../../carta/CarritoContext';
 import { TarjetaProducto } from '../../carta/TarjetaProducto';
+import { RaizCartaPrevia, esCategoriaBebida } from '../../carta/RaizCarta';
+import { calcularMapaBeneficios } from '../../carta/useBeneficiosCarta';
 import { VentanaProductoCarta } from '../../carta/VentanaProductoCarta';
 import { ConmutadorDispositivo, MarcoDispositivo } from '../../comun/MarcoDispositivo';
 import { aProductoCarta, avisosProducto } from './aProductoCarta';
@@ -105,13 +107,20 @@ export function VistaPreviaProducto({ borrador, gruposGenerales = [], sinGuardar
           <div data-testid="vpp-escenario" className={`vpp-escenario${celular ? ' vpp-escenario--celular' : ''}`}>
             <MarcoDispositivo celular={celular}>
               <CarritoProvider>
-                {abierta ? (
-                  <VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => setAbierta(false)} soloLectura esMovilPreview={celular} />
-                ) : (
-                  <div onClickCapture={(e) => { e.stopPropagation(); e.preventDefault(); setAbierta(true); }} style={{ maxWidth: celular ? '100%' : 320, margin: '0 auto' }}>
-                    <TarjetaProducto producto={producto} />
-                  </div>
-                )}
+                <RaizCartaPrevia rejilla={!abierta}>
+                  {({ ofertas, organizacion, rankingDe }) => abierta ? (
+                    <VentanaProductoCarta producto={producto} esBebida={esCategoriaBebida(d.categoria?.nombre ?? d.categoriaNombre)} onCerrar={() => setAbierta(false)} soloLectura esMovilPreview={celular} />
+                  ) : (
+                    <div style={{ display: 'contents' }} onClickCapture={(e) => { e.stopPropagation(); e.preventDefault(); setAbierta(true); }}>
+                      <TarjetaProducto
+                        producto={producto}
+                        rankingInfo={rankingDe(String(producto.id))}
+                        organizacion={organizacion}
+                        insigniaBeneficio={calcularMapaBeneficios(ofertas, [{ id: d.categoriaId ?? '', nombre: d.categoria?.nombre ?? d.categoriaNombre ?? '', orden: 0, productos: [producto] }]).get(String(producto.id))}
+                      />
+                    </div>
+                  )}
+                </RaizCartaPrevia>
               </CarritoProvider>
             </MarcoDispositivo>
           </div>
