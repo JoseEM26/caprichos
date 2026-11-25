@@ -1165,4 +1165,20 @@ describe('ClientesService', () => {
       await expect(service.crearCuentaDesdeBot('912345678', 'Ana')).rejects.toMatchObject({ response: { codigo: 'TELEFONO_REGISTRADO' } });
     });
   });
+
+  describe('liberarIntentosCodigo', () => {
+    it('solo el ADMIN: borra los límites del celular de la cuenta y audita con el celular enmascarado', async () => {
+      prismaMock.party.findUnique = jest.fn().mockResolvedValue({ id: 9n, cuentaCliente: { telefono: '912345678' }, contactos: [] });
+      await expect(service.liberarIntentosCodigo('9', { rol: 'CAJERO' })).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      const r = await service.liberarIntentosCodigo('9', { rol: 'ADMIN', partyId: '1' }, '1.1.1.1');
+      expect(r).toEqual({ ok: true, celular: '···678' });
+      const redis = redisMock.obtenerCliente();
+      expect(redis.del).toHaveBeenCalledWith(
+        'cliente:rec:sol:912345678', 'cliente:rec:int:912345678', 'cliente:reg:sol:912345678', 'cliente:reg:int:912345678', 'bloqueo:cliente:912345678',
+      );
+      const aud = auditoriaMock.registrar.mock.calls.at(-1)[0];
+      expect(aud).toMatchObject({ accion: 'CLIENTE_INTENTOS_LIBERADOS', entidadId: 9n });
+      expect(JSON.stringify(aud, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toContain('912345678');
+    });
+  });
 });

@@ -1755,6 +1755,38 @@ export class ClientesService {
   }
 
   /**
+   * Solo ADMIN: libera los límites del celular del cliente (pedidos de código al recuperar o crear cuenta, intentos de
+   * código y bloqueo por contraseña errada) para que pueda volver a intentar al instante. Los límites por conexión (IP)
+   * no se tocan. Queda auditado con el celular enmascarado.
+   */
+  async liberarIntentosCodigo(partyId: string, usuario: { rol?: string; partyId?: string } | undefined, ip?: string) {
+    if (usuario?.rol !== 'ADMIN') {
+      throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador puede liberar los intentos.' });
+    }
+    const party = await this.prisma.party.findUnique({
+      where: { id: BigInt(partyId) },
+      select: { id: true, cuentaCliente: { select: { telefono: true } }, contactos: { where: { tipo: { in: ['TELEFONO', 'WHATSAPP'] } }, select: { valor: true } } },
+    });
+    if (!party) throw new NotFoundException({ codigo: 'CLIENTE_NO_ENCONTRADO', mensaje: 'No se encontró el cliente.' });
+    const tel = celular9De(party.cuentaCliente?.telefono ?? party.contactos[0]?.valor ?? null);
+    if (!tel) throw new BadRequestException({ codigo: 'SIN_CELULAR', mensaje: 'Este cliente no tiene celular registrado.' });
+    await this.redisService
+      .obtenerCliente()
+      .del(`cliente:rec:sol:${tel}`, `cliente:rec:int:${tel}`, `cliente:reg:sol:${tel}`, `cliente:reg:int:${tel}`, `bloqueo:cliente:${tel}`);
+    await this.auditoria.registrar({
+      categoria: 'ACCESO',
+      modulo: 'clientes',
+      accion: 'CLIENTE_INTENTOS_LIBERADOS',
+      entidad: 'party',
+      entidadId: party.id,
+      partyId: usuario.partyId ? BigInt(usuario.partyId) : undefined,
+      despues: { telefono: enmascararTelefono(tel) },
+      ip,
+    });
+    return { ok: true as const, celular: `···${tel.slice(-3)}` };
+  }
+
+  /**
    * Activa o desactiva a un cliente (no se elimina, RN-CAP-066 / regla general).
    */
   async cambiarEstado(partyId: string, activo: boolean, usuarioId?: string, ip?: string) {

@@ -146,6 +146,14 @@ export class ClientesAdminController {
     return this.clientesService.editarCliente(id, dto, req.usuario?.partyId, ip);
   }
 
+  /** Solo ADMIN: libera los límites de código y de contraseña del celular del cliente (queda auditado). */
+  @Post(':id/liberar-intentos')
+  @Permiso('clientes', 'editar')
+  async liberarIntentos(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.clientesService.liberarIntentosCodigo(id, req.usuario, ip);
+  }
+
   @Patch(':id/estado')
   @Permiso('clientes', 'editar')
   async cambiarEstado(

@@ -140,6 +140,11 @@ export async function obtenerAvatarCliente(id: string): Promise<{ config: unknow
   return api.get(`/admin/clientes/${id}/avatar`);
 }
 
+/** Solo ADMIN: libera los límites de código y de contraseña del celular del cliente. */
+export async function liberarIntentosCliente(id: string): Promise<{ ok: true; celular: string }> {
+  return api.post<{ ok: true; celular: string }>(`/admin/clientes/${id}/liberar-intentos`, {});
+}
+
 export async function obtenerFichaCliente(id: string): Promise<FichaCliente> {
   return api.get<FichaCliente>(`/admin/clientes/${id}`);
 }

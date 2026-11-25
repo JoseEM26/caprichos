@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
 import { AvatarCliente } from './AvatarCliente';
 import type { ClienteItem, FichaCliente, MovimientoPuntosItem, PedidoCliente } from './tipos';
-import { obtenerFichaCliente, listarHistorialPuntos, listarComprasCliente } from './clientesApi';
+import { obtenerFichaCliente, listarHistorialPuntos, listarComprasCliente, liberarIntentosCliente } from './clientesApi';
 import { DetalleCompra } from './DetalleCompra';
 import { useSesion } from '../../comun/sesion';
 import { ModalAjustarPuntos } from './ModalAjustarPuntos';
@@ -39,6 +39,20 @@ export function ModalFichaCliente({
   const [hayMas, setHayMas] = useState(false);
   const [paginaCompras, setPaginaCompras] = useState(1);
   const [saldoPuntos, setSaldoPuntos] = useState(cliente?.puntos ?? 0);
+  const [liberando, setLiberando] = useState(false);
+  const [avisoLiberar, setAvisoLiberar] = useState('');
+  const liberar = async () => {
+    if (!cliente) return;
+    setLiberando(true);
+    try {
+      const r = await liberarIntentosCliente(cliente.id);
+      setAvisoLiberar(`Listo: el celular ${r.celular} ya puede pedir su código o entrar de nuevo.`);
+    } catch (e: any) {
+      setAvisoLiberar(e?.message || 'No se pudo liberar. Intenta de nuevo.');
+    } finally {
+      setLiberando(false);
+    }
+  };
 
   useEffect(() => {
     if (!abierto || !cliente) return;
@@ -147,7 +161,17 @@ export function ModalFichaCliente({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{info}</div>
-          {esAdmin && <button
+          {esAdmin && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={liberar}
+            disabled={liberando}
+            title="Si pidió muchos códigos o falló la contraseña varias veces, puede volver a intentar al instante"
+            style={{ minHeight: 36, padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: 9999, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+          >
+            {liberando ? 'Liberando...' : 'Liberar intentos de código'}
+          </button>
+          <button
             type="button"
             onClick={() => setAbrirAjuste(true)}
             style={{
@@ -163,8 +187,10 @@ export function ModalFichaCliente({
             }}
           >
             Ajustar puntos
-          </button>}
+          </button>
+          </div>}
         </div>
+        {avisoLiberar && <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>{avisoLiberar}</div>}
 
         <div style={{ fontWeight: 800, marginTop: 4 }}>Historial de compras</div>
 

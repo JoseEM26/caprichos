@@ -36,6 +36,15 @@ describe('Ficha del cliente ▸ ajuste de puntos e historial', () => {
     montar();
     await screen.findByText('CP-55');
     expect(screen.queryByText('Ajustar puntos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Liberar intentos de código')).not.toBeInTheDocument();
+  });
+
+  it('el ADMIN libera los intentos de código del celular y ve la confirmación', async () => {
+    const liberar = vi.spyOn(clientesApi, 'liberarIntentosCliente').mockResolvedValue({ ok: true, celular: '···111' });
+    montar();
+    fireEvent.click(await screen.findByText('Liberar intentos de código'));
+    await waitFor(() => expect(liberar).toHaveBeenCalledWith('9'));
+    expect(await screen.findByText('Listo: el celular ···111 ya puede pedir su código o entrar de nuevo.')).toBeInTheDocument();
   });
 
   it('Ver detalle muestra qué pidió: cantidad, producto, opciones, vasos, envío, propina y pago', async () => {
