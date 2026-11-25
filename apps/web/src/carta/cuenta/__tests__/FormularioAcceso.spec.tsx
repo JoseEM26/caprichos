@@ -51,7 +51,7 @@ describe('FormularioAcceso: celular con cuenta o límite de códigos', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Olvidé mi contraseña' }));
 
-    expect(screen.getByRole('button', { name: 'Enviarme el código' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeInTheDocument();
     expect(screen.getByLabelText('Celular')).toHaveValue('912345678');
     expect(screen.queryByRole('alert')).toBeNull();
   });

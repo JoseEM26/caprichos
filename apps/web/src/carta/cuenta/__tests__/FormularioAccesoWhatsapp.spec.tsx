@@ -124,7 +124,7 @@ describe('FormularioAcceso en modo WHATSAPP_ENTRANTE (recuperar contraseña)', (
     mockCuenta();
   });
 
-  it('no deja cambiar la contraseña hasta que el celular llegue por WhatsApp, y luego la cambia sin código', async () => {
+  it('pide la contraseña nueva recién cuando el celular llega por WhatsApp (2 pasos) y la cambia sin código', async () => {
     const post = vi.spyOn(api, 'post').mockImplementation(async (ruta: string) => {
       if (ruta === '/carta/cuenta/recuperar/solicitar') return RESPUESTA_WA('QWER2345');
       return { ok: true };
@@ -133,15 +133,18 @@ describe('FormularioAcceso en modo WHATSAPP_ENTRANTE (recuperar contraseña)', (
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: '¿Olvidaste tu contraseña?' }));
     escribirCelular('914244077');
-    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
 
     expect(await screen.findByRole('link', { name: 'Abrir WhatsApp y enviar mensaje' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Contraseña nueva'), { target: { value: 'clave-nueva-123' } });
-    // Mientras no llegue el mensaje, no se puede confirmar
-    expect(screen.getByRole('button', { name: 'Cambiar mi contraseña' })).toBeDisabled();
+    // Paso 1 de 2: mientras no llegue el mensaje no hay contraseña ni botón que confundan
+    expect(screen.getByTestId('paso-recuperar')).toHaveTextContent('Paso 1 de 2: confirma que el celular 914244077 es tuyo');
+    expect(screen.queryByLabelText('Contraseña nueva')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cambiar mi contraseña' })).toBeNull();
 
-    // Llega el mensaje: el sondeo ya marca verificado y el botón se habilita
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cambiar mi contraseña' })).toBeEnabled(), ESPERA_SONDEO);
+    // Llega el mensaje: paso 2 con la contraseña nueva
+    const campo = await screen.findByLabelText('Contraseña nueva', undefined, ESPERA_SONDEO);
+    expect(screen.getByTestId('paso-recuperar')).toHaveTextContent('Paso 2 de 2: crea tu contraseña nueva');
+    fireEvent.change(campo, { target: { value: 'clave-nueva-123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
 
     await waitFor(() => expect(post).toHaveBeenCalledWith('/carta/cuenta/recuperar/confirmar', { telefono: '914244077', contrasenaNueva: 'clave-nueva-123' }));

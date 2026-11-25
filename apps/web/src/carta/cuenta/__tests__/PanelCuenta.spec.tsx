@@ -228,7 +228,7 @@ describe('PanelCuenta ▸ acceso con celular', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '¿Olvidaste tu contraseña?' }));
     escribir('Celular', '912345678');
-    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(await screen.findByText(/Si ese celular tiene cuenta, te enviamos un código por WhatsApp/)).toBeInTheDocument();
     expect(post).toHaveBeenCalledWith('/carta/cuenta/recuperar/solicitar', { telefono: '912345678' });
     expect(screen.getByRole('button', { name: /Reenviar código en \d+ s/ })).toBeDisabled();
@@ -256,7 +256,7 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     render(<PanelCuenta />);
     fireEvent.click(screen.getByRole('button', { name: '¿Olvidaste tu contraseña?' }));
     escribir('Celular', '912345678');
-    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
     await screen.findByLabelText('Código de 6 dígitos');
     escribir('Código de 6 dígitos', '123456');
     escribir('Contraseña nueva', 'NuevaClave2026');

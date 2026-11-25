@@ -84,7 +84,7 @@ describe('FormularioAcceso: crear contraseña y recuperar sin perder la cuenta',
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     boton('¿Olvidaste tu contraseña?');
     celular('912345678');
-    boton('Enviarme el código');
+    boton('Continuar');
     fireEvent.change(await screen.findByLabelText('Código de 6 dígitos'), { target: { value: '123456' } });
     fireEvent.change(screen.getByLabelText('Contraseña nueva'), { target: { value: 'ClaveSegura1' } });
     post.mockRejectedValueOnce(new ErrorApi('SIN_CUENTA', 'Ese celular aún no tiene cuenta. Créala ahora: tus puntos se conservan.', 400));
@@ -100,7 +100,7 @@ describe('FormularioAcceso: crear contraseña y recuperar sin perder la cuenta',
     render(<FormularioAcceso alSeguirInvitado={vi.fn()} />);
     boton('¿Olvidaste tu contraseña?');
     celular('912345678');
-    boton('Enviarme el código');
+    boton('Continuar');
     fireEvent.change(await screen.findByLabelText('Código de 6 dígitos'), { target: { value: '654321' } });
     expect(screen.getByRole('button', { name: /Reenviar código en \d+ s/ })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Contraseña nueva'), { target: { value: 'ClaveSegura1' } });

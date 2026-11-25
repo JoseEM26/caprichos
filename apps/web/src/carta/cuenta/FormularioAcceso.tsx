@@ -357,7 +357,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
       </div>
     ) : null;
 
-  const textoBoton = modo === 'new' ? (['Enviar código por WhatsApp', 'Confirmar código', 'Crear cuenta'] as const)[paso - 1] : ({ in: 'Ingresar', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' } as const)[modo];
+  const textoBoton = modo === 'new' ? (['Enviar código por WhatsApp', 'Confirmar código', 'Crear cuenta'] as const)[paso - 1] : ({ in: 'Ingresar', rec1: 'Continuar', rec2: 'Cambiar mi contraseña' } as const)[modo];
 
   return (
     <>
@@ -422,7 +422,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
 
       {modo === 'rec1' && (
         <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-          Escribe tu celular y te enviamos un código de 6 dígitos por WhatsApp para crear una contraseña nueva.
+          Escribe el celular de tu cuenta. Para confirmar que es tuyo, nos mandarás un mensaje por WhatsApp desde ese mismo celular y luego creas tu contraseña nueva.
         </div>
       )}
 
@@ -455,6 +455,16 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
       {modo === 'rec2' && (
         <>
           {!verifWa && <div role="status" style={{ fontSize: 13, fontWeight: 700 }}>{aviso}</div>}
+          {verifWa && (
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-navy)' }} data-testid="paso-recuperar">
+              {verificadoWa ? 'Paso 2 de 2: crea tu contraseña nueva' : `Paso 1 de 2: confirma que el celular ${telefono} es tuyo`}
+            </div>
+          )}
+          {verifWa && !verificadoWa && (
+            <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+              Abre WhatsApp <b>en el celular {telefono}</b> y envía el mensaje sin cambiarlo. Si lo mandas desde otro número no se puede confirmar.
+            </div>
+          )}
           {verifWa ? (
             <VerificacionWhatsapp
               token={verifWa.token}
@@ -472,7 +482,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
               <input id="ac-c" autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
             </div>
           )}
-          <CampoClave id="ac-pn" etiquetaTexto="Contraseña nueva" valor={contrasena} alCambiar={setContrasena} nueva />
+          {/* Con WhatsApp, la contraseña nueva aparece recién al confirmar el celular (antes confundía: el botón no hacía nada) */}
+          {(!verifWa || verificadoWa) && <CampoClave id="ac-pn" etiquetaTexto="Contraseña nueva" valor={contrasena} alCambiar={setContrasena} nueva />}
           {!verifWa && (
             <>
               <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>{AYUDA_REENVIO}</div>
@@ -499,7 +510,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
           <button type="button" onClick={() => { setPaso(1); setVerifWa(null); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
         )}
         {/* En WHATSAPP_ENTRANTE el paso de celular avanza solo al llegar el mensaje: no hay botón que pulsar */}
-        {!(paso2 && verifWa) && (
+        {!(paso2 && verifWa) && !(modo === 'rec2' && verifWa && !verificadoWa) && (
           <button
             onClick={modo === 'rec1' ? () => pedirCodigo(false) : modo === 'rec2' ? confirmar : enviar}
             disabled={enviando || (modo === 'rec2' && !!verifWa && !verificadoWa)}
