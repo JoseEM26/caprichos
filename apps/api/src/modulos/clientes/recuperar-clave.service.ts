@@ -153,16 +153,17 @@ export class RecuperarClaveService {
       });
     const tel = celular9De(dto.telefono);
     // WHATSAPP_ENTRANTE: no hay código que escribir; vale la marca que dejó el mensaje verificado por WhatsApp.
-    // CODIGO_PLANTILLA: el código de 6 dígitos de siempre.
+    // Con código de 6 dígitos (modo CODIGO_PLANTILLA, o WhatsApp ocultó el número y se pasó al código): vale el código.
     const entrante = (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE;
     const codigo = String(dto.codigo ?? '').trim();
-    if (!tel || (!entrante && !/^\d{6}$/.test(codigo))) throw invalido();
+    const porCodigo = /^\d{6}$/.test(codigo);
+    if (!tel || (!entrante && !porCodigo)) throw invalido();
     validarContrasena(dto.contrasenaNueva);
 
     const redis = this.redisService.obtenerCliente();
     const claveCod = `cliente:rec:cod:${tel}`;
     const claveInt = `cliente:rec:int:${tel}`;
-    if (entrante) {
+    if (entrante && !porCodigo) {
       let marca: string | null = null;
       try {
         // Solo se mira: la marca se gasta al cambiar la contraseña (o al pasar a crear cuenta), no antes

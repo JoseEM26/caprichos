@@ -137,6 +137,16 @@ describe('RecuperarClaveService', () => {
       await expect(servicio.confirmar(dto(codigo))).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
     });
 
+    it('modo WhatsApp con el número oculto (se pasó al código de 6 dígitos): el código correcto cambia la contraseña', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 'WHATSAPP_ENTRANTE' });
+      await servicio.solicitar('912345678', undefined, true);
+      const codigo = codigoEnviado();
+      await expect(servicio.confirmar(dto('000000' === codigo ? '111111' : '000000'))).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+      expect(await servicio.confirmar(dto(codigo))).toEqual({ ok: true });
+      // sin código y sin marca de WhatsApp sigue sin servir
+      await expect(servicio.confirmar({ telefono: '912345678', contrasenaNueva: 'NuevaClave2026' })).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+    });
+
     it('código incorrecto, vencido o inexistente: mismo error CODIGO_INVALIDO y no cambia nada', async () => {
       await servicio.solicitar('912345678');
       const malo = codigoEnviado() === '000000' ? '111111' : '000000';
