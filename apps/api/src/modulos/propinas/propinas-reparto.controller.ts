@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Put, Req, Res, UseGuards } from '@n
 import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { AnularRepartoDto, ParticipacionDto, PagarRepartoDto } from './dto/propinas-reparto.dto';
+import { AnularRepartoDto, ParticipacionDto } from './dto/propinas-reparto.dto';
 import { PropinasRepartoService } from './propinas-reparto.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -41,10 +41,11 @@ export class PropinasRepartoController {
     return this.reparto.aprobar(Number(anio), Number(mes), req.usuario, ipDe(req));
   }
 
-  @Post('reparto/:anio/:mes/pagar')
+  /** Solo para ver: reparto por día del mes y si cada parte ya se pagó en planilla. */
+  @Get('dias/:anio/:mes')
   @Permiso('propinas', 'repartir')
-  pagar(@Param('anio') anio: string, @Param('mes') mes: string, @Body() dto: PagarRepartoDto, @Req() req: any) {
-    return this.reparto.pagar(Number(anio), Number(mes), dto, req.usuario, ipDe(req));
+  dias(@Param('anio') anio: string, @Param('mes') mes: string) {
+    return this.reparto.vistaDias(Number(anio), Number(mes));
   }
 
   @Post('reparto/:anio/:mes/anular')

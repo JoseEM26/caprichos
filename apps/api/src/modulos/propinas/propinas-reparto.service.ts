@@ -3,12 +3,10 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { AsistenciaService } from '../asistencia/asistencia.service';
+import { PlanillaPropinasService } from '../asistencia/planilla-propinas.service';
 import { PropinasService } from './propinas.service';
 import { diaLima } from './propinas.util';
-import { EstadoReparto, MEDIOS_PAGO_PROPINA, firmaReparto, repartirPorHoras } from './propinas-reparto.util';
-
-/** Rol que no participa del reparto salvo excepción fijada por el ADMIN (person.participa_propinas). */
-const ROL_SIN_PROPINA = 'ADMIN';
+import { EstadoReparto, ROL_SIN_PROPINA, firmaReparto, participaEnPropinas, repartirPorHoras } from './propinas-reparto.util';
 
 function validarMes(anio: number, mes: number) {
   if (!Number.isInteger(anio) || anio < 2000 || anio > 2100 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
@@ -32,6 +30,7 @@ const redondear2 = (n: number) => Math.round(n * 100) / 100;
  * Reparto mensual de propinas: las propinas del mes se reparten UNA VEZ, a fin de mes, entre el personal
  * en proporción a las horas trabajadas. Estados: BORRADOR (se recalcula) → APROBADO (congela) → PAGADO;
  * ANULADO con motivo (solo si no hay pagos). Un reparto vigente (no anulado) por mes.
+ * Ya NO se paga aparte: las propinas se pagan en la planilla de cada persona, por día (ver `vistaDias`).
  */
 @Injectable()
 export class PropinasRepartoService {
@@ -40,6 +39,7 @@ export class PropinasRepartoService {
     private readonly propinas: PropinasService,
     private readonly asistencia: AsistenciaService,
     private readonly auditoria: AuditoriaService,
+    private readonly porDia: PlanillaPropinasService,
   ) {}
 
   /** Vista de un mes: el reparto vigente (si existe) y la vista previa en vivo (solo lectura, no guarda). */
@@ -128,43 +128,50 @@ export class PropinasRepartoService {
     return { ok: true };
   }
 
-  /** Marca pagado a todas (o a las indicadas) las personas de un reparto aprobado. Al pagar a todas, el reparto pasa a PAGADO. */
-  async pagar(
-    anio: number,
-    mes: number,
-    dto: { medio: string; fecha?: string; nota?: string; partyIds?: number[] },
-    usuario: UsuarioAutenticado,
-    ip?: string,
-    ahora = new Date(),
-  ) {
+  /**
+   * Solo para ver: cómo se reparte la propina de cada día del mes entre quienes trabajaron ese día, y si cada parte
+   * ya se pagó (en la planilla de qué período, o por el reparto mensual antiguo). Los días sin nadie con horas salen «sin repartir».
+   */
+  async vistaDias(anio: number, mes: number, ahora = new Date()) {
     validarMes(anio, mes);
-    const r = await this.exigirVigente(anio, mes);
-    if (r.estado !== 'APROBADO') {
-      throw new ConflictException({ codigo: 'NO_APROBADO', mensaje: `Solo se paga un reparto aprobado (ahora está ${r.estado}).` });
-    }
-    if (!(MEDIOS_PAGO_PROPINA as readonly string[]).includes(dto.medio)) {
-      throw new BadRequestException({ codigo: 'MEDIO_INVALIDO', mensaje: 'Medio de pago no válido' });
-    }
-    const cuando = dto.fecha ? new Date(dto.fecha) : ahora;
-    if (Number.isNaN(cuando.getTime())) throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: 'La fecha de pago no es válida' });
-    const sel = dto.partyIds ? new Set(dto.partyIds.map(BigInt)) : null;
-    const pendientes = r.detalle.filter((d) => !d.pagado_en);
-    const aPagar = pendientes.filter((d) => !sel || sel.has(d.party_id));
-    if (!aPagar.length) {
-      throw new BadRequestException({ codigo: 'SIN_PENDIENTES', mensaje: 'No hay personas pendientes de pago en la selección' });
-    }
-    const quedan = pendientes.length - aPagar.length;
-    await this.prisma.$transaction(async (tx) => {
-      await tx.propinaRepartoDetalle.updateMany({
-        where: { reparto_id: r.id, party_id: { in: aPagar.map((d) => d.party_id) } },
-        data: { pagado_en: cuando, pagado_medio: dto.medio, ...(dto.nota?.trim() ? { nota: dto.nota.trim() } : {}) },
-      });
-      if (quedan === 0) {
-        await tx.propinaReparto.update({ where: { id: r.id }, data: { estado: 'PAGADO', pagado_en: cuando, pagado_por: usuario.partyId } });
-      }
-    });
-    await this.auditar('PAGAR_REPARTO', { anio, mes, medio: dto.medio, personas: aPagar.length, completo: quedan === 0 }, usuario.partyId, ip, r.id);
-    return { ok: true, pagadas: aPagar.length, completo: quedan === 0 };
+    const desde = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    const hasta = `${anio}-${String(mes).padStart(2, '0')}-${String(new Date(Date.UTC(anio, mes, 0)).getUTCDate()).padStart(2, '0')}`;
+    const dias = await this.porDia.repartoDelRango(desde, hasta, [], ahora);
+    const ids = [...new Set([...dias.values()].flatMap((d) => d.filas.map((f) => BigInt(f.partyId))))];
+    const [personas, pagos, repartos] = await Promise.all([
+      this.prisma.person.findMany({ where: { party_id: { in: ids } }, select: { party_id: true, nombres: true, apellidos: true } }),
+      this.prisma.planillaPropinaDia.findMany({
+        where: { party_id: { in: ids }, fecha: { gte: new Date(`${desde}T00:00:00Z`), lte: new Date(`${hasta}T00:00:00Z`) } },
+        select: { party_id: true, fecha: true, monto_pagado: true, periodo: { select: { desde: true, hasta: true } } },
+      }),
+      this.prisma.propinaRepartoDetalle.findMany({
+        where: { party_id: { in: ids }, pagado_en: { not: null }, reparto: { anio, mes, estado: { not: 'ANULADO' } } },
+        select: { party_id: true },
+      }),
+    ]);
+    const nombres = new Map(personas.map((p) => [Number(p.party_id), nombreDe(p, p.party_id)]));
+    const pagadoReparto = new Set(repartos.map((r) => Number(r.party_id)));
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const lista = [...dias.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).map((d) => ({
+      fecha: d.fecha,
+      total: d.total,
+      sinRepartir: d.sinRepartir,
+      personas: d.filas.map((f) => {
+        const delDia = pagos.filter((x) => Number(x.party_id) === f.partyId && iso(x.fecha) === d.fecha);
+        const periodo = (delDia.find((x) => Number(x.monto_pagado) !== 0) ?? delDia[0])?.periodo;
+        return {
+          partyId: f.partyId,
+          nombre: nombres.get(f.partyId) ?? `Persona ${f.partyId}`,
+          horas: f.horas,
+          porcentaje: f.porcentaje,
+          monto: f.monto,
+          pagadoPlanilla: redondear2(delDia.reduce((a, x) => a + dec(x.monto_pagado), 0)),
+          periodo: periodo ? { desde: iso(periodo.desde), hasta: iso(periodo.hasta) } : null,
+          pagadoReparto: pagadoReparto.has(f.partyId),
+        };
+      }),
+    }));
+    return { anio, mes, sinRepartir: redondear2(lista.filter((d) => d.sinRepartir).reduce((a, d) => a + d.total, 0)), dias: lista };
   }
 
   /** Anula el reparto vigente con motivo. No se anula si ya hay pagos registrados. */
@@ -282,9 +289,8 @@ export class PropinasRepartoService {
       const p = mapaP.get(h.partyId);
       const c = mapaC.get(h.partyId);
       const nombre = nombreDe(p, BigInt(h.partyId));
-      const esAdmin = !!c && (c.rol === ROL_SIN_PROPINA || c.rolesExtra.some((x) => x.rol === ROL_SIN_PROPINA));
       const excepcion = p?.participa_propinas ?? null;
-      if (!(excepcion ?? !esAdmin)) {
+      if (!participaEnPropinas(c, excepcion)) {
         excluidos.push({ partyId: h.partyId, nombre, motivo: excepcion === false ? 'EXCLUIDO_POR_ADMIN' : ROL_SIN_PROPINA, participa: excepcion });
         continue;
       }

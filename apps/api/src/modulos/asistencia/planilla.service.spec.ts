@@ -14,7 +14,7 @@ const NOV = new Date('2026-11-15T15:00:00Z');
 
 type Fila = Record<string, any>;
 
-function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null; vigencias?: Fila[]; tarifas?: Fila[] } = {}) {
+function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vinculo?: Fila | null; cfg?: Fila; recurrentes?: Fila[]; consumosExtra?: Fila[]; contacto?: Fila | null; vigencias?: Fila[]; tarifas?: Fila[]; propinas?: any } = {}) {
   const sueldoFila = () => ({ party_id: LUIS, modalidad: 'MENSUAL', monto_semanal: 230.77, monto_mensual: 1000, ...opts.sueldo });
   const tarifas: Fila[] = opts.tarifas ?? [];
   const prestamos: Fila[] = [];
@@ -144,7 +144,7 @@ function montar(opts: { estadoDia?: string; feriados?: Fila[]; sueldo?: Fila; vi
     prestamos.push(p);
     montos.forEach((m, i) => cuotas.push({ id: id++, prestamo_id: p.id, numero: i + 1, monto: m, estado: 'PENDIENTE', reprogramada_de: null, periodo_hasta: null, planilla_periodo_id: null }));
   };
-  return { svc: new PlanillaService(prisma, asistencia, auditoria), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias, selecciones, tarifas };
+  return { svc: new PlanillaService(prisma, asistencia, auditoria, opts.propinas), consumos, periodos, vigencias, auditoria, ajustes, vacaciones, prestamos, cuotas, poner, dias, selecciones, tarifas };
 }
 
 describe('PlanillaService', () => {
@@ -231,6 +231,26 @@ describe('PlanillaService', () => {
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REABRIR_PLANILLA' }), expect.anything());
     const r = await svc.detalle(7, '2026-11-15', [], AHORA);
     expect(r.estado).toBe('ABIERTO');
+  });
+
+  it('propinas: la línea suma al neto, al pagar registra los días y reabrir los libera; Mi planilla las muestra por día', async () => {
+    const linea = { fecha: '2026-11-03', totalLocal: 10, horas: 8, horasTotales: 20, porcentaje: 40, monto: 4, pendiente: false };
+    const propinas = {
+      dePersona: jest.fn(async () => ({ total: 4, lineas: [linea] })),
+      registrarPago: jest.fn(async () => undefined),
+      liberarPago: jest.fn(async () => undefined),
+    };
+    const { svc } = montar({ propinas });
+    const abierto = await svc.detalle(7, '2026-11-15', [], AHORA);
+    expect(abierto.resultado.neto).toBe(538.5); // 534.5 sin propinas + 4 de propinas
+    expect(abierto.propinas.lineas).toEqual([linea]);
+    expect(abierto.movimientos.find((m: any) => m.concepto === 'Propinas')).toMatchObject({ fecha: '2026-11-03', monto: 4 });
+    const { periodoId } = await svc.pagar(7, '2026-11-15', [], ADMIN, undefined, AHORA);
+    expect(propinas.registrarPago).toHaveBeenCalledWith(expect.anything(), 7n, expect.anything(), { desde: '2026-11-01', hasta: '2026-11-30' }, [linea]);
+    const mi = await svc.miPlanilla(7n, '2026-11-15', AHORA);
+    expect(mi).toMatchObject({ propinas: { total: 4, lineas: [linea] }, ganado: { bonos: 0 } });
+    await svc.reabrir(periodoId, 'Revisar las propinas del lunes', ADMIN);
+    expect(propinas.liberarPago).toHaveBeenCalledWith(expect.anything(), expect.anything());
   });
 
   it('no se paga con jornadas incompletas o por revisar', async () => {

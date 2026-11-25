@@ -44,7 +44,7 @@ function crear(opts: {
   const propinas: any = { resumenMes: jest.fn(async () => ({ total: opts.total ?? 0 })) };
   const asistencia: any = { horasTrabajadasDelMes: jest.fn(async () => opts.horas ?? []) };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
-  const servicio = new PropinasRepartoService(prisma, propinas, asistencia, auditoria);
+  const servicio = new PropinasRepartoService(prisma, propinas, asistencia, auditoria, {} as any);
   return { servicio, prisma, auditoria };
 }
 
@@ -244,28 +244,6 @@ describe('PropinasRepartoService: estados', () => {
     await expect(cambio.servicio.aprobar(2026, 11, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'CIFRAS_CAMBIARON' } });
   });
 
-  it('pagar: parcial deja el reparto aprobado; con todas las personas pasa a PAGADO', async () => {
-    const detalle = [
-      { party_id: 1n, horas: 24, porcentaje: 20, monto: 30, pagado_en: null },
-      { party_id: 2n, horas: 96, porcentaje: 80, monto: 120, pagado_en: null },
-    ];
-    const { servicio, prisma } = crear({ vigente: { id: 10n, estado: 'APROBADO', detalle } });
-    const parcial = await servicio.pagar(2026, 11, { medio: 'EFECTIVO', partyIds: [1] }, ADMIN, undefined, AHORA);
-    expect(parcial).toMatchObject({ pagadas: 1, completo: false });
-    expect(prisma.propinaReparto.update).not.toHaveBeenCalled();
-
-    const resto = await servicio.pagar(2026, 11, { medio: 'YAPE', nota: 'lote 2' }, ADMIN, undefined, AHORA);
-    expect(resto).toMatchObject({ pagadas: 2, completo: true });
-    expect(prisma.propinaReparto.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'PAGADO' }) }));
-  });
-
-  it('pagar exige un reparto aprobado y un medio válido', async () => {
-    const borrador = crear({ vigente: { id: 10n, estado: 'BORRADOR', detalle: [] } });
-    await expect(borrador.servicio.pagar(2026, 11, { medio: 'EFECTIVO' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'NO_APROBADO' } });
-    const aprobado = crear({ vigente: { id: 10n, estado: 'APROBADO', detalle: [{ party_id: 1n, pagado_en: null }] } });
-    await expect(aprobado.servicio.pagar(2026, 11, { medio: 'BITCOIN' }, ADMIN, undefined, AHORA)).rejects.toMatchObject({ response: { codigo: 'MEDIO_INVALIDO' } });
-  });
-
   it('anular con motivo libera el mes; no se anula si ya hay pagos', async () => {
     const { servicio, prisma } = crear({ vigente: { id: 10n, estado: 'BORRADOR', detalle: [] } });
     await servicio.anular(2026, 11, 'Horas mal cargadas', ADMIN, undefined, AHORA);
@@ -296,6 +274,30 @@ describe('PropinasRepartoService: estados', () => {
     const r = await servicio.csv(2026, 11);
     expect(r.nombre).toBe('propinas-2026-11.csv');
     expect(r.csv.split('\n')[1]).toBe('Luis,24,20,30,,,');
+  });
+});
+
+describe('PropinasRepartoService: solo para ver, por día', () => {
+  it('muestra por día y por persona su parte, si ya se pagó en planilla (con el período) o por el reparto mensual, y lo que quedó sin repartir', async () => {
+    const dias = new Map<string, any>([
+      ['2026-11-02', { fecha: '2026-11-02', total: 10, horasTotales: 12, sinRepartir: false, filas: [{ partyId: 1, horas: 8, porcentaje: 66.6667, monto: 6.67 }, { partyId: 2, horas: 4, porcentaje: 33.3333, monto: 3.33 }] }],
+      ['2026-11-03', { fecha: '2026-11-03', total: 7, horasTotales: 0, sinRepartir: true, filas: [] }],
+    ]);
+    const prisma: any = {
+      person: { findMany: async () => [{ party_id: 1n, nombres: 'Ana', apellidos: null }, { party_id: 2n, nombres: 'Luis', apellidos: null }] },
+      planillaPropinaDia: { findMany: async () => [{ party_id: 1n, fecha: new Date('2026-11-02T00:00:00Z'), monto_pagado: 6.67, periodo: { desde: new Date('2026-11-02T00:00:00Z'), hasta: new Date('2026-11-08T00:00:00Z') } }] },
+      propinaRepartoDetalle: { findMany: async () => [{ party_id: 2n }] },
+    };
+    const servicio = new PropinasRepartoService(prisma, {} as any, {} as any, {} as any, { repartoDelRango: async () => dias } as any);
+    const v = await servicio.vistaDias(2026, 11);
+    expect(v.sinRepartir).toBe(7);
+    expect(v.dias[0].personas).toEqual([
+      expect.objectContaining({ nombre: 'Ana', monto: 6.67, pagadoPlanilla: 6.67, periodo: { desde: '2026-11-02', hasta: '2026-11-08' }, pagadoReparto: false }),
+      expect.objectContaining({ nombre: 'Luis', monto: 3.33, pagadoPlanilla: 0, periodo: null, pagadoReparto: true }),
+    ]);
+    expect(v.dias[1]).toMatchObject({ fecha: '2026-11-03', sinRepartir: true, personas: [] });
+    // el pago aparte del reparto mensual ya no existe
+    expect((servicio as any).pagar).toBeUndefined();
   });
 });
 

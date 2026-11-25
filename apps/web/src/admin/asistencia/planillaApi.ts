@@ -203,8 +203,13 @@ export interface DetallePlanilla {
   movimientos?: MovimientoPlanilla[];
   /** Descuentos y bonos personalizados que no caen en este período: empiezan después o ya terminaron. */
   recurrentesFueraDePeriodo?: RecurrenteFueraApi[];
+  /** Propinas por día que se suman al neto (faltan en pagos hechos antes de esta versión). */
+  propinas?: PropinasPlanilla;
 }
 
+/** Propina de un día en la planilla: su parte según las horas de ese día. `pendiente` = día de un período anterior. */
+export interface LineaPropinaApi { fecha: string; totalLocal: number; horas: number; horasTotales: number; porcentaje: number; monto: number; pendiente: boolean }
+export interface PropinasPlanilla { total: number; lineas: LineaPropinaApi[] }
 export interface MovimientoPlanilla { fecha: string | null; concepto: string; monto: number; detalle?: string; tipo: 'INGRESO' | 'RESTA' | 'INFO' }
 export type GrupoDesglose = 'TARDANZA' | 'CONSUMO' | 'ADELANTO' | 'DESCUENTO' | 'PRESTAMO' | 'RECURRENTE' | 'BONO';
 export interface LineaDesglose { grupo: GrupoDesglose; concepto: string; monto: number; detalle?: string }

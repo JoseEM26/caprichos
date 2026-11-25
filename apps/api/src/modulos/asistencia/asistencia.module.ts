@@ -10,6 +10,8 @@ import { AsistenciaController, MiAsistenciaController } from './asistencia.contr
 import { AsistenciaPantallaPublicaController } from './asistencia-pantalla.controller';
 import { MiPlanillaController, PlanillaController } from './planilla.controller';
 import { PlanillaService } from './planilla.service';
+import { PlanillaPropinasService } from './planilla-propinas.service';
+import { PropinasModule } from '../propinas/propinas.module';
 import { PrestamosService } from './prestamos.service';
 import { AsistenciaService } from './asistencia.service';
 import { AsistenciaCorreccionesService } from './asistencia-correcciones.service';
@@ -21,9 +23,9 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
 import { CorreoModule } from '../correo/correo.module';
 
 @Module({
-  imports: [ArchivosModule, ChatbotModule, CorreoModule],
+  imports: [PropinasModule, ArchivosModule, ChatbotModule, CorreoModule],
   controllers: [AsistenciaController, MiAsistenciaController, AsistenciaAdminController, AsistenciaPantallaPublicaController, PlanillaController, MiPlanillaController, FeriadosController, VinculoController, MisTurnosController, TurnosAprobacionController, MiEquipoController],
-  providers: [AsistenciaService, AsistenciaCalendarioService, AsistenciaCorreccionesService, PlanillaService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea, AsistenciaTurnosService, AsistenciaTurnosTarea],
-  exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, VacacionesService],
+  providers: [AsistenciaService, AsistenciaCalendarioService, AsistenciaCorreccionesService, PlanillaService, PlanillaPropinasService, PrestamosService, FeriadosService, VacacionesService, AsistenciaSelfiesTarea, AsistenciaTurnosService, AsistenciaTurnosTarea],
+  exports: [AsistenciaService, AsistenciaCorreccionesService, PlanillaService, PlanillaPropinasService, VacacionesService],
 })
 export class AsistenciaModule {}

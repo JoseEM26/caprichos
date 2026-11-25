@@ -3497,9 +3497,26 @@ model PlanillaPeriodo {
   reabierto_por  BigInt?
   reabierto_motivo String?
 
+  propinasDias PlanillaPropinaDia[]
 
   @@index([party_id, desde])
   @@map("planilla_periodo")
+}
+
+/// Propina de un día de Lima que ya se pagó a una persona en un período de planilla (migración 20270412100000).
+/// Una fila por persona, día y período (monto_pagado puede ser 0 o negativo). Pendiente = parte de hoy - suma pagada.
+/// Reabrir el período borra sus filas y libera los días.
+model PlanillaPropinaDia {
+  id                  BigInt          @id @default(autoincrement())
+  party_id            BigInt
+  fecha               DateTime        @db.Date
+  monto_pagado        Decimal         @db.Decimal(12, 2)
+  planilla_periodo_id BigInt
+  periodo             PlanillaPeriodo @relation(fields: [planilla_periodo_id], references: [id])
+
+  @@unique([party_id, fecha, planilla_periodo_id])
+  @@index([party_id, fecha])
+  @@map("planilla_propina_dia")
 }
 
 // Feriados (migración 20270201300000_feriados). Las horas trabajadas en un feriado activo se pagan a valor hora × recargo.

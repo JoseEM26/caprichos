@@ -5,6 +5,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { aHoraTexto, jornadaDe, sumarDias } from './asistencia.calculo';
 import { rolEfectivo } from './asistencia.interpretacion';
 import { AsistenciaService } from './asistencia.service';
+import { PlanillaPropinasService } from './planilla-propinas.service';
 import {
   CATEGORIAS_DESCUENTO,
   DIAS_MES_DEFECTO,
@@ -147,6 +148,7 @@ export class PlanillaService {
     private readonly prisma: PrismaService,
     private readonly asistencia: AsistenciaService,
     @Optional() private readonly auditoria?: AuditoriaService,
+    @Optional() private readonly propinasPlanilla?: PlanillaPropinasService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -698,11 +700,13 @@ export class PlanillaService {
       }];
     });
     const bonosPersonales = recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => r.monto);
+    // Propinas del período (reparto por día según horas) más lo pendiente de períodos anteriores. Un rango libre no las incluye.
+    const propinas = this.propinasPlanilla && !omitir.rangoLibre ? await this.propinasPlanilla.dePersona(id, periodo, ahora) : { total: 0, lineas: [] };
     const resultado = calcularPlanilla({
       valorHora: vhFijo ?? undefined,
       multiplicadorExtra: multExtra,
       lineasDescuento,
-      bonos: [...vigentes.filter((a) => a.tipo === 'BONO').map((a) => Number(a.monto)), ...bonosPersonales],
+      bonos: [...vigentes.filter((a) => a.tipo === 'BONO').map((a) => Number(a.monto)), ...bonosPersonales, ...(propinas.total !== 0 ? [propinas.total] : [])],
       modalidad: sueldo.modalidad,
       sueldoPeriodo,
       dias: diasCalc,
@@ -723,6 +727,7 @@ export class PlanillaService {
       ...recurrentes.filter((r) => r.cobrar && r.signo === 'DESCUENTO').map((r) => ({ grupo: 'RECURRENTE' as const, concepto: r.nombre, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
       ...vigentes.filter((a) => a.tipo === 'BONO').map((a) => ({ grupo: 'BONO' as const, concepto: 'Bono', monto: Number(a.monto), detalle: a.motivo as string })),
       ...recurrentes.filter((r) => r.cobrar && r.signo === 'BONO').map((r) => ({ grupo: 'BONO' as const, concepto: r.nombre, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
+      ...(propinas.total !== 0 ? [{ grupo: 'BONO' as const, concepto: 'Propinas', monto: propinas.total, detalle: `${propinas.lineas.length} ${propinas.lineas.length === 1 ? 'día' : 'días'}` }] : []),
     ];
     // Detalle día por día (misma fórmula por día que calcularPlanilla; la suma cierra exacto con el neto)
     const movimientos = movimientosPlanilla(
@@ -733,6 +738,7 @@ export class PlanillaService {
         cuotas: cuotas.filter((c) => c.cobrar),
         recurrentes: recurrentes.filter((r) => r.cobrar).map((r) => ({ nombre: r.nombre, signo: r.signo, monto: r.monto, detalle: ETIQUETA_PERIODICIDAD_API[r.periodicidad] })),
         vacacionesPagadas: vacPagadas.map((v) => ({ fecha: isoDe(v.fecha_desde), monto: Number(v.monto ?? 0), dias: Number(v.dias) })),
+        propinas: propinas.lineas.map((l) => ({ fecha: l.fecha, concepto: l.pendiente ? `Propina pendiente del ${l.fecha.slice(8, 10)}/${l.fecha.slice(5, 7)}` : 'Propinas', monto: l.monto, detalle: `${l.horas} h de ${l.horasTotales} h · ${l.porcentaje}% de S/ ${l.totalLocal.toFixed(2)}` })),
       },
       resultado.neto,
       resultado.valorHoraExacto,
@@ -806,6 +812,7 @@ export class PlanillaService {
       })),
       consumos,
       consumosAnterioresPendiente,
+      propinas,
       ajustes: ajustes.map((a) => ({
         id: Number(a.id),
         tipo: a.tipo,
@@ -860,6 +867,8 @@ export class PlanillaService {
         },
       });
       await this.cerrarCuotas(tx, d.cuotas ?? [], fila.id, d.periodo);
+      // Los días de propina incluidos quedan pagados: no se pagan otra vez
+      if (this.propinasPlanilla) await this.propinasPlanilla.registrarPago(tx, id, fila.id, d.periodo, d.propinas?.lineas ?? []);
       if (aCobrar.length) {
         const r = await tx.consumoPersonal.updateMany({
           where: { id: { in: aCobrar.map((c) => BigInt(c)) }, pagado_en: null },
@@ -884,6 +893,7 @@ export class PlanillaService {
     const ids: string[] = ((p.detalle as any)?.consumosCobradosIds ?? []) as string[];
     await this.prisma.$transaction(async (tx) => {
       await this.reabrirCuotas(tx, p.id);
+      await this.propinasPlanilla?.liberarPago(tx, p.id);
       await tx.planillaPeriodo.update({
         where: { id: p.id },
         data: { estado: 'REABIERTO', reabierto_en: new Date(), reabierto_por: usuario.partyId, reabierto_motivo: motivo },
@@ -1166,7 +1176,8 @@ export class PlanillaService {
         // ponytail: hoy solo existe «aprobada»; quitar la aprobación deja la extra pendiente. Sin tabla de rechazos → 0.
         extraRechazadaMin: 0,
       },
-      ganado: { bruto: r.ganado, extras: r.pagoExtra, bonos: r.adicional },
+      ganado: { bruto: r.ganado, extras: r.pagoExtra, bonos: Math.round((r.adicional - (d.propinas?.total ?? 0)) * 100) / 100 },
+      propinas: { total: (d.propinas?.total ?? 0) as number, lineas: (d.propinas?.lineas ?? []) as Array<{ fecha: string; totalLocal: number; horas: number; horasTotales: number; porcentaje: number; monto: number; pendiente: boolean }> },
       descuentos,
       adelantos: ajustes.filter((a) => a.tipo === 'ADELANTO').map((a) => ({ id: a.id as number, fecha: a.fecha as string, monto: a.monto as number, motivo: a.motivo as string })),
       penalidadTardanza: { total: r.penalidadTardanza ?? 0, detalle: (r.penalidadTardanzaDetalle ?? []) as Array<{ fecha: string; minutos: number; monto: number }> },

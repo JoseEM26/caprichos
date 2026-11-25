@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
+import { PropinasPorDia } from './PropinasPorDia';
 
-/** Reparto mensual de propinas por horas (solo ADMIN). Cifras del servidor; aquí solo se muestran y se disparan acciones. */
+/**
+ * Reparto de propinas (solo ADMIN). El pago ya NO se hace aquí: las propinas se pagan por día en la planilla de cada persona.
+ * Cifras del servidor; aquí solo se muestran (y se calcula/aprueba el reparto mensual antiguo).
+ */
 type Estado = 'BORRADOR' | 'APROBADO' | 'PAGADO' | 'ANULADO';
 
 interface FilaGuardada {
@@ -60,13 +64,6 @@ interface FilaHistorial {
 }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-const MEDIOS: Array<[string, string]> = [
-  ['EFECTIVO', 'Efectivo'],
-  ['YAPE', 'Yape'],
-  ['PLIN', 'Plin'],
-  ['TRANSFERENCIA', 'Transferencia'],
-  ['OTRO', 'Otro'],
-];
 const ETIQUETA_ESTADO: Record<Estado, string> = {
   BORRADOR: 'Borrador',
   APROBADO: 'Aprobado',
@@ -124,8 +121,6 @@ export function RepartoPropinas() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [confirmacion, setConfirmacion] = useState<Confirmacion>(null);
   const [motivo, setMotivo] = useState('');
-  const [medio, setMedio] = useState('EFECTIVO');
-  const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().slice(0, 10));
 
   const ruta = `/admin/propinas/reparto/${seleccion.anio}/${seleccion.mes}`;
 
@@ -186,10 +181,6 @@ export function RepartoPropinas() {
     URL.revokeObjectURL(url);
   };
 
-  const pagarFila = (partyId: number) => {
-    void accion(`${ruta}/pagar`, { medio, fecha: `${fechaPago}T12:00:00-05:00`, partyIds: [partyId] }, 'Pago registrado');
-  };
-
   const reparto = vista?.reparto ?? null;
   const previa = vista?.previa;
   const estado: Estado | null = reparto?.estado ?? null;
@@ -199,15 +190,14 @@ export function RepartoPropinas() {
   const totalHoras = reparto ? reparto.totalHoras : previa?.totalHoras ?? 0;
   const puedeCalcular = !!vista?.mesTerminado && (!reparto || reparto.estado === 'BORRADOR') && !previa?.error;
   const puedeAprobar = estado === 'BORRADOR';
-  const puedePagar = estado === 'APROBADO';
   const puedeAnular = estado === 'BORRADOR' || (estado === 'APROBADO' && !reparto?.filas.some((f) => f.pagadoEn));
 
   return (
     <section aria-label="Reparto del mes" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', maxWidth: 680 }}>
-          Las propinas del mes se reparten una vez, al terminar el mes, entre el personal en proporción a las horas trabajadas.
-          El ADMIN no participa salvo excepción. Cada persona ve solo su parte cuando el reparto está aprobado.
+          Cada día, la propina cobrada se reparte entre quienes trabajaron ese día, en proporción a sus horas, y se paga en la planilla de cada persona.
+          Aquí solo se ve. El ADMIN no participa salvo excepción.
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700 }}>
           Mes
@@ -230,6 +220,8 @@ export function RepartoPropinas() {
           </select>
         </label>
       </div>
+
+      <PropinasPorDia anio={seleccion.anio} mes={seleccion.mes} />
 
       {error && <div role="alert" style={{ fontSize: 13, color: 'var(--cp-red, #b3261e)' }}>{error}</div>}
       {mensaje && <div role="status" style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)' }}>{mensaje}</div>}
@@ -276,7 +268,6 @@ export function RepartoPropinas() {
                   <th>%</th>
                   <th>Monto</th>
                   {esGuardado && <th style={{ textAlign: 'left' }}>Pagado</th>}
-                  {puedePagar && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -291,15 +282,6 @@ export function RepartoPropinas() {
                       {esGuardado && (
                         <td style={{ textAlign: 'left' }}>
                           {pagado ? `Pagado ${new Date(pagado).toLocaleDateString('es-PE')}${'pagadoMedio' in f && f.pagadoMedio ? ` (${f.pagadoMedio})` : ''}` : 'Pendiente'}
-                        </td>
-                      )}
-                      {puedePagar && (
-                        <td>
-                          {!pagado && (
-                            <button type="button" disabled={enviando} onClick={() => pagarFila(f.partyId)}>
-                              Pagar
-                            </button>
-                          )}
                         </td>
                       )}
                     </tr>
@@ -340,18 +322,6 @@ export function RepartoPropinas() {
                   </div>
                 ))}
               </section>
-            )}
-
-            {puedePagar && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
-                <label>Medio <select aria-label="Medio de pago" value={medio} onChange={(e) => setMedio(e.target.value)}>
-                  {MEDIOS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
-                </select></label>
-                <label>Fecha <input type="date" aria-label="Fecha de pago" value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} /></label>
-                <button type="button" disabled={enviando} onClick={() => void accion(`${ruta}/pagar`, { medio, fecha: `${fechaPago}T12:00:00-05:00` }, 'Pagos registrados')}>
-                  Marcar todo pagado
-                </button>
-              </div>
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

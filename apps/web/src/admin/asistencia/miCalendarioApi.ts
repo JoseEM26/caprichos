@@ -83,6 +83,8 @@ export interface MiPlanilla {
   descuentos?: { id: string | number; fecha?: string; etiqueta?: string; concepto?: string; monto: number; periodicidad?: string }[];
   consumos?: { fecha: string; pedido: string; productos: string[]; monto: number; anterior: boolean; cobrar: boolean }[];
   adelantos?: { id: number; fecha?: string; monto: number; motivo?: string | null }[];
+  /** Mis propinas por día (ya incluidas en «Se te suma» y en el neto). */
+  propinas?: { total: number; lineas: { fecha: string; totalLocal: number; horas: number; horasTotales: number; porcentaje: number; monto: number; pendiente: boolean }[] };
   bonosManuales?: { id: number; fecha: string; monto: number; motivo?: string | null }[];
   penalidadTardanza?: { total: number; detalle?: { fecha: string; minutos: number; monto: number }[] };
   prestamos?: { id: number; capital: number; interesPctMensual?: number; cuota: number; saldo: number; cuotasPagadas: number; cuotasTotales: number; estado?: string }[];

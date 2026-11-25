@@ -386,6 +386,8 @@ export interface DatosMovimientos {
   cuotas: Array<{ numero: number; numCuotas: number; monto: number }>;
   recurrentes: Array<{ nombre: string; signo: 'BONO' | 'DESCUENTO'; monto: number; detalle?: string }>;
   vacacionesPagadas: Array<{ fecha: string; monto: number; dias?: number }>;
+  /** Propinas por día (ya sumadas en `bonos`): una línea de ingreso por cada una. */
+  propinas?: Array<{ fecha: string; concepto: string; monto: number; detalle?: string }>;
 }
 
 const hm = (min: number): string => [min >= 60 ? `${Math.floor(min / 60)} h` : '', min % 60 ? `${min % 60} min` : ''].filter(Boolean).join(' ');
@@ -422,6 +424,7 @@ export function movimientosPlanilla(e: EntradaPlanilla, x: DatosMovimientos, net
     if (d.salidaAnticipadaMin > 0) info(f, `Salida ${d.salidaAnticipadaMin} min antes`, 'Ese tiempo no se paga');
   }
   for (const v of x.vacacionesPagadas) ing(v.fecha, 'Vacaciones pagadas', v.monto, v.dias ? `${v.dias} días` : undefined);
+  for (const p of x.propinas ?? []) ing(p.fecha, p.concepto, p.monto, p.detalle);
   for (const c of x.consumos) {
     const fecha = c.anterior ? null : c.fecha;
     const det = [c.pedido, c.anterior ? `consumo del ${c.fecha}` : ''].filter(Boolean).join(' · ') || undefined;

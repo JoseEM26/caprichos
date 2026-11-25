@@ -11,6 +11,7 @@ import { FilaCal, calendarioFilas } from './calendarioApi';
 import { ResultadoLote, aprobarSimplesPeriodo } from './correccionesApi';
 import { DatosPago } from './DatosPago';
 import { DetalleNeto } from './DetalleNeto';
+import { LineaPropinas } from './LineaPropinas';
 import { useUltimaPeticion } from './jornada';
 import { ModoPeriodo, etiquetaPeriodo, moverPeriodo } from './periodoVista';
 import { Plegable } from './Plegable';
@@ -31,13 +32,14 @@ const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(
 const fechaHora = (iso: string) => new Date(iso).toLocaleString('es-PE', { timeZone: 'America/Lima' });
 
 /** Desglose visual del neto: cuánto suma, cuánto se descuenta y a cuánto se llega. Las barras son decorativas; las cifras van en texto. */
-function CascadaNeto({ c }: { c: CtlPlanilla }) {
+export function CascadaNeto({ c }: { c: CtlPlanilla }) {
   const { r, penal } = c;
   const sumas: Array<[string, number]> = [
     ['Sueldo por horas trabajadas', r.pagoTrabajado],
     ['Horas extra aprobadas', r.pagoExtra],
     ...(r.pagoVacaciones ? [['Vacaciones pagadas en dinero', r.pagoVacaciones] as [string, number]] : []),
-    ...(r.adicional ? [['Bonos (adicional)', r.adicional] as [string, number]] : []),
+    ...(r.adicional && Math.round((r.adicional - (c.d.propinas?.total ?? 0)) * 100) !== 0 ? [['Bonos (adicional)', Math.round((r.adicional - (c.d.propinas?.total ?? 0)) * 100) / 100] as [string, number]] : []),
+    ...(c.d.propinas?.total ? [['Propinas', c.d.propinas.total] as [string, number]] : []),
   ];
   const restas: Array<[string, number]> = [
     ['Penalidad por tardanza', penal],
@@ -261,6 +263,7 @@ export function PlanillaPersona({ partyId, fecha, seccion, onSeccion, onFecha, v
       <section aria-label="Cómo se llega al neto" className="pp-bloque">
         <h3 className="as-sub">Cómo se llega al neto a pagar</h3>
         <CascadaNeto c={c} />
+        <LineaPropinas total={c.d.propinas?.total ?? 0} lineas={c.d.propinas?.lineas ?? []} />
         <small className="as-nota">{horas(r.trabajadaMin)} h trabajadas de {horas(r.programadaMin)} h programadas · {cuotasCobrar} cuota(s) de préstamo y servicio(s) extra en este pago.</small>
         <details className="pp-explica" data-testid="como-se-calcula">
           <summary>¿Cómo se calcula?</summary>

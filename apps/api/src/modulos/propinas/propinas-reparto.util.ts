@@ -58,4 +58,12 @@ export function firmaReparto(total: number, filas: Array<{ partyId: number; hora
 export const ESTADOS_REPARTO = ['BORRADOR', 'APROBADO', 'PAGADO', 'ANULADO'] as const;
 export type EstadoReparto = (typeof ESTADOS_REPARTO)[number];
 
-export const MEDIOS_PAGO_PROPINA = ['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'OTRO'] as const;
+
+/** Rol que no participa del reparto salvo excepción fijada por el ADMIN (person.participa_propinas). */
+export const ROL_SIN_PROPINA = 'ADMIN';
+
+/** ¿Participa en las propinas? Excepción de la persona (true/false); si es NULL, todos menos quien tenga el rol ADMIN. */
+export function participaEnPropinas(cuenta: { rol: string; rolesExtra?: Array<{ rol: string }> } | undefined, excepcion: boolean | null | undefined): boolean {
+  const esAdmin = !!cuenta && (cuenta.rol === ROL_SIN_PROPINA || (cuenta.rolesExtra ?? []).some((x) => x.rol === ROL_SIN_PROPINA));
+  return excepcion ?? !esAdmin;
+}

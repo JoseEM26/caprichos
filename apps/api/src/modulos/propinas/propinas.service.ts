@@ -23,6 +23,17 @@ export class PropinasService {
       throw new BadRequestException({ codigo: 'MES_INVALIDO', mensaje: 'Indica un año y un mes válidos' });
     }
     const { inicio, fin } = rangoMesLima(anio, mes);
+    const filas = await this.filasCobradas(inicio, fin);
+    const resumen = resumirPropinas(filas);
+    const devuelto = Math.round(filas.filter((f) => f.propina < 0).reduce((a, f) => a - f.propina, 0) * 100) / 100;
+    return { anio, mes, ...resumen, devuelto };
+  }
+
+  /**
+   * Filas de propina de un rango [inicio, fin): cada cobro vigente suma el día del cobro y cada devolución resta
+   * (en negativo) el día en que se devuelve. Es la fuente única del acumulado del mes y del reparto por día.
+   */
+  private async filasCobradas(inicio: Date, fin: Date) {
     const [cobrados, devueltos] = await Promise.all([
       this.prisma.cobroPago.findMany({
         where: { propina: { gt: 0 }, cobro: { anulado_en: null, en: { gte: inicio, lt: fin } } },
@@ -41,7 +52,7 @@ export class PropinasService {
         },
       }),
     ]);
-    const filas = [
+    return [
       ...cobrados.map((f) => ({
         en: f.cobro.en,
         medio: f.medio,
@@ -57,9 +68,19 @@ export class PropinasService {
         ),
       ),
     ];
-    const resumen = resumirPropinas(filas);
-    const devuelto = Math.round(filas.filter((f) => f.propina < 0).reduce((a, f) => a - f.propina, 0) * 100) / 100;
-    return { anio, mes, ...resumen, devuelto };
+  }
+
+  /** Propina neta de cada día de Lima entre dos fechas AAAA-MM-DD (incluidas): cobros menos devoluciones. */
+  async totalesPorDia(desde: string, hasta: string): Promise<Array<{ fecha: string; total: number }>> {
+    const inicio = new Date(`${desde}T00:00:00-05:00`);
+    const fin = new Date(new Date(`${hasta}T00:00:00-05:00`).getTime() + 86_400_000);
+    const filas = await this.filasCobradas(inicio, fin);
+    const porDia = new Map<string, number>();
+    for (const f of filas) {
+      const d = diaLima(f.en);
+      porDia.set(d, Math.round(((porDia.get(d) ?? 0) + f.propina) * 100) / 100);
+    }
+    return [...porDia].map(([fecha, total]) => ({ fecha, total })).sort((a, b) => a.fecha.localeCompare(b.fecha));
   }
 
   /**

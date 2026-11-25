@@ -44,6 +44,20 @@ describe('PropinasService', () => {
     expect(prisma.devolucionPedido.findMany.mock.calls[0][0].where.creado_en.gte.toISOString()).toBe('2026-11-01T05:00:00.000Z');
   });
 
+  it('totalesPorDia: propina neta de cada día de Lima (la devolución resta el día en que se devuelve)', async () => {
+    const { servicio } = crearServicio({
+      cobros: [
+        { medio: 'EFECTIVO', propina: 10, cobro: { en: new Date('2026-11-06T15:00:00Z'), pedido: { canal: 'CARTA' } } },
+        { medio: 'YAPE', propina: 5, cobro: { en: new Date('2026-11-06T20:00:00Z'), pedido: { canal: 'CARTA' } } },
+      ],
+      devueltos: [{ creado_en: new Date('2026-11-08T14:00:00Z'), pedido: { canal: 'CARTA', cobros: [{ pagos: [{ medio: 'EFECTIVO', propina: 4 }] }] } }],
+    });
+    expect(await servicio.totalesPorDia('2026-11-02', '2026-11-08')).toEqual([
+      { fecha: '2026-11-06', total: 15 },
+      { fecha: '2026-11-08', total: -4 },
+    ]);
+  });
+
   it('resumenMes cuenta igual la propina de MOZO y CAJA con pago mixto (propina por renglón) y la de CARTA; sin filtrar por canal', async () => {
     const { servicio, prisma } = crearServicio({
       cobros: [

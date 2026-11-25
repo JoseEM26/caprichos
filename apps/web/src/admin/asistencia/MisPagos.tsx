@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Insignia } from '../../comun/Insignia';
 import { Cargando } from '../../comun/Cargando';
 import { miPlanilla, type MiPlanilla } from './miCalendarioApi';
+import { LineaPropinas } from './LineaPropinas';
 import { horasMin } from './tiposMarca';
 import { DIAS_SEMANA } from './planillaApi';
 import { moverPeriodo, rangoDe } from './periodoVista';
@@ -227,6 +228,7 @@ export function MisPagos() {
                 {bonosManuales.map((b) => <Fila key={`b-${b.id}`} titulo={`Bono${b.motivo ? `: ${b.motivo}` : ''}`} detalle={`· ${b.fecha}`} monto={s(b.monto)} signo="+" />)}
               </>
             )}
+            <LineaPropinas total={p.propinas?.total ?? 0} lineas={p.propinas?.lineas ?? []} />
             <p className="as-ayuda">El tiempo de almuerzo se paga: cuenta como hora trabajada.</p>
           </div>
 

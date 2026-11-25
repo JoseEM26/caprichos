@@ -572,6 +572,25 @@ export class AsistenciaService {
     }));
   }
 
+  /**
+   * Horas netas trabajadas por día y persona entre dos fechas (misma interpretación que `horasTrabajadasDelMes`).
+   * Solo jornadas ya evaluables y con horas > 0. `soloDias` limita el cálculo a esos días. Lo usa el reparto de propinas.
+   */
+  async horasNetasPorDia(desde: string, hasta: string, soloDias?: Set<string>, ahora = new Date()) {
+    const ctx = await this.cargarContexto(desde, hasta);
+    const cfg = await this.obtenerConfig();
+    const porDia: Record<string, Array<{ partyId: number; horas: number }>> = {};
+    for (let j = desde; j <= hasta; j = sumarDias(j, 1)) {
+      if (soloDias && !soloDias.has(j)) continue;
+      for (const pid of this.partesConActividad(ctx, j)) {
+        const r = this.evaluarDia(pid, j, ctx, ahora, cfg).resultado;
+        if (['SIN_EVALUAR', 'POR_EMPEZAR', 'SIN_MARCAR_ENTRADA'].includes(r.estado) || r.trabajadaMin <= 0) continue;
+        (porDia[j] ??= []).push({ partyId: Number(pid), horas: horas(r.trabajadaMin) });
+      }
+    }
+    return porDia;
+  }
+
   async listarMarcas(filtros: { desde?: string; hasta?: string; partyId?: number }) {
     const where: Record<string, unknown> = {};
     if (filtros.desde || filtros.hasta) {
