@@ -100,6 +100,26 @@ for amb in demo prod; do
   fi
 done
 linea
+echo "== ENTRADA DE MENSAJES EN PRODUCCIÓN (solo lectura) =="
+EVO_P=/opt/caprichos/evolution-prod
+if [[ -f "$EVO_P/evolution.env" ]]; then
+  echo "-- Evolution prod: registros de webhook/mensajes (30 min) --"
+  docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --since 30m evolution-api 2>&1 \
+    | grep -iE "webhook|upsert|messages\.|error|axios|ECONN|timeout|refused|status code" | grep -v "Buffer" | ocultar | tail -40
+fi
+if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-redis$'; then
+  echo "-- cola whatsapp-webhooks (prod): esperando / activos / fallidos / completados / pausada --"
+  docker exec caprichos-prod-redis sh -c 'A=""; [ -n "$REDIS_PASSWORD" ] && A="-a $REDIS_PASSWORD"; for k in wait active paused; do printf "%s=" $k; redis-cli $A --no-auth-warning LLEN bull:whatsapp-webhooks:$k; done; for k in failed completed delayed; do printf "%s=" $k; redis-cli $A --no-auth-warning ZCARD bull:whatsapp-webhooks:$k; done; printf "meta-paused="; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:meta paused; ult=$(redis-cli $A --no-auth-warning ZREVRANGE bull:whatsapp-webhooks:failed 0 0); [ -n "$ult" ] && { printf "ultimo fallido: "; redis-cli $A --no-auth-warning HGET bull:whatsapp-webhooks:$ult failedReason | cut -c1-300; }' 2>&1 | ocultar
+fi
+if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-postgres$'; then
+  docker exec -i caprichos-prod-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off' <<'SQL' 2>&1 | ocultar
+SELECT 'mensajes de clientes por 10 min (últimas 3 h, hora Lima)' AS que;
+SELECT to_char(date_trunc('hour', en AT TIME ZONE 'America/Lima') + floor(extract(minute FROM en AT TIME ZONE 'America/Lima')/10)*interval '10 min','HH24:MI') AS desde, count(*) FROM mensaje_chat WHERE direccion='ENTRA' AND en > now() - interval '3 hours' GROUP BY 1 ORDER BY 1;
+SELECT 'whatsapp_mensaje ENTRANTE por estado (3 h)' AS que;
+SELECT direccion, estado, max(creado_en) AT TIME ZONE 'America/Lima' AS ultimo, count(*) FROM whatsapp_mensaje WHERE creado_en > now() - interval '3 hours' GROUP BY 1,2 ORDER BY 1,2;
+SQL
+fi
+linea
 echo "== BOT PRODUCCIÓN: chats de las últimas 24 h (solo lectura, sin números ni textos) =="
 if docker ps --format '{{.Names}}' | grep -q '^caprichos-prod-postgres$'; then
   docker exec -i caprichos-prod-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off' <<'SQL' 2>&1 | ocultar
