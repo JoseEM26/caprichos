@@ -103,6 +103,10 @@ linea
 echo "== ENTRADA DE MENSAJES EN PRODUCCIÓN (solo lectura) =="
 EVO_P=/opt/caprichos/evolution-prod
 if [[ -f "$EVO_P/evolution.env" ]]; then
+  echo "-- Evolution prod: eventos de las últimas 3 h sin volcados de sesión (hora UTC) --"
+  docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --timestamps --since 3h evolution-api 2>&1 \
+    | sed -E 's/^evolution-api-1 *\| //' | grep -vE "^[0-9TZ:.-]+ +([ }]|\]|[a-zA-Z_]+: )" | grep -vE "SessionEntry|Buffer|_chains|chainKey|registrationId|ephemeral|rootKey|baseKey|preKey|indexInfo|pendingPreKey|remoteIdentity|previousCounter|lastRemote|currentRatchet|closed:|used:|created:|signedKeyId|^\s*$" \
+    | ocultar | cut -c1-220 | tail -70
   echo "-- Evolution prod: registros de webhook/mensajes (30 min) --"
   docker compose -p caprichos-evolution-prod --env-file "$EVO_P/evolution.env" -f /opt/caprichos/compose/docker-compose.evolution.yml logs --no-color --since 30m evolution-api 2>&1 \
     | grep -iE "webhook|upsert|messages\.|error|axios|ECONN|timeout|refused|status code|decrypt|bad mac|no session|no matching|retry|receipt|stream|conflict|logout|connection" | grep -v "Buffer\|npm error" | ocultar | tail -40
