@@ -566,6 +566,10 @@ export function EditarUsuarioModal({
       )}
       {esAdmin && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div data-testid="datos-actuales" style={{ fontSize: "13px", color: "var(--cp-navy)", background: "var(--cp-sand)", borderRadius: "10px", padding: "8px 12px", overflowWrap: "anywhere" }}>
+            <div><span style={{ color: "var(--cp-soft)" }}>Celular actual:</span> <b>{usuario.celular || "sin celular"}</b></div>
+            <div><span style={{ color: "var(--cp-soft)" }}>Correo actual:</span> <b>{usuario.correo || "sin correo"}</b></div>
+          </div>
           <Campo
             id="editar-celular"
             etiqueta="Celular (deja vacío para no cambiarlo)"

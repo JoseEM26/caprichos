@@ -422,6 +422,20 @@ describe('UsuariosService', () => {
       expect(res.elementos[0].nombres).toBe('Pedro');
     });
 
+    it('el ADMIN ve el DNI completo y el celular; el resto, el DNI enmascarado y sin celular', async () => {
+      const fila = {
+        id: 10n, party_id: 20n, rol: 'COCINA', activo: true, debe_cambiar: false, alta_en: new Date('2026-10-01'),
+        party: { persona: { nombres: 'Pedro', apellidos: 'Gomez', correo: 'p@x.pe' }, documentos: [{ tipo: 'DNI', numero: '72345678' }], contactos: [{ id: 1n, valor: '987654321' }] },
+      };
+      prismaMock.userAccount.count.mockResolvedValue(1);
+      prismaMock.userAccount.findMany.mockResolvedValue([fila]);
+      const admin = await service.listar({ pagina: 1, limite: 10 }, { rol: 'ADMIN' } as any);
+      expect(admin.elementos[0]).toMatchObject({ dni: '72345678', celular: '987654321', correo: 'p@x.pe' });
+      prismaMock.userAccount.findMany.mockResolvedValue([fila]);
+      const sup = await service.listar({ pagina: 1, limite: 10 }, { rol: 'SUPERVISOR' } as any);
+      expect(sup.elementos[0]).toMatchObject({ dni: '72****78', celular: null });
+    });
+
     it('Producción se mapea a COCINA y solo cuenta roles extra vigentes', async () => {
       prismaMock.userAccount.count.mockResolvedValue(0);
       prismaMock.userAccount.findMany.mockResolvedValue([]);

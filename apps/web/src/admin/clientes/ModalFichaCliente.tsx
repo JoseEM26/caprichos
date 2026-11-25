@@ -66,7 +66,7 @@ export function ModalFichaCliente({
 
   const nombre = ficha?.nombre || cliente.nombre;
   const pedidosCount = ficha?.pedidos?.length ?? cliente.pedidos;
-  const info = `${cliente.tipo}${ficha?.ruc ? ` · RUC ${ficha.ruc}` : ''}${ficha?.telefono ? ` · Cel. ${ficha.telefono}` : ''} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
+  const info = `${cliente.tipo}${ficha?.ruc ? ` · RUC ${ficha.ruc}` : ''}${ficha?.dni ? ` · DNI ${ficha.dni}` : ''}${ficha?.telefono && ficha.telefono !== '—' ? ` · Cel. ${ficha.telefono}` : ''}${ficha?.correo && ficha.correo !== 'sin correo' ? ` · ${ficha.correo}` : ''} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
 
   const pedidos = [...(ficha?.pedidos || []), ...masCompras];
   const verMas = async () => {

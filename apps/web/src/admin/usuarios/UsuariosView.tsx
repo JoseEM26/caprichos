@@ -946,13 +946,22 @@ export function UsuariosView() {
                     </div>
                   )}
 
+                  {/* Solo ADMIN: celular y correo completos */}
+                  {esAdmin && (u.celular || u.correo) && (
+                    <div data-testid={`contacto-${u.id}`} style={{ fontSize: '13px', color: 'var(--cp-navy)', overflowWrap: 'anywhere' }}>
+                      {u.celular && <><span style={{ color: 'var(--cp-soft)' }}>Celular:</span> <b>{u.celular}</b></>}
+                      {u.celular && u.correo && ' · '}
+                      {u.correo && <><span style={{ color: 'var(--cp-soft)' }}>Correo:</span> <b>{u.correo}</b></>}
+                    </div>
+                  )}
+
                   {/* DNI con testid */}
                   <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ color: 'var(--cp-soft)' }}>DNI:</span>
                     <span data-testid={`dni-${u.id}`} style={{ fontWeight: 700 }}>
                       {dniMostrado}
                     </span>
-                    {esAdmin && !dnisRevelados[u.id] && (
+                    {esAdmin && !dnisRevelados[u.id] && u.dni.includes('*') && (
                       <button
                         type="button"
                         onClick={() => solicitarVerDni(u)}

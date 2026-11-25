@@ -193,8 +193,8 @@ export class UsuariosController {
 
   @Get()
   @Permiso('usuarios', 'ver')
-  async listar(@Query() filtros: FiltrarUsuariosDto) {
-    return this.usuariosService.listar(filtros);
+  async listar(@Query() filtros: FiltrarUsuariosDto, @Req() req?: any) {
+    return this.usuariosService.listar(filtros, req?.usuario);
   }
 
   /** Cuadro de accesos: roles y permisos efectivos de cada persona (solo ADMIN). Sin datos sensibles. */

@@ -3,8 +3,11 @@ export interface UsuarioItem {
   partyId: string;
   nombres: string;
   apellidos: string;
-  /** Documento enmascarado (12****78). */
+  /** Documento: completo para el ADMIN; enmascarado (12****78) para el resto. */
   dni: string;
+  /** Celular de la persona (solo llega al ADMIN). */
+  celular?: string | null;
+  correo?: string | null;
   tipoDocumento?: string;
   /** Rol principal. */
   rol: string;

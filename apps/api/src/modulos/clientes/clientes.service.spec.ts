@@ -182,6 +182,19 @@ describe('ClientesService', () => {
       expect(res.items[0]).not.toHaveProperty('dni');
     });
 
+    it('solo el ADMIN ve el DNI completo; sin contacto guardado, el teléfono sale de la cuenta de la carta', async () => {
+      const conDni = rol(7, 'Rosa', '');
+      conDni.party.documentos = [{ tipo: 'DNI', numero: '45217890' }] as any;
+      conDni.party.contactos = [];
+      (conDni.party as any).cuentaCliente = { hash: 'x', activo: true, clave_cambiada_en: null, telefono: '955111222' };
+      prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([conDni]);
+      const admin = await service.listarAdmin({}, { rol: 'ADMIN' });
+      expect(admin.items[0]).toMatchObject({ dni: '45217890', telefono: '955111222' });
+      const mozo = await service.listarAdmin({}, { rol: 'MOZO' });
+      expect(mozo.items[0]).not.toHaveProperty('dni');
+      expect(mozo.items[0].telefono).toBe('955111222');
+    });
+
     it('un número de documento ya no encuentra clientes', async () => {
       const res = await service.listarAdmin({ q: '45217890' }, { rol: 'ADMIN' });
       expect(res.items).toEqual([]);

@@ -59,6 +59,8 @@ export interface ClienteAdminListItem {
   tipo: 'Persona' | 'Empresa' | 'Personal';
   telefono: string;
   correo: string;
+  /** DNI completo: solo para el ADMIN (para el resto no viene). */
+  dni?: string | null;
   cumpleanos: string;
   /** Pedidos cobrados dentro del rango elegido (sin rango, todos) */
   pedidos: number;

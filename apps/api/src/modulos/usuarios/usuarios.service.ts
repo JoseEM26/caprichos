@@ -112,9 +112,10 @@ export class UsuariosService {
 
   /**
    * Lista usuarios paginados con filtros de rol, estado activo y búsqueda por nombre o DNI.
-   * El DNI siempre se devuelve enmascarado.
+   * El DNI va enmascarado, salvo para el ADMIN: él ve el documento completo y el celular de cada persona.
    */
-  async listar(filtros: FiltrarUsuariosDto) {
+  async listar(filtros: FiltrarUsuariosDto, usuarioActual?: UsuarioAutenticado) {
+    const esAdmin = usuarioActual?.rol === 'ADMIN';
     const { activo, busqueda } = filtros;
     const pagina = Math.max(1, Number(filtros.pagina) || 1);
     const limite = Math.max(1, Math.min(100, Number(filtros.limite) || 20));
@@ -202,7 +203,7 @@ export class UsuariosService {
               documentos: {
                 where: { tipo: { in: [...TIPOS_DOCUMENTO] } },
               },
-              contactos: { where: { tipo: { in: ['TELEFONO', 'WHATSAPP'] }, activo: true }, select: { id: true } },
+              contactos: { where: { tipo: { in: ['TELEFONO', 'WHATSAPP'] }, activo: true }, select: { id: true, valor: true } },
             },
           },
           rolesExtra: true,
@@ -227,8 +228,10 @@ export class UsuariosService {
         partyId: u.party_id.toString(),
         nombres: u.party?.persona?.nombres ?? '',
         apellidos: u.party?.persona?.apellidos ?? '',
-        dni: enmascararDni(dniDoc),
+        dni: esAdmin ? dniDoc : enmascararDni(dniDoc),
         tipoDocumento: u.party?.documentos?.[0]?.tipo ?? 'DNI',
+        // Celular de la persona: solo lo recibe el ADMIN
+        celular: esAdmin ? ((u.party as any)?.contactos?.[0]?.valor ?? null) : null,
         rol: u.rol,
         roles: [u.rol, ...(u.rolesExtra ?? []).filter((r) => !r.vence_en || r.vence_en > ahora).map((r) => r.rol)],
         rolesTemporales: (u.rolesExtra ?? [])

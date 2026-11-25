@@ -181,6 +181,11 @@ export function ModalEditarCliente({
           />
         </div>
 
+        {cliente?.dni && (
+          <div data-testid="dni-cliente" style={{ fontSize: 13, color: 'var(--cp-navy)' }}>
+            <span style={{ color: 'var(--cp-soft)' }}>DNI:</span> <b>{cliente.dni}</b>
+          </div>
+        )}
         <div>
           <label style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
             Celular

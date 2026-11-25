@@ -14,6 +14,8 @@ export interface ClienteItem extends VerificacionCliente {
   tipo: 'Persona' | 'Empresa' | 'Personal';
   telefono: string;
   correo: string;
+  /** DNI completo: solo llega al ADMIN. */
+  dni?: string | null;
   cumpleanos: string;
   /** Pedidos cobrados en el rango elegido (sin rango, todos) */
   pedidos: number;
@@ -65,6 +67,8 @@ export interface FichaCliente extends VerificacionCliente {
   ruc?: string;
   telefono: string;
   correo: string;
+  /** DNI completo: solo llega al ADMIN. */
+  dni?: string | null;
   cumpleanos: string;
   cumpleDia?: number;
   cumpleMes?: number;

@@ -840,6 +840,7 @@ export function ClientesAdminView() {
                   <Dato titulo="Tipo">{c.tipo}</Dato>
                   <Dato titulo="Teléfono">{c.telefono || '—'}</Dato>
                   <Dato titulo="Correo (opcional)">{c.correo || 'sin correo'}</Dato>
+                  {c.dni && <Dato titulo="DNI">{c.dni}</Dato>}
                   <Dato titulo="Cumpleaños">{c.cumpleanos || '—'}</Dato>
                   <Dato titulo="Pedidos">{c.pedidos}</Dato>
                   <Dato titulo="Consumo">{soles(c.consumo)}</Dato>

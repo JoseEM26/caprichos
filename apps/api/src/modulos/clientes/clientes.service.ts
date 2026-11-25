@@ -974,13 +974,13 @@ export class ClientesService {
         party: {
           include: {
             persona: true,
-            documentos: { where: { tipo: 'RUC' } },
+            documentos: { where: { tipo: { in: ['RUC', 'DNI'] } } },
             contactos: true,
             usuario: {
               select: { rol: true },
             },
             // Verificación: una sola consulta con el listado (sin N+1). El hash no sale de aquí: solo se mira si existe.
-            cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true } },
+            cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true, telefono: true } },
             consentimientos: { where: { canal: { in: ['CARTA', 'CAJA'] } }, select: { canal: true, aceptado_en: true } },
           },
         },
@@ -1010,7 +1010,7 @@ export class ClientesService {
     });
     let filas: Fila[] = unicos.map((r) => {
       const p = r.party;
-      // Solo el RUC sirve para reconocer una empresa; el DNI de un cliente no se lee ni se devuelve
+      // Solo el RUC sirve para reconocer una empresa; el DNI se lee para mostrarlo solo al ADMIN
       const docNum = p.documentos.find((d: any) => d.tipo === 'RUC')?.numero || '';
 
       // Tipo de cliente
@@ -1021,9 +1021,11 @@ export class ClientesService {
         tipo = 'Empresa';
       }
 
-      const tel = p.contactos.find((c: any) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || '—';
+      // El celular de la cuenta de la carta vale como teléfono si no hay contacto guardado
+      const tel = p.contactos.find((c: any) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || p.cuentaCliente?.telefono || '—';
       const correo = p.persona?.correo || p.contactos.find((c: any) => c.tipo === 'CORREO')?.valor || 'sin correo';
       const cumple = formatearCumpleanos(p.persona?.cumple_dia, p.persona?.cumple_mes);
+      const dni = p.documentos.find((d: any) => d.tipo === 'DNI')?.numero || null;
 
       const detalle = r.customer_detail;
       const puntos = Number(detalle?.puntos || 0);
@@ -1055,6 +1057,7 @@ export class ClientesService {
           tipo,
           telefono: tel,
           correo,
+          dni,
           cumpleanos: cumple,
           pedidos: res?.n ?? 0,
           consumo: Math.round((res?.total ?? 0) * 100) / 100,
@@ -1157,7 +1160,14 @@ export class ClientesService {
     const pagina = Math.max(1, filtros.pagina || 1);
     const paginas = Math.max(1, Math.ceil(total / limite));
     const inicio = (pagina - 1) * limite;
-    return { items: filas.slice(inicio, inicio + limite).map((f) => f.item), total, pagina, paginas, contadores };
+    // El DNI solo lo ve el ADMIN
+    const esAdmin = usuarioAutenticado?.rol === 'ADMIN';
+    const items = filas.slice(inicio, inicio + limite).map((f) => {
+      if (esAdmin) return f.item;
+      const { dni: _dni, ...sinDni } = f.item;
+      return sinDni;
+    });
+    return { items, total, pagina, paginas, contadores };
   }
 
   /**
@@ -1275,10 +1285,10 @@ export class ClientesService {
       where: { id },
       include: {
         persona: true,
-        documentos: { where: { tipo: 'RUC' } },
+        documentos: { where: { tipo: { in: ['RUC', 'DNI'] } } },
         contactos: true,
         roles: { where: { rol: 'CLIENTE' }, include: { customer_detail: true } },
-        cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true } },
+        cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true, telefono: true } },
         consentimientos: { where: { canal: { in: ['CARTA', 'CAJA'] } }, select: { canal: true, aceptado_en: true } },
       },
     });
@@ -1317,11 +1327,12 @@ export class ClientesService {
 
     // Solo una empresa tiene documento (RUC); un cliente persona no tiene DNI guardado
     const esAdmin = usuarioAutenticado?.rol === 'ADMIN' || usuarioAutenticado?.rol === 'admin';
-    const ruc = party.documentos[0]?.numero || null;
+    const ruc = party.documentos.find((d) => d.tipo === 'RUC')?.numero || null;
+    const dni = party.documentos.find((d) => d.tipo === 'DNI')?.numero || null;
 
     const puntos = await this.puntosService.obtenerSaldo(id);
     const puntosPedidos = await explicarPedidosPorId(this.prisma, pedidos.map((p) => p.id)).catch(() => new Map<string, ExplicacionPuntos>());
-    const tel = party.contactos.find((c) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || '—';
+    const tel = party.contactos.find((c) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || party.cuentaCliente?.telefono || '—';
     const correo = party.persona?.correo || party.contactos.find((c) => c.tipo === 'CORREO')?.valor || 'sin correo';
     const rolCliente = party.roles[0];
     const verif = estadoVerificacionCliente({
@@ -1338,6 +1349,8 @@ export class ClientesService {
       id: party.id.toString(),
       nombre: party.persona?.nombres || 'Sin nombre',
       ruc: ruc ? (esAdmin ? ruc : enmascararDoc(ruc)) : null,
+      // DNI completo solo para el ADMIN
+      ...(esAdmin ? { dni } : {}),
       telefono: tel,
       correo,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
