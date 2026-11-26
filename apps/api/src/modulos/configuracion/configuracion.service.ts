@@ -497,7 +497,7 @@ export class ConfiguracionService {
         if (modo !== MODO_WHATSAPP_ENTRANTE && modo !== MODO_CODIGO_PLANTILLA) {
           throw new BadRequestException({
             codigo: 'VALOR_INVALIDO',
-            mensaje: 'El modo debe ser WHATSAPP_ENTRANTE (el cliente escribe al negocio) o CODIGO_PLANTILLA (código de 6 dígitos por plantilla de Meta)',
+            mensaje: 'El modo debe ser CODIGO_PLANTILLA (código de 6 dígitos por WhatsApp) o WHATSAPP_ENTRANTE (el cliente escribe al negocio)',
           });
         }
         valor = modo;

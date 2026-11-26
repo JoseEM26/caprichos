@@ -30,14 +30,14 @@ interface MetaParametro {
 /** Modos del recargo por reprogramar (mismos valores que el servidor). */
 const OPCIONES_VERIFICACION_CELULAR = [
   {
-    valor: 'WHATSAPP_ENTRANTE',
-    etiqueta: 'El cliente escribe al negocio (recomendado)',
-    ayuda: 'No necesita plantilla de Meta. Sirve mientras las plantillas de código no estén aprobadas.',
+    valor: 'CODIGO_PLANTILLA',
+    etiqueta: 'Código de 6 dígitos por WhatsApp (recomendado)',
+    ayuda: 'El cliente escribe su celular y le llega un código. Funciona también si su WhatsApp oculta el número. Con Evolution sale como texto; con Meta usa las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar.',
   },
   {
-    valor: 'CODIGO_PLANTILLA',
-    etiqueta: 'Código de 6 dígitos por WhatsApp',
-    ayuda: 'Requiere las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar aprobadas en Meta.',
+    valor: 'WHATSAPP_ENTRANTE',
+    etiqueta: 'El cliente escribe al negocio',
+    ayuda: 'El cliente envía un mensaje ya escrito. Si su WhatsApp oculta el número, se pasa igual al código de 6 dígitos.',
   },
 ];
 
@@ -89,7 +89,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   verificacion_celular_modo: {
     nombre: 'Cómo verifica el cliente su celular',
     descripcion:
-      'WHATSAPP_ENTRANTE: el cliente escribe primero al WhatsApp del negocio con un mensaje ya escrito (no hace falta plantilla de Meta). CODIGO_PLANTILLA: se envía un código de 6 dígitos por plantilla de Meta; úsalo cuando las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar estén aprobadas.',
+      'CODIGO_PLANTILLA (en uso): le llega al cliente un código de 6 dígitos por WhatsApp y lo escribe en la carta. WHATSAPP_ENTRANTE: el cliente escribe primero al WhatsApp del negocio con un mensaje ya escrito.',
     tipo: 'selector',
     opciones: OPCIONES_VERIFICACION_CELULAR,
   },

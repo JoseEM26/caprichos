@@ -422,7 +422,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false, 
 
       {modo === 'rec1' && (
         <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-          Escribe el celular de tu cuenta. Para confirmar que es tuyo, nos mandarás un mensaje por WhatsApp desde ese mismo celular y luego creas tu contraseña nueva.
+          Escribe el celular de tu cuenta. Te enviaremos un código de 6 dígitos por WhatsApp para confirmar que es tuyo y luego creas tu contraseña nueva.
         </div>
       )}
 
