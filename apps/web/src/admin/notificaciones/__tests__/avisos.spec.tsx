@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { AvisosEmergentes, DURACION_AVISO_MS, useTituloContador } from '../AvisosNotificaciones';
+import { AvisoGrande, AvisosEmergentes, DURACION_AVISO_MS, useTituloContador } from '../AvisosNotificaciones';
 import { CampanaNotificaciones } from '../CampanaNotificaciones';
 import { CADA_SONIDO_MS, hayQueSonar, reiniciarSonidoParaPruebas, useSonidoAvisos } from '../sonidoAviso';
 import type { NotificacionAdmin } from '../../useNotificaciones';
@@ -258,5 +258,16 @@ describe('título de la pestaña y campanita', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Leída' })[0]);
     expect(onMarcar).toHaveBeenCalledWith('n:11', true);
+  });
+});
+
+describe('Aviso emergente: no tapa la campanita (27/11)', () => {
+  it('va abajo a la derecha, compacto y por debajo del panel de la campanita (zIndex < 36)', () => {
+    render(<AvisoGrande aviso={aviso({ clave: 'n1', titulo: 'Pedido nuevo' })} pendientes={0} onVer={vi.fn()} onMarcarLeida={vi.fn()} onCerrar={vi.fn()} />);
+    const capa = screen.getByRole('status').parentElement as HTMLElement;
+    expect(capa.style.bottom).toBe('16px');
+    expect(capa.style.top).toBe('');
+    expect(Number(capa.style.zIndex)).toBeLessThan(36);
+    expect(capa.style.width).toContain('380px');
   });
 });

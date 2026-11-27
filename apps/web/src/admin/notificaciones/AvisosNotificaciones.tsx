@@ -32,7 +32,7 @@ export function reducirMovimiento(): boolean {
 }
 
 const ESTILOS = `
-@keyframes cpAvisoEntra { from { opacity: 0; transform: translateY(-14px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes cpAvisoEntra { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
 .cp-aviso-entra { animation: cpAvisoEntra 320ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .cp-aviso-entra { animation: none; } }
 `;
@@ -48,7 +48,10 @@ interface AvisoGrandeProps {
   onCerrar: () => void;
 }
 
-/** Aviso grande arriba al centro: se cierra solo a los pocos segundos y se va hacia la campanita. */
+/**
+ * Aviso emergente abajo a la derecha (en celular, abajo a lo ancho): compacto y por debajo de las ventanas, para no
+ * tapar la campanita ni su panel («Marcar todas leídas»). Se cierra solo a los pocos segundos y se va hacia la campanita.
+ */
 export function AvisoGrande({ aviso, pendientes, duracionMs = DURACION_AVISO_MS, onVer, onMarcarLeida, onCerrar }: AvisoGrandeProps) {
   const [saliendo, setSaliendo] = useState(false);
   const [vuelo, setVuelo] = useState({ x: 0, y: 0 });
@@ -83,11 +86,11 @@ export function AvisoGrande({ aviso, pendientes, duracionMs = DURACION_AVISO_MS,
     <div
       style={{
         position: 'fixed',
-        top: 72,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 'min(620px, calc(100vw - 32px))',
-        zIndex: 60,
+        bottom: 16,
+        right: 12,
+        width: 'min(380px, calc(100vw - 24px))',
+        // Debajo del panel de la campanita (36/37) y de las ventanas (50/60): nunca los tapa
+        zIndex: 35,
         pointerEvents: saliendo ? 'none' : 'auto',
       }}
     >
@@ -100,13 +103,13 @@ export function AvisoGrande({ aviso, pendientes, duracionMs = DURACION_AVISO_MS,
         style={{
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
-          borderLeft: `10px solid ${color}`,
-          borderRadius: 16,
-          boxShadow: '0 18px 44px rgba(11,44,62,0.32)',
-          padding: '18px 20px',
+          borderLeft: `8px solid ${color}`,
+          borderRadius: 14,
+          boxShadow: '0 12px 32px rgba(11,44,62,0.28)',
+          padding: '12px 14px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 8,
+          gap: 6,
           color: 'var(--cp-navy)',
           opacity: saliendo ? 0 : 1,
           transform: saliendo && !reducir ? `translate(${vuelo.x}px, ${vuelo.y}px) scale(0.12)` : 'none',
@@ -114,27 +117,31 @@ export function AvisoGrande({ aviso, pendientes, duracionMs = DURACION_AVISO_MS,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             {TEXTO_PRIORIDAD[aviso.prioridad]}
           </span>
-          {pendientes > 0 && <span style={{ fontSize: 13, color: 'var(--cp-soft)', fontWeight: 700 }}>+{pendientes} más en cola</span>}
+          {pendientes > 0 && <span style={{ fontSize: 12, color: 'var(--cp-soft)', fontWeight: 700 }}>+{pendientes} más en cola</span>}
         </div>
-        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 22, lineHeight: '28px', overflowWrap: 'anywhere' }}>
+        <div style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 16, lineHeight: '21px', overflowWrap: 'anywhere' }}>
           {aviso.titulo}
         </div>
-        {aviso.detalle && <div style={{ fontSize: 15, lineHeight: '21px', color: 'var(--cp-soft)' }}>{aviso.detalle}</div>}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+        {aviso.detalle && (
+          <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {aviso.detalle}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
           <button
             type="button"
             onClick={() => onVer(aviso)}
-            style={{ minHeight: 48, padding: '0 18px', border: 0, borderRadius: 10, background: 'var(--cp-navy)', color: 'var(--cp-cream)', fontWeight: 800, fontSize: 15 }}
+            style={{ minHeight: 44, padding: '0 14px', border: 0, borderRadius: 10, background: 'var(--cp-navy)', color: 'var(--cp-cream)', fontWeight: 800, fontSize: 14 }}
           >
             Ver
           </button>
           <button
             type="button"
             onClick={() => onMarcarLeida(aviso)}
-            style={{ minHeight: 48, padding: '0 18px', border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 15 }}
+            style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 14 }}
           >
             Marcar leída
           </button>
@@ -142,7 +149,7 @@ export function AvisoGrande({ aviso, pendientes, duracionMs = DURACION_AVISO_MS,
             type="button"
             onClick={() => setSaliendo(true)}
             aria-label="Cerrar aviso"
-            style={{ minHeight: 48, padding: '0 14px', border: 0, borderRadius: 10, background: 'transparent', color: 'var(--cp-soft)', fontWeight: 700, fontSize: 14 }}
+            style={{ minHeight: 44, padding: '0 12px', border: 0, borderRadius: 10, background: 'transparent', color: 'var(--cp-soft)', fontWeight: 700, fontSize: 13 }}
           >
             Cerrar
           </button>
