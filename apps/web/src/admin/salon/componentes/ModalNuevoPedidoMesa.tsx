@@ -1353,14 +1353,20 @@ export function ModalNuevoPedidoMesa({
   // Lo que entrega el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
   const aPagar = Math.round((total + propinaCobrable) * 100) / 100;
 
+  // Nada que cobrar: todo es cortesía (o cupón/puntos lo cubren) y sin propina. El pedido nace pagado en el servidor:
+  // no lleva plan, ni «con cuánto paga», ni cobro aparte. Un pedido vacío sigue pidiendo productos.
+  const sinProductos = lineas.length === 0 && cargos.length === 0;
+  const nadaQueCobrar = !sinProductos && aPagar <= 0;
   // Plan de pago: se valida contra lo que paga el cliente (venta + propina), hasta 3 métodos
   const errorPlanAhora =
-    total <= 0
+    sinProductos
       ? 'Agrega productos al pedido'
-      : filasPlan.length > MAX_METODOS_PAGO
+      : nadaQueCobrar
+        ? null
+        : filasPlan.length > MAX_METODOS_PAGO
         ? `Máximo ${MAX_METODOS_PAGO} métodos de pago`
         : errorPlan(aPagar, filasPlan);
-  const planAhora = aPlan(filasPlan);
+  const planAhora = nadaQueCobrar ? [] : aPlan(filasPlan);
   const montoEfectivoAhora = montoEfectivoPlan(planAhora);
   const metodoPrincipalAhora: MedioPagoMozo = planAhora.length
     ? medioPrincipalPlan(planAhora)
@@ -1745,7 +1751,7 @@ export function ModalNuevoPedidoMesa({
       const planPago: PlanPagoItem[] = pagaAhora ? planAhora : [];
       const digitales = digitalesDelPlan(planPago);
       // «Pagar ahora» en la mesa: el pedido ya salió a cocina; aquí se deja pagado (Caja) o «pagado por mozo, por verificar» (mozo)
-      const cobrarAhora = !extra && !programando && modalidad === 'local' && cuandoPaga === 'ahora' && !personalPide && pedidoNuevo !== null;
+      const cobrarAhora = !extra && !programando && modalidad === 'local' && cuandoPaga === 'ahora' && !personalPide && !nadaQueCobrar && pedidoNuevo !== null;
       if (cobrarAhora && pedidoNuevo) {
         const abrirCapturas = (errorInicial?: string) =>
           setCapturasPago({ pedido: pedidoNuevo, plan: planPago, res, registrar: true, pagaCon: pagaConValido(), errorInicial });

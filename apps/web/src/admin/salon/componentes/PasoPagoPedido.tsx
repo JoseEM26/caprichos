@@ -103,9 +103,14 @@ export function PasoPagoPedido({
   useEffect(() => {
     const previo = anterior.current;
     anterior.current = aPagar;
-    if (!conDetalle || filas.length !== 1 || aPagar <= 0) return;
-    const monto = aPagar.toFixed(2);
+    if (!conDetalle || filas.length !== 1) return;
     const actual = filas[0].monto;
+    // Todo cortesía (total S/ 0): el monto que seguía al total se vacía (antes quedaba el total anterior, «Sobra S/ 66.50»)
+    if (aPagar <= 0) {
+      if (actual !== '' && previo !== null && actual === previo.toFixed(2)) onFilas([{ ...filas[0], monto: '' }]);
+      return;
+    }
+    const monto = aPagar.toFixed(2);
     const sigueAutomatico = actual === '' || (previo !== null && actual === previo.toFixed(2)) || previo === null;
     if (sigueAutomatico && actual !== monto) onFilas([{ ...filas[0], monto }]);
   }, [conDetalle, filas, aPagar, onFilas]);
@@ -167,7 +172,13 @@ export function PasoPagoPedido({
 
       {bloquePersonal}
 
-      {conDetalle && (
+      {conDetalle && aPagar <= 0 && (
+        <div className="np2-estado np2-estado--ok" role="status" data-testid="nada-que-cobrar">
+          Todo es cortesía: no hay nada que cobrar. El pedido sale a cocina sin pago.
+        </div>
+      )}
+
+      {conDetalle && aPagar > 0 && (
         <div className="np2-metodos" data-testid="plan-pago-editor" id="np-plan-pago">
           <h3 className="np2-titulo">¿Cómo paga?</h3>
           {ahorrosPorMedio.map((a) => (
