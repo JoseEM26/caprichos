@@ -402,6 +402,29 @@ export interface AnalisisCierre {
   patrones: PatronCierre[];
   sugerencias: Array<{ medio: string; diferencia: number; coincideCon: string[]; texto: string }>;
   ayudaGeneral: Array<{ medio: string; sobrante: string[]; faltante: string[] }>;
+  /** Evidencia informativa: ventas de la caja con quién las cobró */
+  ventas?: VentaCierre[];
+  /** Evidencia informativa: cambios de medio de pago con quién los hizo */
+  cambiosMedio?: CambioMedioCierre[];
+}
+
+export interface VentaCierre {
+  codigo: string;
+  hora: string;
+  pagos: Array<{ medio: string; monto: number }>;
+  cobradoPor: string | null;
+  anulado: { hora: string; por: string | null; motivo: string | null } | null;
+}
+
+export interface CambioMedioCierre {
+  codigo: string;
+  hora: string;
+  antes: string;
+  despues: string;
+  por: string | null;
+  motivo: string | null;
+  origen: string;
+  despuesDelCierre: boolean;
 }
 
 /** Guía para quien cierra: operaciones propias, sin esperado ni diferencias (DT-61). */

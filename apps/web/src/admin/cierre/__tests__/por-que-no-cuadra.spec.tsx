@@ -39,6 +39,26 @@ describe('¿Por qué no cuadra? (administrador)', () => {
     expect(cierreApi.obtenerAnalisis).toHaveBeenCalledWith(5);
   });
 
+  it('muestra los cambios de medio con quién los hizo y las ventas filtrables por medio', async () => {
+    vi.spyOn(cierreApi, 'obtenerAnalisis').mockResolvedValue({
+      ...analisis,
+      cambiosMedio: [{ codigo: 'P-7', hora: '13:05', antes: 'Efectivo 20.00', despues: 'Yape 20.00', por: 'Luis Mozo', motivo: 'Pagó con Yape', origen: 'Caja', despuesDelCierre: false }],
+      ventas: [
+        { codigo: 'P-7', hora: '12:50', pagos: [{ medio: 'YAPE', monto: 20 }], cobradoPor: 'Ana Caja', anulado: null },
+        { codigo: 'P-8', hora: '13:10', pagos: [{ medio: 'EFECTIVO', monto: 15 }], cobradoPor: 'Ana Caja', anulado: null },
+      ],
+    } as any);
+    abrir(true);
+    fireEvent.click(screen.getByRole('tab', { name: '¿Por qué no cuadra?' }));
+    await waitFor(() => expect(screen.getByTestId('cambios-medio')).toHaveTextContent('Luis Mozo'));
+    expect(screen.getByTestId('cambios-medio')).toHaveTextContent('Efectivo 20.00 → Yape 20.00');
+    expect(screen.getAllByTestId('venta-caja')).toHaveLength(2);
+    expect(screen.getAllByTestId('venta-caja')[0]).toHaveTextContent('Cambió de medio');
+    fireEvent.change(screen.getByLabelText('Filtrar ventas por medio'), { target: { value: 'EFECTIVO' } });
+    expect(screen.getAllByTestId('venta-caja')).toHaveLength(1);
+    expect(screen.getByTestId('ventas-caja')).toHaveTextContent('Total vigente: S/ 15.00');
+  });
+
   it('quien no es administrador no ve la pestaña', () => {
     abrir(false);
     expect(screen.queryByRole('tab', { name: '¿Por qué no cuadra?' })).not.toBeInTheDocument();

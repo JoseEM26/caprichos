@@ -7,6 +7,11 @@ import { aCentimos, calcularMontosCaja, efectivoDelRepartidor, enPesos, pedidosR
 import { CierreService } from './cierre.service';
 import { calcularTotalConteo, rangoDiaCaja } from './cierre.util';
 import { analizarCaja, DatosAnalisis, horaLima, PagoA } from './analisis-cierre';
+import { nombresDePartes } from '../pedidos-admin/devolucion-pedido.util';
+
+/** Acciones de auditoría que cambian el medio de pago de un pedido (Caja, repartidor o solicitud del delivery). */
+export const ACCIONES_CAMBIO_MEDIO = ['CAMBIO_PAGO', 'APROBAR_CAMBIO_COBRO', 'AUTORIZAR_SIN_VALIDAR_CAMBIO_COBRO'];
+const textoPlan = (j: unknown) => String((j as { plan?: unknown } | null)?.plan ?? '');
 
 const TOPE = 200;
 const pagosDe = (pagos: Array<{ medio: string; monto: unknown; propina: unknown }>): PagoA[] =>
@@ -91,6 +96,41 @@ export class AnalisisCierreService {
         fila('TARJETA', m.sistemaTarjeta, v ? Number(v.tarjeta ?? 0) : null),
       ];
     }
+    // Evidencia (solo informativa): cada venta con quién la cobró y cada cambio de medio con quién lo hizo
+    const pedidoIds = [...new Set(cobros.map((c) => c.pedido_id))];
+    const cambios = pedidoIds.length
+      ? await this.prisma.auditoria.findMany({
+          where: { entidad: 'pedido', entidad_id: { in: pedidoIds }, accion: { in: ACCIONES_CAMBIO_MEDIO } },
+          orderBy: { en: 'asc' },
+          take: TOPE,
+        })
+      : [];
+    const nombres = await nombresDePartes(this.prisma, [
+      ...new Set([...cobros.flatMap((c) => [c.cobrado_por, ...(c.anulado_por ? [c.anulado_por] : [])]), ...cambios.flatMap((a) => (a.party_id ? [a.party_id] : []))]),
+    ]);
+    const nombreDe = (id: bigint | null) => (id ? (nombres.get(String(id)) ?? null) : null);
+    const codigoDe = new Map(cobros.map((c) => [String(c.pedido_id), c.pedido.codigo]));
+    const ventas = cobros.map((c) => ({
+      codigo: c.pedido.codigo,
+      hora: horaLima(c.en),
+      pagos: c.pagos.map((x) => ({ medio: x.medio.toUpperCase(), monto: enPesos(aCentimos(x.monto) + aCentimos(x.propina)) })),
+      cobradoPor: nombreDe(c.cobrado_por),
+      anulado: c.anulado_en ? { hora: horaLima(c.anulado_en), por: nombreDe(c.anulado_por), motivo: c.motivo_anulacion } : null,
+    }));
+    const cambiosMedio = cambios.map((a) => {
+      const d = (a.despues ?? {}) as Record<string, unknown>;
+      return {
+        codigo: codigoDe.get(String(a.entidad_id)) ?? `#${a.entidad_id}`,
+        hora: horaLima(a.en),
+        antes: textoPlan(a.antes),
+        despues: textoPlan(a.despues),
+        por: nombreDe(a.party_id),
+        motivo: a.motivo,
+        origen: a.accion === 'CAMBIO_PAGO' ? (d.origen === 'REPARTIDOR' ? 'Repartidor' : 'Caja') : 'Solicitud del repartidor aprobada en Caja',
+        despuesDelCierre: d.ajuste_posterior_al_cierre === true,
+      };
+    });
+
     const hayDetalle = conteo && !('total_directo' in conteo) && Object.keys(conteo).length > 0;
 
     // Efectivo contra entrega aún sin liquidar
@@ -104,6 +144,8 @@ export class AnalisisCierreService {
     return {
       cajaId: Number(caja.id),
       cerrada: !!caja.cierre,
+      ventas,
+      cambiosMedio,
       ...analizarCaja({
         medios,
         conteoTotal: hayDetalle ? calcularTotalConteo(conteo) : null,

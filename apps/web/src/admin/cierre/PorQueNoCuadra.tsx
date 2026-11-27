@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Insignia } from '../../comun/Insignia';
-import { cierreApi, type AnalisisCierre } from './cierreApi';
+import { cierreApi, type AnalisisCierre, type CambioMedioCierre, type VentaCierre } from './cierreApi';
+import { rotuloMedioCierre } from './cuadre.util';
 
 const soles = (n: number) => `S/ ${Math.abs(n).toFixed(2)}`;
 const conSigno = (n: number) => `${n > 0.004 ? '+' : n < -0.004 ? '−' : ''}${soles(n)}`;
@@ -76,6 +77,9 @@ export function PorQueNoCuadra({ cajaId }: { cajaId: number }) {
         </section>
       )}
 
+      <CambiosDeMedio cambios={datos.cambiosMedio ?? []} />
+      <VentasDeLaCaja ventas={datos.ventas ?? []} cambiados={new Set((datos.cambiosMedio ?? []).map((c) => c.codigo))} />
+
       <details className="dc-intento" data-testid="ayuda-general">
         <summary>Ayuda general: causas comunes</summary>
         {datos.ayudaGeneral.map((a) => (
@@ -89,5 +93,63 @@ export function PorQueNoCuadra({ cajaId }: { cajaId: number }) {
         ))}
       </details>
     </div>
+  );
+}
+
+/** Cambios de medio de pago de los pedidos de esta caja: quién, cuándo, de qué a qué y por qué. Solo informativo. */
+function CambiosDeMedio({ cambios }: { cambios: CambioMedioCierre[] }) {
+  return (
+    <section className="dc-card" data-testid="cambios-medio">
+      <h4>Cambios de medio de pago ({cambios.length}) <Insignia variante="neutro">Informativo</Insignia></h4>
+      {cambios.length === 0 ? (
+        <p className="dc-peq">Nadie cambió el medio de pago de los pedidos de esta caja.</p>
+      ) : (
+        <ul className="dc-items">
+          {cambios.map((c, i) => (
+            <li key={`${c.codigo}-${i}`}>
+              <b>{c.codigo}</b> · {c.hora} · {c.antes || '—'} → <b>{c.despues || '—'}</b>
+              <div className="dc-peq">
+                Hecho por <b>{c.por ?? 'sin dato'}</b> · {c.origen}
+                {c.motivo ? ` · Motivo: ${c.motivo}` : ''}
+              </div>
+              {c.despuesDelCierre && <div className="dc-peq dc-mal">Se cambió después de cerrar la caja: el cierre sigue con el medio anterior.</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Ventas (cobros) de la caja con quién las cobró; filtro por medio para comparar con lo que falta o sobra. */
+function VentasDeLaCaja({ ventas, cambiados }: { ventas: VentaCierre[]; cambiados: Set<string> }) {
+  const [medio, setMedio] = useState('');
+  const medios = [...new Set(ventas.flatMap((v) => v.pagos.map((p) => p.medio)))].sort();
+  const lista = medio ? ventas.filter((v) => v.pagos.some((p) => p.medio === medio)) : ventas;
+  const total = lista.filter((v) => !v.anulado).reduce((a, v) => a + v.pagos.filter((p) => !medio || p.medio === medio).reduce((b, p) => b + p.monto, 0), 0);
+  return (
+    <details className="dc-card" data-testid="ventas-caja">
+      <summary><b>Ventas de esta caja ({ventas.length})</b> <Insignia variante="neutro">Informativo</Insignia></summary>
+      <label className="dc-peq" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px 0' }}>
+        Medio
+        <select aria-label="Filtrar ventas por medio" value={medio} onChange={(e) => setMedio(e.target.value)} style={{ minHeight: 36 }}>
+          <option value="">Todos</option>
+          {medios.map((m) => <option key={m} value={m}>{rotuloMedioCierre(m)}</option>)}
+        </select>
+        <span>Total vigente: <b>{soles(total)}</b></span>
+      </label>
+      <ul className="dc-items" style={{ maxHeight: 360, overflowY: 'auto' }}>
+        {lista.map((v, i) => (
+          <li key={`${v.codigo}-${i}`} data-testid="venta-caja" style={v.anulado ? { opacity: 0.7 } : undefined}>
+            <b>{v.codigo}</b> · {v.hora} · {v.pagos.map((p) => `${rotuloMedioCierre(p.medio)} ${soles(p.monto)}`).join(' + ') || 'sin medio'}
+            {cambiados.has(v.codigo) && <> <Insignia variante="aviso">Cambió de medio</Insignia></>}
+            <div className="dc-peq">
+              Cobró <b>{v.cobradoPor ?? 'sin dato'}</b>
+              {v.anulado && <> · <span className="dc-mal">cobro anulado a las {v.anulado.hora} por {v.anulado.por ?? 'sin dato'}{v.anulado.motivo ? ` (${v.anulado.motivo})` : ''}</span></>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

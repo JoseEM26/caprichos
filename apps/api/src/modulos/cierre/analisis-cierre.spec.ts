@@ -145,6 +145,33 @@ describe('AnalisisCierreService', () => {
     expect(r.patrones.map((p: any) => p.codigo)).toEqual(expect.arrayContaining(['ANULADOS_CON_PAGO', 'DINERO_SIN_COBRO']));
   });
 
+  it('muestra las ventas con quién cobró y los cambios de medio con quién los hizo', async () => {
+    const prisma: any = {
+      caja: { findUnique: jest.fn().mockResolvedValue({ ...caja, cierre: { conteo: {}, medios: [{ medio: 'EFECTIVO', sistema: 20, visto: 0, diferencia: -20 }] } }) },
+      cobro: {
+        findMany: jest.fn().mockResolvedValue([
+          { pedido_id: 9n, pedido: { codigo: 'P-9', creado_en: new Date('2026-10-20T15:00:00Z') }, en: new Date('2026-10-20T15:10:00Z'), anulado_en: null, cobrado_por: 3n, anulado_por: null, motivo_anulacion: null, pagos: [{ medio: 'efectivo', monto: 18, propina: 2 }] },
+        ]),
+      },
+      pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+      conteoCierre: { findFirst: jest.fn().mockResolvedValue(null) },
+      auditoria: {
+        findMany: jest.fn().mockResolvedValue([
+          { entidad_id: 9n, en: new Date('2026-10-20T22:00:00Z'), accion: 'CAMBIO_PAGO', antes: { plan: 'Yape 20.00' }, despues: { plan: 'Efectivo 20.00', origen: 'CAJA', ajuste_posterior_al_cierre: true }, party_id: 4n, motivo: 'Pagó en efectivo' },
+        ]),
+      },
+      party: { findMany: jest.fn().mockResolvedValue([{ id: 3n, persona: { nombres: 'Ana', apellidos: 'Caja' } }, { id: 4n, persona: { nombres: 'Luis', apellidos: 'Mozo' } }]) },
+    };
+    const r: any = await new AnalisisCierreService(prisma, {} as any).analizar('7', admin);
+    expect(prisma.auditoria.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ entidad: 'pedido', entidad_id: { in: [9n] } }) }));
+    expect(r.ventas).toEqual([{ codigo: 'P-9', hora: '10:10', pagos: [{ medio: 'EFECTIVO', monto: 20 }], cobradoPor: 'Ana Caja', anulado: null }]);
+    expect(r.cambiosMedio).toEqual([
+      { codigo: 'P-9', hora: '17:00', antes: 'Yape 20.00', despues: 'Efectivo 20.00', por: 'Luis Mozo', motivo: 'Pagó en efectivo', origen: 'Caja', despuesDelCierre: true },
+    ]);
+  });
+
   describe('guía para quien cierra (DT-61)', () => {
     const prisma: any = {
       pedido: { findMany: jest.fn().mockResolvedValue([{ codigo: 'A-1', pago_estado: 'PAGADO', pago_metodo: 'YAPE', total: 32, monto_credito: 0, cobros: [] }]) },
