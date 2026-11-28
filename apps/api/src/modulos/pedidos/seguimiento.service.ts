@@ -310,7 +310,7 @@ const textoRango = (min: number, max: number) =>
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
 import { lineasDeCuenta } from './lineas-combo.util';
-import { cargarCancelable } from './cancelable-cliente';
+import { CLIENTE_PUEDE_CANCELAR, cargarCancelable } from './cancelable-cliente';
 import { DIAS_RESUMEN_CONTACTO_DEFECTO, escribioParaAviso } from '../chatbot/evolution/ventana-aviso.util';
 
 @Injectable()
@@ -365,10 +365,11 @@ export class SeguimientoService {
     const digitales = mediosDigitalesDelPedido(plan, null, 0);
     const montoDigital = digitales.length > 0 ? montoDigitalDePlan(plan) : null;
     const totalCobrable = Math.round((montoACobrar(pedido) + Number(pedido.propina ?? 0)) * 100) / 100;
-    const veredicto = (await cargarCancelable(this.prisma, { id: pedido.id }))?.resultado;
+    // Sin opción de cancelar para el cliente: la carta no muestra el botón ni ningún aviso
+    const veredicto = CLIENTE_PUEDE_CANCELAR ? (await cargarCancelable(this.prisma, { id: pedido.id }))?.resultado : undefined;
     const base = {
       ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
-      cancelable: veredicto?.cancelable ? { puede: true } : { puede: false, mensaje: veredicto?.mensaje },
+      cancelable: !CLIENTE_PUEDE_CANCELAR ? undefined : veredicto?.cancelable ? { puede: true } : { puede: false, mensaje: veredicto?.mensaje },
       pagoDigital,
       ...(pedido.pago_estado === 'PENDIENTE_ONLINE' ? { pagoEnLinea: { pedidoId: pedido.id.toString(), creadoEn: pedido.creado_en.toISOString() } } : {}),
       ...(pagoDigital ? { medioPago: medioPreferido } : {}),

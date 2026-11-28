@@ -3,7 +3,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { usuarioSistema } from '../pagos-online/usuario-sistema';
 import { CancelarPedidoClientePuerto } from '../chatbot/puerto/cancelar-pedido-cliente.puerto';
-import { cancelablesDelTelefono, cargarCancelable } from '../pedidos/cancelable-cliente';
+import { CLIENTE_PUEDE_CANCELAR, cancelablesDelTelefono, cargarCancelable } from '../pedidos/cancelable-cliente';
 import { verificarTokenSeguimiento } from '../pedidos/seguimiento.tokens';
 import { PedidosEstadoService } from './pedidos-estado.service';
 
@@ -43,6 +43,8 @@ export class CancelarClienteService implements CancelarPedidoClientePuerto {
   }
 
   async evaluarPorTelefono(telefono: string) {
+    // Sin opción de cancelar: el bot sigue el camino de siempre (solicitud que confirma Caja)
+    if (!CLIENTE_PUEDE_CANCELAR) return [];
     const filas = await cancelablesDelTelefono(this.prisma, telefono);
     return filas.map(({ pedido, resultado }) => ({
       id: pedido.id.toString(),
@@ -53,6 +55,9 @@ export class CancelarClienteService implements CancelarPedidoClientePuerto {
   }
 
   private async cancelar(pedidoId: bigint, motivo?: string) {
+    if (!CLIENTE_PUEDE_CANCELAR) {
+      throw new ConflictException({ codigo: 'NO_CANCELABLE', mensaje: 'Los pedidos no se pueden cancelar desde aquí. Si necesitas ayuda, escríbenos por WhatsApp.' });
+    }
     const actual = await cargarCancelable(this.prisma, { id: pedidoId });
     if (!actual) throw noEncontrado();
     if (!actual.resultado.cancelable) {

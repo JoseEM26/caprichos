@@ -4,6 +4,12 @@ import type { PrismaService } from '../../comun/prisma/prisma.service';
  * Regla de «el cliente puede cancelar su pedido» (carta y WhatsApp).
  * Solo mientras NO está pagado, NO tiene un voucher subido (en revisión) y aún no entró a preparación.
  */
+/**
+ * El cliente NO puede anular su pedido ni en la carta ni por WhatsApp (decisión del dueño, 27/11): solo Caja anula.
+ * En WhatsApp «cancelar» queda como solicitud que confirma una persona de Caja. Volver a true reabre la opción.
+ */
+export const CLIENTE_PUEDE_CANCELAR = false;
+
 export type RazonNoCancelable = 'ANULADO' | 'FINALIZADO' | 'YA_PAGADO' | 'PAGO_EN_REVISION' | 'EN_PREPARACION';
 
 export interface DatosCancelable {

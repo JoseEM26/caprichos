@@ -29,12 +29,12 @@ function montar(f = fila(), cambiar: jest.Mock = jest.fn().mockResolvedValue({})
 const token = generarTokenSeguimiento(5n);
 
 describe('CancelarClienteService', () => {
-  it('cancela con token válido, motivo «Cancelado por el cliente» y avisa a Caja', async () => {
-    const { servicio, cambiar, eventos } = montar();
-    const r = await servicio.cancelarPorToken('CP-0005', token, 'me equivoqué');
-    expect(r.codigo).toBe('CP-0005');
-    expect(cambiar).toHaveBeenCalledWith(5n, expect.objectContaining({ estado: 'ANULADO', motivo: 'Cancelado por el cliente: me equivoqué' }), expect.anything());
-    expect(eventos.emitirAdmin).toHaveBeenCalledWith('notificaciones:nueva', expect.anything());
+  it('el cliente nunca anula: carta y WhatsApp responden 409 sin anular, y el bot no ofrece cancelar', async () => {
+    const { servicio, cambiar } = montar();
+    await expect(servicio.cancelarPorToken('CP-0005', token, 'me equivoqué')).rejects.toMatchObject({ response: { codigo: 'NO_CANCELABLE' } });
+    await expect(servicio.cancelarPorTelefono('CP-0005', '+51987654321')).rejects.toMatchObject({ response: { codigo: 'NO_CANCELABLE' } });
+    expect(cambiar).not.toHaveBeenCalled();
+    expect(await servicio.evaluarPorTelefono('+51987654321')).toEqual([]);
   });
 
   it('token ajeno: 404 y no anula', async () => {
@@ -57,9 +57,4 @@ describe('CancelarClienteService', () => {
     }
   });
 
-  it('Caja lo aceptó justo antes (transición inválida): 409 claro', async () => {
-    const cambiar = jest.fn().mockRejectedValue({ getResponse: () => ({ codigo: 'TRANSICION_INVALIDA' }) });
-    const { servicio } = montar(fila(), cambiar);
-    await expect(servicio.cancelarPorToken('CP-0005', token)).rejects.toMatchObject({ response: { codigo: 'NO_CANCELABLE', mensaje: expect.stringMatching(/Caja ya aceptó/) } });
-  });
 });
