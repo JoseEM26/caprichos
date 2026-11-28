@@ -79,8 +79,8 @@ export function sumarDevolucionesDigitales(
  * Pedidos pagados (confirmados o entregados ese día) que no tienen ningún cobro vigente: dinero que no pasó
  * por «cobrar». Quedan fuera por diseño el crédito del personal y el total 0 (una cortesía solo baja el total).
  */
-export function pagadosSinCobroDelDia(db: { pedido: { findMany: (args: any) => Promise<any[]> } }, enElDia: { gte: Date; lt: Date }) {
-  return db.pedido.findMany({
+export async function pagadosSinCobroDelDia(db: { pedido: { findMany: (args: any) => Promise<any[]> } }, enElDia: { gte: Date; lt: Date }) {
+  const pedidos = await db.pedido.findMany({
     where: {
       pago_estado: 'PAGADO',
       estado: { not: 'ANULADO' },
@@ -92,4 +92,12 @@ export function pagadosSinCobroDelDia(db: { pedido: { findMany: (args: any) => P
     include: { planPago: true },
     orderBy: { id: 'asc' },
   });
+  // Delivery pagado solo en efectivo contra entrega: no lleva cobro por diseño, su dinero entra por la
+  // liquidación del repartidor (no es dinero fuera de caja). Con una parte digital sí se sigue avisando.
+  return pedidos.filter((p) => !(p.modalidad === 'DELIVERY' && soloEfectivo(p)));
 }
+
+const soloEfectivo = (p: { planPago?: Array<{ medio: string; monto: unknown }> | null; pago_metodo?: string | null }) => {
+  const plan = (p.planPago ?? []).filter((f) => Number(f.monto) > 0);
+  return plan.length ? plan.every((f) => String(f.medio).toUpperCase() === 'EFECTIVO') : String(p.pago_metodo ?? '').toUpperCase() === 'EFECTIVO';
+};
